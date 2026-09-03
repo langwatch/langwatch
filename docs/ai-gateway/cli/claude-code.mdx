@@ -31,7 +31,11 @@ claude
 
 `claude` boots, authenticates to the gateway, and every call is traced, budgeted, and governed.
 
-<Note>Claude Code reads `ANTHROPIC_AUTH_TOKEN` if set; otherwise it falls back to `ANTHROPIC_API_KEY`. Either works with a LangWatch VK. Using `AUTH_TOKEN` is the upstream recommendation for non-first-party tokens.</Note>
+<Note>
+  Claude Code reads `ANTHROPIC_AUTH_TOKEN` if set; otherwise it falls back to
+  `ANTHROPIC_API_KEY`. Either works with a LangWatch VK. Using `AUTH_TOKEN` is the
+  upstream recommendation for non-first-party tokens.
+</Note>
 
 ## Self-hosted gateway
 
@@ -103,8 +107,8 @@ Pin the VK's `model_aliases` so Claude Code can use friendly names across provid
 ```json
 {
   "claude-haiku-4-5-20251001": "anthropic/claude-haiku-4-5-20251001",
-  "claude-sonnet-4-6":   "anthropic/claude-sonnet-4-6",
-  "claude-opus-4-7":     "anthropic/claude-opus-4-7"
+  "claude-sonnet-4-6": "anthropic/claude-sonnet-4-6",
+  "claude-opus-4-7": "anthropic/claude-opus-4-7"
 }
 ```
 

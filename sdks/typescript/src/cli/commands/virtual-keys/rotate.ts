@@ -32,7 +32,11 @@ export const rotateVirtualKeyCommand = async (
       data: { virtual_key, secret },
       table: () => {
         console.log();
-        console.log(chalk.bold.yellow("⚠  New secret, save it NOW. The old secret keeps working for 24 hours."));
+        console.log(
+          chalk.bold.yellow(
+            "⚠  New secret, save it NOW. The old secret keeps working for 24 hours.",
+          ),
+        );
         console.log();
         console.log(`  ${chalk.green(secret)}`);
         console.log();

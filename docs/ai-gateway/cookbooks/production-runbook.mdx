@@ -6,7 +6,15 @@ sidebarTitle: Production runbook
 
 When the gateway is slow, stuck, or chewing memory, and the LangWatch trace for a specific bad request has already been checked, this runbook is the next stop. Every recipe here relies on the pprof admin listener, which is bound to `127.0.0.1:6060` by default and therefore never reachable from outside the pod.
 
-<Note>**Don't expose the admin port without a token.** `GATEWAY_ADMIN_ADDR` binds to loopback by default. If you genuinely need direct (non-port-forward) access, e.g. non-k8s deploys, or from a corporate VPN, you MUST also set `GATEWAY_ADMIN_AUTH_TOKEN`. The gateway refuses to start otherwise. See [Helm → Admin listener](/ai-gateway/self-hosting/helm#admin-listener) for the three deployment postures. `kubectl port-forward` remains the simplest option for k8s, it tunnels through the API server and is auditable in Kubernetes audit logs.</Note>
+<Note>
+  **Don't expose the admin port without a token.** `GATEWAY_ADMIN_ADDR` binds to loopback
+  by default. If you genuinely need direct (non-port-forward) access, e.g. non-k8s
+  deploys, or from a corporate VPN, you MUST also set `GATEWAY_ADMIN_AUTH_TOKEN`. The
+  gateway refuses to start otherwise. See [Helm → Admin
+  listener](/ai-gateway/self-hosting/helm#admin-listener) for the three deployment
+  postures. `kubectl port-forward` remains the simplest option for k8s, it tunnels through
+  the API server and is auditable in Kubernetes audit logs.
+</Note>
 
 ## Prerequisites
 
@@ -32,7 +40,7 @@ The LangWatch Helm chart exposes the admin listener via a top-level `admin` stan
 ```yaml
 gateway:
   admin:
-    addr: "127.0.0.1:6060"   # default, reachable only via kubectl port-forward
+    addr: "127.0.0.1:6060" # default, reachable only via kubectl port-forward
     # addr: ""               # disable pprof entirely (advised for compliance-regulated envs)
 ```
 
@@ -153,16 +161,20 @@ gateway request -> spend command -> local spool -> drainer -> control-plane inge
 
 **Diagnose, in order:**
 
-| Check | How | If it fails |
-|---|---|---|
-| Commands leaving the gateway | `sum(rate(gateway_spend_spool_appended_total[5m]))` against `gateway_spend_spool_dropped_total` | A rising drop counter is billing loss; see [Observability](/ai-gateway/observability) |
-| Workers running | `kubectl -n langwatch get deploy langwatch-workers` | `workers.enabled: false` means the ledger is never written and hard caps never fire |
-| Ledger advancing | Query `gateway_budget_ledger_events` in ClickHouse for the scope | The drainer is backed off, or the outbox that writes debits is stalled |
-| Gateway seeing the new totals | Watch `gateway_internal_rtt_seconds{endpoint="changes"}` and `gateway_control_plane_requests_total{endpoint="changes"}` | The bundle is not refreshing, so the gateway is prechecking against stale spend |
+| Check                         | How                                                                                                                     | If it fails                                                                           |
+| ----------------------------- | ----------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------- |
+| Commands leaving the gateway  | `sum(rate(gateway_spend_spool_appended_total[5m]))` against `gateway_spend_spool_dropped_total`                         | A rising drop counter is billing loss; see [Observability](/ai-gateway/observability) |
+| Workers running               | `kubectl -n langwatch get deploy langwatch-workers`                                                                     | `workers.enabled: false` means the ledger is never written and hard caps never fire   |
+| Ledger advancing              | Query `gateway_budget_ledger_events` in ClickHouse for the scope                                                        | The drainer is backed off, or the outbox that writes debits is stalled                |
+| Gateway seeing the new totals | Watch `gateway_internal_rtt_seconds{endpoint="changes"}` and `gateway_control_plane_requests_total{endpoint="changes"}` | The bundle is not refreshing, so the gateway is prechecking against stale spend       |
 
 **Operator signal:** `gateway_budget_blocks_total{scope}` is the counter that tells you enforcement actually fired. A scope configured with `on_breach: block` whose ledger is past the limit but whose block counter is flat means the gateway has not received a refreshed bundle yet.
 
-<Note>Because the precheck is local and permissive, a stale snapshot allows requests through rather than rejecting them. Overspend during a workers outage is expected and reconciles once the ledger catches up.</Note>
+<Note>
+  Because the precheck is local and permissive, a stale snapshot allows requests through
+  rather than rejecting them. Overspend during a workers outage is expected and reconciles
+  once the ledger catches up.
+</Note>
 
 ## Recipe 7: Stuck drain
 
@@ -170,10 +182,10 @@ gateway request -> spend command -> local spool -> drainer -> control-plane inge
 
 The pod received SIGTERM but at least one request handler never returned before `shutdown.timeoutSeconds` expired. The drain pipeline exposes this via two gauges:
 
-| Metric | During healthy drain | During stuck drain |
-|---|---|---|
-| `gateway_draining` | 1 → 0 at shutdown | 1 until SIGKILL |
-| `gateway_in_flight_requests` | monotonically → 0 | flat at N > 0 for > grace |
+| Metric                       | During healthy drain | During stuck drain        |
+| ---------------------------- | -------------------- | ------------------------- |
+| `gateway_draining`           | 1 → 0 at shutdown    | 1 until SIGKILL           |
+| `gateway_in_flight_requests` | monotonically → 0    | flat at N > 0 for > grace |
 
 **Diagnose:**
 
@@ -201,11 +213,11 @@ curl -s http://localhost:6060/debug/pprof/goroutine?debug=1 | \
 
 **Fix:**
 
-| Cause | Action |
-|---|---|
-| Upstream hang | Lower `LW_GATEWAY_UPSTREAM_TIMEOUT_MS` below `shutdown.timeoutSeconds`. Default 60 s, bump `shutdown.timeoutSeconds` to 65 s + `terminationGracePeriodSeconds` to 80 s if you genuinely need 60 s upstream calls |
-| Guardrail hang | Raise evaluator SLO or set `guardrails.request_fail_open: true` on the VK to fall through on timeout |
-| Custom middleware | Thread `r.Context()` through every I/O call |
+| Cause             | Action                                                                                                                                                                                                           |
+| ----------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Upstream hang     | Lower `LW_GATEWAY_UPSTREAM_TIMEOUT_MS` below `shutdown.timeoutSeconds`. Default 60 s, bump `shutdown.timeoutSeconds` to 65 s + `terminationGracePeriodSeconds` to 80 s if you genuinely need 60 s upstream calls |
+| Guardrail hang    | Raise evaluator SLO or set `guardrails.request_fail_open: true` on the VK to fall through on timeout                                                                                                             |
+| Custom middleware | Thread `r.Context()` through every I/O call                                                                                                                                                                      |
 
 **Temporary workaround:** bump `shutdown.timeoutSeconds` + `terminationGracePeriodSeconds` to give the hanging request time to complete. Only appropriate while you diagnose the root cause, long grace periods slow down rolling deploys and make HPA scale-downs feel sluggish.
 
@@ -235,11 +247,11 @@ kubectl logs -n langwatch -l app=langwatch-gateway --tail=500 | \
 
 The three log lines form a ladder operators read in order:
 
-| Log line | Level | Meaning | Operator action |
-|---|---|---|---|
-| `auth_cache_serve_stale` | INFO | Grace is active; cached bundle is being served past JWT exp | None, this is expected behaviour during outage. Includes `vk_id`, `stale_for`, `hard_grace_remaining`, `refresh_error_class` |
-| `auth_cache_refresh_transport_failure` | WARN | Each refresh attempt is failing; soft expiry bumped. Includes `error`, `error_class`, `new_soft_expires_at` | Investigate control plane (this is the actual outage signal). Stop bumping once CP returns |
-| `auth_cache_hard_evict` | ERROR | Grace cap exceeded OR auth rejection. `reason` field disambiguates: `hard_cap_exceeded` (outage too long) vs `auth_rejection` (real bad-credential evict) vs `auth_rejection_async`, `hard_cap_exceeded_on_lookup` | If `hard_cap_exceeded`, the grace is spent and customers start seeing `503 auth_upstream_unavailable`: the entry is evicted and the re-resolve hits the same unreachable control plane. A `401` on this line means `reason=auth_rejection`, a genuinely rejected credential rather than the outage. Bump `LW_GATEWAY_AUTH_CACHE_HARD_GRACE_SECONDS` if the outage is ongoing and you'd rather extend than reject |
+| Log line                               | Level | Meaning                                                                                                                                                                                                            | Operator action                                                                                                                                                                                                                                                                                                                                                                                                  |
+| -------------------------------------- | ----- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `auth_cache_serve_stale`               | INFO  | Grace is active; cached bundle is being served past JWT exp                                                                                                                                                        | None, this is expected behaviour during outage. Includes `vk_id`, `stale_for`, `hard_grace_remaining`, `refresh_error_class`                                                                                                                                                                                                                                                                                     |
+| `auth_cache_refresh_transport_failure` | WARN  | Each refresh attempt is failing; soft expiry bumped. Includes `error`, `error_class`, `new_soft_expires_at`                                                                                                        | Investigate control plane (this is the actual outage signal). Stop bumping once CP returns                                                                                                                                                                                                                                                                                                                       |
+| `auth_cache_hard_evict`                | ERROR | Grace cap exceeded OR auth rejection. `reason` field disambiguates: `hard_cap_exceeded` (outage too long) vs `auth_rejection` (real bad-credential evict) vs `auth_rejection_async`, `hard_cap_exceeded_on_lookup` | If `hard_cap_exceeded`, the grace is spent and customers start seeing `503 auth_upstream_unavailable`: the entry is evicted and the re-resolve hits the same unreachable control plane. A `401` on this line means `reason=auth_rejection`, a genuinely rejected credential rather than the outage. Bump `LW_GATEWAY_AUTH_CACHE_HARD_GRACE_SECONDS` if the outage is ongoing and you'd rather extend than reject |
 
 **Customer-facing behaviour during the grace window:**
 
@@ -249,11 +261,11 @@ The three log lines form a ladder operators read in order:
 
 **Tune:**
 
-| Knob | When to lower | When to raise |
-|---|---|---|
-| `LW_GATEWAY_AUTH_CACHE_SOFT_BUMP_SECONDS` | If you want refresh attempts to back off less aggressively (e.g. `60` for tighter retry density) | If your control plane is consistently slow under load and you want to reduce refresh-attempt churn during partial degradation |
-| `LW_GATEWAY_AUTH_CACHE_HARD_GRACE_SECONDS` | If you have strict revocation-latency SLOs (compliance, regulated deployments) and would rather hard-fail than serve a long-stale bundle | If your control plane has known multi-hour planned-maintenance windows and you'd rather ride through |
-| `LW_GATEWAY_AUTH_CACHE_HARD_GRACE_SECONDS=-1` | **Restores legacy behaviour:** any refresh failure past JWT exp evicts immediately. Pick this if you operate under a security regime where stale-while-error is unacceptable | n/a (a negative value is the disable signal; `0` means unset and takes the 6 h default) |
+| Knob                                          | When to lower                                                                                                                                                                | When to raise                                                                                                                 |
+| --------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------- |
+| `LW_GATEWAY_AUTH_CACHE_SOFT_BUMP_SECONDS`     | If you want refresh attempts to back off less aggressively (e.g. `60` for tighter retry density)                                                                             | If your control plane is consistently slow under load and you want to reduce refresh-attempt churn during partial degradation |
+| `LW_GATEWAY_AUTH_CACHE_HARD_GRACE_SECONDS`    | If you have strict revocation-latency SLOs (compliance, regulated deployments) and would rather hard-fail than serve a long-stale bundle                                     | If your control plane has known multi-hour planned-maintenance windows and you'd rather ride through                          |
+| `LW_GATEWAY_AUTH_CACHE_HARD_GRACE_SECONDS=-1` | **Restores legacy behaviour:** any refresh failure past JWT exp evicts immediately. Pick this if you operate under a security regime where stale-while-error is unacceptable | n/a (a negative value is the disable signal; `0` means unset and takes the 6 h default)                                       |
 
 **Alert pattern (log-based, no metric infra required):**
 
@@ -272,11 +284,11 @@ See [Config → Auth cache](/ai-gateway/self-hosting/config#auth-cache) for the 
 
 The gateway is a cache of the control plane, so a surprising amount continues to work when pieces go down. Quick reference:
 
-| Component down | Customer impact | How long gateway stays up | Notes |
-|---|---|---|---|
-| LangWatch control plane | None for cached VKs | ~15 min JWT exp + `LW_GATEWAY_AUTH_CACHE_HARD_GRACE_SECONDS` (default 21600, 6 h) of stale-while-error; a VK the pod has never resolved is not covered | Spend accounting is unaffected: cost rides the spend commands the gateway spools, and the ledger catches up once the control plane returns. New VK creation is blocked until control plane returns. See [Recipe 8](#recipe-8--control-plane-outage--stale-while-error) for the operator runbook |
-| One upstream provider | None for VKs with fallback; 502/504 for VKs without | Indefinite, circuit breaker + fallback chain absorb it | `gateway_circuit_state{credential_id}` shows which provider is down |
-| Gateway pod (crash, eviction) | Streams in flight on that pod are cut; other requests retry onto a surviving replica | N/A | Stateless; the replacement pod warms from the control plane on its first request per key. The PDB (`minAvailable: 1` by default, against 2 replicas) only bounds voluntary disruptions like a drain, so it does not apply to a crash |
+| Component down                | Customer impact                                                                      | How long gateway stays up                                                                                                                              | Notes                                                                                                                                                                                                                                                                                           |
+| ----------------------------- | ------------------------------------------------------------------------------------ | ------------------------------------------------------------------------------------------------------------------------------------------------------ | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| LangWatch control plane       | None for cached VKs                                                                  | ~15 min JWT exp + `LW_GATEWAY_AUTH_CACHE_HARD_GRACE_SECONDS` (default 21600, 6 h) of stale-while-error; a VK the pod has never resolved is not covered | Spend accounting is unaffected: cost rides the spend commands the gateway spools, and the ledger catches up once the control plane returns. New VK creation is blocked until control plane returns. See [Recipe 8](#recipe-8--control-plane-outage--stale-while-error) for the operator runbook |
+| One upstream provider         | None for VKs with fallback; 502/504 for VKs without                                  | Indefinite, circuit breaker + fallback chain absorb it                                                                                                 | `gateway_circuit_state{credential_id}` shows which provider is down                                                                                                                                                                                                                             |
+| Gateway pod (crash, eviction) | Streams in flight on that pod are cut; other requests retry onto a surviving replica | N/A                                                                                                                                                    | Stateless; the replacement pod warms from the control plane on its first request per key. The PDB (`minAvailable: 1` by default, against 2 replicas) only bounds voluntary disruptions like a drain, so it does not apply to a crash                                                            |
 
 For multi-region deployments with shared control plane: a gateway region down is handled by Route53 latency-based failover. See [Scaling → Regional placement](/ai-gateway/self-hosting/scaling#regional-placement).
 
@@ -296,4 +308,4 @@ When you find something worth filing:
 - [Config → Admin, operator endpoints](/ai-gateway/self-hosting/config#admin--operator-endpoints): env-var reference.
 - [Health Checks](/ai-gateway/self-hosting/health-checks): `/readyz` output to interpret alongside pprof.
 - [Troubleshooting](/ai-gateway/troubleshooting): symptom-first diagnostic index for non-pprof issues (401, 403, 429, 502).
-- [Prometheus alerts](/ai-gateway/cookbooks/prometheus-alerts): alert rules that tell you *when* to reach for this runbook.
+- [Prometheus alerts](/ai-gateway/cookbooks/prometheus-alerts): alert rules that tell you _when_ to reach for this runbook.

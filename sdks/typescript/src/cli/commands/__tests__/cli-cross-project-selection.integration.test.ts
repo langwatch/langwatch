@@ -63,14 +63,7 @@ describe("given a login key that reaches the whole organization", () => {
       loginWithOrgWideKey();
 
       const result = await run({
-        args: [
-          "trace",
-          "export",
-          "--project",
-          "checkout-agent",
-          "--format",
-          "jsonl",
-        ],
+        args: ["trace", "export", "--project", "checkout-agent", "--format", "jsonl"],
       });
 
       expect(result.exitCode).toBe(0);
@@ -83,15 +76,7 @@ describe("given a login key that reaches the whole organization", () => {
       loginWithOrgWideKey();
 
       const result = await run({
-        args: [
-          "session",
-          "events",
-          "sess_1",
-          "--project",
-          "proj-b",
-          "-o",
-          "json",
-        ],
+        args: ["session", "events", "sess_1", "--project", "proj-b", "-o", "json"],
       });
 
       expect(result.exitCode).toBe(0);

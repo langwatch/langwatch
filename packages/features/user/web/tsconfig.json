@@ -1,0 +1,33 @@
+{
+  "compilerOptions": {
+    "target": "es2022",
+    "module": "preserve",
+    "moduleResolution": "bundler",
+    "jsx": "react-jsx",
+    "lib": ["es2022", "dom", "dom.iterable"],
+    "strict": true,
+    "noUncheckedIndexedAccess": true,
+    "noImplicitReturns": true,
+    "incremental": true,
+    "tsBuildInfoFile": "node_modules/.cache/tsbuildinfo/user-web.tsbuildinfo",
+    "noEmit": true,
+    "skipLibCheck": true,
+    "forceConsistentCasingInFileNames": true,
+    "verbatimModuleSyntax": true,
+    "paths": {
+      "@langwatch/authz-contract": ["../../authz/contract/src/index.ts"],
+      "@langwatch/coding-agent-contract": ["../../coding-agent/contract/src/index.ts"],
+      "@langwatch/coding-agent-web": ["../../coding-agent/web/src/index.ts"],
+      "@langwatch/coding-agent-web/activity": ["../../coding-agent/web/src/activity.ts"],
+      "@langwatch/enterprise-governance-contract": [
+        "../../../enterprise/features/governance/contract/src/index.ts"
+      ],
+      "@langwatch/gateway-web/surfaces/budget-overview": [
+        "../../gateway/web/src/surfaces/budget-overview/index.ts"
+      ],
+      "@langwatch/model-provider-contract": ["../../model-provider/contract/src/index.ts"],
+      "@langwatch/platform-api-client": ["../../../platform-api-client/src/index.ts"]
+    }
+  },
+  "include": ["src/**/*.ts", "src/**/*.tsx", "vitest.setup.ts"]
+}

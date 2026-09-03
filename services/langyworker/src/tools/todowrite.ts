@@ -8,11 +8,20 @@
  */
 
 import { Type } from "typebox";
-import type { ExtensionAPI, ExtensionContext, InlineExtension } from "@earendil-works/pi-coding-agent";
+import type {
+  ExtensionAPI,
+  ExtensionContext,
+  InlineExtension,
+} from "@earendil-works/pi-coding-agent";
 
 export const TODOWRITE_TOOL_NAME = "todowrite";
 
-export const TODO_STATUSES = ["pending", "in_progress", "completed", "cancelled"] as const;
+export const TODO_STATUSES = [
+  "pending",
+  "in_progress",
+  "completed",
+  "cancelled",
+] as const;
 export type TodoStatus = (typeof TODO_STATUSES)[number];
 
 export type TodoItem = { content: string; status: TodoStatus };
@@ -37,8 +46,10 @@ const todowriteParams = Type.Object({
 export function normalizeTodos(params: unknown): TodoItem[] {
   const rows: unknown[] = Array.isArray(params)
     ? params
-    : typeof params === "object" && params !== null && Array.isArray((params as { todos?: unknown }).todos)
-      ? ((params as { todos: unknown[] }).todos)
+    : typeof params === "object" &&
+        params !== null &&
+        Array.isArray((params as { todos?: unknown }).todos)
+      ? (params as { todos: unknown[] }).todos
       : [];
   const items: TodoItem[] = [];
   for (const row of rows) {
@@ -83,7 +94,8 @@ export function createTodowriteExtension(): InlineExtension {
             toolName?: string;
             details?: { todos?: TodoItem[] };
           };
-          if (message.role !== "toolResult" || message.toolName !== TODOWRITE_TOOL_NAME) continue;
+          if (message.role !== "toolResult" || message.toolName !== TODOWRITE_TOOL_NAME)
+            continue;
           // A session file written by another worker version can carry statuses
           // this build does not know, so it is validated and copied, not adopted.
           if (Array.isArray(message.details?.todos)) {
@@ -99,7 +111,7 @@ export function createTodowriteExtension(): InlineExtension {
         name: TODOWRITE_TOOL_NAME,
         label: "Todo",
         description:
-          "Maintain the live todo list the user sees. Pass the FULL list on every call ({\"todos\": [{\"content\", \"status\"}]}); each call replaces the previous list. Statuses: pending, in_progress, completed, cancelled. Keep exactly one item in_progress at a time.",
+          'Maintain the live todo list the user sees. Pass the FULL list on every call ({"todos": [{"content", "status"}]}); each call replaces the previous list. Statuses: pending, in_progress, completed, cancelled. Keep exactly one item in_progress at a time.',
         parameters: todowriteParams,
         async execute(_toolCallId, params) {
           todos = normalizeTodos(params);

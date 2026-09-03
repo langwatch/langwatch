@@ -53,9 +53,7 @@ export interface CopilotAppEnvOptions {
  * separation from the CLI is enforced by the distinct `copilot_app`
  * ingest key, stamped at the receiver — not by this label.
  */
-export function buildCopilotAppEnv(
-  opts: CopilotAppEnvOptions,
-): Record<string, string> {
+export function buildCopilotAppEnv(opts: CopilotAppEnvOptions): Record<string, string> {
   const env = buildOtelEnvBlock("copilot", opts.endpoint, opts.token);
   env.OTEL_RESOURCE_ATTRIBUTES = "service.name=copilot-app";
   if (!opts.captureContent) {
@@ -85,8 +83,7 @@ export function copilotAppCandidatePaths(
         "/usr/bin/github-copilot",
       ];
     case "win32": {
-      const localAppData =
-        env.LOCALAPPDATA ?? path.join(home, "AppData", "Local");
+      const localAppData = env.LOCALAPPDATA ?? path.join(home, "AppData", "Local");
       const programFiles = env.ProgramFiles ?? "C:\\Program Files";
       return [
         path.join(localAppData, "Programs", "GitHub Copilot", "GitHub Copilot.exe"),

@@ -1,17 +1,24 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
 import { ModelProvidersApiError } from "@/client-sdk/services/model-providers/model-providers-api.service";
 
-vi.mock("@/client-sdk/services/model-providers/model-providers-api.service", async (importOriginal) => {
-  // eslint-disable-next-line @typescript-eslint/no-unnecessary-type-assertion
-  const actual = (await importOriginal()) as Record<string, unknown>;
-  return {
-    ...actual,
-    ModelProvidersApiService: vi.fn(),
-  };
-});
+vi.mock(
+  "@/client-sdk/services/model-providers/model-providers-api.service",
+  async (importOriginal) => {
+    // eslint-disable-next-line @typescript-eslint/no-unnecessary-type-assertion
+    const actual = (await importOriginal()) as Record<string, unknown>;
+    return {
+      ...actual,
+      ModelProvidersApiService: vi.fn(),
+    };
+  },
+);
 
 vi.mock("../../../utils/apiKey", () => ({
-  resolveCredentials: vi.fn(async () => ({ apiKey: "test-key", source: "env", endpoint: "https://app.langwatch.ai" })),
+  resolveCredentials: vi.fn(async () => ({
+    apiKey: "test-key",
+    source: "env",
+    endpoint: "https://app.langwatch.ai",
+  })),
 }));
 
 vi.mock("ora", () => ({
@@ -48,10 +55,12 @@ describe("listModelProvidersCommand()", () => {
   beforeEach(() => {
     vi.clearAllMocks();
     mockList = vi.fn();
-    vi.mocked(ModelProvidersApiService).mockImplementation(function () { return ({
-      list: mockList,
-      set: vi.fn(),
-    }) as unknown as ModelProvidersApiService; });
+    vi.mocked(ModelProvidersApiService).mockImplementation(function () {
+      return {
+        list: mockList,
+        set: vi.fn(),
+      } as unknown as ModelProvidersApiService;
+    });
     vi.spyOn(console, "log").mockImplementation(noop);
     vi.spyOn(console, "error").mockImplementation(noop);
     mockProcessExit();
@@ -111,10 +120,12 @@ describe("setModelProviderCommand()", () => {
   beforeEach(() => {
     vi.clearAllMocks();
     mockSet = vi.fn();
-    vi.mocked(ModelProvidersApiService).mockImplementation(function () { return ({
-      list: vi.fn(),
-      set: mockSet,
-    }) as unknown as ModelProvidersApiService; });
+    vi.mocked(ModelProvidersApiService).mockImplementation(function () {
+      return {
+        list: vi.fn(),
+        set: mockSet,
+      } as unknown as ModelProvidersApiService;
+    });
     vi.spyOn(console, "log").mockImplementation(noop);
     vi.spyOn(console, "error").mockImplementation(noop);
     mockProcessExit();
@@ -126,9 +137,12 @@ describe("setModelProviderCommand()", () => {
 
       await setModelProviderCommand("openai", { enabled: true });
 
-      expect(mockSet).toHaveBeenCalledWith("openai", expect.objectContaining({
-        enabled: true,
-      }));
+      expect(mockSet).toHaveBeenCalledWith(
+        "openai",
+        expect.objectContaining({
+          enabled: true,
+        }),
+      );
     });
   });
 
@@ -138,10 +152,13 @@ describe("setModelProviderCommand()", () => {
 
       await setModelProviderCommand("openai", { enabled: true, apiKey: "sk-test" });
 
-      expect(mockSet).toHaveBeenCalledWith("openai", expect.objectContaining({
-        enabled: true,
-        customKeys: { OPENAI_API_KEY: "sk-test" },
-      }));
+      expect(mockSet).toHaveBeenCalledWith(
+        "openai",
+        expect.objectContaining({
+          enabled: true,
+          customKeys: { OPENAI_API_KEY: "sk-test" },
+        }),
+      );
     });
   });
 
@@ -151,9 +168,9 @@ describe("setModelProviderCommand()", () => {
         new ModelProvidersApiError("Failed", "set model provider"),
       );
 
-      await expect(
-        setModelProviderCommand("openai", { enabled: true }),
-      ).rejects.toThrow(ProcessExitError);
+      await expect(setModelProviderCommand("openai", { enabled: true })).rejects.toThrow(
+        ProcessExitError,
+      );
     });
   });
 });

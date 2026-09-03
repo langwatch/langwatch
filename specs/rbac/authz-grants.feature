@@ -39,7 +39,7 @@ Feature: Authorization grants
   @unit
   Scenario: A role's aggregate is the role
     When a custom role is defined in "org_acme"
-    Then the appended event's aggregate type is "authz_role"
+    Then the appended event's aggregate type is "authz_grant"
     And the appended event's aggregate id is the role id
     And the appended event's tenant is "org_acme"
 

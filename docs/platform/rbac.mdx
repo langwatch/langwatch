@@ -6,7 +6,12 @@ keywords: rbac, langwatch, llm, ai, rbac, role-based access control
 ---
 
 <Note>
-  **Custom roles are available on Enterprise plans.** The built-in organization, team and project roles below work on every plan. Creating custom roles and assigning them needs an Enterprise plan, and a self-hosted deployment needs an Enterprise license. Calls to the [Roles API](/api-reference/roles/overview) without one are refused with HTTP 402 and the error code `enterprise_plan_required`. To enable it, reach out to [enterprise@langwatch.ai](mailto:enterprise@langwatch.ai).
+  **Custom roles are available on Enterprise plans.** The built-in organization, team and
+  project roles below work on every plan. Creating custom roles and assigning them needs
+  an Enterprise plan, and a self-hosted deployment needs an Enterprise license. Calls to
+  the [Roles API](/api-reference/roles/overview) without one are refused with HTTP 402 and
+  the error code `enterprise_plan_required`. To enable it, reach out to
+  [enterprise@langwatch.ai](mailto:enterprise@langwatch.ai).
 </Note>
 
 LangWatch provides role-based access control (RBAC) to manage user permissions and access levels. This allows you to control who can access your LangWatch workspace and what they can do.
@@ -16,100 +21,107 @@ LangWatch provides role-based access control (RBAC) to manage user permissions a
 LangWatch implements a Role-Based Access Control (RBAC) system that manages permissions across organizations, teams, and projects. Role bindings can be assigned directly to users or to groups, including groups synced from your identity provider via SCIM.
 
 <Info>
-  For group-based access control and identity provider integration, see [SCIM Groups](/platform/scim-groups).
+  For group-based access control and identity provider integration, see [SCIM
+  Groups](/platform/scim-groups).
 </Info>
 
 ## Permission Structure
 
 ### Actions
+
 The system defines six core actions that can be performed on resources:
 
-| Action | Description |
-|--------|-------------|
-| `view` | Read-only access to view resources |
-| `create` | Ability to create new resources |
-| `update` | Ability to modify existing resources |
-| `delete` | Ability to remove resources |
+| Action   | Description                                   |
+| -------- | --------------------------------------------- |
+| `view`   | Read-only access to view resources            |
+| `create` | Ability to create new resources               |
+| `update` | Ability to modify existing resources          |
+| `delete` | Ability to remove resources                   |
 | `manage` | Full CRUD access plus administrative settings |
-| `share` | Ability to share resources with others |
+| `share`  | Ability to share resources with others        |
 
 ### Resources
+
 Permissions are applied to the following resource types:
 
-| Resource | Description |
-|----------|-------------|
+| Resource       | Description                                |
+| -------------- | ------------------------------------------ |
 | `organization` | Organization-level settings and management |
-| `project` | Individual projects within teams |
-| `team` | Team management and settings |
-| `analytics` | Analytics dashboards and reports |
-| `cost` | Cost tracking and billing information |
-| `traces` | LLM trace data and logs |
-| `scenarios` | Test scenarios and evaluations |
-| `annotations` | Data annotations and labeling |
-| `evaluations` | Creating and managing evaluations |
-| `datasets` | Managing datasets |
-| `automations` | Creating and managing automations |
-| `workflows` | Creating and managing workflows |
-| `prompts` | Creating and managing prompts |
-
+| `project`      | Individual projects within teams           |
+| `team`         | Team management and settings               |
+| `analytics`    | Analytics dashboards and reports           |
+| `cost`         | Cost tracking and billing information      |
+| `traces`       | LLM trace data and logs                    |
+| `scenarios`    | Test scenarios and evaluations             |
+| `annotations`  | Data annotations and labeling              |
+| `evaluations`  | Creating and managing evaluations          |
+| `datasets`     | Managing datasets                          |
+| `automations`  | Creating and managing automations          |
+| `workflows`    | Creating and managing workflows            |
+| `prompts`      | Creating and managing prompts              |
 
 ## Predefined Roles
 
 ### Team Roles
 
 #### Admin
+
 Full administrative access to all team resources and settings.
 
-| Resource | Permissions |
-|----------|-------------|
-| Projects | `view`, `manage` |
-| Analytics | `view`, `manage` |
-| Cost | `view` |
-| Traces | `view`, `share` |
+| Resource    | Permissions      |
+| ----------- | ---------------- |
+| Projects    | `view`, `manage` |
+| Analytics   | `view`, `manage` |
+| Cost        | `view`           |
+| Traces      | `view`, `share`  |
 | Annotations | `view`, `manage` |
 | Evaluations | `view`, `manage` |
-| Datasets | `view`, `manage` |
+| Datasets    | `view`, `manage` |
 | Automations | `view`, `manage` |
-| Workflows | `view`, `manage` |
-| Prompts | `view`, `manage` |
-| Scenarios | `view`, `manage` |
-| Team | `view`, `manage` |
+| Workflows   | `view`, `manage` |
+| Prompts     | `view`, `manage` |
+| Scenarios   | `view`, `manage` |
+| Team        | `view`, `manage` |
 
 #### Member
+
 Same permissions as Admin but cannot manage team settings.
 
 #### Viewer
+
 Read-only access to the resources listed below, for observation and reporting.
 
-| Resource | Permissions |
-|----------|-------------|
-| Projects | `view` |
-| Analytics | `view` |
-| Traces | `view` |
-| Annotations | `view` |
-| Evaluations | `view` |
-| Datasets | `view` |
-| Automations | `view` |
-| Workflows | `view` |
-| Prompts | `view` |
-| Scenarios | `view` |
-| Team | `view` |
+| Resource    | Permissions |
+| ----------- | ----------- |
+| Projects    | `view`      |
+| Analytics   | `view`      |
+| Traces      | `view`      |
+| Annotations | `view`      |
+| Evaluations | `view`      |
+| Datasets    | `view`      |
+| Automations | `view`      |
+| Workflows   | `view`      |
+| Prompts     | `view`      |
+| Scenarios   | `view`      |
+| Team        | `view`      |
 
 ### Organization Roles
 
 #### Admin
+
 Complete control over organization settings and all teams.
 
-| Resource | Permissions |
-|----------|-------------|
+| Resource     | Permissions                |
+| ------------ | -------------------------- |
 | Organization | `view`, `manage`, `delete` |
 
 #### Member
+
 Basic organization access for team members.
 
-| Resource | Permissions |
-|----------|-------------|
-| Organization | `view` |
+| Resource     | Permissions |
+| ------------ | ----------- |
+| Organization | `view`      |
 
 ## Permission Hierarchy
 
@@ -138,6 +150,7 @@ The day-to-day flows live in the UI under **Settings → Teams**, **Settings →
 ## Custom Roles
 
 ### Overview
+
 Organizations can create custom roles to provide more granular permission control beyond the predefined roles. Custom roles allow organizations to:
 
 - Define specific permission combinations
@@ -150,15 +163,15 @@ Organizations can create custom roles to provide more granular permission contro
 Custom roles are created at the organization level and can be assigned to users within any team in that organization. Custom roles can be found under settings.
 
 #### Required Fields
+
 - **Name**: Unique role name (1-50 characters)
 - **Description**: Optional description of the role's purpose
 - **Permissions**: Array of specific permissions
 
-
 The following screenshot shows the roles interface in LangWatch.
 
 <Frame>
-<img src="/images/rbac/roles.png" alt="LangWatch RBAC Roles Interface" />
+  <img src="/images/rbac/roles.png" alt="LangWatch RBAC Roles Interface" />
 </Frame>
 
 To create a new role, click the "Create Role" button.
@@ -166,23 +179,24 @@ To create a new role, click the "Create Role" button.
 Add the name and description of the role and click the "Create" button.
 
 <Frame>
-<img src="/images/rbac/roles-create.png" alt="Creating Custom Roles in LangWatch" />
+  <img src="/images/rbac/roles-create.png" alt="Creating Custom Roles in LangWatch" />
 </Frame>
 
-Once the role is created, you can attach it to a user under the teams page. 
+Once the role is created, you can attach it to a user under the teams page.
 
 <Frame>
-<img src="/images/rbac/roles-add.png" alt="Adding Roles to Users in LangWatch" />
+  <img src="/images/rbac/roles-add.png" alt="Adding Roles to Users in LangWatch" />
 </Frame>
-
 
 ### Custom Role Management
 
 #### Permissions Required
+
 - **Create/Update/Delete Custom Roles**: `organization:manage` permission
 - **Assign Custom Roles**: `team:manage` permission
 
 #### Best Practices
+
 - **Naming Convention**: Use descriptive names that clearly indicate the role's purpose
 - **Documentation**: Provide clear descriptions explaining when to use each role
 - **Regular Review**: Periodically review custom roles to ensure they're still needed
@@ -195,6 +209,7 @@ Once the role is created, you can attach it to a user under the teams page.
 - Custom roles are organization-scoped and cannot be shared across organizations
 
 ### Public Sharing
+
 The system supports public sharing of traces, allowing access without authentication when resources are explicitly shared publicly.
 
 ---
@@ -205,11 +220,11 @@ Roles in LangWatch are assigned via **role bindings**: a binding links a princip
 
 ### Scopes
 
-| Scope | What it grants |
-|-------|---------------|
+| Scope            | What it grants                                                    |
+| ---------------- | ----------------------------------------------------------------- |
 | **Organization** | Access across the entire organization at the specified role level |
-| **Team** | Access to a specific team and all its projects |
-| **Project** | Access to a single project only |
+| **Team**         | Access to a specific team and all its projects                    |
+| **Project**      | Access to a single project only                                   |
 
 ### Resolution Rules
 
@@ -220,7 +235,9 @@ Roles in LangWatch are assigned via **role bindings**: a binding links a princip
 Role bindings can be assigned to users directly from **Settings → Members**, or to groups from **Settings → Groups**. Users inherit all bindings assigned to groups they belong to.
 
 <Tip>
-  Use group bindings (especially SCIM groups from your IdP) to manage access at scale, assigning a binding to a group is equivalent to assigning it to every member of that group. See [SCIM Groups](/platform/scim-groups).
+  Use group bindings (especially SCIM groups from your IdP) to manage access at scale,
+  assigning a binding to a group is equivalent to assigning it to every member of that
+  group. See [SCIM Groups](/platform/scim-groups).
 </Tip>
 
 ---

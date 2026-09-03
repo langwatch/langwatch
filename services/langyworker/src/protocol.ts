@@ -23,7 +23,11 @@ export type AbortCommand = { type: "abort"; turnId: string };
 export type ShutdownImminentCommand = { type: "shutdown_imminent"; deadlineMs: number };
 export type PingCommand = { type: "ping" };
 
-export type ManagerCommand = TurnCommand | AbortCommand | ShutdownImminentCommand | PingCommand;
+export type ManagerCommand =
+  | TurnCommand
+  | AbortCommand
+  | ShutdownImminentCommand
+  | PingCommand;
 
 /**
  * Parse one stdin line into a command. Returns undefined for unparseable or
@@ -41,7 +45,11 @@ export function parseCommand(line: string): ManagerCommand | undefined {
   const cmd = value as Record<string, unknown>;
   switch (cmd.type) {
     case "turn":
-      if (typeof cmd.turnId !== "string" || cmd.turnId === "" || typeof cmd.prompt !== "string") {
+      if (
+        typeof cmd.turnId !== "string" ||
+        cmd.turnId === "" ||
+        typeof cmd.prompt !== "string"
+      ) {
         return undefined;
       }
       return {

@@ -46,7 +46,11 @@ Then open each row and switch to the **Advanced (Gateway)** tab to set the gatew
 
 No separate "gateway provider" entity to mint. The credential itself is the only thing.
 
-<Note>If you've never configured ModelProviders in LangWatch before, this is the same Settings page you'd use for prompt playground + evaluators. The gateway reads from the same store.</Note>
+<Note>
+  If you've never configured ModelProviders in LangWatch before, this is the same Settings
+  page you'd use for prompt playground + evaluators. The gateway reads from the same
+  store.
+</Note>
 
 ## Step 2: Mint your first virtual key
 
@@ -166,18 +170,18 @@ After a week of running through the gateway, the original upstream keys (`sk-pro
 
 ## Troubleshooting
 
-| Symptom | Cause | Fix |
-|---|---|---|
-| `401 invalid_api_key` on every request | VK env var not loaded; or VK revoked | `echo $LANGWATCH_VK` to verify; check LangWatch UI for VK status |
-| `403 model_not_allowed` on a model you used before | VK's `models_allowed` is set restrictively | Edit VK to add the model, or remove the allowlist |
-| Calls succeed but no trace in LangWatch UI | Scope-id mismatch between VK and where you're looking | `langwatch virtual-keys get <id>` → check `scopes` (and resolved `project_id` per vk-config-bundle rules: TEAM/ORG-scoped VKs file traces in the org's `internal_governance` project) |
-| Anthropic-side calls return `400 must provide max_tokens` | You removed `max_tokens` because OpenAI doesn't require it | Anthropic requires it; keep it set |
-| Response latency jumped by ~50 ms | Fallback is running every call (primary is down) | Check `X-LangWatch-Fallback-Count`, if > 0, fix the primary |
+| Symptom                                                   | Cause                                                      | Fix                                                                                                                                                                                   |
+| --------------------------------------------------------- | ---------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `401 invalid_api_key` on every request                    | VK env var not loaded; or VK revoked                       | `echo $LANGWATCH_VK` to verify; check LangWatch UI for VK status                                                                                                                      |
+| `403 model_not_allowed` on a model you used before        | VK's `models_allowed` is set restrictively                 | Edit VK to add the model, or remove the allowlist                                                                                                                                     |
+| Calls succeed but no trace in LangWatch UI                | Scope-id mismatch between VK and where you're looking      | `langwatch virtual-keys get <id>` → check `scopes` (and resolved `project_id` per vk-config-bundle rules: TEAM/ORG-scoped VKs file traces in the org's `internal_governance` project) |
+| Anthropic-side calls return `400 must provide max_tokens` | You removed `max_tokens` because OpenAI doesn't require it | Anthropic requires it; keep it set                                                                                                                                                    |
+| Response latency jumped by ~50 ms                         | Fallback is running every call (primary is down)           | Check `X-LangWatch-Fallback-Count`, if > 0, fix the primary                                                                                                                           |
 
 ## What NOT to change
 
 - Request bodies: the gateway's whole point is byte-for-byte passthrough. Don't rewrite your payloads.
-- SDKs: the official OpenAI, Anthropic SDKs work unchanged. You don't need the LangWatch SDK for gateway integration (only for *trace propagation*).
+- SDKs: the official OpenAI, Anthropic SDKs work unchanged. You don't need the LangWatch SDK for gateway integration (only for _trace propagation_).
 - Streaming handlers: SSE passthrough is byte-identical post-first-chunk. Your streaming code should keep working.
 
 ## Rollback plan

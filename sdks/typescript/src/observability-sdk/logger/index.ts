@@ -4,9 +4,7 @@ import {
   type LoggerProvider,
   createNoopLogger,
 } from "@opentelemetry/api-logs";
-import {
-  type LangWatchLogger,
-} from "./types";
+import { type LangWatchLogger } from "./types";
 import { LangWatchLoggerInternal } from "./implementation";
 
 /**
@@ -42,9 +40,7 @@ let currentLoggerProvider: LoggerProvider = NOOP_LOGGER_PROVIDER;
  * @see {@link getLangWatchLoggerFromProvider}
  * @see {@link createLangWatchLogger}
  */
-export function setLangWatchLoggerProvider(
-  loggerProvider: LoggerProvider,
-): void {
+export function setLangWatchLoggerProvider(loggerProvider: LoggerProvider): void {
   currentLoggerProvider = loggerProvider;
 }
 
@@ -67,10 +63,7 @@ export function setLangWatchLoggerProvider(
  *
  * @see {@link setLangWatchLoggerProvider}
  */
-export function getLangWatchLogger(
-  name: string,
-  version?: string,
-): LangWatchLogger {
+export function getLangWatchLogger(name: string, version?: string): LangWatchLogger {
   return getLangWatchLoggerFromProvider(currentLoggerProvider, name, version);
 }
 

@@ -62,7 +62,7 @@ on a new drawer — the URL form gives you:
    at the call site.
 
 4. Open from any component via `useDrawer().openDrawer("myDrawer",
-   { editingId })`. The hook handles URL serialization, push vs
+{ editingId })`. The hook handles URL serialization, push vs
    replace, and the navigation stack for back-button behavior.
 
 ## Going to another drawer and back
@@ -77,7 +77,9 @@ sits outside the history the hook keeps.
 const { openDrawer, goBack } = useDrawer();
 
 openDrawer("addOrEditDataset", {
-  onSuccess: (created) => { /* record the result */ },
+  onSuccess: (created) => {
+    /* record the result */
+  },
   onClose: goBack, // both endings return to this drawer
 });
 ```
@@ -126,7 +128,7 @@ opens them, so component tests of the opener can assert by mocking
 ```ts
 const mockOpenDrawer = vi.fn();
 vi.mock("~/hooks/useDrawer", () => ({
-  useDrawer: () => ({ openDrawer: mockOpenDrawer, /* ... */ }),
+  useDrawer: () => ({ openDrawer: mockOpenDrawer /* ... */ }),
 }));
 
 it("opens the drawer with the row id", () => {

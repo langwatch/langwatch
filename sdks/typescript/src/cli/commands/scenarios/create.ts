@@ -47,9 +47,7 @@ export const createScenarioCommand = async (
     const criteria = options.criteria
       ? options.criteria.split(",").map((c) => c.trim())
       : [];
-    const labels = options.labels
-      ? options.labels.split(",").map((l) => l.trim())
-      : [];
+    const labels = options.labels ? options.labels.split(",").map((l) => l.trim()) : [];
 
     const scenario = await service.create({
       name,
@@ -69,7 +67,9 @@ export const createScenarioCommand = async (
       data: scenario,
       table: () => {
         if (scenario.platformUrl) {
-          console.log(`  ${chalk.bold("View:")}  ${chalk.underline(scenario.platformUrl)}`);
+          console.log(
+            `  ${chalk.bold("View:")}  ${chalk.underline(scenario.platformUrl)}`,
+          );
         }
       },
     };

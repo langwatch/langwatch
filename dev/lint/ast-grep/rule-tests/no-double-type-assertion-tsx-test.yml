@@ -1,0 +1,8 @@
+id: no-double-type-assertion-tsx
+valid:
+  - "const a = value as Widget;"
+  - "const b = raw as unknown;"
+  - "const el = <div>{value as Label}</div>;"
+invalid:
+  - "const a = value as unknown as Widget;"
+  - "const el = <div>{value as unknown as Label}</div>;"

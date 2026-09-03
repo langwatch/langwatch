@@ -5,19 +5,19 @@
 # Langy locally = the app (pnpm dev), the AI gateway (auto-started by pnpm
 # dev), and the langyagent Go service running the no-sandbox dev runner
 # (gVisor does not exist on macOS), plus a handful of env entries in
-# platform/app/.env and the release flag force-enabled. Each missing piece fails
+# .env and the release flag force-enabled. Each missing piece fails
 # a turn with a different distant symptom, this script fails them all HERE,
 # named, instead.
 #
 # Usage:
 #   dev/scripts/dogfood/langy-local.sh          # run all checks
-#   dev/scripts/dogfood/langy-local.sh --fix    # also append the missing env block to platform/app/.env
+#   dev/scripts/dogfood/langy-local.sh --fix    # also append the missing env block to .env
 #
 # Spec: specs/setup/langy-local-dogfood.feature
 set -uo pipefail
 
 ROOT="$(cd "$(dirname "$0")/../../.." && pwd)"
-ENV_FILE="$ROOT/platform/app/.env"
+ENV_FILE="$ROOT/.env"
 APP_PORT="${PORT:-5560}"
 GATEWAY_PORT=$((APP_PORT + 3))
 AGENT_PORT="${LANGY_AGENT_PORT:-8080}"
@@ -30,7 +30,7 @@ bad()  { printf '  \033[31m✗\033[0m %s\n' "$1"; failures=$((failures + 1)); }
 warn() { printf '  \033[33m!\033[0m %s\n' "$1"; }
 hint() { printf '      %s\n' "$1"; }
 
-# env_value prints the (unquoted) value of a key in platform/app/.env; empty when
+# env_value prints the (unquoted) value of a key in .env; empty when
 # the key is absent OR set to nothing, so presence checks require a real value.
 env_value() { grep -E "^$1=" "$ENV_FILE" 2>/dev/null | head -1 | sed -E "s/^$1=//; s/\"//g"; }
 
@@ -85,12 +85,12 @@ BLOCK
     if $FIX; then
       if printf '%s\n' "$BLOCK" | sed "s|\$HOME|$HOME|g" >>"$ENV_FILE" &&
         mkdir -p "$HOME/.langwatch-langy/sessions" "$HOME/.langwatch-langy/workspace"; then
-        warn "appended the Langy env block to platform/app/.env (restart pnpm dev + langyagent to pick it up)"
+        warn "appended the Langy env block to .env (restart pnpm dev + langyagent to pick it up)"
       else
         bad "could not write the env block or create the session/workspace roots"
       fi
     else
-      hint "add to platform/app/.env (or re-run with --fix):"
+      hint "add to .env (or re-run with --fix):"
       printf '%s\n' "$BLOCK" | sed 's/^/      /'
     fi
   fi
@@ -124,7 +124,7 @@ fi
 echo "services:"
 if listening "$APP_PORT"; then ok "app on :$APP_PORT"; else
   bad "app not listening on :$APP_PORT"
-  hint "cd \"$ROOT/platform/app\" && pnpm dev   (or make -C \"$ROOT\" quickstart)"
+  hint "cd \"$ROOT\" && pnpm dev   (or make -C \"$ROOT\" quickstart)"
 fi
 if listening "$GATEWAY_PORT"; then ok "AI gateway on :$GATEWAY_PORT"; else
   bad "AI gateway not listening on :$GATEWAY_PORT"
@@ -132,7 +132,7 @@ if listening "$GATEWAY_PORT"; then ok "AI gateway on :$GATEWAY_PORT"; else
 fi
 if listening "$AGENT_PORT"; then ok "langyagent on :$AGENT_PORT"; else
   bad "langyagent not listening on :$AGENT_PORT"
-  hint "make -C \"$ROOT\" service svc=langyagent   (sources platform/app/.env; runs the no-sandbox dev runner)"
+  hint "make -C \"$ROOT\" service svc=langyagent   (sources .env; runs the no-sandbox dev runner)"
 fi
 
 # --- provider keys ---------------------------------------------------------

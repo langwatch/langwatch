@@ -96,7 +96,6 @@ func New(d Deps) *Orchestrator {
 // UpParams identify the worktree `up` runs in (resolved by the composition root).
 type UpParams struct {
 	WorktreeDir      string
-	LwDir            string
 	Branch           string
 	ExplicitSlug     string // from LANGWATCH_SLUG; wins over the derived/cached slug
 	IsBaseline       bool   // this stack is the shared default others fall back to
@@ -179,14 +178,10 @@ func (o *Orchestrator) provision(ctx context.Context, p UpParams, opts PlanOptio
 		Slug: slug, WorktreeDir: p.WorktreeDir, Branch: p.Branch,
 		LauncherPID: o.sys.Getpid(), RedisDB: redisDB,
 		APIPort: ports[nSvc], WorkerMetricsPort: ports[nSvc+1], LocalAPIKey: o.cfg.LocalAPIKey, IsBaseline: p.IsBaseline,
-		// Mirror planChildren: a separate `workers` lane exists only when workers
-		// are requested AND not hosted in-process. Persist it so restart targets
-		// the workers' own group rather than the API's when they share a process.
-		HasStandaloneWorkers: opts.Selection.Workers,
-		LangyTier:            opts.LangyTier,
-		LangyImage:           opts.langyImageTag,
-		DisableGoogleDLP:     o.cfg.ShouldDisableGoogleDLP,
-		PortlessDisabled:     o.cfg.PortlessDisabled,
+		LangyTier:        opts.LangyTier,
+		LangyImage:       opts.langyImageTag,
+		DisableGoogleDLP: o.cfg.ShouldDisableGoogleDLP,
+		PortlessDisabled: o.cfg.PortlessDisabled,
 	}
 	for i, r := range domain.PerWorktreeServices {
 		svc := domain.Service{
@@ -235,7 +230,7 @@ func (o *Orchestrator) provision(ctx context.Context, p UpParams, opts PlanOptio
 	}
 	o.linkObservability(ctx, &st)
 	st.UpdatedAt = o.sys.Now()
-	if err := o.store.WriteOverlay(p.LwDir, st); err != nil {
+	if err := o.store.WriteOverlay(p.WorktreeDir, st); err != nil {
 		return domain.Stack{}, nil, err
 	}
 	if err := o.store.SaveStack(st); err != nil {
@@ -437,7 +432,7 @@ func (o *Orchestrator) Up(ctx context.Context, p UpParams, opts PlanOptions) err
 		return err
 	}
 	langyDockerHost := o.langyContainerHost(ctx, st, &opts)
-	o.sup.Supervise(ctx, o.planChildren(st, opts, p.LwDir, langyDockerHost))
+	o.sup.Supervise(ctx, o.planChildren(st, opts, p.WorktreeDir, langyDockerHost))
 	return nil
 }
 
@@ -473,63 +468,28 @@ func (o *Orchestrator) prepareWorktree(ctx context.Context, p UpParams, st domai
 	env := append(st.OverlayEnv(), "DOTENV_CONFIG_QUIET=true")
 	// Codegen (prisma/zod/sdk-versions/mcp) then migrations — both finish before
 	// the services boot. Owned here so `pnpm dev` is simply `haven up`.
-	if err := o.sup.RunOnce(ctx, "codegen", p.LwDir, "pnpm -s run start:prepare:files", env); err != nil {
+	if err := o.sup.RunOnce(ctx, "codegen", p.WorktreeDir, "pnpm -s run start:prepare:files", env); err != nil {
 		o.log.Warn("codegen (start:prepare:files) failed (continuing)", zap.Error(err))
-	}
-	if err := o.ensureAPIBundle(ctx, p.LwDir, env); err != nil {
-		return err
 	}
 	// Migrations failing on an existing database is the one prep step that must
 	// STOP the up: continuing would boot the app onto a half-migrated schema,
 	// and silently dropping the data to get past it is never haven's call.
-	if err := o.sup.RunOnce(ctx, "prepare", p.LwDir, "pnpm -s run start:prepare:db", env); err != nil {
+	if err := o.sup.RunOnce(ctx, "prepare", p.WorktreeDir, prepareDBShell, env); err != nil {
 		return fmt.Errorf("migrations failed — nothing was dropped; fix the migration, or run `haven db reset` for a fresh database: %w", err)
 	}
 	o.runSeed(ctx, p, env)
 	return nil
 }
 
-// apiBundleRelPath is what `start:app` executes: the PRODUCTION server bundle.
-// Kept as one constant because the check below and the error it prints must
-// name the same file the lane will look for.
-var apiBundleRelPath = filepath.Join("dist", "server", "server.cjs")
-
-// ensureAPIBundle builds the app bundle when it is missing.
+// prepareDBShell migrates both datastores before any service boots.
 //
-// The api lane runs `start:app` -> `node dist/server/server.cjs`, but nothing
-// else in the up produces that file: codegen writes generated SOURCE, the
-// migration step only touches the database, and dist/ is gitignored — so a
-// freshly-created worktree has no bundle at all. Without this the lane
-// crash-loops on MODULE_NOT_FOUND while the app (vite) lane sits behind its
-// /api/health ready-probe and never serves the hostname. The stack reports
-// itself up and then answers nothing, which is a much worse failure than a
-// slow first boot.
-//
-// Only the missing case builds. An existing bundle is left alone: rebuilding
-// on every `up` would add a minute to a bring-up for a file that only
-// server-side edits invalidate, and those already require a manual rebuild.
-//
-// The contract is the whole point: when this returns nil, node has a file to
-// execute. So both ends are checked against that, not against a weaker proxy.
-// A REGULAR file, because `node <a directory>` is the same crash by another
-// name; and re-checked AFTER the build, because a build can exit 0 without
-// emitting the server bundle (a changed build script, a partial run) and
-// trusting the exit code would hand the lane the exact MODULE_NOT_FOUND
-// crash-loop this function exists to prevent — only now with no explanation.
-func (o *Orchestrator) ensureAPIBundle(ctx context.Context, lwDir string, env []string) error {
-	bundle := filepath.Join(lwDir, apiBundleRelPath)
-	if info, err := os.Stat(bundle); err == nil && info.Mode().IsRegular() {
-		return nil
-	}
-	fmt.Println("building the app bundle (missing — first `up` in this worktree)…")
-	if err := o.sup.RunOnce(ctx, "build", lwDir, "pnpm -s run build", env); err != nil {
-		return fmt.Errorf("the app bundle failed to build — the api lane runs %s and cannot start without it: %w", apiBundleRelPath, err)
-	}
-	if info, err := os.Stat(bundle); err != nil || !info.Mode().IsRegular() {
-		return fmt.Errorf("the app build reported success but left no %s behind — the api lane runs that file and cannot start without it", apiBundleRelPath)
-	}
-	return nil
-}
+// It names one script per store rather than a single `start:prepare:db`: that
+// script was the platform application's own composite and went with it, and
+// the two stores are migrated by two different applications now — Prisma from
+// the schema package, ClickHouse by the API process's own task. Chained with
+// `&&` so a failed Prisma migration never lets the ClickHouse one report
+// success on a half-migrated stack.
+const prepareDBShell = "pnpm -s run prisma:migrate && pnpm -s run clickhouse:migrate"
 
 // runSeed always seeds. The seed is idempotent (a no-op once the stable local
 // project + API key exist), so every `up` guarantees the same migrations AND
@@ -544,13 +504,13 @@ func (o *Orchestrator) ensureAPIBundle(ctx context.Context, lwDir string, env []
 // abort the up.
 func (o *Orchestrator) runSeed(ctx context.Context, p UpParams, env []string) {
 	if !hasEnvKey(env, "DATABASE_URL") {
-		if err := o.guardInheritedSeedEnv(p.LwDir); err != nil {
+		if err := o.guardInheritedSeedEnv(p.WorktreeDir); err != nil {
 			o.log.Warn("skipping seed — inherited database URL is not local", zap.Error(err))
 			fmt.Printf("haven: %v — skipping seed\n", err)
 			return
 		}
 	}
-	if err := o.sup.RunOnce(ctx, "seed", p.LwDir, seedShell("pnpm -s run prisma:seed", env), env); err != nil {
+	if err := o.sup.RunOnce(ctx, "seed", p.WorktreeDir, seedShell("pnpm -s run prisma:seed", env), env); err != nil {
 		o.log.Warn("seed failed (continuing)", zap.Error(err))
 	}
 }
@@ -896,9 +856,11 @@ func hasEnvKey(env []string, key string) bool {
 	return false
 }
 
-// runIngestScript runs one live-stack seed script (seed:sample-traces,
-// seed:realistic-platform, seed:mass) through the running stack's collector —
-// the real pipeline, not a ClickHouse side door — so the stack must be up. It
+// runIngestScript runs one live-stack seed script through the running stack's
+// collector — the real pipeline, not a ClickHouse side door — so the stack must
+// be up. No shipped preset names a script today (db.go's seedPreset says why);
+// this is the seam they come back through, and it stays tested against a
+// preset the tests own. It
 // talks to the app's loopback port over plain HTTP (portless terminates TLS in
 // front of it; Node does not trust the proxy's CA). The scripts deliberately
 // use the collector + event-sourcing commands rather than inserting read
@@ -909,12 +871,12 @@ func (o *Orchestrator) runIngestScript(ctx context.Context, p UpParams, retryCmd
 	if err != nil {
 		return err
 	}
-	return o.sup.RunOnce(ctx, script, p.LwDir, "pnpm run "+script, env)
+	return o.sup.RunOnce(ctx, script, p.WorktreeDir, "pnpm run "+script, env)
 }
 
 // liveSeedEnv returns the running stack's complete environment overlay plus a
 // loopback collector endpoint. The complete overlay matters for seeders that
-// write both Postgres and ClickHouse; inheriting platform/app/.env would silently
+// write both Postgres and ClickHouse; inheriting .env would silently
 // target the primary checkout instead of this worktree's isolated databases.
 func (o *Orchestrator) liveSeedEnv(p UpParams, retryCmd string) ([]string, error) {
 	slug, err := o.resolveSlug(p)

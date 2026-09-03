@@ -1,5 +1,8 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
-import { LangWatchLogsExporter, type LangWatchLogsExporterOptions } from "../langwatch-logs-exporter";
+import {
+  LangWatchLogsExporter,
+  type LangWatchLogsExporterOptions,
+} from "../langwatch-logs-exporter";
 import {
   LANGWATCH_SDK_NAME_OBSERVABILITY as LANGWATCH_SDK_NAME,
   LANGWATCH_SDK_LANGUAGE,
@@ -216,7 +219,7 @@ describe("LangWatchLogsExporter", () => {
             "x-langwatch-sdk-runtime": LANGWATCH_SDK_RUNTIME(),
           }),
           url: expect.stringContaining(LOGS_PATH),
-        })
+        }),
       );
     });
   });
@@ -251,7 +254,9 @@ describe("LangWatchLogsExporter", () => {
 
       // URL constructor behavior: new URL("/api/otel/v1/logs", "https://subdomain.example.com:8080/path")
       // results in "https://subdomain.example.com:8080/api/otel/v1/logs" (path gets replaced, not appended)
-      expect((exporter as any).url).toBe(`https://subdomain.example.com:8080${LOGS_PATH}`);
+      expect((exporter as any).url).toBe(
+        `https://subdomain.example.com:8080${LOGS_PATH}`,
+      );
     });
   });
 

@@ -1,0 +1,217 @@
+{
+  "name": "@langwatch/design-system",
+  "version": "0.1.0",
+  "private": true,
+  "description": "LangWatch design tokens, Chakra system, accessible primitives, and shared UI components.",
+  "files": [
+    "src"
+  ],
+  "type": "module",
+  "main": "./src/index.ts",
+  "types": "./src/index.ts",
+  "exports": {
+    ".": {
+      "types": "./src/index.ts",
+      "default": "./src/index.ts"
+    },
+    "./system": {
+      "types": "./src/system/index.ts",
+      "default": "./src/system/index.ts"
+    },
+    "./provider": {
+      "types": "./src/provider/index.tsx",
+      "default": "./src/provider/index.tsx"
+    },
+    "./color-mode": {
+      "types": "./src/color-mode/index.tsx",
+      "default": "./src/color-mode/index.tsx"
+    },
+    "./testing": {
+      "types": "./src/testing/index.tsx",
+      "default": "./src/testing/index.tsx"
+    },
+    "./avatar": {
+      "types": "./src/components/avatar.tsx",
+      "default": "./src/components/avatar.tsx"
+    },
+    "./checkbox": {
+      "types": "./src/components/checkbox.tsx",
+      "default": "./src/components/checkbox.tsx"
+    },
+    "./close-button": {
+      "types": "./src/components/close-button.tsx",
+      "default": "./src/components/close-button.tsx"
+    },
+    "./column-type-icon": {
+      "types": "./src/components/column-type-icon.tsx",
+      "default": "./src/components/column-type-icon.tsx"
+    },
+    "./confirm-dialog": {
+      "types": "./src/components/confirm-dialog.tsx",
+      "default": "./src/components/confirm-dialog.tsx"
+    },
+    "./metric-value-formatters": {
+      "types": "./src/metric-value-formatters.ts",
+      "default": "./src/metric-value-formatters.ts"
+    },
+    "./pass-rate-indicator": {
+      "types": "./src/components/pass-rate-indicator.tsx",
+      "default": "./src/components/pass-rate-indicator.tsx"
+    },
+    "./dialog": {
+      "types": "./src/components/dialog.tsx",
+      "default": "./src/components/dialog.tsx"
+    },
+    "./display-formatters": {
+      "types": "./src/display-formatters.ts",
+      "default": "./src/display-formatters.ts"
+    },
+    "./drawer": {
+      "types": "./src/components/drawer.tsx",
+      "default": "./src/components/drawer.tsx"
+    },
+    "./first-grapheme": {
+      "types": "./src/first-grapheme.ts",
+      "default": "./src/first-grapheme.ts"
+    },
+    "./field-info-tooltip": {
+      "types": "./src/components/field-info-tooltip.tsx",
+      "default": "./src/components/field-info-tooltip.tsx"
+    },
+    "./icons": {
+      "types": "./src/components/icons/index.ts",
+      "default": "./src/components/icons/index.ts"
+    },
+    "./info-without-selecting": {
+      "types": "./src/components/info-without-selecting.tsx",
+      "default": "./src/components/info-without-selecting.tsx"
+    },
+    "./input-group": {
+      "types": "./src/components/input-group.tsx",
+      "default": "./src/components/input-group.tsx"
+    },
+    "./json-value-text": {
+      "types": "./src/json-value-text.ts",
+      "default": "./src/json-value-text.ts"
+    },
+    "./list-table": {
+      "types": "./src/components/list-table.tsx",
+      "default": "./src/components/list-table.tsx"
+    },
+    "./menu": {
+      "types": "./src/components/menu.tsx",
+      "default": "./src/components/menu.tsx"
+    },
+    "./meter-bar": {
+      "types": "./src/components/meter-bar.tsx",
+      "default": "./src/components/meter-bar.tsx"
+    },
+    "./page-layout": {
+      "types": "./src/components/page-layout.tsx",
+      "default": "./src/components/page-layout.tsx"
+    },
+    "./pagination": {
+      "types": "./src/components/pagination.tsx",
+      "default": "./src/components/pagination.tsx"
+    },
+    "./popover": {
+      "types": "./src/components/popover.tsx",
+      "default": "./src/components/popover.tsx"
+    },
+    "./radio": {
+      "types": "./src/components/radio.tsx",
+      "default": "./src/components/radio.tsx"
+    },
+    "./rotating-colors": {
+      "types": "./src/rotating-colors.ts",
+      "default": "./src/rotating-colors.ts"
+    },
+    "./shiki": {
+      "types": "./src/shiki-adapter.ts",
+      "default": "./src/shiki-adapter.ts"
+    },
+    "./shiki-chunking": {
+      "types": "./src/shiki-chunking.ts",
+      "default": "./src/shiki-chunking.ts"
+    },
+    "./search-input": {
+      "types": "./src/components/search-input.tsx",
+      "default": "./src/components/search-input.tsx"
+    },
+    "./segmented-control": {
+      "types": "./src/components/segmented-control.tsx",
+      "default": "./src/components/segmented-control.tsx"
+    },
+    "./select": {
+      "types": "./src/components/select.tsx",
+      "default": "./src/components/select.tsx"
+    },
+    "./slider": {
+      "types": "./src/components/slider.tsx",
+      "default": "./src/components/slider.tsx"
+    },
+    "./small-label": {
+      "types": "./src/components/small-label.tsx",
+      "default": "./src/components/small-label.tsx"
+    },
+    "./switch": {
+      "types": "./src/components/switch.tsx",
+      "default": "./src/components/switch.tsx"
+    },
+    "./tooltip": {
+      "types": "./src/components/tooltip.tsx",
+      "default": "./src/components/tooltip.tsx"
+    },
+    "./toaster": {
+      "types": "./src/components/toaster.tsx",
+      "default": "./src/components/toaster.tsx"
+    },
+    "./text-overflow": {
+      "types": "./src/text-overflow.ts",
+      "default": "./src/text-overflow.ts"
+    },
+    "./trigger-anchor": {
+      "types": "./src/components/trigger-anchor.tsx",
+      "default": "./src/components/trigger-anchor.tsx"
+    },
+    "./use-copy-to-clipboard": {
+      "types": "./src/use-copy-to-clipboard.ts",
+      "default": "./src/use-copy-to-clipboard.ts"
+    }
+  },
+  "scripts": {
+    "storybook": "storybook dev --port 6006",
+    "build:storybook": "storybook build",
+    "typecheck": "tsc --noEmit",
+    "test": "vitest run",
+    "test:unit": "vitest run"
+  },
+  "dependencies": {
+    "lucide-react": "^1.22.0",
+    "next-themes": "^0.4.6",
+    "shiki": "^4.3.0"
+  },
+  "devDependencies": {
+    "@chakra-ui/react": "^3.36.0",
+    "@emotion/react": "^11.14.0",
+    "@storybook/addon-a11y": "^10.5.10",
+    "@storybook/addon-docs": "^10.5.10",
+    "@storybook/react-vite": "^10.5.10",
+    "@testing-library/react": "^16.3.2",
+    "@types/react": "^19.2.14",
+    "@types/react-dom": "^19.2.3",
+    "jsdom": "^30.0.1",
+    "react": "^19.2.7",
+    "react-dom": "^19.2.7",
+    "storybook": "^10.5.10",
+    "typescript": "^7.0.2",
+    "vite": "^8.1.2",
+    "vitest": "^4.1.9"
+  },
+  "peerDependencies": {
+    "@chakra-ui/react": "^3.36.0",
+    "@emotion/react": "^11.14.0",
+    "react": "^19.2.7",
+    "react-dom": "^19.2.7"
+  }
+}

@@ -65,9 +65,10 @@ describe("the actor vocabulary", () => {
 
   describe("given a boundary holding raw ids", () => {
     it("attributes to the person first, then the credential, then the surface", () => {
-      expect(
-        ledgerActorFor({ userId: "u1", apiKeyId: "k1", fallback: "scim" }),
-      ).toEqual({ type: "user", id: "u1" });
+      expect(ledgerActorFor({ userId: "u1", apiKeyId: "k1", fallback: "scim" })).toEqual({
+        type: "user",
+        id: "u1",
+      });
       expect(ledgerActorFor({ apiKeyId: "k1", fallback: "scim" })).toEqual({
         type: "system",
         id: "apikey:k1",

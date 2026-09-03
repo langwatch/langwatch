@@ -1,11 +1,12 @@
 name: Prepare generated files
 description: >-
-  Runs platform/app's `start:prepare:files`, reusing a cached result when none
-  of its inputs changed.
+  Runs the repository root's `start:prepare:files`, reusing a cached result when
+  none of its inputs changed.
 
-# `start:prepare:files` is a chain of seven generators — the AI-gateway secrets
-# check, the langevals evaluator types, the Prisma client, the TypeScript SDK
-# build, the MCP server build, the langy skill catalogue and the task registry.
+# `start:prepare:files` is a chain of six generators — the langevals evaluator
+# types, the Prisma client, the TypeScript SDK build, the MCP server build, the
+# langy skill catalogue and the setup-skill bodies. (The task registry was the
+# seventh; the task lane it scanned no longer exists.)
 # It costs 30-35s and every test, build and check job in this workflow pays it.
 # Across the shards that was several runner-minutes per push spent regenerating
 # byte-identical output from byte-identical committed inputs.
@@ -33,25 +34,23 @@ runs:
       uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
       with:
         # Everything `start:prepare:files` writes. The Prisma client is NOT in
-        # node_modules: this schema sets `output = "../src/generated/prisma"`,
-        # and the app imports it as `~/generated/prisma/client`.
+        # node_modules: @langwatch/prisma-client owns its generated source.
         path: |
-          platform/app/src/generated/prisma
-          platform/app/src/server/evaluations/evaluators.generated.ts
-          platform/app/src/tasks.generated.ts
-          platform/app/src/shared/langy/langySkills.generated.json
+          packages/prisma-client/src/generated
+          packages/features/evaluator/contract/src/evaluators.generated.ts
+          packages/features/langy/web/src/model/shared/langy/langySkills.generated.json
+          packages/features/langy/server/src/services/setup-skill-bodies.generated.ts
           sdks/typescript/dist
           mcp/typescript/dist
         key: >-
           ${{ runner.os }}-prepared-files-${{ hashFiles(
             'pnpm-lock.yaml',
-            'platform/app/prisma/schema.prisma',
-            'platform/app/prisma/schema/**',
-            'platform/app/package.json',
-            'platform/app/scripts/generate-task-registry.mjs',
-            'platform/app/scripts/generate-langy-skills.ts',
-            'platform/app/scripts/build-mcp-server.sh',
-            'platform/app/src/tasks/**',
+            'packages/prisma-client/prisma/schema.prisma',
+            'packages/prisma-client/prisma/schema/**',
+            'packages/prisma-client/package.json',
+            'package.json',
+            'packages/features/langy/web/scripts/generate-langy-skills.ts',
+            'packages/features/langy/server/scripts/generate-setup-skill-bodies.ts',
             'services/langevals/ts-integration/evaluators.generated.ts',
             'sdks/typescript/src/**',
             'sdks/typescript/package.json',
@@ -65,7 +64,6 @@ runs:
     - name: Generate files
       if: steps.cache.outputs.cache-hit != 'true'
       shell: bash
-      working-directory: platform/app
       run: pnpm start:prepare:files
 
     # A cache hit is only useful if it actually produced the files. A key that

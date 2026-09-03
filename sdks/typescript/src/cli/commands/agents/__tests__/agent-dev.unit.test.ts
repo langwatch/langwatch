@@ -1,7 +1,17 @@
 import { EventEmitter } from "node:events";
 import * as os from "node:os";
 import * as path from "node:path";
-import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, it, type Mock, vi } from "vitest";
+import {
+  afterAll,
+  afterEach,
+  beforeAll,
+  beforeEach,
+  describe,
+  expect,
+  it,
+  type Mock,
+  vi,
+} from "vitest";
 
 // The tunnel path verifies the binary it is about to run on every start, and
 // the mock below points at the node executable. Verification fails closed on
@@ -129,9 +139,9 @@ describe("agent dev session", () => {
       data: [makeAgent()],
       pagination: { page: 1, limit: 100, total: 1, totalPages: 1 },
     });
-    mockUpdate = vi.fn().mockImplementation((_id, params) =>
-      Promise.resolve(makeAgent({ config: params.config })),
-    );
+    mockUpdate = vi
+      .fn()
+      .mockImplementation((_id, params) => Promise.resolve(makeAgent({ config: params.config })));
     vi.mocked(AgentsApiService).mockImplementation(function () {
       return {
         list: mockList,
@@ -188,9 +198,8 @@ describe("agent dev session", () => {
         agent: "agent_abc123",
       });
 
-      const written = (
-        mockUpdate.mock.calls[0] as [string, { config: Record<string, unknown> }]
-      )[1].config;
+      const written = (mockUpdate.mock.calls[0] as [string, { config: Record<string, unknown> }])[1]
+        .config;
       mockGet.mockResolvedValue(makeAgent({ config: written }));
 
       await session.shutdown(0);
@@ -202,9 +211,7 @@ describe("agent dev session", () => {
       expect(restored.url).toBe("https://staging.example.com/agent");
       expect(restored.devTunnel).toBeUndefined();
       expect(
-        (restored.headers as { key: string }[]).find(
-          (h) => h.key === DEV_SECRET_HEADER,
-        ),
+        (restored.headers as { key: string }[]).find((h) => h.key === DEV_SECRET_HEADER),
       ).toBeUndefined();
 
       // A second shutdown does not PATCH again.
@@ -228,12 +235,8 @@ describe("agent dev session", () => {
       // The advice points at the UI, which edits the URL field alone. It
       // must never name `agent update --config`: that command replaces the
       // whole config, so a url-only payload would wipe headers and auth.
-      expect(console.error).toHaveBeenCalledWith(
-        expect.stringContaining("LangWatch UI"),
-      );
-      expect(console.error).not.toHaveBeenCalledWith(
-        expect.stringContaining("--config"),
-      );
+      expect(console.error).toHaveBeenCalledWith(expect.stringContaining("LangWatch UI"));
+      expect(console.error).not.toHaveBeenCalledWith(expect.stringContaining("--config"));
       await expect(session.done).resolves.toBe(0);
     });
   });
@@ -245,9 +248,9 @@ describe("agent dev session", () => {
         configurable: true,
       });
       try {
-        await expect(
-          startAgentDevSession({ port: "8000", agent: "agent_abc123" }),
-        ).rejects.toThrow(ProcessExitError);
+        await expect(startAgentDevSession({ port: "8000", agent: "agent_abc123" })).rejects.toThrow(
+          ProcessExitError,
+        );
         expect(mockUpdate).not.toHaveBeenCalled();
       } finally {
         Object.defineProperty(process, "platform", {
@@ -284,16 +287,13 @@ describe("agent dev session", () => {
       });
 
       expect(quickMock).not.toHaveBeenCalled();
-      const written = (
-        mockUpdate.mock.calls[0] as [string, { config: Record<string, unknown> }]
-      )[1].config;
+      const written = (mockUpdate.mock.calls[0] as [string, { config: Record<string, unknown> }])[1]
+        .config;
       expect(written.url).toBe("https://my-own-tunnel.example.com/agent");
       // The auth proxy sits outside a bring-your-own tunnel's chain, so no
       // session secret header is written either.
       expect(
-        (written.headers as { key: string }[]).find(
-          (h) => h.key === DEV_SECRET_HEADER,
-        ),
+        (written.headers as { key: string }[]).find((h) => h.key === DEV_SECRET_HEADER),
       ).toBeUndefined();
 
       await session.shutdown(0);
@@ -327,17 +327,17 @@ describe("agent dev session", () => {
 
   describe("when neither --port nor --url is passed", () => {
     it("fails with guidance instead of guessing a port", async () => {
-      await expect(
-        startAgentDevSession({ agent: "agent_abc123" }),
-      ).rejects.toThrow(ProcessExitError);
+      await expect(startAgentDevSession({ agent: "agent_abc123" })).rejects.toThrow(
+        ProcessExitError,
+      );
     });
   });
 
   describe("when the --agent flag matches nothing", () => {
     it("fails with guidance to list agents", async () => {
-      await expect(
-        startAgentDevSession({ port: "8000", agent: "no-such-agent" }),
-      ).rejects.toThrow(ProcessExitError);
+      await expect(startAgentDevSession({ port: "8000", agent: "no-such-agent" })).rejects.toThrow(
+        ProcessExitError,
+      );
       expect(mockUpdate).not.toHaveBeenCalled();
     });
   });
@@ -349,9 +349,9 @@ describe("agent dev session", () => {
         pagination: { page: 1, limit: 100, total: 1, totalPages: 1 },
       });
 
-      await expect(
-        startAgentDevSession({ port: "8000", agent: "agent_abc123" }),
-      ).rejects.toThrow(ProcessExitError);
+      await expect(startAgentDevSession({ port: "8000", agent: "agent_abc123" })).rejects.toThrow(
+        ProcessExitError,
+      );
       expect(mockUpdate).not.toHaveBeenCalled();
     });
   });
@@ -362,9 +362,8 @@ describe("agent dev session", () => {
         port: "8000",
         agent: "agent_abc123",
       });
-      const written = (
-        mockUpdate.mock.calls[0] as [string, { config: Record<string, unknown> }]
-      )[1].config;
+      const written = (mockUpdate.mock.calls[0] as [string, { config: Record<string, unknown> }])[1]
+        .config;
       mockGet.mockResolvedValue(makeAgent({ config: written }));
 
       fakeTunnels[0]?.emit("exit", 1, null);
@@ -387,12 +386,8 @@ describe("agent dev session", () => {
     "unhandledRejection",
   ] as const;
 
-  const withDetachedProcessListeners = async (
-    fn: () => Promise<void>,
-  ): Promise<void> => {
-    const prior = PROCESS_EVENTS.map(
-      (event) => [event, process.rawListeners(event)] as const,
-    );
+  const withDetachedProcessListeners = async (fn: () => Promise<void>): Promise<void> => {
+    const prior = PROCESS_EVENTS.map((event) => [event, process.rawListeners(event)] as const);
     for (const [event] of prior) process.removeAllListeners(event);
     try {
       await fn();
@@ -421,9 +416,8 @@ describe("agent dev session", () => {
     }).catch((error: unknown) => error);
 
     await vi.waitFor(() => expect(mockUpdate).toHaveBeenCalled());
-    const written = (
-      mockUpdate.mock.calls[0] as [string, { config: Record<string, unknown> }]
-    )[1].config;
+    const written = (mockUpdate.mock.calls[0] as [string, { config: Record<string, unknown> }])[1]
+      .config;
     mockGet.mockResolvedValue(makeAgent({ config: written }));
     return { outcome };
   };
@@ -454,9 +448,7 @@ describe("agent dev session", () => {
         // shutdown, rather than against a count taken before the command
         // started, keeps the test's own timers out of the difference.
         const countRefdTimers = (): number =>
-          process
-            .getActiveResourcesInfo()
-            .filter((resource) => resource === "Timeout").length;
+          process.getActiveResourcesInfo().filter((resource) => resource === "Timeout").length;
 
         const outcome = agentDevCommand({
           port: "8000",
@@ -471,10 +463,7 @@ describe("agent dev session", () => {
         const whileRunning = countRefdTimers();
 
         const written = (
-          mockUpdate.mock.calls[0] as [
-            string,
-            { config: Record<string, unknown> },
-          ]
+          mockUpdate.mock.calls[0] as [string, { config: Record<string, unknown> }]
         )[1].config;
         mockGet.mockResolvedValue(makeAgent({ config: written }));
         process.emit("SIGINT");
@@ -482,10 +471,7 @@ describe("agent dev session", () => {
         expect(await outcome).toBeInstanceOf(ProcessExitError);
         expect(whileRunning).toBeGreaterThan(countRefdTimers());
         const restored = (
-          mockUpdate.mock.calls[1] as [
-            string,
-            { config: Record<string, unknown> },
-          ]
+          mockUpdate.mock.calls[1] as [string, { config: Record<string, unknown> }]
         )[1].config;
         expect(restored.url).toBe("https://staging.example.com/agent");
       });
@@ -504,10 +490,7 @@ describe("agent dev session", () => {
         expect((outcome as ProcessExitError).code).toBe(0);
         expect(mockUpdate).toHaveBeenCalledTimes(2);
         const restored = (
-          mockUpdate.mock.calls[1] as [
-            string,
-            { config: Record<string, unknown> },
-          ]
+          mockUpdate.mock.calls[1] as [string, { config: Record<string, unknown> }]
         )[1].config;
         expect(restored.url).toBe("https://staging.example.com/agent");
       });
@@ -526,10 +509,7 @@ describe("agent dev session", () => {
         expect((outcome as ProcessExitError).code).toBe(1);
         expect(mockUpdate).toHaveBeenCalledTimes(2);
         const restored = (
-          mockUpdate.mock.calls[1] as [
-            string,
-            { config: Record<string, unknown> },
-          ]
+          mockUpdate.mock.calls[1] as [string, { config: Record<string, unknown> }]
         )[1].config;
         expect(restored.url).toBe("https://staging.example.com/agent");
       });
@@ -543,9 +523,8 @@ describe("agent dev session", () => {
         port: "8000",
         agent: "agent_abc123",
       });
-      const written = (
-        mockUpdate.mock.calls[0] as [string, { config: Record<string, unknown> }]
-      )[1].config;
+      const written = (mockUpdate.mock.calls[0] as [string, { config: Record<string, unknown> }])[1]
+        .config;
 
       let releaseGet!: (agent: unknown) => void;
       mockGet.mockImplementation(
@@ -573,9 +552,8 @@ describe("agent dev session", () => {
         port: "8000",
         agent: "agent_abc123",
       });
-      const written = (
-        mockUpdate.mock.calls[0] as [string, { config: Record<string, unknown> }]
-      )[1].config;
+      const written = (mockUpdate.mock.calls[0] as [string, { config: Record<string, unknown> }])[1]
+        .config;
       mockGet.mockResolvedValue(makeAgent({ config: written }));
 
       fakeTunnels[0]?.emit("error", new Error("edge dropped the connection"));
@@ -647,9 +625,8 @@ describe("agent dev session", () => {
         { port: "8000", agent: "agent_abc123" },
         { healthIntervalMs: 5 },
       );
-      const written = (
-        mockUpdate.mock.calls[0] as [string, { config: Record<string, unknown> }]
-      )[1].config;
+      const written = (mockUpdate.mock.calls[0] as [string, { config: Record<string, unknown> }])[1]
+        .config;
       mockGet.mockResolvedValue(makeAgent({ config: written }));
       quickMock.mockImplementation(() => {
         throw new Error("no more tunnels");
@@ -677,9 +654,7 @@ describe("agent dev session", () => {
       );
 
       await vi.waitFor(() => {
-        expect(console.error).toHaveBeenCalledWith(
-          expect.stringContaining("stopped answering"),
-        );
+        expect(console.error).toHaveBeenCalledWith(expect.stringContaining("stopped answering"));
       });
       expect(quickMock).not.toHaveBeenCalled();
       // The session stays up: only the apply PATCH happened.
@@ -694,17 +669,16 @@ describe("agent dev session", () => {
     it("refreshes devTunnel.heartbeatAt through the agents service", async () => {
       // The auth proxy rejects the unauthenticated probe with 401, which still
       // proves the whole chain is up, so it counts as healthy.
-      vi.spyOn(globalThis, "fetch").mockImplementation(async () =>
-        new Response("unauthorized", { status: 401 }),
+      vi.spyOn(globalThis, "fetch").mockImplementation(
+        async () => new Response("unauthorized", { status: 401 }),
       );
 
       const session = await startAgentDevSession(
         { port: "8000", agent: "agent_abc123" },
         { healthIntervalMs: 5 },
       );
-      const written = (
-        mockUpdate.mock.calls[0] as [string, { config: Record<string, unknown> }]
-      )[1].config;
+      const written = (mockUpdate.mock.calls[0] as [string, { config: Record<string, unknown> }])[1]
+        .config;
       mockGet.mockResolvedValue(makeAgent({ config: written }));
 
       await vi.waitFor(() => {
@@ -713,8 +687,9 @@ describe("agent dev session", () => {
           .find(
             ([, params]) =>
               (
-                (params as { config: Record<string, unknown> }).config
-                  .devTunnel as { heartbeatAt?: string } | undefined
+                (params as { config: Record<string, unknown> }).config.devTunnel as
+                  | { heartbeatAt?: string }
+                  | undefined
               )?.heartbeatAt !== undefined,
           );
         expect(heartbeat).toBeDefined();
@@ -756,9 +731,8 @@ describe("agent dev session", () => {
       expect(restored.url).toBe("https://staging.example.com/agent");
       expect(restored.devTunnel).toBeUndefined();
 
-      const applied = (
-        mockUpdate.mock.calls[1] as [string, { config: Record<string, unknown> }]
-      )[1].config;
+      const applied = (mockUpdate.mock.calls[1] as [string, { config: Record<string, unknown> }])[1]
+        .config;
       expect(applied.url).toBe(`${TUNNEL_URL}/agent`);
       expect(applied.devTunnel).toMatchObject({
         previousUrl: "https://staging.example.com/agent",

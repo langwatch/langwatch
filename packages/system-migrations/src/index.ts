@@ -14,3 +14,7 @@ export {
   type TenantMigrationRecord,
   type TenantMigrationStatus,
 } from "./types";
+export {
+  startSystemMigrations,
+  type SystemMigrationPass,
+} from "./convergence";

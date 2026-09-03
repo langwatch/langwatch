@@ -11,9 +11,7 @@ import { resolveControlPlaneUrl } from "@/cli/utils/governance/resolveEndpoint";
  * Returns the deletion outcome rather than printing it: the output port renders
  * it in whatever format the caller asked for (utils/output.ts).
  */
-export const deleteGraphCommand = async (
-  id: string,
-): Promise<CommandResult | void> => {
+export const deleteGraphCommand = async (id: string): Promise<CommandResult | void> => {
   await resolveCredentials();
 
   const apiKey = scopedApiKey() ?? process.env.LANGWATCH_API_KEY ?? "";
@@ -33,7 +31,7 @@ export const deleteGraphCommand = async (
       process.exit(1);
     }
 
-    const result = await response.json() as { id: string; deleted: boolean };
+    const result = (await response.json()) as { id: string; deleted: boolean };
     spinner.succeed(`Graph "${id}" deleted`);
 
     return {

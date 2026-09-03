@@ -71,48 +71,62 @@ skills/
 ## Design Principles
 
 ### 1. Skills are the source of truth
+
 Every onboarding ability is defined as an AgentSkills-compliant skill. Prompts, docs references, and platform integrations are derived from skills.
 
 ### 2. No duplication — pull from docs
+
 Skills do NOT duplicate framework patterns, anti-patterns, or reference material that lives in LangWatch/Scenario docs. Instead, they tell the agent to fetch docs via the `langwatch docs` and `langwatch scenario-docs` CLI commands. Agent bias corrections (e.g., "don't hallucinate frameworks") are embedded directly in each SKILL.md since they're core to every skill.
 
 ### 3. Compiled prompts for zero-friction onboarding
+
 A compiler transforms skills into self-contained copy-paste prompts. Two modes:
+
 - **Platform mode**: API key is injected as a literal value
 - **Docs mode**: Agent is told to ask the user for their API key
 
 ### 4. CLI-only with graceful fallback for shell-less environments
+
 Skills tell the agent to install and use the `langwatch` CLI — it covers docs (`langwatch docs ...`, `langwatch scenario-docs ...`) and every platform operation. There is no MCP install step in any skill. If the CLI itself cannot be run (e.g., the agent is inside ChatGPT or another web assistant with no shell), the skill links to `_shared/llms-txt-fallback.md` for direct llms.txt-based doc fetching.
 
 ### 5. Every improvement has a test
+
 Each skill has scenario tests using Claude Code against fixture codebases. The testing pattern mirrors what's already in `mcp/typescript/tests/scenario-openai.test.ts`.
 
 ### 6. Dev skills write code, platform skills use the CLI
+
 Dev skills (`tracing`, `evaluations`, `scenarios`, `prompts`) explicitly tell the agent to write code files. Platform skills tell the agent to use the `langwatch` CLI for platform operations (e.g. `langwatch scenario create`, `langwatch evaluator create`, `langwatch prompt push`). Cross-cutting skills (`analytics`) use the CLI in both contexts. No skill instructs the agent to use MCP tools.
 
 ### 7. Agent generates content tailored to the user's application
+
 Skills that create datasets, experiments, or tests generate content based on the user's actual codebase — not from static templates or sample files. This maximizes the "a-ha" moment.
 
 ## Relationship to Existing Systems
 
 ### MCP Server (`mcp/typescript/`)
+
 The MCP server still exists and is useful for environments where users specifically prefer MCP tools (notably ChatGPT, where MCP is the only programmatic surface). However, **skills do not reference the MCP at all** — they only point at the `langwatch` CLI, which exposes the same docs (`langwatch docs`, `langwatch scenario-docs`) and platform operations directly. Keeping skills CLI-only avoids the agent juggling two surfaces.
 
 ### Better Agents CLI
+
 Better Agents scaffolds new projects from scratch. Skills are for existing projects. Better Agents knowledge templates inform skill content but the two don't share code — skills are standalone.
 
 ### Scenario & LangWatch Docs (`~/Projects/remote/scenario/docs`, `~/Projects/remote/langwatch-docs`)
+
 Skills pull framework patterns and best practices from these docs via the `langwatch docs` and `langwatch scenario-docs` CLI commands. A change in docs affects skill performance — this is by design, not duplication.
 
 ### Platform Frontend
+
 The `/onboarding` pages (built by another engineer) consume compiled prompts from the compiler. Empty state components in the platform also consume compiled prompts.
 
 ### Documentation Site
+
 Docs pages link to skills/prompts. The four onboarding paths should be reflected in all getting-started content.
 
 ## Testing Strategy
 
 ### Test Infrastructure
+
 - **Agent adapter**: Reusable Claude Code adapter (same pattern as `mcp/typescript/tests/`)
 - **Fixtures**: Minimal agent codebases per language/framework combination
 - **Assertions**: File content checks (deterministic) + JudgeAgent criteria (semantic)
@@ -120,20 +134,22 @@ Docs pages link to skills/prompts. The four onboarding paths should be reflected
 - **Platform skill tests**: Run in empty temp directory (no codebase) to simulate claude web
 
 ### Test Matrix
+
 Each skill is tested against relevant fixture combinations:
 
-| Skill              | python-openai | python-langgraph | python-agno | ts-vercel | ts-mastra |
-|--------------------|:---:|:---:|:---:|:---:|:---:|
-| instrument         | ✓ | ✓ | ✓ | ✓ | ✓ |
-| evaluation         | ✓ | - | - | ✓ | - |
-| scenario-test      | ✓ | - | - | ✓ | - |
-| prompt-versioning  | ✓ | - | - | ✓ | - |
-| red-team           | ✓ | - | - | ✓ | - |
-| level-up           | ✓ | - | - | ✓ | - |
+| Skill             | python-openai | python-langgraph | python-agno | ts-vercel | ts-mastra |
+| ----------------- | :-----------: | :--------------: | :---------: | :-------: | :-------: |
+| instrument        |       ✓       |        ✓         |      ✓      |     ✓     |     ✓     |
+| evaluation        |       ✓       |        -         |      -      |     ✓     |     -     |
+| scenario-test     |       ✓       |        -         |      -      |     ✓     |     -     |
+| prompt-versioning |       ✓       |        -         |      -      |     ✓     |     -     |
+| red-team          |       ✓       |        -         |      -      |     ✓     |     -     |
+| level-up          |       ✓       |        -         |      -      |     ✓     |     -     |
 
 Platform skills (`platform-experiment`, `platform-scenario`, `analytics`) are tested in empty directories with MCP only.
 
 ### Running Tests
+
 ```bash
 # All skill tests
 cd skills/_tests && pnpm test
@@ -148,9 +164,11 @@ cd skills/_tests && pnpm test -- --grep "python-openai"
 ## Prompt Compilation Pipeline
 
 ### Input
+
 One or more skill names + output mode (platform/docs) + optional API key.
 
 ### Process
+
 1. Read SKILL.md files for the requested skills
 2. Read `_shared/` references that skills point to
 3. Deduplicate shared content (CLI setup appears once)
@@ -158,7 +176,9 @@ One or more skill names + output mode (platform/docs) + optional API key.
 5. Inject API key or "ask user" instructions
 
 ### Output
+
 A self-contained prompt text that can be:
+
 - Displayed on the onboarding page
 - Shown in empty platform states
 - Published in documentation
@@ -167,6 +187,7 @@ A self-contained prompt text that can be:
 ## Extensibility
 
 Skills are designed to be extended over time:
+
 - **New frameworks**: Add a fixture codebase + test case
 - **New goals**: Create a new skill folder + SKILL.md + scenario test
 - **Granular use cases**: e.g., "test my voice agent with LangWatch" → new skill

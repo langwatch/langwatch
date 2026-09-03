@@ -10,6 +10,7 @@ Queue Management uses three sections of the [Ops Dashboard](/self-hosting/ops/da
 When a job fails repeatedly, its group becomes **blocked**: no new jobs in that group are processed until the error is resolved. The Blocked section clusters these failures by normalized error message, so you can see patterns at a glance.
 
 Each error cluster shows:
+
 - **Count**: how many groups are affected
 - **Error message**: normalized sample
 - **Pipeline**: which pipeline stage produced the error
@@ -17,19 +18,18 @@ Each error cluster shows:
 
 ### Actions on Blocked Groups
 
-<Note>
-All write actions require the `ops:manage` permission.
-</Note>
+<Note>All write actions require the `ops:manage` permission.</Note>
 
-| Action | Effect |
-|---|---|
-| **Unblock All** | Retries all blocked groups in the queue immediately |
+| Action             | Effect                                                                                                                                          |
+| ------------------ | ----------------------------------------------------------------------------------------------------------------------------------------------- |
+| **Unblock All**    | Retries all blocked groups in the queue immediately                                                                                             |
 | **Canary Unblock** | Retries a small random sample (default 5, configurable up to 100) to test whether the underlying issue is resolved before unblocking everything |
-| **Move to DLQ** | Moves all blocked groups to the Dead Letter Queue for later inspection or reprocessing |
-| **Drain** | Permanently discards all jobs in an error cluster, use when jobs are unrecoverable |
+| **Move to DLQ**    | Moves all blocked groups to the Dead Letter Queue for later inspection or reprocessing                                                          |
+| **Drain**          | Permanently discards all jobs in an error cluster, use when jobs are unrecoverable                                                              |
 
 <Warning>
-**Drain is irreversible.** Drained jobs cannot be recovered. Always prefer moving to DLQ first if there's any chance the jobs can be reprocessed later.
+  **Drain is irreversible.** Drained jobs cannot be recovered. Always prefer moving to DLQ
+  first if there's any chance the jobs can be reprocessed later.
 </Warning>
 
 ## Dead Letter Queue (DLQ)
@@ -37,6 +37,7 @@ All write actions require the `ops:manage` permission.
 The DLQ holds groups that were explicitly moved there, either automatically after exceeding retry limits or manually via the "Move to DLQ" action. Items in the DLQ are not processed until an operator takes action.
 
 Each DLQ entry shows:
+
 - **Queue name**: which queue the group came from
 - **Group ID** and **Pipeline**: for identification
 - **Error message**: the error that caused the failure
@@ -44,14 +45,16 @@ Each DLQ entry shows:
 
 ### Redriving from the DLQ
 
-| Action | Effect |
-|---|---|
-| **Replay All** | Moves all DLQ groups in a queue back to the main queue for reprocessing from the beginning |
-| **Replay** (single) | Moves a single group back to the main queue |
-| **Canary Redrive** | Test-replays a small random sample (default 5, configurable up to 100) before committing to a full redrive |
+| Action              | Effect                                                                                                     |
+| ------------------- | ---------------------------------------------------------------------------------------------------------- |
+| **Replay All**      | Moves all DLQ groups in a queue back to the main queue for reprocessing from the beginning                 |
+| **Replay** (single) | Moves a single group back to the main queue                                                                |
+| **Canary Redrive**  | Test-replays a small random sample (default 5, configurable up to 100) before committing to a full redrive |
 
 <Tip>
-**Use canary redrives after deploying a fix.** If the fix works for the canary batch, replay the rest. If it doesn't, the canary groups return to the DLQ and you haven't made the problem worse.
+  **Use canary redrives after deploying a fix.** If the fix works for the canary batch,
+  replay the rest. If it doesn't, the canary groups return to the DLQ and you haven't made
+  the problem worse.
 </Tip>
 
 ## Groups Table
@@ -59,6 +62,7 @@ Each DLQ entry shows:
 The Groups table provides a detailed per-group view of all processing groups across queues.
 
 Each row shows:
+
 - **Group ID**: the logical partition key
 - **Pipeline**: which pipeline stage this group belongs to
 - **Pending**: number of jobs waiting to be processed
@@ -69,6 +73,7 @@ Each row shows:
 ### Filtering
 
 Filter groups by status to focus on problems:
+
 - **All**: every group
 - **Blocked**: groups stuck due to errors
 - **Stale**: blocked groups that have been waiting too long
@@ -80,6 +85,7 @@ A search box lets you filter by Group ID, Pipeline name, or error message.
 ### Group Detail
 
 Click any row to open the **Group Detail** dialog, which shows:
+
 - Full status and pipeline information
 - Error message and stack trace
 - Active job ID (if currently processing)

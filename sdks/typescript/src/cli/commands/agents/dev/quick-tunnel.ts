@@ -27,14 +27,11 @@ const CLOUDFLARED_RELEASE = "2026.8.2";
  */
 const CLOUDFLARED_SHA256: Record<string, string> = {
   "linux-x64": "fcfb02b575a52ca1af2e3267af4e1517bcdeb30ac48c834c69abaed3c0576ad2",
-  "linux-arm64":
-    "7747d94570fb390cf47dcb4f9555c193c6355cda9793f0d878d9049e5d6a7790",
-  "linux-ia32":
-    "39845d980a4b74b9c84530a28d8fea1fe6c476de26460275602162b349f1cbef",
+  "linux-arm64": "7747d94570fb390cf47dcb4f9555c193c6355cda9793f0d878d9049e5d6a7790",
+  "linux-ia32": "39845d980a4b74b9c84530a28d8fea1fe6c476de26460275602162b349f1cbef",
   "linux-arm": "19809425f60a6261241dfa66a42b4115bab07c295396a3c4d5d7c247fc4e1412",
   "win32-x64": "c29eee2b121f5436a642eed69fd9767da7e7b8c510fa50aaa130337f931357b5",
-  "win32-ia32":
-    "6acb072357618fa16c53c43e05438ed728aacd47119f1c6c3aa1a668c3299b43",
+  "win32-ia32": "6acb072357618fa16c53c43e05438ed728aacd47119f1c6c3aa1a668c3299b43",
 };
 
 /** The tunnel process surface the session needs, satisfied by cloudflared's Tunnel. */
@@ -42,10 +39,7 @@ export interface TunnelHandle {
   stop: () => void;
   once(event: "url", listener: (url: string) => void): unknown;
   once(event: "error", listener: (error: Error) => void): unknown;
-  once(
-    event: "exit",
-    listener: (code: number | null, signal: unknown) => void,
-  ): unknown;
+  once(event: "exit", listener: (code: number | null, signal: unknown) => void): unknown;
 }
 
 /**

@@ -8,7 +8,7 @@ vi.mock("../../../utils/apiKey", () => ({
   })),
 }));
 
-import { readCliErrorDocument } from "@langwatch/langy/cards/handled-error";
+import { readCliErrorDocument } from "@langwatch/langy-contract/cards/handled-error";
 import { REQUEST_TIMEOUT_MS, uiCallCommand } from "../call";
 
 /**
@@ -89,7 +89,7 @@ describe("the ui call command", () => {
     it("sets a deadline the agent harness cannot outrun", () => {
       // Both numbers belong to other layers, so they are written here as the
       // boundary this test pins. UI_ACTION_MAX_BUDGET_MS lives in
-      // platform/app/src/server/app-layer/langy/ui-actions/ui-action.service.ts.
+      // packages/features/langy/server/src/services/langy-ui-action.service.ts.
       const SERVER_BUDGET_CEILING_MS = 15_000;
       const AGENT_HARNESS_COMMAND_LIMIT_MS = 30_000;
 

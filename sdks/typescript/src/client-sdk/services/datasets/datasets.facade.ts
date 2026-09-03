@@ -123,7 +123,7 @@ export class DatasetsFacade {
    */
   get = <T extends Record<string, unknown> = Record<string, unknown>>(
     slugOrId: string,
-    options?: GetDatasetOptions
+    options?: GetDatasetOptions,
   ): Promise<Dataset<T>> => {
     return this.#datasetService.getDataset<T>(slugOrId, options);
   };
@@ -135,7 +135,10 @@ export class DatasetsFacade {
    * @param options - Fields to update (name, columnTypes)
    * @returns The updated dataset metadata
    */
-  update = (slugOrId: string, options: UpdateDatasetOptions): Promise<DatasetMetadata> => {
+  update = (
+    slugOrId: string,
+    options: UpdateDatasetOptions,
+  ): Promise<DatasetMetadata> => {
     if (options.name == null && options.columnTypes == null) {
       throw new DatasetValidationError(
         "At least one field (name or columnTypes) must be provided for update",

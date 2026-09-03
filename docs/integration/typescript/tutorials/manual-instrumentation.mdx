@@ -63,7 +63,7 @@ await tracer.withActiveSpan("risky-operation", async (span) => {
     // Error is automatically recorded and span status is set to ERROR
     span.setStatus({
       code: SpanStatusCode.ERROR,
-      message: error.message
+      message: error.message,
     });
     span.recordException(error);
     throw error; // Re-throw to maintain error flow
@@ -120,13 +120,13 @@ await tracer.withActiveSpan("custom-operation", async (span) => {
     "custom.user_tier": "premium",
     "custom.operation_type": "batch_processing",
     "llm.model": "gpt-5-mini",
-    "llm.temperature": 0.7
+    "llm.temperature": 0.7,
   });
 
   // Add events to track important milestones
   span.addEvent("processing_started", {
     timestamp: Date.now(),
-    batch_size: 1000
+    batch_size: 1000,
   });
 
   // Your business logic
@@ -134,7 +134,7 @@ await tracer.withActiveSpan("custom-operation", async (span) => {
 
   span.addEvent("processing_completed", {
     timestamp: Date.now(),
-    processed_count: result.length
+    processed_count: result.length,
   });
 
   span.setOutput(result);
@@ -145,7 +145,10 @@ await tracer.withActiveSpan("custom-operation", async (span) => {
 ```
 
 <Tip>
-For consistent attribute naming and TypeScript autocomplete support, use semantic conventions. See our [Semantic Conventions](/integration/typescript/tutorials/semantic-conventions) guide for best practices.
+  For consistent attribute naming and TypeScript autocomplete support, use semantic
+  conventions. See our [Semantic
+  Conventions](/integration/typescript/tutorials/semantic-conventions) guide for best
+  practices.
 </Tip>
 
 ### Conditional Span Creation
@@ -193,7 +196,7 @@ tracer.startActiveSpan("my-operation", (span) => {
   } catch (error) {
     span.setStatus({
       code: SpanStatusCode.ERROR,
-      message: error.message
+      message: error.message,
     });
     span.recordException(error);
     throw error;
@@ -219,7 +222,7 @@ try {
 } catch (error) {
   span.setStatus({
     code: SpanStatusCode.ERROR,
-    message: error.message
+    message: error.message,
   });
   span.recordException(error);
   throw error;
@@ -250,7 +253,7 @@ async function processWithContext(userId: string) {
   } catch (error) {
     span.setStatus({
       code: SpanStatusCode.ERROR,
-      message: error.message
+      message: error.message,
     });
     span.recordException(error);
     throw error;
@@ -270,7 +273,7 @@ class SpanManager {
 
   async executeWithSpan<T>(
     operationName: string,
-    operation: (span: Span) => Promise<T>
+    operation: (span: Span) => Promise<T>,
   ): Promise<T> {
     const span = this.tracer.startSpan(operationName);
 
@@ -281,7 +284,7 @@ class SpanManager {
     } catch (error) {
       span.setStatus({
         code: SpanStatusCode.ERROR,
-        message: error.message
+        message: error.message,
       });
       span.recordException(error);
       throw error;
@@ -317,15 +320,17 @@ import { OTLPTraceExporter } from "@opentelemetry/exporter-trace-otlp-http";
 const handle = setupObservability({
   // Use custom span processors
   spanProcessors: [
-    new BatchSpanProcessor(new OTLPTraceExporter({
-      url: 'https://custom-collector.com/v1/traces'
-    }))
+    new BatchSpanProcessor(
+      new OTLPTraceExporter({
+        url: "https://custom-collector.com/v1/traces",
+      }),
+    ),
   ],
 
   // Or use a single trace exporter
   traceExporter: new OTLPTraceExporter({
-    url: 'https://custom-collector.com/v1/traces'
-  })
+    url: "https://custom-collector.com/v1/traces",
+  }),
 });
 ```
 
@@ -344,13 +349,13 @@ const processor = new FilterableBatchSpanProcessor(
   [
     { attribute: "http.url", value: "/health" },
     { attribute: "span.type", value: "health" },
-    { attribute: "custom.ignore", value: "true" }
-  ]
+    { attribute: "custom.ignore", value: "true" },
+  ],
 );
 
 const handle = setupObservability({
-  langwatch: 'disabled',
-  spanProcessors: [processor]
+  langwatch: "disabled",
+  spanProcessors: [processor],
 });
 ```
 
@@ -367,14 +372,18 @@ const handle = setupObservability({
   serviceName: "my-service",
   spanProcessors: [
     // Send to Jaeger for debugging
-    new BatchSpanProcessor(new JaegerExporter({
-      endpoint: "http://localhost:14268/api/traces"
-    })),
+    new BatchSpanProcessor(
+      new JaegerExporter({
+        endpoint: "http://localhost:14268/api/traces",
+      }),
+    ),
     // Send to LangWatch for production monitoring
-    new BatchSpanProcessor(new LangWatchExporter({
-      apiKey: process.env.LANGWATCH_API_KEY
-    }))
-  ]
+    new BatchSpanProcessor(
+      new LangWatchExporter({
+        apiKey: process.env.LANGWATCH_API_KEY,
+      }),
+    ),
+  ],
 });
 ```
 
@@ -388,19 +397,19 @@ import { LangWatchExporter } from "langwatch";
 
 const batchProcessor = new BatchSpanProcessor(
   new LangWatchExporter({
-    apiKey: process.env.LANGWATCH_API_KEY
+    apiKey: process.env.LANGWATCH_API_KEY,
   }),
   {
     maxQueueSize: 2048, // Maximum number of spans in queue
     maxExportBatchSize: 512, // Maximum spans per batch
     scheduledDelayMillis: 5000, // Export interval
     exportTimeoutMillis: 30000, // Export timeout
-  }
+  },
 );
 
 const handle = setupObservability({
-  langwatch: 'disabled', // Disabled we report to LangWatch via the `batchProcessor`
-  spanProcessors: [batchProcessor]
+  langwatch: "disabled", // Disabled we report to LangWatch via the `batchProcessor`
+  spanProcessors: [batchProcessor],
 });
 ```
 
@@ -409,7 +418,8 @@ const handle = setupObservability({
 When using manual span management, consider these performance implications:
 
 <Warning>
-Manual span management requires careful attention to memory usage and proper cleanup to avoid memory leaks.
+  Manual span management requires careful attention to memory usage and proper cleanup to
+  avoid memory leaks.
 </Warning>
 
 1. **Memory Usage**: Manually created spans consume memory until explicitly ended
@@ -428,27 +438,23 @@ Manual span management requires careful attention to memory usage and proper cle
 </Card>
 
 <Card title="Manual Control" icon="settings">
-  - Use manual span management only when needed
-  - Always end spans in finally blocks
-  - Use try-catch-finally patterns consistently
+  - Use manual span management only when needed - Always end spans in finally blocks - Use
+  try-catch-finally patterns consistently
 </Card>
 
 <Card title="Context Management" icon="context">
-  - Propagate span context across async boundaries
-  - Use context.with() for async operations
-  - Maintain span hierarchy properly
+  - Propagate span context across async boundaries - Use context.with() for async
+  operations - Maintain span hierarchy properly
 </Card>
 
 <Card title="Attributes and Events" icon="attributes">
-  - Add meaningful custom attributes for filtering
-  - Use consistent attribute naming conventions
-  - Include relevant business context
+  - Add meaningful custom attributes for filtering - Use consistent attribute naming
+  conventions - Include relevant business context
 </Card>
 
 <Card title="Performance" icon="performance">
-  - Implement appropriate sampling strategies
-  - Use batch processors for high volume
-  - Monitor observability overhead
+  - Implement appropriate sampling strategies - Use batch processors for high volume -
+  Monitor observability overhead
 </Card>
 
 <Card title="Error Handling" icon="error">
@@ -474,6 +480,7 @@ await tracer.withActiveSpan("my-operation", async (span) => {
   return await processData();
 });
 ```
+
 </Tab>
 
 <Tab title="startActiveSpan">
@@ -496,6 +503,7 @@ tracer.startActiveSpan("my-operation", (span) => {
   }
 });
 ```
+
 </Tab>
 
 <Tab title="startSpan (Manual)">
@@ -517,11 +525,14 @@ try {
   span.end();
 }
 ```
+
 </Tab>
 </Tabs>
 
 <Info>
-The `withActiveSpan` method provides the best balance of ease of use, safety, and functionality. Only use manual span management when you need specific control over span lifecycle or context propagation that `withActiveSpan` cannot provide.
+  The `withActiveSpan` method provides the best balance of ease of use, safety, and
+  functionality. Only use manual span management when you need specific control over span
+  lifecycle or context propagation that `withActiveSpan` cannot provide.
 </Info>
 
 ## Related Documentation
@@ -535,5 +546,7 @@ For more advanced observability patterns and best practices:
 - **[Framework Integrations](/integration/typescript/integrations)** - Framework-specific instrumentation approaches
 
 <Tip>
-Combine manual instrumentation with [Semantic Conventions](/integration/typescript/tutorials/semantic-conventions) for consistent, maintainable observability across your application.
+  Combine manual instrumentation with [Semantic
+  Conventions](/integration/typescript/tutorials/semantic-conventions) for consistent,
+  maintainable observability across your application.
 </Tip>

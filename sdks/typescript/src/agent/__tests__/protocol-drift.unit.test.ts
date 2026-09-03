@@ -1,13 +1,13 @@
 /**
  * The SDK's frame shapes against the platform's protocol module.
  *
- * `platform/app/src/server/connected-agents/protocol.ts` is the contract;
- * `src/agent/protocol.ts` is the SDK's copy. This test reads the platform
- * source from the repository and pins the frame type names and the
+ * `packages/features/agent/contract/src/connected-agent.protocol.ts` is the
+ * contract; `src/agent/protocol.ts` is the SDK's copy. This test reads the
+ * platform source from the repository and pins the frame type names and the
  * top-level keys of every frame, so the two cannot drift apart without a
  * failing test. It compares key lists read from the source text, never the
- * zod objects. A published SDK checkout has no platform tree, so the test
- * skips there and says so.
+ * zod objects. A published SDK checkout has no platform packages, so the
+ * test skips there and says so.
  */
 import { existsSync, readFileSync } from "node:fs";
 import { resolve } from "node:path";
@@ -17,7 +17,7 @@ import { PROTOCOL_VERSION } from "../protocol";
 
 const PLATFORM_PROTOCOL = resolve(
   __dirname,
-  "../../../../../platform/app/src/server/connected-agents/protocol.ts",
+  "../../../../../packages/features/agent/contract/src/connected-agent.protocol.ts",
 );
 const SDK_PROTOCOL = resolve(__dirname, "../protocol.ts");
 const SDK_CLIENT = resolve(__dirname, "../client.ts");
@@ -85,8 +85,8 @@ const withoutType = (keys: string[]): string[] => keys.filter((key) => key !== "
 
 describe("the SDK protocol, given the platform's protocol module", () => {
   if (!existsSync(PLATFORM_PROTOCOL)) {
-    it.skip("matches the platform contract (skipped: no platform tree in this checkout)", () => {
-      // A published SDK checkout carries no platform/app; the drift check runs in the monorepo.
+    it.skip("matches the platform contract (skipped: no platform packages in this checkout)", () => {
+      // A published SDK checkout carries no platform packages; the drift check runs in the monorepo.
     });
     return;
   }
@@ -101,11 +101,24 @@ describe("the SDK protocol, given the platform's protocol module", () => {
 
   it("knows every frame type the platform names", () => {
     const platformTypes = [
-      ...new Set([...platform.matchAll(/type: z\.literal\("([a-z_]+)"\)/g)].map((entry) => entry[1]!)),
+      ...new Set(
+        [...platform.matchAll(/type: z\.literal\("([a-z_]+)"\)/g)].map((entry) => entry[1]!),
+      ),
     ].sort();
-    const sdkTypes = [...new Set([...sdk.matchAll(/type: "([a-z_]+)";/g)].map((entry) => entry[1]!))].sort();
+    const sdkTypes = [
+      ...new Set([...sdk.matchAll(/type: "([a-z_]+)";/g)].map((entry) => entry[1]!)),
+    ].sort();
     expect(sdkTypes).toEqual(platformTypes);
-    expect(sdkTypes).toEqual(["ack", "call", "cancel", "deregister", "refused", "register", "registered", "result"]);
+    expect(sdkTypes).toEqual([
+      "ack",
+      "call",
+      "cancel",
+      "deregister",
+      "refused",
+      "register",
+      "registered",
+      "result",
+    ]);
   });
 
   describe("when the frames the SDK sends are compared", () => {
@@ -114,28 +127,41 @@ describe("the SDK protocol, given the platform's protocol module", () => {
         sorted(platformKeys({ source: platform, schema: "sdkSchema" })),
       );
       // The platform also accepts an optional maxConcurrency the SDK does not send.
-      const instanceKeys = platformKeys({ source: platform, schema: "registerInstanceSchema" }).filter(
-        (key) => key !== "maxConcurrency",
+      const instanceKeys = platformKeys({
+        source: platform,
+        schema: "registerInstanceSchema",
+      }).filter((key) => key !== "maxConcurrency");
+      expect(sorted(sdkKeys({ source: sdk, name: "RegisterInstance" }))).toEqual(
+        sorted(instanceKeys),
       );
-      expect(sorted(sdkKeys({ source: sdk, name: "RegisterInstance" }))).toEqual(sorted(instanceKeys));
       expect(sorted(sdkKeys({ source: sdk, name: "RegisterAgent" }))).toEqual(
         sorted(platformKeys({ source: platform, schema: "registerAgentSchema" })),
       );
       expect(sorted(withoutType(sdkKeys({ source: sdk, name: "RegisterFrame" })))).toEqual(
-        sorted(["protocol", ...withoutType(platformKeys({ source: platform, schema: "registerFrameSchema" }))]),
+        sorted([
+          "protocol",
+          ...withoutType(platformKeys({ source: platform, schema: "registerFrameSchema" })),
+        ]),
       );
     });
 
     it("ack, result and deregister carry the same keys", () => {
       expect(sorted(withoutType(sdkKeys({ source: sdk, name: "AckFrame" })))).toEqual(
-        sorted(["protocol", ...withoutType(platformKeys({ source: platform, schema: "ackFrameSchema" }))]),
+        sorted([
+          "protocol",
+          ...withoutType(platformKeys({ source: platform, schema: "ackFrameSchema" })),
+        ]),
       );
-      const resultKeys = withoutType(platformKeys({ source: platform, schema: "resultFrameSchema" }));
+      const resultKeys = withoutType(
+        platformKeys({ source: platform, schema: "resultFrameSchema" }),
+      );
       expect(sorted(resultKeys)).toEqual(sorted(["callId", "output", "session", "error"]));
       expect(sorted(sdkKeys({ source: sdk, name: "CallError" }))).toEqual(
         sorted(platformKeys({ source: platform, schema: "resultErrorSchema" })),
       );
-      expect(sorted(withoutType(sdkKeys({ source: sdk, name: "DeregisterFrame" })))).toEqual(["protocol"]);
+      expect(sorted(withoutType(sdkKeys({ source: sdk, name: "DeregisterFrame" })))).toEqual([
+        "protocol",
+      ]);
     });
   });
 

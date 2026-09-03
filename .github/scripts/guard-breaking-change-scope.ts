@@ -47,9 +47,7 @@ type ReleasePleaseConfig = {
 const isUnder = (file: string, path: string): boolean =>
   path === rootPath || file.indexOf(`${path}/`) === 0;
 
-export const releaseComponents = (
-  config: ReleasePleaseConfig,
-): ReleaseComponent[] =>
+export const releaseComponents = (config: ReleasePleaseConfig): ReleaseComponent[] =>
   Object.entries(config.packages ?? {}).map(([path, packageConfig]) => ({
     path,
     name: packageConfig?.component ?? path,
@@ -159,9 +157,7 @@ export const componentPins = ({
 
     const recorded = shimVersion(readShim(shim) ?? "");
     const pinned =
-      recorded !== undefined && footerVersions.includes(recorded)
-        ? recorded
-        : undefined;
+      recorded !== undefined && footerVersions.includes(recorded) ? recorded : undefined;
     return { component, shim, shimChanged: true, recorded, pinned };
   });
 
@@ -171,8 +167,7 @@ const readLines = (path: string): string[] =>
     .map((line) => line.trim())
     .filter((line) => line !== "");
 
-const readJson = <T>(path: string): T =>
-  JSON.parse(readFileSync(path, "utf8")) as T;
+const readJson = <T>(path: string): T => JSON.parse(readFileSync(path, "utf8")) as T;
 
 /**
  * A shim the pull request deletes, or one under a path this checkout does not
@@ -200,9 +195,7 @@ const reportHalfDonePins = ({
   pins: ComponentPin[];
   footerVersions: string[];
 }): void => {
-  const halfDone = pins.filter(
-    (pin) => pin.pinned === undefined && pin.shimChanged,
-  );
+  const halfDone = pins.filter((pin) => pin.pinned === undefined && pin.shimChanged);
 
   if (halfDone.length > 0) {
     console.error("A pin takes both halves: the shim edit, which is what");
@@ -316,9 +309,7 @@ const main = (): number => {
     return 2;
   }
 
-  const messages = readLines(messagesArg).map(
-    (line) => JSON.parse(line) as string,
-  );
+  const messages = readLines(messagesArg).map((line) => JSON.parse(line) as string);
   if (!carriesBreakingChange(messages)) {
     console.log("no breaking-change marker, release scope check skipped");
     return 0;
@@ -348,9 +339,7 @@ const main = (): number => {
   // exemption: see reportPinsDoNotExempt. More than one bumped component with a
   // breaking marker fails, and the `multi-component-major` label — checked by
   // the workflow before this script runs — is the only way past it.
-  const versions = readJson<Record<string, string>>(
-    resolve(repoRoot, manifestFile),
-  );
+  const versions = readJson<Record<string, string>>(resolve(repoRoot, manifestFile));
   report({ pins, versions, footerVersions });
   return 1;
 };

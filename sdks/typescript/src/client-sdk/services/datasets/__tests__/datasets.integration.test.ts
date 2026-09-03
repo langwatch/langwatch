@@ -4,15 +4,7 @@
  * Tests all CRUD operations for datasets and records with mocked API boundaries (MSW).
  * Corresponds to @integration scenarios in specs/features/dataset-typescript-sdk.feature.
  */
-import {
-  describe,
-  it,
-  expect,
-  beforeAll,
-  beforeEach,
-  afterAll,
-  afterEach,
-} from "vitest";
+import { describe, it, expect, beforeAll, beforeEach, afterAll, afterEach } from "vitest";
 import { http, HttpResponse } from "msw";
 import { setupServer } from "msw/node";
 import { LangWatch } from "@/client-sdk";
@@ -76,7 +68,12 @@ describe("Feature: Dataset TypeScript SDK", () => {
           http.get(`${TEST_ENDPOINT}/api/dataset`, () => {
             return HttpResponse.json({
               data: [
-                datasetMetadata({ id: "d1", name: "ds-1", slug: "ds-1", recordCount: 10 }),
+                datasetMetadata({
+                  id: "d1",
+                  name: "ds-1",
+                  slug: "ds-1",
+                  recordCount: 10,
+                }),
                 datasetMetadata({ id: "d2", name: "ds-2", slug: "ds-2", recordCount: 5 }),
                 datasetMetadata({ id: "d3", name: "ds-3", slug: "ds-3", recordCount: 0 }),
               ],
@@ -165,7 +162,9 @@ describe("Feature: Dataset TypeScript SDK", () => {
 
       /** @scenario "Create a dataset propagates conflict error" */
       it("throws a DatasetApiError with status 409", async () => {
-        const error = await langwatch.datasets.create({ name: "existing-name" }).catch((e: unknown) => e);
+        const error = await langwatch.datasets
+          .create({ name: "existing-name" })
+          .catch((e: unknown) => e);
         expect(error).toBeInstanceOf(DatasetApiError);
         expect((error as DatasetApiError).status).toBe(409);
       });
@@ -217,9 +216,9 @@ describe("Feature: Dataset TypeScript SDK", () => {
 
       /** @scenario "Get non-existent dataset throws DatasetNotFoundError" */
       it("throws a DatasetNotFoundError", async () => {
-        await expect(
-          langwatch.datasets.get("does-not-exist"),
-        ).rejects.toThrow(DatasetNotFoundError);
+        await expect(langwatch.datasets.get("does-not-exist")).rejects.toThrow(
+          DatasetNotFoundError,
+        );
       });
     });
   });
@@ -235,13 +234,16 @@ describe("Feature: Dataset TypeScript SDK", () => {
         capturedBody = null;
         capturedPath = null;
         server.use(
-          http.patch(`${TEST_ENDPOINT}/api/dataset/:slugOrId`, async ({ request, params }) => {
-            capturedBody = (await request.json()) as Record<string, unknown>;
-            capturedPath = params.slugOrId as string;
-            return HttpResponse.json(
-              datasetMetadata({ name: "new-name", slug: "new-name" }),
-            );
-          }),
+          http.patch(
+            `${TEST_ENDPOINT}/api/dataset/:slugOrId`,
+            async ({ request, params }) => {
+              capturedBody = (await request.json()) as Record<string, unknown>;
+              capturedPath = params.slugOrId as string;
+              return HttpResponse.json(
+                datasetMetadata({ name: "new-name", slug: "new-name" }),
+              );
+            },
+          ),
         );
       });
 
@@ -270,9 +272,9 @@ describe("Feature: Dataset TypeScript SDK", () => {
 
       /** @scenario "Update a non-existent dataset throws DatasetNotFoundError" */
       it("throws a DatasetNotFoundError", async () => {
-        await expect(
-          langwatch.datasets.update("ghost", { name: "x" }),
-        ).rejects.toThrow(DatasetNotFoundError);
+        await expect(langwatch.datasets.update("ghost", { name: "x" })).rejects.toThrow(
+          DatasetNotFoundError,
+        );
       });
     });
   });
@@ -288,7 +290,9 @@ describe("Feature: Dataset TypeScript SDK", () => {
         server.use(
           http.delete(`${TEST_ENDPOINT}/api/dataset/:slugOrId`, ({ params }) => {
             capturedPath = params.slugOrId as string;
-            return HttpResponse.json(datasetMetadata({ archivedAt: "2025-06-01T00:00:00Z" }));
+            return HttpResponse.json(
+              datasetMetadata({ archivedAt: "2025-06-01T00:00:00Z" }),
+            );
           }),
         );
       });
@@ -317,9 +321,9 @@ describe("Feature: Dataset TypeScript SDK", () => {
 
       /** @scenario "Delete a non-existent dataset throws DatasetNotFoundError" */
       it("throws a DatasetNotFoundError", async () => {
-        await expect(
-          langwatch.datasets.delete("ghost"),
-        ).rejects.toThrow(DatasetNotFoundError);
+        await expect(langwatch.datasets.delete("ghost")).rejects.toThrow(
+          DatasetNotFoundError,
+        );
       });
     });
   });
@@ -335,14 +339,14 @@ describe("Feature: Dataset TypeScript SDK", () => {
         capturedBody = null;
         capturedPath = null;
         server.use(
-          http.post(`${TEST_ENDPOINT}/api/dataset/:slugOrId/records`, async ({ request, params }) => {
-            capturedBody = (await request.json()) as Record<string, unknown>;
-            capturedPath = params.slugOrId as string;
-            return HttpResponse.json(
-              { data: [recordFixture()] },
-              { status: 201 },
-            );
-          }),
+          http.post(
+            `${TEST_ENDPOINT}/api/dataset/:slugOrId/records`,
+            async ({ request, params }) => {
+              capturedBody = (await request.json()) as Record<string, unknown>;
+              capturedPath = params.slugOrId as string;
+              return HttpResponse.json({ data: [recordFixture()] }, { status: 201 });
+            },
+          ),
         );
       });
 
@@ -401,9 +405,7 @@ describe("Feature: Dataset TypeScript SDK", () => {
               capturedBody = (await request.json()) as Record<string, unknown>;
               capturedSlug = params.slugOrId as string;
               capturedRecordId = params.recordId as string;
-              return HttpResponse.json(
-                recordFixture({ entry: { input: "updated" } }),
-              );
+              return HttpResponse.json(recordFixture({ entry: { input: "updated" } }));
             },
           ),
         );
@@ -425,15 +427,12 @@ describe("Feature: Dataset TypeScript SDK", () => {
     describe("when the API responds with 404", () => {
       beforeEach(() => {
         server.use(
-          http.patch(
-            `${TEST_ENDPOINT}/api/dataset/:slugOrId/records/:recordId`,
-            () => {
-              return HttpResponse.json(
-                { error: "Not Found", message: "Dataset not found" },
-                { status: 404 },
-              );
-            },
-          ),
+          http.patch(`${TEST_ENDPOINT}/api/dataset/:slugOrId/records/:recordId`, () => {
+            return HttpResponse.json(
+              { error: "Not Found", message: "Dataset not found" },
+              { status: 404 },
+            );
+          }),
         );
       });
 
@@ -457,11 +456,14 @@ describe("Feature: Dataset TypeScript SDK", () => {
         capturedBody = null;
         capturedPath = null;
         server.use(
-          http.delete(`${TEST_ENDPOINT}/api/dataset/:slugOrId/records`, async ({ request, params }) => {
-            capturedBody = (await request.json()) as Record<string, unknown>;
-            capturedPath = params.slugOrId as string;
-            return HttpResponse.json({ deletedCount: 2 });
-          }),
+          http.delete(
+            `${TEST_ENDPOINT}/api/dataset/:slugOrId/records`,
+            async ({ request, params }) => {
+              capturedBody = (await request.json()) as Record<string, unknown>;
+              capturedPath = params.slugOrId as string;
+              return HttpResponse.json({ deletedCount: 2 });
+            },
+          ),
         );
       });
 
@@ -507,10 +509,7 @@ describe("Feature: Dataset TypeScript SDK", () => {
         server.use(
           http.get(`${TEST_ENDPOINT}/api/dataset/:slugOrId/records`, () => {
             return HttpResponse.json({
-              data: [
-                recordFixture({ id: "rec-0" }),
-                recordFixture({ id: "rec-1" }),
-              ],
+              data: [recordFixture({ id: "rec-0" }), recordFixture({ id: "rec-1" })],
               pagination: {
                 page: 1,
                 limit: 50,
@@ -552,9 +551,9 @@ describe("Feature: Dataset TypeScript SDK", () => {
 
       /** @scenario "List records for non-existent dataset throws error" */
       it("throws a DatasetNotFoundError", async () => {
-        await expect(
-          langwatch.datasets.listRecords("does-not-exist"),
-        ).rejects.toThrow(DatasetNotFoundError);
+        await expect(langwatch.datasets.listRecords("does-not-exist")).rejects.toThrow(
+          DatasetNotFoundError,
+        );
       });
     });
 
@@ -564,16 +563,13 @@ describe("Feature: Dataset TypeScript SDK", () => {
       beforeEach(() => {
         capturedUrl = undefined;
         server.use(
-          http.get(
-            `${TEST_ENDPOINT}/api/dataset/:slugOrId/records`,
-            ({ request }) => {
-              capturedUrl = new URL(request.url);
-              return HttpResponse.json({
-                data: [],
-                pagination: { page: 2, limit: 20, total: 0, totalPages: 0 },
-              });
-            },
-          ),
+          http.get(`${TEST_ENDPOINT}/api/dataset/:slugOrId/records`, ({ request }) => {
+            capturedUrl = new URL(request.url);
+            return HttpResponse.json({
+              data: [],
+              pagination: { page: 2, limit: 20, total: 0, totalPages: 0 },
+            });
+          }),
         );
       });
 
@@ -688,10 +684,7 @@ describe("Feature: Dataset TypeScript SDK", () => {
             http.get(`${TEST_ENDPOINT}/api/dataset/:slugOrId/records`, () => {
               if (deleteCallCount === 0) {
                 return HttpResponse.json({
-                  data: [
-                    recordFixture({ id: "rec-0" }),
-                    recordFixture({ id: "rec-1" }),
-                  ],
+                  data: [recordFixture({ id: "rec-0" }), recordFixture({ id: "rec-1" })],
                   pagination: { page: 1, limit: 1000, total: 2, totalPages: 1 },
                 });
               }
@@ -747,7 +740,9 @@ describe("Feature: Dataset TypeScript SDK", () => {
         it("throws a DatasetApiError with status 409", async () => {
           const file = new File(["data"], "data.csv", { type: "text/csv" });
 
-          const error = await langwatch.datasets.upload("my-data", file, { ifExists: "error" }).catch((e: unknown) => e);
+          const error = await langwatch.datasets
+            .upload("my-data", file, { ifExists: "error" })
+            .catch((e: unknown) => e);
           expect(error).toBeInstanceOf(DatasetApiError);
           expect((error as DatasetApiError).status).toBe(409);
         });

@@ -13,7 +13,7 @@ import (
 func restartStack() domain.Stack {
 	return domain.Stack{
 		Slug: "feat-x", WorktreeDir: "/wt/feat-x", LauncherPID: 42,
-		APIPort: 9100, WorkerMetricsPort: 9200, HasStandaloneWorkers: true,
+		APIPort: 9100, WorkerMetricsPort: 9200,
 		Services: []domain.Service{
 			{Name: "app", Port: 9000},
 			{Name: "gateway", Port: 9001},
@@ -21,15 +21,6 @@ func restartStack() domain.Stack {
 			{Name: "clickhouse", Port: 8123},            // shared DB server — never a restart target
 		},
 	}
-}
-
-// inProcessWorkersStack is restartStack in the default in-process worker mode:
-// WorkerMetricsPort is set (the API child binds it) but HasStandaloneWorkers is
-// false, so there is no separate workers lane to bounce.
-func inProcessWorkersStack() domain.Stack {
-	st := restartStack()
-	st.HasStandaloneWorkers = false
-	return st
 }
 
 func restartOrch(store *fakeStore, sys *fakeSystem) *Orchestrator {
@@ -41,6 +32,7 @@ func restartOrch(store *fakeStore, sys *fakeSystem) *Orchestrator {
 
 // @scenario "Restarting one service bounces only that service"
 // @scenario "Restarting with no service named bounces every supervised child"
+// @scenario "Bouncing the workers lane touches only its own process group"
 func TestRestart(t *testing.T) {
 	ctx := context.Background()
 	params := UpParams{WorktreeDir: "/wt/feat-x", IsLinkedWorktree: true}
@@ -113,7 +105,7 @@ func TestRestart(t *testing.T) {
 			store, sys, _ := newFixture()
 			sys.pidsByPort[9000] = []int{42}
 			o := restartOrch(store, sys)
-			if err := o.Restart(ctx, params, "app", false); err != nil {
+			if err := o.Restart(ctx, params, "ui", false); err != nil {
 				t.Fatalf("Restart: %v", err)
 			}
 			if len(sys.groupTerminated) != 0 {
@@ -121,37 +113,33 @@ func TestRestart(t *testing.T) {
 			}
 		})
 
-		t.Run("when workers run in-process, `workers` is not a restart target", func(t *testing.T) {
-			// Default haven mode: the API child hosts the workers and holds
-			// WorkerMetricsPort itself, so `restart workers` must refuse rather than
-			// terminate the API's group; `restart` (all) must not touch it either.
-			store := &fakeStore{
-				stacks:    []domain.Stack{inProcessWorkersStack()},
-				slugCache: map[string]string{"/wt/feat-x": "feat-x"},
+		// The three Node lanes are three processes, so each holds its own port and
+		// its own group. `workers` is always a target, and bouncing it can never
+		// reach the API's group — which is exactly what it did while the two
+		// shared a process.
+		t.Run("when `workers` is named, only the workers' own group is bounced", func(t *testing.T) {
+			store, sys, o := newFixture()
+			if err := o.Restart(ctx, params, "workers", false); err != nil {
+				t.Fatalf("Restart(workers): %v", err)
 			}
-			sys := &fakeSystem{
-				alive:      map[int]bool{42: true},
-				pidsByPort: map[int][]int{9000: {100}, 9001: {101}, 9100: {102}, 9200: {102}},
+			_ = store
+			if len(sys.groupTerminated) != 1 || sys.groupTerminated[0] != 103 {
+				t.Errorf("expected only the workers group (pid 103) bounced, got %v", sys.groupTerminated)
 			}
-			o := restartOrch(store, sys)
+		})
 
-			if err := o.Restart(ctx, params, "workers", false); err == nil {
-				t.Error("restart workers should refuse in in-process mode")
-			}
-			if len(sys.groupTerminated) != 0 {
-				t.Errorf("restart workers must terminate nothing in in-process mode, got %v", sys.groupTerminated)
-			}
-
+		t.Run("when nothing is named, all three Node lanes are bounced", func(t *testing.T) {
+			_, sys, o := newFixture()
 			if err := o.Restart(ctx, params, "", false); err != nil {
 				t.Fatalf("Restart(all): %v", err)
 			}
-			// app, gateway, api — NOT workers (its port belongs to the API child).
+			// ui (9000), gateway (9001), api (9100), workers (9200).
+			want := map[int]bool{100: true, 101: true, 102: true, 103: true}
 			for _, pid := range sys.groupTerminated {
-				if pid == 103 {
-					t.Errorf("workers group must not be bounced in in-process mode")
+				if !want[pid] {
+					t.Errorf("unexpected group %d bounced, got %v", pid, sys.groupTerminated)
 				}
 			}
-			want := map[int]bool{100: true, 101: true, 102: true}
 			if len(sys.groupTerminated) != len(want) {
 				t.Fatalf("expected %d groups terminated, got %v", len(want), sys.groupTerminated)
 			}
@@ -163,7 +151,7 @@ func TestRestart(t *testing.T) {
 			store, sys, _ := newFixture()
 			sys.alive = map[int]bool{}
 			o := restartOrch(store, sys)
-			if err := o.Restart(ctx, params, "app", false); err == nil {
+			if err := o.Restart(ctx, params, "ui", false); err == nil {
 				t.Error("Restart should refuse when the launcher is dead")
 			}
 		})
@@ -190,9 +178,9 @@ func TestUpReconcilesRunningStack(t *testing.T) {
 			// Spelled out rather than derived through SelectionFromStack: deriving
 			// the expectation with the same function reconcile compares with makes
 			// the assertion f(x) == f(x), which holds for any implementation.
-			// restartStack runs app + a standalone worker lane + a real gateway;
-			// its nlp is a baseline fallback, so it is not part of the selection.
-			opts := PlanOptions{Selection: domain.Selection{Workers: true, Gateway: true}}
+			// restartStack runs the three Node lanes + a real gateway; its nlp is a
+			// baseline fallback, so it is not part of the selection.
+			opts := PlanOptions{Selection: domain.Selection{Gateway: true}}
 			proceed, err := o.reconcileRunningStack(params, opts)
 			if err != nil {
 				t.Fatalf("reconcile: %v", err)

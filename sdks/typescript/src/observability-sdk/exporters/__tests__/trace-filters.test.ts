@@ -569,4 +569,3 @@ describe("trace-filters", () => {
     });
   });
 });
-

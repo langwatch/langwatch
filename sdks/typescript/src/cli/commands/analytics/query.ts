@@ -73,9 +73,7 @@ export const queryAnalyticsCommand = async (options: {
   const startDate = options.startDate
     ? new Date(options.startDate).getTime()
     : sevenDaysAgo;
-  const endDate = options.endDate
-    ? new Date(options.endDate).getTime()
-    : now;
+  const endDate = options.endDate ? new Date(options.endDate).getTime() : now;
 
   const spinner = createSpinner(`Querying ${metric} (${aggregation})...`).start();
 
@@ -90,7 +88,12 @@ export const queryAnalyticsCommand = async (options: {
         },
       ],
       groupBy: options.groupBy as "metadata.model" | undefined,
-      timeScale: options.timeScale === "full" ? "full" : options.timeScale ? Number(options.timeScale) : undefined,
+      timeScale:
+        options.timeScale === "full"
+          ? "full"
+          : options.timeScale
+            ? Number(options.timeScale)
+            : undefined,
       timeZone: Intl.DateTimeFormat().resolvedOptions().timeZone,
     });
 
@@ -119,9 +122,7 @@ export const queryAnalyticsCommand = async (options: {
           console.log(chalk.gray("  No data for the current period."));
         } else {
           for (const dataPoint of result.currentPeriod) {
-            const entries = Object.entries(dataPoint).filter(
-              ([key]) => key !== "date",
-            );
+            const entries = Object.entries(dataPoint).filter(([key]) => key !== "date");
             const dateStr = dataPoint.date
               ? new Date(dataPoint.date as number).toLocaleDateString()
               : "—";
@@ -141,9 +142,7 @@ export const queryAnalyticsCommand = async (options: {
           console.log();
           console.log(chalk.bold("Previous Period:"));
           for (const dataPoint of result.previousPeriod) {
-            const entries = Object.entries(dataPoint).filter(
-              ([key]) => key !== "date",
-            );
+            const entries = Object.entries(dataPoint).filter(([key]) => key !== "date");
             const dateStr = dataPoint.date
               ? new Date(dataPoint.date as number).toLocaleDateString()
               : "—";
@@ -158,7 +157,9 @@ export const queryAnalyticsCommand = async (options: {
         }
 
         console.log();
-        console.log(chalk.gray("Available presets: " + Object.keys(METRIC_PRESETS).join(", ")));
+        console.log(
+          chalk.gray("Available presets: " + Object.keys(METRIC_PRESETS).join(", ")),
+        );
         console.log(
           chalk.gray(
             `Use ${chalk.cyan("langwatch analytics query --metric <preset> -f json")} for raw data`,

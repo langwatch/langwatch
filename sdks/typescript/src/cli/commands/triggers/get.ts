@@ -16,9 +16,7 @@ import { redactTriggerSecrets } from "./redact";
  * record, so a machine caller keeps `actionParams` and `updatedAt`, which the
  * human view omits.
  */
-export const getTriggerCommand = async (
-  id: string,
-): Promise<CommandResult | void> => {
+export const getTriggerCommand = async (id: string): Promise<CommandResult | void> => {
   await resolveCredentials();
 
   const apiKey = scopedApiKey() ?? process.env.LANGWATCH_API_KEY ?? "";
@@ -32,11 +30,15 @@ export const getTriggerCommand = async (
     });
 
     if (!response.ok) {
-      await failSpinnerFromResponse({ spinner, response, action: `fetch trigger "${id}"` });
+      await failSpinnerFromResponse({
+        spinner,
+        response,
+        action: `fetch trigger "${id}"`,
+      });
       process.exit(1);
     }
 
-    const trigger = await response.json() as {
+    const trigger = (await response.json()) as {
       id: string;
       name: string;
       action: string;
@@ -62,18 +64,30 @@ export const getTriggerCommand = async (
         console.log(`    ${chalk.gray("ID:")}      ${chalk.green(trigger.id)}`);
         console.log(`    ${chalk.gray("Name:")}    ${chalk.cyan(trigger.name)}`);
         console.log(`    ${chalk.gray("Action:")}  ${trigger.action}`);
-        console.log(`    ${chalk.gray("Status:")}  ${trigger.active ? chalk.green("active") : chalk.gray("inactive")}`);
-        console.log(`    ${chalk.gray("Alert:")}   ${trigger.alertType ?? chalk.gray("—")}`);
-        console.log(`    ${chalk.gray("Message:")} ${trigger.message ?? chalk.gray("—")}`);
-        console.log(`    ${chalk.gray("Created:")} ${new Date(trigger.createdAt).toLocaleString()}`);
+        console.log(
+          `    ${chalk.gray("Status:")}  ${trigger.active ? chalk.green("active") : chalk.gray("inactive")}`,
+        );
+        console.log(
+          `    ${chalk.gray("Alert:")}   ${trigger.alertType ?? chalk.gray("—")}`,
+        );
+        console.log(
+          `    ${chalk.gray("Message:")} ${trigger.message ?? chalk.gray("—")}`,
+        );
+        console.log(
+          `    ${chalk.gray("Created:")} ${new Date(trigger.createdAt).toLocaleString()}`,
+        );
         if (trigger.platformUrl) {
-          console.log(`    ${chalk.bold("View:")}   ${chalk.underline(trigger.platformUrl)}`);
+          console.log(
+            `    ${chalk.bold("View:")}   ${chalk.underline(trigger.platformUrl)}`,
+          );
         }
 
         if (Object.keys(trigger.filters).length > 0) {
           console.log();
           console.log(chalk.bold("  Filters:"));
-          console.log(`    ${JSON.stringify(trigger.filters, null, 2).split("\n").join("\n    ")}`);
+          console.log(
+            `    ${JSON.stringify(trigger.filters, null, 2).split("\n").join("\n    ")}`,
+          );
         }
 
         console.log();

@@ -22,12 +22,12 @@ Pick Anthropic as a primary or fallback on any VK. When a VK uses Anthropic as i
 
 ## Supported endpoints
 
-| Gateway route | Upstream | Notes |
-|---|---|---|
-| `POST /v1/messages` | `POST /v1/messages` | Native shape. Preferred for Claude Code, Anthropic SDK, any tool-using agent. |
-| `POST /v1/chat/completions` | `POST /v1/messages` (translated) | OpenAI SDKs work transparently via translation. |
-| `POST /v1/embeddings` | ❌ not supported | Anthropic has no embeddings endpoint. |
-| `POST /v1/messages` with `stream: true` | `POST /v1/messages` streaming | SSE pass-through byte-for-byte (tool-call deltas preserved). |
+| Gateway route                           | Upstream                         | Notes                                                                         |
+| --------------------------------------- | -------------------------------- | ----------------------------------------------------------------------------- |
+| `POST /v1/messages`                     | `POST /v1/messages`              | Native shape. Preferred for Claude Code, Anthropic SDK, any tool-using agent. |
+| `POST /v1/chat/completions`             | `POST /v1/messages` (translated) | OpenAI SDKs work transparently via translation.                               |
+| `POST /v1/embeddings`                   | ❌ not supported                 | Anthropic has no embeddings endpoint.                                         |
+| `POST /v1/messages` with `stream: true` | `POST /v1/messages` streaming    | SSE pass-through byte-for-byte (tool-call deltas preserved).                  |
 
 ## `cache_control` passthrough, the 90-percent discount
 

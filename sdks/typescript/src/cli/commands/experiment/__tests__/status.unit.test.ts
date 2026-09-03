@@ -6,16 +6,23 @@ const oraMocks = vi.hoisted(() => ({
   succeed: vi.fn(),
 }));
 
-vi.mock("@/client-sdk/services/experiments/experiments-api.service", async (importOriginal) => {
-  const actual = await importOriginal<typeof ExperimentsApiModule>();
-  return {
-    ...actual,
-    ExperimentsApiService: vi.fn(),
-  };
-});
+vi.mock(
+  "@/client-sdk/services/experiments/experiments-api.service",
+  async (importOriginal) => {
+    const actual = await importOriginal<typeof ExperimentsApiModule>();
+    return {
+      ...actual,
+      ExperimentsApiService: vi.fn(),
+    };
+  },
+);
 
 vi.mock("../../../utils/apiKey", () => ({
-  resolveCredentials: vi.fn(async () => ({ apiKey: "test-key", source: "env", endpoint: "https://app.langwatch.ai" })),
+  resolveCredentials: vi.fn(async () => ({
+    apiKey: "test-key",
+    source: "env",
+    endpoint: "https://app.langwatch.ai",
+  })),
 }));
 
 vi.mock("ora", () => ({
@@ -54,12 +61,14 @@ describe("experimentStatusCommand()", () => {
     mockListRuns = vi.fn().mockResolvedValue({
       runs: [{ runId: "latest_run" }, { runId: "older_run" }],
     });
-    vi.mocked(ExperimentsApiService).mockImplementation(function () { return ({
-      startRun: vi.fn(),
-      getRunStatus: mockGetRunStatus,
-      getRunResults: mockGetRunResults,
-      listRuns: mockListRuns,
-    }) as unknown as ExperimentsApiService; });
+    vi.mocked(ExperimentsApiService).mockImplementation(function () {
+      return {
+        startRun: vi.fn(),
+        getRunStatus: mockGetRunStatus,
+        getRunResults: mockGetRunResults,
+        listRuns: mockListRuns,
+      } as unknown as ExperimentsApiService;
+    });
     logSpy = vi.spyOn(console, "log").mockImplementation(noop);
     vi.spyOn(console, "error").mockImplementation(noop);
     vi.spyOn(process, "exit").mockImplementation((code) => {

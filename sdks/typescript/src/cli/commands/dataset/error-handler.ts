@@ -63,9 +63,7 @@ export function handleDatasetCommandError({
     });
     if (error.current !== undefined && error.max !== undefined) {
       console.error(
-        chalk.gray(
-          `  Current ${error.limitType}: ${error.current} / ${error.max}`,
-        ),
+        chalk.gray(`  Current ${error.limitType}: ${error.current} / ${error.max}`),
       );
     }
   } else if (error instanceof DatasetApiError) {

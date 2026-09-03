@@ -1,5 +1,11 @@
 import { NodeSDK } from "@opentelemetry/sdk-node";
-import { SimpleLogRecordProcessor, BatchLogRecordProcessor, type LogRecordProcessor, ConsoleLogRecordExporter, LoggerProvider } from "@opentelemetry/sdk-logs";
+import {
+  SimpleLogRecordProcessor,
+  BatchLogRecordProcessor,
+  type LogRecordProcessor,
+  ConsoleLogRecordExporter,
+  LoggerProvider,
+} from "@opentelemetry/sdk-logs";
 import { createMergedResource, getConcreteProvider, isConcreteProvider } from "../utils";
 import { type SetupObservabilityOptions, type ObservabilityHandle } from "./types";
 import { trace } from "@opentelemetry/api";
@@ -25,18 +31,21 @@ const createNoOpHandle = (logger: Logger): ObservabilityHandle => ({
 });
 
 const getLangWatchConfig = (options: SetupObservabilityOptions) => {
-  const isDisabled = options.langwatch === 'disabled';
-  const config = typeof options.langwatch === 'object' ? options.langwatch : {};
+  const isDisabled = options.langwatch === "disabled";
+  const config = typeof options.langwatch === "object" ? options.langwatch : {};
 
   return {
     disabled: isDisabled,
     apiKey: isDisabled ? void 0 : (config.apiKey ?? process.env.LANGWATCH_API_KEY),
     endpoint: isDisabled ? void 0 : resolveEndpoint(config.endpoint),
-    processorType: config.processorType ?? 'batch'
+    processorType: config.processorType ?? "batch",
   };
 };
 
-const checkForEarlyExit = (options: SetupObservabilityOptions, logger: Logger): ObservabilityHandle | null => {
+const checkForEarlyExit = (
+  options: SetupObservabilityOptions,
+  logger: Logger,
+): ObservabilityHandle | null => {
   const globalProvider = trace.getTracerProvider();
   const alreadySetup = isConcreteProvider(globalProvider);
 
@@ -62,14 +71,18 @@ const checkForEarlyExit = (options: SetupObservabilityOptions, logger: Logger): 
   if (alreadySetup) {
     logger.warn(
       "OpenTelemetry is already set up, but UNSAFE_forceOpenTelemetryReinitialization=true. " +
-      "Proceeding with reinitialization. This may cause conflicts."
+        "Proceeding with reinitialization. This may cause conflicts.",
     );
   }
 
   return null;
 };
 
-const warnIfMisconfigured = (options: SetupObservabilityOptions, langwatch: ReturnType<typeof getLangWatchConfig>, logger: Logger) => {
+const warnIfMisconfigured = (
+  options: SetupObservabilityOptions,
+  langwatch: ReturnType<typeof getLangWatchConfig>,
+  logger: Logger,
+) => {
   // Check if LangWatch is disabled but no alternative export mechanisms are provided
   // Note: If we reach this function, we know advanced.disabled and advanced.skipOpenTelemetrySetup are false
   // because those are handled as early exits in setupObservability()
@@ -137,7 +150,10 @@ const registerAutoShutdownHandlers = ({
   exitProcessAfterShutdown: boolean;
 }): void => {
   let isShuttingDown = false;
-  const registrations: { event: "beforeExit" | TerminationSignal; handler: () => void }[] = [];
+  const registrations: {
+    event: "beforeExit" | TerminationSignal;
+    handler: () => void;
+  }[] = [];
 
   const register = (event: "beforeExit" | TerminationSignal, handler: () => void) => {
     registrations.push({ event, handler });
@@ -185,7 +201,9 @@ const registerAutoShutdownHandlers = ({
 
       void flush(signal).then(() => {
         if (exitProcessAfterShutdown) {
-          logger.debug(`${signal}: flush complete, exiting because UNSAFE_exitProcessAfterAutoShutdown is set`);
+          logger.debug(
+            `${signal}: flush complete, exiting because UNSAFE_exitProcessAfterAutoShutdown is set`,
+          );
           process.exit(0);
           return;
         }
@@ -198,18 +216,24 @@ const registerAutoShutdownHandlers = ({
           return;
         }
 
-        logger.debug(`${signal}: flush complete and nothing else is listening, re-raising`);
+        logger.debug(
+          `${signal}: flush complete and nothing else is listening, re-raising`,
+        );
         process.kill(process.pid, signal);
       });
     });
   }
 };
 
-export function setupObservability(options: SetupObservabilityOptions = {}): ObservabilityHandle {
-  const logger = options.debug?.logger ?? new ConsoleLogger({
-    level: options.debug?.logLevel ?? 'warn',
-    prefix: "LangWatch Observability SDK",
-  });
+export function setupObservability(
+  options: SetupObservabilityOptions = {},
+): ObservabilityHandle {
+  const logger =
+    options.debug?.logger ??
+    new ConsoleLogger({
+      level: options.debug?.logLevel ?? "warn",
+      prefix: "LangWatch Observability SDK",
+    });
 
   initializeObservabilitySdkConfig({
     logger,
@@ -256,11 +280,11 @@ export function setupObservability(options: SetupObservabilityOptions = {}): Obs
       return createNoOpHandle(logger);
     }
 
-    const sdk = createAndStartNodeSdk(options, logger, createMergedResource(
-      options.attributes,
-      options.serviceName,
-      options.resource,
-    ));
+    const sdk = createAndStartNodeSdk(
+      options,
+      logger,
+      createMergedResource(options.attributes, options.serviceName, options.resource),
+    );
 
     logger.info("LangWatch Observability SDK setup completed successfully");
 
@@ -293,7 +317,7 @@ function setupDedicatedProvider(
   const addedProcessors: SpanProcessor[] = [];
 
   const internalArray = (provider as any)?._activeSpanProcessor?._spanProcessors;
-  const hasPublicApi = typeof (provider as any)?.addSpanProcessor === 'function';
+  const hasPublicApi = typeof (provider as any)?.addSpanProcessor === "function";
 
   if (!Array.isArray(internalArray) && !hasPublicApi) {
     const msg = "Dedicated tracerProvider does not support adding span processors.";
@@ -316,9 +340,10 @@ function setupDedicatedProvider(
       endpoint: langwatch.endpoint,
     });
 
-    const processor = langwatch.processorType === 'batch'
-      ? new BatchSpanProcessor(traceExporter)
-      : new SimpleSpanProcessor(traceExporter);
+    const processor =
+      langwatch.processorType === "batch"
+        ? new BatchSpanProcessor(traceExporter)
+        : new SimpleSpanProcessor(traceExporter);
 
     addedProcessors.push(processor);
     addProcessor(processor);
@@ -344,10 +369,14 @@ function setupDedicatedProvider(
       tracerProvider: provider,
       instrumentations: options.instrumentations,
     });
-    logger.info(`Registered ${options.instrumentations.length} instrumentations against dedicated provider`);
+    logger.info(
+      `Registered ${options.instrumentations.length} instrumentations against dedicated provider`,
+    );
   }
 
-  logger.info("LangWatch Observability SDK setup completed with dedicated provider (trace-only, global provider untouched)");
+  logger.info(
+    "LangWatch Observability SDK setup completed with dedicated provider (trace-only, global provider untouched)",
+  );
 
   return {
     shutdown: async () => {
@@ -380,7 +409,7 @@ function attachToExistingProvider(
   logger: Logger,
 ): ObservabilityHandle | null {
   const internalArray = (provider as any)?._activeSpanProcessor?._spanProcessors;
-  const hasPublicApi = typeof (provider as any)?.addSpanProcessor === 'function';
+  const hasPublicApi = typeof (provider as any)?.addSpanProcessor === "function";
 
   if (!Array.isArray(internalArray) && !hasPublicApi) {
     return null;
@@ -403,9 +432,10 @@ function attachToExistingProvider(
       endpoint: langwatch.endpoint,
     });
 
-    const processor = langwatch.processorType === 'batch'
-      ? new BatchSpanProcessor(traceExporter)
-      : new SimpleSpanProcessor(traceExporter);
+    const processor =
+      langwatch.processorType === "batch"
+        ? new BatchSpanProcessor(traceExporter)
+        : new SimpleSpanProcessor(traceExporter);
 
     addedProcessors.push(processor);
     addProcessor(processor);
@@ -424,7 +454,9 @@ function attachToExistingProvider(
       addedProcessors.push(processor);
       addProcessor(processor);
     }
-    logger.debug(`Attached ${options.spanProcessors.length} user-provided span processors to existing provider`);
+    logger.debug(
+      `Attached ${options.spanProcessors.length} user-provided span processors to existing provider`,
+    );
   }
 
   return {
@@ -459,9 +491,13 @@ export function createAndStartNodeSdk(
   const langwatch = getLangWatchConfig(options);
 
   if (langwatch.disabled) {
-    logger.warn("LangWatch integration disabled, using user-provided SpanProcessors and LogRecordProcessors");
+    logger.warn(
+      "LangWatch integration disabled, using user-provided SpanProcessors and LogRecordProcessors",
+    );
   } else {
-    logger.info(`Using LangWatch ${langwatch.processorType} processors for tracing and logging`);
+    logger.info(
+      `Using LangWatch ${langwatch.processorType} processors for tracing and logging`,
+    );
   }
 
   const spanProcessors: SpanProcessor[] = [];
@@ -476,7 +512,9 @@ export function createAndStartNodeSdk(
     logProcessors.push(
       new SimpleLogRecordProcessor({ exporter: new ConsoleLogRecordExporter() }),
     );
-    logger.debug("Console recording of logs enabled; adding console log record processor");
+    logger.debug(
+      "Console recording of logs enabled; adding console log record processor",
+    );
   }
 
   if (!langwatch.disabled) {
@@ -489,14 +527,18 @@ export function createAndStartNodeSdk(
       endpoint: langwatch.endpoint,
     });
 
-    if (langwatch.processorType === 'batch') {
+    if (langwatch.processorType === "batch") {
       spanProcessors.push(new BatchSpanProcessor(traceExporter));
       logProcessors.push(new BatchLogRecordProcessor({ exporter: logExporter }));
-      logger.debug(`Added LangWatch ${langwatch.processorType} SpanProcessor and LogRecordProcessor to SDK`);
+      logger.debug(
+        `Added LangWatch ${langwatch.processorType} SpanProcessor and LogRecordProcessor to SDK`,
+      );
     } else {
       spanProcessors.push(new SimpleSpanProcessor(traceExporter));
       logProcessors.push(new SimpleLogRecordProcessor({ exporter: logExporter }));
-      logger.debug(`Added LangWatch ${langwatch.processorType} SpanProcessor and LogRecordProcessor to SDK`);
+      logger.debug(
+        `Added LangWatch ${langwatch.processorType} SpanProcessor and LogRecordProcessor to SDK`,
+      );
     }
   }
 
@@ -507,20 +549,26 @@ export function createAndStartNodeSdk(
 
   if (options.spanProcessors?.length) {
     spanProcessors.push(...options.spanProcessors);
-    logger.debug(`Added user-provided ${options.spanProcessors.length} SpanProcessors to SDK`);
+    logger.debug(
+      `Added user-provided ${options.spanProcessors.length} SpanProcessors to SDK`,
+    );
   }
   if (options.logRecordProcessors?.length) {
     logProcessors.push(...options.logRecordProcessors);
-    logger.debug(`Added user-provided ${options.logRecordProcessors.length} LogRecordProcessors to SDK`);
+    logger.debug(
+      `Added user-provided ${options.logRecordProcessors.length} LogRecordProcessors to SDK`,
+    );
   }
 
   warnIfMisconfigured(options, langwatch, logger);
 
   // Create logger provider
-  const loggerProvider = logProcessors.length ? new LoggerProvider({
-    resource,
-    processors: logProcessors,
-  }) : void 0;
+  const loggerProvider = logProcessors.length
+    ? new LoggerProvider({
+        resource,
+        processors: logProcessors,
+      })
+    : void 0;
 
   if (loggerProvider) {
     logger.debug("Created LangWatch logger provider");
@@ -548,24 +596,30 @@ export function createAndStartNodeSdk(
 
   // Fix for Next.js 15: Explicitly verify and register provider if still proxy
   // See: https://github.com/langwatch/langwatch/issues/753
-  if (process.env.NEXT_RUNTIME === 'nodejs') {
+  if (process.env.NEXT_RUNTIME === "nodejs") {
     // Wait a tick to ensure SDK initialization completes
     setImmediate(() => {
       const globalProvider = trace.getTracerProvider();
 
       // Check if provider is still a proxy (Next.js 15 issue)
-      if (globalProvider.constructor.name === 'ProxyTracerProvider') {
-        logger.warn('Global provider is still ProxyTracerProvider after SDK start - applying Next.js 15 workaround');
+      if (globalProvider.constructor.name === "ProxyTracerProvider") {
+        logger.warn(
+          "Global provider is still ProxyTracerProvider after SDK start - applying Next.js 15 workaround",
+        );
 
         // Access the real provider from the delegate
         const realProvider = (globalProvider as any)._delegate;
 
-        if (realProvider?.constructor.name === 'NodeTracerProvider') {
+        if (realProvider?.constructor.name === "NodeTracerProvider") {
           // Explicitly register the real provider globally
           trace.setGlobalTracerProvider(realProvider);
-          logger.info('Successfully registered NodeTracerProvider globally for Next.js 15');
+          logger.info(
+            "Successfully registered NodeTracerProvider globally for Next.js 15",
+          );
         } else {
-          logger.error('Could not find NodeTracerProvider in proxy delegate - spans may not be exported');
+          logger.error(
+            "Could not find NodeTracerProvider in proxy delegate - spans may not be exported",
+          );
         }
       } else {
         logger.debug(`Provider registered correctly: ${globalProvider.constructor.name}`);
@@ -582,7 +636,8 @@ export function createAndStartNodeSdk(
     registerAutoShutdownHandlers({
       sdk,
       logger,
-      exitProcessAfterShutdown: options.advanced?.UNSAFE_exitProcessAfterAutoShutdown ?? false,
+      exitProcessAfterShutdown:
+        options.advanced?.UNSAFE_exitProcessAfterAutoShutdown ?? false,
     });
   }
 
@@ -591,22 +646,22 @@ export function createAndStartNodeSdk(
 
 /**
  * Ensure observability is set up, but only if not already configured.
- * 
+ *
  * This is an idempotent function that:
  * - Does nothing if OpenTelemetry is already configured (by you or another library)
  * - Sets up LangWatch observability if no tracer provider exists
  * - Does nothing if LANGWATCH_API_KEY is not set
- * 
+ *
  * This is useful for libraries/SDKs that want to ensure tracing is available
  * without conflicting with user's existing observability setup.
- * 
+ *
  * @example
  * ```typescript
  * import { ensureSetup } from "langwatch/observability/node";
- * 
+ *
  * // Safe to call - won't conflict with existing setup
  * ensureSetup();
- * 
+ *
  * // Now you can use tracing
  * const tracer = trace.getTracer("my-app");
  * ```
@@ -614,7 +669,7 @@ export function createAndStartNodeSdk(
 export const ensureSetup = (): ObservabilityHandle => {
   const globalProvider = trace.getTracerProvider();
   const alreadySetup = isConcreteProvider(globalProvider);
-  
+
   // If already set up, return no-op handle (don't log error, just silently skip)
   if (alreadySetup) {
     return {
@@ -623,7 +678,7 @@ export const ensureSetup = (): ObservabilityHandle => {
       },
     };
   }
-  
+
   // If no API key, return no-op handle (can't set up without it)
   if (!process.env.LANGWATCH_API_KEY) {
     return {
@@ -632,7 +687,7 @@ export const ensureSetup = (): ObservabilityHandle => {
       },
     };
   }
-  
+
   // Set up observability with defaults
   return setupObservability();
 };

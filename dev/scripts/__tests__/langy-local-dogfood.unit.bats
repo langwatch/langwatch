@@ -1,7 +1,7 @@
 #!/usr/bin/env bats
 # Unit tests for dev/scripts/dogfood/langy-local.sh, the Langy local dogfood
 # doctor. The script under test runs for real against a sandboxed repo
-# layout: a temp platform/app/.env, fake opencode/go shims on PATH, and real
+# layout: a temp .env, fake opencode/go shims on PATH, and real
 # loopback listeners standing in for the app / gateway / langyagent.
 #
 # Spec: specs/setup/langy-local-dogfood.feature
@@ -10,10 +10,10 @@ REPO_DIR="$(cd "$(dirname "$BATS_TEST_FILENAME")/../../.." && pwd)"
 
 setup() {
   TEST_DIR="$(mktemp -d)"
-  mkdir -p "$TEST_DIR/dev/scripts/dogfood" "$TEST_DIR/platform/app" "$TEST_DIR/bin"
+  mkdir -p "$TEST_DIR/dev/scripts/dogfood" "$TEST_DIR/apps/api" "$TEST_DIR/bin"
   cp "$REPO_DIR/dev/scripts/dogfood/langy-local.sh" "$TEST_DIR/dev/scripts/dogfood/"
   DOCTOR="$TEST_DIR/dev/scripts/dogfood/langy-local.sh"
-  ENV_FILE="$TEST_DIR/platform/app/.env"
+  ENV_FILE="$TEST_DIR/.env"
   : >"$ENV_FILE"
 
   # Binaries the doctor requires: fake shims are enough — it only checks PATH.

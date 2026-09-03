@@ -1,8 +1,5 @@
 import type { paths } from "@/internal/generated/openapi/api-client";
-import {
-  createLangWatchApiClient,
-  type LangwatchApiClient,
-} from "@/internal/api/client";
+import { createLangWatchApiClient, type LangwatchApiClient } from "@/internal/api/client";
 import type { InternalConfig } from "@/client-sdk/types";
 import {
   extractStatusFromResponse,
@@ -79,9 +76,13 @@ export class SuitesApiService {
   }
 
   private handleApiError(operation: string, error: unknown): never {
-    const message = formatApiErrorForOperation({ operation: operation, error: error, options: {
-      status: extractStatusFromResponse(error),
-    } });
+    const message = formatApiErrorForOperation({
+      operation: operation,
+      error: error,
+      options: {
+        status: extractStatusFromResponse(error),
+      },
+    });
     throw new SuitesApiError(message, operation, error);
   }
 
@@ -141,7 +142,7 @@ export class SuitesApiService {
     const options: SuiteRunOptions =
       typeof optionsOrIdempotencyKey === "string"
         ? { idempotencyKey: optionsOrIdempotencyKey }
-        : optionsOrIdempotencyKey ?? {};
+        : (optionsOrIdempotencyKey ?? {});
 
     const body: {
       idempotencyKey: string;

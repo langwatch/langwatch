@@ -39,7 +39,7 @@ const toTitleCase = (str: string): string => {
 const generatePythonExperimentSample = (
   slug: string,
   requiredFields: string[],
-  optionalFields: string[]
+  optionalFields: string[],
 ): string => {
   const allFields = [...requiredFields, ...optionalFields];
   const dataFields = allFields
@@ -51,8 +51,7 @@ const generatePythonExperimentSample = (
         return `            "${field}": row["expected_output"],`;
       if (field === "expected_contexts")
         return `            "${field}": row["expected_contexts"],`;
-      if (field === "conversation")
-        return `            "${field}": row["conversation"],`;
+      if (field === "conversation") return `            "${field}": row["conversation"],`;
       return `            "${field}": "",`;
     })
     .join("\n");
@@ -80,12 +79,10 @@ const generatePythonOnlineSample = (
   slug: string,
   name: string,
   requiredFields: string[],
-  optionalFields: string[]
+  optionalFields: string[],
 ): string => {
   const allFields = [...requiredFields, ...optionalFields];
-  const dataFields = allFields
-    .map((field) => `            "${field}": "",`)
-    .join("\n");
+  const dataFields = allFields.map((field) => `            "${field}": "",`).join("\n");
 
   const checkName = toTitleCase(name);
 
@@ -108,7 +105,7 @@ ${dataFields}
 const generateTypeScriptExperimentSample = (
   slug: string,
   requiredFields: string[],
-  optionalFields: string[]
+  optionalFields: string[],
 ): string => {
   const allFields = [...requiredFields, ...optionalFields];
   const dataFields = allFields
@@ -149,7 +146,7 @@ ${dataFields}
 const generateTypeScriptOnlineSample = (
   slug: string,
   requiredFields: string[],
-  optionalFields: string[]
+  optionalFields: string[],
 ): string => {
   const allFields = [...requiredFields, ...optionalFields];
   const dataFields = allFields
@@ -179,7 +176,7 @@ ${dataFields}
 
 const generateSettingsSchema = (
   slug: string,
-  settings: Record<string, { description?: string; default: unknown }>
+  settings: Record<string, { description?: string; default: unknown }>,
 ): Record<string, unknown> => {
   const properties: Record<string, unknown> = {};
   const required: string[] = [];
@@ -225,7 +222,7 @@ const generateSettingsSchema = (
 const generateRequestSchema = (
   slug: string,
   requiredFields: string[],
-  optionalFields: string[]
+  optionalFields: string[],
 ): Record<string, unknown> => {
   const properties: Record<string, unknown> = {};
 
@@ -302,9 +299,7 @@ const generateOpenAPISpec = async (): Promise<void> => {
 
   // Extract the AVAILABLE_EVALUATORS object using regex
   // Find the start of the object
-  const startMatch = content.match(
-    /export const AVAILABLE_EVALUATORS[^=]*=\s*\{/
-  );
+  const startMatch = content.match(/export const AVAILABLE_EVALUATORS[^=]*=\s*\{/);
   if (!startMatch || startMatch.index === undefined) {
     throw new Error("Could not find AVAILABLE_EVALUATORS in the file");
   }
@@ -370,9 +365,7 @@ const generateOpenAPISpec = async (): Promise<void> => {
     evaluators = JSON.parse(jsonStr);
   } catch (e) {
     // If direct parsing fails, try a different approach - evaluate as JS
-    console.log(
-      "Direct JSON parsing failed, trying alternative parsing method..."
-    );
+    console.log("Direct JSON parsing failed, trying alternative parsing method...");
 
     // Use Function constructor to safely evaluate the object
     // First, we need to extract just the object without the export statement
@@ -433,14 +426,11 @@ const generateOpenAPISpec = async (): Promise<void> => {
     schemas[`${schemaName}Request`] = generateRequestSchema(
       slug,
       evaluator.requiredFields,
-      evaluator.optionalFields
+      evaluator.optionalFields,
     );
 
     // Generate settings schema
-    schemas[`${schemaName}Settings`] = generateSettingsSchema(
-      slug,
-      evaluator.settings
-    );
+    schemas[`${schemaName}Settings`] = generateSettingsSchema(slug, evaluator.settings);
 
     // Generate path
     paths[`/${slug}/evaluate`] = {
@@ -510,7 +500,7 @@ const generateOpenAPISpec = async (): Promise<void> => {
             source: generatePythonExperimentSample(
               slug,
               evaluator.requiredFields,
-              evaluator.optionalFields
+              evaluator.optionalFields,
             ),
           },
           {
@@ -520,7 +510,7 @@ const generateOpenAPISpec = async (): Promise<void> => {
               slug,
               evaluator.name,
               evaluator.requiredFields,
-              evaluator.optionalFields
+              evaluator.optionalFields,
             ),
           },
           {
@@ -529,7 +519,7 @@ const generateOpenAPISpec = async (): Promise<void> => {
             source: generateTypeScriptExperimentSample(
               slug,
               evaluator.requiredFields,
-              evaluator.optionalFields
+              evaluator.optionalFields,
             ),
           },
           {
@@ -538,7 +528,7 @@ const generateOpenAPISpec = async (): Promise<void> => {
             source: generateTypeScriptOnlineSample(
               slug,
               evaluator.requiredFields,
-              evaluator.optionalFields
+              evaluator.optionalFields,
             ),
           },
         ],
@@ -575,10 +565,7 @@ const generateOpenAPISpec = async (): Promise<void> => {
   };
 
   // Write to file
-  const outputPath = new URL(
-    "../api-reference/openapi-evals.json",
-    import.meta.url
-  );
+  const outputPath = new URL("../api-reference/openapi-evals.json", import.meta.url);
   const fs = await import("fs");
   fs.writeFileSync(outputPath, JSON.stringify(openApiSpec, null, 2));
 

@@ -404,7 +404,7 @@ Feature: Unified authorization engine
   #
   # Scope note: this section pins what the ENGINE decides about a resource
   # grant. It deliberately does not restate what a customer sees when they
-  # open a share link - specs/traces-v2/sharing.feature owns that, including
+  # open a share link - packages/features/share/specs/share.feature owns that, including
   # "A public link resolves for an anonymous viewer" and the Rule covering
   # the redactions an anonymous viewer's payload carries. The engine
   # supplies the audience; that spec pins what the audience is shown.

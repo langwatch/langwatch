@@ -22,9 +22,7 @@ const visitWith = (sessionId: string) => {
 const LOW_SESSION = `00000000${"a".repeat(24)}`; // ~0.0 → inside any ratio
 const HIGH_SESSION = `ffffffff${"a".repeat(24)}`; // ~1.0 → outside any ratio
 
-const decide = (sampler: {
-  shouldSample: SessionRatioSampler["shouldSample"];
-}) =>
+const decide = (sampler: { shouldSample: SessionRatioSampler["shouldSample"] }) =>
   sampler.shouldSample(
     ROOT_CONTEXT,
     "0af7651916cd43dd8448eb211c80319c",
@@ -54,9 +52,7 @@ describe("SessionRatioSampler", () => {
       it("drops it", () => {
         visitWith(LOW_SESSION);
 
-        expect(decide(new SessionRatioSampler(0))).toBe(
-          SamplingDecision.NOT_RECORD,
-        );
+        expect(decide(new SessionRatioSampler(0))).toBe(SamplingDecision.NOT_RECORD);
       });
     });
   });
@@ -101,12 +97,9 @@ describe("SessionRatioSampler", () => {
         let sampled = 0;
 
         for (let visit = 0; visit < 400; visit++) {
-          const leading = ((visit * 0x9e3779b1) >>> 0)
-            .toString(16)
-            .padStart(8, "0");
+          const leading = ((visit * 0x9e3779b1) >>> 0).toString(16).padStart(8, "0");
           visitWith(`${leading}${"0".repeat(24)}`);
-          if (decide(sampler) === SamplingDecision.RECORD_AND_SAMPLED)
-            sampled++;
+          if (decide(sampler) === SamplingDecision.RECORD_AND_SAMPLED) sampled++;
         }
 
         expect(sampled / 400).toBeGreaterThan(0.15);
@@ -119,10 +112,7 @@ describe("SessionRatioSampler", () => {
     describe("when a trace starts", () => {
       it("falls back to a single draw rather than deciding per trace", () => {
         const sampler = new SessionRatioSampler(0.5, 0.9);
-        const original = Object.getOwnPropertyDescriptor(
-          window,
-          "sessionStorage",
-        )!;
+        const original = Object.getOwnPropertyDescriptor(window, "sessionStorage")!;
         Object.defineProperty(window, "sessionStorage", {
           configurable: true,
           get() {

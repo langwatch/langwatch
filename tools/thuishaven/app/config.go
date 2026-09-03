@@ -80,9 +80,9 @@ type Config struct {
 // PlanOptions decide which services `up` runs and how.
 type PlanOptions struct {
 	ShouldGoWatch bool // air hot-reload for the Go services instead of `go run`
-	// Selection is the worktree's sticky service choice (ADR-064): workers
-	// lane, gateway, nlp, langy. app always runs, and the worker stack always
-	// runs with it — Selection.Workers only picks its own lane over in-process.
+	// Selection is the worktree's sticky service choice (ADR-064): gateway,
+	// nlp, langy, idp. The three Node lanes — ui, api and workers — always run
+	// and are not selectable.
 	Selection  domain.Selection
 	ShouldSeed bool
 	// ShouldRebuildImages (--rebuild) forces container images to be rebuilt even

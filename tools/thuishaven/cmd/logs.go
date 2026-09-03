@@ -52,7 +52,7 @@ func fileToCLIService(name string) string {
 // logServiceColors mirrors the supervisor's lane palette so a service reads
 // the same in `haven logs` as it did live.
 var logServiceColors = map[string]string{
-	"app": "34", "api": "35", "gateway": "33", "nlp": "36", "langy": "92", "workers": "32",
+	"ui": "34", "api": "35", "gateway": "33", "nlp": "36", "langy": "92", "workers": "32",
 }
 
 func runLogsCmd(ctx context.Context, d deps, inv invocation) error {

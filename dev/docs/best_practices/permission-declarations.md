@@ -19,7 +19,7 @@ lands you in the next.
             what it sees                      what it refuses
           ┌──────────────────────────────────────────────────────────┐
  COMPILE  │ the declaration and its input     │ no declaration        │
-          │ (types from @langwatch/authz)     │ wrong scope tier      │
+          │ (types from @langwatch/authz-contract)     │ wrong scope tier      │
           │                                   │ off-registry perm     │
           │                                   │ undeclared middleware │
           │                                   │ forged witness        │
@@ -41,19 +41,19 @@ lands you in the next.
 
 ## Which call do I make?
 
-| You are writing | Declare with |
-| --- | --- |
-| A tRPC procedure | `.permission("resource:action")` after `.input(...)` |
-| A tRPC procedure with no check | `.noPermission({ reason, allow })` |
-| A tRPC procedure with a custom check | `.use(declareAuthzMiddleware(declaration, middleware))` |
-| A management API endpoint (`@langwatch/api`) | `...guard("resource:action")` in the endpoint config |
-| A management API endpoint with no check | `noPermission: { reason: "..." }` in the endpoint config |
-| A Hono route on `SecuredApp` | `.access(requires("resource:action"))` before the verb |
-| Service or route code deciding imperatively | `requireProjectPermission(ctx, id, permission)` — returns the witness |
-| Code that genuinely branches on the answer | `probeProjectPermission(ctx, id, permission)` — returns the boolean |
+| You are writing                              | Declare with                                                          |
+| -------------------------------------------- | --------------------------------------------------------------------- |
+| A tRPC procedure                             | `.permission("resource:action")` after `.input(...)`                  |
+| A tRPC procedure with no check               | `.noPermission({ reason, allow })`                                    |
+| A tRPC procedure with a custom check         | `.use(declareAuthzMiddleware(declaration, middleware))`               |
+| A management API endpoint (`@langwatch/api`) | `...guard("resource:action")` in the endpoint config                  |
+| A management API endpoint with no check      | `noPermission: { reason: "..." }` in the endpoint config              |
+| A Hono route on `SecuredApp`                 | `.access(requires("resource:action"))` before the verb                |
+| Service or route code deciding imperatively  | `requireProjectPermission(ctx, id, permission)` — returns the witness |
+| Code that genuinely branches on the answer   | `probeProjectPermission(ctx, id, permission)` — returns the boolean   |
 
 Permissions are always the registry union (`AuthzPermission` from
-`@langwatch/authz`). The union is generated per resource, so
+`@langwatch/authz-contract`). The union is generated per resource, so
 `"traces:rotate"` is a compile error — traces cannot be rotated, and the type
 system knows the registry does not say they can.
 
@@ -160,21 +160,29 @@ input must be covered by a check or explicitly named by one.
 
 ## Management API endpoints (`@langwatch/api`)
 
-Every endpoint config carries `AccessDeclaration` (from `@langwatch/authz`):
+Every endpoint config carries `AccessDeclaration` (from `@langwatch/authz-contract`):
 exactly one of a permission or a written opt-out. Neither, or both, does not
 compile.
 
 ```ts
-v.post("/", {
-  ...guard("organization:manage"),   // permission + route-registry policy, from one argument
-  input: createRoleSchema,
-  output: roleSchema,
-}, createRoleHandler);
+v.post(
+  "/",
+  {
+    ...guard("organization:manage"), // permission + route-registry policy, from one argument
+    input: createRoleSchema,
+    output: roleSchema,
+  },
+  createRoleHandler,
+);
 
-v.get("/health", {
-  noPermission: { reason: "liveness probe; the response carries no data" },
-  output: healthSchema,
-}, healthHandler);
+v.get(
+  "/health",
+  {
+    noPermission: { reason: "liveness probe; the response carries no data" },
+    output: healthSchema,
+  },
+  healthHandler,
+);
 ```
 
 `build()` re-judges everything at boot, so a JS-level bypass of the types
@@ -271,7 +279,7 @@ policy, one verb.
 Before any permission is checked, exactly one credential must have decided
 who the request is. Surfaces that accept more than one credential kind
 (API key, session cookie) arbitrate with `arbitrateClaims` from
-`@langwatch/authz` instead of trying kinds in precedence order: every kind
+`@langwatch/authz-contract` instead of trying kinds in precedence order: every kind
 that is in play claims the request, one claim proceeds, zero claims is
 structurally unauthenticated, and two claims are refused as contested. A
 claimed credential that fails to resolve is that kind's own refusal — never
@@ -288,13 +296,13 @@ Spec: `specs/rbac/credential-arbitration.feature`.
 
 ## Escape hatches, and what each one costs
 
-| Hatch | Price |
-| --- | --- |
-| `.noPermission({ reason, allow })` | A written reason per scope field, forever visible in the code and the sweep |
-| `authorizeInResolver({ ...enforces })` | A per-field claim naming what the resolver enforces; an unclaimed or stale field fails the sweep |
-| `.authorizeInService({ reason, permissions })` | The service owns the check; take the witness in the service signature so the claim is proof |
-| `handlerManagedAuth({ reason, permissions })` | Same, on the REST surface |
-| `guard()`-less management endpoint | Does not exist — build error |
+| Hatch                                            | Price                                                                                            |
+| ------------------------------------------------ | ------------------------------------------------------------------------------------------------ |
+| `.noPermission({ reason, allow })`               | A written reason per scope field, forever visible in the code and the sweep                      |
+| `authorizeInResolver({ ...enforces })`           | A per-field claim naming what the resolver enforces; an unclaimed or stale field fails the sweep |
+| `.authorizeInService({ reason, permissions })`   | The service owns the check; take the witness in the service signature so the claim is proof      |
+| `handlerManagedAuth({ reason, permissions })`    | Same, on the REST surface                                                                        |
+| `guard()`-less management endpoint               | Does not exist — build error                                                                     |
 | A cast (`as any`, `as never`) around any of this | Passes the compiler and lands in the boot check or the sweep; the reviewers treat it as a defect |
 
 ## The lineage guard behind every check
@@ -302,8 +310,9 @@ Spec: `specs/rbac/credential-arbitration.feature`.
 Whatever the declaration kind — declared, custom, or opted out — a runtime
 guard in front of it refuses any request whose input carries scope ids that
 do not all resolve to one organization
-(`platform/app/src/server/app-layer/authz/scope-lineage-guard.ts`, wired in
-`withPermissionCheck`). The declaration sweep closes tier-shadowing
+(`AuthzService.checkScopeLineage`, adapted by
+`apps/api/src/api-request.policy.ts`). The
+declaration sweep closes tier-shadowing
 statically, but only for declarations it can see through; this guard removes
 the exploit's precondition everywhere instead — a check passing on your own
 narrow id can never aim a handler at someone else's wider one, because the
@@ -315,16 +324,16 @@ carrying at most one scope id costs nothing.
 
 ## Where things live
 
-- `packages/authz` — the registry, the declaration types
+- `packages/features/authz/contract` — the registry and declaration types
   (`AccessDeclaration`, `ValidatePermissionForInput`, `PermissionScopeArg`,
   `TierOfScopeArg`), the middleware brand (`declareAuthzMiddleware`,
   `DeclaredAuthzMiddleware`), and the witness type. Browser-safe.
-- `@langwatch/authz/witness` — `mintWitness`, server-only by subpath. Do not
-  put it on the barrel; application code receives witnesses, it never mints
-  them.
-- `platform/app/src/server/app-layer/permissions/imperative.ts` — `require*`
-  and `probe*`.
-- `platform/app/src/server/api/trpc.ts` — the pending builder.
+- `@langwatch/authz-contract` — the portable contract and opaque witness type.
+  Witness minting is private to the concrete `AuthzService`; application code
+  receives witnesses through `authorize`, it never mints them.
+- `packages/api/src/access-policy.ts` — the imperative `requires*` helpers.
+- `apps/api/src/app-trpc/app-trpc.policy.ts` — the API process's own
+  declaration policy chain; `@langwatch/api/trpc` owns generic root creation.
 - `packages/api` — the service framework and its boot checks.
 - `specs/rbac/typed-permission-declarations.feature` — the behavioural
   contract; every guarantee above is a bound scenario.

@@ -21,8 +21,7 @@ import { installClaudePluginHarness } from "./claude-plugin-test-helpers";
 const { spawnSyncMock } = vi.hoisted(() => ({ spawnSyncMock: vi.fn() }));
 
 vi.mock("node:child_process", async () => {
-  const actual =
-    await vi.importActual<typeof ChildProcessModule>("node:child_process");
+  const actual = await vi.importActual<typeof ChildProcessModule>("node:child_process");
   return { ...actual, spawnSync: spawnSyncMock };
 });
 
@@ -92,14 +91,8 @@ describe("readClaudePluginState", () => {
   describe("given plugin state files holding malformed JSON", () => {
     it("reports nothing installed rather than throwing", async () => {
       fs.mkdirSync(pluginsDir(), { recursive: true });
-      fs.writeFileSync(
-        path.join(pluginsDir(), "installed_plugins.json"),
-        "{ not json",
-      );
-      fs.writeFileSync(
-        path.join(pluginsDir(), "known_marketplaces.json"),
-        "[[[",
-      );
+      fs.writeFileSync(path.join(pluginsDir(), "installed_plugins.json"), "{ not json");
+      fs.writeFileSync(path.join(pluginsDir(), "known_marketplaces.json"), "[[[");
       const { readClaudePluginState } = await loadModule();
       expect(readClaudePluginState().pluginInstalled).toBe(false);
       expect(readClaudePluginState().marketplaceKnown).toBe(false);

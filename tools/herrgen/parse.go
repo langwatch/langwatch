@@ -200,23 +200,28 @@ func Parse(root string, warn io.Writer) ([]Entry, []NodeCode, error) {
 	return group(declarations, statuses), groupNodeCodes(resolvedNodeSites), nil
 }
 
-// snippetSegment marks the hand-written Go under platform/app/ that is
-// rendered into the onboarding UI rather than compiled.
+// snippetSegment marks the hand-written Go that is rendered into the
+// onboarding UI rather than compiled.
 const snippetSegment = "/codegen/snippets/"
+
+// snippetRoot is the package that owns those snippets. The tolerance is scoped
+// by tree as well as by segment, so a stray /codegen/snippets/ directory
+// anywhere else cannot silently drop a compiled file's codes.
+const snippetRoot = "packages/features/onboarding/web/"
 
 // toleratesParseFailure reports whether a file failing to parse is expected.
 // Only the onboarding snippets are: everywhere else the file is real, compiled
 // Go, and dropping it would drop its codes.
 func toleratesParseFailure(rel string) bool {
-	return strings.HasPrefix(rel, "platform/app/") && strings.Contains(rel, snippetSegment)
+	return strings.HasPrefix(rel, snippetRoot) && strings.Contains(rel, snippetSegment)
 }
 
 // goFiles lists the repository-relative non-test Go files under root.
 //
 // testdata is skipped for the same reason the go tool skips it: the Go inside is
 // a fixture, and its codes are not the product's. Everything else is walked,
-// including platform/app/'s onboarding snippets — see toleratesParseFailure for
-// the one place that costs us something.
+// including the onboarding snippets — see toleratesParseFailure for the one
+// place that costs us something.
 func goFiles(root string) ([]string, error) {
 	var files []string
 	err := filepath.WalkDir(root, func(abs string, entry fs.DirEntry, err error) error {

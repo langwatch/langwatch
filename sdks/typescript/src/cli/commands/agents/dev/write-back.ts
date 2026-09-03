@@ -29,9 +29,7 @@ function readHeaderRows(config: Record<string, unknown>): HeaderRow[] {
 }
 
 function withoutDevSecretHeader(rows: HeaderRow[]): HeaderRow[] {
-  return rows.filter(
-    (row) => row.key.toLowerCase() !== DEV_SECRET_HEADER.toLowerCase(),
-  );
+  return rows.filter((row) => row.key.toLowerCase() !== DEV_SECRET_HEADER.toLowerCase());
 }
 
 /**
@@ -79,9 +77,7 @@ export function applyDevTunnel({
   secret?: string;
   connectedAt?: string;
 }): Record<string, unknown> {
-  const existingStash = config.devTunnel as
-    | { previousUrl?: string }
-    | undefined;
+  const existingStash = config.devTunnel as { previousUrl?: string } | undefined;
   const previousUrl =
     existingStash?.previousUrl ??
     (typeof config.url === "string" ? config.url : undefined);

@@ -130,9 +130,7 @@ export const helpCommand = (program: Command, topics: string[]): void => {
   if (!target) {
     // Mirror commander's own unknown-command error so scripts that probe
     // `help <word>` to test for a command keep working.
-    console.error(
-      `error: unknown command or help topic '${topics.join(" ")}'`,
-    );
+    console.error(`error: unknown command or help topic '${topics.join(" ")}'`);
     process.exitCode = 1;
     return;
   }

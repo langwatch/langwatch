@@ -1,0 +1,42 @@
+{
+  "name": "@langwatch/identity-eventing",
+  "version": "0.1.0",
+  "private": true,
+  "description": "The identity platform's event-sourcing layer (ADR-101, ADR-115, ADR-116, ADR-117): the framework envelope over @langwatch/identity's fact payloads, the thin command handlers that run @langwatch/identity-server's guards, the fold projections, the two process managers, the four pipeline definitions the worker registers, and the Postgres binding of the two folds this package owns outright - the Identifier/MfaEnrollment head and the ScimSyncState head - behind postgres.*.adapter seams. Every factory still takes its stores and ports as arguments; the app supplies the connection-teardown and join-lifecycle ports.",
+  "license": "MIT",
+  "type": "module",
+  "exports": {
+    ".": {
+      "types": "./src/index.ts",
+      "default": "./src/index.ts"
+    },
+    "./testing": {
+      "types": "./src/testing.ts",
+      "default": "./src/testing.ts"
+    }
+  },
+  "main": "./src/index.ts",
+  "types": "./src/index.ts",
+  "files": [
+    "src"
+  ],
+  "scripts": {
+    "typecheck": "tsc --noEmit && tsc --noEmit -p tsconfig.test.json",
+    "test": "vitest run",
+    "test:unit": "vitest run"
+  },
+  "dependencies": {
+    "@langwatch/actor": "workspace:*",
+    "@langwatch/eventing": "workspace:*",
+    "@langwatch/identity-contract": "workspace:*",
+    "@langwatch/identity-server": "workspace:*",
+    "@langwatch/observability": "workspace:*",
+    "@langwatch/prisma-client": "workspace:*",
+    "zod": "^4.4.3"
+  },
+  "devDependencies": {
+    "@types/node": "^26",
+    "typescript": "^7.0.2",
+    "vitest": "^4.1.9"
+  }
+}

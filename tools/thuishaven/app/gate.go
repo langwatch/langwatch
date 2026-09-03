@@ -303,7 +303,7 @@ func (o *Orchestrator) slotState() slotState {
 }
 
 // fullWidth is the width a unit run takes when nobody narrows it: half the
-// cores, which is what platform/app/vitest.config.ts asks for with
+// cores, which is what the repository's vitest configs ask for with
 // `maxWorkers: "50%"`.
 func fullWidth() int { return max(runtime.NumCPU()/2, 1) }
 

@@ -7,8 +7,8 @@
 ## Context
 
 ADR-022 stamps `_retention_days` on every row and lets ClickHouse-native TTL
-drop expired rows at merge time. That covers the *deletion* half of retention.
-The *storage cost* half — what we pay to keep N days of data on hot SSD versus
+drop expired rows at merge time. That covers the _deletion_ half of retention.
+The _storage cost_ half — what we pay to keep N days of data on hot SSD versus
 cheaper object storage — is a separate, operator-facing concern.
 
 Three forces shape the cold path:
@@ -77,12 +77,12 @@ The retention machinery is safe to ship onto a 100 TB cluster because
 every step that touches all tables is metadata-only. No path
 auto-rewrites existing parts on deploy.
 
-| Step | What it does | Cost on populated tables |
-|---|---|---|
-| Migration 00032 `ADD COLUMN _retention_days UInt16 DEFAULT 308` | Records the column + DEFAULT in table metadata. `SETTINGS alter_sync = 1, mutations_sync = 0` waits only for the local replica's metadata update. | **Seconds.** Existing parts have no column file on disk; reads evaluate DEFAULT lazily. New inserts include the column. Merges drift it onto disk over time. |
-| Migration 00032 `ADD COLUMN _size_bytes UInt32 MATERIALIZED byteSize(...)` | Same shape — formula stored in metadata, computed lazily on read for old parts, at insert time for new ones. | **Seconds.** |
-| Reconciler `MODIFY TTL` (every deploy) | `SETTINGS materialize_ttl_after_modify = 0` — records the new TTL expression in metadata, does NOT queue a per-part mutation. | **Seconds.** |
-| First ~24h after deploy | CH's TTL-merge scheduler (`merge_with_ttl_timeout`, default 24h) walks parts in normal interleaved merge order. Parts past TTL get evaluated and dropped/moved. | **Bounded by CH's merge concurrency settings**, not by part count. No thundering herd. |
+| Step                                                                       | What it does                                                                                                                                                    | Cost on populated tables                                                                                                                                     |
+| -------------------------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| Migration 00032 `ADD COLUMN _retention_days UInt16 DEFAULT 308`            | Records the column + DEFAULT in table metadata. `SETTINGS alter_sync = 1, mutations_sync = 0` waits only for the local replica's metadata update.               | **Seconds.** Existing parts have no column file on disk; reads evaluate DEFAULT lazily. New inserts include the column. Merges drift it onto disk over time. |
+| Migration 00032 `ADD COLUMN _size_bytes UInt32 MATERIALIZED byteSize(...)` | Same shape — formula stored in metadata, computed lazily on read for old parts, at insert time for new ones.                                                    | **Seconds.**                                                                                                                                                 |
+| Reconciler `MODIFY TTL` (every deploy)                                     | `SETTINGS materialize_ttl_after_modify = 0` — records the new TTL expression in metadata, does NOT queue a per-part mutation.                                   | **Seconds.**                                                                                                                                                 |
+| First ~24h after deploy                                                    | CH's TTL-merge scheduler (`merge_with_ttl_timeout`, default 24h) walks parts in normal interleaved merge order. Parts past TTL get evaluated and dropped/moved. | **Bounded by CH's merge concurrency settings**, not by part count. No thundering herd.                                                                       |
 
 The avalanche we don't fire: with `materialize_ttl_after_modify = 1` (CH's
 default), `MODIFY TTL` would queue a mutation per part to evaluate TTL
@@ -105,12 +105,12 @@ SSD.
 
 Steady state, with retention=70d, cold=49d:
 
-| Age | Where | What happens |
-|---|---|---|
-| 0 → 49d | `hot` volume | New parts written here. Merges evaluate both TTL clauses; neither expired. |
-| Day 49 | hot → cold | Next merge after the MOVE clause expires copies the part to the S3 object disk. Metadata stays in CH; bytes move. Local cache may keep the part hot for reads. |
-| 49 → 70d | `cold` volume | Parts continue to be merged by the same scheduler. DELETE clause evaluates per merge against `_retention_days`. Not expired yet. |
-| Day 70 | cold → ∅ | Next TTL merge fires the DELETE clause. CH evaluates `_retention_days` per row (reads via cache → S3 fallback). When every row in the part is expired, the part is **dropped** — which on an S3-backed disk frees the underlying S3 objects via the storage policy's normal part-drop path. |
+| Age      | Where         | What happens                                                                                                                                                                                                                                                                                |
+| -------- | ------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| 0 → 49d  | `hot` volume  | New parts written here. Merges evaluate both TTL clauses; neither expired.                                                                                                                                                                                                                  |
+| Day 49   | hot → cold    | Next merge after the MOVE clause expires copies the part to the S3 object disk. Metadata stays in CH; bytes move. Local cache may keep the part hot for reads.                                                                                                                              |
+| 49 → 70d | `cold` volume | Parts continue to be merged by the same scheduler. DELETE clause evaluates per merge against `_retention_days`. Not expired yet.                                                                                                                                                            |
+| Day 70   | cold → ∅      | Next TTL merge fires the DELETE clause. CH evaluates `_retention_days` per row (reads via cache → S3 fallback). When every row in the part is expired, the part is **dropped** — which on an S3-backed disk frees the underlying S3 objects via the storage policy's normal part-drop path. |
 
 TTL-only merges are scheduled by `merge_with_ttl_timeout` (CH default
 24h, we don't override), so expired parts disappear within ~24h of TTL
@@ -166,7 +166,7 @@ run on prod (tiered) and local dev (default policy).
 `system.tables.engine_full` per managed table, and reconciles:
 
 ```ts
-if (storage_policy !== 'local_primary' || !COLD_STORAGE_ENABLED) {
+if (storage_policy !== "local_primary" || !COLD_STORAGE_ENABLED) {
   // retention-only branch: install/refresh DELETE clause if missing
 } else {
   // tiered branch: re-emit BOTH cold MOVE + retention DELETE atomically
@@ -180,12 +180,12 @@ separate from `retentionTTLColumn` (the immutable business timestamp).
 
 ### Invariants
 
-| Invariant | Why |
-|---|---|
-| Retention reconciles whenever `CLICKHOUSE_URL` is set | Self-hosted installs without cold storage still need retention. Closed reviewer P1 (`PRRT_kwDOKRXhvM6GMdj8`). |
-| Cold MOVE only on `local_primary` policy + `CLICKHOUSE_COLD_STORAGE_ENABLED=true` | `TO VOLUME 'cold'` is invalid on tables not on a tiered policy. |
-| `MODIFY TTL` re-emits **both** clauses atomically when both apply | `MODIFY TTL` replaces the whole expression. Re-emitting only one drops the other. |
-| Cold-day count is week-aligned | Tables partition by `toYearWeek(...)`; non-week-aligned values straddle partitions. |
+| Invariant                                                                         | Why                                                                                                           |
+| --------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------- |
+| Retention reconciles whenever `CLICKHOUSE_URL` is set                             | Self-hosted installs without cold storage still need retention. Closed reviewer P1 (`PRRT_kwDOKRXhvM6GMdj8`). |
+| Cold MOVE only on `local_primary` policy + `CLICKHOUSE_COLD_STORAGE_ENABLED=true` | `TO VOLUME 'cold'` is invalid on tables not on a tiered policy.                                               |
+| `MODIFY TTL` re-emits **both** clauses atomically when both apply                 | `MODIFY TTL` replaces the whole expression. Re-emitting only one drops the other.                             |
+| Cold-day count is week-aligned                                                    | Tables partition by `toYearWeek(...)`; non-week-aligned values straddle partitions.                           |
 
 All three have regression tests in `ttlReconciler.regression.unit.test.ts`.
 
@@ -252,13 +252,13 @@ plays out over hours, but throttled — not as a thundering herd.
 
 ## Failure modes
 
-| Failure | Effect | Mitigation |
-|---|---|---|
-| Hot disk fills | CH proactively moves largest parts to cold via `move_factor` | Already the design. Lower `move_factor` if it's still not enough. |
-| Hot disk past `keep_free_space_bytes` | Writes refused | Raise PVC size, lower `move_factor`, or shrink cold TTL. |
-| S3 unavailable | Cold reads fail; writes (always hot) unaffected | CH retries; cache absorbs warm reads. |
-| Reconciler drops retention TTL | Data lives past policy | Re-emit invariant + regression test. |
-| Tables created without `local_primary`, then `cold.enabled=true` later | No-op; tiering doesn't apply retroactively | Detected at bootstrap; operator rebuilds tables. |
+| Failure                                                                | Effect                                                       | Mitigation                                                        |
+| ---------------------------------------------------------------------- | ------------------------------------------------------------ | ----------------------------------------------------------------- |
+| Hot disk fills                                                         | CH proactively moves largest parts to cold via `move_factor` | Already the design. Lower `move_factor` if it's still not enough. |
+| Hot disk past `keep_free_space_bytes`                                  | Writes refused                                               | Raise PVC size, lower `move_factor`, or shrink cold TTL.          |
+| S3 unavailable                                                         | Cold reads fail; writes (always hot) unaffected              | CH retries; cache absorbs warm reads.                             |
+| Reconciler drops retention TTL                                         | Data lives past policy                                       | Re-emit invariant + regression test.                              |
+| Tables created without `local_primary`, then `cold.enabled=true` later | No-op; tiering doesn't apply retroactively                   | Detected at bootstrap; operator rebuilds tables.                  |
 
 ## Open questions
 
@@ -274,10 +274,9 @@ plays out over hours, but throttled — not as a thundering herd.
 
 ## References
 
-- Related ADRs: ADR-022 (data retention, umbrella), ADR-023
-  (orphan-sweep reactor + chain — superseded), ADR-025 (orphan sweep removed)
+- Related ADRs: ADR-022 (data retention, umbrella), ADR-025 (orphan sweep removed)
 - Chart: `charts/clickhouse-serverless/{values.yaml,
-  templates/statefulset.yaml, templates/_helpers.tpl}`
+templates/statefulset.yaml, templates/_helpers.tpl}`
 - Image: `infra/clickhouse-serverless/internal/{config,storage,render}/`
 - Bootstrap: `platform/app/src/server/clickhouse/goose.ts`
 - Reconciler: `platform/app/src/server/clickhouse/ttlReconciler.ts`

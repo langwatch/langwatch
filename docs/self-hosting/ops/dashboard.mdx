@@ -6,24 +6,25 @@ description: "Real-time pipeline health monitoring with throughput, latency, and
 The Ops Dashboard is the landing page of the Operations Console (`/ops`). It provides a real-time view of the event-sourcing pipeline, ingestion rates, processing throughput, latency percentiles, queue health, and top errors, all in a single screen.
 
 <Frame>
-<img src="/images/ops/dashboard.png" alt="Ops Dashboard" />
+  <img src="/images/ops/dashboard.png" alt="Ops Dashboard" />
 </Frame>
 
 ## Metrics Overview
 
 The top of the dashboard displays six key metrics, each showing the current rate and a secondary stat (peak, total, or count):
 
-| Metric | What it measures | Secondary stat |
-|---|---|---|
-| **Staged/s** | Ingestion rate, commands entering the queue | Peak rate |
-| **Completed/s** | Processing throughput, commands fully processed | Total completed |
-| **Failed/s** | Failure rate, commands that errored | Total failed |
-| **Blocked** | Groups stuck due to errors | Number of error groups |
-| **DLQ** | Items in the Dead Letter Queue | Redis memory usage |
-| **P50, P99** | End-to-end processing latency | Peak latency |
+| Metric          | What it measures                                | Secondary stat         |
+| --------------- | ----------------------------------------------- | ---------------------- |
+| **Staged/s**    | Ingestion rate, commands entering the queue     | Peak rate              |
+| **Completed/s** | Processing throughput, commands fully processed | Total completed        |
+| **Failed/s**    | Failure rate, commands that errored             | Total failed           |
+| **Blocked**     | Groups stuck due to errors                      | Number of error groups |
+| **DLQ**         | Items in the Dead Letter Queue                  | Redis memory usage     |
+| **P50, P99**    | End-to-end processing latency                   | Peak latency           |
 
 <Tip>
-Metrics marked in red indicate an active problem, non-zero failure rates or blocked groups. Orange indicates a warning state, such as items in the DLQ.
+  Metrics marked in red indicate an active problem, non-zero failure rates or blocked
+  groups. Orange indicates a warning state, such as items in the DLQ.
 </Tip>
 
 ## Active Operations

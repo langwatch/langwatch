@@ -12,12 +12,7 @@
 
 import { describe, expect, it } from "vitest";
 
-import {
-  attributesOf,
-  ENDPOINT,
-  installHookHarness,
-  SESSION_ID,
-} from "./hook-harness";
+import { attributesOf, ENDPOINT, installHookHarness, SESSION_ID } from "./hook-harness";
 
 const hook = installHookHarness();
 const { posted } = hook;

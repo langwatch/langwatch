@@ -97,15 +97,13 @@ export async function handleExperimentResults(params: {
     const status =
       error instanceof LangWatchApiError
         ? error.status
-        : error && typeof error === "object" &&
+        : error &&
+            typeof error === "object" &&
             "status" in error &&
             typeof (error as { status?: unknown }).status === "number"
           ? (error as { status: number }).status
           : undefined;
-    if (
-      status === 404 ||
-      (status === undefined && /404|not found/i.test(message))
-    ) {
+    if (status === 404 || (status === undefined && /404|not found/i.test(message))) {
       return [
         `# Evaluation Results: ${params.runId}`,
         "",
@@ -182,14 +180,13 @@ export async function handleExperimentResults(params: {
   >();
   for (const r of rowsForSummary) {
     for (const e of r.evaluations) {
-      const stats =
-        evaluatorAverages.get(e.evaluator) ?? {
-          sum: 0,
-          count: 0,
-          passed: 0,
-          failed: 0,
-          errored: 0,
-        };
+      const stats = evaluatorAverages.get(e.evaluator) ?? {
+        sum: 0,
+        count: 0,
+        passed: 0,
+        failed: 0,
+        errored: 0,
+      };
       if (typeof e.score === "number") {
         stats.sum += e.score;
         stats.count += 1;
@@ -235,8 +232,7 @@ export async function handleExperimentResults(params: {
     lines.push("| Evaluator | Avg Score | Passed | Failed | Errored |");
     lines.push("| --- | --- | --- | --- | --- |");
     for (const [name, stats] of evaluatorAverages) {
-      const avg =
-        stats.count > 0 ? (stats.sum / stats.count).toFixed(3) : "—";
+      const avg = stats.count > 0 ? (stats.sum / stats.count).toFixed(3) : "—";
       lines.push(
         `| ${name} | ${avg} | ${stats.passed} | ${stats.failed} | ${stats.errored} |`,
       );
@@ -259,9 +255,7 @@ export async function handleExperimentResults(params: {
     return lines.join("\n");
   }
 
-  lines.push(
-    `## Rows (${rows.length}${truncated ? ` of ${totalMatching}` : ""})`,
-  );
+  lines.push(`## Rows (${rows.length}${truncated ? ` of ${totalMatching}` : ""})`);
   lines.push("");
 
   for (const { entry, evaluations } of rows) {

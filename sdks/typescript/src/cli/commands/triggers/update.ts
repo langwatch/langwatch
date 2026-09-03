@@ -61,7 +61,11 @@ export const updateTriggerCommand = async (
       process.exit(1);
     }
 
-    const trigger = await response.json() as { id: string; name: string; active: boolean };
+    const trigger = (await response.json()) as {
+      id: string;
+      name: string;
+      active: boolean;
+    };
     spinner.succeed(`Trigger "${trigger.name}" updated`);
 
     return {

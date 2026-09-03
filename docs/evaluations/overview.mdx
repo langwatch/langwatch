@@ -5,7 +5,9 @@ description: Ensure quality and safety for your LLM applications with experiment
 ---
 
 <Tip>
-  **Let your agent set this up.** [Copy the evaluations prompt](/skills/code-prompts#set-up-evaluations) into your coding agent to get started automatically.
+  **Let your agent set this up.** [Copy the evaluations
+  prompt](/skills/code-prompts#set-up-evaluations) into your coding agent to get started
+  automatically.
 </Tip>
 
 LangWatch provides evaluation tools for your LLM applications, both before deployment and in production.
@@ -51,14 +53,14 @@ BUILD → TEST → DEPLOY → MONITOR
 
 ## When to Use What
 
-| Use Case | Solution |
-|----------|----------|
-| Test prompt changes before deploying | [Experiments](/evaluations/experiments/overview) |
-| Compare different models or configurations | [Experiments](/evaluations/experiments/overview) |
-| Run quality checks in CI/CD | [Experiments CI/CD](/evaluations/experiments/ci-cd) |
-| Monitor production quality over time | [Online Evaluation](/evaluations/online-evaluation/overview) |
-| Block harmful or policy-violating content | [Guardrails](/evaluations/guardrails/overview) |
-| Get alerts when quality drops | [Online Evaluation](/evaluations/online-evaluation/overview) + [Automations](/features/automations) |
+| Use Case                                   | Solution                                                                                            |
+| ------------------------------------------ | --------------------------------------------------------------------------------------------------- |
+| Test prompt changes before deploying       | [Experiments](/evaluations/experiments/overview)                                                    |
+| Compare different models or configurations | [Experiments](/evaluations/experiments/overview)                                                    |
+| Run quality checks in CI/CD                | [Experiments CI/CD](/evaluations/experiments/ci-cd)                                                 |
+| Monitor production quality over time       | [Online Evaluation](/evaluations/online-evaluation/overview)                                        |
+| Block harmful or policy-violating content  | [Guardrails](/evaluations/guardrails/overview)                                                      |
+| Get alerts when quality drops              | [Online Evaluation](/evaluations/online-evaluation/overview) + [Automations](/features/automations) |
 
 ## Quick Start
 
@@ -77,9 +79,10 @@ import langwatch
 evaluation = langwatch.experiment.init("my-first-experiment")
 
 for idx, row in evaluation.loop(dataset.iterrows()):
-    response = my_llm(row["input"])
-    evaluation.log("quality", index=idx, score=0.95)
-```
+response = my_llm(row["input"])
+evaluation.log("quality", index=idx, score=0.95)
+
+````
   </Tab>
   <Tab title="TypeScript">
 ```typescript
@@ -92,7 +95,8 @@ await evaluation.run(dataset, async ({ item, index }) => {
   const response = await myLLM(item.input);
   evaluation.log("quality", { index, score: 0.95 });
 });
-```
+````
+
   </Tab>
 </Tabs>
 

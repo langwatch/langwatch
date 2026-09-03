@@ -1,0 +1,317 @@
+/**
+ * What the moved simulation, scenario and Agent Testing modules do with a
+ * failure.
+ *
+ * The code-keyed presentation registry is NOT here and is not copied here: it
+ * is `@langwatch/handled-error/presentation`, one module for the whole
+ * platform, and every surface that needs the words for a code reads it there —
+ * the same way the trace family does. What lives in this file is the rest of
+ * the seam: the toaster, which reports through `ScenarioHostPort.failed` so
+ * the application still owns where a failure appears, the form binder that
+ * places a rejection on the field it belongs to, and the two panels that
+ * render one inline.
+ *
+ * The names below are the ones twenty-six moved files import, kept letter for
+ * letter so none of those files needed an edit beyond the module path.
+ *
+ * WHAT IS NARROWER THAN THE APPLICATION'S, named rather than hidden:
+ * `applyHandledErrorToForm` places a validation refusal on the fields the
+ * server named in `meta.fieldErrors`, but the SENTENCE it places is the generic
+ * one, because a field-level rejection carries its own text and the registry
+ * describes the code, not the field. A refusal still lands where the reader is
+ * looking, which is the property the helper exists for.
+ */
+
+import { Alert, Box, Button, HStack, Text, VStack } from "@chakra-ui/react";
+import type { ReactNode } from "react";
+
+import { explainAnyError, UNKNOWN_ERROR_PRESENTATION } from "@langwatch/handled-error/presentation";
+
+import {
+  useScenarioHost,
+  type ScenarioFailureAction,
+  type ScenarioHostPort,
+} from "../model/scenario-host";
+
+/**
+ * The generic line, shared by every slot below so the two never disagree.
+ *
+ * Read off the registry's own `UNKNOWN_ERROR_PRESENTATION` rather than typed
+ * again here, because a failure that reads one way inside a run board and
+ * another way on the page next to it is two products.
+ */
+export const UNKNOWN_ERROR_DESCRIPTION = UNKNOWN_ERROR_PRESENTATION.description;
+
+export type HandledErrorShape = {
+  code: string;
+  httpStatus: number;
+  /** Whatever the code documented. Read by key, never spread into the UI. */
+  meta: Record<string, unknown>;
+  /** The one identifier a customer can hand to support. Absent on a browser-side refusal. */
+  traceId?: string;
+};
+
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return typeof value === "object" && value !== null && !Array.isArray(value);
+}
+
+/** The tRPC envelope's payload, or `null` when the failure was not a handled one. */
+export function readHandledError(error: unknown): HandledErrorShape | null {
+  const candidate = (error as { data?: { error?: unknown } } | null)?.data?.error;
+  if (!isRecord(candidate)) return null;
+  const code = typeof candidate.code === "string" ? candidate.code : null;
+  if (code === null) return null;
+  if (typeof candidate.httpStatus !== "number") return null;
+  return {
+    code,
+    httpStatus: candidate.httpStatus,
+    meta: isRecord(candidate.meta) ? candidate.meta : {},
+    ...(typeof candidate.traceId === "string" ? { traceId: candidate.traceId } : {}),
+  };
+}
+
+/**
+ * The whole explanation as one string, for slots that can only take text.
+ *
+ * Registered copy beats the caller's headline, because it describes the actual
+ * failure; the degraded form does not, since a caller's own title at least
+ * names the action that failed.
+ */
+export function describeError({
+  error,
+  fallbackTitle,
+}: {
+  error: unknown;
+  fallbackTitle?: string;
+}): string {
+  const explanation = explainAnyError(error);
+  const title = explanation.isRegistered ? explanation.title : (fallbackTitle ?? explanation.title);
+  return explanation.description ? `${title}. ${explanation.description}` : title;
+}
+
+export type ShowErrorToastOptions = {
+  error?: unknown;
+  fallbackTitle?: string;
+  description?: string;
+  /**
+   * The single fix this failure offers, where there is one.
+   *
+   * Four failures in this package have one — both "the run plan has nothing
+   * runnable left in it" codes, the model-provider gate, and a generation
+   * failure that needs a provider configured — and each used to reach the
+   * Design System toaster directly to keep its button, giving up the
+   * registry's words for it. They keep both now.
+   */
+  action?: ScenarioFailureAction;
+  id?: string;
+};
+
+let mounted: ScenarioHostPort | undefined;
+
+/** Called by this family's host provider on mount, and cleared on unmount. */
+export function setScenarioErrorHost(host: ScenarioHostPort | undefined): void {
+  mounted = host;
+}
+
+/**
+ * Reports a failure through the application's own feedback capability.
+ *
+ * A singleton for the same reason the toaster is one: most of these fire from a
+ * mutation callback, where no hook can run.
+ */
+export function showErrorToast(options: ShowErrorToastOptions): void {
+  if (!mounted) {
+    // oxlint-disable-next-line no-console
+    console.warn("A scenario failure was reported with no host mounted:", options.fallbackTitle);
+    return;
+  }
+  mounted.failed({
+    error: options.error,
+    fallbackTitle: options.fallbackTitle ?? UNKNOWN_ERROR_PRESENTATION.title,
+    description: options.description,
+    action: options.action,
+    id: options.id,
+  });
+}
+
+/** The key `applyHandledErrorToForm` writes a whole-form refusal under. */
+export const FORM_SERVER_ERROR = "root.serverError";
+
+/**
+ * As much of a react-hook-form as these two helpers touch.
+ *
+ * Structural and deliberately loose: the forms that pass one in are typed by
+ * their own value shapes, and narrowing `setError` to `string` would make every
+ * caller cast.
+ */
+type MinimalForm = {
+  // oxlint-disable-next-line no-explicit-any
+  setError: (name: any, error: { type: string; message: string }) => void;
+  /**
+   * Optional because one caller is not a react-hook-form at all.
+   *
+   * `ScenarioFormController` is the scenario form's own controller and exposes
+   * `setError` without an error tree; it uses `applyHandledErrorToForm`, which
+   * only writes, and never `FormServerError`, which only reads.
+   */
+  formState?: { errors: Record<string, unknown> };
+};
+
+/**
+ * Places a server's field-level rejection on the fields it named.
+ *
+ * Answers `true` when it placed something, which is the caller's signal to NOT
+ * also raise a toast — a refusal reported twice reads as two failures.
+ */
+export function applyHandledErrorToForm({
+  error,
+  form,
+  hasFormErrorSlot,
+}: {
+  error: unknown;
+  form: MinimalForm;
+  hasFormErrorSlot?: boolean;
+}): boolean {
+  const handled = readHandledError(error);
+  if (!handled) return false;
+
+  const fieldErrors = handled.meta.fieldErrors;
+  let placed = false;
+  if (isRecord(fieldErrors)) {
+    for (const [field, message] of Object.entries(fieldErrors)) {
+      const text = Array.isArray(message) ? String(message[0] ?? "") : String(message ?? "");
+      if (!text) continue;
+      form.setError(field, { type: "server", message: text });
+      placed = true;
+    }
+  }
+  if (placed) return true;
+  if (!hasFormErrorSlot) return false;
+  form.setError(FORM_SERVER_ERROR, { type: "server", message: UNKNOWN_ERROR_DESCRIPTION });
+  return true;
+}
+
+/** Renders whatever `applyHandledErrorToForm` put in the whole-form slot. */
+export function FormServerError({ form }: { form: MinimalForm }) {
+  const root = form.formState?.errors.root as { serverError?: { message?: string } } | undefined;
+  const message = root?.serverError?.message;
+  if (!message) return null;
+  return (
+    <Alert.Root status="error" role="alert">
+      <Alert.Indicator />
+      <Alert.Content>
+        <Alert.Description>{message}</Alert.Description>
+      </Alert.Content>
+    </Alert.Root>
+  );
+}
+
+/**
+ * The two ways out a failed panel offers.
+ *
+ * `~/features/errors/components/ErrorActions` rendered a retry and a "contact
+ * support" that reached the application's support widget. The retry travels;
+ * the support link does not, because a feature package has no support channel
+ * of its own — a caller that wants one passes `children`.
+ */
+export function ErrorActions({
+  onRetry,
+  traceId,
+  children,
+}: {
+  onRetry?: () => void;
+  /** Shown so a customer can quote it to support, exactly as the registry's did. */
+  traceId?: string;
+  children?: ReactNode;
+}) {
+  if (!onRetry && !children && !traceId) return null;
+  return (
+    <HStack gap={2}>
+      {traceId && (
+        <Text fontSize="xs" color="fg.muted">
+          Reference {traceId}
+        </Text>
+      )}
+      {onRetry && (
+        <Button size="sm" variant="outline" onClick={onRetry}>
+          Try again
+        </Button>
+      )}
+      {children}
+    </HStack>
+  );
+}
+
+export type HandledErrorStateProps = {
+  error: unknown;
+  fallbackTitle?: string;
+  icon?: ReactNode;
+  fullHeight?: boolean;
+  children?: ReactNode;
+};
+
+/** A whole-page dead end that still says what failed and offers a way out. */
+export function HandledErrorState({
+  error,
+  fallbackTitle,
+  icon,
+  fullHeight = true,
+  children,
+}: HandledErrorStateProps) {
+  const explanation = explainAnyError(error);
+  return (
+    <VStack
+      role="alert"
+      width="full"
+      height={fullHeight ? "100vh" : "full"}
+      justify="center"
+      align="center"
+      gap={4}
+      padding={8}
+    >
+      {icon && <Box color="fg.muted">{icon}</Box>}
+      <Text fontSize="lg" fontWeight="semibold">
+        {explanation.isRegistered ? explanation.title : (fallbackTitle ?? explanation.title)}
+      </Text>
+      <Text color="fg.muted" textAlign="center" maxWidth="480px">
+        {explanation.description}
+      </Text>
+      {children}
+    </VStack>
+  );
+}
+
+/** The inline variant, for a region of a page rather than the whole of it. */
+export function HandledErrorAlert({
+  error,
+  fallbackTitle,
+  onRetry,
+}: {
+  error: unknown;
+  fallbackTitle?: string;
+  onRetry?: () => void;
+}) {
+  const explanation = explainAnyError(error);
+  return (
+    <Alert.Root status="error">
+      <Alert.Indicator />
+      <Alert.Content>
+        <Alert.Title>
+          {explanation.isRegistered ? explanation.title : (fallbackTitle ?? explanation.title)}
+        </Alert.Title>
+        <Alert.Description>{explanation.description}</Alert.Description>
+      </Alert.Content>
+      {onRetry && (
+        <Button size="xs" variant="outline" onClick={onRetry}>
+          Try again
+        </Button>
+      )}
+    </Alert.Root>
+  );
+}
+
+/** Publishes the host to the singleton above. Rendered by the host provider. */
+export function useScenarioErrorHostBinding(): void {
+  const host = useScenarioHost();
+  setScenarioErrorHost(host);
+}

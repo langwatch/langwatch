@@ -1,0 +1,42 @@
+import type {
+  CreateUserInput,
+  CreateCredentialUserInput,
+  CreatePasskeyUserInput,
+  CreatedUser,
+  SetFirstUserPasswordInput,
+  SetFirstUserPasswordResult,
+  UpdateUserProfileInput,
+  UserAccountInfo,
+  UserFullProfile,
+  UserPasskeyNudgeStatus,
+  UserProfile,
+  UserSsoStatus,
+  UserTourPreference,
+} from "@langwatch/user-contract";
+
+/** Persistence owned by User. It never crosses the feature boundary. */
+export abstract class UserRepository {
+  abstract getProfiles(userIds: string[]): Promise<UserFullProfile[]>;
+  abstract tryFindById(id: string): Promise<UserProfile | null>;
+  abstract tryFindByEmail(email: string): Promise<UserProfile | null>;
+  abstract create(input: CreateUserInput): Promise<UserProfile>;
+  abstract createCredentialUser(input: CreateCredentialUserInput): Promise<CreatedUser>;
+  abstract createPasskeyUser(input: CreatePasskeyUserInput): Promise<CreatedUser>;
+  abstract hasPassword(id: string): Promise<boolean>;
+  abstract setFirstPassword(input: SetFirstUserPasswordInput): Promise<SetFirstUserPasswordResult>;
+  abstract getPasskeyNudgeStatus(id: string): Promise<UserPasskeyNudgeStatus>;
+  abstract setPasskeyNudgeDismissedAt(id: string, dismissedAt: Date): Promise<void>;
+  abstract updateProfile(input: UpdateUserProfileInput): Promise<UserProfile>;
+  abstract tryGetAccountInfo(id: string): Promise<UserAccountInfo | null>;
+  abstract getSsoStatus(id: string): Promise<UserSsoStatus>;
+  abstract getTraceExplorerTourPreference(id: string): Promise<UserTourPreference>;
+  abstract setTraceExplorerTourDismissedAt(
+    id: string,
+    dismissedAt: Date,
+  ): Promise<UserTourPreference>;
+  abstract setLastLoginAt(id: string, lastLoginAt: Date): Promise<void>;
+  abstract tryGetLastHomePath(id: string): Promise<string | null>;
+  abstract setLastHomePath(id: string, path: string | null): Promise<void>;
+  abstract setDeactivatedAt(id: string, deactivatedAt: Date | null): Promise<UserProfile>;
+  abstract setAvatar(id: string, image: string | null): Promise<void>;
+}

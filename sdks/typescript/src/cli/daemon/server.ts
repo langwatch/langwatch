@@ -351,8 +351,7 @@ export function createDaemonServer(options: DaemonServerOptions): DaemonServer {
   const startedAt = Date.now();
 
   const window = new ExecutionWindow();
-  const executor =
-    options.executor ?? createCommandExecutor({ window, telemetry });
+  const executor = options.executor ?? createCommandExecutor({ window, telemetry });
 
   let served = 0;
   let inflight = 0;
@@ -408,9 +407,7 @@ export function createDaemonServer(options: DaemonServerOptions): DaemonServer {
     });
   };
 
-  const stop = async (
-    reason: "idle" | "stop-requested" | "signal",
-  ): Promise<void> => {
+  const stop = async (reason: "idle" | "stop-requested" | "signal"): Promise<void> => {
     if (stopping) return closedPromise;
     stopping = true;
     if (idleTimer) clearTimeout(idleTimer);
@@ -668,8 +665,7 @@ export function createDaemonServer(options: DaemonServerOptions): DaemonServer {
               // client can safely run the command itself.
               send({
                 t: "fallback",
-                reason:
-                  error instanceof Error ? error.message : "execution-failed",
+                reason: error instanceof Error ? error.message : "execution-failed",
               });
               finish();
               endRequest();
@@ -714,9 +710,7 @@ export function createDaemonServer(options: DaemonServerOptions): DaemonServer {
         ? stagingPath
         : null;
     if (tooLong !== null) {
-      throw new Error(
-        `socket path is too long for a unix domain socket: ${tooLong}`,
-      );
+      throw new Error(`socket path is too long for a unix domain socket: ${tooLong}`);
     }
 
     ensureSocketDir(options.socketDir);

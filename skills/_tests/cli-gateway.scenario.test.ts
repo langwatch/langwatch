@@ -84,9 +84,7 @@ Workflow to exercise (in order):
 
             const allText = state.messages
               .map((m) =>
-                typeof m.content === "string"
-                  ? m.content
-                  : JSON.stringify(m.content),
+                typeof m.content === "string" ? m.content : JSON.stringify(m.content),
               )
               .join("\n");
 
@@ -150,18 +148,14 @@ Workflow:
           }),
         ],
         script: [
-          scenario.user(
-            "Read CLAUDE.md and follow the workflow via Bash. No MCP tools.",
-          ),
+          scenario.user("Read CLAUDE.md and follow the workflow via Bash. No MCP tools."),
           scenario.agent(),
           (state) => {
             toolCallFix(state);
 
             const allText = state.messages
               .map((m) =>
-                typeof m.content === "string"
-                  ? m.content
-                  : JSON.stringify(m.content),
+                typeof m.content === "string" ? m.content : JSON.stringify(m.content),
               )
               .join("\n");
 
@@ -231,9 +225,7 @@ Your goal: report back which top-level command groups are available and what the
 
             const allText = state.messages
               .map((m) =>
-                typeof m.content === "string"
-                  ? m.content
-                  : JSON.stringify(m.content),
+                typeof m.content === "string" ? m.content : JSON.stringify(m.content),
               )
               .join("\n");
 

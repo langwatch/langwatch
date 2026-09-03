@@ -1,0 +1,121 @@
+import { useSession } from "./auth-client";
+import { useRouter } from "./use-route";
+
+export const publicRoutes = [
+  "/share/[id]",
+  "/auth/signin",
+  "/auth/signup",
+  "/auth/forgot-password",
+  "/auth/reset-password",
+  "/auth/verify-email",
+  "/auth/error",
+];
+
+/**
+ * Routes that REQUIRE authentication but should NOT be subject to the
+ * `useOrganizationTeamProject` onboarding bouncer.
+ *
+ * These are routes where an authenticated user with zero organizations
+ * is in a legitimate state — they're in the middle of accepting an
+ * invitation that will create their first OrganizationUser row, or
+ * they're in the onboarding flow itself. Without this exemption, the
+ * `CommandBar` (mounted globally in `_app.tsx`) calls
+ * `useOrganizationTeamProject({redirectToOnboarding: true})` and races
+ * with the `acceptInviteMutation` in `/invite/accept`. For VALID
+ * invites the mutation's `window.location.href = ...` hard-redirect
+ * usually wins; for INVALID invites (expired, NOT_FOUND, FORBIDDEN)
+ * the bouncer wins, silently masking the error UI and dumping the
+ * user on `/onboarding/welcome` with no explanation. Caught by iter
+ * 47 of the BetterAuth migration audit.
+ */
+export const noOrgBouncerRoutes = [
+  "/invite/accept",
+  // Join before create (ADR-117 §6). A brand-new account is signed in and has
+  // no organization by definition when it lands here, which is the state this
+  // step exists to resolve — the bouncer must not resolve it first.
+  "/auth/join",
+  // The CLI device-login approval page. The global bouncer (e.g.
+  // CommandBar's useOrganizationTeamProject) must never swallow
+  // /cli/auth?user_code=… into onboarding — the page handles the no-org
+  // case itself by round-tripping through onboarding with return_to.
+  "/cli/auth",
+  "/onboarding/welcome",
+  "/onboarding/[team]/project",
+  "/onboarding/product",
+  // Org-scoped governance pages — admin in an empty org (no project yet)
+  // must still reach /governance/* to set up sources and rules. Bouncing
+  // them to /onboarding/welcome is wrong: they ALREADY have an org, they
+  // just haven't created a project yet (and may never need to; governance
+  // is org-scoped).
+  "/governance",
+  "/governance/inventory",
+  "/governance/inventory/[id]",
+  "/governance/people",
+  "/governance/costs",
+  "/governance/billed",
+  // The retired addresses stay exempt so each redirect route renders
+  // before the bouncer fires (cost-centers precedent below).
+  "/governance/catalog",
+  "/governance/catalog/[id]",
+  "/governance/ingestion-sources",
+  "/governance/ingestion-sources/[id]",
+  "/governance/anomaly-rules",
+  "/governance/tool-catalog",
+  "/governance/departments",
+  "/governance/cost-centers",
+  "/governance/teams",
+  "/governance/teams/[id]",
+  "/governance/users",
+  "/governance/users/[id]",
+  // Routing policies is a gateway page, and it is the one an admin in an
+  // empty org has to reach first: `langwatch login` fails with
+  // no_default_routing_policy until a default policy exists, and that
+  // happens before the org has any project.
+  "/gateway/routing-policies",
+  // Personal-scope pages — persona-1 (org-less CLI/IDE devs) is a
+  // first-class persona per the persona-aware-chrome spec. They have
+  // a legitimate home at /me + /me/configure without needing to create
+  // an org first. Without this exemption, CommandBar's global
+  // useOrganizationTeamProject({redirectToOnboarding: true}) wins the
+  // race and dumps them on /onboarding/welcome — exact opposite of the
+  // p1 storyboard.
+  "/me",
+  "/me/configure",
+  // The root index is responsible for picking the right home per
+  // persona (`pages/index.tsx` resolves via api.governance.resolveHome
+  // for org-having users + falls back to /me for org-less p1). The
+  // global no-org bouncer must defer to the index page's own logic
+  // here, otherwise CommandBar wins the race and dumps p1 on
+  // /onboarding/welcome before the resolver effect fires.
+  "/",
+];
+
+export const useRequiredSession = (
+  { required = true }: { required?: boolean } = { required: true },
+) => {
+  const router = useRouter();
+
+  const session = useSession({
+    required,
+    onUnauthenticated: required
+      ? () => {
+          if (publicRoutes.includes(router.route)) return;
+          if (navigator.onLine) {
+            // Redirect to /auth/signin which detects the configured auth
+            // provider from publicEnv.NEXTAUTH_PROVIDER and either shows
+            // the credentials form or auto-redirects to the OAuth provider.
+            // This is correct for email/on-prem, google, auth0, azure-ad, etc.
+            // Preserves the current URL so we can come back after signin.
+            const callbackUrl = encodeURIComponent(
+              window.location.pathname + window.location.search,
+            );
+            window.location.href = `/auth/signin?callbackUrl=${callbackUrl}`;
+          } else {
+            window.addEventListener("online", () => window.location.reload());
+          }
+        }
+      : undefined,
+  });
+
+  return session;
+};

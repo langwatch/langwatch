@@ -11,22 +11,23 @@ If your provider is not named here and speaks OpenID Connect, use the generic [`
 **SSO requires an Enterprise license.** Setting the environment variables is not enough on its own: a deployment with an identity provider configured but no license runs in email mode, the identity-provider button is not shown on the sign-in page, and SSO sign-in routes are refused. Email sign-in and **Forgot password** stay available so users are not locked out, though **Forgot password** can only deliver if outbound email is configured. If everyone on an unlicensed deployment signs in through SSO, set `LANGWATCH_LICENSE_KEY` or configure SMTP before upgrading, see [Editions and licensing](/self-hosting/licensing).
 
 The decision is made once at startup, so a license activated on a running server enables SSO at the **next restart**. See [Editions and licensing](/self-hosting/licensing) for how to obtain and activate one.
+
 </Warning>
 
 ## Supported Providers
 
-| Provider | `NEXTAUTH_PROVIDER` value | Requires |
-|----------|--------------------------|----------|
-| Email/Password | `email` (default) | Nothing extra |
-| Auth0 | `auth0` | Client ID, Client Secret, Issuer |
-| AWS Cognito | `cognito` | Client ID, Client Secret, Issuer |
-| Azure AD | `azure-ad` | Client ID, Client Secret, Tenant ID |
-| GitHub | `github` | Client ID, Client Secret |
-| GitLab | `gitlab` | Client ID, Client Secret |
-| Google | `google` | Client ID, Client Secret |
-| Okta | `okta` | Client ID, Client Secret, Issuer |
-| OneLogin | `onelogin` | Client ID, Client Secret, Issuer |
-| Any other OpenID Connect provider | `oidc` | Client ID, Client Secret, Issuer |
+| Provider                          | `NEXTAUTH_PROVIDER` value | Requires                            |
+| --------------------------------- | ------------------------- | ----------------------------------- |
+| Email/Password                    | `email` (default)         | Nothing extra                       |
+| Auth0                             | `auth0`                   | Client ID, Client Secret, Issuer    |
+| AWS Cognito                       | `cognito`                 | Client ID, Client Secret, Issuer    |
+| Azure AD                          | `azure-ad`                | Client ID, Client Secret, Tenant ID |
+| GitHub                            | `github`                  | Client ID, Client Secret            |
+| GitLab                            | `gitlab`                  | Client ID, Client Secret            |
+| Google                            | `google`                  | Client ID, Client Secret            |
+| Okta                              | `okta`                    | Client ID, Client Secret, Issuer    |
+| OneLogin                          | `onelogin`                | Client ID, Client Secret, Issuer    |
+| Any other OpenID Connect provider | `oidc`                    | Client ID, Client Secret, Issuer    |
 
 ## OAuth Redirect URL
 
@@ -39,7 +40,11 @@ https://your-langwatch-domain.com/api/auth/callback/{provider}
 Replace `{provider}` with: `auth0`, `azure-ad`, `cognito`, `github`, `gitlab`, `google`, `okta`, `onelogin`, or `oidc`. This is the same value you set as `NEXTAUTH_PROVIDER`.
 
 <Note>
-A `NEXTAUTH_PROVIDER` value LangWatch does not recognise, or one whose client credentials are missing, starts the deployment in email mode and logs which provider it could not mount. That keeps a licensed deployment signable-in while you correct the value, rather than pointing the sign-in page at an identity provider that was never wired up.
+  A `NEXTAUTH_PROVIDER` value LangWatch does not recognise, or one whose client
+  credentials are missing, starts the deployment in email mode and logs which provider it
+  could not mount. That keeps a licensed deployment signable-in while you correct the
+  value, rather than pointing the sign-in page at an identity provider that was never
+  wired up.
 </Note>
 
 ## Provider Setup
@@ -76,12 +81,12 @@ app:
 
 Or via environment variables:
 
-| Variable | Value |
-|----------|-------|
-| `NEXTAUTH_PROVIDER` | `auth0` |
-| `AUTH0_CLIENT_ID` | Your Auth0 client ID |
-| `AUTH0_CLIENT_SECRET` | Your Auth0 client secret |
-| `AUTH0_ISSUER` | `https://your-tenant.auth0.com` |
+| Variable              | Value                           |
+| --------------------- | ------------------------------- |
+| `NEXTAUTH_PROVIDER`   | `auth0`                         |
+| `AUTH0_CLIENT_ID`     | Your Auth0 client ID            |
+| `AUTH0_CLIENT_SECRET` | Your Auth0 client secret        |
+| `AUTH0_ISSUER`        | `https://your-tenant.auth0.com` |
 
 ### AWS Cognito
 
@@ -106,12 +111,12 @@ app:
 
 Or via environment variables:
 
-| Variable | Value |
-|----------|-------|
-| `NEXTAUTH_PROVIDER` | `cognito` |
-| `COGNITO_CLIENT_ID` | Your app client ID |
-| `COGNITO_CLIENT_SECRET` | Your app client secret |
-| `COGNITO_ISSUER` | `https://cognito-idp.<region>.amazonaws.com/<userPoolId>` |
+| Variable                | Value                                                     |
+| ----------------------- | --------------------------------------------------------- |
+| `NEXTAUTH_PROVIDER`     | `cognito`                                                 |
+| `COGNITO_CLIENT_ID`     | Your app client ID                                        |
+| `COGNITO_CLIENT_SECRET` | Your app client secret                                    |
+| `COGNITO_ISSUER`        | `https://cognito-idp.<region>.amazonaws.com/<userPoolId>` |
 
 <Note>
 The issuer is the user pool's own issuer, not the hosted-UI domain. LangWatch reads the hosted-UI endpoints from the issuer's discovery document, so the domain never has to be configured separately. You can confirm a pool's issuer is reachable with:
@@ -119,6 +124,7 @@ The issuer is the user pool's own issuer, not the hosted-UI domain. LangWatch re
 ```bash
 curl https://cognito-idp.<region>.amazonaws.com/<userPoolId>/.well-known/openid-configuration
 ```
+
 </Note>
 
 ### Azure AD
@@ -143,15 +149,17 @@ app:
 ```
 
 <Note>
-The provider is `azure-ad` while its credentials sit under `providers.azureAd`. The first is the value LangWatch selects on, the second is the chart's key for the `AZURE_AD_*` variables.
+  The provider is `azure-ad` while its credentials sit under `providers.azureAd`. The
+  first is the value LangWatch selects on, the second is the chart's key for the
+  `AZURE_AD_*` variables.
 </Note>
 
-| Variable | Value |
-|----------|-------|
-| `NEXTAUTH_PROVIDER` | `azure-ad` |
-| `AZURE_AD_CLIENT_ID` | Application (client) ID |
-| `AZURE_AD_CLIENT_SECRET` | Client secret value |
-| `AZURE_AD_TENANT_ID` | Directory (tenant) ID |
+| Variable                 | Value                   |
+| ------------------------ | ----------------------- |
+| `NEXTAUTH_PROVIDER`      | `azure-ad`              |
+| `AZURE_AD_CLIENT_ID`     | Application (client) ID |
+| `AZURE_AD_CLIENT_SECRET` | Client secret value     |
+| `AZURE_AD_TENANT_ID`     | Directory (tenant) ID   |
 
 ### GitHub
 
@@ -171,10 +179,10 @@ app:
           secretKeyRef: { name: langwatch-sso, key: githubClientSecret }
 ```
 
-| Variable | Value |
-|----------|-------|
-| `NEXTAUTH_PROVIDER` | `github` |
-| `GITHUB_CLIENT_ID` | OAuth app client ID |
+| Variable               | Value                   |
+| ---------------------- | ----------------------- |
+| `NEXTAUTH_PROVIDER`    | `github`                |
+| `GITHUB_CLIENT_ID`     | OAuth app client ID     |
 | `GITHUB_CLIENT_SECRET` | OAuth app client secret |
 
 ### GitLab
@@ -183,10 +191,10 @@ app:
 2. Set **Redirect URI** to `https://your-domain.com/api/auth/callback/gitlab`
 3. Select scopes: `read_user`, `openid`, `profile`, `email`
 
-| Variable | Value |
-|----------|-------|
-| `NEXTAUTH_PROVIDER` | `gitlab` |
-| `GITLAB_CLIENT_ID` | Application ID |
+| Variable               | Value              |
+| ---------------------- | ------------------ |
+| `NEXTAUTH_PROVIDER`    | `gitlab`           |
+| `GITLAB_CLIENT_ID`     | Application ID     |
 | `GITLAB_CLIENT_SECRET` | Application secret |
 
 ### Google
@@ -194,10 +202,10 @@ app:
 1. Create credentials in [Google Cloud Console](https://console.cloud.google.com/apis/credentials)
 2. Add an **Authorized redirect URI**: `https://your-domain.com/api/auth/callback/google`
 
-| Variable | Value |
-|----------|-------|
-| `NEXTAUTH_PROVIDER` | `google` |
-| `GOOGLE_CLIENT_ID` | OAuth client ID |
+| Variable               | Value               |
+| ---------------------- | ------------------- |
+| `NEXTAUTH_PROVIDER`    | `google`            |
+| `GOOGLE_CLIENT_ID`     | OAuth client ID     |
 | `GOOGLE_CLIENT_SECRET` | OAuth client secret |
 
 ### Okta
@@ -219,12 +227,12 @@ app:
           value: "https://your-org.okta.com"
 ```
 
-| Variable | Value |
-|----------|-------|
-| `NEXTAUTH_PROVIDER` | `okta` |
-| `OKTA_CLIENT_ID` | Client ID |
-| `OKTA_CLIENT_SECRET` | Client secret |
-| `OKTA_ISSUER` | `https://your-org.okta.com` |
+| Variable             | Value                       |
+| -------------------- | --------------------------- |
+| `NEXTAUTH_PROVIDER`  | `okta`                      |
+| `OKTA_CLIENT_ID`     | Client ID                   |
+| `OKTA_CLIENT_SECRET` | Client secret               |
+| `OKTA_ISSUER`        | `https://your-org.okta.com` |
 
 ### OneLogin
 
@@ -246,15 +254,17 @@ app:
           value: "https://your-subdomain.onelogin.com/oidc/2"
 ```
 
-| Variable | Value |
-|----------|-------|
-| `NEXTAUTH_PROVIDER` | `onelogin` |
-| `ONELOGIN_CLIENT_ID` | Client ID |
-| `ONELOGIN_CLIENT_SECRET` | Client secret |
-| `ONELOGIN_ISSUER` | `https://your-subdomain.onelogin.com/oidc/2` |
+| Variable                 | Value                                        |
+| ------------------------ | -------------------------------------------- |
+| `NEXTAUTH_PROVIDER`      | `onelogin`                                   |
+| `ONELOGIN_CLIENT_ID`     | Client ID                                    |
+| `ONELOGIN_CLIENT_SECRET` | Client secret                                |
+| `ONELOGIN_ISSUER`        | `https://your-subdomain.onelogin.com/oidc/2` |
 
 <Note>
-If OneLogin sits behind another identity provider, for example a Cognito user pool that federates to it, point LangWatch at whichever one it talks to directly and let that one handle the hop. LangWatch only needs one OIDC issuer.
+  If OneLogin sits behind another identity provider, for example a Cognito user pool that
+  federates to it, point LangWatch at whichever one it talks to directly and let that one
+  handle the hop. LangWatch only needs one OIDC issuer.
 </Note>
 
 ### Any other OpenID Connect provider
@@ -278,12 +288,12 @@ app:
           value: "https://idp.example.com"
 ```
 
-| Variable | Value |
-|----------|-------|
-| `NEXTAUTH_PROVIDER` | `oidc` |
-| `OIDC_CLIENT_ID` | Client ID |
-| `OIDC_CLIENT_SECRET` | Client secret |
-| `OIDC_ISSUER` | Whatever your provider publishes `.well-known/openid-configuration` under |
+| Variable             | Value                                                                     |
+| -------------------- | ------------------------------------------------------------------------- |
+| `NEXTAUTH_PROVIDER`  | `oidc`                                                                    |
+| `OIDC_CLIENT_ID`     | Client ID                                                                 |
+| `OIDC_CLIENT_SECRET` | Client secret                                                             |
+| `OIDC_ISSUER`        | Whatever your provider publishes `.well-known/openid-configuration` under |
 
 <Note>
 Check the issuer is right by fetching its discovery document, which is exactly what LangWatch does at sign-in:
@@ -293,6 +303,7 @@ curl https://idp.example.com/.well-known/openid-configuration
 ```
 
 JSON back means the issuer is right. LangWatch then reads `authorization_endpoint`, `token_endpoint` and `userinfo_endpoint` from that document, so all three have to be there, and the client you registered has to allow the authorization code flow with PKCE.
+
 </Note>
 
 ## Domain-to-Organization Mapping
@@ -323,5 +334,6 @@ WHERE "email" LIKE '%@yourcompany.com';
 3. When flagged users next sign in via SSO, their accounts are automatically linked
 
 <Note>
-Users keep their existing data, projects, and permissions after the SSO migration. The migration only changes their authentication method.
+  Users keep their existing data, projects, and permissions after the SSO migration. The
+  migration only changes their authentication method.
 </Note>

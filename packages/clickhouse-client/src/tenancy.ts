@@ -80,9 +80,7 @@ export interface RoutingTable {
  * one at module load. The single exception is a duplicate organisation, which
  * is ambiguous rather than merely malformed - there is no safe way to pick.
  */
-export function parseRoutingTable(
-  env: Record<string, string | undefined>,
-): RoutingTable {
+export function parseRoutingTable(env: Record<string, string | undefined>): RoutingTable {
   const routes = new Map<string, string>();
   const source = new Map<string, string>();
   const skipped: { envVar: string; reason: string }[] = [];
@@ -98,8 +96,7 @@ export function parseRoutingTable(
 
     const suffix = envVar.slice(PRIVATE_ROUTE_ENV_PREFIX.length);
     const separator = suffix.lastIndexOf("__");
-    const organizationId =
-      separator >= 0 ? suffix.slice(separator + 2) : suffix;
+    const organizationId = separator >= 0 ? suffix.slice(separator + 2) : suffix;
 
     if (organizationId === "") {
       skipped.push({ envVar, reason: "no organization id in the name" });

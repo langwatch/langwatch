@@ -1,7 +1,4 @@
-import {
-  createLangWatchApiClient,
-  type LangwatchApiClient,
-} from "@/internal/api/client";
+import { createLangWatchApiClient, type LangwatchApiClient } from "@/internal/api/client";
 import type { paths } from "@/internal/generated/openapi/api-client";
 import { type InternalConfig } from "@/client-sdk/types";
 import {
@@ -94,9 +91,13 @@ export class AgentsApiService {
   }
 
   private handleApiError(operation: string, error: unknown): never {
-    const message = formatApiErrorForOperation({ operation: operation, error: error, options: {
-      status: extractStatusFromResponse(error),
-    } });
+    const message = formatApiErrorForOperation({
+      operation: operation,
+      error: error,
+      options: {
+        status: extractStatusFromResponse(error),
+      },
+    });
     throw new AgentsApiError(message, operation, error);
   }
 
@@ -129,11 +130,14 @@ export class AgentsApiService {
     return data as unknown as AgentResponse;
   }
 
-  async update(id: string, params: {
-    name?: string;
-    type?: string;
-    config?: Record<string, unknown>;
-  }): Promise<AgentResponse> {
+  async update(
+    id: string,
+    params: {
+      name?: string;
+      type?: string;
+      config?: Record<string, unknown>;
+    },
+  ): Promise<AgentResponse> {
     const { data, error } = await this.apiClient.PATCH("/api/v1/agents/{id}", {
       params: { path: { id } },
       body: params as never,

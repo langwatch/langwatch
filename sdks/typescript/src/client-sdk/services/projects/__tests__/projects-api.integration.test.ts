@@ -1,17 +1,7 @@
-import {
-  describe,
-  it,
-  expect,
-  beforeAll,
-  beforeEach,
-  afterAll,
-  afterEach,
-} from "vitest";
+import { describe, it, expect, beforeAll, beforeEach, afterAll, afterEach } from "vitest";
 import { http, HttpResponse } from "msw";
 import { setupServer } from "msw/node";
-import {
-  ProjectsApiService,
-} from "../projects-api.service";
+import { ProjectsApiService } from "../projects-api.service";
 import { LangWatchHandledError } from "@/internal/api/errors";
 
 const TEST_ENDPOINT = "http://localhost:5560";
@@ -216,9 +206,7 @@ describe("ProjectsApiService", () => {
       beforeEach(() => {
         server.use(
           http.patch(`${TEST_ENDPOINT}/api/projects/proj_abc123`, () => {
-            return HttpResponse.json(
-              projectFixture({ name: "Updated Name" }),
-            );
+            return HttpResponse.json(projectFixture({ name: "Updated Name" }));
           }),
         );
       });

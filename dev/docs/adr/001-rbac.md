@@ -10,12 +10,12 @@ LangWatch is a multi-tenant SaaS platform. We need strict data isolation between
 
 Three-level hierarchy: Organization → Team → Project, with role-based permissions at each level.
 
-| Role | Scope | Creates | Manages Members |
-|------|-------|---------|-----------------|
-| Org Admin | Organization | Teams | Yes (all) |
-| Team Admin | Team | Projects | Yes (team) |
-| Team Member | Team | Resources | No |
-| Team Viewer | Team | Nothing | No |
+| Role        | Scope        | Creates   | Manages Members |
+| ----------- | ------------ | --------- | --------------- |
+| Org Admin   | Organization | Teams     | Yes (all)       |
+| Team Admin  | Team         | Projects  | Yes (team)      |
+| Team Member | Team         | Resources | No              |
+| Team Viewer | Team         | Nothing   | No              |
 
 Permission format: `resource:action` (e.g., `analytics:view`, `datasets:manage`)
 
@@ -30,6 +30,7 @@ Alternative considered: flat user-project model. Rejected because it doesn't sup
 ## Consequences
 
 **Rules to follow:**
+
 1. Always use `checkPermissionOrThrow` from `src/server/api/rbac.ts` — never write raw permission checks
 2. Never bypass with direct DB queries — all data access must flow through RBAC
 3. Use the new system (`rbac.ts`), not legacy `permission.ts` — backward compat only

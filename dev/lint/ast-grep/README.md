@@ -21,21 +21,24 @@ rules that apply to both file types are split into `_ts` / `_tsx` siblings.
 
 ## Rules
 
-| Rule | Forbids | Scope |
-|---|---|---|
-| `no-explicit-any` + `-tsx` | `: any`, `as any` | `platform/app/src/**/*.{ts,tsx}` |
-| `no-inline-dynamic-import` + `-tsx` | inline `import(...)` outside `routes.tsx` / `pages/**` | `platform/app/src/**/*.{ts,tsx}` |
-| `no-form-watch-in-child` | `$form.watch()` in a child receiving `form` as a prop | `platform/app/src/components/**/*.tsx` |
-| `no-export-star-shim` + `-tsx` | `export * from "..."`. Disable inline with `// ast-grep-ignore: no-export-star-shim-{ts,tsx}` | `platform/app/src/**/*.{ts,tsx}` |
-| `no-localhost-fallback` + `-tsx` | `?? "http://localhost..."` and template-literal variants | `platform/app/src/**/*.{ts,tsx}` |
-| `no-form-disable-on-isvalid` | `disabled={!form.formState.isValid}` on submit buttons | `platform/app/src/**/*.tsx` |
-| `require-bdd-describe-context` + `-tsx` | nested `describe` that names a topic instead of a `given`/`when` condition | test files under `platform/app/**`, `sdks/typescript/**` |
-| `require-boolean-name-prefix` | `foo: boolean` without an `is`/`has`/`should`/`can`/`will` prefix or a domain-adjective equivalent | `platform/app/{src,ee}/**/*.ts` |
-| `require-fetch-timeout` + `-tsx` | `fetch(...)` with no `signal` — a hung peer hangs the caller | `platform/app/src/**`, `sdks/typescript/src/**` |
-| `no-test-without-assertion` + `-tsx` | a test whose inline body contains no `expect`/`assert` — passes unless the code throws | test files |
-| `use-action-based-test-name` + `-tsx` | `it("should …")`, and names carrying no behaviour (`works`, `renders`, `test`) | test files |
-| `no-tautological-assertion` + `-tsx` | `expect(X).toBe(X)` — an assertion that cannot fail | test files |
-| `no-empty-test` + `-tsx` | `it("…", () => {})` — always green, counts as coverage | test files |
+| Rule                                    | Forbids                                                                                            | Scope                                                    |
+| --------------------------------------- | -------------------------------------------------------------------------------------------------- | -------------------------------------------------------- |
+| `no-explicit-any` + `-tsx`              | `: any`, `as any`                                                                                  | `apps/**`, `packages/**` `*.{ts,tsx}`                    |
+| `no-identity-function`                  | a named function or `const` arrow that returns its own argument                                     | `packages/**`, `apps/**` `*.ts`                          |
+| `no-same-name-delegation`               | a method whose whole body forwards to the same name on a collaborator (skips `app/*.app.ts`)        | `packages/**`, `apps/**` `*.ts`                          |
+| `no-inline-dynamic-import` + `-tsx`     | inline `import(...)` outside the page-loader list / `pages/**`                                             | `apps/**`, `packages/**` `*.{ts,tsx}`                    |
+| `no-form-watch-in-child`                | `$form.watch()` in a child receiving `form` as a prop                                              | `apps/ui/src/**`, `packages/**/web/src/**` `*.tsx`       |
+| `no-export-star-shim` + `-tsx`          | `export * from "..."`. Disable inline with `// ast-grep-ignore: no-export-star-shim-{ts,tsx}`      | `apps/**`, `packages/**` `*.{ts,tsx}`                    |
+| `no-localhost-fallback` + `-tsx`        | `?? "http://localhost..."` and template-literal variants                                           | `apps/**`, `packages/**` `*.{ts,tsx}`                    |
+| `no-form-disable-on-isvalid`            | `disabled={!form.formState.isValid}` on submit buttons                                             | `apps/**`, `packages/**` `*.tsx`                         |
+| `require-bdd-describe-context` + `-tsx` | nested `describe` that names a topic instead of a `given`/`when` condition                         | test files under `apps/**`, `packages/**`, `sdks/typescript/**` |
+| `require-boolean-name-prefix`           | `foo: boolean` without an `is`/`has`/`should`/`can`/`will` prefix or a domain-adjective equivalent | `apps/**`, `packages/**` `*.ts`                          |
+| `require-fetch-timeout` + `-tsx`        | `fetch(...)` with no `signal` — a hung peer hangs the caller                                       | `apps/**`, `packages/**`, `sdks/typescript/src/**`       |
+| `no-test-without-assertion` + `-tsx`    | a test whose inline body contains no `expect`/`assert` — passes unless the code throws             | test files                                               |
+| `use-action-based-test-name` + `-tsx`   | `it("should …")`, and names carrying no behaviour (`works`, `renders`, `test`)                     | test files                                               |
+| `no-tautological-assertion` + `-tsx`    | `expect(X).toBe(X)` — an assertion that cannot fail                                                | test files                                               |
+| `no-empty-test` + `-tsx`                | `it("…", () => {})` — always green, counts as coverage                                             | test files                                               |
+| `no-double-type-assertion` + `-tsx`     | `x as unknown as T` — a single `as T` still proves overlap; routing via `unknown` removes even that | `packages/**/contract/src/**` (**`error`**)              |
 
 The BDD/boolean/fetch trio was added because they were the three largest
 mechanically preventable clusters in a 50-PR sample of CodeRabbit comments —
@@ -44,16 +47,30 @@ the second-largest cluster (45 findings): tests that cannot fail. Measured
 across `src`, `ee` and `packages`: 171 `should`/vague names, 20 tautological
 assertions, 10 assertion-free tests.
 
-Biome covers the rest of the test surface — `noFocusedTests`,
-`noSkippedTests`, `noDuplicateTestHooks`, `noMisplacedAssertion`,
-`noExportsInTest`, `useTestHooksOnTop`, `noExcessiveNestedTestSuites` — scoped
-to test files in `platform/app/biome.jsonc`. Unscoped, `noFocusedTests` fires on
-any function named `fit(...)`, including a production zoom hook. Each rule that moves here should be **deleted**
-from `path_instructions` in `/.coderabbit.yaml`, or every violation gets
-reported twice, once deterministically and once probabilistically.
+oxlint covers the rest of the test surface — `vitest/no-focused-tests`,
+`jest/no-export`, `jest/max-nested-describe`, `jest/no-duplicate-hooks`,
+`jest/prefer-hooks-on-top` — scoped to test files in
+`/.oxlintrc.architecture.json`. Unscoped, `no-focused-tests` fires on any
+function named `fit(...)`, including a production zoom hook, which is why the
+scoping is deliberate. Each rule that moves here should be **deleted** from
+`path_instructions` in `/.coderabbit.yaml`, or every violation gets reported
+twice, once deterministically and once probabilistically.
 
-All rules are `severity: warning` during rollout. Promote per-rule to `error`
-once its baseline is verifiably clean.
+Most rules are `severity: warning` during rollout. Promote per-rule to `error`
+once its baseline is verifiably clean — **severity is what makes a rule a
+gate**: `ast-grep scan` exits 0 on a tree whose only findings are warnings, so
+a `warning` here annotates and blocks nothing.
+
+`no-double-type-assertion` is the first `error` rule. It is scoped to the
+contract layer rather than the whole repo because that is where its baseline
+is clean: `as unknown as` appears 59 times in `packages/**` source (31 files)
+and 187 times in the platform application, but only twice under
+`packages/**/contract/src/**` — one was a cast around `URL`, which the
+package's own `lib` already declares (removed), and the other is the evaluator
+catalogue, where TypeScript rejects even a single assertion and the rule's
+`ignores` records why. A contract package IS the domain's type surface, so a
+double cast there is the type system being switched off at the one place the
+types are the product.
 
 ## Every rule is proven by a fixture
 
@@ -81,5 +98,5 @@ rule is unproven.
   heavy-column dedup anti-pattern).
 - `/.coderabbit.yaml` — the AI reviewer; consumes `rules/`, and carries the
   judgement-level rules that genuinely cannot be expressed syntactically.
-- `platform/app/biome.json` — the TypeScript linter proper. Rules expressible as
-  Biome config belong there, not here.
+- `/.oxlintrc.architecture.json` — the TypeScript linter proper. Rules
+  expressible as oxlint config belong there, not here.

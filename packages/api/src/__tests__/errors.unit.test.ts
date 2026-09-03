@@ -1,5 +1,5 @@
 import { HandledError, NotFoundError } from "@langwatch/handled-error";
-import { describe, expect, it } from "vitest";
+import { describe, expect, it, vi } from "vitest";
 import { type ZodError, z } from "zod";
 
 import { createErrorHandler, formatError } from "../errors.js";
@@ -30,9 +30,8 @@ function zodErrorFrom(parse: () => unknown): ZodError {
 }
 
 /** Minimal Hono-ish context for the error handler. */
-function fakeContext(overrides: { isVersioned?: boolean } = {}) {
+function fakeContext() {
   const store = new Map<string, unknown>();
-  if (overrides.isVersioned) store.set("isVersionedRequest", true);
   return {
     req: { method: "POST", path: "/api/things" },
     get: (key: string) => store.get(key),
@@ -48,72 +47,81 @@ function fakeContext(overrides: { isVersioned?: boolean } = {}) {
 
 describe("formatError", () => {
   describe("when given a HandledError", () => {
-    describe("when the request is versioned", () => {
-      it("returns the new format without the error field", () => {
-        const err = new NotFoundError("not_found", "Resource", "abc");
+    it("returns the clean format", () => {
+      const err = new NotFoundError("not_found", "Resource", "abc");
 
-        const { status, body } = formatError({ err, isVersioned: true });
+      const { status, body } = formatError({ err });
 
-        expect(status).toBe(404);
-        expect(body.code).toBe("not_found");
-        // The code, never the handled error's own message: that is server copy
-        // and can name internals (ADR-045). Identifying context is in `meta`.
-        expect(body.message).toBe("not_found");
-        expect(JSON.stringify(body)).not.toContain("Resource not found: abc");
-        expect(body.meta).toEqual({ id: "abc" });
-        expect(body.error).toBeUndefined();
-      });
-
-      it("carries fault, tips and docsUrl when present", () => {
-        const err = new TestError(
-          "query_memory_exceeded",
-          "Query used too much memory",
-          {
-            httpStatus: 422,
-            fault: "customer",
-            tips: ["Narrow the time range"],
-            docsUrl: "https://docs.langwatch.ai/traces",
-          },
-        );
-
-        const { body } = formatError({ err, isVersioned: true });
-
-        expect(body.fault).toBe("customer");
-        expect(body.tips).toEqual(["Narrow the time range"]);
-        expect(body.docsUrl).toBe("https://docs.langwatch.ai/traces");
-      });
+      expect(status).toBe(404);
+      expect(body.code).toBe("not_found");
+      // The code, never the handled error's own message: that is server copy
+      // and can name internals (ADR-045). Identifying context is in `meta`.
+      expect(body.message).toBe("not_found");
+      expect(JSON.stringify(body)).not.toContain("Resource not found: abc");
+      expect(body.meta).toEqual({ id: "abc" });
+      expect(body.retryable).toBe(false);
     });
 
-    describe("when the request is unversioned", () => {
-      it("returns the union format with the error field", () => {
-        const err = new NotFoundError("not_found", "Resource", "abc");
-
-        const { status, body } = formatError({ err, isVersioned: false });
-
-        expect(status).toBe(404);
-        expect(body.code).toBe("not_found");
-        expect(body.error).toBe("Not Found");
+    it("keeps trusted handled remediation metadata lossless", () => {
+      const err = new TestError("query_memory_exceeded", "Query used too much memory", {
+        httpStatus: 422,
+        fault: "customer",
+        tips: ["Narrow the time range"],
+        docsUrl: "https://docs.langwatch.ai/traces",
       });
+
+      const { body } = formatError({ err });
+
+      expect(body.fault).toBe("customer");
+      expect(body.tips).toEqual(["Narrow the time range"]);
+      expect(body.docsUrl).toBe("https://docs.langwatch.ai/traces");
+    });
+
+    it("carries an explicit retryability decision", () => {
+      const err = new TestError("provider_unavailable", "Provider unavailable", {
+        httpStatus: 503,
+        retryable: true,
+      });
+
+      const { body } = formatError({ err });
+
+      expect(body.retryable).toBe(true);
+    });
+
+    it("does not infer retryability from the HTTP status", () => {
+      const err = new TestError("provider_unavailable", "Provider unavailable", {
+        httpStatus: 503,
+      });
+
+      const { body } = formatError({ err });
+
+      expect(body.retryable).toBe(false);
+    });
+
+    /**
+     * The version-gated union envelope died with the bare alias (ADR 002 §5):
+     * there is no request shape left that carries the legacy `error` field.
+     */
+    it("never carries the legacy error field", () => {
+      const err = new NotFoundError("not_found", "Resource", "abc");
+
+      const { body } = formatError({ err });
+
+      expect(body).not.toHaveProperty("error");
     });
 
     describe("back-compat `kind` alias", () => {
       it("emits `kind` equal to `code`", () => {
         const err = new NotFoundError("not_found", "Resource", "abc");
-        const { body } = formatError({ err, isVersioned: true });
+        const { body } = formatError({ err });
         expect(body.kind).toBe("not_found");
         expect(body.kind).toBe(body.code);
       });
 
       it("emits `kind` for synthesized error bodies too", () => {
-        const zodErr = zodErrorFrom(() =>
-          z.object({ name: z.string() }).parse({}),
-        );
-        expect(formatError({ err: zodErr, isVersioned: true }).body.kind).toBe(
-          "validation_error",
-        );
-        expect(
-          formatError({ err: new Error("oops"), isVersioned: true }).body.kind,
-        ).toBe("internal_error");
+        const zodErr = zodErrorFrom(() => z.object({ name: z.string() }).parse({}));
+        expect(formatError({ err: zodErr }).body.kind).toBe("validation_error");
+        expect(formatError({ err: new Error("oops") }).body.kind).toBe("internal_error");
       });
     });
   });
@@ -129,14 +137,87 @@ describe("formatError", () => {
         serialize: () => ({ code: "not_found", httpStatus: 404, reasons: [] }),
       });
 
-      const { status, body } = formatError({
-        err: impostor,
-        isVersioned: true,
-      });
+      const { status, body } = formatError({ err: impostor });
 
       expect(status).toBe(500);
       expect(body.code).toBe("internal_error");
       expect(body.message).toBe("An unknown error occurred");
+    });
+
+    it("does not trust a copied handled brand without the trusted serializer", () => {
+      const impostor = Object.assign(new Error("not really handled"), {
+        isHandled: true,
+        code: "malicious_error",
+        docsUrl: "https://not-langwatch.example",
+      });
+
+      const { status, body } = formatError({ err: impostor });
+
+      expect(status).toBe(500);
+      expect(body).toMatchObject({ code: "internal_error", retryable: false });
+      expect(JSON.stringify(body)).not.toContain("not-langwatch.example");
+    });
+
+    it("does not call a serializer supplied by a branded impostor", () => {
+      const serialize = vi.fn(() => ({
+        code: "malicious_error",
+        docsUrl: "https://not-langwatch.example",
+        httpStatus: 418,
+        meta: { leaked: "credential" },
+        reasons: [],
+        retryable: false,
+      }));
+      const impostor = Object.assign(new Error("not really handled"), {
+        isHandled: true,
+        serialize,
+      });
+
+      const { status, body } = formatError({ err: impostor });
+
+      expect(serialize).not.toHaveBeenCalled();
+      expect(status).toBe(500);
+      expect(body).toMatchObject({ code: "internal_error", retryable: false });
+      expect(JSON.stringify(body)).not.toContain("credential");
+      expect(JSON.stringify(body)).not.toContain("not-langwatch.example");
+    });
+
+    it("bypasses an overridden serializer on a registry-issued error", () => {
+      class OverriddenSerializerError extends TestError {
+        override serialize(): never {
+          throw new Error("override must not run");
+        }
+      }
+
+      const { status, body } = formatError({
+        err: new OverriddenSerializerError("trusted_error", "server copy", {
+          httpStatus: 409,
+          meta: { field: "name" },
+        }),
+      });
+
+      expect(status).toBe(409);
+      expect(body).toMatchObject({ code: "trusted_error", meta: { field: "name" } });
+    });
+
+    it("degrades non-JSON metadata and invalid handled statuses to an internal error", () => {
+      const circular: Record<string, unknown> = {};
+      circular.self = circular;
+      const invalidMeta = new TestError("trusted_error", "server copy", {
+        httpStatus: 409,
+        meta: circular,
+      });
+      const invalidStatus = new TestError("trusted_error", "server copy", {
+        httpStatus: 200,
+      });
+
+      expect(formatError({ err: invalidMeta })).toMatchObject({
+        status: 500,
+        body: { code: "internal_error" },
+      });
+      expect(formatError({ err: invalidStatus })).toMatchObject({
+        status: 500,
+        body: { code: "internal_error" },
+      });
     });
   });
 
@@ -152,10 +233,7 @@ describe("formatError", () => {
           .parse({ name: "", age: "not-a-number" }),
       );
 
-      const { status, body } = formatError({
-        err: zodError,
-        isVersioned: true,
-      });
+      const { status, body } = formatError({ err: zodError });
 
       expect(status).toBe(422);
       expect(body.code).toBe("validation_error");
@@ -180,24 +258,11 @@ describe("formatError", () => {
     it("gains the remediation channel by travelling as a HandledError", () => {
       // Before, the ZodError branch built a bare payload and validation errors
       // silently missed fault/tips/docsUrl entirely.
-      const zodError = zodErrorFrom(() =>
-        z.object({ name: z.string() }).parse({}),
-      );
+      const zodError = zodErrorFrom(() => z.object({ name: z.string() }).parse({}));
 
-      const { body } = formatError({ err: zodError, isVersioned: true });
+      const { body } = formatError({ err: zodError });
 
       expect(body.fault).toBe("customer");
-    });
-
-    describe("when the request is unversioned", () => {
-      it("includes the error field", () => {
-        const zodError = zodErrorFrom(() =>
-          z.object({ name: z.string() }).parse({}),
-        );
-
-        const { body } = formatError({ err: zodError, isVersioned: false });
-        expect(body.error).toBe("Unprocessable Entity");
-      });
     });
   });
 
@@ -208,11 +273,32 @@ describe("formatError", () => {
   describe("when given an Error with a status property", () => {
     it("uses the status as the HTTP code", () => {
       const err = Object.assign(new Error("Forbidden"), { status: 403 });
-      const { status, body } = formatError({ err, isVersioned: true });
+      const { status, body } = formatError({ err });
 
       expect(status).toBe(403);
       expect(body.code).toBe("http_error");
-      expect(body.message).toBe("Forbidden");
+      expect(body.message).toBe("http_error");
+      expect(body.retryable).toBe(false);
+    });
+
+    it("does not expose an adapter-provided HTTP error message", () => {
+      const err = Object.assign(new Error("upstream returned a customer token"), {
+        status: 400,
+      });
+
+      const { body } = formatError({ err });
+
+      expect(body.message).toBe("http_error");
+      expect(JSON.stringify(body)).not.toContain("customer token");
+    });
+
+    it("does not trust an invalid status property", () => {
+      const err = Object.assign(new Error("not a status"), { status: 999 });
+
+      const { status, body } = formatError({ err });
+
+      expect(status).toBe(500);
+      expect(body).toMatchObject({ code: "internal_error", retryable: false });
     });
   });
 
@@ -221,31 +307,24 @@ describe("formatError", () => {
   // -------------------------------------------------------------------------
 
   describe("when given an unknown error", () => {
-    it.each([
-      "production",
-      "development",
-    ])("returns 500 with a sanitized message in %s", (nodeEnv) => {
-      const originalEnv = process.env.NODE_ENV;
-      process.env.NODE_ENV = nodeEnv;
-      try {
-        const err = new Error("secret internal details");
-        const { status, body } = formatError({ err, isVersioned: true });
+    it.each(["production", "development"])(
+      "returns 500 with a sanitized message in %s",
+      (nodeEnv) => {
+        const originalEnv = process.env.NODE_ENV;
+        process.env.NODE_ENV = nodeEnv;
+        try {
+          const err = new Error("secret internal details");
+          const { status, body } = formatError({ err });
 
-        expect(status).toBe(500);
-        expect(body.code).toBe("internal_error");
-        expect(body.message).toBe("An unknown error occurred");
-      } finally {
-        process.env.NODE_ENV = originalEnv;
-      }
-    });
-
-    describe("when the request is unversioned", () => {
-      it("includes the error field", () => {
-        const err = new Error("oops");
-        const { body } = formatError({ err, isVersioned: false });
-        expect(body.error).toBe("Internal Server Error");
-      });
-    });
+          expect(status).toBe(500);
+          expect(body.code).toBe("internal_error");
+          expect(body.message).toBe("An unknown error occurred");
+          expect(body.retryable).toBe(false);
+        } finally {
+          process.env.NODE_ENV = originalEnv;
+        }
+      },
+    );
   });
 });
 
@@ -317,9 +396,7 @@ describe("createErrorHandler", () => {
       // Regression: a bare ZodError has no `httpStatus`, so the request logger
       // derived 500 and logged at error while the response went out 422.
       const handler = createErrorHandler();
-      const zodError = zodErrorFrom(() =>
-        z.object({ name: z.string() }).parse({}),
-      );
+      const zodError = zodErrorFrom(() => z.object({ name: z.string() }).parse({}));
       const c = fakeContext();
 
       handler(zodError as unknown as Error, c as never);

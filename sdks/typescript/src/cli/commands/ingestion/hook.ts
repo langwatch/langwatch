@@ -41,18 +41,11 @@
  * Spec: specs/ai-governance/cli-wrappers/session-context-hook.feature
  */
 
-import {
-  type GovernanceConfig,
-  loadConfig,
-} from "@/cli/utils/governance/config";
+import { type GovernanceConfig, loadConfig } from "@/cli/utils/governance/config";
 import { LANGWATCH_SDK_VERSION } from "@/internal/constants";
 import { resolveLogsEndpoint } from "@/internal/endpoint";
 
-import {
-  type GitRunner,
-  readSessionContext,
-  runGitCommand,
-} from "./git-context";
+import { type GitRunner, readSessionContext, runGitCommand } from "./git-context";
 import { parseHookInput, readStdin } from "./hook-input";
 import {
   defaultStateDir,
@@ -298,8 +291,7 @@ async function postOwnSessionContext({
           input.sessionTitle ??
             readClaudeSessionName({
               sessionId,
-              registryDir:
-                claudeRegistryDir ?? defaultClaudeSessionRegistryDir(env),
+              registryDir: claudeRegistryDir ?? defaultClaudeSessionRegistryDir(env),
             }),
         )
       : null;
@@ -447,13 +439,7 @@ function firstNonEmpty(...values: Array<string | undefined>): string | undefined
   return undefined;
 }
 
-function debug({
-  message,
-  env,
-}: {
-  message: string;
-  env: NodeJS.ProcessEnv;
-}): void {
+function debug({ message, env }: { message: string; env: NodeJS.ProcessEnv }): void {
   if (!env.DEBUG?.includes("langwatch")) return;
   process.stderr.write(`langwatch:hook ${message}\n`);
 }

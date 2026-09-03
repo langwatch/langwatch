@@ -7,9 +7,7 @@ description: "Version arbitrary application settings alongside your prompts and 
 
 Every prompt version can carry a `parameters` object: arbitrary JSON that is versioned, tagged, and fetched together with the prompt itself. Use it for application settings that should change in lockstep with the prompt: search iteration limits, confidence thresholds, structured output schemas, metadata field lists, feature switches.
 
-<Note>
-Changing `parameters` creates a new prompt version, just like changing the prompt text.
-</Note>
+<Note>Changing `parameters` creates a new prompt version, just like changing the prompt text.</Note>
 
 ## Why
 
@@ -25,7 +23,10 @@ The code around a prompt has knobs: how many retrieval rounds to run, what score
   "confidence_threshold": 0.8,
   "extraction": {
     "metadata_fields": ["category", "priority"],
-    "response_schema": { "type": "object", "properties": { "answer": { "type": "string" } } }
+    "response_schema": {
+      "type": "object",
+      "properties": { "answer": { "type": "string" } }
+    }
   }
 }
 ```

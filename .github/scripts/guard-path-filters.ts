@@ -117,11 +117,7 @@ const findKeyIndex = (lines: string[], key: string, indent: number): number =>
   });
 
 /** Index of a key at ANY indent greater than `minIndent`. */
-const findKeyAnyIndent = (
-  lines: string[],
-  keys: string[],
-  minIndent: number,
-): number =>
+const findKeyAnyIndent = (lines: string[], keys: string[], minIndent: number): number =>
   lines.findIndex((line) => {
     if (isBlank(line) || indentOf(line) <= minIndent) return false;
     const trimmed = line.trim();
@@ -186,11 +182,7 @@ export const pullRequestFilter = (source: string): FilterResult => {
   if (onIndex === -1) return { kind: "none" };
 
   const onBlock = blockUnder(lines, onIndex, 0);
-  const prIndex = findKeyAnyIndent(
-    onBlock,
-    ["pull_request", "pull_request_target"],
-    -1,
-  );
+  const prIndex = findKeyAnyIndent(onBlock, ["pull_request", "pull_request_target"], -1);
   if (prIndex === -1) return { kind: "none" };
 
   const prLine = onBlock[prIndex]!;
@@ -291,7 +283,10 @@ export const aggregatorJobs = (source: string): string[] => {
   const jobIndent = indentOf(first);
 
   return block
-    .filter((l) => !isBlank(l) && indentOf(l) === jobIndent && /^[a-z0-9_-]+:\s*$/i.test(l.trim()))
+    .filter(
+      (l) =>
+        !isBlank(l) && indentOf(l) === jobIndent && /^[a-z0-9_-]+:\s*$/i.test(l.trim()),
+    )
     .map((l) => l.trim().slice(0, -1))
     .filter((name) => name.endsWith("-complete"));
 };

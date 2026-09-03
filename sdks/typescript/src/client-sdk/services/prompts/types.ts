@@ -3,16 +3,13 @@ import type { paths } from "@/internal/generated/openapi/api-client";
 import {
   type corePromptDataSchema,
   type promptMetadataSchema,
-  type promptDataSchema
+  type promptDataSchema,
 } from "./schema";
 
 /**
  * Type for template variables - supporting common data types
  */
-export type TemplateVariables = Record<
-  string,
-  string | number | boolean | object | null
->;
+export type TemplateVariables = Record<string, string | number | boolean | object | null>;
 
 /**
  * Core data needed for prompt functionality
@@ -43,7 +40,8 @@ export type PromptResponse = NonNullable<
 >;
 
 // Extract the PromptScope type from the API client
-export type PromptScope = paths["/api/prompts"]["post"]["responses"]["200"]["content"]["application/json"]["scope"];
+export type PromptScope =
+  paths["/api/prompts"]["post"]["responses"]["200"]["content"]["application/json"]["scope"];
 
 // Extract tag definition types from the OpenAPI schema
 export type TagDefinition = NonNullable<
@@ -68,4 +66,3 @@ export enum FetchPolicy {
   /** Never fetch, use materialized files only */
   MATERIALIZED_ONLY = "MATERIALIZED_ONLY",
 }
-

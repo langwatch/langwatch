@@ -87,10 +87,7 @@ describe("buildTable", () => {
     });
 
     it("preserves the ANSI codes verbatim — strip is for measurement only", () => {
-      const out = buildTable([
-        ["NAME"],
-        [chalk.red("err")],
-      ]);
+      const out = buildTable([["NAME"], [chalk.red("err")]]);
       // Raw output should still contain the colour codes; only the
       // padding calculation strips them.
       expect(out).toContain("\x1b[31m");

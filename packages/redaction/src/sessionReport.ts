@@ -79,16 +79,14 @@ export function collectSensitiveEnvValues(
 // Quantifiers bounded to the RFC limits (64-char local part, 253-char domain)
 // so a long run of name-like characters costs constant backtracking per
 // position instead of a quadratic scan on huge transcript strings.
-const EMAIL_REGEX =
-  /[A-Za-z0-9._%+-]{1,64}@[A-Za-z0-9.-]{1,253}\.[A-Za-z]{2,24}/g;
+const EMAIL_REGEX = /[A-Za-z0-9._%+-]{1,64}@[A-Za-z0-9.-]{1,253}\.[A-Za-z]{2,24}/g;
 
 /** International phone candidates: `+` then 7-15 digits with light punctuation. */
 const INTL_PHONE_REGEX =
   /(?<![\w.+-])\+[1-9]\d{0,2}(?:[\s.-]?(?:\(\d{1,4}\)[\s.-]?)?\d{1,4}){1,5}(?!\d)/g;
 
 /** Punctuated national formats: (415) 555-2671, 415-555-2671, 415.555.2671. */
-const NATIONAL_PHONE_REGEX =
-  /(?<!\d)(?:\(\d{3}\)[\s.-]?|\d{3}[.-])\d{3}[.-]\d{4}(?!\d)/g;
+const NATIONAL_PHONE_REGEX = /(?<!\d)(?:\(\d{3}\)[\s.-]?|\d{3}[.-])\d{3}[.-]\d{4}(?!\d)/g;
 
 /** Card candidates: 13-19 digits, optionally separated by spaces or dashes. */
 const CARD_REGEX = /(?<![\d.-])\d(?:[ -]?\d){12,18}(?![\d.-])/g;
@@ -257,11 +255,7 @@ function redactJsonValue(
   if (value && typeof value === "object") {
     const out: Record<string, unknown> = {};
     for (const [key, entry] of Object.entries(value)) {
-      if (
-        isSensitiveAttributeKey(key) &&
-        entry !== null &&
-        entry !== undefined
-      ) {
+      if (isSensitiveAttributeKey(key) && entry !== null && entry !== undefined) {
         out[key] = SECRET_MARKER;
         count.redacted++;
         continue;

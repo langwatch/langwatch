@@ -1,0 +1,117 @@
+{
+  "name": "@langwatch/onboarding-web",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Browser-safe onboarding screens: the welcome flow, the product flavour flow, project creation and the project setup guide.",
+  "files": [
+    "src"
+  ],
+  "type": "module",
+  "exports": {
+    "./screens/onboarding": {
+      "types": "./src/screens/onboarding/index.ts",
+      "default": "./src/screens/onboarding/index.ts"
+    },
+    "./features/onboarding/components/OnboardingMeshBackground": {
+      "types": "./src/ui/elements/onboarding-mesh-background.tsx",
+      "default": "./src/ui/elements/onboarding-mesh-background.tsx"
+    },
+    "./features/onboarding/components/sections/ViaClaudeCodeScreen": {
+      "types": "./src/ui/sections/via-claude-code-screen.tsx",
+      "default": "./src/ui/sections/via-claude-code-screen.tsx"
+    },
+    "./features/onboarding/components/sections/ViaClaudeDesktopScreen": {
+      "types": "./src/ui/sections/via-claude-desktop-screen.tsx",
+      "default": "./src/ui/sections/via-claude-desktop-screen.tsx"
+    },
+    "./features/onboarding/components/sections/observability/CodePreview": {
+      "types": "./src/ui/sections/observability/code-preview.tsx",
+      "default": "./src/ui/sections/observability/code-preview.tsx"
+    },
+    "./features/onboarding/components/sections/observability/DocsLinks": {
+      "types": "./src/ui/blocks/observability/docs-links.tsx",
+      "default": "./src/ui/blocks/observability/docs-links.tsx"
+    },
+    "./features/onboarding/components/sections/observability/FrameworkGrid": {
+      "types": "./src/ui/sections/observability/framework-grid.tsx",
+      "default": "./src/ui/sections/observability/framework-grid.tsx"
+    },
+    "./features/onboarding/components/sections/observability/FrameworkIntegrationCode": {
+      "types": "./src/ui/sections/observability/framework-integration-code.tsx",
+      "default": "./src/ui/sections/observability/framework-integration-code.tsx"
+    },
+    "./features/onboarding/components/sections/observability/InstallPreview": {
+      "types": "./src/ui/sections/observability/install-preview.tsx",
+      "default": "./src/ui/sections/observability/install-preview.tsx"
+    },
+    "./features/onboarding/components/sections/observability/PlatformGrid": {
+      "types": "./src/ui/sections/observability/platform-grid.tsx",
+      "default": "./src/ui/sections/observability/platform-grid.tsx"
+    },
+    "./features/onboarding/components/sections/shared/InlineCopyButton": {
+      "types": "./src/ui/sections/shared/inline-copy-button.tsx",
+      "default": "./src/ui/sections/shared/inline-copy-button.tsx"
+    },
+    "./features/onboarding/components/sections/shared/build-mcp-config": {
+      "types": "./src/model/shared/build-mcp-config.ts",
+      "default": "./src/model/shared/build-mcp-config.ts"
+    },
+    "./features/onboarding/contexts/ActiveProjectContext": {
+      "types": "./src/ui/sections/active-project-context.tsx",
+      "default": "./src/ui/sections/active-project-context.tsx"
+    },
+    "./features/onboarding/regions/observability/codegen/registry": {
+      "types": "./src/ui/sections/observability/codegen/registry.tsx",
+      "default": "./src/ui/sections/observability/codegen/registry.tsx"
+    },
+    "./features/onboarding/regions/observability/types": {
+      "types": "./src/model/observability/types.ts",
+      "default": "./src/model/observability/types.ts"
+    },
+    "./features/onboarding/regions/observability/ui-options": {
+      "types": "./src/ui/sections/observability/ui-options.ts",
+      "default": "./src/ui/sections/observability/ui-options.ts"
+    }
+  },
+  "scripts": {
+    "typecheck": "tsc --noEmit",
+    "test": "vitest run",
+    "test:unit": "vitest run"
+  },
+  "dependencies": {
+    "@langwatch/design-system": "workspace:*",
+    "@langwatch/feature-flag-contract": "workspace:*",
+    "@langwatch/organization-contract": "workspace:*",
+    "@langwatch/platform-api-client": "workspace:*",
+    "@langwatch/project-web": "workspace:*",
+    "libphonenumber-js": "^1.12.25",
+    "lucide-react": "^1.22.0",
+    "motion": "^12.42.2",
+    "react-contextual-analytics": "^1.1.2",
+    "react-feather": "^2.0.10",
+    "react-hook-form": "^7.80.0",
+    "react-icons": "^5.7.0",
+    "shiki": "^4.3.0",
+    "zod": "^4.4.3"
+  },
+  "devDependencies": {
+    "@chakra-ui/react": "^3.36.0",
+    "@emotion/react": "^11.14.0",
+    "@testing-library/jest-dom": "^7.0.1",
+    "@testing-library/react": "^16.3.2",
+    "@testing-library/user-event": "14.6.1",
+    "@types/react": "^19.2.14",
+    "@types/react-dom": "^19.2.3",
+    "jsdom": "^30.0.1",
+    "react": "^19.2.7",
+    "react-dom": "^19.2.7",
+    "typescript": "^7.0.2",
+    "vitest": "^4.1.9"
+  },
+  "peerDependencies": {
+    "@chakra-ui/react": "^3.36.0",
+    "@emotion/react": "^11.14.0",
+    "react": "^19.2.7",
+    "react-dom": "^19.2.7"
+  }
+}

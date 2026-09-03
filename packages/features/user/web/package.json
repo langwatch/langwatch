@@ -1,0 +1,68 @@
+{
+  "name": "@langwatch/user-web",
+  "version": "0.1.0",
+  "private": true,
+  "description": "The personal workspace a person opens on themselves: their AI tools, their usage, their credentials and their coding-agent activity.",
+  "files": [
+    "src"
+  ],
+  "type": "module",
+  "main": "./src/index.ts",
+  "types": "./src/index.ts",
+  "exports": {
+    ".": {
+      "types": "./src/index.ts",
+      "default": "./src/index.ts"
+    },
+    "./screens/personal-workspace": {
+      "types": "./src/screens/personal-workspace/index.ts",
+      "default": "./src/screens/personal-workspace/index.ts"
+    }
+  },
+  "scripts": {
+    "typecheck": "tsc --noEmit",
+    "test": "vitest run",
+    "test:unit": "vitest run"
+  },
+  "dependencies": {
+    "@langwatch/coding-agent-contract": "workspace:*",
+    "@langwatch/coding-agent-web": "workspace:*",
+    "@langwatch/config": "workspace:*",
+    "@langwatch/design-system": "workspace:*",
+    "@langwatch/enterprise-governance-contract": "workspace:*",
+    "@langwatch/gateway-web": "workspace:*",
+    "@langwatch/handled-error": "workspace:*",
+    "@langwatch/identity-contract": "workspace:*",
+    "@langwatch/model-provider-contract": "workspace:*",
+    "@langwatch/platform-api-client": "workspace:*",
+    "@paper-design/shaders-react": "^0.0.76",
+    "date-fns": "^4.4.0",
+    "lucide-react": "^1.22.0",
+    "numeral": "^2.0.6",
+    "react-icons": "^5.7.0",
+    "react-markdown": "^10.1.0",
+    "remark-gfm": "^4.0.1"
+  },
+  "devDependencies": {
+    "@chakra-ui/react": "^3.36.0",
+    "@emotion/react": "^11.14.0",
+    "@langwatch/authz-contract": "workspace:*",
+    "@testing-library/jest-dom": "^7.0.1",
+    "@testing-library/react": "^16.3.2",
+    "@testing-library/user-event": "^14.6.1",
+    "@types/numeral": "^2.0.5",
+    "@types/react": "^19.2.14",
+    "@types/react-dom": "^19.2.3",
+    "jsdom": "^30.0.1",
+    "react": "^19.2.7",
+    "react-dom": "^19.2.7",
+    "typescript": "^7.0.2",
+    "vitest": "^4.1.9"
+  },
+  "peerDependencies": {
+    "@chakra-ui/react": "^3.36.0",
+    "@emotion/react": "^11.14.0",
+    "react": "^19.2.7",
+    "react-dom": "^19.2.7"
+  }
+}

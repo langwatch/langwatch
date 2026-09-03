@@ -6,19 +6,25 @@ description: Browse all available evaluators in LangWatch to find the right scor
 LangWatch offers a library of evaluators to check the quality and safety of your LLM apps.
 
 <Info>
-**How to use these evaluators:**
-- [Built-in Evaluators](/evaluations/evaluators/built-in-evaluators) - Use directly in your code with the slug (e.g., `ragas/faithfulness`)
-- [Saved Evaluators](/evaluations/evaluators/saved-evaluators) - Configure on the platform and reuse via `evaluators/{slug}`
-- [Custom Scoring](/evaluations/evaluators/custom-scoring) - Send your own evaluation scores
+  **How to use these evaluators:** - [Built-in
+  Evaluators](/evaluations/evaluators/built-in-evaluators) - Use directly in your code
+  with the slug (e.g., `ragas/faithfulness`) - [Saved
+  Evaluators](/evaluations/evaluators/saved-evaluators) - Configure on the platform and
+  reuse via `evaluators/{slug}` - [Custom Scoring](/evaluations/evaluators/custom-scoring)
+  - Send your own evaluation scores
 </Info>
 
-<Card title="Evaluators API Reference" icon="code" href="/api-reference/evaluators/overview">
+<Card
+  title="Evaluators API Reference"
+  icon="code"
+  href="/api-reference/evaluators/overview"
+>
   Full API documentation for running evaluations programmatically.
 </Card>
 
 ## Evaluators List
 
-import EvaluatorsList from "/snippets/evaluators-list.mdx"
+import EvaluatorsList from "/snippets/evaluators-list.mdx";
 
 <EvaluatorsList />
 
@@ -34,7 +40,7 @@ import langwatch
 
 @langwatch.span()
 def my_llm_step(user_input: str):
-    output = my_llm(user_input)
+output = my_llm(user_input)
 
     # Use any evaluator from the list above
     result = langwatch.evaluation.evaluate(
@@ -48,7 +54,8 @@ def my_llm_step(user_input: str):
     )
 
     return output
-```
+
+````
 
 ```typescript TypeScript
 import { LangWatch } from "langwatch";
@@ -70,7 +77,8 @@ async function myLLMStep(userInput: string): Promise<string> {
 
   return output;
 }
-```
+````
+
 </CodeGroup>
 
 [Learn more about using built-in evaluators →](/evaluations/evaluators/built-in-evaluators)
@@ -80,9 +88,14 @@ async function myLLMStep(userInput: string): Promise<string> {
 You can also run evaluations through the Experiments Workbench without writing code:
 
 <a href="https://app.langwatch.ai/@project/experiments" target="_blank">
-<Frame>
-<img src="/images/offline-evaluation/Screenshot_2025-04-17_at_16.53.38.png" alt="" style={{ maxWidth: '400px' }} noZoom />
-</Frame>
+  <Frame>
+    <img
+      src="/images/offline-evaluation/Screenshot_2025-04-17_at_16.53.38.png"
+      alt=""
+      style={{ maxWidth: "400px" }}
+      noZoom
+    />
+  </Frame>
 </a>
 
 [Learn more about experiments →](/evaluations/experiments/overview)

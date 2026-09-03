@@ -1,0 +1,43 @@
+id: no-identity-function-ts
+valid:
+  - |
+    export function defineConfig(definition: Definition): Definition {
+      return freeze(definition);
+    }
+  - |
+    const double = (value: number): number => value * 2;
+  - |
+    export function pick(source: Source, key: string) {
+      return source[key];
+    }
+  - |
+    const passthrough = (value: number, fallback: number) => value ?? fallback;
+  - |
+    const rows = items.filter((x) => x);
+  - |
+    this.prepareEvent = prepareEvent ?? ((event) => event);
+  - |
+    const selector = args[0] ?? ((state) => state);
+invalid:
+  - |
+    export function defineRuntimeConfig<const Definition extends RuntimeConfigDefinition>(
+      definition: Definition,
+    ): Definition {
+      return definition;
+    }
+  - |
+    function identity(value: string) {
+      return value;
+    }
+  - |
+    const same = (value: Config): Config => value;
+  - |
+    export function metadataPatch(
+      next: ResourceMetadata | undefined,
+    ): ResourceMetadata | undefined {
+      return next;
+    }
+  - |
+    function scopeKindToEnum(kind: BudgetScope["kind"]): "ORGANIZATION" | "TEAM" {
+      return kind;
+    }

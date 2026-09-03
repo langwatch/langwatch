@@ -46,7 +46,10 @@ python -c "import uuid; print('00-{:032x}-{:016x}-01'.format(uuid.uuid4().int, u
 export OPENAI_EXTRA_HEADERS="{\"traceparent\": \"$(cat /tmp/aider-trace)\", \"X-LangWatch-Thread-Id\": \"aider-$(date +%s)\"}"
 ```
 
-<Note>`OPENAI_EXTRA_HEADERS` passthrough works with `openai` Python SDK ≥ v1.30. Aider versions pinned to older SDKs ignore it.</Note>
+<Note>
+  `OPENAI_EXTRA_HEADERS` passthrough works with `openai` Python SDK ≥ v1.30. Aider
+  versions pinned to older SDKs ignore it.
+</Note>
 
 Every request from that Aider session shares a trace id; the gateway nests its span under it and no cost is double-attributed. See [SDKs → trace propagation](/ai-gateway/sdks/python#trace-propagation) for the generator helper.
 

@@ -32,7 +32,10 @@ export async function createDashboard(data: { name: string }): Promise<Dashboard
   return makeRequest("POST", "/api/dashboards", data) as Promise<DashboardDetail>;
 }
 
-export async function renameDashboard(id: string, data: { name: string }): Promise<DashboardDetail> {
+export async function renameDashboard(
+  id: string,
+  data: { name: string },
+): Promise<DashboardDetail> {
   return makeRequest(
     "PATCH",
     `/api/dashboards/${encodeURIComponent(id)}`,
@@ -41,8 +44,8 @@ export async function renameDashboard(id: string, data: { name: string }): Promi
 }
 
 export async function deleteDashboard(id: string): Promise<{ id: string; name: string }> {
-  return makeRequest(
-    "DELETE",
-    `/api/dashboards/${encodeURIComponent(id)}`,
-  ) as Promise<{ id: string; name: string }>;
+  return makeRequest("DELETE", `/api/dashboards/${encodeURIComponent(id)}`) as Promise<{
+    id: string;
+    name: string;
+  }>;
 }

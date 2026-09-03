@@ -28,7 +28,10 @@ export const webhookEventsCommand = async (options: {
   // The log is a ranged read by contract; default to the 24 hours before
   // whatever `to` resolved to, so `--to` alone reads the day before the
   // instant the caller named rather than a range ending before it starts.
-  const to = options.to !== undefined ? parseInstant({ value: options.to, flag: "--to" }) : Date.now();
+  const to =
+    options.to !== undefined
+      ? parseInstant({ value: options.to, flag: "--to" })
+      : Date.now();
   const from =
     options.from !== undefined
       ? parseInstant({ value: options.from, flag: "--from" })
@@ -43,7 +46,9 @@ export const webhookEventsCommand = async (options: {
       cursor: options.cursor,
       limit: options.limit !== undefined ? Number(options.limit) : undefined,
     });
-    spinner.succeed(`${page.data.length} event${page.data.length !== 1 ? "s" : ""}${page.next_cursor ? " (more available)" : ""}`);
+    spinner.succeed(
+      `${page.data.length} event${page.data.length !== 1 ? "s" : ""}${page.next_cursor ? " (more available)" : ""}`,
+    );
     return {
       data: page,
       table: () => {
@@ -91,7 +96,10 @@ export const webhookEventTypesCommand = async (): Promise<CommandResult | void> 
             Type: t.type,
             Family: t.family,
             Emitting: t.is_emitting ? chalk.green("yes") : chalk.gray("declared"),
-            Description: t.description.length > 50 ? `${t.description.slice(0, 47)}...` : t.description,
+            Description:
+              t.description.length > 50
+                ? `${t.description.slice(0, 47)}...`
+                : t.description,
           })),
           headers: ["Type", "Family", "Emitting", "Description"],
           colorMap: { Type: chalk.cyan },

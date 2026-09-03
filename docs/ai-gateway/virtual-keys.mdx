@@ -9,16 +9,32 @@ A **virtual key** (VK) is a LangWatch-issued credential that a downstream client
 VKs replace raw provider keys in your applications. The provider keys themselves stay inside LangWatch (configured under **Settings → Model Providers**, the same surface you already use for evaluators and playground) and are never shared with downstream clients.
 
 <CardGroup cols={2}>
-  <Card title="Quickstart, first request in 5 min" icon="rocket" href="/ai-gateway/quickstart">
+  <Card
+    title="Quickstart, first request in 5 min"
+    icon="rocket"
+    href="/ai-gateway/quickstart"
+  >
     Create a VK, call `/v1/chat/completions`, read correlation headers.
   </Card>
-  <Card title="Use your VK from Python, TypeScript" icon="code" href="/ai-gateway/sdks/python">
+  <Card
+    title="Use your VK from Python, TypeScript"
+    icon="code"
+    href="/ai-gateway/sdks/python"
+  >
     OpenAI, Anthropic SDK drop-in, just swap `base_url` and `api_key`.
   </Card>
-  <Card title="Plug your VK into Claude Code, Codex, Cursor" icon="terminal" href="/ai-gateway/cli/overview">
+  <Card
+    title="Plug your VK into Claude Code, Codex, Cursor"
+    icon="terminal"
+    href="/ai-gateway/cli/overview"
+  >
     Route coding-assistant traffic through the gateway for budget + audit.
   </Card>
-  <Card title="Manage VKs from the terminal" icon="keyboard" href="/integration/cli#virtual-keys">
+  <Card
+    title="Manage VKs from the terminal"
+    icon="keyboard"
+    href="/integration/cli#virtual-keys"
+  >
     `langwatch virtual-keys create | list | rotate | revoke`, scriptable.
   </Card>
 </CardGroup>
@@ -181,16 +197,16 @@ Both use the same `vk-lw-…` format and the same multi-scope semantics; the pri
 
 Acting on VKs requires the following permissions (2-segment `resource:action`):
 
-| Action | Permission |
-|---|---|
-| View list (own + scope-visible) | `virtualKeys:view` |
-| View another user's personal VK | `virtualKeys:viewOtherPersonal` |
-| Create | `virtualKeys:create` (must hold `:manage` at every named scope when creating multi-scope) |
-| Update config | `virtualKeys:update` |
-| Disable, enable | `virtualKeys:update` |
-| Rotate | `virtualKeys:rotate` |
-| Delete, revoke | `virtualKeys:delete` |
-| All of the above | `virtualKeys:manage` |
+| Action                          | Permission                                                                                |
+| ------------------------------- | ----------------------------------------------------------------------------------------- |
+| View list (own + scope-visible) | `virtualKeys:view`                                                                        |
+| View another user's personal VK | `virtualKeys:viewOtherPersonal`                                                           |
+| Create                          | `virtualKeys:create` (must hold `:manage` at every named scope when creating multi-scope) |
+| Update config                   | `virtualKeys:update`                                                                      |
+| Disable, enable                 | `virtualKeys:update`                                                                      |
+| Rotate                          | `virtualKeys:rotate`                                                                      |
+| Delete, revoke                  | `virtualKeys:delete`                                                                      |
+| All of the above                | `virtualKeys:manage`                                                                      |
 
 See [RBAC](/ai-gateway/rbac) for default role mappings.
 

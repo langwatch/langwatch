@@ -117,9 +117,7 @@ async function deliverReport(
  * an API key: the reporter may be struggling precisely because setup failed.
  * When a key is configured it only links the report to the project.
  */
-export async function handleReportIssue(
-  params: ReportIssueParams,
-): Promise<string> {
+export async function handleReportIssue(params: ReportIssueParams): Promise<string> {
   if (!params.user_approved) {
     throw new Error(
       "This sends a report to the LangWatch team, so the user must approve it first. " +
@@ -143,7 +141,9 @@ export async function handleReportIssue(
     `Report sent to the LangWatch team (${id}). Thank you!`,
     `Redacted ${report.redactedCount} sensitive value${report.redactedCount === 1 ? "" : "s"} locally before sending.`,
     ...(report.sessionTruncated
-      ? ["The session content was truncated to the most recent activity to fit the upload limit."]
+      ? [
+          "The session content was truncated to the most recent activity to fit the upload limit.",
+        ]
       : []),
     "Reports like this directly shape what gets fixed next.",
   ].join(" ");

@@ -2,34 +2,43 @@
 
 **Date:** 2026-07-28
 
-**Status:** Accepted
+**Status:** Accepted; physical application and npm staging source details
+amended by [ADR-111](./111-physical-application-workspaces.md)
+
+ADR-111 preserves this ADR's single workspace, root lockfile, frozen first-boot
+install and nested staging tree. It replaces the physical application package,
+publishable-manifest location, workspace filter and version source:
+`apps/server` owns `@langwatch/server`, and staged installation selects the
+`@langwatch/server...` closure. References below to `@langwatch/web`,
+`platform/app`, `packages/server` and its filter describe the implementation
+this ADR originally introduced, not the post-ADR-111 target layout.
 
 ## Context
 
 The repo accumulated six independent pnpm install roots, each with its own
 lockfile:
 
-| Root                 | Members                                                                    | Lockfile |
-| -------------------- | -------------------------------------------------------------------------- | -------- |
-| `/`                  | `packages/*` (server-cli, handled-error, langy)                             | 1,949 l  |
-| `/langwatch`         | `.`, `packages/*`, `../mcp-server`, `../packages/handled-error`, `../packages/langy` | 21,796 l |
-| `/typescript-sdk`    | —                                                                           | 5,091 l  |
-| `/mcp-server`        | —                                                                           | 5,965 l  |
-| `/skills`            | —                                                                           | 4,862 l  |
-| `/agentic-e2e-tests` | —                                                                           | 52 l     |
+| Root                     | Members                                                                              | Lockfile |
+| ------------------------ | ------------------------------------------------------------------------------------ | -------- |
+| `/`                      | `packages/*` (server-cli, handled-error, langy)                                      | 1,949 l  |
+| `/langwatch`             | `.`, `packages/*`, `../mcp-server`, `../packages/handled-error`, `../packages/langy` | 21,796 l |
+| `/typescript-sdk`        | —                                                                                    | 5,091 l  |
+| `/mcp-server`            | —                                                                                    | 5,965 l  |
+| `/skills`                | —                                                                                    | 4,862 l  |
+| `/dev/tests/agentic-e2e` | —                                                                                    | 52 l     |
 
 Two of those overlapped. `mcp-server` was both its own root and a member of the
 application's workspace, so CI installed it twice on every application build
 (`langwatch-app-ci.yml`, `e2e-ci.yml`). `packages/handled-error` and
 `packages/langy` were members of two workspaces at once.
 
-Two more — `skills` and `agentic-e2e-tests` — were not members of any workspace
+Two more — `skills` and `dev/tests/agentic-e2e` — were not members of any workspace
 but sat inside a directory tree whose root declared one, so every install of
 them needed `--ignore-workspace` to escape a workspace they were never in.
 
 Three separate consequences followed.
 
-**Onboarding was a trap.** A fresh clone needed `pnpm install` at the root *and*
+**Onboarding was a trap.** A fresh clone needed `pnpm install` at the root _and_
 again inside `langwatch/`. Skipping the second produced
 `ERR_PNPM_RECURSIVE_EXEC_FIRST_FAIL  Command "prisma" not found`, which reads
 like a broken toolchain rather than a missing install. This was common enough
@@ -103,8 +112,8 @@ application by walking up for `platform/app/package.json`
 finds `app/` by itself and every downstream path resolves unchanged.
 
 `dev/scripts/pack-npm.sh` becomes the assembler. It reads `files` from
-`package.json` — still the single source of truth for *what* ships — and decides
-only *where* it lands. The two `.npmignore` files are deleted; their trimming
+`package.json` — still the single source of truth for _what_ ships — and decides
+only _where_ it lands. The two `.npmignore` files are deleted; their trimming
 rules move into one explicit exclude list next to the copy that applies them.
 
 ## Rationale / Trade-offs
@@ -154,7 +163,7 @@ Two classes of override behave very differently once shared. A **ranged** pin
 (`pkg@<x: y`) only bites the versions it names, so it is safe to apply
 repo-wide; all of them are merged as a union. An **unconditional** pin
 (`pkg: version`) applies to everything, so a pin that suited one project can
-break another. Three were deliberately not carried up, each a *direct*
+break another. Three were deliberately not carried up, each a _direct_
 dependency of the project that pinned it, so that project's own declaration
 governs it just as well:
 
@@ -205,7 +214,7 @@ one command and a security pin that reaches every project.
 - The application's package name changes. Anything filtering it by name needs
   `@langwatch/web`; path-based invocation (`pnpm -C platform/app`) is unaffected.
 - The tarball grows by every member `package.json` it did not previously carry
-  (`packages/server`, `sdks/typescript`, `tests/agentic-e2e`) — a few kilobytes —
+  (`packages/server`, `sdks/typescript`, `dev/tests/agentic-e2e`) — a few kilobytes —
   and by the root lockfile. In exchange it stops carrying a second lockfile that
   could drift from the one the repo develops against.
 - `npx @langwatch/server` installs from `app/` inside the tarball — the staged

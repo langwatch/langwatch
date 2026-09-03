@@ -26,12 +26,12 @@ Feature: Personal-workspace progressive feature unlock — minimal-by-default, c
     - specs/ai-gateway/governance/ingestion-attribution.feature (security boundary)
 
   Implementation lives at:
-    - platform/app/prisma/schema.prisma `Project.personalFeatures` JSON
-    - platform/app/src/server/api/routers/personalWorkspaceFeatures.ts (tRPC)
-    - platform/app/src/components/me/PersonalSidebar.tsx (nav predicate)
-    - platform/app/src/pages/me/settings.tsx 'Workspace features' card
-    - platform/app/src/components/traces/EnableAdvancedFeaturesModal.tsx
-    - platform/app/src/server/governance/audit/personalWorkspaceFeatures.audit.ts
+    - packages/prisma-client/prisma/schema.prisma `Project.personalFeatures` JSON
+    - packages/features/organization/contract/src/personal-workspace.ts (contract) and its tRPC transport
+    - packages/features/navigation/web/src/ui/sections/personal-sidebar.tsx (nav predicate)
+    - the personal settings screen's 'Workspace features' card
+    - the advanced-features opt-in modal on the traces screen
+    - packages/enterprise/features/governance/server/src/ (governance audit)personalWorkspaceFeatures.audit.ts
 
   Background:
     Given a user "ariana@acme.com" who is a member of the personal-only
@@ -58,7 +58,7 @@ Feature: Personal-workspace progressive feature unlock — minimal-by-default, c
         on the user's personal project — NOT a separate user-scoped explorer
         (the v2 explorer is project-URL-scoped per Lane-B's probe; personal
         project IS a project with `Project.isPersonal=true` + `ownerUserId`
-        per `prisma/schema.prisma:407`)
+        per `packages/prisma-client/prisma/schema.prisma`)
     And clicking 'Traces' must NOT flip the chrome to the project-shell
         — the PersonalSidebar stays present throughout the user's
         navigation in their own personal project (the `/me` chrome

@@ -39,7 +39,7 @@ export const listGraphsCommand = async (options: {
       process.exit(1);
     }
 
-    const graphs = await response.json() as Array<{
+    const graphs = (await response.json()) as Array<{
       id: string;
       name: string;
       dashboardId: string | null;
@@ -58,7 +58,11 @@ export const listGraphsCommand = async (options: {
           console.log();
           console.log(chalk.gray("No graphs found."));
           console.log(chalk.gray("Create one with:"));
-          console.log(chalk.cyan('  langwatch graph create "My Graph" --dashboard-id <id> --graph \'{"type":"line"}\''));
+          console.log(
+            chalk.cyan(
+              '  langwatch graph create "My Graph" --dashboard-id <id> --graph \'{"type":"line"}\'',
+            ),
+          );
           return;
         }
 

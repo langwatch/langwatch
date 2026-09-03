@@ -43,7 +43,9 @@ describe("assertFormatIsSupported", () => {
         expect(exited).toEqual([1]);
         // Rendered as the human block on stderr here: no output scope has been
         // applied in this unit, so errorOutput takes its non-machine path.
-        expect(warned.join("") + logged.join("")).toContain("does not emit structured output");
+        expect(warned.join("") + logged.join("")).toContain(
+          "does not emit structured output",
+        );
       });
 
       it("refuses a --jq expression it would otherwise never parse", async () => {
@@ -78,20 +80,23 @@ describe("assertFormatIsSupported", () => {
       it.each([
         ["output", "yaml"],
         ["jq", ".foo"],
-      ])("still refuses --%s from a command that only owns --json", async (flag, value) => {
-        const program = new Command();
-        program.enablePositionalOptions().passThroughOptions();
-        const owner = program
-          .command("owner")
-          .option("--json", "emit machine-readable JSON")
-          .action(() => undefined);
-        registerOutputOptions(program);
-        owner.setOptionValue(flag, value);
+      ])(
+        "still refuses --%s from a command that only owns --json",
+        async (flag, value) => {
+          const program = new Command();
+          program.enablePositionalOptions().passThroughOptions();
+          const owner = program
+            .command("owner")
+            .option("--json", "emit machine-readable JSON")
+            .action(() => undefined);
+          registerOutputOptions(program);
+          owner.setOptionValue(flag, value);
 
-        await assertFormatIsSupported(owner, resolveActionOutputOptions(owner));
+          await assertFormatIsSupported(owner, resolveActionOutputOptions(owner));
 
-        expect(exited).toEqual([1]);
-      });
+          expect(exited).toEqual([1]);
+        },
+      );
 
       // `--json <payload>` on dataset records add/update is DATA, not an
       // output-capability claim, so an explicit -o must still be refused.

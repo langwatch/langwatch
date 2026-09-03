@@ -1,0 +1,152 @@
+import { describe, expect, it } from "vitest";
+import { MODULES } from "../model/studio-registry";
+
+describe("Optimization Studio Registry", () => {
+  describe("signature (Prompt) defaults", () => {
+    const { signature } = MODULES;
+
+    it("has input field named 'input'", () => {
+      expect(signature.inputs).toBeDefined();
+      expect(signature.inputs).toHaveLength(1);
+      expect(signature.inputs?.[0]).toEqual({
+        identifier: "input",
+        type: "str",
+      });
+    });
+
+    it("has output field named 'output'", () => {
+      expect(signature.outputs).toBeDefined();
+      expect(signature.outputs).toHaveLength(1);
+      expect(signature.outputs?.[0]).toEqual({
+        identifier: "output",
+        type: "str",
+      });
+    });
+
+    it("has instructions parameter with default system prompt", () => {
+      expect(signature.parameters).toBeDefined();
+      const instructionsParam = signature.parameters?.find(
+        (p) => p.identifier === "instructions",
+      );
+
+      expect(instructionsParam).toBeDefined();
+      expect(instructionsParam?.value).toBe("You are a helpful assistant.");
+    });
+
+    it("has messages parameter with user message using {{input}}", () => {
+      expect(signature.parameters).toBeDefined();
+      const messagesParam = signature.parameters?.find(
+        (p) => p.identifier === "messages",
+      );
+
+      expect(messagesParam).toBeDefined();
+      expect(messagesParam?.value).toEqual([{ role: "user", content: "{{input}}" }]);
+    });
+  });
+
+  describe("code block defaults", () => {
+    const { code } = MODULES;
+
+    it("has input field named 'input'", () => {
+      expect(code.inputs).toBeDefined();
+      expect(code.inputs).toHaveLength(1);
+      expect(code.inputs?.[0]).toEqual({
+        identifier: "input",
+        type: "str",
+      });
+    });
+
+    it("has output field named 'output'", () => {
+      expect(code.outputs).toBeDefined();
+      expect(code.outputs).toHaveLength(1);
+      expect(code.outputs?.[0]).toEqual({
+        identifier: "output",
+        type: "str",
+      });
+    });
+
+    it("has code parameter with input parameter in function signature", () => {
+      expect(code.parameters).toBeDefined();
+      const codeParam = code.parameters?.find((p) => p.identifier === "code");
+
+      expect(codeParam).toBeDefined();
+      // Inputs default to None so an unconnected handle does not raise a
+      // missing-argument error at run time.
+      expect(codeParam?.value).toContain("def __call__(self, input: str = None)");
+    });
+
+    it("has code parameter returning output key", () => {
+      expect(code.parameters).toBeDefined();
+      const codeParam = code.parameters?.find((p) => p.identifier === "code");
+
+      expect(codeParam).toBeDefined();
+      expect(codeParam?.value).toContain('return {"output":');
+    });
+
+    // Owner directive: the default code-block template must have NO
+    // dspy reference whatsoever. The fake-dspy stub still resolves
+    // `import dspy` for legacy customer workflows, but new
+    // drag-and-drop templates ship as plain Python so future code-block
+    // surface stays dspy-free as we move the lambda image off dspy.
+    it("default template ships without any dspy reference", () => {
+      const codeParam = code.parameters?.find((p) => p.identifier === "code");
+      const value = codeParam?.value as string;
+
+      expect(value).not.toContain("import dspy");
+      expect(value).not.toContain("dspy.Module");
+      expect(value).not.toContain("(dspy.");
+    });
+
+    it("default template uses a plain Python class with __call__", () => {
+      const codeParam = code.parameters?.find((p) => p.identifier === "code");
+      const value = codeParam?.value as string;
+
+      // Plain class shape: `class Code:` (no parens), entrypoint via
+      // Python's idiomatic `__call__` protocol — not torch/dspy's
+      // `forward` convention. The runner resolves classes that define
+      // `__call__` on the class itself; legacy customer code using
+      // `forward` or dspy.Module still resolves via fallback rules.
+      expect(value).toMatch(/^class\s+\w+\s*:/m);
+      expect(value).toContain("def __call__(self");
+      expect(value).not.toContain("def forward");
+    });
+  });
+
+  describe("if/else block defaults", () => {
+    const { ifElse } = MODULES;
+
+    /** @scenario If/Else is available in the node palette */
+    it("registers the If/Else module for the node palette", () => {
+      expect(ifElse.name).toBe("If/Else");
+      expect(ifElse.inputs).toEqual([{ identifier: "input", type: "str" }]);
+    });
+
+    /** @scenario If/Else node has one condition and two output branches */
+    it("ships a condition parameter and the fixed branch outputs", () => {
+      const conditionParam = ifElse.parameters?.find((p) => p.identifier === "condition");
+      expect(conditionParam).toBeDefined();
+      expect(conditionParam?.type).toBe("str");
+
+      // The branch handles are the engine's gating contract - fixed
+      // identifiers true/false of type bool.
+      expect(ifElse.outputs).toEqual([
+        { identifier: "true", type: "bool" },
+        { identifier: "false", type: "bool" },
+      ]);
+    });
+  });
+
+  describe("unified naming consistency", () => {
+    it("signature and code use same input/output naming", () => {
+      const { signature, code } = MODULES;
+
+      expect(signature.inputs).toBeDefined();
+      expect(code.inputs).toBeDefined();
+      expect(signature.outputs).toBeDefined();
+      expect(code.outputs).toBeDefined();
+
+      expect(signature.inputs?.[0]?.identifier).toBe(code.inputs?.[0]?.identifier);
+      expect(signature.outputs?.[0]?.identifier).toBe(code.outputs?.[0]?.identifier);
+    });
+  });
+});

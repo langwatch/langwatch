@@ -14,7 +14,9 @@ describe("apiKeysMatch", () => {
 
   it("rejects different keys, including different lengths", () => {
     expect(apiKeysMatch({ presentedKey: "sk-abc", expectedKey: "sk-abd" })).toBe(false);
-    expect(apiKeysMatch({ presentedKey: "sk-abc", expectedKey: "sk-abc-longer" })).toBe(false);
+    expect(apiKeysMatch({ presentedKey: "sk-abc", expectedKey: "sk-abc-longer" })).toBe(
+      false,
+    );
     expect(apiKeysMatch({ presentedKey: "", expectedKey: "sk-abc" })).toBe(false);
   });
 });
@@ -89,7 +91,7 @@ describe("createApiKeyVerifier", () => {
       expect.objectContaining({
         method: "GET",
         headers: { "X-Auth-Token": "sk-real" },
-      })
+      }),
     );
   });
 
@@ -172,7 +174,7 @@ describe("createApiKeyVerifier", () => {
     });
 
     const results = await Promise.all(
-      Array.from({ length: 25 }, () => verifier.verify("sk-real"))
+      Array.from({ length: 25 }, () => verifier.verify("sk-real")),
     );
 
     expect(results.every((result) => result === true)).toBe(true);
@@ -202,9 +204,7 @@ describe("createApiKeyVerifier", () => {
       requestTimeoutMs: 20,
       fetchImpl: ((_url: string, init?: RequestInit) =>
         new Promise((_resolve, reject) => {
-          init?.signal?.addEventListener("abort", () =>
-            reject(new Error("aborted"))
-          );
+          init?.signal?.addEventListener("abort", () => reject(new Error("aborted")));
         })) as unknown as typeof fetch,
     });
 

@@ -3,10 +3,7 @@ import { createSpinner } from "../../utils/spinner";
 import { EvaluatorsApiService } from "@/client-sdk/services/evaluators";
 import { resolveCredentials } from "../../utils/apiKey";
 import { failSpinner } from "../../utils/spinnerError";
-import {
-  commandValidationError,
-  reportCommandError,
-} from "../../utils/errorOutput";
+import { commandValidationError, reportCommandError } from "../../utils/errorOutput";
 import type { CommandResult } from "../../utils/output";
 import { closestEvaluatorTypes, isValidEvaluatorType } from "./catalog";
 
@@ -73,7 +70,9 @@ export const createEvaluatorCommand = async (
     data: evaluator,
     table: () => {
       if (evaluator.platformUrl) {
-        console.log(`  ${chalk.bold("View:")}  ${chalk.underline(evaluator.platformUrl)}`);
+        console.log(
+          `  ${chalk.bold("View:")}  ${chalk.underline(evaluator.platformUrl)}`,
+        );
       }
     },
   };

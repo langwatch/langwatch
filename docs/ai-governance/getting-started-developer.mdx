@@ -12,9 +12,13 @@ When you finish you will have:
 - A [Personal Virtual Key](/ai-gateway/governance/personal-keys) bound to your identity, your monthly budget, and your org's [Routing Policy](/ai-gateway/governance/routing-policies).
 - One real request flowing through the [AI Gateway](/ai-gateway/overview) that you can see in your own [/me dashboard](/ai-governance/personal-portal/overview).
 
-If you are an admin trying to make the org *ready* for developers to do this, jump to the [admin walkthrough](/ai-governance/getting-started-admin) instead.
+If you are an admin trying to make the org _ready_ for developers to do this, jump to the [admin walkthrough](/ai-governance/getting-started-admin) instead.
 
-<Info>**Pairs with:** [Personal IDE keys](/ai-gateway/governance/personal-keys) (the device-flow login that runs underneath every step here) and [Coding CLI Integrations](/ai-gateway/cli/overview) (the deep reference for each supported assistant).</Info>
+<Info>
+  **Pairs with:** [Personal IDE keys](/ai-gateway/governance/personal-keys) (the device-flow login
+  that runs underneath every step here) and [Coding CLI Integrations](/ai-gateway/cli/overview) (the
+  deep reference for each supported assistant).
+</Info>
 
 ## Prerequisites
 
@@ -95,6 +99,7 @@ langwatch instrument claude
 ```
 
 A plain `claude` run then reports to LangWatch. Add `--project <id-or-slug>` to send it to a team project, or `--key <ingest-key>` on a machine that never logs in. Model calls keep going wherever the tool points them, so start the tool with the wrapper when you want the gateway. See the [Claude Code integration guide](/coding-agents/claude-code).
+
 </Tip>
 
 ## Step 5: Read your spend back

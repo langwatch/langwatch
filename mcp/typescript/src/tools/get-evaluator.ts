@@ -9,9 +9,7 @@ import {
  * Retrieves a specific evaluator by ID or slug and formats it as
  * AI-readable markdown.
  */
-export async function handleGetEvaluator(params: {
-  idOrSlug: string;
-}): Promise<string> {
+export async function handleGetEvaluator(params: { idOrSlug: string }): Promise<string> {
   const evaluator = await apiGetEvaluator(params.idOrSlug);
 
   const evaluatorType = getEvaluatorType(evaluator);

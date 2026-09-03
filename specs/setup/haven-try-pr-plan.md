@@ -8,7 +8,7 @@ Scoping document (not yet implemented). Citations are `file:line` under
 Trying a teammate's PR locally today is a manual chore: `git fetch`, `git
 worktree add`, copy `.env`s, `pnpm install`, regen Prisma/Zod, migrate, seed,
 start — then remember to tear it down. `dev/scripts/worktree.sh` automates the
-*issue→worktree→install* half (`dev/scripts/worktree.sh:84-122`) but stops before
+_issue→worktree→install_ half (`dev/scripts/worktree.sh:84-122`) but stops before
 env-wiring and launch and knows nothing about hostnames, DB isolation, or
 reaping.
 
@@ -18,7 +18,7 @@ identity, the overlay env file, process supervision, and a daemon that reaps dea
 stacks. **`haven pr` is the missing front-half** — resolve a PR to a worktree —
 bolted onto haven's existing `up` back-half, plus a throwaway-teardown story.
 
-**vs boxd** (`dev/docs/boxd-makefile.md`): boxd forks a *cloud VM* from a golden
+**vs boxd** (`dev/docs/boxd-makefile.md`): boxd forks a _cloud VM_ from a golden
 image — durable, shareable, production-shaped, minutes to provision. `haven pr`
 is the opposite end: **local native processes, seconds to a hostname, disposable**
 — reuses your warm pnpm store, already-running shared Postgres/ClickHouse, and
@@ -51,16 +51,16 @@ letter. `-pc` == `-cp`, no separate combined spelling to keep in sync. Accept
 `-r` as a documented no-op alias ("private Redis only, shared PG/CH") so the
 original mental model maps cleanly.
 
-| Flag | Postgres | ClickHouse | Redis |
-|------|----------|-----------|-------|
-| *(none)* | shared server, per-PR DB `lw_pr_<n>` | shared server, per-PR DB | **private instance** |
-| `-p` | **private instance** | shared, per-PR DB | **private instance** |
-| `-c` | shared, per-PR DB | **private instance** | **private instance** |
-| `-pc` | **private instance** | **private instance** | **private instance** |
+| Flag     | Postgres                             | ClickHouse               | Redis                |
+| -------- | ------------------------------------ | ------------------------ | -------------------- |
+| _(none)_ | shared server, per-PR DB `lw_pr_<n>` | shared server, per-PR DB | **private instance** |
+| `-p`     | **private instance**                 | shared, per-PR DB        | **private instance** |
+| `-c`     | shared, per-PR DB                    | **private instance**     | **private instance** |
+| `-pc`    | **private instance**                 | **private instance**     | **private instance** |
 
 ## Execution flow (reuses `haven up` wholesale)
 
-Key insight: `wire()` (`cmd/root.go:96-156`) derives *everything* (worktree dir,
+Key insight: `wire()` (`cmd/root.go:96-156`) derives _everything_ (worktree dir,
 lwDir, branch, slug, IsLinkedWorktree) from `os.Getwd()`. So once the PR worktree
 exists, running `haven up` **with cwd set to that worktree** reuses the entire
 provision→codegen→migrate→seed→supervise pipeline with zero refactor.
@@ -75,8 +75,8 @@ provision→codegen→migrate→seed→supervise pipeline with zero refactor.
    place it at `<worktreesBase>/pr-<N>` (the sibling `worktrees/` dir, overridable
    via `HAVEN_WORKTREE_DIR`); the dir name makes the slug deterministically
    `pr-<n>` → `app.pr-<n>.langwatch.localhost`. Same-repo: `git fetch origin
-   <headRefName>` + `git worktree add`. **Fork/cross-repo**: `git fetch origin
-   pull/<N>/head:pr-<N>` then add — no fork remote needed. Copy `.env`s via the
+<headRefName>` + `git worktree add`. **Fork/cross-repo**: `git fetch origin
+pull/<N>/head:pr-<N>` then add — no fork remote needed. Copy `.env`s via the
    drift-aware copier in `dev/scripts/worktree.sh:124-186` (reuse, don't reimplement).
 3. **Install deps** (reuse Supervisor). `pnpm install` in the worktree via
    `Supervisor.RunOnce` (`app/ports.go:56-61`, the one-shot mechanism `Up` already
@@ -150,7 +150,7 @@ dirty** (`Hygiene.Dirty`, `hygiene.go:54-60`) — never delete uncommitted work.
   cap; consider bounding concurrent isolated instances via the existing
   `Semaphore` (`app/ports.go`).
 - **True idle detection** — heartbeat proves the launcher is alive, not that the
-  PR is *used*. MVP runs `haven pr` in the foreground so closing the terminal is
+  PR is _used_. MVP runs `haven pr` in the foreground so closing the terminal is
   the reap trigger; detached + activity-based idle is a later phase (co-developed
   with private-Redis idle work).
 
@@ -161,5 +161,5 @@ dirty** (`Hygiene.Dirty`, `hygiene.go:54-60`) — never delete uncommitted work.
   stateful volumes, in-process workers amendments).
 - Reference `dev/docs/boxd-makefile.md` (local-vs-cloud complementarity) and
   `tools/thuishaven/README.md` "Forward ideas" (this ships two of them).
-- Ruled out: `specs/langy/langy-github-prs-plan.md` is the *Langy agent* opening
+- Ruled out: `specs/langy/langy-github-prs-plan.md` is the _Langy agent_ opening
   PRs on a user's behalf — unrelated to haven trying PRs locally.

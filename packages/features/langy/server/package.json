@@ -1,0 +1,126 @@
+{
+  "name": "@langwatch/langy-server",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Canonical server-side Langy service.",
+  "files": [
+    "src"
+  ],
+  "type": "module",
+  "imports": {
+    "#*": "./src/*.ts"
+  },
+  "main": "./src/index.ts",
+  "types": "./src/index.ts",
+  "exports": {
+    ".": {
+      "types": "./src/index.ts",
+      "default": "./src/index.ts"
+    },
+    "./execution/langy-turn.errors": {
+      "types": "./src/adapters/langy.turn-errors.adapter.ts",
+      "default": "./src/adapters/langy.turn-errors.adapter.ts"
+    },
+    "./event-sourcing/langy.events": {
+      "types": "./src/adapters/eventing.langy.adapter.ts",
+      "default": "./src/adapters/eventing.langy.adapter.ts"
+    },
+    "./event-sourcing/langy.type-guards": {
+      "types": "./src/adapters/eventing.langy-type-guards.adapter.ts",
+      "default": "./src/adapters/eventing.langy-type-guards.adapter.ts"
+    },
+    "./streaming/langy-frame-auth": {
+      "types": "./src/ports/langy-frame-auth.port.ts",
+      "default": "./src/ports/langy-frame-auth.port.ts"
+    },
+    "./streaming/langy-capability-progress": {
+      "types": "./src/streaming/langy-capability-progress.ts",
+      "default": "./src/streaming/langy-capability-progress.ts"
+    },
+    "./streaming/langy-turn-settlement": {
+      "types": "./src/streaming/langy-turn-settlement.ts",
+      "default": "./src/streaming/langy-turn-settlement.ts"
+    },
+    "./processes/langy-turn-dispatch-retry": {
+      "types": "./src/processes/langy-turn-dispatch-retry.error.ts",
+      "default": "./src/processes/langy-turn-dispatch-retry.error.ts"
+    },
+    "./langy.ids": {
+      "types": "./src/ports/langy-ids.port.ts",
+      "default": "./src/ports/langy-ids.port.ts"
+    },
+    "./public-api": {
+      "types": "./src/api/public/langy.api.ts",
+      "default": "./src/api/public/langy.api.ts"
+    },
+    "./testing": {
+      "types": "./src/testing.ts",
+      "default": "./src/testing.ts"
+    },
+    "./eventing/langy-conversation-processing": {
+      "types": "./src/adapters/eventing.langy-conversation-index.adapter.ts",
+      "default": "./src/adapters/eventing.langy-conversation-index.adapter.ts"
+    },
+    "./eventing/langy-conversation-processing/process-manager": {
+      "types": "./src/adapters/eventing.langy-process-index.adapter.ts",
+      "default": "./src/adapters/eventing.langy-process-index.adapter.ts"
+    },
+    "./services/langy-cli-envelope.service": {
+      "types": "./src/services/langy-cli-envelope.service.ts",
+      "default": "./src/services/langy-cli-envelope.service.ts"
+    },
+    "./services/langy-final-parts.service": {
+      "types": "./src/services/langy-final-parts.service.ts",
+      "default": "./src/services/langy-final-parts.service.ts"
+    },
+    "./services/langy-message.service": {
+      "types": "./src/services/langy-message.service.ts",
+      "default": "./src/services/langy-message.service.ts"
+    },
+    "./services/langy-turn.service": {
+      "types": "./src/services/langy-turn.service.ts",
+      "default": "./src/services/langy-turn.service.ts"
+    },
+    "./ports/langy-turn-runtime": {
+      "types": "./src/ports/langy-turn-runtime.port.ts",
+      "default": "./src/ports/langy-turn-runtime.port.ts"
+    },
+    "./subscribers/langy-conversation": {
+      "types": "./src/subscribers/langy-conversation.subscriber.ts",
+      "default": "./src/subscribers/langy-conversation.subscriber.ts"
+    }
+  },
+  "scripts": {
+    "typecheck": "tsc --noEmit",
+    "test": "vitest run",
+    "test:unit": "vitest run",
+    "generate:setup-skill-bodies": "node --experimental-strip-types scripts/generate-setup-skill-bodies.ts"
+  },
+  "dependencies": {
+    "@langwatch/api": "workspace:*",
+    "@langwatch/api-key-contract": "workspace:*",
+    "@langwatch/authz-contract": "workspace:*",
+    "@langwatch/eventing": "workspace:*",
+    "@langwatch/feature-flag-contract": "workspace:*",
+    "@langwatch/handled-error": "workspace:*",
+    "@langwatch/ksuid": "^2.0.2",
+    "@langwatch/langy-contract": "workspace:*",
+    "@langwatch/observability": "workspace:*",
+    "@langwatch/prisma-client": "workspace:*",
+    "@opentelemetry/api": "^1.9.1",
+    "@trpc/server": "^11.18.0",
+    "ai": "^6.0.217",
+    "hono": "^4.12.27",
+    "langwatch": "workspace:*",
+    "nanoid": "^5.1.5",
+    "zod": "^4.4.3"
+  },
+  "devDependencies": {
+    "@langwatch/feature-flag-server": "workspace:*",
+    "@opentelemetry/sdk-trace-base": "2.10.0",
+    "@opentelemetry/sdk-trace-node": "2.10.0",
+    "@types/node": "^26.0.1",
+    "typescript": "^7.0.2",
+    "vitest": "^4.1.9"
+  }
+}

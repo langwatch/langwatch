@@ -4,31 +4,52 @@ description: Per-platform integration matrix for LangWatch governance receivers.
 sidebarTitle: Ingestion sources
 ---
 
-<Info>**Pairs with:** [AI Gateway → Observability](/ai-gateway/observability). The gateway is itself an ingestion source (its spans land in the same trace store); IngestionSources extend that substrate to platforms whose API key path you don't own (Workato, Copilot Studio, Databricks Genie, OpenAI/Anthropic compliance APIs). Also pairs with [Audit log](/ai-governance/audit-log): S3 audit log feeds (Workato, Anthropic Compliance) become OTel-shaped events through this same pipeline, so a single audit log query at `/settings/audit-log` covers in-platform mutations and third-party-tool activity uniformly.</Info>
+<Info>
+  **Pairs with:** [AI Gateway → Observability](/ai-gateway/observability). The gateway is itself an
+  ingestion source (its spans land in the same trace store); IngestionSources extend that substrate
+  to platforms whose API key path you don't own (Workato, Copilot Studio, Databricks Genie,
+  OpenAI/Anthropic compliance APIs). Also pairs with [Audit log](/ai-governance/audit-log): S3 audit
+  log feeds (Workato, Anthropic Compliance) become OTel-shaped events through this same pipeline, so
+  a single audit log query at `/settings/audit-log` covers in-platform mutations and
+  third-party-tool activity uniformly.
+</Info>
 
-<Note>**One `otel_generic` source is Apache 2.0 floor; multiple sources and configurable retention require Enterprise.** Self-hosted Apache 2.0 deployments can wire one OTel receiver at the platform default retention window; the additional source types on this page (Workato, S3, Copilot Studio, OpenAI, Anthropic compliance APIs) and [retention policies](/platform/data-retention) ship under the Enterprise license. Non-enterprise organizations see an upgrade card on `/governance/ingestion-sources`. See [Open-core licensing](/ai-governance/open-core-licensing) for the full split.</Note>
+<Note>
+  **One `otel_generic` source is Apache 2.0 floor; multiple sources and configurable retention
+  require Enterprise.** Self-hosted Apache 2.0 deployments can wire one OTel receiver at the
+  platform default retention window; the additional source types on this page (Workato, S3, Copilot
+  Studio, OpenAI, Anthropic compliance APIs) and [retention policies](/platform/data-retention) ship
+  under the Enterprise license. Non-enterprise organizations see an upgrade card on
+  `/governance/ingestion-sources`. See [Open-core licensing](/ai-governance/open-core-licensing) for
+  the full split.
+</Note>
 
 LangWatch governance ingest accepts events from upstream agent and audit-log platforms and lands them in the **same `recorded_spans` + `log_records` tables** that power the rest of LangWatch, distinguished by `langwatch.origin.kind = "ingestion_source"` origin metadata stamped at the receiver edge. Same trace viewer, same compliance + RBAC + retention machinery, surfaced in the [governance dashboard](/ai-governance/control-plane), the per-source detail page, and the [`langwatch ingest tail`](/ai-governance/cli-debug) CLI.
 
-<Note>**Governance ingestion is for third-party AI platforms your org runs.** If you want to send your *own application's* LLM traces to LangWatch, use [`/api/otel/v1/traces`](/integration/quick-start) with your project API key, that's the right home for traces from systems you own. See [Choosing the right OTel endpoint](/observability/trace-vs-activity-ingestion) for the full comparison.</Note>
+<Note>
+  **Governance ingestion is for third-party AI platforms your org runs.** If you want to send your
+  *own application's* LLM traces to LangWatch, use [`/api/otel/v1/traces`](/integration/quick-start)
+  with your project API key, that's the right home for traces from systems you own. See [Choosing
+  the right OTel endpoint](/observability/trace-vs-activity-ingestion) for the full comparison.
+</Note>
 
 Each supported `sourceType` below states what is wired up today, what is still envelope-only, and what is a configuration contract awaiting an adapter.
 
 ## State of each receiver: at a glance
 
-| Source type | Delivery | OTLP shape | Storage | State |
-|---|---|---|---|---|
-| [`otel_generic`](/ai-gateway/governance/ingestion-sources/otel-generic) | Push (HTTP/OTLP) | Spans | `recorded_spans` | **Production-ready** |
-| `claude_code` | Push (HTTP/OTLP) | Spans | `recorded_spans` | **Production-ready** |
-| [`claude_cowork`](/ai-gateway/governance/ingestion-sources/claude-cowork) | Push (HTTP/OTLP) | Spans | `recorded_spans` | **Receiver works**, Cowork-specific attribute mapping pending |
-| [`workato`](/ai-gateway/governance/ingestion-sources/workato) | Webhook → OTLP logs | Logs | `log_records` | **Receiver works**, deeper audit-shape parser pending |
-| [`s3_custom`](/ai-gateway/governance/ingestion-sources/s3-custom) | S3 replay + callback webhook | Logs | `log_records` | **Callback-mode works**, S3 puller + DSL parser pending |
-| [`copilot_studio_dataverse`](/ai-governance/ingestion-sources/copilot-studio) | Pull (Dataverse) | Spans | `recorded_spans` | **Production-ready**: reads conversations from the Power Platform transcript table |
-| `anthropic_admin` | Pull (Admin API) | OCSF events | `governance_ocsf_events` | **Production-ready**: usage and cost reports |
-| `databricks_genie` | Pull (Genie API) | Spans | `recorded_spans` | **Production-ready**: reads Genie conversations as traces |
-| [`openai_compliance`](/ai-gateway/governance/ingestion-sources/openai-compliance) | Pull (Enterprise Compliance JSONL) | Logs | `log_records` | **Setup-contract-only**: S3 + role config persisted, puller worker pending |
-| [`claude_compliance`](/ai-gateway/governance/ingestion-sources/claude-compliance) | Pull (Anthropic Compliance API) | Logs | `log_records` | **Setup-contract-only**: workspace API key persisted, puller worker pending |
-| `http_custom` | Pull (BYO REST API) | OCSF events | `governance_ocsf_events` | **Production-ready**: universal HTTP-polling adapter with field mapping |
+| Source type                                                                       | Delivery                           | OTLP shape  | Storage                  | State                                                                              |
+| --------------------------------------------------------------------------------- | ---------------------------------- | ----------- | ------------------------ | ---------------------------------------------------------------------------------- |
+| [`otel_generic`](/ai-gateway/governance/ingestion-sources/otel-generic)           | Push (HTTP/OTLP)                   | Spans       | `recorded_spans`         | **Production-ready**                                                               |
+| `claude_code`                                                                     | Push (HTTP/OTLP)                   | Spans       | `recorded_spans`         | **Production-ready**                                                               |
+| [`claude_cowork`](/ai-gateway/governance/ingestion-sources/claude-cowork)         | Push (HTTP/OTLP)                   | Spans       | `recorded_spans`         | **Receiver works**, Cowork-specific attribute mapping pending                      |
+| [`workato`](/ai-gateway/governance/ingestion-sources/workato)                     | Webhook → OTLP logs                | Logs        | `log_records`            | **Receiver works**, deeper audit-shape parser pending                              |
+| [`s3_custom`](/ai-gateway/governance/ingestion-sources/s3-custom)                 | S3 replay + callback webhook       | Logs        | `log_records`            | **Callback-mode works**, S3 puller + DSL parser pending                            |
+| [`copilot_studio_dataverse`](/ai-governance/ingestion-sources/copilot-studio)     | Pull (Dataverse)                   | Spans       | `recorded_spans`         | **Production-ready**: reads conversations from the Power Platform transcript table |
+| `anthropic_admin`                                                                 | Pull (Admin API)                   | OCSF events | `governance_ocsf_events` | **Production-ready**: usage and cost reports                                       |
+| `databricks_genie`                                                                | Pull (Genie API)                   | Spans       | `recorded_spans`         | **Production-ready**: reads Genie conversations as traces                          |
+| [`openai_compliance`](/ai-gateway/governance/ingestion-sources/openai-compliance) | Pull (Enterprise Compliance JSONL) | Logs        | `log_records`            | **Setup-contract-only**: S3 + role config persisted, puller worker pending         |
+| [`claude_compliance`](/ai-gateway/governance/ingestion-sources/claude-compliance) | Pull (Anthropic Compliance API)    | Logs        | `log_records`            | **Setup-contract-only**: workspace API key persisted, puller worker pending        |
+| `http_custom`                                                                     | Pull (BYO REST API)                | OCSF events | `governance_ocsf_events` | **Production-ready**: universal HTTP-polling adapter with field mapping            |
 
 **Production-ready** = receiver accepts traffic, lands in unified store, web detail page + CLI tail render with full payload + cost, token deltas, drill-down opens the trace viewer (span-shape) or log-detail pane (log-shape).
 
@@ -82,12 +103,12 @@ The CLI hits the same backend the web detail page hits, byte-for-byte (`--json` 
 
 Every governance-ingested span, log_record is stamped at the receiver edge with reserved attribute namespaces (rejected if found in user-supplied OTLP):
 
-| Attribute | Purpose |
-|---|---|
-| `langwatch.origin.kind` | Always `"ingestion_source"` for governance traffic, discriminator |
-| `langwatch.ingestion_source.id` | Source identity (matches the `lw_is_*` Bearer's resolved IngestionSource) |
-| `langwatch.ingestion_source.organization_id` | Org tenancy for cross-source roll-ups |
-| `langwatch.ingestion_source.source_type` | Source type (`otel_generic`, `workato`, etc.) for filtering |
+| Attribute                                    | Purpose                                                                   |
+| -------------------------------------------- | ------------------------------------------------------------------------- |
+| `langwatch.origin.kind`                      | Always `"ingestion_source"` for governance traffic, discriminator         |
+| `langwatch.ingestion_source.id`              | Source identity (matches the `lw_is_*` Bearer's resolved IngestionSource) |
+| `langwatch.ingestion_source.organization_id` | Org tenancy for cross-source roll-ups                                     |
+| `langwatch.ingestion_source.source_type`     | Source type (`otel_generic`, `workato`, etc.) for filtering               |
 
 These appear as read-only system metadata in the trace viewer, log detail pane; users cannot supply or edit them.
 

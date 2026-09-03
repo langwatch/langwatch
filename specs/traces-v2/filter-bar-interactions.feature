@@ -1,13 +1,13 @@
 # Filter bar interactions — caret placement + clear-all
 #
 # Implementation:
-#   platform/app/src/features/traces-v2/components/SearchBar/TokenValuePicker.tsx
-#   platform/app/src/features/traces-v2/components/SearchBar/SearchBar.tsx
-#   platform/app/src/features/traces-v2/components/SearchBar/SearchBarIndicators.tsx
-#   platform/app/src/features/traces-v2/components/FilterSidebar/FilterSidebar.tsx
-#   platform/app/src/features/traces-v2/components/FilterSidebar/FacetSection.tsx (row-order freeze)
-#   platform/app/src/features/traces-v2/stores/filterStore.ts   (clearAll)
-#   platform/app/src/features/traces-v2/stores/viewStore.ts     (revertLens, isDraft — reset to lens)
+#   packages/features/trace/web/src/ui/sections/explorer/search-bar/token-value-picker.tsx
+#   packages/features/trace/web/src/ui/sections/explorer/search-bar/search-bar.tsx
+#   packages/features/trace/web/src/ui/sections/explorer/search-bar/search-bar-indicators.tsx
+#   packages/features/trace/web/src/ui/sections/explorer/filter-sidebar/filter-sidebar.tsx
+#   packages/features/trace/web/src/ui/sections/explorer/filter-sidebar/facet-section.tsx (row-order freeze)
+#   packages/features/trace/web/src/filter.store.ts   (clearAll)
+#   packages/features/trace/web/src/view.store.ts     (revertLens, isDraft — reset to lens)
 #
 # Related specs:
 #   specs/traces-v2/data-layer.feature   — owns the clearAll mechanism (AST + dependent state reset)

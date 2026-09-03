@@ -23,10 +23,7 @@ import {
 } from "./guard-breaking-change-scope.ts";
 
 const repoRoot = resolve(import.meta.dirname, "../..");
-const scriptPath = resolve(
-  import.meta.dirname,
-  "guard-breaking-change-scope.ts",
-);
+const scriptPath = resolve(import.meta.dirname, "guard-breaking-change-scope.ts");
 
 /**
  * The version the manifest currently records for a component path.
@@ -54,10 +51,7 @@ const nextMinor = (version: string): string => {
 const liveComponents = () =>
   releaseComponents(
     JSON.parse(
-      readFileSync(
-        resolve(repoRoot, ".github/release-please-config.json"),
-        "utf8",
-      ),
+      readFileSync(resolve(repoRoot, ".github/release-please-config.json"), "utf8"),
     ),
   );
 
@@ -111,9 +105,7 @@ const checkout = ({
   return root;
 };
 
-const runGuard = (
-  root: string,
-): { status: number; stdout: string; stderr: string } => {
+const runGuard = (root: string): { status: number; stdout: string; stderr: string } => {
   const result = spawnSync(
     process.execPath,
     [
@@ -136,11 +128,9 @@ const shimSaying = (version: string): string =>
   `release-please shadow marker (v9), next: ${version}`;
 
 const pinCommit = (component: string, version: string): string =>
-  [
-    `chore(release): pin ${component} at ${version}`,
-    "",
-    `Release-As: ${version}`,
-  ].join("\n");
+  [`chore(release): pin ${component} at ${version}`, "", `Release-As: ${version}`].join(
+    "\n",
+  );
 
 const breakingCommit = "feat(gateway)!: a key must say where its traces land";
 
@@ -220,15 +210,13 @@ describe("breaking-change scope guard", () => {
 
   describe("when mapping changed files onto release components", () => {
     it("charges a file to its own package and not to a sibling", () => {
-      assert.deepEqual(names(["sdks/typescript/src/index.ts"]), [
-        "typescript-sdk",
-      ]);
+      assert.deepEqual(names(["sdks/typescript/src/index.ts"]), ["typescript-sdk"]);
     });
 
     it("charges a nested package over the parent that contains it", () => {
       const components = releaseComponents({
         packages: {
-          "sdks": { component: "sdks" },
+          sdks: { component: "sdks" },
           "sdks/typescript": { component: "typescript-sdk" },
         },
       });
@@ -250,10 +238,10 @@ describe("breaking-change scope guard", () => {
 
     it("charges the root package when one file escapes the excluded paths", () => {
       // The shape of #6641: fifteen files under mcp/typescript, plus SECURITY.md.
-      assert.deepEqual(
-        names(["mcp/typescript/src/server.ts", "SECURITY.md"]),
-        ["langwatch", "mcp-server"],
-      );
+      assert.deepEqual(names(["mcp/typescript/src/server.ts", "SECURITY.md"]), [
+        "langwatch",
+        "mcp-server",
+      ]);
     });
 
     it("reproduces the three components #6600 bumped at once", () => {
@@ -293,9 +281,7 @@ describe("breaking-change scope guard", () => {
   describe("when reading the release-please config", () => {
     it("keeps every configured package, named by its component", () => {
       const configured = liveComponents();
-      const byPath = new Map(
-        configured.map((component) => [component.path, component]),
-      );
+      const byPath = new Map(configured.map((component) => [component.path, component]));
       assert.equal(byPath.get("sdks/typescript")?.name, "typescript-sdk");
       assert.equal(byPath.get(".")?.name, "langwatch");
       assert.ok(
@@ -328,9 +314,7 @@ describe("breaking-change scope guard", () => {
     it("reads the version out of every shim this repository ships", () => {
       for (const component of liveComponents()) {
         const shim = shimPath(component);
-        const version = shimVersion(
-          readFileSync(resolve(repoRoot, shim), "utf8"),
-        );
+        const version = shimVersion(readFileSync(resolve(repoRoot, shim), "utf8"));
         assert.match(
           version ?? "",
           /^\d+\.\d+\.\d+$/,
@@ -428,14 +412,9 @@ describe("breaking-change scope guard", () => {
         result.stderr.includes("- typescript-sdk, pinned to 1.5.0"),
         result.stderr,
       );
+      assert.ok(result.stderr.includes("- python-sdk, pinned to 1.2.1"), result.stderr);
       assert.ok(
-        result.stderr.includes("- python-sdk, pinned to 1.2.1"),
-        result.stderr,
-      );
-      assert.ok(
-        result.stderr.includes(
-          "still take the break into their own changelog",
-        ),
+        result.stderr.includes("still take the break into their own changelog"),
         result.stderr,
       );
     });
@@ -562,9 +541,7 @@ describe("breaking-change scope guard", () => {
       const label = workflow.indexOf(
         "contains(github.event.pull_request.labels.*.name, 'multi-component-major')",
       );
-      const shortCircuit = workflow.indexOf(
-        'if [ "$ACKNOWLEDGED" = "true" ]; then',
-      );
+      const shortCircuit = workflow.indexOf('if [ "$ACKNOWLEDGED" = "true" ]; then');
       const guardRun = workflow.lastIndexOf(
         ".github/scripts/guard-breaking-change-scope.ts",
       );
@@ -677,14 +654,8 @@ describe("breaking-change scope guard", () => {
         result.stderr.includes("- typescript-sdk, pinned to 1.5.0"),
         result.stderr,
       );
-      assert.ok(
-        result.stderr.includes("- python-sdk, pinned to 1.2.1"),
-        result.stderr,
-      );
-      assert.ok(
-        result.stderr.includes("- langwatch, pinned to 3.11.0"),
-        result.stderr,
-      );
+      assert.ok(result.stderr.includes("- python-sdk, pinned to 1.2.1"), result.stderr);
+      assert.ok(result.stderr.includes("- langwatch, pinned to 3.11.0"), result.stderr);
     });
 
     it("still refuses it with the pin commits dropped, shims and all", () => {
@@ -695,9 +666,7 @@ describe("breaking-change scope guard", () => {
       assert.equal(result.status, 1);
       for (const [shim, content] of Object.entries(shims)) {
         assert.ok(
-          result.stderr.includes(
-            `- ${shim} records next: ${shimVersion(content)},`,
-          ),
+          result.stderr.includes(`- ${shim} records next: ${shimVersion(content)},`),
           result.stderr,
         );
       }
@@ -743,10 +712,7 @@ describe("breaking-change scope guard", () => {
         result.stderr.includes("A pin does not exempt a component"),
         result.stderr,
       );
-      assert.ok(
-        result.stderr.includes("- langwatch, pinned to 3.13.0"),
-        result.stderr,
-      );
+      assert.ok(result.stderr.includes("- langwatch, pinned to 3.13.0"), result.stderr);
     });
 
     it("names both the platform and the Go SDK as reached by the break", () => {
@@ -786,8 +752,7 @@ describe("breaking-change scope guard", () => {
       const result = runGuard(
         checkout({
           files: files.filter(
-            (file) =>
-              file.startsWith("sdks/go/") || file.startsWith("specs/go-sdk/"),
+            (file) => file.startsWith("sdks/go/") || file.startsWith("specs/go-sdk/"),
           ),
           messages,
         }),

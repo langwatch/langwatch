@@ -8,11 +8,11 @@
       "include-component-in-tag": true,
       "tag-separator": "@",
       "changelog-sections": [
-        {"type": "feat",     "section": "Features"},
-        {"type": "fix",      "section": "Bug Fixes"},
-        {"type": "chore",    "section": "Miscellaneous",    "hidden": false},
-        {"type": "docs",     "section": "Documentation",    "hidden": false},
-        {"type": "refactor", "section": "Code Refactoring", "hidden": false}
+        { "type": "feat", "section": "Features" },
+        { "type": "fix", "section": "Bug Fixes" },
+        { "type": "chore", "section": "Miscellaneous", "hidden": false },
+        { "type": "docs", "section": "Documentation", "hidden": false },
+        { "type": "refactor", "section": "Code Refactoring", "hidden": false }
       ],
       "extra-files": [
         {
@@ -55,9 +55,7 @@
           "hidden": false
         }
       ],
-      "extra-files": [
-        "version.go"
-      ]
+      "extra-files": ["version.go"]
     },
     "sdks/typescript": {
       "release-type": "node",
@@ -131,9 +129,7 @@
           "hidden": false
         }
       ],
-      "extra-files": [
-        "src/langwatch/__version__.py"
-      ]
+      "extra-files": ["src/langwatch/__version__.py"]
     },
     "mcp/typescript": {
       "release-type": "node",
@@ -369,12 +365,12 @@
         },
         {
           "type": "json",
-          "path": "platform/app/package.json",
+          "path": "apps/api/package.json",
           "jsonpath": "$.version"
         },
         {
           "type": "json",
-          "path": "package.json",
+          "path": "apps/server/package.json",
           "jsonpath": "$.version"
         }
       ]
@@ -411,9 +407,7 @@
           "hidden": false
         }
       ],
-      "extra-files": [
-        "skills/version.txt"
-      ]
+      "extra-files": ["skills/version.txt"]
     }
   },
   "bootstrap-sha": "HEAD",

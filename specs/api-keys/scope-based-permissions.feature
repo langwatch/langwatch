@@ -102,6 +102,7 @@ Feature: API Key Scope and Fine-Grained Permissions
       | Organization           | read, write   |
       | Gateway                | read, write   |
       | Governance             | read, write   |
+      | Feature Flags          | write         |
 
   @unit
   Scenario: Project write carries creation and deletion, because manage implies them
@@ -370,6 +371,13 @@ Feature: API Key Scope and Fine-Grained Permissions
     When I switch it to "Restricted" with specific permissions and save
     Then the router upserts a CustomRole for this key
     And the bindings are recreated with the CustomRole id
+
+  @unit
+  Scenario: Editing a key without changing its scopes keeps them
+    Given an API key already bound to a project
+    When I save an edit that resubmits the same scope unchanged
+    Then the key keeps that binding
+    And the key still works afterwards
 
   @unit
   Scenario: Restricted key with camelCase permissions saves without error

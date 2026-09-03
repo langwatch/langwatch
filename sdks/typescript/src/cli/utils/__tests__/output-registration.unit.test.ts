@@ -50,7 +50,17 @@ describe("registerOutputOptions", () => {
       });
 
     registerOutputOptions(program);
-    program.parse(["node", "lw", "trace", "list", "--agent", "-o", "yaml", "--jq", ".items[]"]);
+    program.parse([
+      "node",
+      "lw",
+      "trace",
+      "list",
+      "--agent",
+      "-o",
+      "yaml",
+      "--jq",
+      ".items[]",
+    ]);
 
     expect(captured).toMatchObject({ agent: true, output: "yaml", jq: ".items[]" });
   });
@@ -58,11 +68,9 @@ describe("registerOutputOptions", () => {
   it("makes the global flags parse BEFORE a subcommand too", () => {
     const program = build();
     let captured: Record<string, unknown> = {};
-    program
-      .command("status")
-      .action((opts: Record<string, unknown>, cmd: Command) => {
-        captured = cmd.optsWithGlobals();
-      });
+    program.command("status").action((opts: Record<string, unknown>, cmd: Command) => {
+      captured = cmd.optsWithGlobals();
+    });
 
     registerOutputOptions(program);
     program.parse(["node", "lw", "--agent", "status"]);
@@ -110,9 +118,9 @@ describe("registerOutputOptions", () => {
 
     registerOutputOptions(program);
 
-    expect(() =>
-      program.parse(["node", "lw", "status", "-o", "jsn"]),
-    ).toThrow(/Allowed choices are table, json, agents, yaml/);
+    expect(() => program.parse(["node", "lw", "status", "-o", "jsn"])).toThrow(
+      /Allowed choices are table, json, agents, yaml/,
+    );
   });
 
   it("does not constrain a command's own -o (trace export's file path)", () => {

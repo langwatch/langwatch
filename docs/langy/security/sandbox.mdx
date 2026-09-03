@@ -19,15 +19,15 @@ Running unsandboxed takes an explicit pair, `runtimeClassName: ""` plus `acceptU
 
 Langy is isolated at several layers, from the pod boundary down to the walls between two conversations sharing one pod. Weakest to strongest:
 
-| Boundary | Mechanism | Enforced by |
-|---|---|---|
-| Pod to host | gVisor (`runsc`) user-space kernel; required RuntimeClass with a render-time chart guard | Kubernetes + chart |
-| Worker to worker (files) | Each conversation gets a distinct Unix UID and a `0700` home; homes are chowned before any secret is written; `/proc/<pid>/environ` is `0400` owned by the worker UID, so a sibling UID gets `EACCES` | Linux file permissions (DAC) |
-| Worker to worker (control port) | Each worker gets a distinct random `OPENCODE_SERVER_PASSWORD`; a per-worker auth proxy terminates the external token and swaps in HTTP Basic upstream; a fail-closed guard refuses to start a worker whose control server does not return `401` to an unauthenticated request | Go auth proxy + opencode |
-| Worker to external (L7) | Per-worker egress adapter: require-TLS, per-destination throttle, the project's allow-list, an operator FQDN floor, and a TLS SNI cross-check against the CONNECT authority | Go adapter (cooperative, see below) |
-| Worker to external (L3/L4) | Deny-by-default `NetworkPolicy`; outbound `:443` to anywhere is off by default; RFC 1918 private ranges, CGNAT, and the cloud metadata endpoint are carved out and blocked | Container network interface (CNI) |
-| Worker to external (optional, hard) | Cilium `toFQDNs` on the floor, or a per-worker network namespace (ADR-033 Fix B) | Cilium / netns (planned, see below) |
-| Control plane to agent | `LANGY_INTERNAL_SECRET` bearer token, constant-time compared; the agent Service is ClusterIP only and never exposed outside the cluster | Go |
+| Boundary                            | Mechanism                                                                                                                                                                                                                                                                     | Enforced by                         |
+| ----------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ----------------------------------- |
+| Pod to host                         | gVisor (`runsc`) user-space kernel; required RuntimeClass with a render-time chart guard                                                                                                                                                                                      | Kubernetes + chart                  |
+| Worker to worker (files)            | Each conversation gets a distinct Unix UID and a `0700` home; homes are chowned before any secret is written; `/proc/<pid>/environ` is `0400` owned by the worker UID, so a sibling UID gets `EACCES`                                                                         | Linux file permissions (DAC)        |
+| Worker to worker (control port)     | Each worker gets a distinct random `OPENCODE_SERVER_PASSWORD`; a per-worker auth proxy terminates the external token and swaps in HTTP Basic upstream; a fail-closed guard refuses to start a worker whose control server does not return `401` to an unauthenticated request | Go auth proxy + opencode            |
+| Worker to external (L7)             | Per-worker egress adapter: require-TLS, per-destination throttle, the project's allow-list, an operator FQDN floor, and a TLS SNI cross-check against the CONNECT authority                                                                                                   | Go adapter (cooperative, see below) |
+| Worker to external (L3/L4)          | Deny-by-default `NetworkPolicy`; outbound `:443` to anywhere is off by default; RFC 1918 private ranges, CGNAT, and the cloud metadata endpoint are carved out and blocked                                                                                                    | Container network interface (CNI)   |
+| Worker to external (optional, hard) | Cilium `toFQDNs` on the floor, or a per-worker network namespace (ADR-033 Fix B)                                                                                                                                                                                              | Cilium / netns (planned, see below) |
+| Control plane to agent              | `LANGY_INTERNAL_SECRET` bearer token, constant-time compared; the agent Service is ClusterIP only and never exposed outside the cluster                                                                                                                                       | Go                                  |
 
 The manager process runs as root in the container, because assigning a distinct UID per worker needs `CAP_SETUID`, `CAP_SETGID`, and `CAP_CHOWN`.
 
@@ -51,6 +51,7 @@ Today the per-worker Unix accounts are a **sibling-process boundary, not a full 
 The stock L7 egress adapter is **cooperative**, not mandatory. It enforces the allow-list only for traffic that goes through the proxy. A prompt-injected worker that ignores `HTTPS_PROXY` and dials an external IP directly on `:443` is **monitored, not blocked**, in the stock pod.
 
 The mandatory-enforcement end states (a Cilium `toFQDNs` policy, or a per-worker network namespace that needs `CAP_SYS_ADMIN`) are **designed, not shipped**. Do not read this page as a claim of hard tenant isolation by default.
+
 </Warning>
 
 The defence-in-depth mitigations that **are** shipped today:
@@ -60,7 +61,11 @@ The defence-in-depth mitigations that **are** shipped today:
 - **Public-subnet node placement (opt-in).** You can schedule the agent pod on a node group that has no route to your private data tier, so a full escape lands somewhere with no path to your databases.
 
 <Note>
-For a self-hosted install, egress is **denied by default**: `networkPolicy.allowExternalHttps` is `false`, so Langy cannot reach the internet at all until you enable it. Turning it on for GitHub is covered in [Networking and egress](/self-hosting/langy/networking-and-egress) and [the GitHub App setup](/self-hosting/langy/github-app).
+  For a self-hosted install, egress is **denied by default**:
+  `networkPolicy.allowExternalHttps` is `false`, so Langy cannot reach the internet at all
+  until you enable it. Turning it on for GitHub is covered in [Networking and
+  egress](/self-hosting/langy/networking-and-egress) and [the GitHub App
+  setup](/self-hosting/langy/github-app).
 </Note>
 
 ## What the sandbox can and cannot reach
@@ -71,7 +76,9 @@ For a self-hosted install, egress is **denied by default**: `networkPolicy.allow
 - **Does not keep at rest:** nothing durable lives worker-side. The manager wipes the sessions root on boot, and the idle reaper deletes a worker's home once it has been idle for 10 minutes, so clones and injected credentials do not survive.
 
 <Info>
-**Also check:** [Data flow and privacy](/langy/security/data-flow-and-privacy), [What Langy can do in your GitHub](/langy/security/github-access), [Self-hosting: networking and egress](/self-hosting/langy/networking-and-egress).
+  **Also check:** [Data flow and privacy](/langy/security/data-flow-and-privacy), [What
+  Langy can do in your GitHub](/langy/security/github-access), [Self-hosting: networking
+  and egress](/self-hosting/langy/networking-and-egress).
 </Info>
 
 ## Reference

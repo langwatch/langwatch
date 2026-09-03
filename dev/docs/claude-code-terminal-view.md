@@ -32,13 +32,13 @@ There is **no shared `body` convention**. This bit us: enrichment read `body` fo
 everything, so on the light path spans came back with no input and no output,
 silently (fixed; regression-pinned in `trace-service-claude-enrichment.unit.test.ts`).
 
-| event | content key | gate |
-|---|---|---|
-| `user_prompt` | `prompt` | `OTEL_LOG_USER_PROMPTS` |
-| `assistant_response` | `response` | `OTEL_LOG_ASSISTANT_RESPONSES` (falls back to the above) |
-| `api_request_body` / `api_response_body` | `body` | `OTEL_LOG_RAW_API_BODIES` |
-| `api_request` | — (`cost_usd`, `request_id`) | always |
-| `tool_result` / `tool_decision` | `tool_input`, `tool_parameters` | `OTEL_LOG_TOOL_DETAILS` |
+| event                                    | content key                     | gate                                                     |
+| ---------------------------------------- | ------------------------------- | -------------------------------------------------------- |
+| `user_prompt`                            | `prompt`                        | `OTEL_LOG_USER_PROMPTS`                                  |
+| `assistant_response`                     | `response`                      | `OTEL_LOG_ASSISTANT_RESPONSES` (falls back to the above) |
+| `api_request_body` / `api_response_body` | `body`                          | `OTEL_LOG_RAW_API_BODIES`                                |
+| `api_request`                            | — (`cost_usd`, `request_id`)    | always                                                   |
+| `tool_result` / `tool_decision`          | `tool_input`, `tool_parameters` | `OTEL_LOG_TOOL_DETAILS`                                  |
 
 Every event also carries **`prompt.id`** (a UUID linking all events from one user
 prompt) and **`event.sequence`** (monotonic per session).
@@ -68,7 +68,7 @@ PII/redaction pass as any other span content.
 Why spans and not the trace summary: a Claude Code turn is an agentic **loop** —
 model → tool → model → tool → answer. The trace summary only ever holds the
 opening prompt and the closing reply, so rendering from it loses every tool call.
-Each model call carries the *rolling* history, so the final `llm_request` span's
+Each model call carries the _rolling_ history, so the final `llm_request` span's
 input already contains the whole turn (prompt, every `tool_use`, every
 `tool_result`); appending its own reply completes the transcript. Metrics are
 summed across all the calls — the turn cost is the whole loop.
@@ -79,7 +79,7 @@ you already have, and its whole hierarchy rides on four glyphs at one monospace
 size: `❯` prompt, `⏺` call/message, `⎿` result, `✻` thinking. Chrome around it
 makes it read as a screenshot of a terminal rather than as the session.
 
-Components (`platform/app/src/features/traces-v2/components/TraceDrawer/terminalView/`):
+Components (`packages/features/trace/web/src/ui/sections/explorer/trace-drawer/terminal-view/`):
 `TerminalTab` (data boundary) · `TerminalView` (the screen + status line) ·
 `buildStepsFromSpans` (spans → steps) · `TerminalOutput` (ANSI tool output,
 click-to-copy) · `TerminalDiff` + `diff.ts` · `terminalSession.ts` (timeline,

@@ -1,0 +1,59 @@
+{
+  "name": "@langwatch/prisma-client",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Explicitly configured Prisma/Postgres construction and lifecycle services, the tenancy query guards every process composes its client with, plus the canonical LangWatch schema, migrations, and generated client.",
+  "license": "MIT",
+  "files": [
+    "prisma",
+    "src"
+  ],
+  "type": "module",
+  "main": "./src/index.ts",
+  "types": "./src/index.ts",
+  "exports": {
+    ".": {
+      "types": "./src/index.ts",
+      "default": "./src/index.ts"
+    },
+    "./generated": {
+      "types": "./src/generated/client.ts",
+      "default": "./src/generated/client.ts"
+    }
+  },
+  "scripts": {
+    "prisma:generate": "prisma generate --config ./prisma.config.ts",
+    "typecheck": "tsc --noEmit",
+    "test": "vitest",
+    "test:unit": "vitest run",
+    "db:seed": "tsx prisma/seed.ts"
+  },
+  "dependencies": {
+    "@langwatch/api-key-contract": "workspace:*",
+    "@langwatch/observability": "workspace:*",
+    "@prisma/adapter-pg": "7.9.1",
+    "@prisma/client": "7.9.1",
+    "lodash-es": "^4.18.1",
+    "pg": "^8.22.0",
+    "zod": "^4.4.3"
+  },
+  "devDependencies": {
+    "@langwatch/api-key-server": "workspace:*",
+    "@langwatch/enterprise-licensing-server": "workspace:*",
+    "@langwatch/model-provider-contract": "workspace:*",
+    "@langwatch/prompt-contract": "workspace:*",
+    "@langwatch/role-contract": "workspace:*",
+    "@langwatch/secret-server": "workspace:*",
+    "@langwatch/workflow-contract": "workspace:*",
+    "@types/bcrypt": "^6.0.0",
+    "@types/lodash-es": "^4.17.12",
+    "@types/node": "^26.0.1",
+    "@types/pg": "^8.20.3",
+    "bcrypt": "^6.0.0",
+    "dotenv": "^17.4.2",
+    "prisma": "7.9.1",
+    "tsx": "^4.22.4",
+    "typescript": "^7.0.2",
+    "vitest": "^4.1.9"
+  }
+}

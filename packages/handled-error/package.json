@@ -2,26 +2,40 @@
   "name": "@langwatch/handled-error",
   "version": "0.1.0",
   "private": true,
-  "description": "The shared handled-error contract: HandledError base class, serialized wire shapes, and the Go herr envelope adapter. Used by the LangWatch app, MCP server, CLI, and SDKs.",
+  "description": "The shared handled-error contract: HandledError base class, serialized wire shapes, the Go herr envelope adapter, the enumerated app codes and the code-keyed client presentation registry. Used by the LangWatch app, MCP server, CLI, and SDKs.",
   "license": "MIT",
+  "files": [
+    "src"
+  ],
   "type": "module",
+  "main": "./src/index.ts",
+  "types": "./src/index.ts",
   "exports": {
     ".": {
       "types": "./src/index.ts",
       "default": "./src/index.ts"
+    },
+    "./app-codes": {
+      "types": "./src/app-codes.ts",
+      "default": "./src/app-codes.ts"
+    },
+    "./presentation": {
+      "types": "./src/presentation.ts",
+      "default": "./src/presentation.ts"
+    },
+    "./read-handled-error": {
+      "types": "./src/read-handled-error.ts",
+      "default": "./src/read-handled-error.ts"
     }
   },
-  "main": "./src/index.ts",
-  "types": "./src/index.ts",
-  "files": [
-    "src"
-  ],
   "scripts": {
     "typecheck": "tsc --noEmit",
     "test": "vitest run"
   },
   "dependencies": {
-    "@opentelemetry/api": "^1.9.1"
+    "@langwatch/config": "workspace:*",
+    "@opentelemetry/api": "^1.9.1",
+    "zod": "^4.4.3"
   },
   "devDependencies": {
     "typescript": "^7.0.2",

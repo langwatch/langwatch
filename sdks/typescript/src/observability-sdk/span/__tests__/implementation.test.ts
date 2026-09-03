@@ -1,6 +1,9 @@
 import { describe, expect, it, beforeEach, afterEach, vi } from "vitest";
 import { createLangWatchSpan } from "../implementation";
-import { type ChatMessage, type SpanInputOutput } from "../../../internal/generated/types/tracer";
+import {
+  type ChatMessage,
+  type SpanInputOutput,
+} from "../../../internal/generated/types/tracer";
 
 // Mock OpenTelemetry Span
 const createMockSpan = () => ({
@@ -37,7 +40,7 @@ describe("LangWatchSpan Implementation", () => {
       expect(result).toBe(langwatchSpan);
       expect(mockSpan.setAttribute).toHaveBeenCalledWith(
         expect.any(String),
-        expect.stringContaining('"type":"text"')
+        expect.stringContaining('"type":"text"'),
       );
     });
 
@@ -48,35 +51,35 @@ describe("LangWatchSpan Implementation", () => {
       expect(result).toBe(langwatchSpan);
       expect(mockSpan.setAttribute).toHaveBeenCalledWith(
         expect.any(String),
-        expect.stringContaining('"type":"raw"')
+        expect.stringContaining('"type":"raw"'),
       );
     });
 
     it("handles explicit chat_messages type", () => {
       const messages: ChatMessage[] = [
         { role: "user", content: "Hello" },
-        { role: "assistant", content: "Hi!" }
+        { role: "assistant", content: "Hi!" },
       ];
       const result = langwatchSpan.setInput("chat_messages", messages);
 
       expect(result).toBe(langwatchSpan);
       expect(mockSpan.setAttribute).toHaveBeenCalledWith(
         expect.any(String),
-        expect.stringContaining('"type":"chat_messages"')
+        expect.stringContaining('"type":"chat_messages"'),
       );
     });
 
     it("handles explicit list type", () => {
       const list: SpanInputOutput[] = [
         { type: "text", value: "Item 1" },
-        { type: "text", value: "Item 2" }
+        { type: "text", value: "Item 2" },
       ];
       const result = langwatchSpan.setInput("list", list);
 
       expect(result).toBe(langwatchSpan);
       expect(mockSpan.setAttribute).toHaveBeenCalledWith(
         expect.any(String),
-        expect.stringContaining('"type":"list"')
+        expect.stringContaining('"type":"list"'),
       );
     });
 
@@ -87,7 +90,7 @@ describe("LangWatchSpan Implementation", () => {
       expect(result).toBe(langwatchSpan);
       expect(mockSpan.setAttribute).toHaveBeenCalledWith(
         expect.any(String),
-        expect.stringContaining('"type":"json"')
+        expect.stringContaining('"type":"json"'),
       );
     });
 
@@ -97,7 +100,7 @@ describe("LangWatchSpan Implementation", () => {
       expect(result).toBe(langwatchSpan);
       expect(mockSpan.setAttribute).toHaveBeenCalledWith(
         expect.any(String),
-        expect.stringContaining('"type":"text"')
+        expect.stringContaining('"type":"text"'),
       );
     });
 
@@ -108,7 +111,7 @@ describe("LangWatchSpan Implementation", () => {
       expect(result).toBe(langwatchSpan);
       expect(mockSpan.setAttribute).toHaveBeenCalledWith(
         expect.any(String),
-        expect.stringContaining('"type":"json"')
+        expect.stringContaining('"type":"json"'),
       );
     });
 
@@ -119,7 +122,7 @@ describe("LangWatchSpan Implementation", () => {
       expect(result).toBe(langwatchSpan);
       expect(mockSpan.setAttribute).toHaveBeenCalledWith(
         expect.any(String),
-        expect.stringContaining('"type":"list"')
+        expect.stringContaining('"type":"list"'),
       );
     });
   });
@@ -131,7 +134,7 @@ describe("LangWatchSpan Implementation", () => {
       expect(result).toBe(langwatchSpan);
       expect(mockSpan.setAttribute).toHaveBeenCalledWith(
         expect.any(String),
-        expect.stringContaining('"type":"text"')
+        expect.stringContaining('"type":"text"'),
       );
     });
 
@@ -142,34 +145,32 @@ describe("LangWatchSpan Implementation", () => {
       expect(result).toBe(langwatchSpan);
       expect(mockSpan.setAttribute).toHaveBeenCalledWith(
         expect.any(String),
-        expect.stringContaining('"type":"raw"')
+        expect.stringContaining('"type":"raw"'),
       );
     });
 
     it("handles explicit chat_messages type", () => {
-      const messages: ChatMessage[] = [
-        { role: "assistant", content: "Response" }
-      ];
+      const messages: ChatMessage[] = [{ role: "assistant", content: "Response" }];
       const result = langwatchSpan.setOutput("chat_messages", messages);
 
       expect(result).toBe(langwatchSpan);
       expect(mockSpan.setAttribute).toHaveBeenCalledWith(
         expect.any(String),
-        expect.stringContaining('"type":"chat_messages"')
+        expect.stringContaining('"type":"chat_messages"'),
       );
     });
 
     it("handles explicit list type", () => {
       const list: SpanInputOutput[] = [
         { type: "text", value: "Response 1" },
-        { type: "text", value: "Response 2" }
+        { type: "text", value: "Response 2" },
       ];
       const result = langwatchSpan.setOutput("list", list);
 
       expect(result).toBe(langwatchSpan);
       expect(mockSpan.setAttribute).toHaveBeenCalledWith(
         expect.any(String),
-        expect.stringContaining('"type":"list"')
+        expect.stringContaining('"type":"list"'),
       );
     });
 
@@ -180,7 +181,7 @@ describe("LangWatchSpan Implementation", () => {
       expect(result).toBe(langwatchSpan);
       expect(mockSpan.setAttribute).toHaveBeenCalledWith(
         expect.any(String),
-        expect.stringContaining('"type":"json"')
+        expect.stringContaining('"type":"json"'),
       );
     });
 
@@ -190,7 +191,7 @@ describe("LangWatchSpan Implementation", () => {
       expect(result).toBe(langwatchSpan);
       expect(mockSpan.setAttribute).toHaveBeenCalledWith(
         expect.any(String),
-        expect.stringContaining('"type":"text"')
+        expect.stringContaining('"type":"text"'),
       );
     });
 
@@ -201,7 +202,7 @@ describe("LangWatchSpan Implementation", () => {
       expect(result).toBe(langwatchSpan);
       expect(mockSpan.setAttribute).toHaveBeenCalledWith(
         expect.any(String),
-        expect.stringContaining('"type":"json"')
+        expect.stringContaining('"type":"json"'),
       );
     });
 
@@ -212,7 +213,7 @@ describe("LangWatchSpan Implementation", () => {
       expect(result).toBe(langwatchSpan);
       expect(mockSpan.setAttribute).toHaveBeenCalledWith(
         expect.any(String),
-        expect.stringContaining('"type":"list"')
+        expect.stringContaining('"type":"list"'),
       );
     });
   });
@@ -224,14 +225,14 @@ describe("LangWatchSpan Implementation", () => {
       (langwatchSpan.setInput as any)("text", obj);
       expect(mockSpan.setAttribute).toHaveBeenCalledWith(
         expect.any(String),
-        expect.stringContaining('"type":"text"')
+        expect.stringContaining('"type":"text"'),
       );
 
       // String that would auto-detect as "text", but explicit "json" should be preferred
       (langwatchSpan.setOutput as any)("json", "Hello world");
       expect(mockSpan.setAttribute).toHaveBeenCalledWith(
         expect.any(String),
-        expect.stringContaining('"type":"json"')
+        expect.stringContaining('"type":"json"'),
       );
     });
   });
@@ -254,7 +255,7 @@ describe("LangWatchSpan Implementation", () => {
     it("handles non-serializable objects", () => {
       const objWithFunction = {
         data: "test",
-        method: () => "hello"
+        method: () => "hello",
       };
       const result = langwatchSpan.setInput(objWithFunction);
 

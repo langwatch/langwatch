@@ -1,0 +1,125 @@
+{
+  "name": "@langwatch/evaluator-web",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Browser-safe reusable Evaluator UI and presentation helpers.",
+  "files": [
+    "src"
+  ],
+  "type": "module",
+  "main": "./src/index.ts",
+  "types": "./src/index.ts",
+  "exports": {
+    ".": {
+      "types": "./src/index.ts",
+      "default": "./src/index.ts"
+    },
+    "./components/checks/DynamicZodForm": {
+      "types": "./src/ui/sections/checks/dynamic-zod-form.tsx",
+      "default": "./src/ui/sections/checks/dynamic-zod-form.tsx"
+    },
+    "./components/evaluations/EvaluatorTracesMapping": {
+      "types": "./src/ui/elements/evaluations/evaluator-traces-mapping.tsx",
+      "default": "./src/ui/elements/evaluations/evaluator-traces-mapping.tsx"
+    },
+    "./components/evaluators/EvaluatorEditorContent": {
+      "types": "./src/ui/sections/evaluators/evaluator-editor-content.tsx",
+      "default": "./src/ui/sections/evaluators/evaluator-editor-content.tsx"
+    },
+    "./components/evaluators/EvaluatorEditorShared": {
+      "types": "./src/ui/sections/evaluators/evaluator-editor-shared.tsx",
+      "default": "./src/ui/sections/evaluators/evaluator-editor-shared.tsx"
+    },
+    "./components/shared/EvaluatorResultChip": {
+      "types": "./src/ui/elements/shared/evaluator-result-chip.tsx",
+      "default": "./src/ui/elements/shared/evaluator-result-chip.tsx"
+    },
+    "./drawers": {
+      "types": "./src/ui/sections/drawers.ts",
+      "default": "./src/ui/sections/drawers.ts"
+    },
+    "./editor-drawers": {
+      "types": "./src/ui/sections/editor-drawers.ts",
+      "default": "./src/ui/sections/editor-drawers.ts"
+    },
+    "./hooks/useAvailableEvaluators": {
+      "types": "./src/behavior/use-available-evaluators.ts",
+      "default": "./src/behavior/use-available-evaluators.ts"
+    },
+    "./screens/evaluation-edit": {
+      "types": "./src/screens/evaluation-edit/index.ts",
+      "default": "./src/screens/evaluation-edit/index.ts"
+    },
+    "./screens/evaluators": {
+      "types": "./src/screens/evaluators/index.ts",
+      "default": "./src/screens/evaluators/index.ts"
+    },
+    "./server/evaluations/types": {
+      "types": "./src/model/evaluations/types.ts",
+      "default": "./src/model/evaluations/types.ts"
+    },
+    "./utils/evaluationResults": {
+      "types": "./src/model/evaluation-results.ts",
+      "default": "./src/model/evaluation-results.ts"
+    }
+  },
+  "scripts": {
+    "typecheck": "tsc --noEmit",
+    "test": "vitest run",
+    "test:unit": "vitest run"
+  },
+  "dependencies": {
+    "@hookform/resolvers": "^5.4.0",
+    "@langwatch/analytics-contract": "workspace:*",
+    "@langwatch/analytics-web": "workspace:*",
+    "@langwatch/design-system": "workspace:*",
+    "@langwatch/evaluation-contract": "workspace:*",
+    "@langwatch/evaluator-contract": "workspace:*",
+    "@langwatch/experiment-web": "workspace:*",
+    "@langwatch/handled-error": "workspace:*",
+    "@langwatch/model-provider-web": "workspace:*",
+    "@langwatch/observability": "workspace:*",
+    "@langwatch/platform-api-client": "workspace:*",
+    "@langwatch/prompt-web": "workspace:*",
+    "@langwatch/trace-contract": "workspace:*",
+    "@langwatch/trace-web": "workspace:*",
+    "@langwatch/ui-drawer": "workspace:*",
+    "@langwatch/workflow-contract": "workspace:*",
+    "@langwatch/workflow-web": "workspace:*",
+    "@xyflow/react": "^12.11.1",
+    "date-fns": "^4.4.0",
+    "langwatch": "workspace:*",
+    "lodash-es": "^4.18.1",
+    "lucide-react": "^1.22.0",
+    "motion": "^12.42.2",
+    "numeral": "^2.0.6",
+    "react-feather": "^2.0.10",
+    "react-hook-form": "^7.80.0",
+    "react-icons": "^5.5.0",
+    "safe-regex2": "^5.1.1",
+    "usehooks-ts": "^3.1.1",
+    "zod": "^4.4.3"
+  },
+  "devDependencies": {
+    "@chakra-ui/react": "^3.36.0",
+    "@emotion/react": "^11.14.0",
+    "@testing-library/jest-dom": "^7.0.1",
+    "@testing-library/react": "^16.3.2",
+    "@testing-library/user-event": "^14.6.1",
+    "@types/lodash-es": "^4.17.12",
+    "@types/numeral": "^2.0.5",
+    "@types/react": "^19.2.14",
+    "@types/react-dom": "^19.2.3",
+    "jsdom": "^30.0.1",
+    "react": "^19.2.7",
+    "react-dom": "^19.2.7",
+    "typescript": "^7.0.2",
+    "vitest": "^4.1.9"
+  },
+  "peerDependencies": {
+    "@chakra-ui/react": "^3.36.0",
+    "@emotion/react": "^11.14.0",
+    "react": "^19.2.7",
+    "react-dom": "^19.2.7"
+  }
+}

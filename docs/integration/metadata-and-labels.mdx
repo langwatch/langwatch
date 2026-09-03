@@ -12,21 +12,24 @@ The reference below covers every integration method. For SDK-specific details, s
 
 ## Quick Reference
 
-| Concept | OTEL Attribute | REST API | Description |
-|---------|---------------|----------|-------------|
-| **Thread/Conversation** | `gen_ai.conversation.id` | `metadata.thread_id` | Groups messages in a conversation |
-| **User ID** | `langwatch.user.id` | `metadata.user_id` | Identifies the end user |
-| **Customer ID** | `langwatch.customer.id` | `metadata.customer_id` | Your platform's customer/tenant |
-| **Labels** | `langwatch.labels` | `metadata.labels` | Categorization tags |
-| **Custom Metadata** | `metadata` attribute | `metadata.*` | Any additional context |
+| Concept                 | OTEL Attribute           | REST API               | Description                       |
+| ----------------------- | ------------------------ | ---------------------- | --------------------------------- |
+| **Thread/Conversation** | `gen_ai.conversation.id` | `metadata.thread_id`   | Groups messages in a conversation |
+| **User ID**             | `langwatch.user.id`      | `metadata.user_id`     | Identifies the end user           |
+| **Customer ID**         | `langwatch.customer.id`  | `metadata.customer_id` | Your platform's customer/tenant   |
+| **Labels**              | `langwatch.labels`       | `metadata.labels`      | Categorization tags               |
+| **Custom Metadata**     | `metadata` attribute     | `metadata.*`           | Any additional context            |
 
 <Note>
-  For OTEL, `gen_ai.conversation.id` follows the [OpenTelemetry GenAI semantic conventions](https://opentelemetry.io/docs/specs/semconv/gen-ai/). The legacy `langwatch.thread.id` attribute is also supported.
+  For OTEL, `gen_ai.conversation.id` follows the [OpenTelemetry GenAI semantic
+  conventions](https://opentelemetry.io/docs/specs/semconv/gen-ai/). The legacy
+  `langwatch.thread.id` attribute is also supported.
 </Note>
 
 ## SDK Examples
 
 For detailed SDK-specific tutorials, see:
+
 - **TypeScript:** [Capturing Metadata](/integration/typescript/tutorials/capturing-metadata) · [Tracking Conversations](/integration/typescript/tutorials/tracking-conversations) · [Full example](https://github.com/langwatch/langwatch/tree/main/sdks/typescript/examples/metadata)
 - **Python:** [Capturing Metadata](/integration/python/tutorials/capturing-metadata) · [Tracking Conversations](/integration/python/tutorials/tracking-conversations) · [Full example](https://github.com/langwatch/langwatch/blob/main/sdks/python/examples/metadata_example.py)
 
@@ -39,9 +42,9 @@ setupObservability();
 const tracer = getLangWatchTracer("my-service");
 
 async function handleUserMessage(userId: string, conversationId: string) {
-  return await tracer.withActiveSpan("HandleMessage", async (span) => {
-    // Thread/conversation ID (OTEL semconv)
-    span.setAttribute("gen_ai.conversation.id", conversationId);
+return await tracer.withActiveSpan("HandleMessage", async (span) => {
+// Thread/conversation ID (OTEL semconv)
+span.setAttribute("gen_ai.conversation.id", conversationId);
 
     // User and customer identification
     span.setAttribute("langwatch.user.id", userId);
@@ -57,9 +60,11 @@ async function handleUserMessage(userId: string, conversationId: string) {
     }));
 
     // Your application logic...
-  });
+
+});
 }
-```
+
+````
 
 ```python Python SDK
 import langwatch
@@ -76,7 +81,8 @@ def handle_request(user_id: str, thread_id: str):
     )
 
     # Your logic here...
-```
+````
+
 </CodeGroup>
 
 ## Raw OpenTelemetry
@@ -90,24 +96,25 @@ import { trace } from "@opentelemetry/api";
 const tracer = trace.getTracer("my-service");
 
 tracer.startActiveSpan("operation", (span) => {
-  // OTEL semconv for conversation/thread
-  span.setAttribute("gen_ai.conversation.id", "conv-456");
+// OTEL semconv for conversation/thread
+span.setAttribute("gen_ai.conversation.id", "conv-456");
 
-  // LangWatch-specific attributes
-  span.setAttribute("langwatch.user.id", "user-123");
-  span.setAttribute("langwatch.customer.id", "customer-789");
-  span.setAttribute("langwatch.labels", JSON.stringify(["urgent", "support"]));
+// LangWatch-specific attributes
+span.setAttribute("langwatch.user.id", "user-123");
+span.setAttribute("langwatch.customer.id", "customer-789");
+span.setAttribute("langwatch.labels", JSON.stringify(["urgent", "support"]));
 
-  // Custom metadata as JSON string
-  span.setAttribute("metadata", JSON.stringify({
-    priority: "high",
-    department: "engineering"
-  }));
+// Custom metadata as JSON string
+span.setAttribute("metadata", JSON.stringify({
+priority: "high",
+department: "engineering"
+}));
 
-  // ... your code ...
-  span.end();
+// ... your code ...
+span.end();
 });
-```
+
+````
 
 ```python Python
 import json
@@ -131,7 +138,8 @@ with tracer.start_as_current_span("operation") as span:
     }))
 
     # ... your code ...
-```
+````
+
 </CodeGroup>
 
 **Exporter configuration:**
@@ -141,12 +149,13 @@ with tracer.start_as_current_span("operation") as span:
 import { OTLPTraceExporter } from "@opentelemetry/exporter-trace-otlp-http";
 
 const exporter = new OTLPTraceExporter({
-  url: "https://app.langwatch.ai/api/otel/v1/traces",
-  headers: {
-    Authorization: `Bearer ${process.env.LANGWATCH_API_KEY}`,
-  },
+url: "https://app.langwatch.ai/api/otel/v1/traces",
+headers: {
+Authorization: `Bearer ${process.env.LANGWATCH_API_KEY}`,
+},
 });
-```
+
+````
 
 ```python Python
 from opentelemetry.exporter.otlp.proto.http.trace_exporter import OTLPSpanExporter
@@ -155,12 +164,11 @@ exporter = OTLPSpanExporter(
     endpoint="https://app.langwatch.ai/api/otel/v1/traces",
     headers={"Authorization": f"Bearer {os.environ['LANGWATCH_API_KEY']}"},
 )
-```
+````
+
 </CodeGroup>
 
-<Warning>
-  The OTEL endpoint is `/api/otel/v1/traces` (not `/v1/traces`).
-</Warning>
+<Warning>The OTEL endpoint is `/api/otel/v1/traces` (not `/v1/traces`).</Warning>
 
 ## REST API
 
@@ -267,30 +275,31 @@ const response = await fetch("https://app.langwatch.ai/api/collector", {
   }),
 });
 ```
+
 </CodeGroup>
 
 ### Reserved vs Custom Fields
 
 In the REST API `metadata` object:
 
-| Field | Type | Description |
-|-------|------|-------------|
-| `user_id` | string | End user identifier |
-| `thread_id` | string | Conversation/session ID |
-| `customer_id` | string | Your tenant/customer ID |
-| `labels` | string[] | Categorization tags |
-| *other keys* | any | Stored as custom metadata |
+| Field         | Type     | Description               |
+| ------------- | -------- | ------------------------- |
+| `user_id`     | string   | End user identifier       |
+| `thread_id`   | string   | Conversation/session ID   |
+| `customer_id` | string   | Your tenant/customer ID   |
+| `labels`      | string[] | Categorization tags       |
+| _other keys_  | any      | Stored as custom metadata |
 
 ## Timings
 
 Beyond metadata, spans carry timing information that powers the latency views: the Duration column, the Time to First Token (TTFT) column, and the latency analytics.
 
-| Field | Where | Description |
-|-------|-------|-------------|
-| `timestamps.started_at` | Span | When the operation started (epoch ms). Set automatically by the SDKs |
-| `timestamps.first_token_at` | Span | When the first streamed token arrived (epoch ms). Powers TTFT |
-| `timestamps.finished_at` | Span | When the operation finished (epoch ms). Set automatically by the SDKs |
-| `gen_ai.server.time_to_first_token` | OTEL attribute | TTFT as a duration in milliseconds, alternative to `first_token_at` |
+| Field                               | Where          | Description                                                           |
+| ----------------------------------- | -------------- | --------------------------------------------------------------------- |
+| `timestamps.started_at`             | Span           | When the operation started (epoch ms). Set automatically by the SDKs  |
+| `timestamps.first_token_at`         | Span           | When the first streamed token arrived (epoch ms). Powers TTFT         |
+| `timestamps.finished_at`            | Span           | When the operation finished (epoch ms). Set automatically by the SDKs |
+| `gen_ai.server.time_to_first_token` | OTEL attribute | TTFT as a duration in milliseconds, alternative to `first_token_at`   |
 
 Most streaming instrumentations report TTFT automatically. To set it manually, or to understand how it rolls up to the trace level, see the dedicated tutorials:
 

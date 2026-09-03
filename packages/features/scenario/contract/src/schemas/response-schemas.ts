@@ -1,0 +1,155 @@
+/**
+ * Response schemas for scenario event API endpoints
+ * Defines the structure of API responses for scenario runs, batches, and events.
+ */
+import { z } from "zod";
+import { ScenarioRunStatus } from "../scenario-run";
+import {
+  batchRunIdSchema,
+  langwatchMetadataSchema,
+  scenarioAgentSchema,
+  scenarioEventSchema,
+  scenarioIdSchema,
+  scenarioMessageSnapshotSchema,
+  scenarioResultsSchema,
+  scenarioRunIdSchema,
+} from "./event-schemas";
+
+/**
+ * Standard success response schema
+ * Used for operations that complete successfully with optional URL redirect
+ */
+const successSchema = z.object({
+  success: z.boolean(),
+  url: z.string().optional().nullable(),
+});
+
+/**
+ * Standard error response schema
+ * Used when API operations fail with error message
+ */
+const errorSchema = z.object({ error: z.string() });
+
+/**
+ * Individual scenario run data schema
+ * Contains complete information about a single scenario execution
+ */
+export const runDataSchema = z.object({
+  scenarioId: scenarioIdSchema,
+  batchRunId: batchRunIdSchema,
+  scenarioRunId: scenarioRunIdSchema,
+  // The scenario set this run belongs to. Optional: only the ClickHouse
+  // repository populates it today (used to group/filter runs by suite);
+  // older/other producers of ScenarioRunData omit it. It does not shape the
+  // run's platformUrl — the drawer link is run-id only.
+  scenarioSetId: z.string().optional(),
+  name: z.string().optional().nullable(),
+  description: z.string().optional().nullable(),
+  metadata: z
+    .object({
+      name: z.string().optional(),
+      description: z.string().optional(),
+      /**
+       * One short line describing why the run was started. Absent, rather than
+       * empty, on a run started without one.
+       *
+       * @see specs/suites/run-note-metadata-convention.feature
+       */
+      note: z.string().optional(),
+      /** Who took part in the run. See {@link scenarioAgentSchema}. */
+      agents: z.array(scenarioAgentSchema).optional(),
+      langwatch: langwatchMetadataSchema.optional(),
+    })
+    .passthrough()
+    .optional()
+    .nullable(),
+  status: z.nativeEnum(ScenarioRunStatus),
+  results: scenarioResultsSchema.optional().nullable(),
+  messages: scenarioMessageSnapshotSchema.shape.messages,
+  // True when `messages` holds only the first few messages of a longer
+  // conversation. List reads trim the message arrays to protect ClickHouse;
+  // pass `include=messages` to read them all.
+  messagesTruncated: z.boolean().optional(),
+  timestamp: z.number(), // Unix timestamp when run started (stable sort key)
+  updatedAt: z.number().optional(), // Last update timestamp (for conditional fetch)
+  durationInMs: z.number(), // Execution time in milliseconds
+  totalCost: z.number().optional(), // Total cost in USD across all traces
+  roleCosts: z.record(z.string(), z.array(z.number())).optional(), // Per-role cost values (one per trace)
+  roleLatencies: z.record(z.string(), z.array(z.number())).optional(), // Per-role latency values (one per trace)
+});
+
+/**
+ * Collection of scenario runs response schema
+ * Used for endpoints returning multiple run records
+ */
+const runsSchema = z.object({ runs: z.array(runDataSchema) });
+
+/**
+ * Collection of scenario events response schema
+ * Used for endpoints returning event history/logs
+ */
+const eventsSchema = z.object({ events: z.array(scenarioEventSchema) });
+
+/**
+ * Scenario batch summary schema
+ * Contains aggregated statistics for a batch of scenario runs
+ */
+export const scenarioBatchSchema = z.object({
+  batchRunId: z.string(),
+  scenarioCount: z.number(), // Total number of scenarios in this batch
+  successRate: z.number(), // Percentage of successful runs (0-1)
+  lastRunAt: z.number(), // Unix timestamp of most recent run in batch
+});
+
+/**
+ * Collection of scenario batches response schema
+ * Used for endpoints returning batch summaries and statistics
+ */
+const batchesSchema = z.object({
+  batches: z.array(scenarioBatchSchema),
+});
+
+/**
+ * Archive operation response schema
+ * Returned by the DELETE /api/scenario-events endpoint. Set-scoped archives
+ * report the set id plus whether more runs remain; run-scoped archives
+ * report the single run id.
+ */
+export const archiveResponseSchema = z.union([
+  z.object({
+    archived: z.number().int().nonnegative(),
+    failed: z.number().int().nonnegative(),
+    scenarioSetId: z.string(),
+    hasMore: z.boolean(),
+  }),
+  z.object({
+    archived: z.number().int().nonnegative(),
+    failed: z.number().int().nonnegative(),
+    scenarioRunId: z.string(),
+  }),
+]);
+
+/**
+ * Browser-tab handoff response schema
+ * Returned by POST /api/scenario-events/browser-tab. `delivered` tells the SDK
+ * whether a live simulations tab took the run, so it can skip opening one.
+ */
+export const browserTabHandoffResponseSchema = z.object({
+  delivered: z.boolean(),
+  url: z.string(),
+});
+
+/**
+ * Consolidated response schemas object
+ * Maps response types to their corresponding Zod schemas for validation
+ */
+export const responseSchemas = {
+  success: successSchema,
+  error: errorSchema,
+  runs: runsSchema,
+  events: eventsSchema,
+  batches: batchesSchema,
+  runData: runDataSchema,
+  archive: archiveResponseSchema,
+  browserTabHandoff: browserTabHandoffResponseSchema,
+};

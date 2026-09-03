@@ -1,0 +1,21 @@
+{
+  "compilerOptions": {
+    "incremental": true,
+    "tsBuildInfoFile": "node_modules/.cache/tsbuildinfo/enterprise-audit-log-server.tsbuildinfo",
+    "target": "es2022",
+    "module": "preserve",
+    "moduleResolution": "bundler",
+    "paths": {
+      "@langwatch/enterprise-audit-log-contract": ["../contract/src/index.ts"]
+    },
+    "lib": ["es2022"],
+    "types": [],
+    "strict": true,
+    "noUncheckedIndexedAccess": true,
+    "noEmit": true,
+    "skipLibCheck": true,
+    "forceConsistentCasingInFileNames": true,
+    "verbatimModuleSyntax": true
+  },
+  "include": ["src/**/*.ts"]
+}

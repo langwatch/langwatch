@@ -51,17 +51,9 @@ import { emitEvaluationEvent, type AddEvaluationParams } from "../evaluation";
  * });
  * ```
  */
-export function getLangWatchTracer(
-  name: string,
-  version?: string,
-): LangWatchTracer {
-  return getLangWatchTracerFromProvider(
-    trace.getTracerProvider(),
-    name,
-    version,
-  );
+export function getLangWatchTracer(name: string, version?: string): LangWatchTracer {
+  return getLangWatchTracerFromProvider(trace.getTracerProvider(), name, version);
 }
-
 
 /**
  * Get a LangWatch tracer from a specific OpenTelemetry tracer provider.
@@ -141,7 +133,12 @@ export function getLangWatchTracerFromProvider(
               spanArgs.fn(createLangWatchSpan(span), ...cbArgs);
 
             if (spanArgs.context !== void 0)
-              return target.startActiveSpan(spanArgs.name, options, spanArgs.context, wrappedFn);
+              return target.startActiveSpan(
+                spanArgs.name,
+                options,
+                spanArgs.context,
+                wrappedFn,
+              );
 
             return target.startActiveSpan(spanArgs.name, options, wrappedFn);
           };
@@ -198,14 +195,21 @@ export function getLangWatchTracerFromProvider(
 
             // Call target.startActiveSpan to avoid double-wrapping
             if (spanArgs.context !== void 0)
-              return target.startActiveSpan(spanArgs.name, optionsWithOrigin, spanArgs.context, cb);
+              return target.startActiveSpan(
+                spanArgs.name,
+                optionsWithOrigin,
+                spanArgs.context,
+                cb,
+              );
 
             return target.startActiveSpan(spanArgs.name, optionsWithOrigin, cb);
           };
 
         case "startSpan":
           return (name: string, options?: SpanOptions, context?: Context) =>
-            createLangWatchSpan(target.startSpan(name, withDefaultOrigin(options), context));
+            createLangWatchSpan(
+              target.startSpan(name, withDefaultOrigin(options), context),
+            );
 
         case "addEvaluation":
           return (params: AddEvaluationParams) => {
@@ -243,8 +247,7 @@ export function getLangWatchTracerFromProvider(
 function normalizeSpanArgs(args: any[]) {
   const [name, arg2, arg3, arg4] = args;
 
-  if (typeof arg4 === "function")
-    return { name, options: arg2, context: arg3, fn: arg4 };
+  if (typeof arg4 === "function") return { name, options: arg2, context: arg3, fn: arg4 };
 
   if (typeof arg3 === "function") return { name, options: arg2, fn: arg3 };
   if (typeof arg2 === "function") return { name, fn: arg2 };

@@ -182,7 +182,7 @@ export class Experiment {
       logger: Logger;
       runId?: string;
       concurrency?: number;
-    }
+    },
   ) {
     this.name = name;
     this.experimentSlug = name;
@@ -205,7 +205,7 @@ export class Experiment {
       endpoint: string;
       apiKey: string;
       logger: Logger;
-    } & ExperimentInitOptions
+    } & ExperimentInitOptions,
   ): Promise<Experiment> {
     // Ensure observability is set up for proper tracing
     ensureSetup();
@@ -221,7 +221,7 @@ export class Experiment {
   private async initialize(): Promise<void> {
     if (!this.apiKey) {
       throw new ExperimentInitError(
-        "API key is required. Set LANGWATCH_API_KEY or pass apiKey to LangWatch constructor."
+        "API key is required. Set LANGWATCH_API_KEY or pass apiKey to LangWatch constructor.",
       );
     }
 
@@ -262,7 +262,7 @@ export class Experiment {
       }
       throw new ExperimentInitError(
         `Failed to initialize evaluation: ${error instanceof Error ? error.message : String(error)}`,
-        error instanceof Error ? error : undefined
+        error instanceof Error ? error : undefined,
       );
     }
   }
@@ -285,7 +285,7 @@ export class Experiment {
   async run<T>(
     dataset: T[],
     callback: RunCallback<T>,
-    options?: RunOptions
+    options?: RunOptions,
   ): Promise<void> {
     if (!this.initialized) {
       await this.initialize();
@@ -319,10 +319,15 @@ export class Experiment {
 
     // Flush OTEL spans so all child spans created inside callbacks are exported
     const provider = trace.getTracerProvider();
-    const delegate = "getDelegate" in provider && typeof provider.getDelegate === "function"
-      ? provider.getDelegate()
-      : provider;
-    if (delegate && "forceFlush" in delegate && typeof delegate.forceFlush === "function") {
+    const delegate =
+      "getDelegate" in provider && typeof provider.getDelegate === "function"
+        ? provider.getDelegate()
+        : provider;
+    if (
+      delegate &&
+      "forceFlush" in delegate &&
+      typeof delegate.forceFlush === "function"
+    ) {
       await delegate.forceFlush();
     }
 
@@ -337,7 +342,7 @@ export class Experiment {
     tracer: ReturnType<typeof trace.getTracer>,
     item: T,
     index: number,
-    callback: RunCallback<T>
+    callback: RunCallback<T>,
   ): Promise<void> {
     const startTime = Date.now();
     let error: Error | undefined;
@@ -356,9 +361,15 @@ export class Experiment {
         try {
           // Create a minimal span context for the callback
           const span = {
-            setStatus: () => { /* no-op */ },
-            recordException: () => { /* no-op */ },
-            end: () => { /* no-op */ },
+            setStatus: () => {
+              /* no-op */
+            },
+            recordException: () => {
+              /* no-op */
+            },
+            end: () => {
+              /* no-op */
+            },
           } as unknown as LangWatchSpan;
 
           const ctx: RunContext<T> = { item, index, span };
@@ -414,7 +425,7 @@ export class Experiment {
             } finally {
               span.end();
             }
-          }
+          },
         );
       });
     }
@@ -633,7 +644,7 @@ export class Experiment {
       const wrappedError = new EvaluatorError(
         evaluatorSlug,
         error instanceof Error ? error.message : String(error),
-        error instanceof Error ? error : undefined
+        error instanceof Error ? error : undefined,
       );
 
       this.log(name ?? evaluatorSlug, {
@@ -687,7 +698,7 @@ export class Experiment {
           as_guardrail: asGuardrail,
         }),
         signal: AbortSignal.timeout(EVALUATOR_TIMEOUT_MS),
-      }
+      },
     );
 
     if (!response.ok) {
@@ -738,12 +749,7 @@ export class Experiment {
    * ```
    */
   async compare(options: ComparisonOptions = {}): Promise<ComparisonVerdict> {
-    const {
-      name = DEFAULT_COMPARISON_NAME,
-      targets,
-      input,
-      golden,
-    } = options;
+    const { name = DEFAULT_COMPARISON_NAME, targets, input, golden } = options;
 
     const index = this.resolveComparisonRow(options.index);
 
@@ -757,7 +763,7 @@ export class Experiment {
           `Cannot compare row ${index}: no output was recorded for ${missing
             .map((target) => `'${target}'`)
             .join(", ")}. Compare a row once every withTarget() call for it has settled.`,
-          missing
+          missing,
         );
       }
     }
@@ -767,14 +773,13 @@ export class Experiment {
     // would reshuffle what the judge sees from one row to the next.
     const requested = targets ? new Set(targets) : null;
     const candidates = Array.from(this.targets.keys()).filter(
-      (target) =>
-        captured.has(target) && (requested === null || requested.has(target))
+      (target) => captured.has(target) && (requested === null || requested.has(target)),
     );
 
     if (candidates.length < 2) {
       const missing = Array.from(this.targets.keys()).filter(
         (target) =>
-          !captured.has(target) && (requested === null || requested.has(target))
+          !captured.has(target) && (requested === null || requested.has(target)),
       );
       const verdict: ComparisonVerdict = {
         status: "skipped",
@@ -810,8 +815,7 @@ export class Experiment {
         settings,
         name,
         traceId:
-          iterationContextStorage.getStore()?.traceId ??
-          this.getTraceIdFromContext(),
+          iterationContextStorage.getStore()?.traceId ?? this.getTraceIdFromContext(),
         spanId: this.getSpanIdFromContext(),
       });
     } catch (error) {
@@ -853,7 +857,7 @@ export class Experiment {
 
     if (resolved === undefined) {
       throw new ComparisonError(
-        "Cannot compare: no row was given and none could be inferred. Pass index explicitly when comparing outside a run() iteration."
+        "Cannot compare: no row was given and none could be inferred. Pass index explicitly when comparing outside a run() iteration.",
       );
     }
 
@@ -892,8 +896,7 @@ export class Experiment {
       name,
       evaluator: COMPARISON_EVALUATOR_SLUG,
       trace_id:
-        iterationContextStorage.getStore()?.traceId ??
-        this.getTraceIdFromContext(),
+        iterationContextStorage.getStore()?.traceId ?? this.getTraceIdFromContext(),
       status,
       // The results page keys a comparison column off this candidate list.
       data: {
@@ -951,20 +954,19 @@ export class Experiment {
   async withTarget<R>(
     targetName: string,
     metadata: TargetMetadata | null,
-    callback: TargetCallback<R>
+    callback: TargetCallback<R>,
   ): Promise<TargetResult<R>>;
   async withTarget<R>(
     targetName: string,
-    callback: TargetCallback<R>
+    callback: TargetCallback<R>,
   ): Promise<TargetResult<R>>;
   async withTarget<R>(
     targetName: string,
     metadataOrCallback: TargetMetadata | null | TargetCallback<R>,
-    maybeCallback?: TargetCallback<R>
+    maybeCallback?: TargetCallback<R>,
   ): Promise<TargetResult<R>> {
     // Handle overloads
-    const metadata =
-      typeof metadataOrCallback === "function" ? null : metadataOrCallback;
+    const metadata = typeof metadataOrCallback === "function" ? null : metadataOrCallback;
     const callback =
       typeof metadataOrCallback === "function" ? metadataOrCallback : maybeCallback!;
 
@@ -1029,7 +1031,10 @@ export class Experiment {
             const ctx: TargetContext = { span, traceId, spanId };
             const callbackResult = callback(ctx);
 
-            if (callbackResult && typeof (callbackResult as Promise<R>).then === "function") {
+            if (
+              callbackResult &&
+              typeof (callbackResult as Promise<R>).then === "function"
+            ) {
               return await callbackResult;
             }
             return callbackResult as R;
@@ -1047,7 +1052,7 @@ export class Experiment {
         } finally {
           span.end();
         }
-      }
+      },
     );
 
     const duration = Date.now() - startTime;
@@ -1055,9 +1060,10 @@ export class Experiment {
     // Serialize the result as "predicted" output (similar to Evaluations V3)
     let predicted: Record<string, unknown> | null = null;
     if (result !== undefined && result !== null) {
-      predicted = typeof result === "object"
-        ? (result as Record<string, unknown>)
-        : { output: result };
+      predicted =
+        typeof result === "object"
+          ? (result as Record<string, unknown>)
+          : { output: result };
     }
 
     // Create a dataset entry for this target execution (like Evaluations V3)
@@ -1068,7 +1074,7 @@ export class Experiment {
       entry: this.serializeItem(currentItem),
       duration,
       error: callbackError?.message ?? null,
-      trace_id: traceId || null,  // null if no tracer configured (no-op)
+      trace_id: traceId || null, // null if no tracer configured (no-op)
       target_id: targetName,
       predicted,
     };
@@ -1173,10 +1179,13 @@ export class Experiment {
     if (now - this.lastSentMs >= DEBOUNCE_INTERVAL_MS) {
       this.sendBatch();
     } else {
-      this.flushTimeout ??= setTimeout(() => {
-        this.flushTimeout = null;
-        this.sendBatch();
-      }, DEBOUNCE_INTERVAL_MS - (now - this.lastSentMs));
+      this.flushTimeout ??= setTimeout(
+        () => {
+          this.flushTimeout = null;
+          this.sendBatch();
+        },
+        DEBOUNCE_INTERVAL_MS - (now - this.lastSentMs),
+      );
     }
   }
 
@@ -1233,13 +1242,25 @@ export class Experiment {
 
     const targets = new Map<
       string,
-      { passed: number; failed: number; latencySum: number; latencyCount: number; cost: number }
+      {
+        passed: number;
+        failed: number;
+        latencySum: number;
+        latencyCount: number;
+        cost: number;
+      }
     >();
     for (const entry of this.cumulativeEntries) {
       const tid = entry.target_id;
       if (!tid) continue;
       if (!targets.has(tid)) {
-        targets.set(tid, { passed: 0, failed: 0, latencySum: 0, latencyCount: 0, cost: 0 });
+        targets.set(tid, {
+          passed: 0,
+          failed: 0,
+          latencySum: 0,
+          latencyCount: 0,
+          cost: 0,
+        });
       }
       const stats = targets.get(tid)!;
       if (typeof entry.duration === "number") {
@@ -1259,7 +1280,13 @@ export class Experiment {
       const tid = e.target_id;
       if (!tid) continue;
       if (!targets.has(tid)) {
-        targets.set(tid, { passed: 0, failed: 0, latencySum: 0, latencyCount: 0, cost: 0 });
+        targets.set(tid, {
+          passed: 0,
+          failed: 0,
+          latencySum: 0,
+          latencyCount: 0,
+          cost: 0,
+        });
       }
       const stats = targets.get(tid)!;
       if (e.status === "error" || e.passed === false) stats.failed += 1;
@@ -1295,7 +1322,10 @@ export class Experiment {
       summary: {
         runId: this.runId,
         totalCells: this.cumulativeEntries.length || total,
-        completedCells: Math.max(0, (this.cumulativeEntries.length || total) - failedCells),
+        completedCells: Math.max(
+          0,
+          (this.cumulativeEntries.length || total) - failedCells,
+        ),
         failedCells,
         duration,
         runUrl: this.runUrl,
@@ -1316,7 +1346,8 @@ export class Experiment {
           name,
           passed: s.passed,
           failed: s.failed,
-          passRate: s.passed + s.failed > 0 ? (s.passed / (s.passed + s.failed)) * 100 : 0,
+          passRate:
+            s.passed + s.failed > 0 ? (s.passed / (s.passed + s.failed)) * 100 : 0,
           avgScore: s.scoreCount > 0 ? s.scoreSum / s.scoreCount : undefined,
         })),
       },
@@ -1430,7 +1461,10 @@ export class Experiment {
 
     if (typeof item === "object") {
       // Handle objects with toJSON method
-      if ("toJSON" in item && typeof (item as { toJSON: unknown }).toJSON === "function") {
+      if (
+        "toJSON" in item &&
+        typeof (item as { toJSON: unknown }).toJSON === "function"
+      ) {
         return (item as { toJSON: () => unknown }).toJSON();
       }
       // Return as-is, JSON.stringify will handle it

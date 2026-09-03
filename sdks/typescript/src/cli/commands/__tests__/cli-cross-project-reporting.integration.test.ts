@@ -4,7 +4,7 @@
  *
  * Feature: specs/typescript-sdk/cli-cross-project-access.feature
  */
-import { readCliErrorDocument } from "@langwatch/langy/cards/handled-error";
+import { readCliErrorDocument } from "@langwatch/langy-contract/cards/handled-error";
 import { describe, expect, it } from "vitest";
 import {
   installCrossProjectHarness,
@@ -61,9 +61,7 @@ describe("given a login that minted a user-scoped CLI key", () => {
       });
 
       expect(result.exitCode).not.toBe(0);
-      expect(result.stderr).toContain(
-        'no accessible project matches "does-not-exist"',
-      );
+      expect(result.stderr).toContain('no accessible project matches "does-not-exist"');
       expect(recorded.searchAuth).toBeNull();
     });
   });

@@ -1,0 +1,37 @@
+/**
+ * The Scenarios tab: the suites rail beside the table of scenarios.
+ *
+ * The reads and the writes of the tab live in useTestCasesTab. The rail, the
+ * panel and the dialogs are views over the model it returns.
+ *
+ * @see specs/features/agent-testing/suites-rail.feature
+ * @see specs/features/agent-testing/cases-table.feature
+ */
+
+import { HStack, VStack } from "@chakra-ui/react";
+import { TestCasesDialogs } from "./test-cases-dialogs";
+import { TestCasesPanel } from "./test-cases-panel";
+import { TestCasesRail } from "./test-cases-rail";
+import { useTestCasesTab } from "./use-test-cases-tab";
+
+export function TestCasesTab() {
+  const model = useTestCasesTab();
+
+  return (
+    <HStack
+      width="full"
+      height="full"
+      gap={0}
+      alignItems="stretch"
+      data-testid="agent-testing-cases-tab"
+    >
+      <TestCasesRail model={model} />
+
+      <VStack align="stretch" flex={1} minWidth={0} gap={0}>
+        <TestCasesPanel model={model} />
+      </VStack>
+
+      <TestCasesDialogs model={model} />
+    </HStack>
+  );
+}

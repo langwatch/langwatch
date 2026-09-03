@@ -1,0 +1,285 @@
+import { describe, expect, it, vi } from "vitest";
+import type { CanonicalMetricDataPoint } from "@langwatch/metric-contract";
+import { CanonicalMetricAdapter, MetricService } from "@langwatch/metric-server/testing";
+import { PLATFORM_DEFAULT_DATA_PRIVACY } from "@langwatch/data-privacy-contract";
+import type { RecordMetricCorrelationCommandData } from "@langwatch/trace-contract";
+import {
+  type MetricRequestCollectionResult,
+  MetricRequestCollectionService,
+} from "../metric-request-collection.service";
+import { OtlpSpanPiiRedactionService } from "@langwatch/data-privacy-server";
+import { DataPrivacyServiceFake } from "@langwatch/data-privacy-server";
+
+/** Narrows the result union so a test can assert on the collected counters. */
+function expectCollected(
+  result: MetricRequestCollectionResult,
+): Extract<MetricRequestCollectionResult, { outcome: "collected" }> {
+  if (result.outcome !== "collected") {
+    throw new Error(`expected a collected result, got "${result.outcome}"`);
+  }
+  return result;
+}
+
+function makeService(
+  recordDataPointsImpl: (data: CanonicalMetricDataPoint[]) => Promise<void> = async () => {},
+) {
+  const recordDataPoints =
+    vi.fn<(data: CanonicalMetricDataPoint[]) => Promise<void>>(recordDataPointsImpl);
+  const recordMetricCorrelations = vi.fn<
+    (data: RecordMetricCorrelationCommandData[]) => Promise<void>
+  >(async () => {});
+  const metrics = MetricService.create({
+    preparation: CanonicalMetricAdapter.create({
+      redaction: OtlpSpanPiiRedactionService.create({
+        transport: {
+          tryClearGoogleDlp: async () => null,
+          clearPresidio: async () => [],
+          close: async () => undefined,
+        },
+        isLangevalsConfigured: false,
+        isProduction: false,
+        nativePolicyEnforced: false,
+        piiRedactionMaxAttributeLength: 250_000,
+        dataPrivacy: new DataPrivacyServiceFake(PLATFORM_DEFAULT_DATA_PRIVACY),
+      }),
+    }),
+  });
+  const service = new MetricRequestCollectionService({
+    metrics,
+    recordDataPoints,
+    recordMetricCorrelations,
+  });
+  return { service, recordDataPoints, recordMetricCorrelations };
+}
+
+function gaugeRequest(args: {
+  value?: number;
+  values?: number[];
+  resourceAttributes?: Array<Record<string, unknown>>;
+  pointAttributes?: Array<Record<string, unknown>>;
+}) {
+  return {
+    resourceMetrics: [
+      {
+        resource: { attributes: args.resourceAttributes ?? [] },
+        scopeMetrics: [
+          {
+            scope: { name: "test", version: "1.0.0" },
+            metrics: [
+              {
+                name: "requests.active",
+                unit: "{request}",
+                gauge: {
+                  dataPoints: (args.values ?? [args.value ?? 1]).map((value, index) => ({
+                    timeUnixNano: String(1_700_000_000_000_000_000n + BigInt(index)),
+                    asInt: value,
+                    attributes: args.pointAttributes ?? [],
+                  })),
+                },
+              },
+            ],
+          },
+        ],
+      },
+    ],
+  };
+}
+
+const requestContext = {
+  tenantId: "project_test_tenant",
+  organizationId: "organization_test",
+  piiRedactionLevel: "DISABLED",
+} as const;
+
+describe("MetricRequestCollectionService", () => {
+  /** @scenario "Missing or invalid exemplars do not call Trace" */
+  it("keeps a standalone gauge as one canonical integer data point", async () => {
+    const { service, recordDataPoints, recordMetricCorrelations } = makeService();
+
+    const result = await service.handleOtlpMetricRequest({
+      ...requestContext,
+      metricRequest: gaugeRequest({ value: 42 }),
+    });
+
+    expect(result).toEqual({
+      outcome: "collected",
+      acceptedDataPoints: 1,
+      rejectedDataPoints: 0,
+    });
+    expect(recordDataPoints).toHaveBeenCalledTimes(1);
+    expect(recordDataPoints.mock.calls[0]![0][0]).toMatchObject({
+      tenantId: requestContext.tenantId,
+      organizationId: requestContext.organizationId,
+      metricName: "requests.active",
+      metricKind: "gauge",
+      valueType: "int",
+      valueInt: "42",
+      timeUnixNano: "1700000000000000000",
+    });
+    expect(recordMetricCorrelations).not.toHaveBeenCalled();
+  });
+
+  it("enqueues all accepted points in one batch", async () => {
+    const { service, recordDataPoints } = makeService();
+
+    const result = await service.handleOtlpMetricRequest({
+      ...requestContext,
+      metricRequest: gaugeRequest({ values: [1, 2, 3] }),
+    });
+
+    expect(result).toEqual({
+      outcome: "collected",
+      acceptedDataPoints: 3,
+      rejectedDataPoints: 0,
+    });
+    expect(recordDataPoints).toHaveBeenCalledTimes(1);
+    expect(recordDataPoints.mock.calls[0]![0]).toHaveLength(3);
+  });
+
+  it("makes identity independent of attribute order and acceptance time", async () => {
+    const { service, recordDataPoints } = makeService();
+    const a = { key: "a", value: { stringValue: "one" } };
+    const b = { key: "b", value: { intValue: "2" } };
+
+    await service.handleOtlpMetricRequest({
+      ...requestContext,
+      metricRequest: gaugeRequest({ pointAttributes: [a, b] }),
+    });
+    await service.handleOtlpMetricRequest({
+      ...requestContext,
+      metricRequest: gaugeRequest({ pointAttributes: [b, a] }),
+    });
+    await service.handleOtlpMetricRequest({
+      ...requestContext,
+      metricRequest: gaugeRequest({ value: 2, pointAttributes: [a, b] }),
+    });
+
+    const first = recordDataPoints.mock.calls[0]![0][0]!;
+    const retry = recordDataPoints.mock.calls[1]![0][0]!;
+    const changedValue = recordDataPoints.mock.calls[2]![0][0]!;
+    expect(retry.seriesId).toBe(first.seriesId);
+    expect(retry.pointId).toBe(first.pointId);
+    expect(changedValue.seriesId).toBe(first.seriesId);
+    expect(changedValue.pointId).not.toBe(first.pointId);
+  });
+
+  /** @scenario "Invalid metric points use partial success" */
+  /** @scenario "A valid exemplar requests Trace correlation only" */
+  /** @scenario "Missing or invalid exemplars do not call Trace" */
+  it("rejects an oversized sibling while accepting and correlating a valid point", async () => {
+    const { service, recordDataPoints, recordMetricCorrelations } = makeService();
+    const traceId = "0123456789abcdef0123456789abcdef";
+    const spanId = "0123456789abcdef";
+
+    const result = await service.handleOtlpMetricRequest({
+      ...requestContext,
+      metricRequest: {
+        resourceMetrics: [
+          {
+            scopeMetrics: [
+              {
+                scope: { name: "test" },
+                metrics: [
+                  {
+                    name: "payload.size",
+                    gauge: {
+                      dataPoints: [
+                        {
+                          timeUnixNano: "1700000000000000000",
+                          asDouble: 1,
+                          attributes: [
+                            {
+                              key: "oversized",
+                              value: { stringValue: "x".repeat(270_000) },
+                            },
+                          ],
+                        },
+                        {
+                          timeUnixNano: "1700000030000000000",
+                          asDouble: 2.5,
+                          exemplars: [
+                            {
+                              timeUnixNano: "1700000030000000000",
+                              asDouble: 2.5,
+                              traceId: Buffer.from(traceId, "hex").toString("base64"),
+                              spanId: Buffer.from(spanId, "hex").toString("base64"),
+                            },
+                            {
+                              timeUnixNano: "1700000030000000001",
+                              asDouble: 3,
+                              traceId: Buffer.from(traceId, "hex").toString("base64"),
+                              spanId: Buffer.from(spanId, "hex").toString("base64"),
+                            },
+                            {
+                              timeUnixNano: "1700000030000000002",
+                              asDouble: 4,
+                              traceId: "not-a-trace-id",
+                              spanId: "not-a-span-id",
+                            },
+                          ],
+                        },
+                      ],
+                    },
+                  },
+                ],
+              },
+            ],
+          },
+        ],
+      },
+    });
+
+    const collected = expectCollected(result);
+    expect(collected.acceptedDataPoints).toBe(1);
+    expect(collected.rejectedDataPoints).toBe(1);
+    expect(collected.errorMessage).toContain("maximum 262144");
+    expect(recordDataPoints).toHaveBeenCalledTimes(1);
+    expect(recordMetricCorrelations).toHaveBeenCalledTimes(1);
+    expect(recordMetricCorrelations.mock.calls[0]![0][0]).toMatchObject({
+      traceId,
+      spanId,
+      exemplarValue: 2.5,
+    });
+    expect(recordMetricCorrelations.mock.calls[0]![0]).not.toContainEqual(
+      expect.objectContaining({ exemplarValue: 4 }),
+    );
+  });
+
+  describe("when persisting a point throws", () => {
+    const internals =
+      "connect ECONNREFUSED clickhouse-shard-3.internal:9440 while INSERT INTO metric_data_points";
+
+    it("reports the failure without echoing internals to the caller", async () => {
+      const { service } = makeService(async () => {
+        throw new Error(internals);
+      });
+
+      const result = await service.handleOtlpMetricRequest({
+        ...requestContext,
+        metricRequest: gaugeRequest({ value: 1 }),
+      });
+
+      expect(result.errorMessage).toBe("failed to record data point");
+      expect(result.errorMessage).not.toContain("clickhouse-shard-3");
+      expect(result.errorMessage).not.toContain("INSERT INTO");
+    });
+
+    it("reports the batch as unavailable rather than rejected", async () => {
+      const { service } = makeService(async () => {
+        throw new Error(internals);
+      });
+
+      const result = await service.handleOtlpMetricRequest({
+        ...requestContext,
+        metricRequest: gaugeRequest({ value: 1 }),
+      });
+
+      // A persistence failure is ours, so the point must stay retryable. If
+      // this ever reports `collected` with a non-zero `rejectedDataPoints`,
+      // the route answers 200 + partialSuccess and every collector in the
+      // fleet drops the batch it could have re-sent.
+      expect(result.outcome).toBe("unavailable");
+      expect(result).not.toHaveProperty("rejectedDataPoints");
+    });
+  });
+});

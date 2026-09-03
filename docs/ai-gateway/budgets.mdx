@@ -40,15 +40,15 @@ The budget is in force immediately; the next request counts against it. Everythi
 
 ## Scopes
 
-| Scope | Applies to |
-|---|---|
-| `organization` | All gateway traffic across every project in the org. |
-| `team` | All gateway traffic in projects belonging to the team, plus traffic on any key scoped to that team. |
-| `project` | All gateway traffic in this project. |
-| `virtual_key` | This specific VK. |
-| `principal` | This user or service account across any VK they use. |
-| `group` | Each member of the group individually (see below). |
-| `attributed_user` | Each distinct **end user** seen on an anchor (a VK or a project), individually (see below). |
+| Scope             | Applies to                                                                                          |
+| ----------------- | --------------------------------------------------------------------------------------------------- |
+| `organization`    | All gateway traffic across every project in the org.                                                |
+| `team`            | All gateway traffic in projects belonging to the team, plus traffic on any key scoped to that team. |
+| `project`         | All gateway traffic in this project.                                                                |
+| `virtual_key`     | This specific VK.                                                                                   |
+| `principal`       | This user or service account across any VK they use.                                                |
+| `group`           | Each member of the group individually (see below).                                                  |
+| `attributed_user` | Each distinct **end user** seen on an anchor (a VK or a project), individually (see below).         |
 
 A request is evaluated against **every** budget whose scope applies. A request by Alice in project `demo` of team `platform` in org `acme` with VK `prod-key` is checked against that org's, team's, project's and VK's budgets, Alice's principal budgets, and the per-member budgets of every group Alice belongs to. If any budget hard-blocks, the request is rejected; if any warn threshold is crossed, a warning header is added. Hard-block wins over warn.
 
@@ -208,17 +208,19 @@ The exception is an attributed-user template, where one row governs a separate a
 </Accordion>
 
 <Note>
-The ClickHouse ledger is the primary read wherever it is enabled; the Postgres `spentUsd` column is the fallback for self-hosted installs without it. A $1 budget blocks at $1 of spend on either.
+  The ClickHouse ledger is the primary read wherever it is enabled; the Postgres
+  `spentUsd` column is the fallback for self-hosted installs without it. A $1 budget
+  blocks at $1 of spend on either.
 </Note>
 
 ## Permissions
 
-| Action | Permission |
-|---|---|
-| View budgets | `gatewayBudgets:view` |
-| Create | `gatewayBudgets:create` |
-| Edit and reset | `gatewayBudgets:update` |
-| Archive | `gatewayBudgets:delete` |
+| Action           | Permission              |
+| ---------------- | ----------------------- |
+| View budgets     | `gatewayBudgets:view`   |
+| Create           | `gatewayBudgets:create` |
+| Edit and reset   | `gatewayBudgets:update` |
+| Archive          | `gatewayBudgets:delete` |
 | All of the above | `gatewayBudgets:manage` |
 
 See [RBAC](/ai-gateway/rbac).

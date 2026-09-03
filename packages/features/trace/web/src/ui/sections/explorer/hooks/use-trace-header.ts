@@ -1,0 +1,115 @@
+import { keepPreviousData } from "@tanstack/react-query";
+import { useEffect, useMemo } from "react";
+import type { SpanTreeNode } from "@langwatch/trace-contract";
+import { applyOverlayToTraceHeader } from "../../../../model/traces/edit-overlay/apply-trace-edit-overlay-to-views";
+import { api } from "../../trace-api";
+import { LIVE_REFETCH_MS, useDrawerStore, useSseStatusStore } from "../../../../index";
+import { asSharedQueryResult, useSharedTrace } from "../context/shared-trace-context";
+import { useAppliedTraceEditPatch } from "./use-trace-edit-overlay";
+import { useTraceQueryArgs } from "./use-trace-query-args";
+
+/** When prompt aggregation is still catching up (containsPrompt=true but
+ * the projected IDs haven't landed yet), poll on a slower cadence so the
+ * chips fill in without making the user click around. */
+const PROMPTS_PENDING_REFETCH_MS = 8_000;
+
+/**
+ * The trace header exactly as captured, before any correction. Read it when
+ * the captured trace is the point: the Original view and the difference view.
+ */
+export function useTraceHeaderCanonical() {
+  const shared = useSharedTrace();
+  const { isLive, isReady, queryArgs } = useTraceQueryArgs();
+  const occurredAtMs = useDrawerStore((s) => s.occurredAtMs);
+  const backfillOccurredAtMs = useDrawerStore((s) => s.backfillOccurredAtMs);
+  // SSE-aware polling: when `useTraceFreshness` has an active
+  // subscription, `trace_summary_updated` events invalidate this query
+  // push-style and any timer is redundant. The prompt-pending fallback
+  // still runs regardless — it's not an SSE-covered transition (the
+  // prompt aggregator writes asynchronously and doesn't broadcast a
+  // trace-updated event when only the `lastUsedPromptId` slot fills in).
+  const sseConnected = useSseStatusStore((s) => s.sseConnectionState === "connected");
+
+  // Treat the URL hint as our liveness signal. When the trace started
+  // within the last 3 min and SSE is OFF, set a 10s refetch interval so
+  // newly arrived spans show up without a manual refresh. Once the
+  // trace is older than the window, the interval falls away and the
+  // query goes back to its normal staleTime caching behaviour.
+  // full: true — this is the drawer's own detail read; it's the one caller
+  // of tracesV2.header that actually shows/exports untruncated input/output
+  // (see buildTraceMarkdown), so it's worth the extra spans read full
+  // resolution costs. Every other header caller (peek, name lookups, bulk
+  // hydrators, sibling prefetch) passes false.
+  const query = api.tracesV2.header.useQuery(
+    { ...queryArgs, full: true },
+    {
+      enabled: isReady && !shared,
+      staleTime: 300_000,
+      gcTime: 1_800_000,
+      placeholderData: keepPreviousData,
+      refetchOnWindowFocus: true,
+      refetchInterval: (query) => {
+        if (isLive && !sseConnected) return LIVE_REFETCH_MS;
+        // The trace knows it used a prompt but the rollup hasn't
+        // populated the IDs yet — keep polling on a slower cadence so
+        // the chips fill in without the user clicking around. Once an
+        // ID is present we go quiet again.
+        const data = query.state.data;
+        if (data?.containsPrompt && !data.lastUsedPromptId) {
+          return PROMPTS_PENDING_REFETCH_MS;
+        }
+        return false;
+      },
+    },
+  );
+
+  // When the drawer opened without a partition hint (deep link / refresh
+  // whose URL carried no `t`), the header itself runs an unconstrained
+  // by-id scan — but its result carries the trace's real timestamp. Feed
+  // that back into the store so the drawer's *other* per-trace reads
+  // (span tree, events, signals) and any header refetch prune partitions
+  // instead of cold-scanning `stored_spans` on S3. No-op when a hint was
+  // already present, so a correct opener-supplied value is never lost.
+  // Guard against `placeholderData: keepPreviousData`: on a trace switch the previous
+  // trace's header lingers in `query.data` until the new fetch lands, so
+  // only trust the timestamp when it belongs to the trace we're asking
+  // about — otherwise we'd backfill trace A's time onto trace B.
+  const resolvedTimestamp =
+    query.data?.traceId === queryArgs.traceId ? query.data.timestamp : undefined;
+  useEffect(() => {
+    if (occurredAtMs === null && typeof resolvedTimestamp === "number") {
+      backfillOccurredAtMs(resolvedTimestamp);
+    }
+  }, [occurredAtMs, resolvedTimestamp, backfillOccurredAtMs]);
+
+  if (shared) return asSharedQueryResult(shared.header) as unknown as typeof query;
+  return query;
+}
+
+/**
+ * The trace header as the reader sees it: corrected when a correction applies,
+ * captured otherwise. The trace's own input and output move, and so does the
+ * span count once the caller hands over the captured spans, so the header
+ * agrees with the waterfall underneath it. Durations and cost describe the run
+ * rather than the corrected content, and never move.
+ */
+export function useTraceHeader({
+  spans,
+}: {
+  /** The spans as captured, for counting the ones a correction removes. */
+  spans?: SpanTreeNode[];
+} = {}) {
+  const query = useTraceHeaderCanonical();
+  const patch = useAppliedTraceEditPatch();
+  const header = query.data;
+
+  const data = useMemo(
+    () => (header ? applyOverlayToTraceHeader({ header, patch, spans }) : header),
+    [header, patch, spans],
+  );
+
+  return useMemo(
+    () => (data === header ? query : { ...query, data }),
+    [query, data, header],
+  );
+}

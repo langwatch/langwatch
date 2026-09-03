@@ -5,11 +5,7 @@
  * output-registration.unit.test.ts.
  */
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
-import {
-  AGENT_MODE_ENV_VARS,
-  applyJq,
-  printResult,
-} from "../output";
+import { AGENT_MODE_ENV_VARS, applyJq, printResult } from "../output";
 
 const DATA = [
   { name: "alpha", id: "1", nested: { score: 0.9 } },
@@ -37,7 +33,12 @@ afterEach(() => {
 });
 
 const printedJson = (): unknown =>
-  JSON.parse(vi.mocked(console.log).mock.calls.map((call) => String(call[0])).join("\n"));
+  JSON.parse(
+    vi
+      .mocked(console.log)
+      .mock.calls.map((call) => String(call[0]))
+      .join("\n"),
+  );
 
 describe("printResult", () => {
   describe("given no output flags", () => {
@@ -69,7 +70,10 @@ describe("printResult", () => {
 
   describe("given -o yaml", () => {
     it("prints YAML", async () => {
-      await printResult({ name: "alpha", tags: ["a", "b"] }, { output: "yaml", table: vi.fn() });
+      await printResult(
+        { name: "alpha", tags: ["a", "b"] },
+        { output: "yaml", table: vi.fn() },
+      );
 
       expect(console.log).toHaveBeenCalledWith("name: alpha\ntags:\n  - a\n  - b");
     });
@@ -124,9 +128,9 @@ describe("printResult", () => {
     });
 
     it("throws on an expression that does not start with a dot", async () => {
-      await expect(
-        printResult(DATA, { jq: "items[]", table: vi.fn() }),
-      ).rejects.toThrow(/must start with/);
+      await expect(printResult(DATA, { jq: "items[]", table: vi.fn() })).rejects.toThrow(
+        /must start with/,
+      );
     });
 
     it("throws when iterating a non-array", async () => {
@@ -152,18 +156,16 @@ describe("applyJq", () => {
     expect(applyJq(". | length", { a: 1, b: 2 })).toBe(2);
     // Iteration collects first (`.items[].tags` → array of tag arrays), then
     // `| length` sizes the collected result — the subset's documented reading.
-    expect(applyJq(".items[].tags | length", {
-      items: [{ tags: ["a", "b"] }, { tags: [] }],
-    })).toBe(2);
+    expect(
+      applyJq(".items[].tags | length", {
+        items: [{ tags: ["a", "b"] }, { tags: [] }],
+      }),
+    ).toBe(2);
   });
 
   it("throws on unsupported pipes instead of silently printing null", () => {
-    expect(() => applyJq(".items | map(.name)", { items: [] })).toThrow(
-      /\| length/,
-    );
-    expect(() => applyJq(".items | length | length", { items: [] })).toThrow(
-      /\| length/,
-    );
+    expect(() => applyJq(".items | map(.name)", { items: [] })).toThrow(/\| length/);
+    expect(() => applyJq(".items | length | length", { items: [] })).toThrow(/\| length/);
     expect(() => applyJq(".items | length", { items: 42 })).toThrow(/no size/);
   });
 

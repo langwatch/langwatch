@@ -5,7 +5,7 @@ import "go.opentelemetry.io/otel/attribute"
 // LangWatch span/trace attribute keys.
 //
 // These mirror the TypeScript SDK's semconv/attributes.ts and the server's
-// canonical ingestion keys (app-layer/traces/canonicalisation extractors). Keys
+// canonical ingestion keys (packages/features/trace/server adapters). Keys
 // in the langwatch.* namespace are either owned by LangWatch or not yet part of
 // the OpenTelemetry GenAI semantic conventions. GenAI semconv keys (gen_ai.*)
 // come from go.opentelemetry.io/otel/semconv and are not duplicated here.

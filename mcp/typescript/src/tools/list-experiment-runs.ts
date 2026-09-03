@@ -52,12 +52,10 @@ const passRate = (evaluations: RunSummary["evaluations"]): string => {
   if (passed.length === 0) {
     const scored = entries.filter((e) => typeof e.averageScore === "number");
     if (scored.length === 0) return "—";
-    const avg =
-      scored.reduce((sum, e) => sum + (e.averageScore ?? 0), 0) / scored.length;
+    const avg = scored.reduce((sum, e) => sum + (e.averageScore ?? 0), 0) / scored.length;
     return `${avg.toFixed(2)} avg`;
   }
-  const avg =
-    passed.reduce((sum, e) => sum + (e.averagePassed ?? 0), 0) / passed.length;
+  const avg = passed.reduce((sum, e) => sum + (e.averagePassed ?? 0), 0) / passed.length;
   return `${(avg * 100).toFixed(0)}% pass`;
 };
 
@@ -72,9 +70,7 @@ export async function handleExperimentListRuns(params: {
   limit?: number;
 }): Promise<string> {
   const requested =
-    typeof params.limit === "number" && params.limit > 0
-      ? params.limit
-      : DEFAULT_LIMIT;
+    typeof params.limit === "number" && params.limit > 0 ? params.limit : DEFAULT_LIMIT;
   const effectiveLimit = Math.min(requested, MAX_LIMIT);
 
   const search = new URLSearchParams();

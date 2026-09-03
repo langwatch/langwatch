@@ -6,23 +6,16 @@
 import { resolveEndpoint } from "@/internal/endpoint";
 import {
   createManagementRequest,
-  resolveManagementToken,
+  managementPath,
   type ManagementRequest,
+  resolveManagementToken,
 } from "../_shared/management-request";
-import type {
-  ManagementRole,
-  ManagementScopeType,
-} from "../_shared/management-types";
+import type { ManagementRole, ManagementScopeType } from "../_shared/management-types";
 
 /** The three kinds of principal a binding can name. */
-export const ROLE_BINDING_PRINCIPAL_TYPES = [
-  "user",
-  "group",
-  "apiKey",
-] as const;
+export const ROLE_BINDING_PRINCIPAL_TYPES = ["user", "group", "apiKey"] as const;
 
-export type RoleBindingPrincipalType =
-  (typeof ROLE_BINDING_PRINCIPAL_TYPES)[number];
+export type RoleBindingPrincipalType = (typeof ROLE_BINDING_PRINCIPAL_TYPES)[number];
 
 export interface RoleBindingPrincipal {
   type: RoleBindingPrincipalType;
@@ -107,12 +100,10 @@ export class RoleBindingsApiService {
     });
   }
 
-  async list(
-    options: ListRoleBindingsOptions = {},
-  ): Promise<ListRoleBindingsResponse> {
+  async list(options: ListRoleBindingsOptions = {}): Promise<ListRoleBindingsResponse> {
     return this.#request({
       operation: "list role bindings",
-      path: "/api/role-bindings",
+      path: managementPath("/api/role-bindings"),
       query: { ...options },
     });
   }
@@ -120,7 +111,7 @@ export class RoleBindingsApiService {
   async create(input: CreateRoleBindingInput): Promise<CreatedRoleBinding> {
     return this.#request({
       operation: "create role binding",
-      path: "/api/role-bindings",
+      path: managementPath("/api/role-bindings"),
       method: "POST",
       body: input,
     });
@@ -135,7 +126,7 @@ export class RoleBindingsApiService {
   }): Promise<RoleBinding> {
     return this.#request({
       operation: `update role binding "${id}"`,
-      path: `/api/role-bindings/${encodeURIComponent(id)}`,
+      path: managementPath(`/api/role-bindings/${encodeURIComponent(id)}`),
       method: "PATCH",
       body: input,
     });
@@ -144,7 +135,7 @@ export class RoleBindingsApiService {
   async delete(id: string): Promise<{ success: true }> {
     return this.#request({
       operation: `delete role binding "${id}"`,
-      path: `/api/role-bindings/${encodeURIComponent(id)}`,
+      path: managementPath(`/api/role-bindings/${encodeURIComponent(id)}`),
       method: "DELETE",
     });
   }

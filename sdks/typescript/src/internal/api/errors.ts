@@ -2,7 +2,7 @@ import {
   parseHandledError,
   type CliHandledError,
   type CliHandledErrorReason,
-} from "@langwatch/langy/cards/handled-error";
+} from "@langwatch/langy-contract/cards/handled-error";
 
 /**
  * A failure the platform NAMED.
@@ -65,6 +65,8 @@ export class LangWatchHandledError extends Error {
   readonly logsUrl: string | undefined;
   /** The failure behind the failure, when the route sent the chain. */
   readonly reasons: CliHandledErrorReason[] | undefined;
+  /** Whether the platform explicitly marked this failure safe to retry. */
+  readonly retryable: boolean;
   /** What the user can DO about it, when the platform sent next steps. */
   readonly suggestions: string[] | undefined;
   /** The docs page that explains the failure, when the platform sent one. */
@@ -107,6 +109,7 @@ export class LangWatchHandledError extends Error {
     this.traceUrl = handled.traceUrl;
     this.logsUrl = handled.logsUrl;
     this.reasons = handled.reasons;
+    this.retryable = handled.retryable;
     this.suggestions = handled.suggestions;
     this.docUrl = handled.docUrl;
     this.body = body;
@@ -117,14 +120,11 @@ export class LangWatchHandledError extends Error {
 }
 
 /** Narrows any caught value to a {@link LangWatchHandledError}. */
-export const isLangWatchHandledError = (
-  error: unknown,
-): error is LangWatchHandledError =>
+export const isLangWatchHandledError = (error: unknown): error is LangWatchHandledError =>
   error instanceof LangWatchHandledError ||
   (typeof error === "object" &&
     error !== null &&
-    (error as { isLangWatchHandledError?: unknown }).isLangWatchHandledError ===
-      true);
+    (error as { isLangWatchHandledError?: unknown }).isLangWatchHandledError === true);
 
 /**
  * Read a non-2xx response into a {@link LangWatchHandledError}, or `null` when the

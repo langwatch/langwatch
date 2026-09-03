@@ -1,0 +1,341 @@
+{
+  "version": 0,
+  "queue": "event-sourcing/jobs",
+  "pipelines": [
+    {
+      "name": "automations",
+      "feature": "automation",
+      "jobs": ["command:recordTriggerMatch", "subscriber:pm:triggerSettlement"]
+    },
+    {
+      "name": "blob_maintenance",
+      "feature": "eventing-maintenance",
+      "jobs": []
+    },
+    {
+      "name": "process_manager_maintenance",
+      "feature": "eventing-maintenance",
+      "jobs": []
+    },
+    {
+      "name": "langy_maintenance",
+      "feature": "langy-maintenance",
+      "jobs": []
+    },
+    {
+      "name": "agent_sandbox_maintenance",
+      "feature": "api-key",
+      "jobs": []
+    },
+    {
+      "name": "github_maintenance",
+      "feature": "github",
+      "jobs": []
+    },
+    {
+      "name": "evaluation_processing",
+      "feature": "evaluation",
+      "jobs": [
+        "command:completeEvaluation",
+        "command:executeEvaluation",
+        "command:reportEvaluation",
+        "command:startEvaluation",
+        "handler:evaluationAnalyticsRollup",
+        "projection:evaluationAnalytics",
+        "projection:evaluationRun",
+        "reactor:triggerMatch",
+        "subscriber:graphTriggerActivity"
+      ]
+    },
+    {
+      "name": "coding_agent_processing",
+      "feature": "coding-agent",
+      "jobs": [
+        "command:contributeLogFacts",
+        "command:contributeMetricFacts",
+        "command:contributeSpanFacts",
+        "handler:codingAgentSessionEvents",
+        "handler:codingAgentTraceSessions",
+        "handler:sessionMetricSeries",
+        "projection:codingAgentSession",
+        "reactor:pullRequestMapping",
+        "subscriber:codingAgentCostDrift"
+      ]
+    },
+    {
+      "name": "governance_events_processing",
+      "feature": "governance-events",
+      "jobs": [
+        "command:recordBudgetCrossing",
+        "command:recordVkLifecycle",
+        "subscriber:pm:governanceEventsDelivery"
+      ]
+    },
+    {
+      "name": "gateway_spend_processing",
+      "feature": "gateway-spend",
+      "jobs": [
+        "command:admitSpend",
+        "command:confirmSpend",
+        "command:failSpend",
+        "command:settleSpend",
+        "projection:gatewaySpend",
+        "subscriber:pm:gatewayDebits",
+        "subscriber:pm:webhookDelivery"
+      ]
+    },
+    {
+      "name": "metric_processing",
+      "feature": "metric",
+      "jobs": [
+        "command:recordDataPoint",
+        "handler:metricDataPointStorage",
+        "handler:metricSeriesCatalog",
+        "handler:metricTimeRollup",
+        "subscriber:codingAgentMetricFactsDispatch"
+      ]
+    },
+    {
+      "name": "log_processing",
+      "feature": "log",
+      "jobs": [
+        "command:recordLogRecord",
+        "handler:canonicalLogStorage",
+        "subscriber:codingAgentLogFactsDispatch"
+      ]
+    },
+    {
+      "name": "trace_processing",
+      "feature": "trace",
+      "jobs": [
+        "command:addAnnotation",
+        "command:assignTopic",
+        "command:bulkSyncAnnotations",
+        "command:changeTraceName",
+        "command:recordLogContribution",
+        "command:recordMetricCorrelation",
+        "command:recordSpan",
+        "command:removeAnnotation",
+        "command:resolveOrigin",
+        "handler:spanStorage",
+        "handler:traceAnalyticsRollup",
+        "job:datasetNormalize",
+        "job:deferredOriginResolution",
+        "projection:traceAnalytics",
+        "projection:traceSummary",
+        "reactor:customEvaluationSync",
+        "reactor:evaluationTrigger",
+        "reactor:experimentMetricsSync",
+        "reactor:governanceKpisSync",
+        "reactor:governanceOcsfEventsSync",
+        "reactor:originGate",
+        "reactor:projectMetadata",
+        "reactor:simulationMetricsSync",
+        "reactor:spanStorageBroadcast",
+        "reactor:traceUpdateBroadcast",
+        "reactor:trackedEventSync",
+        "reactor:triggerMatch",
+        "subscriber:codingAgentSpanFactsDispatch",
+        "subscriber:graphTriggerActivity"
+      ]
+    },
+    {
+      "name": "suite_run_processing",
+      "feature": "suite",
+      "jobs": [
+        "command:completeSuiteRunItem",
+        "command:recordSuiteRunItemStarted",
+        "command:startSuiteRun",
+        "projection:suiteRunState"
+      ]
+    },
+    {
+      "name": "simulation_processing",
+      "feature": "scenario",
+      "jobs": [
+        "command:cancelRun",
+        "command:computeRunMetrics",
+        "command:deleteRun",
+        "command:finishRun",
+        "command:messageSnapshot",
+        "command:queueRun",
+        "command:startRun",
+        "command:textMessageEnd",
+        "command:textMessageStart",
+        "handler:simulationRunMetrics",
+        "job:deferredComputeRunMetrics",
+        "projection:simulationRunState",
+        "subscriber:pm:simulation_run_execution",
+        "subscriber:snapshotUpdateBroadcast",
+        "subscriber:suiteRunSync",
+        "subscriber:traceMetricsSync"
+      ]
+    },
+    {
+      "name": "experiment_run_processing",
+      "feature": "experiment",
+      "jobs": [
+        "command:completeExperimentRun",
+        "command:computeExperimentRunMetrics",
+        "command:recordEvaluatorResult",
+        "command:recordTargetResult",
+        "command:startExperimentRun",
+        "handler:experimentRunResultStorage",
+        "projection:experimentRunState"
+      ]
+    },
+    {
+      "name": "langy_conversation_processing",
+      "feature": "langy-conversation",
+      "jobs": [
+        "command:acceptAgentTurn",
+        "command:archiveConversation",
+        "command:consumeTurnHandoff",
+        "command:createConversation",
+        "command:failAgentResponse",
+        "command:failToolCall",
+        "command:forkConversation",
+        "command:generateConversationTitle",
+        "command:importMessage",
+        "command:initiateToolCall",
+        "command:recordAgentResponse",
+        "command:recordMessage",
+        "command:recordTurnHandoff",
+        "command:succeedToolCall",
+        "command:updateConversationMetadata",
+        "command:updatePlan",
+        "handler:langyAnalyticsEvent",
+        "handler:langyMessageOperational",
+        "stateProjection:langyConversationState",
+        "stateProjection:langyConversationTurn",
+        "subscriber:agentTurnLiveness",
+        "subscriber:langyConversationUpdateBroadcast",
+        "subscriber:langyTurnAdmissionLifecycle",
+        "subscriber:pm:langyConversation"
+      ]
+    },
+    {
+      "name": "topic_clustering_processing",
+      "feature": "topic",
+      "jobs": [
+        "command:recordClusteringRunCompleted",
+        "command:recordClusteringRunFailed",
+        "command:recordClusteringRunStarted",
+        "command:recordTopics",
+        "command:requestClustering",
+        "stateProjection:topicClusteringRunHistory",
+        "stateProjection:topicClusteringRunStatus",
+        "stateProjection:topicModel",
+        "subscriber:pm:topicClustering"
+      ]
+    },
+    {
+      "name": "pulled_usage_processing",
+      "feature": "governance-ingestion",
+      "jobs": ["command:recordPulledUsage", "subscriber:pm:pulledUsageLedger"]
+    },
+    {
+      "name": "ingestion_pull_processing",
+      "feature": "governance-ingestion",
+      "jobs": [
+        "command:configure",
+        "command:disable",
+        "command:recordRunCompleted",
+        "command:recordRunFailed",
+        "stateProjection:ingestionPullRunStatus",
+        "subscriber:pm:ingestionPull"
+      ]
+    },
+    {
+      "name": "billing_reporting",
+      "feature": "billing-reporting",
+      "jobs": ["command:reportUsageForMonth"]
+    },
+    {
+      "name": "authz_grant",
+      "feature": "authz",
+      "jobs": [
+        "command:attachGrant",
+        "command:changeGrantRole",
+        "command:changeRolePermissions",
+        "command:defineRole",
+        "command:deleteRole",
+        "command:revokeGrant",
+        "handler:authzGrantsWrite",
+        "subscriber:auditTrail"
+      ]
+    },
+    {
+      "name": "identity",
+      "feature": "identity",
+      "jobs": [
+        "command:attachIdentifier",
+        "command:confirmMfa",
+        "command:consumeBackupCode",
+        "command:detachIdentifier",
+        "command:disableMfa",
+        "command:enrollMfa",
+        "command:eraseUser",
+        "command:expireMfaEnrollment",
+        "command:markPrimary",
+        "command:proposeLink",
+        "command:recordMfaVerificationFailure",
+        "command:regenerateBackupCodes",
+        "command:verifyIdentifier",
+        "stateProjection:identityState",
+        "stateProjection:mfaEnrollmentState"
+      ]
+    },
+    {
+      "name": "sso-connections",
+      "feature": "sso-connection",
+      "jobs": [
+        "command:activateConnection",
+        "command:approveDomainClaim",
+        "command:attestDomain",
+        "command:claimDomain",
+        "command:completeTeardown",
+        "command:discardConnection",
+        "command:grandfatherConnection",
+        "command:registerConnection",
+        "command:rejectDomainClaim",
+        "command:requestTeardown",
+        "command:requestVerification",
+        "command:resumeConnection",
+        "command:suspendConnection",
+        "command:verifyDomain",
+        "stateProjection:ssoConnectionState",
+        "subscriber:pm:connectionTeardown"
+      ]
+    },
+    {
+      "name": "scim-sync",
+      "feature": "scim-sync",
+      "jobs": [
+        "command:issueScimToken",
+        "command:recordScimApplyFailure",
+        "command:recordScimGroupMapping",
+        "command:recordScimUserPush",
+        "command:revokeScimSync",
+        "stateProjection:scimSyncState"
+      ]
+    },
+    {
+      "name": "join-requests",
+      "feature": "join-request",
+      "jobs": [
+        "command:approveJoin",
+        "command:expireJoin",
+        "command:rejectJoin",
+        "command:requestJoin",
+        "command:withdrawJoin",
+        "stateProjection:joinRequestState",
+        "subscriber:pm:joinRequestLifecycle"
+      ]
+    }
+  ],
+  "globalProjections": {
+    "pipeline": "global",
+    "jobs": ["handler:orgBillableEventsMeter", "reactor:billingMeterDispatch"]
+  }
+}

@@ -93,9 +93,7 @@ describe("credentialContext", () => {
       // carry the environment key, the unchanged pre-daemon behavior.
       createClientCalls.length = 0;
       createLangWatchApiClient();
-      expect(createClientCalls[0]?.headers?.authorization).toBe(
-        "Bearer env-key",
-      );
+      expect(createClientCalls[0]?.headers?.authorization).toBe("Bearer env-key");
     } finally {
       if (savedEnvKey === undefined) delete process.env.LANGWATCH_API_KEY;
       else process.env.LANGWATCH_API_KEY = savedEnvKey;

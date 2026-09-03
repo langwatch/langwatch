@@ -33,28 +33,30 @@ If the app is not installed when Langy reaches for `git` or `gh`, the platform s
 
 These are the only repository permissions the app requests:
 
-| Permission | Access |
-|---|---|
-| Contents | Read and write |
+| Permission    | Access         |
+| ------------- | -------------- |
+| Contents      | Read and write |
 | Pull requests | Read and write |
-| Metadata | Read |
+| Metadata      | Read           |
 
 The app subscribes to the `pull_request` event, plus the installation lifecycle that GitHub sends automatically (`installation`, `installation_repositories`). The event is what links a pull request to the coding-agent sessions that worked on it.
 
 These are the fields the platform keeps from it:
 
-| Field | Kept as |
-|---|---|
-| Number, title, web URL | The row the Pull Requests page shows |
-| State, draft flag | The status the page draws |
-| Head branch | The key that matches sessions to the pull request |
-| Author login | The GitHub account that opened it, shown as the contributor |
+| Field                                     | Kept as                                                                  |
+| ----------------------------------------- | ------------------------------------------------------------------------ |
+| Number, title, web URL                    | The row the Pull Requests page shows                                     |
+| State, draft flag                         | The status the page draws                                                |
+| Head branch                               | The key that matches sessions to the pull request                        |
+| Author login                              | The GitHub account that opened it, shown as the contributor              |
 | Created, updated, closed and merged times | The pull request's lifetime, which decides the sessions counted under it |
 
 The event carries no file content and no diff.
 
 <Note>
-`Contents: Read and write` is what lets Langy clone a repository, create a branch, and push commits to that branch. It does not let Langy merge; merging a pull request is a separate action that a human takes in GitHub after review.
+  `Contents: Read and write` is what lets Langy clone a repository, create a branch, and
+  push commits to that branch. It does not let Langy merge; merging a pull request is a
+  separate action that a human takes in GitHub after review.
 </Note>
 
 ## Disconnecting
@@ -62,13 +64,18 @@ The event carries no file content and no diff.
 Disconnect from **Settings, Integrations, GitHub, Disconnect**, which opens GitHub's uninstall page (an app cannot be uninstalled through the API). Once GitHub confirms, the `installation.deleted` webhook removes the local record.
 
 <Warning>
-Removing the installation cuts off **new** turns immediately. A worker that is already running with a token keeps that token until the idle reaper kills it (up to 10 minutes idle) or the token self-expires (up to 1 hour). There is no way for a live worker to mint a new token once the install is gone.
+  Removing the installation cuts off **new** turns immediately. A worker that is already
+  running with a token keeps that token until the idle reaper kills it (up to 10 minutes
+  idle) or the token self-expires (up to 1 hour). There is no way for a live worker to
+  mint a new token once the install is gone.
 </Warning>
 
 Install and disconnect actions are recorded in the audit log as `langy.github.install` and `langy.github.disconnect`.
 
 <Info>
-**Also check:** [How Langy is isolated](/langy/security/sandbox), [Data flow and privacy](/langy/security/data-flow-and-privacy), [Register the Langy GitHub App](/self-hosting/langy/github-app).
+  **Also check:** [How Langy is isolated](/langy/security/sandbox), [Data flow and
+  privacy](/langy/security/data-flow-and-privacy), [Register the Langy GitHub
+  App](/self-hosting/langy/github-app).
 </Info>
 
 ## Reference

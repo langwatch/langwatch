@@ -6,9 +6,19 @@ sidebarTitle: Members & invites
 
 The members surface at `/settings/members` is the admin entry point for everything **about who is in your org**: existing members and their roles, pending invites, invite requests waiting for admin approval, and removal flows. Per-user account self-service (change password, sign-in method status, optional add-method when allowed) lives at `/settings/authentication`, the same URL used by the legacy non-governance LLMOps shell, so existing bookmarks and muscle memory keep working.
 
-<Info>**Pairs with:** [Roles & permissions](/ai-governance/roles-and-permissions) (the role catalog and what each org-level role can do) and [Audit log](/ai-governance/audit-log) (every invite, role change, and removal records a row).</Info>
+<Info>
+  **Pairs with:** [Roles & permissions](/ai-governance/roles-and-permissions) (the role
+  catalog and what each org-level role can do) and [Audit log](/ai-governance/audit-log)
+  (every invite, role change, and removal records a row).
+</Info>
 
-<Note>**Permissions**: `/settings/members` requires `organization:manage` (admins). Members navigating here directly see an "Access Restricted" panel. The underlying tRPC procedures (`organization.getAllOrganizationMembers`, `organization.createInvites`, `organization.deleteMember`, `organization.updateMemberRole`) are also gated server-side.</Note>
+<Note>
+  **Permissions**: `/settings/members` requires `organization:manage` (admins). Members
+  navigating here directly see an "Access Restricted" panel. The underlying tRPC
+  procedures (`organization.getAllOrganizationMembers`, `organization.createInvites`,
+  `organization.deleteMember`, `organization.updateMemberRole`) are also gated
+  server-side.
+</Note>
 
 ## What admins see at `/settings/members`
 
@@ -18,12 +28,12 @@ Three sections, top to bottom.
 
 A table of every active member. Columns:
 
-| Column | What it shows |
-|---|---|
-| **Name** | Display name + avatar |
-| **Email** | The address they sign in with |
-| **Access** | Per-team role chips, `ADMIN on Marketing`, `MEMBER on Engineering`, etc. Stacks vertically when a user is on multiple teams. |
-| (overflow menu) | Per-row actions: Change role, Remove from org, View access breakdown. |
+| Column          | What it shows                                                                                                                |
+| --------------- | ---------------------------------------------------------------------------------------------------------------------------- |
+| **Name**        | Display name + avatar                                                                                                        |
+| **Email**       | The address they sign in with                                                                                                |
+| **Access**      | Per-team role chips, `ADMIN on Marketing`, `MEMBER on Engineering`, etc. Stacks vertically when a user is on multiple teams. |
+| (overflow menu) | Per-row actions: Change role, Remove from org, View access breakdown.                                                        |
 
 The table reflects every `OrganizationUser` row plus their `TeamUser` rows. Personal-workspace teams owned by other users are hidden from non-admin viewers (a privacy boundary documented in [Workspaces](/ai-governance/workspaces#personal-workspace-privacy)).
 
@@ -97,8 +107,8 @@ Overflow menu → **Remove from org**. The user loses every team membership, eve
 What the user controls about their own account lives at `/settings/authentication`, the same URL used by both the governance/Personal-Workspace shell and the legacy non-governance LLMOps shell. The page renders one of three shapes depending on how your org is configured:
 
 - **Email + password**: single Change Password row. The default shape for self-hosted Apache 2.0 deployments + dev orgs without an SSO enforced.
-- **SSO enforced**: *"You sign in via your company's SSO provider"* status row, no add-method affordance. This is the shape for any org that enforces a single SSO provider.
-- **Auth0 + no enforced SSO (rare)**: linked OAuth providers list (Google, GitHub, Microsoft) with an optional Link-another button. Only relevant when the deployment is on Auth0 *and* the admin hasn't enforced one provider.
+- **SSO enforced**: _"You sign in via your company's SSO provider"_ status row, no add-method affordance. This is the shape for any org that enforces a single SSO provider.
+- **Auth0 + no enforced SSO (rare)**: linked OAuth providers list (Google, GitHub, Microsoft) with an optional Link-another button. Only relevant when the deployment is on Auth0 _and_ the admin hasn't enforced one provider.
 
 The page is per-user. There's no admin gate, every member of the org can manage their own credentials here. Admins don't manage other users' sign-in methods from this page; user-account-management is by-design self-service.
 

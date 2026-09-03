@@ -22,15 +22,15 @@ This means: rotating the raw OpenAI key rotates it everywhere; changing a rate l
 
 ## Supported providers (v1)
 
-| Provider | Routes supported | Auth methods | Caching passthrough |
-|---|---|---|---|
-| [OpenAI](/ai-gateway/providers/openai) | chat, responses, embeddings, images, audio, moderations | API key | auto-prefix |
-| [Anthropic](/ai-gateway/providers/anthropic) | messages, chat (translated), streaming | API key | `cache_control` blocks |
-| [Azure OpenAI](/ai-gateway/providers/azure-openai) | chat, responses, embeddings, images, audio | API key, AAD | auto-prefix |
-| [AWS Bedrock](/ai-gateway/providers/bedrock) | messages, chat, embeddings (Titan) | AWS SigV4, IRSA | `cachePoint` |
-| [Google Vertex AI](/ai-gateway/providers/vertex) | messages, chat | GCP ADC, SA JSON | implicit context cache |
-| [Google Gemini](/ai-gateway/providers/gemini) | chat | API key | implicit context cache |
-| [Custom OpenAI-compatible](/ai-gateway/providers/custom-openai-compatible) | chat, embeddings (depends on upstream) | Bearer, custom header | opaque |
+| Provider                                                                   | Routes supported                                        | Auth methods          | Caching passthrough    |
+| -------------------------------------------------------------------------- | ------------------------------------------------------- | --------------------- | ---------------------- |
+| [OpenAI](/ai-gateway/providers/openai)                                     | chat, responses, embeddings, images, audio, moderations | API key               | auto-prefix            |
+| [Anthropic](/ai-gateway/providers/anthropic)                               | messages, chat (translated), streaming                  | API key               | `cache_control` blocks |
+| [Azure OpenAI](/ai-gateway/providers/azure-openai)                         | chat, responses, embeddings, images, audio              | API key, AAD          | auto-prefix            |
+| [AWS Bedrock](/ai-gateway/providers/bedrock)                               | messages, chat, embeddings (Titan)                      | AWS SigV4, IRSA       | `cachePoint`           |
+| [Google Vertex AI](/ai-gateway/providers/vertex)                           | messages, chat                                          | GCP ADC, SA JSON      | implicit context cache |
+| [Google Gemini](/ai-gateway/providers/gemini)                              | chat                                                    | API key               | implicit context cache |
+| [Custom OpenAI-compatible](/ai-gateway/providers/custom-openai-compatible) | chat, embeddings (depends on upstream)                  | Bearer, custom header | opaque                 |
 
 Behind the scenes bifrost/core also supports Groq, Cohere, Mistral, Ollama, vLLM, SGLang, Perplexity, ElevenLabs, and others. Each appears in the UI once LangWatch ships its configuration form.
 

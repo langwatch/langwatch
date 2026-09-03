@@ -10,21 +10,21 @@ Focus on **what** the code does, not **how** it does it. Tests should validate u
 
 Use present tense, active voice. Describe expected behavior directly.
 
-| Avoid | Prefer |
-|-------|--------|
-| `it("should sign up a user")` | `it("signs up a user")` |
+| Avoid                          | Prefer                        |
+| ------------------------------ | ----------------------------- |
+| `it("should sign up a user")`  | `it("signs up a user")`       |
 | `it("should redirect guests")` | `it("redirects guest users")` |
 
 ### Describe Block Naming
 
 Use MDN-style naming for the unit under test:
 
-| Type | Format | Example |
-|------|--------|---------|
-| Function | `name()` | `describe("transformData()", ...)` |
-| Class | `Name` | `describe("Analytics", ...)` |
-| Component | `<Name/>` | `describe("<DatePicker/>", ...)` |
-| Hook | `useName()` | `describe("useFeatureFlag()", ...)` |
+| Type      | Format      | Example                             |
+| --------- | ----------- | ----------------------------------- |
+| Function  | `name()`    | `describe("transformData()", ...)`  |
+| Class     | `Name`      | `describe("Analytics", ...)`        |
+| Component | `<Name/>`   | `describe("<DatePicker/>", ...)`    |
+| Hook      | `useName()` | `describe("useFeatureFlag()", ...)` |
 
 ### Nested Describe for Context
 
@@ -60,17 +60,25 @@ Use nested `describe` blocks to express Given/When/Then structure:
 describe("ClassName", () => {
   describe("methodName", () => {
     describe("given some precondition", () => {
-      beforeEach(() => { /* setup context */ });
+      beforeEach(() => {
+        /* setup context */
+      });
 
       describe("when some action occurs", () => {
-        it("produces expected result", () => { /* assertion */ });
-        it("also does this other thing", () => { /* assertion */ });
+        it("produces expected result", () => {
+          /* assertion */
+        });
+        it("also does this other thing", () => {
+          /* assertion */
+        });
       });
     });
 
     describe("given different precondition", () => {
       describe("when same action occurs", () => {
-        it("produces different result", () => { /* assertion */ });
+        it("produces different result", () => {
+          /* assertion */
+        });
       });
     });
   });
@@ -78,11 +86,13 @@ describe("ClassName", () => {
 ```
 
 Benefits:
+
 - **Grouping**: Related tests share setup in `beforeEach`
 - **Readability**: Test output reads like a spec: "ClassName > methodName > given X > when Y > does Z"
 - **Organization**: Clear separation of context (given) from action (when) from expectation (it)
 
 Avoid flat structures with Given/When/Then only in comments:
+
 ```typescript
 // Avoid: comments don't provide grouping or shared setup
 it("does X when Y given Z", () => {
@@ -106,12 +116,12 @@ Target near-100% coverage via integration + unit tests. E2E tests are deprioriti
 
 Avoid overlap. Each level has a distinct purpose.
 
-| Level | Purpose | Mocking | Quantity |
-|-------|---------|---------|----------|
-| **E2E** | Catastrophic regression detection for stable core flows | None | 5-10 total (deprioritized) |
-| **Browser Verification** | Interactive feature validation during development | None | Per-feature, not persisted as tests |
-| **Integration** | Edge cases, error handling, component rendering | External boundaries only | As many as needed |
-| **Unit** | Pure logic, branches | Everything | As many as needed |
+| Level                    | Purpose                                                 | Mocking                  | Quantity                            |
+| ------------------------ | ------------------------------------------------------- | ------------------------ | ----------------------------------- |
+| **E2E**                  | Catastrophic regression detection for stable core flows | None                     | 5-10 total (deprioritized)          |
+| **Browser Verification** | Interactive feature validation during development       | None                     | Per-feature, not persisted as tests |
+| **Integration**          | Edge cases, error handling, component rendering         | External boundaries only | As many as needed                   |
+| **Unit**                 | Pure logic, branches                                    | Everything               | As many as needed                   |
 
 ### E2E Tests: Deprioritized
 
@@ -123,11 +133,11 @@ We do **not** generate E2E tests per feature. Interactive browser verification (
 
 ### Language-Specific Patterns
 
-| Language | E2E | Integration | Unit | Location |
-|----------|-----|-------------|------|----------|
+| Language   | E2E             | Integration             | Unit             | Location     |
+| ---------- | --------------- | ----------------------- | ---------------- | ------------ |
 | TypeScript | `*.e2e.test.ts` | `*.integration.test.ts` | `*.unit.test.ts` | `__tests__/` |
-| Python | `test_*_e2e.py` | `test_*_integration.py` | `test_*.py` | `tests/` |
-| Go | `*_e2e_test.go` | `*_integration_test.go` | `*_test.go` | same package |
+| Python     | `test_*_e2e.py` | `test_*_integration.py` | `test_*.py`      | `tests/`     |
+| Go         | `*_e2e_test.go` | `*_integration_test.go` | `*_test.go`      | same package |
 
 ## Mocking Strategy
 
@@ -159,21 +169,21 @@ Feature specs in `specs/` define what tests must exist. **Every scenario in a fe
 
 ### Convention
 
-| Feature file | Test file |
-|-------------|-----------|
-| `specs/analytics/chart-rendering.feature` | `src/server/analytics/__tests__/chart-rendering.integration.test.ts` |
-| `specs/scenarios/welcome-modal.feature` | `src/components/scenarios/__tests__/welcome-modal.integration.test.ts` |
+| Feature file                              | Test file                                                              |
+| ----------------------------------------- | ---------------------------------------------------------------------- |
+| `specs/analytics/chart-rendering.feature` | `src/server/analytics/__tests__/chart-rendering.integration.test.ts`   |
+| `specs/scenarios/welcome-modal.feature`   | `src/components/scenarios/__tests__/welcome-modal.integration.test.ts` |
 
 The scenario title in the feature file should match the `it()` description in the test. Use `describe("Feature: <feature name>")` as the outer block.
 
 ### Tags
 
-| Tag | Meaning | Use when |
-|-----|---------|----------|
-| `@unit` | Pure logic test | Testing functions, utilities, transformations |
-| `@integration` | Component/boundary test | Testing rendering, API calls, DB queries |
-| `@regression` | Prevents a previously-fixed bug from recurring | Bug fix scenarios — must fail without the fix |
-| `@e2e` | Stable core flow (deprioritized) | Only for the 5-10 stable happy-path tests |
+| Tag            | Meaning                                        | Use when                                      |
+| -------------- | ---------------------------------------------- | --------------------------------------------- |
+| `@unit`        | Pure logic test                                | Testing functions, utilities, transformations |
+| `@integration` | Component/boundary test                        | Testing rendering, API calls, DB queries      |
+| `@regression`  | Prevents a previously-fixed bug from recurring | Bug fix scenarios — must fail without the fix |
+| `@e2e`         | Stable core flow (deprioritized)               | Only for the 5-10 stable happy-path tests     |
 
 Bug-fix feature specs should use `@regression` (alongside `@unit` or `@integration` for pyramid level):
 
@@ -187,7 +197,7 @@ Scenario: Analytics chart shows error state when ClickHouse query fails
 
 ### Binding scenarios to tests
 
-The parity checker (`platform/app/scripts/check-feature-parity.ts`, run in CI as `pnpm check:feature-parity`) matches every `@unit` / `@integration` scenario to at least one test via a `@scenario "<title>"` JSDoc annotation placed directly above an `it(...)` / `test(...)` call:
+The parity checker (`packages/architecture-lint/src/check-feature-parity.ts`, run in CI as `pnpm check:feature-parity`) matches every `@unit` / `@integration` scenario to at least one test via a `@scenario "<title>"` JSDoc annotation placed directly above an `it(...)` / `test(...)` call:
 
 ```ts
 /** @scenario Analytics chart shows error state when ClickHouse query fails */
@@ -226,7 +236,7 @@ Adding a new entry to `LEGACY_UNBOUND` should require justification — prefer b
 
 ### `@unimplemented`
 
-When a scenario in a legacy feature file describes behavior that has no matching test *and* the test has not yet been written, tag the scenario `@unimplemented` alongside its pyramid tag (`@unit` / `@integration`) and file a tracking issue for the missing test. The parity checker treats `@unimplemented` as a non-binding signal — scenarios so tagged are not expected to resolve to a `@scenario` annotation.
+When a scenario in a legacy feature file describes behavior that has no matching test _and_ the test has not yet been written, tag the scenario `@unimplemented` alongside its pyramid tag (`@unit` / `@integration`) and file a tracking issue for the missing test. The parity checker treats `@unimplemented` as a non-binding signal — scenarios so tagged are not expected to resolve to a `@scenario` annotation.
 
 `@unimplemented` is a lightweight promise that the gap is tracked, not ignored. Every removal of an `@unimplemented` tag must land with either a new `@scenario` binding or a feature-file edit that removes the scenario entirely.
 
@@ -268,13 +278,13 @@ Is this a regression from production?
 
 ### When to Use Each Approach
 
-| Situation | Approach |
-|-----------|----------|
-| New feature during development | `/browser-test` for interactive verification |
-| Bug fix verification | `/browser-test` to confirm the fix works |
-| Core sign-in/dashboard/traces flow broke | Stable E2E suite catches this |
-| Form renders correct fields | `@integration` test |
-| API returns correct data | `@unit` or `@integration` test |
+| Situation                                | Approach                                     |
+| ---------------------------------------- | -------------------------------------------- |
+| New feature during development           | `/browser-test` for interactive verification |
+| Bug fix verification                     | `/browser-test` to confirm the fix works     |
+| Core sign-in/dashboard/traces flow broke | Stable E2E suite catches this                |
+| Form renders correct fields              | `@integration` test                          |
+| API returns correct data                 | `@unit` or `@integration` test               |
 
 Use `/test-review` to validate pyramid placement.
 
@@ -306,17 +316,17 @@ This keeps the suite lean while ensuring real failures never recur.
 
 ## E2E Patterns (Playwright)
 
-The stable E2E suite lives in `tests/agentic-e2e/`. These tests cover core happy paths only.
+The stable E2E suite lives in `dev/tests/agentic-e2e/`. These tests cover core happy paths only.
 
-| Pattern | Convention |
-|---------|------------|
-| Sidebar navigation | Always use `{ name: 'X', exact: true }` |
-| Dialogs (Chakra) | Use `.last()` to handle duplicate renders |
-| Auth state | Stored in `.auth/user.json`, reused across tests |
-| Test naming | Action-based, no "should" (see `CLAUDE.md`) |
-| Test credentials | `browser-test@langwatch.ai` / `BrowserTest123!` (consistent across scripts and tests) |
+| Pattern            | Convention                                                                            |
+| ------------------ | ------------------------------------------------------------------------------------- |
+| Sidebar navigation | Always use `{ name: 'X', exact: true }`                                               |
+| Dialogs (Chakra)   | Use `.last()` to handle duplicate renders                                             |
+| Auth state         | Stored in `.auth/user.json`, reused across tests                                      |
+| Test naming        | Action-based, no "should" (see `CLAUDE.md`)                                           |
+| Test credentials   | `browser-test@langwatch.ai` / `BrowserTest123!` (consistent across scripts and tests) |
 
-See `tests/agentic-e2e/README.md` for setup and running tests.
+See `dev/tests/agentic-e2e/README.md` for setup and running tests.
 
 ## Browser Verification
 

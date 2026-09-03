@@ -9,13 +9,13 @@ The table lists each limit's current value; the **Kind** column marks which ones
 
 ## Limits
 
-| Limit | Value | Kind | Set by |
-|---|---|---|---|
-| GitHub pull requests per day | 20 | Hardcoded | `LANGY_GITHUB_PRS_PER_DAY` (a code constant, not an env var) |
-| Max concurrent workers | 20 (default) | Configurable | `LANGY_MAX_WORKERS` |
-| Idle worker reap | 10 minutes (600000 ms default) | Configurable | `LANGY_WORKER_IDLE_MS` |
-| Per-session LangWatch API key lifetime | Short-lived, auto-expiring | Fixed by design | Minted per chat, owned by the requesting user |
-| GitHub installation token lifetime | 1 hour | Fixed by GitHub | Minted per turn, cached in Redis just under 1 hour, self-expires |
+| Limit                                  | Value                          | Kind            | Set by                                                           |
+| -------------------------------------- | ------------------------------ | --------------- | ---------------------------------------------------------------- |
+| GitHub pull requests per day           | 20                             | Hardcoded       | `LANGY_GITHUB_PRS_PER_DAY` (a code constant, not an env var)     |
+| Max concurrent workers                 | 20 (default)                   | Configurable    | `LANGY_MAX_WORKERS`                                              |
+| Idle worker reap                       | 10 minutes (600000 ms default) | Configurable    | `LANGY_WORKER_IDLE_MS`                                           |
+| Per-session LangWatch API key lifetime | Short-lived, auto-expiring     | Fixed by design | Minted per chat, owned by the requesting user                    |
+| GitHub installation token lifetime     | 1 hour                         | Fixed by GitHub | Minted per turn, cached in Redis just under 1 hour, self-expires |
 
 ## What each limit means
 
@@ -40,11 +40,15 @@ Each chat mints its own LangWatch API key, owned by the requesting user, project
 Langy mints a fresh 1-hour GitHub App installation token per turn, hands it to the worker as an environment variable only, and never stores it at rest. The token carries only `contents:write` and `pull_requests:write`, scoped to the installation's repositories. See [GitHub access](/langy/security/github-access).
 
 <Note>
-Only the max-workers cap and the idle-reap timeout are configurable. The 20-PRs-per-day cap is hardcoded, and the two token lifetimes are fixed (one by design, one by GitHub). For the full environment-variable reference, see [Environment variables](/self-hosting/langy/environment-variables).
+  Only the max-workers cap and the idle-reap timeout are configurable. The 20-PRs-per-day
+  cap is hardcoded, and the two token lifetimes are fixed (one by design, one by GitHub).
+  For the full environment-variable reference, see [Environment
+  variables](/self-hosting/langy/environment-variables).
 </Note>
 
 <Info>
-**Also check:** [Environment variables](/self-hosting/langy/environment-variables), [Pull requests](/langy/pull-requests), [Sandbox](/langy/security/sandbox).
+  **Also check:** [Environment variables](/self-hosting/langy/environment-variables),
+  [Pull requests](/langy/pull-requests), [Sandbox](/langy/security/sandbox).
 </Info>
 
 ## Reference

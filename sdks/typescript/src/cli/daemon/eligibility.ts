@@ -122,9 +122,7 @@ export type Ineligible =
   | "long-running-flag"
   | "no-command";
 
-export type Eligibility =
-  | { eligible: true }
-  | { eligible: false; reason: Ineligible };
+export type Eligibility = { eligible: true } | { eligible: false; reason: Ineligible };
 
 export interface EligibilityInput {
   /** process.argv.slice(2) */
@@ -288,11 +286,7 @@ function hasCommandOperand(args: string[]): boolean {
   return args.some((arg, index) => {
     if (arg.startsWith("-")) return false;
     const previous = index === 0 ? undefined : args[index - 1];
-    return (
-      previous === undefined ||
-      !previous.startsWith("-") ||
-      previous.includes("=")
-    );
+    return previous === undefined || !previous.startsWith("-") || previous.includes("=");
   });
 }
 
@@ -342,8 +336,7 @@ export function isAutoSpawnEnabled(env: NodeJS.ProcessEnv): boolean {
 export function isDaemonDisabledByConfig(env: NodeJS.ProcessEnv): boolean {
   try {
     const configFile =
-      env.LANGWATCH_CLI_CONFIG ??
-      path.join(os.homedir(), ".langwatch", "config.json");
+      env.LANGWATCH_CLI_CONFIG ?? path.join(os.homedir(), ".langwatch", "config.json");
     const parsed = JSON.parse(fs.readFileSync(configFile, "utf8")) as {
       daemon?: string;
     };
@@ -389,9 +382,7 @@ const ENV_ALLOWLIST = new Set([
   "LW_AGENT_MODE",
 ]);
 
-export function collectForwardedEnv(
-  env: NodeJS.ProcessEnv,
-): Record<string, string> {
+export function collectForwardedEnv(env: NodeJS.ProcessEnv): Record<string, string> {
   const forwarded: Record<string, string> = {};
   for (const [key, value] of Object.entries(env)) {
     if (value === undefined) continue;

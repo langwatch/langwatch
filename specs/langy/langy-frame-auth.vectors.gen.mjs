@@ -14,7 +14,14 @@
 //   mac = hex( HMAC-SHA256( key = hexDecode(runToken), signingInput ) )
 import { createHmac } from "node:crypto";
 
-const FIELDS = ["projectId", "userId", "conversationId", "turnId", "frameNonce", "payload"];
+const FIELDS = [
+  "projectId",
+  "userId",
+  "conversationId",
+  "turnId",
+  "frameNonce",
+  "payload",
+];
 
 function signingInput(f) {
   const chunks = [];
@@ -32,13 +39,39 @@ export function computeMac(runTokenHex, f) {
   return createHmac("sha256", key).update(signingInput(f)).digest("hex");
 }
 
-const runToken =
-  "00112233445566778899aabbccddeeff00112233445566778899aabbccddeeff";
+const runToken = "00112233445566778899aabbccddeeff00112233445566778899aabbccddeeff";
 
 const vectors = [
-  { name: "delta-frame", runToken, projectId: "proj_test", userId: "user_test", conversationId: "conv_test", turnId: "turn_test", frameNonce: "0123456789abcdef0123456789abcdef", payload: JSON.stringify({ type: "delta", text: "hello" }) },
-  { name: "heartbeat-minimal", runToken, projectId: "p", userId: "u", conversationId: "c", turnId: "t", frameNonce: "ffffffffffffffffffffffffffffffff", payload: JSON.stringify({ type: "heartbeat" }) },
-  { name: "unicode-card-payload", runToken, projectId: "prj_ünîcode", userId: "usr_🔒", conversationId: "conv-1", turnId: "turn-9", frameNonce: "abad1deaabad1deaabad1deaabad1dea", payload: JSON.stringify({ type: "card", kind: "trace_download", detail: "café ☕" }) },
+  {
+    name: "delta-frame",
+    runToken,
+    projectId: "proj_test",
+    userId: "user_test",
+    conversationId: "conv_test",
+    turnId: "turn_test",
+    frameNonce: "0123456789abcdef0123456789abcdef",
+    payload: JSON.stringify({ type: "delta", text: "hello" }),
+  },
+  {
+    name: "heartbeat-minimal",
+    runToken,
+    projectId: "p",
+    userId: "u",
+    conversationId: "c",
+    turnId: "t",
+    frameNonce: "ffffffffffffffffffffffffffffffff",
+    payload: JSON.stringify({ type: "heartbeat" }),
+  },
+  {
+    name: "unicode-card-payload",
+    runToken,
+    projectId: "prj_ünîcode",
+    userId: "usr_🔒",
+    conversationId: "conv-1",
+    turnId: "turn-9",
+    frameNonce: "abad1deaabad1deaabad1deaabad1dea",
+    payload: JSON.stringify({ type: "card", kind: "trace_download", detail: "café ☕" }),
+  },
 ];
 for (const v of vectors) v.mac = computeMac(runToken, v);
 

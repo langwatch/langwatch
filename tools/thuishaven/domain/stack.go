@@ -37,19 +37,17 @@ type Stack struct {
 	// of its own: it is a backend of `app`, reached same-origin at
 	// app.<slug>.../api (Vite proxies /api → 127.0.0.1:APIPort). One app URL, not
 	// two confusable ones — the frontend and its API share a single origin.
-	APIPort           int `json:"apiPort"`
-	WorkerMetricsPort int `json:"workerMetricsPort"`
-	// HasStandaloneWorkers is true only when this stack runs a separate `workers`
-	// lane (WorkerMetricsPort is that lane's own port). In the default in-process
-	// mode the app/api child hosts the workers and holds WorkerMetricsPort itself,
-	// so there is no separate group to bounce — `haven restart workers` must not
-	// target it (it would kill the API's group). See planChildren.
-	HasStandaloneWorkers bool   `json:"hasStandaloneWorkers,omitempty"`
-	ClickHouseHTTPPort   int    `json:"clickhouseHttpPort"` // shared managed CH server's HTTP port (0 = unmanaged)
-	ClickHouseDatabase   string `json:"clickhouseDatabase"` // this stack's isolated CH database (lw_<slug>)
-	PostgresPort         int    `json:"postgresPort"`       // shared managed Postgres's port (0 = unmanaged)
-	PostgresDatabase     string `json:"postgresDatabase"`   // this stack's isolated PG database (lw_<slug>)
-	RedisPort            int    `json:"redisPort"`          // shared managed Redis's port (0 = unmanaged)
+	APIPort int `json:"apiPort"`
+	// WorkerMetricsPort is the background worker lane's own loopback port
+	// (/metrics and /healthz). It belongs to that process alone: the worker is
+	// its own application, so `haven restart workers` bounces the group holding
+	// this port and can never reach the API's.
+	WorkerMetricsPort  int    `json:"workerMetricsPort"`
+	ClickHouseHTTPPort int    `json:"clickhouseHttpPort"` // shared managed CH server's HTTP port (0 = unmanaged)
+	ClickHouseDatabase string `json:"clickhouseDatabase"` // this stack's isolated CH database (lw_<slug>)
+	PostgresPort       int    `json:"postgresPort"`       // shared managed Postgres's port (0 = unmanaged)
+	PostgresDatabase   string `json:"postgresDatabase"`   // this stack's isolated PG database (lw_<slug>)
+	RedisPort          int    `json:"redisPort"`          // shared managed Redis's port (0 = unmanaged)
 	// ObservabilityOTLPPort is the shared LGTM collector's OTLP/HTTP port when the
 	// stack is up, and 0 when it is not. Non-zero is what makes OverlayEnv emit the
 	// OTel wiring, so a worktree exports its logs/traces/metrics the moment the
@@ -119,7 +117,8 @@ type Stack struct {
 // PerWorktreeServices are the routed hostnames a stack always plans for — each
 // gets its own <name>.<slug>.langwatch.localhost. The Hono API is deliberately
 // absent: it shares `app`'s origin at /api (see Stack.APIPort), so the app and
-// its API are one URL. Order is the launch + print order.
+// its API are one URL. `app` is the browser application's port — the `ui` lane
+// (apps/ui, Vite) is what listens on it. Order is the launch + print order.
 var PerWorktreeServices = []struct{ Name, Role string }{
 	{"app", "App — UI + API at /api"},
 	{"gateway", "AI Gateway (Go)"},
@@ -165,4 +164,26 @@ func (s Stack) Stale(now time.Time, ttl time.Duration) bool {
 		return false
 	}
 	return now.Sub(s.UpdatedAt) > ttl
+}
+
+// Lane is one supervised process lane of a stack, as `haven status --json`
+// reports it. The routed Services list answers "what hostname resolves where";
+// this answers "what processes is this stack running", which stopped being the
+// same question when the platform application became three applications: the
+// api and workers lanes hold loopback ports and no hostname of their own.
+type Lane struct {
+	Name string `json:"name"`
+	Port int    `json:"port"`
+}
+
+// Lanes are the Node application lanes every stack supervises, in launch order:
+// the browser application (on the routed `app` port), the API and the
+// background worker. The Go services are omitted because they are one-to-one
+// with their routed services, which the same report already lists.
+func (s Stack) Lanes() []Lane {
+	return []Lane{
+		{Name: "ui", Port: s.svc("app").Port},
+		{Name: "api", Port: s.APIPort},
+		{Name: "workers", Port: s.WorkerMetricsPort},
+	}
 }

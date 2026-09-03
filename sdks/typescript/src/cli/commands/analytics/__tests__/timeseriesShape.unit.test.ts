@@ -1,9 +1,5 @@
 import { describe, expect, it } from "vitest";
-import {
-  humanMetric,
-  toTimeseriesShape,
-  unitFor,
-} from "../timeseriesShape";
+import { humanMetric, toTimeseriesShape, unitFor } from "../timeseriesShape";
 
 const day = (iso: string) => Date.parse(iso);
 

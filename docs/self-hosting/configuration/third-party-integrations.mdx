@@ -26,8 +26,8 @@ app:
 
 Or via environment variable:
 
-| Variable | Description |
-|----------|-------------|
+| Variable              | Description                                        |
+| --------------------- | -------------------------------------------------- |
 | `DISABLE_USAGE_STATS` | Set to `true` to disable anonymous usage analytics |
 
 ## LLM Providers for Evaluations
@@ -49,11 +49,11 @@ app:
         secretKeyRef: { name: langwatch-evaluators, key: azureApiKey }
 ```
 
-| Variable | Description |
-|----------|-------------|
-| `AZURE_OPENAI_EVALUATOR_ENABLED` | `true` to enable |
+| Variable                          | Description               |
+| --------------------------------- | ------------------------- |
+| `AZURE_OPENAI_EVALUATOR_ENABLED`  | `true` to enable          |
 | `AZURE_OPENAI_EVALUATOR_ENDPOINT` | Azure OpenAI endpoint URL |
-| `AZURE_OPENAI_EVALUATOR_API_KEY` | Azure OpenAI API key |
+| `AZURE_OPENAI_EVALUATOR_API_KEY`  | Azure OpenAI API key      |
 
 ### Google AI
 
@@ -68,13 +68,15 @@ app:
         secretKeyRef: { name: langwatch-evaluators, key: googleCredentials }
 ```
 
-| Variable | Description |
-|----------|-------------|
-| `GOOGLE_EVALUATOR_ENABLED` | `true` to enable |
-| `GOOGLE_CREDENTIALS_JSON` | Service account credentials JSON |
+| Variable                   | Description                      |
+| -------------------------- | -------------------------------- |
+| `GOOGLE_EVALUATOR_ENABLED` | `true` to enable                 |
+| `GOOGLE_CREDENTIALS_JSON`  | Service account credentials JSON |
 
 <Note>
-You don't need to configure evaluator providers to use LangWatch. They're only required if you want to use built-in evaluators that rely on specific LLM providers. You can always configure your own LLM provider API keys in the LangWatch UI for evaluations.
+  You don't need to configure evaluator providers to use LangWatch. They're only required
+  if you want to use built-in evaluators that rely on specific LLM providers. You can
+  always configure your own LLM provider API keys in the LangWatch UI for evaluations.
 </Note>
 
 ## Slack
@@ -84,5 +86,6 @@ LangWatch can send notifications to Slack channels via webhooks for alerts and a
 ## S3, Object Storage
 
 Used for dataset storage and ClickHouse cold storage/backups. See:
+
 - [Backups](/self-hosting/configuration/backups) for ClickHouse cold storage and backup configuration
 - [Environment Variables](/self-hosting/configuration/environment-variables#object-storage-s3) for S3 configuration reference

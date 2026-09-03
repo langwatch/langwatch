@@ -18,14 +18,17 @@ Feature: TypeScript 7 is the compiler
     When it imports the compiler
     Then it takes the AST types and predicates from the unstable export
     And no file value-imports the root `typescript` module
+    But a package held on 6 may, because there the root export is the compiler
 
   @unit
   Scenario: Every workspace package builds against one compiler major
     Given the workspace installs from a single root
     Then every package declares TypeScript 7
-    But the two packages that publish bundled declarations stay on 6
-    # tsup's `dts: true` bundles through the old programmatic compiler API,
-    # which 7 does not expose. Held deliberately, not by omission.
+    But the packages that drive the old programmatic compiler API stay on 6
+    # Two of them publish bundled declarations through tsup's `dts: true`; the
+    # third is the architecture linter, a synchronous CLI over the whole tree
+    # that uses a program, a printer and a scanner 7 does not expose. Held
+    # deliberately, not by omission.
 
   @unit
   Scenario: The superseded preview compiler is gone

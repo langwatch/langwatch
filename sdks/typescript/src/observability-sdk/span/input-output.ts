@@ -5,14 +5,22 @@ import {
   type ChatMessage,
   type SpanInputOutput,
 } from "../../internal/generated/types/tracer";
-import { type SimpleChatMessage, type JsonSerializable, type InputOutputType, INPUT_OUTPUT_TYPES } from "./types";
+import {
+  type SimpleChatMessage,
+  type JsonSerializable,
+  type InputOutputType,
+  INPUT_OUTPUT_TYPES,
+} from "./types";
 
 /**
  * Zod schema for simple chat messages (less strict than the generated one)
  */
 const simpleChatMessageSchema = z.object({
   role: z.string(),
-  content: z.union([z.string(), z.array(z.any())]).nullable().optional()
+  content: z
+    .union([z.string(), z.array(z.any())])
+    .nullable()
+    .optional(),
 });
 
 const simpleChatMessageArraySchema = z.array(simpleChatMessageSchema);
@@ -21,7 +29,7 @@ const simpleChatMessageArraySchema = z.array(simpleChatMessageSchema);
  * Utility function to create a safe fallback value
  */
 function createSafeFallbackValue(value: unknown): string {
-  if (typeof value === 'object' && value !== null) {
+  if (typeof value === "object" && value !== null) {
     try {
       return JSON.stringify(value);
     } catch {
@@ -35,7 +43,10 @@ function createSafeFallbackValue(value: unknown): string {
 /**
  * Utility function to create a safe SpanInputOutput fallback
  */
-function createSafeSpanInputOutput(type: "text" | "raw", value: unknown): SpanInputOutput {
+function createSafeSpanInputOutput(
+  type: "text" | "raw",
+  value: unknown,
+): SpanInputOutput {
   const safeValue = createSafeFallbackValue(value);
   return { type, value: safeValue } as SpanInputOutput;
 }
@@ -55,11 +66,15 @@ function isChatMessage(value: unknown): value is ChatMessage | SimpleChatMessage
   if (!isObject(value)) return false;
   return (
     typeof value.role === "string" &&
-    (typeof value.content === "string" || value.content === null || value.content === undefined)
+    (typeof value.content === "string" ||
+      value.content === null ||
+      value.content === undefined)
   );
 }
 
-function isChatMessageArray(value: unknown): value is (ChatMessage | SimpleChatMessage)[] {
+function isChatMessageArray(
+  value: unknown,
+): value is (ChatMessage | SimpleChatMessage)[] {
   return Array.isArray(value) && value.every(isChatMessage);
 }
 
@@ -103,7 +118,10 @@ function convertToSpanInputOutput(value: unknown): SpanInputOutput {
     }
 
     // Handle chat messages (single message or array)
-    if (isChatMessage(value) || (Array.isArray(value) && value.length > 0 && isChatMessageArray(value))) {
+    if (
+      isChatMessage(value) ||
+      (Array.isArray(value) && value.length > 0 && isChatMessageArray(value))
+    ) {
       return processChatMessages(value);
     }
 
@@ -111,7 +129,7 @@ function convertToSpanInputOutput(value: unknown): SpanInputOutput {
     if (Array.isArray(value)) {
       return spanInputOutputSchema.parse({
         type: "list",
-        value: value.map(item => convertToSpanInputOutput(item))
+        value: value.map((item) => convertToSpanInputOutput(item)),
       });
     }
 
@@ -166,7 +184,9 @@ function validateValueForInputOutputType(type: InputOutputType, value: unknown):
 
     case "list": {
       const listResult = z.array(spanInputOutputSchema).safeParse(value);
-      return listResult.success ? listResult.data : [{ type: "text", value: createSafeFallbackValue(value) }];
+      return listResult.success
+        ? listResult.data
+        : [{ type: "text", value: createSafeFallbackValue(value) }];
     }
 
     case "json": {
@@ -212,7 +232,7 @@ function validateValueForInputOutputType(type: InputOutputType, value: unknown):
  */
 export function processSpanInputOutput(
   typeOrValue: unknown,
-  value?: unknown
+  value?: unknown,
 ): SpanInputOutput {
   try {
     // If explicit type is provided, prefer it over auto-detection
@@ -222,7 +242,9 @@ export function processSpanInputOutput(
 
       // Final validation with spanInputOutputSchema
       const result = spanInputOutputSchema.safeParse({ type, value: validatedValue });
-      return result.success ? result.data : createSafeSpanInputOutput("raw", validatedValue);
+      return result.success
+        ? result.data
+        : createSafeSpanInputOutput("raw", validatedValue);
     }
 
     // Auto-detect type when no explicit type is provided
@@ -245,4 +267,4 @@ export type SpanInputOutputMethod<T> = {
   (type: "guardrail_result", value: unknown): T;
   (type: "evaluation_result", value: unknown): T;
   (value: unknown): T;
-}
+};

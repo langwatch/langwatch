@@ -35,10 +35,10 @@ Feature: Bird's-eye governance dashboard v2 — graphs, Top-N framing, click-thr
     - specs/ai-gateway/governance/persona-home-content.feature (page wrap)
 
   Implementation lives under:
-    - platform/app/src/pages/governance/index.tsx                      (page)
-    - platform/app/src/server/governance/activity-monitor/             (service)
-    - platform/app/src/components/governance/charts/                   (Recharts wrappers — Phase B)
-    - platform/app/src/utils/colorFromName.ts                          (Phase C util)
+    - apps/ui governance route                                         (page)
+    - packages/enterprise/features/governance/server/src/ (activity-monitor)             (service)
+    - packages/enterprise/features/governance/web/src/                 (chart wrappers — Phase B)
+    - packages/features/trace/web/src/model/rotating-colors.ts         (Phase C util)
 
   Background:
     Given the user is signed in as an org admin of "acme-corp"
@@ -59,7 +59,7 @@ Feature: Bird's-eye governance dashboard v2 — graphs, Top-N framing, click-thr
     Then the lastActivity cell renders "just now"
     And no row anywhere on the page renders a string starting with "-"
       followed by digits + "s ago" / "m ago" / "h ago" / "d ago"
-    And the seed scripts under platform/app/scripts/ also clamp seeded
+    And the governance seed harness also clamps seeded
       OccurredAt to "now - 1s" minimum so re-seeding cannot reintroduce
       the bug
 
@@ -299,7 +299,7 @@ Feature: Bird's-eye governance dashboard v2 — graphs, Top-N framing, click-thr
     Then all three surfaces show that team in the SAME color
     And the color is derived deterministically from the team name
       (same algorithm ProjectAvatar uses today via
-       platform/app/src/utils/rotatingColors.ts → getColorForString)
+       packages/features/trace/web/src/model/rotating-colors.ts → getColorForString)
     And a different team named "marketing" renders in a different
       color (palette spread is a function of the name, not row order)
     And renaming a team changes its color (acceptable trade-off — the
@@ -308,7 +308,7 @@ Feature: Bird's-eye governance dashboard v2 — graphs, Top-N framing, click-thr
   @bdd @ui @birds-eye-v2 @color
   Scenario: Color util is hoisted to a shared module
     Given Phase C ships
-    Then a shared util exists at platform/app/src/utils/colorFromName.ts
+    Then a shared colour-from-name util exists in one place
       (or equivalent shared path) exporting at minimum:
         | export                  | shape                                |
         | colorFromName(name)     | (name: string) => string (CSS color) |

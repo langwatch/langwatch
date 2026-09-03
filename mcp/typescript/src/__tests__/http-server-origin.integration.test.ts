@@ -80,7 +80,7 @@ describe("Origin validation", () => {
 
     expect(response.status).toBe(200);
     expect(response.headers.get("access-control-allow-origin")).toBe(
-      "http://localhost:5173"
+      "http://localhost:5173",
     );
   });
 
@@ -91,7 +91,7 @@ describe("Origin validation", () => {
 
     expect(response.status).toBe(200);
     expect(response.headers.get("access-control-allow-origin")).toBe(
-      "https://console.example.com"
+      "https://console.example.com",
     );
   });
 
@@ -114,7 +114,7 @@ describe("Origin validation", () => {
     });
 
     expect(
-      response.headers.get("access-control-expose-headers")?.toLowerCase()
+      response.headers.get("access-control-expose-headers")?.toLowerCase(),
     ).toContain("mcp-session-id");
   });
 

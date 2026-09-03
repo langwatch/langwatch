@@ -1,0 +1,283 @@
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import { DisabledPipeline } from "../../disabledPipeline";
+import { createTenantId } from "../../domain/tenantId";
+import { defineAggregate, defineEvents } from "../../domain/definitions";
+import type { Event } from "../../domain/types";
+import { EventSourcing } from "../../eventSourcing";
+import { definePipeline } from "../../pipeline/staticBuilder";
+import { InMemoryProcessStore } from "../../process-manager/stores/inMemoryProcessStore";
+import {
+  createMockEventStore,
+  createMockMapProjectionDefinition,
+} from "../../services/__tests__/testHelpers";
+import { EventStoreMemory } from "../../stores/eventStoreMemory";
+
+/**
+ * Creates a minimal static pipeline definition for testing.
+ */
+function createTestPipelineDefinition() {
+  return definePipeline<Event>({
+    name: "test-pipeline",
+    aggregate: defineAggregate({
+      type: "trace",
+      events: defineEvents(["test.event"] as const),
+    }),
+  }).build();
+}
+
+function createProcessPipelineDefinition() {
+  return definePipeline<Event>({
+    name: "process-pipeline",
+    aggregate: defineAggregate({
+      type: "trace",
+      events: defineEvents(["test.event"] as const),
+    }),
+  })
+    .withProcessManager("durable-process", (process) =>
+      process
+        .state({ handled: 0 })
+        .keyBy(() => "test-process")
+        .on("test.event", (state) => ({
+          state: { handled: state.handled + 1 },
+        })),
+    )
+    .build();
+}
+
+describe("EventSourcing", () => {
+  beforeEach(() => {
+    vi.stubEnv("BUILD_TIME", "");
+    vi.stubEnv("NODE_ENV", "test");
+  });
+
+  afterEach(() => {
+    vi.restoreAllMocks();
+    vi.unstubAllEnvs();
+  });
+
+  describe("constructor", () => {
+    it("creates with default options (enabled, no clients)", () => {
+      const es = new EventSourcing();
+
+      expect(es.isEnabled).toBe(true);
+    });
+
+    it("rejects an implicit unsafe memory-store fallback", () => {
+      const es = new EventSourcing();
+
+      expect(() => es.getEventStore()).toThrow(
+        "Tests and local development must explicitly inject EventStoreMemory",
+      );
+    });
+
+    it("creates disabled when enabled is false", () => {
+      const es = new EventSourcing({ enabled: false });
+
+      expect(es.isEnabled).toBe(false);
+    });
+
+    it("uses memory event store only when a test process opts in", () => {
+      const es = new EventSourcing({ eventStore: EventStoreMemory.createForTesting() });
+      const eventStore = es.getEventStore();
+
+      expect(eventStore).toBeInstanceOf(EventStoreMemory);
+    });
+  });
+
+  describe("createForTesting", () => {
+    it("uses injected event store", () => {
+      const mockEventStore = createMockEventStore<Event>();
+      const es = EventSourcing.createForTesting({
+        eventStore: mockEventStore,
+      });
+
+      expect(es.getEventStore()).toBe(mockEventStore);
+      expect(es.isEnabled).toBe(true);
+    });
+
+    it("returns enabled status", () => {
+      const es = EventSourcing.createForTesting({
+        eventStore: createMockEventStore<Event>(),
+      });
+
+      expect(es.isEnabled).toBe(true);
+    });
+  });
+
+  describe("createWithStores", () => {
+    it("uses injected event store and global queue", () => {
+      const mockEventStore = createMockEventStore<Event>();
+      const mockGlobalQueue = {
+        send: vi.fn().mockResolvedValue(void 0),
+        sendBatch: vi.fn().mockResolvedValue(void 0),
+        close: vi.fn().mockResolvedValue(void 0),
+        waitUntilReady: vi.fn().mockResolvedValue(void 0),
+      };
+      const es = EventSourcing.createWithStores({
+        eventStore: mockEventStore,
+        globalQueue: mockGlobalQueue,
+      });
+
+      expect(es.getEventStore()).toBe(mockEventStore);
+    });
+  });
+
+  describe("getEventStore", () => {
+    it("returns the same event store instance on multiple calls", () => {
+      const mockEventStore = createMockEventStore<Event>();
+      const es = EventSourcing.createForTesting({
+        eventStore: mockEventStore,
+      });
+
+      expect(es.getEventStore()).toBe(mockEventStore);
+      expect(es.getEventStore()).toBe(mockEventStore);
+      expect(es.getEventStore()).toBe(mockEventStore);
+    });
+
+    it("preserves type casting for generic EventType", () => {
+      interface TestEvent extends Event {
+        data: { test: string };
+      }
+
+      const mockEventStore = createMockEventStore<TestEvent>();
+      const es = EventSourcing.createForTesting({
+        eventStore: mockEventStore,
+      });
+
+      const eventStore = es.getEventStore<TestEvent>();
+      expect(eventStore).toBe(mockEventStore);
+    });
+  });
+
+  describe("register", () => {
+    it("returns a DisabledPipeline when no event store available", () => {
+      const es = EventSourcing.createForTesting({
+        eventStore: void 0,
+      });
+
+      const pipeline = es.register(createTestPipelineDefinition());
+
+      expect(pipeline).toBeInstanceOf(DisabledPipeline);
+    });
+
+    it("registers a pipeline with a static definition", () => {
+      const mockEventStore = createMockEventStore<Event>();
+      const es = EventSourcing.createForTesting({
+        eventStore: mockEventStore,
+      });
+
+      const pipeline = es.register(createTestPipelineDefinition());
+
+      expect(pipeline.name).toBe("test-pipeline");
+      expect(pipeline.aggregateType).toBe("trace");
+    });
+
+    it("rejects process-manager registration atomically without an explicitly injected ProcessStore", () => {
+      const eventSourcing = EventSourcing.createForTesting({
+        eventStore: createMockEventStore<Event>(),
+      });
+
+      expect(() => eventSourcing.register(createProcessPipelineDefinition())).toThrow(
+        "A durable ProcessStore is required for process managers",
+      );
+
+      expect(eventSourcing.definitions).toEqual([]);
+      expect(() => eventSourcing.getPipeline("process-pipeline")).toThrow(
+        'Pipeline "process-pipeline" not found',
+      );
+
+      const pipeline = eventSourcing.register(createTestPipelineDefinition());
+
+      expect(pipeline.name).toBe("test-pipeline");
+      expect(eventSourcing.definitions).toHaveLength(1);
+    });
+
+    it("accepts a process manager when a test explicitly injects InMemoryProcessStore", async () => {
+      const eventSourcing = EventSourcing.createForTesting({
+        eventStore: createMockEventStore<Event>(),
+        processStore: InMemoryProcessStore.createForTesting(),
+      });
+
+      expect(() => eventSourcing.register(createProcessPipelineDefinition())).not.toThrow();
+      await eventSourcing.close();
+    });
+
+    it("forwards projection payload preparation into the live pipeline", async () => {
+      const eventStore = createMockEventStore<Event>();
+      const mapProjection = createMockMapProjectionDefinition<Event>("spanStorage", {
+        eventTypes: ["test.event"],
+      });
+      const prepare = vi.fn((event: Event) => ({
+        ...event,
+        data: { ...(event.data as Record<string, unknown>), leaned: true },
+      }));
+      const definition = definePipeline<Event>({
+        name: "prepared-pipeline",
+        aggregate: defineAggregate({
+          type: "trace",
+          events: defineEvents(["test.event"] as const),
+        }),
+      })
+        .withProjectionPayloadPreparation(prepare)
+        .withClickHouseMapProjection(mapProjection)
+        .build();
+      const eventSourcing = EventSourcing.createForTesting({ eventStore });
+      const pipeline = eventSourcing.register(definition);
+      const tenantId = createTenantId("project-1");
+      const event: Event = {
+        id: "event-1",
+        aggregateId: "trace-1",
+        aggregateType: "trace",
+        tenantId,
+        type: "test.event",
+        version: "2026-01-01",
+        createdAt: 1,
+        occurredAt: 1,
+        data: {},
+      };
+
+      await pipeline.service.storeEvents([event], { tenantId });
+
+      expect(eventStore.storeEvents).toHaveBeenCalledWith([event], { tenantId }, "trace");
+      expect(mapProjection.map).toHaveBeenCalledWith(
+        expect.objectContaining({ data: { leaned: true } }),
+      );
+      await eventSourcing.close();
+    });
+  });
+
+  describe("close", () => {
+    it("clears all registered pipelines", async () => {
+      const mockEventStore = createMockEventStore<Event>();
+      const es = EventSourcing.createForTesting({
+        eventStore: mockEventStore,
+      });
+
+      es.register(createTestPipelineDefinition());
+      await es.close();
+
+      expect(() => es.getPipeline("test-pipeline")).toThrow('Pipeline "test-pipeline" not found');
+    });
+  });
+
+  describe("getPipeline", () => {
+    it("throws when pipeline not registered", () => {
+      const es = EventSourcing.createForTesting({
+        eventStore: createMockEventStore<Event>(),
+      });
+
+      expect(() => es.getPipeline("nonexistent")).toThrow('Pipeline "nonexistent" not found');
+    });
+
+    it("returns a registered pipeline", () => {
+      const es = EventSourcing.createForTesting({
+        eventStore: createMockEventStore<Event>(),
+      });
+
+      es.register(createTestPipelineDefinition());
+      const pipeline = es.getPipeline("test-pipeline");
+
+      expect(pipeline.name).toBe("test-pipeline");
+    });
+  });
+});

@@ -1,6 +1,7 @@
 # Trims mcp/typescript/ for the @langwatch/server tarball. The root
 # pnpm-workspace.yaml lists `mcp/typescript` as a workspace package, and
-# platform/app/src imports from "@langwatch/mcp-server/create-mcp-server"
+# packages/features/hosted-mcp/server imports from
+# "@langwatch/mcp-server/create-mcp-server"
 # (resolved to ./dist/create-mcp-server.js via the package's exports
 # map). Ship pre-built dist/ + the .d.ts shims in src/ — tests, build
 # config, and dev tooling stay out.

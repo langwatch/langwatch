@@ -13,20 +13,21 @@ LangWatch provides a library of ready-to-use evaluators for common evaluation ta
 - You want to use well-tested, standardized evaluation methods
 
 **See also:**
+
 - [Saved Evaluators](/evaluations/evaluators/saved-evaluators) - Reuse configured evaluators across your project
 - [Custom Scoring](/evaluations/evaluators/custom-scoring) - Send scores from your own evaluation logic
-</Info>
+  </Info>
 
 ## Available Evaluators
 
 LangWatch offers evaluators across several categories:
 
-| Category | Examples | Use Case |
-|----------|----------|----------|
-| **RAG Quality** | `ragas/faithfulness`, `ragas/context_precision` | Evaluate retrieval-augmented generation |
-| **Safety** | `presidio/pii_detection`, `langwatch/api_keys_and_secrets_detection`, `azure/jailbreak` | Detect PII, leaked credentials, jailbreaks, harmful content |
-| **Correctness** | `langevals/exact_match`, `langevals/llm_boolean` | Check answer accuracy |
-| **Custom Criteria** | `langevals/llm_boolean`, `langevals/llm_score` | LLM-as-Judge for custom checks |
+| Category            | Examples                                                                                | Use Case                                                    |
+| ------------------- | --------------------------------------------------------------------------------------- | ----------------------------------------------------------- |
+| **RAG Quality**     | `ragas/faithfulness`, `ragas/context_precision`                                         | Evaluate retrieval-augmented generation                     |
+| **Safety**          | `presidio/pii_detection`, `langwatch/api_keys_and_secrets_detection`, `azure/jailbreak` | Detect PII, leaked credentials, jailbreaks, harmful content |
+| **Correctness**     | `langevals/exact_match`, `langevals/llm_boolean`                                        | Check answer accuracy                                       |
+| **Custom Criteria** | `langevals/llm_boolean`, `langevals/llm_score`                                          | LLM-as-Judge for custom checks                              |
 
 [Browse all evaluators →](/evaluations/evaluators/list)
 
@@ -54,9 +55,8 @@ df = langwatch.datasets.get_dataset("my-dataset").to_pandas()
 
 experiment = langwatch.experiment.init("my-experiment")
 
-for index, row in experiment.loop(df.iterrows()):
-    # Your LLM call
-    output = my_llm(row["input"])
+for index, row in experiment.loop(df.iterrows()): # Your LLM call
+output = my_llm(row["input"])
 
     # Run built-in evaluator
     experiment.evaluate(
@@ -68,7 +68,8 @@ for index, row in experiment.loop(df.iterrows()):
             "contexts": row["contexts"],
         },
     )
-```
+
+````
 
 ```typescript TypeScript
 import { LangWatch } from "langwatch";
@@ -96,7 +97,8 @@ await experiment.run(
   },
   { concurrency: 4 }
 );
-```
+````
+
 </CodeGroup>
 
 ### In Online Evaluation
@@ -108,9 +110,8 @@ Run evaluators on production traces in real-time:
 import langwatch
 
 @langwatch.span()
-def my_llm_step(user_input: str):
-    # Your LLM call
-    output = my_llm(user_input)
+def my_llm_step(user_input: str): # Your LLM call
+output = my_llm(user_input)
 
     # Run evaluator on production traffic
     result = langwatch.evaluation.evaluate(
@@ -123,7 +124,8 @@ def my_llm_step(user_input: str):
     )
 
     return output
-```
+
+````
 
 ```typescript TypeScript
 import { LangWatch } from "langwatch";
@@ -145,7 +147,8 @@ async function myLLMStep(userInput: string): Promise<string> {
 
   return output;
 }
-```
+````
+
 </CodeGroup>
 
 ### As Guardrails
@@ -157,21 +160,21 @@ Use evaluators to block harmful content before responding:
 import langwatch
 
 @langwatch.span()
-def my_llm_step(user_input: str):
-    # Check input before processing
-    guardrail = langwatch.evaluation.evaluate(
-        "azure/jailbreak",  # Built-in evaluator slug
-        name="Jailbreak Detection",
-        data={"input": user_input},
-        as_guardrail=True,
-    )
+def my_llm_step(user_input: str): # Check input before processing
+guardrail = langwatch.evaluation.evaluate(
+"azure/jailbreak", # Built-in evaluator slug
+name="Jailbreak Detection",
+data={"input": user_input},
+as_guardrail=True,
+)
 
     if not guardrail.passed:
         return "I can't help with that request."
 
     # Safe to proceed
     return my_llm(user_input)
-```
+
+````
 
 ```typescript TypeScript
 import { LangWatch } from "langwatch";
@@ -193,20 +196,21 @@ async function myLLMStep(userInput: string): Promise<string> {
   // Safe to proceed
   return await myLLM(userInput);
 }
-```
+````
+
 </CodeGroup>
 
 ## Evaluator Inputs
 
 Different evaluators require different inputs. Check the [evaluator list](/evaluations/evaluators/list) for each evaluator's requirements.
 
-| Input | Description | Example Evaluators |
-|-------|-------------|-------------------|
-| `input` | User question/prompt | Jailbreak Detection, Off-Topic |
-| `output` | LLM response | PII Detection, Valid Format |
-| `contexts` | Retrieved documents (array) | Faithfulness, Context Precision |
-| `expected_output` | Ground truth answer | Answer Correctness, Exact Match |
-| `conversation` | Conversation history | Conversation Relevancy |
+| Input             | Description                 | Example Evaluators              |
+| ----------------- | --------------------------- | ------------------------------- |
+| `input`           | User question/prompt        | Jailbreak Detection, Off-Topic  |
+| `output`          | LLM response                | PII Detection, Valid Format     |
+| `contexts`        | Retrieved documents (array) | Faithfulness, Context Precision |
+| `expected_output` | Ground truth answer         | Answer Correctness, Exact Match |
+| `conversation`    | Conversation history        | Conversation Relevancy          |
 
 ## Configuring Settings
 
@@ -235,12 +239,14 @@ await experiment.evaluate("langevals/llm_boolean", {
   },
 });
 ```
+
 </CodeGroup>
 
 ## The `name` Parameter
 
 <Warning>
-Always provide a descriptive `name` when using evaluators in online evaluation. This helps track results in Analytics.
+  Always provide a descriptive `name` when using evaluators in online evaluation. This
+  helps track results in Analytics.
 </Warning>
 
 ```python

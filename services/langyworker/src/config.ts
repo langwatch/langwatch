@@ -10,7 +10,15 @@ import { readFileSync } from "node:fs";
 import { join } from "node:path";
 import { z } from "zod";
 
-export const THINKING_LEVELS = ["off", "minimal", "low", "medium", "high", "xhigh", "max"] as const;
+export const THINKING_LEVELS = [
+  "off",
+  "minimal",
+  "low",
+  "medium",
+  "high",
+  "xhigh",
+  "max",
+] as const;
 
 const modelConfigSchema = z
   .object({
@@ -21,7 +29,7 @@ const modelConfigSchema = z
     reasoning: z.boolean().optional(),
     contextWindow: z.number().int().positive().optional(),
     maxTokens: z.number().int().positive().optional(),
-    compat: z.record(z.unknown()).optional(),
+    compat: z.record(z.string(), z.unknown()).optional(),
   })
   .passthrough();
 
@@ -50,7 +58,9 @@ export function parseConfig(raw: string): LangyWorkerConfig {
   }
   const parsed = configSchema.safeParse(json);
   if (!parsed.success) {
-    throw new Error(`invalid ${CONFIG_FILE_NAME}: ${parsed.error.issues.map((i) => `${i.path.join(".")}: ${i.message}`).join("; ")}`);
+    throw new Error(
+      `invalid ${CONFIG_FILE_NAME}: ${parsed.error.issues.map((i) => `${i.path.join(".")}: ${i.message}`).join("; ")}`,
+    );
   }
   return parsed.data;
 }
@@ -61,7 +71,9 @@ export function loadConfig(home: string): LangyWorkerConfig {
   try {
     raw = readFileSync(path, "utf8");
   } catch (error) {
-    throw new Error(`cannot read ${path}: ${error instanceof Error ? error.message : String(error)}`);
+    throw new Error(
+      `cannot read ${path}: ${error instanceof Error ? error.message : String(error)}`,
+    );
   }
   return parseConfig(raw);
 }

@@ -8,11 +8,7 @@ import {
   runDeviceFlowLogin,
   runUnifiedLoginFlow,
 } from "@/cli/utils/governance/login-flow";
-import {
-  isLoggedIn,
-  loadConfig,
-  saveConfig,
-} from "@/cli/utils/governance/config";
+import { isLoggedIn, loadConfig, saveConfig } from "@/cli/utils/governance/config";
 import {
   fetchProjectKeyBySlug,
   SessionApiError,
@@ -56,11 +52,7 @@ function printAgentHintBanner(): void {
       "  --token <TOKEN>            pre-minted device session (writes ~/.langwatch/config.json)",
     ),
   );
-  console.log(
-    chalk.gray(
-      "  --endpoint <URL>           self-hosted instance URL",
-    ),
-  );
+  console.log(chalk.gray("  --endpoint <URL>           self-hosted instance URL"));
   console.log();
 }
 
@@ -161,7 +153,9 @@ const loginToProjectBySlug = async (slug: string): Promise<void> => {
     rememberProjectName(result.api_key, result.project.name);
     const envResult = updateEnvFile(result.api_key);
     console.log(
-      chalk.green(`✓ API key for project ${chalk.bold(result.project.name)} saved to .env`),
+      chalk.green(
+        `✓ API key for project ${chalk.bold(result.project.name)} saved to .env`,
+      ),
     );
     if (envResult.created) {
       console.log(chalk.gray(`  • Created .env file at ${envResult.path}`));
@@ -188,16 +182,14 @@ const loginToProjectBySlug = async (slug: string): Promise<void> => {
   }
 };
 
-export const loginCommand = async (
-  options?: {
-    apiKey?: string;
-    device?: boolean;
-    project?: boolean | string;
-    browser?: string;
-    endpoint?: string;
-    token?: string;
-  },
-): Promise<void> => {
+export const loginCommand = async (options?: {
+  apiKey?: string;
+  device?: boolean;
+  project?: boolean | string;
+  browser?: string;
+  endpoint?: string;
+  token?: string;
+}): Promise<void> => {
   try {
     // Honor `--endpoint` flag OR `LANGWATCH_ENDPOINT` env. Persist the
     // resolved value BEFORE the chosen flow runs so subsequent reads
@@ -225,7 +217,9 @@ export const loginCommand = async (
     if (options?.token) {
       const token = options.token.trim();
       if (token.length < 10) {
-        console.error(chalk.red("Error: token seems too short. Please check and try again."));
+        console.error(
+          chalk.red("Error: token seems too short. Please check and try again."),
+        );
         process.exit(1);
       }
       const cfg = loadConfig();
@@ -274,7 +268,9 @@ export const loginCommand = async (
     if (options?.apiKey) {
       const apiKey = options.apiKey.trim();
       if (apiKey.length < 10) {
-        console.error(chalk.red("Error: API key seems too short. Please check and try again."));
+        console.error(
+          chalk.red("Error: API key seems too short. Please check and try again."),
+        );
         process.exit(1);
       }
 
@@ -423,7 +419,8 @@ export const loginCommand = async (
         },
         {
           title: "Project / SDK API key",
-          description: "langwatch eval, sync, prompts, SDK auto-instrumentation - writes .env",
+          description:
+            "langwatch eval, sync, prompts, SDK auto-instrumentation - writes .env",
           value: "api-key",
         },
         {
@@ -454,15 +451,7 @@ export const loginCommand = async (
     }
     return;
   } catch (error) {
-    console.error(
-      chalk.red(
-        `Error during login: ${
-          formatApiErrorMessage({ error })
-        }`,
-      ),
-    );
+    console.error(chalk.red(`Error during login: ${formatApiErrorMessage({ error })}`));
     process.exit(1);
   }
 };
-
-

@@ -5,14 +5,14 @@ Feature: Machine-wide slots for whole-repo checks
   explains itself instead of looking hung
 
   # Both checks saturate the machine on purpose. A typecheck peaks around 3 to 4
-  # GiB and uses every core; a biome run over 6,800 files spends 38 CPU-seconds
+  # GiB and uses every core; a whole-tree lint over 6,800 files spends 38 CPU-seconds
   # in 4 seconds of wall clock. That is the right trade for one run, and capping
   # either tool's threads only stretches the same CPU cost over 5x the wall
   # clock. Three or four at once, which is the normal state of a laptop driving
   # several worktrees or agents, is what makes the machine unusable, and neither
   # command knew another was already running.
   #
-  # `platform/app`'s typecheck, lint and format scripts now run through
+  # The repository's typecheck, lint and format scripts run through
   # dev/scripts/check-queue.mjs, a thin wrapper that takes a machine-wide
   # slot, runs the real command, and releases. ONE counter covers all of them,
   # because they compete for the same cores. The state is a directory of
@@ -325,9 +325,9 @@ Feature: Machine-wide slots for whole-repo checks
   # @typescript/native-preview as `tsgo` — so the shims cover both and so does
   # haven's gate (ADR-095).
   #
-  # dev/scripts/install-check-shims.mjs makes platform/app's bin entries
+  # dev/scripts/install-check-shims.mjs makes the workspace root's bin entries
   # themselves the boundary, so the route into the tool stops mattering. Only
-  # platform/app's: sdks/typescript's build runs `tsc --noEmit` on the way to
+  # the root's: sdks/typescript's build runs `tsc --noEmit` on the way to
   # `pnpm dev`, and a dev server that waits for a typecheck slot before it
   # boots is not an improvement.
 
@@ -338,7 +338,7 @@ Feature: Machine-wide slots for whole-repo checks
 
   @unit
   Scenario: A run over a directory counts
-    When I run "biome check ./src ./ee"
+    When I run a check over a directory rather than a named file
     Then the run counts against the limit
 
   @unit
@@ -350,7 +350,7 @@ Feature: Machine-wide slots for whole-repo checks
   # file to check is what turns a whole-project run into one nothing waits for.
   @unit
   Scenario: A subcommand or a flag's value is not a target
-    When I run "biome check" with no paths, or "tsc --pretty false"
+    When I run a check with a bare subcommand and no paths, or "tsc --pretty false"
     Then the run counts against the limit, because neither names a file and both walk the project
 
   @unit
@@ -404,7 +404,7 @@ Feature: Machine-wide slots for whole-repo checks
 
   # The shims are a laptop concern, and neither environment below is a laptop.
   # CI turns the queue off anyway, so a shim there only puts a node process in
-  # front of every tsc and biome to decide nothing, and an install in an image
+  # front of every tsc run to decide nothing, and an install in an image
   # or on a server has no bin entries worth rewriting.
 
   @unit

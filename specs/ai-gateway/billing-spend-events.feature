@@ -204,6 +204,38 @@ Feature: Billing spend events, one durable record per gateway request
       Then the command is rejected so another worker retries it
       And the rejection names the gateway request at error level
 
+    # The same rule one tier earlier. The API process is where the drained
+    # batch arrives, and it can only queue a command on a pipeline it has
+    # registered. A door that answered 200 without one would let the drainer
+    # delete the spool segment that held the only copy of the charge.
+
+    @integration
+    Scenario: The ingest door accepts a drained batch and prices it on the way in
+      Given a process that registered the gateway spend pipeline
+      When a signed batch of outcomes reaches the ingest door
+      Then every record is accepted and queued under its own command
+      And the queued outcome carries a cost the wire never sent
+
+    @integration
+    Scenario: A process that registered no spend pipeline refuses the whole batch
+      Given a process with no gateway spend registration
+      When a signed batch of outcomes reaches the ingest door
+      Then the batch is refused with the code the gateway's drainer spools against
+      And nothing is acknowledged, so the spool segment is kept
+
+    # Registering the definition is not the same decision as running it. The
+    # pipeline mounts process managers that write budgets and ship a
+    # customer's webhooks, and those belong to the process that claims the
+    # shared queue; a tier that produced onto the queue and also drained it
+    # would be doing the worker's work inside a web request.
+
+    @unit
+    Scenario: The tier that ingests registers the pipeline as a producer only
+      Given the process that serves the ingest door
+      When it registers the gateway spend pipeline
+      Then it registers the same pipeline, aggregate and commands the worker does
+      And it mounts none of that pipeline's process managers
+
   Rule: Attribution the gateway cannot see is resolved once, at ingest
 
     The gateway knows the key and the project it dispatched for. The key's

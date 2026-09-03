@@ -1,6 +1,12 @@
 import { PromptsApiService, type AssignTagResult } from "./prompts-api.service";
 import { Prompt } from "./prompt";
-import type { CreatePromptBody, UpdatePromptBody, PromptData, TagDefinition, CreatedTag } from "./types";
+import type {
+  CreatePromptBody,
+  UpdatePromptBody,
+  PromptData,
+  TagDefinition,
+  CreatedTag,
+} from "./types";
 import { FetchPolicy } from "./types";
 import { type InternalConfig } from "@/client-sdk/types";
 import { LocalPromptsService } from "./local-prompts.service";
@@ -34,12 +40,15 @@ interface PromptsFacadeDependencies {
  * Facade for prompt operations in the LangWatch SDK.
  * Provides a simplified interface for common prompt management tasks.
  */
-export class PromptsFacade implements Pick<PromptsApiService, "sync" | "delete">{
+export class PromptsFacade implements Pick<PromptsApiService, "sync" | "delete"> {
   private readonly promptsApiService: PromptsApiService;
   private readonly localPromptsService: LocalPromptsService;
   private readonly cache = new Map<string, CacheEntry>();
   readonly tags: {
-    assign(id: string, params: { tag: string; versionId: string }): Promise<AssignTagResult>;
+    assign(
+      id: string,
+      params: { tag: string; versionId: string },
+    ): Promise<AssignTagResult>;
     list(): Promise<TagDefinition[]>;
     create(params: { name: string }): Promise<CreatedTag>;
     delete(tagName: string): Promise<void>;
@@ -82,10 +91,7 @@ export class PromptsFacade implements Pick<PromptsApiService, "sync" | "delete">
    * @returns The Prompt instance.
    * @throws {PromptsError} If the prompt is not found or the API call fails.
    */
-  async get(
-    handleOrId: string,
-    options?: GetPromptOptions,
-  ): Promise<Prompt> {
+  async get(handleOrId: string, options?: GetPromptOptions): Promise<Prompt> {
     const fetchPolicy = options?.fetchPolicy ?? FetchPolicy.MATERIALIZED_FIRST;
 
     switch (fetchPolicy) {
@@ -141,8 +147,8 @@ export class PromptsFacade implements Pick<PromptsApiService, "sync" | "delete">
   }
 
   private buildCacheKey(handleOrId: string, options?: GetPromptOptions): string {
-    const tagSegment = options?.tag != null ? `::tag:${options.tag}` : '';
-    return `${handleOrId}::version:${options?.version ?? ''}${tagSegment}`;
+    const tagSegment = options?.tag != null ? `::tag:${options.tag}` : "";
+    return `${handleOrId}::version:${options?.version ?? ""}${tagSegment}`;
   }
 
   private async getCacheTtl(

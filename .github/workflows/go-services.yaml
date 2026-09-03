@@ -47,11 +47,10 @@ on:
       - "packages/langy/**"
       - "skills/**"
       - "feature-map.json"
-      - "platform/app/src/server/tracer/types.ts"
-      - "platform/app/src/server/filters/types.ts"
-      - "platform/app/src/server/evaluations/types.ts"
-      - "platform/app/src/server/modelProviders/llmModels.json"
-      - "platform/app/src/app/api/openapiLangWatch.json"
+      - "packages/features/trace/contract/src/trace-format.schemas.ts"
+      - "packages/features/evaluator/contract/src/evaluators.native.ts"
+      - "packages/features/model-provider/contract/src/catalog/model-catalog.json"
+      - "apps/api/src/features/discovery/openapi-document.json"
       - "services/langevals/ts-integration/evaluators.generated.ts"
   workflow_dispatch:
 
@@ -108,7 +107,7 @@ jobs:
               # The langyagent image bakes in the langwatch CLI, and that CLI is
               # generated AT IMAGE-BUILD TIME from inputs OUTSIDE the Go tree:
               # sdks/typescript/ + skills/ + feature-map.json + a handful of
-              # platform/app + services/langevals source files (sdks/typescript/copy-types.sh +
+              # packages + apps/api + services/langevals source files (sdks/typescript/copy-types.sh +
               # generate-skills-bundle.mjs). A change to any of those can break
               # `docker build -f infra/docker/Dockerfile.langyagent` with no Go source
               # touched — exactly the gap that shipped a broken build once
@@ -126,11 +125,10 @@ jobs:
               - 'packages/langy/**'
               - 'skills/**'
               - 'feature-map.json'
-              - 'platform/app/src/server/tracer/types.ts'
-              - 'platform/app/src/server/filters/types.ts'
-              - 'platform/app/src/server/evaluations/types.ts'
-              - 'platform/app/src/server/modelProviders/llmModels.json'
-              - 'platform/app/src/app/api/openapiLangWatch.json'
+              - 'packages/features/trace/contract/src/trace-format.schemas.ts'
+              - 'packages/features/evaluator/contract/src/evaluators.native.ts'
+              - 'packages/features/model-provider/contract/src/catalog/model-catalog.json'
+              - 'apps/api/src/features/discovery/openapi-document.json'
               - 'services/langevals/ts-integration/evaluators.generated.ts'
               - '.github/workflows/go-services.yaml'
 

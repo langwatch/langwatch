@@ -69,7 +69,7 @@ type warmRequest struct {
 }
 
 // cancelRequest names the in-flight turn a user's Stop wants aborted
-// (ADR-078). Mirrors the control plane's caller body (langyWorker.ts cancel):
+// (ADR-078). Mirrors the control plane Langy worker adapter's cancel body:
 // conversationId routes to the worker, turnId guards which turn may die, and
 // projectId rides along for the log line only: the internal secret is the
 // authority, exactly as on every other verb.

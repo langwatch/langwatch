@@ -1,0 +1,12 @@
+import { useTabId } from "../model/prompt-tab-context";
+import { useDraggableTabsBrowserStore } from "./use-prompt-tabs-browser-store";
+
+/**
+ * useIsTabActive
+ * Single Responsibility: Determines if the current tab is the active tab in its window.
+ * @returns true if the current tab is active, false otherwise
+ */
+export function useIsTabActive() {
+  const tabId = useTabId();
+  return useDraggableTabsBrowserStore((state) => state.isTabIdActive(tabId));
+}

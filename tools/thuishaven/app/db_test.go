@@ -64,6 +64,29 @@ func dbOrchestrator(sup *fakeSupervisor, store *fakeStore, sys System, ch, pg *f
 	}
 }
 
+// withIngestPreset registers a preset that carries live-stack ingest steps,
+// for the length of one test.
+//
+// Every SHIPPED preset's ingest list is empty: the scripts that filled them
+// went with the platform application (see the seedPreset comment in db.go).
+// The machinery that runs a list — the stack-not-running refusal, the
+// not-answering refusal, the loopback endpoint and ingestion key, the order,
+// the give-up path — is still live and is still the seam those seeds return
+// through, so it keeps its coverage against a preset this test owns rather
+// than losing it along with the data.
+func withIngestPreset(t *testing.T, name string, steps ...string) {
+	t.Helper()
+	previous, existed := seedPresets[name]
+	seedPresets[name] = seedPreset{env: []string{"HAVEN_SEED_PRESET=demo"}, ingest: steps, summary: "test-only"}
+	t.Cleanup(func() {
+		if existed {
+			seedPresets[name] = previous
+			return
+		}
+		delete(seedPresets, name)
+	})
+}
+
 func liveStackStore() *fakeStore {
 	return &fakeStore{stacks: []domain.Stack{{
 		Slug: "feat-x", WorktreeDir: "/wt/feat-x", LauncherPID: 42,
@@ -73,9 +96,9 @@ func liveStackStore() *fakeStore {
 }
 
 // @scenario "Fresh data is an explicit, confirmed noun"
-// @scenario "The demo preset needs the stack for its traces"
+// @scenario "A preset that ingests needs the stack up"
 func TestDBReset(t *testing.T) {
-	params := UpParams{ExplicitSlug: "feat-x", WorktreeDir: "/wt/feat-x", LwDir: "/wt/feat-x/langwatch"}
+	params := UpParams{ExplicitSlug: "feat-x", WorktreeDir: "/wt/feat-x"}
 
 	t.Run("given managed databases and no demo", func(t *testing.T) {
 		sup := &fakeSupervisor{}
@@ -95,8 +118,8 @@ func TestDBReset(t *testing.T) {
 			if len(sup.shells) != 2 {
 				t.Fatalf("shells = %v, want prepare then seed", sup.shells)
 			}
-			if !strings.Contains(sup.shells[0], "start:prepare:db") {
-				t.Errorf("shells[0] = %q, want the migrations", sup.shells[0])
+			if !strings.Contains(sup.shells[0], "prisma:migrate") || !strings.Contains(sup.shells[0], "clickhouse:migrate") {
+				t.Errorf("shells[0] = %q, want both stores' migrations", sup.shells[0])
 			}
 			if !strings.Contains(sup.shells[1], "prisma:seed") {
 				t.Errorf("shells[1] = %q, want the seed", sup.shells[1])
@@ -156,7 +179,7 @@ func TestDBReset(t *testing.T) {
 	})
 
 	t.Run("given migrations fail on the fresh database", func(t *testing.T) {
-		sup := &fakeSupervisor{err: errors.New("migrate boom"), errOn: "start:prepare:db"}
+		sup := &fakeSupervisor{err: errors.New("migrate boom"), errOn: "prisma:migrate"}
 		o := dbOrchestrator(sup, &fakeStore{}, &fakeSystem{}, &fakeDBServer{}, &fakeDBServer{})
 
 		t.Run("when resetting, the error propagates and the seed never runs", func(t *testing.T) {
@@ -174,7 +197,8 @@ func TestDBReset(t *testing.T) {
 		sup := &fakeSupervisor{err: errors.New("seed boom"), errOn: "prisma:seed"}
 		o := dbOrchestrator(sup, liveStackStore(), &fakeSystem{alive: map[int]bool{42: true}}, &fakeDBServer{}, &fakeDBServer{})
 
-		t.Run("when resetting with demo, the error propagates and traces never run", func(t *testing.T) {
+		t.Run("when resetting with an ingesting preset, the error propagates and the ingest never runs", func(t *testing.T) {
+			withIngestPreset(t, "demo", "seed:sample-traces")
 			err := o.DBReset(context.Background(), params, "demo")
 			if err == nil || !strings.Contains(err.Error(), "seed failed") {
 				t.Fatal("expected the seed error to propagate")
@@ -185,11 +209,12 @@ func TestDBReset(t *testing.T) {
 		})
 	})
 
-	t.Run("given demo with the stack not running", func(t *testing.T) {
+	t.Run("given an ingesting preset with the stack not running", func(t *testing.T) {
 		sup := &fakeSupervisor{}
+		withIngestPreset(t, "demo", "seed:sample-traces")
 		o := dbOrchestrator(sup, &fakeStore{}, &fakeSystem{}, &fakeDBServer{}, &fakeDBServer{})
 
-		t.Run("when resetting, the seed carries the preset but traces are refused with the retry command", func(t *testing.T) {
+		t.Run("when resetting, the seed carries the preset but the ingest is refused with the retry command", func(t *testing.T) {
 			err := o.DBReset(context.Background(), params, "demo")
 			if err == nil || !strings.Contains(err.Error(), "not running") {
 				t.Fatalf("expected a stack-not-running error, got %v", err)
@@ -206,12 +231,13 @@ func TestDBReset(t *testing.T) {
 		})
 	})
 
-	t.Run("given demo with a live stack whose app port is not answering", func(t *testing.T) {
+	t.Run("given an ingesting preset with a live stack whose app port is not answering", func(t *testing.T) {
 		sup := &fakeSupervisor{}
+		withIngestPreset(t, "demo", "seed:sample-traces")
 		sys := &portSystem{fakeSystem: fakeSystem{alive: map[int]bool{42: true}}, portsUp: map[int]bool{}}
 		o := dbOrchestrator(sup, liveStackStore(), sys, &fakeDBServer{}, &fakeDBServer{})
 
-		t.Run("when resetting, traces are refused", func(t *testing.T) {
+		t.Run("when resetting, the ingest is refused", func(t *testing.T) {
 			err := o.DBReset(context.Background(), params, "demo")
 			if err == nil || !strings.Contains(err.Error(), "not answering") {
 				t.Fatalf("expected a not-answering refusal, got %v", err)
@@ -222,43 +248,41 @@ func TestDBReset(t *testing.T) {
 		})
 	})
 
-	t.Run("given demo with a live, answering stack", func(t *testing.T) {
+	t.Run("given an ingesting preset with a live, answering stack", func(t *testing.T) {
 		sup := &fakeSupervisor{}
+		withIngestPreset(t, "demo", "seed:first", "seed:second")
 		sys := &portSystem{fakeSystem: fakeSystem{alive: map[int]bool{42: true}}, portsUp: map[int]bool{5560: true}}
 		o := dbOrchestrator(sup, liveStackStore(), sys, &fakeDBServer{}, &fakeDBServer{})
 
-		t.Run("when resetting, demo data is ingested through the app's loopback port", func(t *testing.T) {
+		t.Run("when resetting, the steps run in the registry's order through the app's loopback port", func(t *testing.T) {
 			if err := o.DBReset(context.Background(), params, "demo"); err != nil {
 				t.Fatalf("DBReset: %v", err)
 			}
-			if len(sup.shells) != 5 {
-				t.Fatalf("shells = %v, want prepare, seed, retention, sample-traces, realistic-platform", sup.shells)
+			if len(sup.shells) != 4 {
+				t.Fatalf("shells = %v, want prepare, seed, then the two ingest steps", sup.shells)
 			}
-			// Retention is pinned first so nothing lands under the 7-day default.
-			if !strings.Contains(sup.shells[2], "seed:retention") {
-				t.Fatalf("shells = %v, want seed:retention third", sup.shells)
+			if !strings.Contains(sup.shells[2], "seed:first") {
+				t.Fatalf("shells = %v, want seed:first third", sup.shells)
 			}
-			if !strings.Contains(sup.shells[3], "seed:sample-traces") {
-				t.Fatalf("shells = %v, want seed:sample-traces fourth", sup.shells)
+			if !strings.Contains(sup.shells[3], "seed:second") {
+				t.Fatalf("shells = %v, want seed:second fourth", sup.shells)
 			}
-			if !strings.Contains(sup.shells[4], "seed:realistic-platform") {
-				t.Fatalf("shells = %v, want seed:realistic-platform fifth", sup.shells)
-			}
-			joined := strings.Join(sup.envs[3], " ")
+			joined := strings.Join(sup.envs[2], " ")
 			if !strings.Contains(joined, "HAVEN_SEED_ENDPOINT=http://127.0.0.1:5560") {
-				t.Errorf("traces env should point at the app's loopback port, got %v", sup.envs[3])
+				t.Errorf("ingest env should point at the app's loopback port, got %v", sup.envs[2])
 			}
 			if !strings.Contains(joined, "HAVEN_SEED_LANGWATCH_API_KEY=sk-lw-local-development-key") {
-				t.Errorf("traces env should carry the local ingestion key, got %v", sup.envs[3])
+				t.Errorf("ingest env should carry the local ingestion key, got %v", sup.envs[2])
 			}
-			if strings.Join(sup.envs[4], " ") != joined {
-				t.Errorf("platform seed should receive the same isolated stack overlay")
+			if strings.Join(sup.envs[3], " ") != joined {
+				t.Errorf("every ingest step should receive the same isolated stack overlay")
 			}
 		})
 	})
 
-	t.Run("given demo with a live stack whose only app service is a baseline fallback", func(t *testing.T) {
+	t.Run("given an ingesting preset whose only app service is a baseline fallback", func(t *testing.T) {
 		sup := &fakeSupervisor{}
+		withIngestPreset(t, "demo", "seed:sample-traces")
 		store := &fakeStore{stacks: []domain.Stack{{
 			Slug: "feat-x", WorktreeDir: "/wt/feat-x", LauncherPID: 42,
 			PostgresPort: 1, PostgresDatabase: "lw_feat_x",
@@ -267,7 +291,7 @@ func TestDBReset(t *testing.T) {
 		sys := &portSystem{fakeSystem: fakeSystem{alive: map[int]bool{42: true}}, portsUp: map[int]bool{5560: true}}
 		o := dbOrchestrator(sup, store, sys, &fakeDBServer{}, &fakeDBServer{})
 
-		t.Run("when resetting, the fallback app is not a local target so traces are refused", func(t *testing.T) {
+		t.Run("when resetting, the fallback app is not a local target so the ingest is refused", func(t *testing.T) {
 			err := o.DBReset(context.Background(), params, "demo")
 			if err == nil || !strings.Contains(err.Error(), "not answering") {
 				t.Fatalf("expected a not-answering refusal, got %v", err)
@@ -302,11 +326,12 @@ func TestDBURLRejectsUnknownEngine(t *testing.T) {
 }
 
 // @scenario "The default seed is unchanged"
-// @scenario "The demo preset needs the stack for its traces"
+// @scenario "A preset that ingests needs the stack up"
 // @scenario "Unknown presets are rejected with the available choices"
+// @scenario "Retired presets say so rather than reading as a typo"
 // @scenario "Reseeding drops nothing"
 func TestDBSeed(t *testing.T) {
-	params := UpParams{ExplicitSlug: "feat-x", WorktreeDir: "/wt/feat-x", LwDir: "/wt/feat-x/langwatch"}
+	params := UpParams{ExplicitSlug: "feat-x", WorktreeDir: "/wt/feat-x"}
 
 	t.Run("given no preset", func(t *testing.T) {
 		sup := &fakeSupervisor{}
@@ -347,8 +372,31 @@ func TestDBSeed(t *testing.T) {
 
 		t.Run("when seeding, it fails listing the available presets and runs nothing", func(t *testing.T) {
 			err := o.DBSeed(context.Background(), params, "nosuch")
-			if err == nil || !strings.Contains(err.Error(), "demo") || !strings.Contains(err.Error(), "traces") {
+			if err == nil || !strings.Contains(err.Error(), "demo") || !strings.Contains(err.Error(), "bare") {
 				t.Fatalf("expected the preset list, got %v", err)
+			}
+			if len(sup.shells) != 0 {
+				t.Errorf("nothing may run, got %v", sup.shells)
+			}
+		})
+	})
+
+	t.Run("given a retired preset", func(t *testing.T) {
+		sup := &fakeSupervisor{}
+		o := dbOrchestrator(sup, &fakeStore{}, &fakeSystem{}, &fakeDBServer{}, &fakeDBServer{})
+
+		t.Run("when seeding, it says the preset is retired rather than unknown, and runs nothing", func(t *testing.T) {
+			for name := range retiredSeedPresets {
+				err := o.DBSeed(context.Background(), params, name)
+				if err == nil || !strings.Contains(err.Error(), "retired") {
+					t.Fatalf("preset %q: expected a retirement refusal, got %v", name, err)
+				}
+				if strings.Contains(err.Error(), "unknown seed preset") {
+					t.Errorf("preset %q: %v reads as a typo, not a retirement", name, err)
+				}
+				if !strings.Contains(err.Error(), "demo") {
+					t.Errorf("preset %q: %v does not offer what is left", name, err)
+				}
 			}
 			if len(sup.shells) != 0 {
 				t.Errorf("nothing may run, got %v", sup.shells)
@@ -360,13 +408,9 @@ func TestDBSeed(t *testing.T) {
 		sup := &fakeSupervisor{}
 		o := dbOrchestrator(sup, &fakeStore{}, &fakeSystem{}, &fakeDBServer{}, &fakeDBServer{})
 
-		t.Run("when seeding, the base seed lands but traces are refused with the retry command", func(t *testing.T) {
-			err := o.DBSeed(context.Background(), params, "demo")
-			if err == nil || !strings.Contains(err.Error(), "not running") {
-				t.Fatalf("expected a stack-not-running error, got %v", err)
-			}
-			if !strings.Contains(err.Error(), "haven db seed demo") {
-				t.Errorf("err = %v, want the retry command", err)
+		t.Run("when seeding, it succeeds — no shipped preset needs a running stack", func(t *testing.T) {
+			if err := o.DBSeed(context.Background(), params, "demo"); err != nil {
+				t.Fatalf("DBSeed: %v", err)
 			}
 			if len(sup.shells) != 1 || !strings.Contains(strings.Join(sup.envs[0], " "), "HAVEN_SEED_PRESET=demo") {
 				t.Errorf("want one seed run carrying the demo preset, got %v", sup.shells)
@@ -374,23 +418,24 @@ func TestDBSeed(t *testing.T) {
 		})
 	})
 
-	t.Run("given the traces preset with a live, answering stack", func(t *testing.T) {
+	t.Run("given an ingesting preset with a live, answering stack", func(t *testing.T) {
 		sup := &fakeSupervisor{}
+		withIngestPreset(t, "demo", "seed:first", "seed:second")
 		sys := &portSystem{fakeSystem: fakeSystem{alive: map[int]bool{42: true}}, portsUp: map[int]bool{5560: true}}
 		o := dbOrchestrator(sup, liveStackStore(), sys, &fakeDBServer{}, &fakeDBServer{})
 
-		t.Run("when seeding, retention is pinned before the sample traces are ingested", func(t *testing.T) {
-			if err := o.DBSeed(context.Background(), params, "traces"); err != nil {
+		t.Run("when seeding, the ingest steps follow the base seed in the registry's order", func(t *testing.T) {
+			if err := o.DBSeed(context.Background(), params, "demo"); err != nil {
 				t.Fatalf("DBSeed: %v", err)
 			}
 			if len(sup.shells) != 3 {
-				t.Fatalf("shells = %v, want seed, retention, sample-traces", sup.shells)
+				t.Fatalf("shells = %v, want seed then the two ingest steps", sup.shells)
 			}
-			if !strings.Contains(sup.shells[1], "seed:retention") {
-				t.Fatalf("shells = %v, want seed:retention second", sup.shells)
+			if !strings.Contains(sup.shells[1], "seed:first") {
+				t.Fatalf("shells = %v, want seed:first second", sup.shells)
 			}
-			if !strings.Contains(sup.shells[2], "seed:sample-traces") {
-				t.Fatalf("shells = %v, want seed:sample-traces third", sup.shells)
+			if !strings.Contains(sup.shells[2], "seed:second") {
+				t.Fatalf("shells = %v, want seed:second third", sup.shells)
 			}
 		})
 	})

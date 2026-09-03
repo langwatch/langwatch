@@ -34,14 +34,9 @@ import { runDeviceFlowLogin } from "./login-flow";
  *   - `other`: anything else (control plane unreachable, no personal
  *     workspace yet, mint refused).
  */
-export type IngestionSetupFailureKind =
-  | "expired_session"
-  | "tool_disabled"
-  | "other";
+export type IngestionSetupFailureKind = "expired_session" | "tool_disabled" | "other";
 
-export function classifyIngestionSetupError(
-  err: unknown,
-): IngestionSetupFailureKind {
+export function classifyIngestionSetupError(err: unknown): IngestionSetupFailureKind {
   if (!(err instanceof GovernanceCliError)) return "other";
   if (err.code === "tool_disabled") return "tool_disabled";
   if (err.status === 401) return "expired_session";
@@ -101,8 +96,7 @@ export async function recoverExpiredSession(
     writeImpl = (s: string) => void process.stderr.write(s),
   } = opts;
   const isTTY =
-    opts.isTTY ??
-    (Boolean(process.stdin.isTTY) && Boolean(process.stdout.isTTY));
+    opts.isTTY ?? (Boolean(process.stdin.isTTY) && Boolean(process.stdout.isTTY));
 
   if (!isTTY) {
     return { status: "abort", message: expiredSessionHelp(tool), exitCode: 1 };

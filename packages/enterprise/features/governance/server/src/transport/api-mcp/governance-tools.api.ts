@@ -1,0 +1,356 @@
+/**
+ * Governance MCP toolset — Ask B-MCP per umbrella spec
+ * (specs/ai-gateway/governance/governance-api-cli-mcp-coverage.feature).
+ *
+ * Mirrors the Hono /api/governance/* resource×verb shape (sergey 0bb951160 +
+ * 5275e7e11 + 8fffad4ad) but dispatches IN-PROCESS through the same shared
+ * service-layer functions, passing `surface: 'mcp'` per the GovernanceCallSurface
+ * contract (sergey fc6d54100). No HTTP round-trip, no auth-token mismatch with
+ * the human-caller PAT path. Service-layer-shared invariant from umbrella spec
+ * @service-layer is satisfied: tRPC + Hono + CLI + MCP all funnel through the
+ * same IngestionTemplateService.
+ *
+ * RBAC enforcement at the tool layer (per @governance-mcp @rbac): each tool
+ * checks the caller's organization permissions BEFORE the service call and
+ * returns FORBIDDEN otherwise. Mirrors `probeOrganizationPermission` from
+ * src/server/api/rbac.ts. Services trust the surface for audit attribution
+ * but DO NOT gate access — gating is the entrypoint's job.
+ *
+ * Caller identity: governance write tools require an OAuth-authenticated MCP
+ * session (the userId is captured at /api/mcp/authorize and threaded through
+ * to the SessionState here). Project-apiKey-only sessions get read tools but
+ * are rejected on writes with a clear error message pointing them at the
+ * OAuth flow.
+ *
+ * Spec: specs/ai-gateway/governance/governance-api-cli-mcp-coverage.feature
+ * Docs: docs/ai-governance/mcp.mdx
+ */
+
+import { type ZodRawShape, z } from "zod";
+import type { AuthzPermission } from "@langwatch/authz-contract";
+import type { GovernanceService } from "@langwatch/enterprise-governance-contract";
+import type { PrismaClient } from "@langwatch/prisma-client/generated";
+
+type ToolCallback = (
+  // The MCP SDK passes parsed input as the first arg; we don't currently
+  // need the second `extra` parameter.
+  args: any,
+) => Promise<{ content: Array<{ type: "text"; text: string }> }>;
+
+/**
+ * Structural shape we use from the McpServer instance returned by
+ * `@langwatch/mcp-server.createMcpServer`. The .d.ts in that package
+ * intentionally narrows McpServer to keep the langwatch app's typecheck
+ * cheap; we mirror that narrow shape here so callers can pass the same
+ * value verbatim without an `as` cast.
+ */
+type McpServerLike = {
+  tool(
+    name: string,
+    description: string,
+    inputSchema: ZodRawShape,
+    cb: ToolCallback,
+  ): unknown;
+};
+
+
+/**
+ * Whether the caller holds a permission on an organization.
+ *
+ * Injected rather than imported: the decision belongs to the process's own
+ * AuthZ graph, and a tool surface that reached for a global one would be
+ * asking a different engine than the request path beside it.
+ */
+export abstract class GovernanceMcpPermissionProbePort {
+  abstract holdsOrganizationPermission(input: {
+    userId: string;
+    organizationId: string;
+    permission: AuthzPermission;
+  }): Promise<boolean>;
+}
+
+const SURFACE = "mcp" as const;
+
+const FORBIDDEN_PREFIX = "FORBIDDEN: ";
+const NEEDS_OAUTH_PREFIX = "AUTH_REQUIRED: ";
+
+export interface GovernanceMcpContext {
+  prisma: PrismaClient;
+  governance: GovernanceService;
+  /** The organization permission decision this surface is judged by. */
+  permissions: GovernanceMcpPermissionProbePort;
+  /** Project apiKey from the MCP session (used to derive organizationId). */
+  apiKey: string;
+  /**
+   * OAuth-flowing user id captured at /api/mcp/authorize, propagated via
+   * the OAuth token cache. Absent for project-apiKey-only sessions —
+   * write tools reject those with NEEDS_OAUTH_PREFIX.
+   */
+  callerUserId?: string;
+}
+
+interface ResolvedContext {
+  organizationId: string;
+  callerUserId?: string;
+}
+
+/**
+ * Registers the 11 governance MCP tools on the given session-scoped
+ * McpServer. Resolves the caller's organization from the apiKey lazily on
+ * the first tool invocation and caches per-session.
+ */
+export function registerGovernanceMcpTools(
+  server: McpServerLike,
+  ctx: GovernanceMcpContext,
+): void {
+  let resolvedPromise: Promise<ResolvedContext> | null = null;
+  const resolve = async (): Promise<ResolvedContext> => {
+    if (!resolvedPromise) {
+      resolvedPromise = (async () => {
+        const project = await ctx.prisma.project.findUnique({
+          where: { apiKey: ctx.apiKey, archivedAt: null },
+          select: { team: { select: { organizationId: true } } },
+        });
+        if (!project) {
+          throw new Error(
+            "MCP session apiKey did not resolve to a project — cannot derive organization context for governance tools.",
+          );
+        }
+        return {
+          organizationId: project.team.organizationId,
+          callerUserId: ctx.callerUserId,
+        };
+      })();
+    }
+    return resolvedPromise;
+  };
+
+  const requirePermission = async (
+    rctx: ResolvedContext,
+    permission: AuthzPermission,
+  ): Promise<string | null> => {
+    if (!rctx.callerUserId) {
+      return `${NEEDS_OAUTH_PREFIX}This governance MCP tool requires an OAuth-authenticated session (mint via /api/mcp/authorize). Project-apiKey-only sessions can use read tools but cannot perform writes.`;
+    }
+    const allowed = await ctx.permissions.holdsOrganizationPermission({
+      userId: rctx.callerUserId,
+      organizationId: rctx.organizationId,
+      permission,
+    });
+    if (!allowed) {
+      return `${FORBIDDEN_PREFIX}caller lacks permission '${permission}' on organization ${rctx.organizationId}`;
+    }
+    return null;
+  };
+
+  const requireRead = async (
+    rctx: ResolvedContext,
+    permission: AuthzPermission,
+  ): Promise<string | null> => {
+    // Read tools may run without callerUserId (project-apiKey sessions),
+    // since the legacy MCP auth path is project-scoped and the org is
+    // implicit. Only enforce permission when a userId is present.
+    if (!rctx.callerUserId) return null;
+    const allowed = await ctx.permissions.holdsOrganizationPermission({
+      userId: rctx.callerUserId,
+      organizationId: rctx.organizationId,
+      permission,
+    });
+    if (!allowed) {
+      return `${FORBIDDEN_PREFIX}caller lacks permission '${permission}' on organization ${rctx.organizationId}`;
+    }
+    return null;
+  };
+
+  const text = (value: string) => ({
+    content: [{ type: "text" as const, text: value }],
+  });
+  const json = (value: unknown) => text(JSON.stringify(value, null, 2));
+
+  // ── IngestionTemplate ────────────────────────────────────────────────
+
+  server.tool(
+    "governance_ingestion_templates_list",
+    "List the user-visible ingestion templates for the caller's organization. Returns the union of platform-published defaults and any org-authored rows; excludes the OTTL source. Mirrors GET /api/governance/ingestion-templates.",
+    {},
+    async () => {
+      const r = await resolve();
+      const denied = await requireRead(r, "aiTools:view");
+      if (denied) return text(denied);
+      const rows = await ctx.governance.templateListForUser({
+        organizationId: r.organizationId,
+      });
+      return json(rows);
+    },
+  );
+
+  server.tool(
+    "governance_ingestion_templates_admin_list",
+    "Admin catalog read — same union as the user-visible list but INCLUDES ottlRules. Requires aiTools:manage. Mirrors GET /api/governance/ingestion-templates/admin.",
+    {},
+    async () => {
+      const r = await resolve();
+      // Admin catalog returns OTTL source (org config secret) and gates
+      // on aiTools:manage — treat it like a write: project-apiKey-only
+      // sessions without a user identity are rejected, not silently allowed.
+      const denied = await requirePermission(r, "aiTools:manage");
+      if (denied) return text(denied);
+      const rows = await ctx.governance.templateListForOrgAdmin({
+        organizationId: r.organizationId,
+      });
+      return json(rows);
+    },
+  );
+
+  server.tool(
+    "governance_ingestion_templates_get",
+    "Fetch a single ingestion template by id. Cross-org probes return null. Mirrors GET /api/governance/ingestion-templates/:id.",
+    { id: z.string().describe("IngestionTemplate id") },
+    async ({ id }) => {
+      const r = await resolve();
+      const denied = await requireRead(r, "aiTools:view");
+      if (denied) return text(denied);
+      const row = await ctx.governance.tryFindTemplateByIdForOrg({
+        id,
+        organizationId: r.organizationId,
+      });
+      return json(row);
+    },
+  );
+
+  server.tool(
+    "governance_ingestion_templates_create",
+    "Author a new org-scoped ingestion template. The slug is auto-generated from displayName + a random suffix. Requires aiTools:manage. Mirrors POST /api/governance/ingestion-templates.",
+    {
+      source_type: z
+        .string()
+        .describe(
+          "Lowercase + underscores. Discriminator that matches an upstream emitter (e.g. 'codex_internal').",
+        ),
+      display_name: z.string(),
+      description: z.string().optional(),
+      icon_asset: z.string().optional(),
+      credential_schema: z.string().optional(),
+      ottl_rules: z.string().optional(),
+    },
+    async (input) => {
+      const r = await resolve();
+      const denied = await requirePermission(r, "aiTools:manage");
+      if (denied) return text(denied);
+      const row = await ctx.governance.templateCreateOrg({
+        organizationId: r.organizationId,
+        callerUserId: r.callerUserId!,
+        sourceType: input.source_type,
+        displayName: input.display_name,
+        description: input.description ?? null,
+        iconAsset: input.icon_asset ?? null,
+        credentialSchema: input.credential_schema ?? null,
+        ottlRules: input.ottl_rules ?? "",
+        surface: SURFACE,
+      });
+      return json(row);
+    },
+  );
+
+  server.tool(
+    "governance_ingestion_templates_update_ottl_rules",
+    "Update the ottlRules of an org-authored template. Platform rows are immutable. Requires aiTools:manage. Mirrors PATCH /api/governance/ingestion-templates/:id/ottl-rules.",
+    {
+      id: z.string(),
+      ottl_rules: z.string().describe("New ottlRules body. Empty string permitted."),
+    },
+    async ({ id, ottl_rules }) => {
+      const r = await resolve();
+      const denied = await requirePermission(r, "aiTools:manage");
+      if (denied) return text(denied);
+      const row = await ctx.governance.templateUpdateOttlRules({
+        id,
+        organizationId: r.organizationId,
+        callerUserId: r.callerUserId!,
+        ottlRules: ottl_rules,
+        surface: SURFACE,
+      });
+      return json(row);
+    },
+  );
+
+  server.tool(
+    "governance_ingestion_templates_clone_from_platform",
+    "Clone a platform-published template into an editable org-authored row. Requires aiTools:manage. Mirrors POST /api/governance/ingestion-templates/:id/clone.",
+    { source_template_id: z.string() },
+    async ({ source_template_id }) => {
+      const r = await resolve();
+      const denied = await requirePermission(r, "aiTools:manage");
+      if (denied) return text(denied);
+      const row = await ctx.governance.templateCloneFromPlatform({
+        sourceTemplateId: source_template_id,
+        organizationId: r.organizationId,
+        callerUserId: r.callerUserId!,
+        surface: SURFACE,
+      });
+      return json(row);
+    },
+  );
+
+  server.tool(
+    "governance_ingestion_templates_archive",
+    "Soft-archive an org-authored template. Existing ingestion keys continue to land traces; new installs are blocked. Requires aiTools:manage. Mirrors DELETE /api/governance/ingestion-templates/:id.",
+    { id: z.string() },
+    async ({ id }) => {
+      const r = await resolve();
+      const denied = await requirePermission(r, "aiTools:manage");
+      if (denied) return text(denied);
+      await ctx.governance.templateArchiveOrg({
+        id,
+        organizationId: r.organizationId,
+        callerUserId: r.callerUserId!,
+        surface: SURFACE,
+      });
+      return text(`archived ${id}`);
+    },
+  );
+
+  // ── Ingestion keys ──────────────────────────────────────────────────
+
+  server.tool(
+    "governance_ingestion_keys_list",
+    "List the caller's live ingestion keys (one per connected source) in their personal project. Requires OAuth-authenticated session + organization:view.",
+    {},
+    async () => {
+      const r = await resolve();
+      if (!r.callerUserId) {
+        return text(
+          `${NEEDS_OAUTH_PREFIX}listing your own ingestion keys requires an OAuth-authenticated MCP session.`,
+        );
+      }
+      const denied = await requireRead(r, "organization:view");
+      if (denied) return text(denied);
+      const rows = await ctx.governance.ingestionKeyListForPersonalProject({
+        userId: r.callerUserId,
+        organizationId: r.organizationId,
+      });
+      return json(rows);
+    },
+  );
+
+  server.tool(
+    "governance_ingestion_keys_mint",
+    "Mint (rotating in place) an ingestion key for the caller's personal project + source_type, returning the ik-lw-* token (shown ONCE). Requires OAuth-authenticated session + organization:view.",
+    {
+      source_type: z.string(),
+      template_id: z.string().optional(),
+    },
+    async ({ source_type, template_id }) => {
+      const r = await resolve();
+      const denied = await requirePermission(r, "organization:view");
+      if (denied) return text(denied);
+      const result = await ctx.governance.ingestionKeyEnsureForPersonalProject({
+        userId: r.callerUserId!,
+        organizationId: r.organizationId,
+        sourceType: source_type,
+        ingestionTemplateId: template_id ?? null,
+      });
+      return json(result);
+    },
+  );
+}

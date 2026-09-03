@@ -18,9 +18,7 @@ import * as telemetryRefreshMod from "../../utils/governance/telemetry-refresh";
 import { instrumentCommand } from "../instrument";
 
 vi.mock("../../utils/governance/config", async () => {
-  const actual = await vi.importActual<typeof configMod>(
-    "../../utils/governance/config",
-  );
+  const actual = await vi.importActual<typeof configMod>("../../utils/governance/config");
   return { ...actual, loadConfig: vi.fn(), saveConfig: vi.fn(), isLoggedIn: vi.fn() };
 });
 
@@ -47,8 +45,7 @@ class ExitError extends Error {
   }
 }
 
-const asMock = (fn: unknown): ReturnType<typeof vi.fn> =>
-  fn as ReturnType<typeof vi.fn>;
+const asMock = (fn: unknown): ReturnType<typeof vi.fn> => fn as ReturnType<typeof vi.fn>;
 
 const personalCredential = {
   token: "ik-lw-personal00000000_secret",
@@ -77,7 +74,9 @@ beforeEach(() => {
   };
   asMock(configMod.loadConfig).mockReturnValue(cfg);
   asMock(configMod.isLoggedIn).mockReturnValue(true);
-  asMock(telemetryRefreshMod.resolveIngestionCredential).mockResolvedValue(personalCredential);
+  asMock(telemetryRefreshMod.resolveIngestionCredential).mockResolvedValue(
+    personalCredential,
+  );
   asMock(installTelemetryWiring).mockReturnValue({
     labels: ["~/.codex/config.toml"],
     warnings: [],
@@ -105,9 +104,7 @@ describe("instrumentCommand", () => {
         requiredFailures: ["could not enable opencode's OpenTelemetry flag"],
       });
 
-      await expect(instrumentCommand("opencode", {})).rejects.toThrow(
-        ExitError,
-      );
+      await expect(instrumentCommand("opencode", {})).rejects.toThrow(ExitError);
 
       expect(writtenTo(stderrSpy)).toContain(
         "could not enable opencode's OpenTelemetry flag",
@@ -153,9 +150,9 @@ describe("instrumentCommand", () => {
 
     /** @scenario "A tool whose organization forbids direct OTLP is not instrumented" */
     it("refuses before minting a project key or writing any wiring", async () => {
-      await expect(
-        instrumentCommand("codex", { project: "acme-app" }),
-      ).rejects.toThrow(ExitError);
+      await expect(instrumentCommand("codex", { project: "acme-app" })).rejects.toThrow(
+        ExitError,
+      );
 
       expect(writtenTo(stderrSpy)).toContain(
         "does not allow codex to send telemetry directly",
@@ -166,9 +163,9 @@ describe("instrumentCommand", () => {
     });
 
     it("refuses --personal too, leaving the existing pin in place", async () => {
-      await expect(
-        instrumentCommand("codex", { personal: true }),
-      ).rejects.toThrow(ExitError);
+      await expect(instrumentCommand("codex", { personal: true })).rejects.toThrow(
+        ExitError,
+      );
 
       expect(clearToolProjectPin).not.toHaveBeenCalled();
       expect(installTelemetryWiring).not.toHaveBeenCalled();
@@ -259,12 +256,10 @@ describe("instrumentCommand", () => {
       it("fails and points at login or --key", async () => {
         asMock(configMod.isLoggedIn).mockReturnValue(false);
 
-        await expect(
-          instrumentCommand("codex", { project: "acme-app" }),
-        ).rejects.toThrow(ExitError);
-        expect(writtenTo(stderrSpy)).toContain(
-          "--project needs a signed-in session",
+        await expect(instrumentCommand("codex", { project: "acme-app" })).rejects.toThrow(
+          ExitError,
         );
+        expect(writtenTo(stderrSpy)).toContain("--project needs a signed-in session");
         expect(pinToolToProject).not.toHaveBeenCalled();
       });
     });

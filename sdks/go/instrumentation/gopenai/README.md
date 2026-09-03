@@ -12,7 +12,7 @@ extensions.
 `go-openai` doesn't expose a middleware hook, but it does let you inject the HTTP
 client it uses (`ClientConfig.HTTPClient`, typed as the `HTTPDoer` interface that
 `*http.Client` satisfies). This package traces at that HTTP layer via the shared
-[`otelhttp`](../otelhttp) base: it passes request and response bodies *through* to
+[`otelhttp`](../otelhttp) base: it passes request and response bodies _through_ to
 the caller byte-for-byte while capturing a bounded copy off the critical path for
 attribute extraction. Tracing adds negligible latency and memory.
 
@@ -26,11 +26,11 @@ tiebreaker. A generic fallback extractor is tried last, so unknown or
 unsupported OpenAI-compatible endpoints still produce a useful span instead of
 nothing.
 
-| Extractor    | Request discriminator                                     | Response discriminator (`object`)      | Streaming reconstruction |
-| ------------ | --------------------------------------------------------- | -------------------------------------- | ------------------------ |
-| `chat`       | `messages[]` (or a `chat/completions`/`completions` path) | `chat.completion` / `text_completion`  | accumulate `choices[].delta.content` (or `.text`); terminated by `[DONE]`; usage from the final chunk |
-| `embeddings` | `input` + (`encoding_format`/`dimensions`); never streams | `list`                                 | n/a                      |
-| `generic`    | anything (terminal fallback)                              | anything                               | best-effort chat-style delta probing |
+| Extractor    | Request discriminator                                     | Response discriminator (`object`)     | Streaming reconstruction                                                                              |
+| ------------ | --------------------------------------------------------- | ------------------------------------- | ----------------------------------------------------------------------------------------------------- |
+| `chat`       | `messages[]` (or a `chat/completions`/`completions` path) | `chat.completion` / `text_completion` | accumulate `choices[].delta.content` (or `.text`); terminated by `[DONE]`; usage from the final chunk |
+| `embeddings` | `input` + (`encoding_format`/`dimensions`); never streams | `list`                                | n/a                                                                                                   |
+| `generic`    | anything (terminal fallback)                              | anything                              | best-effort chat-style delta probing                                                                  |
 
 ## Supported operations
 
@@ -131,11 +131,11 @@ To chain a custom base transport, use `NewTransportWithBase(base, opts...)`.
 
 ## Options
 
-| Option                          | Description                                                                                       |
-| ------------------------------- | ------------------------------------------------------------------------------------------------- |
-| `WithTracerProvider(tp)`        | Tracer provider to use. Defaults to the global provider.                                           |
-| `WithDataCapture(mode)`         | Gates input/output **content** capture at the source. Defaults to `langwatch.DataCaptureAll`. Span structure, models, usage and metrics are always recorded. |
-| `WithGenAIProvider(kv)`         | Sets `gen_ai.provider.name`. Defaults to `openai`; override for OpenAI-compatible providers.       |
+| Option                   | Description                                                                                                                                                  |
+| ------------------------ | ------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| `WithTracerProvider(tp)` | Tracer provider to use. Defaults to the global provider.                                                                                                     |
+| `WithDataCapture(mode)`  | Gates input/output **content** capture at the source. Defaults to `langwatch.DataCaptureAll`. Span structure, models, usage and metrics are always recorded. |
+| `WithGenAIProvider(kv)`  | Sets `gen_ai.provider.name`. Defaults to `openai`; override for OpenAI-compatible providers.                                                                 |
 
 `WithDataCapture` composes with the exporter-level
 `langwatch.WithDataCapture(...)`: the transport gates content at the source and

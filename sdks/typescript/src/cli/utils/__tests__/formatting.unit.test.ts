@@ -24,12 +24,16 @@ describe("stripAnsi()", () => {
 describe("formatRelativeTime()", () => {
   describe("when given a valid past date", () => {
     it("returns years for dates over a year ago", () => {
-      const twoYearsAgo = new Date(Date.now() - 2 * 365 * 24 * 60 * 60 * 1000).toISOString();
+      const twoYearsAgo = new Date(
+        Date.now() - 2 * 365 * 24 * 60 * 60 * 1000,
+      ).toISOString();
       expect(formatRelativeTime(twoYearsAgo)).toBe("2y ago");
     });
 
     it("returns months for dates over a month ago", () => {
-      const threeMonthsAgo = new Date(Date.now() - 3 * 30 * 24 * 60 * 60 * 1000).toISOString();
+      const threeMonthsAgo = new Date(
+        Date.now() - 3 * 30 * 24 * 60 * 60 * 1000,
+      ).toISOString();
       expect(formatRelativeTime(threeMonthsAgo)).toBe("3mo ago");
     });
 
@@ -123,10 +127,7 @@ describe("formatTable()", () => {
 
     it("pads columns to align with the longest value", () => {
       formatTable({
-        data: [
-          { Col: "short" },
-          { Col: "a longer value" },
-        ],
+        data: [{ Col: "short" }, { Col: "a longer value" }],
         headers: ["Col"],
       });
 

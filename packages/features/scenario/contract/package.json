@@ -1,0 +1,37 @@
+{
+  "name": "@langwatch/scenario-contract",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Portable Scenario feature contracts and Zod 4 schemas.",
+  "files": [
+    "src"
+  ],
+  "type": "module",
+  "main": "./src/index.ts",
+  "types": "./src/index.ts",
+  "exports": {
+    ".": {
+      "types": "./src/index.ts",
+      "default": "./src/index.ts"
+    }
+  },
+  "scripts": {
+    "build": "tsc --project tsconfig.build.json",
+    "typecheck": "tsc --noEmit",
+    "test": "vitest run",
+    "test:unit": "vitest run"
+  },
+  "dependencies": {
+    "@ag-ui/core": "~0.0.57",
+    "@langwatch/automation-contract": "workspace:*",
+    "@langwatch/handled-error": "workspace:*",
+    "@langwatch/ksuid": "^2.0.2",
+    "@langwatch/model-provider-contract": "workspace:*",
+    "liquidjs": "^10.27.1",
+    "zod": "^4.4.3"
+  },
+  "devDependencies": {
+    "typescript": "^7.0.2",
+    "vitest": "^4.1.9"
+  }
+}

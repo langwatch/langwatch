@@ -4,11 +4,21 @@ description: OTLP/HTTP push, the production-ready governance ingest path. Spans 
 sidebarTitle: Generic OTel
 ---
 
-<Info>**Pairs with:** [LangWatch OpenTelemetry guide](/integration/opentelemetry/guide). Same wire shape; this page uses the governance ingest endpoint instead of a project-scoped one, so events get `langwatch.origin.kind = "ingestion_source"` instead of `app`.</Info>
+<Info>
+  **Pairs with:** [LangWatch OpenTelemetry guide](/integration/opentelemetry/guide). Same
+  wire shape; this page uses the governance ingest endpoint instead of a project-scoped
+  one, so events get `langwatch.origin.kind = "ingestion_source"` instead of `app`.
+</Info>
 
 `otel_generic` is the production-ready governance ingest path. Anything that speaks OTLP/HTTP, your own agents, third-party SDKs, tracing libraries, points at the source's URL with the source's bearer secret and events flow end-to-end into the [governance dashboard](/ai-governance/control-plane), the per-source detail page, and the [`langwatch ingest tail`](/ai-governance/cli-debug) CLI.
 
-<Note>**Not sending your own app's traces here.** This endpoint is for *third-party* OTel feeds your org wants in the governance audit trail. For your own application's LLM traces, use [`/api/otel/v1/traces`](/integration/quick-start) with your project API key, see [Choosing the right OTel endpoint](/observability/trace-vs-activity-ingestion) for the full comparison.</Note>
+<Note>
+  **Not sending your own app's traces here.** This endpoint is for *third-party* OTel
+  feeds your org wants in the governance audit trail. For your own application's LLM
+  traces, use [`/api/otel/v1/traces`](/integration/quick-start) with your project API key,
+  see [Choosing the right OTel endpoint](/observability/trace-vs-activity-ingestion) for
+  the full comparison.
+</Note>
 
 ## Currently implemented
 
@@ -23,9 +33,9 @@ sidebarTitle: Generic OTel
 
 After clicking Create on the composer, the one-time-reveal modal exposes:
 
-| Field | Value |
-|---|---|
-| OTLP URL | `https://<your-langwatch>/api/ingest/otel/<sourceId>` |
+| Field         | Value                                                                  |
+| ------------- | ---------------------------------------------------------------------- |
+| OTLP URL      | `https://<your-langwatch>/api/ingest/otel/<sourceId>`                  |
 | Bearer secret | `lw_is_<base64url>` (shown once, never returned by the list endpoints) |
 
 The composer also persists one optional config field:
@@ -62,15 +72,15 @@ exporter = OTLPSpanExporter(
 
 OTLP spans land in `recorded_spans` with `langwatch.origin.kind = "ingestion_source"` stamped at the receiver edge. The governance fold projection (`governance_kpis` + `governance_ocsf_events`) extracts the canonical KPI + OCSF dimensions from these attribute precedences. Span resource attributes are merged with span-level attributes (span-level wins on collision):
 
-| Governance dimension | OTLP attribute precedence |
-|---|---|
-| Actor (OCSF, KPI user) | `langwatch.user.id` ▸ `user.email` ▸ `user.id` ▸ `enduser.id` |
-| Action (OCSF) | `gen_ai.operation.name` ▸ `span.name` |
-| Target (OCSF, KPI model) | `gen_ai.request.model` ▸ `gen_ai.response.model` ▸ `llm.model` ▸ `model` ▸ `tool.name` |
-| Cost USD (KPI spend) | `gen_ai.usage.cost_usd` ▸ `gen_ai.usage.cost` ▸ `llm.cost.usd` ▸ `langwatch.cost.usd` |
-| Input tokens | `gen_ai.usage.input_tokens` ▸ `gen_ai.usage.prompt_tokens` ▸ `llm.token_count.prompt` ▸ `input_tokens` |
-| Output tokens | `gen_ai.usage.output_tokens` ▸ `gen_ai.usage.completion_tokens` ▸ `llm.token_count.completion` ▸ `output_tokens` |
-| Event time | `span.startTimeUnixNano` (parsed as nanoseconds) ▸ ingest time |
+| Governance dimension     | OTLP attribute precedence                                                                                        |
+| ------------------------ | ---------------------------------------------------------------------------------------------------------------- |
+| Actor (OCSF, KPI user)   | `langwatch.user.id` ▸ `user.email` ▸ `user.id` ▸ `enduser.id`                                                    |
+| Action (OCSF)            | `gen_ai.operation.name` ▸ `span.name`                                                                            |
+| Target (OCSF, KPI model) | `gen_ai.request.model` ▸ `gen_ai.response.model` ▸ `llm.model` ▸ `model` ▸ `tool.name`                           |
+| Cost USD (KPI spend)     | `gen_ai.usage.cost_usd` ▸ `gen_ai.usage.cost` ▸ `llm.cost.usd` ▸ `langwatch.cost.usd`                            |
+| Input tokens             | `gen_ai.usage.input_tokens` ▸ `gen_ai.usage.prompt_tokens` ▸ `llm.token_count.prompt` ▸ `input_tokens`           |
+| Output tokens            | `gen_ai.usage.output_tokens` ▸ `gen_ai.usage.completion_tokens` ▸ `llm.token_count.completion` ▸ `output_tokens` |
+| Event time               | `span.startTimeUnixNano` (parsed as nanoseconds) ▸ ingest time                                                   |
 
 If a field doesn't resolve from the precedence list, the fold projection stores an empty string, 0, the span is still persisted and queryable in the trace viewer.
 
@@ -109,13 +119,13 @@ If `eventType` shows `agent.action` instead of `api.call`, `tool.invocation`, th
 
 The five attributes that make the canonical first-event flow useful (and that the secret-reveal modal's auto-generated curl pre-fills):
 
-| Attribute | Maps to | Why include it |
-|---|---|---|
-| `gen_ai.request.model` | `target` | Source detail page shows a model name instead of an empty cell |
-| `user.email` | `actor` | "Spend by user" KPI groups by actor; `agent.action` on its own attributes to "(unattributed)" |
-| `gen_ai.usage.cost_usd` | `costUsd` | Drives the Spend KPI on `/governance` and the per-source health strip |
-| `gen_ai.usage.input_tokens` | `tokensInput` | Tokens KPI |
-| `gen_ai.usage.output_tokens` | `tokensOutput` | Tokens KPI |
+| Attribute                    | Maps to        | Why include it                                                                                |
+| ---------------------------- | -------------- | --------------------------------------------------------------------------------------------- |
+| `gen_ai.request.model`       | `target`       | Source detail page shows a model name instead of an empty cell                                |
+| `user.email`                 | `actor`        | "Spend by user" KPI groups by actor; `agent.action` on its own attributes to "(unattributed)" |
+| `gen_ai.usage.cost_usd`      | `costUsd`      | Drives the Spend KPI on `/governance` and the per-source health strip                         |
+| `gen_ai.usage.input_tokens`  | `tokensInput`  | Tokens KPI                                                                                    |
+| `gen_ai.usage.output_tokens` | `tokensOutput` | Tokens KPI                                                                                    |
 
 A complete OTLP/HTTP JSON body that hits the full normaliser and produces one row in `langwatch ingest tail`, the per-source detail page. Substitute `<otlpUrl>` and `<secret>` from the one-time-reveal modal:
 
@@ -158,6 +168,7 @@ Content-Type: application/json
 ```
 
 `events:1` confirms the body parsed and the row landed. `events:0` with `bytes>0` means the body was accepted but no spans were extracted, common causes:
+
 - `resource_spans`, `resourceSpans` not present at the top level (wrong nesting)
 - `spans` array empty within a `scope_spans` entry
 - Body is not OTLP-shaped JSON (e.g. you posted a Workato-style envelope to the OTLP endpoint).

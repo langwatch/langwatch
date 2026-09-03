@@ -1,0 +1,17 @@
+{
+  "skill_name": "feature-move",
+  "evals": [
+    {
+      "id": 1,
+      "prompt": "packages/features/trace/server/src/services/redaction.service.ts contains PII stripping that belongs to data-privacy. Move it.",
+      "expected_output": "Moves the pure stripper into data-privacy contract (or server service if it needs runtime), repoints every importer including tests and vi.mock paths, adds no re-export, deletes the source, updates package.json dependencies and runs pnpm install, and runs tsc on every consumer to catch TS2304.",
+      "files": []
+    },
+    {
+      "id": 2,
+      "prompt": "apps/ui/src/features/prompts/ui/blocks/VariableChip.tsx is a generic prompt component; it should live in the prompt web package.",
+      "expected_output": "Moves it to packages/features/prompt/web/src/ui/elements or blocks with a kebab filename, keeps the layer direction, exposes it only through a surface or screen if apps/ui still needs it, repoints imports, and checks the install registries and screen closure.",
+      "files": []
+    }
+  ]
+}

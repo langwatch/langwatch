@@ -16,11 +16,7 @@ import { PassThrough } from "node:stream";
 import { describe, expect, it } from "vitest";
 
 import { readStdin } from "../hook-input";
-import {
-  installHookHarness,
-  SESSION_ID,
-  unreachableCollector,
-} from "./hook-harness";
+import { installHookHarness, SESSION_ID, unreachableCollector } from "./hook-harness";
 
 const hook = installHookHarness();
 const { posted } = hook;
@@ -113,9 +109,7 @@ describe("the session context hook's silence", () => {
       const stream = new PassThrough();
       stream.write('{"session_id":"');
 
-      await expect(readStdin({ stream, timeoutMs: 20 })).resolves.toBe(
-        '{"session_id":"',
-      );
+      await expect(readStdin({ stream, timeoutMs: 20 })).resolves.toBe('{"session_id":"');
     });
 
     /** @scenario "A payload that never arrives does not outlive the session" */
@@ -141,8 +135,7 @@ describe("the session context hook's silence", () => {
     /** @scenario "An oversized payload sends no session context and leaves the session undisturbed" */
     it("posts nothing, writes nothing and exits zero", async () => {
       await hook.runHook({
-        readInput: () =>
-          readStdin({ stream: oversizedWrite(), timeoutMs: 5_000 }),
+        readInput: () => readStdin({ stream: oversizedWrite(), timeoutMs: 5_000 }),
       });
 
       expect(posted).toEqual([]);

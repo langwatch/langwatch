@@ -32,8 +32,7 @@ vi.mock("@/cli/utils/governance/cli-api", async () => {
 });
 
 vi.mock("node:child_process", async () => {
-  const actual =
-    await vi.importActual<typeof ChildProcessModule>("node:child_process");
+  const actual = await vi.importActual<typeof ChildProcessModule>("node:child_process");
   return { ...actual, spawnSync: spawnSyncMock };
 });
 
@@ -150,13 +149,11 @@ describe("the claude_code ingestion install", () => {
     it("writes the hook entries into the settings file", async () => {
       await runInstall();
 
-      const settings = JSON.parse(
-        fs.readFileSync(settingsPath, "utf8"),
-      ) as Record<string, unknown>;
-      expect(Object.keys(settings.hooks as object)).toEqual([
-        "SessionStart",
-        "Stop",
-      ]);
+      const settings = JSON.parse(fs.readFileSync(settingsPath, "utf8")) as Record<
+        string,
+        unknown
+      >;
+      expect(Object.keys(settings.hooks as object)).toEqual(["SessionStart", "Stop"]);
     });
   });
 

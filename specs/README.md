@@ -13,22 +13,25 @@ BDD feature files describing user-facing behavior.
 A feature file should be a **complete specification** of the work:
 
 ### Feature Complete
+
 - All acceptance criteria from the issue are captured as scenarios
 - All user-visible behaviors are described
 - No gaps - if it's not in the feature file, it's not in scope
 
 ### Non-Overlapping Test Coverage
+
 Each test level has a distinct purpose (see `dev/docs/TESTING_PHILOSOPHY.md`):
 
-| Tag | Purpose | What It Tests |
-|-----|---------|---------------|
-| `@e2e` | Happy paths via real examples | Full system, no mocks |
-| `@integration` | Edge cases, error handling | Module boundaries, external services mocked |
-| `@unit` | Pure logic, branches | Single function/class, collaborators mocked |
+| Tag            | Purpose                       | What It Tests                               |
+| -------------- | ----------------------------- | ------------------------------------------- |
+| `@e2e`         | Happy paths via real examples | Full system, no mocks                       |
+| `@integration` | Edge cases, error handling    | Module boundaries, external services mocked |
+| `@unit`        | Pure logic, branches          | Single function/class, collaborators mocked |
 
 **Avoid overlap**: If an E2E test covers the happy path, don't duplicate it in integration. Integration tests edge cases. Unit tests logic branches.
 
 ### Scenario Design
+
 - One invariant per scenario
 - Scenarios should be independent
 - Focus on behavior, not implementation
@@ -62,7 +65,7 @@ Annotations live in the normal test files (`*.unit.test.ts`, `*.integration.test
 One `it` block may carry multiple `@scenario` annotations if it covers several scenarios;
 one scenario may be bound by multiple tests.
 
-The `platform/app/scripts/check-feature-parity.ts` script parses every feature file
+The `packages/architecture-lint/src/check-feature-parity.ts` script parses every feature file
 and fails CI if any tagged (`@unit` / `@integration` / `@e2e` / `@regression`) scenario
 has no binding. Enforcement is on by default and fails closed — a new feature file
 needs no registration anywhere. The script carries two ratcheted deny-lists instead:
@@ -78,5 +81,5 @@ scenarios, or the spec is decorative.
 Run locally:
 
 ```bash
-cd platform/app && pnpm check:feature-parity
+pnpm --filter @langwatch/architecture-lint check:feature-parity
 ```

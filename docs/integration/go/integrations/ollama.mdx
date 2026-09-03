@@ -16,7 +16,8 @@ go get github.com/langwatch/langwatch/sdks/go github.com/openai/openai-go
 ## Usage
 
 <Info>
-Set `LANGWATCH_API_KEY` environment variable before running. Ollama runs locally so no API key is needed for the model.
+  Set `LANGWATCH_API_KEY` environment variable before running. Ollama runs locally so no
+  API key is needed for the model.
 </Info>
 
 ```go
@@ -73,7 +74,8 @@ func main() {
 ```
 
 <Warning>
-The `defer tp.Shutdown(ctx)` call is essential. Without it, traces buffered in memory will be lost when your application exits.
+  The `defer tp.Shutdown(ctx)` call is essential. Without it, traces buffered in memory
+  will be lost when your application exits.
 </Warning>
 
 ## Related

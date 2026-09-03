@@ -1,0 +1,366 @@
+{
+  "name": "@langwatch/workflow-web",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Browser-safe Workflow DSL, graph state, and workflow UI primitives.",
+  "files": [
+    "src"
+  ],
+  "type": "module",
+  "main": "./src/index.ts",
+  "types": "./src/index.ts",
+  "exports": {
+    ".": {
+      "types": "./src/index.ts",
+      "default": "./src/index.ts"
+    },
+    "./components/CopyButton": {
+      "types": "./src/ui/sections/copy-button.tsx",
+      "default": "./src/ui/sections/copy-button.tsx"
+    },
+    "./components/Delayed": {
+      "types": "./src/ui/elements/delayed.tsx",
+      "default": "./src/ui/elements/delayed.tsx"
+    },
+    "./components/ExternalImage": {
+      "types": "./src/ui/sections/external-image.tsx",
+      "default": "./src/ui/sections/external-image.tsx"
+    },
+    "./components/GenerateApiSnippetButton": {
+      "types": "./src/ui/elements/generate-api-snippet-button.tsx",
+      "default": "./src/ui/elements/generate-api-snippet-button.tsx"
+    },
+    "./components/GenerateApiSnippetDialog": {
+      "types": "./src/ui/sections/generate-api-snippet-dialog.tsx",
+      "default": "./src/ui/sections/generate-api-snippet-dialog.tsx"
+    },
+    "./components/HorizontalFormControl": {
+      "types": "./src/ui/elements/horizontal-form-control.tsx",
+      "default": "./src/ui/elements/horizontal-form-control.tsx"
+    },
+    "./components/HoverableBigText": {
+      "types": "./src/ui/sections/hoverable-big-text.tsx",
+      "default": "./src/ui/sections/hoverable-big-text.tsx"
+    },
+    "./components/Markdown": {
+      "types": "./src/ui/sections/markdown.tsx",
+      "default": "./src/ui/sections/markdown.tsx"
+    },
+    "./components/OverflownText": {
+      "types": "./src/ui/elements/overflown-text.tsx",
+      "default": "./src/ui/elements/overflown-text.tsx"
+    },
+    "./components/VerticalFormControl": {
+      "types": "./src/ui/elements/vertical-form-control.tsx",
+      "default": "./src/ui/elements/vertical-form-control.tsx"
+    },
+    "./components/blocks/CodeBlockEditor": {
+      "types": "./src/ui/sections/blocks/code-block-editor.tsx",
+      "default": "./src/ui/sections/blocks/code-block-editor.tsx"
+    },
+    "./components/code/RenderCode": {
+      "types": "./src/ui/sections/code/render-code.tsx",
+      "default": "./src/ui/sections/code/render-code.tsx"
+    },
+    "./components/code/langwatchEndpointEnv": {
+      "types": "./src/model/code/langwatch-endpoint-env.ts",
+      "default": "./src/model/code/langwatch-endpoint-env.ts"
+    },
+    "./components/run-via-api/DataSourcePicker": {
+      "types": "./src/ui/elements/run-via-api/data-source-picker.tsx",
+      "default": "./src/ui/elements/run-via-api/data-source-picker.tsx"
+    },
+    "./components/run-via-api/runSnippets": {
+      "types": "./src/model/run-via-api/run-snippets.ts",
+      "default": "./src/model/run-via-api/run-snippets.ts"
+    },
+    "./components/run-via-api/useRunViaApiTabs": {
+      "types": "./src/ui/sections/run-via-api/use-run-via-api-tabs.ts",
+      "default": "./src/ui/sections/run-via-api/use-run-via-api-tabs.ts"
+    },
+    "./components/ui/IsolatedErrorBoundary": {
+      "types": "./src/ui/elements/isolated-error-boundary.tsx",
+      "default": "./src/ui/elements/isolated-error-boundary.tsx"
+    },
+    "./components/ui/PropertySectionTitle": {
+      "types": "./src/ui/elements/property-section-title.tsx",
+      "default": "./src/ui/elements/property-section-title.tsx"
+    },
+    "./components/ui/RedactedField": {
+      "types": "./src/ui/sections/redacted-field.tsx",
+      "default": "./src/ui/sections/redacted-field.tsx"
+    },
+    "./components/ui/SelectionActionBar": {
+      "types": "./src/ui/elements/selection-action-bar.tsx",
+      "default": "./src/ui/elements/selection-action-bar.tsx"
+    },
+    "./components/ui/delete-confirmation-dialog": {
+      "types": "./src/ui/elements/delete-confirmation-dialog.tsx",
+      "default": "./src/ui/elements/delete-confirmation-dialog.tsx"
+    },
+    "./components/ui/dialog": {
+      "types": "./src/ui/elements/dialog.tsx",
+      "default": "./src/ui/elements/dialog.tsx"
+    },
+    "./components/ui/drawer": {
+      "types": "./src/ui/elements/drawer.tsx",
+      "default": "./src/ui/elements/drawer.tsx"
+    },
+    "./components/ui/messages/index": {
+      "types": "./src/ui/sections/messages/index.ts",
+      "default": "./src/ui/sections/messages/index.ts"
+    },
+    "./hooks/useDejaViewLink": {
+      "types": "./src/behavior/use-deja-view-link.ts",
+      "default": "./src/behavior/use-deja-view-link.ts"
+    },
+    "./hooks/useEscapeKey": {
+      "types": "./src/behavior/use-escape-key.ts",
+      "default": "./src/behavior/use-escape-key.ts"
+    },
+    "./hooks/useFeatureFlag": {
+      "types": "./src/behavior/use-feature-flag.ts",
+      "default": "./src/behavior/use-feature-flag.ts"
+    },
+    "./hooks/useInteractiveTooltip": {
+      "types": "./src/behavior/use-interactive-tooltip.ts",
+      "default": "./src/behavior/use-interactive-tooltip.ts"
+    },
+    "./model/prism-language": {
+      "types": "./src/model/prism-language.ts",
+      "default": "./src/model/prism-language.ts"
+    },
+    "./model/prisma-types": {
+      "types": "./src/model/prisma-types.ts",
+      "default": "./src/model/prisma-types.ts"
+    },
+    "./model/workflow-host": {
+      "types": "./src/model/workflow-host.ts",
+      "default": "./src/model/workflow-host.ts"
+    },
+    "./optimization_studio/components/AddModelProviderKey": {
+      "types": "./src/ui/elements/optimization_studio/add-model-provider-key.tsx",
+      "default": "./src/ui/elements/optimization_studio/add-model-provider-key.tsx"
+    },
+    "./optimization_studio/components/FormatMoney": {
+      "types": "./src/ui/elements/optimization_studio/format-money.tsx",
+      "default": "./src/ui/elements/optimization_studio/format-money.tsx"
+    },
+    "./optimization_studio/components/History": {
+      "types": "./src/ui/sections/optimization_studio/history.tsx",
+      "default": "./src/ui/sections/optimization_studio/history.tsx"
+    },
+    "./optimization_studio/components/code/workflow-code-editor.transport": {
+      "types": "./src/ui/sections/optimization_studio/code/workflow-code-editor.transport.tsx",
+      "default": "./src/ui/sections/optimization_studio/code/workflow-code-editor.transport.tsx"
+    },
+    "./optimization_studio/components/properties/modals/EmojiPickerModal": {
+      "types": "./src/ui/sections/optimization_studio/properties/modals/emoji-picker-modal.tsx",
+      "default": "./src/ui/sections/optimization_studio/properties/modals/emoji-picker-modal.tsx"
+    },
+    "./optimization_studio/utils/executionStateError": {
+      "types": "./src/ui/sections/optimization_studio/execution-state-error.ts",
+      "default": "./src/ui/sections/optimization_studio/execution-state-error.ts"
+    },
+    "./screens/studio": {
+      "types": "./src/screens/studio/index.ts",
+      "default": "./src/screens/studio/index.ts"
+    },
+    "./screens/workflows": {
+      "types": "./src/screens/workflows/index.ts",
+      "default": "./src/screens/workflows/index.ts"
+    },
+    "./stores/upgradeModalStore": {
+      "types": "./src/behavior/stores/upgrade-modal-store.ts",
+      "default": "./src/behavior/stores/upgrade-modal-store.ts"
+    },
+    "./studio-host/api": {
+      "types": "./src/behavior/studio-host/api.ts",
+      "default": "./src/behavior/studio-host/api.ts"
+    },
+    "./studio-host/binding": {
+      "types": "./src/ui/sections/studio-host/binding.ts",
+      "default": "./src/ui/sections/studio-host/binding.ts"
+    },
+    "./studio-host/errors": {
+      "types": "./src/ui/elements/studio-host/errors.tsx",
+      "default": "./src/ui/elements/studio-host/errors.tsx"
+    },
+    "./studio-host/link": {
+      "types": "./src/ui/elements/studio-host/link.tsx",
+      "default": "./src/ui/elements/studio-host/link.tsx"
+    },
+    "./studio-host/next-router": {
+      "types": "./src/behavior/studio-host/next-router.ts",
+      "default": "./src/behavior/studio-host/next-router.ts"
+    },
+    "./studio-host/toaster": {
+      "types": "./src/behavior/studio-host/toaster.ts",
+      "default": "./src/behavior/studio-host/toaster.ts"
+    },
+    "./studio-host/use-drawer": {
+      "types": "./src/behavior/studio-host/use-drawer.ts",
+      "default": "./src/behavior/studio-host/use-drawer.ts"
+    },
+    "./studio-host/use-organization-team-project": {
+      "types": "./src/behavior/studio-host/use-organization-team-project.ts",
+      "default": "./src/behavior/studio-host/use-organization-team-project.ts"
+    },
+    "./types": {
+      "types": "./src/model/types.ts",
+      "default": "./src/model/types.ts"
+    },
+    "./ui/elements/loading-screen": {
+      "types": "./src/ui/sections/loading-screen.tsx",
+      "default": "./src/ui/sections/loading-screen.tsx"
+    },
+    "./ui/elements/no-data-info-block": {
+      "types": "./src/ui/elements/no-data-info-block.tsx",
+      "default": "./src/ui/elements/no-data-info-block.tsx"
+    },
+    "./utils/compat/next-dynamic": {
+      "types": "./src/behavior/compat/next-dynamic.ts",
+      "default": "./src/behavior/compat/next-dynamic.ts"
+    },
+    "./utils/compat/next-link": {
+      "types": "./src/ui/elements/compat/next-link.tsx",
+      "default": "./src/ui/elements/compat/next-link.tsx"
+    },
+    "./utils/compat/next-navigation": {
+      "types": "./src/behavior/compat/next-navigation.ts",
+      "default": "./src/behavior/compat/next-navigation.ts"
+    },
+    "./utils/constants": {
+      "types": "./src/model/constants.ts",
+      "default": "./src/model/constants.ts"
+    },
+    "./utils/crispBubblePolicy": {
+      "types": "./src/behavior/crisp-bubble-policy.ts",
+      "default": "./src/behavior/crisp-bubble-policy.ts"
+    },
+    "./utils/formatMoney": {
+      "types": "./src/model/format-money.ts",
+      "default": "./src/model/format-money.ts"
+    },
+    "./utils/formatTimeAgo": {
+      "types": "./src/model/utils/format-time-ago.ts",
+      "default": "./src/model/utils/format-time-ago.ts"
+    },
+    "./utils/routes": {
+      "types": "./src/model/routes.ts",
+      "default": "./src/model/routes.ts"
+    },
+    "./utils/slugify": {
+      "types": "./src/model/slugify.ts",
+      "default": "./src/model/slugify.ts"
+    },
+    "./utils/sse/fetchSSE": {
+      "types": "./src/model/sse/fetch-sse.ts",
+      "default": "./src/model/sse/fetch-sse.ts"
+    },
+    "./utils/stringCasing": {
+      "types": "./src/model/string-casing.ts",
+      "default": "./src/model/string-casing.ts"
+    },
+    "./utils/trpcError": {
+      "types": "./src/behavior/trpc-error.ts",
+      "default": "./src/behavior/trpc-error.ts"
+    },
+    "./utils/types": {
+      "types": "./src/model/utils/types.ts",
+      "default": "./src/model/utils/types.ts"
+    },
+    "./utils/workflow-api": {
+      "types": "./src/behavior/workflow-api.tsx",
+      "default": "./src/behavior/workflow-api.tsx"
+    },
+    "./utils/zodSalvage": {
+      "types": "./src/model/zod-salvage.ts",
+      "default": "./src/model/zod-salvage.ts"
+    }
+  },
+  "scripts": {
+    "typecheck": "tsc --noEmit",
+    "test": "vitest run",
+    "test:unit": "vitest run"
+  },
+  "dependencies": {
+    "@chakra-ui/react": "^3.36.0",
+    "@langwatch/agent-contract": "workspace:*",
+    "@langwatch/agent-web": "workspace:*",
+    "@langwatch/dataset-contract": "workspace:*",
+    "@langwatch/dataset-web": "workspace:*",
+    "@langwatch/design-system": "workspace:*",
+    "@langwatch/enterprise-licensing-contract": "workspace:*",
+    "@langwatch/evaluator-contract": "workspace:*",
+    "@langwatch/evaluator-web": "workspace:*",
+    "@langwatch/experiment-web": "workspace:*",
+    "@langwatch/feature-flag-contract": "workspace:*",
+    "@langwatch/langy-web": "workspace:*",
+    "@langwatch/model-provider-contract": "workspace:*",
+    "@langwatch/model-provider-web": "workspace:*",
+    "@langwatch/observability": "workspace:*",
+    "@langwatch/platform-api-client": "workspace:*",
+    "@langwatch/platform-api-contract": "workspace:*",
+    "@langwatch/prompt-contract": "workspace:*",
+    "@langwatch/prompt-web": "workspace:*",
+    "@langwatch/trace-contract": "workspace:*",
+    "@langwatch/trace-web": "workspace:*",
+    "@langwatch/ui-drawer": "workspace:*",
+    "@langwatch/workflow-contract": "workspace:*",
+    "@microsoft/fetch-event-source": "^2.0.1",
+    "@monaco-editor/react": "^4.7.0",
+    "@tanstack/react-query": "5.101.4",
+    "@trpc/client": "11.18.0",
+    "@trpc/react-query": "11.18.0",
+    "@trpc/server": "11.18.0",
+    "@xyflow/react": "^12.11.1",
+    "date-fns": "^4.4.0",
+    "emoji-picker-react": "^4.19.1",
+    "fast-deep-equal": "^3.1.3",
+    "langwatch": "workspace:*",
+    "liquidjs": "^10.27.1",
+    "lodash-es": "^4.17.21",
+    "lucide-react": "^1.22.0",
+    "monaco-editor": "^0.55.1",
+    "monacopilot": "^1.2.12",
+    "motion": "^12.42.2",
+    "nanoid": "^5.1.5",
+    "numeral": "^2.0.6",
+    "react-dnd": "^16.0.1",
+    "react-dnd-html5-backend": "^16.0.1",
+    "react-error-boundary": "^6.1.2",
+    "react-feather": "^2.0.10",
+    "react-hook-form": "^7.80.0",
+    "react-icons": "^5.5.0",
+    "react-markdown": "^10.1.0",
+    "react-resizable-panels": "^2.1.9",
+    "react-spinners": "^0.17.0",
+    "remark-gfm": "^4.0.1",
+    "slugify": "^1.6.9",
+    "superjson": "^2.2.6",
+    "use-debounce": "^10.1.1",
+    "usehooks-ts": "^3.1.1",
+    "zod": "^4.4.3",
+    "zundo": "^2.3.0",
+    "zustand": "^4.5.7"
+  },
+  "devDependencies": {
+    "@testing-library/jest-dom": "^7.0.1",
+    "@testing-library/react": "^16.3.2",
+    "@testing-library/user-event": "^14.6.1",
+    "@types/lodash-es": "^4.17.12",
+    "@types/numeral": "^2.0.5",
+    "@types/react": "^19.2.14",
+    "@types/react-dom": "^19.2.3",
+    "jsdom": "^30.0.1",
+    "react": "^19.2.7",
+    "react-dom": "^19.2.7",
+    "typescript": "^7.0.2",
+    "vitest": "^4.1.9"
+  },
+  "peerDependencies": {
+    "react": "^19.2.7",
+    "react-dom": "^19.2.7"
+  }
+}

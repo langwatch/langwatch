@@ -17,8 +17,8 @@ name: gateway-matrix
 # Touches needing this matrix:
 #   - services/aigateway/**          (gateway data plane)
 #   - pkg/**                         (shared HTTP/health helpers)
-#   - platform/app/src/server/gateway/  (control plane)
-#   - platform/app/ee/governance/process-manager/gatewayDebits.process.ts
+#   - packages/features/gateway/  (control plane)
+#   - packages/enterprise/features/governance/server/src/processes/gateway-debit.process.ts
 #     (the sole writer of gateway budget debits)
 # Triggers:
 #   - PR push (path-filtered to gateway-relevant files only — doc-only
@@ -32,13 +32,13 @@ on:
   workflow_dispatch:
     inputs:
       providers:
-        description: 'Build tags (space-separated). Default = all six.'
+        description: "Build tags (space-separated). Default = all six."
         type: string
-        default: 'live_openai live_anthropic live_gemini live_bedrock live_azure live_vertex live_embeddings live_audio'
+        default: "live_openai live_anthropic live_gemini live_bedrock live_azure live_vertex live_embeddings live_audio"
       run_id_label:
-        description: 'Optional label appended to trace tags for grep.'
+        description: "Optional label appended to trace tags for grep."
         type: string
-        default: ''
+        default: ""
   pull_request:
     # `ready_for_review` on top of the defaults, because the job below
     # skips drafts: without it a PR opened as a draft and then marked
@@ -48,19 +48,19 @@ on:
     # Only fire when gateway-relevant code or this workflow itself
     # changes — doc-only / unrelated PRs stay free.
     paths:
-      - 'services/aigateway/**'
-      - 'pkg/**'
-      - 'cmd/**'
-      - 'go.mod'
-      - 'go.sum'
-      - 'platform/app/src/server/gateway/**'
-      - 'platform/app/ee/governance/process-manager/gatewayDebits.process.ts'
-      - 'platform/app/src/server/routes/gateway-internal.ts'
-      - 'charts/gateway/**'
-      - '.github/workflows/gateway-matrix.yaml'
+      - "services/aigateway/**"
+      - "pkg/**"
+      - "cmd/**"
+      - "go.mod"
+      - "go.sum"
+      - "packages/features/gateway/**"
+      - "packages/enterprise/features/governance/server/src/processes/gateway-debit.process.ts"
+      - "apps/api/src/app/api-gateway*.composition.ts"
+      - "charts/gateway/**"
+      - ".github/workflows/gateway-matrix.yaml"
   schedule:
     # 04:00 UTC daily — quiet provider tier, runs while EMEA is asleep
-    - cron: '0 4 * * *'
+    - cron: "0 4 * * *"
 
 permissions:
   contents: read
@@ -169,7 +169,7 @@ jobs:
           POSTGRES_USER: postgres
           POSTGRES_PASSWORD: postgres
           POSTGRES_DB: langwatch
-        ports: ['5432:5432']
+        ports: ["5432:5432"]
         options: >-
           --health-cmd pg_isready
           --health-interval 10s
@@ -178,15 +178,15 @@ jobs:
 
       clickhouse:
         image: clickhouse/clickhouse-server:24.8
-        ports: ['8123:8123', '9000:9000']
+        ports: ["8123:8123", "9000:9000"]
         env:
           CLICKHOUSE_USER: default
-          CLICKHOUSE_PASSWORD: ''
+          CLICKHOUSE_PASSWORD: ""
           CLICKHOUSE_DB: langwatch
 
       redis:
         image: redis:7-alpine
-        ports: ['6379:6379']
+        ports: ["6379:6379"]
 
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
@@ -200,8 +200,8 @@ jobs:
 
       - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v4
         with:
-          node-version: '24'
-          cache: 'pnpm'
+          node-version: "24"
+          cache: "pnpm"
           cache-dependency-path: pnpm-lock.yaml
 
       - name: Install langwatch deps
@@ -210,22 +210,22 @@ jobs:
         # action that puts node-gyp on PATH.
         run: |
           npm install -g node-gyp@12.3.0
-          pnpm install --frozen-lockfile --filter "@langwatch/web..."
+          pnpm install --frozen-lockfile --filter "@langwatch/platform-api..."
 
       - name: Apply DB migrations
-        working-directory: platform/app
+        working-directory: apps/api
         env:
           DATABASE_URL: postgresql://postgres:postgres@localhost:5432/langwatch
-        run: pnpm prisma migrate deploy
+        run: pnpm run task:prisma-migrate
 
       - name: Start control plane (background)
-        working-directory: platform/app
+        working-directory: apps/api
         env:
           DATABASE_URL: postgresql://postgres:postgres@localhost:5432/langwatch
           REDIS_URL: redis://localhost:6379
           CLICKHOUSE_HOST: http://localhost:8123
         run: |
-          pnpm dev > /tmp/langwatch-dev.log 2>&1 &
+          pnpm start > /tmp/langwatch-dev.log 2>&1 &
           echo $! > /tmp/langwatch.pid
           # Wait up to 90s for /api/health
           for i in {1..45}; do

@@ -43,7 +43,5 @@
     "pricing.mdx",
     "support.mdx"
   ],
-  "excludePaths": [
-    "**/node_modules/**"
-  ]
+  "excludePaths": ["**/node_modules/**"]
 }

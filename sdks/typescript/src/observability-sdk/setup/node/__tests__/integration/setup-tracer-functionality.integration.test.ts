@@ -1,7 +1,7 @@
 import { describe, it, expect, vi, afterEach } from "vitest";
 import { setupObservability } from "../../setup";
 import { trace } from "@opentelemetry/api";
-import { resetObservabilitySdkConfig } from '../../../../config.js';
+import { resetObservabilitySdkConfig } from "../../../../config.js";
 
 // Integration tests for tracer functionality in setupObservability
 function createMockLogger() {

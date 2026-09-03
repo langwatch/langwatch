@@ -21,17 +21,18 @@ LangWatch captures TTFT per LLM span, rolls it up to the trace, and surfaces it 
 
 If your instrumentation already emits any of the signals below, TTFT shows up without any extra code:
 
-| Source | Signal |
-|--------|--------|
-| Vercel AI SDK | `ai.response.msToFirstChunk` span attribute |
+| Source                              | Signal                                                                  |
+| ----------------------------------- | ----------------------------------------------------------------------- |
+| Vercel AI SDK                       | `ai.response.msToFirstChunk` span attribute                             |
 | OpenLLMetry / OpenLIT instrumentors | `llm.content.completion.chunk` / `First Token Stream Event` span events |
-| OTel GenAI semconv emitters | `gen_ai.server.time_to_first_token` span attribute (milliseconds) |
-| LangWatch SDKs | `timestamps.first_token_at` on the span (see below) |
+| OTel GenAI semconv emitters         | `gen_ai.server.time_to_first_token` span attribute (milliseconds)       |
+| LangWatch SDKs                      | `timestamps.first_token_at` on the span (see below)                     |
 
 When more than one LLM span in a trace reports a TTFT, the trace-level value is the smallest one, the first token the user could have seen.
 
 <Note>
-  If you stream through the Vercel AI SDK with `experimental_telemetry` enabled, TTFT is captured automatically from `ai.response.msToFirstChunk`, nothing to do.
+  If you stream through the Vercel AI SDK with `experimental_telemetry` enabled, TTFT is
+  captured automatically from `ai.response.msToFirstChunk`, nothing to do.
 </Note>
 
 ## Setting TTFT manually
@@ -65,10 +66,7 @@ async function streamCompletion(prompt: string): Promise<string> {
       if (firstTokenAt === null) {
         firstTokenAt = Date.now();
         // Duration in milliseconds until the first streamed token
-        span.setAttribute(
-          "gen_ai.server.time_to_first_token",
-          firstTokenAt - startedAt
-        );
+        span.setAttribute("gen_ai.server.time_to_first_token", firstTokenAt - startedAt);
       }
       chunks.push(chunk.choices[0]?.delta?.content ?? "");
     }
@@ -84,7 +82,7 @@ Alternatively, if you track the wall-clock timestamp of the first token instead 
 ```typescript
 span.setAttribute(
   "langwatch.timestamps",
-  JSON.stringify({ first_token_at: firstTokenAt })  // epoch milliseconds
+  JSON.stringify({ first_token_at: firstTokenAt }), // epoch milliseconds
 );
 ```
 

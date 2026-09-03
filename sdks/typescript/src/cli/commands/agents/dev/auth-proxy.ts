@@ -176,9 +176,7 @@ function forwardToUpstream({
     // through the public tunnel to the caller, and the local URL can carry
     // basic-auth credentials (http://user:password@127.0.0.1:3000).
     console.error(
-      chalk.red(
-        `Could not reach the local agent at ${targetUrl}: ${error.message}`,
-      ),
+      chalk.red(`Could not reach the local agent at ${targetUrl}: ${error.message}`),
     );
     if (res.headersSent) {
       // The upstream died mid-response. Appending an error body here would

@@ -32,9 +32,7 @@ export const listModelDefaultsCommand = async (): Promise<CommandResult | void> 
       table: () => {
         console.log();
         console.log(chalk.bold("Effective resolution"));
-        const effectiveRows = (
-          ["DEFAULT", "FAST", "EMBEDDINGS"] as const
-        ).map((role) => {
+        const effectiveRows = (["DEFAULT", "FAST", "EMBEDDINGS"] as const).map((role) => {
           const hit = snapshot.effective[role];
           return {
             Role: role,
@@ -51,14 +49,8 @@ export const listModelDefaultsCommand = async (): Promise<CommandResult | void> 
         console.log();
         console.log(chalk.bold(`Configs (${snapshot.configs.length})`));
         if (snapshot.configs.length === 0) {
-          console.log(
-            chalk.gray(
-              "  No configs at any readable scope. Set one with:",
-            ),
-          );
-          console.log(
-            chalk.cyan("    langwatch model-default set DEFAULT openai/gpt-5"),
-          );
+          console.log(chalk.gray("  No configs at any readable scope. Set one with:"));
+          console.log(chalk.cyan("    langwatch model-default set DEFAULT openai/gpt-5"));
           console.log();
           return;
         }

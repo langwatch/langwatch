@@ -246,5 +246,3 @@ Feature: OpenAI Admin cost puller
       And the recorded reason does not contain the key
       # The reason is logged and shown on the source, so anything it carries is
       # readable by people who were never given the credential.
-
-

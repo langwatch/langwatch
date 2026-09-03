@@ -37,7 +37,11 @@ describe("Tag CRUD", () => {
         it("calls GET /api/prompts/tags", async () => {
           mockGet.mockResolvedValue({
             data: [
-              { id: "ptag_prod", name: "production", createdAt: "2026-01-01T00:00:00.000Z" },
+              {
+                id: "ptag_prod",
+                name: "production",
+                createdAt: "2026-01-01T00:00:00.000Z",
+              },
               { id: "ptag_stg", name: "staging", createdAt: "2026-01-01T00:00:00.000Z" },
               { id: "ptag_abc", name: "canary", createdAt: "2026-01-01T00:00:00.000Z" },
             ],
@@ -52,7 +56,11 @@ describe("Tag CRUD", () => {
         /** @scenario List tags returns built-in and custom tags */
         it("returns the list of tags", async () => {
           const expectedTags = [
-            { id: "ptag_prod", name: "production", createdAt: "2026-01-01T00:00:00.000Z" },
+            {
+              id: "ptag_prod",
+              name: "production",
+              createdAt: "2026-01-01T00:00:00.000Z",
+            },
             { id: "ptag_stg", name: "staging", createdAt: "2026-01-01T00:00:00.000Z" },
             { id: "ptag_abc", name: "canary", createdAt: "2026-01-01T00:00:00.000Z" },
           ];
@@ -81,7 +89,11 @@ describe("Tag CRUD", () => {
         /** @scenario Create custom tag via SDK */
         it("calls POST /api/prompts/tags with the tag name", async () => {
           mockPost.mockResolvedValue({
-            data: { id: "ptag_abc", name: "canary", createdAt: "2026-01-01T00:00:00.000Z" },
+            data: {
+              id: "ptag_abc",
+              name: "canary",
+              createdAt: "2026-01-01T00:00:00.000Z",
+            },
             error: undefined,
           });
 
@@ -94,7 +106,11 @@ describe("Tag CRUD", () => {
         });
 
         it("returns the created tag", async () => {
-          const expectedTag = { id: "ptag_abc", name: "canary", createdAt: "2026-01-01T00:00:00.000Z" };
+          const expectedTag = {
+            id: "ptag_abc",
+            name: "canary",
+            createdAt: "2026-01-01T00:00:00.000Z",
+          };
           mockPost.mockResolvedValue({ data: expectedTag, error: undefined });
 
           const result = await service.createTag({ name: "canary" });
@@ -110,7 +126,9 @@ describe("Tag CRUD", () => {
             error: { error: "Tag already exists" },
           });
 
-          await expect(service.createTag({ name: "canary" })).rejects.toThrow(PromptsApiError);
+          await expect(service.createTag({ name: "canary" })).rejects.toThrow(
+            PromptsApiError,
+          );
         });
       });
     });
@@ -176,7 +194,11 @@ describe("Tag CRUD", () => {
 
     describe("tags.create()", () => {
       it("delegates to PromptsApiService.createTag with name", async () => {
-        const expectedTag = { id: "ptag_abc", name: "canary", createdAt: "2026-01-01T00:00:00.000Z" };
+        const expectedTag = {
+          id: "ptag_abc",
+          name: "canary",
+          createdAt: "2026-01-01T00:00:00.000Z",
+        };
         promptsApiService.createTag.mockResolvedValue(expectedTag);
 
         const result = await facade.tags.create({ name: "canary" });

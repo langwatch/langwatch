@@ -34,9 +34,7 @@ describe("given the count printed after a summaries walk", () => {
   describe("when a time bucket is added", () => {
     it("counts rows even on a single dimension", () => {
       // One model over 24 hours is 24 rows and one model.
-      expect(summaryCountNoun({ groupBy: ["model"], bucket: "hour" })).toBe(
-        "rows",
-      );
+      expect(summaryCountNoun({ groupBy: ["model"], bucket: "hour" })).toBe("rows");
     });
   });
 });

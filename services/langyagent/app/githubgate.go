@@ -14,7 +14,7 @@
 // turn that carries none, trips the gate; the gate cancels the stream and
 // driveTurn emits the vetted error frame. The command grammar mirrors the TS
 // recogniser in
-// platform/app/src/server/app-layer/langy/execution/githubCommand.ts — keep the
+// packages/features/langy/contract/src/github-command.ts — keep the
 // two in sync.
 package app
 

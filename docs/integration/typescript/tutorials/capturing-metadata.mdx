@@ -11,7 +11,9 @@ Metadata and attributes are key-value pairs that allow you to add custom context
 In the TypeScript SDK, all metadata is captured through **span attributes**. You can set attributes on any span to provide context for that operation or the entire trace.
 
 <Note>
-  For a comprehensive reference of all available attributes and semantic conventions, see the [Semantic Conventions guide](/integration/typescript/tutorials/semantic-conventions).
+  For a comprehensive reference of all available attributes and semantic conventions, see
+  the [Semantic Conventions
+  guide](/integration/typescript/tutorials/semantic-conventions).
 </Note>
 
 ## Setting Attributes
@@ -59,10 +61,10 @@ span.setAttributes({
 
 ### Common Attributes
 
-*   **User and session**: `langwatch.user.id`, `langwatch.thread.id` - see [Tracking Conversations](/integration/typescript/tutorials/tracking-conversations)
-*   **Application context**: `app.version`, `environment`, `region`
-*   **LLM operations**: `gen_ai.request.model`, `gen_ai.request.temperature`
-*   **Custom business logic**: `customer.tier`, `feature.flags`
+- **User and session**: `langwatch.user.id`, `langwatch.thread.id` - see [Tracking Conversations](/integration/typescript/tutorials/tracking-conversations)
+- **Application context**: `app.version`, `environment`, `region`
+- **LLM operations**: `gen_ai.request.model`, `gen_ai.request.temperature`
+- **Custom business logic**: `customer.tier`, `feature.flags`
 
 ### Setting Attributes on Child Spans
 
@@ -118,10 +120,12 @@ async function handleRequest(userId: string, requestType: string) {
 ## Viewing in LangWatch
 
 All captured span attributes will be visible in the LangWatch UI:
+
 - **Root span attributes** are displayed in the trace details view, providing an overview of the entire operation
 - **Child span attributes** are shown when you inspect individual spans within a trace
 
 This rich contextual data allows you to:
+
 - **Filter and search** for traces and spans based on specific attribute values
 - **Analyze performance** by correlating metrics with different attributes
 - **Debug issues** by quickly understanding the context and parameters of a failed or slow operation

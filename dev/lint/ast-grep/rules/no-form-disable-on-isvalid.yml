@@ -11,7 +11,8 @@ rule:
   kind: jsx_attribute
   regex: '^disabled=\{[^}]*(isValid|formState\.isValid)'
 files:
-  - "platform/app/src/**/*.tsx"
+  - "apps/**/*.tsx"
+  - "packages/**/*.tsx"
 ignores:
   - "**/*.test.tsx"
   - "**/*.spec.tsx"

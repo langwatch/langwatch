@@ -14,10 +14,12 @@ The `model` field of a request accepts four kinds of name. The gateway reads the
     `"model": "openai/gpt-5-mini"`. Goes to a provider of that type.
   </Card>
   <Card title="Routing handle" icon="key">
-    `"model": "europe/claude-sonnet-5"`. Goes to that exact provider, when the key can reach it.
+    `"model": "europe/claude-sonnet-5"`. Goes to that exact provider, when the key can
+    reach it.
   </Card>
   <Card title="Alias" icon="arrow-right-arrow-left">
-    `"model": "coding-small"`. A per-key redirect. See [Model Aliases](/ai-gateway/model-aliases).
+    `"model": "coding-small"`. A per-key redirect. See [Model
+    Aliases](/ai-gateway/model-aliases).
   </Card>
 </CardGroup>
 
@@ -37,14 +39,14 @@ If none of that places the model, the request is refused with `model_not_recogni
 
 The examples below read the order above from the top, so each one assumes no earlier step matched. A name that another provider declares, or a first segment that is also a routing handle, is decided by whichever step comes first.
 
-| Request `model` | Where it goes |
-|---|---|
-| `gpt-5-mini` | The bound provider that declares `gpt-5-mini`, otherwise the bound OpenAI provider |
-| `openai/gpt-5-mini` | A bound OpenAI provider, model `gpt-5-mini` |
-| `europe/claude-sonnet-5` | The reachable provider whose routing handle is `europe` |
-| `stealth/ox-alpha` | The provider that declares the model `stealth/ox-alpha`, when `stealth` is not a routing handle |
-| `custom/stealth/ox-alpha` | A bound custom provider, model `stealth/ox-alpha` |
-| `coding-small` | Wherever the key's alias points |
+| Request `model`           | Where it goes                                                                                   |
+| ------------------------- | ----------------------------------------------------------------------------------------------- |
+| `gpt-5-mini`              | The bound provider that declares `gpt-5-mini`, otherwise the bound OpenAI provider              |
+| `openai/gpt-5-mini`       | A bound OpenAI provider, model `gpt-5-mini`                                                     |
+| `europe/claude-sonnet-5`  | The reachable provider whose routing handle is `europe`                                         |
+| `stealth/ox-alpha`        | The provider that declares the model `stealth/ox-alpha`, when `stealth` is not a routing handle |
+| `custom/stealth/ox-alpha` | A bound custom provider, model `stealth/ox-alpha`                                               |
+| `coding-small`            | Wherever the key's alias points                                                                 |
 
 The provider prefix is removed before the request leaves, so an upstream never receives `openai/gpt-5-mini` as a model name.
 
@@ -131,9 +133,7 @@ The models allowlist on a virtual key decides what a key is ALLOWED to call. It 
 ## Choosing a form
 
 <Steps>
-  <Step title="One provider on the key">
-    Use the model name. Nothing else is needed.
-  </Step>
+  <Step title="One provider on the key">Use the model name. Nothing else is needed.</Step>
   <Step title="Several providers, different models">
     Use the model name. Each provider declares its own models, so the name is enough.
   </Step>
@@ -141,9 +141,12 @@ The models allowlist on a virtual key decides what a key is ALLOWED to call. It 
     Give each one a routing handle and use it: `europe/claude-sonnet-5`.
   </Step>
   <Step title="A stable name you want to repoint later">
-    Use an alias. Edit the key once and no caller changes. See [Model Aliases](/ai-gateway/model-aliases).
+    Use an alias. Edit the key once and no caller changes. See [Model
+    Aliases](/ai-gateway/model-aliases).
   </Step>
   <Step title="Failover between providers">
-    Name a model that more than one bound provider serves. The gateway carries the same model name to the next provider in the chain. See [Fallback Chains](/ai-gateway/providers/fallback-chains).
+    Name a model that more than one bound provider serves. The gateway carries the same
+    model name to the next provider in the chain. See [Fallback
+    Chains](/ai-gateway/providers/fallback-chains).
   </Step>
 </Steps>

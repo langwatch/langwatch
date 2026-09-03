@@ -36,10 +36,7 @@ const claudeCodeAgent = (workingDirectory: string): AgentAdapter => ({
         },
       },
     };
-    fs.writeFileSync(
-      `${__dirname}/.mcp-config.json`,
-      JSON.stringify(mcpConfig)
-    );
+    fs.writeFileSync(`${__dirname}/.mcp-config.json`, JSON.stringify(mcpConfig));
 
     return new Promise<string>((resolve, reject) => {
       const args = [
@@ -55,17 +52,13 @@ const claudeCodeAgent = (workingDirectory: string): AgentAdapter => ({
 
       console.log(chalk.blue("Starting claude in:"), workingDirectory);
 
-      const ptyProcess = pty.spawn(
-        `${__dirname}/../node_modules/.bin/claude`,
-        args,
-        {
-          name: "xterm-256color",
-          cols: 80,
-          rows: 30,
-          cwd: workingDirectory,
-          env: { ...process.env, FORCE_COLOR: "1" },
-        }
-      );
+      const ptyProcess = pty.spawn(`${__dirname}/../node_modules/.bin/claude`, args, {
+        name: "xterm-256color",
+        cols: 80,
+        rows: 30,
+        cwd: workingDirectory,
+        env: { ...process.env, FORCE_COLOR: "1" },
+      });
 
       let output = "";
 
@@ -101,11 +94,9 @@ const claudeCodeAgent = (workingDirectory: string): AgentAdapter => ({
 
 describe("OpenAI Implementation", () => {
   it.skipIf(isCI)("implements LangWatch in an OpenAI bot project", async () => {
-    const tempFolder = fs.mkdtempSync(
-      path.join(os.tmpdir(), "langwatch-openai-bot-")
-    );
+    const tempFolder = fs.mkdtempSync(path.join(os.tmpdir(), "langwatch-openai-bot-"));
     execSync(
-      `cp -r tests/fixtures/openai/openai_bot_function_call_input.py ${tempFolder}/main.py`
+      `cp -r tests/fixtures/openai/openai_bot_function_call_input.py ${tempFolder}/main.py`,
     );
 
     const result = await scenario.run({
@@ -124,7 +115,7 @@ describe("OpenAI Implementation", () => {
       ],
       script: [
         scenario.user(
-          "please instrument my code with langwatch, short and sweet, no need to test the changes"
+          "please instrument my code with langwatch, short and sweet, no need to test the changes",
         ),
         scenario.agent(),
         () => {

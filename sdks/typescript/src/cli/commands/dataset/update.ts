@@ -53,13 +53,13 @@ export const updateCommand = async (
         console.log(`  ${chalk.bold("Slug:")}  ${dataset.slug}`);
         console.log(`  ${chalk.bold("Name:")}  ${dataset.name}`);
         if (dataset.columnTypes.length > 0) {
-          const colStr = dataset.columnTypes
-            .map((c) => `${c.name}:${c.type}`)
-            .join(", ");
+          const colStr = dataset.columnTypes.map((c) => `${c.name}:${c.type}`).join(", ");
           console.log(`  ${chalk.bold("Columns:")} ${colStr}`);
         }
         if (dataset.platformUrl) {
-          console.log(`  ${chalk.bold("View:")}  ${chalk.underline(dataset.platformUrl)}`);
+          console.log(
+            `  ${chalk.bold("View:")}  ${chalk.underline(dataset.platformUrl)}`,
+          );
         }
       },
     };

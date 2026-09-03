@@ -1,24 +1,22 @@
 /**
  * The version as it appears on a record `createLogger` actually wrote.
  *
- * `serviceVersion.unit.test.ts` tests the parser in isolation, and a parser test
- * passes perfectly well while the emitted record carries nothing — the field
- * only reaches a log line if the parser is wired into pino's `bindings`
+ * `serviceVersion.unit.test.ts` tests configured identity in isolation, and
+ * that test passes perfectly well while the emitted record carries nothing —
+ * the field only reaches a log line if the value is wired into pino's `bindings`
  * formatter, and nothing in a direct call proves that it is. So this goes
  * through `createLogger` and reads what lands on the stream.
  *
  * `createLogger` writes to `process.stdout` when there is no transport, which is
- * the case under NODE_ENV=test, so intercepting the write is enough to see the
- * real record.
+ * the case under injected test configuration, so intercepting the write is
+ * enough to see the real record.
  */
 
-import { afterEach, beforeEach, describe, expect, it } from "vitest";
-import { createLogger, resetLoggerCache } from "../logger";
-
-const ORIGINAL_ENV = { ...process.env };
+import { beforeEach, describe, expect, it } from "vitest";
+import { configureLogger, createLogger, resetLoggerCache } from "../logger";
 
 /** Everything createLogger wrote while `run` executed, parsed. */
-function emitted(run: () => void): Record<string, any>[] {
+function emitted(run: () => void): Record<string, unknown>[] {
   const written: string[] = [];
   const realWrite = process.stdout.write.bind(process.stdout);
 
@@ -37,30 +35,18 @@ function emitted(run: () => void): Record<string, any>[] {
     .join("")
     .split("\n")
     .filter(Boolean)
-    .map((line) => JSON.parse(line) as Record<string, any>);
+    .map((line) => JSON.parse(line) as Record<string, unknown>);
 }
 
 describe("service.version on a record createLogger wrote", () => {
   beforeEach(() => {
-    delete process.env.SERVICE_VERSION;
-    delete process.env.OTEL_RESOURCE_ATTRIBUTES;
-    // The node logger defaults to `error` under NODE_ENV=test; these assertions
-    // are about an ordinary info line.
-    process.env.PINO_LOG_LEVEL = "info";
-    // Every case here writes through the same logger name while changing the
-    // environment that name was built from. createLogger memoises by name for
-    // the life of the process, so without this each case would assert against
-    // whichever environment the first case happened to set.
+    configureLogger({ environment: "test", level: "info" });
     resetLoggerCache();
   });
 
-  afterEach(() => {
-    process.env = { ...ORIGINAL_ENV };
-  });
-
   it("reaches the emitted line, not just the parser", () => {
-    process.env.OTEL_RESOURCE_ATTRIBUTES =
-      "service.name=langwatch-app,service.version=git-5373dad";
+    configureLogger({ environment: "test", level: "info", serviceVersion: "git-5373dad" });
+    resetLoggerCache();
 
     const [record] = emitted(() => {
       createLogger("langwatch:test:version").info("hello");
@@ -69,8 +55,9 @@ describe("service.version on a record createLogger wrote", () => {
     expect(record?.["service.version"]).toBe("git-5373dad");
   });
 
-  it("decodes a percent-encoded value, so it matches what the trace says", () => {
-    process.env.OTEL_RESOURCE_ATTRIBUTES = "service.version=git%2Dabc%2C1";
+  it("uses the configured version, so it matches the trace resource", () => {
+    configureLogger({ environment: "test", level: "info", serviceVersion: "git-abc,1" });
+    resetLoggerCache();
 
     const [record] = emitted(() => {
       createLogger("langwatch:test:version").info("hello");
@@ -79,7 +66,7 @@ describe("service.version on a record createLogger wrote", () => {
     expect(record?.["service.version"]).toBe("git-abc,1");
   });
 
-  it("is absent, not empty, when the environment says nothing", () => {
+  it("is absent, not empty, when configuration says nothing", () => {
     const [record] = emitted(() => {
       createLogger("langwatch:test:version").info("hello");
     });
@@ -88,7 +75,8 @@ describe("service.version on a record createLogger wrote", () => {
   });
 
   it("does not disturb the fields the record already carried", () => {
-    process.env.OTEL_RESOURCE_ATTRIBUTES = "service.version=git-5373dad";
+    configureLogger({ environment: "test", level: "info", serviceVersion: "git-5373dad" });
+    resetLoggerCache();
 
     const [record] = emitted(() => {
       createLogger("langwatch:test:version").info("hello");

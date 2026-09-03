@@ -6,10 +6,7 @@ import { resolveCredentials } from "../../utils/apiKey";
 import { formatFetchError } from "../../utils/formatFetchError";
 import { failSpinner } from "../../utils/spinnerError";
 import { clockTime, dayHeading, localDay } from "../../utils/event-clock";
-import {
-  printResult,
-  type RawOutputFlags,
-} from "../../utils/output";
+import { printResult, type RawOutputFlags } from "../../utils/output";
 import { createCommandEvents } from "../../telemetry/events";
 import { cliAuthHeaders } from "../../utils/authHeaders";
 
@@ -39,9 +36,7 @@ const transcriptDocumentSchema = z.object({
     tokens: z.number(),
     costUsd: z.number(),
   }),
-  subAgents: z.array(
-    z.looseObject({ agentId: z.string(), toolCalls: z.number() }),
-  ),
+  subAgents: z.array(z.looseObject({ agentId: z.string(), toolCalls: z.number() })),
 });
 
 type TranscriptEntry = z.infer<typeof transcriptEntrySchema>;

@@ -405,7 +405,7 @@ var table = []commandSpec{
 			{long: "--ttl", takesValue: true, value: "<dur>", summary: "how long the gate holds (default 30s)"},
 		},
 		run: func(ctx context.Context, d deps, inv invocation) error {
-			return d.orch.RunHMR(ctx, d.lwDir, inv.raw)
+			return d.orch.RunHMR(ctx, d.worktree, inv.raw)
 		},
 	},
 	{
@@ -470,7 +470,7 @@ var table = []commandSpec{
 		// haven flag and the command could only ever run bare.
 		minusArgs: true,
 		run: func(ctx context.Context, d deps, inv invocation) error {
-			return d.orch.Typecheck(ctx, d.lwDir, inv.raw, envInt("HAVEN_TYPECHECK_SLOTS", 0), envInt("HAVEN_TYPECHECK_MAX_RSS_MB", 0))
+			return d.orch.Typecheck(ctx, d.worktree, inv.raw, envInt("HAVEN_TYPECHECK_SLOTS", 0), envInt("HAVEN_TYPECHECK_MAX_RSS_MB", 0))
 		},
 	},
 	{

@@ -10,7 +10,7 @@ from typing import Any, Dict, Optional, Sequence
 
 SCOPE_MODES = ("all", "test_suites", "labels", "scenarios")
 """The scope modes the platform has. Mirrors `suiteScopeSchema` in
-platform/app/src/server/suites/scope.ts."""
+packages/features/suite/contract/src/suite.scope.ts."""
 
 
 def build_scope(

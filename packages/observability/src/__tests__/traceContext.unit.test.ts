@@ -1,10 +1,7 @@
 import { propagation, trace } from "@opentelemetry/api";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { INVALID_TRACE_ID } from "../constants";
-import {
-  getActiveTraceId,
-  injectTraceContextHeaders,
-} from "../trace/traceContext";
+import { getActiveTraceId, injectTraceContextHeaders } from "../trace/traceContext";
 
 vi.mock("@opentelemetry/api", () => ({
   context: { active: vi.fn(() => ({})) },
@@ -27,10 +24,7 @@ describe("injectTraceContextHeaders", () => {
 
       expect(result.headers).toBe(headers);
       expect(result.traceId).toBeUndefined();
-      expect(propagation.inject).toHaveBeenCalledWith(
-        expect.anything(),
-        headers,
-      );
+      expect(propagation.inject).toHaveBeenCalledWith(expect.anything(), headers);
     });
   });
 

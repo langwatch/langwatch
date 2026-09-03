@@ -50,39 +50,46 @@ import {
 
 ### Use Drawer for:
 
-| Use Case | Example |
-|----------|---------|
-| Resource creation | "New Prompt" form |
-| Resource editing | Editing trigger settings |
-| Resource selection | Selecting a dataset |
-| Configuration panels | LLM model settings |
-| Detail views | Trace details |
-| Multi-step forms | Batch evaluation setup |
+| Use Case             | Example                  |
+| -------------------- | ------------------------ |
+| Resource creation    | "New Prompt" form        |
+| Resource editing     | Editing trigger settings |
+| Resource selection   | Selecting a dataset      |
+| Configuration panels | LLM model settings       |
+| Detail views         | Trace details            |
+| Multi-step forms     | Batch evaluation setup   |
 
 ### Use Dialog for:
 
-| Use Case | Example |
-|----------|---------|
-| Confirmations | "Delete this item?" |
-| Alerts | Error messages |
+| Use Case       | Example                    |
+| -------------- | -------------------------- |
+| Confirmations  | "Delete this item?"        |
+| Alerts         | Error messages             |
 | Simple choices | "Save or discard changes?" |
 
 ### Drawer Anatomy
 
 ```tsx
-<Drawer.Root open={isOpen} onOpenChange={({ open }) => setOpen(open)} placement="end" size="lg">
+<Drawer.Root
+  open={isOpen}
+  onOpenChange={({ open }) => setOpen(open)}
+  placement="end"
+  size="lg"
+>
   <Drawer.Backdrop />
   <Drawer.Content>
     <Drawer.CloseTrigger />
     <Drawer.Header>
       <Drawer.Title>Drawer Title</Drawer.Title>
     </Drawer.Header>
-    <Drawer.Body>
-      {/* Main content */}
-    </Drawer.Body>
+    <Drawer.Body>{/* Main content */}</Drawer.Body>
     <Drawer.Footer>
-      <Button variant="outline" onClick={onClose}>Cancel</Button>
-      <Button colorPalette="blue" onClick={onSave}>Save</Button>
+      <Button variant="outline" onClick={onClose}>
+        Cancel
+      </Button>
+      <Button colorPalette="blue" onClick={onSave}>
+        Save
+      </Button>
     </Drawer.Footer>
   </Drawer.Content>
 </Drawer.Root>
@@ -97,12 +104,14 @@ import {
     <Dialog.Header>
       <Dialog.Title>Confirm Action</Dialog.Title>
     </Dialog.Header>
-    <Dialog.Body>
-      Are you sure you want to proceed?
-    </Dialog.Body>
+    <Dialog.Body>Are you sure you want to proceed?</Dialog.Body>
     <Dialog.Footer>
-      <Button variant="outline" onClick={onClose}>Cancel</Button>
-      <Button colorPalette="red" onClick={onConfirm}>Delete</Button>
+      <Button variant="outline" onClick={onClose}>
+        Cancel
+      </Button>
+      <Button colorPalette="red" onClick={onConfirm}>
+        Delete
+      </Button>
     </Dialog.Footer>
   </Dialog.Content>
 </Dialog.Root>
@@ -120,6 +129,7 @@ The system consists of two parts:
 2. **`useDrawer`** - A hook for opening/closing drawers and managing navigation
 
 **Important:** Don't render drawers explicitly in pages - `CurrentDrawer` handles rendering automatically based on URL state. This ensures:
+
 - Browser back/forward buttons work naturally
 - URLs are shareable (drawer state is in the URL)
 - No duplicate drawer rendering
@@ -148,15 +158,15 @@ function MyComponent() {
 
 ### Hook API
 
-| Function/Property | Description |
-|-------------------|-------------|
-| `openDrawer(type, props?, options?)` | Open a drawer with optional props |
-| `closeDrawer()` | Close drawer and clear navigation stack |
-| `goBack()` | Return to previous drawer in stack |
-| `canGoBack` | Boolean - true if there's history to go back to |
-| `currentDrawer` | Currently open drawer type |
-| `setFlowCallbacks(type, callbacks)` | Register callbacks that persist across navigation |
-| `getFlowCallbacks(type)` | Retrieve persisted callbacks |
+| Function/Property                    | Description                                       |
+| ------------------------------------ | ------------------------------------------------- |
+| `openDrawer(type, props?, options?)` | Open a drawer with optional props                 |
+| `closeDrawer()`                      | Close drawer and clear navigation stack           |
+| `goBack()`                           | Return to previous drawer in stack                |
+| `canGoBack`                          | Boolean - true if there's history to go back to   |
+| `currentDrawer`                      | Currently open drawer type                        |
+| `setFlowCallbacks(type, callbacks)`  | Register callbacks that persist across navigation |
+| `getFlowCallbacks(type)`             | Retrieve persisted callbacks                      |
 
 ### Options
 
@@ -197,13 +207,14 @@ Drawers must be registered in `src/components/drawerRegistry.ts` to be used with
 
 The **evaluations-v3** module is the canonical example of this drawer pattern. Study these files:
 
-| File | Purpose |
-|------|---------|
-| `src/evaluations-v3/hooks/useOpenTargetEditor.ts` | Sets up flow callbacks and opens prompt/agent editor drawers |
-| `src/evaluations-v3/utils/promptEditorCallbacks.ts` | Centralizes callback creation for prompt editor |
-| `src/components/targets/TargetTypeSelectorDrawer.tsx` | Multi-step flow: type → list → editor |
+| File                                                  | Purpose                                                      |
+| ----------------------------------------------------- | ------------------------------------------------------------ |
+| `src/evaluations-v3/hooks/useOpenTargetEditor.ts`     | Sets up flow callbacks and opens prompt/agent editor drawers |
+| `src/evaluations-v3/utils/promptEditorCallbacks.ts`   | Centralizes callback creation for prompt editor              |
+| `src/components/targets/TargetTypeSelectorDrawer.tsx` | Multi-step flow: type → list → editor                        |
 
 **Flow example (selecting/creating prompts):**
+
 1. User clicks "Add Target" → opens `targetTypeSelector`
 2. User selects "Prompt" → navigates to `promptList`
 3. User selects a prompt → navigates to `promptEditor`
@@ -221,13 +232,13 @@ import { PageLayout } from "../../components/ui/layouts/PageLayout";
 
 ### Available Components
 
-| Component | Purpose |
-|-----------|---------|
-| `PageLayout.Container` | Main page wrapper with responsive max-width |
-| `PageLayout.Header` | Fixed-height header with border |
-| `PageLayout.Heading` | Page title (h1) |
-| `PageLayout.HeaderButton` | Styled button for header actions |
-| `PageLayout.Content` | Card wrapper for page content |
+| Component                 | Purpose                                     |
+| ------------------------- | ------------------------------------------- |
+| `PageLayout.Container`    | Main page wrapper with responsive max-width |
+| `PageLayout.Header`       | Fixed-height header with border             |
+| `PageLayout.Heading`      | Page title (h1)                             |
+| `PageLayout.HeaderButton` | Styled button for header actions            |
+| `PageLayout.Content`      | Card wrapper for page content               |
 
 ## Dashboard Layout
 
@@ -297,7 +308,7 @@ import { Checkbox } from "../../components/ui/checkbox";
 
 <Checkbox checked={isChecked} onCheckedChange={({ checked }) => setChecked(checked)}>
   Enable feature
-</Checkbox>
+</Checkbox>;
 ```
 
 ## Icons
@@ -309,7 +320,7 @@ import { Plus, Trash, Pencil, Check, X } from "lucide-react";
 
 <Button>
   <Plus /> Add Item
-</Button>
+</Button>;
 ```
 
 ## Tooltip
@@ -319,7 +330,7 @@ import { Tooltip } from "../../components/ui/tooltip";
 
 <Tooltip content="Helpful description" positioning={{ placement: "top" }} showArrow>
   <Button>Hover me</Button>
-</Tooltip>
+</Tooltip>;
 ```
 
 ## Menu
@@ -337,16 +348,16 @@ import { Menu } from "../../components/ui/menu";
     <Menu.Item value="edit">Edit</Menu.Item>
     <Menu.Item value="delete">Delete</Menu.Item>
   </Menu.Content>
-</Menu.Root>
+</Menu.Root>;
 ```
 
 ## Spacing Reference
 
-| Token | Value | Use Case |
-|-------|-------|----------|
-| `1` | 4px | Tight spacing |
-| `2` | 8px | Element margin |
-| `3` | 12px | Small gaps |
-| `4` | 16px | Standard gaps |
-| `6` | 24px | Section padding |
-| `8` | 32px | Large sections |
+| Token | Value | Use Case        |
+| ----- | ----- | --------------- |
+| `1`   | 4px   | Tight spacing   |
+| `2`   | 8px   | Element margin  |
+| `3`   | 12px  | Small gaps      |
+| `4`   | 16px  | Standard gaps   |
+| `6`   | 24px  | Section padding |
+| `8`   | 32px  | Large sections  |

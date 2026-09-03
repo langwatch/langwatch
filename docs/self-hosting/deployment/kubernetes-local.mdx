@@ -28,6 +28,7 @@ make example-up
 ```
 
 This runs four steps:
+
 1. Create a Kind cluster named `lw-local` (if it doesn't exist)
 2. Build all Docker images locally (if not already built, first build takes 15-30 min)
 3. Load images into the Kind cluster
@@ -62,6 +63,7 @@ make images-local
 ```
 
 This builds four images:
+
 - `langwatch/langwatch:local`, App
 - `langwatch/langwatch_nlp:local`, NLP service
 - `langwatch/langevals:local`, Evaluators
@@ -109,15 +111,15 @@ Each profile uses the corresponding `examples/values-{profile}.yaml` file.
 
 The `values-local.yaml` profile deploys:
 
-| Component | Replicas | Notes |
-|-----------|----------|-------|
-| LangWatch App | 1 | NodePort on 30560 |
-| LangWatch Workers | 1 | Separate pod |
-| LangWatch NLP | 1 | |
-| LangEvals | 1 | |
-| PostgreSQL | 1 | Chart-managed |
-| ClickHouse | 1 | Chart-managed, standalone |
-| Redis | 1 | Chart-managed |
+| Component         | Replicas | Notes                     |
+| ----------------- | -------- | ------------------------- |
+| LangWatch App     | 1        | NodePort on 30560         |
+| LangWatch Workers | 1        | Separate pod              |
+| LangWatch NLP     | 1        |                           |
+| LangEvals         | 1        |                           |
+| PostgreSQL        | 1        | Chart-managed             |
+| ClickHouse        | 1        | Chart-managed, standalone |
+| Redis             | 1        | Chart-managed             |
 
 - `autogen.enabled: true`, secrets are auto-generated
 - `pullPolicy: Never`, uses locally-built images

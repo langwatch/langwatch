@@ -97,15 +97,15 @@ Review the aggregate result and the row-level explanations together:
 
 ## Settings
 
-| Setting | Default | Description |
-| ------- | ------- | ----------- |
-| `model` | - | The judge model. |
-| `has_golden_answer` | `true` | Compare each candidate against a reference answer. Disable it to compare the candidates directly. |
-| `randomize_order` | `true` | Shuffle candidate order per row (deterministically, seeded by row index) before presenting them to the judge, to reduce position bias. |
-| `allow_tie` | `true` | Allow the judge to return a tie when the candidates are effectively equivalent. |
-| `swap_and_reconcile` | `true` | Ask the judge a second time with the candidate order reversed, and record no winner when the two answers disagree. Doubles the judge cost per row. |
-| `include_metrics` | `[]` | Include per-candidate metrics such as cost or duration in the judge context. |
-| `prompt` | - | Optional custom judge instructions. |
+| Setting              | Default | Description                                                                                                                                        |
+| -------------------- | ------- | -------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `model`              | -       | The judge model.                                                                                                                                   |
+| `has_golden_answer`  | `true`  | Compare each candidate against a reference answer. Disable it to compare the candidates directly.                                                  |
+| `randomize_order`    | `true`  | Shuffle candidate order per row (deterministically, seeded by row index) before presenting them to the judge, to reduce position bias.             |
+| `allow_tie`          | `true`  | Allow the judge to return a tie when the candidates are effectively equivalent.                                                                    |
+| `swap_and_reconcile` | `true`  | Ask the judge a second time with the candidate order reversed, and record no winner when the two answers disagree. Doubles the judge cost per row. |
+| `include_metrics`    | `[]`    | Include per-candidate metrics such as cost or duration in the judge context.                                                                       |
+| `prompt`             | -       | Optional custom judge instructions.                                                                                                                |
 
 ## Using it from the SDK
 

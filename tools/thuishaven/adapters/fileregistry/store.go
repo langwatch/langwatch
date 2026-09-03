@@ -106,8 +106,12 @@ type selectionFile struct {
 // turned ON — the natural thing to hand-write, and what a truncated or
 // hand-merged file looks like — would silently strip gateway and nlp off the
 // stack. Absent means "not stated", and what is not stated keeps its default.
+//
+// A `"workers"` key written before the worker became its own application is
+// simply not decoded any more, which is the point of dropping the field rather
+// than keeping it: every one of those files says `"workers": false`, and a
+// field would read that as "run no background processing at all".
 type selectionFields struct {
-	Workers *bool `json:"workers"`
 	Gateway *bool `json:"gateway"`
 	NLP     *bool `json:"nlp"`
 	Langy   *bool `json:"langy"`
@@ -117,7 +121,6 @@ type selectionFields struct {
 // applyTo overlays the services this file actually states onto sel.
 func (f selectionFields) applyTo(sel *domain.Selection) {
 	for _, field := range []struct{ stated, target *bool }{
-		{f.Workers, &sel.Workers},
 		{f.Gateway, &sel.Gateway},
 		{f.NLP, &sel.NLP},
 		{f.Langy, &sel.Langy},
@@ -161,7 +164,6 @@ func (s *Store) ReadSelection(worktreeDir string) (domain.Selection, bool) {
 // write.
 func (s *Store) WriteSelection(worktreeDir string, sel domain.Selection) error {
 	b, err := json.MarshalIndent(selectionFile{Services: &selectionFields{
-		Workers: &sel.Workers,
 		Gateway: &sel.Gateway,
 		NLP:     &sel.NLP,
 		Langy:   &sel.Langy,
@@ -179,25 +181,30 @@ func writeFileAtomic(path string, data []byte, perm os.FileMode) error {
 	return atomicfile.Write(path, data, perm)
 }
 
-// WriteOverlay writes platform/app/.env.portless. Mode 0o600: it carries
-// LANGWATCH_API_KEY, so it must not be world-readable.
-func (s *Store) WriteOverlay(lwDir string, st domain.Stack) error {
-	return os.WriteFile(filepath.Join(lwDir, ".env.portless"), []byte(st.OverlayFile()), 0o600)
+// WriteOverlay writes .env.portless at the WORKSPACE ROOT — the directory every
+// application in apps/ resolves it from (apps/ui's Vite config loads
+// ../../.env.portless, and the api/worker start scripts pass the same path to
+// --env-file-if-exists). Mode 0o600: it carries LANGWATCH_API_KEY, so it must
+// not be world-readable.
+func (s *Store) WriteOverlay(repoDir string, st domain.Stack) error {
+	return os.WriteFile(filepath.Join(repoDir, ".env.portless"), []byte(st.OverlayFile()), 0o600)
 }
 
-// hmrGatePath is the worktree-local marker the Vite HMR-gate plugin reads.
-func (s *Store) hmrGatePath(lwDir string) string {
-	return filepath.Join(lwDir, ".haven-hmr-gate")
+// hmrGatePath is the marker the Vite HMR-gate plugin reads. The plugin resolves
+// it against its own working directory, which is the Vite lane's — apps/ui —
+// so the marker is written there, not at the workspace root.
+func (s *Store) hmrGatePath(uiDir string) string {
+	return filepath.Join(uiDir, ".haven-hmr-gate")
 }
 
 // WriteHMRGate writes the gate expiry (unix-ms) so Vite defers HMR until then.
-func (s *Store) WriteHMRGate(lwDir string, expiryUnixMs int64) error {
-	return os.WriteFile(s.hmrGatePath(lwDir), []byte(strconv.FormatInt(expiryUnixMs, 10)+"\n"), 0o644)
+func (s *Store) WriteHMRGate(uiDir string, expiryUnixMs int64) error {
+	return os.WriteFile(s.hmrGatePath(uiDir), []byte(strconv.FormatInt(expiryUnixMs, 10)+"\n"), 0o644)
 }
 
 // ReadHMRGate reads the gate expiry (unix-ms); ok is false when no gate is set.
-func (s *Store) ReadHMRGate(lwDir string) (int64, bool) {
-	b, err := os.ReadFile(s.hmrGatePath(lwDir))
+func (s *Store) ReadHMRGate(uiDir string) (int64, bool) {
+	b, err := os.ReadFile(s.hmrGatePath(uiDir))
 	if err != nil {
 		return 0, false
 	}
@@ -209,7 +216,7 @@ func (s *Store) ReadHMRGate(lwDir string) (int64, bool) {
 }
 
 // ClearHMRGate removes the marker so HMR resumes immediately.
-func (s *Store) ClearHMRGate(lwDir string) { _ = os.Remove(s.hmrGatePath(lwDir)) }
+func (s *Store) ClearHMRGate(uiDir string) { _ = os.Remove(s.hmrGatePath(uiDir)) }
 
 // dbActivityPath is the machine-wide last-seen clock for per-slug databases.
 func (s *Store) dbActivityPath() string { return filepath.Join(s.home, "db-activity.json") }

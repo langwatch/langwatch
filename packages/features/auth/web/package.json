@@ -1,0 +1,56 @@
+{
+  "name": "@langwatch/auth-web",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Browser-safe front-door screens: sign in, sign up, password recovery, email verification, the invitation landing and the sign-in error page.",
+  "files": [
+    "src"
+  ],
+  "type": "module",
+  "exports": {
+    "./screens/auth": {
+      "types": "./src/screens/auth/index.ts",
+      "default": "./src/screens/auth/index.ts"
+    }
+  },
+  "scripts": {
+    "typecheck": "tsc --noEmit",
+    "test": "vitest run",
+    "test:unit": "vitest run"
+  },
+  "dependencies": {
+    "@better-auth/passkey": "1.7.1",
+    "@hookform/resolvers": "^5.4.0",
+    "@langwatch/design-system": "workspace:*",
+    "@langwatch/identity-contract": "workspace:*",
+    "@langwatch/platform-api-client": "workspace:*",
+    "@paper-design/shaders-react": "^0.0.76",
+    "better-auth": "^1.7.1",
+    "lucide-react": "^1.22.0",
+    "motion": "^12.42.2",
+    "react-feather": "^2.0.10",
+    "react-hook-form": "^7.80.0",
+    "zod": "^4.4.3"
+  },
+  "devDependencies": {
+    "@chakra-ui/react": "^3.36.0",
+    "@emotion/react": "^11.14.0",
+    "@testing-library/jest-dom": "^7.0.1",
+    "@testing-library/react": "^16.3.2",
+    "@testing-library/user-event": "14.6.1",
+    "@types/react": "^19.2.14",
+    "@types/react-dom": "^19.2.3",
+    "jsdom": "^30.0.1",
+    "react": "^19.2.7",
+    "react-dom": "^19.2.7",
+    "react-router": "^8.0.1",
+    "typescript": "^7.0.2",
+    "vitest": "^4.1.9"
+  },
+  "peerDependencies": {
+    "@chakra-ui/react": "^3.36.0",
+    "@emotion/react": "^11.14.0",
+    "react": "^19.2.7",
+    "react-dom": "^19.2.7"
+  }
+}

@@ -15,7 +15,7 @@ import { join } from "path";
  */
 
 const sdkPackageJson = JSON.parse(
-  readFileSync(join(__dirname, "../../package.json"), "utf-8")
+  readFileSync(join(__dirname, "../../package.json"), "utf-8"),
 );
 const peerDeps: Record<string, string> = sdkPackageJson.peerDependencies;
 
@@ -30,7 +30,7 @@ function semverSatisfies(version: string, range: string): boolean {
   // Use npm's own semver to check — avoids adding semver as a dependency
   const result = execSync(
     `node -e "console.log(require('semver').satisfies('${version}', '${range}'))"`,
-    { encoding: "utf-8", timeout: 10_000 }
+    { encoding: "utf-8", timeout: 10_000 },
   ).trim();
   return result === "true";
 }
@@ -65,7 +65,7 @@ describe("peer dependency compatibility", () => {
             satisfies,
             `${pkg}@${latestVersion} does not satisfy peer dep range "${range}". ` +
               `Users installing ${pkg}@latest alongside langwatch will get ERESOLVE errors. ` +
-              `Update the range in package.json peerDependencies.`
+              `Update the range in package.json peerDependencies.`,
           ).toBe(true);
         });
       }

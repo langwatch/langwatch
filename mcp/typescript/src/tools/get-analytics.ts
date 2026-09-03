@@ -55,7 +55,7 @@ export async function handleGetAnalytics(params: {
   const lines: string[] = [];
   lines.push(`# Analytics: ${metricKey} (${aggregation})\n`);
   lines.push(
-    `Period: ${new Date(startDate).toISOString().split("T")[0]} to ${new Date(endDate).toISOString().split("T")[0]}`
+    `Period: ${new Date(startDate).toISOString().split("T")[0]} to ${new Date(endDate).toISOString().split("T")[0]}`,
   );
   if (params.groupBy) lines.push(`Grouped by: ${params.groupBy}`);
   lines.push("");
@@ -73,8 +73,7 @@ export async function handleGetAnalytics(params: {
       const groups = getGroupedData(bucket, params.groupBy);
       if (!groups) continue;
       for (const [groupKey, metrics] of Object.entries(groups)) {
-        const value =
-          Object.values(metrics).find((v) => typeof v === "number") ?? "N/A";
+        const value = Object.values(metrics).find((v) => typeof v === "number") ?? "N/A";
         lines.push(`| ${bucket.date} | ${groupKey} | ${value} |`);
       }
     }
@@ -84,14 +83,14 @@ export async function handleGetAnalytics(params: {
     for (const bucket of currentPeriod) {
       const value =
         Object.entries(bucket).find(
-          ([k]) => k !== "date" && typeof bucket[k] === "number"
+          ([k]) => k !== "date" && typeof bucket[k] === "number",
         )?.[1] ?? "N/A";
       lines.push(`| ${bucket.date} | ${value} |`);
     }
   }
 
   lines.push(
-    "\n> Tip: Use `discover_schema` to see all available metrics and aggregation types."
+    "\n> Tip: Use `discover_schema` to see all available metrics and aggregation types.",
   );
 
   return lines.join("\n");

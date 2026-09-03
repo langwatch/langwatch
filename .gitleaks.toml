@@ -24,38 +24,23 @@ useDefault = true
 [[allowlists]]
 description = "Stripe catalog lookupKeys are public price handles, not credentials"
 targetRules = ["generic-api-key"]
-paths = ['''platform/app/ee/billing/stripe/stripeCatalog\.json''']
+paths = ['''packages/enterprise/features/billing/contract/src/stripe-catalog\.json''']
 
-# Gateway test fixtures that pattern-match `generic-api-key` but are provably
-# not credentials: the sequential-hex fixture `0123456789abcdef0123456789abcdef`
-# that signs the vk-lifecycle, vk-expiry and spend-ingest route tests and the
-# gateway JWT suite.
+# Two entries stood here and both are gone, because their subjects are.
 #
-# Scoped by VALUE as well as path, matched with AND, so a real token landing in
-# one of these files is still reported. The value is anchored: only the whole
-# fixture is allowed, never a string that merely starts with it.
-[[allowlists]]
-description = "Sequential-hex signing fixture in the gateway tests, not a credential"
-targetRules = ["generic-api-key"]
-condition = "AND"
-paths = [
-  '''platform/app/src/server/routes/__tests__/gateway-internal\.vk-lifecycle\.integration\.test\.ts''',
-  '''platform/app/src/server/routes/__tests__/gateway-internal\.vk-expiry\.integration\.test\.ts''',
-  '''platform/app/src/server/routes/__tests__/gateway-internal\.spend-ingest\.integration\.test\.ts''',
-  '''platform/app/src/server/routes/__tests__/gateway-internal\.health-route\.integration\.test\.ts''',
-  '''platform/app/src/server/routes/__tests__/gateway-internal\.config-route\.integration\.test\.ts''',
-  '''platform/app/src/server/gateway/__tests__/gatewayJwt\.unit\.test\.ts''',
-]
-regexes = ['''^0123456789abcdef0123456789abcdef$''']
-
-[[allowlists]]
-description = "Literal fixture ids (conversation-1) in the process-store suite, not credentials"
-targetRules = ["generic-api-key"]
-paths = ['''platform/app/src/server/event-sourcing/process-manager/stores/__tests__/prismaProcessStore\.integration\.test\.ts''']
+# The first allowed the sequential-hex fixture `0123456789abcdef0123456789abcdef`
+# in six gateway route and JWT suites; the second allowed the literal
+# `conversation-1` ids in the Prisma process-store suite. All seven files were
+# deleted with the platform application. The fixture value still appears in five
+# surviving files, but in none of them does it sit in the `Key": "<value>"` shape
+# `generic-api-key` fires on, so no successor entry is needed — verified against
+# gitleaks 8.30 over the whole tree. A test that reintroduces the shape should
+# get its own entry naming its own file, which is what an allowlist scoped by
+# path is for.
 
 # The self-hosted license fixtures are base64 payloads signed with the TEST
-# keypair that sits beside them in `fixtures/testKeys.ts`, checked in on
-# purpose: license validation is signature verification, so a test that does not
+# keypair that sits beside them in `fixtures/license-keys.fixture.ts`, checked in
+# on purpose: license validation is signature verification, so a test that does not
 # carry a real signature verifies nothing. The keypair signs nothing outside
 # this suite, and the production verifier reads its key from
 # `LANGWATCH_LICENSE_PUBLIC_KEY`, so a fixture key is refused by every real
@@ -68,7 +53,20 @@ paths = ['''platform/app/src/server/event-sourcing/process-manager/stores/__test
 [[allowlists]]
 description = "Signed license test fixtures, verifiable only against the checked-in test keypair"
 targetRules = ["generic-api-key"]
-paths = ['''platform/app/ee/licensing/__tests__/fixtures/testLicenses\.ts''']
+paths = ['''packages/enterprise/features/licensing/server/src/testing\.ts''']
+
+# The keypair itself, which the extraction re-added at a new path. It is the
+# RSA pair the fixtures above are signed with and the verifier tests verify
+# against; the file's own first line says so. It carries a `gitleaks:allow`
+# comment in its docblock, which gitleaks honours only on the line the finding
+# is on, so the block bodies were never covered by it.
+#
+# Scoped to `private-key` and to this one file: any OTHER rule still applies
+# here, and no other file in the licensing package may carry a key block.
+[[allowlists]]
+description = "Test RSA keypair the license fixtures are signed with; verifies nothing in production"
+targetRules = ["private-key"]
+paths = ['''packages/enterprise/features/licensing/server/src/fixtures/license-keys\.fixture\.ts''']
 
 # gitleaks scans the branch's whole commit range, not just its tip, so a value
 # removed in a later commit is still found in the commit that added it. This one
@@ -105,10 +103,7 @@ regexes = ['''^(0123456789abcdef){4}$''']
 # would add little: the value is the axis that matters.
 [[allowlists]]
 description = "AWS-shaped fixture credentials planted by the secrets-gate scoping tests"
-regexes = [
-  '''AKIAQYLPMN5HHHFPZAM2''',
-  '''A1B2C3D4E5F6G7H8I9J0K1L2M3N4O5P6Q7R8S9T0''',
-]
+regexes = ['''AKIAQYLPMN5HHHFPZAM2''', '''A1B2C3D4E5F6G7H8I9J0K1L2M3N4O5P6Q7R8S9T0''']
 
 # The synthetic credentials the secrets-redaction suite feeds to the redactor.
 # This suite's whole job is to hand credential-shaped strings to `redact()` and
@@ -171,10 +166,12 @@ paths = [
 # Scoped to this one file and to the two rules its shape trips, so every other
 # rule still applies here: a real Azure account key or SAS token landing in this
 # file is still caught.
-[[allowlists]]
-description = "Synthetic JWT-shaped fixture proving bearer-token redaction; signs nothing, grants nothing"
-targetRules = ["jwt", "generic-api-key"]
-paths = ['''platform/app/src/server/stored-objects/__tests__/azure-secret-hygiene\.unit\.test\.ts''']
+# NOTE: this entry's subject is gone. The Azure hygiene suite moved to
+# packages/features/stored-object/server/src/adapters/__tests__/ and its
+# fixture is now a computed base64 account key rather than a JWT-shaped
+# literal, so it trips neither rule — verified against gitleaks 8.30 over the
+# whole tree. The entry is deleted rather than repointed: an allowlist that
+# names a file with nothing to allow only hides the next real finding in it.
 
 # The three synthetic credentials the secret-redaction tests assign to a named
 # key. Same argument as the Azure fixture above: a test that proves a secret is
@@ -207,11 +204,7 @@ paths = ['''platform/app/src/server/stored-objects/__tests__/azure-secret-hygien
 [[allowlists]]
 description = "Synthetic credential fixtures in the secret-redaction tests; issued by nobody, revocable nowhere"
 targetRules = ["generic-api-key"]
-regexes = [
-  '''^sk-live-abc123$''',
-  '''^hunter2-signing$''',
-  '''^tok-live-abc123$''',
-]
+regexes = ['''^sk-live-abc123$''', '''^hunter2-signing$''', '''^tok-live-abc123$''']
 
 # The JWT-shaped fixture an earlier commit on the redaction-eats-product-ids
 # branch put in `applyContentRedaction.unit.test.ts`. The test proves the `jwt`

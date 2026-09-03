@@ -16,17 +16,12 @@ export interface VirtualKeySpendOptions {
  * The flag stays human: a date or timestamp anyone would type, or the epoch
  * value itself. Only the wire is strict about the unit.
  */
-function parseWindowBound(
-  flag: string,
-  value: string | undefined,
-): number | undefined {
+function parseWindowBound(flag: string, value: string | undefined): number | undefined {
   if (value === undefined) return undefined;
   const asEpoch = Number(value);
   const ms = Number.isFinite(asEpoch) ? asEpoch : Date.parse(value);
   if (!Number.isFinite(ms)) {
-    throw new Error(
-      `${flag} must be a date or epoch milliseconds, got "${value}"`,
-    );
+    throw new Error(`${flag} must be a date or epoch milliseconds, got "${value}"`);
   }
   return Math.trunc(ms);
 }
@@ -60,8 +55,12 @@ export const virtualKeySpendCommand = async (
       table: () => {
         console.log();
         console.log(`${chalk.bold("Virtual key:")} ${summary.virtual_key_id}`);
-        console.log(`${chalk.bold("Window:")}      ${new Date(summary.window.from).toLocaleString()} → ${new Date(summary.window.to).toLocaleString()}`);
-        console.log(`${chalk.bold("Spent:")}       $${Number.parseFloat(summary.spent_usd).toFixed(4)}`);
+        console.log(
+          `${chalk.bold("Window:")}      ${new Date(summary.window.from).toLocaleString()} → ${new Date(summary.window.to).toLocaleString()}`,
+        );
+        console.log(
+          `${chalk.bold("Spent:")}       $${Number.parseFloat(summary.spent_usd).toFixed(4)}`,
+        );
         console.log(`${chalk.bold("Requests:")}    ${summary.requests}`);
         console.log();
       },

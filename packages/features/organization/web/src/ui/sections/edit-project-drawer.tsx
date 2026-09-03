@@ -1,0 +1,236 @@
+/**
+ * `editProject`, as the address spells it.
+ *
+ * RECOVERED FROM `platform/app/src/components/projects/EditProjectDrawer.tsx`,
+ * deleted in `cc91631cd8`. The Teams page's per-project overflow menu kept
+ * writing the address after the component went, so renaming a project or moving
+ * it to another team changed the URL and opened nothing.
+ *
+ * ONLY THE CHANGED FIELDS ARE SENT. `project.update` is the same procedure that
+ * saves the whole project-settings page, so posting the untouched fields back
+ * would overwrite settings this drawer never showed the reader.
+ *
+ * A PERSONAL WORKSPACE IS NEVER OFFERED as somewhere to move a project to: it
+ * holds only the project provisioned with it, and the server refuses the move
+ * anyway. Filtering it out of the picker is what keeps the refusal from being
+ * the way the reader finds that out.
+ *
+ * The three names that came out of `~/features/errors` are answered by
+ * `behavior/handled-error-form`, which places a field-level rejection where the
+ * reader is looking; the words still come from the application's registry
+ * through the host.
+ */
+
+import {
+  Button,
+  createListCollection,
+  Field,
+  Heading,
+  HStack,
+  Input,
+  Spacer,
+  Text,
+  VStack,
+} from "@chakra-ui/react";
+import { useCallback, useMemo } from "react";
+import { Controller, type SubmitHandler, useForm } from "react-hook-form";
+
+import { Drawer } from "@langwatch/design-system/drawer";
+import { Select } from "@langwatch/design-system/select";
+
+import { applyHandledErrorToForm, FormServerError } from "../../behavior/handled-error-form";
+import { api } from "../../behavior/organization-api";
+import { useOrganizationToaster, useShowErrorToast } from "../../behavior/organization-feedback";
+import { useDrawer } from "../../behavior/use-drawer";
+import { useOrganizationTeamProject } from "../../behavior/use-organization-team-project";
+
+interface EditProjectFormData {
+  name: string;
+  teamId: string;
+}
+
+export function EditProjectDrawer({
+  open = true,
+  projectId,
+  projectName,
+  currentTeamId,
+}: {
+  open?: boolean;
+  projectId?: string;
+  projectName?: string;
+  currentTeamId?: string;
+}) {
+  const { organization } = useOrganizationTeamProject();
+  const toaster = useOrganizationToaster();
+  const showErrorToast = useShowErrorToast();
+  const { closeDrawer } = useDrawer();
+  const queryClient = api.useUtils();
+
+  const teams = api.team.getTeamsWithMembers.useQuery(
+    { organizationId: organization?.id ?? "" },
+    { enabled: !!organization },
+  );
+
+  const form = useForm<EditProjectFormData>({
+    defaultValues: {
+      name: projectName ?? "",
+      teamId: currentTeamId ?? "",
+    },
+  });
+  const {
+    register,
+    handleSubmit,
+    formState: { errors, isDirty },
+    control,
+  } = form;
+
+  const updateProject = api.project.update.useMutation();
+
+  const teamOptions = useMemo(
+    () =>
+      (teams.data ?? [])
+        .filter((t) => !t.isPersonal)
+        .map((t) => ({
+          label: t.name,
+          value: t.id,
+        })),
+    [teams.data],
+  );
+  const teamCollection = useMemo(() => createListCollection({ items: teamOptions }), [teamOptions]);
+
+  const onSubmit: SubmitHandler<EditProjectFormData> = useCallback(
+    (data: EditProjectFormData) => {
+      if (!projectId) return;
+
+      updateProject.mutate(
+        {
+          projectId,
+          ...(data.name !== projectName && { name: data.name }),
+          ...(data.teamId !== currentTeamId && { teamId: data.teamId }),
+        },
+        {
+          onSuccess: () => {
+            void queryClient.team.getTeamsWithRoleBindings.invalidate();
+            void queryClient.team.getTeamsWithMembers.invalidate();
+            void queryClient.organization.getAll.invalidate();
+            toaster.create({
+              title: "Project updated",
+              type: "success",
+              duration: 5000,
+            });
+            closeDrawer();
+          },
+          onError: (error) => {
+            if (applyHandledErrorToForm({ error, form, hasFormErrorSlot: true })) return;
+            showErrorToast({
+              error,
+              fallbackTitle: "Couldn't update the project",
+            });
+          },
+        },
+      );
+    },
+    [
+      updateProject,
+      projectId,
+      projectName,
+      currentTeamId,
+      queryClient,
+      closeDrawer,
+      form,
+      toaster,
+      showErrorToast,
+    ],
+  );
+
+  return (
+    <Drawer.Root
+      open={open}
+      placement="end"
+      size="lg"
+      onOpenChange={({ open: isOpen }) => {
+        if (!isOpen) closeDrawer();
+      }}
+    >
+      <Drawer.Content bg="bg">
+        <Drawer.Header>
+          <Drawer.CloseTrigger onClick={closeDrawer} />
+          <Heading>Edit Project</Heading>
+        </Drawer.Header>
+        <Drawer.Body>
+          <form onSubmit={handleSubmit(onSubmit)}>
+            <VStack align="stretch" gap={6}>
+              <FormServerError form={form} />
+
+              <Text fontSize="sm" color="fg.muted">
+                Update the project name or move it to a different team. Moving a project changes
+                which team members inherit access.
+              </Text>
+
+              <Field.Root invalid={!!errors.name}>
+                <Field.Label>Project Name</Field.Label>
+                <Input
+                  {...register("name", {
+                    required: "Project name is required",
+                    minLength: { value: 1, message: "Name is required" },
+                  })}
+                  placeholder="AI Project"
+                />
+                {errors.name && <Field.ErrorText>{errors.name.message}</Field.ErrorText>}
+              </Field.Root>
+
+              <Field.Root invalid={!!errors.teamId}>
+                <Field.Label>Team</Field.Label>
+                <Controller
+                  control={control}
+                  name="teamId"
+                  rules={{ required: "Team is required" }}
+                  render={({ field }) => (
+                    <Select.Root
+                      collection={teamCollection}
+                      value={[field.value]}
+                      onValueChange={(details) => {
+                        const selectedValue = details.value[0];
+                        if (selectedValue) {
+                          field.onChange(selectedValue);
+                        }
+                      }}
+                    >
+                      <Select.Trigger>
+                        <Select.ValueText placeholder="Select team">
+                          {() =>
+                            teamOptions.find((o) => o.value === field.value)?.label ?? "Select team"
+                          }
+                        </Select.ValueText>
+                      </Select.Trigger>
+                      <Select.Content paddingY={2}>
+                        {teamOptions.map((option) => (
+                          <Select.Item key={option.value} item={option}>
+                            {option.label}
+                          </Select.Item>
+                        ))}
+                      </Select.Content>
+                    </Select.Root>
+                  )}
+                />
+                {errors.teamId && <Field.ErrorText>{errors.teamId.message}</Field.ErrorText>}
+              </Field.Root>
+
+              <HStack width="full">
+                <Spacer />
+                <Button
+                  colorPalette="orange"
+                  type="submit"
+                  loading={updateProject.isPending}
+                  disabled={!isDirty || updateProject.isPending}
+                >
+                  Save
+                </Button>
+              </HStack>
+            </VStack>
+          </form>
+        </Drawer.Body>
+      </Drawer.Content>
+    </Drawer.Root>
+  );
+}

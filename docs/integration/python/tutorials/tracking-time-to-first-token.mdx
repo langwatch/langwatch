@@ -21,12 +21,12 @@ LangWatch captures TTFT per LLM span, rolls it up to the trace, and surfaces it 
 
 If your instrumentation already emits any of the signals below, TTFT shows up without any extra code:
 
-| Source | Signal |
-|--------|--------|
+| Source                              | Signal                                                                  |
+| ----------------------------------- | ----------------------------------------------------------------------- |
 | OpenLLMetry / OpenLIT instrumentors | `llm.content.completion.chunk` / `First Token Stream Event` span events |
-| OTel GenAI semconv emitters | `gen_ai.server.time_to_first_token` span attribute (milliseconds) |
-| Vercel AI SDK | `ai.response.msToFirstChunk` span attribute |
-| LangWatch SDKs | `timestamps.first_token_at` on the span (see below) |
+| OTel GenAI semconv emitters         | `gen_ai.server.time_to_first_token` span attribute (milliseconds)       |
+| Vercel AI SDK                       | `ai.response.msToFirstChunk` span attribute                             |
+| LangWatch SDKs                      | `timestamps.first_token_at` on the span (see below)                     |
 
 When more than one LLM span in a trace reports a TTFT, the trace-level value is the smallest one, the first token the user could have seen.
 
@@ -75,7 +75,10 @@ def main():
 LangWatch computes TTFT as `first_token_at - started_at`. You don't need to set `started_at` or `finished_at`, those fall back to the span's own start and end times.
 
 <Warning>
-  Assigning to the dict directly, e.g. `langwatch.get_current_span().timestamps["first_token_at"] = ...`, does **not** work. The timestamps are only exported to the underlying OpenTelemetry span when they go through `update(timestamps=...)`.
+  Assigning to the dict directly, e.g.
+  `langwatch.get_current_span().timestamps["first_token_at"] = ...`, does **not** work.
+  The timestamps are only exported to the underlying OpenTelemetry span when they go
+  through `update(timestamps=...)`.
 </Warning>
 
 ### If you already have the duration

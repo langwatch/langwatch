@@ -14,6 +14,7 @@ Open a headed Chromium browser the user can see, then drive it interactively. Th
 ## Setup
 
 Parse `$ARGUMENTS` for:
+
 - **URL or port** (optional): full URL or just a port number (e.g. `5560` becomes `http://localhost:5560`)
 - **Page** (optional): where to navigate after login (e.g. "agents page", "run plans")
 
@@ -24,6 +25,7 @@ If not provided, check for `.dev-port` file or ask the user.
 Use **only** `mcp__playwright-headed__*` tools. Never use `mcp__playwright__*` (headless). The user must see the browser.
 
 Key tools:
+
 - `mcp__playwright-headed__browser_navigate` — go to a URL
 - `mcp__playwright-headed__browser_snapshot` — read page state (preferred over screenshots)
 - `mcp__playwright-headed__browser_click` — click elements by ref
@@ -41,6 +43,7 @@ Before starting, create a task for each step below using TaskCreate. Chain seque
 Navigate to the app URL. Take a snapshot to see the page state.
 
 If you land on a login/signup page:
+
 1. Check `dev/scripts/verify-browser-test.js` in the project for test credentials
 2. Register or sign in with those credentials
 3. Complete any onboarding flow (pick quick defaults)
@@ -59,6 +62,7 @@ This is the core. Repeat:
 3. **Wait** for the user's direction
 
 When the user gives feedback:
+
 - **Navigation:** "go to X" — navigate and snapshot
 - **UI issue:** "the fonts don't match" — read the relevant component code, edit it, tell the user to refresh (or navigate away and back)
 - **Interaction:** "click the button" — click it and snapshot the result
@@ -67,6 +71,7 @@ When the user gives feedback:
 ### 4. Code changes
 
 When editing code based on visual feedback:
+
 1. Read the component file first
 2. Make the edit
 3. Tell the user the change is saved — Next.js hot reload should pick it up

@@ -84,8 +84,7 @@ describe("resolveProjectSelector()", () => {
       const resolved = await resolveProjectSelector({
         selector: "proj-b",
         cfg: personalConfig,
-        service: listing([[project({ id: "proj-b", slug: "checkout-agent" })]])
-          .service,
+        service: listing([[project({ id: "proj-b", slug: "checkout-agent" })]]).service,
       });
 
       expect(resolved).toBe("proj-b");
@@ -95,8 +94,7 @@ describe("resolveProjectSelector()", () => {
       const resolved = await resolveProjectSelector({
         selector: "checkout-agent",
         cfg: personalConfig,
-        service: listing([[project({ id: "proj-b", slug: "checkout-agent" })]])
-          .service,
+        service: listing([[project({ id: "proj-b", slug: "checkout-agent" })]]).service,
       });
 
       expect(resolved).toBe("proj-b");
@@ -136,14 +134,11 @@ describe("resolveProjectSelector()", () => {
       const failure = await resolveProjectSelector({
         selector: "someone-elses",
         cfg: personalConfig,
-        service: listing([[project({ id: "proj-b", slug: "checkout-agent" })]])
-          .service,
+        service: listing([[project({ id: "proj-b", slug: "checkout-agent" })]]).service,
       }).catch((err: unknown) => err);
 
       expect(failure).toBeInstanceOf(ProjectScopeError);
-      expect((failure as ProjectScopeError).code).toBe(
-        "project_not_accessible",
-      );
+      expect((failure as ProjectScopeError).code).toBe("project_not_accessible");
       expect((failure as ProjectScopeError).project).toBe("someone-elses");
       expect((failure as ProjectScopeError).message).toContain(
         'no accessible project matches "someone-elses"',
@@ -159,9 +154,7 @@ describe("resolveProjectSelector()", () => {
         service: failingListing(403),
       }).catch((err: unknown) => err);
 
-      expect((failure as ProjectScopeError).code).toBe(
-        "project_not_accessible",
-      );
+      expect((failure as ProjectScopeError).code).toBe("project_not_accessible");
       expect((failure as ProjectScopeError).message).toContain("proj-b");
     });
 

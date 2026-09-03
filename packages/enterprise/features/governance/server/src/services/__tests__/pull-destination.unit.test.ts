@@ -1,0 +1,127 @@
+import { describe, expect, it } from "vitest";
+import { GovernanceValidationError } from "@langwatch/enterprise-governance-contract";
+import { PullDestinationService } from "../pull-destination.service";
+import { DATABRICKS_GENIE_ADAPTER_ID } from "../../adapters/databricks-genie-puller.adapter";
+
+const pullDestination = PullDestinationService.create();
+
+const genie = (workspaceUrl: string) => ({
+  adapter: DATABRICKS_GENIE_ADAPTER_ID,
+  workspaceUrl,
+  credentials: { token: "dapi-secret" },
+});
+
+describe("given a Genie config naming a real workspace", () => {
+  describe("when the destination is checked", () => {
+    it.each([
+      "https://adb-7405615080492024.4.azuredatabricks.net",
+      "https://dbc-1234abcd-5e6f.cloud.databricks.com",
+      "https://1234567890.7.gcp.databricks.com",
+    ])("accepts %s", (url) => {
+      expect(() => pullDestination.assertAllowed(genie(url))).not.toThrow();
+    });
+  });
+});
+
+describe("given a Genie config pointed somewhere the token must never go", () => {
+  describe("when the destination is checked", () => {
+    /** @scenario "The token may only be sent to a Databricks workspace" */
+    it("refuses a host the attacker controls", () => {
+      expect(() => pullDestination.assertAllowed(genie("https://attacker.example.com"))).toThrow(
+        /Databricks workspace address/,
+      );
+      expect(() => pullDestination.assertAllowed(genie("https://attacker.example.com"))).toThrow(
+        GovernanceValidationError,
+      );
+    });
+
+    /**
+     * The admin has to be able to act on the rejection, and the only thing that
+     * tells them what to type instead is the message itself. Asserting the
+     * phrasing alone would let it shrink to "invalid workspace URL" and still
+     * pass, which is a rejection with nowhere to go.
+     *
+     * @scenario "The token may only be sent to a Databricks workspace"
+     */
+    it("names every address that would have been accepted", () => {
+      let message = "";
+      try {
+        pullDestination.assertAllowed(genie("https://attacker.example.com"));
+      } catch (error) {
+        message = error instanceof Error ? error.message : String(error);
+      }
+      expect(message).toContain(".azuredatabricks.net");
+      expect(message).toContain(".cloud.databricks.com");
+      expect(message).toContain(".gcp.databricks.com");
+    });
+
+    it("refuses a lookalike that merely contains the real domain", () => {
+      expect(() =>
+        pullDestination.assertAllowed(genie("https://azuredatabricks.net.attacker.example.com")),
+      ).toThrow(/Databricks workspace address/);
+    });
+
+    it("refuses plain http, which would expose the token even to a real workspace", () => {
+      expect(() =>
+        pullDestination.assertAllowed(genie("http://adb-1234567890123456.7.azuredatabricks.net")),
+      ).toThrow(/Databricks workspace address/);
+    });
+
+    it("refuses a URL smuggling credentials in its userinfo", () => {
+      expect(() =>
+        pullDestination.assertAllowed(genie("https://user:pass@adb-1.7.azuredatabricks.net")),
+      ).toThrow(/Databricks workspace address/);
+    });
+
+    /**
+     * The two copies of this rule disagreed here, and nothing pinned it: the
+     * regex on the write path refused anything past the host, while the URL
+     * parse beside the reasoning allowed a path. Now that one calls the other,
+     * the answer has to be written down — a matching host reached at a path or
+     * a port is not the workspace API, and it is the shape a real workspace
+     * host gets pointed somewhere else with.
+     */
+    it.each([
+      "https://adb-1.7.azuredatabricks.net/redirect",
+      "https://adb-1.7.azuredatabricks.net:8443",
+      "https://adb-1.7.azuredatabricks.net/?to=elsewhere",
+      "https://adb-1.7.azuredatabricks.net/#elsewhere",
+    ])("refuses %s, which is more than a bare origin", (url) => {
+      expect(() => pullDestination.assertAllowed(genie(url))).toThrow(
+        /Databricks workspace address/,
+      );
+    });
+
+    it("still accepts the trailing slash a browser adds", () => {
+      expect(() =>
+        pullDestination.assertAllowed(genie("https://adb-1.7.azuredatabricks.net/")),
+      ).not.toThrow();
+    });
+
+    it("refuses a missing workspace URL rather than letting it through", () => {
+      expect(() =>
+        pullDestination.assertAllowed({
+          adapter: DATABRICKS_GENIE_ADAPTER_ID,
+        }),
+      ).toThrow(/Databricks workspace address/);
+    });
+  });
+});
+
+describe("given a config for an adapter with no fixed destination", () => {
+  describe("when the destination is checked", () => {
+    it("leaves it alone rather than inventing a rule for it", () => {
+      expect(() =>
+        pullDestination.assertAllowed({
+          adapter: "http_polling",
+          url: "https://customers-own-audit-api.example.com/events",
+        }),
+      ).not.toThrow();
+    });
+
+    it("ignores a config with no adapter at all", () => {
+      expect(() => pullDestination.assertAllowed({ ottlStatements: [] })).not.toThrow();
+      expect(() => pullDestination.assertAllowed(null)).not.toThrow();
+    });
+  });
+});

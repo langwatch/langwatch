@@ -11,10 +11,7 @@ import { describe, expect, it } from "vitest";
 const MIRRORED_FILES = ["markers.ts", "secrets.ts", "sessionReport.ts"] as const;
 
 const generatedDir = join(__dirname, "../../../internal/generated/redaction");
-const canonicalDir = join(
-  __dirname,
-  "../../../../../../packages/redaction/src",
-);
+const canonicalDir = join(__dirname, "../../../../../../packages/redaction/src");
 
 describe("the bundled redaction mirror, given the canonical package", () => {
   for (const file of MIRRORED_FILES) {

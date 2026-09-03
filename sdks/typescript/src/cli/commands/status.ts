@@ -2,9 +2,7 @@ import { scopedApiKey } from "@/internal/credentialContext";
 import chalk from "chalk";
 import { createSpinner } from "../utils/spinner";
 import { resolveCredentials } from "../utils/apiKey";
-import {
-  createLangWatchApiClient,
-} from "@/internal/api/client";
+import { createLangWatchApiClient } from "@/internal/api/client";
 import { buildAuthHeaders, isPersonalAccessToken } from "@/internal/api/auth";
 import { formatApiErrorMessage } from "@/client-sdk/services/_shared/format-api-error";
 import { resolveControlPlaneUrl } from "@/cli/utils/governance/resolveEndpoint";
@@ -147,7 +145,7 @@ export interface StatusDocument {
 }
 
 export const statusCommand = async (options?: RawOutputFlags): Promise<void> => {
-  await resolveCredentials();
+  const credentials = await resolveCredentials();
 
   const apiClient = createLangWatchApiClient();
   const apiKey = scopedApiKey() ?? process.env.LANGWATCH_API_KEY ?? "";
@@ -163,9 +161,17 @@ export const statusCommand = async (options?: RawOutputFlags): Promise<void> => 
     advisories: {},
   };
 
-  async function fetchCount(url: string): Promise<{ data: unknown; error?: unknown; status?: number }> {
+  async function fetchCount(
+    url: string,
+    options?: { method?: "GET" | "POST"; body?: unknown },
+  ): Promise<{ data: unknown; error?: unknown; status?: number }> {
     const response = await fetch(`${endpoint}${url}`, {
-      headers: buildAuthHeaders({ apiKey }),
+      method: options?.method,
+      headers: {
+        ...buildAuthHeaders({ apiKey, projectId: credentials.projectId }),
+        ...(options?.body === undefined ? {} : { "Content-Type": "application/json" }),
+      },
+      ...(options?.body === undefined ? {} : { body: JSON.stringify(options.body) }),
     });
     if (!response.ok) {
       let body: unknown;
@@ -307,8 +313,7 @@ export const statusCommand = async (options?: RawOutputFlags): Promise<void> => 
         // is 0, which passes the finite check and scores the budget at 0%, so
         // an unreadable budget would drop out of the at-risk list looking
         // healthy. Absent spend is unreadable, not zero spend.
-        const spent =
-          budget.spent_usd === null ? Number.NaN : Number(budget.spent_usd);
+        const spent = budget.spent_usd === null ? Number.NaN : Number(budget.spent_usd);
         // Neither "at risk" nor "fine" - we cannot say which, so say that.
         if (!Number.isFinite(limit) || !Number.isFinite(spent)) {
           unreadable.push(budget.name);
@@ -341,9 +346,7 @@ export const statusCommand = async (options?: RawOutputFlags): Promise<void> => 
         // limit x member_count. Without a member count (empty group) the
         // allowance covers nobody and any spend is over it.
         const effectiveLimit =
-          budget.scope_type === "group"
-            ? limit * (budget.member_count ?? 0)
-            : limit;
+          budget.scope_type === "group" ? limit * (budget.member_count ?? 0) : limit;
         return [
           {
             name: budget.name,
@@ -416,7 +419,11 @@ export const statusCommand = async (options?: RawOutputFlags): Promise<void> => 
     { key: "dashboards", fn: () => apiClient.GET("/api/dashboards") },
     { key: "triggers", fn: () => fetchCount("/api/triggers") },
     { key: "monitors", fn: () => fetchCount("/api/monitors") },
-    { key: "secrets", fn: () => fetchCount("/api/secrets") },
+    {
+      key: "secrets",
+      fn: () =>
+        fetchCount(`/api/v1/secret?projectId=${encodeURIComponent(credentials.projectId ?? "")}`),
+    },
   ];
 
   // Same reason as `fetchers` above: the three return number |
@@ -434,8 +441,9 @@ export const statusCommand = async (options?: RawOutputFlags): Promise<void> => 
       try {
         const result = await withTimeout(fn, LIST_CALL_TIMEOUT_MS);
         const { data, error } = result;
-        const status = (result as { status?: number; response?: { status?: number } }).status
-          ?? (result as { response?: { status?: number } }).response?.status;
+        const status =
+          (result as { status?: number; response?: { status?: number } }).status ??
+          (result as { response?: { status?: number } }).response?.status;
         if (error) {
           results[key] = {
             count: 0,
@@ -446,10 +454,18 @@ export const statusCommand = async (options?: RawOutputFlags): Promise<void> => 
         }
         if (Array.isArray(data)) {
           results[key] = { count: data.length };
-        } else if (data && typeof data === "object" && "data" in (data as Record<string, unknown>)) {
+        } else if (
+          data &&
+          typeof data === "object" &&
+          "data" in (data as Record<string, unknown>)
+        ) {
           const arr = (data as { data: unknown[] }).data;
           results[key] = { count: Array.isArray(arr) ? arr.length : 0 };
-        } else if (data && typeof data === "object" && "pagination" in (data as Record<string, unknown>)) {
+        } else if (
+          data &&
+          typeof data === "object" &&
+          "pagination" in (data as Record<string, unknown>)
+        ) {
           const pagination = (data as { pagination: { total: number } }).pagination;
           results[key] = { count: pagination.total };
         } else {
@@ -498,19 +514,44 @@ export const statusCommand = async (options?: RawOutputFlags): Promise<void> => 
         const statuses = Object.values(results)
           .map((r) => r.status)
           .filter((s): s is number => typeof s === "number");
-        const allUnauthorized = statuses.length > 0 && statuses.every((s) => s === 401 || s === 403);
+        const allUnauthorized =
+          statuses.length > 0 && statuses.every((s) => s === 401 || s === 403);
         console.log();
         console.log(chalk.red("  ✗ Could not fetch any project resources."));
         console.log(chalk.gray(`    Reason: ${sampleError}`));
         console.log();
-        if (allUnauthorized && isPersonalAccessToken(apiKey) && !process.env.LANGWATCH_PROJECT_ID) {
-          console.log(chalk.gray(`    Your PAT requires ${chalk.cyan("LANGWATCH_PROJECT_ID")} to be set.`));
-          console.log(chalk.gray(`    Set it via: ${chalk.cyan("export LANGWATCH_PROJECT_ID=<your-project-id>")}`));
-          console.log(chalk.gray(`    Or add to .env: ${chalk.cyan("LANGWATCH_PROJECT_ID=<your-project-id>")}`));
+        if (
+          allUnauthorized &&
+          isPersonalAccessToken(apiKey) &&
+          !process.env.LANGWATCH_PROJECT_ID
+        ) {
+          console.log(
+            chalk.gray(
+              `    Your PAT requires ${chalk.cyan("LANGWATCH_PROJECT_ID")} to be set.`,
+            ),
+          );
+          console.log(
+            chalk.gray(
+              `    Set it via: ${chalk.cyan("export LANGWATCH_PROJECT_ID=<your-project-id>")}`,
+            ),
+          );
+          console.log(
+            chalk.gray(
+              `    Or add to .env: ${chalk.cyan("LANGWATCH_PROJECT_ID=<your-project-id>")}`,
+            ),
+          );
         } else if (allUnauthorized) {
-          console.log(chalk.gray(`    Your API key appears to be invalid or revoked. Re-run ${chalk.cyan("langwatch login")} or check ${chalk.cyan("LANGWATCH_API_KEY")}.`));
+          console.log(
+            chalk.gray(
+              `    Your API key appears to be invalid or revoked. Re-run ${chalk.cyan("langwatch login")} or check ${chalk.cyan("LANGWATCH_API_KEY")}.`,
+            ),
+          );
         } else {
-          console.log(chalk.gray(`    Check ${chalk.cyan("LANGWATCH_API_KEY")} (current endpoint: ${chalk.cyan(endpoint)}).`));
+          console.log(
+            chalk.gray(
+              `    Check ${chalk.cyan("LANGWATCH_API_KEY")} (current endpoint: ${chalk.cyan(endpoint)}).`,
+            ),
+          );
         }
         console.log();
         process.exit(1);
@@ -538,7 +579,10 @@ export const statusCommand = async (options?: RawOutputFlags): Promise<void> => 
         console.log(
           chalk.yellow(
             `    ⚠ experiment "${experiment.name ?? experiment.slug}" is still running${progress}`,
-          ) + chalk.gray(`  →  langwatch experiment status ${experiment.slug} --run-id ${experiment.runId}`),
+          ) +
+            chalk.gray(
+              `  →  langwatch experiment status ${experiment.slug} --run-id ${experiment.runId}`,
+            ),
         );
       }
       for (const budget of attention.budgetsAtRisk ?? []) {
@@ -566,9 +610,7 @@ export const statusCommand = async (options?: RawOutputFlags): Promise<void> => 
         if (Object.keys(attention.errors).length === 0 && errorCount === 0) {
           console.log(chalk.green("    ✓ nothing needs your attention"));
         } else {
-          console.log(
-            chalk.gray("    – nothing flagged, but some checks did not run"),
-          );
+          console.log(chalk.gray("    – nothing flagged, but some checks did not run"));
         }
       }
       // Sections that could not be fetched are noted dimly, never fatal.
@@ -578,7 +620,9 @@ export const statusCommand = async (options?: RawOutputFlags): Promise<void> => 
         budgetsAtRisk: "gateway budgets",
       };
       for (const [key, message] of Object.entries(attention.errors)) {
-        console.log(chalk.gray(`    (could not check ${sectionLabels[key] ?? key}: ${message})`));
+        console.log(
+          chalk.gray(`    (could not check ${sectionLabels[key] ?? key}: ${message})`),
+        );
       }
       // Advisories read differently on purpose: "note" is a standing limit of
       // the API, not a check that failed this run, and it does not gate the ✓.
@@ -592,10 +636,10 @@ export const statusCommand = async (options?: RawOutputFlags): Promise<void> => 
       for (const key of RESOURCE_KEYS) {
         const r = results[key];
         if (!r) continue;
-        const countStr = r.error
-          ? chalk.red(r.error)
-          : chalk.cyan(String(r.count));
-        console.log(`    ${chalk.gray(key + ":")} ${" ".repeat(14 - key.length)}${countStr}`);
+        const countStr = r.error ? chalk.red(r.error) : chalk.cyan(String(r.count));
+        console.log(
+          `    ${chalk.gray(key + ":")} ${" ".repeat(14 - key.length)}${countStr}`,
+        );
       }
 
       console.log();
@@ -607,7 +651,11 @@ export const statusCommand = async (options?: RawOutputFlags): Promise<void> => 
         console.log(chalk.gray(`    ${line}`));
       }
       console.log();
-      console.log(chalk.gray("  Run `langwatch commands` for the full catalog (args, flags, hints)."));
+      console.log(
+        chalk.gray(
+          "  Run `langwatch commands` for the full catalog (args, flags, hints).",
+        ),
+      );
       console.log();
     },
   });

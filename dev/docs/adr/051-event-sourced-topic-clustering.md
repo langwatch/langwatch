@@ -10,13 +10,13 @@ shape" — topic clustering is that domain.
 
 ## Context
 
-Topic clustering's *write* path is already event-sourced: `storeResults`
+Topic clustering's _write_ path is already event-sourced: `storeResults`
 emits one `AssignTopic` command per assigned trace, and the
 `TopicAssignedEvent` fold projections stamp `TopicId`/`SubTopicId` onto
 ClickHouse `trace_summaries` and `trace_analytics`
 (see [specs/topic-clustering/trace-assignment.feature](../../../specs/topic-clustering/trace-assignment.feature)).
 
-Its *scheduling and orchestration*, however, is the platform's last
+Its _scheduling and orchestration_, however, is the platform's last
 substantial BullMQ holdout after ADR-014:
 
 - A Kubernetes CronJob hits `/api/cron/schedule_topic_clustering`, which
@@ -87,11 +87,11 @@ event subscriber ── feeds committed events back into the process
 Aggregate type `topic_clustering`, aggregate id = project id. Three
 `defineCommand` declarations:
 
-| Command                        | Event                                  |
-| ------------------------------ | -------------------------------------- |
-| `requestClustering`            | `lw.obs.topic_clustering.requested`    |
-| `recordClusteringRunCompleted` | `lw.obs.topic_clustering.run_completed`|
-| `recordClusteringRunFailed`    | `lw.obs.topic_clustering.run_failed`   |
+| Command                        | Event                                   |
+| ------------------------------ | --------------------------------------- |
+| `requestClustering`            | `lw.obs.topic_clustering.requested`     |
+| `recordClusteringRunCompleted` | `lw.obs.topic_clustering.run_completed` |
+| `recordClusteringRunFailed`    | `lw.obs.topic_clustering.run_failed`    |
 
 `requested` carries a trigger (`manual` | `bootstrap`). `run_completed`
 carries the run's facts: mode (batch/incremental), traces processed,
@@ -135,6 +135,7 @@ decision memory. No prompts, trace content, or credentials.
   a factor, so pairing them would give 120 combinations, not 1440).
   Deploying this moves every project's slot once; a daily job simply
   gets one longer or shorter interval, and the slot is stable after.
+
 - **On `requested` (manual)** — emit a `run:manual:<occurredAt>` intent
   immediately. Manual runs do not disturb the daily schedule.
 - **On `requested` (bootstrap)** — initialize state and schedule the
@@ -161,7 +162,7 @@ records it.
 and work detection depend on live trace counts the process cannot see
 (traces are a different aggregate; subscribing the process to trace
 events is a non-starter at trace volume). Purity is therefore
-structurally capped at a *split* policy — evolve() saying "not in a skip
+structurally capped at a _split_ policy — evolve() saying "not in a skip
 window" while the effect still skips for its own reasons. One policy
 home on live data beats two half-policies; the saved daily count query
 is negligible. Revisitable once `run_completed` facts have proven
@@ -170,7 +171,7 @@ reliable in production.
 ### 4. The clustering effect: parity retry posture, generous lease
 
 The outbox intent handler calls `clusterTopicsForProject` — changed to
-*return* its outcome (mode, counts, skip reason, next cursor) instead of
+_return_ its outcome (mode, counts, skip reason, next cursor) instead of
 enqueueing its own next page — then dispatches
 `recordClusteringRunCompleted`/`…Failed`. Dispatch posture matches the
 BullMQ behaviour being replaced:
@@ -197,9 +198,9 @@ pipeline registry alongside the outbox worker. Topic clustering is the
 first production consumer of the wake path; Langy can adopt it later
 without new infrastructure.
 
-### 6. Bootstrap, backfill, and legacy removal
+### 6. Bootstrap and recurring scheduling
 
-- The trace pipeline's `projectMetadata` reactor dispatches
+- The trace pipeline's `projectMetadata` projection subscriber dispatches
   `requestClustering` (bootstrap) on **every** real ingest, not only when
   `firstMessage` flips. This is deliberately **level-triggered**: an edge
   that is missed — a failed bootstrap, a project predating the feature, a
@@ -209,8 +210,8 @@ without new infrastructure.
   project's hash slot, not relative to now), and affordable because the
   injected implementation is rate-limited per project
   (`createRateLimitedBootstrap`, one commit per project per claim window).
-- `seedClusteringSchedules` (`app-layer/topic-clustering/
-  seedClusteringSchedules.ts`) seeds processes for existing eligible
+- `LegacyImportTopicClusteringMigration` (`packages/features/topic/server/src/
+migrations/legacy-import.topic-clustering.migration.ts`) seeds processes for existing eligible
   projects (`firstMessage: true`). Safe to re-run: bootstrap is idempotent.
 - **It covers dormant projects only.** Any project that ingests re-asserts
   its own schedule, so its remaining job is projects that have ingested
@@ -274,10 +275,12 @@ them.
 
 ### 9. Code home and identifiers
 
-The whole domain lives in `app-layer/topic-clustering/` (clustering
-core, process manager, repositories, status service) — the legacy
-`server/topicClustering/` module is gone. New row identifiers use KSUIDs
-(`topicrun_…`) per platform convention, not nanoid.
+The Topic feature server owns the clustering core, process manager,
+repositories, projections, and status service under
+`packages/features/topic/server/`; `platform/app` only composes its runtime
+ports and transports. The legacy `server/topicClustering/` module is gone.
+New row identifiers use KSUIDs (`topicrun_…`) per platform convention, not
+nanoid.
 
 ## Implementation and validation
 
@@ -306,7 +309,7 @@ Acceptance gates:
 
 ## Rationale / Trade-offs
 
-The process manager is the right home because topic clustering *is* a
+The process manager is the right home because topic clustering _is_ a
 long-running per-project workflow: a recurring timer, a multi-step
 paginated run, retries, and operator-visible outcomes. Modelling it as
 (timer → intent → effect → event → state) makes every piece durable,

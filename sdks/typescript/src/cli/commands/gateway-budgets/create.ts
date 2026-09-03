@@ -52,10 +52,12 @@ function buildScope(options: CreateGatewayBudgetOptions): CreateGatewayBudgetSco
       if (!options.project) throw new Error("--project <id> required for scope=project");
       return { kind: "project", project_id: options.project };
     case "virtual-key":
-      if (!options.virtualKey) throw new Error("--virtual-key <id> required for scope=virtual-key");
+      if (!options.virtualKey)
+        throw new Error("--virtual-key <id> required for scope=virtual-key");
       return { kind: "virtual_key", virtual_key_id: options.virtualKey };
     case "principal":
-      if (!options.principal) throw new Error("--principal <id> required for scope=principal");
+      if (!options.principal)
+        throw new Error("--principal <id> required for scope=principal");
       return { kind: "principal", principal_user_id: options.principal };
     case "group":
       // Per-member allowance: --limit is what EACH member may spend.
@@ -88,7 +90,9 @@ export const createGatewayBudgetCommand = async (
   try {
     scope = buildScope(options);
   } catch (err) {
-    console.error(chalk.red(`Error: ${err instanceof Error ? err.message : String(err)}`));
+    console.error(
+      chalk.red(`Error: ${err instanceof Error ? err.message : String(err)}`),
+    );
     process.exit(1);
   }
 
@@ -131,7 +135,9 @@ export const createGatewayBudgetCommand = async (
         if (budget.provider_key) {
           console.log(`${chalk.bold("Provider:")} ${budget.provider_key}`);
         }
-        console.log(`${chalk.bold("Resets:")}   ${new Date(budget.resets_at).toLocaleString()}`);
+        console.log(
+          `${chalk.bold("Resets:")}   ${new Date(budget.resets_at).toLocaleString()}`,
+        );
         if (budget.cycle_anchor_at) {
           // Only anchored budgets have a phase worth showing; calendar
           // aligned ones are already implied by the window.

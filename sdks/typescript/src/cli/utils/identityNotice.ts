@@ -126,16 +126,13 @@ async function fetchProjectName(
   fetchImpl: typeof fetch,
 ): Promise<string | undefined> {
   try {
-    const res = await fetchImpl(
-      `${normalizeEndpoint(endpoint)}/api/me/project`,
-      {
-        headers: {
-          Authorization: `Bearer ${apiKey}`,
-          Accept: "application/json",
-        },
-        signal: AbortSignal.timeout(NAME_FETCH_TIMEOUT_MS),
+    const res = await fetchImpl(`${normalizeEndpoint(endpoint)}/api/me/project`, {
+      headers: {
+        Authorization: `Bearer ${apiKey}`,
+        Accept: "application/json",
       },
-    );
+      signal: AbortSignal.timeout(NAME_FETCH_TIMEOUT_MS),
+    });
     if (!res.ok) return undefined;
     const body = (await res.json()) as { name?: string };
     return typeof body.name === "string" && body.name.trim() !== ""

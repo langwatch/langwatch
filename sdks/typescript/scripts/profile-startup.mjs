@@ -97,7 +97,11 @@ const timeRuns = (command, commandArgs) => {
     if (result.error) throw result.error;
     samples.push(elapsed);
   }
-  return { median: median(samples), min: Math.min(...samples), max: Math.max(...samples) };
+  return {
+    median: median(samples),
+    min: Math.min(...samples),
+    max: Math.max(...samples),
+  };
 };
 
 // ----------------------------------------------- cpuprofile → speedscope ----
@@ -142,7 +146,11 @@ const convertCpuProfile = (cpuprofile, name) => {
     const cached = stackCache.get(leafId);
     if (cached) return cached;
     const ids = [];
-    for (let id = leafId; id !== undefined && !ids.includes(id); id = parentById.get(id)) {
+    for (
+      let id = leafId;
+      id !== undefined && !ids.includes(id);
+      id = parentById.get(id)
+    ) {
       ids.push(id);
     }
     const stack = ids.reverse().map(frameIndex);
@@ -200,7 +208,9 @@ const renderTopTables = (tree) => {
 };
 
 // ------------------------------------------------------------------ run ----
-console.log(`profiling: langwatch ${cliArgs.join(" ")}  (LANGWATCH_NO_DAEMON=1, ${runs} wall runs)`);
+console.log(
+  `profiling: langwatch ${cliArgs.join(" ")}  (LANGWATCH_NO_DAEMON=1, ${runs} wall runs)`,
+);
 
 // 1. require tree
 const treePath = path.join(OUT_DIR, `${label}-require-tree.json`);

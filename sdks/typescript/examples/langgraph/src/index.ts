@@ -74,15 +74,11 @@ async function main() {
     `;
 
     const result = await chatModel.invoke([
-      new SystemMessage(
-        "You are a question analyzer. Respond with only YES or NO.",
-      ),
+      new SystemMessage("You are a question analyzer. Respond with only YES or NO."),
       new HumanMessage(prompt),
     ]);
 
-    const needsSearch = (result.content as string)
-      .toUpperCase()
-      .includes("YES");
+    const needsSearch = (result.content as string).toUpperCase().includes("YES");
 
     return {
       current_step: "question_analyzed",
@@ -117,9 +113,7 @@ async function main() {
     `;
 
     const result = await chatModel.invoke([
-      new SystemMessage(
-        "You are an expert analyst. Provide comprehensive analysis.",
-      ),
+      new SystemMessage("You are an expert analyst. Provide comprehensive analysis."),
       new HumanMessage(prompt),
     ]);
 
@@ -259,10 +253,7 @@ async function main() {
           });
 
           // Check for exit command
-          if (
-            userInput.toLowerCase() === "quit" ||
-            userInput.toLowerCase() === "exit"
-          ) {
+          if (userInput.toLowerCase() === "quit" || userInput.toLowerCase() === "exit") {
             console.log("👋 Goodbye!");
             finish = true;
             return;
@@ -334,9 +325,7 @@ async function main() {
 
           // Show workflow statistics
           console.log(`\n📈 Workflow Statistics:`);
-          console.log(
-            `   Search performed: ${finalState.needs_search ? "Yes" : "No"}`,
-          );
+          console.log(`   Search performed: ${finalState.needs_search ? "Yes" : "No"}`);
           console.log(`   Total iterations: ${finalState.iterations}`);
           console.log(`   Final step: ${finalState.current_step}`);
           console.log("---");

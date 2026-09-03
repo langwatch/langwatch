@@ -19,9 +19,7 @@ export async function ingestListCommand(options: {
 }): Promise<void> {
   const cfg = loadConfig();
   if (!isLoggedIn(cfg)) {
-    process.stderr.write(
-      "Not logged in. Run `langwatch login --device` first.\n",
-    );
+    process.stderr.write("Not logged in. Run `langwatch login --device` first.\n");
     process.exit(1);
   }
 
@@ -60,16 +58,9 @@ export async function ingestListCommand(options: {
   const rows: string[][] = [headerRow];
   for (const s of sources) {
     const lastEvent =
-      s.lastEventAt === null
-        ? chalk.gray("—")
-        : humanRelative(new Date(s.lastEventAt));
+      s.lastEventAt === null ? chalk.gray("—") : humanRelative(new Date(s.lastEventAt));
     const archivedTag = s.archivedAt ? chalk.gray(" [archived]") : "";
-    rows.push([
-      s.name + archivedTag,
-      s.sourceType,
-      colorStatus(s.status),
-      lastEvent,
-    ]);
+    rows.push([s.name + archivedTag, s.sourceType, colorStatus(s.status), lastEvent]);
   }
   printTable(rows);
 

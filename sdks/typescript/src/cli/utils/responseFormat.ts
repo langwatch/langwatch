@@ -150,10 +150,7 @@ export const asFlatFields = (
     if (!Array.isArray(schema.required)) return null;
     const required = [...(schema.required as unknown[])].sort();
     const names = [...propertyNames].sort();
-    if (
-      required.length !== names.length ||
-      required.some((r, i) => r !== names[i])
-    ) {
+    if (required.length !== names.length || required.some((r, i) => r !== names[i])) {
       return null;
     }
   }
@@ -172,9 +169,7 @@ export const outputsToResponseFormat = (
 ): LocalResponseFormat | undefined => {
   if (!outputs || outputs.length === 0) return undefined;
 
-  const jsonSchemaOutput = outputs.find(
-    (o) => o.type === "json_schema" && o.json_schema,
-  );
+  const jsonSchemaOutput = outputs.find((o) => o.type === "json_schema" && o.json_schema);
   if (jsonSchemaOutput?.json_schema) {
     return {
       name: jsonSchemaOutput.identifier,
@@ -218,9 +213,7 @@ export const outputsToResponseFormat = (
  * a flat object schema expands to flat fields (so the platform keeps showing
  * them individually), anything richer becomes one json_schema output.
  */
-export const responseFormatToOutputs = (
-  raw: unknown,
-): CliOutput[] | undefined => {
+export const responseFormatToOutputs = (raw: unknown): CliOutput[] | undefined => {
   const rf = normalizeResponseFormat(raw);
   if (!rf) return undefined;
 

@@ -59,8 +59,7 @@ const BOUND_TENANT_PREDICATE =
   /(?:^|[\s.(])TenantId\s*=\s*\{\s*([A-Za-z_][A-Za-z0-9_]*)\s*:/i;
 
 /** `TenantId = 'literal'` or `= "literal"`, which is never acceptable. */
-const LITERAL_TENANT_PREDICATE =
-  /(?:^|[\s.(])TenantId\s*=\s*(?:'[^']*'|"[^"]*")/i;
+const LITERAL_TENANT_PREDICATE = /(?:^|[\s.(])TenantId\s*=\s*(?:'[^']*'|"[^"]*")/i;
 
 /**
  * Returns the reason a statement is not tenant-scoped, or null when it is.
@@ -216,9 +215,7 @@ export function checkTenantScope({
       : { kind: "missing-predicate" };
   }
 
-  if (
-    hasWeakeningDisjunction({ masked: statement, predicateIndex: bound.index })
-  ) {
+  if (hasWeakeningDisjunction({ masked: statement, predicateIndex: bound.index })) {
     return { kind: "weakening-disjunction" };
   }
 
@@ -275,9 +272,7 @@ export interface TenantGuardOptions {
  * statement that must not run.
  */
 export class TenantGuard {
-  private readonly onUnscoped:
-    | ((request: QueryRequest) => void)
-    | undefined;
+  private readonly onUnscoped: ((request: QueryRequest) => void) | undefined;
 
   constructor({ onUnscoped }: TenantGuardOptions = {}) {
     this.onUnscoped = onUnscoped;

@@ -22,25 +22,23 @@ export const STALE_ENDPOINT = "https://app.langwatch.ai/api/otel";
 export const STALE_TOKEN = "ik-lw-stalelogin000000_oldsecret";
 
 export const currentClaudeVars = (): Record<string, string> =>
-	buildOtelEnvBlock("claude", CURRENT_ENDPOINT, CURRENT_TOKEN);
+  buildOtelEnvBlock("claude", CURRENT_ENDPOINT, CURRENT_TOKEN);
 
-export function baseCfg(
-	overrides: Partial<GovernanceConfig> = {},
-): GovernanceConfig {
-	return {
-		gateway_url: "http://localhost:5563",
-		control_plane_url: "http://localhost:5580",
-		access_token: "tok",
-		organization: { id: "o1", slug: "acme" },
-		...overrides,
-	};
+export function baseCfg(overrides: Partial<GovernanceConfig> = {}): GovernanceConfig {
+  return {
+    gateway_url: "http://localhost:5563",
+    control_plane_url: "http://localhost:5580",
+    access_token: "tok",
+    organization: { id: "o1", slug: "acme" },
+    ...overrides,
+  };
 }
 
 export interface TempHomeAndCwd {
-	/** Absolute path of the temp $HOME for the CURRENT test (reassigned every beforeEach). */
-	home: string;
-	/** Absolute path of a temp working directory for the CURRENT test. */
-	cwd: string;
+  /** Absolute path of the temp $HOME for the CURRENT test (reassigned every beforeEach). */
+  home: string;
+  /** Absolute path of a temp working directory for the CURRENT test. */
+  cwd: string;
 }
 
 /**
@@ -53,32 +51,30 @@ export interface TempHomeAndCwd {
  * genuinely unset beforehand.
  */
 export function installTempHomeAndCwd(): TempHomeAndCwd {
-	const state: TempHomeAndCwd = { home: "", cwd: "" };
-	const origHome = process.env.HOME;
-	const origUserprofile = process.env.USERPROFILE;
-	const origCodexHome = process.env.CODEX_HOME;
+  const state: TempHomeAndCwd = { home: "", cwd: "" };
+  const origHome = process.env.HOME;
+  const origUserprofile = process.env.USERPROFILE;
+  const origCodexHome = process.env.CODEX_HOME;
 
-	beforeEach(() => {
-		state.home = fs.mkdtempSync(
-			path.join(os.tmpdir(), "lw-telemetry-refresh-"),
-		);
-		state.cwd = fs.mkdtempSync(path.join(os.tmpdir(), "lw-refresh-cwd-"));
-		process.env.HOME = state.home;
-		process.env.USERPROFILE = state.home;
-		delete process.env.CODEX_HOME;
-	});
+  beforeEach(() => {
+    state.home = fs.mkdtempSync(path.join(os.tmpdir(), "lw-telemetry-refresh-"));
+    state.cwd = fs.mkdtempSync(path.join(os.tmpdir(), "lw-refresh-cwd-"));
+    process.env.HOME = state.home;
+    process.env.USERPROFILE = state.home;
+    delete process.env.CODEX_HOME;
+  });
 
-	afterEach(() => {
-		if (origHome === undefined) delete process.env.HOME;
-		else process.env.HOME = origHome;
-		if (origUserprofile === undefined) delete process.env.USERPROFILE;
-		else process.env.USERPROFILE = origUserprofile;
-		if (origCodexHome === undefined) delete process.env.CODEX_HOME;
-		else process.env.CODEX_HOME = origCodexHome;
-		fs.rmSync(state.home, { recursive: true, force: true });
-		fs.rmSync(state.cwd, { recursive: true, force: true });
-		vi.clearAllMocks();
-	});
+  afterEach(() => {
+    if (origHome === undefined) delete process.env.HOME;
+    else process.env.HOME = origHome;
+    if (origUserprofile === undefined) delete process.env.USERPROFILE;
+    else process.env.USERPROFILE = origUserprofile;
+    if (origCodexHome === undefined) delete process.env.CODEX_HOME;
+    else process.env.CODEX_HOME = origCodexHome;
+    fs.rmSync(state.home, { recursive: true, force: true });
+    fs.rmSync(state.cwd, { recursive: true, force: true });
+    vi.clearAllMocks();
+  });
 
-	return state;
+  return state;
 }

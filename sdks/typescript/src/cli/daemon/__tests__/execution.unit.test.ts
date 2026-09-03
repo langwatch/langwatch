@@ -273,9 +273,7 @@ describe("process interceptors", () => {
 describe("given a write made outside any request", () => {
   describe("when the daemon logs for itself", () => {
     it("passes the write through to the real stream", () => {
-      const underlying = vi
-        .spyOn(process.stdout, "write")
-        .mockImplementation(() => true);
+      const underlying = vi.spyOn(process.stdout, "write").mockImplementation(() => true);
       // Install AFTER spying, so the interceptor captures the spy as the real
       // stream and we can observe the pass-through.
       const uninstall = installProcessInterceptors();
@@ -393,13 +391,17 @@ describe("ExecutionWindow", () => {
       // reused window would otherwise keep the previous caller's level.
       const savedLevel = chalk.level;
       try {
-        const first = await window.acquire({ request: { cwd: dirA, env: {}, colorLevel: 3 } });
+        const first = await window.acquire({
+          request: { cwd: dirA, env: {}, colorLevel: 3 },
+        });
         expect(chalk.level).toBe(3);
 
         chalk.level = 0; // what the just-finished --agent request left behind
         first();
 
-        const second = await window.acquire({ request: { cwd: dirA, env: {}, colorLevel: 3 } });
+        const second = await window.acquire({
+          request: { cwd: dirA, env: {}, colorLevel: 3 },
+        });
         expect(chalk.level).toBe(3);
         second();
       } finally {
@@ -457,7 +459,9 @@ describe("ExecutionWindow", () => {
 
       const pendingB = window.acquire({ request: { cwd: dirB, env: {}, colorLevel: 0 } });
       // Arrives after B, but matches the ACTIVE window. It must not jump B.
-      const pendingA2 = window.acquire({ request: { cwd: dirA, env: {}, colorLevel: 0 } });
+      const pendingA2 = window.acquire({
+        request: { cwd: dirA, env: {}, colorLevel: 0 },
+      });
 
       await Promise.resolve();
       expect(window.queuedCount).toBe(2);
@@ -497,7 +501,9 @@ describe("ExecutionWindow", () => {
 
       // The window still drains correctly for the next caller.
       releaseA();
-      const releaseB = await window.acquire({ request: { cwd: dirB, env: {}, colorLevel: 0 } });
+      const releaseB = await window.acquire({
+        request: { cwd: dirB, env: {}, colorLevel: 0 },
+      });
       expect(fs.realpathSync(process.cwd())).toBe(fs.realpathSync(dirB));
       releaseB();
     });

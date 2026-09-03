@@ -16,7 +16,7 @@ version: 2
 #     family (or any shared dependency) is bumped across all of them together
 #     instead of one PR per project per dependency.
 #     This also closed a coverage gap: while the repo had six install roots,
-#     only three of them were listed here, so skills/, agentic-e2e-tests/,
+#     only three of them were listed here, so skills/ and dev/tests/agentic-e2e/,
 #     packages/* was never scanned at all.
 #   - Everything left over is caught by a `minor-and-patch` group, so the long
 #     tail of trivial version bumps is a single PR. Major bumps of ungrouped

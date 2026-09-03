@@ -56,10 +56,16 @@ export const getAgentCommand = async (id: string): Promise<CommandResult | void>
           console.log(`  ${chalk.gray("Host:")}        ${agent.hostLabel}`);
         }
         if (agent.lastSeenAt) {
-          console.log(`  ${chalk.gray("Last seen:")}   ${new Date(agent.lastSeenAt).toLocaleString()}`);
+          console.log(
+            `  ${chalk.gray("Last seen:")}   ${new Date(agent.lastSeenAt).toLocaleString()}`,
+          );
         }
-        console.log(`  ${chalk.gray("Created:")}     ${new Date(agent.createdAt).toLocaleString()}`);
-        console.log(`  ${chalk.gray("Updated:")}     ${new Date(agent.updatedAt).toLocaleString()}`);
+        console.log(
+          `  ${chalk.gray("Created:")}     ${new Date(agent.createdAt).toLocaleString()}`,
+        );
+        console.log(
+          `  ${chalk.gray("Updated:")}     ${new Date(agent.updatedAt).toLocaleString()}`,
+        );
 
         if (agent.platformUrl) {
           console.log(`  ${chalk.bold("View:")}        ${chalk.underline(agent.platformUrl)}`);

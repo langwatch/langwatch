@@ -148,7 +148,7 @@ func TestWriteSelectionStatesEveryService(t *testing.T) {
 
 	t.Run("given a selection with everything on", func(t *testing.T) {
 		dir := t.TempDir()
-		on := domain.Selection{Workers: true, Gateway: true, NLP: true, Langy: true}
+		on := domain.Selection{Gateway: true, NLP: true, Langy: true, IDP: true}
 
 		t.Run("when it is written and read back", func(t *testing.T) {
 			if err := s.WriteSelection(dir, on); err != nil {
@@ -175,7 +175,7 @@ func TestWriteSelectionStatesEveryService(t *testing.T) {
 func TestObserveDurationKeepsEveryKeyWhenRunsFinishTogether(t *testing.T) {
 	t.Run("given many runs recording different commands at the same moment", func(t *testing.T) {
 		store := New(t.TempDir())
-		keys := []string{"unit", "integration", "typecheck", "lint", "biome", "tsgo"}
+		keys := []string{"unit", "integration", "typecheck", "lint", "oxlint", "tsgo"}
 
 		var wg sync.WaitGroup
 		for _, key := range keys {

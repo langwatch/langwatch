@@ -1,12 +1,4 @@
-import {
-  describe,
-  it,
-  expect,
-  beforeAll,
-  beforeEach,
-  afterAll,
-  afterEach,
-} from "vitest";
+import { describe, it, expect, beforeAll, beforeEach, afterAll, afterEach } from "vitest";
 import { http, HttpResponse } from "msw";
 import { setupServer } from "msw/node";
 import { TeamsApiService } from "../teams-api.service";
@@ -56,10 +48,9 @@ describe("TeamsApiService", () => {
         server.use(
           http.post(`${TEST_ENDPOINT}/api/teams`, async ({ request }) => {
             capturedBody = (await request.json()) as Record<string, unknown>;
-            return HttpResponse.json(
-              teamFixture({ name: capturedBody.name as string }),
-              { status: 201 },
-            );
+            return HttpResponse.json(teamFixture({ name: capturedBody.name as string }), {
+              status: 201,
+            });
           }),
         );
       });
@@ -88,9 +79,7 @@ describe("TeamsApiService", () => {
       });
 
       it("throws LangWatchHandledError", async () => {
-        await expect(service.create({ name: "" })).rejects.toThrow(
-          LangWatchHandledError,
-        );
+        await expect(service.create({ name: "" })).rejects.toThrow(LangWatchHandledError);
       });
     });
   });
@@ -166,17 +155,14 @@ describe("TeamsApiService", () => {
       beforeEach(() => {
         capturedMethod = "";
         server.use(
-          http.delete(
-            `${TEST_ENDPOINT}/api/teams/team_abc123`,
-            ({ request }) => {
-              capturedMethod = request.method;
-              return HttpResponse.json({
-                id: "team_abc123",
-                name: "Test Team",
-                archivedAt: "2025-02-01T00:00:00Z",
-              });
-            },
-          ),
+          http.delete(`${TEST_ENDPOINT}/api/teams/team_abc123`, ({ request }) => {
+            capturedMethod = request.method;
+            return HttpResponse.json({
+              id: "team_abc123",
+              name: "Test Team",
+              archivedAt: "2025-02-01T00:00:00Z",
+            });
+          }),
         );
       });
 

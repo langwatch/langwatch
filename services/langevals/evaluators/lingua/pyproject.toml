@@ -2,21 +2,13 @@
 name = "langevals-lingua"
 version = "3.0.0"
 description = "LangEvals lingua evaluator for language detection."
-authors = [
-    {name = "Rogerio Chaves", email = "rogerio@langwatch.ai"},
-]
-license = {text = "MIT"}
+authors = [{ name = "Rogerio Chaves", email = "rogerio@langwatch.ai" }]
+license = { text = "MIT" }
 requires-python = ">=3.11"
-dependencies = [
-    "langevals-core>=0.1.0",
-    "lingua-language-detector>=2.0.2",
-]
+dependencies = ["langevals-core>=0.1.0", "lingua-language-detector>=2.0.2"]
 
 [dependency-groups]
-test = [
-    "pytest>=7.4.2",
-    "python-dotenv==1.2.2",
-]
+test = ["pytest>=7.4.2", "python-dotenv==1.2.2"]
 
 [build-system]
 requires = ["hatchling"]

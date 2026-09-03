@@ -25,7 +25,10 @@ describe("formatApiErrorMessage", () => {
 
     it("annotates a generic string with the status", () => {
       expect(
-        formatApiErrorMessage({ error: "Internal server error", options: { status: 500 } }),
+        formatApiErrorMessage({
+          error: "Internal server error",
+          options: { status: 500 },
+        }),
       ).toBe("Internal server error (status 500)");
     });
   });
@@ -43,16 +46,13 @@ describe("formatApiErrorMessage", () => {
       // the port, or the server is the problem.
       const cause = Object.assign(new Error(""), { code: "ECONNREFUSED" });
       const err = Object.assign(new TypeError("fetch failed"), { cause });
-      expect(formatApiErrorMessage({ error: err })).toBe(
-        "fetch failed (ECONNREFUSED)",
-      );
+      expect(formatApiErrorMessage({ error: err })).toBe("fetch failed (ECONNREFUSED)");
     });
 
     it("includes cause.code and cause.message together when both informative", () => {
-      const cause = Object.assign(
-        new Error("getaddrinfo ENOTFOUND host.invalid"),
-        { code: "ENOTFOUND" },
-      );
+      const cause = Object.assign(new Error("getaddrinfo ENOTFOUND host.invalid"), {
+        code: "ENOTFOUND",
+      });
       const err = Object.assign(new TypeError("fetch failed"), { cause });
       expect(formatApiErrorMessage({ error: err })).toBe(
         "fetch failed (ENOTFOUND: getaddrinfo ENOTFOUND host.invalid)",
@@ -136,9 +136,7 @@ describe("formatApiErrorMessage", () => {
         error: "Error",
         message: "enterprise_plan_required",
       };
-      expect(formatApiErrorMessage({ error: body })).toBe(
-        "enterprise_plan_required",
-      );
+      expect(formatApiErrorMessage({ error: body })).toBe("enterprise_plan_required");
     });
 
     it("does not collapse to 'Internal server error' when other fields exist", () => {
@@ -182,8 +180,7 @@ describe("formatApiErrorMessage", () => {
               code: "invalid_enum_value",
               options: ["digest", "json"],
               path: ["format"],
-              message:
-                "Invalid enum value. Expected 'digest' | 'json', received 'table'",
+              message: "Invalid enum value. Expected 'digest' | 'json', received 'table'",
             },
           ],
         },
@@ -274,9 +271,7 @@ describe("given a handled-error envelope whose message is just the code", () => 
         message: "organization_slug_taken",
       };
 
-      expect(formatApiErrorMessage({ error: body })).toBe(
-        "Organization slug taken",
-      );
+      expect(formatApiErrorMessage({ error: body })).toBe("Organization slug taken");
     });
   });
 
@@ -287,9 +282,7 @@ describe("given a handled-error envelope whose message is just the code", () => 
         message: "name must not be empty",
       };
 
-      expect(formatApiErrorMessage({ error: body })).toBe(
-        "name must not be empty",
-      );
+      expect(formatApiErrorMessage({ error: body })).toBe("name must not be empty");
     });
   });
 });

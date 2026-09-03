@@ -87,10 +87,7 @@ export const updateWebhookCommand = async (
     return parsed;
   };
   const maxBatchSize = parseIntOption(options.maxBatchSize, "--max-batch-size");
-  const maxBatchDelayMs = parseIntOption(
-    options.maxBatchDelay,
-    "--max-batch-delay",
-  );
+  const maxBatchDelayMs = parseIntOption(options.maxBatchDelay, "--max-batch-delay");
   const maxInFlight = parseIntOption(options.maxInFlight, "--max-in-flight");
   const service = new WebhooksApiService({ apiKey });
   const spinner = createSpinner("Updating webhook endpoint...").start();
@@ -103,9 +100,13 @@ export const updateWebhookCommand = async (
       max_batch_size: maxBatchSize,
       max_batch_delay_ms: maxBatchDelayMs,
       max_in_flight: maxInFlight,
-      enabled_events: options.events !== undefined
-        ? options.events.split(",").map((e) => e.trim()).filter(Boolean)
-        : undefined,
+      enabled_events:
+        options.events !== undefined
+          ? options.events
+              .split(",")
+              .map((e) => e.trim())
+              .filter(Boolean)
+          : undefined,
     });
     spinner.succeed(`Updated endpoint ${endpoint.id}`);
     return {
@@ -121,7 +122,9 @@ export const updateWebhookCommand = async (
             : `URL:         ${endpoint.url}`,
         );
         console.log(`Events:      ${endpoint.enabled_events.join(", ")}`);
-        console.log(`Delivery:    batch<=${endpoint.max_batch_size}, delay ${endpoint.max_batch_delay_ms}ms, in-flight<=${endpoint.max_in_flight}`);
+        console.log(
+          `Delivery:    batch<=${endpoint.max_batch_size}, delay ${endpoint.max_batch_delay_ms}ms, in-flight<=${endpoint.max_in_flight}`,
+        );
         console.log();
       },
     };
@@ -142,7 +145,9 @@ export const enableWebhookCommand = async (id: string): Promise<CommandResult | 
       data: endpoint,
       table: () => {
         console.log();
-        console.log(`Endpoint ${endpoint.id} is active again. Replay the gap window if the pause left undelivered events.`);
+        console.log(
+          `Endpoint ${endpoint.id} is active again. Replay the gap window if the pause left undelivered events.`,
+        );
         console.log();
       },
     };
@@ -152,18 +157,24 @@ export const enableWebhookCommand = async (id: string): Promise<CommandResult | 
   }
 };
 
-export const disableWebhookCommand = async (id: string): Promise<CommandResult | void> => {
+export const disableWebhookCommand = async (
+  id: string,
+): Promise<CommandResult | void> => {
   const apiKey = checkOrgApiKey();
   const service = new WebhooksApiService({ apiKey });
   const spinner = createSpinner("Disabling webhook endpoint...").start();
   try {
     const endpoint = await service.update(id, { status: "disabled" });
-    spinner.succeed(`Endpoint ${endpoint.id} disabled (deliveries drain without sending)`);
+    spinner.succeed(
+      `Endpoint ${endpoint.id} disabled (deliveries drain without sending)`,
+    );
     return {
       data: endpoint,
       table: () => {
         console.log();
-        console.log(`Endpoint ${endpoint.id} is disabled. Events keep accruing; re-enable and replay to catch up.`);
+        console.log(
+          `Endpoint ${endpoint.id} is disabled. Events keep accruing; re-enable and replay to catch up.`,
+        );
         console.log();
       },
     };

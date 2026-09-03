@@ -8,7 +8,7 @@ Feature: Code block — execute user Python with isolated subprocess and structu
 
   See _shared/contract.md §7.
 
-  # The feature-parity checker (platform/app/scripts/check-feature-parity.ts) has a
+  # The feature-parity checker (packages/architecture-lint/src/check-feature-parity.ts) has a
   # Go walker, so scenarios here bind to Go tests via a `@scenario` comment above
   # the test func. The execution-semantics scenarios are bound to
   # services/nlpgo/tests/integration (code_block_spec_test.go and
@@ -189,7 +189,8 @@ Feature: Code block — execute user Python with isolated subprocess and structu
 
     # Parity with the Python executor's build_secrets_preamble
     # (langwatch_nlp/studio/utils.py): decrypted project secrets ride on
-    # the workflow DSL (`workflow.secrets`, populated by addEnvs.ts) and
+    # the workflow DSL (`workflow.secrets`, populated by
+    # WorkflowService.prepareStudioEvent) and
     # are surfaced to user code as attribute access on a `secrets` object,
     # matching the Studio code-editor hint ("Use secrets.NAME syntax").
 

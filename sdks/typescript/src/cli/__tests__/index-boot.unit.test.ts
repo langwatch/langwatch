@@ -204,10 +204,9 @@ describe("the CLI boot module graph", () => {
         (spec) => !spec.startsWith("node:") && !spec.endsWith(".json"),
       );
 
-      expect(
-        thirdParty,
-        `A third-party package reached the boot path. ${WHY}`,
-      ).toEqual(["dotenv"]);
+      expect(thirdParty, `A third-party package reached the boot path. ${WHY}`).toEqual([
+        "dotenv",
+      ]);
     });
 
     it("keeps the known-heavy modules off the boot path", () => {
@@ -222,7 +221,7 @@ describe("the CLI boot module graph", () => {
         "js-yaml",
         "zod",
         "ora",
-        "@langwatch/langy/cards",
+        "@langwatch/langy-contract/cards",
         "cli/program.ts",
         "cli/utils/commandCatalog.ts",
       ];

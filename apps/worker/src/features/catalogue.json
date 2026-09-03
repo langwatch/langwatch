@@ -1,0 +1,29 @@
+{
+  "version": 0,
+  "features": [
+    "api-key",
+    "authz",
+    "automation",
+    "billing-reporting",
+    "coding-agent",
+    "evaluation",
+    "eventing-maintenance",
+    "experiment",
+    "gateway-spend",
+    "github",
+    "governance-events",
+    "governance-ingestion",
+    "identity",
+    "join-request",
+    "langy-conversation",
+    "langy-maintenance",
+    "log",
+    "metric",
+    "scenario",
+    "scim-sync",
+    "sso-connection",
+    "suite",
+    "topic",
+    "trace"
+  ]
+}

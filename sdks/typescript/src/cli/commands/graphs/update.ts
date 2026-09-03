@@ -19,7 +19,7 @@ export const updateGraphCommand = async (
     name?: string;
     graph?: string;
     filters?: string;
-  }
+  },
 ): Promise<CommandResult | void> => {
   await resolveCredentials();
 
@@ -33,8 +33,7 @@ export const updateGraphCommand = async (
   }
 
   const apiKey = scopedApiKey() ?? process.env.LANGWATCH_API_KEY ?? "";
-  const endpoint =
-    resolveControlPlaneUrl();
+  const endpoint = resolveControlPlaneUrl();
 
   const spinner = createSpinner(`Updating graph "${id}"...`).start();
 

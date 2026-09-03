@@ -6,19 +6,21 @@ license: MIT
 compatibility: Works with Claude Code and similar coding agents. The `langwatch` CLI is the only interface.
 ---
 
-import CliSetup from '../_shared/cli-setup.mdx'
-import ProjectsAndApiKeys from '../_shared/projects-and-api-keys.mdx'
+import CliSetup from "../_shared/cli-setup.mdx";
+import ProjectsAndApiKeys from "../_shared/projects-and-api-keys.mdx";
 
 # Add LangWatch Tracing to Your Code
 
 ## Determine Scope
 
 If the user's request is **general** ("instrument my code", "add tracing", "set up observability"):
+
 - Read the full codebase to understand the agent's architecture
 - Study git history to understand what changed and why: focus on agent behavior changes, prompt tweaks, bug fixes. Read commit messages for context.
 - Add comprehensive tracing across all LLM call sites
 
 If the user's request is **specific** ("add tracing to the payment function", "trace this endpoint"):
+
 - Focus on the specific function or module
 - Add tracing only where requested
 - Verify the instrumentation works in context
@@ -55,6 +57,7 @@ If install fails due to peer dependency conflicts, widen the conflicting range a
 Follow the integration guide you read in Step 1. The general shape is:
 
 **Python:**
+
 ```python
 import langwatch
 langwatch.setup()
@@ -65,6 +68,7 @@ def my_function():
 ```
 
 **TypeScript:**
+
 ```typescript
 import { LangWatch } from "langwatch";
 const langwatch = new LangWatch();

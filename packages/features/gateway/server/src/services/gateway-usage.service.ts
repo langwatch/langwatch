@@ -1,0 +1,385 @@
+/**
+ * Aggregate read-side queries for the AI Gateway usage surfaces.
+ *
+ * Spend comes from `trace_summaries`, the enriched per-trace cost the rest
+ * of the product bills and reports from, keyed on the
+ * `langwatch.virtual_key_id` attribute the gateway stamps on every span.
+ *
+ * It used to come from `gateway_budget_ledger_events`, which is written
+ * once per applicable budget and not at all when a key has none. That made
+ * the page structurally unable to show spend for an uncapped key ($0.00
+ * forever) and made it report double or triple for a key covered by
+ * several budgets. The budget ledger stays the source for the debit list
+ * on a budget's own page, where "one row per budget" is the point.
+ *
+ * The virtual-keys table's spend column reads the same repository, because
+ * a number you can click has to match the page it lands on.
+ *
+ * Every read spans the organization's projects, not just one: traces land
+ * in the tenant of a key's trace destination (its explicit trace project,
+ * else its single PROJECT scope, else the org's governance project), which
+ * is rarely the project the viewer happens to have selected. Reading one
+ * project is how the Usage page rendered "No usage in this window" while
+ * the keys table showed spend for the same keys.
+ */
+import { Prisma } from "@langwatch/prisma-client/generated";
+
+import type { GatewayBudgetSpendPort } from "../ports/gateway-budget-spend.port";
+import type { GatewayVirtualKeySpendPort } from "../ports/gateway-virtual-key-spend.port";
+
+/**
+ * The one project read these surfaces make: which tenants an organization's
+ * gateway traces can land in. Narrower than ProjectService on purpose — a
+ * ProjectService satisfies it, and so does anything else that can answer the
+ * question, which is what a test needs.
+ */
+export type GatewayUsageProjectsPort = {
+  listIdsByOrganization(input: { organizationId: string }): Promise<string[]>;
+};
+
+/**
+ * The one key read these surfaces make: a label for each key the ledger
+ * reported spend against. Narrow for the same reason as the project port —
+ * the repository satisfies it, and so can two lines in a test.
+ */
+export type GatewayUsageVirtualKeysPort = {
+  findMetaByIds(input: {
+    organizationId: string;
+    ids: string[];
+  }): Promise<Array<{ id: string; name: string; displayPrefix: string }>>;
+};
+
+export type UsageWindow = { fromDate: Date; toDate: Date };
+
+export type UsageSummary = {
+  totalUsd: string;
+  totalRequests: number;
+  blockedRequests: number;
+  avgUsdPerRequest: string;
+  byVirtualKey: Array<{
+    virtualKeyId: string;
+    name: string;
+    displayPrefix: string;
+    totalUsd: string;
+    requests: number;
+  }>;
+  byModel: Array<{
+    model: string;
+    totalUsd: string;
+    requests: number;
+  }>;
+  byDay: Array<{ day: string; totalUsd: string; requests: number }>;
+};
+
+// Scoped-to-one-VK version for the detail page. Omits the per-VK
+// rollup (there's only one) and exposes the 20 most recent debits.
+export type VirtualKeyUsageSummary = {
+  totalUsd: string;
+  totalRequests: number;
+  blockedRequests: number;
+  avgUsdPerRequest: string;
+  byModel: Array<{
+    model: string;
+    totalUsd: string;
+    requests: number;
+  }>;
+  byDay: Array<{ day: string; totalUsd: string; requests: number }>;
+  recentDebits: Array<{
+    id: string;
+    occurredAt: string;
+    model: string;
+    providerSlot: string | null;
+    amountUsd: string;
+    tokensInput: number;
+    tokensOutput: number;
+    durationMs: number | null;
+    status: string;
+  }>;
+};
+
+const RECENT_DEBITS_LIMIT = 20;
+
+export class GatewayUsageService {
+  constructor(
+    private readonly projects: GatewayUsageProjectsPort,
+    private readonly virtualKeys: GatewayUsageVirtualKeysPort,
+    private readonly chRepo?: GatewayBudgetSpendPort,
+    private readonly spendRepo?: GatewayVirtualKeySpendPort,
+  ) {}
+
+  /**
+   * Both repos are required keys with optional values: a deploy without
+   * ClickHouse passes `undefined` explicitly and gets empty summaries by
+   * configuration, while a caller that forgets the dependency fails to
+   * compile instead of silently reporting $0.00.
+   */
+  static create(args: {
+    projects: GatewayUsageProjectsPort;
+    virtualKeys: GatewayUsageVirtualKeysPort;
+    chRepo: GatewayBudgetSpendPort | undefined;
+    spendRepo: GatewayVirtualKeySpendPort | undefined;
+  }): GatewayUsageService {
+    return new GatewayUsageService(args.projects, args.virtualKeys, args.chRepo, args.spendRepo);
+  }
+
+  /**
+   * Spend per key over a window, for every key in an organization.
+   *
+   * Reads across every project in the org, not just one: a key's traces
+   * land in whichever project resolved as its trace destination, which for
+   * org- and team-scoped keys is the governance project.
+   */
+  async spendByVirtualKey(args: {
+    organizationId: string;
+    virtualKeyIds: string[];
+    window: UsageWindow;
+  }): Promise<Map<string, { spentUsd: string; requests: number }>> {
+    const out = new Map<string, { spentUsd: string; requests: number }>();
+    if (!this.spendRepo || args.virtualKeyIds.length === 0) return out;
+
+    const tenantIds = await this.orgProjectIds(args.organizationId);
+    if (tenantIds.length === 0) return out;
+
+    const rows = await this.spendRepo.spendByVirtualKey({
+      tenantIds,
+      virtualKeyIds: args.virtualKeyIds,
+      window: { fromDate: args.window.fromDate, toDate: args.window.toDate },
+    });
+    for (const row of rows) {
+      out.set(row.virtualKeyId, {
+        spentUsd: row.spentUsd,
+        requests: row.requests,
+      });
+    }
+    return out;
+  }
+
+  /**
+   * The Usage page's org-wide rollup.
+   *
+   * `virtualKeyIds` is the caller's visible-key set, computed by the
+   * router with the same membership rule the keys table applies, so the
+   * page totals exactly the keys the table lists. The aggregation itself
+   * happens in ClickHouse: the buckets are keys x models x days, so a
+   * busy org's window never streams per-trace rows into this process.
+   */
+  async summary(args: {
+    organizationId: string;
+    virtualKeyIds: string[];
+    window: UsageWindow;
+  }): Promise<UsageSummary> {
+    if (!this.spendRepo || args.virtualKeyIds.length === 0) {
+      return this.emptySummary();
+    }
+
+    const tenantIds = await this.orgProjectIds(args.organizationId);
+    if (tenantIds.length === 0) return this.emptySummary();
+
+    const buckets = await this.spendRepo.usageBuckets({
+      tenantIds,
+      window: args.window,
+      virtualKeyIds: args.virtualKeyIds,
+    });
+    if (buckets.length === 0) return this.emptySummary();
+
+    const byVk = new Map<string, { totalUsd: Prisma.Decimal; requests: number }>();
+    const byModel = new Map<string, { totalUsd: Prisma.Decimal; requests: number }>();
+    const byDay = new Map<string, { totalUsd: Prisma.Decimal; requests: number }>();
+    let totalUsd = new Prisma.Decimal(0);
+    let totalRequests = 0;
+    let blockedRequests = 0;
+
+    for (const bucket of buckets) {
+      totalUsd = totalUsd.plus(bucket.totalUsd);
+      totalRequests += bucket.requests;
+      blockedRequests += bucket.blockedRequests;
+      this.bumpBucket(byVk, bucket.virtualKeyId, bucket.totalUsd, bucket.requests);
+      this.bumpBucket(byModel, bucket.model, bucket.totalUsd, bucket.requests);
+      this.bumpBucket(byDay, bucket.day, bucket.totalUsd, bucket.requests);
+    }
+
+    const vkMeta = await this.loadVirtualKeyMeta(args.organizationId, [...byVk.keys()]);
+
+    return {
+      totalUsd: totalUsd.toFixed(6),
+      totalRequests,
+      blockedRequests,
+      avgUsdPerRequest: this.averagePerRequest(totalUsd, totalRequests),
+      byVirtualKey: this.topEntries(byVk).map(
+        ([virtualKeyId, { totalUsd: bucketUsd, requests }]) => ({
+          virtualKeyId,
+          name: vkMeta.get(virtualKeyId)?.name ?? virtualKeyId,
+          displayPrefix: vkMeta.get(virtualKeyId)?.displayPrefix ?? "",
+          totalUsd: bucketUsd.toFixed(6),
+          requests,
+        }),
+      ),
+      byModel: this.topEntries(byModel).map(([model, { totalUsd: bucketUsd, requests }]) => ({
+        model,
+        totalUsd: bucketUsd.toFixed(6),
+        requests,
+      })),
+      byDay: this.sortedDays(byDay),
+    };
+  }
+
+  /**
+   * One key's usage, read across the organization's projects so the total
+   * matches the spend column that deep-links here. Key visibility is the
+   * router's job (the same membership rule as `virtualKeys.get`); by the
+   * time this runs the caller is allowed to see the key.
+   */
+  async summaryForVirtualKey(args: {
+    organizationId: string;
+    virtualKeyId: string;
+    window: UsageWindow;
+    /**
+     * Narrows the recent-activity list to one model, and only that list.
+     * The totals, the daily series and the per-model breakdown stay whole:
+     * the breakdown is the control the model is picked from, so filtering
+     * it with the table would leave the reader one row and no way back.
+     */
+    model?: string;
+  }): Promise<VirtualKeyUsageSummary> {
+    if (!this.spendRepo) return this.emptyVirtualKeySummary();
+
+    const tenantIds = await this.orgProjectIds(args.organizationId);
+    if (tenantIds.length === 0) return this.emptyVirtualKeySummary();
+
+    // Slices aggregate in ClickHouse; only the 20-row recent list pulls
+    // raw traces, and that pull carries its own LIMIT.
+    const [buckets, recentTraces] = await Promise.all([
+      this.spendRepo.usageBuckets({
+        tenantIds,
+        window: args.window,
+        virtualKeyIds: [args.virtualKeyId],
+      }),
+      this.spendRepo.gatewayTraces({
+        tenantIds,
+        window: args.window,
+        virtualKeyIds: [args.virtualKeyId],
+        model: args.model,
+        limit: RECENT_DEBITS_LIMIT,
+      }),
+    ]);
+
+    const byModel = new Map<string, { totalUsd: Prisma.Decimal; requests: number }>();
+    const byDay = new Map<string, { totalUsd: Prisma.Decimal; requests: number }>();
+    let totalUsd = new Prisma.Decimal(0);
+    let totalRequests = 0;
+    let blockedRequests = 0;
+
+    for (const bucket of buckets) {
+      totalUsd = totalUsd.plus(bucket.totalUsd);
+      totalRequests += bucket.requests;
+      blockedRequests += bucket.blockedRequests;
+      this.bumpBucket(byModel, bucket.model, bucket.totalUsd, bucket.requests);
+      this.bumpBucket(byDay, bucket.day, bucket.totalUsd, bucket.requests);
+    }
+
+    return {
+      totalUsd: totalUsd.toFixed(6),
+      totalRequests,
+      blockedRequests,
+      avgUsdPerRequest: this.averagePerRequest(totalUsd, totalRequests),
+      byModel: this.topEntries(byModel).map(([model, { totalUsd: bucketUsd, requests }]) => ({
+        model,
+        totalUsd: bucketUsd.toFixed(6),
+        requests,
+      })),
+      byDay: this.sortedDays(byDay),
+      recentDebits: recentTraces.map((trace) => ({
+        id: trace.traceId,
+        occurredAt: trace.occurredAt.toISOString(),
+        model: trace.models[0] ?? "unknown",
+        providerSlot: null,
+        amountUsd: trace.costUsd,
+        tokensInput: trace.promptTokens,
+        tokensOutput: trace.completionTokens,
+        durationMs: trace.durationMs || null,
+        status: trace.blockedByGuardrail
+          ? "BLOCKED_BY_GUARDRAIL"
+          : trace.hasError
+            ? "PROVIDER_ERROR"
+            : "SUCCESS",
+      })),
+    };
+  }
+
+  private async loadVirtualKeyMeta(
+    organizationId: string,
+    virtualKeyIds: string[],
+  ): Promise<Map<string, { name: string; displayPrefix: string }>> {
+    const keys = await this.virtualKeys.findMetaByIds({ organizationId, ids: virtualKeyIds });
+    return new Map(keys.map((k) => [k.id, { name: k.name, displayPrefix: k.displayPrefix }]));
+  }
+
+  /** Every project of the org: the tenant set gateway traces can land in. */
+  private orgProjectIds(organizationId: string): Promise<string[]> {
+    return this.projects.listIdsByOrganization({ organizationId });
+  }
+
+  private averagePerRequest(totalUsd: Prisma.Decimal, requests: number): string {
+    return requests > 0 ? totalUsd.div(requests).toFixed(6) : "0.000000";
+  }
+
+  private topEntries(
+    map: Map<string, { totalUsd: Prisma.Decimal; requests: number }>,
+    limit = 10,
+  ): Array<[string, { totalUsd: Prisma.Decimal; requests: number }]> {
+    return [...map.entries()]
+      .sort((a, b) => b[1].totalUsd.comparedTo(a[1].totalUsd) || a[0].localeCompare(b[0]))
+      .slice(0, limit);
+  }
+
+  private sortedDays(
+    map: Map<string, { totalUsd: Prisma.Decimal; requests: number }>,
+  ): Array<{ day: string; totalUsd: string; requests: number }> {
+    return [...map.entries()]
+      .sort((a, b) => (a[0] < b[0] ? -1 : 1))
+      .map(([day, { totalUsd, requests }]) => ({
+        day,
+        totalUsd: totalUsd.toFixed(6),
+        requests,
+      }));
+  }
+
+  private bumpBucket(
+    map: Map<string, { totalUsd: Prisma.Decimal; requests: number }>,
+    key: string,
+    amount: Prisma.Decimal | string,
+    requests: number,
+  ) {
+    const existing = map.get(key);
+    if (existing) {
+      existing.totalUsd = existing.totalUsd.plus(amount);
+      existing.requests += requests;
+    } else {
+      map.set(key, { totalUsd: new Prisma.Decimal(amount), requests });
+    }
+  }
+
+  private emptySummary(): UsageSummary {
+    return {
+      totalUsd: "0.000000",
+      totalRequests: 0,
+      blockedRequests: 0,
+      avgUsdPerRequest: "0.000000",
+      byVirtualKey: [],
+      byModel: [],
+      byDay: [],
+    };
+  }
+
+  private emptyVirtualKeySummary(): VirtualKeyUsageSummary {
+    return {
+      totalUsd: "0.000000",
+      totalRequests: 0,
+      blockedRequests: 0,
+      avgUsdPerRequest: "0.000000",
+      byModel: [],
+      byDay: [],
+      recentDebits: [],
+    };
+  }
+}

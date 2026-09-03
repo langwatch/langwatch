@@ -60,9 +60,7 @@ describe("parseRelativeDate()", () => {
 
   describe("when given an invalid string", () => {
     it("throws an error for garbage input", () => {
-      expect(() => parseRelativeDate("banana")).toThrow(
-        'Invalid date: "banana"'
-      );
+      expect(() => parseRelativeDate("banana")).toThrow('Invalid date: "banana"');
     });
 
     it("throws an error for empty string", () => {
@@ -70,9 +68,7 @@ describe("parseRelativeDate()", () => {
     });
 
     it("includes usage hint in error message", () => {
-      expect(() => parseRelativeDate("xyz")).toThrow(
-        "relative duration"
-      );
+      expect(() => parseRelativeDate("xyz")).toThrow("relative duration");
     });
   });
 });

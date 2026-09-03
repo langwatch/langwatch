@@ -72,9 +72,7 @@ export const getCommand = async (slugOrId: string): Promise<CommandResult | void
         console.log(`  ${chalk.bold("ID:")}         ${dataset.id}`);
 
         if (dataset.columnTypes.length > 0) {
-          const colStr = dataset.columnTypes
-            .map((c) => `${c.name}:${c.type}`)
-            .join(", ");
+          const colStr = dataset.columnTypes.map((c) => `${c.name}:${c.type}`).join(", ");
           console.log(`  ${chalk.bold("Columns:")}    ${colStr}`);
         }
 

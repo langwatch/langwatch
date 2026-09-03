@@ -4,30 +4,19 @@ Feature: Customer.io nurturing integration
   So that customer nurturing workflows trigger automatically as users progress through the platform
 
   # All scenarios bound to existing tests in:
-  #   platform/app/ee/billing/nurturing/nurturing.service.unit.test.ts
-  #   platform/app/ee/billing/nurturing/nurturing.service.wiring.unit.test.ts
-  #   platform/app/ee/billing/nurturing/hooks/signupIdentification.unit.test.ts
-  #   platform/app/ee/billing/nurturing/hooks/featureAdoption.unit.test.ts
-  #   platform/app/ee/billing/nurturing/hooks/activityTracking.unit.test.ts
-  #   platform/app/ee/billing/nurturing/hooks/productInterest.unit.test.ts
-  #   platform/app/ee/billing/nurturing/hooks/promptCreation.unit.test.ts
-  #   platform/app/ee/billing/nurturing/hooks/promptCreation.integration.test.ts
-  #   platform/app/src/hooks/__tests__/useAttributionCapture.unit.test.ts
-  #   platform/app/src/server/event-sourcing/pipelines/trace-processing/subscribers/__tests__/customerIoTraceSync.subscriber.unit.test.ts
-  #   platform/app/src/server/event-sourcing/pipelines/evaluation-processing/subscribers/__tests__/customerIoEvaluationSync.subscriber.unit.test.ts
-  #   platform/app/src/server/event-sourcing/pipelines/simulation-processing/subscribers/__tests__/customerIoSimulationSync.subscriber.unit.test.ts
-  # Six scenarios were rewritten to match shipped implementation (was UPDATE-class):
-  #   - "Null service resolves..." dropped (impl uses `undefined`, not null pattern)
-  #   - "Region defaults to US" → "Region defaults to EU" (matches impl)
-  #   - "Test app uses null NurturingService" → "Test app passes no NurturingService"
-  #   - "Evaluation sync uses project-scoped job ID" → "...project-and-evaluation-scoped job ID"
-  #   - "Pick your flavour" / product_interest scenarios → "Integration-method selection"
-  #     (the actual onboarding flow & trait names)
+  #   packages/enterprise/features/billing/server/src/__tests__/nurturing.service.unit.test.ts
+  #   packages/enterprise/features/billing/server/src/__tests__/nurturing.service.wiring.unit.test.ts
+  #   [gone] ee/billing/nurturing/hooks/signupIdentification.unit.test.ts
+  #   [gone] ee/billing/nurturing/hooks/featureAdoption.unit.test.ts
+  #   [gone] ee/billing/nurturing/hooks/activityTracking.unit.test.ts
+  #   [gone] ee/billing/nurturing/hooks/productInterest.unit.test.ts
+  #   [gone] ee/billing/nurturing/hooks/promptCreation.unit.test.ts
+  #   [gone] ee/billing/nurturing/hooks/promptCreation.integration.test.ts
+  #   [gone] src/hooks/__tests__/useAttributionCapture.unit.test.ts
 
   All scheduling, sequencing, and email delivery is owned by Customer.io.
-  LangWatch subscribers and hooks fire-and-forget data to Customer.io via the
-  Pipelines API. The NurturingService follows the NotificationService pattern
-  (private constructor, static create/createNull, wired through App).
+  LangWatch nurturing hooks fire-and-forget data through the Pipelines API.
+  The application wires NurturingService only when it is configured.
 
   # ---------------------------------------------------------------------------
   # R1: NurturingService — Customer.io API client
@@ -161,88 +150,6 @@ Feature: Customer.io nurturing integration
     Then the organization is created successfully
     And no Customer.io requests are made
 
-  # ---------------------------------------------------------------------------
-  # R3: Trace integration subscriber — customerIoTraceSync
-  # ---------------------------------------------------------------------------
-
-  @integration
-  Scenario: First trace identifies user with trace milestones
-    Given a project that has never received a trace
-    When the first trace is processed with sdk_language "python" and sdk_framework "openai"
-    Then the user is identified in Customer.io with has_traces true
-    And the user traits include sdk_language, sdk_framework, and first_trace_at
-
-  @integration
-  Scenario: First trace fires first_trace_integrated event
-    Given a project that has never received a trace
-    When the first trace is processed with sdk_language "python" and sdk_framework "openai"
-    Then a "first_trace_integrated" event is tracked with sdk_language, sdk_framework, and project_id
-
-  @integration
-  Scenario: First trace fires immediately without debouncing
-    Given a project that has never received a trace
-    When the first trace is processed
-    Then the Customer.io calls are made immediately without delay
-
-  @integration
-  Scenario: Subsequent traces update count and timestamp with debouncing
-    Given a project that already has traces
-    When a new trace is processed
-    Then the user is identified in Customer.io with updated trace_count and last_trace_at
-    And the update is debounced so at most one call per project per 5 minutes
-
-  @unit
-  Scenario: Trace sync subscriber uses project-scoped job ID for debouncing
-    Given the customerIoTraceSync subscriber
-    When makeJobId is called for a project
-    Then the returned ID is "cio-trace-sync-{projectId}"
-
-  @unit
-  Scenario: Trace sync does not duplicate first-trace detection logic
-    Given the projectMetadata subscriber already tracks first trace via Project.firstMessage
-    When the customerIoTraceSync subscriber processes a trace
-    Then it reads the existing first-trace flag rather than re-detecting it
-
-  # ---------------------------------------------------------------------------
-  # R4: Evaluation sync subscriber — customerIoEvaluationSync
-  # ---------------------------------------------------------------------------
-
-  @integration
-  Scenario: First evaluation identifies user with evaluation milestones
-    Given an organization with no prior evaluations
-    When the first evaluation is processed with type "llm_judge"
-    Then the user is identified in Customer.io with has_evaluations true and evaluation_count 1
-    And the user traits include first_evaluation_at
-
-  @integration
-  Scenario: First evaluation fires first_evaluation_created event
-    Given an organization with no prior evaluations
-    When the first evaluation is processed with type "llm_judge"
-    Then a "first_evaluation_created" event is tracked with evaluation_type and project_id
-
-  @integration
-  Scenario: Subsequent evaluations update identify with evaluation count
-    Given an organization that already has evaluations
-    When a new evaluation is processed with score 0.85 and passed true
-    Then the user is identified with updated evaluation_count and last_evaluation_at
-
-  @integration
-  Scenario: Subsequent evaluations fire evaluation_ran event
-    Given an organization that already has evaluations
-    When a new evaluation is processed with score 0.85 and passed true
-    Then an "evaluation_ran" event is tracked with evaluation_id, score, and passed
-
-  @integration
-  Scenario: Subsequent evaluation updates are debounced per project
-    Given an organization that already has evaluations
-    When a new evaluation is processed with score 0.85 and passed true
-    Then the update is debounced per project
-
-  @unit
-  Scenario: Evaluation sync subscriber uses project-and-evaluation-scoped job ID for debouncing
-    Given the customerIoEvaluationSync subscriber
-    When makeJobId is called for an evaluation event
-    Then the returned ID is "cio-eval-sync-{projectId}-{evaluationId}"
 
   # ---------------------------------------------------------------------------
   # R6: Team and feature adoption hooks
@@ -307,22 +214,9 @@ Feature: Customer.io nurturing integration
     Then the user session is established successfully
     And the Customer.io error is captured for observability
 
-  # ===========================================================================
-  # Iteration 2 — Journey Alignment (R10–R13)
-  #
-  # Aligns LangWatch nurturing data with the Customer.io onboarding Journey.
-  # Adds product_interest capture, has_prompts tracking, has_simulations
-  # tracking via the simulation pipeline subscriber, and updated trait schema.
-  #
-  # Challenge findings incorporated:
-  # 1. product_interest is captured via a separate identify call AFTER the
-  #    "Pick your flavour" screen, not in signupData (initializeOrganization
-  #    fires before the flavour screen).
-  # 2. Simulation sync debounce key is project-scoped (tenantId), not
-  #    run-scoped (tenantId-aggregateId), matching the trace sync pattern.
-  # 3. Prompt and simulation counts are org-wide (aggregated across all
-  #    projects in the org), following the createEvaluationCountFn pattern.
-  # ===========================================================================
+  # ---------------------------------------------------------------------------
+  # Journey traits and hooks
+  # ---------------------------------------------------------------------------
 
   # ---------------------------------------------------------------------------
   # R10: Capture product_interest from onboarding "Pick your flavour"
@@ -409,51 +303,6 @@ Feature: Customer.io nurturing integration
     Then the prompt is created successfully
     And the Customer.io error is captured for observability
 
-  # ---------------------------------------------------------------------------
-  # R12: has_simulations trait + subscriber on simulation_processing pipeline
-  #
-  # simulation_count is org-wide (aggregated across all projects in the
-  # organization), following the createEvaluationCountFn pattern.
-  # Debounce key is project-scoped (tenantId only), matching trace sync.
-  # ---------------------------------------------------------------------------
-
-  @integration
-  Scenario: First simulation run identifies user with has_simulations true
-    Given an organization with no prior simulation runs across any project
-    When the first simulation is processed in the simulation_processing pipeline
-    Then the user is identified in Customer.io with has_simulations true and org-wide simulation_count 1
-    And the user traits include first_simulation_at
-
-  @integration
-  Scenario: First simulation run fires first_simulation_ran event
-    Given an organization with no prior simulation runs across any project
-    When the first simulation is processed in the simulation_processing pipeline
-    Then a "first_simulation_ran" event is tracked with project_id
-
-  @integration
-  Scenario: First simulation fires immediately without debouncing
-    Given an organization with no prior simulation runs
-    When the first simulation is processed
-    Then the Customer.io calls are made immediately without delay
-
-  @integration
-  Scenario: Subsequent simulation runs update org-wide count and timestamp with debouncing
-    Given an organization that already has simulation runs
-    When a new simulation is processed
-    Then the user is identified in Customer.io with updated org-wide simulation_count and last_simulation_at
-    And the update is debounced so at most one call per project per debounce window
-
-  @unit
-  Scenario: Simulation sync subscriber uses project-scoped dedup ID for debouncing
-    Given the customerIoSimulationSync subscriber
-    When the debounce dedup ID is derived for a project
-    Then the returned ID is "cio-sim-sync-{tenantId}"
-
-  @integration
-  Scenario: Simulation tracking is independent of scenario template creation
-    Given a user creates a scenario template
-    When the scenario is saved
-    Then no simulation-related traits are updated in Customer.io
 
   # ---------------------------------------------------------------------------
   # R13: Trait schema + signup defaults

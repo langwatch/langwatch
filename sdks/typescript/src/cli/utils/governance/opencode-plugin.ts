@@ -46,14 +46,14 @@ export const OPENCODE_HOOK_COMMAND = "langwatch ingest hook opencode";
 export type OpencodePluginAction = "created" | "updated" | "unchanged";
 
 export interface OpencodePluginTarget {
-	/** Absolute path of the plugin file. */
-	path: string;
-	/** The same path with the home directory collapsed, for display. */
-	displayPath: string;
+  /** Absolute path of the plugin file. */
+  path: string;
+  /** The same path with the home directory collapsed, for display. */
+  displayPath: string;
 }
 
 export interface OpencodePluginInstallResult extends OpencodePluginTarget {
-	action: OpencodePluginAction;
+  action: OpencodePluginAction;
 }
 
 /**
@@ -62,25 +62,25 @@ export interface OpencodePluginInstallResult extends OpencodePluginTarget {
  * how opencode itself resolves it.
  */
 export function opencodePluginTarget(dirPath?: string): OpencodePluginTarget {
-	if (dirPath) {
-		const file = path.join(dirPath, OPENCODE_PLUGIN_FILE_NAME);
-		return { path: file, displayPath: file };
-	}
-	const xdg = process.env.XDG_CONFIG_HOME?.trim();
-	if (xdg) {
-		const file = path.join(xdg, "opencode", "plugins", OPENCODE_PLUGIN_FILE_NAME);
-		return { path: file, displayPath: file };
-	}
-	return {
-		path: path.join(
-			os.homedir(),
-			".config",
-			"opencode",
-			"plugins",
-			OPENCODE_PLUGIN_FILE_NAME,
-		),
-		displayPath: `~/.config/opencode/plugins/${OPENCODE_PLUGIN_FILE_NAME}`,
-	};
+  if (dirPath) {
+    const file = path.join(dirPath, OPENCODE_PLUGIN_FILE_NAME);
+    return { path: file, displayPath: file };
+  }
+  const xdg = process.env.XDG_CONFIG_HOME?.trim();
+  if (xdg) {
+    const file = path.join(xdg, "opencode", "plugins", OPENCODE_PLUGIN_FILE_NAME);
+    return { path: file, displayPath: file };
+  }
+  return {
+    path: path.join(
+      os.homedir(),
+      ".config",
+      "opencode",
+      "plugins",
+      OPENCODE_PLUGIN_FILE_NAME,
+    ),
+    displayPath: `~/.config/opencode/plugins/${OPENCODE_PLUGIN_FILE_NAME}`,
+  };
 }
 
 /**
@@ -90,29 +90,29 @@ export function opencodePluginTarget(dirPath?: string): OpencodePluginTarget {
  * silently replaced.
  */
 export function installOpencodeSessionContextPlugin({
-	dirPath,
+  dirPath,
 }: { dirPath?: string } = {}): OpencodePluginInstallResult {
-	const target = opencodePluginTarget(dirPath);
-	const existing = readFileOrNull(target.path);
+  const target = opencodePluginTarget(dirPath);
+  const existing = readFileOrNull(target.path);
 
-	if (existing !== null && !isLangwatchPlugin(existing)) {
-		return { action: "unchanged", ...target };
-	}
+  if (existing !== null && !isLangwatchPlugin(existing)) {
+    return { action: "unchanged", ...target };
+  }
 
-	const source = opencodePluginSource();
-	if (existing === source) return { action: "unchanged", ...target };
+  const source = opencodePluginSource();
+  if (existing === source) return { action: "unchanged", ...target };
 
-	fs.mkdirSync(path.dirname(target.path), { recursive: true });
-	fs.writeFileSync(target.path, source);
-	return { action: existing === null ? "created" : "updated", ...target };
+  fs.mkdirSync(path.dirname(target.path), { recursive: true });
+  fs.writeFileSync(target.path, source);
+  return { action: existing === null ? "created" : "updated", ...target };
 }
 
 /** Whether our plugin is currently on disk, for the logout scan. */
 export function hasOpencodeSessionContextPlugin({
-	dirPath,
+  dirPath,
 }: { dirPath?: string } = {}): boolean {
-	const contents = readFileOrNull(opencodePluginTarget(dirPath).path);
-	return contents !== null && isLangwatchPlugin(contents);
+  const contents = readFileOrNull(opencodePluginTarget(dirPath).path);
+  return contents !== null && isLangwatchPlugin(contents);
 }
 
 /**
@@ -121,29 +121,29 @@ export function hasOpencodeSessionContextPlugin({
  * error, so this is safe to call unconditionally.
  */
 export function removeOpencodeSessionContextPlugin({
-	dirPath,
+  dirPath,
 }: { dirPath?: string } = {}): boolean {
-	const target = opencodePluginTarget(dirPath);
-	const contents = readFileOrNull(target.path);
-	if (contents === null || !isLangwatchPlugin(contents)) return false;
-	try {
-		fs.unlinkSync(target.path);
-		return true;
-	} catch {
-		return false;
-	}
+  const target = opencodePluginTarget(dirPath);
+  const contents = readFileOrNull(target.path);
+  if (contents === null || !isLangwatchPlugin(contents)) return false;
+  try {
+    fs.unlinkSync(target.path);
+    return true;
+  } catch {
+    return false;
+  }
 }
 
 function isLangwatchPlugin(contents: string): boolean {
-	return contents.startsWith(OPENCODE_PLUGIN_MARKER);
+  return contents.startsWith(OPENCODE_PLUGIN_MARKER);
 }
 
 function readFileOrNull(filePath: string): string | null {
-	try {
-		return fs.readFileSync(filePath, "utf8");
-	} catch {
-		return null;
-	}
+  try {
+    return fs.readFileSync(filePath, "utf8");
+  } catch {
+    return null;
+  }
 }
 
 /**
@@ -155,7 +155,7 @@ function readFileOrNull(filePath: string): string | null {
  * are read because `session.idle` carries only the flat `sessionID`.
  */
 function opencodePluginSource(): string {
-	return `${OPENCODE_PLUGIN_MARKER}
+  return `${OPENCODE_PLUGIN_MARKER}
 // Reports the repository, branch and worktree of every opencode session to
 // LangWatch, by running the CLI's session context hook. Managed by
 // \`langwatch ingest install opencode\`; delete this file to opt out, or run

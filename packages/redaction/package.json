@@ -1,30 +1,34 @@
 {
-	"name": "@langwatch/redaction",
-	"version": "0.0.1",
-	"private": true,
-	"description": "Canonical secret and PII redaction rules shared across LangWatch services: the ingestion-pipeline secret scrubbing plus the session-report scrubbing mirrored into the langwatch CLI",
-	"type": "module",
-	"packageManager": "pnpm@10.24.0",
-	"main": "src/index.ts",
-	"exports": {
-		".": "./src/index.ts"
-	},
-	"scripts": {
-		"typecheck": "tsc --noEmit",
-		"test": "vitest",
-		"test:unit": "vitest run",
-		"bench": "vitest bench --run"
-	},
-	"keywords": [
-		"langwatch",
-		"redaction",
-		"pii",
-		"secrets"
-	],
-	"license": "MIT",
-	"devDependencies": {
-		"@types/node": "^26.0.1",
-		"typescript": "^7.0.2",
-		"vitest": "^4.1.9"
-	}
+  "name": "@langwatch/redaction",
+  "version": "0.0.1",
+  "private": true,
+  "description": "Canonical secret and PII redaction rules shared across LangWatch services: the ingestion-pipeline secret scrubbing plus the session-report scrubbing mirrored into the langwatch CLI",
+  "keywords": [
+    "langwatch",
+    "pii",
+    "redaction",
+    "secrets"
+  ],
+  "license": "MIT",
+  "type": "module",
+  "main": "src/index.ts",
+  "exports": {
+    ".": "./src/index.ts",
+    "./pii": "./src/pii.ts"
+  },
+  "scripts": {
+    "typecheck": "tsc --noEmit",
+    "test": "vitest",
+    "test:unit": "vitest run",
+    "bench": "vitest bench --run"
+  },
+  "dependencies": {
+    "libphonenumber-js": "^1.13.7"
+  },
+  "devDependencies": {
+    "@types/node": "^26.0.1",
+    "typescript": "^7.0.2",
+    "vitest": "^4.1.9"
+  },
+  "packageManager": "pnpm@10.24.0"
 }

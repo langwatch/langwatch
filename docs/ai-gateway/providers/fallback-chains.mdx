@@ -18,7 +18,7 @@ The VK's resolved configuration carries the chain and the attempt limit:
 ```json
 {
   "fallback": {
-    "chain":        ["pc_primary_openai", "pc_anthropic", "pc_bedrock_us_east"],
+    "chain": ["pc_primary_openai", "pc_anthropic", "pc_bedrock_us_east"],
     "max_attempts": 3
   }
 }
@@ -30,19 +30,19 @@ The VK's resolved configuration carries the chain and the attempt limit:
 
 The gateway decides which failures move to the next provider. It reads the real upstream result, and the rule is the same for every virtual key. There is no per-key trigger list. A narrowed list could only turn a failure the gateway can recover from into one that your callers see.
 
-| Condition | Fires? | Why |
-|---|---|---|
-| Upstream `5xx` | ✅ | Provider's fault; next provider may work. |
-| `timeout` | ✅ | Provider degraded. |
-| `429 rate_limit_exceeded` | ✅ | Primary is throttled; secondary may have headroom. |
-| `network_error` (DNS/TCP/TLS) | ✅ | Connectivity issue to primary. |
-| Upstream `404 Not Found` | ✅ | In a chain with more than one provider, this usually means that this provider does not serve that model. The next one can. Common with self-hosted and OpenAI-compatible providers. |
-| `circuit_breaker` open | ✅ | Preemptive, gateway knows primary has been failing recently. |
-| Upstream `400 Bad Request` | ❌ | Client-fault. Surfacing the error is correct. |
-| Upstream `401 Unauthorized` | ❌ | Provider credential bad. Needs human fix, not masking. |
-| Upstream `403 Forbidden` | ❌ | Authorization issue. Silent switch would hide a real problem. |
-| Client disconnect or an expired request deadline | ❌ | The caller went away. This tells nothing about the provider's health. |
-| LangWatch-internal `invalid_api_key` etc | ❌ | Never reaches the fallback layer. |
+| Condition                                        | Fires? | Why                                                                                                                                                                                 |
+| ------------------------------------------------ | ------ | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Upstream `5xx`                                   | ✅     | Provider's fault; next provider may work.                                                                                                                                           |
+| `timeout`                                        | ✅     | Provider degraded.                                                                                                                                                                  |
+| `429 rate_limit_exceeded`                        | ✅     | Primary is throttled; secondary may have headroom.                                                                                                                                  |
+| `network_error` (DNS/TCP/TLS)                    | ✅     | Connectivity issue to primary.                                                                                                                                                      |
+| Upstream `404 Not Found`                         | ✅     | In a chain with more than one provider, this usually means that this provider does not serve that model. The next one can. Common with self-hosted and OpenAI-compatible providers. |
+| `circuit_breaker` open                           | ✅     | Preemptive, gateway knows primary has been failing recently.                                                                                                                        |
+| Upstream `400 Bad Request`                       | ❌     | Client-fault. Surfacing the error is correct.                                                                                                                                       |
+| Upstream `401 Unauthorized`                      | ❌     | Provider credential bad. Needs human fix, not masking.                                                                                                                              |
+| Upstream `403 Forbidden`                         | ❌     | Authorization issue. Silent switch would hide a real problem.                                                                                                                       |
+| Client disconnect or an expired request deadline | ❌     | The caller went away. This tells nothing about the provider's health.                                                                                                               |
+| LangWatch-internal `invalid_api_key` etc         | ❌     | Never reaches the fallback layer.                                                                                                                                                   |
 
 ## Crossing providers mid-chain
 
@@ -73,7 +73,11 @@ Fallback attribution today:
 - Response header `X-LangWatch-Fallback-Count: N`, how many fallbacks were attempted before success.
 - Request-id correlation via `X-LangWatch-Gateway-Request-Id`, join the metric + log line back to the specific trace.
 
-<Info>Per-attempt nested spans (`langwatch.fallback.attempt`, `.reason` attrs) are a v1.1 observability follow-up. In v1, the counter + header give you the aggregate picture; per-attempt reasoning lives in the gateway log line for that request-id.</Info>
+<Info>
+  Per-attempt nested spans (`langwatch.fallback.attempt`, `.reason` attrs) are a v1.1
+  observability follow-up. In v1, the counter + header give you the aggregate picture;
+  per-attempt reasoning lives in the gateway log line for that request-id.
+</Info>
 
 If **all** attempts in the chain fail, the gateway returns the last provider's error envelope mapped to the OpenAI-compatible shape (`provider_error` or `upstream_timeout` as the `type`).
 
@@ -81,20 +85,20 @@ If **all** attempts in the chain fail, the gateway returns the last provider's e
 
 Each provider has an independent circuit breaker with a sliding window:
 
-| Default | Meaning |
-|---|---|
-| **Window:** 30 s | Failure events within the last 30 s count toward the open threshold |
-| **Threshold:** 10 failures | 10 failures in the window open the circuit |
-| **Open cooldown:** 60 s | Circuit stays open for 60 s; skipped on new requests regardless of fallback order |
+| Default                        | Meaning                                                                                                          |
+| ------------------------------ | ---------------------------------------------------------------------------------------------------------------- |
+| **Window:** 30 s               | Failure events within the last 30 s count toward the open threshold                                              |
+| **Threshold:** 10 failures     | 10 failures in the window open the circuit                                                                       |
+| **Open cooldown:** 60 s        | Circuit stays open for 60 s; skipped on new requests regardless of fallback order                                |
 | **Half-open probe:** 1 request | After cooldown, a single probe is let through; if it succeeds, circuit closes; if it fails, another 60 s of open |
 
 Override at the service level:
 
-| Env var | Default |
-|---|---|
-| `LW_GATEWAY_CIRCUIT_WINDOW_S` | `30` |
-| `LW_GATEWAY_CIRCUIT_THRESHOLD` | `10` |
-| `LW_GATEWAY_CIRCUIT_COOLDOWN_S` | `60` |
+| Env var                         | Default |
+| ------------------------------- | ------- |
+| `LW_GATEWAY_CIRCUIT_WINDOW_S`   | `30`    |
+| `LW_GATEWAY_CIRCUIT_THRESHOLD`  | `10`    |
+| `LW_GATEWAY_CIRCUIT_COOLDOWN_S` | `60`    |
 
 **Per-replica, not shared**: each gateway replica maintains its own breaker state. This is deliberate, under a large-scale outage, N replicas rediscovering the recovered provider independently is resilient; depending on Redis for breaker consensus is not.
 

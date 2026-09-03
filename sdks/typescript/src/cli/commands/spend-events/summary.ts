@@ -113,7 +113,6 @@ function oneOf<T extends string>({
   return value as T;
 }
 
-
 export const spendSummaryCommand = async (options: {
   groupBy?: string;
   bucket?: string;
@@ -132,7 +131,9 @@ export const spendSummaryCommand = async (options: {
   const apiKey = checkOrgApiKey();
   const groupBy = (options.groupBy ?? "virtual_key")
     .split(",")
-    .map((part) => oneOf({ value: part.trim(), allowed: GROUP_BY_VALUES, flag: "--group-by" }));
+    .map((part) =>
+      oneOf({ value: part.trim(), allowed: GROUP_BY_VALUES, flag: "--group-by" }),
+    );
   if (groupBy.length > 2) {
     console.error(chalk.red("--group-by takes at most two dimensions"));
     process.exit(1);
@@ -150,8 +151,7 @@ export const spendSummaryCommand = async (options: {
     options.from !== undefined
       ? parseInstant(options.from, "--from")
       : now - 24 * 60 * 60 * 1000;
-  const toMs =
-    options.to !== undefined ? parseInstant(options.to, "--to") : now;
+  const toMs = options.to !== undefined ? parseInstant(options.to, "--to") : now;
   const service = new SpendEventsApiService({ apiKey });
   const spinner = createSpinner("Reading spend summaries...").start();
   try {

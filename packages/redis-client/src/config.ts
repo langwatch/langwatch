@@ -92,9 +92,7 @@ function parseClusterEndpoints(endpointsStr: string): RedisClusterEndpoint[] {
     .map((entry) => entry.trim())
     .filter((entry) => entry.length > 0)
     .map((raw) => {
-      const url = raw.includes("://")
-        ? new URL(raw)
-        : new URL(`redis://${raw}`);
+      const url = raw.includes("://") ? new URL(raw) : new URL(`redis://${raw}`);
       return {
         host: url.hostname,
         port: Number(url.port || DEFAULT_REDIS_PORT),

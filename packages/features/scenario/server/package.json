@@ -1,0 +1,73 @@
+{
+  "name": "@langwatch/scenario-server",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Canonical server-side Scenario service and private persistence.",
+  "files": [
+    "src"
+  ],
+  "type": "module",
+  "imports": {
+    "#*": "./src/*.ts"
+  },
+  "main": "./src/index.ts",
+  "types": "./src/index.ts",
+  "exports": {
+    ".": {
+      "types": "./src/index.ts",
+      "default": "./src/index.ts"
+    },
+    "./testing": {
+      "types": "./src/testing.ts",
+      "default": "./src/testing.ts"
+    }
+  },
+  "scripts": {
+    "typecheck": "tsc --noEmit",
+    "test": "vitest run",
+    "test:unit": "vitest run"
+  },
+  "dependencies": {
+    "@ai-sdk/openai-compatible": "^2.0.55",
+    "@clickhouse/client": "^1.23.0",
+    "@langwatch/agent-contract": "workspace:*",
+    "@langwatch/api": "workspace:*",
+    "@langwatch/authz-contract": "workspace:*",
+    "@langwatch/eventing": "workspace:*",
+    "@langwatch/handled-error": "workspace:*",
+    "@langwatch/model-provider-contract": "workspace:*",
+    "@langwatch/observability": "workspace:*",
+    "@langwatch/prisma-client": "workspace:*",
+    "@langwatch/project-contract": "workspace:*",
+    "@langwatch/prompt-contract": "workspace:*",
+    "@langwatch/scenario": "^1.3.0",
+    "@langwatch/scenario-contract": "workspace:*",
+    "@langwatch/secret-contract": "workspace:*",
+    "@langwatch/suite-contract": "workspace:*",
+    "@langwatch/trace-contract": "workspace:*",
+    "@langwatch/user-contract": "workspace:*",
+    "@langwatch/workflow-contract": "workspace:*",
+    "@opentelemetry/api": "^1.9.1",
+    "@trpc/server": "11.18.0",
+    "@xyflow/react": "^12.9.3",
+    "ai": "^6.0.217",
+    "hono": "^4.12.27",
+    "hono-openapi": "^1.3.1",
+    "jsonpath-plus": "^10.4.0",
+    "langwatch": "workspace:*",
+    "liquidjs": "^10.27.1",
+    "nanoid": "^5.1.6",
+    "papaparse": "^5.5.4",
+    "undici": "^8.5.0",
+    "zod": "^4.4.3"
+  },
+  "devDependencies": {
+    "@langwatch/redis-client": "workspace:*",
+    "@langwatch/test-harness": "workspace:*",
+    "@opentelemetry/sdk-trace-base": "2.10.0",
+    "@opentelemetry/sdk-trace-node": "2.10.0",
+    "@types/papaparse": "^5.5.2",
+    "typescript": "^7.0.2",
+    "vitest": "^4.1.9"
+  }
+}

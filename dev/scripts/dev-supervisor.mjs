@@ -263,9 +263,7 @@ async function runSentinel(args, env) {
       stderr(`${PREFIX} could not start ${argv[0]} (${err.message})\n`);
       resolve(127);
     });
-    child.on("close", (status, signal) =>
-      resolve(exitCodeFor({ code: status, signal })),
-    );
+    child.on("close", (status, signal) => resolve(exitCodeFor({ code: status, signal })));
   });
   void settled.then((value) => {
     code = value;
@@ -313,13 +311,7 @@ async function startSentinel({ leader, argv, env }) {
   try {
     proc = spawn(
       process.execPath,
-      [
-        SELF,
-        SENTINEL_FLAG,
-        String(process.pid),
-        String(leader ?? 0),
-        ...argv,
-      ],
+      [SELF, SENTINEL_FLAG, String(process.pid), String(leader ?? 0), ...argv],
       {
         detached: true,
         // The stack's stdio is ours, passed down a level; fd 3 is the pipe it
@@ -430,8 +422,7 @@ function startDirect(argv, env, detached) {
         stderr(`${PREFIX} could not start ${argv[0]} (${err.message})\n`);
         cb(127);
       }),
-    onExit: (cb) =>
-      child.on("close", (code, signal) => cb(exitCodeFor({ code, signal }))),
+    onExit: (cb) => child.on("close", (code, signal) => cb(exitCodeFor({ code, signal }))),
   };
 }
 
@@ -496,9 +487,7 @@ async function passThrough(argv, env, { detached, leader = null }) {
           graceMs: positiveInt(env.LANGWATCH_DEV_GRACE_MS, DEFAULT_GRACE_MS),
         });
         if (!(await stack.takeDown())) {
-          stderr(
-            `${PREFIX} some of the dev stack outlived SIGKILL, giving up.\n`,
-          );
+          stderr(`${PREFIX} some of the dev stack outlived SIGKILL, giving up.\n`);
         }
       }
       finish(stackCode ?? exitCodeFor(null));

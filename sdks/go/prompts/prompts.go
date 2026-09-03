@@ -1,6 +1,6 @@
 // Package prompts emits the PromptApiService.get + Prompt.compile span
-// pair that the trace-UI consumer (platform/app/src/server/traces/
-// findPromptReferenceInAncestors.ts) walks to surface "Open in Prompts"
+// pair that the trace-UI consumer (packages/features/trace/contract/src/
+// trace-prompt-reference.ts) walks to surface "Open in Prompts"
 // deep-links on LLM spans.
 //
 // The shape mirrors python-sdk byte-for-byte:

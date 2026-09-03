@@ -25,7 +25,12 @@ export interface RunAgentOptions {
 
 const isMessageList = (value: unknown): value is AgentCallMessage[] =>
   Array.isArray(value) &&
-  value.every((item) => typeof item === "object" && item !== null && typeof (item as AgentCallMessage).role === "string");
+  value.every(
+    (item) =>
+      typeof item === "object" &&
+      item !== null &&
+      typeof (item as AgentCallMessage).role === "string",
+  );
 
 /**
  * The relay body for a connected agent: `--message` is one user turn,
@@ -57,7 +62,8 @@ export function buildRelayBody({
     return "a connected agent takes a conversation: give --message <text>, or --input with a messages list.";
   }
   const body: AgentCallBody = { messages };
-  const threadId = options.threadId ?? (typeof input.threadId === "string" ? input.threadId : undefined);
+  const threadId =
+    options.threadId ?? (typeof input.threadId === "string" ? input.threadId : undefined);
   if (threadId) body.threadId = threadId;
   if (isMessageList(input.newMessages)) body.newMessages = input.newMessages;
   if (input.session !== undefined) body.session = input.session;
@@ -133,7 +139,7 @@ export const runAgentCommand = async (
       const result = await service.call(agent.id, body);
       const where = result.instance?.label
         ? `${result.instance.hostname} (${result.instance.label})`
-        : result.instance?.hostname ?? "an instance";
+        : (result.instance?.hostname ?? "an instance");
       runSpinner.succeed(`Agent "${agent.name}" answered from ${where} in ${result.durationMs} ms`);
 
       return {
@@ -141,14 +147,17 @@ export const runAgentCommand = async (
         table: () => {
           console.log();
           console.log(chalk.bold("  Output:"));
-          const output = typeof result.output === "string"
-            ? result.output
-            : JSON.stringify(result.output, null, 2);
+          const output =
+            typeof result.output === "string"
+              ? result.output
+              : JSON.stringify(result.output, null, 2);
           console.log(`    ${output.split("\n").join("\n    ")}`);
           if (result.session !== undefined && result.session !== null) {
             console.log();
             console.log(chalk.bold("  Session:"));
-            console.log(`    ${JSON.stringify(result.session, null, 2).split("\n").join("\n    ")}`);
+            console.log(
+              `    ${JSON.stringify(result.session, null, 2).split("\n").join("\n    ")}`,
+            );
           }
           console.log();
         },
@@ -175,7 +184,7 @@ export const runAgentCommand = async (
         body: JSON.stringify(input),
       });
 
-      const result = await response.json() as Record<string, unknown>;
+      const result = (await response.json()) as Record<string, unknown>;
       runSpinner.succeed(`HTTP agent responded (${response.status})`);
 
       return {
@@ -199,11 +208,13 @@ export const runAgentCommand = async (
     // Check if agent has a linked workflow
     const workflowId = config?.workflowId as string | undefined;
     if (!workflowId) {
-      console.error(chalk.yellow(
-        `Agent "${agent.name}" (type: ${agent.type}) cannot be executed directly from CLI.\n` +
-        `Only connected agents, HTTP agents and workflow-linked agents can be run.\n` +
-        `To test this agent, use it within a workflow in the UI.`,
-      ));
+      console.error(
+        chalk.yellow(
+          `Agent "${agent.name}" (type: ${agent.type}) cannot be executed directly from CLI.\n` +
+            `Only connected agents, HTTP agents and workflow-linked agents can be run.\n` +
+            `To test this agent, use it within a workflow in the UI.`,
+        ),
+      );
       process.exit(1);
     }
 
@@ -227,7 +238,7 @@ export const runAgentCommand = async (
         process.exit(1);
       }
 
-      const result = await response.json() as Record<string, unknown>;
+      const result = (await response.json()) as Record<string, unknown>;
       runSpinner.succeed(`Agent "${agent.name}" executed successfully`);
 
       return {
@@ -236,9 +247,10 @@ export const runAgentCommand = async (
           console.log();
           if (result.output !== undefined) {
             console.log(chalk.bold("  Output:"));
-            const output = typeof result.output === "string"
-              ? result.output
-              : JSON.stringify(result.output, null, 2);
+            const output =
+              typeof result.output === "string"
+                ? result.output
+                : JSON.stringify(result.output, null, 2);
             console.log(`    ${output.split("\n").join("\n    ")}`);
           } else {
             console.log(chalk.bold("  Result:"));

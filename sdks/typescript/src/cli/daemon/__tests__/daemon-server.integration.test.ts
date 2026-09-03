@@ -6,14 +6,7 @@
  * without commander or the network in the picture. The real CLI running through
  * a real daemon is covered by daemon-cli.integration.test.ts.
  */
-import {
-  afterEach,
-  beforeEach,
-  describe,
-  expect,
-  it,
-  vi,
-} from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import * as fs from "node:fs";
 import * as net from "node:net";
 import * as os from "node:os";
@@ -31,7 +24,12 @@ import {
   stagingSocketPath,
   type DaemonServer,
 } from "../server";
-import { encodeFrame, FrameDecoder, PROTOCOL_VERSION, type ClientFrame } from "../protocol";
+import {
+  encodeFrame,
+  FrameDecoder,
+  PROTOCOL_VERSION,
+  type ClientFrame,
+} from "../protocol";
 import type { CommandExecution, CommandExecutor } from "../runner";
 import { noopTelemetry, type DaemonTelemetry } from "../telemetry";
 
@@ -272,9 +270,7 @@ describe("daemon over a unix socket", () => {
           build: BUILD,
         });
 
-        await expect(second.listen()).rejects.toBeInstanceOf(
-          DaemonAlreadyRunningError,
-        );
+        await expect(second.listen()).rejects.toBeInstanceOf(DaemonAlreadyRunningError);
       });
 
       it("leaves nothing behind but the socket clients dial", async () => {
@@ -421,9 +417,7 @@ describe("daemon over a unix socket", () => {
 
         await exec(["trace", "get", "trace-123", "--format", "json"]);
 
-        expect(seen).toEqual([
-          ["trace", "get", "trace-123", "--format", "json"],
-        ]);
+        expect(seen).toEqual([["trace", "get", "trace-123", "--format", "json"]]);
       });
     });
 
@@ -538,9 +532,7 @@ describe("daemon over a unix socket", () => {
           },
         });
 
-        const results = await Promise.all(
-          fanOut.map((n) => exec(["cmd", String(n)])),
-        );
+        const results = await Promise.all(fanOut.map((n) => exec(["cmd", String(n)])));
 
         results.forEach((result, index) => {
           const n = index + 1;
@@ -878,9 +870,7 @@ describe("daemon over a unix socket", () => {
         await startDaemon({ executor });
 
         // chown needs root; moving OUR uid makes the same comparison fail.
-        vi.spyOn(process, "getuid").mockReturnValue(
-          (process.getuid?.() ?? 0) + 1,
-        );
+        vi.spyOn(process, "getuid").mockReturnValue((process.getuid?.() ?? 0) + 1);
 
         const { outcome, stdout } = await exec(["trace", "search"]);
 
@@ -911,15 +901,11 @@ describe("daemon over a unix socket", () => {
         // and nothing would ever say why: a permanent, silent denial of service.
         // A stranger's listener, bound to our socket path first.
         const squatter = net.createServer();
-        await new Promise<void>((resolve) =>
-          squatter.listen(socketPath, resolve),
-        );
+        await new Promise<void>((resolve) => squatter.listen(socketPath, resolve));
         secureSocketFile(socketPath);
 
         // chown needs root; moving OUR uid makes the same comparison fail.
-        vi.spyOn(process, "getuid").mockReturnValue(
-          (process.getuid?.() ?? 0) + 1,
-        );
+        vi.spyOn(process, "getuid").mockReturnValue((process.getuid?.() ?? 0) + 1);
 
         // A foreign socket is not "alive", because it is not ours...
         expect(await isSocketAlive(socketPath)).toBe(false);
@@ -1182,9 +1168,7 @@ describe("daemon over a unix socket", () => {
         const { outcome, stdout } = await exec(["trace", "search"]);
 
         expect(outcome).toMatchObject({ served: false });
-        expect((outcome as { reason: string }).reason).toContain(
-          "daemon-declined",
-        );
+        expect((outcome as { reason: string }).reason).toContain("daemon-declined");
         expect(stdout).toBe("");
       });
     });

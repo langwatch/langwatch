@@ -1,0 +1,82 @@
+# ADR-001: Analytics owns timeseries reads and the LangWatchQL web surface
+
+**Status:** Accepted
+
+**Behavioural contracts:** [Analytics timeseries](../specs/analytics-timeseries.feature)
+and [LangWatchQL workbench](../specs/analytics-lwql-workbench.feature)
+
+## Context
+
+Analytics provides tenant-scoped timeseries reads and the reusable browser
+surface for LangWatchQL. Dashboard owns graphs and saved charts; Topic, Trace,
+and Evaluation own their distinct lifecycles.
+
+## Decision
+
+Analytics owns portable timeseries contracts, conservative table routing,
+ClickHouse reads and the `evaluation_analytics` / `evaluation_analytics_rollup`
+persistence boundary, LangWatchQL browser behaviour, and Vega-Lite policy. The
+application owns routes, tRPC transport, saved-chart persistence, and browser
+theme/lazy-render ports.
+
+`LangWatchQLService` is the one deliberate additional public Analytics service:
+its restricted database identity, tenant capability, query/result ceilings, and
+one close lifecycle are a distinct trust boundary from ordinary Analytics
+reads. Dashboard and other consumers use its portable contract, never an
+Analytics repository or executor.
+
+The concrete server executor remains a recorded migration residual under
+`platform/app/src/server/analytics/lwql` until its typed configuration and
+restricted client move into the Analytics server package. The portable contract
+is canonical; the residual implementation does not define another owner.
+
+## Public surfaces and transports
+
+`@langwatch/analytics-contract` publishes Zod contracts. The server service is
+called from composed application transports. `@langwatch/analytics-web` accepts
+controlled query, schema, toolbar, error, and chart render ports; it imports no
+application hooks or router clients.
+
+## Dependencies
+
+Analytics consumes ClickHouse through its private server repository. Other
+features consume its contract, never its repositories or query builders.
+
+## Persistence
+
+Analytics reads ClickHouse and is the sole service writing and reading the
+evaluation analytics tables. Evaluation owns the pure event projections that
+derive their rows, then calls the canonical Analytics service. When ClickHouse
+is disabled, Analytics composes a no-op evaluation persistence implementation:
+projections continue without a database call and read-back returns no row.
+Saved workbench chart records belong to Dashboard; the browser workbench itself
+persists nothing.
+
+## Runtime and registration
+
+The application composes one Analytics server service per process and installs
+its transports. The web package is mounted by page composition and has no
+import-time registration.
+
+## Environment and configuration
+
+The contract and web package read no environment. Deployment configuration is
+resolved by application composition and injected into server adapters.
+
+## Errors
+
+Services throw named domain errors. The workbench receives transport failures
+through its error render port and preserves their structured metadata.
+
+## Contracts and validation
+
+Timeseries, LangWatchQL, and evaluation analytics persistence values are shared
+Zod 4 contracts. The repository parses writes and decoded ClickHouse rows; the
+LangWatchQL query output is validated at the tRPC boundary; browser chart policy
+validates member-authored Vega-Lite specifications before rendering.
+
+## Consequences
+
+`trace_analytics`, `trace_summaries`, and timeseries rollups remain distinct
+server table boundaries. Moving the LangWatchQL workbench does not alter query
+routes, response fields, authorization, or those table choices.

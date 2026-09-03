@@ -1,0 +1,52 @@
+{
+  "name": "@langwatch/identity-server",
+  "version": "0.1.0",
+  "private": true,
+  "description": "The server-side runtime of the identity platform (ADR-101, ADR-115): IdentityGuards, IdentityService, the verification ceremony, the backfill pass, the better-auth ceremonies and the storage ports they run on. Storage-engine-free and better-auth-free - the app implements the repository interfaces with Prisma, binds the ceremonies to better-auth's databaseHooks, and implements the ledger port over its event-sourcing pipeline.",
+  "license": "MIT",
+  "type": "module",
+  "exports": {
+    ".": {
+      "types": "./src/index.ts",
+      "default": "./src/index.ts"
+    },
+    "./better-auth": {
+      "types": "./src/better-auth.ts",
+      "default": "./src/better-auth.ts"
+    }
+  },
+  "main": "./src/index.ts",
+  "types": "./src/index.ts",
+  "files": [
+    "src"
+  ],
+  "scripts": {
+    "typecheck": "tsc --noEmit && tsc --noEmit -p tsconfig.test.json",
+    "test": "vitest run"
+  },
+  "dependencies": {
+    "@langwatch/actor": "workspace:*",
+    "@langwatch/authz-contract": "workspace:*",
+    "@langwatch/eventing": "workspace:*",
+    "@langwatch/handled-error": "workspace:*",
+    "@langwatch/identity-contract": "workspace:*",
+    "@langwatch/identity-eventing": "workspace:*",
+    "@langwatch/ksuid": "^2.0.2",
+    "@langwatch/observability": "workspace:*",
+    "@langwatch/ops-server": "workspace:*",
+    "@langwatch/prisma-client": "workspace:*",
+    "@langwatch/system-migrations": "workspace:*",
+    "nanoid": "^6.0.0",
+    "prom-client": "^15.1.3",
+    "zod": "^4.4.3"
+  },
+  "peerDependencies": {
+    "better-auth": "^1.7.1"
+  },
+  "devDependencies": {
+    "@types/node": "^26",
+    "better-auth": "^1.7.1",
+    "typescript": "^7.0.2",
+    "vitest": "^4.1.9"
+  }
+}

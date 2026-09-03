@@ -96,7 +96,9 @@ export function renderBudgetExceeded(
   const lines: string[] = [];
   lines.push("⚠  Budget limit reached");
   lines.push("");
-  lines.push(`   You've used $${e.spent_usd} of your $${e.limit_usd} ${periodLabel} budget.`);
+  lines.push(
+    `   You've used $${e.spent_usd} of your $${e.limit_usd} ${periodLabel} budget.`,
+  );
   lines.push("   To continue, ask your team admin to raise your limit.");
   lines.push("");
   if (e.admin_email) {

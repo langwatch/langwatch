@@ -24,9 +24,9 @@ kubectl -n langwatch get pods -l app.kubernetes.io/name=langyagent
 ```
 
 <Note>
-Langy is single-tenant by nature here: every person with access to your
-LangWatch install can use it, and it runs with the permissions of whoever is
-asking. To roll it out gradually instead, see [Staged rollout](#staged-rollout).
+  Langy is single-tenant by nature here: every person with access to your LangWatch
+  install can use it, and it runs with the permissions of whoever is asking. To roll it
+  out gradually instead, see [Staged rollout](#staged-rollout).
 </Note>
 
 ## How Langy is isolated
@@ -81,11 +81,11 @@ kubectl -n langwatch get deploy langwatch-langyagent \
 
 Where the class comes from:
 
-| Cluster | What to do |
-|---------|------------|
-| GKE | Enable GKE Sandbox on a node pool, or use Autopilot, which schedules `gvisor` pods directly. The class is named `gvisor`. |
-| AKS | Use a Kata VM isolation pool and set `runtimeClassName: kata-mshv-vm-isolation`. Any sandboxed class works. |
-| EKS | No managed option. Install gVisor on a dedicated node group ([below](#eks-install-gvisor-on-a-node-group)). |
+| Cluster | What to do                                                                                                                |
+| ------- | ------------------------------------------------------------------------------------------------------------------------- |
+| GKE     | Enable GKE Sandbox on a node pool, or use Autopilot, which schedules `gvisor` pods directly. The class is named `gvisor`. |
+| AKS     | Use a Kata VM isolation pool and set `runtimeClassName: kata-mshv-vm-isolation`. Any sandboxed class works.               |
+| EKS     | No managed option. Install gVisor on a dedicated node group ([below](#eks-install-gvisor-on-a-node-group)).               |
 
 ### EKS: install gVisor on a node group
 

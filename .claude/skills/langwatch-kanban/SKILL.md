@@ -13,6 +13,7 @@ Manage the LangWatch Kanban GitHub project board (project #5, org: langwatch).
 ## Project Reference
 
 Read the project board reference from memory before doing anything:
+
 - File: `/Users/USER/.claude/projects/-Users-hope-workspace-langwatch-workspace-langwatch-saas-langwatch/memory/reference_gh-project.md`
 
 This contains all project IDs, field IDs, status option IDs, and GraphQL patterns. **Use python3 for all JSON parsing** — issue titles with special characters break jq.

@@ -76,7 +76,9 @@ export const listGatewayBudgetsCommand = async (
           console.log(chalk.gray("No gateway budgets configured."));
           console.log(chalk.gray("Create one with:"));
           console.log(
-            chalk.cyan('  langwatch gateway-budgets create --scope project --project <id> --window day --limit 100 --name "daily cap"'),
+            chalk.cyan(
+              '  langwatch gateway-budgets create --scope project --project <id> --window day --limit 100 --name "daily cap"',
+            ),
           );
           return;
         }
@@ -103,7 +105,12 @@ export const listGatewayBudgetsCommand = async (
           // breached, not 0% utilized (matches `langwatch status`).
           const pct = effectiveLimit > 0 ? (spent / effectiveLimit) * 100 : 100;
           const pctLabel = `${pct.toFixed(0)}%`;
-          const coloredPct = pct >= 100 ? chalk.red(pctLabel) : pct >= 80 ? chalk.yellow(pctLabel) : chalk.green(pctLabel);
+          const coloredPct =
+            pct >= 100
+              ? chalk.red(pctLabel)
+              : pct >= 80
+                ? chalk.yellow(pctLabel)
+                : chalk.green(pctLabel);
           const seatsLabel = `${seatsOver} of ${seatsSeen} over cap`;
           const spentLabel = !spend_available
             ? chalk.gray("unavailable")
@@ -132,7 +139,18 @@ export const listGatewayBudgetsCommand = async (
 
         formatTable({
           data: tableData,
-          headers: ["ID", "Name", "Scope", "Window", "Breach", "Limit", "Spent", "Provider", "Resets", "Archived"],
+          headers: [
+            "ID",
+            "Name",
+            "Scope",
+            "Window",
+            "Breach",
+            "Limit",
+            "Spent",
+            "Provider",
+            "Resets",
+            "Archived",
+          ],
           colorMap: { Name: chalk.cyan, ID: chalk.gray },
         });
 

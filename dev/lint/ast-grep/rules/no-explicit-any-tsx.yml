@@ -1,16 +1,17 @@
 id: no-explicit-any-tsx
 message: >
   Avoid `any` — prefer `unknown` + narrowing, or a real type. See
-  langwatch CLAUDE.md and #3754 AC3. (Biome also flags this via
-  `suspicious.noExplicitAny` — this rule is the deterministic fallback
-  for cases Biome misses.)
+  langwatch CLAUDE.md and #3754 AC3. (`typescript/no-explicit-any` is
+  measured at 1395 in the platform application and left off in
+  /.oxlintrc.architecture.json; this rule is the deterministic gate.)
 severity: warning
 language: Tsx
 rule:
   kind: predefined_type
-  regex: '^any$'
+  regex: "^any$"
 files:
-  - "platform/app/src/**/*.tsx"
+  - "apps/**/*.tsx"
+  - "packages/**/*.tsx"
 ignores:
   - "**/__tests__/**"
   - "**/*.test.tsx"

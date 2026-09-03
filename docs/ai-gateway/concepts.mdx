@@ -58,7 +58,7 @@ The identity attributed to a request, the user or service account who owns the V
 
 - **Attribution in traces** (`langwatch.principal_id`).
 - **Principal-scoped budgets** (cap spend per-person).
-- **RBAC**: the principal must have permission to *use* the VK at all.
+- **RBAC**: the principal must have permission to _use_ the VK at all.
 
 Personal-access VKs bind to a user principal; shared VKs bind to a service-account principal.
 
@@ -155,7 +155,15 @@ Attributes always present (source of truth: `services/aigateway/adapters/gateway
 
 When a bundle-baked cache rule matches: `langwatch.cache.rule_id`, `.rule_priority`, `.mode_applied`.
 
-<Info>Previously-documented per-feature attrs (`langwatch.fallback.attempt`, `.reason`, `langwatch.policy.blocked`, `langwatch.budget.breached_scope`, `langwatch.guardrail.post_flag`, `.verdict`) are **not emitted in v1**. For per-feature signals today, use the Prometheus counters + correlate via `X-LangWatch-Gateway-Request-Id`. See [Observability → Per-feature attributes](/ai-gateway/observability#per-feature-attributes-when-applicable) for the v1 ↔ v1.1 breakdown.</Info>
+<Info>
+  Previously-documented per-feature attrs (`langwatch.fallback.attempt`, `.reason`,
+  `langwatch.policy.blocked`, `langwatch.budget.breached_scope`,
+  `langwatch.guardrail.post_flag`, `.verdict`) are **not emitted in v1**. For per-feature
+  signals today, use the Prometheus counters + correlate via
+  `X-LangWatch-Gateway-Request-Id`. See [Observability → Per-feature
+  attributes](/ai-gateway/observability#per-feature-attributes-when-applicable) for the v1
+  ↔ v1.1 breakdown.
+</Info>
 
 ## Request id
 
@@ -167,7 +175,7 @@ Once a request is authenticated, its response carries `X-LangWatch-Gateway-Reque
 
 The id also flows into the CH ledger as the idempotency key for debit replays, so a single request is billed exactly once even across gateway restarts.
 
-## What's intentionally *not* here
+## What's intentionally _not_ here
 
 - **SDK migration of existing litellm callsites**: the LangWatch playground and evaluators continue to use the litellm path. The gateway serves new traffic; existing internal call sites don't change. This is deliberate scope control for v1.
 - **Semantic caching across unrelated requests**: Bifrost ships a semantic-cache plugin; we're not enabling it by default because it changes latency characteristics in ways customers should opt into.

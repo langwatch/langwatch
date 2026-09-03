@@ -124,6 +124,17 @@ type stackStatus struct {
 	Live bool `json:"live"`
 	// Services shadows the embedded record's list to add per-service liveness.
 	Services []serviceStatus `json:"services"`
+	// Lanes are the three Node applications the stack supervises. The routed
+	// Services list cannot answer this on its own: only `ui` has a hostname —
+	// api and workers hold loopback ports — so a reader asking "is this stack
+	// actually running the whole application" had nowhere to look.
+	Lanes []laneStatus `json:"lanes"`
+}
+
+// laneStatus is one supervised Node lane plus whether its port answers.
+type laneStatus struct {
+	domain.Lane
+	Listening bool `json:"listening"`
 }
 
 // serviceStatus is one routed service plus whether anything is actually
@@ -145,10 +156,15 @@ func (o *Orchestrator) stackStatuses(stacks []domain.Stack) []stackStatus {
 		for _, svc := range s.Services {
 			svcs = append(svcs, serviceStatus{Service: svc, Listening: svc.Port != 0 && o.sys.PortInUse(svc.Port)})
 		}
+		lanes := make([]laneStatus, 0, len(s.Lanes()))
+		for _, lane := range s.Lanes() {
+			lanes = append(lanes, laneStatus{Lane: lane, Listening: lane.Port != 0 && o.sys.PortInUse(lane.Port)})
+		}
 		out = append(out, stackStatus{
 			Stack:    s,
 			Live:     s.LauncherPID != 0 && o.sys.ProcessAlive(s.LauncherPID),
 			Services: svcs,
+			Lanes:    lanes,
 		})
 	}
 	return out

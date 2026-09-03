@@ -43,12 +43,12 @@ All overlays (drawers, popovers, dialogs) should have translucent backgrounds wi
 
 The overlay components in `components/ui/` already implement these styles:
 
-| Property | Value |
-|----------|-------|
-| `background` | `white/75` |
-| `backdropFilter` | `blur(8px)` |
-| `borderRadius` | `lg` |
-| `margin` | `2` (for drawers) |
+| Property         | Value             |
+| ---------------- | ----------------- |
+| `background`     | `white/75`        |
+| `backdropFilter` | `blur(8px)`       |
+| `borderRadius`   | `lg`              |
+| `margin`         | `2` (for drawers) |
 
 ### Code Pattern
 
@@ -59,13 +59,9 @@ import { Dialog } from "../../components/ui/dialog";
 import { Popover } from "../../components/ui/popover";
 
 // If creating custom overlays, apply:
-<Box
-  background="white/75"
-  backdropFilter="blur(8px)"
-  borderRadius="lg"
->
+<Box background="white/75" backdropFilter="blur(8px)" borderRadius="lg">
   ...
-</Box>
+</Box>;
 ```
 
 ## 3. Prefer Drawers Over Modals
@@ -171,7 +167,7 @@ import { PageLayout } from "../../components/ui/layouts/PageLayout";
   <VStack gap={4} padding={6}>
     ...
   </VStack>
-</PageLayout.Container>
+</PageLayout.Container>;
 ```
 
 ### Key Points
@@ -196,9 +192,7 @@ For content-heavy pages, use the compact sidebar that expands on hover.
 ```tsx
 import { DashboardLayout } from "~/components/DashboardLayout";
 
-<DashboardLayout compactMenu>
-  {/* Page content */}
-</DashboardLayout>
+<DashboardLayout compactMenu>{/* Page content */}</DashboardLayout>;
 ```
 
 ### Behavior
@@ -225,7 +219,7 @@ See [ADR 018](../adr/018-form-validation-and-save.md) for the full decision cont
 ```tsx
 <Button
   type="submit"
-  disabled={mutation.isPending}  // ✅ in-flight only
+  disabled={mutation.isPending} // ✅ in-flight only
   // disabled={!form.formState.isValid}  // ❌ don't pre-disable
 >
   Save

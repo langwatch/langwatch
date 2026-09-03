@@ -256,9 +256,7 @@ export function isCanonicalVkSecret(secret: string | undefined): boolean {
 }
 
 /** Whether a stored `cli_api_key_scope` is in the shape `whoami` can read. */
-function isWellFormedCliKeyScope(
-  scope: GovernanceConfig["cli_api_key_scope"],
-): boolean {
+function isWellFormedCliKeyScope(scope: GovernanceConfig["cli_api_key_scope"]): boolean {
   if (!scope) return false;
   if (scope.kind !== "organization" && scope.kind !== "projects") return false;
   if (
@@ -306,10 +304,7 @@ export function loadConfig(): GovernanceConfig {
     // dropped, the wrapper preflight tells the user to re-login and the
     // next login persists a fresh `vk-lw-` secret. A valid canonical
     // secret is never touched, so this won't wipe a working credential.
-    if (
-      cfg.default_personal_vk &&
-      !isCanonicalVkSecret(cfg.default_personal_vk.secret)
-    ) {
+    if (cfg.default_personal_vk && !isCanonicalVkSecret(cfg.default_personal_vk.secret)) {
       delete cfg.default_personal_vk;
     }
     // Same reasoning for a hand-edited project pin. `secret` is the one

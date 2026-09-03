@@ -12,8 +12,8 @@ Under **Settings → Model Providers**:
 
 1. **Add provider → Google Vertex AI**.
 2. Choose authentication:
-    - **Service account JSON**: paste the JSON key (least-privilege role: `roles/aiplatform.user` or `roles/aiplatform.serviceAgent`).
-    - **Application Default Credentials**: leave JSON empty; gateway picks up workload identity on GKE, Cloud Run.
+   - **Service account JSON**: paste the JSON key (least-privilege role: `roles/aiplatform.user` or `roles/aiplatform.serviceAgent`).
+   - **Application Default Credentials**: leave JSON empty; gateway picks up workload identity on GKE, Cloud Run.
 3. Set **project ID** and **region** (`us-central1`, `us-east5`, `europe-west1`, Anthropic-on-Vertex has a limited region list).
 4. Save.
 
@@ -29,8 +29,8 @@ Expose friendly names via VK `model_aliases`:
 ```json
 {
   "model_aliases": {
-    "claude-haiku":  "vertex/publishers/anthropic/models/claude-haiku-4-5-20251001@20251001",
-    "gemini-flash":  "vertex/publishers/google/models/gemini-2.5-flash"
+    "claude-haiku": "vertex/publishers/anthropic/models/claude-haiku-4-5-20251001@20251001",
+    "gemini-flash": "vertex/publishers/google/models/gemini-2.5-flash"
   }
 }
 ```

@@ -3,10 +3,7 @@ import * as path from "path";
 import chalk from "chalk";
 import { createSpinner } from "../utils/spinner";
 import { PromptConverter } from "@/cli/utils/promptConverter";
-import {
-  PromptsApiService,
-  PromptsError,
-} from "@/client-sdk/services/prompts";
+import { PromptsApiService, PromptsError } from "@/client-sdk/services/prompts";
 import type { PromptsConfig, PromptsLock, SyncResult } from "../types";
 import { FileManager } from "../utils/fileManager";
 import { ensureProjectInitialized } from "../utils/init";
@@ -30,29 +27,25 @@ export const pullPrompts = async ({
   result: SyncResult;
   tag?: string;
 }): Promise<void> => {
-  const remoteDeps = Object.entries(config.prompts).filter(
-    ([, dependency]) => {
-      if (typeof dependency === "object" && dependency.file) {
-        return false;
-      }
-      if (typeof dependency === "string" && dependency.startsWith("file:")) {
-        return false;
-      }
-      return true;
+  const remoteDeps = Object.entries(config.prompts).filter(([, dependency]) => {
+    if (typeof dependency === "object" && dependency.file) {
+      return false;
     }
-  );
+    if (typeof dependency === "string" && dependency.startsWith("file:")) {
+      return false;
+    }
+    return true;
+  });
 
   if (remoteDeps.length > 0) {
     const fetchSpinner = createSpinner(
-      `Checking ${remoteDeps.length} remote prompts...`
+      `Checking ${remoteDeps.length} remote prompts...`,
     ).start();
 
     for (const [name, dependency] of remoteDeps) {
       try {
         const versionSpec =
-          typeof dependency === "string"
-            ? dependency
-            : dependency.version ?? "latest";
+          typeof dependency === "string" ? dependency : (dependency.version ?? "latest");
 
         const displaySpec = tag ?? versionSpec;
 
@@ -69,12 +62,11 @@ export const pullPrompts = async ({
             !fs.existsSync(path.resolve(lockEntry.materialized));
 
           if (needsUpdate) {
-            const materializedPrompt =
-              PromptConverter.fromApiToMaterialized(prompt);
+            const materializedPrompt = PromptConverter.fromApiToMaterialized(prompt);
 
             const savedPath = FileManager.saveMaterializedPrompt(
               name,
-              materializedPrompt
+              materializedPrompt,
             );
             const relativePath = path.relative(process.cwd(), savedPath);
             result.fetched.push({
@@ -83,17 +75,12 @@ export const pullPrompts = async ({
               versionSpec: displaySpec,
             });
 
-            FileManager.updateLockEntry(
-              lock,
-              name,
-              materializedPrompt,
-              savedPath
-            );
+            FileManager.updateLockEntry(lock, name, materializedPrompt, savedPath);
 
             fetchSpinner.text = `Fetched ${chalk.cyan(
-              `${name}@${displaySpec}`
+              `${name}@${displaySpec}`,
             )} ${chalk.gray(`(version ${prompt.version})`)} → ${chalk.gray(
-              relativePath
+              relativePath,
             )}`;
           } else {
             result.unchanged.push(name);
@@ -102,8 +89,7 @@ export const pullPrompts = async ({
           result.errors.push({ name, error: "Prompt not found" });
         }
       } catch (error) {
-        const errorMessage =
-          formatApiErrorMessage({ error });
+        const errorMessage = formatApiErrorMessage({ error });
         result.errors.push({ name, error: errorMessage });
       }
     }
@@ -122,11 +108,10 @@ export const pullPrompts = async ({
         return false;
       }
       return true;
-    })
+    }),
   );
 
-  const cleanedFiles =
-    FileManager.cleanupOrphanedMaterializedFiles(currentDependencies);
+  const cleanedFiles = FileManager.cleanupOrphanedMaterializedFiles(currentDependencies);
   if (cleanedFiles.length > 0) {
     result.cleaned = cleanedFiles;
     FileManager.removeFromLock(lock, cleanedFiles);
@@ -152,9 +137,9 @@ const printPullResults = ({
       console.log(
         chalk.green(
           `✓ Pulled ${chalk.cyan(`${name}@${versionSpec}`)} ${chalk.gray(
-            `(version ${version})`
-          )} → ${chalk.gray(displayPath)}`
-        )
+            `(version ${version})`,
+          )} → ${chalk.gray(displayPath)}`,
+        ),
       );
     }
   }
@@ -162,9 +147,7 @@ const printPullResults = ({
   if (result.cleaned.length > 0) {
     for (const name of result.cleaned) {
       console.log(
-        chalk.yellow(
-          `✓ Cleaned ${chalk.cyan(name)} (no longer in dependencies)`
-        )
+        chalk.yellow(`✓ Cleaned ${chalk.cyan(name)} (no longer in dependencies)`),
       );
     }
   }
@@ -181,12 +164,9 @@ const printPullResults = ({
     console.log(chalk.gray(`Pulled in ${duration}s, no changes`));
   } else {
     const summary = [];
-    if (result.fetched.length > 0)
-      summary.push(`${result.fetched.length} fetched`);
-    if (result.cleaned.length > 0)
-      summary.push(`${result.cleaned.length} cleaned`);
-    if (result.errors.length > 0)
-      summary.push(`${result.errors.length} errors`);
+    if (result.fetched.length > 0) summary.push(`${result.fetched.length} fetched`);
+    if (result.cleaned.length > 0) summary.push(`${result.cleaned.length} cleaned`);
+    if (result.errors.length > 0) summary.push(`${result.errors.length} errors`);
 
     console.log(chalk.gray(`Pulled ${summary.join(", ")} in ${duration}s`));
   }
@@ -229,13 +209,7 @@ export const pullCommand = async (options?: { tag?: string }): Promise<void> => 
     if (error instanceof PromptsError) {
       console.error(chalk.red(`Error: ${error.message}`));
     } else {
-      console.error(
-        chalk.red(
-          `Unexpected error: ${
-            formatApiErrorMessage({ error })
-          }`
-        )
-      );
+      console.error(chalk.red(`Unexpected error: ${formatApiErrorMessage({ error })}`));
     }
     process.exit(1);
   }

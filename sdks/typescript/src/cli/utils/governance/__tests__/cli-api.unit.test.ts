@@ -69,13 +69,13 @@ describe("cli-api — auth contract", () => {
         ...baseCfg(),
         access_token: undefined,
       };
-      await expect(
-        listIngestionSources(cfgNoToken, { fetchImpl }),
-      ).rejects.toMatchObject({
-        name: "GovernanceCliError",
-        status: 401,
-        code: "not_logged_in",
-      });
+      await expect(listIngestionSources(cfgNoToken, { fetchImpl })).rejects.toMatchObject(
+        {
+          name: "GovernanceCliError",
+          status: 401,
+          code: "not_logged_in",
+        },
+      );
       expect(fetchImpl).not.toHaveBeenCalled();
     });
   });
@@ -88,9 +88,7 @@ describe("cli-api — auth contract", () => {
       // `status` control-flow surface is unchanged; the CLI's composed
       // re-login message is reused verbatim.
       const { fetchImpl } = spyFetch(status(401, { error: "unauthorized" }));
-      await expect(
-        getGovernanceStatus(baseCfg(), { fetchImpl }),
-      ).rejects.toMatchObject({
+      await expect(getGovernanceStatus(baseCfg(), { fetchImpl })).rejects.toMatchObject({
         name: "LangWatchHandledError",
         status: 401,
         code: "unauthorized",
@@ -387,9 +385,7 @@ describe("cli-api — request shape", () => {
       };
       const { fetchImpl, seen } = spyFetch(ok(fixture));
       const out = await getGovernanceStatus(baseCfg(), { fetchImpl });
-      expect(seen[0]!.url).toBe(
-        "http://app.example/api/auth/cli/governance/status",
-      );
+      expect(seen[0]!.url).toBe("http://app.example/api/auth/cli/governance/status");
       expect(out).toEqual(fixture);
     });
   });
@@ -419,9 +415,7 @@ describe("cli-api — request shape", () => {
     });
 
     it("returns null on 404 — graceful degrade for older self-hosters without the REST adapter", async () => {
-      const { fetchImpl } = spyFetch(
-        status(404, { error_description: "Not found" }),
-      );
+      const { fetchImpl } = spyFetch(status(404, { error_description: "Not found" }));
       const out = await getCliBootstrap(baseCfg(), { fetchImpl });
       expect(out).toBeNull();
     });
@@ -435,9 +429,7 @@ describe("cli-api — request shape", () => {
 
     it("propagates 5xx errors with the status in the message", async () => {
       const { fetchImpl } = spyFetch(status(500, { msg: "boom" }));
-      await expect(getCliBootstrap(baseCfg(), { fetchImpl })).rejects.toThrow(
-        /500/,
-      );
+      await expect(getCliBootstrap(baseCfg(), { fetchImpl })).rejects.toThrow(/500/);
     });
   });
   describe("when the caller sets a request timeout", () => {
@@ -513,11 +505,9 @@ describe("cli-api — request shape", () => {
     it("posts to the route the app actually serves", async () => {
       const { fetchImpl, seen } = onlyRealRoutes();
 
-      const out = await cloneIngestionTemplateFromPlatform(
-        baseCfg(),
-        "tpl_platform",
-        { fetchImpl },
-      );
+      const out = await cloneIngestionTemplateFromPlatform(baseCfg(), "tpl_platform", {
+        fetchImpl,
+      });
 
       expect(seen[0]!.url).toBe(
         "http://app.example/api/governance/ingestion-templates/clone",

@@ -1,3 +1,4 @@
+# Stored Objects persistence and accounting: ../../packages/features/stored-object/adrs/001-package-boundary.md
 Feature: Trace media blob extraction at the ingestion edge
   As the LangWatch trace ingestion pipeline receiving spans whose message
   content embeds inline media bytes (base64 audio turns, data-URI images,
@@ -5,7 +6,7 @@ Feature: Trace media blob extraction at the ingestion edge
   I want those bytes externalized to the content-addressed stored-objects
   store at the earliest edge point, before the command is staged on the queue
   So that the queue, event_log, fold state, and ClickHouse carry lightweight
-  /api/files references instead of megabytes of base64, the same recording
+  durable StoredObjectReferences instead of megabytes of base64, the same recording
   captured by a scenario run and by its trace is stored exactly once, and the
   trace UIs can render players and previews instead of raw base64 dumps.
 
@@ -31,6 +32,9 @@ Feature: Trace media blob extraction at the ingestion edge
   #     content-addressing namespaced by project. A scenario run's audio turn
   #     and the same turn observed on a trace resolve to the same stored
   #     object id — stored once, referenced twice.
+  #   - Persisted trace shapes carry StoredObjectReference values. Trace read
+  #     and rendering adapters resolve fresh service-delivery capabilities at
+  #     the presentation boundary; `/api/files/...` is not persisted authority.
   #
   # Privacy interlock: the data-privacy content drop runs later, at the
   #   RecordSpanCommand choke point. Extracting at the edge for a project
@@ -39,14 +43,14 @@ Feature: Trace media blob extraction at the ingestion edge
   #   skips extraction entirely when any drop rule is configured — those
   #   projects keep today's behavior end to end.
   #
-  # Retention: stored_objects is content-addressed and currently GC-free — it
-  #   is not in RETENTION_TABLE_CATEGORY_MAP and not counted by the storage
-  #   meter, so extracted media outlives the trace's retention TTL. Until
-  #   stored-objects retention lands, the feature flag ships default OFF and
-  #   enabling it is an explicit per-project / per-deployment opt-in.
+  # Retention: Stored Objects is content-addressed and currently GC-free, so
+  #   extracted media outlives the trace's retention TTL. It is still counted
+  #   once in the project byte ledger. Until trace-owned retention cleanup lands,
+  #   the feature flag ships default OFF and enabling it is an explicit
+  #   per-project / per-deployment opt-in.
   #
   # Related: specs/features/scenarios/externalize-event-byte-content.feature
-  #   (scenario edge extraction), specs/event-sourcing/large-trace-blob-offload.feature
+  #   (scenario edge extraction), specs/trace-processing/large-trace-blob-offload.feature
   #   (ADR-022 spool + previews), specs/trace-processing/audio-player-in-traces.feature.
 
   Background:
@@ -64,7 +68,7 @@ Feature: Trace media blob extraction at the ingestion edge
       with a part {type:"file", mediaType:"audio/pcm16", data:"<base64 pcm>"}
     When the span is ingested through the collector
     Then the staged command's "langwatch.input" carries an input_audio part
-      referencing "/api/files/{projectId}/{id}" with no inline base64 data
+      carrying a durable StoredObjectReference with no inline base64 data
     And the decoded bytes are stored once under the project, addressed by their SHA-256
 
   @integration
@@ -80,14 +84,14 @@ Feature: Trace media blob extraction at the ingestion edge
   Scenario: A data-URI image inside an image_url part is externalized
     Given a span input message with a part {type:"image_url", image_url:{url:"data:image/png;base64,..."}}
     When the span is ingested
-    Then the staged part's image_url.url is "/api/files/{projectId}/{id}"
+    Then the staged part carries a durable StoredObjectReference instead of a delivery URL
     And the PNG bytes are stored content-addressed under the project
 
   @integration
   Scenario: A PDF file part is externalized to a binary reference preserving the filename
     Given a span output message with a part {type:"file", file:{filename:"report.pdf", file_data:"data:application/pdf;base64,..."}}
     When the span is ingested
-    Then the staged part is a binary reference with url "/api/files/{projectId}/{id}" and filename "report.pdf"
+    Then the staged part is a StoredObjectReference with filename "report.pdf"
     And no base64 remains in the staged command
 
   @integration
@@ -226,7 +230,7 @@ Feature: Trace media blob extraction at the ingestion edge
     Given a span whose media was externalized at the edge
     When the staged command is retried by the group queue
     Then the command still carries only the stored-object references
-    And re-running extraction over it is a no-op (parts already reference urls)
+    And re-running extraction over it is a no-op because parts already carry durable references
 
   @unit
   Scenario: Redacted trace content never leaks its media references

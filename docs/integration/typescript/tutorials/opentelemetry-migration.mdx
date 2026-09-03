@@ -22,11 +22,14 @@ You can migrate an existing OpenTelemetry setup to LangWatch and keep your custo
 The LangWatch observability SDK is built on OpenTelemetry and passes through all NodeSDK configuration options, making it easy to migrate from existing OpenTelemetry setups while maintaining all your custom configuration.
 
 <Info>
-LangWatch supports all OpenTelemetry NodeSDK configuration options, so you can migrate without losing any functionality or custom settings.
+  LangWatch supports all OpenTelemetry NodeSDK configuration options, so you can migrate
+  without losing any functionality or custom settings.
 </Info>
 
 <Note>
-For consistent attribute naming and semantic conventions, see our [Semantic Conventions](/integration/typescript/tutorials/semantic-conventions) guide which covers both OpenTelemetry standards and LangWatch's custom attributes.
+  For consistent attribute naming and semantic conventions, see our [Semantic
+  Conventions](/integration/typescript/tutorials/semantic-conventions) guide which covers
+  both OpenTelemetry standards and LangWatch's custom attributes.
 </Note>
 
 ## Complete NodeSDK Configuration
@@ -43,38 +46,38 @@ import { envDetector, processDetector, hostDetector } from "@opentelemetry/resou
 const handle = setupObservability({
   langwatch: {
     apiKey: process.env.LANGWATCH_API_KEY,
-    processorType: 'batch'
+    processorType: "batch",
   },
   serviceName: "my-service",
-  
+
   // All NodeSDK options are supported
   autoDetectResources: true,
   contextManager: undefined, // Use default
   textMapPropagator: new W3CTraceContextPropagator(),
   resourceDetectors: [envDetector, processDetector, hostDetector],
-  
+
   // Sampling strategy
   sampler: new TraceIdRatioBasedSampler(0.1), // Sample 10% of traces
-  
+
   // Span limits
   spanLimits: {
     attributeCountLimit: 128,
     eventCountLimit: 128,
-    linkCountLimit: 128
+    linkCountLimit: 128,
   },
-  
+
   // Auto-instrumentations
   instrumentations: [
     new HttpInstrumentation(),
     // Add other instrumentations as needed
   ],
-  
+
   // Advanced options
   advanced: {
     throwOnSetupError: false, // Don't throw on setup errors
     skipOpenTelemetrySetup: false, // Handle setup yourself
-    UNSAFE_forceOpenTelemetryReinitialization: false // Force reinit (dangerous)
-  }
+    UNSAFE_forceOpenTelemetryReinitialization: false, // Force reinit (dangerous)
+  },
 });
 ```
 
@@ -87,45 +90,47 @@ const handle = setupObservability({
   import { BatchSpanProcessor } from "@opentelemetry/sdk-trace-base";
   import { JaegerExporter } from "@opentelemetry/exporter-jaeger";
 
-  const sdk = new NodeSDK({
-    serviceName: "my-service",
-    spanProcessors: [
-      new BatchSpanProcessor(new JaegerExporter())
-    ],
-    instrumentations: [new HttpInstrumentation()],
-    sampler: new TraceIdRatioBasedSampler(0.1),
-    spanLimits: { attributeCountLimit: 128 }
-  });
+const sdk = new NodeSDK({
+serviceName: "my-service",
+spanProcessors: [
+new BatchSpanProcessor(new JaegerExporter())
+],
+instrumentations: [new HttpInstrumentation()],
+sampler: new TraceIdRatioBasedSampler(0.1),
+spanLimits: { attributeCountLimit: 128 }
+});
 
-  sdk.start();
-  ```
+sdk.start();
+
+````
 </Step>
 
 <Step title="After: Using LangWatch with Same Configuration">
-  ```typescript
-  import { setupObservability } from "langwatch/observability/node";
-  import { BatchSpanProcessor } from "@opentelemetry/sdk-trace-base";
-  import { JaegerExporter } from "@opentelemetry/exporter-jaeger";
+```typescript
+import { setupObservability } from "langwatch/observability/node";
+import { BatchSpanProcessor } from "@opentelemetry/sdk-trace-base";
+import { JaegerExporter } from "@opentelemetry/exporter-jaeger";
 
-  const handle = setupObservability({
-    langwatch: {
-      apiKey: process.env.LANGWATCH_API_KEY
-    },
-    serviceName: "my-service",
-    spanProcessors: [
-      new BatchSpanProcessor(new JaegerExporter())
-    ],
-    instrumentations: [new HttpInstrumentation()],
-    sampler: new TraceIdRatioBasedSampler(0.1),
-    spanLimits: { attributeCountLimit: 128 }
-  });
+const handle = setupObservability({
+  langwatch: {
+    apiKey: process.env.LANGWATCH_API_KEY
+  },
+  serviceName: "my-service",
+  spanProcessors: [
+    new BatchSpanProcessor(new JaegerExporter())
+  ],
+  instrumentations: [new HttpInstrumentation()],
+  sampler: new TraceIdRatioBasedSampler(0.1),
+  spanLimits: { attributeCountLimit: 128 }
+});
 
-  // Graceful shutdown
-  process.on('SIGTERM', async () => {
-    await handle.shutdown();
-    process.exit(0);
-  });
-  ```
+// Graceful shutdown
+process.on('SIGTERM', async () => {
+  await handle.shutdown();
+  process.exit(0);
+});
+````
+
 </Step>
 </Steps>
 
@@ -134,7 +139,10 @@ const handle = setupObservability({
 Implement sophisticated sampling strategies for different use cases:
 
 ```typescript
-import { TraceIdRatioBasedSampler, ParentBasedSampler } from "@opentelemetry/sdk-trace-base";
+import {
+  TraceIdRatioBasedSampler,
+  ParentBasedSampler,
+} from "@opentelemetry/sdk-trace-base";
 
 // Sample based on trace ID ratio
 const ratioSampler = new TraceIdRatioBasedSampler(0.1); // 10% sampling
@@ -150,10 +158,10 @@ const parentBasedSampler = new ParentBasedSampler({
 
 const handle = setupObservability({
   langwatch: {
-    apiKey: process.env.LANGWATCH_API_KEY
+    apiKey: process.env.LANGWATCH_API_KEY,
   },
   serviceName: "my-service",
-  sampler: parentBasedSampler
+  sampler: parentBasedSampler,
 });
 ```
 
@@ -170,20 +178,22 @@ const customResource = new Resource({
   [SemanticResourceAttributes.SERVICE_VERSION]: "1.0.0",
   [SemanticResourceAttributes.DEPLOYMENT_ENVIRONMENT]: process.env.NODE_ENV,
   "custom.team": "ai-platform",
-  "custom.datacenter": "us-west-2"
+  "custom.datacenter": "us-west-2",
 });
 
 const handle = setupObservability({
   langwatch: {
-    apiKey: process.env.LANGWATCH_API_KEY
+    apiKey: process.env.LANGWATCH_API_KEY,
   },
   serviceName: "my-service",
-  resource: customResource
+  resource: customResource,
 });
 ```
 
 <Tip>
-For consistent attribute naming and TypeScript autocomplete support, consider using LangWatch's semantic conventions. See our [Semantic Conventions](/integration/typescript/tutorials/semantic-conventions) guide for details.
+  For consistent attribute naming and TypeScript autocomplete support, consider using
+  LangWatch's semantic conventions. See our [Semantic
+  Conventions](/integration/typescript/tutorials/semantic-conventions) guide for details.
 </Tip>
 
 ## Custom Instrumentations
@@ -197,17 +207,17 @@ import { MongoDBInstrumentation } from "@opentelemetry/instrumentation-mongodb";
 
 const handle = setupObservability({
   langwatch: {
-    apiKey: process.env.LANGWATCH_API_KEY
+    apiKey: process.env.LANGWATCH_API_KEY,
   },
   serviceName: "my-service",
   instrumentations: [
     new HttpInstrumentation({
-      ignoreIncomingPaths: ['/health', '/metrics'],
-      ignoreOutgoingUrls: ['https://external-service.com/health']
+      ignoreIncomingPaths: ["/health", "/metrics"],
+      ignoreOutgoingUrls: ["https://external-service.com/health"],
     }),
     new ExpressInstrumentation(),
-    new MongoDBInstrumentation()
-  ]
+    new MongoDBInstrumentation(),
+  ],
 });
 ```
 
@@ -220,18 +230,15 @@ import { W3CTraceContextPropagator, W3CBaggagePropagator } from "@opentelemetry/
 import { CompositePropagator } from "@opentelemetry/core";
 
 const compositePropagator = new CompositePropagator({
-  propagators: [
-    new W3CTraceContextPropagator(),
-    new W3CBaggagePropagator()
-  ]
+  propagators: [new W3CTraceContextPropagator(), new W3CBaggagePropagator()],
 });
 
 const handle = setupObservability({
   langwatch: {
-    apiKey: process.env.LANGWATCH_API_KEY
+    apiKey: process.env.LANGWATCH_API_KEY,
   },
   serviceName: "my-service",
-  textMapPropagator: compositePropagator
+  textMapPropagator: compositePropagator,
 });
 ```
 
@@ -244,60 +251,58 @@ const getObservabilityConfig = (environment: string) => {
   const baseConfig = {
     serviceName: "my-service",
     langwatch: {
-      apiKey: process.env.LANGWATCH_API_KEY
-    }
+      apiKey: process.env.LANGWATCH_API_KEY,
+    },
   };
 
   switch (environment) {
-    case 'development':
+    case "development":
       return {
         ...baseConfig,
         langwatch: {
           ...baseConfig.langwatch,
-          processorType: 'simple'
+          processorType: "simple",
         },
         debug: {
           consoleTracing: true,
-          logLevel: 'debug'
-        }
+          logLevel: "debug",
+        },
       };
-    
-    case 'staging':
+
+    case "staging":
       return {
         ...baseConfig,
         langwatch: {
           ...baseConfig.langwatch,
-          processorType: 'batch'
+          processorType: "batch",
         },
         sampler: new TraceIdRatioBasedSampler(0.5), // 50% sampling
         debug: {
           consoleTracing: false,
-          logLevel: 'info'
-        }
+          logLevel: "info",
+        },
       };
-    
-    case 'production':
+
+    case "production":
       return {
         ...baseConfig,
         langwatch: {
           ...baseConfig.langwatch,
-          processorType: 'batch'
+          processorType: "batch",
         },
         sampler: new TraceIdRatioBasedSampler(0.1), // 10% sampling
         debug: {
           consoleTracing: false,
-          logLevel: 'warn'
-        }
+          logLevel: "warn",
+        },
       };
-    
+
     default:
       return baseConfig;
   }
 };
 
-const handle = setupObservability(
-  getObservabilityConfig(process.env.NODE_ENV)
-);
+const handle = setupObservability(getObservabilityConfig(process.env.NODE_ENV));
 ```
 
 ## Performance Tuning
@@ -308,31 +313,34 @@ Optimize performance for high-volume applications:
 const handle = setupObservability({
   langwatch: {
     apiKey: process.env.LANGWATCH_API_KEY,
-    processorType: 'batch'
+    processorType: "batch",
   },
   serviceName: "my-service",
-  
+
   // Performance tuning
   spanLimits: {
     attributeCountLimit: 64, // Reduce attribute count
-    eventCountLimit: 32,     // Reduce event count
-    linkCountLimit: 32       // Reduce link count
+    eventCountLimit: 32, // Reduce event count
+    linkCountLimit: 32, // Reduce link count
   },
-  
+
   // Sampling for high volume
   sampler: new TraceIdRatioBasedSampler(0.05), // 5% sampling
-  
+
   // Batch processing configuration
   spanProcessors: [
-    new BatchSpanProcessor(new LangWatchExporter({
-      apiKey: process.env.LANGWATCH_API_KEY
-    }), {
-      maxQueueSize: 4096,
-      maxExportBatchSize: 1024,
-      scheduledDelayMillis: 1000,
-      exportTimeoutMillis: 30000
-    })
-  ]
+    new BatchSpanProcessor(
+      new LangWatchExporter({
+        apiKey: process.env.LANGWATCH_API_KEY,
+      }),
+      {
+        maxQueueSize: 4096,
+        maxExportBatchSize: 1024,
+        scheduledDelayMillis: 1000,
+        exportTimeoutMillis: 30000,
+      },
+    ),
+  ],
 });
 ```
 
@@ -348,11 +356,13 @@ const handle = setupObservability({
 </Step>
 
 <Step title="Verify Data Flow">
-  Ensure traces are appearing in LangWatch dashboard with correct attributes and structure.
+  Ensure traces are appearing in LangWatch dashboard with correct attributes and
+  structure.
 </Step>
 
 <Step title="Performance Testing">
-  Monitor application performance impact and adjust sampling/processing settings as needed.
+  Monitor application performance impact and adjust sampling/processing settings as
+  needed.
 </Step>
 
 <Step title="Gradual Rollout">
@@ -380,21 +390,21 @@ const handle = setupObservability({
 </Accordion>
 
 <Accordion title="Missing Traces">
-  **Problem**: No traces appearing in LangWatch dashboard.
-  
-  **Solution**: Verify API key configuration, check network connectivity to LangWatch endpoints, and ensure spans are being created and ended properly.
+  **Problem**: No traces appearing in LangWatch dashboard. **Solution**: Verify API key
+  configuration, check network connectivity to LangWatch endpoints, and ensure spans are
+  being created and ended properly.
 </Accordion>
 
 <Accordion title="Performance Degradation">
-  **Problem**: Application performance impacted after migration.
-  
-  **Solution**: Adjust sampling rates, optimize batch processing settings, and monitor memory usage of span processors.
+  **Problem**: Application performance impacted after migration. **Solution**: Adjust
+  sampling rates, optimize batch processing settings, and monitor memory usage of span
+  processors.
 </Accordion>
 
 <Accordion title="Context Loss">
-  **Problem**: Span context not propagating across async boundaries.
-  
-  **Solution**: Verify context propagation configuration and ensure proper async context management in your code.
+  **Problem**: Span context not propagating across async boundaries. **Solution**: Verify
+  context propagation configuration and ensure proper async context management in your
+  code.
 </Accordion>
 
 <Accordion title="Instrumentation Conflicts">
@@ -412,17 +422,17 @@ Enable detailed logging during migration to identify issues:
 // Enable detailed logging during migration
 const handle = setupObservability({
   langwatch: {
-    apiKey: process.env.LANGWATCH_API_KEY
+    apiKey: process.env.LANGWATCH_API_KEY,
   },
   serviceName: "my-service",
   debug: {
     consoleTracing: true,
     consoleLogging: true,
-    logLevel: 'debug'
+    logLevel: "debug",
   },
   advanced: {
-    throwOnSetupError: true
-  }
+    throwOnSetupError: true,
+  },
 });
 ```
 
@@ -434,11 +444,13 @@ const handle = setupObservability({
 </Card>
 
 <Card title="Enhanced Features" icon="features">
-  Gain access to LangWatch's specialized LLM observability features while keeping your existing setup.
+  Gain access to LangWatch's specialized LLM observability features while keeping your
+  existing setup.
 </Card>
 
 <Card title="Gradual Migration" icon="gradual">
-  Migrate at your own pace with the ability to run both systems in parallel during transition.
+  Migrate at your own pace with the ability to run both systems in parallel during
+  transition.
 </Card>
 
 <Card title="Production Ready" icon="production">
@@ -447,5 +459,7 @@ const handle = setupObservability({
 </CardGroup>
 
 <Info>
-The migration process is designed to be non-disruptive. You can run your existing OpenTelemetry setup alongside LangWatch during the transition period to ensure everything works correctly.
+  The migration process is designed to be non-disruptive. You can run your existing
+  OpenTelemetry setup alongside LangWatch during the transition period to ensure
+  everything works correctly.
 </Info>

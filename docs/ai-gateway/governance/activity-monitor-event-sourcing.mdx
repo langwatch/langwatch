@@ -73,8 +73,8 @@ withMapProjection().withSubscriber()` builder, the same
 
 Gateway and activity events have different aggregate semantics from
 traces. A trace is a multi-span aggregate that folds into a
-`TraceSummaryData` over its lifetime. An activity event is a *single
-completed observation* of upstream platform behaviour, with no
+`TraceSummaryData` over its lifetime. An activity event is a _single
+completed observation_ of upstream platform behaviour, with no
 multi-event aggregate to fold across; each event already has
 final cost, tokens, and actor when it arrives.
 
@@ -99,9 +99,9 @@ aggregateId:    EventId  (one event = one aggregate, no fold across events)
 tenantId:       IngestionSource.id  (matches gateway_activity_events.TenantId)
 ```
 
-The fold projection (`anomalyWindow`) aggregates *across* aggregates
+The fold projection (`anomalyWindow`) aggregates _across_ aggregates
 within a tenant, keyed by tenant and rolling window, rather than
-folding events *into* one aggregate. Trace-processing folds spans
+folding events _into_ one aggregate. Trace-processing folds spans
 into a trace summary; this fold tallies per-tenant rolling spend,
 request count, and per-actor breakdown for the past N minutes or
 hours. Same machinery, different aggregate semantics.
@@ -175,12 +175,12 @@ The redesign ships as four slices, C0 through C3:
 
 ## Test strategy per slice
 
-| Slice | BDD spec | Integration test | Manual check |
-|-------|----------|------------------|--------------|
-| C0 (this) | anomaly-detection.feature updated | n/a (doc + schema) | architecture review in-channel |
-| C1 | activity-monitor pipeline scenarios in `activity-monitor.feature` | pipeline test: append event → projection fires → CH row | curl → 202 → CH SELECT |
-| C2 | spend_spike scenario in anomaly-detection.feature | subscriber test: violating fold state → AnomalyAlert.upsert called | UI rule + violating event → /governance shows alert |
-| C3 | dispatch scenarios in anomaly-detection.feature | subscriber test: dispatch helper called with right shape | webhook receives canonical body |
+| Slice     | BDD spec                                                          | Integration test                                                   | Manual check                                        |
+| --------- | ----------------------------------------------------------------- | ------------------------------------------------------------------ | --------------------------------------------------- |
+| C0 (this) | anomaly-detection.feature updated                                 | n/a (doc + schema)                                                 | architecture review in-channel                      |
+| C1        | activity-monitor pipeline scenarios in `activity-monitor.feature` | pipeline test: append event → projection fires → CH row            | curl → 202 → CH SELECT                              |
+| C2        | spend_spike scenario in anomaly-detection.feature                 | subscriber test: violating fold state → AnomalyAlert.upsert called | UI rule + violating event → /governance shows alert |
+| C3        | dispatch scenarios in anomaly-detection.feature                   | subscriber test: dispatch helper called with right shape           | webhook receives canonical body                     |
 
 Each slice ships its own BDD and integration coverage before code
 lands. The production architecture is subscriber-only: `evaluateNow`

@@ -1,8 +1,5 @@
 import { describe, expect, it } from "vitest";
-import {
-  MAX_VALIDATION_ISSUES,
-  validationMeta,
-} from "../validation/validationMeta";
+import { MAX_VALIDATION_ISSUES, validationMeta } from "../validation/validationMeta";
 
 /**
  * The issues are hand-built rather than produced by zod on purpose: this
@@ -40,9 +37,7 @@ describe("validationMeta", () => {
     };
 
     it("names the failing path with array indices", () => {
-      expect(validationMeta(error)?.issues[0]?.path).toBe(
-        "spans[0].timestamps.started_at",
-      );
+      expect(validationMeta(error)?.issues[0]?.path).toBe("spans[0].timestamps.started_at");
     });
 
     /** @scenario A field of the wrong type reports both types by name */
@@ -82,6 +77,69 @@ describe("validationMeta", () => {
     });
   });
 
+  // The shapes below are captured verbatim from zod 4.4.3, which renamed the
+  // codes the cases above match. This package takes no zod dependency on
+  // purpose, so these stand in for the real emitter; without them the zod 4
+  // branches read as covered while never having run.
+  describe("when zod 4 reports a rejected enum", () => {
+    const error = {
+      issues: [
+        {
+          code: "invalid_value",
+          values: ["llm", "chain", "tool"],
+          path: ["spans", 0, "type"],
+          message: 'Invalid option: expected one of "llm"|"chain"|"tool"',
+        },
+      ],
+    };
+
+    /** @scenario A rejected enum reports the options without the value */
+    it("names the options the schema allows", () => {
+      expect(validationMeta(error)?.issues[0]?.options).toEqual(["llm", "chain", "tool"]);
+    });
+
+    it("carries no value that arrived", () => {
+      expect(validationMeta(error)?.issues[0]?.received).toBeUndefined();
+    });
+  });
+
+  describe("when zod 4 reports a rejected discriminator", () => {
+    const error = {
+      issues: [
+        {
+          code: "invalid_union",
+          note: "No matching discriminator",
+          discriminator: "type",
+          options: ["llm", "chain"],
+          path: ["spans", 0, "type"],
+          message: "Invalid discriminator value. Expected 'llm' | 'chain'",
+        },
+      ],
+    };
+
+    it("names the options the schema allows", () => {
+      expect(validationMeta(error)?.issues[0]?.options).toEqual(["llm", "chain"]);
+    });
+  });
+
+  describe("when zod 4 reports a malformed string", () => {
+    const error = {
+      issues: [
+        {
+          origin: "string",
+          code: "invalid_format",
+          format: "email",
+          path: ["contact"],
+          message: "Invalid email address",
+        },
+      ],
+    };
+
+    it("names the rule that rejected it", () => {
+      expect(validationMeta(error)?.issues[0]?.rule).toBe("email");
+    });
+  });
+
   describe("when a value is not one of the allowed options", () => {
     const error = {
       issues: [
@@ -98,11 +156,7 @@ describe("validationMeta", () => {
 
     /** @scenario A rejected enum reports the options without the value */
     it("names the options the schema allows", () => {
-      expect(validationMeta(error)?.issues[0]?.options).toEqual([
-        "llm",
-        "chain",
-        "tool",
-      ]);
+      expect(validationMeta(error)?.issues[0]?.options).toEqual(["llm", "chain", "tool"]);
     });
 
     it("omits the value that arrived", () => {
@@ -184,6 +238,35 @@ describe("validationMeta", () => {
   });
 
   describe("when the failure is a union", () => {
+    it("follows the Zod 4 branch issues so the real reasons are visible", () => {
+      // Zod 4 hangs the arms' issue arrays off `errors`, not a `ZodError` per
+      // arm off `unionErrors`. Reading only the Zod 3 spelling reported the
+      // collector's every union rejection as a bare `invalid_union` at `<root>`.
+      const error = {
+        issues: [
+          {
+            code: "invalid_union",
+            path: [],
+            errors: [
+              [
+                {
+                  code: "invalid_type",
+                  path: ["timestamps", "started_at"],
+                  expected: "number",
+                  received: "string",
+                },
+              ],
+            ],
+          },
+        ],
+      };
+
+      const meta = validationMeta(error);
+      expect(meta?.issueCount).toBe(2);
+      expect(meta?.issues.map((i) => i.code)).toEqual(["invalid_union", "invalid_type"]);
+      expect(meta?.issues.map((i) => i.path)).toEqual(["<root>", "timestamps.started_at"]);
+    });
+
     it("follows the branch errors so the real reasons are visible", () => {
       const error = {
         issues: [
@@ -208,10 +291,7 @@ describe("validationMeta", () => {
 
       const meta = validationMeta(error);
       expect(meta?.issueCount).toBe(2);
-      expect(meta?.issues.map((i) => i.code)).toEqual([
-        "invalid_union",
-        "invalid_type",
-      ]);
+      expect(meta?.issues.map((i) => i.code)).toEqual(["invalid_union", "invalid_type"]);
     });
   });
 

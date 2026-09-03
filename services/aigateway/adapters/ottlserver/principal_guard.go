@@ -35,7 +35,7 @@ import (
 // MUST NOT be rewritten by OTTL.
 //
 // Keep in sync with the TS-side registry at
-// platform/app/ee/governance/services/governanceAttributeKeys.ts —
+// packages/enterprise/features/governance/contract/src/governance-attributes.ts —
 // every key the governance pipeline treats as principal-binding
 // belongs here.
 var protectedAttributeKeys = []string{

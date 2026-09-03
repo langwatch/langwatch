@@ -6,10 +6,7 @@ import type {
   ScenarioVersionListResponse,
   UpdateScenarioBody,
 } from "./types";
-import {
-  createLangWatchApiClient,
-  type LangwatchApiClient,
-} from "@/internal/api/client";
+import { createLangWatchApiClient, type LangwatchApiClient } from "@/internal/api/client";
 import { type InternalConfig } from "@/client-sdk/types";
 import { ScenariosApiError } from "./errors";
 import {
@@ -25,9 +22,13 @@ export class ScenariosApiService {
   }
 
   private handleApiError(operation: string, error: unknown): never {
-    const message = formatApiErrorForOperation({ operation: operation, error: error, options: {
-      status: extractStatusFromResponse(error),
-    } });
+    const message = formatApiErrorForOperation({
+      operation: operation,
+      error: error,
+      options: {
+        status: extractStatusFromResponse(error),
+      },
+    });
     throw new ScenariosApiError(message, operation, error);
   }
 
@@ -41,8 +42,7 @@ export class ScenariosApiService {
     const { data, error } = await this.apiClient.GET("/api/scenarios/{id}", {
       params: { path: { id } },
     });
-    if (error)
-      this.handleApiError(`fetch scenario with ID "${id}"`, error);
+    if (error) this.handleApiError(`fetch scenario with ID "${id}"`, error);
     return data;
   }
 
@@ -59,8 +59,7 @@ export class ScenariosApiService {
       params: { path: { id } },
       body: params,
     });
-    if (error)
-      this.handleApiError(`update scenario with ID "${id}"`, error);
+    if (error) this.handleApiError(`update scenario with ID "${id}"`, error);
     return data;
   }
 
@@ -104,14 +103,10 @@ export class ScenariosApiService {
   }
 
   async delete(id: string): Promise<DeleteScenarioResponse> {
-    const { data, error } = await this.apiClient.DELETE(
-      "/api/scenarios/{id}",
-      {
-        params: { path: { id } },
-      },
-    );
-    if (error)
-      this.handleApiError(`delete scenario with ID "${id}"`, error);
+    const { data, error } = await this.apiClient.DELETE("/api/scenarios/{id}", {
+      params: { path: { id } },
+    });
+    if (error) this.handleApiError(`delete scenario with ID "${id}"`, error);
     return data;
   }
 }

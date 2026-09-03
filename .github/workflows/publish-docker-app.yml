@@ -8,7 +8,7 @@ on:
       tag:
         description: 'Custom image tag (default: "next")'
         required: false
-        default: 'next'
+        default: "next"
 
 # A publish run drains — the reasoning is spelled out in prerelease-charts-oci.
 # Re-running a release (or dispatching the same tag twice) otherwise has two

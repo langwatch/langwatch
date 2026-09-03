@@ -13,7 +13,7 @@ import (
 // node_modules stale. Part of up's automatic preparation: a failed install
 // fails the up, because every service would otherwise fail later and worse.
 //
-// Takes the WORKSPACE ROOT, not platform/app/. Since ADR-076 the repo is a single
+// Takes the WORKSPACE ROOT. Since ADR-076 the repo is a single
 // pnpm workspace: the lockfile and node_modules live at the root and langwatch/
 // has neither. Pointed at langwatch/ this silently did nothing at all —
 // depsStale found no lockfile there and read that as "nothing to install", so

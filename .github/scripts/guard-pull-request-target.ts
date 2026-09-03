@@ -34,9 +34,7 @@ const workflowFiles = (repoRoot: string): string[] => {
 };
 
 export const jobBlocks = (lines: string[]): JobBlock[] => {
-  const jobsStart = lines.findIndex((line) =>
-    /^jobs:\s*(?:#.*)?$/.test(line),
-  );
+  const jobsStart = lines.findIndex((line) => /^jobs:\s*(?:#.*)?$/.test(line));
   if (jobsStart === -1) {
     return [];
   }
@@ -86,19 +84,14 @@ const stripYamlComment = (line: string): string => {
 };
 
 export const usesPullRequestTarget = (lines: string[]): boolean =>
-  lines.some((line) =>
-    /(^|[{,\s])pull_request_target\s*:/.test(stripYamlComment(line)),
-  );
+  lines.some((line) => /(^|[{,\s])pull_request_target\s*:/.test(stripYamlComment(line)));
 
 const hasUnsafeCheckout = (jobText: string): boolean =>
   jobText.includes("actions/checkout") &&
   unsafeHeadRefPatterns.some((pattern) => jobText.includes(pattern));
 
 export const hasSensitivePermissions = (text: string): boolean => {
-  const uncommentedText = text
-    .split(/\r?\n/)
-    .map(stripYamlComment)
-    .join("\n");
+  const uncommentedText = text.split(/\r?\n/).map(stripYamlComment).join("\n");
 
   return [
     /(^|\n)permissions:\s*write-all\b/,
@@ -111,9 +104,7 @@ export const usesNonGithubTokenSecret = (text: string): boolean =>
   /secrets\.(?!GITHUB_TOKEN\b)[A-Za-z0-9_]+/.test(text);
 
 export const jobIfExpression = (job: JobBlock): string | undefined => {
-  const fieldPattern = new RegExp(
-    `^(\\s{${job.indent + 1},})([A-Za-z0-9_-]+):\\s*`,
-  );
+  const fieldPattern = new RegExp(`^(\\s{${job.indent + 1},})([A-Za-z0-9_-]+):\\s*`);
   const fieldIndent = job.lines.reduce<number | undefined>((minimum, line) => {
     const match = fieldPattern.exec(line);
     const indent = match?.[1]?.length;
@@ -135,9 +126,7 @@ export const jobIfExpression = (job: JobBlock): string | undefined => {
   const firstLine = job.lines[ifStart] ?? "";
   const firstValue = stripYamlComment(firstLine.replace(ifPattern, ""));
   const ifLines =
-    /^(?:[>|][+-]?)?$/.test(firstValue) || firstValue === ""
-      ? []
-      : [firstValue];
+    /^(?:[>|][+-]?)?$/.test(firstValue) || firstValue === "" ? [] : [firstValue];
 
   for (let index = ifStart + 1; index < job.lines.length; index++) {
     const line = job.lines[index] ?? "";
@@ -193,9 +182,7 @@ const main = (): number => {
       continue;
     }
 
-    const workflowHasSensitivePermissions = hasSensitivePermissions(
-      lines.join("\n"),
-    );
+    const workflowHasSensitivePermissions = hasSensitivePermissions(lines.join("\n"));
 
     for (const job of jobBlocks(lines)) {
       const jobText = job.lines.join("\n");
@@ -204,9 +191,7 @@ const main = (): number => {
         workflowHasSensitivePermissions || hasSensitivePermissions(jobText)
           ? "has write permissions"
           : undefined,
-        usesNonGithubTokenSecret(jobText)
-          ? "uses non-GITHUB_TOKEN secrets"
-          : undefined,
+        usesNonGithubTokenSecret(jobText) ? "uses non-GITHUB_TOKEN secrets" : undefined,
       ].filter((risk) => risk !== undefined);
 
       if (risks.length > 0 && !hasSafeGate(job)) {

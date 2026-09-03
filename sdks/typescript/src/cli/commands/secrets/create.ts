@@ -22,9 +22,12 @@ import type { CommandResult } from "../../utils/output";
  */
 export const createSecretCommand = async (
   name: string,
-  options: { value: string }
+  options: { value: string },
 ): Promise<CommandResult | void> => {
-  await resolveCredentials();
+  const credentials = await resolveCredentials();
+  if (!credentials.projectId) {
+    throw new Error("A project must be selected for secret operations");
+  }
 
   if (!/^[A-Z][A-Z0-9_]*$/.test(name)) {
     reportCommandError({
@@ -36,19 +39,22 @@ export const createSecretCommand = async (
   }
 
   const apiKey = scopedApiKey() ?? process.env.LANGWATCH_API_KEY ?? "";
-  const endpoint =
-    resolveControlPlaneUrl();
+  const endpoint = resolveControlPlaneUrl();
 
   const spinner = createSpinner(`Creating secret "${name}"...`).start();
 
   try {
-    const response = await fetch(`${endpoint}/api/secrets`, {
+    const response = await fetch(`${endpoint}/api/v1/secret`, {
       method: "POST",
       headers: {
         "Content-Type": "application/json",
         ...buildAuthHeaders({ apiKey }),
       },
-      body: JSON.stringify({ name, value: options.value }),
+      body: JSON.stringify({
+        projectId: credentials.projectId,
+        name,
+        value: options.value,
+      }),
     });
 
     if (!response.ok) {

@@ -20,11 +20,10 @@ export const promptRestoreCommand = async (
   await resolveCredentials();
 
   const apiKey = scopedApiKey() ?? process.env.LANGWATCH_API_KEY ?? "";
-  const endpoint =
-    resolveControlPlaneUrl();
+  const endpoint = resolveControlPlaneUrl();
 
   const spinner = createSpinner(
-    `Restoring "${handle}" to version ${versionId}...`
+    `Restoring "${handle}" to version ${versionId}...`,
   ).start();
 
   try {
@@ -36,7 +35,7 @@ export const promptRestoreCommand = async (
           "Content-Type": "application/json",
           ...buildAuthHeaders({ apiKey }),
         },
-      }
+      },
     );
 
     if (!response.ok) {
@@ -55,19 +54,17 @@ export const promptRestoreCommand = async (
       commitMessage: string | null;
     };
 
-    spinner.succeed(
-      `Restored "${handle}" — new version v${restored.version} created`
-    );
+    spinner.succeed(`Restored "${handle}" — new version v${restored.version} created`);
 
     return {
       data: restored,
       table: () => {
         console.log();
         console.log(
-          `  ${chalk.gray("New version:")} ${chalk.cyan(`v${restored.version}`)}`
+          `  ${chalk.gray("New version:")} ${chalk.cyan(`v${restored.version}`)}`,
         );
         console.log(
-          `  ${chalk.gray("Message:")}     ${restored.commitMessage ?? chalk.gray("—")}`
+          `  ${chalk.gray("Message:")}     ${restored.commitMessage ?? chalk.gray("—")}`,
         );
         console.log();
       },

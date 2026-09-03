@@ -86,8 +86,7 @@ describe("parseRoutingTable", () => {
     describe("when the name has a single separator", () => {
       it("does not flag it", () => {
         expect(
-          parseRoutingTable({ CLICKHOUSE_URL__org_1: "http://x:8123" })
-            .ambiguous,
+          parseRoutingTable({ CLICKHOUSE_URL__org_1: "http://x:8123" }).ambiguous,
         ).toEqual([]);
       });
     });
@@ -110,24 +109,21 @@ describe("parseRoutingTable", () => {
 describe("createTenantRouter", () => {
   describe("given an invalid cache bound", () => {
     describe("when the router is built", () => {
-      it.each([
-        0,
-        -1,
-        2.5,
-        Number.NaN,
-        Number.POSITIVE_INFINITY,
-      ])("refuses to be built with %s", (maxCacheEntries) => {
-        // `cache.size >= NaN` and `>= Infinity` are both false forever, so an
-        // unvalidated value removes the bound and lets a long-lived worker
-        // grow the map for the life of the process.
-        expect(() =>
-          createTenantRouter({
-            table: tableOf({}),
-            directory: directoryOf({}),
-            maxCacheEntries,
-          }),
-        ).toThrow(RangeError);
-      });
+      it.each([0, -1, 2.5, Number.NaN, Number.POSITIVE_INFINITY])(
+        "refuses to be built with %s",
+        (maxCacheEntries) => {
+          // `cache.size >= NaN` and `>= Infinity` are both false forever, so an
+          // unvalidated value removes the bound and lets a long-lived worker
+          // grow the map for the life of the process.
+          expect(() =>
+            createTenantRouter({
+              table: tableOf({}),
+              directory: directoryOf({}),
+              maxCacheEntries,
+            }),
+          ).toThrow(RangeError);
+        },
+      );
     });
   });
 
@@ -184,9 +180,7 @@ describe("createTenantRouter", () => {
         const directory = { organizationForTenant: vi.fn() };
         const router = createTenantRouter({ table: tableOf({}), directory });
 
-        await expect(router.route("")).rejects.toBeInstanceOf(
-          UnknownTenantError,
-        );
+        await expect(router.route("")).rejects.toBeInstanceOf(UnknownTenantError);
         expect(directory.organizationForTenant).not.toHaveBeenCalled();
       });
     });

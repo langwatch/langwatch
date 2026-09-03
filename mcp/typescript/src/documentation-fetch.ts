@@ -5,7 +5,10 @@ const MAX_DOCUMENTATION_BYTES = 2 * 1024 * 1024;
 const DOCUMENTATION_TIMEOUT_MS = 30_000;
 const DOCUMENTATION_CONTENT_TYPES = new Set(["text/markdown", "text/plain"]);
 
-const DOCUMENTATION_CONFIG: Record<DocumentationKind, { defaultPath: string; namespace: string }> = {
+const DOCUMENTATION_CONFIG: Record<
+  DocumentationKind,
+  { defaultPath: string; namespace: string }
+> = {
   langwatch: {
     defaultPath: "/docs/llms.txt",
     namespace: "/docs",
@@ -18,7 +21,7 @@ const DOCUMENTATION_CONFIG: Record<DocumentationKind, { defaultPath: string; nam
 
 function documentationUrlError(namespace: string): Error {
   return new Error(
-    `Only a trusted LangWatch documentation URL under ${TRUSTED_DOCUMENTATION_ORIGIN}${namespace}/ may be fetched`
+    `Only a trusted LangWatch documentation URL under ${TRUSTED_DOCUMENTATION_ORIGIN}${namespace}/ may be fetched`,
   );
 }
 
@@ -67,7 +70,7 @@ export function resolveDocumentationUrl(kind: DocumentationKind, input?: string)
 export async function fetchDocumentation(
   kind: DocumentationKind,
   input?: string,
-  fetchImplementation: typeof fetch = fetch
+  fetchImplementation: typeof fetch = fetch,
 ): Promise<string> {
   const url = resolveDocumentationUrl(kind, input);
   const response = await fetchImplementation(url, {
@@ -78,7 +81,8 @@ export async function fetchDocumentation(
     throw new Error(`Documentation request failed with status ${response.status}`);
   }
 
-  const contentType = response.headers.get("content-type")?.split(";", 1)[0]?.trim() ?? "";
+  const contentType =
+    response.headers.get("content-type")?.split(";", 1)[0]?.trim() ?? "";
   if (!DOCUMENTATION_CONTENT_TYPES.has(contentType)) {
     throw new Error("Documentation response has an unexpected content type");
   }

@@ -1,0 +1,101 @@
+/**
+ * The two actions of the run dialog: leave it, or queue the run.
+ *
+ * Only the run is solid: it is the one thing the dialog is open for, and it
+ * names how many scenarios it starts. A run plan is a name and a
+ * configuration, and running is what writes both down, so there is nothing to
+ * save on its own.
+ *
+ * @see specs/features/agent-testing/run-dialog.feature
+ */
+
+import { Box, chakra } from "@chakra-ui/react";
+import { Play } from "lucide-react";
+import { Dialog } from "@langwatch/workflow-web/components/ui/dialog";
+import { FG_MUTED, QUIET_BUTTON_SHADOW } from "../../../../model/agent-testing/shared/design";
+import { SmallButton } from "../../../elements/agent-testing/shared/small-button";
+import type { RunDialogController } from "./use-run-dialog-submit";
+import { Tooltip } from "@langwatch/design-system/tooltip";
+
+/**
+ * What the run control reads, given how many scenarios the subject covers
+ * and, in a comparison, how many targets it goes against.
+ */
+export function runButtonLabel({
+  caseCount,
+  targetCount,
+}: {
+  caseCount: number | null;
+  targetCount: number;
+}): string {
+  if (caseCount === null) return "Run";
+  const scenarios = caseCount === 1 ? "Run 1 scenario" : `Run ${caseCount} scenarios`;
+  return targetCount > 1 ? `${scenarios} × ${targetCount} targets` : scenarios;
+}
+
+export function RunDialogFooter({
+  controller,
+  isRunBlocked,
+  caseCount,
+  targetCount,
+  blockedReason,
+  onClose,
+}: {
+  controller: RunDialogController;
+  isRunBlocked: boolean;
+  /** How many scenarios the run covers, or nothing when it is not known. */
+  caseCount: number | null;
+  /** How many targets the run goes against. */
+  targetCount: number;
+  /** Why the run cannot start, when it cannot. Shown as the button tooltip. */
+  blockedReason: string | null;
+  onClose: () => void;
+}) {
+  const runButton = (
+    <SmallButton
+      variant="solid"
+      colorPalette="blue"
+      disabled={isRunBlocked}
+      loading={controller.isBusy}
+      onClick={() => void controller.run()}
+      data-testid="run-dialog-run"
+    >
+      <Play size={13} />
+      {runButtonLabel({ caseCount, targetCount })}
+    </SmallButton>
+  );
+  return (
+    <Dialog.Footer borderTopWidth="1px" borderColor="border" paddingX={5} paddingY={3} gap={2}>
+      <Box flex={1} />
+      <chakra.button
+        type="button"
+        onClick={onClose}
+        disabled={controller.isBusy}
+        paddingX={3}
+        height="28px"
+        borderRadius="lg"
+        fontSize="12px"
+        fontWeight="medium"
+        color={FG_MUTED}
+        cursor="pointer"
+        boxShadow={QUIET_BUTTON_SHADOW}
+        _hover={{ background: "bg.muted", color: "fg" }}
+        _disabled={{ cursor: "not-allowed", opacity: 0.5 }}
+      >
+        Cancel
+      </chakra.button>
+      {isRunBlocked && blockedReason ? (
+        <Tooltip content={blockedReason}>
+          {/* A disabled button never dispatches pointer events, which would
+              keep the tooltip from firing; wrap it in a span so the hover
+              still lands on something. */}
+          <Box as="span" display="inline-flex">
+            {runButton}
+          </Box>
+        </Tooltip>
+      ) : (
+        runButton
+      )}
+    </Dialog.Footer>
+  );
+}

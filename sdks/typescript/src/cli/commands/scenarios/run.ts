@@ -52,9 +52,7 @@ export const runScenarioCommand = async (
         targets,
         ...(repeatCount !== undefined ? { repeatCount } : {}),
       },
-      ...(options.idempotencyKey
-        ? { idempotencyKey: options.idempotencyKey }
-        : {}),
+      ...(options.idempotencyKey ? { idempotencyKey: options.idempotencyKey } : {}),
       ...(parameters ? { parameters } : {}),
       ...(note ? { note } : {}),
     };

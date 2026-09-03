@@ -64,7 +64,7 @@ function normalizeEndpoint(endpoint: string): string {
   return trimmed.slice(0, end);
 }
 
-export function initConfig(args: { apiKey?: string; endpoint?: string }): void {
+export function initConfig(args: { apiKey?: string; endpoint?: string; projectId?: string }): void {
   const state = getGlobalState();
   state.globalConfig = {
     apiKey: args.apiKey || process.env.LANGWATCH_API_KEY,
@@ -72,19 +72,35 @@ export function initConfig(args: { apiKey?: string; endpoint?: string }): void {
       normalizeEndpoint(args.endpoint ?? "") ||
       normalizeEndpoint(process.env.LANGWATCH_ENDPOINT ?? "") ||
       "https://app.langwatch.ai",
-    projectId: process.env.LANGWATCH_PROJECT_ID,
+    projectId: args.projectId ?? process.env.LANGWATCH_PROJECT_ID,
   };
+}
+
+/**
+ * The current config, or undefined when there is none: the per-request scoped
+ * config if inside a `runWithConfig()` callback, otherwise the global one.
+ *
+ * For the caller that is ASKING rather than demanding. A host embedding this
+ * server initialises the config on a cold process, and the way to find out
+ * whether it still has to used to be to call `getConfig()` and catch — which
+ * printed a synthesized stack trace to the console first, on every boot, for
+ * the entirely normal case of not having been initialised yet.
+ */
+export function tryGetConfig(): McpConfig | undefined {
+  const state = getGlobalState();
+  return state.configStorage.getStore() ?? state.globalConfig;
 }
 
 /**
  * Returns the current config: the per-request scoped config if inside
  * a `runWithConfig()` callback, otherwise the global config.
+ *
+ * Throws when there is none, because every caller of this one needs it to
+ * proceed. A caller that can carry on without it asks `tryGetConfig()`.
  */
 export function getConfig(): McpConfig {
-  const state = getGlobalState();
-  const scoped = state.configStorage.getStore();
-  if (scoped) return scoped;
-  if (!state.globalConfig) {
+  const config = tryGetConfig();
+  if (!config) {
     console.error(
       "[MCP config] getConfig() failed: globalConfig is null, no scoped config active. " +
         "Was initConfig() called? Stack:",
@@ -92,7 +108,7 @@ export function getConfig(): McpConfig {
     );
     throw new Error("Config not initialized");
   }
-  return state.globalConfig;
+  return config;
 }
 
 export function requireApiKey(): string {
@@ -107,7 +123,7 @@ export function requireApiKey(): string {
       new Error().stack,
     );
     throw new Error(
-      "LANGWATCH_API_KEY is required. Set it via --apiKey flag or LANGWATCH_API_KEY environment variable."
+      "LANGWATCH_API_KEY is required. Set it via --apiKey flag or LANGWATCH_API_KEY environment variable.",
     );
   }
   return config.apiKey;

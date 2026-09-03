@@ -22,10 +22,7 @@ export class TracesService {
     /**
      * Wraps the service in a tracing proxy via the decorator.
      */
-    return createTracingProxy(
-      this as TracesService,
-      tracer,
-    );
+    return createTracingProxy(this as TracesService, tracer);
   }
 
   /**
@@ -38,14 +35,10 @@ export class TracesService {
     const errorMessage =
       typeof error === "string"
         ? error
-        : error?.error ?? error?.message ?? "Unknown error occurred";
+        : (error?.error ?? error?.message ?? "Unknown error occurred");
     const message = `Failed to ${operation}: ${errorMessage}`;
 
-    throw new TracesError(
-      message,
-      operation,
-      error,
-    );
+    throw new TracesError(message, operation, error);
   }
 
   /**
@@ -55,10 +48,7 @@ export class TracesService {
    * @returns The trace response object.
    * @throws {TracesError} If the API call fails.
    */
-  async get(
-    traceId: string,
-    params?: GetTraceParams,
-  ): Promise<GetTraceResponse> {
+  async get(traceId: string, params?: GetTraceParams): Promise<GetTraceResponse> {
     const { data, error } = await this.config.langwatchApiClient.GET("/api/trace/{id}", {
       params: {
         path: {

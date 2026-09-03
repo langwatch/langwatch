@@ -1,13 +1,12 @@
 import {
   HandledError,
   isZodLikeError,
+  serializedHandledErrorSchema,
   ValidationError,
   type ZodLikeError,
 } from "@langwatch/handled-error";
 import type { Context } from "hono";
 import type { ContentfulStatusCode } from "hono/utils/http-status";
-
-import { httpStatusText } from "./types.js";
 
 // ---------------------------------------------------------------------------
 // Zod error mapping
@@ -28,6 +27,85 @@ class SchemaFailure extends HandledError {
   constructor(meta: { field: string; type: string; message: string }) {
     super("schema_failure", meta.message, { meta, httpStatus: 422 });
     this.name = "SchemaFailure";
+  }
+}
+
+export class ProjectInputMismatchError extends HandledError {
+  constructor() {
+    super(
+      "project_input_mismatch",
+      "The requested project is not the project authorized for this request",
+      { httpStatus: 403 },
+    );
+    this.name = "ProjectInputMismatchError";
+  }
+}
+
+/**
+ * The request named a tenant its credential did not resolve to.
+ *
+ * Distinct from {@link ProjectInputMismatchError} only in which scope was
+ * named; that one keeps its own code because customers already see it. `meta`
+ * carries the field name so a client can mark the offending input, and
+ * nothing else: which organization or team the credential DOES cover is the
+ * question the refusal exists to withhold.
+ */
+export class ScopeInputMismatchError extends HandledError {
+  constructor(scope: string) {
+    super(
+      "scope_input_mismatch",
+      "The requested scope is not the scope authorized for this request",
+      { httpStatus: 403, meta: { field: scope } },
+    );
+    this.name = "ScopeInputMismatchError";
+  }
+}
+
+export class AuthenticatedActorRequiredError extends HandledError {
+  constructor() {
+    super("authenticated_actor_required", "This operation requires a credential bound to a user", {
+      httpStatus: 403,
+    });
+    this.name = "AuthenticatedActorRequiredError";
+  }
+}
+
+export class ApiVersionConflictError extends HandledError {
+  constructor() {
+    super("api_version_conflict", "The API version in the URL and header must match", {
+      httpStatus: 400,
+    });
+    this.name = "ApiVersionConflictError";
+  }
+}
+
+export class InvalidApiVersionError extends HandledError {
+  constructor(expected = "latest or a real date in YYYY-MM-DD form") {
+    super("invalid_api_version", `The API version must be ${expected}`, { httpStatus: 400 });
+    this.name = "InvalidApiVersionError";
+  }
+}
+
+export class ApiVersionUnavailableError extends HandledError {
+  constructor() {
+    super("api_version_unavailable", "The requested API version is not available", {
+      httpStatus: 404,
+    });
+    this.name = "ApiVersionUnavailableError";
+  }
+}
+
+export class EndpointWithdrawnError extends HandledError {
+  constructor() {
+    super("endpoint_withdrawn", "This endpoint has been removed", { httpStatus: 410 });
+    this.name = "EndpointWithdrawnError";
+  }
+}
+
+export class RateLimitedError extends HandledError {
+  constructor() {
+    super("rate_limited", "Too many requests", { httpStatus: 429, retryable: true });
+    this.name = "RateLimitedError";
   }
 }
 
@@ -64,8 +142,6 @@ function validationErrorFromZod(err: ZodLikeError): ValidationError {
 // ---------------------------------------------------------------------------
 
 interface ErrorResponseBody {
-  /** Present only for unversioned (backwards-compat) responses. */
-  error?: string;
   code: string;
   /**
    * Always equal to `code`. The Go envelope calls the discriminant `type`
@@ -82,6 +158,7 @@ interface ErrorResponseBody {
    */
   kind?: string;
   message: string;
+  retryable: boolean;
   meta?: Record<string, unknown>;
   reasons?: unknown[];
   traceId?: string;
@@ -95,13 +172,10 @@ interface ErrorResponseBody {
 function finalizeErrorResponse({
   status,
   body,
-  isVersioned,
 }: {
   status: ContentfulStatusCode;
   body: ErrorResponseBody;
-  isVersioned: boolean;
 }): { status: ContentfulStatusCode; body: ErrorResponseBody } {
-  if (!isVersioned) body.error = httpStatusText(status);
   // Emit the deprecated `kind` alias alongside `code` so clients still reading
   // the old discriminant keep working through the transition. See
   // ErrorResponseBody.kind. `type` mirrors the Go envelope's name for the same
@@ -111,24 +185,41 @@ function finalizeErrorResponse({
   return { status, body };
 }
 
-function handledErrorToResponse({
-  err,
-  isVersioned,
-}: {
-  err: HandledError;
-  isVersioned: boolean;
-}): { status: ContentfulStatusCode; body: ErrorResponseBody } {
-  const serialized = err.serialize();
+function handledErrorToResponse({ err }: { err: HandledError }): {
+  status: ContentfulStatusCode;
+  body: ErrorResponseBody;
+} {
+  let serialized: ReturnType<typeof HandledError.serializeTrusted>;
+  try {
+    const candidate = HandledError.serializeTrusted(err);
+    const json = JSON.stringify(candidate);
+    if (json === void 0) {
+      return internalErrorResponse();
+    }
+    const wire: unknown = JSON.parse(json);
+    const parsed = serializedHandledErrorSchema.safeParse(wire);
+    if (!parsed.success) {
+      return internalErrorResponse();
+    }
+    serialized = parsed.data;
+  } catch {
+    return internalErrorResponse();
+  }
+
+  const status = serialized.httpStatus;
+  if (!validHttpStatus(status)) {
+    return internalErrorResponse();
+  }
+
   return finalizeErrorResponse({
-    status: serialized.httpStatus as ContentfulStatusCode,
-    isVersioned,
+    status,
     body: {
       code: serialized.code,
       // The code, never `err.message`. A HandledError's message is server copy
-      // — it can name env vars, hostnames or internal services (ADR-045) — and
-      // this body goes to external API callers. Consumers that need prose read
-      // `tips` / `docsUrl`, which are authored for exactly that.
+      // and the body is externally visible. Trusted handled metadata remains
+      // lossless; untrusted exceptions never reach this branch.
       message: serialized.code,
+      retryable: serialized.retryable,
       meta: serialized.meta,
       reasons: serialized.reasons,
       traceId: serialized.traceId,
@@ -144,54 +235,68 @@ function handledErrorToResponse({
 /**
  * Formats an error into a JSON response body + status code.
  *
- * @param isVersioned - Whether the request was made through a versioned path.
- *   Versioned requests get the new format only; unversioned get a union
- *   format that includes the legacy `error` field.
+ * There is exactly one error format (ADR 002 §5): the version-gated union
+ * envelope carrying the legacy `error` field died with the bare alias that
+ * justified it.
  */
-function formatError({
-  err,
-  isVersioned,
-}: {
-  err: unknown;
-  isVersioned: boolean;
-}): { status: ContentfulStatusCode; body: ErrorResponseBody } {
+function formatError({ err }: { err: unknown }): {
+  status: ContentfulStatusCode;
+  body: ErrorResponseBody;
+} {
   // 1. Handled errors -- the domain's own vocabulary, safe to show a caller.
-  if (HandledError.isHandled(err)) {
-    return handledErrorToResponse({ err, isVersioned });
+  if (isTrustedHandledError(err)) {
+    return handledErrorToResponse({ err });
   }
 
   // 2. ZodError -- promoted to a ValidationError so it travels the same path.
-  //    Matched by shape, so a route whose schema is on `zod/v4` is promoted
-  //    the same as one still on v3; an `instanceof` would see only one major
-  //    and drop the other's rejections through to the unknown-error 500 below.
+  //    Matched by shape so portable contracts do not depend on the identity of
+  //    the particular Zod runtime instance that created the error.
   if (isZodLikeError(err)) {
     return handledErrorToResponse({
       err: validationErrorFromZod(err),
-      isVersioned,
     });
   }
 
-  // 3. Error with `status` property (e.g. Hono HTTPException)
+  // 3. Error with `status` property (e.g. Hono HTTPException). Its message is
+  // untrusted: an adapter may put a downstream response body in it.
   const errObj = err as Record<string, unknown>;
   if (err instanceof Error && typeof errObj.status === "number") {
-    const status = errObj.status as ContentfulStatusCode;
+    const status = validHttpStatus(errObj.status) ? errObj.status : 500;
     return finalizeErrorResponse({
       status,
-      isVersioned,
       body: {
         code: status >= 500 ? "internal_error" : "http_error",
-        message: status >= 500 ? "An unknown error occurred" : err.message,
+        message: status >= 500 ? "internal_error" : "http_error",
+        retryable: false,
       },
     });
   }
 
   // 4. Unknown errors -- 500
+  return internalErrorResponse();
+}
+
+function internalErrorResponse(): {
+  status: ContentfulStatusCode;
+  body: ErrorResponseBody;
+} {
   const status: ContentfulStatusCode = 500;
   return finalizeErrorResponse({
     status,
-    isVersioned,
-    body: { code: "internal_error", message: "An unknown error occurred" },
+    body: {
+      code: "internal_error",
+      message: "An unknown error occurred",
+      retryable: false,
+    },
   });
+}
+
+function isTrustedHandledError(error: unknown): error is HandledError {
+  return HandledError.isHandled(error);
+}
+
+function validHttpStatus(value: number): value is ContentfulStatusCode {
+  return Number.isInteger(value) && value >= 400 && value <= 599;
 }
 
 // ---------------------------------------------------------------------------
@@ -231,30 +336,25 @@ export interface ResolvedError {
 /**
  * Creates the `app.onError(...)` handler for the service framework.
  *
- * Reads `c.get("isVersionedRequest")` to decide the response format, and
- * records the error it sent plus the status it sent it as on the context, so
+ * Records the error it sent plus the status it sent it as on the context, so
  * the request logger reports what the caller actually received.
  *
  * This handler does not log. `loggerMiddleware` writes exactly one error
  * record per failed request, from the resolved pair published here — a second
  * record from this side would double every error-log-derived alert and count.
  */
-export function createErrorHandler(): (
-  err: Error,
-  c: Context,
-) => Response | Promise<Response> {
+export function createErrorHandler(): (err: Error, c: Context) => Response | Promise<Response> {
   return (err: Error, c: Context) => {
-    const isVersioned = c.get("isVersionedRequest") === true;
     // Promote first so the response and the log agree on one error. Reporting
     // the raw ZodError would log it as unhandled, at `error`, against the 500
     // it no longer is.
     const effective = isZodLikeError(err) ? validationErrorFromZod(err) : err;
-    const { status, body } = formatError({ err: effective, isVersioned });
+    const { status, body } = formatError({ err: effective });
 
     const resolved: ResolvedError = {
       status,
       error: effective,
-      ...(HandledError.isHandled(effective) && effective.traceId
+      ...(isTrustedHandledError(effective) && effective.traceId
         ? { traceId: effective.traceId }
         : {}),
     };
@@ -264,4 +364,4 @@ export function createErrorHandler(): (
   };
 }
 
-export { formatError, SchemaFailure, validationErrorFromZod };
+export { formatError, isTrustedHandledError, SchemaFailure, validationErrorFromZod };

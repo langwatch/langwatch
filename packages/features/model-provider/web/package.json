@@ -1,0 +1,106 @@
+{
+  "name": "@langwatch/model-provider-web",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Browser-safe Model Providers and Model Costs screens, presentation and client contracts.",
+  "files": [
+    "src"
+  ],
+  "type": "module",
+  "exports": {
+    "./components/ModelSelector": {
+      "types": "./src/ui/elements/model-selector.tsx",
+      "default": "./src/ui/elements/model-selector.tsx"
+    },
+    "./components/NoModelsConfiguredCallout": {
+      "types": "./src/ui/elements/no-models-configured-callout.tsx",
+      "default": "./src/ui/elements/no-models-configured-callout.tsx"
+    },
+    "./components/ProviderModelSelector": {
+      "types": "./src/ui/elements/provider-model-selector.tsx",
+      "default": "./src/ui/elements/provider-model-selector.tsx"
+    },
+    "./components/icons/AISparklesLoader": {
+      "types": "./src/ui/elements/icons/ai-sparkles-loader.tsx",
+      "default": "./src/ui/elements/icons/ai-sparkles-loader.tsx"
+    },
+    "./components/icons/Copy": {
+      "types": "./src/ui/elements/icons/copy.tsx",
+      "default": "./src/ui/elements/icons/copy.tsx"
+    },
+    "./components/icons/History": {
+      "types": "./src/ui/elements/icons/history.tsx",
+      "default": "./src/ui/elements/icons/history.tsx"
+    },
+    "./components/modelProviders/iconsMap": {
+      "types": "./src/ui/elements/modelProviders/icons-map.tsx",
+      "default": "./src/ui/elements/modelProviders/icons-map.tsx"
+    },
+    "./drawers": {
+      "types": "./src/ui/sections/drawers.ts",
+      "default": "./src/ui/sections/drawers.ts"
+    },
+    "./hooks/useModelLimits": {
+      "types": "./src/behavior/use-model-limits.ts",
+      "default": "./src/behavior/use-model-limits.ts"
+    },
+    "./hooks/useModelProvidersSettings": {
+      "types": "./src/behavior/use-model-providers-settings.ts",
+      "default": "./src/behavior/use-model-providers-settings.ts"
+    },
+    "./screens/model-provider": {
+      "types": "./src/screens/model-provider/index.ts",
+      "default": "./src/screens/model-provider/index.ts"
+    },
+    "./utils/clampMaxTokens": {
+      "types": "./src/model/clamp-max-tokens.ts",
+      "default": "./src/model/clamp-max-tokens.ts"
+    }
+  },
+  "scripts": {
+    "typecheck": "tsc --noEmit",
+    "test": "vitest run",
+    "test:unit": "vitest run"
+  },
+  "dependencies": {
+    "@langwatch/authz-web": "workspace:*",
+    "@langwatch/design-system": "workspace:*",
+    "@langwatch/enterprise-managed-provider-web": "workspace:*",
+    "@langwatch/feature-flag-contract": "workspace:*",
+    "@langwatch/handled-error": "workspace:*",
+    "@langwatch/model-provider-contract": "workspace:*",
+    "@langwatch/platform-api-client": "workspace:*",
+    "@langwatch/prompt-web": "workspace:*",
+    "@langwatch/ui-drawer": "workspace:*",
+    "@langwatch/workflow-web": "workspace:*",
+    "@tanstack/react-query": "5.101.4",
+    "lucide-react": "^1.22.0",
+    "react-hook-form": "^7.65.0",
+    "react-icons": "^5.7.0",
+    "safe-regex2": "^5.1.1",
+    "use-debounce": "^10.0.6",
+    "zod": "^4.4.3",
+    "zod-validation-error": "^5.0.0",
+    "zustand": "^4.5.7"
+  },
+  "devDependencies": {
+    "@chakra-ui/react": "^3.36.0",
+    "@emotion/react": "^11.14.0",
+    "@testing-library/jest-dom": "^7.0.1",
+    "@testing-library/react": "^16.3.2",
+    "@testing-library/user-event": "14.6.1",
+    "@types/react": "^19.2.14",
+    "@types/react-dom": "^19.2.3",
+    "jsdom": "^30.0.1",
+    "react": "^19.2.7",
+    "react-dom": "^19.2.7",
+    "typescript": "^7.0.2",
+    "vitest": "^4.1.9"
+  },
+  "peerDependencies": {
+    "@chakra-ui/react": "^3.36.0",
+    "@emotion/react": "^11.14.0",
+    "react": "^19.2.7",
+    "react-dom": "^19.2.7"
+  }
+}

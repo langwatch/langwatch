@@ -239,7 +239,7 @@ jobs:
           go-version-file: go.mod
           cache-dependency-path: go.sum
 
-      # BLOCKING, on the same "clean baseline earns a gate" rule the Biome
+      # BLOCKING, on the same "clean baseline earns a gate" rule the oxlint
       # rules in this branch follow. The baseline is zero as of the go.mod bump
       # that accompanies this file — `go 1.26.2 -> 1.26.5` plus grpc, x/text
       # and the otel v1 family, which together cleared all 13 findings this

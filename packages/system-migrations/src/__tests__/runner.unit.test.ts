@@ -39,9 +39,7 @@ class FakeStateRepository implements SystemMigrationStateRepository {
     this.records.set(this.key(record.migrationName, record.tenantId), record);
   }
 
-  async upsertRecordUnlessRolledBack(
-    record: TenantMigrationRecord,
-  ): Promise<boolean> {
+  async upsertRecordUnlessRolledBack(record: TenantMigrationRecord): Promise<boolean> {
     const key = this.key(record.migrationName, record.tenantId);
     if (this.records.get(key)?.status === "rolled_back") return false;
     this.records.set(key, record);
@@ -60,10 +58,7 @@ class FakeLeaseRepository implements MigrationLeaseRepository {
   /** Two repositories over one holder table: two processes, one Redis. */
   static shared(): [FakeLeaseRepository, FakeLeaseRepository] {
     const holders = new Map<string, symbol>();
-    return [
-      new FakeLeaseRepository(holders),
-      new FakeLeaseRepository(holders),
-    ];
+    return [new FakeLeaseRepository(holders), new FakeLeaseRepository(holders)];
   }
 
   async acquire({ name }: { name: string; ttlMs: number }): Promise<boolean> {
@@ -153,9 +148,7 @@ describe("SystemMigrationRunnerService", () => {
       const [summaryA, summaryB] = await Promise.all([
         runnerA.runPass(),
         // Give runner A the first tick so the race is deterministic.
-        new Promise((resolve) => setTimeout(resolve, 5)).then(() =>
-          runnerB.runPass(),
-        ),
+        new Promise((resolve) => setTimeout(resolve, 5)).then(() => runnerB.runPass()),
       ]);
 
       expect(summaryA.finalized).toBe(1);
@@ -201,9 +194,7 @@ describe("SystemMigrationRunnerService", () => {
       // The LAST organization still finishes before the slow first one: a
       // pool keeps pulling past the straggler, where a chunked convoy would
       // hold the tail behind org-00's sleep.
-      expect(completed.indexOf("org-11")).toBeLessThan(
-        completed.indexOf("org-00"),
-      );
+      expect(completed.indexOf("org-11")).toBeLessThan(completed.indexOf("org-00"));
     });
   });
 
@@ -255,9 +246,7 @@ describe("SystemMigrationRunnerService", () => {
       const summary = await runner.runPass();
 
       expect(migrate).toHaveBeenCalledTimes(1);
-      expect(migrate).toHaveBeenCalledWith(
-        expect.objectContaining({ tenantId: "acme" }),
-      );
+      expect(migrate).toHaveBeenCalledWith(expect.objectContaining({ tenantId: "acme" }));
       expect(summary?.skipped).toBe(1);
       expect(
         await state.findRecord({ migrationName: "m1", tenantId: "globex" }),
@@ -362,8 +351,7 @@ describe("SystemMigrationRunnerService", () => {
       expect(migrate).not.toHaveBeenCalled();
       expect(summary?.alreadyRolledBack).toBe(1);
       expect(
-        (await state.findRecord({ migrationName: "m1", tenantId: "acme" }))
-          ?.status,
+        (await state.findRecord({ migrationName: "m1", tenantId: "acme" }))?.status,
       ).toBe("rolled_back");
     });
   });
@@ -400,8 +388,7 @@ describe("SystemMigrationRunnerService", () => {
       expect(migrate).not.toHaveBeenCalled();
       expect(summary?.alreadyRolledBack).toBe(1);
       expect(
-        (await state.findRecord({ migrationName: "m1", tenantId: "acme" }))
-          ?.status,
+        (await state.findRecord({ migrationName: "m1", tenantId: "acme" }))?.status,
       ).toBe("rolled_back");
     });
   });
@@ -477,8 +464,7 @@ describe("SystemMigrationRunnerService", () => {
       // A `parked` row would be retried on the next pass and re-finalized -
       // the exact undo the pin exists to prevent.
       expect(
-        (await state.findRecord({ migrationName: "m1", tenantId: "acme" }))
-          ?.status,
+        (await state.findRecord({ migrationName: "m1", tenantId: "acme" }))?.status,
       ).toBe("rolled_back");
     });
   });
@@ -537,12 +523,8 @@ describe("SystemMigrationRunnerService", () => {
         tenants: tenantSourceOf(["acme", "globex"]),
         cohort: () => true,
         migrations: [
-          migrationOf("m1", ({ tenantId }) =>
-            migrationBody({ tenantId, name: "m1" }),
-          ),
-          migrationOf("m2", ({ tenantId }) =>
-            migrationBody({ tenantId, name: "m2" }),
-          ),
+          migrationOf("m1", ({ tenantId }) => migrationBody({ tenantId, name: "m1" })),
+          migrationOf("m2", ({ tenantId }) => migrationBody({ tenantId, name: "m2" })),
         ],
         leaseTtlMs: 50,
         leaseRenewIntervalMs: 5,

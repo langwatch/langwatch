@@ -28,21 +28,36 @@ import { MoreVertical } from "lucide-react";
     </Button>
   </Menu.Trigger>
   <Menu.Content>
-    <Menu.Item value="edit" onClick={(e) => { e.stopPropagation(); onEdit(row); }}>
+    <Menu.Item
+      value="edit"
+      onClick={(e) => {
+        e.stopPropagation();
+        onEdit(row);
+      }}
+    >
       Edit
     </Menu.Item>
-    <Menu.Item value="toggle" onClick={(e) => { e.stopPropagation(); onToggle(row); }}>
+    <Menu.Item
+      value="toggle"
+      onClick={(e) => {
+        e.stopPropagation();
+        onToggle(row);
+      }}
+    >
       {row.enabled ? "Disable" : "Enable"}
     </Menu.Item>
     <Menu.Item
       value="delete"
       color="red.500"
-      onClick={(e) => { e.stopPropagation(); onDelete(row); }}
+      onClick={(e) => {
+        e.stopPropagation();
+        onDelete(row);
+      }}
     >
       Delete
     </Menu.Item>
   </Menu.Content>
-</Menu.Root>
+</Menu.Root>;
 ```
 
 Rules:

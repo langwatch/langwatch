@@ -1,0 +1,141 @@
+import { HStack, Input, Text } from "@chakra-ui/react";
+import { X } from "lucide-react";
+import { useRef, useState } from "react";
+
+type ScenarioInlineTagsInputProps = {
+  value: string[];
+  onChange: (value: string[]) => void;
+  placeholder?: string;
+};
+
+/** Inline labels committed on comma, Enter or blur. */
+export function ScenarioInlineTagsInput({
+  value,
+  onChange,
+  placeholder = "Add label...",
+}: ScenarioInlineTagsInputProps) {
+  const [inputValue, setInputValue] = useState("");
+  const inputRef = useRef<HTMLInputElement>(null);
+
+  const addLabel = (label: string) => {
+    const trimmed = label.trim();
+    if (trimmed && !value.includes(trimmed)) {
+      onChange([...value, trimmed]);
+    }
+    setInputValue("");
+  };
+
+  const handleRemove = (index: number) => {
+    onChange(value.filter((_, i) => i !== index));
+  };
+
+  const handleKeyDown = (e: React.KeyboardEvent<HTMLInputElement>) => {
+    if (e.key === "Enter" || e.key === ",") {
+      e.preventDefault();
+      addLabel(inputValue);
+    }
+    if (e.key === "Backspace" && inputValue === "" && value.length > 0) {
+      // Remove last tag when pressing backspace on empty input
+      onChange(value.slice(0, -1));
+    }
+  };
+
+  const handleBlur = () => {
+    // Auto-add label when user clicks away
+    if (inputValue.trim()) {
+      addLabel(inputValue);
+    }
+  };
+
+  const handleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const val = e.target.value;
+    // If user types a comma, add the label immediately
+    if (val.includes(",")) {
+      const parts = val.split(",");
+      parts.forEach((part, i) => {
+        if (i < parts.length - 1) {
+          addLabel(part);
+        } else {
+          setInputValue(part);
+        }
+      });
+    } else {
+      setInputValue(val);
+    }
+  };
+
+  return (
+    <HStack
+      flexWrap="wrap"
+      gap={2}
+      align="center"
+      padding={2}
+      borderWidth="1px"
+      borderColor="border"
+      borderRadius="md"
+      minHeight="40px"
+      cursor="text"
+      onClick={() => inputRef.current?.focus()}
+      _focusWithin={{
+        borderColor: "blue.subtle",
+        boxShadow: "0 0 0 1px var(--chakra-colors-blue-subtle)",
+      }}
+    >
+      {value.map((tag, index) => (
+        <HStack
+          key={index}
+          bg="blue.subtle"
+          color="blue.fg"
+          px={2}
+          py={0.5}
+          borderRadius="md"
+          fontSize="sm"
+          gap={1}
+        >
+          <Text>{tag}</Text>
+          <button
+            type="button"
+            aria-label={`Remove ${tag} label`}
+            onClick={(e) => {
+              e.stopPropagation();
+              handleRemove(index);
+            }}
+            style={{
+              cursor: "pointer",
+              display: "flex",
+              alignItems: "center",
+              background: "transparent",
+              border: "none",
+              color: "var(--chakra-colors-blue-fg)",
+            }}
+            onMouseOver={(e) =>
+              (e.currentTarget.style.color = "var(--chakra-colors-blue-emphasized)")
+            }
+            onMouseOut={(e) =>
+              (e.currentTarget.style.color = "var(--chakra-colors-blue-fg)")
+            }
+          >
+            <X size={12} />
+          </button>
+        </HStack>
+      ))}
+
+      <Input
+        ref={inputRef}
+        size="sm"
+        variant="flushed"
+        border="none"
+        width="auto"
+        minWidth="100px"
+        flex={1}
+        value={inputValue}
+        onChange={handleChange}
+        onKeyDown={handleKeyDown}
+        onBlur={handleBlur}
+        placeholder={value.length === 0 ? placeholder : ""}
+        _placeholder={{ color: "fg.subtle" }}
+        _focus={{ boxShadow: "none" }}
+      />
+    </HStack>
+  );
+}

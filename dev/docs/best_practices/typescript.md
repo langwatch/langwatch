@@ -9,8 +9,8 @@
 
   ```typescript
   // Bad: positional parameters
-  runScenario(scenarioId, target, setId)
+  runScenario(scenarioId, target, setId);
 
   // Good: named parameters via object destructuring
-  runScenario({ scenarioId, target, setId })
+  runScenario({ scenarioId, target, setId });
   ```

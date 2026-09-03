@@ -1,6 +1,6 @@
 import { OTLPTraceExporter } from "@opentelemetry/exporter-trace-otlp-http";
 import { type ReadableSpan } from "@opentelemetry/sdk-trace-base";
-import { type ExportResult } from '@opentelemetry/core';
+import { type ExportResult } from "@opentelemetry/core";
 import {
   DEFAULT_ENDPOINT,
   LANGWATCH_SDK_LANGUAGE,
@@ -183,10 +183,7 @@ export class LangWatchTraceExporter extends OTLPTraceExporter {
   constructor(opts?: LangWatchTraceExporterOptions) {
     const apiKey = opts?.apiKey ?? process.env.LANGWATCH_API_KEY ?? "";
     const projectId = opts?.projectId ?? process.env.LANGWATCH_PROJECT_ID;
-    const endpoint =
-      opts?.endpoint ??
-      process.env.LANGWATCH_ENDPOINT ??
-      DEFAULT_ENDPOINT;
+    const endpoint = opts?.endpoint ?? process.env.LANGWATCH_ENDPOINT ?? DEFAULT_ENDPOINT;
 
     const url = new URL(TRACES_PATH, endpoint);
     const otelEndpoint = url.toString();
@@ -203,7 +200,10 @@ export class LangWatchTraceExporter extends OTLPTraceExporter {
     });
 
     // Handle filters: null or [] = no filtering, undefined = default, array = use provided
-    if (opts?.filters === null || (Array.isArray(opts?.filters) && opts.filters.length === 0)) {
+    if (
+      opts?.filters === null ||
+      (Array.isArray(opts?.filters) && opts.filters.length === 0)
+    ) {
       this.filters = [];
     } else if (Array.isArray(opts?.filters)) {
       this.filters = opts.filters;

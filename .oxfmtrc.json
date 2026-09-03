@@ -1,0 +1,33 @@
+{
+  "$schema": "./node_modules/oxfmt/configuration_schema.json",
+  "printWidth": 100,
+  "tabWidth": 2,
+  "useTabs": false,
+  "semi": true,
+  "singleQuote": false,
+  "trailingComma": "all",
+  "ignorePatterns": [
+    "**/node_modules/**",
+    "**/dist/**",
+    "**/build/**",
+    "**/coverage/**",
+    "**/.next/**",
+    "**/generated/**",
+    "packages/features/analytics/contract/src/visualization/vega-lite-schema-validator.generated.js",
+    "packages/features/analytics/contract/src/visualization/vega-lite-schema-validator.generated.d.ts",
+    "packages/features/langy/server/src/services/setup-skill-bodies.generated.ts",
+    "specs/webhooks/signature-vectors.json",
+    "**/*.min.*",
+    "**/testdata/**",
+    "**/fixtures/**",
+    "**/__fixtures__/**",
+    "charts/**/templates/**",
+    "docs/docs.json",
+    "specs/langy/langy-keys-plan.md",
+    "specs/langy/langy-pr4-plan.md",
+    "**/vendor/**",
+    "pnpm-lock.yaml",
+    "package-lock.json",
+    "yarn.lock"
+  ]
+}

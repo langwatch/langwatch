@@ -1,13 +1,13 @@
 # Trace edit overlay: corrections stored beside an immutable trace
 #
 # Implementation:
-#   platform/app/src/server/traces/edit-overlay/traceEditOverlay.schemas.ts    (patch contract, version 1)
-#   platform/app/src/server/traces/edit-overlay/applyTraceEditOverlay.ts       (pure appliers)
-#   platform/app/src/server/traces/edit-overlay/traceEditOverlay.repository.ts (one row per project + trace)
-#   platform/app/src/server/traces/edit-overlay/traceEditOverlay.service.ts    (read, upsert, merge, delete)
-#   platform/app/src/server/api/routers/traceEditOverlay.ts                    (tRPC surface)
-#   platform/app/src/server/traces/trace.service.ts                            (withEditOverlay read seam)
-#   platform/app/src/server/api/routers/annotation.ts                          (suggestion dual-write, queue marks)
+#   [gone] src/server/traces/edit-overlay/traceEditOverlay.schemas.ts    (patch contract, version 1)
+#   [gone] src/server/traces/edit-overlay/applyTraceEditOverlay.ts       (pure appliers)
+#   [gone] src/server/traces/edit-overlay/traceEditOverlay.repository.ts (one row per project + trace)
+#   packages/features/trace/server/src/services/trace-edit-overlay.service.ts    (read, upsert, merge, delete)
+#   packages/prisma-client/src/generated/models/TraceEditOverlay.ts                    (tRPC surface)
+#   packages/features/trace/server/src/services/trace-legacy-read.service.ts                            (withEditOverlay read seam)
+#   packages/features/annotation/server/src/transport/api-trpc/annotation.api.ts                          (suggestion dual-write, queue marks)
 #
 # Motivation: the curation loop is production traces, then correction, then an
 # evaluation dataset. Today the only correctable thing is the final expected
@@ -437,5 +437,5 @@ Feature: Correcting a trace without rewriting it
 
   # The end-of-queue dataset hand-off no longer stores marks on queue items.
   # Which traces a sitting keeps is collected in the browser for that sitting;
-  # see specs/annotations/annotation-queue-workflow.feature, Rule "The
-  # session's traces are collected as the queue is walked".
+  # see packages/features/annotation/specs/annotation-queue-workflow.feature,
+  # Rule "Session marks are local to this queue visit".

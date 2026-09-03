@@ -9,7 +9,7 @@ package otelsetup
 import (
 	"context"
 	"errors"
-	"log/slog"
+	"regexp"
 	"strings"
 	"sync"
 	"sync/atomic"
@@ -24,11 +24,13 @@ import (
 	"go.opentelemetry.io/otel/sdk/resource"
 	sdktrace "go.opentelemetry.io/otel/sdk/trace"
 	semconv "go.opentelemetry.io/otel/semconv/v1.26.0"
+	"go.uber.org/zap"
 
+	"github.com/langwatch/langwatch/pkg/clog"
 	"github.com/langwatch/langwatch/pkg/contexts"
 )
 
-// slogErrorHandler is the fallback delegate behind startupErrorHandler.
+// collectorErrorReporter is the leaf delegate behind startupErrorHandler.
 // Using a concrete handler — rather than whatever otelapi.GetErrorHandler()
 // returns — is load-bearing: GetErrorHandler() returns the global
 // *ErrDelegator wrapper, which forwards to the latest handler registered
@@ -36,14 +38,89 @@ import (
 // startupErrorHandler globally, dispatching any OTel error would recurse
 // (startupErrorHandler.Handle → delegator → startupErrorHandler.Handle …)
 // until the goroutine stack overflowed and the process exited with code 2.
-type slogErrorHandler struct{}
+//
+// It does two things beyond being a leaf.
+//
+// It writes through the service's own logger. Before this the fallback was
+// slog, whose default handler goes to Go's standard log — a different shape
+// from every other line the service prints, and the only one in a `pnpm dev`
+// terminal with a date on it.
+//
+// And it says an unreachable collector ONCE. A collector that is simply not
+// running refuses every batch for as long as the process lives, and each
+// refusal used to be a line; with OTEL_EXPORTER_OTLP_ENDPOINT pointing at a
+// stack the developer did not start, that is the loudest thing in the
+// terminal and none of it is new after the first line. The suppression is
+// lifted by a successful export, so a collector that answers and then stops
+// is reported again.
+type collectorErrorReporter struct {
+	logger *zap.Logger
+	mu     sync.Mutex
+	quiet  map[string]struct{}
+}
 
-func (slogErrorHandler) Handle(err error) {
+func newCollectorErrorReporter(logger *zap.Logger) *collectorErrorReporter {
+	return &collectorErrorReporter{logger: logger, quiet: map[string]struct{}{}}
+}
+
+func (r *collectorErrorReporter) Handle(err error) {
 	if err == nil {
 		return
 	}
-	slog.Warn("otel error", "err", err)
+
+	endpoint := unreachableCollector(err)
+	if endpoint == "" {
+		r.logger.Warn("otel export failed", zap.Error(err))
+		return
+	}
+
+	r.mu.Lock()
+	_, alreadySaid := r.quiet[endpoint]
+	r.quiet[endpoint] = struct{}{}
+	r.mu.Unlock()
+	if alreadySaid {
+		return
+	}
+
+	r.logger.Warn("otel collector unreachable",
+		zap.String("endpoint", endpoint), zap.Error(err))
+	r.logger.Warn("suppressing further export errors until the collector answers",
+		zap.String("endpoint", endpoint))
 }
+
+// exported is called after a successful export. What was reported unreachable
+// has answered, so the next failure is news again.
+func (r *collectorErrorReporter) exported() {
+	r.mu.Lock()
+	clear(r.quiet)
+	r.mu.Unlock()
+}
+
+// collectorAddress picks the endpoint out of an export failure. The OTLP
+// exporters phrase these as `Post "http://host:4318/v1/logs": dial tcp …`, so
+// the quoted URL is the collector one signal was aimed at — which is what the
+// suppression is keyed on, since a service can be exporting to two.
+var collectorAddress = regexp.MustCompile(`"([^"]+)"`)
+
+// unreachableCollector returns the endpoint an error says could not be
+// reached, or "" when the error is not about reaching one. Only a refusal or
+// an unresolvable name counts: those are the failures a collector that is not
+// running produces forever, and the ones there is nothing new to say about.
+func unreachableCollector(err error) string {
+	message := err.Error()
+	if !strings.Contains(message, "connection refused") &&
+		!strings.Contains(message, "no such host") {
+		return ""
+	}
+	if address := collectorAddress.FindStringSubmatch(message); address != nil {
+		return address[1]
+	}
+	return message
+}
+
+// startupGraceWindow is how long a starting service's transport and auth
+// failures are treated as the control plane not being up yet.
+const startupGraceWindow = 30 * time.Second
 
 // startupErrorHandler silences OTLP export errors during the first few
 // seconds of startup. The gateway commonly races its OTel exporter
@@ -218,6 +295,9 @@ type Provider struct {
 	tp *sdktrace.TracerProvider
 	lp *sdklog.LoggerProvider
 	mp *sdkmetric.MeterProvider
+	// logger is where a flush that could not reach its collector is reported.
+	// nil on the noop provider, which has nothing to flush.
+	logger *zap.Logger
 }
 
 // LoggerProvider returns the OTLP log provider, or nil when the debug
@@ -318,6 +398,18 @@ func New(ctx context.Context, opts Options) (*Provider, error) {
 		return &Provider{}, nil
 	}
 
+	// Installed here rather than on one branch below, so every pipeline this
+	// function can build — single-tenant traces, the per-tenant router, the
+	// ops fallback, the debug collector's logs and the metric readers — reports
+	// what it cannot export through the service's own logger, once per
+	// unreachable collector. Only the single-tenant branch can lift the
+	// startup grace window early, because it is the only one holding an
+	// exporter to observe succeeding.
+	logger := clog.Get(ctx)
+	reporter := newCollectorErrorReporter(logger)
+	startupFilter := newStartupErrorHandler(reporter, startupGraceWindow)
+	otelapi.SetErrorHandler(startupFilter)
+
 	// The internal-origin marker goes on every single-tenant resource: those
 	// providers carry exclusively LangWatch's own telemetry. Multi-tenant
 	// providers (nlpgo) are excluded — their resource reaches customer
@@ -401,17 +493,16 @@ func New(ctx context.Context, opts Options) (*Provider, error) {
 				return nil, err
 			}
 
-			// Suppress startup-race auth/transport noise from the OTLP
-			// exporter — the default handler emits WARN for every batch,
-			// which floods logs for ~5s until the control-plane mints auth.
-			// The filter auto-disables once the healthyExporter wrapper sees
-			// a successful export, or after the 30s grace window elapses.
-			startupFilter := newStartupErrorHandler(
-				slogErrorHandler{},
-				30*time.Second,
-			)
-			otelapi.SetErrorHandler(startupFilter)
-			wrappedExp := healthyExporterWrap(exp, startupFilter.markHealthy)
+			// The filter installed above suppresses startup-race auth and
+			// transport noise: the gateway commonly races its exporter against
+			// control-plane readiness, and the first few batches hit 401/503
+			// while auth is still being minted. A successful export lifts it
+			// early, and also lifts the unreachable-collector suppression, so
+			// a collector that answers and then stops is reported again.
+			wrappedExp := healthyExporterWrap(exp, func() {
+				startupFilter.markHealthy()
+				reporter.exported()
+			})
 
 			batchTimeout := opts.BatchTimeout
 			if batchTimeout == 0 {
@@ -452,7 +543,7 @@ func New(ctx context.Context, opts Options) (*Provider, error) {
 
 	tp := sdktrace.NewTracerProvider(tpOpts...)
 	otelapi.SetTracerProvider(tp)
-	provider := &Provider{tp: tp}
+	provider := &Provider{tp: tp, logger: logger}
 
 	if err := installDebugLogs(ctx, opts, res, provider); err != nil {
 		return nil, err
@@ -533,7 +624,7 @@ func installMetrics(ctx context.Context, opts Options, res *resource.Resource, p
 	// Runtime metrics (GC, goroutines, mem) are the first cut — a start failure
 	// must not sink service init, so warn and carry on.
 	if err := startRuntimeMetrics(mp); err != nil {
-		slog.Warn("otel runtime metrics start failed", "err", err)
+		clog.Get(ctx).Warn("otel runtime metrics start failed", zap.Error(err))
 	}
 	provider.mp = mp
 	return nil
@@ -546,22 +637,39 @@ func installMetrics(ctx context.Context, opts Options, res *resource.Resource, p
 // the log/metric providers.
 func (p *Provider) Shutdown(ctx context.Context) error {
 	var errs []error
-	if p.tp != nil {
-		if err := p.tp.Shutdown(ctx); err != nil {
+	for _, flush := range p.configuredFlushes() {
+		if err := flush(ctx); err != nil {
 			errs = append(errs, err)
 		}
+	}
+
+	// Reported, never returned. This is the last flush of telemetry ABOUT the
+	// work, not the work: a collector that is not running makes it fail every
+	// time, and returning the error turned an ordinary Ctrl-C into
+	// `service exited with error … stop otel: Post "http://localhost:4318…"`
+	// and a non-zero exit — a clean shutdown that reads as a crash. The
+	// service did everything it was asked to do; it could not tell anyone
+	// about it.
+	if failed := errors.Join(errs...); failed != nil && p.logger != nil {
+		p.logger.Warn("otel telemetry was not flushed at shutdown", zap.Error(failed))
+	}
+	return nil
+}
+
+// configuredFlushes is every signal this provider installed, in the order it
+// installed them.
+func (p *Provider) configuredFlushes() []func(context.Context) error {
+	var flushes []func(context.Context) error
+	if p.tp != nil {
+		flushes = append(flushes, p.tp.Shutdown)
 	}
 	if p.lp != nil {
-		if err := p.lp.Shutdown(ctx); err != nil {
-			errs = append(errs, err)
-		}
+		flushes = append(flushes, p.lp.Shutdown)
 	}
 	if p.mp != nil {
-		if err := p.mp.Shutdown(ctx); err != nil {
-			errs = append(errs, err)
-		}
+		flushes = append(flushes, p.mp.Shutdown)
 	}
-	return errors.Join(errs...)
+	return flushes
 }
 
 // ForceFlush exports any pending spans synchronously. Safe to call on
@@ -608,7 +716,6 @@ func (p *Provider) ForceFlush(ctx context.Context) error {
 type healthyExporter struct {
 	inner     sdktrace.SpanExporter
 	onHealthy func()
-	once      sync.Once
 }
 
 func healthyExporterWrap(inner sdktrace.SpanExporter, onHealthy func()) sdktrace.SpanExporter {
@@ -618,7 +725,10 @@ func healthyExporterWrap(inner sdktrace.SpanExporter, onHealthy func()) sdktrace
 func (h *healthyExporter) ExportSpans(ctx context.Context, spans []sdktrace.ReadOnlySpan) error {
 	err := h.inner.ExportSpans(ctx, spans)
 	if err == nil {
-		h.once.Do(h.onHealthy)
+		// Every success, not only the first: the startup filter latches on its
+		// own, and the unreachable-collector suppression has to be lifted each
+		// time the collector comes back.
+		h.onHealthy()
 	}
 	return err
 }

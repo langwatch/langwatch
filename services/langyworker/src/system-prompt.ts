@@ -28,7 +28,11 @@ export type SystemPromptParts = {
   turnSystem?: string;
 };
 
-export function composeSystemPrompt({ personaPrompt, agentsMd, turnSystem }: SystemPromptParts): string {
+export function composeSystemPrompt({
+  personaPrompt,
+  agentsMd,
+  turnSystem,
+}: SystemPromptParts): string {
   const sections = [personaPrompt, turnSystem, agentsMd]
     .map((section) => section?.trim() ?? "")
     .filter((section) => section.length > 0);
@@ -40,7 +44,13 @@ export function composeSystemPrompt({ personaPrompt, agentsMd, turnSystem }: Sys
  * turn prompt, clearly labeled so the model reads it as context, not as the
  * user's words.
  */
-export function prependResumeSeed({ prompt, seed }: { prompt: string; seed: string }): string {
+export function prependResumeSeed({
+  prompt,
+  seed,
+}: {
+  prompt: string;
+  seed: string;
+}): string {
   return [
     "[Resumed conversation: digest of the previous worker's session. Newest messages last; the oldest may be truncated.]",
     seed,

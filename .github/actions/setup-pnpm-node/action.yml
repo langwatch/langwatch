@@ -11,7 +11,7 @@
 #   - uses: ./.github/actions/setup-pnpm-node
 #     with:
 #       # optional: what to install. Omit to skip installing entirely.
-#       install: "@langwatch/web..."
+#       install: "@langwatch/platform-api..."
 name: setup-pnpm-node
 description: Set up pnpm + Node 24 with pnpm-store caching.
 inputs:
@@ -33,8 +33,8 @@ inputs:
       What to install. Omit to skip the install step. `all` installs every
       workspace project. Anything else is split on whitespace and each word
       becomes one `pnpm --filter`, so a trailing `...` selects a project
-      together with its workspace dependencies (e.g. `@langwatch/web...`,
-      or `@langwatch/web... @langwatch/langyworker...` for two roots).
+      together with its workspace dependencies (e.g. `@langwatch/platform-api...`,
+      or `@langwatch/platform-api... @langwatch/langyworker...` for two roots).
     required: false
     default: ""
 
@@ -45,7 +45,7 @@ runs:
       if: inputs.install-dir != ''
       shell: bash
       run: |
-        echo "::error::setup-pnpm-node no longer takes 'install-dir'. The repo is a single pnpm workspace (ADR-076), so installs run from the root and are narrowed with a filter. Replace 'install-dir: <dir>' with 'install: \"<package-name>...\"' — e.g. install-dir: langwatch becomes install: \"@langwatch/web...\"."
+        echo "::error::setup-pnpm-node no longer takes 'install-dir'. The repo is a single pnpm workspace (ADR-076), so installs run from the root and are narrowed with a filter. Replace 'install-dir: <dir>' with 'install: \"<package-name>...\"' — e.g. install-dir: langwatch becomes install: \"langwatch...\"."
         exit 1
 
     - name: Setup pnpm

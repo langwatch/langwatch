@@ -29,7 +29,11 @@ rule:
     - pattern: describe.skipIf(!!process.env.CI_CLICKHOUSE_URL)($$$)
     - pattern: describe.skipIf(process.env.CI_CLICKHOUSE_URL)($$$)
 files:
-  - "platform/app/**/*.test.ts"
-  - "platform/app/**/*.test.tsx"
-  - "platform/app/**/*.spec.ts"
-  - "platform/app/**/*.spec.tsx"
+  - "apps/**/*.test.ts"
+  - "packages/**/*.test.ts"
+  - "apps/**/*.test.tsx"
+  - "packages/**/*.test.tsx"
+  - "apps/**/*.spec.ts"
+  - "packages/**/*.spec.ts"
+  - "apps/**/*.spec.tsx"
+  - "packages/**/*.spec.tsx"

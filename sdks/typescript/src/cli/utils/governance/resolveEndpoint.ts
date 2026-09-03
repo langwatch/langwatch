@@ -80,8 +80,6 @@ export function resolveControlPlaneEndpoint(
  * the source-attribution. Equivalent to
  * `resolveControlPlaneEndpoint(opts).url`.
  */
-export function resolveControlPlaneUrl(
-  opts: ResolveEndpointOptions = {},
-): string {
+export function resolveControlPlaneUrl(opts: ResolveEndpointOptions = {}): string {
   return resolveControlPlaneEndpoint(opts).url;
 }

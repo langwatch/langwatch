@@ -5,7 +5,9 @@ import { resolveCredentials } from "../../utils/apiKey";
 import { failSpinner } from "../../utils/spinnerError";
 import type { CommandResult } from "../../utils/output";
 
-export const deleteWorkflowCommand = async (id: string): Promise<CommandResult | void> => {
+export const deleteWorkflowCommand = async (
+  id: string,
+): Promise<CommandResult | void> => {
   await resolveCredentials();
 
   const service = new WorkflowsApiService();

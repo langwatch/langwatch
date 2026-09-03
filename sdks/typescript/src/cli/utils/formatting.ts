@@ -45,9 +45,7 @@ export const formatTable = ({
     .join("  ");
   console.log(headerRow);
 
-  const separator = headers
-    .map((header) => "─".repeat(colWidths[header]!))
-    .join("  ");
+  const separator = headers.map((header) => "─".repeat(colWidths[header]!)).join("  ");
   console.log(chalk.gray(separator));
 
   data.forEach((row) => {

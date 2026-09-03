@@ -33,7 +33,8 @@ const CLI_PROGRAM_PATH = join(__dirname, "../program.ts");
  */
 function cliTopLevelCommands(): Set<string> {
   const source = readFileSync(CLI_PROGRAM_PATH, "utf-8");
-  const pattern = /(?:const\s+\w+\s*=\s*)?\bprogram\s*(?:[\r\n]+\s*)?\.command\(\s*"([^"\s]+)/g;
+  const pattern =
+    /(?:const\s+\w+\s*=\s*)?\bprogram\s*(?:[\r\n]+\s*)?\.command\(\s*"([^"\s]+)/g;
   const commands = new Set<string>();
   for (const match of source.matchAll(pattern)) {
     commands.add(match[1]!);
@@ -42,10 +43,7 @@ function cliTopLevelCommands(): Set<string> {
 }
 
 const flattenFeatures = (features: GeneratedFeature[]): GeneratedFeature[] =>
-  features.flatMap((feature) => [
-    feature,
-    ...flattenFeatures(feature.children ?? []),
-  ]);
+  features.flatMap((feature) => [feature, ...flattenFeatures(feature.children ?? [])]);
 
 /** The top-level group words of every CLI command the feature map claims. */
 function featureMapCliGroups(): Set<string> {
@@ -61,9 +59,7 @@ function featureMapCliGroups(): Set<string> {
 
 describe("the feature map, given the CLI's real command tree", () => {
   const cliCommands = cliTopLevelCommands();
-  const cliGroups = [...cliCommands].filter(
-    (command) => !PLUMBING_COMMANDS.has(command),
-  );
+  const cliGroups = [...cliCommands].filter((command) => !PLUMBING_COMMANDS.has(command));
   const mapGroups = featureMapCliGroups();
 
   describe("when the CLI source is parsed", () => {

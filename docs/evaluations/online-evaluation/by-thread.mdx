@@ -8,7 +8,11 @@ With LangWatch, you can evaluate your LLM applications by thread. This approach 
 To set up evaluation by thread, toggle the thread-based mapping option when creating an evaluation.
 
 <Frame>
-<img className="block" src="/images/dataset-thread-evaluation.png" alt="LangWatch Evaluation by Thread" />
+  <img
+    className="block"
+    src="/images/dataset-thread-evaluation.png"
+    alt="LangWatch Evaluation by Thread"
+  />
 </Frame>
 
 This enables thread-based evaluation where each time a trace is evaluated, the full thread context is retrieved and passed to the evaluation function. This approach builds upon the complete conversation thread rather than individual traces.

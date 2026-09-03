@@ -94,11 +94,7 @@ describe("failSpinnerFromResponse", () => {
     it("keeps the sentence and does not invent a domain code", async () => {
       await failSpinnerFromResponse({
         spinner: spinner(),
-        response: responseOf(
-          502,
-          "<html><body>Bad Gateway</body></html>",
-          "text/html",
-        ),
+        response: responseOf(502, "<html><body>Bad Gateway</body></html>", "text/html"),
         action: "create trigger",
         format: "json",
       });

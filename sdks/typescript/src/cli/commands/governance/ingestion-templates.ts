@@ -9,10 +9,7 @@ import {
   updateIngestionTemplateOttlRules,
 } from "@/cli/utils/governance/cli-api";
 import { isLoggedIn, loadConfig } from "@/cli/utils/governance/config";
-import {
-  commandValidationError,
-  reportCommandError,
-} from "@/cli/utils/errorOutput";
+import { commandValidationError, reportCommandError } from "@/cli/utils/errorOutput";
 
 import type { IngestionTemplateRow } from "@/cli/utils/governance/cli-api";
 
@@ -31,21 +28,13 @@ import type { IngestionTemplateRow } from "@/cli/utils/governance/cli-api";
 function requireLogin() {
   const cfg = loadConfig();
   if (!isLoggedIn(cfg)) {
-    process.stderr.write(
-      "Not logged in. Run `langwatch login --device` first.\n",
-    );
+    process.stderr.write("Not logged in. Run `langwatch login --device` first.\n");
     process.exit(1);
   }
   return cfg;
 }
 
-function handleError({
-  error,
-  json,
-}: {
-  error: unknown;
-  json?: boolean;
-}): never {
+function handleError({ error, json }: { error: unknown; json?: boolean }): never {
   reportCommandError({ error, format: json ? "json" : undefined });
   process.exit(1);
 }
@@ -77,9 +66,7 @@ function printTemplateList(rows: IngestionTemplateRow[]): void {
   }
 }
 
-export async function adminListCommand(options: {
-  json?: boolean;
-}): Promise<void> {
+export async function adminListCommand(options: { json?: boolean }): Promise<void> {
   const cfg = requireLogin();
   let rows: IngestionTemplateRow[];
   try {
@@ -94,10 +81,7 @@ export async function adminListCommand(options: {
   printTemplateList(rows);
 }
 
-export async function getCommand(
-  id: string,
-  options: { json?: boolean },
-): Promise<void> {
+export async function getCommand(id: string, options: { json?: boolean }): Promise<void> {
   const cfg = requireLogin();
   let row: IngestionTemplateRow;
   try {
@@ -124,9 +108,7 @@ export async function createCommand(options: {
   const cfg = requireLogin();
   if (
     options.credentialSchema &&
-    !["otlp_token", "static_api_key", "agent_id"].includes(
-      options.credentialSchema,
-    )
+    !["otlp_token", "static_api_key", "agent_id"].includes(options.credentialSchema)
   ) {
     reportCommandError({
       error: commandValidationError(

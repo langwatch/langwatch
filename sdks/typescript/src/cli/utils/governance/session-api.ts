@@ -23,11 +23,7 @@
  */
 
 import { normalizeEndpoint } from "../../../internal/endpoint";
-import {
-  type GovernanceConfig,
-  loadConfig,
-  saveConfig,
-} from "./config";
+import { type GovernanceConfig, loadConfig, saveConfig } from "./config";
 import { refreshSession as sharedRefreshSession } from "./session-refresh";
 
 export interface SessionApiOptions {
@@ -261,9 +257,7 @@ export async function fetchProjectKeyBySlug(
   // Same guard as fetchPersonalProject: a 200 with no key must fail loudly
   // here, or the caller writes `LANGWATCH_API_KEY=undefined` into .env and
   // reports success.
-  const parsed = (await res
-    .json()
-    .catch(() => null)) as SessionProjectKey | null;
+  const parsed = (await res.json().catch(() => null)) as SessionProjectKey | null;
   if (!parsed?.api_key) {
     throw new SessionApiError(
       500,

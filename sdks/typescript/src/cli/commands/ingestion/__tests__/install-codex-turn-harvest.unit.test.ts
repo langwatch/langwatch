@@ -60,8 +60,7 @@ const origConfig = process.env.LANGWATCH_CLI_CONFIG;
 const stdout = (): string =>
   stdoutSpy.mock.calls.map((call: unknown[]) => String(call[0])).join("");
 
-const readConfigToml = (): string =>
-  fs.readFileSync(codexConfigPath, "utf8");
+const readConfigToml = (): string => fs.readFileSync(codexConfigPath, "utf8");
 
 const runCodexInstall = async (
   overrides: Record<string, unknown> = {},
@@ -143,9 +142,7 @@ describe("the codex ingestion install", () => {
         await runCodexInstall();
 
         const toml = readConfigToml();
-        expect((toml.match(/langwatch codex notify begin/g) ?? []).length).toBe(
-          1,
-        );
+        expect((toml.match(/langwatch codex notify begin/g) ?? []).length).toBe(1);
       });
     });
 
@@ -164,10 +161,7 @@ describe("the codex ingestion install", () => {
         fs.mkdirSync(path.dirname(codexConfigPath), { recursive: true });
         // Two top-level assignments: moving one aside still leaves the other,
         // and a duplicate key stops codex from starting at all.
-        fs.writeFileSync(
-          codexConfigPath,
-          'notify = ["/one"]\nnotify = ["/two"]\n',
-        );
+        fs.writeFileSync(codexConfigPath, 'notify = ["/one"]\nnotify = ["/two"]\n');
 
         await runCodexInstall();
 
@@ -178,10 +172,7 @@ describe("the codex ingestion install", () => {
 
       it("carries the blocked action in the json report", async () => {
         fs.mkdirSync(path.dirname(codexConfigPath), { recursive: true });
-        fs.writeFileSync(
-          codexConfigPath,
-          'notify = ["/one"]\nnotify = ["/two"]\n',
-        );
+        fs.writeFileSync(codexConfigPath, 'notify = ["/one"]\nnotify = ["/two"]\n');
 
         await runCodexInstall({ json: true });
 

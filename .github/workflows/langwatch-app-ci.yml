@@ -112,7 +112,7 @@ jobs:
       # the same Prisma client and server graph — and 331 of the 477 files can
       # share one. The other 146 call `vi.mock`, which cannot apply to a
       # registry an earlier file already populated, so they keep isolation.
-      # See platform/app/src/test-utils/integrationModuleGraph.ts.
+      # See packages/test-harness/src/integration-module-graph.ts.
       #
       # Two shards each rather than four of one kind: measured on src/app/api,
       # the shared lane runs ~4x faster per file, so 331 shared files and 146
@@ -178,9 +178,14 @@ jobs:
         with:
           filters: |
             relevant:
-              - 'platform/app/**'
-              # Root workspace members the app's `...` closure installs from
-              # source — a change there is a change to the app.
+              # The three deployable applications — apps/api, apps/worker,
+              # apps/ui — plus apps/server, the npx self-host CLI. This IS the
+              # code these jobs exist to protect: the monolith they were
+              # written for is gone, and every transport, router, worker
+              # installer and browser screen lives here or under packages/.
+              - 'apps/**'
+              # Workspace members the applications' `...` closures install from
+              # source — a change there is a change to all three.
               - 'packages/**'
               # @langwatch/langyworker tests + typecheck run on unit shard 1;
               # without this a wrapper-only change runs zero app CI.
@@ -198,7 +203,7 @@ jobs:
               - '.npmrc'
               # NOTE: 'charts/**' is deliberately NOT listed. Integration suites
               # do render the chart and assert on the output, so a chart-only
-              # edit can break a test under platform/app/ without touching a file
+              # edit can break a package test without touching a file
               # there — but this one flag gates nine jobs (typecheck, every unit
               # and integration shard, e2e), so adding it would run the entire
               # app suite for a comment change in values.yaml. That trade is a
@@ -228,11 +233,11 @@ jobs:
               - '.github/actions/prepare-generated-files/**'
               - '.github/actions/setup-pnpm-node/**'
             # The parity scanner binds @scenario annotations from test files
-            # across many roots, not just specs/ and platform/app/. This list MUST
+            # across many roots, not just specs/. This list MUST
             # cover every root the scanner reads (DEFAULT_TEST_ROOTS,
             # DEFAULT_GO_TEST_ROOTS, DEFAULT_PYTHON_TEST_ROOTS,
             # DEFAULT_BATS_TEST_ROOTS, DEFAULT_SHELL_TEST_ROOTS in
-            # platform/app/scripts/check-feature-parity.ts),
+            # the parity scanner),
             # otherwise a binding change in an unlisted root merges without the
             # gate ever running and silently breaks parity on main (e.g. #5143
             # edited only dev/scripts/__tests__/*.bats and slipped through).
@@ -240,7 +245,7 @@ jobs:
               - 'specs/**'
               - 'charts/langwatch/tests/**'
               - 'charts/gateway/tests/**'
-              - 'platform/app/**'
+              - 'apps/**'
               - 'packages/**'
               - 'skills/**'
               - 'plugins/**'
@@ -274,29 +279,34 @@ jobs:
 
       - uses: ./.github/actions/setup-pnpm-node
         with:
-          install: "@langwatch/web..."
+          install: "@langwatch/platform-api... @langwatch/worker... @langwatch/ui..."
 
       - uses: ./.github/actions/prepare-generated-files
 
-      # tsc writes incremental .tsbuildinfo caches to explicit paths
-      # under node_modules/.cache/tsbuildinfo (see tsconfig.tsgo*.json). A warm
-      # cache turns the full ~13-19s cold check into a ~1.5s revalidation of
-      # only the files whose content changed. Restored after install so pnpm
-      # can't clobber it; keyed rolling per-SHA with a prefix fallback so every
-      # run refreshes the cache off the most recent match (mirrors the Turbo
-      # cache pattern used by the build job).
+      # tsc writes incremental .tsbuildinfo caches to explicit paths under each
+      # application's node_modules/.cache/tsbuildinfo (see their tsconfig.json).
+      # A warm cache turns the full cold check into a revalidation of only the
+      # files whose content changed. Restored after install so pnpm can't
+      # clobber it; keyed rolling per-SHA with a prefix fallback so every run
+      # refreshes the cache off the most recent match (mirrors the Turbo cache
+      # pattern used by the build job).
       - name: Cache TypeScript incremental build info
         uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
         with:
-          path: platform/app/node_modules/.cache/tsbuildinfo
-          key: ${{ runner.os }}-tsbuildinfo-${{ hashFiles('pnpm-lock.yaml', 'platform/app/tsconfig.tsgo.json', 'platform/app/tsconfig.tsgo.tests.json', 'platform/app/tsconfig.tsgo.all.json') }}-${{ github.sha }}
+          path: |
+            apps/api/node_modules/.cache/tsbuildinfo
+            apps/worker/node_modules/.cache/tsbuildinfo
+            apps/ui/node_modules/.cache/tsbuildinfo
+          key: ${{ runner.os }}-tsbuildinfo-${{ hashFiles('pnpm-lock.yaml', 'apps/*/tsconfig.json', 'apps/*/tsconfig.test.json') }}-${{ github.sha }}
           restore-keys: |
-            ${{ runner.os }}-tsbuildinfo-${{ hashFiles('pnpm-lock.yaml', 'platform/app/tsconfig.tsgo.json', 'platform/app/tsconfig.tsgo.tests.json', 'platform/app/tsconfig.tsgo.all.json') }}-
+            ${{ runner.os }}-tsbuildinfo-${{ hashFiles('pnpm-lock.yaml', 'apps/*/tsconfig.json', 'apps/*/tsconfig.test.json') }}-
             ${{ runner.os }}-tsbuildinfo-
 
-      - name: Run typecheck (app and tests in one program)
-        working-directory: platform/app
-        run: pnpm run typecheck:all
+      # Each application's own `typecheck` runs its source and its tests as two
+      # programs, which is what the monolith's `typecheck:all` did in one.
+      # `typecheck-packages` below covers everything under `packages/`.
+      - name: Run typecheck (the three applications, source and tests)
+        run: pnpm run typecheck
 
       - name: Notify Slack on failure
         if: failure() && github.ref == 'refs/heads/main'
@@ -305,13 +315,88 @@ jobs:
           GH_TOKEN: ${{ github.token }}
         run: bash .github/scripts/notify-slack-job-failure.sh typecheck
 
+  # Every workspace package's own typecheck, as one recursive run.
+  #
+  # This exists because the alternative was an allowlist and the allowlist went
+  # stale exactly the way an allowlist does. 156 packages under `packages/` and
+  # `apps/` declare a `typecheck` script; ten were named individually across
+  # this file (identity, share, redaction, system-migrations and friends), so
+  # 146 were never typechecked by CI at all — `@langwatch/api`, the design
+  # system, every enterprise package, and every feature contract/server/web
+  # package the core-application extraction has been moving code INTO. The root
+  # `pnpm typecheck` does not cover them either: it checks the three
+  # applications alone.
+  #
+  # `-r` runs each package's own script, so a package opts in by declaring one
+  # and opts out by not declaring one. That is the property the named list
+  # could not have: a package added tomorrow is covered without editing this
+  # file, which is the whole failure mode being fixed.
+  #
+  # `install: all` because it runs every package, so every package's
+  # dependencies have to be present — the same reasoning as package-suites.
+  typecheck-packages:
+    needs: changes
+    if: needs.changes.outputs.relevant == 'true'
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - name: Checkout
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v6
+        with:
+          # Drops docs/ + assets/ media. See LEAN CHECKOUT at the top of this file.
+          sparse-checkout: |
+            /*
+            !/docs/media/
+            !/docs/images/
+            !/assets/
+          sparse-checkout-cone-mode: false
+
+      - uses: ./.github/actions/setup-pnpm-node
+        with:
+          install: all
+
+      - uses: ./.github/actions/prepare-generated-files
+
+      # Each package writes its own .tsbuildinfo to
+      # node_modules/.cache/tsbuildinfo/<pkg>.tsbuildinfo, per the repo rule
+      # that every package tsconfig sets `incremental` and a per-package path.
+      # Without the per-package path they would clobber each other's cache and
+      # this job would be cold every time.
+      - name: Cache TypeScript incremental build info
+        uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+        with:
+          path: |
+            packages/**/node_modules/.cache/tsbuildinfo
+            apps/*/node_modules/.cache/tsbuildinfo
+          key: ${{ runner.os }}-pkg-tsbuildinfo-${{ hashFiles('pnpm-lock.yaml') }}-${{ github.sha }}
+          restore-keys: |
+            ${{ runner.os }}-pkg-tsbuildinfo-${{ hashFiles('pnpm-lock.yaml') }}-
+            ${{ runner.os }}-pkg-tsbuildinfo-
+
+      # Not --no-bail: one package's failure should not hide the rest, and a
+      # migration in flight tends to break several at once. The job still fails.
+      - name: Run every package typecheck
+        run: pnpm -r --no-bail --filter "./packages/**" --filter "./apps/**" typecheck
+
+      - name: Notify Slack on failure
+        if: failure() && github.ref == 'refs/heads/main'
+        env:
+          SLACK_RELEASE_NOTIFICATION_WEBHOOK_URL: ${{ secrets.SLACK_RELEASE_NOTIFICATION_WEBHOOK_URL }}
+          GH_TOKEN: ${{ github.token }}
+        run: bash .github/scripts/notify-slack-job-failure.sh typecheck-packages
+
   test-unit:
     needs: changes
     if: needs.changes.outputs.relevant == 'true'
     strategy:
       fail-fast: false
       matrix:
-        shard: ${{ fromJSON(needs.changes.outputs.unit-shards) }}
+        # One job per deployable. The sharded matrix this replaced existed for
+        # the monolith's five-thousand-file suite; the three applications hold
+        # about two thousand tests between them and each is its own vitest
+        # root, so the parallelism that pays is per application rather than per
+        # slice of one corpus.
+        app: [platform-api, worker, ui]
     env:
       VITEST_MAX_WORKERS: "4" # physical core count on GitHub-hosted ubuntu runners
       DATABASE_URL: "postgresql://langwatch_ci:ci_password@localhost:5432/langwatch_test"
@@ -341,10 +426,10 @@ jobs:
 
       - uses: ./.github/actions/setup-pnpm-node
         with:
-          # langyworker is not a dependency of web, and its tests and
-          # typecheck run on this job's shard 1, so it needs its own
-          # install root.
-          install: "@langwatch/web... @langwatch/langyworker..."
+          # langyworker is not a dependency of any application, and its tests
+          # and typecheck run on this job's platform-api leg, so it needs its
+          # own install root.
+          install: "@langwatch/platform-api... @langwatch/worker... @langwatch/ui... @langwatch/langyworker..."
 
       - uses: ./.github/actions/prepare-generated-files
 
@@ -362,14 +447,15 @@ jobs:
       # package suite is not sharded, and shard 1 exists in every matrix shape
       # (drafts run [1]).
       - name: Run @langwatch/api unit tests
-        if: matrix.shard == 1
+        if: matrix.app == 'platform-api'
         run: pnpm --filter @langwatch/api run test:unit
 
-      # Same reason as @langwatch/api above. The app's vitest root is
-      # `platform/app`, so a suite under `packages/` is not merely unsharded —
-      # it is unreachable, and without this step it never runs anywhere.
+      # Same reason as @langwatch/api above: a package suite is not reachable
+      # from an application's vitest root, so without a step naming it, it runs
+      # nowhere. `package-suites` discovers the rest; these are named here
+      # because they gate this job.
       - name: Run @langwatch/redis-client unit tests
-        if: matrix.shard == 1
+        if: matrix.app == 'platform-api'
         run: pnpm --filter @langwatch/redis-client run test:unit
 
       # Same reason again. This one decides the level and the shape of every
@@ -377,7 +463,7 @@ jobs:
       # place in the repo to have one — a regression here is invisible until
       # someone reads a dashboard and finds it empty.
       - name: Run @langwatch/observability unit tests
-        if: matrix.shard == 1
+        if: matrix.app == 'platform-api'
         run: pnpm --filter @langwatch/observability run test:unit
 
       # Same reason again. This package owns the retry classifier, the
@@ -386,7 +472,7 @@ jobs:
       # managedClient assembly, so a regression in an unassembled path (the
       # query client, the router) would otherwise ship untested.
       - name: Run @langwatch/clickhouse-client unit tests
-        if: matrix.shard == 1
+        if: matrix.app == 'platform-api'
         run: pnpm --filter @langwatch/clickhouse-client run test:unit
 
       # @langwatch/redaction is the canonical secret and PII scrubber the
@@ -396,123 +482,242 @@ jobs:
       # and while it ran nowhere a rule change reached production that blanked
       # the product's own record ids.
       - name: Run @langwatch/redaction unit tests
-        if: matrix.shard == 1
+        if: matrix.app == 'platform-api'
         run: pnpm --filter @langwatch/redaction run test:unit
 
       - name: Typecheck @langwatch/redaction
-        if: matrix.shard == 1
+        if: matrix.app == 'platform-api'
         run: pnpm --filter @langwatch/redaction run typecheck
 
       # @langwatch/authz is the pure authorization engine (ADR-092) and
       # @langwatch/authz-server its storage-port runtime — raw TypeScript the
       # app inlines the same way, same shard-1 arrangement.
       - name: Run @langwatch/authz unit tests
-        if: matrix.shard == 1
+        if: matrix.app == 'platform-api'
         run: pnpm --filter @langwatch/authz run test
 
       # @langwatch/actor is the actor vocabulary (who caused an action) —
       # dependency-free raw TypeScript, same shard-1 arrangement.
       - name: Run @langwatch/actor unit tests
-        if: matrix.shard == 1
+        if: matrix.app == 'platform-api'
         run: pnpm --filter @langwatch/actor run test
 
       - name: Run @langwatch/authz-server unit tests
-        if: matrix.shard == 1
+        if: matrix.app == 'platform-api'
         run: pnpm --filter @langwatch/authz-server run test
 
-      # @langwatch/identity is the pure identity core (ADR-115) and
+      # @langwatch/identity-contract is the pure identity core (ADR-115) and
       # @langwatch/identity-server its storage-port runtime — same raw
       # TypeScript, same shard-1 arrangement as authz. Both get the typecheck
       # step the authz pair lacks: sources and tests are only compiled here.
-      - name: Run @langwatch/identity unit tests
-        if: matrix.shard == 1
-        run: pnpm --filter @langwatch/identity run test
+      - name: Run @langwatch/identity-contract unit tests
+        if: matrix.app == 'platform-api'
+        run: pnpm --filter @langwatch/identity-contract run test
 
-      - name: Typecheck @langwatch/identity
-        if: matrix.shard == 1
-        run: pnpm --filter @langwatch/identity run typecheck
+      - name: Typecheck @langwatch/identity-contract
+        if: matrix.app == 'platform-api'
+        run: pnpm --filter @langwatch/identity-contract run typecheck
 
       - name: Run @langwatch/identity-server unit tests
-        if: matrix.shard == 1
+        if: matrix.app == 'platform-api'
         run: pnpm --filter @langwatch/identity-server run test
 
       - name: Typecheck @langwatch/identity-server
-        if: matrix.shard == 1
+        if: matrix.app == 'platform-api'
         run: pnpm --filter @langwatch/identity-server run typecheck
+
+      # @langwatch/identity-eventing is the third of the identity trio: the
+      # framework envelope, commands, folds, process managers and the four
+      # pipeline definitions the worker registers. It carries the seven suites
+      # that moved out of the monolith with them, so without these steps that
+      # coverage would run nowhere.
+      - name: Run @langwatch/identity-eventing unit tests
+        if: matrix.app == 'platform-api'
+        run: pnpm --filter @langwatch/identity-eventing run test
+
+      - name: Typecheck @langwatch/identity-eventing
+        if: matrix.app == 'platform-api'
+        run: pnpm --filter @langwatch/identity-eventing run typecheck
 
       # @langwatch/system-migrations is the in-place data-migration runner
       # (ADR-092 stage B) — same raw-TypeScript, shard-1 arrangement.
       - name: Run @langwatch/system-migrations unit tests
-        if: matrix.shard == 1
+        if: matrix.app == 'platform-api'
         run: pnpm --filter @langwatch/system-migrations run test
 
-      # `pnpm typecheck` at the root checks @langwatch/web alone, so without
-      # this the package's own TypeScript — sources and tests both — is never
-      # compiled by CI at all.
+      # `pnpm typecheck` at the root checks the three applications alone, so
+      # without this the package's own TypeScript — sources and tests both — is
+      # never compiled by CI at all.
       - name: Typecheck @langwatch/system-migrations
-        if: matrix.shard == 1
+        if: matrix.app == 'platform-api'
         run: pnpm --filter @langwatch/system-migrations run typecheck
+
+      # @langwatch/platform-api-client owns `trpcQueryKey`, which re-derives
+      # tRPC's React Query cache-key encoding from a procedure path. Every
+      # feature web package invalidating a procedure its own map does not
+      # declare goes through it, so if the encoding drifts from
+      # `@trpc/react-query`'s the failure is silent — an invalidation that
+      # matches nothing, and stale UI nobody can trace back here. Its suite is
+      # the only thing that pins the encoding, and it ran nowhere.
+      - name: Run @langwatch/platform-api-client unit tests
+        if: matrix.app == 'platform-api'
+        run: pnpm --filter @langwatch/platform-api-client run test:unit
+
+      - name: Typecheck @langwatch/platform-api-client
+        if: matrix.app == 'platform-api'
+        run: pnpm --filter @langwatch/platform-api-client run typecheck
+
+      # @langwatch/trace-web is the first feature web package, and the largest
+      # body of browser code that left the monolith — 406 tests over 42 files,
+      # none of which CI ran for a long time: a package suite is unreachable
+      # from an application's vitest root.
+      - name: Run @langwatch/trace-web unit tests
+        if: matrix.app == 'platform-api'
+        run: pnpm --filter @langwatch/trace-web run test:unit
+
+      - name: Typecheck @langwatch/trace-web
+        if: matrix.app == 'platform-api'
+        run: pnpm --filter @langwatch/trace-web run typecheck
+
+      # Eleven more suites that ran nowhere. Between them they hold ~4,550
+      # tests and cost about a minute: `@langwatch/eventing` and
+      # `@langwatch/trace-server` alone are 963 and 1,390. Every one of them
+      # was red when first run, and none of the failures was a bug in the code
+      # under test — they were fixtures, doubles and assertions that had drifted
+      # from the interfaces around them, which is exactly what a suite nobody
+      # runs turns into. Naming them here is what stops that happening again.
+      # the event-sourcing framework itself — pipelines, projections, replay, the process-manager fleet.
+      - name: Run @langwatch/eventing tests
+        if: matrix.app == 'platform-api'
+        run: pnpm --filter @langwatch/eventing run test
+      # the largest feature package, including the ingestion subscribers.
+      - name: Run @langwatch/trace-server tests
+        if: matrix.app == 'platform-api'
+        run: pnpm --filter @langwatch/trace-server run test
+      # simulation execution and the child-process spawn policy.
+      - name: Run @langwatch/scenario-server tests
+        if: matrix.app == 'platform-api'
+        run: pnpm --filter @langwatch/scenario-server run test
+      # the suite and run-plan forms.
+      - name: Run @langwatch/suite-web tests
+        if: matrix.app == 'platform-api'
+        run: pnpm --filter @langwatch/suite-web run test
+      # the assistant's browser behaviour.
+      - name: Run @langwatch/langy-web tests
+        if: matrix.app == 'platform-api'
+        run: pnpm --filter @langwatch/langy-web run test
+      # the studio's pickers and flows.
+      - name: Run @langwatch/workflow-web tests
+        if: matrix.app == 'platform-api'
+        run: pnpm --filter @langwatch/workflow-web run test
+      # the grants vocabulary every authorization path validates against.
+      - name: Run @langwatch/authz-contract tests
+        if: matrix.app == 'platform-api'
+        run: pnpm --filter @langwatch/authz-contract run test
+      # usage reporting and the Stripe error masking.
+      - name: Run @langwatch/enterprise-billing-server tests
+        if: matrix.app == 'platform-api'
+        run: pnpm --filter @langwatch/enterprise-billing-server run test
+      # the back-office single sign-on surface and its hidden-surface denials.
+      - name: Run @langwatch/enterprise-sso-server tests
+        if: matrix.app == 'platform-api'
+        run: pnpm --filter @langwatch/enterprise-sso-server run test
+      # the resource-limit rows.
+      - name: Run @langwatch/enterprise-licensing-web tests
+        if: matrix.app == 'platform-api'
+        run: pnpm --filter @langwatch/enterprise-licensing-web run test
+      # endpoint validation and delivery.
+      - name: Run @langwatch/enterprise-webhook-server tests
+        if: matrix.app == 'platform-api'
+        run: pnpm --filter @langwatch/enterprise-webhook-server run test
+
+      # The six enterprise contract packages whose suites `vitest` could not
+      # even discover until `packages/enterprise/vitest.config.ts` learned the
+      # `src/__tests__/` layout their tests moved to. 155 tests, all green the
+      # first time they ran; naming them keeps them that way.
+      - name: Run @langwatch/enterprise-billing-contract tests
+        if: matrix.app == 'platform-api'
+        run: pnpm --filter @langwatch/enterprise-billing-contract run test
+      - name: Run @langwatch/enterprise-licensing-contract tests
+        if: matrix.app == 'platform-api'
+        run: pnpm --filter @langwatch/enterprise-licensing-contract run test
+      - name: Run @langwatch/enterprise-managed-provider-contract tests
+        if: matrix.app == 'platform-api'
+        run: pnpm --filter @langwatch/enterprise-managed-provider-contract run test
+      - name: Run @langwatch/enterprise-saas-contract tests
+        if: matrix.app == 'platform-api'
+        run: pnpm --filter @langwatch/enterprise-saas-contract run test
+      - name: Run @langwatch/enterprise-scim-contract tests
+        if: matrix.app == 'platform-api'
+        run: pnpm --filter @langwatch/enterprise-scim-contract run test
+      - name: Run @langwatch/enterprise-sso-contract tests
+        if: matrix.app == 'platform-api'
+        run: pnpm --filter @langwatch/enterprise-sso-contract run test
 
       # @langwatch/langyworker is the langy-worker pi-harness wrapper
       # (services/langyworker) the langyagent image compiles into the worker
-      # binary. It sits outside platform/app, so the root typecheck and the
-      # sharded app suite never see it, same raw-TypeScript, shard-1
-      # arrangement as the packages above.
+      # binary. It is not in any application's dependency closure, so the root
+      # typecheck and the application suites never see it — same
+      # raw-TypeScript, one-leg arrangement as the packages above.
       - name: Run @langwatch/langyworker unit tests
-        if: matrix.shard == 1
+        if: matrix.app == 'platform-api'
         run: pnpm --filter @langwatch/langyworker run test
 
       - name: Typecheck @langwatch/langyworker
-        if: matrix.shard == 1
+        if: matrix.app == 'platform-api'
         run: pnpm --filter @langwatch/langyworker run typecheck
 
-      - name: Run unit tests (shard ${{ matrix.shard }}/4)
+      # The share feature (ADR-057 / share ADR-001) owns trace-link minting,
+      # token resolution, audience and expiry, the view budget and the
+      # share-safe payload cache. Its suites live under packages/, so the app's
+      # vitest root cannot see them and nothing here named them: the whole
+      # feature's own coverage ran nowhere, while the scenarios it binds in
+      # packages/features/share/specs/share.feature still counted as bound by
+      # check-feature-parity.ts. Same raw-TypeScript, shard-1 arrangement as
+      # the packages above.
+      - name: Run @langwatch/share-contract unit tests
+        if: matrix.app == 'platform-api'
+        run: pnpm --filter @langwatch/share-contract run test
+
+      - name: Typecheck @langwatch/share-contract
+        if: matrix.app == 'platform-api'
+        run: pnpm --filter @langwatch/share-contract run typecheck
+
+      # The Postgres-backed suite here self-skips without DATABASE_URL, so this
+      # step runs the unit coverage and stays green on a runner with no
+      # database — it does not silently drop the integration file, which runs
+      # wherever a database is present.
+      - name: Run @langwatch/share-server unit tests
+        if: matrix.app == 'platform-api'
+        run: pnpm --filter @langwatch/share-server run test
+
+      - name: Typecheck @langwatch/share-server
+        if: matrix.app == 'platform-api'
+        run: pnpm --filter @langwatch/share-server run typecheck
+
+      - name: Run @langwatch/share-web unit tests
+        if: matrix.app == 'platform-api'
+        run: pnpm --filter @langwatch/share-web run test
+
+      - name: Typecheck @langwatch/share-web
+        if: matrix.app == 'platform-api'
+        run: pnpm --filter @langwatch/share-web run typecheck
+
+      - name: Run @langwatch/${{ matrix.app }} tests
         id: unit-tests
-        working-directory: platform/app
         run: |
-          # shardFailureReporter feeds the globalSetup hard-floor so a wedged
-          # shard that already printed failures exits 1, not a masked 0.
-          #
-          # On a draft we run only the tests whose module graph reaches the
-          # diff (`--changed`), unsharded, on one runner. Real signal for a
-          # tenth of the budget. The full sharded suite returns on
-          # ready_for_review and in the merge queue, so nothing reaches main
-          # having only had the subset.
           COV=""
           if [ "${{ needs.changes.outputs.coverage }}" = "true" ]; then
             COV="--coverage --coverage.reporter=lcov --coverage.reporter=text"
           fi
-          # Passive: records how long each file took so the sequencer can weigh
-          # by measured cost. Only on a dispatched run — see `durations` above.
-          DUR=""
-          if [ "${{ needs.changes.outputs.durations }}" = "true" ]; then
-            DUR="--reporter=./src/test-utils/durationManifestReporter.ts"
-          fi
-          if [ "${{ needs.changes.outputs.heavy }}" != "true" ]; then
-            git fetch --no-tags origin +refs/heads/main:refs/remotes/origin/main
-            pnpm test:unit --run --changed origin/main --passWithNoTests \
-              --reporter=default --reporter=./src/test-utils/shardFailureReporter.ts \
-              --dangerouslyIgnoreUnhandledErrors
-          else
-            # shellcheck disable=SC2086
-            pnpm test:unit --run --shard=${{ matrix.shard }}/${{ needs.changes.outputs.unit-shard-count }} $COV $DUR \
-              --reporter=default --reporter=./src/test-utils/shardFailureReporter.ts \
-              --dangerouslyIgnoreUnhandledErrors
-          fi
-
-      # One shard's slice of the sequencer's weights. Merged by the
-      # `shard-durations` job below into a manifest to commit.
-      - name: Upload shard durations
-        if: always() && needs.changes.outputs.durations == 'true'
-        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
-        with:
-          name: shard-durations-unit-${{ matrix.shard }}
-          path: platform/app/vitest.durations.delta.json
-          if-no-files-found: ignore
+          # shellcheck disable=SC2086
+          pnpm --filter @langwatch/${{ matrix.app }} exec vitest run $COV \
+            --reporter=default --reporter=json --outputFile=test-results.json \
+            --dangerouslyIgnoreUnhandledErrors
 
       - name: Extract test failures
         if: failure()
-        working-directory: platform/app
+        working-directory: apps/${{ matrix.app == 'platform-api' && 'api' || matrix.app }}
         run: bash ../../.github/scripts/extract-failures.sh test-results.json test-failures.txt
 
       - name: Notify Slack on new failure
@@ -520,16 +725,16 @@ jobs:
         env:
           SLACK_RELEASE_NOTIFICATION_WEBHOOK_URL: ${{ secrets.SLACK_RELEASE_NOTIFICATION_WEBHOOK_URL }}
           GH_TOKEN: ${{ github.token }}
-        working-directory: platform/app
+        working-directory: apps/${{ matrix.app == 'platform-api' && 'api' || matrix.app }}
         run: bash ../../.github/scripts/notify-slack-test-failure.sh test-unit
 
       - name: Upload unit test coverage to Codecov
-        if: always() && hashFiles('platform/app/coverage/lcov.info') != ''
+        if: always() && hashFiles('apps/*/coverage/lcov.info') != ''
         uses: codecov/codecov-action@fb8b3582c8e4def4969c97caa2f19720cb33a72f # v5
         with:
-          files: platform/app/coverage/lcov.info
+          files: apps/api/coverage/lcov.info,apps/worker/coverage/lcov.info,apps/ui/coverage/lcov.info
           flags: unit
-          name: unit-tests-shard-${{ matrix.shard }}
+          name: unit-tests-${{ matrix.app }}
           fail_ci_if_error: false
 
   # The `.integration.test.*` files that need no datastore.
@@ -547,196 +752,41 @@ jobs:
   # by src/test-utils/integrationLanes.ts, which vitest.integration.config.ts
   # also calls, so the two lanes are exact complements and no file can go
   # missing from CI. See specs/ci/integration-test-lanes.feature.
-  test-component:
+  package-suites:
     needs: changes
     if: needs.changes.outputs.relevant == 'true'
-    strategy:
-      fail-fast: false
-      matrix:
-        shard: ${{ fromJSON(needs.changes.outputs.component-shards) }}
     env:
-      VITEST_MAX_WORKERS: "4" # physical core count on GitHub-hosted ubuntu runners
       BUILD_TIME: "true"
-      CI: "true"
-      # This lane inherits the UNIT lane's hard floor and needs a bigger one.
-      #
-      # vitest.component.config.ts spreads `...unitTest`, so it also inherits
-      # `globalSetup: ["./src/test-unit-global-setup.ts"]` and its
-      # DEFAULT_HARD_FLOOR_MS of 4 minutes. That number is sized for a unit
-      # shard, which the file says finishes in ~3 min. A component shard does
-      # not: measured over recent runs the median is 297s — 4.95 min — so the
-      # floor fires on a HEALTHY shard, mid-run, whenever it lands on the slow
-      # side of its own average.
-      #
-      # The failure reads as a hang and is not one. The floor says so itself:
-      # "the shard still had files to start, so the floor cut a run that was
-      # working rather than one that was wedged. Read that as a shard too slow
-      # for the floor, not as a hang." Observed on main (run 32011... shard 2)
-      # as well as on pull requests, so it is intermittent rather than new.
-      #
-      # 12 minutes keeps the floor doing its job — a finalize wedge still gets
-      # cut well before the 25-minute job cap below, which is the outcome the
-      # floor exists to avoid — while leaving a healthy 5-minute shard alone.
-      LANGWATCH_UNIT_HARD_FLOOR_MS: "720000"
-    runs-on: ubuntu-latest
-    # No services, so nothing here can wedge on a container. The cap matches
-    # test-unit's reasoning rather than test-integration's: a vitest finalize
-    # wedge, not a datastore that never came up.
-    timeout-minutes: 25
-    steps:
-      - name: Checkout
-        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v6
-        with:
-          # Drops docs/ + assets/ media. See LEAN CHECKOUT at the top of this file.
-          sparse-checkout: |
-            /*
-            !/docs/media/
-            !/docs/images/
-            !/assets/
-          sparse-checkout-cone-mode: false
-
-      - uses: ./.github/actions/setup-pnpm-node
-        with:
-          install: "@langwatch/web..."
-
-      - uses: ./.github/actions/prepare-generated-files
-
-      - name: Generate a throwaway CREDENTIALS_SECRET
-        # Same reason as the integration job: anything encrypted at rest has to
-        # round-trip through a real key, and a component test asserting on a
-        # redacted value cannot mock the cipher it is asserting about.
-        run: echo "CREDENTIALS_SECRET=$(openssl rand -hex 32)" >> "$GITHUB_ENV"
-
-      - name: Run component tests (shard ${{ matrix.shard }}/${{ needs.changes.outputs.component-shard-count }})
-        id: component-tests
-        working-directory: platform/app
-        run: |
-          # Same draft treatment as test-unit: affected files only, unsharded,
-          # on one runner. The full sharded lane returns on ready_for_review.
-          COV=""
-          if [ "${{ needs.changes.outputs.coverage }}" = "true" ]; then
-            COV="--coverage --coverage.reporter=lcov --coverage.reporter=text"
-          fi
-          # Passive: records how long each file took so the sequencer can weigh
-          # by measured cost. Only on a dispatched run — see `durations` above.
-          DUR=""
-          if [ "${{ needs.changes.outputs.durations }}" = "true" ]; then
-            DUR="--reporter=./src/test-utils/durationManifestReporter.ts"
-          fi
-          if [ "${{ needs.changes.outputs.heavy }}" != "true" ]; then
-            git fetch --no-tags origin +refs/heads/main:refs/remotes/origin/main
-            pnpm test:component --run --changed origin/main --passWithNoTests \
-              --reporter=default --reporter=./src/test-utils/shardFailureReporter.ts \
-              --dangerouslyIgnoreUnhandledErrors
-          else
-            # shellcheck disable=SC2086
-            pnpm test:component --run --shard=${{ matrix.shard }}/${{ needs.changes.outputs.component-shard-count }} $COV $DUR \
-              --reporter=default --reporter=./src/test-utils/shardFailureReporter.ts \
-              --dangerouslyIgnoreUnhandledErrors
-          fi
-
-      # One shard's slice of the sequencer's weights. Merged by the
-      # `shard-durations` job below into a manifest to commit.
-      - name: Upload shard durations
-        if: always() && needs.changes.outputs.durations == 'true'
-        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
-        with:
-          name: shard-durations-component-${{ matrix.shard }}
-          path: platform/app/vitest.durations.delta.json
-          if-no-files-found: ignore
-
-      # The sibling lanes both upload, so without this the instrumentation the
-      # `coverage` flag turns on for this lane would be computed and thrown
-      # away — ~45% of the run for output nobody reads.
-      - name: Upload component test coverage to Codecov
-        if: always() && hashFiles('platform/app/coverage/lcov.info') != ''
-        uses: codecov/codecov-action@fb8b3582c8e4def4969c97caa2f19720cb33a72f # v5
-        with:
-          files: platform/app/coverage/lcov.info
-          flags: component
-          name: component-tests-shard-${{ matrix.shard }}
-          fail_ci_if_error: false
-
-      - name: Extract test failures
-        if: failure()
-        working-directory: platform/app
-        run: bash ../../.github/scripts/extract-failures.sh test-results.json test-failures.txt
-
-      - name: Notify Slack on new failure
-        if: failure() && github.ref == 'refs/heads/main'
-        env:
-          SLACK_RELEASE_NOTIFICATION_WEBHOOK_URL: ${{ secrets.SLACK_RELEASE_NOTIFICATION_WEBHOOK_URL }}
-          GH_TOKEN: ${{ github.token }}
-        working-directory: platform/app
-        run: bash ../../.github/scripts/notify-slack-test-failure.sh test-component
-
-  test-integration:
-    name: "test-integration (${{ matrix.lane }} ${{ matrix.shard }}/${{ matrix.count }})"
-    needs: changes
-    if: needs.changes.outputs.relevant == 'true'
-    strategy:
-      fail-fast: false
-      matrix:
-        include: ${{ fromJSON(needs.changes.outputs.integration-matrix) }}
-    env:
-      # Which half of the datastore lane this shard runs, and — because the
-      # config derives `include` and `isolate` from this one variable — whether
-      # it may share a module registry. Setting it anywhere else, or setting it
-      # to something these two jobs do not, silently changes what runs.
-      INTEGRATION_GRAPH_LANE: ${{ matrix.lane }}
-      # VITEST_INTEGRATION_PARALLEL is deliberately NOT set, so a shard runs
-      # its files one at a time.
-      #
-      # It was set here on the theory that the only obstacle to concurrent
-      # files was five suites calling redis.flushall() in afterEach, and that
-      # switching them to flushdb() plus a per-worker Redis logical database
-      # closed the gap. It did not: with it on, groupQueue.decodeDrop and
-      # scripts began failing non-deterministically, and both failures are
-      # state vanishing rather than a wrong assertion — a staged job that is
-      # never dispatched, and a group set that has lost `j1`. That is the
-      # shape a flushdb crossing a worker boundary makes.
-      #
-      # The isolation is also subtler than it reads: setupEnv runs as a
-      # config-time import in the main process, where VITEST_POOL_ID does not
-      # exist and the worker id falls back to 1, and again per worker as a
-      # setup file. Nothing in the suite asserts that two concurrent workers
-      # cannot see each other's keys. Turn this back on behind a test that
-      # does.
-      #
-      # The parallelism instead comes from six shards, each its own runner
-      # with its own Redis service container, where isolation is a property of
-      # the topology rather than of a database index.
-      #
-      # The Redis isolation below stays set. It is free when files are serial
-      # and means the wiring is already in place if the flag above returns.
-      #
-      # VITEST_MAX_WORKERS must NOT be set here. Vitest applies it after the
-      # clamp that implements `fileParallelism: false`, so exporting it hands
-      # the shard concurrent files while every comment above says it runs one
-      # at a time, and a suite replaying a migration rebuilds a shared
-      # ClickHouse table underneath a suite reading it. The worker cap for a
-      # deliberately parallel run lives in vitest.integration.config.ts, which
-      # withdraws this variable while the flag above is off.
-      VITEST_ISOLATE_WORKER_REDIS: "1"
-      # Required environment variables for integration tests
-      DATABASE_URL: "postgresql://langwatch_ci:ci_password@localhost:5432/langwatch_test"
       BASE_HOST: "localhost:3000"
       NEXTAUTH_SECRET: "nextauth-secret-for-ci-testing"
       NEXTAUTH_URL: "http://localhost:3000"
       API_TOKEN_JWT_SECRET: "api-jwt-secret-for-ci-testing"
+      # The datastores this job now stands up. A package suite that needs one
+      # is expected to self-skip when its connection string is absent, which is
+      # exactly why they have to be PRESENT here: a suite that skips itself in
+      # the only job that runs it has no coverage at all, and reports green.
+      DATABASE_URL: "postgresql://langwatch_ci:ci_password@localhost:5432/langwatch_test"
       CLICKHOUSE_URL: "http://default:ci_password@localhost:8123/test_langwatch"
+      REDIS_URL: "redis://localhost:6379"
       CI_REDIS_URL: "redis://localhost:6379"
       CI_CLICKHOUSE_URL: "http://default:ci_password@localhost:8123/test_langwatch"
       LANGWATCH_NLP_SERVICE: "http://localhost:5561"
       LANGWATCH_ENDPOINT: "http://localhost:3000"
-      BUILD_TIME: "true"
+      VITEST_ISOLATE_WORKER_REDIS: "1"
       CI: "true"
-
     runs-on: ubuntu-latest
-    # Belt-and-suspenders: per-shard coverage accumulation in the single fork
-    # worker can wedge post-test (worker fails to exit). Cap the per-job wait
-    # so a wedge fails fast in ~25 min instead of burning the 6h default.
-    timeout-minutes: 25
+    # No shards: a hundred and fifty small suites, run one after another.
+    # Serial is not thrift — each suite is its own vitest with its own worker
+    # pool, and several at once on a 4-core runner produce "[vitest-pool]:
+    # Worker forks emitted error", which reads as a broken test and is not one.
+    #
+    # It DOES have services. This job absorbed the datastore lane at the
+    # deployment cutover: `test-integration` existed to shard the monolith's
+    # 1,017 integration files, and that corpus is gone — what is left are
+    # package suites, which this job already discovers. Standing the datastores
+    # up here is what keeps their integration halves running for real instead
+    # of self-skipping into a green job.
+    timeout-minutes: 45
 
     services:
       redis:
@@ -777,39 +827,17 @@ jobs:
 
       - uses: ./.github/actions/setup-pnpm-node
         with:
-          install: "@langwatch/web..."
+          install: "all"
 
       - uses: ./.github/actions/prepare-generated-files
 
       - name: Generate a throwaway CREDENTIALS_SECRET
-        # Anything encrypted at rest (webhook header values, signing secrets,
-        # stored idempotency responses) needs a real key to round-trip, and a
-        # test asserting that ciphertext is not readable text cannot mock the
-        # cipher it is asserting about. Generated per run rather than written
-        # into this file: a committed 32-byte hex literal is indistinguishable
-        # from a leaked key, to a scanner and to a reader.
+        # Same reason as test-unit and test-component: anything encrypted at
+        # rest has to round-trip through a real key, and a test asserting that
+        # ciphertext is not readable text cannot mock the cipher it asserts on.
         run: echo "CREDENTIALS_SECRET=$(openssl rand -hex 32)" >> "$GITHUB_ENV"
 
-      # traceparent-roundtrip.integration.test.ts runs the REAL nlpgo service,
-      # so it compiles it: `go build ./cmd/service` into platform/app/.vitest-tmp/.
-      # That build is the single most expensive thing in the whole integration
-      # suite — 140.9s for a file containing one test, measured on shard 2,
-      # where the entire shard's tests came to 10.6 minutes. One Go compile was
-      # over a fifth of it.
-      #
-      # The test already skips the build when the cached binary is newer than
-      # every .go file under services/nlpgo, so it only needs the artifact to
-      # survive between runs. Keyed on the Go sources and go.sum, so a real
-      # change to the service still rebuilds; the OS is in the key because the
-      # cached artifact is a native binary.
-      - name: Cache the compiled nlpgo test binary
-        uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
-        with:
-          path: platform/app/.vitest-tmp
-          key: ${{ runner.os }}-nlpgo-testbin-${{ hashFiles('services/nlpgo/**/*.go', 'go.sum') }}
-
       - name: Setup database
-        working-directory: platform/app
         run: pnpm prisma:migrate
 
       - name: Install Goose migration tool
@@ -821,134 +849,51 @@ jobs:
         run: bash .github/scripts/start-clickhouse-with-storage-policy.sh
 
       - name: Run ClickHouse migrations
-        working-directory: platform/app
+        working-directory: apps/api
         # ClickHouse's HTTP probe can answer SELECT 1 via curl while the
         # Node @clickhouse/client still sees ECONNREFUSED on its first
         # connect (IPv6/IPv4 dual-stack bind race under --network host).
         # Retry the whole migrate step a couple of times to absorb the
-        # cold-start window. Observed flake: run 24930819915 shard 3.
+        # cold-start window.
         run: |
           for i in 1 2 3; do
-            if pnpm clickhouse:migrate; then
+            if pnpm task:clickhouse-migrate; then
               exit 0
             fi
             if [ "$i" -lt 3 ]; then
-              echo "clickhouse:migrate attempt $i failed; sleeping 5s and retrying"
+              echo "task:clickhouse-migrate attempt $i failed; sleeping 5s and retrying"
               sleep 5
             fi
           done
           exit 1
 
-      # The chart-rendering integration tests shell out to `helm template`, and
-      # skip themselves when helm or the chart dependencies are missing. That
-      # honesty is only honest if CI actually supplies both — otherwise the
-      # suite reports "skipped", the job exits 0, and every guard it contains
-      # is silently unenforced. REQUIRE_HELM_TESTS below turns a skip here into
-      # a failure, so this setup can never quietly rot.
+      # The chart-rendering suites shell out to `helm template` and skip
+      # themselves when helm or the chart dependencies are missing. That
+      # honesty is only honest if CI supplies both — otherwise the suite
+      # reports "skipped", the job exits 0, and every guard it contains is
+      # silently unenforced. REQUIRE_HELM_TESTS below turns a skip into a
+      # failure, so this setup can never quietly rot.
       - uses: azure/setup-helm@9bc31f4ebc9c6b171d7bfbaa5d006ae7abdb4310 # v5
       - name: Add chart dependency repositories
         run: |
           helm repo add prometheus-community https://prometheus-community.github.io/helm-charts
           helm repo add langwatch https://langwatch.github.io/langwatch
 
-      - name: Run integration tests (${{ matrix.lane }} ${{ matrix.shard }}/${{ matrix.count }})
-        id: integration-tests
-        working-directory: platform/app
-        # Integration files run sequentially in a single long-lived fork worker
-        # (fileParallelism:false, for Redis contention), so v8 coverage data
-        # accumulates across every file in the shard. Two levers keep that
-        # accumulation manageable: the shard count bounds files-per-worker, and
-        # the raised --max-old-space-size gives the worker enough headroom to
-        # finalize coverage and exit. NODE_OPTIONS is inherited by the fork
-        # worker (execArgv is not), so it raises the heap where it's needed.
+      - name: Run every workspace package suite
         env:
-          NODE_OPTIONS: --max-old-space-size=8192
-          # Fail loudly if the helm-backed suites cannot run here, rather than
-          # skipping into a green job.
           REQUIRE_HELM_TESTS: "1"
-        run: |
-          # shardFailureReporter feeds the globalSetup hard-floor so a wedged
-          # shard that already printed failures exits 1, not a masked 0.
-          #
-          # Draft: affected integration tests only, one runner (see test-unit).
-          # The services are already up by this point either way.
-          COV=""
-          if [ "${{ needs.changes.outputs.coverage }}" = "true" ]; then
-            COV="--coverage --coverage.reporter=lcov --coverage.reporter=text"
-          fi
-          # Passive: records how long each file took so the sequencer can weigh
-          # by measured cost. Only on a dispatched run — see `durations` above.
-          DUR=""
-          if [ "${{ needs.changes.outputs.durations }}" = "true" ]; then
-            DUR="--reporter=./src/test-utils/durationManifestReporter.ts"
-          fi
-          if [ "${{ needs.changes.outputs.heavy }}" != "true" ]; then
-            git fetch --no-tags origin +refs/heads/main:refs/remotes/origin/main
-            pnpm test:integration --changed origin/main --passWithNoTests \
-              --reporter=default --reporter=json --reporter=./src/test-utils/shardFailureReporter.ts \
-              --outputFile=test-results.json
-          else
-            # shellcheck disable=SC2086
-            pnpm test:integration --shard=${{ matrix.shard }}/${{ matrix.count }} $COV $DUR \
-              --reporter=default --reporter=json --reporter=./src/test-utils/shardFailureReporter.ts \
-              --outputFile=test-results.json
-          fi
-
-      # One shard's slice of the sequencer's weights. Merged by the
-      # `shard-durations` job below into a manifest to commit.
-      - name: Upload shard durations
-        if: always() && needs.changes.outputs.durations == 'true'
-        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
-        with:
-          # The lane is in the name because the two lanes both number their
-          # shards from 1: without it, `shared 1/2` and `mocking 1/2` would both
-          # upload `shard-durations-integration-1`, and upload-artifact rejects
-          # a duplicate name within one run. The merge job below globs
-          # `shard-durations-*`, so it picks both up either way.
-          name: shard-durations-integration-${{ matrix.lane }}-${{ matrix.shard }}
-          path: platform/app/vitest.durations.delta.json
-          if-no-files-found: ignore
-
-      - name: Extract test failures
-        if: failure()
-        working-directory: platform/app
-        run: bash ../../.github/scripts/extract-failures.sh test-results.json test-failures.txt
-
-      - name: Notify Slack on new failure
-        if: failure() && github.ref == 'refs/heads/main'
-        env:
-          SLACK_RELEASE_NOTIFICATION_WEBHOOK_URL: ${{ secrets.SLACK_RELEASE_NOTIFICATION_WEBHOOK_URL }}
-          GH_TOKEN: ${{ github.token }}
-        working-directory: platform/app
-        run: bash ../../.github/scripts/notify-slack-test-failure.sh test-integration
-
-      - name: Upload integration test coverage to Codecov
-        if: always() && hashFiles('platform/app/coverage/lcov.info') != ''
-        uses: codecov/codecov-action@fb8b3582c8e4def4969c97caa2f19720cb33a72f # v5
-        with:
-          files: platform/app/coverage/lcov.info
-          flags: integration
-          name: integration-tests-shard-${{ matrix.shard }}
-          fail_ci_if_error: false
+        run: bash .github/scripts/run-package-suites.sh
 
   lint:
     needs: changes
     if: needs.changes.outputs.relevant == 'true'
     runs-on: ubuntu-latest
-    # Scoped to this job rather than the workflow, so nothing else gains write
-    # access. `reporter: github-pr-review` posts inline review comments, which
-    # needs `pull-requests: write`; without it reviewdog gets a 403 from the
-    # Review API and silently degrades to logging commands. The gate itself
-    # still bites either way — the exit code does not depend on posting — but
-    # the findings stop landing on the diff, which is the whole point of
-    # annotating rather than just failing.
-    #
-    # A pull_request from a fork gets a read-only token no matter what is
-    # declared here, so reviewdog falls back to logging for those. That is
-    # GitHub's rule, not something this block can opt out of.
+    # Read-only. This job used to carry `pull-requests: write` so that a
+    # reviewdog pass could post inline lint annotations through the Review
+    # API. The Oxlint gate reports through the job's exit code and writes
+    # nothing back, so the write scope went with it.
     permissions:
       contents: read
-      pull-requests: write
     steps:
       - name: Checkout
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v6
@@ -968,7 +913,7 @@ jobs:
 
       - uses: ./.github/actions/setup-pnpm-node
         with:
-          install: "@langwatch/web..."
+          install: "@langwatch/platform-api... @langwatch/ui... @langwatch/architecture-lint..."
 
       # The ADR-076 workspace invariants: one lockfile, one workspace
       # definition, no member carrying overrides pnpm would ignore, the app and
@@ -981,157 +926,85 @@ jobs:
       # manifests. Takes ~200ms.
       - name: Check the workspace invariants (ADR-076)
         run: |
-          pnpm install --frozen-lockfile --filter "@langwatch/server-cli..."
-          pnpm --filter @langwatch/server-cli run test:invariants
+          pnpm install --frozen-lockfile --filter "@langwatch/server..."
+          pnpm --filter @langwatch/server run test:invariants
 
-      # THE GATE. Everything below this step is annotation, not enforcement.
-      #
-      # reviewdog-action-biome runs with fail_on_error: false and pipes Biome's
-      # stdout into reviewdog, so it reports success whenever Biome produces no
-      # parseable diagnostics — including when Biome refuses to start. That is
-      # not hypothetical: three `nursery` rules graduated out of nursery in
-      # Biome 2.5.x, the unknown keys were a fatal config error, and `pnpm lint`
-      # exited 1 having checked zero files while this job stayed green.
-      #
-      # So run Biome ourselves and let a non-zero exit fail the job. A config
-      # error and a lint violation both surface here.
-      - name: Biome (blocking — config errors included)
-        working-directory: platform/app
-        run: pnpm lint
+      - name: Oxfmt (blocking)
+        run: pnpm format:check
 
-      - name: Set up reviewdog
-        if: github.event_name == 'pull_request'
-        uses: reviewdog/action-setup@d8a7baabd7f3e8544ee4dbde3ee41d0011c3a93f # v1.5.0
-        with:
-          reviewdog_version: v0.21.0
+      - name: Architecture policy tests (blocking)
+        run: |
+          pnpm --filter @langwatch/architecture-lint typecheck
+          pnpm --filter @langwatch/architecture-lint test
 
-      # The house rules that still carry a baseline are `warn` in biome.jsonc,
-      # so the step above lets them through. This step makes them BLOCKING for
-      # new violations, and annotates the diff with the rest.
-      #
-      # TWO JOBS, TWO MECHANISMS, because one tool cannot do both well:
-      #
-      #   ANNOTATE — reviewdog maps each diagnostic onto the diff and drops
-      #     anything outside the added lines, which is line-level filtering
-      #     Biome cannot do itself. This pass cannot fail the job.
-      #
-      #   GATE — .github/scripts/biome-new-violations.sh counts violations per
-      #     (file, rule) on both sides of the merge base and fails only on an
-      #     increase. Its header explains why the added-lines filter is the
-      #     wrong thing to GATE on: these rules anchor at a function's
-      #     declaration line, so a formatter rewrapping a signature re-adds
-      #     that line and hands the PR the function's entire pre-existing
-      #     backlog. Measured on this branch: 61 such findings, none of them
-      #     authored here.
-      #
-      # `biome lint --changed` is not a substitute for either: it is
-      # file-granular, so a one-line typo fix in a legacy file would inherit
-      # every long-function violation already in it (measured at 902 on this
-      # branch alone). A gate that fires on work you did not do is a gate
-      # people switch off.
-      #
-      # reviewdog comes from its own first-party setup action, pinned to the
-      # same v0.21.0 the previous wrapper resolved. Biome comes from this
-      # repo's lockfile rather than a second copy bundled by a wrapper action.
-      #
-      # That split replaces mongolyy/reviewdog-action-biome, for four measured
-      # reasons:
-      #
-      #  1. VERSION DRIFT. That action bundles its own Biome (renovate moved it
-      #     to ^2.5.5) while this repo pins 2.5.1 in package.json. Rule
-      #     behaviour is version-sensitive, so CI would enforce rules the
-      #     developer's `pnpm lint` never runs. `pnpm exec` uses the lockfile's
-      #     Biome, so the gate and the local command are the same program.
-      #  2. It shells out to `biome check --write`, which MUTATES files during
-      #     what is supposed to be a check.
-      #  3. It reconstructs diagnostics by scraping Biome's human-readable
-      #     console output through a stack of errorformat regexes. Biome 2.x
-      #     emits `--reporter=rdjson` — reviewdog's own schema — so the parsing
-      #     step disappears along with its failure mode.
-      #  4. It passes `--max-diagnostics=30`, silently capping what is reported.
-      #
-      # Biome's own CI recipe is `biome ci`, which annotates via GitHub
-      # directly. That is not enough on its own here: `biome ci` has no notion
-      # of a diff, and the `warn`-tier rules have a baseline in the thousands.
-      # reviewdog is what narrows them to the lines this PR actually adds.
-      #
-      # rdjson carries no severity (verified — Biome omits it even for errors),
-      # so `-level=warning` supplies it for the annotating pass. Errors are
-      # already caught full-tree by the blocking step above.
-      - name: Biome house rules — annotate the diff, gate on new violations
-        if: github.event_name == 'pull_request'
+      # Debt inventories are ceilings, not a second place to hide debt. Compare
+      # each one with the merge-base copy when it exists. The first reviewed
+      # inventory bootstraps explicitly; after that, the CLI rejects growth.
+      - name: Read architecture debt inventories at the merge base
+        shell: bash
         env:
-          REVIEWDOG_GITHUB_API_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          PULL_REQUEST_BASE_SHA: ${{ github.event.pull_request.base.sha }}
+          MERGE_GROUP_BASE_SHA: ${{ github.event.merge_group.base_sha }}
         run: |
           set -euo pipefail
-
-          # One list, used by the head run, the annotator and the gate's base
-          # run. They must agree: a path linted on one side and not the other
-          # reads as that file's whole backlog appearing or vanishing.
-          # `./packages` is GONE from this list, and deliberately not replaced
-          # with `../../packages`. The nine workspace packages live in one
-          # repo-root tree that this run does not reach: it is started from the
-          # app directory, and /biome.jsonc scopes the workspace to
-          # platform/app/** anyway. Biome reports files outside the project root
-          # by ABSOLUTE path, and the gate keys counts on the reported path, so
-          # the base tree's temp-dir prefix can never match the head's: all 268
-          # of their diagnostics read as brand new every run. Restoring coverage
-          # means giving packages/ a nested config of its own, adding it to the
-          # root config's includes, and giving it its own gate run -- a change to
-          # the lint setup rather than to this list, tracked as a follow-up. The
-          # app tree, which is what this job is named for, is still fully
-          # covered.
-          BIOME_PATHS=(./src ./ee ./scripts ./e2e ./prisma ./vite)
-
-          # Biome exits non-zero whenever it reports anything; the gate is the
-          # script's decision, not this line's, so don't abort here.
-          pnpm --dir platform/app exec biome check --reporter=rdjson \
-            "${BIOME_PATHS[@]}" > biome.raw.json || true
-          echo "diagnostics: $(jq '.diagnostics | length' biome.raw.json)"
-
-          # --- ANNOTATE (cannot fail the job) ---
-          #
-          # Biome ran with platform/app as its cwd, so its paths are relative to
-          # that; reviewdog matches against a repo-root diff. Rewriting the
-          # paths here rather than running reviewdog from platform/app keeps the
-          # mapping explicit — a path that silently fails to match the diff
-          # would filter every finding away and read as a clean pass.
-          #
-          # The gate below reads biome.raw.json, NOT this file: it compares
-          # against a base tree whose paths are app-relative too.
-          jq '.diagnostics |= map(.location.path = "platform/app/" + .location.path)' \
-            biome.raw.json > biome.rdjson
-
-          # A single un-capped `github-pr-review` pass died on `422 Body is too
-          # long (maximum is 65536 characters)`: GitHub caps a review body, and
-          # a PR that reformats files has a lot of added lines to annotate.
-          # Capping is safe now that posting and deciding are separate — the
-          # cap costs annotations, never enforcement.
-          POSTED=200
-          jq --argjson n "$POSTED" \
-            '.diagnostics |= (sort_by(.location.path, .location.range.start.line) | .[:$n])' \
-            biome.rdjson > biome.posted.json
-          total=$(jq '.diagnostics | length' biome.rdjson)
-          if [ "$total" -gt "$POSTED" ]; then
-            echo "::notice::annotating the first $POSTED of $total diagnostics; the gate reads all $total"
+          base_sha="${PULL_REQUEST_BASE_SHA:-${MERGE_GROUP_BASE_SHA:-}}"
+          if [ -z "$base_sha" ]; then
+            base_sha="$(git rev-parse HEAD^)"
           fi
+          merge_base="$(git merge-base "$base_sha" HEAD)"
+          reference_directory="$RUNNER_TEMP/architecture-lint-baselines"
+          mkdir -p "$reference_directory"
+          for baseline in service-quality-baseline.json port-module-baseline.json; do
+            source_path="packages/architecture-lint/src/$baseline"
+            reference="$reference_directory/$baseline"
+            if git cat-file -e "$merge_base:$source_path"; then
+              git show "$merge_base:$source_path" > "$reference"
+            else
+              rm -f "$reference"
+            fi
+          done
 
-          reviewdog -f=rdjson -name=Biome \
-            -reporter=github-pr-review \
-            -filter-mode=added \
-            -level=warning \
-            -fail-level=none \
-            < biome.posted.json || true
+      - name: Architecture debt inventories (blocking)
+        run: |
+          pnpm --filter @langwatch/architecture-lint lint -- \
+            --shrinking-baseline-only \
+            --baseline-reference-dir "$RUNNER_TEMP/architecture-lint-baselines"
 
-          # --- GATE (the only thing that can fail this step) ---
-          #
-          # Fetch the base explicitly: the script needs a real merge base, and
-          # a missing ref must fail the fetch rather than quietly leave the
-          # comparison with nothing to compare against.
-          BASE="${{ github.base_ref }}"
-          git fetch --no-tags origin "+refs/heads/$BASE:refs/remotes/origin/$BASE"
-          bash .github/scripts/biome-new-violations.sh \
-            biome.raw.json "origin/$BASE" "${BIOME_PATHS[@]}"
+      # THE GATE. Oxlint over the whole governed tree, and a non-zero exit
+      # fails the job. A config error and a lint violation both surface here.
+      #
+      # It replaced a two-part step: a blocking full-tree lint plus a
+      # reviewdog pass that made the previous linter's `warn`-tier rules
+      # blocking on the lines a PR added, gated by a script that counted
+      # violations per (file, rule) on both sides of the merge base and
+      # failed only on an increase. See
+      # packages/architecture-lint/adrs/003-unified-oxc-toolchain.md.
+      #
+      # NONE OF THAT MACHINERY HAS AN EQUIVALENT HERE, AND NONE IS NEEDED.
+      # It existed because that ruleset carried a warn tier with a baseline
+      # in the thousands, and a rule that cannot block full-tree has to be
+      # narrowed to the diff somehow. /.oxlintrc.architecture.json has no
+      # warn tier: a rule is `error` for the whole tree, and where a backlog
+      # exists the offending files are named in the debt register at the
+      # bottom of that file. The gate is full-tree and the register is the
+      # exemption, in place of a diff filter that had to guess which findings
+      # the author wrote.
+      #
+      # The register is also strictly better on the failure mode that
+      # motivated the delta gate: a formatter rewrapping a signature re-added
+      # the declaration line and handed the PR a whole function's backlog,
+      # because the rules anchored there counted lines. No carried rule
+      # counts lines, so nothing anchors that way any more.
+      #
+      # What IS lost: inline annotations on the diff. Findings now arrive as
+      # job output rather than as review comments.
+      #
+      # `lint:oxlint` rather than `lint`, because `lint` also runs the
+      # architecture-lint CLI, and the step above already runs it with the
+      # merge-base baselines this job needs. `lint:oxlint` is the same binary,
+      # config and path set that `pnpm lint` gives a contributor.
+      - name: Oxlint (blocking -- config errors included)
+        run: pnpm lint:oxlint
 
       - name: Notify Slack on failure
         if: failure() && github.ref == 'refs/heads/main'
@@ -1220,11 +1093,12 @@ jobs:
 
       - uses: ./.github/actions/setup-pnpm-node
         with:
-          install: "@langwatch/web..."
+          install: "@langwatch/architecture-lint..."
 
+      # The parity scanner moved into @langwatch/architecture-lint with the
+      # rest of the repository-wide checks.
       - name: Check feature-file parity
-        working-directory: platform/app
-        run: pnpm check:feature-parity
+        run: pnpm --filter @langwatch/architecture-lint run check:feature-parity
 
       - name: Notify Slack on failure
         if: failure() && github.ref == 'refs/heads/main'
@@ -1233,10 +1107,25 @@ jobs:
           GH_TOKEN: ${{ github.token }}
         run: bash .github/scripts/notify-slack-job-failure.sh feature-parity
 
-  # The generated OpenAPI document is what external integrators compile
-  # clients from, and an operation missing its body, parameters or success
-  # response still appears in it. This turns each omission into a failure.
-  openapi-completeness:
+  # The frozen OpenAPI document against the surface the API process mounts.
+  #
+  # This replaces `openapi-completeness`, which was deleted at the deployment
+  # cutover along with the generator it read. The check is not the same one and
+  # deliberately so. The old pair asserted that every documented operation
+  # carried a body, parameters and a success response; this one asserts the
+  # fact those presupposed — that the operation is still SERVED.
+  #
+  # `apps/api/src/features/discovery/openapi-document.json` is frozen: three
+  # routes serve it and both SDKs generate clients from it, so this job never
+  # writes it. The task describes the mounted surface into a scratch file and
+  # diffs the two.
+  #
+  # ONE direction fails: an operation the document lists that no route on the
+  # process answers. An integrator generated a client from it, and the call now
+  # 404s. Operations served and undocumented are printed and never failed on,
+  # because the document is frozen and every route added since the freeze is
+  # one of them — failing there would make this a wall rather than a signal.
+  openapi-drift:
     needs: changes
     if: needs.changes.outputs.relevant == 'true'
     runs-on: ubuntu-latest
@@ -1254,27 +1143,19 @@ jobs:
 
       - uses: ./.github/actions/setup-pnpm-node
         with:
-          install: "@langwatch/web..."
+          install: "@langwatch/platform-api..."
 
       - uses: ./.github/actions/prepare-generated-files
 
-      - name: Check OpenAPI completeness
-        working-directory: platform/app
-        run: pnpm check:openapi-completeness
-
-      # The completeness check only inspects operations already in the
-      # document. This one catches the route that never got there: a handler
-      # with no describeRoute, or one whose app the generator never imports.
-      - name: Check OpenAPI route coverage
-        working-directory: platform/app
-        run: pnpm check:openapi-route-coverage
+      - name: Check the frozen OpenAPI document against the served surface
+        run: pnpm --filter @langwatch/platform-api run task:openapi-check
 
       - name: Notify Slack on failure
         if: failure() && github.ref == 'refs/heads/main'
         env:
           SLACK_RELEASE_NOTIFICATION_WEBHOOK_URL: ${{ secrets.SLACK_RELEASE_NOTIFICATION_WEBHOOK_URL }}
           GH_TOKEN: ${{ github.token }}
-        run: bash .github/scripts/notify-slack-job-failure.sh openapi-completeness
+        run: bash .github/scripts/notify-slack-job-failure.sh openapi-drift
 
   build:
     needs: changes
@@ -1324,12 +1205,12 @@ jobs:
       - name: Cache Prisma client
         uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
         with:
-          path: platform/app/node_modules/.prisma
-          key: ${{ runner.os }}-prisma-${{ hashFiles('platform/app/prisma/schema.prisma') }}
+          path: packages/prisma-client/src/generated
+          key: ${{ runner.os }}-prisma-${{ hashFiles('packages/prisma-client/prisma/schema.prisma') }}
 
       # Cache Vite build artifacts.
       #
-      # The key deliberately does NOT hash platform/app/src/**. It used to,
+      # The key deliberately does NOT hash apps/ui/src/**. It used to,
       # which made the primary key change on every commit: the cache was
       # therefore never a hit, and every run still wrote a fresh multi-MB
       # entry, churning the repository's 10GB cache quota for a cache that
@@ -1343,8 +1224,8 @@ jobs:
         uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
         with:
           path: |
-            platform/app/node_modules/.vite
-          key: ${{ runner.os }}-vite-${{ hashFiles('pnpm-lock.yaml', 'platform/app/vite.config.ts') }}
+            apps/ui/node_modules/.vite
+          key: ${{ runner.os }}-vite-${{ hashFiles('pnpm-lock.yaml', 'apps/ui/vite.config.ts') }}
           restore-keys: |
             ${{ runner.os }}-vite-
 
@@ -1367,25 +1248,32 @@ jobs:
           test -x "$(dirname "$gyp")/../gyp/gyp_main.py"
           echo "npm_config_node_gyp=$gyp" >> "$GITHUB_ENV"
 
-      # One install. mcp-server is a workspace dependency of the app, so the
+      # One install covering the three deployables. mcp-server is a workspace
+      # dependency of the API through @langwatch/hosted-mcp-server, so the
       # trailing `...` pulls it in — it used to be installed separately here
       # from its own lockfile, i.e. twice per run. See ADR-076.
       - name: Install dependencies
-        run: CI=true pnpm install --frozen-lockfile --filter "@langwatch/web..."
+        run: >
+          CI=true pnpm install --frozen-lockfile
+          --filter "@langwatch/platform-api..."
+          --filter "@langwatch/worker..."
+          --filter "@langwatch/ui..."
 
       - name: Build mcp-server
         run: pnpm --filter @langwatch/mcp-server run build
 
+      # apps/api and apps/worker declare no build — they run from source through
+      # tsx. What is built here is the browser bundle the API process serves,
+      # plus every workspace dependency that has a build of its own.
       - name: Build
-        working-directory: platform/app
-        run: pnpm build
+        run: pnpm --filter "@langwatch/ui..." run build
 
       # A successful `vite build` only proves the bundle compiles, not that it
       # boots. Serve the built output and load it in a headless browser to
       # catch runtime boot failures (white screens from chunk-init errors).
       # Uses the runner's preinstalled Google Chrome (no browser download).
       - name: Boot smoke test
-        working-directory: platform/app
+        working-directory: apps/ui
         env:
           SMOKE_BROWSER_CHANNEL: chrome
         run: |
@@ -1432,11 +1320,11 @@ jobs:
       - name: Test start-boxd-ssh-agent.sh
         run: bash .github/scripts/__tests__/start-boxd-ssh-agent.test.sh
 
-      - name: Test biome-new-violations.sh
-        run: bash .github/scripts/__tests__/biome-new-violations.test.sh
-
       - name: Test notify-slack-release.sh
         run: bash .github/scripts/__tests__/notify-slack-release.test.sh
+
+      - name: Test run-package-suites.sh
+        run: bash .github/scripts/__tests__/run-package-suites.test.sh
 
       # Lives here rather than in deployment-impact-check.yml because that
       # workflow filters `on.paths` down to deployment surface, which
@@ -1499,23 +1387,23 @@ jobs:
 
       - uses: ./.github/actions/setup-pnpm-node
         with:
-          install: "@langwatch/web..."
+          install: "@langwatch/platform-api..."
 
       - name: Stage canary fixture inside vitest root
-        working-directory: platform/app
-        run: cp ../../.github/scripts/__fixtures__/intentional-failure.test.ts ./_ci_canary.test.ts
+        working-directory: apps/api
+        run: cp ../../.github/scripts/__fixtures__/intentional-failure.test.ts ./src/_ci_canary.test.ts
 
       - name: Run intentional failure
         id: canary
         continue-on-error: true
-        working-directory: platform/app
+        working-directory: apps/api
         run: |
-          pnpm vitest run _ci_canary.test.ts \
+          pnpm exec vitest run src/_ci_canary.test.ts \
             --reporter=default --reporter=json --outputFile=test-results.json
 
       - name: Extract failures
         if: always()
-        working-directory: platform/app
+        working-directory: apps/api
         run: bash ../../.github/scripts/extract-failures.sh test-results.json test-failures.txt
 
       - name: Assert detection worked
@@ -1525,92 +1413,34 @@ jobs:
             echo "FAIL: canary step should have failed (vitest should exit non-zero for a failing test), got outcome=${{ steps.canary.outcome }}"
             exit 1
           fi
-          if [ ! -s platform/app/test-failures.txt ]; then
+          if [ ! -s apps/api/test-failures.txt ]; then
             echo "FAIL: test-failures.txt is missing or empty — failure extraction did not work"
             exit 1
           fi
           echo "PASS: canary failed as expected and failures were extracted"
-          cat platform/app/test-failures.txt
-
-  # Assemble the shard sequencer's weights from the lanes that just ran.
-  #
-  # Only on a dispatched run, and it produces an ARTIFACT rather than a commit:
-  # the manifest has to be identical for every shard that reads it, so it lands
-  # in the repo through a reviewed change like anything else. Download
-  # `shard-durations`, drop it at platform/app/vitest.durations.json, commit.
-  shard-durations:
-    needs: [changes, test-unit, test-component, test-integration]
-    if: always() && needs.changes.outputs.durations == 'true'
-    runs-on: ubuntu-latest
-    steps:
-      - name: Download every shard's durations
-        uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8.0.1
-        with:
-          pattern: shard-durations-*
-          path: shard-durations
-
-      # The committed manifest is the base layer, so files this run did not
-      # execute keep the weights they already had.
-      - name: Check out the committed manifest
-        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v6
-        with:
-          sparse-checkout: platform/app/vitest.durations.json
-          sparse-checkout-cone-mode: false
-          path: baseline
-
-      - name: Merge into one manifest
-        run: |
-          # Baseline FIRST, then every shard's delta on top: `add` lets later
-          # keys win, so this is "the committed weights, updated by whatever was
-          # measured". The deltas cannot fight each other — each holds only the
-          # files its own shard ran, and the lanes partition the files
-          # (integrationLanes.ts) while a lane's shards partition its own — so
-          # their union is the same whatever order `find` lists them in.
-          #
-          # This ordering is the whole point. Were each shard to emit the full
-          # manifest instead of a delta, every artifact would carry the baseline,
-          # a file measured by shard A would hold its NEW value in A's artifact
-          # and its OLD one in every other, and whichever artifact `find`
-          # happened to list last would decide — silently discarding fresh
-          # measurements.
-          baseline=baseline/platform/app/vitest.durations.json
-          if [ ! -f "$baseline" ]; then
-            baseline=empty-baseline.json
-            echo '{}' > "$baseline"
-          fi
-
-          find shard-durations -name 'vitest.durations.delta.json' -print0 |
-            xargs -0 cat |
-            jq -s --slurpfile base "$baseline" \
-              '($base[0] + (add // {})) | to_entries | sort_by(.key) | from_entries' \
-              > vitest.durations.json
-
-          # An empty merge means no shard uploaded a delta AND there was no
-          # committed manifest — every test job skipped, or all of them died
-          # before their upload step. Publishing `{}` would hand someone an
-          # artifact the instructions above say to commit, and committing it
-          # would delete every weight in the repo. Fail instead: an absent
-          # manifest is a safe state, a blank one is not.
-          count=$(jq 'length' vitest.durations.json)
-          if [ "$count" -eq 0 ]; then
-            echo "::error::No shard produced any timings — refusing to publish an empty manifest."
-            echo "::error::Committing it would remove every weight the sequencer has."
-            exit 1
-          fi
-          echo "Merged $count file timings."
-
-      - name: Upload the manifest to commit
-        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
-        with:
-          name: shard-durations
-          path: vitest.durations.json
+          cat apps/api/test-failures.txt
 
   langwatch-app-complete:
-    needs: [changes, typecheck, test-unit, test-component, test-integration, lint, ast-grep, feature-parity, openapi-completeness, build, ci-scripts-test, ci-self-test, pack-filters]
+    needs:
+      [
+        changes,
+        typecheck,
+        typecheck-packages,
+        test-unit,
+        package-suites,
+        lint,
+        ast-grep,
+        feature-parity,
+        openapi-drift,
+        build,
+        ci-scripts-test,
+        ci-self-test,
+        pack-filters,
+      ]
     if: always()
     runs-on: ubuntu-latest
     steps:
       - uses: re-actors/alls-green@05ac9388f0aebcb5727afa17fcccfecd6f8ec5fe # v1.2.2
         with:
           jobs: ${{ toJSON(needs) }}
-          allowed-skips: typecheck, test-unit, test-component, test-integration, lint, ast-grep, feature-parity, openapi-completeness, build, ci-scripts-test, ci-self-test
+          allowed-skips: typecheck, typecheck-packages, test-unit, package-suites, lint, ast-grep, feature-parity, openapi-drift, build, ci-scripts-test, ci-self-test

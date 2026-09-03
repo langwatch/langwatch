@@ -52,8 +52,7 @@ const PORTABLE_REQUIRED_KEYS = ["$schema", "name"] as const;
 /** The only fields the `author` object may carry. */
 const PORTABLE_AUTHOR_KEYS = ["name", "email", "url"] as const;
 
-const PORTABLE_SCHEMA_ID =
-  "https://agent-plugins.org/schemas/1.0.0/plugin.schema.json";
+const PORTABLE_SCHEMA_ID = "https://agent-plugins.org/schemas/1.0.0/plugin.schema.json";
 
 /** Lowercase alphanumerics, hyphens and periods; alphanumeric at both ends. */
 const PORTABLE_NAME_RE = /^[a-z0-9](?:[a-z0-9.-]*[a-z0-9])?$/;
@@ -115,9 +114,7 @@ describe("the plugin manifests", () => {
     /** @scenario "The marketplace offers the plugin from the repository root" */
     it("offers exactly the one plugin, sourced from the marketplace's own directory", () => {
       expect(marketplace.name).toBe(PLUGIN_NAME);
-      expect((marketplace.owner as Record<string, unknown>).name).toBe(
-        "LangWatch",
-      );
+      expect((marketplace.owner as Record<string, unknown>).name).toBe("LangWatch");
 
       const plugins = marketplace.plugins as Array<Record<string, unknown>>;
       expect(plugins).toHaveLength(1);

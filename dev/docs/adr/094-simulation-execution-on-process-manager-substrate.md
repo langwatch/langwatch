@@ -1,168 +1,126 @@
-# ADR-094: Simulation execution on the process-manager substrate
+# ADR-094: Simulation execution uses a per-run process manager
 
 **Date:** 2026-08-06
 
 **Status:** Accepted
 
+**Behavioural contracts:**
+[event-driven execution preparation](../../../specs/scenarios/event-driven-execution-prep.feature)
+and [queued/running cancellation](../../../specs/features/suites/cancel-queued-running-jobs.feature).
+
+**Related:** [Eventing framework boundary](../../../packages/eventing/adrs/20260820-eventing-framework-boundary.md)
+and [automation process managers](./052-automations-on-process-manager-substrate.md).
+
 ## Context
 
-The simulation-processing pipeline ran its side effects through fire-and-forget
-reactors, and the cracks were structural:
+Submitting a simulation run, cancelling it and deciding that it has stalled are
+stake-sensitive lifecycle decisions. The execution pool and Redis pub/sub are
+useful low-latency delivery mechanisms, but neither is the durable record that
+an execution or cancellation must eventually reach a terminal outcome.
 
-- The `scenarioExecution` reactor submitted queued runs to a late-bound,
-  in-process execution pool. If the pool was not yet bound when the event was
-  processed, or dispatch threw after the event was acknowledged, the run was
-  silently dropped — it sat QUEUED forever with no terminal event.
-- The `cancellationBroadcast` reactor republished `cancel_requested` over
-  ephemeral Redis pub/sub. A lost message (subscriber reconnect, pod down)
-  left the child process running with no backstop, and the cancellation
-  service dual-wrote `finishRun(CANCELLED)` for queued runs to paper over it.
-- Stall handling was read-time derivation (`stall-detection.ts`): it painted
-  STALLED cosmetically but never wrote a terminal event, so downstream
-  consumers (suite aggregates, metrics, Customer.io) never fired. Two
-  boot-time sweeps (`orphaned-run-reconciliation.ts`,
-  `scenario-orphan-reconciler.ts`) existed solely to close that gap.
-- The sync reactors (`suiteRunSync`, `traceMetricsSync`,
-  `snapshotUpdateBroadcast`, `customerIoSimulationSync`) read fold-projection
-  state to do their work, coupling them to projection timing and making them
-  unsafe under replay.
-
-ADR-052 put automations on the generic process-manager substrate
-(revision-fenced durable wakes, leased transactional outbox, per-process PG
-inbox/state). The simulation pipeline has the same requirements — per-run
-lifecycle, durable dispatch promises, deadline backstops — so it moves to the
-same substrate.
+Each run therefore needs durable private state, scheduled watchdogs and
+retryable external intent.
 
 ## Decision
 
-### `simulation_run_execution` process manager
+### One process instance per scenario run
 
-One process instance per scenario run (process key = `scenarioRunId`),
-registered on the simulation-processing pipeline via `.withProcessManager`.
-Intents: `execute` (submit to the execution pool), `cancel` (broadcast to the
-`scenario:cancel` Redis channel), `finish` (dispatch `finishRun`). All intents
-ride the leased PG outbox with deterministic message keys
-(`execute:<runId>`, `cancel:<runId>`, `finish:<runId>:<reason>`), so dispatch
-is retried up to the outbox's five attempts and redeliveries dedup.
+`simulation_run_execution` is keyed by `scenarioRunId` and registered on the
+simulation-processing pipeline. It owns three intent types:
 
-There is no `.schedule()` — wakes are per-run deadlines:
+- `execute` submits the run to the execution pool;
+- `cancel` broadcasts to the `scenario:cancel` Redis channel; and
+- `finish` records a terminal run event.
 
-- **Stall watchdog.** Queued/started/activity events arm
-  `nextWakeAt = lastActivity + STALL_THRESHOLD_MS` (the constant lives in
-  `scenario.constants.ts`). A wake that finds the run quiet past the threshold
-  force-finishes it `ERROR` with reason `"stalled"` — a recorded terminal
-  event, not a read-time paint.
-- **Cancel-grace watchdog.** A `cancel_requested` against a running run emits
-  the `cancel` intent and arms `nextWakeAt = now + CANCEL_GRACE_MS` (60s). If
-  no terminal event lands within the grace (the pub/sub message was lost, the
-  owning pod was down), the wake force-finishes the run `CANCELLED`. A cancel
-  against a queued run finishes `CANCELLED` immediately instead of waiting out
-  the grace window — the cancellation service no longer dual-dispatches that
-  event. It still emits the `cancel` intent, because `queued` does not mean
-  undispatched: the execute intent goes out the moment the run is queued, so
-  the pool may already hold the job behind a busy slot, and `pool.wasCancelled`
-  (set only by the cancellation subscriber) is what stops it spawning. The one
-  case that skips the broadcast is a cancel that overtook the queued event, so
-  no execute intent was ever emitted.
+Intent message keys are deterministic:
 
-### Event-carried subscribers
+```text
+execute:<runId>
+cancel:<runId>
+finish:<runId>:<reason>
+```
 
-The four surviving reactors became `.withSubscriber` event subscriptions
-driven by **event payloads only** — no fold-state reads. To make that
-possible, `lw.simulation_run.finished` events now carry optional
-`scenarioId` / `batchRunId` / `scenarioSetId` / `traceIds` (event version
-2026-08-06), and the DI `FinishRunCommand` backfills them from the aggregate's
-own event log (`RunQueued` + message events) when a caller omits them.
-`snapshotUpdateBroadcast` and `customerIoSimulationSync` keep a fold
-attachment for sequencing only (fire after the fold commits); the handlers
-read the event, not the fold.
+The Eventing process store commits the source-event inbox marker, next process
+state, wake and intents atomically. The leased intent dispatcher retries each
+effect under the process definition's attempt policy.
 
-### `simulation_run_metrics` table
+### Wakes enforce lifecycle deadlines
 
-Per-trace cost/latency metrics gain a dedicated ClickHouse table (migration
-`00080_create_simulation_run_metrics.sql`), written by a new
-`simulationRunMetrics` map projection that appends one row per
-`metrics_computed` event. The table is a ReplacingMergeTree keyed
-`TenantId / ScenarioRunId / TraceId`, which collapses retry re-deliveries at
-read time (exactly-once-under-retry).
+Queued, started and activity events arm:
 
-**This step is additive, and deliberately so.** The `simulation_runs` fold
-still keeps its `TraceMetrics` map and still computes the cross-trace
-`TotalCost` / `RoleCosts` / `RoleLatencies` aggregate, and it remains the only
-thing the product reads. Nothing is moved off the fold in this ADR, and no
-customer-visible read path changes. The new table is the durable per-trace
-fact log the aggregate should eventually be derived from; the repository's
-`getRunMetrics` is written and integration-tested against the rollup but has
-no production caller yet. Cutting the fold's aggregate over to it is a
-separate change, because it is a read-path migration with its own backfill
-question (the table starts empty, so every run that predates it would read as
-zero cost until refolded).
+```text
+nextWakeAt = lastActivity + STALL_THRESHOLD_MS
+```
 
-A second migration (`00081_create_simulation_run_metrics_rollup.sql`) adds a
-materialized view onto an AggregatingMergeTree rollup so a read does not
-re-collapse every raw row. The states are `argMaxState`, not `sumState`,
-because a materialized view fires per inserted block: an additive state would
-double-count a retried append that landed in its own insert, whereas a retry
-re-inserting the same `OccurredAt` and the same values resolves to one value
-under `argMaxMerge` whether or not the parts have merged.
+A due wake that still observes no newer activity emits a `finish` intent with
+terminal `ERROR` and reason `stalled`.
 
-### Data boundary: no conversation content in Postgres
+A `cancel_requested` event for a running run emits the cancel intent and arms a
+60-second cancel-grace wake. If no terminal event arrives within that grace,
+the wake emits a terminal `CANCELLED` finish intent.
 
-PM inbox/state/outbox rows carry only ids, enums, timestamps, and the
-execution target. The enforcement point is the `toPayload` event view
-(`buildSimulationRunEventView`): it narrows a committed pipeline event to
-that view before the runtime builds the envelope, so anything it drops can
-never become durable in PG. Conversation content lives only in ClickHouse
-(`event_log`, the `simulation_runs` fold, `simulation_run_metrics`).
+A queued run is finished as cancelled immediately and still emits the cancel
+broadcast, because its execute intent may already be waiting behind an occupied
+pool slot. A cancellation that precedes the queued event emits no broadcast,
+because no execute intent exists.
 
-Convention, stated once and applied pipeline-wide:
-`.withProjection` = Postgres, `.withFoldProjection` / `.withMapProjection` =
-ClickHouse.
+### Subscribers declare the consistency boundary they need
 
-### Deletions
+Simulation post-event work consumes typed event payloads. An event subscriber
+receives the committed event only. A projection subscriber may attach to a
+named projection when it needs sequencing after that projection commits, but
+its handler still reads contract-owned event data rather than treating a fold
+snapshot as private workflow state.
 
-Deleted outright, with no deprecation cycle: the `scenarioExecution` and
-`cancellationBroadcast` reactors (the whole `reactors/` dir of the
-simulation-processing pipeline), the fold-reading bodies of the sync
-reactors, `stall-detection.ts` (read-time STALLED derivation) — stored
-status is now the only truth — and both boot-time orphan sweeps
-(`orphaned-run-reconciliation.ts`, `scenario-orphan-reconciler.ts`).
+Terminal simulation events carry the scenario, batch, set and trace identities
+needed by their subscribers. Command handling derives omitted terminal
+identities from the aggregate's own event history before the terminal fact is
+recorded.
 
-Accepted loss: runs queued or in-flight BEFORE the process manager existed
-have no process instance, so no stall watchdog covers them — they may never
-reach a terminal state. We accept losing those pre-migration rows over the
-deployment window rather than keeping the legacy sweeps deployed for a
-release cycle.
+Subscribers and process managers do not run during projection replay.
+
+### Per-trace metrics have an idempotent analytical projection
+
+`simulationRunMetrics` maps each `metrics_computed` event to one
+`simulation_run_metrics` row per trace. The ClickHouse table is a
+`ReplacingMergeTree` keyed by tenant, scenario run and trace, so retry delivery
+converges by source identity.
+
+A materialized view writes `argMaxState` values into an
+`AggregatingMergeTree` rollup. Additive state is not used because the same
+source event can be inserted more than once under at-least-once delivery.
+
+The simulation-run fold remains the product read model for aggregate total
+cost, role cost and latency. The per-trace analytical table is a distinct
+fact-grain repository and is not read implicitly by the process manager.
+
+### Postgres carries no conversation content
+
+Process inbox, state and intent rows contain only IDs, enums, timestamps and
+the bounded execution target. `buildSimulationRunEventView` narrows each
+committed event before the process-manager envelope is built, so conversation
+content cannot enter Postgres through generic serialization.
+
+Full conversation content remains in ClickHouse event and simulation
+projections. Repositories return simulation contract types rather than raw
+ClickHouse or Prisma records.
+
+## Alternatives considered
+
+Submitting directly from a best-effort subscriber leaves a crash window after
+the event is accepted. Redis pub/sub alone cannot prove that a cancellation was
+observed. Read-time stall decoration changes presentation without recording a
+terminal domain fact, so downstream consumers cannot converge on it. A global
+sweeper does not model per-run cancellation grace or execution ownership as
+directly as a durable wake.
 
 ## Consequences
 
-- A queued run can no longer be silently dropped: the execute intent is a
-  durable outbox row that survives worker restarts and is retried until the
-  pool accepts it or the outbox's five attempts are spent.
-- Cancellation is durable end to end. Redis pub/sub remains the low-latency
-  broadcast, but a lost message is backstopped by the cancel-grace wake
-  instead of a dual-write in the service layer.
-- A stall is a recorded terminal outcome that fires downstream consumers,
-  not a per-read recomputation. Watchdog wakes can fire a few seconds late
-  (wake polling), but cannot lose a committed deadline.
-- Subscribers are replay-safe: event payloads carry everything they need, so
-  rebuilding projections cannot re-trigger side effects from stale fold reads.
-- PG gains per-run inbox/state/outbox rows; they are id/enum/timestamp-only by
-  construction (`toPayload`), keeping the no-conversation-content-in-PG
-  boundary enforceable at one function.
-- Pre-migration in-flight/queued rows have no process instance and may never
-  reach a terminal state — an accepted deployment-window loss. The legacy
-  orphan sweeps and the read-time stall derivation are already deleted.
-
-## References
-
-- ADR-052 (automations on the process-manager substrate — the pattern this
-  ADR ports to simulations), ADR-049 (process-manager inbox/state/outbox)
-- ADR-010 (scenario orphaned-run reconciliation — the boot sweep this ADR
-  removes)
-- [`specs/scenarios/event-driven-execution-prep.feature`](../../../specs/scenarios/event-driven-execution-prep.feature),
-  [`specs/features/suites/cancel-queued-running-jobs.feature`](../../../specs/features/suites/cancel-queued-running-jobs.feature)
-- Code: `platform/app/src/server/event-sourcing/pipelines/simulation-processing/process-manager/`,
-  `.../subscribers/`, `.../projections/simulationRunMetrics.mapProjection.ts`,
-  `platform/app/src/server/clickhouse/migrations/00080_create_simulation_run_metrics.sql`,
-  `platform/app/src/server/clickhouse/migrations/00081_create_simulation_run_metrics_rollup.sql`
+- A queued execution has a durable, retryable intent.
+- Cancellation uses Redis for prompt delivery and a durable wake as its
+  backstop.
+- A stall is a recorded terminal outcome, not a UI-only interpretation.
+- Replay cannot re-submit, cancel or finish a run.
+- Postgres write amplification is bounded to compact per-run process data.
+- Per-trace simulation metrics converge independently of the aggregate read
+  model.

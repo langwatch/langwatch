@@ -5,10 +5,7 @@ import { resolveCredentials } from "../../utils/apiKey";
 import { formatFetchError } from "../../utils/formatFetchError";
 import { failSpinner } from "../../utils/spinnerError";
 import { clockTime, dayHeading, localDay } from "../../utils/event-clock";
-import {
-  printResult,
-  type RawOutputFlags,
-} from "../../utils/output";
+import { printResult, type RawOutputFlags } from "../../utils/output";
 import { createCommandEvents } from "../../telemetry/events";
 import { cliAuthHeaders } from "../../utils/authHeaders";
 
@@ -68,20 +65,13 @@ const parseLimitOption = (raw: string | undefined): number => {
  * here, because `new Date(...).getTime()` on unparsable input is NaN and the
  * server would receive the literal string "NaN" as the bound.
  */
-const parseTimeOption = (
-  raw: string | undefined,
-  flag: string,
-): number | undefined => {
+const parseTimeOption = (raw: string | undefined, flag: string): number | undefined => {
   if (raw === undefined) return undefined;
   const trimmed = raw.trim();
-  const parsed = /^-?\d+$/.test(trimmed)
-    ? Number(trimmed)
-    : new Date(trimmed).getTime();
+  const parsed = /^-?\d+$/.test(trimmed) ? Number(trimmed) : new Date(trimmed).getTime();
   if (!Number.isFinite(parsed)) {
     console.error(
-      chalk.red(
-        `Error: ${flag} must be an ISO date or epoch ms, got "${raw}"`,
-      ),
+      chalk.red(`Error: ${flag} must be an ISO date or epoch ms, got "${raw}"`),
     );
     process.exit(1);
   }
@@ -143,11 +133,7 @@ const fetchAllSessionEvents = async ({
     nextCursor = page.nextCursor;
     onProgress(collected.length);
 
-    if (
-      !page.nextCursor ||
-      page.events.length === 0 ||
-      collected.length >= limit
-    ) {
+    if (!page.nextCursor || page.events.length === 0 || collected.length >= limit) {
       break;
     }
     cursor = page.nextCursor;

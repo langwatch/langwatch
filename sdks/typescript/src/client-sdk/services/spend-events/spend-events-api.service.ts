@@ -207,8 +207,7 @@ function appendSpendFilters({
  * Reconcile closed periods and this never fires. For a live view where an
  * approximate shape is enough, send `allowUnstable`.
  */
-export interface SpendSummariesOptions
-  extends Omit<SpendFilterOptions, "status"> {
+export interface SpendSummariesOptions extends Omit<SpendFilterOptions, "status"> {
   /**
    * One lifecycle status, minus `admitted`: a rollup sums the cost of requests
    * past admission, and an admitted request has none yet. List the events for
@@ -446,9 +445,7 @@ export class SpendEventsApiService {
     options: SpendSummariesOptions & { cursor?: string; limit?: number },
   ): Promise<SpendSummariesPage> {
     const params = new URLSearchParams();
-    const groupBy = Array.isArray(options.groupBy)
-      ? options.groupBy
-      : [options.groupBy];
+    const groupBy = Array.isArray(options.groupBy) ? options.groupBy : [options.groupBy];
     params.set("group_by", groupBy.join(","));
     params.set("from", String(options.from));
     params.set("to", String(options.to));

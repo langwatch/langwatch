@@ -15,7 +15,7 @@ Feature: Creating organization invitations
   # WAITING_APPROVAL rows were migrated to REVOKED.
 
   # Exercised by the Playwright e2e specs under
-  # tests/agentic-e2e/tests/members/*.spec.ts, which RUN and PASS in CI
+  # dev/tests/agentic-e2e/tests/members/*.spec.ts, which RUN and PASS in CI
   # (#1802) but sit outside check-feature-parity's scan, so the scenario
   # keeps @unimplemented (extending the checker is a follow-up).
   @e2e @unimplemented

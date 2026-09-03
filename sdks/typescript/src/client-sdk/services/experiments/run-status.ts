@@ -5,10 +5,7 @@
 // died before sending finished_at/stopped_at.
 
 import type { ExperimentRunSummary } from "./platformTypes";
-import {
-  ExperimentTimeoutError,
-  ExperimentRunFailedError,
-} from "./platformErrors";
+import { ExperimentTimeoutError, ExperimentRunFailedError } from "./platformErrors";
 
 export const INTERRUPTED_THRESHOLD_MS = 5 * 60 * 1000;
 
@@ -93,11 +90,7 @@ export const pollExperimentRun = async ({
   while (true) {
     if (now() - startTime > timeout) {
       const finalStatus = await getStatus(runId);
-      throw new ExperimentTimeoutError(
-        runId,
-        finalStatus.progress,
-        finalStatus.total,
-      );
+      throw new ExperimentTimeoutError(runId, finalStatus.progress, finalStatus.total);
     }
 
     await sleep(pollInterval);

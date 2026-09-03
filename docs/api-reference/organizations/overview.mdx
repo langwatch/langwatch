@@ -4,7 +4,10 @@ description: "Create organizations on a self-hosted instance with an instance ad
 ---
 
 <Note>
-  **Self-hosted only.** These endpoints exist on a self-hosted LangWatch deployment that has `LANGWATCH_INSTANCE_ADMIN_API_KEY` configured. Without that variable, and on LangWatch Cloud, they answer 404: the family is absent rather than forbidden. Creating organizations on LangWatch Cloud is not part of this API.
+  **Self-hosted only.** These endpoints exist on a self-hosted LangWatch deployment that
+  has `LANGWATCH_INSTANCE_ADMIN_API_KEY` configured. Without that variable, and on
+  LangWatch Cloud, they answer 404: the family is absent rather than forbidden. Creating
+  organizations on LangWatch Cloud is not part of this API.
 </Note>
 
 ## Intro
@@ -33,11 +36,11 @@ Set the variable on the deployment, generate it the way you generate any other s
 
 ## Endpoints
 
-| Method | Path | Description |
-|--------|------|-------------|
-| `GET` | `/api/organizations` | List the organizations on this instance |
-| `POST` | `/api/organizations` | Create an organization and its bootstrap admin API key |
-| `GET` | `/api/organizations/{id}` | Read one organization |
+| Method | Path                      | Description                                            |
+| ------ | ------------------------- | ------------------------------------------------------ |
+| `GET`  | `/api/organizations`      | List the organizations on this instance                |
+| `POST` | `/api/organizations`      | Create an organization and its bootstrap admin API key |
+| `GET`  | `/api/organizations/{id}` | Read one organization                                  |
 
 There is no `DELETE`. Deleting an organization takes everything in it, so it stays a deliberate operation rather than one an automated run can reach.
 

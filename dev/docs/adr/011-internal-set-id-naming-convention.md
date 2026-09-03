@@ -26,7 +26,7 @@ We will use a structured naming convention for all internal set IDs:
 
 All detection logic is centralised in two utility modules:
 
-- `src/server/scenarios/internal-set-id.ts` -- exports `INTERNAL_SET_PREFIX`, `ON_PLATFORM_SET_SUFFIX`, `ON_PLATFORM_DISPLAY_NAME`, `isInternalSetId()`, `isOnPlatformSet()`, `getOnPlatformSetId()`
+- `packages/features/scenario/contract/src/scenario-set-id.ts` -- exports `INTERNAL_SET_PREFIX`, `ON_PLATFORM_SET_SUFFIX`, `ON_PLATFORM_DISPLAY_NAME`, `isInternalSetId()`, `isOnPlatformSet()`, `getOnPlatformSetId()`
 - `src/server/suites/suite-set-id.ts` -- exports `SUITE_SET_SUFFIX`, `isSuiteSetId()`, `getSuiteSetId()`, `extractSuiteId()`
 
 Detection functions validate **both prefix and suffix** to prevent false positives from user-created sets that happen to end with an internal suffix.
@@ -44,5 +44,5 @@ All code that needs to distinguish internal from external sets must use these ut
 ## References
 
 - Feature spec: `specs/scenarios/internal-set-namespace.feature`
-- Utility modules: `src/server/scenarios/internal-set-id.ts`, `src/server/suites/suite-set-id.ts`
+- Utility modules: `packages/features/scenario/contract/src/scenario-set-id.ts`, `packages/features/suite/contract/src/suite-set-id.ts`
 - Related issue: #2344

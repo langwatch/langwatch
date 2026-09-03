@@ -23,10 +23,7 @@ describe("checkTenantScope", () => {
   describe("given a properly scoped statement", () => {
     describe("when the statement is checked", () => {
       it.each([
-        [
-          "a bare predicate",
-          "SELECT 1 FROM t WHERE TenantId = {tenantId:String}",
-        ],
+        ["a bare predicate", "SELECT 1 FROM t WHERE TenantId = {tenantId:String}"],
         [
           "an aliased predicate",
           "SELECT 1 FROM stored_spans AS t WHERE t.TenantId = {tenantId:String}",
@@ -130,10 +127,7 @@ describe("checkTenantScope", () => {
   describe("given a disjunction that can weaken the predicate", () => {
     describe("when the OR sits at or above the predicate's depth", () => {
       it.each([
-        [
-          "a trailing OR",
-          "SELECT 1 FROM t WHERE TenantId = {t:String} OR Status = 'x'",
-        ],
+        ["a trailing OR", "SELECT 1 FROM t WHERE TenantId = {t:String} OR Status = 'x'"],
         [
           "an OR outside the predicate's brackets",
           "SELECT 1 FROM t WHERE (TenantId = {t:String}) OR Status = 'x'",
@@ -245,10 +239,7 @@ describe("checkTenantScope", () => {
  * "refuses BEFORE the statement runs" a real claim — the driver spy is the
  * only thing that can witness it.
  */
-function guardedBy(
-  execute: QueryDriver["execute"],
-  options: TenantGuardOptions = {},
-) {
+function guardedBy(execute: QueryDriver["execute"], options: TenantGuardOptions = {}) {
   const client = new ClickHouseQueryClient({
     driver: { execute },
     tenantGuard: new TenantGuard(options),

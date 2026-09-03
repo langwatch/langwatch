@@ -74,9 +74,9 @@ describe("session-api request bounds", () => {
               ? input.toString()
               : input.url;
         if (url.endsWith("/api/auth/cli/refresh")) {
-          const sent = JSON.parse(
-            typeof init?.body === "string" ? init.body : "{}",
-          ) as { refresh_token?: string };
+          const sent = JSON.parse(typeof init?.body === "string" ? init.body : "{}") as {
+            refresh_token?: string;
+          };
           seen.push(sent.refresh_token ?? "");
           if (sent.refresh_token === "lw_rt_spent") {
             return jsonResponse(401, { error: "unauthorized" });

@@ -41,15 +41,11 @@ describe("buildCodexOtelBlock", () => {
     expect(out).toContain("# <<< langwatch otel end <<<");
     expect(out).toContain("[otel]");
     expect(out).toContain("[otel.trace_exporter.otlp-http]");
-    expect(out).toContain(
-      `endpoint = "https://app.langwatch.ai/api/otel/v1/traces"`,
-    );
+    expect(out).toContain(`endpoint = "https://app.langwatch.ai/api/otel/v1/traces"`);
     // The EVENTS exporter — codex's tool_result / user_prompt / turn_ttft
     // records, which the session fold reads — posts to /v1/logs.
     expect(out).toContain("[otel.exporter.otlp-http]");
-    expect(out).toContain(
-      `endpoint = "https://app.langwatch.ai/api/otel/v1/logs"`,
-    );
+    expect(out).toContain(`endpoint = "https://app.langwatch.ai/api/otel/v1/logs"`);
     // Traces stay FIRST: codexOtelBlockEndpoint reads the block's first
     // endpoint line, and the login staleness compare expects the trace one.
     expect(out.indexOf("[otel.trace_exporter.otlp-http]")).toBeLessThan(
@@ -541,9 +537,7 @@ describe("codexTraceEndpoint", () => {
 
 describe("codexOtelBlockHasAuthHeader", () => {
   it("returns false when the file is missing", () => {
-    expect(
-      codexOtelBlockHasAuthHeader(path.join(tmp, "nope.toml")),
-    ).toBe(false);
+    expect(codexOtelBlockHasAuthHeader(path.join(tmp, "nope.toml"))).toBe(false);
   });
 
   it("returns false for an endpoint-only block, true once the header lands", () => {

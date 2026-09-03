@@ -1,0 +1,44 @@
+{
+  "name": "@langwatch/architecture-lint",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Executable package-boundary policies for the LangWatch monorepo.",
+  "files": [
+    "src"
+  ],
+  "type": "module",
+  "main": "./src/index.ts",
+  "types": "./src/index.ts",
+  "exports": {
+    ".": {
+      "types": "./src/index.ts",
+      "default": "./src/index.ts"
+    }
+  },
+  "scripts": {
+    "lint": "tsx src/cli.ts --root ../.. --no-declarations --no-legacy-application-migration",
+    "lint:declarations": "tsx src/cli.ts --root ../.. --no-legacy-application-migration",
+    "lint:migration": "tsx src/cli.ts --root ../.. --no-declarations",
+    "review:comment-blocks": "tsx src/cli.ts --root ../.. --no-declarations --no-legacy-application-migration --review-comment-blocks --all-comment-blocks",
+    "review:test-quality": "tsx src/cli.ts --root ../.. --review-test-quality",
+    "rename-package": "tsx src/rename-workspace-package.cli.ts",
+    "rename-feature-sources": "tsx src/rename-feature-sources.cli.ts",
+    "typecheck": "tsc --noEmit",
+    "test": "vitest run",
+    "test:unit": "vitest run",
+    "colocate-tests": "tsx src/colocate-tests.cli.ts",
+    "check:feature-parity": "tsx src/check-feature-parity.ts"
+  },
+  "dependencies": {
+    "typescript": "^6.0.3",
+    "zod": "^4.4.3"
+  },
+  "devDependencies": {
+    "@types/js-yaml": "^4.0.9",
+    "@types/node": "^26.0.1",
+    "js-yaml": "^5.2.0",
+    "oxlint": "^1.78.0",
+    "tsx": "^4.22.4",
+    "vitest": "^4.1.9"
+  }
+}

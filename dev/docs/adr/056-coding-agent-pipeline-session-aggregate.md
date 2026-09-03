@@ -2,11 +2,13 @@
 
 **Date:** 2026-07-21
 
-**Status:** Proposed
+**Status:** Accepted
 
-**Store corrected by:** [ADR-066](./066-projection-clickhouse-cached-store.md) — the session-aggregate store must read its full state back from ClickHouse. The no-read-back store (`get()` returns null, forcing an `event_log` refold on every cache miss and out-of-order delivery) caused a production outage and is forbidden. The pipeline shape and session-key decisions in this ADR stand.
+**Store corrected by:** [ADR-066](../../../packages/eventing/adrs/066-clickhouse-cached-projections.md) — the session-aggregate store must read its full state back from ClickHouse. The no-read-back store (`get()` returns null, forcing an `event_log` refold on every cache miss and out-of-order delivery) caused a production outage and is forbidden. The pipeline shape and session-key decisions in this ADR stand.
 
-**Amended (2026-07-24):** the per-agent vocabulary moved from one grown-together normalization module into a **registration-style agent registry** (`coding-agent-processing/agents/` — one pure definition per agent: identity predicate, name prefixes, alias quirks; ordered, first match wins), mirroring the trace-canonicalisation extractor pattern. And the agent roster gained a sixth member: **`claude_cowork`** (Claude Cowork — the Claude desktop runtime in a VM; same event vocabulary as Claude Code, identified only by `service.name: cowork`, events-only export, model calls and tool runs folded from its `api_request`/`tool_result` events). Note the literal `claude_cowork` also names a governance IngestionSource type ([ADR-018](./018-governance-unified-observability-substrate.md)) — same product, different subsystem: governance ingests Cowork's span-shaped payloads org-wide; this pipeline folds its per-project session events.
+**Current vocabulary owner:** the Coding Agent contract's `telemetry/` registry,
+with one definition per agent and ordered first-match detection. Cowork precedes
+Claude Code because it reuses that runtime and is distinguished by service name.
 
 ## Context
 
@@ -17,17 +19,17 @@ empirically (live telemetry + agent source), not assumed:
 - **Spans** carry real trace context. One session's spans share one wire
   `TraceId` per interaction; the session key rides as an attribute
   (`session.id` on Claude Code, `gen_ai.conversation.id` on opencode — the
-  *values* are identical across signals, only the spelling differs).
+  _values_ are identical across signals, only the spelling differs).
 - **Logs** carry content (prompts, replies, tool decisions) plus lifecycle
   events. The canonical log pipeline (ADR-055) stamps every record with a
   `CorrelationTraceId` — the wire id when present, otherwise a deterministic
   hash of the session key (`CorrelationSource: synthesized`). A tool the human
-  *denied* never ran, so it exists **only** as a log.
+  _denied_ never ran, so it exists **only** as a log.
 - **Metrics** carry **no trace context at all**: an OTLP datapoint has no
   trace/span field, only exemplars could carry one, and neither the OTel Rust
   nor JS SDK implements exemplars. Measured on live data: 0 of 356
   coding-agent points carried a trace id; 356 of 356 carried `session.id`.
-  Metrics are also the *only* source of lines-of-code, commits, PRs, edit
+  Metrics are also the _only_ source of lines-of-code, commits, PRs, edit
   accept/reject and active-time — and some sessions emit **only metrics**
   (measured: 5 metric sessions vs 3 span sessions in the same window; Codex
   and Copilot metrics are fleet-level by design upstream).
@@ -36,21 +38,21 @@ PR #5708 built the first coding-agent session view as a **fold inside
 `trace-processing`, keyed by `TraceId`**. That shipped real value (Session
 tab, Terminal transcript, five-agent vocabulary normalization, several silent
 bug fixes), but the trace-first shape forces workarounds that all share one
-root cause — *the model has no session aggregate, only a trace aggregate*:
+root cause — _the model has no session aggregate, only a trace aggregate_:
 
 1. The session row is keyed by `TraceId`, so a session spanning traces
    (sub-agent `claude -p` spawns) scatters across rows, and a metric-only
    session cannot exist at all.
-2. Log facts are re-routed *into* the trace pipeline
+2. Log facts are re-routed _into_ the trace pipeline
    (`RecordLogContributionCommand`) so a trace-keyed fold can see them —
    re-coupling the log pipeline to traces right after ADR-055 separated them.
 3. Metrics structurally cannot feed the fold, so the read path re-scans
    `metric_time_rollups` by `session.id` on every session-view open and
    overlays the result.
-4. Context-less logs must first *become* a trace (synthesized trace ids) to
+4. Context-less logs must first _become_ a trace (synthesized trace ids) to
    participate — everything must be a trace before it can be seen.
-5. `trace-processing` already registers 13 reactors; coding-agent concerns
-   metastasizing there deepens a side-effect sprawl we already regret.
+5. `trace-processing` already serves many post-fold concerns; coding-agent
+   lifecycle and projections there would deepen an unrelated side-effect graph.
 
 ## Decision
 
@@ -71,14 +73,14 @@ aggregate is the **session**, not the trace.
      vocabulary; content never rides, lengths/ids/counters only).
    - `contributeMetricFacts` — from metric-processing (**net-new**: the
      converged per-series totals for the session's series).
-   The trace pipeline's coding-agent fold and its log re-routing are retired;
-   the trace becomes a *contribution and a drill-down*, not the spine.
+     The trace pipeline's coding-agent fold and its log re-routing are retired;
+     the trace becomes a _contribution and a drill-down_, not the spine.
 
-3. **Consumption primitives: subscribers, projections, one process manager.
-   No reactors.** Fan-in is `withEventSubscriber`; read models are
+3. **Consumption primitives: subscribers, projections, one process manager.**
+   Fan-in is `withEventSubscriber`; read models are
    projections; lifecycle (session finalization, late-contribution reopen) is
    a named process manager per ADR-052. Origin gating is a predicate inside
-   the subscriber, not a gate reactor.
+   the subscriber, not a separate gate stage.
 
 4. **Projections.**
    - `coding_agent_sessions` — the session row (fold), **keyed by
@@ -108,16 +110,13 @@ aggregate is the **session**, not the trace.
      read-time span content enrichment, exemplar-correlated metrics like
      TTFT) reads by `CorrelationTraceId` and does **not** depend on the
      session aggregate. It works for any trace, coding-agent or not.
-   Neither surface can break the other.
+     Neither surface can break the other.
 
-7. **Provider vocabulary lives here.** The per-agent knowledge (identity
-   predicates, name prefixes, alias quirks) is single-sourced in this
-   pipeline's `agents/` registry — one pure definition per agent, folded
-   into shared tables by the normalization engine (see the 2026-07-24
-   amendment above). Cross-agent spelling folds (token buckets,
-   non-additive buckets like Codex `total` / Gemini `tool`, MCP name
-   parsing) stay in the engine. Nothing agent-specific remains in
-   `trace-processing`.
+7. **Provider vocabulary belongs to the feature contract.** Identity
+   predicates, name prefixes, aliases, token buckets, and MCP naming are
+   single-sourced in `packages/features/coding-agent/contract/src/telemetry`.
+   Event pipelines and UI callers consume that portable vocabulary; nothing
+   agent-specific remains in `trace-processing`.
 
 8. **Synthesis stays, generically.** Logs-only sources (a logs exporter with
    no traces exporter) still get a synthesized `CorrelationTraceId` and the
@@ -137,14 +136,13 @@ the trace pipeline. A session aggregate makes metrics a first-class
 contributor — which is the only way metric-only sessions can exist — and
 returns `trace-processing` to processing traces.
 
-**Why no reactors:** reactors are unnamed side effects triggered by storage
-events; thirteen of them on the trace pipeline is how the current tangle
-grew. Subscribers make consumption explicit and replay-visible; process
+**Why subscribers and process managers:** subscribers make best-effort
+consumption explicit and replay-excluded; process
 managers make multi-step lifecycle a named, testable saga (ADR-052).
 Everything this pipeline needs maps onto those two plus projections.
 
 **Why engine-fold for metrics, app-fold for spans/logs:** span/log facts are
-*derived and non-summable* (step sequencing, cache-rebuild detection, error
+_derived and non-summable_ (step sequencing, cache-rebuild detection, error
 classes) — they need the app-side fold. Metric facts are sums/counts —
 exactly what `ReplacingMergeTree` + `GROUP BY` do natively, with replay
 safety inherited from the converged-value rule rather than bespoke state.
@@ -170,14 +168,8 @@ canonical metric tables.
 - Multi-trace sessions unify under one row; the trace drawer's session tab
   resolves through `coding_agent_trace_sessions`.
 - The session-view read drops its per-open rollup scan.
-- `trace-processing` loses the coding-agent fold, the legacy
-  `claudeCodeSpanSync` reactor and log-to-span converter (still live on
-  main today), and their spec; log-only installs stop getting synthesized
-  tool spans and need `langwatch claude` re-run for real spans — a release
-  note, as PR #5708 already documented.
-- PR #5708 is superseded and closed; its branch is deleted (this also
-  retires the credential blob still reachable in that branch's history —
-  the password is already rotated).
+- `trace-processing` contains no coding-agent fold or log-to-span converter;
+  coding-agent facts enter through the dedicated pipeline's subscribers.
 - Future agents (or any customer app that sets `session.id`) onboard by
   writing one vocabulary adapter; the aggregate, projections and surfaces
   are already generic.
@@ -189,6 +181,7 @@ canonical metric tables.
   projection — superseded by this document).
 - Specs: `specs/coding-agent/session-aggregate.feature`,
   `specs/coding-agent/personal-usage.feature`.
-- Build plan + port manifest: `dev/docs/coding-agent-pipeline-plan.md`.
+- Feature service boundary:
+  `packages/features/coding-agent/adrs/001-session-read-service-boundary.md`.
 - Claude Code telemetry reference:
   https://code.claude.com/docs/en/monitoring-usage

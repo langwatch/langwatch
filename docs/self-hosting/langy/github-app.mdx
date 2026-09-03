@@ -19,11 +19,16 @@ There is no per-user OAuth and no long-lived stored token: the app private key i
 To set it up: register a GitHub App, put its id, private key, webhook secret, and slug into the deployment env, and have org admins install it on the repos LangWatch may touch from **Settings > Integrations**.
 
 <Info>
-**Also check:** [What Langy can do in your GitHub](/langy/security/github-access), [Setup](/self-hosting/langy/setup), [Environment variables](/self-hosting/langy/environment-variables).
+  **Also check:** [What Langy can do in your GitHub](/langy/security/github-access),
+  [Setup](/self-hosting/langy/setup), [Environment
+  variables](/self-hosting/langy/environment-variables).
 </Info>
 
 <Note>
-Registering the app is independent of the Langy runtime, which the umbrella chart deploys by default. See [Setup](/self-hosting/langy/setup) first if you have not enabled the pod yet. If the private key is unset, the GitHub feature is silently off and Langy returns findings without opening PRs.
+  Registering the app is independent of the Langy runtime, which the umbrella chart
+  deploys by default. See [Setup](/self-hosting/langy/setup) first if you have not enabled
+  the pod yet. If the private key is unset, the GitHub feature is silently off and Langy
+  returns findings without opening PRs.
 </Note>
 
 ## Register the app
@@ -32,29 +37,31 @@ Go to GitHub, then your **org settings > Developer settings > GitHub Apps > New 
 
 Fill in these fields:
 
-| Field | Value |
-|---|---|
-| App name | `LangWatch Langy` (or per environment, e.g. `LangWatch Langy (dev)`) |
-| Homepage URL | `https://app.langwatch.ai` (or your control-plane URL) |
-| Setup URL | `<BASE_URL>/api/github/setup` |
-| Redirect on update | ON (so re-configuring an install returns to the Setup URL) |
-| Request user authorization (OAuth) during installation | OFF. Langy is bot-authored, no user OAuth. |
-| Webhook > Active | ON (optional, see [Restricted networks](#restricted-networks)) |
-| Webhook URL | `<BASE_URL>/api/github/webhook` |
-| Webhook secret | Generate one (`openssl rand -hex 32`). You set it as `GITHUB_LANGY_WEBHOOK_SECRET`. |
-| Where can this GitHub App be installed? | Any account (recommended) or only this org |
+| Field                                                  | Value                                                                               |
+| ------------------------------------------------------ | ----------------------------------------------------------------------------------- |
+| App name                                               | `LangWatch Langy` (or per environment, e.g. `LangWatch Langy (dev)`)                |
+| Homepage URL                                           | `https://app.langwatch.ai` (or your control-plane URL)                              |
+| Setup URL                                              | `<BASE_URL>/api/github/setup`                                                       |
+| Redirect on update                                     | ON (so re-configuring an install returns to the Setup URL)                          |
+| Request user authorization (OAuth) during installation | OFF. Langy is bot-authored, no user OAuth.                                          |
+| Webhook > Active                                       | ON (optional, see [Restricted networks](#restricted-networks))                      |
+| Webhook URL                                            | `<BASE_URL>/api/github/webhook`                                                     |
+| Webhook secret                                         | Generate one (`openssl rand -hex 32`). You set it as `GITHUB_LANGY_WEBHOOK_SECRET`. |
+| Where can this GitHub App be installed?                | Any account (recommended) or only this org                                          |
 
 <Note>
-`/api/github-langy/setup` and `/api/github-langy/webhook` are the earlier paths. They stay mounted on the same handlers, so an App already registered with them keeps working. Use the paths above for a new registration.
+  `/api/github-langy/setup` and `/api/github-langy/webhook` are the earlier paths. They
+  stay mounted on the same handlers, so an App already registered with them keeps working.
+  Use the paths above for a new registration.
 </Note>
 
 Set the repository permissions to exactly these, nothing more. Tighter scope means a smaller blast radius.
 
-| Permission | Access |
-|---|---|
-| Contents | Read & write |
+| Permission    | Access       |
+| ------------- | ------------ |
+| Contents      | Read & write |
 | Pull requests | Read & write |
-| Metadata | Read |
+| Metadata      | Read         |
 
 Under **Subscribe to events**, select **Pull request**. GitHub sends the installation lifecycle events (`installation`, `installation_repositories`) on its own. Subscribe to nothing else.
 
@@ -68,7 +75,7 @@ Click **Create GitHub App**. On the resulting page:
 
 ## Plumb the secrets
 
-Add these to the control-plane env (`.env` or your secret manager). All are optional in the schema (`platform/app/src/env-create.mjs`); when the private key is unset the feature is silently off, the connect card reports the integration as unavailable, and no token can be minted.
+Add these to the control-plane env (`.env` or your secret manager). All are optional in the environment schema (`apps/api/src/platform/config/api.config.ts`); when the private key is unset the feature is silently off, the connect card reports the integration as unavailable, and no token can be minted.
 
 ```bash title=".env"
 GITHUB_LANGY_APP_ID="<App ID from registration>"
@@ -82,7 +89,9 @@ GITHUB_LANGY_PRIVATE_KEY="-----BEGIN RSA PRIVATE KEY-----\n...\n-----END RSA PRI
 ```
 
 <Warning>
-`GITHUB_LANGY_PRIVATE_KEY` is the only credential for the whole GitHub integration and grants write access to installed repos. Keep it in a secrets manager, never in version control, and never let it reach the Langy agent pod. It stays in the control plane.
+  `GITHUB_LANGY_PRIVATE_KEY` is the only credential for the whole GitHub integration and
+  grants write access to installed repos. Keep it in a secrets manager, never in version
+  control, and never let it reach the Langy agent pod. It stays in the control plane.
 </Warning>
 
 There is no client id or secret; the bot-authored flow uses no user OAuth. `CREDENTIALS_SECRET` (already required for any production install) signs the install round-trip's state, so nothing new is needed there.
@@ -123,7 +132,10 @@ LangWatch then derives every address from that host: the REST API at `https://<H
 Sessions are matched by the host their git remote reports, so an instance bound to an Enterprise Server links sessions on that host and leaves github.com sessions unlinked.
 
 <Note>
-`GITHUB_LANGY_HOST` covers the control plane: the connection, token minting, and coding-agent pull request linkage. Langy's own pull requests still go to github.com, because the worker clones with the `gh` command line, which reads its own host setting. Enterprise Server support for Langy pull requests is separate work.
+  `GITHUB_LANGY_HOST` covers the control plane: the connection, token minting, and
+  coding-agent pull request linkage. Langy's own pull requests still go to github.com,
+  because the worker clones with the `gh` command line, which reads its own host setting.
+  Enterprise Server support for Langy pull requests is separate work.
 </Note>
 
 ## Restricted networks
@@ -134,11 +146,11 @@ GitHub must be able to reach `<BASE_URL>/api/github/webhook` to deliver webhooks
 
 What changes without webhooks:
 
-| Behavior | With webhooks | Without webhooks |
-|---|---|---|
+| Behavior                                         | With webhooks                     | Without webhooks                                                                                                                                                               |
+| ------------------------------------------------ | --------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
 | A pull request appears on the Pull Requests page | Within seconds of it being opened | On the next outbound recheck: about 15 to 25 minutes while sessions keep running on the branch, up to 24 hours for a branch that went quiet before its pull request was opened |
-| Uninstall and suspend | Reconciled at once | Reconciled late. The next live read gets a 404 from GitHub and removes the stale record |
-| Repository selection changes | Reconciled at once | Refreshed on the next live resolve |
+| Uninstall and suspend                            | Reconciled at once                | Reconciled late. The next live read gets a 404 from GitHub and removes the stale record                                                                                        |
+| Repository selection changes                     | Reconciled at once                | Refreshed on the next live resolve                                                                                                                                             |
 
 Everything else is outbound only and is not affected: minting installation tokens, Langy opening pull requests, the post-connect backfill, and the live pull request status the page reads.
 
@@ -154,13 +166,16 @@ In a session, ask Langy something like "open a PR on `<a repo the app is install
 
 <Steps>
   <Step title="Install card (if not yet installed)">
-    The "Install the LangWatch GitHub App" card appears in chat if the org has not installed the app yet.
+    The "Install the LangWatch GitHub App" card appears in chat if the org has not
+    installed the app yet.
   </Step>
   <Step title="Chat continues">
     After installing, the popup closes and the chat continues.
   </Step>
   <Step title="PR card">
-    Langy clones the repo into the per-session worker home, branches, commits, pushes, and posts the PR URL, rendered as a PR card. The PR is authored by the app, with the requester credited as co-author.
+    Langy clones the repo into the per-session worker home, branches, commits, pushes, and
+    posts the PR URL, rendered as a PR card. The PR is authored by the app, with the
+    requester credited as co-author.
   </Step>
 </Steps>
 

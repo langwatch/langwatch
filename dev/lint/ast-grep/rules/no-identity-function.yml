@@ -1,0 +1,34 @@
+id: no-identity-function-ts
+message: >
+  This named function returns the argument it was given. An identity function
+  adds an import, a name and a call for no behaviour, and it usually exists so
+  a `define(...)` / `createX(...)` / `toY(...)` wrapper looks like a builder or
+  a conversion. If the point is to pin a literal's type, `as const` or
+  `satisfies` does it at the call site with nothing to import. If the point is
+  somewhere to add validation later, add the name when there is validation.
+  A conversion that converts nothing is worse than none: the name claims work
+  that is not happening. See dev/docs/best_practices/overengineering.md.
+severity: warning
+language: TypeScript
+rule:
+  any:
+    # Named declarations, with and without a return annotation or generics.
+    - pattern: "function $NAME($ARG: $T): $R { return $ARG; }"
+    - pattern: "function $NAME($ARG: $T) { return $ARG; }"
+    - pattern: "function $NAME($ARG): $R { return $ARG; }"
+    - pattern: "function $NAME<$$$G>($ARG: $T): $R { return $ARG; }"
+    - pattern: "function $NAME<$$$G>($ARG: $T) { return $ARG; }"
+    # Arrows only when BOUND TO A NAME. An unbound `(x) => x` is the legitimate
+    # no-op default — `transform ?? ((e) => e)`, a pino `bindings` formatter,
+    # a zustand default selector — and flagging those is noise.
+    - pattern: "const $NAME = ($ARG: $T): $R => $ARG;"
+    - pattern: "const $NAME = ($ARG: $T) => $ARG;"
+    - pattern: "const $NAME = <$$$G>($ARG: $T): $R => $ARG;"
+files:
+  - "packages/**/*.ts"
+  - "apps/**/*.ts"
+ignores:
+  - "**/*.d.ts"
+  - "**/__tests__/**"
+  - "**/*.test.ts"
+  - "**/generated/**"

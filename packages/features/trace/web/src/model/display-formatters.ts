@@ -1,0 +1,230 @@
+const MS_PER_MINUTE = 60_000;
+const MS_PER_HOUR = 60 * MS_PER_MINUTE;
+const MS_PER_DAY = 24 * MS_PER_HOUR;
+const MS_PER_WEEK = 7 * MS_PER_DAY;
+const MS_PER_MONTH = 30 * MS_PER_DAY;
+const MS_PER_YEAR = 365 * MS_PER_DAY;
+
+export function formatRelativeTime(timestamp: number): string {
+  const diffMs = Date.now() - timestamp;
+  if (diffMs < MS_PER_MINUTE) return "now";
+  if (diffMs < MS_PER_HOUR) return `${Math.floor(diffMs / MS_PER_MINUTE)}m`;
+  if (diffMs < MS_PER_DAY) return `${Math.floor(diffMs / MS_PER_HOUR)}h`;
+  return `${Math.floor(diffMs / MS_PER_DAY)}d`;
+}
+
+/**
+ * Verbose natural-language relative time — "1 minute ago", "2 hours ago",
+ * "3 weeks ago". Used by the SINCE column, which trades compactness for
+ * readability (the compact `formatRelativeTime` stays the format for the
+ * narrow TIME column).
+ */
+export function formatVerboseRelative(timestamp: number): string {
+  // Clock skew can produce `timestamp > Date.now()` for traces that arrive
+  // a hair ahead of the viewer's clock. The narrow `formatRelativeTime`
+  // clamps the same way; matching that behaviour here keeps the Since
+  // column and the hover card from blinking "in the future" on traces
+  // that are really just landing live.
+  const diffMs = Math.max(0, Date.now() - timestamp);
+  if (diffMs < MS_PER_MINUTE) return "just now";
+  const pick = (n: number, singular: string): string => `${n} ${singular}${n === 1 ? "" : "s"} ago`;
+  if (diffMs < MS_PER_HOUR) {
+    return pick(Math.floor(diffMs / MS_PER_MINUTE), "minute");
+  }
+  if (diffMs < MS_PER_DAY) {
+    return pick(Math.floor(diffMs / MS_PER_HOUR), "hour");
+  }
+  if (diffMs < MS_PER_WEEK) {
+    return pick(Math.floor(diffMs / MS_PER_DAY), "day");
+  }
+  if (diffMs < MS_PER_MONTH) {
+    return pick(Math.floor(diffMs / MS_PER_WEEK), "week");
+  }
+  if (diffMs < MS_PER_YEAR) {
+    return pick(Math.floor(diffMs / MS_PER_MONTH), "month");
+  }
+  return pick(Math.floor(diffMs / MS_PER_YEAR), "year");
+}
+
+/**
+ * Full ISO 8601 timestamp in UTC, e.g. `2026-06-02T13:14:15.123Z`. Used by
+ * the TIMESTAMP column for users who want to copy-paste a precise wall-
+ * clock into log queries / external tools without translating from a
+ * relative string.
+ */
+export function formatISOTimestamp(timestamp: number): string {
+  return new Date(timestamp).toISOString();
+}
+
+/**
+ * Local-time string with the viewer's IANA zone abbreviated (e.g.
+ * `2026-06-02 15:14:15 CEST`). Used inside the TimeHoverCard. Falls back
+ * gracefully on environments without `Intl` (SSR) — returns the bare
+ * locale string.
+ */
+export function formatLocalWithZone(timestamp: number): string {
+  const d = new Date(timestamp);
+  try {
+    const formatter = new Intl.DateTimeFormat(void 0, {
+      year: "numeric",
+      month: "2-digit",
+      day: "2-digit",
+      hour: "2-digit",
+      minute: "2-digit",
+      second: "2-digit",
+      hour12: false,
+      timeZoneName: "short",
+    });
+    // Intl returns "06/02/2026, 15:14:15 CEST" — reformat to the ISO-ish
+    // shape we use elsewhere for consistency with formatAbsoluteTime.
+    const parts = formatter.formatToParts(d);
+    const lookup: Record<string, string> = {};
+    for (const p of parts) lookup[p.type] = p.value;
+    const ymd = `${lookup.year}-${lookup.month}-${lookup.day}`;
+    const hms = `${lookup.hour}:${lookup.minute}:${lookup.second}`;
+    return `${ymd} ${hms} ${lookup.timeZoneName ?? ""}`.trim();
+  } catch {
+    return d.toLocaleString();
+  }
+}
+
+/**
+ * Resolve the viewer's IANA time zone, e.g. `Europe/Amsterdam`. Returns
+ * `"UTC"` when `Intl` isn't available (server render path).
+ */
+export function resolveViewerTimeZone(): string {
+  try {
+    return Intl.DateTimeFormat().resolvedOptions().timeZone || "UTC";
+  } catch {
+    return "UTC";
+  }
+}
+
+/**
+ * Day of week in the viewer's locale, e.g. `Tuesday`. Mirrors what most
+ * dashboards put in the right-rail of a date hover.
+ */
+export function formatDayOfWeek(timestamp: number): string {
+  try {
+    return new Intl.DateTimeFormat(void 0, { weekday: "long" }).format(new Date(timestamp));
+  } catch {
+    return "";
+  }
+}
+
+/**
+ * Compact relative-time formatter with an explicit "ago" suffix for
+ * drawer-header / detail surfaces. No space between the number and
+ * unit (`10m ago`, `16d ago`) so it stays tight at small sizes, but
+ * keeps the natural-language hint that the table-cell
+ * `formatRelativeTime` drops.
+ */
+export function formatRelativeTimeAgo(timestamp: number): string {
+  const diffMs = Date.now() - timestamp;
+  if (diffMs < MS_PER_MINUTE) return "just now";
+  if (diffMs < MS_PER_HOUR) {
+    return `${Math.floor(diffMs / MS_PER_MINUTE)}m ago`;
+  }
+  if (diffMs < MS_PER_DAY) {
+    return `${Math.floor(diffMs / MS_PER_HOUR)}h ago`;
+  }
+  return `${Math.floor(diffMs / MS_PER_DAY)}d ago`;
+}
+
+export function formatAbsoluteTime(timestamp: number): string {
+  // Render in UTC and tag the suffix so engineers reading a trace can
+  // line up timestamps against their server logs without doing the TZ
+  // math in their heads. The previous `toLocaleString()` form rendered
+  // in the viewer's local time without saying so, which was ambiguous.
+  const d = new Date(timestamp);
+  const pad = (n: number) => String(n).padStart(2, "0");
+  return `${d.getUTCFullYear()}-${pad(d.getUTCMonth() + 1)}-${pad(
+    d.getUTCDate(),
+  )} ${pad(d.getUTCHours())}:${pad(d.getUTCMinutes())}:${pad(d.getUTCSeconds())} UTC`;
+}
+
+/**
+ * Human-readable byte size using decimal (SI) units — bytes, kB, MB, GB, TB.
+ * Decimal, not binary (KiB), because the source is ClickHouse `byteSize(...)`
+ * which reports raw byte totals and SI units read more naturally to users
+ * ("1.4 MB"). Sub-kB renders as a plain integer ("512 B"); kB and up carry
+ * one decimal place. A zero / negative / non-finite size reads as the em-dash
+ * placeholder so an empty Size column matches the other numeric cells.
+ */
+const BYTE_UNITS = ["B", "kB", "MB", "GB", "TB"] as const;
+
+export function formatBytes(bytes: number): string {
+  if (!Number.isFinite(bytes) || bytes <= 0) return "—";
+  if (bytes < 1_000) return `${Math.round(bytes)} B`;
+  let value = bytes;
+  let unitIndex = 0;
+  while (value >= 1_000 && unitIndex < BYTE_UNITS.length - 1) {
+    value /= 1_000;
+    unitIndex += 1;
+  }
+  return `${value.toFixed(1)} ${BYTE_UNITS[unitIndex]}`;
+}
+
+export function formatWallClock(startMs: number, endMs: number): string {
+  const diff = Math.max(0, endMs - startMs);
+  const secs = Math.floor(diff / 1_000);
+  const mins = Math.floor(secs / 60);
+  const remainSecs = secs % 60;
+  if (mins === 0) return `wall: ${remainSecs}s`;
+  return `wall: ${mins}m ${String(remainSecs).padStart(2, "0")}s`;
+}
+
+export function truncateId(id: string, chars = 8): string {
+  if (id.length <= chars) return id;
+  return id.slice(0, chars);
+}
+
+export const SPAN_TYPE_COLORS = {
+  llm: "blue.solid",
+  tool: "green.solid",
+  agent: "purple.solid",
+  rag: "teal.solid",
+  guardrail: "orange.solid",
+  evaluation: "pink.solid",
+  chain: "cyan.solid",
+  span: "gray.solid",
+  module: "gray.solid",
+} as const;
+
+export const STATUS_COLORS = {
+  error: "red.solid",
+  warning: "yellow.solid",
+  ok: "green.solid",
+} as const;
+
+/**
+ * Hash palette — deliberately conservative. Each entry is a Chakra colorPalette
+ * name whose `.subtle`/`.muted`/`.emphasized` variants render legibly in BOTH
+ * light and dark mode. Yellow is excluded because its low-contrast subtle tones
+ * are easy to miss against light backgrounds; red is excluded because it carries
+ * negative-state semantics elsewhere in the UI (status). Order is fixed so the
+ * mapping is stable across deploys.
+ */
+const HASH_COLOR_PALETTE = [
+  "blue.solid",
+  "purple.solid",
+  "pink.solid",
+  "orange.solid",
+  "teal.solid",
+  "cyan.solid",
+  "green.solid",
+] as const;
+
+export function hashColor(value: string): (typeof HASH_COLOR_PALETTE)[number] {
+  let hash = 0;
+  for (let i = 0; i < value.length; i++) {
+    hash = (hash << 5) - hash + value.charCodeAt(i);
+    hash |= 0;
+  }
+  return HASH_COLOR_PALETTE[Math.abs(hash) % HASH_COLOR_PALETTE.length]!;
+}
+export {
+  formatCost,
+  formatDuration,
+  formatTokens,
+} from "@langwatch/design-system/display-formatters";

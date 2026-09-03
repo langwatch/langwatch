@@ -1,10 +1,7 @@
 import chalk from "chalk";
 import { createSpinner } from "../../utils/spinner";
 import { resolveCredentials } from "../../utils/apiKey";
-import {
-  commandValidationError,
-  reportCommandError,
-} from "../../utils/errorOutput";
+import { commandValidationError, reportCommandError } from "../../utils/errorOutput";
 import type { CommandResult } from "../../utils/output";
 import { createDatasetService } from "./service-factory";
 import { handleDatasetCommandError } from "./error-handler";
@@ -36,7 +33,9 @@ export const recordsUpdateCommand = async (
   }
 
   const service = createDatasetService();
-  const spinner = createSpinner(`Updating record "${recordId}" in "${slugOrId}"...`).start();
+  const spinner = createSpinner(
+    `Updating record "${recordId}" in "${slugOrId}"...`,
+  ).start();
 
   try {
     const record = await service.updateRecord(slugOrId, recordId, entry);

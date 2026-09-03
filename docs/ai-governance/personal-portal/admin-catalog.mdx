@@ -11,9 +11,16 @@ every matching user's `/me` portal grid.
 
 ![Admin catalog editor, section-grouped list of published tiles](/images/ai-governance/portal/admin-catalog-overview.png)
 
-<Info>**Pairs with:** [Portal overview](/ai-governance/personal-portal/overview) for the user-side tile grid, and [End-user tile interactions](/ai-governance/personal-portal/end-user) for what each tile expands into.</Info>
+<Info>
+  **Pairs with:** [Portal overview](/ai-governance/personal-portal/overview) for the
+  user-side tile grid, and [End-user tile
+  interactions](/ai-governance/personal-portal/end-user) for what each tile expands into.
+</Info>
 
-<Note>**Permission required**: `aiTools:manage` (granted to ADMIN by default; delegable via the `CustomRolePermissions` JSON column).</Note>
+<Note>
+  **Permission required**: `aiTools:manage` (granted to ADMIN by default; delegable via
+  the `CustomRolePermissions` JSON column).
+</Note>
 
 ## Starter pack
 
@@ -45,28 +52,28 @@ the **type** picker:
 
 ### Coding assistant
 
-| Field | Description |
-|---|---|
-| Display name | What appears on the tile (e.g. "Claude Code") |
-| Icon | Tile icon, `slug`-derived by default, overridable |
-| Scope | `org-wide` or `team:<team-name>` |
-| Setup command | The `langwatch <tool>` command shown to the user (e.g. `langwatch claude`) |
-| Setup docs URL | Optional `/ai-governance/...` link for "More" |
-| Helper text | Optional one-liner shown above the command block |
+| Field          | Description                                                                |
+| -------------- | -------------------------------------------------------------------------- |
+| Display name   | What appears on the tile (e.g. "Claude Code")                              |
+| Icon           | Tile icon, `slug`-derived by default, overridable                          |
+| Scope          | `org-wide` or `team:<team-name>`                                           |
+| Setup command  | The `langwatch <tool>` command shown to the user (e.g. `langwatch claude`) |
+| Setup docs URL | Optional `/ai-governance/...` link for "More"                              |
+| Helper text    | Optional one-liner shown above the command block                           |
 
 The user-side click-to-expand renders the setup command in a
 copy-to-clipboard code block plus the helper text and docs link.
 
 ### Model provider
 
-| Field | Description |
-|---|---|
-| Display name | What appears on the tile (e.g. "OpenAI") |
-| Icon, scope | Same as coding assistant |
-| `providerKey` | Provider slug (`openai`, `anthropic`, `bedrock`, …) |
-| Suggested routing policy | Routing policy to bind new virtual keys to |
-| Default label | Pre-fills the user's "Name your key" input |
-| Project-suggestion text | Override the "building an app? create a project" hint |
+| Field                    | Description                                           |
+| ------------------------ | ----------------------------------------------------- |
+| Display name             | What appears on the tile (e.g. "OpenAI")              |
+| Icon, scope              | Same as coding assistant                              |
+| `providerKey`            | Provider slug (`openai`, `anthropic`, `bedrock`, …)   |
+| Suggested routing policy | Routing policy to bind new virtual keys to            |
+| Default label            | Pre-fills the user's "Name your key" input            |
+| Project-suggestion text  | Override the "building an app? create a project" hint |
 
 The user-side click-to-expand opens an inline virtual-key creation form.
 The form posts to `personalVirtualKeys.issuePersonal` with the suggested
@@ -75,12 +82,12 @@ order, fallback, per-model rules) applies automatically.
 
 ### External tool
 
-| Field | Description |
-|---|---|
-| Display name | What appears on the tile (e.g. "Copilot Studio") |
-| Icon, scope | Same as coding assistant |
-| External link | Where the tile's CTA points (vendor portal, internal wiki) |
-| CTA label | Override default "Open guide ▸" if needed |
+| Field                  | Description                                                       |
+| ---------------------- | ----------------------------------------------------------------- |
+| Display name           | What appears on the tile (e.g. "Copilot Studio")                  |
+| Icon, scope            | Same as coding assistant                                          |
+| External link          | Where the tile's CTA points (vendor portal, internal wiki)        |
+| CTA label              | Override default "Open guide ▸" if needed                         |
 | Description (markdown) | Admin-authored body, supports headings, lists, links, code blocks |
 
 The user-side click-to-expand renders the markdown via LangWatch's

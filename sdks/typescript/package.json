@@ -2,14 +2,16 @@
   "name": "langwatch",
   "version": "1.12.0",
   "description": "LangWatch TypeScript/JavaScript SDK. Interact with the full LangWatch API and use the LangWatch OpenTelemetry SDK to instrument your application. For more information, see https://docs.langwatch.ai/integration/typescript/guide",
-  "main": "dist/index.js",
-  "module": "dist/index.mjs",
-  "types": "dist/index.d.ts",
-  "author": "LangWatch",
   "license": "MIT",
-  "engines": {
-    "node": ">=20",
-    "pnpm": ">=8"
+  "author": "LangWatch",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/langwatch/langwatch.git",
+    "directory": "typescript-sdk"
+  },
+  "bin": {
+    "langwatch": "./dist/cli/index.js",
+    "lw": "./dist/cli/index.js"
   },
   "files": [
     "dist",
@@ -19,10 +21,9 @@
     "README.md",
     "LICENSE"
   ],
-  "bin": {
-    "lw": "./dist/cli/index.js",
-    "langwatch": "./dist/cli/index.js"
-  },
+  "main": "dist/index.js",
+  "module": "dist/index.mjs",
+  "types": "dist/index.d.ts",
   "exports": {
     ".": {
       "types": "./dist/index.d.ts",
@@ -50,11 +51,6 @@
       "import": "./dist/agent/index.mjs"
     }
   },
-  "repository": {
-    "type": "git",
-    "url": "https://github.com/langwatch/langwatch.git",
-    "directory": "typescript-sdk"
-  },
   "scripts": {
     "generate": "pnpm run generate:server-types && pnpm run generate:openapi-types",
     "cli": "node dist/cli/index.js",
@@ -65,7 +61,7 @@
     "test:unit": "vitest run --exclude '**/*.integration.test.ts'",
     "test:e2e": "dotenv -- vitest run -c ./vitest.e2e.config.mts",
     "test:governance-e2e": "vitest run -c ./vitest.governance-e2e.config.mts",
-    "test:seed": "dotenv -e .env.test -- bash -c 'cd ../../platform/app && pnpm prisma:seed'",
+    "test:seed": "dotenv -e .env.test -- pnpm -w run prisma:seed",
     "prebuild": "pnpm run generate",
     "build": "tsc --noEmit && rm -rf dist && tsup",
     "postbuild": "node -e \"const{statSync}=require('node:fs'),{execFileSync}=require('node:child_process');const f='dist/cli/index.js',want=require('./package.json').version;const s=statSync(f);if(process.platform!=='win32'&&!(s.mode&0o111))throw new Error(f+' is not executable');const got=execFileSync(process.execPath,[f,'--version'],{encoding:'utf8',env:{...process.env,LANGWATCH_NO_DAEMON:'1'}}).trim();if(got!==want)throw new Error('version mismatch: '+f+' reports '+got+', package.json says '+want);console.log('postbuild: '+f+' ok ('+got+')')\"",
@@ -74,41 +70,8 @@
     "tarball": "pnpm build && pnpm pack",
     "typecheck": "tsc --noEmit",
     "prepublish": "pnpm run build",
-    "generate:openapi-types": "pnpm exec openapi-typescript ../../platform/app/src/app/api/openapiLangWatch.json -o ./src/internal/generated/openapi/api-client.ts && node scripts/patch-generated-openapi.mjs",
+    "generate:openapi-types": "test -f ../../apps/api/src/features/discovery/openapi-document.json || { echo 'apps/api/src/features/discovery/openapi-document.json is missing; the SDK client types are generated from it' >&2; exit 1; } && pnpm exec openapi-typescript ../../apps/api/src/features/discovery/openapi-document.json -o ./src/internal/generated/openapi/api-client.ts && node scripts/patch-generated-openapi.mjs",
     "generate:server-types": "./copy-types.sh"
-  },
-  "devDependencies": {
-    "@eslint/js": "^9.32.0",
-    "@langchain/core": ">=0.3.68 <0.4.0",
-    "@langchain/langgraph": ">=0.4.0 <1.0.0",
-    "@langchain/openai": ">=0.6.0 <1.0.0",
-    "@langwatch/langy": "workspace:*",
-    "@opentelemetry/sdk-node": "0.221.0",
-    "@opentelemetry/sdk-trace-node": "^2.0.1",
-    "@opentelemetry/sdk-trace-web": ">=2.0.1",
-    "@types/debug": "^4.1.12",
-    "@types/js-yaml": "^4.0.9",
-    "@types/node": "^26.2.0",
-    "@types/prompts": "^2.4.9",
-    "@types/ws": "^8.18.1",
-    "@vercel/otel": "^1.13.0",
-    "@vitest/coverage-v8": "^4.1.0",
-    "dotenv-cli": "^11.0.0",
-    "esbuild": "^0.28.1",
-    "eslint": "^9.32.0",
-    "fets": "^0.8.5",
-    "fishery": "^2.3.1",
-    "langchain": ">=0.3.0 <2.0.0",
-    "msw": "^2.10.4",
-    "nock": "^14.0.8",
-    "openapi-msw": "^1.2.0",
-    "openapi-typescript": "7.13.0",
-    "tsup": "^8.5.0",
-    "typescript": "^6.0.3",
-    "typescript-eslint": "^8.38.0",
-    "vitest": "^4.1.0",
-    "vitest-mock-extended": "^5.1.1",
-    "yaml": "^2.8.1"
   },
   "dependencies": {
     "@opentelemetry/api": "^1.9.0",
@@ -137,6 +100,39 @@
     "ws": "^8.21.0",
     "xksuid": "^0.0.4",
     "zod": "^4.0.14"
+  },
+  "devDependencies": {
+    "@eslint/js": "^9.32.0",
+    "@langchain/core": ">=0.3.68 <0.4.0",
+    "@langchain/langgraph": ">=0.4.0 <1.0.0",
+    "@langchain/openai": ">=0.6.0 <1.0.0",
+    "@langwatch/langy-contract": "workspace:*",
+    "@opentelemetry/sdk-node": "0.221.0",
+    "@opentelemetry/sdk-trace-node": "^2.0.1",
+    "@opentelemetry/sdk-trace-web": ">=2.0.1",
+    "@types/debug": "^4.1.12",
+    "@types/js-yaml": "^4.0.9",
+    "@types/node": "^26.2.0",
+    "@types/prompts": "^2.4.9",
+    "@types/ws": "^8.18.1",
+    "@vercel/otel": "^1.13.0",
+    "@vitest/coverage-v8": "^4.1.0",
+    "dotenv-cli": "^11.0.0",
+    "esbuild": "^0.28.1",
+    "eslint": "^9.32.0",
+    "fets": "^0.8.5",
+    "fishery": "^2.3.1",
+    "langchain": ">=0.3.0 <2.0.0",
+    "msw": "^2.10.4",
+    "nock": "^14.0.8",
+    "openapi-msw": "^1.2.0",
+    "openapi-typescript": "7.13.0",
+    "tsup": "^8.5.0",
+    "typescript": "^6.0.3",
+    "typescript-eslint": "^8.38.0",
+    "vitest": "^4.1.0",
+    "vitest-mock-extended": "^5.1.1",
+    "yaml": "^2.8.1"
   },
   "peerDependencies": {
     "@ai-sdk/openai": ">=2.0.0 <5.0.0",
@@ -173,5 +169,9 @@
     "langchain": {
       "optional": true
     }
+  },
+  "engines": {
+    "node": ">=20",
+    "pnpm": ">=8"
   }
 }

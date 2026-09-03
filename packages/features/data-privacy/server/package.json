@@ -1,0 +1,42 @@
+{
+  "name": "@langwatch/data-privacy-server",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Canonical server-side scoped data-privacy service.",
+  "files": [
+    "src"
+  ],
+  "type": "module",
+  "main": "./src/index.ts",
+  "types": "./src/index.ts",
+  "exports": {
+    ".": {
+      "types": "./src/index.ts",
+      "default": "./src/index.ts"
+    }
+  },
+  "scripts": {
+    "typecheck": "tsc --noEmit",
+    "test": "vitest run",
+    "test:unit": "vitest run"
+  },
+  "dependencies": {
+    "@langwatch/authz-contract": "workspace:*",
+    "@langwatch/data-privacy-contract": "workspace:*",
+    "@langwatch/eventing": "workspace:*",
+    "@langwatch/feature-flag-contract": "workspace:*",
+    "@langwatch/observability": "workspace:*",
+    "@langwatch/organization-contract": "workspace:*",
+    "@langwatch/prisma-client": "workspace:*",
+    "@langwatch/project-contract": "workspace:*",
+    "@langwatch/redaction": "workspace:*",
+    "@langwatch/trace-contract": "workspace:*",
+    "@trpc/server": "^11.18.0",
+    "safe-regex2": "^5.1.1",
+    "zod": "^4.4.3"
+  },
+  "devDependencies": {
+    "typescript": "^7.0.2",
+    "vitest": "^4.1.9"
+  }
+}

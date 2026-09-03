@@ -10,8 +10,9 @@
 import { resolveEndpoint } from "@/internal/endpoint";
 import {
   createManagementRequest,
-  resolveManagementToken,
+  managementPath,
   type ManagementRequest,
+  resolveManagementToken,
 } from "../_shared/management-request";
 
 export interface ScimTokenSummary {
@@ -54,14 +55,14 @@ export class ScimTokensApiService {
   async list(): Promise<{ tokens: ScimTokenSummary[] }> {
     return this.#request({
       operation: "list SCIM tokens",
-      path: "/api/scim-tokens",
+      path: managementPath("/api/scim-tokens"),
     });
   }
 
   async create(input: { description?: string } = {}): Promise<CreatedScimToken> {
     return this.#request({
       operation: "create SCIM token",
-      path: "/api/scim-tokens",
+      path: managementPath("/api/scim-tokens"),
       method: "POST",
       body: input,
     });
@@ -70,7 +71,7 @@ export class ScimTokensApiService {
   async revoke(id: string): Promise<{ success: true }> {
     return this.#request({
       operation: `revoke SCIM token "${id}"`,
-      path: `/api/scim-tokens/${encodeURIComponent(id)}`,
+      path: managementPath(`/api/scim-tokens/${encodeURIComponent(id)}`),
       method: "DELETE",
     });
   }

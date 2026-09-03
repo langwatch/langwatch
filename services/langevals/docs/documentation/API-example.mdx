@@ -2,23 +2,21 @@
 title: "API Example"
 ---
 
-The LangEvals server can be run both locally and on a server. 
+The LangEvals server can be run both locally and on a server.
 This guide will quickly explain how to set up LangEvals on your machine and make API calls to the evaluators.
 
+## Set Up Locally
 
-
-## Set Up Locally 
 <Steps>
 
 <Step title="Install Poetry">
-Poetry is used for managing virtual environments in LangEvals. Follow the official [Poetry installation guide](https://python-poetry.org/docs/) for detailed instructions.
+  Poetry is used for managing virtual environments in LangEvals. Follow the official
+  [Poetry installation guide](https://python-poetry.org/docs/) for detailed instructions.
 </Step>
 
 <Step title="Run the Server">
-Once Poetry is installed, you can start the LangEvals server with the following command from the root of the project:
-```bash
-poetry run python langevals/server.py
-```
+  Once Poetry is installed, you can start the LangEvals server with the following command
+  from the root of the project: ```bash poetry run python langevals/server.py ```
 </Step>
 
 <Step title="Call the Evaluators">
@@ -36,8 +34,5 @@ curl -X POST "https://http://127.0.0.1:8000/ragas/context_precision/evaluate" \
 
 Great job! Now you can easily use evaluators on your machine and assess your LLMs in the way you want it.
 For detailed API documentation please refer to [API Reference](/api-reference/)
-
-
-
 
 </Steps>

@@ -4,7 +4,10 @@ description: "Grant a role to one principal, a user, a group or an API key, at o
 ---
 
 <Note>
-  **Available on Enterprise plans.** An organization without an Enterprise plan is refused with HTTP 402 and the error code `enterprise_plan_required`. Self-hosted deployments need an Enterprise license for the same endpoints. To enable it, reach out to [enterprise@langwatch.ai](mailto:enterprise@langwatch.ai).
+  **Available on Enterprise plans.** An organization without an Enterprise plan is refused
+  with HTTP 402 and the error code `enterprise_plan_required`. Self-hosted deployments
+  need an Enterprise license for the same endpoints. To enable it, reach out to
+  [enterprise@langwatch.ai](mailto:enterprise@langwatch.ai).
 </Note>
 
 ## Intro
@@ -13,11 +16,11 @@ A role binding is one sentence: **this principal has this role, here**. It is ho
 
 Each binding names exactly one principal, and there are three kinds:
 
-| Principal | Field | Used for |
-|-----------|-------|----------|
-| A person | `userId` | Access someone has directly, on top of anything their groups give them |
-| A group | `groupId` | Access every member of the group inherits, including groups synced from your identity provider |
-| An API key | `apiKeyId` | What a service credential may reach, independent of any person |
+| Principal  | Field      | Used for                                                                                       |
+| ---------- | ---------- | ---------------------------------------------------------------------------------------------- |
+| A person   | `userId`   | Access someone has directly, on top of anything their groups give them                         |
+| A group    | `groupId`  | Access every member of the group inherits, including groups synced from your identity provider |
+| An API key | `apiKeyId` | What a service credential may reach, independent of any person                                 |
 
 ## Authentication
 
@@ -29,22 +32,22 @@ Authorization: Bearer sk-lw-<id>_<secret>
 
 ## Endpoints
 
-| Method | Path | Description |
-|--------|------|-------------|
-| `GET` | `/api/role-bindings` | List bindings, filtered by principal or scope |
-| `POST` | `/api/role-bindings` | Grant one role to one principal at one scope |
-| `PATCH` | `/api/role-bindings/{id}` | Change the role a binding grants |
-| `DELETE` | `/api/role-bindings/{id}` | Delete a binding |
+| Method   | Path                      | Description                                   |
+| -------- | ------------------------- | --------------------------------------------- |
+| `GET`    | `/api/role-bindings`      | List bindings, filtered by principal or scope |
+| `POST`   | `/api/role-bindings`      | Grant one role to one principal at one scope  |
+| `PATCH`  | `/api/role-bindings/{id}` | Change the role a binding grants              |
+| `DELETE` | `/api/role-bindings/{id}` | Delete a binding                              |
 
 `GET` filters on `userId`, `groupId`, `apiKeyId`, `scopeType` and `scopeId`, and pages with `offset` and `limit`. `limit` defaults to 50 and cannot exceed 200. `totalCount` counts the filtered set, not the organization.
 
 ## Scopes
 
-| `scopeType` | `scopeId` | What it reaches |
-|-------------|-----------|-----------------|
+| `scopeType`    | `scopeId`           | What it reaches                            |
+| -------------- | ------------------- | ------------------------------------------ |
 | `ORGANIZATION` | the organization id | Every team and project in the organization |
-| `TEAM` | a team id | That team and all its projects |
-| `PROJECT` | a project id | That project only |
+| `TEAM`         | a team id           | That team and all its projects             |
+| `PROJECT`      | a project id        | That project only                          |
 
 The roles are `ADMIN`, `MEMBER`, `VIEWER`, and `CUSTOM`. `CUSTOM` carries a `customRoleId` from the [Roles](/api-reference/roles/overview) API, and is refused without one (`custom_role_id_required`).
 
@@ -85,15 +88,15 @@ A create response can carry `hasLegacyAccessNotice: true`. It means this is the 
 
 ## Errors
 
-| Code | Status | Meaning |
-|------|--------|---------|
-| `role_binding_principal_invalid` | 422 | Not exactly one of `userId`, `groupId`, `apiKeyId` |
-| `user_not_in_organization` | 422 | The user is not a member here |
-| `group_not_in_organization` | 422 | The group belongs to another organization |
-| `api_key_not_in_organization` | 422 | The API key belongs to another organization |
-| `scope_not_in_organization` | 422 | The team or project belongs to another organization |
-| `custom_role_id_required` | 422 | Role is `CUSTOM` with no `customRoleId` |
-| `custom_role_not_assignable` | 422 | That custom role cannot be granted here |
-| `org_exclusive_permission_scope` | 422 | The role carries organization-only permissions, and the scope is a team or project |
-| `role_binding_already_exists` | 409 | That principal already has that role at that scope |
-| `role_binding_not_found` | 404 | No such binding in this organization |
+| Code                             | Status | Meaning                                                                            |
+| -------------------------------- | ------ | ---------------------------------------------------------------------------------- |
+| `role_binding_principal_invalid` | 422    | Not exactly one of `userId`, `groupId`, `apiKeyId`                                 |
+| `user_not_in_organization`       | 422    | The user is not a member here                                                      |
+| `group_not_in_organization`      | 422    | The group belongs to another organization                                          |
+| `api_key_not_in_organization`    | 422    | The API key belongs to another organization                                        |
+| `scope_not_in_organization`      | 422    | The team or project belongs to another organization                                |
+| `custom_role_id_required`        | 422    | Role is `CUSTOM` with no `customRoleId`                                            |
+| `custom_role_not_assignable`     | 422    | That custom role cannot be granted here                                            |
+| `org_exclusive_permission_scope` | 422    | The role carries organization-only permissions, and the scope is a team or project |
+| `role_binding_already_exists`    | 409    | That principal already has that role at that scope                                 |
+| `role_binding_not_found`         | 404    | No such binding in this organization                                               |

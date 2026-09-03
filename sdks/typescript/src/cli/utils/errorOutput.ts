@@ -29,14 +29,10 @@ import {
   handledErrorFromThrown,
   toCliErrorDocument,
   type CliHandledError,
-} from "@langwatch/langy/cards/handled-error";
+} from "@langwatch/langy-contract/cards/handled-error";
 import { redactSecrets } from "../telemetry/events";
 import { withFallbackSuggestions } from "./errorSuggestions";
-import {
-  currentOutputScope,
-  getOutputFormat,
-  resolveOutputFormat,
-} from "./outputScope";
+import { currentOutputScope, getOutputFormat, resolveOutputFormat } from "./outputScope";
 
 /**
  * The output-context machinery (format + colour scope) lives in
@@ -91,7 +87,7 @@ export const disableOutputColor = (): void => {
  * `meta`, `kind` and `reasons` are the opposite: they are a CURATED payload the
  * platform composes for a user, an agent or the UI to act on, and the handled-error
  * contract is that nothing internal or secret goes in them (see the content rule
- * on `server/app-layer/langy/errors.ts`). Scrubbing them would not add safety —
+ * on the package-owned Langy error adapter). Scrubbing them would not add safety —
  * it would destroy the actionable data this whole feature exists to surface,
  * because the credential patterns match legitimate identifiers too: a `vk-…`
  * virtual-key id or an `lw-…` handle in `meta` would come out as `[redacted]`
@@ -122,8 +118,7 @@ const detailLines = (domain: CliHandledError): string[] => {
   // the very identifiers the user is reading the error to find.
   for (const [key, value] of Object.entries(domain.meta)) {
     if (value === null || value === undefined) continue;
-    const rendered =
-      typeof value === "string" ? value : JSON.stringify(value) ?? "";
+    const rendered = typeof value === "string" ? value : (JSON.stringify(value) ?? "");
     if (!rendered) continue;
     details.push([key, rendered]);
   }
@@ -139,10 +134,7 @@ const detailLines = (domain: CliHandledError): string[] => {
       const field = reason.meta?.field;
       const message = reason.meta?.message;
       if (typeof message !== "string" || !message) continue;
-      details.push([
-        typeof field === "string" && field ? field : reason.kind,
-        message,
-      ]);
+      details.push([typeof field === "string" && field ? field : reason.kind, message]);
     }
   }
 
@@ -238,6 +230,7 @@ export const commandValidationError = (
   httpStatus: 0,
   meta,
   isHandled: true,
+  retryable: false,
 });
 
 /**

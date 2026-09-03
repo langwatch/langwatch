@@ -22,7 +22,13 @@ export type {
   UploadResponse,
   DatasetRecordResponse,
 } from "./services/datasets";
-export { DatasetError, DatasetNotFoundError, DatasetApiError, DatasetValidationError, DatasetPlanLimitError } from "./services/datasets";
+export {
+  DatasetError,
+  DatasetNotFoundError,
+  DatasetApiError,
+  DatasetValidationError,
+  DatasetPlanLimitError,
+} from "./services/datasets";
 export type {
   ExperimentRunResult,
   RunExperimentOptions,
@@ -37,7 +43,12 @@ export {
   ExperimentRunFailedError,
   ExperimentsApiError,
 } from "./services/experiments";
-export type { EvaluationResult, EvaluateOptions, EvaluationStatus, EvaluationCost } from "./services/evaluations";
+export type {
+  EvaluationResult,
+  EvaluateOptions,
+  EvaluationStatus,
+  EvaluationCost,
+} from "./services/evaluations";
 export {
   EvaluationError,
   EvaluatorCallError,
@@ -51,9 +62,18 @@ export { RunPlansApiService, RunPlansApiError } from "./services/run-plans";
 export { TestSuitesApiService, TestSuitesApiError } from "./services/test-suites";
 export { WorkflowsApiService, WorkflowsApiError } from "./services/workflows/workflows-api.service";
 export { AgentsApiService, AgentsApiError } from "./services/agents/agents-api.service";
-export { AnnotationsApiService, AnnotationsApiError } from "./services/annotations/annotations-api.service";
-export { DashboardsApiService, DashboardsApiError } from "./services/dashboards/dashboards-api.service";
-export { ModelProvidersApiService, ModelProvidersApiError } from "./services/model-providers/model-providers-api.service";
+export {
+  AnnotationsApiService,
+  AnnotationsApiError,
+} from "./services/annotations/annotations-api.service";
+export {
+  DashboardsApiService,
+  DashboardsApiError,
+} from "./services/dashboards/dashboards-api.service";
+export {
+  ModelProvidersApiService,
+  ModelProvidersApiError,
+} from "./services/model-providers/model-providers-api.service";
 export { AnalyticsApiService, AnalyticsApiError } from "./services/analytics/analytics-api.service";
 export { QueryApiService, QueryApiError } from "./services/query/query-api.service";
 export { TriggersApiService, TriggersApiError } from "./services/triggers";
@@ -62,9 +82,18 @@ export { SimulationRunsApiService, SimulationRunsApiError } from "./services/sim
 export { TracesApiService, TracesApiError } from "./services/traces/traces-api.service";
 export { MonitorsApiService, MonitorsApiError } from "./services/monitors";
 export { SecretsApiService, SecretsApiError } from "./services/secrets";
-export { VirtualKeysApiService, VirtualKeysApiError } from "./services/virtual-keys/virtual-keys-api.service";
-export { GatewayBudgetsApiService, GatewayBudgetsApiError } from "./services/gateway-budgets/gateway-budgets-api.service";
-export { SpendEventsApiService, SpendEventsApiError } from "./services/spend-events/spend-events-api.service";
+export {
+  VirtualKeysApiService,
+  VirtualKeysApiError,
+} from "./services/virtual-keys/virtual-keys-api.service";
+export {
+  GatewayBudgetsApiService,
+  GatewayBudgetsApiError,
+} from "./services/gateway-budgets/gateway-budgets-api.service";
+export {
+  SpendEventsApiService,
+  SpendEventsApiError,
+} from "./services/spend-events/spend-events-api.service";
 export { WebhooksApiService, WebhooksApiError } from "./services/webhooks/webhooks-api.service";
 export { TeamsApiService, TeamsApiError } from "./services/teams/teams-api.service";
 export type {
@@ -119,6 +148,7 @@ import { resolveEndpoint } from "@/internal/endpoint";
 export interface LangWatchConstructorOptions {
   apiKey?: string;
   endpoint?: string;
+  projectId?: string;
   options?: {
     logger?: Logger;
   };
@@ -248,7 +278,11 @@ export class LangWatch {
     this.graphs = new GraphsApiService(this.config);
     this.simulationRuns = new SimulationRunsApiService(this.config);
     this.monitors = new MonitorsApiService({ apiKey, endpoint });
-    this.secrets = new SecretsApiService({ apiKey, endpoint });
+    this.secrets = new SecretsApiService({
+      apiKey,
+      endpoint,
+      projectId: options.projectId,
+    });
     this.virtualKeys = new VirtualKeysApiService({ apiKey, endpoint });
     this.gatewayBudgets = new GatewayBudgetsApiService({ apiKey, endpoint });
     this.spendEvents = new SpendEventsApiService({ apiKey, endpoint });

@@ -126,7 +126,10 @@ describe("handleListDatasets()", () => {
 
   describe("when no datasets exist", () => {
     it("returns a no-datasets message in digest mode", async () => {
-      mockListDatasets.mockResolvedValue({ data: [], pagination: { total: 0, page: 1, limit: 50, totalPages: 0 } });
+      mockListDatasets.mockResolvedValue({
+        data: [],
+        pagination: { total: 0, page: 1, limit: 50, totalPages: 0 },
+      });
       const result = await handleListDatasets();
       expect(result).toContain("No datasets found");
     });
@@ -146,9 +149,7 @@ describe("handleGetDataset()", () => {
     ],
     createdAt: "2025-01-01T00:00:00.000Z",
     updatedAt: "2025-01-02T00:00:00.000Z",
-    data: [
-      { id: "rec-1", entry: { input: "hello", output: "world" } },
-    ],
+    data: [{ id: "rec-1", entry: { input: "hello", output: "world" } }],
   };
 
   describe("when format is digest (default)", () => {
@@ -203,7 +204,9 @@ describe("MCP server dataset tool registration", () => {
       const { createMcpServer } = await import("../create-mcp-server.js");
       const server = createMcpServer();
       // Access registered tools via the internal _registeredTools object
-      const registeredTools = (server as unknown as { _registeredTools: Record<string, unknown> })._registeredTools;
+      const registeredTools = (
+        server as unknown as { _registeredTools: Record<string, unknown> }
+      )._registeredTools;
       const toolNames = Object.keys(registeredTools);
 
       expect(toolNames).toContain("platform_list_datasets");
@@ -231,9 +234,7 @@ describe("dataset tools API key requirement", () => {
         const { initConfig, requireApiKey } = await import("../config.js");
         initConfig({ apiKey: "", endpoint: "http://localhost:0" });
 
-        expect(() => requireApiKey()).toThrow(
-          "LANGWATCH_API_KEY is required",
-        );
+        expect(() => requireApiKey()).toThrow("LANGWATCH_API_KEY is required");
       } finally {
         if (savedKey !== undefined) {
           process.env.LANGWATCH_API_KEY = savedKey;

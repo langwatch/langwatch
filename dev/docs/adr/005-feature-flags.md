@@ -1,10 +1,21 @@
-# ADR-005: Feature Flags (registry, postgres, PostHog)
+# ADR-005: Feature flags via PostHog
 
-**Date:** 2026-01-29 (initial), 2026-05-17 (scope split + registry)
+**Date:** 2026-01-29
 
-**Status:** Accepted — amended 2026-08-20 and 2026-08-31, see below
+**Status:** Superseded by
+[`feature-flag/adrs/001`](../../../packages/features/feature-flag/adrs/001-feature-flag-service-boundary.md)
+— amended 2026-08-20 and 2026-08-31 before it was, see below
 
-## Amendment (2026-08-20): PostHog removed from the resolver
+This ADR introduced registered SYSTEM and PRODUCT flags, with PostHog handling
+product targeting and a separate local path for operational switches. That
+split later left resolution spread across a global app service, PostHog,
+environment reads and browser overrides.
+
+The current decision is owned beside the singular `feature-flag` feature. It
+keeps the useful in-code registry and operator controls, removes PostHog from
+resolution, parses environment overrides once at boot, and exposes one
+composed service for backend, transport and browser callers. Everything below
+is the record of how this document got there.
 
 PR #7194 deleted `FeatureFlagServicePostHog` and the PostHog branch of `featureFlagService.isEnabled`. **Both scopes now resolve identically**, and PostHog is not consulted for any flag:
 

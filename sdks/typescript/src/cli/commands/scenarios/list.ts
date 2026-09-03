@@ -28,9 +28,7 @@ export const listScenariosCommand = async (): Promise<CommandResult | void> => {
       for (const suite of suites) testSuiteNameById.set(suite.id, suite.name);
     }
 
-    spinner.succeed(
-      `Found ${scenarios.length} scenario${scenarios.length !== 1 ? "s" : ""}`,
-    );
+    spinner.succeed(`Found ${scenarios.length} scenario${scenarios.length !== 1 ? "s" : ""}`);
 
     return {
       data: scenarios,
@@ -72,9 +70,7 @@ export const listScenariosCommand = async (): Promise<CommandResult | void> => {
 
         console.log();
         console.log(
-          chalk.gray(
-            `Use ${chalk.cyan("langwatch scenario get <id>")} to view scenario details`,
-          ),
+          chalk.gray(`Use ${chalk.cyan("langwatch scenario get <id>")} to view scenario details`),
         );
       },
     };

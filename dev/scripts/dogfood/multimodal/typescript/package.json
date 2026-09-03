@@ -2,12 +2,9 @@
   "name": "multimodal-dogfood-vercel-ai",
   "version": "1.0.0",
   "private": true,
-  "type": "module",
   "description": "Vercel AI SDK multimodal dogfood cell for LangWatch.",
   "license": "MIT",
-  "engines": {
-    "node": ">=22.18.0"
-  },
+  "type": "module",
   "scripts": {
     "start:image": "node vercel-ai.ts image",
     "start:pdf": "node vercel-ai.ts pdf"
@@ -16,5 +13,8 @@
     "@ai-sdk/openai": "^3.0.79",
     "ai": "^6.0.217",
     "langwatch": "^1.6.0"
+  },
+  "engines": {
+    "node": ">=22.18.0"
   }
 }

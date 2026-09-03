@@ -14,12 +14,12 @@ Each worktree's slug is simply its own directory name, sanitised (a checkout at
 `.../worktrees/portless` is the `portless` stack), cached in `.langwatch-slug`.
 Predictable hostnames, not a random `happy-tiger`. Its services are reached at:
 
-| Hostname | Service |
-| --- | --- |
-| `app.<slug>.langwatch.localhost` | App — the UI, **and its API at `/api`** |
-| `gateway.<slug>.langwatch.localhost` | AI Gateway (Go) |
-| `nlp.<slug>.langwatch.localhost` | NLP engine (Go) |
-| `clickhouse.<slug>.langwatch.localhost` | ClickHouse — this stack's own database |
+| Hostname                                | Service                                 |
+| --------------------------------------- | --------------------------------------- |
+| `app.<slug>.langwatch.localhost`        | App — the UI, **and its API at `/api`** |
+| `gateway.<slug>.langwatch.localhost`    | AI Gateway (Go)                         |
+| `nlp.<slug>.langwatch.localhost`        | NLP engine (Go)                         |
+| `clickhouse.<slug>.langwatch.localhost` | ClickHouse — this stack's own database  |
 
 The **app and its API are one origin**: open `app.<slug>.langwatch.localhost` for
 the UI and hit `app.<slug>.langwatch.localhost/api` for the API. There is no
@@ -29,11 +29,11 @@ confusable URLs. Vite serves the SPA and proxies `/api` (plus `/mcp`, `/sse`,
 
 Shared, machine-wide (one daemon serves all worktrees):
 
-| Hostname | What |
-| --- | --- |
-| `langwatch.localhost` | Dashboard — which worktree runs what |
-| `observability.langwatch.localhost` | The local Grafana LGTM stack (:3000) |
-| `telemetry.langwatch.localhost` | OTLP fan-out to **every** running stack |
+| Hostname                            | What                                    |
+| ----------------------------------- | --------------------------------------- |
+| `langwatch.localhost`               | Dashboard — which worktree runs what    |
+| `observability.langwatch.localhost` | The local Grafana LGTM stack (:3000)    |
+| `telemetry.langwatch.localhost`     | OTLP fan-out to **every** running stack |
 
 ## Setup
 
@@ -45,8 +45,15 @@ works everywhere. Hostname routing is opt-in — `pnpm dev` uses the plain
 
 ```bash
 haven up                 # registers hostnames, starts + supervises the stack
-haven up +workers        # …with a standalone workers lane (sticky, per worktree)
+haven up +langy          # …with the langy agent manager too (sticky, per worktree)
 ```
+
+Every stack runs the three Node applications as three lanes — `ui`
+(`@langwatch/ui`, Vite), `api` (`@langwatch/platform-api`) and `workers`
+(`@langwatch/worker`) — each `pnpm --filter <package> dev` from the workspace
+root. They are not selectable: a stack running two of the three would serve
+pages and quietly process no jobs. `app.<slug>` is the ui lane's hostname, and
+`/api` under it proxies to the api lane on loopback.
 
 Open <https://langwatch.localhost> to see every stack across your worktrees.
 
@@ -63,15 +70,16 @@ haven up         start or reconcile this worktree's stack — in a terminal it
                  runs in the BACKGROUND under an attached log view: ←/→/tab/digits
                  switch between "all" and per-service logs, q detaches (the stack
                  keeps running; haven down stops it). +svc/-svc picks services and
-                 sticks (+langy, -nlp, +workers, -gateway); a fresh worktree runs
-                 app + nlp + gateway + idp, langy off. -w watches the Go services via
+                 sticks (+langy, -nlp, -gateway); a fresh worktree runs
+                 ui + api + workers + nlp + gateway + idp, langy off. -w watches
+                 the Go services via
                  air; -d detaches without the view; --rebuild forces images
 haven down       stop this worktree's stack — data is always kept;
                  --all stops every stack, the shared servers, daemon, and proxy
 haven restart    bounce one supervised service (or all) in place; `restart obs`
                  bounces the observability stack; `restart langy --rebuild`
                  re-images first
-haven idp        run ONLY the IdP simulator — no app, API or databases — routed
+haven idp        run ONLY the IdP simulator — no ui, api or databases — routed
                  at idp.langwatch.localhost; --tenants <n> sizes the range
 haven logs       captured service logs from any terminal, attached or detached:
                  all interleaved, `haven logs nlp` filters, -t tails,
@@ -81,8 +89,8 @@ haven status     one-shot report: selection, per-service health, shared servers,
                  RAM footprints (--json for machines)
 haven db         this stack's data: `db seed [preset]` (reseed in place, drops
                  nothing) · `db reset [preset]` (fresh database, confirmed;
-                 --yes for scripts) · `db url [engine]`. Presets: demo, traces,
-                 onboarding, post-onboarding, bare, mass
+                 --yes for scripts) · `db url [engine]`. Presets: demo,
+                 onboarding, post-onboarding, bare
 haven clean      one cleanup: interactive worktree picker + safe reclaim
                  (build artifacts, orphaned processes); --yes applies only the
                  safe categories
@@ -93,10 +101,10 @@ haven play [pr]  run a PR in a throwaway sandbox: own checkout, own
                  Quitting the view DESTROYS everything it created, every time.
                  No argument opens a picker of open PRs (terminal only).
                  --seed <preset> seeds it from the same registry `db seed`
-                 reads, so it can open on data rather than the onboarding
-                 screen: demo, traces and mass load data, onboarding and
-                 post-onboarding move the onboarding flag, bare is the
-                 identity alone
+                 reads, so it can open past onboarding rather than on it:
+                 demo adds the demo prompt, HTTP agent and dataset,
+                 onboarding and post-onboarding move the onboarding flag,
+                 bare is the identity alone
                  Trust-gated: every commit author must have write access, or a
                  two-step confirmation — y/N, then the PR number typed back
                  after it discloses that the code runs as you, from this
@@ -173,15 +181,20 @@ worktrees, and the reaping feed.
 **Seeding.** `haven db seed` reseeds in place — an idempotent upsert that can
 only add or refresh, never discard — and `haven db reset` is the destructive
 sibling that starts from a fresh, migrated database. Both take a preset:
-`demo` marks the project past onboarding and ingests deterministic sample
-traces + realistic platform lifecycles through the running stack's real
-collector (the stack must be up; re-running is idempotent), `traces` ingests
-just the sample traces, `onboarding` / `post-onboarding` flip the first-trace
-flag, and `bare` seeds the identity alone. `mass` is demo plus months of
-backdated activity (`HAVEN_SEED_MONTHS`, default 3): event-sourced products
-are seeded through their event logs with backdated `occurredAt` and replayed
-by the projection workers — read models are never written directly — while
-traces ingest through the collector inside its 31-day window.
+`demo` marks the project past onboarding and adds the demo prompt, HTTP agent
+and dataset, `onboarding` / `post-onboarding` flip the first-trace flag, and
+`bare` seeds the identity alone. Every preset is switches that
+`packages/prisma-client/prisma/seed.ts` reads for itself, so none of them
+needs a running stack.
+
+`traces` and `mass` are RETIRED and refused by name. Both existed only to run
+ingest scripts through the live stack's collector — `seed:sample-traces`,
+`seed:realistic-platform`, `seed:mass` and the `seed:retention` pin that had to
+precede them — and all four lived in the platform application, which is
+deleted. Nothing that survives loads data through the collector. The ingest
+machinery itself is intact and tested (`seedPreset.ingest`, `runSeedIngest`,
+`ingestPlaySeed`); it is the seam those seeds return through, and every
+shipped preset's list is empty until they do.
 
 **Resource caps.** Everything haven manages is bounded: the ClickHouse
 container and the observability stack are memory-capped (and their colima VM is
@@ -212,7 +225,9 @@ preset's switches go to the sandbox's own seed, and any data that has to travel
 through the collector is ingested once the sandbox's app answers, in a lane
 beside the services. A failed ingest never takes the sandbox down — it names
 the step and the command that retries it, since a PR that broke the collector
-is exactly the PR you want to keep watching.
+is exactly the PR you want to keep watching. No shipped preset ingests
+anything today (see Seeding), so a sandbox waits for nothing and every preset
+is a plain seed.
 
 **Git across worktrees.** `haven git` opens [moron](https://github.com/0xdeafcafe/moron)
 in-process (a Go module dependency — nothing extra to install) for the current
@@ -268,9 +283,11 @@ like an auth or routing bug rather than a dead stack. haven does not restart
 what it did not start; `haven up` is the recovery, and it deregisters the dead
 entry's routes before it provisions.
 
-The resolved config lands in `platform/app/.env.portless`, which every TS entry
-point loads **last with `override: true`** so it beats anything pinned in `.env`
-(that repo runs `dotenv.config({ override: true })`).
+The resolved config lands in `.env.portless` **at the workspace root**, beside
+`.env` — where every application in `apps/` resolves both from. It is loaded
+**last, with `override: true`**, so it beats anything pinned in `.env`. Each
+supervised lane is also handed the same variables directly, so a lane never
+depends on the file having been read.
 
 ### Why native processes, not kind/k8s (yet)
 
@@ -279,7 +296,7 @@ server inside a container/kind mount reintroduces the slow file-watching it
 already fights. haven routes across native processes **and** containerized
 backends uniformly by hostname, so a future backend swap (a shared `kind`
 cluster with per-worktree Helm value overlays: standard services off `main`,
-worktrees overriding select ones) is a change *behind* haven — the routing,
+worktrees overriding select ones) is a change _behind_ haven — the routing,
 registry, and dashboard stay the same.
 
 ## More of what haven does
@@ -312,7 +329,7 @@ registry, and dashboard stay the same.
   3 GiB floor and `GOMAXPROCS` is halved, so the check pays for the shortage
   instead of everything else swapping. `CHECK_PRESSURE=green|amber|red`
   forces the level; explicit `GOMEMLIMIT`/`GOMAXPROCS`/`CHECK_SLOTS` win. The
-  same watch observes gopls, biome, vitest workers, node, bun and claude
+  same watch observes gopls, oxlint, vitest workers, node, bun and claude
   agents (never touched — observed only) and ships every class's footprint to
   the local Grafana as `haven_proc_*` metrics. See
   `dev/docs/adr/095-haven-tsgo-governor.md`.
@@ -327,11 +344,11 @@ registry, and dashboard stay the same.
   be serving a live run whatever its age. Ryuk itself is never touched, and the
   sweep never boots the VM just to clean it. See
   `specs/setup/haven-testcontainer-reaper.feature`.
-- **Always migrate + seed, fully static identity.** Every `up` migrates *and*
+- **Always migrate + seed, fully static identity.** Every `up` migrates _and_
   seeds idempotently. Nothing about the local dev identity is ever randomly
   generated — the same admin login, org/team/project/user IDs, and API
   tokens exist on every worktree and every machine. See the doc comment at
-  the top of `platform/app/prisma/seed.ts` for the exact values (admin email +
+  the top of `packages/prisma-client/prisma/seed.ts` for the exact values (admin email +
   password, ingestion key `sk-lw-local-development-key` (override
   `LANGWATCH_LOCAL_API_KEY`), a private full-access personal access token,
   and a public ingestion-only token).
@@ -360,6 +377,7 @@ registry, and dashboard stay the same.
   `LANGY_WORKER_GATEWAY_URL`), and the host reaches the manager over a published
   loopback port. Production is never any of these — it always runs sandboxed under
   gVisor.
+
 - **`haven clean`.** One cleanup command. The interactive picker scans every
   worktree at once (git + database facts on a fast queue, disk size via `du` on
   a slow one), pre-ticks everything idle 5+ days (`--stale-days N`), lets you
@@ -385,5 +403,5 @@ registry, and dashboard stay the same.
   migrated + seeded" cover Postgres too.
 - **Shared `kind` cluster.** The baseline fallback already routes across a
   heterogeneous set, so the backend can become a shared `kind` cluster with
-  per-worktree Helm value overlays *behind* haven — the routing, registry, and
+  per-worktree Helm value overlays _behind_ haven — the routing, registry, and
   dashboard stay the same.

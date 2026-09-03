@@ -35,23 +35,14 @@ type fakeContainer struct{}
 func (fakeContainer) Ensure(context.Context) (string, error) { return "unix:///fake.sock", nil }
 func (fakeContainer) Profile() string                        { return "fake" }
 
-// playCheckout is a complete-enough checkout for the launcher: a lockfile (so
-// the dependency install resolves a workspace root), the app directory, and an
-// already-built api bundle. The bundle is part of "complete enough" because
-// preparePlaySandbox refuses to continue without one — these are seed tests, so
-// they start from a checkout that has been built and say nothing about the
-// build itself; TestPreparePlaySandbox* covers that.
+// playCheckout is a complete-enough checkout for the launcher: a lockfile, so
+// the dependency install resolves a workspace root. Nothing is built first —
+// each lane runs its own package's `dev` script, so there is no artefact the
+// prep has to produce before a lane can start.
 func playCheckout(t *testing.T) string {
 	t.Helper()
 	dir := t.TempDir()
 	if err := os.WriteFile(filepath.Join(dir, "pnpm-lock.yaml"), []byte("x"), 0o600); err != nil {
-		t.Fatal(err)
-	}
-	bundle := filepath.Join(dir, "platform", "app", apiBundleRelPath)
-	if err := os.MkdirAll(filepath.Dir(bundle), 0o750); err != nil {
-		t.Fatal(err)
-	}
-	if err := os.WriteFile(bundle, []byte("// built\n"), 0o600); err != nil {
 		t.Fatal(err)
 	}
 	return dir
@@ -85,10 +76,7 @@ func launchPlay(t *testing.T, sup *fakeSupervisor, preset string) *Orchestrator 
 	t.Helper()
 	o := playOrchestrator(sup)
 	checkout := playCheckout(t)
-	sandbox := PlaySandbox{
-		Number: 4913, Checkout: checkout,
-		LwDir: filepath.Join(checkout, "platform", "app"), Preset: preset,
-	}
+	sandbox := PlaySandbox{Number: 4913, Checkout: checkout, Preset: preset}
 	if err := o.PlayLaunch(context.Background(), sandbox); err != nil {
 		t.Fatalf("PlayLaunch(%q): %v", preset, err)
 	}
@@ -164,6 +152,9 @@ func TestPlaySeedsFromTheSharedPresetRegistry(t *testing.T) {
 // @scenario "Preset data is ingested once the sandbox is serving"
 func TestPlaySeedIngestWaitsForTheSandboxsOwnApp(t *testing.T) {
 	sup := &fakeSupervisor{}
+	// No shipped preset ingests any more (db.go's seedPreset comment says why),
+	// so the seam is exercised against a preset this test owns.
+	withIngestPreset(t, "demo", "seed:first", "seed:second")
 	o := launchPlay(t, sup, "demo")
 
 	stack, ok := o.stackBySlug(PlaySlug(4913))
@@ -192,7 +183,7 @@ func TestPlaySeedIngestWaitsForTheSandboxsOwnApp(t *testing.T) {
 				t.Errorf("ingest step %d = %q, want %q — order is the registry's", i, steps[i], script)
 			}
 		}
-		env := envForShell(t, sup, "seed:sample-traces")
+		env := envForShell(t, sup, "seed:first")
 		if !strings.Contains(env, "HAVEN_SEED_ENDPOINT=http://127.0.0.1:"+strconv.Itoa(appPort)) {
 			t.Errorf("ingest env = %q, want the sandbox's own loopback app", env)
 		}
@@ -222,6 +213,7 @@ func TestPlaySeedWithoutIngestNeverWaits(t *testing.T) {
 // @scenario "A sandbox that never serves keeps its base seed and nothing more"
 func TestPlaySeedIngestGivesUpWhenTheAppNeverAnswers(t *testing.T) {
 	sup := &fakeSupervisor{notReady: true}
+	withIngestPreset(t, "demo", "seed:first")
 	launchPlay(t, sup, "demo")
 	if len(sup.waited) != 1 {
 		t.Fatalf("waited on %v, want one attempt at the app", sup.waited)
@@ -240,19 +232,20 @@ func TestPlaySeedIngestGivesUpWhenTheAppNeverAnswers(t *testing.T) {
 // the collector is exactly a PR someone wants to watch running.
 // @scenario "A failed seed never takes the sandbox down"
 func TestPlaySeedFailureLeavesTheSandboxRunning(t *testing.T) {
-	sup := &fakeSupervisor{errOn: "seed:sample-traces", err: errors.New("collector said no")}
+	sup := &fakeSupervisor{errOn: "seed:second", err: errors.New("collector said no")}
+	withIngestPreset(t, "demo", "seed:first", "seed:second", "seed:third")
 	launchPlay(t, sup, "demo") // launchPlay fails the test if the launch returns an error
 
 	t.Run("when a step fails, the steps after it are abandoned", func(t *testing.T) {
 		steps := shellsMatching(sup, "pnpm run seed:")
 		if len(steps) != 2 {
-			t.Fatalf("ingest steps = %v, want the retention pin then the failing traces step", steps)
+			t.Fatalf("ingest steps = %v, want the first step then the failing second one", steps)
 		}
 	})
 
 	t.Run("when a step fails, the retry names this sandbox's own stack", func(t *testing.T) {
-		msg := PlaySeedFailure(PlaySlug(4913), "demo", "seed:sample-traces")
-		for _, want := range []string{"seed:sample-traces", "still running", "LANGWATCH_SLUG=play-4913", "haven db seed demo"} {
+		msg := PlaySeedFailure(PlaySlug(4913), "demo", "seed:second")
+		for _, want := range []string{"seed:second", "still running", "LANGWATCH_SLUG=play-4913", "haven db seed demo"} {
 			if !strings.Contains(msg, want) {
 				t.Errorf("failure message %q is missing %q", msg, want)
 			}

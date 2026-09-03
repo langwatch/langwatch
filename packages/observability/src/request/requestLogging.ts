@@ -42,9 +42,7 @@ export function getStatusCodeFromError(error: unknown): number {
  * - 5xx: 'error' (server errors - unexpected, needs attention)
  * - Others: 'info' (success or redirects)
  */
-export function getLogLevelFromStatusCode(
-  statusCode: number,
-): "info" | "warn" | "error" {
+export function getLogLevelFromStatusCode(statusCode: number): "info" | "warn" | "error" {
   if (statusCode >= 500) return "error";
   if (statusCode === 404) return "info";
   if (statusCode >= 400) return "warn";

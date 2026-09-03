@@ -22,10 +22,7 @@ import {
   SpanStatusCode,
   trace,
 } from "@opentelemetry/api";
-import {
-  ATTR_HTTP_ROUTE,
-  ATTR_URL_PATH,
-} from "@opentelemetry/semantic-conventions";
+import { ATTR_HTTP_ROUTE, ATTR_URL_PATH } from "@opentelemetry/semantic-conventions";
 
 import {
   ATTR_NAVIGATION_FROM_PATH,

@@ -22,7 +22,7 @@ Feature: Sign-in flows (credentials, Google OAuth, Auth0 OAuth)
   flow retires at D10, when the legacy callback shim goes.
 
   # Exercised end-to-end by the BetterAuth smoke test
-  # (platform/app/e2e/auth-regression/better-auth-smoketest.ts, "Credentials
+  # ([gone] e2e/auth-regression/better-auth-smoketest.ts, "Credentials
   # signin with correct password" -> HTTP 200 + session cookie).
   Scenario: On-prem credentials signin works end-to-end
     Given the deployment's default method set offers email and password
@@ -35,7 +35,7 @@ Feature: Sign-in flows (credentials, Google OAuth, Auth0 OAuth)
   # Full OAuth round-trip is verified via browser QA, not yet automated in
   # a parity-bound test. Provider selection/credential threading is covered
   # by the buildSocialProviders unit test in
-  # platform/app/src/server/better-auth/__tests__/index.test.ts.
+  # packages/ssrf/src/index.test.ts.
   Scenario: Google OAuth signin works end-to-end
     Given the deployment's default method set offers Google
     And GOOGLE_CLIENT_* envs are set
@@ -47,7 +47,7 @@ Feature: Sign-in flows (credentials, Google OAuth, Auth0 OAuth)
   # The regression-prone part of this flow — the legacy redirect_uri pin
   # (/api/auth/callback/auth0) that customer Auth0 apps depend on — is
   # locked by a unit test in
-  # platform/app/src/server/better-auth/__tests__/index.test.ts. The full OAuth
+  # packages/ssrf/src/index.test.ts. The full OAuth
   # round-trip is verified via browser QA, not yet automated.
   Scenario: Auth0 OAuth signin works end-to-end
     Given NEXTAUTH_PROVIDER is "auth0"

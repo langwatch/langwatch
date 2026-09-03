@@ -49,20 +49,75 @@ Feature: Change password from /settings/authentication
     And I see a "Password changed successfully" toast
     And the dialog closes
 
+  # The refusal the server AUTHORED and the one it did not are two different
+  # sentences, and the difference is deliberate (#5984). A non-5xx rejection the
+  # procedure wrote for a reader travels and is shown; a 500's message names
+  # Auth0 scopes and environment variables, which is an operator's detail, and
+  # degrades to the action that failed plus the generic line.
   @integration
   Scenario: Wrong current password keeps the dialog open and shows an error
     When I open the dialog
     And I submit an incorrect current password
     Then the server returns "Current password is incorrect"
-    And I see a "Failed to change password" toast with that message
+    And I see a "Couldn't change your password" notice carrying that sentence
     And the dialog stays open so I can retry
 
   @integration
   Scenario: Server error keeps the dialog open and shows the error
     When I open the dialog
     And the server returns an unexpected error on submit
-    Then I see a "Failed to change password" toast with the server's message
+    Then I see a "Couldn't change your password" notice with the generic explanation
+    And nothing the server wrote is shown to me
     And the dialog stays open so I can retry
+
+  # ── The linked sign-in methods list ────────────────────────────────────────
+
+  @integration
+  Scenario: The only linked sign-in method offers no way to remove it
+    Given my account holds exactly one linked sign-in method
+    Then no control to remove it is offered
+    Because the server refuses the last account under a serializable transaction,
+      and the affordance should say so before the click rather than after it
+
+  @integration
+  Scenario: An organization on single sign-on links and removes nothing
+    Given my organization is pinned to a single sign-on provider
+    Then I am told my company's provider signs me in
+    And neither linking nor removing a method is offered,
+      because a second way in would route around the provider the organization chose
+
+  @integration
+  Scenario: Removing a linked sign-in method re-reads the list
+    Given my account holds two linked sign-in methods
+    When I remove one
+    Then the account id is sent, the list is asked for again,
+      and I am told the method was removed
+
+  @integration
+  Scenario: Linking an additional sign-in method goes through the account-linking route
+    When I link another sign-in method
+    Then the request goes to the account-linking endpoint as the signed-in reader,
+      never through a fresh sign-in that could silently switch accounts
+    And the provider id the product names differently is mapped to the one
+      the identity library registered
+    And a refusal from the provider is shown with its own reason
+
+  # A credential typed into a text field is one over-the-shoulder glance and one
+  # screen recording away from being somebody else's.
+  @integration
+  Scenario: Every password field on the page masks what is typed into it
+    When I open the dialog
+    Then Current Password, New Password and Confirm New Password are all masked
+
+  # Everything on this page is keyed on the reader's own account, so there is no
+  # scope to hold a grant over. A page-level refusal here would leave a member
+  # with no way to change their own password.
+  @integration
+  Scenario: Every signed-in reader can open their own sign-in methods
+    Given I hold no organization or project permissions at all
+    When I open /settings/authentication
+    Then the page opens
+    And it is framed in the settings chrome
 
   @integration
   Scenario: Cancel button closes the dialog without submitting

@@ -10,10 +10,7 @@ import {
   type AgentResponse,
   type AgentsApiService,
 } from "@/client-sdk/services/agents/agents-api.service";
-import {
-  commandValidationError,
-  reportCommandError,
-} from "../../../utils/errorOutput";
+import { commandValidationError, reportCommandError } from "../../../utils/errorOutput";
 import { loadConfig, saveConfig } from "../../../utils/governance/config";
 
 export function fail(message: string): never {
@@ -22,10 +19,7 @@ export function fail(message: string): never {
 }
 
 /** The local URL the flags point at, after mutual-exclusion validation. */
-export function resolveLocalUrl(options: {
-  port?: string;
-  url?: string;
-}): string {
+export function resolveLocalUrl(options: { port?: string; url?: string }): string {
   if (options.port && options.url) {
     fail("--port and --url are mutually exclusive. Pass one of them.");
   }
@@ -166,7 +160,7 @@ function agentFromMemory(httpAgents: AgentResponse[]): AgentResponse | undefined
 }
 
 const CREATE_INSTRUCTIONS =
-  "This project has no HTTP agents. Create one first: langwatch agent create \"My Agent\" --type http --config '{\"url\":\"https://...\"}'";
+  'This project has no HTTP agents. Create one first: langwatch agent create "My Agent" --type http --config \'{"url":"https://..."}\'';
 
 /**
  * The project has no HTTP agents yet: offer to create one on the spot (TTY
@@ -231,8 +225,7 @@ async function pickHttpAgent({
     message: "Which agent should point at your machine?",
     choices: httpAgents.map((agent) => ({
       title: agent.name,
-      description:
-        typeof agent.config?.url === "string" ? agent.config.url : undefined,
+      description: typeof agent.config?.url === "string" ? agent.config.url : undefined,
       value: agent.id,
     })),
     initial: 0,

@@ -1,0 +1,485 @@
+/**
+ * Scenario event schemas
+ * Extends the AG-UI base event schema to add scenario-specific fields.
+ */
+import { EventType } from "@ag-ui/core";
+import { z } from "zod";
+import { runParameterValuesSchema } from "../scenario.parameters";
+import { runActorLabelSchema } from "../run-actor";
+import { scenarioMessageSchema } from "../scenario-message.schema";
+import { ScenarioEventType, ScenarioRunStatus, Verdict } from "../scenario-run";
+
+/**
+ * AG-UI Base Event Schema
+ * Provides the foundation for all events with type, timestamp, and raw event data
+ */
+const baseEventSchema = z.object({
+  type: z.nativeEnum(EventType),
+  timestamp: z.number(),
+  rawEvent: z.unknown().optional(),
+});
+
+/**
+ * Batch Run ID Schema
+ */
+export const batchRunIdSchema = z.string();
+
+/**
+ * Scenario Run ID Schema
+ */
+export const scenarioRunIdSchema = z.string();
+
+/**
+ * Scenario ID Schema
+ */
+export const scenarioIdSchema = z.string();
+
+/**
+ * Base Scenario Event Schema
+ * Common fields shared by all scenario events including batch tracking and scenario identification.
+ * Extends the base event schema with scenario-specific identifiers.
+ */
+const baseScenarioEventSchema = baseEventSchema.extend({
+  batchRunId: batchRunIdSchema,
+  scenarioId: scenarioIdSchema,
+  scenarioRunId: scenarioRunIdSchema,
+  scenarioSetId: z
+    .string()
+    .optional()
+    .default("default")
+    .transform((v) => v || "default"),
+});
+
+/**
+ * LangWatch platform metadata schema.
+ * Reserved namespace for platform-internal context injected by the suite runner.
+ * Direct SDK users should not populate this.
+ */
+export const langwatchMetadataSchema = z.object({
+  targetReferenceId: z.string(),
+  targetType: z.enum(["prompt", "http", "code", "workflow", "connected"]),
+  /**
+   * The key the target folds under: the reference id alone, or the reference
+   * id and a hash of the target's parameter overrides when it carries any.
+   * Stamped at queue time. Absent on runs recorded before targets carried
+   * parameters, which read as the reference id alone.
+   *
+   * @see specs/features/agent-testing/results-atoms.feature
+   */
+  targetKey: z.string().optional(),
+  /**
+   * The parameter overrides of this target alone, so a reader can name the
+   * variant. Absent when the target carries none. The merged values the run
+   * resolved sit beside the namespace under `parameters`, as they always did.
+   */
+  targetParameters: runParameterValuesSchema.optional(),
+  simulationSuiteId: z.string().optional(),
+  /**
+   * The version of the scenario at the moment the run was queued. A later
+   * edit of the scenario never changes what an old run says. Absent on runs
+   * recorded before versions existed.
+   *
+   * @see specs/scenarios/scenario-version-on-runs.feature
+   */
+  scenarioVersion: z.number().int().optional(),
+  /**
+   * The simulation models the run plan was CONFIGURED with, stamped at queue
+   * time. Absent when the plan names none and the project default is used,
+   * and absent on runs recorded before this was stamped. Both read back as
+   * "this configuration named no model", which is what a person chose.
+   *
+   * Not the model the run resolved to: the same choice has to key the same
+   * way after a project default changes.
+   *
+   * @see specs/scenarios/run-configuration-on-runs.feature
+   */
+  simulatorModel: z.string().optional(),
+  judgeModel: z.string().optional(),
+  /**
+   * The simulation models the run RESOLVED, stamped at queue time: the run
+   * plan's choice, else the case's own choice, else the project default for
+   * that role.
+   *
+   * This is what a person reads back off the run. The project default changes
+   * over time, so a run that recorded only the configured value cannot say
+   * which model judged it a month later.
+   *
+   * Absent when the project had no model set for the role, and absent on runs
+   * recorded before this was stamped. Both read the same way.
+   *
+   * @see specs/scenarios/resolved-run-models-on-runs.feature
+   */
+  resolvedSimulatorModel: z.string().optional(),
+  resolvedJudgeModel: z.string().optional(),
+  /**
+   * Who started the run: the platform user id, and the surface that person
+   * acted through. Stamped at queue time, and absent whenever the caller
+   * named no person, which is every project-key and SDK run.
+   *
+   * The id and not a name, so a run still points at the right person after
+   * they rename themselves.
+   *
+   * @see specs/scenarios/run-actor-on-runs.feature
+   */
+  actorId: z.string().optional(),
+  actorLabel: runActorLabelSchema.optional(),
+  /**
+   * The connected agent instance that served the run, recorded when the run
+   * finished. Absent for every other kind of target, and for a run recorded
+   * before instances were.
+   *
+   * @see specs/scenarios/served-agent-instance-on-runs.feature
+   */
+  agentInstance: z.object({ hostname: z.string(), label: z.string().nullable() }).optional(),
+});
+
+/**
+ * One participant of a run, as the code that pushed the run names it.
+ *
+ * The SDK reports every agent it wired into the run: the agent under test,
+ * the user simulator and the judge. Only the `agent` role names what the run
+ * was pointed at, so a run pushed from code can say which agent it tested
+ * without the platform holding a target for it.
+ *
+ * `name` is the adapter's own name, or its class name when it was given none,
+ * for example "AgnoAgentAdapter".
+ *
+ * It sits beside `name` and `description` on the metadata rather than inside
+ * the reserved `langwatch` namespace, which only the platform writes.
+ *
+ * @see specs/features/agent-testing/results-atoms.feature
+ */
+export const scenarioAgentSchema = z.object({
+  name: z.string(),
+  role: z.enum(["agent", "user", "judge"]),
+});
+
+/**
+ * Scenario Run Started Event Schema
+ * Captures the initiation of a scenario run with metadata about the scenario being executed.
+ * Contains the scenario name and optional description for identification purposes.
+ * User-defined metadata fields pass through via .passthrough().
+ * The langwatch namespace is strictly validated.
+ */
+export const scenarioRunStartedSchema = baseScenarioEventSchema.extend({
+  type: z.literal(ScenarioEventType.RUN_STARTED),
+  metadata: z
+    .object({
+      name: z.string().optional(),
+      description: z.string().optional(),
+      /**
+       * One short line describing why the run was started. Any caller that can
+       * set run metadata can set it, platform or SDK.
+       *
+       * Trimmed, and dropped when it holds only spaces, so a note that arrives
+       * on an event reads the same as a note the platform stamped. The
+       * 200-character limit of the platform and CLI input paths is NOT applied
+       * here: an event is a record of a run that already happened, and
+       * refusing it over the length of its note would lose the run itself.
+       *
+       * @see specs/suites/run-note-metadata-convention.feature
+       */
+      note: z
+        .string()
+        .trim()
+        .transform((note) => (note === "" ? undefined : note))
+        .optional(),
+      /** Who took part in the run. See {@link scenarioAgentSchema}. */
+      agents: z.array(scenarioAgentSchema).optional(),
+      langwatch: langwatchMetadataSchema.optional(),
+    })
+    .passthrough(),
+});
+
+/**
+ * Scenario Results Schema
+ * Defines the structure for scenario evaluation results including verdict and criteria analysis.
+ * Matches the Python dataclass structure used in the evaluation system.
+ */
+export const scenarioResultsSchema = z.object({
+  verdict: z.nativeEnum(Verdict),
+  reasoning: z.string().optional(),
+  metCriteria: z.array(z.string()),
+  unmetCriteria: z.array(z.string()),
+  error: z.string().optional(),
+});
+export type ScenarioResults = z.infer<typeof scenarioResultsSchema>;
+
+/**
+ * Scenario Run Finished Event Schema
+ * Captures the completion of a scenario run with final status and evaluation results.
+ * Status indicates success/failure, while results contain detailed evaluation outcomes.
+ */
+export const scenarioRunFinishedSchema = baseScenarioEventSchema.extend({
+  type: z.literal(ScenarioEventType.RUN_FINISHED),
+  status: z.nativeEnum(ScenarioRunStatus),
+  results: scenarioResultsSchema.optional().nullable(),
+});
+
+/**
+ * Voice scenario `input_audio` content part — the missing WIRE leg of #4138
+ * (tracked as #5149).
+ *
+ * Voice turns arrive as a mixed content array, e.g.
+ *   `[ { type: "text", text }, { type: "input_audio", input_audio: { data, format } } ]`
+ * — the shape the langwatch python-sdk emits, and the shape the typescript-sdk's
+ * `convert-core-messages-to-agui-messages` translates AI-SDK audio parts to.
+ *
+ * Neither the AG-UI `MessageSchema` nor the tracer `chatMessageSchema` content
+ * unions accept an `input_audio` part, so a voice MESSAGE_SNAPSHOT was
+ * 400-rejected at the route validator (`zValidator("json", scenarioEventSchema)`
+ * in `packages/features/scenario/server/src/transport/api-rest/scenario-event.api.ts`) BEFORE
+ * `extractInlineMediaFromEvent` — which already externalizes `input_audio`
+ * (`server/stored-objects/content-extractor.ts` `inputAudio`) — ever ran.
+ * Accepting it here lets the payload reach that extractor so the UI render leg
+ * shipped in #4138 finally has data to paint.
+ *
+ * Every `input_audio` field is optional so this validates BOTH the inbound
+ * pre-extraction shape (`{ data, format }`) and the post-extraction rewrite
+ * (`{ url, mimeType, data: undefined }`).
+ */
+const inputAudioContentPartSchema = z.object({
+  type: z.literal("input_audio"),
+  input_audio: z.object({
+    data: z.string().optional(),
+    format: z.string().optional(),
+    mimeType: z.string().optional(),
+    url: z.string().optional(),
+    id: z.string().optional(),
+  }),
+});
+
+/**
+ * A message whose `content` array mixes plain text with `input_audio` parts.
+ * Added as a third member of the message union below so existing text / image /
+ * tool / binary messages keep validating via `MessageSchema` / `chatMessageSchema`
+ * — this is purely additive and rejects no previously-accepted shape.
+ */
+const scenarioAudioMessageSchema = z.object({
+  role: z.string().optional(),
+  content: z.array(
+    z.union([z.object({ type: z.literal("text"), text: z.string() }), inputAudioContentPartSchema]),
+  ),
+});
+
+/**
+ * Keep AG-UI's third-party validator runtime out of the application's Zod 4
+ * schema graph and
+ * describe the small message boundary we consume here instead. The richer
+ * LangWatch message schema below remains the primary validator; this branch
+ * covers AG-UI-only roles such as `activity` and `reasoning`.
+ */
+const agUiMessageSchema = z.looseObject({
+  id: z.string(),
+  role: z.enum(["developer", "system", "assistant", "user", "tool", "activity", "reasoning"]),
+  content: z.unknown().optional(),
+  toolCalls: z
+    .array(
+      z.looseObject({
+        id: z.string().optional(),
+        function: z
+          .looseObject({
+            name: z.string().optional(),
+            arguments: z.string().optional(),
+          })
+          .optional(),
+      }),
+    )
+    .optional(),
+  tool_calls: z
+    .array(
+      z.looseObject({
+        id: z.string().optional(),
+        function: z
+          .looseObject({
+            name: z.string().optional(),
+            arguments: z.string().optional(),
+          })
+          .optional(),
+      }),
+    )
+    .optional(),
+});
+
+/**
+ * An Anthropic `text` block. `citations` is carried through because zod drops
+ * every key a schema does not declare: a block that cites the documents it
+ * answered from would otherwise reach the transcript without them.
+ */
+const anthropicTextBlockSchema = z.object({
+  type: z.literal("text"),
+  text: z.string(),
+  citations: z.array(z.unknown()).nullish(),
+});
+
+const anthropicToolUseBlockSchema = z.object({
+  type: z.literal("tool_use"),
+  id: z.string(),
+  name: z.string(),
+  input: z.unknown(),
+});
+
+const anthropicToolResultBlockSchema = z.object({
+  type: z.literal("tool_result"),
+  tool_use_id: z.string(),
+  content: z.union([z.string(), z.array(z.unknown())]).optional(),
+  is_error: z.boolean().optional(),
+});
+
+const anthropicThinkingBlockSchema = z.object({
+  type: z.literal("thinking"),
+  thinking: z.string(),
+  signature: z.string().optional(),
+});
+
+const anthropicRedactedThinkingBlockSchema = z.object({
+  type: z.literal("redacted_thinking"),
+  data: z.string(),
+});
+
+/**
+ * A message in the Anthropic Messages API shape: an assistant turn made of
+ * `thinking`, `text` and `tool_use` blocks, or a user turn that carries the
+ * `tool_result` blocks answering those calls. An adapter that returns the
+ * response of the Anthropic SDK, or the transcript of Claude Code, sends its
+ * snapshots in this shape, and the transcript renderer already reads
+ * `tool_use` and `tool_result` blocks.
+ *
+ * Neither the AG-UI message boundary nor the LangWatch `scenarioMessageSchema`
+ * accepts a `tool_use` or `thinking` block, so every snapshot after the first
+ * tool call was 400-rejected and the run kept only the turns before it. This
+ * member sits before `scenarioMessageSchema` in the union on purpose: its `tool_result`
+ * part carries `toolCallId` and `result`, so it would validate an Anthropic
+ * `tool_result` block and strip its `tool_use_id` and `content`. The refine
+ * keeps this member to messages that actually carry an Anthropic-only block,
+ * so a plain text array keeps validating through the members that came before.
+ * A text block with `citations` counts as one: no schema before this member
+ * declares that field, so a cited turn routed to them would reach the
+ * transcript with its citations stripped.
+ */
+const scenarioAnthropicMessageSchema = z.object({
+  role: z.string().optional(),
+  content: z
+    .array(
+      z.union([
+        anthropicTextBlockSchema,
+        anthropicToolUseBlockSchema,
+        anthropicToolResultBlockSchema,
+        anthropicThinkingBlockSchema,
+        anthropicRedactedThinkingBlockSchema,
+      ]),
+    )
+    .refine(
+      (blocks) =>
+        blocks.some(
+          (block) =>
+            block.type !== "text" || (block.citations !== undefined && block.citations !== null),
+        ),
+      {
+        message:
+          "An Anthropic message carries at least one non-text block, or a text block with citations",
+      },
+    ),
+});
+
+/**
+ * Scenario Message Snapshot Event Schema
+ * Captures the conversation state at a specific point during scenario execution.
+ * Includes searchable_content and payload for full message functionality.
+ */
+export const scenarioMessageSnapshotSchema = baseScenarioEventSchema.extend({
+  type: z.literal(ScenarioEventType.MESSAGE_SNAPSHOT),
+  messages: z.array(
+    z.intersection(
+      z.union([
+        agUiMessageSchema,
+        scenarioAnthropicMessageSchema,
+        scenarioMessageSchema,
+        scenarioAudioMessageSchema,
+      ]),
+      z.object({
+        id: z.string().optional(),
+        trace_id: z.string().optional(),
+      }),
+    ),
+  ),
+});
+
+/**
+ * Scenario Text Message Start Event Schema
+ * Emitted when a message begins (placeholder). Persisted via event-sourcing.
+ */
+export const scenarioTextMessageStartSchema = baseScenarioEventSchema.extend({
+  type: z.literal(ScenarioEventType.TEXT_MESSAGE_START),
+  messageId: z.string(),
+  role: z.string(),
+  messageIndex: z.number().optional(),
+});
+
+/**
+ * Scenario Text Message End Event Schema
+ * Emitted when a message is complete with full content. Persisted via event-sourcing.
+ */
+export const scenarioTextMessageEndSchema = baseScenarioEventSchema.extend({
+  type: z.literal(ScenarioEventType.TEXT_MESSAGE_END),
+  messageId: z.string(),
+  role: z.string(),
+  content: z.string().optional(),
+  message: z.record(z.string(), z.unknown()).optional(),
+  traceId: z.string().optional(),
+  messageIndex: z.number().optional(),
+});
+
+/**
+ * Scenario Text Message Content Event Schema (broadcast only)
+ * Streaming delta for real-time UX, not persisted.
+ */
+export const scenarioTextMessageContentSchema = baseScenarioEventSchema.extend({
+  type: z.literal(ScenarioEventType.TEXT_MESSAGE_CONTENT),
+  messageId: z.string(),
+  delta: z.string(),
+});
+
+/**
+ * Scenario Tool Call Start Event Schema (broadcast only)
+ */
+export const scenarioToolCallStartSchema = baseScenarioEventSchema.extend({
+  type: z.literal(ScenarioEventType.TOOL_CALL_START),
+  toolCallId: z.string(),
+  toolCallName: z.string(),
+  parentMessageId: z.string().optional(),
+});
+
+/**
+ * Scenario Tool Call Args Event Schema (broadcast only)
+ */
+export const scenarioToolCallArgsSchema = baseScenarioEventSchema.extend({
+  type: z.literal(ScenarioEventType.TOOL_CALL_ARGS),
+  toolCallId: z.string(),
+  delta: z.string(),
+});
+
+/**
+ * Scenario Tool Call End Event Schema (broadcast only)
+ */
+export const scenarioToolCallEndSchema = baseScenarioEventSchema.extend({
+  type: z.literal(ScenarioEventType.TOOL_CALL_END),
+  toolCallId: z.string(),
+});
+
+/**
+ * Scenario Event Union Schema
+ * Discriminated union of all possible scenario event types.
+ * Enables type-safe handling of different event types based on the 'type' field.
+ */
+export const scenarioEventSchema = z.discriminatedUnion("type", [
+  scenarioRunStartedSchema,
+  scenarioRunFinishedSchema,
+  scenarioMessageSnapshotSchema,
+  scenarioTextMessageStartSchema,
+  scenarioTextMessageEndSchema,
+  scenarioTextMessageContentSchema,
+  scenarioToolCallStartSchema,
+  scenarioToolCallArgsSchema,
+  scenarioToolCallEndSchema,
+]);

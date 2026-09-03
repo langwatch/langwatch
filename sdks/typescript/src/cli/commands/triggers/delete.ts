@@ -12,9 +12,7 @@ import type { CommandResult } from "../../utils/output";
  * Returns the deletion result rather than printing it: the output port renders
  * it in whatever format the caller asked for (utils/output.ts).
  */
-export const deleteTriggerCommand = async (
-  id: string,
-): Promise<CommandResult | void> => {
+export const deleteTriggerCommand = async (id: string): Promise<CommandResult | void> => {
   await resolveCredentials();
 
   const apiKey = scopedApiKey() ?? process.env.LANGWATCH_API_KEY ?? "";
@@ -29,11 +27,15 @@ export const deleteTriggerCommand = async (
     });
 
     if (!response.ok) {
-      await failSpinnerFromResponse({ spinner, response, action: `delete trigger "${id}"` });
+      await failSpinnerFromResponse({
+        spinner,
+        response,
+        action: `delete trigger "${id}"`,
+      });
       process.exit(1);
     }
 
-    const result = await response.json() as { id: string; deleted: boolean };
+    const result = (await response.json()) as { id: string; deleted: boolean };
     spinner.succeed(`Trigger "${id}" deleted`);
 
     return {

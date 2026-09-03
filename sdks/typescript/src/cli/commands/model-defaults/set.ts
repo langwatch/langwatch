@@ -28,7 +28,10 @@ function resolveScope(
   const kind: ScopeKind = options.scope ?? "project";
 
   if (options.scopeId) {
-    return { scopeType: kind.toUpperCase() as ModelDefaultScopeType, scopeId: options.scopeId };
+    return {
+      scopeType: kind.toUpperCase() as ModelDefaultScopeType,
+      scopeId: options.scopeId,
+    };
   }
 
   if (kind === "project") {
@@ -81,9 +84,7 @@ export const setModelDefaultCommand = async (
 
     const existing = snapshot.configs
       .filter((c) =>
-        c.scopes.some(
-          (s) => s.type === target.scopeType && s.id === target.scopeId,
-        ),
+        c.scopes.some((s) => s.type === target.scopeType && s.id === target.scopeId),
       )
       .sort((a, b) => (a.createdAt > b.createdAt ? -1 : 1));
 

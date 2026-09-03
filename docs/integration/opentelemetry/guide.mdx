@@ -116,6 +116,7 @@ The setup follows this general pattern across all languages:
         ```
       </Step>
     </Steps>
+
   </Tab>
 
   <Tab title="C#/.NET">
@@ -167,6 +168,7 @@ The setup follows this general pattern across all languages:
         ```
       </Step>
     </Steps>
+
   </Tab>
 </Tabs>
 
@@ -175,10 +177,12 @@ The setup follows this general pattern across all languages:
 LangWatch works with any OpenTelemetry-compatible instrumentation library. Here are some popular options:
 
 ### Java Libraries
+
 - **[Spring AI](https://docs.spring.io/spring-ai/reference/index.html)**: Spring AI provides built-in observability support for AI applications, including OpenTelemetry integration for tracing LLM calls and AI operations
 - **OpenTelemetry Java SDK**: Use OpenTelemetry Java SDK with custom spans
 
 ### .NET Libraries
+
 - **[Azure Monitor OpenTelemetry](https://learn.microsoft.com/en-us/azure/azure-monitor/app/opentelemetry-enable?tabs=aspnetcore)**: Azure Monitor OpenTelemetry provides comprehensive OpenTelemetry support for .NET applications, including automatic instrumentation and Azure-specific features
 - **OpenTelemetry .NET SDK**: Use OpenTelemetry .NET SDK with custom instrumentation
 
@@ -196,16 +200,16 @@ public class LLMService {
 
     public String callLLM(String prompt) {
         Span span = tracer.spanBuilder("llm-call").startSpan();
-        
+
         try (var scope = span.makeCurrent()) {
             // Add relevant attributes
             span.setAttribute("llm.provider", "custom-provider");
             span.setAttribute("llm.model", "gpt-5-mini");
             span.setAttribute("llm.prompt", prompt);
-            
+
             // Your LLM call here
             String response = yourLLMClient.generate(prompt);
-            
+
             return response;
         } finally {
             span.end();
@@ -224,7 +228,9 @@ export LANGWATCH_PROJECT_ID="your-project-id-here"  # Required for service API k
 ```
 
 <Note>
-  `LANGWATCH_PROJECT_ID` is required when using a **service API key** (e.g. for CI/CD or multi-project setups). Project API keys obtained from the project settings page already have the project context built in.
+  `LANGWATCH_PROJECT_ID` is required when using a **service API key** (e.g. for CI/CD or
+  multi-project setups). Project API keys obtained from the project settings page already
+  have the project context built in.
 </Note>
 
 ## Verification
@@ -245,11 +251,11 @@ After setting up your instrumentation, you can verify that traces are being sent
     - Check network connectivity to the LangWatch endpoint
   </Accordion>
 
-  <Accordion title="Authentication errors">
-    - Verify the Authorization header format: `Bearer YOUR_API_KEY`
-    - Ensure the API key is valid and not expired
-    - Check that the API key has the necessary permissions for trace ingestion
-  </Accordion>
+<Accordion title="Authentication errors">
+  - Verify the Authorization header format: `Bearer YOUR_API_KEY` - Ensure the API key is
+  valid and not expired - Check that the API key has the necessary permissions for trace
+  ingestion
+</Accordion>
 
   <Accordion title="Performance issues">
     - Consider using batch span processors for high-volume applications

@@ -34,23 +34,23 @@ Design principles:
 
 Every feature has up to four surfaces:
 
-| Surface | Meaning |
-|---|---|
-| **code** | Developer writes code in their project — SDK namespace, CLI subcommands, agent skill |
-| **platform** | No-code via UI route, MCP tools (`platform_*`), platform-side skill |
-| **api** | REST / Hono endpoint namespace (shared by code and platform) |
-| **docs** | Canonical documentation URL |
+| Surface      | Meaning                                                                              |
+| ------------ | ------------------------------------------------------------------------------------ |
+| **code**     | Developer writes code in their project — SDK namespace, CLI subcommands, agent skill |
+| **platform** | No-code via UI route, MCP tools (`platform_*`), platform-side skill                  |
+| **api**      | REST / Hono endpoint namespace (shared by code and platform)                         |
+| **docs**     | Canonical documentation URL                                                          |
 
 Fields point to **namespaces**, not individual methods (e.g. `langwatch.experiment` covers the whole module).
 
 ## The Sync Model
 
-| `sync` value | Meaning | Example |
-|---|---|---|
-| `null` | Separate or one-mode only | annotations (platform-only creation) |
-| `bidirectional` | Code ↔ platform, synced | prompts (via `prompt sync`) |
-| `code-to-platform` | Code generates, platform displays | tracing, experiments |
-| `platform-to-code` | Platform configures, code consumes | — (none currently) |
+| `sync` value       | Meaning                            | Example                              |
+| ------------------ | ---------------------------------- | ------------------------------------ |
+| `null`             | Separate or one-mode only          | annotations (platform-only creation) |
+| `bidirectional`    | Code ↔ platform, synced            | prompts (via `prompt sync`)          |
+| `code-to-platform` | Code generates, platform displays  | tracing, experiments                 |
+| `platform-to-code` | Platform configures, code consumes | — (none currently)                   |
 
 `plannedSync` captures known future intent (e.g. scenarios will become `bidirectional`).
 
@@ -58,50 +58,50 @@ Fields point to **namespaces**, not individual methods (e.g. `langwatch.experime
 
 Legend: ✅ present · — absent · `—` no SDK/CLI/skill/MCP by design
 
-| Feature | SDK py | SDK ts | SDK go | CLI | Skill (code) | UI | MCP | Skill (platform) | API | Docs |
-|---|:-:|:-:|:-:|:-:|:-:|:-:|:-:|:-:|:-:|:-:|
-| **Observability** | | | | | | | | | | |
-| Tracing | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | — | ✅ | ✅ |
-| Analytics | ✅ | ✅ | — | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ |
-| User Events | ✅ | — | ✅ | — | — | — | — | — | ✅ | ✅ |
-| Annotations | ✅ | ✅ | ✅ | ✅ | — | ✅ | ✅ | — | ✅ | ✅ |
-| **Evaluations** | | | | | | | | | | |
-| Experiments | ✅ | ✅ | — | ✅ | ✅ | ✅ | ✅ | — | ✅ | ✅ |
-| Online Evaluation (Monitors) | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | — | ✅ | ✅ |
-| **Agent Simulations** | | | | | | | | | | |
-| Scenarios | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ |
-| Runs | — | ✅ | ✅ | ✅ | — | ✅ | ✅ | — | ✅ | ✅ |
-| Test Suites | ✅ | ✅ | — | ✅ | — | ✅ | ✅ | — | ✅ | — |
-| Run Plans | ✅ | ✅ | — | ✅ | — | ✅ | ✅ | — | ✅ | — |
-| **Prompt Management** | | | | | | | | | | |
-| Prompts | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | — | ✅ | ✅ |
-| Prompt Playground | — | — | — | — | — | ✅ | — | — | ✅ | ✅ |
-| **Library** | | | | | | | | | | |
-| Agents | ✅ | ✅ | — | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ |
-| Workflows | ✅ | ✅ | — | ✅ | — | ✅ | ✅ | — | ✅ | ✅ |
-| Evaluators | ✅ | ✅ | — | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ |
-| Datasets | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | — | ✅ | ✅ |
-| **Cross-cutting** | | | | | | | | | | |
-| Dashboards | ✅ | ✅ | — | ✅ | — | ✅ | ✅ | — | ✅ | — |
-| Triggers | ✅ | ✅ | ✅ | ✅ | — | ✅ | ✅ | — | ✅ | — |
-| **AI Gateway** | | | | | | | | | | |
-| Virtual Keys | — | — | — | ✅ | — | ✅ | — | — | ✅ | ✅ |
-| Budgets | — | — | — | ✅ | — | ✅ | — | — | ✅ | ✅ |
-| Governance | — | — | — | ✅ | — | ✅ | — | — | ✅ | ✅ |
-| Inventory (ingestion) | — | — | — | ✅ | — | ✅ | — | — | ✅ | ✅ |
-| **Settings** | | | | | | | | | | |
-| Projects | — | — | ✅ | ✅ | — | ✅ | ✅ | — | ✅ | — |
-| Model Providers | ✅ | ✅ | — | ✅ | — | ✅ | ✅ | — | ✅ | ✅ |
-| Model Defaults | — | — | — | ✅ | — | ✅ | — | — | ✅ | — |
-| Project Secrets | ✅ | ✅ | — | ✅ | — | ✅ | ✅ | — | ✅ | — |
-| Agent Skills | — | — | — | ✅ | — | — | — | — | — | ✅ |
-| Organization | — | — | — | ✅ | — | ✅ | — | — | ✅ | — |
-| Members and Invites | — | — | — | ✅ | — | ✅ | — | — | ✅ | — |
-| Teams | — | — | — | ✅ | — | ✅ | — | — | ✅ | — |
-| Access Groups | — | — | — | ✅ | — | ✅ | — | — | ✅ | — |
-| Custom Roles | — | — | — | ✅ | — | ✅ | — | — | ✅ | — |
-| Role Bindings | — | — | — | ✅ | — | ✅ | — | — | ✅ | — |
-| SCIM Provisioning | — | — | — | ✅ | — | ✅ | — | — | ✅ | — |
+| Feature                      | SDK py | SDK ts | SDK go | CLI | Skill (code) | UI  | MCP | Skill (platform) | API | Docs |
+| ---------------------------- | :----: | :----: | :----: | :-: | :----------: | :-: | :-: | :--------------: | :-: | :--: |
+| **Observability**            |        |        |        |     |              |     |     |                  |     |      |
+| Tracing                      |   ✅   |   ✅   |   ✅   | ✅  |      ✅      | ✅  | ✅  |        —         | ✅  |  ✅  |
+| Analytics                    |   ✅   |   ✅   |   —    | ✅  |      ✅      | ✅  | ✅  |        ✅        | ✅  |  ✅  |
+| User Events                  |   ✅   |   —    |   ✅   |  —  |      —       |  —  |  —  |        —         | ✅  |  ✅  |
+| Annotations                  |   ✅   |   ✅   |   ✅   | ✅  |      —       | ✅  | ✅  |        —         | ✅  |  ✅  |
+| **Evaluations**              |        |        |        |     |              |     |     |                  |     |      |
+| Experiments                  |   ✅   |   ✅   |   —    | ✅  |      ✅      | ✅  | ✅  |        —         | ✅  |  ✅  |
+| Online Evaluation (Monitors) |   ✅   |   ✅   |   ✅   | ✅  |      ✅      | ✅  | ✅  |        —         | ✅  |  ✅  |
+| **Agent Simulations**        |        |        |        |     |              |     |     |                  |     |      |
+| Scenarios                    |   ✅   |   ✅   |   ✅   | ✅  |      ✅      | ✅  | ✅  |        ✅        | ✅  |  ✅  |
+| Runs                         |   —    |   ✅   |   ✅   | ✅  |      —       | ✅  | ✅  |        —         | ✅  |  ✅  |
+| Test Suites                  |   ✅   |   ✅   |   —    | ✅  |      —       | ✅  | ✅  |        —         | ✅  |  —   |
+| Run Plans                    |   ✅   |   ✅   |   —    | ✅  |      —       | ✅  | ✅  |        —         | ✅  |  —   |
+| **Prompt Management**        |        |        |        |     |              |     |     |                  |     |      |
+| Prompts                      |   ✅   |   ✅   |   ✅   | ✅  |      ✅      | ✅  | ✅  |        —         | ✅  |  ✅  |
+| Prompt Playground            |   —    |   —    |   —    |  —  |      —       | ✅  |  —  |        —         | ✅  |  ✅  |
+| **Library**                  |        |        |        |     |              |     |     |                  |     |      |
+| Agents                       |   ✅   |   ✅   |   —    | ✅  |      ✅      | ✅  | ✅  |        ✅        | ✅  |  ✅  |
+| Workflows                    |   ✅   |   ✅   |   —    | ✅  |      —       | ✅  | ✅  |        —         | ✅  |  ✅  |
+| Evaluators                   |   ✅   |   ✅   |   —    | ✅  |      ✅      | ✅  | ✅  |        ✅        | ✅  |  ✅  |
+| Datasets                     |   ✅   |   ✅   |   ✅   | ✅  |      ✅      | ✅  | ✅  |        —         | ✅  |  ✅  |
+| **Cross-cutting**            |        |        |        |     |              |     |     |                  |     |      |
+| Dashboards                   |   ✅   |   ✅   |   —    | ✅  |      —       | ✅  | ✅  |        —         | ✅  |  —   |
+| Triggers                     |   ✅   |   ✅   |   ✅   | ✅  |      —       | ✅  | ✅  |        —         | ✅  |  —   |
+| **AI Gateway**               |        |        |        |     |              |     |     |                  |     |      |
+| Virtual Keys                 |   —    |   —    |   —    | ✅  |      —       | ✅  |  —  |        —         | ✅  |  ✅  |
+| Budgets                      |   —    |   —    |   —    | ✅  |      —       | ✅  |  —  |        —         | ✅  |  ✅  |
+| Governance                   |   —    |   —    |   —    | ✅  |      —       | ✅  |  —  |        —         | ✅  |  ✅  |
+| Inventory (ingestion)        |   —    |   —    |   —    | ✅  |      —       | ✅  |  —  |        —         | ✅  |  ✅  |
+| **Settings**                 |        |        |        |     |              |     |     |                  |     |      |
+| Projects                     |   —    |   —    |   ✅   | ✅  |      —       | ✅  | ✅  |        —         | ✅  |  —   |
+| Model Providers              |   ✅   |   ✅   |   —    | ✅  |      —       | ✅  | ✅  |        —         | ✅  |  ✅  |
+| Model Defaults               |   —    |   —    |   —    | ✅  |      —       | ✅  |  —  |        —         | ✅  |  —   |
+| Project Secrets              |   ✅   |   ✅   |   —    | ✅  |      —       | ✅  | ✅  |        —         | ✅  |  —   |
+| Agent Skills                 |   —    |   —    |   —    | ✅  |      —       |  —  |  —  |        —         |  —  |  ✅  |
+| Organization                 |   —    |   —    |   —    | ✅  |      —       | ✅  |  —  |        —         | ✅  |  —   |
+| Members and Invites          |   —    |   —    |   —    | ✅  |      —       | ✅  |  —  |        —         | ✅  |  —   |
+| Teams                        |   —    |   —    |   —    | ✅  |      —       | ✅  |  —  |        —         | ✅  |  —   |
+| Access Groups                |   —    |   —    |   —    | ✅  |      —       | ✅  |  —  |        —         | ✅  |  —   |
+| Custom Roles                 |   —    |   —    |   —    | ✅  |      —       | ✅  |  —  |        —         | ✅  |  —   |
+| Role Bindings                |   —    |   —    |   —    | ✅  |      —       | ✅  |  —  |        —         | ✅  |  —   |
+| SCIM Provisioning            |   —    |   —    |   —    | ✅  |      —       | ✅  |  —  |        —         | ✅  |  —   |
 
 ### Coverage notes
 
@@ -121,49 +121,61 @@ Legend: ✅ present · — absent · `—` no SDK/CLI/skill/MCP by design
 ## Where to Find Things
 
 ### API endpoints
-- **Hono routes** — `platform/app/src/app/api/<namespace>/[[...route]]/app.ts`
-- **Legacy Next.js routes** — `platform/app/src/pages/api/` (being migrated)
-- **tRPC routers** — `platform/app/src/server/api/routers/` (registered in `root.ts`)
+
+- **Contracts and handlers** — the owning singular feature under
+  `packages/features/<feature>/{contract,server}` or
+  `packages/enterprise/features/<feature>/{contract,server}`
+- **Transport composition** — `apps/api/`; compatibility routes still being
+  drained from the application are tracked in the extraction ledger
 
 ### Platform UI
-- **Route definitions** — `platform/app/src/utils/routes.ts`
-- **Sidebar menu** — `platform/app/src/components/MainMenu.tsx`
-- **Feature icons** — `platform/app/src/utils/featureIcons.ts`
+
+- **Reusable feature UI** — the owning feature's `web` package
+- **Routing and process composition** — `apps/ui/`
+- **Shared primitives** — `packages/design-system/`
 
 ### MCP tools
+
 - **All tools** — `mcp/typescript/src/index.ts` (every `server.tool(...)` call)
 - **Handlers** — `mcp/typescript/src/tools/*.ts`
 
 ### CLI
+
 - **Entry point** — `sdks/typescript/src/cli/index.ts`
 - **Commands** — `sdks/typescript/src/cli/commands/`
 - Meta/plumbing commands (no feature-map coverage by design) are owned by `PLUMBING_COMMANDS` in `sdks/typescript/src/cli/utils/commandCatalog.ts` — the single list, enforced by the feature-map drift test.
 
 ### SDKs
+
 - **Python** — `sdks/python/src/langwatch/` (lazy-loaded facades in `__init__.py`)
 - **TypeScript** — `sdks/typescript/src/index.ts` (`LangWatch` class with per-feature accessors)
 - **Go** — `sdks/go/` (tracing: `tracer.go`, `span.go`, `evaluation.go`, `event.go`, `datacapture.go`; instrumentations: `sdks/go/instrumentation/{openai,azureopenai,gopenai,anthropic,bedrock,googlegenai,ollama,genkit}`) and `sdks/go/client/` (`Client` struct in `client.go`, one file per service)
 - **Scenario SDK** — separate: `@langwatch/scenario` / `langwatch-scenario`
 
 ### Skills
+
 - **Feature skills** — `skills/{tracing,evaluations,scenarios,prompts}/SKILL.mdx`
 - **Cross-cutting** — `skills/{analytics,datasets}/SKILL.mdx`
 - **Meta** — `skills/level-up/SKILL.mdx` (orchestrates the feature skills)
 - **Recipes** — `skills/recipes/{debug-instrumentation,improve-setup,test-cli-usability,evaluate-multimodal,generate-rag-dataset,test-compliance}`
 
 ### Documentation
+
 - **LangWatch docs** — index at `https://langwatch.ai/docs/llms.txt` (served via `fetch_langwatch_docs` MCP / `langwatch docs` CLI)
 - **Scenario docs** — index at `https://langwatch.ai/scenario/llms.txt` (served via `fetch_scenario_docs` MCP / `langwatch scenario-docs` CLI)
 
 ## Maintaining the Map
 
-When adding a feature or surface, update `feature-map.json` first — then update whatever derives from it (sidebar, skills, docs, this file). See `.claude/skills/feature-map/SKILL.md` for the update protocol.
+When adding a feature or surface, update `feature-map.json` first — then update whatever derives from it (sidebar, skills, docs, this file). Feature ownership itself is recorded in `packages/features/catalogue.json`.
 
 Validation checklist:
 
-- Every `api` value corresponds to a route in `platform/app/src/app/api/` or `platform/app/src/pages/api/`
+- Every `api` value corresponds to an owning feature handler mounted by
+  `apps/api`, or to a named compatibility adapter still recorded in the
+  extraction ledger
 - Every `mcp` tool name appears in `mcp/typescript/src/index.ts`
 - Every `skill` name has a `skills/{name}/SKILL.mdx`
 - Every `cli` command exists in `sdks/typescript/src/cli/`
-- Every `ui` route exists in `platform/app/src/utils/routes.ts`
+- Every `ui` route is composed by `apps/ui`, or is recorded as residual UI in
+  the extraction ledger
 - No aspirational entries — use `plannedSync` for future intent

@@ -23,9 +23,9 @@ require_dir() {
   [ -d "$1" ] || missing+=("$1/")
 }
 
-require_file "platform/app/src/server/evaluations/evaluators.generated.ts"
-require_file "platform/app/src/tasks.generated.ts"
-require_file "platform/app/src/shared/langy/langySkills.generated.json"
+require_file "packages/features/evaluator/contract/src/evaluators.generated.ts"
+require_file "packages/features/langy/web/src/model/shared/langy/langySkills.generated.json"
+require_file "packages/features/langy/server/src/services/setup-skill-bodies.generated.ts"
 
 # Name the ENTRYPOINTS, not just the directories that hold them. A directory
 # check passes for an empty or half-written one, so a partially restored cache
@@ -38,11 +38,10 @@ require_file "sdks/typescript/dist/index.mjs"
 require_file "sdks/typescript/dist/index.d.ts"
 require_file "mcp/typescript/dist/index.js"
 
-# `generator client { output = "../src/generated/prisma" }` — this schema does
-# NOT use the default node_modules/.prisma location, and app code imports it as
-# `~/generated/prisma/client`.
-require_dir "platform/app/src/generated/prisma"
-require_file "platform/app/src/generated/prisma/client.ts"
+# `generator client { output = "../src/generated" }` — the generated client is
+# first-party source owned by @langwatch/prisma-client, not node_modules state.
+require_dir "packages/prisma-client/src/generated"
+require_file "packages/prisma-client/src/generated/client.ts"
 
 if [ ${#missing[@]} -gt 0 ]; then
   echo "::error::start:prepare:files did not produce these outputs:"

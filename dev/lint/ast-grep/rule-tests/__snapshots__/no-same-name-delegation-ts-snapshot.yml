@@ -1,0 +1,74 @@
+id: no-same-name-delegation-ts
+snapshots:
+  ? |
+    class Facade {
+      activitySummary = async (input: SummaryInput) => this.operations.activitySummary(input);
+    }
+  : labels:
+    - source: 'activitySummary = async (input: SummaryInput) => this.operations.activitySummary(input)'
+      style: primary
+      start: 17
+      end: 104
+  ? |
+    class Facade {
+      async finalizeUpload(input: FinalizeInput): Promise<Result> {
+        return this.uploads.finalizeUpload(input);
+      }
+    }
+  : labels:
+    - source: |-
+        async finalizeUpload(input: FinalizeInput): Promise<Result> {
+            return this.uploads.finalizeUpload(input);
+          }
+      style: primary
+      start: 17
+      end: 129
+  ? |
+    class Facade {
+      getDatasetPage(input: PageInput): Promise<DatasetPage> {
+        return this.dependencies.dataset.getDatasetPage(input);
+      }
+    }
+  : labels:
+    - source: |-
+        getDatasetPage(input: PageInput): Promise<DatasetPage> {
+            return this.dependencies.dataset.getDatasetPage(input);
+          }
+      style: primary
+      start: 17
+      end: 137
+  ? |
+    class Facade {
+      listRecords(input: PageInput): Promise<Page> {
+        return this.dataset.listRecords(input);
+      }
+    }
+  : labels:
+    - source: |-
+        listRecords(input: PageInput): Promise<Page> {
+            return this.dataset.listRecords(input);
+          }
+      style: primary
+      start: 17
+      end: 111
+  ? |
+    class Facade {
+      listRules = (input: ListInput): Promise<Rule[]> => this.rules.listRules(input);
+    }
+  : labels:
+    - source: 'listRules = (input: ListInput): Promise<Rule[]> => this.rules.listRules(input)'
+      style: primary
+      start: 17
+      end: 95
+  ? |
+    class Facade {
+      readonly anomalyRuleList: GovernanceService["anomalyRuleList"] = (...args) =>
+        this.rules.anomalyRuleList(...args);
+    }
+  : labels:
+    - source: |-
+        readonly anomalyRuleList: GovernanceService["anomalyRuleList"] = (...args) =>
+            this.rules.anomalyRuleList(...args)
+      style: primary
+      start: 17
+      end: 134

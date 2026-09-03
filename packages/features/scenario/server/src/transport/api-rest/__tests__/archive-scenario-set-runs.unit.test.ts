@@ -1,0 +1,177 @@
+import { beforeEach, describe, expect, it, type Mock, vi } from "vitest";
+import type { SimulationService } from "@langwatch/scenario-contract";
+
+// Partial: a whole-module replacement of the observability package takes away
+// exports the transport reads at module scope, and the file then fails to
+// collect before a single case runs. Only the logger is stubbed.
+vi.mock("@langwatch/observability", async (importOriginal) => ({
+  ...(await importOriginal<typeof import("@langwatch/observability")>()),
+  createLogger: () => ({
+    info: vi.fn(),
+    error: vi.fn(),
+    warn: vi.fn(),
+    debug: vi.fn(),
+  }),
+}));
+
+import { archiveScenarioSetRuns } from "../scenario-event.api";
+
+describe("archiveScenarioSetRuns()", () => {
+  let mockGetRunIdsForSet: Mock;
+  let mockDeleteRun: Mock;
+  let simulations: Pick<SimulationService, "getRunIdsForSet" | "deleteRun">;
+
+  beforeEach(() => {
+    vi.clearAllMocks();
+
+    mockGetRunIdsForSet = vi.fn();
+    mockDeleteRun = vi.fn().mockResolvedValue(undefined);
+
+    simulations = {
+      getRunIdsForSet: mockGetRunIdsForSet,
+      deleteRun: mockDeleteRun,
+    } as unknown as Pick<SimulationService, "getRunIdsForSet" | "deleteRun">;
+  });
+  describe("when getRunIdsForSet returns N runs", () => {
+    /** @scenario "Archiving one set leaves runs in other sets untouched" */
+    it("dispatches deleteRun for each and returns archived=N, failed=0, scenarioSetId, hasMore=false", async () => {
+      const runIds = ["run-1", "run-2", "run-3"];
+      mockGetRunIdsForSet.mockResolvedValue({ runIds, reachedCap: false });
+
+      const result = await archiveScenarioSetRuns({
+        simulations,
+        projectId: "project-a",
+        scenarioSetId: "set-a",
+      });
+
+      expect(result.archived).toBe(3);
+      expect(result.failed).toBe(0);
+      expect(result.scenarioSetId).toBe("set-a");
+      expect(result.hasMore).toBe(false);
+      expect(mockDeleteRun).toHaveBeenCalledTimes(3);
+    });
+  });
+
+  describe("when one deleteRun rejects", () => {
+    /** @scenario "One run failing to archive does not stop the others" */
+    it("does not short-circuit; returns archived=N-1, failed=1", async () => {
+      const runIds = ["run-1", "run-2", "run-3"];
+      mockGetRunIdsForSet.mockResolvedValue({ runIds, reachedCap: false });
+
+      mockDeleteRun
+        .mockResolvedValueOnce(undefined)
+        .mockRejectedValueOnce(new Error("delete failed"))
+        .mockResolvedValueOnce(undefined);
+
+      const result = await archiveScenarioSetRuns({
+        simulations,
+        projectId: "project-a",
+        scenarioSetId: "set-a",
+      });
+
+      expect(result.archived).toBe(2);
+      expect(result.failed).toBe(1);
+      expect(mockDeleteRun).toHaveBeenCalledTimes(3);
+    });
+  });
+
+  describe("when reachedCap is true", () => {
+    /** @scenario "Reaching the 10k cap reports hasMore true" */
+    it("returns hasMore: true", async () => {
+      mockGetRunIdsForSet.mockResolvedValue({
+        runIds: ["run-1"],
+        reachedCap: true,
+      });
+
+      const result = await archiveScenarioSetRuns({
+        simulations,
+        projectId: "project-a",
+        scenarioSetId: "set-big",
+      });
+
+      expect(result.hasMore).toBe(true);
+    });
+  });
+
+  describe("when reachedCap is false", () => {
+    it("returns hasMore: false", async () => {
+      mockGetRunIdsForSet.mockResolvedValue({
+        runIds: ["run-1"],
+        reachedCap: false,
+      });
+
+      const result = await archiveScenarioSetRuns({
+        simulations,
+        projectId: "project-a",
+        scenarioSetId: "set-small",
+      });
+
+      expect(result.hasMore).toBe(false);
+    });
+  });
+
+  describe("when 32 ids are dispatched with concurrency 8", () => {
+    it("has at most 8 deleteRun calls in flight at once", async () => {
+      const runIds = Array.from({ length: 32 }, (_, i) => `run-${i}`);
+      mockGetRunIdsForSet.mockResolvedValue({ runIds, reachedCap: false });
+
+      let maxInFlight = 0;
+      let currentInFlight = 0;
+
+      const resolvers: Array<() => void> = [];
+
+      mockDeleteRun.mockImplementation(() => {
+        currentInFlight++;
+        if (currentInFlight > maxInFlight) maxInFlight = currentInFlight;
+
+        return new Promise<void>((resolve) => {
+          resolvers.push(() => {
+            currentInFlight--;
+            resolve();
+          });
+        });
+      });
+
+      // Start archiving (will block until resolvers are called)
+      const archivePromise = archiveScenarioSetRuns({
+        simulations,
+        projectId: "project-a",
+        scenarioSetId: "set-32",
+      });
+
+      // Yield a macrotask tick so pMapLimited has time to start and fill
+      // the first concurrency window (8 slots) before we start draining.
+      await new Promise<void>((r) => setTimeout(r, 0));
+
+      // Drain resolvers in round-trip loops: release all currently pending,
+      // yield, then repeat until everything is settled.
+      while (resolvers.length > 0) {
+        const batch = resolvers.splice(0, resolvers.length);
+        for (const resolve of batch) resolve();
+        await new Promise<void>((r) => setTimeout(r, 0));
+      }
+
+      await archivePromise;
+
+      expect(maxInFlight).toBeLessThanOrEqual(8);
+      expect(mockDeleteRun).toHaveBeenCalledTimes(32);
+    });
+  });
+
+  describe("when getRunIdsForSet returns an empty list", () => {
+    it("returns archived=0, failed=0, hasMore=false without calling deleteRun", async () => {
+      mockGetRunIdsForSet.mockResolvedValue({ runIds: [], reachedCap: false });
+
+      const result = await archiveScenarioSetRuns({
+        simulations,
+        projectId: "project-a",
+        scenarioSetId: "ghost-set",
+      });
+
+      expect(result.archived).toBe(0);
+      expect(result.failed).toBe(0);
+      expect(result.hasMore).toBe(false);
+      expect(mockDeleteRun).not.toHaveBeenCalled();
+    });
+  });
+});

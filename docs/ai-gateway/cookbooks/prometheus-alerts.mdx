@@ -15,7 +15,6 @@ groups:
   - name: langwatch-gateway
     interval: 30s
     rules:
-
       # ─── Reliability ─────────────────────────────────────────────────────
 
       - alert: GatewayHighErrorRate
@@ -218,9 +217,9 @@ tests:
   - interval: 1m
     input_series:
       - series: 'gateway_http_requests_total{route="/v1/chat/completions", status="500", provider="openai", model="gpt-4o"}'
-        values: '0+1x15'
+        values: "0+1x15"
       - series: 'gateway_http_requests_total{route="/v1/chat/completions", status="200", provider="openai", model="gpt-4o"}'
-        values: '0+0x15'
+        values: "0+0x15"
     alert_rule_test:
       - eval_time: 10m
         alertname: GatewayHighErrorRate
@@ -232,20 +231,21 @@ tests:
   - interval: 1m
     input_series:
       - series: 'gateway_circuit_state{credential_id="cred_openai_primary"}'
-        values: '1+0x15'
+        values: "1+0x15"
     alert_rule_test:
       - eval_time: 10m
         alertname: CircuitOpenTooLong
         exp_alerts:
-          - exp_labels: { credential_id: cred_openai_primary, severity: page, team: ai-platform }
+          - exp_labels:
+              { credential_id: cred_openai_primary, severity: page, team: ai-platform }
 
   # Half the attempts land on a fallback slot, well past the 10% threshold.
   - interval: 1m
     input_series:
       - series: 'gateway_provider_attempts_total{credential_id="cred_openai_primary", outcome="success"}'
-        values: '0+1x30'
+        values: "0+1x30"
       - series: 'gateway_provider_attempts_total{credential_id="cred_anthropic_backup", outcome="fallback_success"}'
-        values: '0+1x30'
+        values: "0+1x30"
     alert_rule_test:
       - eval_time: 25m
         alertname: ExcessiveFallback
@@ -256,7 +256,7 @@ tests:
   - interval: 1m
     input_series:
       - series: 'gateway_budget_blocks_total{scope="project:proj_acme"}'
-        values: '0+120x30'
+        values: "0+120x30"
     alert_rule_test:
       - eval_time: 25m
         alertname: BudgetBlockSpike

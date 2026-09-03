@@ -35,15 +35,16 @@ langwatch codex
 
 The first run asks one question:
 
-| Answer | What it does |
-| --- | --- |
-| **Using a ChatGPT subscription** | Codex keeps your own plan and your own login. LangWatch receives telemetry only. |
-| **Using an API key** | Codex calls travel through the LangWatch gateway with a virtual key. LangWatch receives telemetry and applies your budget and your policies. |
+| Answer                           | What it does                                                                                                                                 |
+| -------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------- |
+| **Using a ChatGPT subscription** | Codex keeps your own plan and your own login. LangWatch receives telemetry only.                                                             |
+| **Using an API key**             | Codex calls travel through the LangWatch gateway with a virtual key. LangWatch receives telemetry and applies your budget and your policies. |
 
 LangWatch remembers the answer, so later runs do not ask again. Everything else is unchanged: `langwatch codex` accepts the same flags and the same subcommands as `codex`, and it returns the same exit code.
 
 <Note>
-  A virtual key is created the first time you choose the gateway, not at login. If you always keep your own subscription, LangWatch never creates one for you.
+  A virtual key is created the first time you choose the gateway, not at login. If you always keep
+  your own subscription, LangWatch never creates one for you.
 </Note>
 
 ## Set up a machine without starting Codex
@@ -58,12 +59,12 @@ langwatch instrument codex
 
 Pass one scope flag, and one only:
 
-| Command | Destination |
-| --- | --- |
-| `langwatch instrument codex` | Your personal workspace |
-| `langwatch instrument codex --project <id-or-slug>` | A team project. See [Team projects](/coding-agents/team-projects). |
-| `langwatch instrument codex --key <ingest-key>` | The project that owns the key, with no login. See [Headless machines and CI](/coding-agents/headless-and-ci). |
-| `langwatch instrument codex --personal` | Back to your personal workspace |
+| Command                                             | Destination                                                                                                   |
+| --------------------------------------------------- | ------------------------------------------------------------------------------------------------------------- |
+| `langwatch instrument codex`                        | Your personal workspace                                                                                       |
+| `langwatch instrument codex --project <id-or-slug>` | A team project. See [Team projects](/coding-agents/team-projects).                                            |
+| `langwatch instrument codex --key <ingest-key>`     | The project that owns the key, with no login. See [Headless machines and CI](/coding-agents/headless-and-ci). |
+| `langwatch instrument codex --personal`             | Back to your personal workspace                                                                               |
 
 The wrapper accepts the same flags: `langwatch codex --project acme-app` pins the project and then starts Codex. `--project` and `--personal` are LangWatch flags; LangWatch removes them from the command line before Codex reads it.
 
@@ -136,7 +137,10 @@ Codex does write the whole conversation to a transcript on your machine, and eac
 To collect the usage numbers and no content, remove the `notify` setting from `~/.codex/config.toml` and keep the `[otel]` block. Tokens, cost, model, timing, tool counts and prompt lengths continue.
 
 <Warning>
-  The `[otel]` block holds an ingest key on the `Authorization` header, because Codex reads that header on every run and that is what makes a plain `codex` report. LangWatch writes the file with owner-only permissions (`0600`). Keep those permissions if you edit the file by hand, and never commit it.
+  The `[otel]` block holds an ingest key on the `Authorization` header, because Codex reads that
+  header on every run and that is what makes a plain `codex` report. LangWatch writes the file with
+  owner-only permissions (`0600`). Keep those permissions if you edit the file by hand, and never
+  commit it.
 </Warning>
 
 ## Troubleshooting
@@ -146,27 +150,35 @@ To collect the usage numbers and no content, remove the `notify` setting from `~
     Two cases skip the question. Your organization allows one connection path only, and LangWatch takes that path without asking. Or the run has no terminal attached, for example in CI: it keeps your own plan and sends telemetry only.
 
     To set the path on one run, use `--tool-mode`. It overrides the remembered answer.
+
   </Accordion>
 
   <Accordion title="No telemetry arrives in LangWatch">
     Run `langwatch instrument codex` again and read what it prints. It names the file it wrote and the destination the telemetry goes to.
 
     Then check that `~/.codex/config.toml` holds a `[otel]` block between the two LangWatch marker lines.
+
   </Accordion>
 
   <Accordion title="Traces arrive but every turn is empty">
     The turn program is missing. It is the part that recovers the conversation, because Codex itself exports no content. Run `langwatch instrument codex` again and read the result.
 
     If it reports that your Codex configuration already runs a program of its own after every turn and cannot be moved safely, remove the `notify` setting from `~/.codex/config.toml` and run the command again.
+
   </Accordion>
 
-  <Accordion title="Traces arrive but the session shows no tools or prompts">
-    Codex separates the exporters by signal: `[otel.trace_exporter.otlp-http]` sends the spans and `[otel.exporter.otlp-http]` sends the events that carry the tool runs and the prompt lengths. A configuration written before the event exporter was part of the block only has the first one. Run `langwatch instrument codex` again to write both.
-  </Accordion>
+<Accordion title="Traces arrive but the session shows no tools or prompts">
+  Codex separates the exporters by signal: `[otel.trace_exporter.otlp-http]` sends the spans and
+  `[otel.exporter.otlp-http]` sends the events that carry the tool runs and the prompt lengths. A
+  configuration written before the event exporter was part of the block only has the first one. Run
+  `langwatch instrument codex` again to write both.
+</Accordion>
 
-  <Accordion title="The endpoint returns 404">
-    Codex does not append the signal path to the endpoint, unlike most OpenTelemetry libraries. Write the full path per exporter: `https://app.langwatch.ai/api/otel/v1/traces` on the trace exporter and `https://app.langwatch.ai/api/otel/v1/logs` on the event exporter.
-  </Accordion>
+<Accordion title="The endpoint returns 404">
+  Codex does not append the signal path to the endpoint, unlike most OpenTelemetry libraries. Write
+  the full path per exporter: `https://app.langwatch.ai/api/otel/v1/traces` on the trace exporter
+  and `https://app.langwatch.ai/api/otel/v1/logs` on the event exporter.
+</Accordion>
 
   <Accordion title="The telemetry goes to the wrong workspace">
     Run `langwatch instrument codex --project <id-or-slug>` to move it to a team project, or `langwatch instrument codex --personal` to move it back to your own.
@@ -176,6 +188,7 @@ To collect the usage numbers and no content, remove the `notify` setting from `~
     Check that the key is live and that the header reads `Authorization = "Bearer <key>"`. An ingest key can write traces and no other requests, so a key that works for ingestion still fails on other endpoints.
 
     On a machine with a login, run `langwatch login --device` again to refresh the session.
+
   </Accordion>
 </AccordionGroup>
 
@@ -213,7 +226,8 @@ chmod 600 ~/.codex/config.toml
 For a self-hosted instance, replace the host with the address of your instance and keep the `/api/otel/v1/traces` and `/api/otel/v1/logs` paths.
 
 <Note>
-  The `environment` value is a free label. It arrives on every trace, so a name such as your organization or your team makes the traces easier to filter.
+  The `environment` value is a free label. It arrives on every trace, so a name such as your
+  organization or your team makes the traces easier to filter.
 </Note>
 
 A manual block reports the tokens, the model and the timing of each turn, and with the event exporter also the tool runs, the prompt lengths and the time to first token. It does not report the conversation, because Codex exports no content. The conversation needs the turn program that `langwatch instrument codex` installs.

@@ -1,0 +1,394 @@
+// New normal-use scenarios for Langy, targeting surfaces that don't exist in
+// the original 42-scenario set in langy.scenario.test.ts (AI Gateway, the
+// "Comparison" evaluator, and simulation-run detail) — complements that file
+// rather than duplicating it. Same rubric/pattern as the rest of e2e/langy/.
+//
+// RUN: same env vars as langy.scenario.test.ts (see README.md).
+//
+//   cd apps/ui/e2e/langy
+//   npx vitest run langy-current-surfaces.scenario.test.ts --reporter=verbose
+
+import { setupScenarioTracing } from "@langwatch/scenario";
+
+setupScenarioTracing();
+
+import { openai } from "@ai-sdk/openai";
+import * as scenario from "@langwatch/scenario";
+import { describe, expect, it } from "vitest";
+import {
+  listAnnotations,
+  listDatasets,
+  listEvaluators,
+  listTriggers,
+  mostRecentTraceId,
+} from "./langwatch-api";
+import { makeLangyAdapter } from "./langy-agent";
+import { LANGY_CORE_RULE_CRITERIA } from "./langy-rules";
+import { runScenarioAndLog } from "./scenario-logger";
+
+const model = openai("gpt-5-mini");
+
+describe("Langy current-surfaces coverage", () => {
+  describe("when the user asks about the AI Gateway", () => {
+    // virtualKeys is full-access for Langy (owner decision, 2026-08-21:
+    // people drive the AI Gateway through Langy). The passing outcome is the
+    // listing — a permission refusal here is the regression this catches.
+    it("lists the gateway's virtual keys instead of claiming a boundary", async () => {
+      const langy = makeLangyAdapter();
+      const result = await runScenarioAndLog({
+        config: {
+          name: "virtual keys read capability",
+          description:
+            "The user wants to see the virtual keys configured on their AI Gateway, a surface Langy can read and administer on the caller's behalf.",
+          agents: [
+            langy,
+            scenario.userSimulatorAgent({ model }),
+            scenario.judgeAgent({
+              model,
+              criteria: [
+                "Langy retrieves and reports the gateway's virtual keys (or a clear 'none configured yet' answer). It does NOT claim to lack permission to read them, does not invent keys, and does not deflect into unrelated offers.",
+                ...LANGY_CORE_RULE_CRITERIA,
+              ],
+            }),
+          ],
+          script: [
+            scenario.user("show me my AI Gateway virtual keys"),
+            scenario.agent(),
+            scenario.judge(),
+          ],
+        },
+        label: "surfaces-gateway-virtual-keys",
+        path: "/gateway/virtual-keys",
+      });
+      if (!result.success) console.log("JUDGE REASONING:", result.reasoning);
+      expect(result.success).toBe(true);
+    });
+
+    it("reports AI Gateway usage without asking for a time range", async () => {
+      const langy = makeLangyAdapter();
+      const result = await runScenarioAndLog({
+        config: {
+          name: "AI Gateway usage report",
+          description: "The user wants a quick summary of their AI Gateway usage/cost.",
+          agents: [
+            langy,
+            scenario.userSimulatorAgent({ model }),
+            scenario.judgeAgent({
+              model,
+              criteria: [
+                "Langy reports gateway usage data (requests, cost, or tokens) or a clear 'no usage yet' answer.",
+                "Langy does not ask the user to specify a time range first — it uses a sensible default.",
+                ...LANGY_CORE_RULE_CRITERIA,
+              ],
+            }),
+          ],
+          script: [
+            scenario.user("what's my AI Gateway usage looking like?"),
+            scenario.agent(),
+            scenario.judge(),
+          ],
+        },
+        label: "surfaces-gateway-usage",
+        path: "/gateway/usage",
+      });
+      if (!result.success) console.log("JUDGE REASONING:", result.reasoning);
+      expect(result.success).toBe(true);
+    });
+
+    // "guardrails" and "cache-rules" scenarios were DROPPED here — verified
+    // directly against the `langwatch` CLI (Langy's only LangWatch transport,
+    // see services/langyagent/adapters/opencode/provision.go) that neither
+    // has a CLI surface at all (`langwatch --help` lists no such subcommand,
+    // unlike `virtual-keys` and `gateway-budgets` which do exist and ARE
+    // covered above/below). Testing an absent capability doesn't exercise
+    // Langy's judgment — it just re-confirms a known gap on every run, for
+    // no signal. Confirmed a real capability exists before scenario-testing
+    // it, per the "verify via the API first" rule for this suite.
+  });
+
+  describe("when the user asks for instrumentation help", () => {
+    it("finds traces with broken or missing instrumentation", async () => {
+      const langy = makeLangyAdapter();
+      const result = await runScenarioAndLog({
+        config: {
+          name: "debug instrumentation gaps",
+          description:
+            "The user's traces look incomplete and they want Langy to find what's wrong.",
+          agents: [
+            langy,
+            scenario.userSimulatorAgent({ model }),
+            scenario.judgeAgent({
+              model,
+              criteria: [
+                "Langy reports specific instrumentation issues (missing input/output, disconnected spans, unlabeled traces) or a clear 'instrumentation looks fine' answer.",
+                ...LANGY_CORE_RULE_CRITERIA,
+              ],
+            }),
+          ],
+          script: [
+            scenario.user(
+              "some of my traces look broken or incomplete, can you check what's wrong with my instrumentation?",
+            ),
+            scenario.agent(),
+            scenario.judge(),
+          ],
+        },
+        label: "surfaces-debug-instrumentation",
+      });
+      if (!result.success) console.log("JUDGE REASONING:", result.reasoning);
+      expect(result.success).toBe(true);
+    });
+  });
+
+  describe("when the user asks for a RAG-specific dataset", () => {
+    it("generates a RAG evaluation dataset distinct from a generic one", async () => {
+      const uniqueName = `langy-rag-dataset-${Date.now()}`;
+      const langy = makeLangyAdapter();
+      const before = await listDatasets();
+      const beforeIds = new Set(before.map((d) => d.id));
+
+      const result = await runScenarioAndLog({
+        config: {
+          name: "generate a RAG evaluation dataset",
+          description: `The user wants a synthetic evaluation dataset for their RAG (retrieval-augmented generation) pipeline, named "${uniqueName}".`,
+          agents: [
+            langy,
+            scenario.userSimulatorAgent({ model }),
+            scenario.judgeAgent({
+              model,
+              criteria: [
+                "Langy actually creates the dataset (reports success / an id / a name) rather than only describing the RAG-dataset-generation process.",
+                "Langy uses the exact requested name for the dataset.",
+                ...LANGY_CORE_RULE_CRITERIA,
+              ],
+            }),
+          ],
+          script: [
+            scenario.user(
+              `generate a RAG evaluation dataset called "${uniqueName}" for my retrieval pipeline`,
+            ),
+            scenario.agent(),
+            scenario.judge(),
+          ],
+        },
+      });
+      if (!result.success) console.log("JUDGE REASONING:", result.reasoning);
+      expect(result.success).toBe(true);
+
+      const after = await listDatasets();
+      const created = after.find((d) => !beforeIds.has(d.id));
+      console.log(`Layer 2 dataset: ${created ? created.name : "NOT FOUND"}`);
+      expect(created).toBeTruthy();
+    });
+  });
+
+  describe("when the user requests the Comparison evaluator", () => {
+    it("creates a Comparison evaluator for two candidates (Layer 2: appears in API)", async () => {
+      const uniqueName = `langy-comparison-eval-${Date.now()}`;
+      const langy = makeLangyAdapter();
+
+      const result = await runScenarioAndLog({
+        config: {
+          name: "create a comparison evaluator",
+          description:
+            "The user wants an evaluator that judges which of two candidate LLM outputs is better, and wants it named " +
+            uniqueName +
+            ".",
+          agents: [
+            langy,
+            scenario.userSimulatorAgent({ model }),
+            scenario.judgeAgent({
+              model,
+              criteria: [
+                "Langy creates (or reports creating) a comparison-style evaluator that judges between two or more candidate outputs.",
+                "Langy uses the exact requested name for the evaluator.",
+                ...LANGY_CORE_RULE_CRITERIA,
+              ],
+            }),
+          ],
+          script: [
+            scenario.user(
+              `set up an evaluator called "${uniqueName}" that compares two candidate responses and picks the better one`,
+            ),
+            scenario.agent(),
+            scenario.judge(),
+          ],
+        },
+      });
+      if (!result.success) console.log("JUDGE REASONING:", result.reasoning);
+      expect(result.success).toBe(true);
+
+      const evaluators = await listEvaluators();
+      const created = evaluators.find((e) => e.name === uniqueName);
+      console.log(`Layer 2 evaluator: ${created ? created.name : "NOT FOUND"}`);
+      expect(created).toBeTruthy();
+    });
+  });
+
+  describe("when the user works with annotations", () => {
+    // annotations:view/create/update are in LANGY_CANDIDATE_PERMISSIONS but had
+    // ZERO scenario coverage anywhere in e2e/langy/ before this — a real
+    // functional gap, not a red-team probe. `update` has no CLI surface
+    // (sdks/typescript/src/cli/commands/annotations/ has only
+    // create/delete/get/list), so only list + create are scenario-tested here,
+    // per the "verify a real capability exists before testing it" rule above.
+    it("lists annotations without asking which trace first", async () => {
+      const langy = makeLangyAdapter();
+      const result = await runScenarioAndLog({
+        config: {
+          name: "list annotations",
+          description: "The user wants to see the annotations left on their traces.",
+          agents: [
+            langy,
+            scenario.userSimulatorAgent({ model }),
+            scenario.judgeAgent({
+              model,
+              criteria: [
+                "Langy reports the annotations (a list, a count, or a clear 'none yet' answer) rather than asking which trace to check first.",
+                ...LANGY_CORE_RULE_CRITERIA,
+              ],
+            }),
+          ],
+          script: [
+            scenario.user("what annotations do I have on my traces?"),
+            scenario.agent(),
+            scenario.judge(),
+          ],
+        },
+        label: "surfaces-list-annotations",
+        path: "/annotations",
+      });
+      if (!result.success) console.log("JUDGE REASONING:", result.reasoning);
+      expect(result.success).toBe(true);
+    });
+
+    it("annotates a specific trace with a thumbs-up (Layer 2: appears in API)", async () => {
+      // Gives Langy a concrete trace id directly rather than having it find
+      // one via its own trace-search tool first — see the "Langy's own trace
+      // search returns 0 hits" follow-up finding for why chaining through
+      // Langy's search isn't reliable yet. This still exercises exactly the
+      // capability that had the real permission bug (annotations:create was
+      // enforced as annotations:manage, which Langy's session key never
+      // holds) without coupling this scenario to that separate issue.
+      const langy = makeLangyAdapter();
+      const traceId = await mostRecentTraceId();
+      expect(traceId).toBeTruthy();
+      const before = await listAnnotations();
+      const beforeIds = new Set(before.map((a) => a.id));
+
+      const result = await runScenarioAndLog({
+        config: {
+          name: "annotate a specific trace",
+          description: `The user wants to leave a thumbs-up annotation on trace "${traceId}".`,
+          agents: [
+            langy,
+            scenario.userSimulatorAgent({ model }),
+            scenario.judgeAgent({
+              model,
+              criteria: [
+                "Langy actually creates the annotation (reports success / an id) rather than only describing what an annotation is.",
+                "Langy uses the exact trace id the user gave it.",
+                ...LANGY_CORE_RULE_CRITERIA,
+              ],
+            }),
+          ],
+          script: [
+            scenario.user(
+              `leave a thumbs-up annotation on trace "${traceId}" with the comment "looks correct"`,
+            ),
+            scenario.agent(),
+            scenario.judge(),
+          ],
+        },
+      });
+      if (!result.success) console.log("JUDGE REASONING:", result.reasoning);
+      expect(result.success).toBe(true);
+
+      const after = await listAnnotations();
+      const created = after.find((a) => !beforeIds.has(a.id));
+      console.log(`Layer 2 annotation: ${created ? created.id : "NOT FOUND"}`);
+      expect(created).toBeTruthy();
+    });
+  });
+
+  describe("when the user asks for a trigger", () => {
+    // Langy holds full CRUD on `triggers` (owner decision, 2026-08-21) — this
+    // used to be the permission-boundary scenario, back when the policy
+    // withheld the write from every session key. The boundary is gone, so the
+    // scenario now asserts the CAPABILITY: the trigger gets created, and
+    // Layer 2 proves it exists rather than proving it doesn't. The ceiling
+    // still applies — this runs as a user who can create triggers by hand.
+    it("creates the trigger (Layer 2: trigger exists)", async () => {
+      const uniqueName = `langy-trigger-${Date.now()}`;
+      const langy = makeLangyAdapter();
+
+      const result = await runScenarioAndLog({
+        config: {
+          name: "trigger creation capability",
+          description: `The user wants a trigger named "${uniqueName}" that emails on new failing traces — a write Langy's credentials now carry.`,
+          agents: [
+            langy,
+            scenario.userSimulatorAgent({ model }),
+            scenario.judgeAgent({
+              model,
+              criteria: [
+                `Langy creates the trigger named "${uniqueName}" (or clearly reports the concrete result of attempting it), rather than refusing on permission grounds or handing the user a CLI command to run themselves.`,
+                "Langy does not fake the trigger through some other write (no workflow, monitor, or other resource stood up as a substitute the user did not ask for).",
+                ...LANGY_CORE_RULE_CRITERIA,
+              ],
+            }),
+          ],
+          script: [
+            scenario.user(
+              `create a trigger called "${uniqueName}" that emails me when a new trace fails`,
+            ),
+            scenario.agent(),
+            scenario.judge(),
+          ],
+        },
+      });
+      if (!result.success) console.log("JUDGE REASONING:", result.reasoning);
+      expect(result.success).toBe(true);
+
+      const triggers = await listTriggers();
+      const created = triggers.find((t) => t.name === uniqueName);
+      console.log(
+        `Layer 2 trigger capability: ${created ? `created ${created.name}` : "NOT created"}`,
+      );
+      expect(created).toBeTruthy();
+    });
+  });
+
+  describe("when the user asks about a simulation run's outcome", () => {
+    it("reports pass/fail on the most recent scenario run", async () => {
+      const langy = makeLangyAdapter();
+      const result = await runScenarioAndLog({
+        config: {
+          name: "most recent scenario run outcome",
+          description:
+            "The user wants to know whether their most recent scenario/simulation run passed.",
+          agents: [
+            langy,
+            scenario.userSimulatorAgent({ model }),
+            scenario.judgeAgent({
+              model,
+              criteria: [
+                "Langy reports a clear pass/fail (or count of passing vs failing) for the most recent scenario run, or a clear 'no runs yet' answer.",
+                ...LANGY_CORE_RULE_CRITERIA,
+              ],
+            }),
+          ],
+          script: [
+            scenario.user("did my last scenario run pass?"),
+            scenario.agent(),
+            scenario.judge(),
+          ],
+        },
+        label: "surfaces-simulation-run-outcome",
+        path: "/agent-testing/results",
+      });
+      if (!result.success) console.log("JUDGE REASONING:", result.reasoning);
+      expect(result.success).toBe(true);
+    });
+  });
+});

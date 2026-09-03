@@ -1,7 +1,7 @@
 # Implementation:
-#   platform/app/src/features/traces-v2/utils/leadingContext.ts
-#   platform/app/src/features/traces-v2/utils/previewFormatter.ts (list preview)
-#   platform/app/src/features/traces-v2/components/TraceDrawer/transcript/BlockStack.tsx (pretty mode)
+#   packages/features/coding-agent/contract/src/leading-context.ts
+#   packages/features/trace/web/src/behavior/preview-formatter.ts (list preview)
+#   packages/features/trace/web/src/ui/sections/explorer/trace-drawer/transcript/block-stack.tsx (pretty mode)
 
 Feature: Prepended context collapse
 

@@ -42,7 +42,6 @@ export interface ResolvedSession {
   /** The codex rollout identity, when the session resolved to codex. */
   codexMeta: CodexRolloutMeta | null;
 }
-
 /** What every resolution tier needs to answer. */
 interface ResolutionInputs {
   sessionId?: string;
@@ -179,4 +178,3 @@ async function readCodexMeta({
     return null;
   }
 }
-

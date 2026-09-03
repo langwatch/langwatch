@@ -20,9 +20,7 @@ import { resolveCredentials } from "../../utils/apiKey";
  *
  * @see specs/langy/langy-agent-driven-navigation.feature
  */
-export const navigateOpenCommand = async (
-  resourceId: string,
-): Promise<void> => {
+export const navigateOpenCommand = async (resourceId: string): Promise<void> => {
   await resolveCredentials();
   console.log(JSON.stringify({ resourceId }));
 };

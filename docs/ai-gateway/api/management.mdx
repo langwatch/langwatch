@@ -8,7 +8,11 @@ The management REST API is the same surface the `langwatch` CLI and LangWatch da
 
 Authentication uses existing LangWatch API tokens (`Authorization: Bearer lwp_...` or `X-Auth-Token: lwp_...`). No new token format.
 
-<Info>The CLI (`langwatch virtual-keys ...`) is built on this API. If you're scripting from Node or Python, consider using the CLI rather than calling the REST directly, it handles pagination, JSON formatting, and error messages for you.</Info>
+<Info>
+  The CLI (`langwatch virtual-keys ...`) is built on this API. If you're scripting from
+  Node or Python, consider using the CLI rather than calling the REST directly, it handles
+  pagination, JSON formatting, and error messages for you.
+</Info>
 
 ## Base
 
@@ -45,7 +49,11 @@ curl -sS https://app.langwatch.ai/api/gateway/v1/budgets \
 Replay is what makes a lost create recoverable on the two routes that return a secret exactly once: replaying the original request returns the original `secret`.
 
 <Warning>
-**The body has to be identical on the retry**, because the key is matched against a fingerprint of it. A field computed fresh each attempt makes every retry a `409`: `"cycle_anchor_at": new Date().toISOString()` is a different body every time. Derive such values from something the first call already produced, for example the `created_at` of the virtual key you just minted, rather than from the clock at retry time.
+  **The body has to be identical on the retry**, because the key is matched against a
+  fingerprint of it. A field computed fresh each attempt makes every retry a `409`:
+  `"cycle_anchor_at": new Date().toISOString()` is a different body every time. Derive
+  such values from something the first call already produced, for example the `created_at`
+  of the virtual key you just minted, rather than from the clock at retry time.
 </Warning>
 
 Keys are scoped to your project on the gateway routes and to your organization on the webhook routes, so two projects can use the same key text without colliding. Stored responses are encrypted at rest and expire after 24 hours.
@@ -167,7 +175,7 @@ Response:
       "scopes": [{ "scope_type": "project", "scope_id": "proj_01HZ..." }],
       "routing_policy_id": null,
       "routing_mode": "none",
-      "config": { /* modelsAllowed, model_aliases, cache, fallback, ... */ },
+      "config": {/* modelsAllowed, model_aliases, cache, fallback, ... */},
       "revision": "3",
       "created_at": "2026-04-10T12:00:00Z",
       "updated_at": "2026-04-18T18:21:00Z",
@@ -219,12 +227,14 @@ Response `201`:
 
 ```json
 {
-  "virtual_key": { /* full VK shape per List */ },
+  "virtual_key": {/* full VK shape per List */},
   "secret": "vk-lw-01HZX9K3MABCDEFGH...JIKLMN0Z"
 }
 ```
 
-<Warning>The `secret` field is returned **only this once**. Persist it immediately.</Warning>
+<Warning>
+  The `secret` field is returned **only this once**. Persist it immediately.
+</Warning>
 
 ### Get
 
@@ -260,7 +270,7 @@ Body (all fields optional):
   "routing_mode": "fallback_all",
   "expires_at": "2026-10-01T00:00:00.000Z", // or null so it never expires
   "budget": { "limit_usd": "50", "window": "month" },
-  "config": { /* partial, merges with existing */ }
+  "config": {/* partial, merges with existing */},
 }
 ```
 
@@ -347,23 +357,23 @@ Body:
 ```jsonc
 {
   "scope": {
-    "kind": "project",         // or organization, team, virtual_key, principal, group, attributed_user
-    "project_id": "proj_..."   // the id field depends on scope.kind:
-                               // organization_id | team_id | project_id |
-                               // virtual_key_id | principal_user_id | group_id;
-                               // attributed_user takes exactly one of
-                               // anchor_virtual_key_id | anchor_project_id
+    "kind": "project", // or organization, team, virtual_key, principal, group, attributed_user
+    "project_id": "proj_...", // the id field depends on scope.kind:
+    // organization_id | team_id | project_id |
+    // virtual_key_id | principal_user_id | group_id;
+    // attributed_user takes exactly one of
+    // anchor_virtual_key_id | anchor_project_id
   },
   "name": "project-monthly-cap",
   "description": "Standard monthly envelope",
-  "window": "month",           // minute | hour | day | week | month | total | manual
-  "limit_usd": 5000,           // or "5000.00"
-  "on_breach": "block",        // or warn
+  "window": "month", // minute | hour | day | week | month | total | manual
+  "limit_usd": 5000, // or "5000.00"
+  "on_breach": "block", // or warn
   "timezone": "Europe/Amsterdam",
-  "provider_key": null,        // optional ModelProvider id to pin the budget to one provider
-  "cycle_anchor_at": null,     // optional ISO 8601 instant; rolls the cycle from here
-  "external_id": null,         // optional, your own id
-  "metadata": {}               // optional, flat string map
+  "provider_key": null, // optional ModelProvider id to pin the budget to one provider
+  "cycle_anchor_at": null, // optional ISO 8601 instant; rolls the cycle from here
+  "external_id": null, // optional, your own id
+  "metadata": {}, // optional, flat string map
 }
 ```
 

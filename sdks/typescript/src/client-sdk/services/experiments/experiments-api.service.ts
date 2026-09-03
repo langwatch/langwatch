@@ -1,8 +1,5 @@
 import type { paths } from "@/internal/generated/openapi/api-client";
-import {
-  createLangWatchApiClient,
-  type LangwatchApiClient,
-} from "@/internal/api/client";
+import { createLangWatchApiClient, type LangwatchApiClient } from "@/internal/api/client";
 import { type InternalConfig } from "@/client-sdk/types";
 import {
   extractStatusFromResponse,
@@ -163,7 +160,7 @@ export interface ExperimentRunsListResponse {
  * Per-row results for a completed experiment run.
  *
  * Mirrors `ExperimentRunWithItems` from the control plane
- * (`platform/app/src/server/experiments-v3/services/types.ts`). Hand-written
+ * (`packages/features/experiment/contract/src/experiment-run.ts`). Hand-written
  * because the `/runs/{runId}/results` route is not yet exposed via the
  * generated OpenAPI types.
  */
@@ -279,9 +276,13 @@ export class ExperimentsApiService {
   }
 
   private handleApiError(operation: string, error: unknown): never {
-    const message = formatApiErrorForOperation({ operation: operation, error: error, options: {
-      status: extractStatusFromResponse(error),
-    } });
+    const message = formatApiErrorForOperation({
+      operation: operation,
+      error: error,
+      options: {
+        status: extractStatusFromResponse(error),
+      },
+    });
     throw new ExperimentsApiServiceError(message, operation, error);
   }
 
@@ -355,13 +356,10 @@ export class ExperimentsApiService {
     } = {},
   ): Promise<ExperimentRunStartResponse> {
     const body = toRunStartRequest({ parameters: options.parameters });
-    const { data, error } = await this.apiClient.POST(
-      "/api/experiments/{slug}/run",
-      {
-        params: { path: { slug } },
-        ...(body !== undefined ? { body } : {}),
-      },
-    );
+    const { data, error } = await this.apiClient.POST("/api/experiments/{slug}/run", {
+      params: { path: { slug } },
+      ...(body !== undefined ? { body } : {}),
+    });
     if (error) this.handleApiError(`start experiment run for "${slug}"`, error);
     return data as unknown as ExperimentRunStartResponse;
   }
@@ -515,12 +513,9 @@ export class ExperimentsApiService {
   }
 
   async getRunStatus(runId: string): Promise<ExperimentRunStatusResponse> {
-    const { data, error } = await this.apiClient.GET(
-      "/api/experiments/runs/{runId}",
-      {
-        params: { path: { runId } },
-      },
-    );
+    const { data, error } = await this.apiClient.GET("/api/experiments/runs/{runId}", {
+      params: { path: { runId } },
+    });
     if (error) this.handleApiError(`get run status for "${runId}"`, error);
     return data;
   }
@@ -592,9 +587,7 @@ export class ExperimentsApiService {
     const search = new URLSearchParams();
     if (experimentSlug) search.set("experimentSlug", experimentSlug);
     const qs = search.toString() ? `?${search.toString()}` : "";
-    const body = await this.getUndeclaredEndpoint<
-      ExperimentRunResultsResponse | null
-    >({
+    const body = await this.getUndeclaredEndpoint<ExperimentRunResultsResponse | null>({
       path: `/api/experiments/runs/${encodeURIComponent(runId)}/results${qs}`,
       operation: `get run results for "${runId}"`,
     });
@@ -658,9 +651,7 @@ export class ExperimentsApiService {
     const search = new URLSearchParams();
     if (experimentSlug) search.set("experimentSlug", experimentSlug);
     const qs = search.toString() ? `?${search.toString()}` : "";
-    const body = await this.getUndeclaredEndpoint<
-      ExperimentRunResultsResponse | null
-    >({
+    const body = await this.getUndeclaredEndpoint<ExperimentRunResultsResponse | null>({
       path: `/api/evaluations/v3/runs/${encodeURIComponent(runId)}/results${qs}`,
       operation: `get run results for "${runId}"`,
     });

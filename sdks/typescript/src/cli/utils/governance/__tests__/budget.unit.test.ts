@@ -22,7 +22,10 @@ const status = (code: number, body?: unknown): Response =>
 describe("checkBudget", () => {
   it("returns null when not logged in (no probe call)", async () => {
     const fetchImpl = vi.fn();
-    const res = await checkBudget({ ...baseCfg(""), access_token: undefined }, { fetchImpl });
+    const res = await checkBudget(
+      { ...baseCfg(""), access_token: undefined },
+      { fetchImpl },
+    );
     expect(res).toBeNull();
     expect(fetchImpl).not.toHaveBeenCalled();
   });

@@ -1,0 +1,65 @@
+id: no-identity-function-ts
+snapshots:
+  ? |
+    const same = (value: Config): Config => value;
+  : labels:
+    - source: 'const same = (value: Config): Config => value;'
+      style: primary
+      start: 0
+      end: 46
+  ? |
+    export function defineRuntimeConfig<const Definition extends RuntimeConfigDefinition>(
+      definition: Definition,
+    ): Definition {
+      return definition;
+    }
+  : labels:
+    - source: |-
+        function defineRuntimeConfig<const Definition extends RuntimeConfigDefinition>(
+          definition: Definition,
+        ): Definition {
+          return definition;
+        }
+      style: primary
+      start: 7
+      end: 151
+  ? |
+    export function metadataPatch(
+      next: ResourceMetadata | undefined,
+    ): ResourceMetadata | undefined {
+      return next;
+    }
+  : labels:
+    - source: |-
+        function metadataPatch(
+          next: ResourceMetadata | undefined,
+        ): ResourceMetadata | undefined {
+          return next;
+        }
+      style: primary
+      start: 7
+      end: 119
+  ? |
+    function identity(value: string) {
+      return value;
+    }
+  : labels:
+    - source: |-
+        function identity(value: string) {
+          return value;
+        }
+      style: primary
+      start: 0
+      end: 52
+  ? |
+    function scopeKindToEnum(kind: BudgetScope["kind"]): "ORGANIZATION" | "TEAM" {
+      return kind;
+    }
+  : labels:
+    - source: |-
+        function scopeKindToEnum(kind: BudgetScope["kind"]): "ORGANIZATION" | "TEAM" {
+          return kind;
+        }
+      style: primary
+      start: 0
+      end: 95

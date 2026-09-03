@@ -81,10 +81,12 @@ spec:
       # webhook injects its own projected token volume, which the chart
       # deliberately does not hand-roll.
       automountServiceAccountToken: {{ .Values.global.automountServiceAccountToken }}
-      # The app runs the same shutdown budget as the workers, because it can be
-      # the process hosting the worker stack (the `all` process role) and its
-      # entrypoint watchdog is the same one. Even web-only, the drain finishes
-      # in well under this — the grace period is a ceiling, not a wait.
+      # The app runs the same shutdown budget as the workers. It no longer hosts
+      # the worker stack — apps/api and apps/worker are separate processes and
+      # separate Deployments — but its drain is the same kind of clock: the
+      # listener stops accepting, live requests get API_HTTP_DRAIN_GRACE_MS, and
+      # the process deadline sits above that. The API drains in well under this;
+      # the grace period is a ceiling, not a wait.
       terminationGracePeriodSeconds: {{ include "langwatch.terminationGracePeriod" (dict "component" .Values.app "name" "app") }}
       # Pod security context - https://kubespec.dev/v1/Pod#spec.securityContext
       securityContext:
@@ -149,14 +151,16 @@ spec:
               value: {{ .Values.app.otel.serviceName | default "langwatch-app" | quote }}
 
             {{/* NEXTAUTH_URL comes from langwatch.sharedEnv: every process
-                 needs the same answer for what this installation is called. */}}
-            - name: NEXTAUTH_URL_INTERNAL
-              value: "http://localhost:{{ .Values.app.service.port | default 5560 }}"
+                 needs the same answer for what this installation is called.
+                 NEXTAUTH_URL_INTERNAL used to be emitted here too; no process
+                 reads it — the API resolves its own base URL from NEXTAUTH_URL
+                 and BASE_HOST — so it is gone rather than left as a knob that
+                 does nothing. */}}
 
             # Internal platform-API base URL that in-pod scenario/simulation
             # runners call back to. Post-#3541 the app boot-validates it as a
             # required URL. On the app pod the app IS local, so self-reference
-            # over localhost (like NEXTAUTH_URL_INTERNAL) — no Service/DNS hop.
+            # over localhost, like NEXTAUTH_URL — no Service/DNS hop.
             # Workers/nlp are separate pods and use the app's service DNS
             # instead. Override only if in-pod runners must reach the app
             # through a different URL.
@@ -194,7 +198,7 @@ spec:
 
             # AI Gateway virtual-key pepper (control-plane only).
             # The gateway pod must NEVER receive this value — it is used here
-            # in src/server/gateway/virtualKey.crypto.ts to hash incoming VK
+            # by @langwatch/gateway-server to hash incoming virtual-key
             # plaintext against the stored digest.
             {{- if .Values.app.virtualKeyPepper.secretKeyRef.name }}
             - name: LW_VIRTUAL_KEY_PEPPER

@@ -145,9 +145,7 @@ describe("RedisConnectionService", () => {
     });
 
     it("returns null without a URL, constructing nothing", () => {
-      expect(
-        new RedisConnectionService().connectStandalone({ url: void 0 }),
-      ).toBeNull();
+      expect(new RedisConnectionService().connectStandalone({ url: void 0 })).toBeNull();
       expect(standaloneCalls).toHaveLength(0);
     });
   });
@@ -162,9 +160,7 @@ describe("RedisConnectionService", () => {
       });
 
       expect(logger.warn).toHaveBeenCalledTimes(1);
-      expect(logger.warn.mock.calls[0]?.[1]).toContain(
-        "only supports database 0",
-      );
+      expect(logger.warn.mock.calls[0]?.[1]).toContain("only supports database 0");
     });
 
     it("reports connection lifecycle events", () => {
@@ -210,9 +206,7 @@ describe("RedisConnectionService", () => {
         url: "redis://localhost:6379",
       });
 
-      expect(
-        new RedisConnectionService().connectResolved({ config }),
-      ).not.toBeNull();
+      expect(new RedisConnectionService().connectResolved({ config })).not.toBeNull();
       expect(standaloneCalls).toHaveLength(1);
     });
   });

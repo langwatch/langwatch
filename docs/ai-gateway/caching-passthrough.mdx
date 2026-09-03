@@ -20,18 +20,23 @@ This is asserted by integration tests that compare a request-hash roundtrip: we 
 
 Per-VK default `cache.mode` and per-request header `X-LangWatch-Cache` (highest precedence):
 
-| Mode | Behaviour | Availability |
-|---|---|---|
-| `respect` | Forward cache markers byte-identically. Provider handles caching. **(default)** | v1 |
-| `disable` | Gateway recursively JSON-walks the body and drops every `cache_control` object at any nesting depth, covers Anthropic `messages[].content[].cache_control`, `system[].cache_control`, and `tools[].cache_control` uniformly. Forces a cold call. Use for benchmarks, A/B cache-impact tests, or reproducing cache-dependent bugs. Gateway's own semantic cache is also bypassed. | v1 |
-| `force` | Gateway injects `cache_control: ephemeral` on large stable prefixes (system message, tool definitions, first N messages) even if the client didn't. | **v1.1**: currently returns `400 cache_override_not_implemented` |
-| `ttl=NNN` | Same as `force` but with an explicit TTL hint. | **v1.1**: currently returns `400 cache_override_not_implemented` |
+| Mode      | Behaviour                                                                                                                                                                                                                                                                                                                                                                        | Availability                                                     |
+| --------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ---------------------------------------------------------------- |
+| `respect` | Forward cache markers byte-identically. Provider handles caching. **(default)**                                                                                                                                                                                                                                                                                                  | v1                                                               |
+| `disable` | Gateway recursively JSON-walks the body and drops every `cache_control` object at any nesting depth, covers Anthropic `messages[].content[].cache_control`, `system[].cache_control`, and `tools[].cache_control` uniformly. Forces a cold call. Use for benchmarks, A/B cache-impact tests, or reproducing cache-dependent bugs. Gateway's own semantic cache is also bypassed. | v1                                                               |
+| `force`   | Gateway injects `cache_control: ephemeral` on large stable prefixes (system message, tool definitions, first N messages) even if the client didn't.                                                                                                                                                                                                                              | **v1.1**: currently returns `400 cache_override_not_implemented` |
+| `ttl=NNN` | Same as `force` but with an explicit TTL hint.                                                                                                                                                                                                                                                                                                                                   | **v1.1**: currently returns `400 cache_override_not_implemented` |
 
 Override per-request via header: `X-LangWatch-Cache: respect`, `X-LangWatch-Cache: disable`. (In v1.1: `force` and `ttl=3600`.)
 
 Malformed/unknown mode → `400 cache_override_invalid` with a reason in the envelope. Valid-but-unimplemented (`force`, `ttl=N` in v1) → `400 cache_override_not_implemented`.
 
-<Note>**Enforcement ordering:** the cache-override hook runs on `/v1/messages` **before** blocked-pattern enforcement. A `disable`-mode request has its `cache_control` blocks stripped first, then the regex checks fire on the post-strip body. This keeps policy evaluation deterministic regardless of the caller's caching choice.</Note>
+<Note>
+  **Enforcement ordering:** the cache-override hook runs on `/v1/messages` **before**
+  blocked-pattern enforcement. A `disable`-mode request has its `cache_control` blocks
+  stripped first, then the regex checks fire on the post-strip body. This keeps policy
+  evaluation deterministic regardless of the caller's caching choice.
+</Note>
 
 ## What's reported back
 

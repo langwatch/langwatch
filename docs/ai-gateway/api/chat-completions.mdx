@@ -18,25 +18,25 @@ Body matches OpenAI's [Chat Completions schema](https://platform.openai.com/docs
 
 ```json
 {
-  "model":       "gpt-5-mini",
-  "messages":    [
-    {"role": "system", "content": "You are concise."},
-    {"role": "user",   "content": "Hi"}
+  "model": "gpt-5-mini",
+  "messages": [
+    { "role": "system", "content": "You are concise." },
+    { "role": "user", "content": "Hi" }
   ],
   "temperature": 0.2,
-  "max_tokens":  256,
-  "stream":      false,
-  "tools":       [],
+  "max_tokens": 256,
+  "stream": false,
+  "tools": [],
   "tool_choice": "auto"
 }
 ```
 
 ### LangWatch-specific headers
 
-| Header | Purpose |
-|---|---|
+| Header                                                | Purpose                                                                                                    |
+| ----------------------------------------------------- | ---------------------------------------------------------------------------------------------------------- |
 | `X-LangWatch-Cache: respect\|force\|disable\|ttl=<s>` | Override the VK's cache mode for this request. See [Caching Passthrough](/ai-gateway/caching-passthrough). |
-| `X-LangWatch-Trace-Metadata: {...}` | Attach arbitrary key/value metadata to the trace (e.g. deployment id, experiment tag). |
+| `X-LangWatch-Trace-Metadata: {...}`                   | Attach arbitrary key/value metadata to the trace (e.g. deployment id, experiment tag).                     |
 
 ### Model resolution
 

@@ -1,8 +1,8 @@
 # Drawer back stack - Gherkin Spec
 # Implementation:
-#   platform/app/src/hooks/useDrawer.ts
-#   platform/app/src/components/AddDatasetRecordDrawer.tsx
-#   platform/app/src/features/traces-v2/components/TraceDrawer/useTraceDrawerScaffold.ts
+#   packages/ui-drawer/src/behavior/use-drawer.ts
+#   [gone] src/components/AddDatasetRecordDrawer.tsx
+#   packages/features/trace/web/src/ui/sections/explorer/trace-drawer/use-trace-drawer-scaffold.ts
 #
 # Drawers open on top of each other: a trace hands over to "Add to Dataset", a
 # simulation run hands over to a trace. Closing the drawer on top has to put the

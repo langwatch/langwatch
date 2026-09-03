@@ -17,21 +17,20 @@ COPY mcp/typescript/package.json ./mcp/typescript/
 COPY packages/handled-error ./packages/handled-error
 # Manifests only. `--frozen-lockfile` checks the lockfile against every
 # workspace member it can see, so each member needs at least its package.json.
-COPY platform/app/package.json ./platform/app/
 COPY packages/redaction/package.json ./packages/redaction/
 COPY packages/ssrf/package.json ./packages/ssrf/
 COPY packages/api/package.json ./packages/api/
-COPY packages/authz/package.json ./packages/authz/
-COPY packages/authz-server/package.json ./packages/authz-server/
+COPY packages/features/authz/contract/package.json ./packages/features/authz/contract/
+COPY packages/features/authz/server/package.json ./packages/features/authz/server/
+COPY packages/features/automation/contract/package.json ./packages/features/automation/contract/
+COPY packages/features/automation/server/package.json ./packages/features/automation/server/
 COPY packages/system-migrations/package.json ./packages/system-migrations/
-COPY packages/automations/package.json ./packages/automations/
 COPY packages/observability/package.json ./packages/observability/
 COPY packages/react-rum/package.json ./packages/react-rum/
-COPY packages/langy/package.json ./packages/langy/
-COPY packages/server/package.json ./packages/server/
+COPY apps/server/package.json ./apps/server/
 COPY sdks/typescript/package.json ./sdks/typescript/
 COPY skills/package.json ./skills/
-COPY tests/agentic-e2e/package.json ./tests/agentic-e2e/
+COPY dev/tests/agentic-e2e/package.json ./dev/tests/agentic-e2e/
 RUN pnpm install --frozen-lockfile --filter "@langwatch/mcp-server..."
 
 # The redaction and ssrf sources the MCP server imports, copied after the

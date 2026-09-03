@@ -13,7 +13,11 @@ vi.mock(
 );
 
 vi.mock("../../../utils/apiKey", () => ({
-  resolveCredentials: vi.fn(async () => ({ apiKey: "test-key", source: "env", endpoint: "https://app.langwatch.ai" })),
+  resolveCredentials: vi.fn(async () => ({
+    apiKey: "test-key",
+    source: "env",
+    endpoint: "https://app.langwatch.ai",
+  })),
 }));
 
 vi.mock("ora", () => ({
@@ -46,10 +50,11 @@ describe("experimentListCommand()", () => {
   beforeEach(() => {
     vi.clearAllMocks();
     mockListExperiments = vi.fn();
-    vi.mocked(ExperimentsApiService).mockImplementation(
-      function () { return ({
-          listExperiments: mockListExperiments,
-        }) as unknown as ExperimentsApiService; });
+    vi.mocked(ExperimentsApiService).mockImplementation(function () {
+      return {
+        listExperiments: mockListExperiments,
+      } as unknown as ExperimentsApiService;
+    });
     logSpy = vi.spyOn(console, "log").mockImplementation(noop);
     vi.spyOn(console, "error").mockImplementation(noop);
     vi.spyOn(process, "exit").mockImplementation((code) => {

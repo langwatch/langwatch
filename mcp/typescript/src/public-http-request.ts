@@ -20,7 +20,10 @@ const SENSITIVE_REDIRECT_HEADERS = new Set([
   "x-access-token",
 ]);
 
-type DnsResolver = (hostname: string, options: { all: true; verbatim: true }) => Promise<ResolvedAddress[]>;
+type DnsResolver = (
+  hostname: string,
+  options: { all: true; verbatim: true },
+) => Promise<ResolvedAddress[]>;
 
 interface ResolvedAddress {
   address: string;
@@ -34,11 +37,15 @@ export interface PublicDestination {
 }
 
 function unsafeDestinationError(): Error {
-  return new Error("HTTP agent destinations must resolve only to globally routable public addresses");
+  return new Error(
+    "HTTP agent destinations must resolve only to globally routable public addresses",
+  );
 }
 
 function hostnameWithoutBrackets(hostname: string): string {
-  return hostname.startsWith("[") && hostname.endsWith("]") ? hostname.slice(1, -1) : hostname;
+  return hostname.startsWith("[") && hostname.endsWith("]")
+    ? hostname.slice(1, -1)
+    : hostname;
 }
 
 function assertPublicAddress(address: string): void {
@@ -66,21 +73,23 @@ async function withTimeout<T>(promise: Promise<T>, timeoutMs: number): Promise<T
 
 export function headersForRedirect(
   headers: Record<string, string> | undefined,
-  crossOrigin: boolean
+  crossOrigin: boolean,
 ): Record<string, string> | undefined {
   if (!headers || !crossOrigin) {
     return headers;
   }
 
   const safeHeaders = Object.fromEntries(
-    Object.entries(headers).filter(([name]) => !SENSITIVE_REDIRECT_HEADERS.has(name.toLowerCase()))
+    Object.entries(headers).filter(
+      ([name]) => !SENSITIVE_REDIRECT_HEADERS.has(name.toLowerCase()),
+    ),
   );
   return Object.keys(safeHeaders).length > 0 ? safeHeaders : undefined;
 }
 
 export async function resolvePublicDestination(
   input: string,
-  resolver: DnsResolver = dnsLookup
+  resolver: DnsResolver = dnsLookup,
 ): Promise<PublicDestination> {
   let url: URL;
   try {
@@ -89,7 +98,11 @@ export async function resolvePublicDestination(
     throw new Error("HTTP agent URL is invalid");
   }
 
-  if ((url.protocol !== "http:" && url.protocol !== "https:") || url.username !== "" || url.password !== "") {
+  if (
+    (url.protocol !== "http:" && url.protocol !== "https:") ||
+    url.username !== "" ||
+    url.password !== ""
+  ) {
     throw unsafeDestinationError();
   }
 
@@ -104,7 +117,7 @@ export async function resolvePublicDestination(
   try {
     addresses = await withTimeout(
       resolver(hostname, { all: true, verbatim: true }),
-      REQUEST_TIMEOUT_MS
+      REQUEST_TIMEOUT_MS,
     );
   } catch {
     throw new Error("HTTP agent destination could not be resolved");
@@ -135,7 +148,7 @@ interface PublicJsonRequestOptions {
 
 function requestBody(
   destination: PublicDestination,
-  options: PublicJsonRequestOptions
+  options: PublicJsonRequestOptions,
 ): Promise<{ body: string; location?: string; statusCode: number }> {
   return new Promise((resolve, reject) => {
     const hostname = hostnameWithoutBrackets(destination.url.hostname);
@@ -198,7 +211,7 @@ function requestBody(
 export async function requestPublicJson(
   input: string,
   options: PublicJsonRequestOptions = {},
-  redirectCount = 0
+  redirectCount = 0,
 ): Promise<Record<string, unknown>> {
   const destination = await resolvePublicDestination(input);
   const response = await requestBody(destination, options);
@@ -210,7 +223,7 @@ export async function requestPublicJson(
     const redirectUrl = new URL(response.location, destination.url);
     const redirectHeaders = headersForRedirect(
       options.headers,
-      redirectUrl.origin !== destination.url.origin
+      redirectUrl.origin !== destination.url.origin,
     );
     const preserveBody = response.statusCode === 307 || response.statusCode === 308;
     return requestPublicJson(
@@ -223,7 +236,7 @@ export async function requestPublicJson(
             headers: redirectHeaders,
             method: "GET",
           },
-      redirectCount + 1
+      redirectCount + 1,
     );
   }
 

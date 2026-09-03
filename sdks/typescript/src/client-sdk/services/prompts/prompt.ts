@@ -2,11 +2,21 @@ import { Liquid } from "liquidjs";
 import { PromptTracingDecorator, tracer } from "./tracing";
 import { createTracingProxy } from "@/client-sdk/tracing/create-tracing-proxy";
 import { promptDataSchema } from "./schema";
-import { type TemplateVariables, type PromptData, type CorePromptData, type PromptScope } from "./types";
+import {
+  type TemplateVariables,
+  type PromptData,
+  type CorePromptData,
+  type PromptScope,
+} from "./types";
 import { PromptCompilationError, PromptValidationError } from "./errors";
 
 // Re-export types and errors for convenience
-export type { TemplateVariables, PromptData, CorePromptData, PromptMetadata } from "./types";
+export type {
+  TemplateVariables,
+  PromptData,
+  CorePromptData,
+  PromptMetadata,
+} from "./types";
 export { PromptCompilationError, PromptValidationError } from "./errors";
 
 // Global Liquid instance - shared across all prompts for efficiency
@@ -50,7 +60,7 @@ export class Prompt {
     if (!validationResult.success) {
       throw new PromptValidationError(
         "Invalid prompt data provided",
-        validationResult.error
+        validationResult.error,
       );
     }
 
@@ -65,7 +75,7 @@ export class Prompt {
   }
 
   private extractSystemPrompt(): string {
-    return this.messages.find(m => m.role === "system")?.content ?? "";
+    return this.messages.find((m) => m.role === "system")?.content ?? "";
   }
 
   /**
@@ -73,10 +83,7 @@ export class Prompt {
    * @param variables - Object containing variable values for template compilation
    * @returns CompiledPrompt instance with compiled content
    */
-  private _compile(
-    variables: TemplateVariables,
-    strict: boolean,
-  ): CompiledPrompt {
+  private _compile(variables: TemplateVariables, strict: boolean): CompiledPrompt {
     try {
       // Compile main prompt
       const compiledPrompt = this.prompt
@@ -128,7 +135,6 @@ export class Prompt {
     return this._compile(variables, true);
   }
 }
-
 
 /**
  * Represents a compiled prompt that extends Prompt with reference to the original template

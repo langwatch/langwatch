@@ -4,7 +4,7 @@
  * The cases are not written here. They are read from
  * `specs/webhooks/signature-vectors.json`, which is generated from the
  * server's signing code by
- * `platform/app/src/tasks/generateWebhookSignatureVectors.ts` and asserted
+ * `packages/egress/src/webhook/signature-vectors.ts` and asserted
  * against that code by a suite on the platform side. Three implementations
  * agreeing with their own local idea of the algorithm is not agreement, so
  * this suite and the Python one read the SAME file and neither can be made
@@ -80,9 +80,7 @@ const outcomeOf = (candidate: VerificationVector): string => {
 
 /** One generated case by name, so a scenario reads as the case it is about. */
 const vector = (name: string): VerificationVector => {
-  const found = vectors.verification.find(
-    (candidate) => candidate.name === name,
-  );
+  const found = vectors.verification.find((candidate) => candidate.name === name);
   if (!found) throw new Error(`no signature vector named ${name}`);
   return found;
 };
@@ -150,18 +148,14 @@ describe("Feature: verifying a LangWatch webhook delivery", () => {
   describe("when a correctly signed delivery arrives long after it was signed", () => {
     /** @scenario A delivery outside the freshness window is refused as stale */
     it("refuses it as stale, which reads as a clock or a replay", () => {
-      expect(outcomeOf(vector("stale_timestamp_in_the_past"))).toBe(
-        "stale_timestamp",
-      );
+      expect(outcomeOf(vector("stale_timestamp_in_the_past"))).toBe("stale_timestamp");
     });
   });
 
   describe("when the header is not the signature scheme at all", () => {
     /** @scenario A signature header the receiver cannot parse is refused as malformed */
     it("refuses it as malformed rather than guessing at the format", () => {
-      expect(outcomeOf(vector("malformed_header_garbage"))).toBe(
-        "malformed_header",
-      );
+      expect(outcomeOf(vector("malformed_header_garbage"))).toBe("malformed_header");
     });
   });
 
@@ -170,15 +164,9 @@ describe("Feature: verifying a LangWatch webhook delivery", () => {
     it("accepts the delivery whichever of the two secrets the receiver holds", () => {
       // The header carries one signature per valid secret. All three
       // receivers below must take delivery, or a rotation drops traffic.
-      expect(outcomeOf(vector("valid_rotation_receiver_holds_new_only"))).toBe(
-        "valid",
-      );
-      expect(outcomeOf(vector("valid_rotation_receiver_holds_old_only"))).toBe(
-        "valid",
-      );
-      expect(outcomeOf(vector("valid_rotation_receiver_holds_both"))).toBe(
-        "valid",
-      );
+      expect(outcomeOf(vector("valid_rotation_receiver_holds_new_only"))).toBe("valid");
+      expect(outcomeOf(vector("valid_rotation_receiver_holds_old_only"))).toBe("valid");
+      expect(outcomeOf(vector("valid_rotation_receiver_holds_both"))).toBe("valid");
     });
   });
 
@@ -245,9 +233,7 @@ describe("Feature: verifying a LangWatch webhook delivery", () => {
         throw new Error("expected the delivery to be judged stale");
       } catch (error) {
         expect(error).toBeInstanceOf(WebhookSignatureVerificationError);
-        expect((error as WebhookSignatureVerificationError).code).toBe(
-          "stale_timestamp",
-        );
+        expect((error as WebhookSignatureVerificationError).code).toBe("stale_timestamp");
       }
       expect(nowSeconds).toBeGreaterThan(stale.now_seconds);
     });

@@ -8,10 +8,5 @@
     "eslint.config.mjs",
     "__tests__/**/*.ts"
   ],
-  "exclude": [
-    "node_modules",
-    "./dist/**/*",
-    "./examples/**/*",
-    "./coverage/**/*"
-  ]
+  "exclude": ["node_modules", "./dist/**/*", "./examples/**/*", "./coverage/**/*"]
 }

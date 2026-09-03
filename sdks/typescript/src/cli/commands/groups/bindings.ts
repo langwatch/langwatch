@@ -61,9 +61,7 @@ export const addGroupBindingCommand = async ({
 }): Promise<CommandResult | void> => {
   const input = withParsedFlags(() => ({
     role: parseRole(options.role),
-    ...(options.customRoleId !== undefined
-      ? { customRoleId: options.customRoleId }
-      : {}),
+    ...(options.customRoleId !== undefined ? { customRoleId: options.customRoleId } : {}),
     scopeType: parseScopeType(options.scopeType),
     scopeId: options.scopeId,
   }));
@@ -98,9 +96,7 @@ export const removeGroupBindingCommand = async ({
     succeed: () => `Removed binding "${bindingId}" from group "${groupId}"`,
     table: () => {
       console.log();
-      console.log(
-        chalk.gray("The group no longer grants that role at that scope."),
-      );
+      console.log(chalk.gray("The group no longer grants that role at that scope."));
       console.log();
     },
   });

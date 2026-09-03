@@ -17,13 +17,14 @@ import (
 
 // Proxy is the portless-backed implementation of app.Proxy.
 type Proxy struct {
-	naming domain.Naming
-	lwDir  string
+	naming  domain.Naming
+	repoDir string
 }
 
-// New builds a Proxy. lwDir is used to find a project-local portless install.
-func New(naming domain.Naming, lwDir string) *Proxy {
-	return &Proxy{naming: naming, lwDir: lwDir}
+// New builds a Proxy. repoDir is the workspace root, where a project-local
+// portless install would be hoisted (ADR-076: one node_modules at the root).
+func New(naming domain.Naming, repoDir string) *Proxy {
+	return &Proxy{naming: naming, repoDir: repoDir}
 }
 
 // resolveBinary returns a real, runnable portless binary and true, or "" and
@@ -36,7 +37,7 @@ func (p *Proxy) resolveBinary() (string, bool) {
 	if bin := os.Getenv("PORTLESS_BIN"); bin != "" && isExecutableFile(bin) {
 		return bin, true
 	}
-	local := filepath.Join(p.lwDir, "node_modules", ".bin", "portless")
+	local := filepath.Join(p.repoDir, "node_modules", ".bin", "portless")
 	if isExecutableFile(local) {
 		return local, true
 	}

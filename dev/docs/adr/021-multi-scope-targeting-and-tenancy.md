@@ -68,7 +68,7 @@ The storage shape is chosen by the row's scope **cardinality**, not by feature:
 
 - **Multi-scope-per-row** (one logical resource visible at several scopes at
   once) uses a **per-feature junction table** `<Resource>Scope { <resource>Id,
-  scopeType, scopeId }` with a per-table `<Resource>ScopeType` enum. This is the
+scopeType, scopeId }` with a per-table `<Resource>ScopeType` enum. This is the
   existing `ModelProviderScope` shape. It applies to `ModelProvider`,
   `ModelDefaultConfig`, `VirtualKey`, and the future genuinely-1:N candidates.
 

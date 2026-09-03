@@ -29,11 +29,8 @@
     "jsx": "preserve",
     "incremental": true,
     "noUncheckedIndexedAccess": true,
-    "tsBuildInfoFile": "./tsconfig.tsbuildinfo"
+    "tsBuildInfoFile": "./node_modules/.cache/tsbuildinfo/mcp-server.tsbuildinfo"
   },
-  "include": [
-    ".eslintrc.cjs",
-    "**/*.ts",
-  ],
+  "include": [".eslintrc.cjs", "**/*.ts"],
   "exclude": ["node_modules", "./dist/**/*", "./example/**/*"]
 }

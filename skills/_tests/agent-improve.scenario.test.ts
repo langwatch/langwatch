@@ -27,7 +27,7 @@ describe("Agent Improvement Skill", () => {
     "proposes evidence-backed hypotheses and explains them before building anything",
     async () => {
       const tempFolder = fs.mkdtempSync(
-        path.join(os.tmpdir(), "langwatch-skill-agent-improve-")
+        path.join(os.tmpdir(), "langwatch-skill-agent-improve-"),
       );
 
       // A sample agent codebase gives the proposals something concrete to
@@ -71,7 +71,7 @@ describe("Agent Improvement Skill", () => {
             assertSkillWasRead(state, "agent-improve");
           },
           scenario.user(
-            "the first hypothesis makes sense to me, go ahead and set it up as you proposed. Keep it minimal: create the artifact and show it to me, no need to run the app or install anything heavy"
+            "the first hypothesis makes sense to me, go ahead and set it up as you proposed. Keep it minimal: create the artifact and show it to me, no need to run the app or install anything heavy",
           ),
           scenario.agent(),
           (state) => {
@@ -85,6 +85,6 @@ describe("Agent Improvement Skill", () => {
     },
     // Two full agent turns: evidence sweep + hypothesis execution. Each turn
     // is a long autonomous run, so this needs more than the single-turn 15m.
-    1_800_000
+    1_800_000,
   );
 });

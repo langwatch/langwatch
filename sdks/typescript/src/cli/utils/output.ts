@@ -56,8 +56,7 @@ import { parsePositiveIntOrNull } from "./positiveInt";
  * `build --compile`, which cannot see through `createRequire`.
  */
 let yamlModulePromise: Promise<typeof yaml> | undefined;
-const loadYaml = (): Promise<typeof yaml> =>
-  (yamlModulePromise ??= import("js-yaml"));
+const loadYaml = (): Promise<typeof yaml> => (yamlModulePromise ??= import("js-yaml"));
 
 /** The formats the output contract knows. */
 const OUTPUT_FORMATS = ["table", "json", "agents", "yaml"] as const;
@@ -128,9 +127,8 @@ const isTruthyEnvValue = (value: string | undefined): boolean =>
   value !== undefined && value !== "" && value !== "0" && value !== "false";
 
 /** Whether the environment says the caller is an agent. */
-export const isAgentModeEnv = (
-  env: NodeJS.ProcessEnv = process.env,
-): boolean => AGENT_MODE_ENV_VARS.some((name) => isTruthyEnvValue(env[name]));
+export const isAgentModeEnv = (env: NodeJS.ProcessEnv = process.env): boolean =>
+  AGENT_MODE_ENV_VARS.some((name) => isTruthyEnvValue(env[name]));
 
 /**
  * THE central option preprocessor: maps every spelling a caller can use —
@@ -177,9 +175,7 @@ export const resolveOutputOptions = (
   // A cap that is not a positive whole number is ignored rather than obeyed: a
   // typo must not turn a list into one row and read as the whole answer.
   const limit =
-    raw.limit === undefined
-      ? undefined
-      : (parsePositiveIntOrNull(raw.limit) ?? undefined);
+    raw.limit === undefined ? undefined : (parsePositiveIntOrNull(raw.limit) ?? undefined);
 
   return {
     format,
@@ -214,8 +210,7 @@ export const resolveOutputOptions = (
  * lives here once rather than being hand-rolled at each site with its own
  * subtly different meaning.
  */
-const ownsOwnJsonFlag = (command: Command): boolean =>
-  ownsOwnOptionFlag(command, "--json");
+const ownsOwnJsonFlag = (command: Command): boolean => ownsOwnOptionFlag(command, "--json");
 
 /**
  * Does the command define this long flag ITSELF, for its own purposes?
@@ -335,9 +330,7 @@ const parsePathSteps = (expression: string): PathStep[] => {
 
     for (const accessor of accessors.match(/\[(?:-?\d+)?\]/g) ?? []) {
       const inner = accessor.slice(1, -1);
-      steps.push(
-        inner === "" ? { kind: "iterate" } : { kind: "index", index: Number(inner) },
-      );
+      steps.push(inner === "" ? { kind: "iterate" } : { kind: "index", index: Number(inner) });
     }
   });
 
@@ -477,13 +470,9 @@ const serialize = async (data: unknown, format: OutputFormat): Promise<string> =
 const collectionKeyOf = (data: unknown): string | null => {
   if (!data || typeof data !== "object" || Array.isArray(data)) return null;
   const record = data as Record<string, unknown>;
-  const arrayKeys = Object.keys(record).filter((key) =>
-    Array.isArray(record[key]),
-  );
+  const arrayKeys = Object.keys(record).filter((key) => Array.isArray(record[key]));
   if (arrayKeys.length !== 1) return null;
-  return "pagination" in record || Object.keys(record).length === 1
-    ? arrayKeys[0]!
-    : null;
+  return "pagination" in record || Object.keys(record).length === 1 ? arrayKeys[0]! : null;
 };
 
 /**
@@ -527,15 +516,12 @@ const withNormalizedTotal = (data: unknown): unknown => {
   if (!data || typeof data !== "object" || Array.isArray(data)) return data;
   const record = data as Record<string, unknown>;
   const pagination = record.pagination;
-  if (!pagination || typeof pagination !== "object" || Array.isArray(pagination))
-    return data;
+  if (!pagination || typeof pagination !== "object" || Array.isArray(pagination)) return data;
 
   const paginationRecord = pagination as Record<string, unknown>;
   if (typeof paginationRecord.total === "number") return data;
 
-  const named = TOTAL_ALIASES.find(
-    (field) => typeof paginationRecord[field] === "number",
-  );
+  const named = TOTAL_ALIASES.find((field) => typeof paginationRecord[field] === "number");
   if (!named) return data;
 
   return {
@@ -580,10 +566,7 @@ export interface PrintResultOptions extends RawOutputFlags {
  * Async solely so the yaml format can lazy-load js-yaml (see `loadYaml`);
  * callers must await it so output ordering is preserved.
  */
-export const printResult = async (
-  data: unknown,
-  options: PrintResultOptions,
-): Promise<void> => {
+export const printResult = async (data: unknown, options: PrintResultOptions): Promise<void> => {
   const { table, ...raw } = options;
   const resolved = resolveOutputOptions(raw);
 
@@ -710,8 +693,7 @@ export const rendersOwnResult = (command: Command): Command => {
 };
 
 /** Whether this command's action speaks the output contract. */
-export const isOutputAware = (command: Command): boolean =>
-  OUTPUT_AWARE_COMMANDS.has(command);
+export const isOutputAware = (command: Command): boolean => OUTPUT_AWARE_COMMANDS.has(command);
 
 /**
  * Refuse to answer a machine format we cannot actually produce.
@@ -787,9 +769,7 @@ export const assertFormatIsSupported = async (
     raw.json !== undefined;
 
   if (requestedNewContractFlag) {
-    const { commandValidationError, reportCommandError } = await import(
-      "./errorOutput.js"
-    );
+    const { commandValidationError, reportCommandError } = await import("./errorOutput.js");
     // Reported here rather than thrown: `preAction` runs OUTSIDE each
     // registration's try/catch, so a throw escapes to the dependency-free net
     // in index.ts and renders as `Error: [object Object]` — prose at a parser,
@@ -835,17 +815,11 @@ export const assertFormatIsSupported = async (
  * `preAction` hook awaits this, so the disabler has run before the command's
  * action (and its own chalk imports) executes.
  */
-export const applyOutputContext = async (
-  resolved: ResolvedOutput,
-): Promise<void> => {
+export const applyOutputContext = async (resolved: ResolvedOutput): Promise<void> => {
   // Machine formats fail as structured documents; agent mode's document is the
   // compact single-line form (see renderErrorAsJson), everything else pretty.
   setOutputFormat(
-    resolved.format === "table"
-      ? undefined
-      : resolved.format === "agents"
-        ? "agents"
-        : "json",
+    resolved.format === "table" ? undefined : resolved.format === "agents" ? "agents" : "json",
   );
   if (resolved.agent) {
     const { disableOutputColor } = await import("./errorOutput.js");
@@ -877,7 +851,8 @@ export const registerOutputOptions = (program: Command): void => {
   }[] = [
     {
       flags: "-o, --output <format>",
-      description: "Output format: table (default), json, agents (compact single-line JSON), or yaml",
+      description:
+        "Output format: table (default), json, agents (compact single-line JSON), or yaml",
       long: "--output",
       short: "-o",
       // Constrained so a typo (`-o jsn`) errors loudly at parse time instead
@@ -909,7 +884,8 @@ export const registerOutputOptions = (program: Command): void => {
     },
     {
       flags: "--agent",
-      description: "Agent mode: compact JSON output, no colour, no spinners (auto-detected from agent env vars)",
+      description:
+        "Agent mode: compact JSON output, no colour, no spinners (auto-detected from agent env vars)",
       long: "--agent",
     },
   ];
@@ -917,8 +893,8 @@ export const registerOutputOptions = (program: Command): void => {
   const visit = (command: Command, isRoot: boolean): void => {
     // Commander private API: there is no public accessor for
     // allowUnknownOption — re-check on commander upgrades.
-    const allowsUnknown = (command as unknown as { _allowUnknownOption?: boolean })
-      ._allowUnknownOption === true;
+    const allowsUnknown =
+      (command as unknown as { _allowUnknownOption?: boolean })._allowUnknownOption === true;
 
     if (!allowsUnknown) {
       for (const option of globals) {

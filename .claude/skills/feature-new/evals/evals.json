@@ -1,0 +1,17 @@
+{
+  "skill_name": "feature-new",
+  "evals": [
+    {
+      "id": 1,
+      "prompt": "Add a new 'saved-view' feature: users can save a named set of trace filters per project, list them and delete them. Settings page under the project.",
+      "expected_output": "Creates packages/features/saved-view/{contract,server,web} with feature.json, a spec file written first, a catalogue.json subject, zod schemas with infer, an abstract service, prisma repository behind a postgres adapter, tRPC transport, an apps/api composition root, apps/ui catalogue and install registrations, a route-table key, error codes registered in handled-error, and tests binding every scenario; runs scoped gates only.",
+      "files": []
+    },
+    {
+      "id": 2,
+      "prompt": "Scaffold a feature package for webhook signing keys, server only, no UI yet.",
+      "expected_output": "Creates contract and server only, no web package, names the absence of a UI, and still writes the spec, the service, the repository, the transport and the composition root.",
+      "files": []
+    }
+  ]
+}

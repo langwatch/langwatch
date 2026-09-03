@@ -6,23 +6,28 @@ sidebarTitle: Roles & permissions
 
 LangWatch RBAC has two layers, two surfaces, and one stitching mechanism:
 
-- **Two layers**: *organization roles* (org-wide capabilities, e.g. `ADMIN`, `MEMBER`, `EXTERNAL`) and *team roles* (per-team capabilities, e.g. `ADMIN`, `MEMBER`, `VIEWER`).
+- **Two layers**: _organization roles_ (org-wide capabilities, e.g. `ADMIN`, `MEMBER`, `EXTERNAL`) and _team roles_ (per-team capabilities, e.g. `ADMIN`, `MEMBER`, `VIEWER`).
 - **Two surfaces**: `/settings/roles` (the role catalog: pre-built + custom) and `/settings/role-bindings` (who is bound to what role at what scope).
-- **One stitching mechanism**: a `RoleBinding` row glues a *user* to a *role* at a *scope* (organization, team, project, or governance subscope).
+- **One stitching mechanism**: a `RoleBinding` row glues a _user_ to a _role_ at a _scope_ (organization, team, project, or governance subscope).
 
 The pre-built roles cover the common cases. You only land here when you need to delegate `aiTools:manage` without granting full `organization:manage`, or when an audit asks "who can read the audit log" and you want a screen instead of a Slack thread.
 
-<Info>**Pairs with:** [Members & invites](/ai-governance/members-and-invites) (assigning roles when inviting), [Audit log](/ai-governance/audit-log) (every role binding mutation records a row), and [AI Gateway → RBAC](/ai-gateway/rbac) (the gateway-side enforcement of permissions).</Info>
+<Info>
+  **Pairs with:** [Members & invites](/ai-governance/members-and-invites) (assigning roles
+  when inviting), [Audit log](/ai-governance/audit-log) (every role binding mutation
+  records a row), and [AI Gateway → RBAC](/ai-gateway/rbac) (the gateway-side enforcement
+  of permissions).
+</Info>
 
 ## Organization roles
 
 The three pre-built org roles. Each user in the org has exactly one.
 
-| Org role | Defaults | What it grants by default |
-|---|---|---|
-| **ADMIN** | First user to sign in becomes admin | `organization:view`, `organization:manage`, `organization:delete`; the full governance surface (`governance:view`, `governance:manage`, `ingestionSources:*`, `anomalyRules:*`, `complianceExport:view`, `activityMonitor:view`); `aiTools:view` + `aiTools:manage`. |
-| **MEMBER** | Default for invitees | `organization:view`, `aiTools:view`. **No** governance permissions, **no** member-list reads, **no** audit log access by default. The team-role (below) is what gives them anything beyond `/me`. |
-| **EXTERNAL** | Lite-member shape, opt-in via the invite drawer | Same as MEMBER. EXTERNAL also has stricter team-level defaults: even when on a team they default to view-only, apart from annotations (see [Seats](#seats)). |
+| Org role     | Defaults                                        | What it grants by default                                                                                                                                                                                                                                            |
+| ------------ | ----------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| **ADMIN**    | First user to sign in becomes admin             | `organization:view`, `organization:manage`, `organization:delete`; the full governance surface (`governance:view`, `governance:manage`, `ingestionSources:*`, `anomalyRules:*`, `complianceExport:view`, `activityMonitor:view`); `aiTools:view` + `aiTools:manage`. |
+| **MEMBER**   | Default for invitees                            | `organization:view`, `aiTools:view`. **No** governance permissions, **no** member-list reads, **no** audit log access by default. The team-role (below) is what gives them anything beyond `/me`.                                                                    |
+| **EXTERNAL** | Lite-member shape, opt-in via the invite drawer | Same as MEMBER. EXTERNAL also has stricter team-level defaults: even when on a team they default to view-only, apart from annotations (see [Seats](#seats)).                                                                                                         |
 
 The minimum-privilege default is intentional: an `ORGANIZATION` role binding for a MEMBER does **not** grant team-level access. Team-level permissions come from team-role bindings (next).
 
@@ -41,22 +46,23 @@ Assign a **custom role** to an EXTERNAL member and that role decides the seat in
 
 They can open the projects they are invited to and read what the team produces there:
 
-| They can see | They cannot |
-|---|---|
-| Traces, including the detail view | See costs |
-| Analytics | Create, edit or delete projects, datasets, prompts, evaluations, workflows or experiments |
-| Evaluations and their results | Invite anyone or change roles |
-| Scenario runs | Manage the gateway, virtual keys or budgets |
-| Datasets, prompts, workflows and experiments | Reach any project they were not invited to |
-| Their own team | |
-| The names of the project's secrets, never their values | |
+| They can see                                           | They cannot                                                                               |
+| ------------------------------------------------------ | ----------------------------------------------------------------------------------------- |
+| Traces, including the detail view                      | See costs                                                                                 |
+| Analytics                                              | Create, edit or delete projects, datasets, prompts, evaluations, workflows or experiments |
+| Evaluations and their results                          | Invite anyone or change roles                                                             |
+| Scenario runs                                          | Manage the gateway, virtual keys or budgets                                               |
+| Datasets, prompts, workflows and experiments           | Reach any project they were not invited to                                                |
+| Their own team                                         |                                                                                           |
+| The names of the project's secrets, never their values |                                                                                           |
 
 Annotations are the exception: on the built-in lite role a member can leave and edit them, so reviewers can mark up what they read without needing a full seat.
 
 These are permissions, not screens, so they hold wherever the data is reached. A lite member using the [MCP server](/integration/mcp) with their own account, or the API with their own credentials, sees exactly what they see in the app.
 
 <Note>
-Trace **viewing** is included in a lite seat. If you want someone who cannot open a trace at all, build a custom role that withholds `traces:view` and bind it to them.
+  Trace **viewing** is included in a lite seat. If you want someone who cannot open a
+  trace at all, build a custom role that withholds `traces:view` and bind it to them.
 </Note>
 
 ### Choosing between them
@@ -67,12 +73,12 @@ The question to ask about a person is whether they need to change anything. Some
 
 The four pre-built team roles. A user can have **different** team roles on different teams (`ADMIN` on Engineering, `VIEWER` on Marketing).
 
-| Team role | What it grants by default |
-|---|---|
-| **ADMIN** | The full team-scoped permission set: `project:create/update`, `analytics:manage`, `traces:create`, `virtualKeys:create/update/rotate/manage`, `gatewayBudgets:view/manage`, `gatewayProviders:view/update/manage`, `routingPolicies:view/manage`, `gatewayGuardrails:view/attach/detach/manage`, `gatewayLogs:view`, `auditLog:view`, `gatewayUsage:view`, `gatewayCacheRules:*`. |
+| Team role  | What it grants by default                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                               |
+| ---------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| **ADMIN**  | The full team-scoped permission set: `project:create/update`, `analytics:manage`, `traces:create`, `virtualKeys:create/update/rotate/manage`, `gatewayBudgets:view/manage`, `gatewayProviders:view/update/manage`, `routingPolicies:view/manage`, `gatewayGuardrails:view/attach/detach/manage`, `gatewayLogs:view`, `auditLog:view`, `gatewayUsage:view`, `gatewayCacheRules:*`.                                                                                                                                                                                                       |
 | **MEMBER** | The team-scoped working set: `project:view/create/update`, `analytics:manage`, `traces:create/update/share`, and `*:manage` on annotations, evaluations, workflows, experiments, datasets, triggers, prompts, scenarios and secrets. On the gateway it runs its own keys (`virtualKeys:view/create/update/rotate`) and reads the rest (`gatewayBudgets:view`, `gatewayProviders:view`, `routingPolicies:view`, `gatewayGuardrails:view`, `gatewayLogs:view`, `auditLog:view`, `gatewayUsage:view`, `gatewayCacheRules:view`), so it can't delete or reconfigure providers and policies. |
-| **VIEWER** | View-only across the team. No create, update, delete on anything. The right shape for stakeholders who need read access to a team's traces but should never reconfigure anything. |
-| **CUSTOM** | Empty by default. Permissions come from the `CustomRolePermissions` JSON column on the `RoleBinding` row, see [Custom roles](#custom-roles) below. |
+| **VIEWER** | View-only across the team. No create, update, delete on anything. The right shape for stakeholders who need read access to a team's traces but should never reconfigure anything.                                                                                                                                                                                                                                                                                                                                                                                                       |
+| **CUSTOM** | Empty by default. Permissions come from the `CustomRolePermissions` JSON column on the `RoleBinding` row, see [Custom roles](#custom-roles) below.                                                                                                                                                                                                                                                                                                                                                                                                                                      |
 
 A user's effective permissions on a resource are the **union** of every binding that applies, org-level baseline + team-level baseline + any custom-role overrides.
 
@@ -129,11 +135,11 @@ The binding is now active. The user's effective permissions are the union of:
 
 The bindings page is a **deep table**: every active `RoleBinding` row in the org. Filter by user, role, scope, or scope target. The most common admin questions:
 
-| Question | Filter |
-|---|---|
-| Who can manage the AI Tools Portal? | Role = `aiTools-curator` (or any custom role granting `aiTools:manage`). |
-| Who has admin on the Marketing team? | Role = `ADMIN`, Scope = `Team`, Scope target = Marketing. |
-| What does `bob@acme.test` actually have access to? | User = bob. Cross-reference with the [permission catalog](#permission-catalog) for what each role grants. |
+| Question                                                   | Filter                                                                                                                                                |
+| ---------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Who can manage the AI Tools Portal?                        | Role = `aiTools-curator` (or any custom role granting `aiTools:manage`).                                                                              |
+| Who has admin on the Marketing team?                       | Role = `ADMIN`, Scope = `Team`, Scope target = Marketing.                                                                                             |
+| What does `bob@acme.test` actually have access to?         | User = bob. Cross-reference with the [permission catalog](#permission-catalog) for what each role grants.                                             |
 | Has anyone been bound at `Organization` scope to `MEMBER`? | Role = `MEMBER`, Scope = `Organization`. (Note: org-scoped MEMBER bindings do NOT imply team- or project-level access, the resolver is hierarchical.) |
 
 The page is the answer to "who can do what in this org." Every change records an audit log row.

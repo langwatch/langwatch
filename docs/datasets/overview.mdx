@@ -5,29 +5,27 @@ description: Create and manage datasets in LangWatch to build evaluation sets fo
 ---
 
 <Tip>
-  **Let your agent set this up.** [Copy the evaluations prompt](/skills/code-prompts#set-up-evaluations) into your coding agent to get started automatically.
+  **Let your agent set this up.** [Copy the evaluations
+  prompt](/skills/code-prompts#set-up-evaluations) into your coding agent to get started
+  automatically.
 </Tip>
 
 ## Create datasets
 
 LangWatch allows you to create and manage datasets, with a built-in excel-like interface for collaborating with your team.
 
-* Import datasets in any format you want, manage columns and data types
-* Keep populating the dataset with data traced from production
-* Create new datasets from scratch with AI assistance
-* Generate synthetic data from documents
-* Import, export and manage versions
+- Import datasets in any format you want, manage columns and data types
+- Keep populating the dataset with data traced from production
+- Create new datasets from scratch with AI assistance
+- Generate synthetic data from documents
+- Import, export and manage versions
 
 ### Usage
 
 To create a dataset, go to the datasets page and click the "Upload or Create Dataset" button. You can then select the type of dataset you want as well as the columns you want to include.
 
 <Frame caption="Create dataset">
-<img
-  className="block"
-  src="/images/dataset-screenshot-new.png"
-  alt="LangWatch"
-/>
+  <img className="block" src="/images/dataset-screenshot-new.png" alt="LangWatch" />
 </Frame>
 ## Adding data
 
@@ -45,11 +43,7 @@ There are a couple ways to add data to a dataset;
 To add data manually, click the "Add to Dataset" button on the messages page after selecting a message. You can then choose the dataset type and preview the data before adding it.
 
 <Frame caption="Add to dataset manually">
-<img
-  className="block"
-  src="/images/dataset-screenshot-single.png"
-  alt="LangWatch"
-/>
+  <img className="block" src="/images/dataset-screenshot-single.png" alt="LangWatch" />
 </Frame>
 
 ### From traces
@@ -57,28 +51,19 @@ To add data manually, click the "Add to Dataset" button on the messages page aft
 To add data by selecting a group, click the "Add to Dataset" button after choosing the desired messages in the table view. You can then select the type of dataset you wish to add to and preview the data before including it.
 
 <Frame caption="Add to dataset from traces">
-<img
-  className="block"
-  src="/images/dataset-screenshot-group.png"
-  alt="LangWatch"
-/>
+  <img className="block" src="/images/dataset-screenshot-group.png" alt="LangWatch" />
 </Frame>
 
 ### Continuously
 
 You can keep continuously populating the dataset with new data arriving from production by using **Automations**. See [Automatically building a dataset from traces](/datasets/automatically-from-traces) for more details.
 
-
 ### CSV Upload
 
 To add data by CSV upload, go to your datasets page and select the dataset you want to update. Click the "Upload CSV" button and upload your CSV or JSONL file. You can then map the columns from your file to the appropriate fields in the dataset based on the dataset type.
 
 <Frame caption="Add dataset from CSV">
-<img
-  className="block"
-  src="/images/dataset-screenshot-csv.png"
-  alt="LangWatch"
-/>
+  <img className="block" src="/images/dataset-screenshot-csv.png" alt="LangWatch" />
 </Frame>
 
 ## Programmatic Access

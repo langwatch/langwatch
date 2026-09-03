@@ -30,14 +30,14 @@ Feature: `pnpm dev` starts the Langy agent manager
   Rule: The manager starts on the address the app dials
 
     # The launcher runs before every Node entry point and sees only the
-    # calling shell, while the app loads platform/app/.env and then the
+    # calling shell, while the applications load .env and then the
     # .env.portless haven overlay with override. A pinned agent URL is
     # therefore invisible to the launcher and authoritative for the app, the
     # same split the NLP engine had.
 
     @unit
     Scenario: The manager follows the address pinned in the app's env file
-      Given platform/app/.env pins the agent URL to port 8080
+      Given .env pins the agent URL to port 8080
       And this worktree runs on port slot 5590
       When the launcher resolves the agent address
       Then it resolves to the pinned port 8080
@@ -45,14 +45,14 @@ Feature: `pnpm dev` starts the Langy agent manager
 
     @unit
     Scenario: The haven overlay wins over the plain env file for the agent address
-      Given platform/app/.env pins one agent URL
+      Given .env pins one agent URL
       And the haven overlay pins another
       When the launcher resolves the agent address
       Then it resolves to the overlay's address, the one the app loads last
 
     @unit
     Scenario: An agent address pinned in a file beats one exported for a single run
-      Given platform/app/.env pins the agent URL
+      Given .env pins the agent URL
       And a different address is exported into the shell
       When the launcher resolves the agent address
       Then it resolves to the pinned one, because that is what the app will read
@@ -65,7 +65,7 @@ Feature: `pnpm dev` starts the Langy agent manager
 
     @unit
     Scenario: An overlay that clears the agent address is not read past
-      Given platform/app/.env pins the agent URL
+      Given .env pins the agent URL
       And the haven overlay assigns it an empty value
       When the launcher resolves the agent address
       Then it derives the port slot, because the app reads the empty overlay too
@@ -80,7 +80,7 @@ Feature: `pnpm dev` starts the Langy agent manager
 
     @unit
     Scenario: A commented-out pin is not an agent address
-      Given platform/app/.env has its agent URL commented out
+      Given .env has its agent URL commented out
       When the launcher resolves the agent address
       Then it leaves the address unset for the launcher to derive from the port
 
@@ -101,7 +101,7 @@ Feature: `pnpm dev` starts the Langy agent manager
 
     @unit
     Scenario: A pinned address decides the port the lane sets
-      Given platform/app/.env pins the agent URL to port 8080
+      Given .env pins the agent URL to port 8080
       When the launcher plans the langy lane
       Then the lane sets the manager's port to 8080
 
@@ -114,7 +114,7 @@ Feature: `pnpm dev` starts the Langy agent manager
 
     @unit
     Scenario: A missing Langy env block skips the lane and names the doctor
-      Given platform/app/.env has no LANGY_INTERNAL_SECRET
+      Given .env has no LANGY_INTERNAL_SECRET
       When the launcher plans the langy lane
       Then the lane is skipped
       And the reason names the missing setting
@@ -122,7 +122,7 @@ Feature: `pnpm dev` starts the Langy agent manager
 
     @unit
     Scenario: A missing workspace root skips the lane the same way
-      Given platform/app/.env has no LANGY_WORKSPACE_ROOT
+      Given .env has no LANGY_WORKSPACE_ROOT
       When the launcher plans the langy lane
       Then the lane is skipped
       And the reason names the missing setting

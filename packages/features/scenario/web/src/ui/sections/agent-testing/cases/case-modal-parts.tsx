@@ -1,0 +1,517 @@
+/**
+ * The parts of the scenario dialog: its heading, the four questions it asks,
+ * the blocks its chips open, and the line of actions at its foot.
+ *
+ * @see specs/features/agent-testing/cases-table.feature
+ * @see specs/features/agent-testing/case-version-history.feature
+ */
+
+import {
+  Box,
+  Button,
+  Grid,
+  HStack,
+  Input,
+  NativeSelect,
+  Skeleton,
+  Text,
+  Textarea,
+  VStack,
+} from "@chakra-ui/react";
+import { Play } from "lucide-react";
+import { UNFILED_OPTION_LABEL } from "../../../../index";
+import { SimulationModelSelect } from "../../scenarios/simulation-model-select";
+import { FieldInfoTooltip } from "@langwatch/design-system/field-info-tooltip";
+import { TagList } from "../../../elements/tag-list";
+import { CustomizeChips } from "../../../elements/agent-testing/shared/customize-chips";
+import {
+  DIALOG_FIELD_STYLE,
+  FieldLabel,
+} from "../../../elements/agent-testing/shared/dialog-fields";
+import { FG_MUTED } from "../../../../model/agent-testing/shared/design";
+import { RemoveBlockButton } from "../../../elements/agent-testing/shared/remove-block-button";
+import { SmallButton } from "../../../elements/agent-testing/shared/small-button";
+import { CaseVersionHistoryPopover } from "./case-version-history-popover";
+import type { TestSuiteEntry } from "../../../../model/agent-testing/cases/test-cases";
+import type { CaseDraft, CaseEditorState } from "./use-case-editor";
+import { Drawer } from "@langwatch/workflow-web/components/ui/drawer";
+import { ParameterLineField } from "../run/parameter-line-field";
+import { parameterPlaceholder } from "../run/parameter-suggestions";
+import { useAgentDeclaredParameters } from "../run/use-agent-declared-parameters";
+import { CaseRecentRunsButton } from "./case-recent-runs-button";
+
+const CASE_MODAL_SUBTITLE = "Test your agent on a critical path or edge case";
+
+/**
+ * What a field that grows with its text carries.
+ *
+ * The two long fields of the dialog follow their own text rather than holding a
+ * fixed box, the way the prompt editor does. Growing stops at three times the
+ * height the field opens at, and the field scrolls from there, so one long
+ * scenario cannot push the footer of the drawer off the screen.
+ *
+ * A grown field writes its height inline, so each field states the height it
+ * opens at as well; without it the field would shrink under its own rows while
+ * it is empty.
+ */
+const GROWING_FIELD = { autoresize: true, resize: "none" } as const;
+
+/** The height the situation opens at, and the height it stops growing at. */
+const SITUATION_HEIGHT = { min: "52px", max: "156px" } as const;
+
+/** The same pair for the criteria, which opens two lines taller. */
+const CRITERIA_HEIGHT = { min: "92px", max: "276px" } as const;
+
+const PARAMETERS_HELP =
+  "Parameters reach your agent as arguments of the function you annotated. Use them to run the same scenario as a free or a pro customer, in another locale, or on another model.";
+
+/**
+ * The heading: what the dialog is for, the way into a recent run of this
+ * scenario, and the way back to its versions.
+ */
+export function CaseModalHeader({
+  isEditing,
+  scenarioId,
+  version,
+  openHistoryOnOpen,
+}: {
+  isEditing: boolean;
+  /** The scenario being edited, or nothing for a new one. */
+  scenarioId: string | null;
+  version: number | null;
+  /** True when the dialog was opened from a History entry. */
+  openHistoryOnOpen?: boolean;
+}) {
+  return (
+    <Drawer.Header
+      borderBottomWidth="1px"
+      borderColor="border"
+      paddingX={5}
+      paddingY={3.5}
+      display="block"
+    >
+      <Drawer.Title fontSize="14px" fontWeight="semibold">
+        {isEditing ? "Edit scenario" : "New scenario"}
+      </Drawer.Title>
+      <Text fontSize="12px" color={FG_MUTED} marginTop={0.5}>
+        {CASE_MODAL_SUBTITLE}
+      </Text>
+      {isEditing && scenarioId && (
+        <HStack position="absolute" top={2.5} right={11} gap={1.5}>
+          <CaseRecentRunsButton scenarioId={scenarioId} />
+          {version !== null && (
+            <CaseVersionHistoryPopover
+              scenarioId={scenarioId}
+              version={version}
+              initialOpen={openHistoryOnOpen}
+            />
+          )}
+        </HStack>
+      )}
+      <Drawer.CloseTrigger />
+    </Drawer.Header>
+  );
+}
+
+/** The title of the scenario and the suite it is filed under, on one line. */
+function TitleAndSuiteRow({
+  draft,
+  setDraft,
+  suites,
+}: {
+  draft: CaseDraft;
+  setDraft: (update: Partial<CaseDraft>) => void;
+  suites: TestSuiteEntry[];
+}) {
+  return (
+    <Grid templateColumns="1fr 180px" gap={3}>
+      <Box>
+        <FieldLabel>Title</FieldLabel>
+        <Input
+          {...DIALOG_FIELD_STYLE}
+          autoFocus
+          aria-label="Title"
+          placeholder="Angry customer threatens a chargeback"
+          value={draft.title}
+          onChange={(event) => setDraft({ title: event.target.value })}
+        />
+      </Box>
+      <Box>
+        <FieldLabel>Test suite</FieldLabel>
+        <NativeSelect.Root size="sm">
+          <NativeSelect.Field
+            {...DIALOG_FIELD_STYLE}
+            aria-label="Test suite"
+            value={draft.testSuiteId ?? ""}
+            onChange={(event) => setDraft({ testSuiteId: event.target.value || null })}
+          >
+            <option value="">{UNFILED_OPTION_LABEL}</option>
+            {suites.map((suite) => (
+              <option key={suite.id} value={suite.id}>
+                {suite.name}
+              </option>
+            ))}
+          </NativeSelect.Field>
+          <NativeSelect.Indicator />
+        </NativeSelect.Root>
+      </Box>
+    </Grid>
+  );
+}
+
+/** What the user is trying to do, and what the judge must check. */
+function SituationAndCriteria({
+  draft,
+  setDraft,
+}: {
+  draft: CaseDraft;
+  setDraft: (update: Partial<CaseDraft>) => void;
+}) {
+  return (
+    <>
+      <Box>
+        <FieldLabel>Situation · what is the user trying to do?</FieldLabel>
+        <Textarea
+          {...DIALOG_FIELD_STYLE}
+          {...GROWING_FIELD}
+          rows={2}
+          minHeight={SITUATION_HEIGHT.min}
+          maxHeight={SITUATION_HEIGHT.max}
+          aria-label="Situation"
+          placeholder="The customer is on day three of waiting for a refund and threatens to charge back."
+          value={draft.situation}
+          onChange={(event) => setDraft({ situation: event.target.value })}
+        />
+      </Box>
+
+      <Box>
+        <FieldLabel>Criteria · one per line</FieldLabel>
+        <Textarea
+          {...DIALOG_FIELD_STYLE}
+          {...GROWING_FIELD}
+          rows={4}
+          minHeight={CRITERIA_HEIGHT.min}
+          maxHeight={CRITERIA_HEIGHT.max}
+          aria-label="Criteria"
+          placeholder={
+            "Keeps a calm tone\nGives the refund status without being asked twice\nDoes not promise compensation we do not offer"
+          }
+          value={draft.criteria}
+          onChange={(event) => setDraft({ criteria: event.target.value })}
+        />
+        <Text marginTop={1} fontSize="11px" color={FG_MUTED}>
+          The judge scores each line as pass or fail on the finished conversation.
+        </Text>
+      </Box>
+    </>
+  );
+}
+
+/**
+ * The declared parameters of the scenario, as one `name=value` line.
+ *
+ * The line offers what the agents of the project declare, so a scenario can
+ * name an agent's parameter and pick one of its options without opening the
+ * agent.
+ */
+function ParametersBlock({
+  draft,
+  setDraft,
+  onRemove,
+}: {
+  draft: CaseDraft;
+  setDraft: (update: Partial<CaseDraft>) => void;
+  onRemove: () => void;
+}) {
+  const definitions = useAgentDeclaredParameters();
+
+  return (
+    <Box data-testid="case-parameters-block">
+      <FieldLabel>
+        Parameters
+        <FieldInfoTooltip
+          description={PARAMETERS_HELP}
+          docHref="/agent-testing/run-parameters"
+          docLabel="How to annotate an agent"
+          trigger="hover"
+          testId="case-parameters-info"
+        />
+        <RemoveBlockButton label="Remove the parameters" onClick={onRemove} />
+      </FieldLabel>
+      <ParameterLineField
+        ariaLabel="Parameters"
+        placeholder={parameterPlaceholder(definitions)}
+        value={draft.parameters}
+        onChange={(parameters) => setDraft({ parameters })}
+        definitions={definitions}
+        testId="case-parameters-line"
+      />
+    </Box>
+  );
+}
+
+/** The four questions the form asks, or the skeleton they stand in as. */
+export function CaseModalFields({
+  editor,
+  suites,
+}: {
+  editor: CaseEditorState;
+  suites: TestSuiteEntry[];
+}) {
+  const { draft, setDraft } = editor;
+
+  if (editor.isLoading) return <CaseModalSkeleton />;
+
+  return (
+    <VStack align="stretch" gap={4} minHeight="full">
+      {editor.staleVersion !== null && (
+        <StaleVersionNotice currentVersion={editor.staleVersion} onReload={editor.reloadStale} />
+      )}
+      <TitleAndSuiteRow draft={draft} setDraft={setDraft} suites={suites} />
+      <SituationAndCriteria draft={draft} setDraft={setDraft} />
+      {/* A block a chip opened reads where the reader was looking when they
+          opened it: straight under the criteria, in the order the chips sit
+          in. Pinned to the foot with the chip row, it left a hole under a
+          short scenario and read as part of the chips rather than as part of
+          the scenario. */}
+      <CustomizeBlocks editor={editor} />
+      {/* The chip row alone is pinned to the bottom of the scroll area, so the
+          gap between the last block and the footer belongs to it, not to
+          empty space. */}
+      <Box marginTop="auto">
+        <CustomizeChips
+          title="Customize scenario"
+          chips={editor.customize.chips}
+          testId="customize-case-chips"
+        />
+      </Box>
+    </VStack>
+  );
+}
+
+/** The labels of the scenario, and the two ways of leaving with it saved. */
+export function CaseModalFooter({ editor }: { editor: CaseEditorState }) {
+  const { draft, setDraft } = editor;
+
+  return (
+    <Drawer.Footer
+      borderTopWidth="1px"
+      borderColor="border"
+      paddingX={5}
+      paddingY={3}
+      justifyContent="space-between"
+      gap={5}
+      flexWrap="wrap"
+    >
+      <HStack gap={1.5} flexWrap="wrap">
+        <Text fontSize="12px" fontWeight="medium" color={FG_MUTED}>
+          Labels
+        </Text>
+        <TagList
+          labels={draft.labels}
+          tone="pastel"
+          onRemove={(_label, index) =>
+            setDraft({ labels: draft.labels.filter((_, at) => at !== index) })
+          }
+          onAdd={(label) => setDraft({ labels: [...draft.labels, label] })}
+        />
+      </HStack>
+      <HStack gap={2}>
+        <SmallButton
+          loading={editor.isSaving}
+          disabled={!!editor.problem}
+          title={editor.problem ?? undefined}
+          onClick={() => editor.save({ shouldRunAfterSave: false })}
+          data-testid="case-modal-save"
+        >
+          Save
+        </SmallButton>
+        <SmallButton
+          variant="solid"
+          colorPalette="blue"
+          loading={editor.isSaving}
+          disabled={!!editor.problem}
+          title={editor.problem ?? undefined}
+          onClick={() => editor.save({ shouldRunAfterSave: true })}
+          data-testid="case-modal-save-and-run"
+        >
+          <Play size={13} />
+          Save &amp; Run
+        </SmallButton>
+      </HStack>
+    </Drawer.Footer>
+  );
+}
+
+/** How long the conversation may run, and how early the judge may end it. */
+function TurnsBlock({
+  draft,
+  setDraft,
+  onRemove,
+}: {
+  draft: CaseDraft;
+  setDraft: (update: Partial<CaseDraft>) => void;
+  onRemove: () => void;
+}) {
+  return (
+    <VStack align="stretch" gap={2} data-testid="case-turns-block">
+      <Grid templateColumns="1fr 1fr" gap={3}>
+        <Box>
+          <FieldLabel>Max turns</FieldLabel>
+          <Input
+            {...DIALOG_FIELD_STYLE}
+            type="number"
+            aria-label="Max turns"
+            placeholder="Default: 10"
+            value={draft.maxTurns ?? ""}
+            onChange={(event) => setDraft({ maxTurns: toTurnCount(event.target.value) })}
+          />
+        </Box>
+        <Box>
+          <FieldLabel>
+            Min turns
+            <RemoveBlockButton label="Remove the turn limits" onClick={onRemove} />
+          </FieldLabel>
+          <Input
+            {...DIALOG_FIELD_STYLE}
+            type="number"
+            aria-label="Min turns"
+            placeholder="Default: none"
+            value={draft.minTurns ?? ""}
+            onChange={(event) => setDraft({ minTurns: toTurnCount(event.target.value) })}
+          />
+        </Box>
+      </Grid>
+      <Text fontSize="11px" color={FG_MUTED}>
+        Max turns caps the conversation. Min turns keeps the judge from ending the test early.
+      </Text>
+    </VStack>
+  );
+}
+
+/**
+ * The models this scenario runs on. A scenario that overrides neither follows the
+ * models of the project.
+ */
+function ModelsBlock({
+  draft,
+  setDraft,
+  onRemove,
+}: {
+  draft: CaseDraft;
+  setDraft: (update: Partial<CaseDraft>) => void;
+  onRemove: () => void;
+}) {
+  return (
+    <Grid templateColumns="1fr 1fr" gap={3} data-testid="case-models-block">
+      <Box>
+        <FieldLabel>User simulator</FieldLabel>
+        <SimulationModelSelect
+          value={draft.simulatorModel}
+          onChange={(value) => setDraft({ simulatorModel: value })}
+          featureKey="scenarios.user_simulator"
+          size="sm"
+        />
+      </Box>
+      <Box>
+        <FieldLabel>
+          Judge
+          <RemoveBlockButton label="Remove the model overrides" onClick={onRemove} />
+        </FieldLabel>
+        <SimulationModelSelect
+          value={draft.judgeModel}
+          onChange={(value) => setDraft({ judgeModel: value })}
+          featureKey="scenarios.judge"
+          size="sm"
+        />
+      </Box>
+    </Grid>
+  );
+}
+
+/**
+ * What the scenario can carry beyond the four questions: the parameters, the
+ * turn limits and the model overrides, each behind a chip until it is asked
+ * for.
+ *
+ * The blocks read in the order their chips sit in, and they read as part of the
+ * scenario rather than as part of the chip row: a scenario with one block open
+ * runs criteria, block, chips, top to bottom.
+ */
+function CustomizeBlocks({ editor }: { editor: CaseEditorState }) {
+  const { draft, setDraft, customize } = editor;
+
+  if (!customize.showParameters && !customize.showTurns && !customize.showModels) {
+    return null;
+  }
+
+  return (
+    <VStack align="stretch" gap={4} data-testid="case-customize-blocks">
+      {customize.showParameters && (
+        <ParametersBlock draft={draft} setDraft={setDraft} onRemove={customize.removeParameters} />
+      )}
+      {customize.showTurns && (
+        <TurnsBlock draft={draft} setDraft={setDraft} onRemove={customize.removeTurns} />
+      )}
+      {customize.showModels && (
+        <ModelsBlock draft={draft} setDraft={setDraft} onRemove={customize.removeModels} />
+      )}
+    </VStack>
+  );
+}
+
+/** An empty turn field follows the default rather than sending a zero. */
+function toTurnCount(raw: string): number | null {
+  if (raw === "") return null;
+  const value = Number(raw);
+  return Number.isFinite(value) ? value : null;
+}
+
+/**
+ * Says the scenario changed since it was opened, and offers the reload.
+ *
+ * The refused save wrote nothing, so nothing is lost by leaving the draft as
+ * it is. Reloading is the destructive choice, and the button says so.
+ */
+function StaleVersionNotice({
+  currentVersion,
+  onReload,
+}: {
+  currentVersion: number;
+  onReload: () => void;
+}) {
+  return (
+    <VStack
+      align="start"
+      gap={2}
+      borderWidth="1px"
+      borderColor="orange.solid"
+      borderRadius="lg"
+      padding={3}
+      data-testid="scenario-stale-version"
+    >
+      <Text fontSize="13px" fontWeight="medium">
+        This scenario changed since it was opened
+      </Text>
+      <Text fontSize="11.5px" color={FG_MUTED}>
+        Somebody else saved {currentVersion > 0 ? `version ${currentVersion}` : "a newer version"}{" "}
+        while this one was open. Nothing was written, so your edits are still here. Reloading
+        replaces them with the newer version, so copy anything you want to keep first.
+      </Text>
+      <Button size="xs" variant="outline" onClick={onReload}>
+        Discard my edits and reload
+      </Button>
+    </VStack>
+  );
+}
+
+/** Stands in for the form while a stored scenario is being read. */
+function CaseModalSkeleton() {
+  return (
+    <VStack align="stretch" gap={4} data-testid="case-modal-skeleton">
+      <Skeleton height="46px" />
+      <Skeleton height="60px" />
+      <Skeleton height="92px" />
+    </VStack>
+  );
+}

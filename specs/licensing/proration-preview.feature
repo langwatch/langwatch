@@ -3,9 +3,9 @@ Feature: Proration Preview Before Seat Update
   # All scenarios in this file describe the Seat-update proration-preview
   # modal on the Subscription page (loading state, error state, calculation
   # base, cancel behavior). The previewProration backend method is unit tested
-  # in platform/app/ee/billing/__tests__/seatEventSubscription.unit.test.ts;
+  # in packages/enterprise/features/billing/server/src/__tests__/seatEventSubscription.unit.test.ts;
   # the modal itself is covered by
-  # platform/app/src/components/__tests__/UpgradeModal.integration.test.tsx.
+  # [gone] src/components/__tests__/UpgradeModal.integration.test.tsx.
 
   As a Growth plan (SEAT_EVENT) administrator
   I want to see the prorated charges before confirming a seat update

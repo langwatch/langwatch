@@ -5,13 +5,16 @@ description: Continuously score and monitor your LLM's production traffic for qu
 ---
 
 <Tip>
-  **Let your agent set this up.** [Copy the evaluations prompt](/skills/code-prompts#set-up-evaluations) into your coding agent to get started automatically.
+  **Let your agent set this up.** [Copy the evaluations
+  prompt](/skills/code-prompts#set-up-evaluations) into your coding agent to get started
+  automatically.
 </Tip>
 
 Online evaluation lets you continuously score your LLM's production traffic. It monitors your live application to catch quality issues, detect regressions, and ensure safety. To test before deployment instead, see [experiments](/evaluations/experiments/overview).
 
 <Info>
-In the LangWatch platform, online evaluation is implemented through **Monitors** - automated rules that score incoming traces based on evaluators you configure.
+  In the LangWatch platform, online evaluation is implemented through **Monitors** -
+  automated rules that score incoming traces based on evaluators you configure.
 </Info>
 
 ## How It Works
@@ -29,23 +32,23 @@ User Request → Your LLM → Response → LangWatch Trace → Monitor → Score
 
 ## When to Use Online Evaluation
 
-| Use Case | Example |
-|----------|---------|
-| **Quality monitoring** | Track faithfulness, relevance, or custom quality metrics over time |
-| **Safety monitoring** | Detect PII leakage, jailbreak attempts, or policy violations |
-| **Regression detection** | Get alerts when quality metrics drop after deployments |
-| **Dataset building** | Automatically add low-scoring traces to datasets for improvement |
+| Use Case                 | Example                                                            |
+| ------------------------ | ------------------------------------------------------------------ |
+| **Quality monitoring**   | Track faithfulness, relevance, or custom quality metrics over time |
+| **Safety monitoring**    | Detect PII leakage, jailbreak attempts, or policy violations       |
+| **Regression detection** | Get alerts when quality metrics drop after deployments             |
+| **Dataset building**     | Automatically add low-scoring traces to datasets for improvement   |
 
 ## Monitors vs Guardrails
 
 Both use evaluators, but serve different purposes:
 
-| Monitors | Guardrails |
-|----------|------------|
-| **Measure** quality asynchronously | **Block** harmful content in real-time |
-| Run after the response is sent | Run before/during response generation |
-| Feed dashboards and alerts | Return errors or safe responses to users |
-| For observability | For enforcement |
+| Monitors                           | Guardrails                               |
+| ---------------------------------- | ---------------------------------------- |
+| **Measure** quality asynchronously | **Block** harmful content in real-time   |
+| Run after the response is sent     | Run before/during response generation    |
+| Feed dashboards and alerts         | Return errors or safe responses to users |
+| For observability                  | For enforcement                          |
 
 If you need to block harmful content before it reaches users, see [Guardrails](/evaluations/guardrails/overview).
 
@@ -78,10 +81,10 @@ First, make sure your application is sending traces to LangWatch:
 import langwatch
 
 @langwatch.trace()
-def my_llm_app(user_input):
-    # Your LLM logic here
-    return response
-```
+def my_llm_app(user_input): # Your LLM logic here
+return response
+
+````
   </Tab>
   <Tab title="TypeScript">
 ```typescript
@@ -92,7 +95,8 @@ const trace = langwatch.getTrace();
 
 // Your LLM logic here
 trace.end();
-```
+````
+
   </Tab>
 </Tabs>
 
@@ -109,6 +113,7 @@ trace.end();
 ### 3. View Results
 
 Once enabled, scores appear on:
+
 - **Traces** - Individual trace scores visible in trace details
 - **Analytics** - Aggregate metrics over time
 - **Alerts** - Configure automations for low scores
@@ -124,8 +129,8 @@ import langwatch
 
 @langwatch.trace()
 def my_llm_app(user_input):
-    response = generate_response(user_input)
-    
+response = generate_response(user_input)
+
     # Add a custom score
     langwatch.get_current_span().add_evaluation(
         name="response_quality",
@@ -133,9 +138,10 @@ def my_llm_app(user_input):
         score=0.95,
         details="High quality response"
     )
-    
+
     return response
-```
+
+````
   </Tab>
   <Tab title="TypeScript">
 ```typescript
@@ -148,7 +154,8 @@ trace.addEvaluation({
   score: 0.95,
   details: "High quality response"
 });
-```
+````
+
   </Tab>
 </Tabs>
 

@@ -166,8 +166,8 @@ describe("Limits", () => {
               Authorization: `Bearer ${VALID_KEY}`,
             },
             body: initializeBody(),
-          })
-        )
+          }),
+        ),
       );
 
       const opened = responses.filter((response) => response.status === 200);
@@ -232,9 +232,7 @@ describe("Verification against the LangWatch API", () => {
       res.writeHead(401).end();
     });
 
-    await new Promise<void>((resolve) =>
-      upstream.listen(0, "127.0.0.1", resolve)
-    );
+    await new Promise<void>((resolve) => upstream.listen(0, "127.0.0.1", resolve));
     upstreamUrl = `http://127.0.0.1:${(upstream.address() as AddressInfo).port}`;
   });
 

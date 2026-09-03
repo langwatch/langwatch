@@ -80,10 +80,10 @@ const eventsPage = (ids: string[], next_cursor: string | null): unknown => ({
   next_cursor,
 });
 
-const summariesPage = (
-  keys: string[],
-  next_cursor: string | null,
-): unknown => ({ data: keys.map(summaryRow), next_cursor });
+const summariesPage = (keys: string[], next_cursor: string | null): unknown => ({
+  data: keys.map(summaryRow),
+  next_cursor,
+});
 
 /** The query string of the nth fetch, in call order. */
 const queryOf = (call: number): string => {
@@ -92,7 +92,7 @@ const queryOf = (call: number): string => {
 };
 
 /** Reads an iterator to exhaustion and hands back every row it yielded. */
-const drain = async <T,>(rows: AsyncIterable<T>): Promise<T[]> => {
+const drain = async <T>(rows: AsyncIterable<T>): Promise<T[]> => {
   const collected: T[] = [];
   for await (const row of rows) collected.push(row);
   return collected;
@@ -181,9 +181,7 @@ describe("SpendEventsApiService cursor paging", () => {
     it("yields events across pages and stops when the cursor comes back null", async () => {
       mockFetch
         .mockResolvedValueOnce(jsonResponse(eventsPage(["req_a"], "cursor-1")))
-        .mockResolvedValueOnce(
-          jsonResponse(eventsPage(["req_b", "req_c"], null)),
-        );
+        .mockResolvedValueOnce(jsonResponse(eventsPage(["req_b", "req_c"], null)));
 
       const events = await drain(new SpendEventsApiService().iterate(WINDOW));
 
@@ -193,9 +191,7 @@ describe("SpendEventsApiService cursor paging", () => {
 
     it("reads a page only when the consumer reaches it", async () => {
       mockFetch
-        .mockResolvedValueOnce(
-          jsonResponse(eventsPage(["req_a", "req_b"], "cursor-1")),
-        )
+        .mockResolvedValueOnce(jsonResponse(eventsPage(["req_a", "req_b"], "cursor-1")))
         .mockResolvedValueOnce(jsonResponse(eventsPage(["req_c"], null)));
 
       const events = new SpendEventsApiService().iterate(WINDOW);
@@ -215,9 +211,7 @@ describe("SpendEventsApiService cursor paging", () => {
         .mockResolvedValueOnce(jsonResponse(eventsPage(["req_a"], "cursor-1")))
         .mockResolvedValueOnce(jsonResponse(eventsPage(["req_b"], null)));
 
-      await drain(
-        new SpendEventsApiService().iterate({ ...WINDOW, model: "claude" }),
-      );
+      await drain(new SpendEventsApiService().iterate({ ...WINDOW, model: "claude" }));
 
       for (const call of [0, 1]) {
         const query = new URLSearchParams(queryOf(call));
@@ -255,18 +249,14 @@ describe("SpendEventsApiService cursor paging", () => {
 
       expect(page.data.map((r) => r.key)).toEqual(["vk_a", "vk_b"]);
       expect(page.next_cursor).toBe("cursor-1");
-      expect(new URLSearchParams(queryOf(0)).get("group_by")).toBe(
-        "virtual_key",
-      );
+      expect(new URLSearchParams(queryOf(0)).get("group_by")).toBe("virtual_key");
     });
   });
 
   describe("iterSummaries()", () => {
     it("yields every rollup row across the window's pages", async () => {
       mockFetch
-        .mockResolvedValueOnce(
-          jsonResponse(summariesPage(["vk_a", "vk_b"], "cursor-1")),
-        )
+        .mockResolvedValueOnce(jsonResponse(summariesPage(["vk_a", "vk_b"], "cursor-1")))
         .mockResolvedValueOnce(jsonResponse(summariesPage(["vk_c"], null)));
 
       const rows = await drain(
@@ -278,9 +268,7 @@ describe("SpendEventsApiService cursor paging", () => {
 
       expect(rows.map((r) => r.key)).toEqual(["vk_a", "vk_b", "vk_c"]);
       for (const call of [0, 1]) {
-        expect(new URLSearchParams(queryOf(call)).get("group_by")).toBe(
-          "end_user",
-        );
+        expect(new URLSearchParams(queryOf(call)).get("group_by")).toBe("end_user");
       }
     });
 

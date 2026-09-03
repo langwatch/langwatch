@@ -8,7 +8,8 @@ without leaking how the work is done, and to never read the resource before it
 is ready.
 
 This is the pattern. The dataset upload is the reference implementation
-(`src/pages/[project]/datasets/[id].tsx`); reuse it for the next
+(`packages/features/dataset/web/src/screens/datasets/dataset-editor.screen.tsx`);
+reuse it for the next
 processing-then-ready resource instead of reinventing the poll/banner/gate.
 
 ## 1. Poll the status with a self-stopping interval
@@ -24,14 +25,13 @@ const datasetQuery = api.dataset.getById.useQuery(
   {
     enabled: !!project && !!datasetId,
     refetchInterval: (data) =>
-      data?.status === "processing" || data?.status === "uploading"
-        ? 3000
-        : false,
+      data?.status === "processing" || data?.status === "uploading" ? 3000 : false,
   },
 );
 ```
 
-Reference: `src/pages/[project]/datasets/[id].tsx` (the `getById` poll). The
+Reference: `packages/features/dataset/web/src/screens/datasets/dataset-editor.screen.tsx`
+(the `getById` poll). The
 functional-`refetchInterval` idiom mirrors
 `src/features/traces-v2/hooks/useTraceFacets.ts`, where the same form drives a
 cold-miss backoff poll that stops as soon as the payload settles. Read the
@@ -46,24 +46,34 @@ message and a **Retry** affordance. Use Chakra `Alert.Root` /
 (`src/components/experiments/DSPyExperiment.tsx`).
 
 ```tsx
-{(status === "uploading" || status === "processing") && (
-  <Alert.Root status="info">
-    <Alert.Indicator><Spinner size="sm" /></Alert.Indicator>
-    <Alert.Content>
-      <Alert.Title>Preparing your dataset, this can take a few minutes</Alert.Title>
-    </Alert.Content>
-  </Alert.Root>
-)}
-{status === "failed" && (
-  <Alert.Root status="error">
-    <Alert.Indicator />
-    <Alert.Content>
-      <Alert.Title>We could not prepare your dataset</Alert.Title>
-      <Alert.Description>{statusError ?? "Something went wrong. You can retry."}</Alert.Description>
-    </Alert.Content>
-    <Button loading={isRetrying} onClick={handleRetry}>Retry</Button>
-  </Alert.Root>
-)}
+{
+  (status === "uploading" || status === "processing") && (
+    <Alert.Root status="info">
+      <Alert.Indicator>
+        <Spinner size="sm" />
+      </Alert.Indicator>
+      <Alert.Content>
+        <Alert.Title>Preparing your dataset, this can take a few minutes</Alert.Title>
+      </Alert.Content>
+    </Alert.Root>
+  );
+}
+{
+  status === "failed" && (
+    <Alert.Root status="error">
+      <Alert.Indicator />
+      <Alert.Content>
+        <Alert.Title>We could not prepare your dataset</Alert.Title>
+        <Alert.Description>
+          {statusError ?? "Something went wrong. You can retry."}
+        </Alert.Description>
+      </Alert.Content>
+      <Button loading={isRetrying} onClick={handleRetry}>
+        Retry
+      </Button>
+    </Alert.Root>
+  );
+}
 ```
 
 Retry calls the backend's re-enqueue endpoint and then refetches the status
@@ -78,7 +88,7 @@ once the status settles:
 ```tsx
 const isReady = status === "ready" || status == null;
 // ...
-<DatasetEditorTable datasetId={datasetId} readEnabled={isReady} />
+<DatasetEditorTable datasetId={datasetId} readEnabled={isReady} />;
 // inside the table:
 api.datasetRecord.getAll.useQuery(args, {
   enabled: !!project && !!datasetId && readEnabled,
@@ -112,9 +122,11 @@ User-facing copy describes what the customer gets, never how the work is done
 
 ## Reference implementation
 
-- Poll + banner + retry + read-gate: `src/pages/[project]/datasets/[id].tsx`
+- Poll + banner + retry + read-gate:
+  `packages/features/dataset/web/src/screens/datasets/dataset-editor.screen.tsx`
 - Functional `refetchInterval` idiom: `src/features/traces-v2/hooks/useTraceFacets.ts`
 - `Alert` banner primitive: `src/components/experiments/DSPyExperiment.tsx`
-- Gated dependent read: `src/components/datasets/editor/DatasetEditorTable.tsx`
+- Gated dependent read: `src/components/datasets/editor/DatasetEditorTable.tsx`, and its
+  package copy `packages/features/dataset/web/src/ui/sections/dataset-editor-table.tsx`
 - Server not-ready mapping: `src/server/api/routers/datasetRecord.ts`
 - Architecture: ADR-032 (`dev/docs/adr/032-datasets-s3-jsonl.md`), Decision 6 / I-READY.

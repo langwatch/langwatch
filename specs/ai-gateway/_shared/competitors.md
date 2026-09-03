@@ -65,12 +65,12 @@
 
 Our current `docs/ai-gateway/cli/codex.mdx` covers the env-var setup but **does not yet explain `wire_api: "responses"|"chat"` switching** or the "which endpoint does this model support" caveat. Iter 2 TODO: add a "Which Codex `wire_api` mode to use" section with a table:
 
-| Model family | Routed to | Recommended `wire_api` |
-|---|---|---|
-| `gpt-5*`, `gpt-4.1*`, `o3*` via OpenAI / Azure | OpenAI / Azure OpenAI | `responses` |
-| `gpt-*` via a generic OpenAI-compatible provider that doesn't expose `/v1/responses` | generic | `chat` |
-| `claude-*` via Anthropic / Bedrock / Vertex | Anthropic family | `chat` |
-| `gemini-*` via Google | Gemini | `chat` |
+| Model family                                                                         | Routed to             | Recommended `wire_api` |
+| ------------------------------------------------------------------------------------ | --------------------- | ---------------------- |
+| `gpt-5*`, `gpt-4.1*`, `o3*` via OpenAI / Azure                                       | OpenAI / Azure OpenAI | `responses`            |
+| `gpt-*` via a generic OpenAI-compatible provider that doesn't expose `/v1/responses` | generic               | `chat`                 |
+| `claude-*` via Anthropic / Bedrock / Vertex                                          | Anthropic family      | `chat`                 |
+| `gemini-*` via Google                                                                | Gemini                | `chat`                 |
 
 Then document that our gateway automatically exposes `/v1/responses` when the VK's resolved model supports it, and returns `400 bad_request` with a clear message when the CLI sends to `/v1/responses` for a model that requires `chat`. The error message should include a hint: `Model '<name>' resolves to Anthropic. Set wire_api = "chat" in your Codex config.`
 
@@ -82,22 +82,22 @@ Nexos publishes a clean per-CLI integration guide page (we only saw Codex). We s
 
 ## 4. Feature matrix — where LangWatch AI Gateway wins or is at parity
 
-| Capability | LangWatch | Bifrost OSS | Portkey OSS | Nexos (hosted) |
-|---|---|---|---|---|
-| OpenAI-compat `/v1/chat/completions` | ✅ | ✅ | ✅ | ✅ |
-| Anthropic-compat `/v1/messages` | ✅ | ✅ | ✅ | ✅ |
-| Virtual keys with budgets | ✅ built-in | ✅ plugin | ✅ | ✅ |
-| Hierarchical scopes (org/team/project/VK/principal) | ✅ 5-level | ✅ 4-level | partial | partial |
-| Inline guardrails (pre/post/stream_chunk) | ✅ | ❌ OSS / ✅ Enterprise | partial | unknown |
-| Policy rules (tools/MCP/URL regex) | ✅ | partial | ❌ | ❌ |
-| Per-tenant OTel routing | ✅ | ✅ plugin | ❌ | ❌ |
-| Anthropic `cache_control` byte-identical passthrough | ✅ with integration test | partial | partial | unknown |
-| Fallback chain with 400-error exclusion | ✅ documented | partial | ✅ | partial |
-| Coding-CLI integration docs (Claude Code / Codex / opencode) | ✅ in progress | minimal | minimal | ✅ Codex only |
-| Helm chart for self-host | ✅ (sub-chart of LangWatch) | ✅ | manual | ❌ |
-| RBAC integrated with SSO/SCIM | ✅ via existing LangWatch RBAC | ✅ Enterprise only | Enterprise only | hosted only |
-| Audit log of gateway actions | ✅ (unified `AuditLog` table — same surface as platform audit) | ✅ Enterprise only | Enterprise only | hosted only |
-| Built on bifrost/core for provider breadth | ✅ | native | ❌ (their own) | unknown |
+| Capability                                                   | LangWatch                                                      | Bifrost OSS            | Portkey OSS     | Nexos (hosted) |
+| ------------------------------------------------------------ | -------------------------------------------------------------- | ---------------------- | --------------- | -------------- |
+| OpenAI-compat `/v1/chat/completions`                         | ✅                                                             | ✅                     | ✅              | ✅             |
+| Anthropic-compat `/v1/messages`                              | ✅                                                             | ✅                     | ✅              | ✅             |
+| Virtual keys with budgets                                    | ✅ built-in                                                    | ✅ plugin              | ✅              | ✅             |
+| Hierarchical scopes (org/team/project/VK/principal)          | ✅ 5-level                                                     | ✅ 4-level             | partial         | partial        |
+| Inline guardrails (pre/post/stream_chunk)                    | ✅                                                             | ❌ OSS / ✅ Enterprise | partial         | unknown        |
+| Policy rules (tools/MCP/URL regex)                           | ✅                                                             | partial                | ❌              | ❌             |
+| Per-tenant OTel routing                                      | ✅                                                             | ✅ plugin              | ❌              | ❌             |
+| Anthropic `cache_control` byte-identical passthrough         | ✅ with integration test                                       | partial                | partial         | unknown        |
+| Fallback chain with 400-error exclusion                      | ✅ documented                                                  | partial                | ✅              | partial        |
+| Coding-CLI integration docs (Claude Code / Codex / opencode) | ✅ in progress                                                 | minimal                | minimal         | ✅ Codex only  |
+| Helm chart for self-host                                     | ✅ (sub-chart of LangWatch)                                    | ✅                     | manual          | ❌             |
+| RBAC integrated with SSO/SCIM                                | ✅ via existing LangWatch RBAC                                 | ✅ Enterprise only     | Enterprise only | hosted only    |
+| Audit log of gateway actions                                 | ✅ (unified `AuditLog` table — same surface as platform audit) | ✅ Enterprise only     | Enterprise only | hosted only    |
+| Built on bifrost/core for provider breadth                   | ✅                                                             | native                 | ❌ (their own)  | unknown        |
 
 **Our differentiators, ranked:**
 

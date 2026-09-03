@@ -1,0 +1,167 @@
+import type { AppendStore } from "@langwatch/eventing";
+import { AbstractMapProjection, type MapEventHandlers } from "@langwatch/eventing";
+import {
+  type EvaluatorResultEvent,
+  evaluatorResultEventSchema,
+  type TargetResultEvent,
+  targetResultEventSchema,
+} from "../adapters/eventing.experiment-run-events.adapter";
+import { normalizeDurationMs } from "../processes/experiment-run-duration.process";
+import { ExperimentRunIds } from "../processes/experiment-run-id.process";
+
+/**
+ * Record type matching the experiment_run_items ClickHouse table schema.
+ */
+export interface ClickHouseExperimentRunResultRecord {
+  ProjectionId: string;
+  TenantId: string;
+  RunId: string;
+  ExperimentId: string;
+  RowIndex: number;
+  TargetId: string;
+  ResultType: "target" | "evaluator";
+  DatasetEntry: string;
+  Predicted: string | null;
+  TargetCost: number | null;
+  TargetDurationMs: number | null;
+  TargetError: string | null;
+  /** Serialised handled error (JSON) — the coded half of `TargetError`. */
+  TargetDomainError: string | null;
+  TraceId: string | null;
+  EvaluatorId: string | null;
+  EvaluatorName: string | null;
+  EvaluationStatus: string;
+  Score: number | null;
+  Label: string | null;
+  Passed: number | null;
+  EvaluationDetails: string | null;
+  EvaluationCost: number | null;
+  EvaluationInputs: string | null;
+  EvaluationDurationMs: number | null;
+  /**
+   * 1 when the cell was copied into the run from the board, 0 when the run
+   * produced it. The run's cost and duration read only the rows it produced;
+   * its verdicts and scores read every row.
+   */
+  CarriedOver: number;
+  OccurredAt: Date;
+}
+
+const resultEvents = [targetResultEventSchema, evaluatorResultEventSchema] as const;
+
+/**
+ * The verdict as ClickHouse holds it: a nullable flag.
+ *
+ * An evaluator that errored or was skipped reports no verdict at all, and that
+ * is not the same fact as a failure. It stays null so a pass rate counts it in
+ * neither half.
+ */
+const toPassedFlag = (passed: boolean | null | undefined): number | null => {
+  if (passed === undefined || passed === null) return null;
+  return passed ? 1 : 0;
+};
+
+/**
+ * Map projection that transforms TargetResultEvent and EvaluatorResultEvent
+ * into ClickHouse records for storage in the experiment_run_items table.
+ */
+export class ExperimentRunResultStorageMapProjection
+  extends AbstractMapProjection<ClickHouseExperimentRunResultRecord, typeof resultEvents>
+  implements MapEventHandlers<typeof resultEvents, ClickHouseExperimentRunResultRecord>
+{
+  readonly name = "experimentRunResultStorage";
+  readonly store: AppendStore<ClickHouseExperimentRunResultRecord>;
+  protected readonly events = resultEvents;
+
+  override options = {
+    groupKeyFn: (event: { data: { experimentId: string; runId: string; index: number } }) =>
+      `experiment:${event.data.experimentId}:result:${event.data.runId}:item:${event.data.index}`,
+  };
+
+  constructor(deps: { store: AppendStore<ClickHouseExperimentRunResultRecord> }) {
+    super();
+    this.store = deps.store;
+  }
+
+  mapExperimentRunTargetResult(event: TargetResultEvent): ClickHouseExperimentRunResultRecord {
+    const id = ExperimentRunIds.generateDeterministicResultId({
+      tenantId: event.tenantId,
+      runId: event.data.runId,
+      index: event.data.index,
+      targetId: event.data.targetId,
+      resultType: "target",
+      evaluatorId: null,
+    });
+
+    return {
+      ProjectionId: id,
+      TenantId: event.tenantId,
+      RunId: event.data.runId,
+      ExperimentId: event.data.experimentId,
+      RowIndex: event.data.index,
+      TargetId: event.data.targetId,
+      ResultType: "target",
+      DatasetEntry: JSON.stringify(event.data.entry),
+      Predicted: event.data.predicted ? JSON.stringify(event.data.predicted) : null,
+      TargetCost: event.data.cost ?? null,
+      TargetDurationMs: normalizeDurationMs(event.data.duration),
+      TargetError: event.data.error ?? null,
+      TargetDomainError: event.data.domainError ? JSON.stringify(event.data.domainError) : null,
+      TraceId: event.data.traceId ?? null,
+      EvaluatorId: null,
+      EvaluatorName: null,
+      EvaluationStatus: "",
+      Score: null,
+      Label: null,
+      Passed: null,
+      EvaluationDetails: null,
+      EvaluationCost: null,
+      EvaluationInputs: null,
+      EvaluationDurationMs: null,
+      CarriedOver: event.data.carriedOver ? 1 : 0,
+      OccurredAt: new Date(event.occurredAt),
+    };
+  }
+
+  mapExperimentRunEvaluatorResult(
+    event: EvaluatorResultEvent,
+  ): ClickHouseExperimentRunResultRecord {
+    const id = ExperimentRunIds.generateDeterministicResultId({
+      tenantId: event.tenantId,
+      runId: event.data.runId,
+      index: event.data.index,
+      targetId: event.data.targetId,
+      resultType: "evaluator",
+      evaluatorId: event.data.evaluatorId,
+    });
+
+    return {
+      ProjectionId: id,
+      TenantId: event.tenantId,
+      RunId: event.data.runId,
+      ExperimentId: event.data.experimentId,
+      RowIndex: event.data.index,
+      TargetId: event.data.targetId,
+      ResultType: "evaluator",
+      DatasetEntry: "{}",
+      Predicted: null,
+      TargetCost: null,
+      TargetDurationMs: null,
+      TargetError: null,
+      TargetDomainError: null,
+      TraceId: null,
+      EvaluatorId: event.data.evaluatorId,
+      EvaluatorName: event.data.evaluatorName ?? null,
+      EvaluationStatus: event.data.status,
+      Score: event.data.score ?? null,
+      Label: event.data.label ?? null,
+      Passed: toPassedFlag(event.data.passed),
+      EvaluationDetails: event.data.details ?? null,
+      EvaluationCost: event.data.cost ?? null,
+      EvaluationInputs: event.data.inputs ? JSON.stringify(event.data.inputs) : null,
+      EvaluationDurationMs: normalizeDurationMs(event.data.duration),
+      CarriedOver: event.data.carriedOver ? 1 : 0,
+      OccurredAt: new Date(event.occurredAt),
+    };
+  }
+}

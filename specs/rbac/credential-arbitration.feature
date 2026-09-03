@@ -1,6 +1,7 @@
-# The claims runner lives in packages/authz (credential-claims.ts); the
+# The claims runner lives in packages/features/authz/contract
+# (credential-claims.ts); the
 # surfaces that arbitrate through it are the dual-auth byte endpoints
-# (platform/app/src/app/api/middleware/dual-auth.ts) and the API-key
+# ([gone] src/app/api/middleware/dual-auth.ts) and the API-key
 # permission gate (server/api-key/auth-middleware.ts). Approach follows
 # mojo's authenforce exactly-one-claims model: every credential kind that
 # is in play claims the request, and anything other than exactly one claim
@@ -13,7 +14,7 @@ Feature: Credential arbitration
   So that no request is answered by guessing between identities, and no
   permission gate silently waves through a request nobody authenticated
 
-  # ═══ The claims runner (packages/authz) ═══════════════════════════════
+  # ═══ The claims runner (AuthZ contract) ══════════════════════════════
 
   @unit
   Scenario: A single claim wins the arbitration

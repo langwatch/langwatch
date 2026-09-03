@@ -4,7 +4,10 @@ description: "Invite people into the organization in batches, with the teams and
 ---
 
 <Note>
-  **Available on Enterprise plans.** An organization without an Enterprise plan is refused with HTTP 402 and the error code `enterprise_plan_required`. Self-hosted deployments need an Enterprise license for the same endpoints. To enable it, reach out to [enterprise@langwatch.ai](mailto:enterprise@langwatch.ai).
+  **Available on Enterprise plans.** An organization without an Enterprise plan is refused
+  with HTTP 402 and the error code `enterprise_plan_required`. Self-hosted deployments
+  need an Enterprise license for the same endpoints. To enable it, reach out to
+  [enterprise@langwatch.ai](mailto:enterprise@langwatch.ai).
 </Note>
 
 ## Intro
@@ -23,11 +26,11 @@ Authorization: Bearer sk-lw-<id>_<secret>
 
 ## Endpoints
 
-| Method | Path | Description |
-|--------|------|-------------|
-| `GET` | `/api/organization/invites` | List pending invites with their acceptance links |
-| `POST` | `/api/organization/invites` | Create up to 50 invites in one batch |
-| `DELETE` | `/api/organization/invites/{id}` | Revoke a pending invite |
+| Method   | Path                             | Description                                      |
+| -------- | -------------------------------- | ------------------------------------------------ |
+| `GET`    | `/api/organization/invites`      | List pending invites with their acceptance links |
+| `POST`   | `/api/organization/invites`      | Create up to 50 invites in one batch             |
+| `DELETE` | `/api/organization/invites/{id}` | Revoke a pending invite                          |
 
 ## The acceptance link is part of the response
 
@@ -55,15 +58,15 @@ Validation runs over the whole batch before anything is written, and a problem r
 
 The refusals to expect:
 
-| Code | Status | Meaning |
-|------|--------|---------|
-| `already_organization_member` | 409 | One of the addresses is already in the organization |
-| `duplicate_invite` | 409 | An invite for that address is already pending |
-| `member_seat_limit_reached` | 403 | The batch would take the organization past its seats |
-| `team_not_in_organization` | 422 | A `teamId` belongs to another organization |
-| `personal_workspace_not_managed_here` | 403 | A `teamId` names somebody's personal workspace, which is not shareable |
-| `custom_role_id_required` | 422 | A team assignment names a custom role without a `customRoleId` |
-| `custom_role_not_assignable` | 422 | The custom role cannot be handed out on that team |
+| Code                                  | Status | Meaning                                                                |
+| ------------------------------------- | ------ | ---------------------------------------------------------------------- |
+| `already_organization_member`         | 409    | One of the addresses is already in the organization                    |
+| `duplicate_invite`                    | 409    | An invite for that address is already pending                          |
+| `member_seat_limit_reached`           | 403    | The batch would take the organization past its seats                   |
+| `team_not_in_organization`            | 422    | A `teamId` belongs to another organization                             |
+| `personal_workspace_not_managed_here` | 403    | A `teamId` names somebody's personal workspace, which is not shareable |
+| `custom_role_id_required`             | 422    | A team assignment names a custom role without a `customRoleId`         |
+| `custom_role_not_assignable`          | 422    | The custom role cannot be handed out on that team                      |
 
 ## Typical flow
 

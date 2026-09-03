@@ -63,10 +63,7 @@ export type Actor =
     };
 
 /** Mint the actor for platform-initiated work, named by its code path. */
-export function internalActor(
-  codePath: string,
-  options?: { revision?: string },
-): Actor {
+export function internalActor(codePath: string, options?: { revision?: string }): Actor {
   return { type: "internal", codePath, revision: options?.revision };
 }
 

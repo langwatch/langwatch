@@ -30,10 +30,10 @@ Feature: Departments - org-chart spend attribution across people, teams, and pro
     - specs/ai-gateway/governance/ingestion-attribution.feature (principal attribution)
 
   Implementation lives under:
-    - platform/app/ee/governance/services/department/                  (attribution + service)
-    - platform/app/ee/governance/routers/departments.ts                (tRPC)
-    - platform/app/ee/governance/services/activity-monitor/            (bird-eye rollup)
-    - platform/app/ee/scim/scim.service.ts                     (SCIM auto-assignment)
+    - packages/enterprise/features/governance/server/src/ (department)                  (attribution + service)
+    - packages/enterprise/features/governance/contract/src/department.ts                (tRPC)
+    - packages/enterprise/features/governance/server/src/ (activity-monitor)            (bird-eye rollup)
+    - packages/enterprise/features/scim/server/src/services/scim.service.ts                     (SCIM auto-assignment)
 
   Background:
     Given the user is signed in as an org admin of "acme-corp"

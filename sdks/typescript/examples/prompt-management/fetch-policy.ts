@@ -53,10 +53,7 @@ export const runMaterializedOnlyPolicy = async (handle: string, cli: CliRunner) 
  * Demonstrates CACHE_TTL happy path (first fetch hits API).
  * Assumes the prompt already exists remotely.
  */
-export const runCacheTtlPolicy = async (
-  handle: string,
-  cacheTtlMinutes = 5,
-) => {
+export const runCacheTtlPolicy = async (handle: string, cacheTtlMinutes = 5) => {
   const { LangWatch, FetchPolicy } = await import("../../dist");
 
   const langwatch = new LangWatch();

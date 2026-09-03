@@ -1,0 +1,17 @@
+{
+  "skill_name": "feature-extend",
+  "evals": [
+    {
+      "id": 1,
+      "prompt": "In the secret feature, add the ability to rotate a secret's value and record who rotated it.",
+      "expected_output": "Adds a tagged scenario first, a command schema in contract, a service method with the actor, a repository method carrying projectId, a tRPC procedure, the api-map entry and a hook in web, an error code if a failure is named, and binds tests at each layer; does not touch other features' packages.",
+      "files": []
+    },
+    {
+      "id": 2,
+      "prompt": "Prompts should refuse a version note longer than 500 characters with a clear error.",
+      "expected_output": "Adds a failure scenario with a stable code, a HandledError subclass in the prompt contract, the code in app-codes.ts and copy in presentation.ts, the check in the service (not the transport), and a unit test asserting the code, not the message.",
+      "files": []
+    }
+  ]
+}

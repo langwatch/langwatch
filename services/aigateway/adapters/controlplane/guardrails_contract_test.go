@@ -174,8 +174,15 @@ func TestContentForPacksEachDirectionUnderItsOwnKey(t *testing.T) {
 }
 
 // monorepoRoot and controlPlaneRoot locate the TypeScript side relative to this
-// package. The control plane is the @langwatch/web app, which ADR-076 moved from
-// <root>/langwatch to <root>/platform/app.
+// package. The control plane used to be one application package at a fixed path;
+// the feature extraction deleted it and split its gateway half into
+// <root>/packages/features/gateway. That is the second such move -- ADR-076 was
+// the first -- and each one broke this file, which is why the layout is derived
+// in exactly one function.
+//
+// The files these tests read now span several packages, so a source read is
+// addressed from the repository root; controlPlaneRoot is only the witness that
+// decides skip-versus-fail.
 var (
 	monorepoRoot     = filepath.Join("..", "..", "..", "..")
 	controlPlaneRoot = controlPlaneRootFor(monorepoRoot)
@@ -186,7 +193,7 @@ var (
 // layout through here, so a future move cannot repoint one and leave the other
 // stale -- which is the drift ADR-076 already caused once.
 func controlPlaneRootFor(root string) string {
-	return filepath.Join(root, "platform", "app")
+	return filepath.Join(root, "packages", "features", "gateway", "server")
 }
 
 // The two witnesses that decide skip-versus-fail. Neither is a bare directory:
@@ -198,15 +205,18 @@ func controlPlaneRootFor(root string) string {
 // produce, so these are a named repo-root manifest and a package identity.
 const (
 	workspaceManifest   = "pnpm-workspace.yaml"
-	controlPlanePackage = "@langwatch/web"
+	controlPlanePackage = "@langwatch/gateway-server"
 )
 
 // readControlPlaneSource reads one control plane source file, or ends the test.
+// The parts are repository-relative: the contract is stated across the gateway
+// feature package, its contract package, the trace package and the enterprise
+// governance package, and no shared prefix spans all four.
 func readControlPlaneSource(t *testing.T, parts ...string) string {
 	t.Helper()
 	requireControlPlane(t)
 
-	path := filepath.Join(append([]string{controlPlaneRoot}, parts...)...)
+	path := filepath.Join(append([]string{monorepoRoot}, parts...)...)
 	source, err := os.ReadFile(path)
 	if err != nil {
 		t.Fatalf("control plane source %s is missing or unreadable, which means the two sides have drifted: %v", path, err)
@@ -467,9 +477,9 @@ func TestControlPlaneVerdictDecidesEachWitnessCombination(t *testing.T) {
 type controlPlaneFixture struct {
 	hasWorkspaceManifest           bool   // pnpm-workspace.yaml at the repo root
 	hasUnreadableWorkspaceManifest bool   // pnpm-workspace.yaml exists but will not stat
-	hasControlPlaneDir             bool   // platform/app exists, possibly empty
-	manifest                       string // written to platform/app/package.json when set
-	isManifestDirectory            bool   // platform/app/package.json exists but cannot be read
+	hasControlPlaneDir             bool   // controlPlaneRootFor(root) exists, possibly empty
+	manifest                       string // written to controlPlaneRootFor(root)/package.json when set
+	isManifestDirectory            bool   // that package.json exists but cannot be read
 }
 
 // build materializes the fixture under t.TempDir() and returns the repo root.
@@ -478,7 +488,7 @@ func (f controlPlaneFixture) build(t *testing.T) string {
 
 	root := t.TempDir()
 	if f.hasWorkspaceManifest {
-		writeControlPlaneFile(t, filepath.Join(root, workspaceManifest), "packages:\n  - platform/app\n")
+		writeControlPlaneFile(t, filepath.Join(root, workspaceManifest), "packages:\n  - \"packages/**\"\n")
 	}
 	if f.hasUnreadableWorkspaceManifest {
 		// A symlink pointing at itself stats as ELOOP rather than ENOENT,
@@ -590,7 +600,9 @@ func TestRequireControlPlaneDispatchesTheVerdictItWasGiven(t *testing.T) {
 // here keeps a rename on the TypeScript side from silently breaking the gateway.
 /** @scenario "the data plane and the control plane agree on the wire shape" */
 func TestControlPlaneSchemaAgreesOnTheWireShape(t *testing.T) {
-	text := readControlPlaneSource(t, "src", "server", "routes", "gateway-internal.ts")
+	text := readControlPlaneSource(t,
+		"packages", "features", "gateway", "server", "src", "transport", "api-rest",
+		"gateway-internal.api.ts")
 
 	start := strings.Index(text, "const guardrailCheckRequestSchema")
 	if start < 0 {
@@ -614,7 +626,9 @@ func TestControlPlaneSchemaAgreesOnTheWireShape(t *testing.T) {
 	// The accepted directions live in one exported constant so both the route
 	// and this test read the same source of truth. The schema used to inline
 	// the storage enum instead, so every live gateway call failed validation.
-	service := readControlPlaneSource(t, "src", "server", "gateway", "guardrailEvaluation.service.ts")
+	service := readControlPlaneSource(t,
+		"packages", "features", "gateway", "server", "src", "services",
+		"gateway-guardrail-evaluation.service.ts")
 	for _, direction := range []string{"request", "response", "stream_chunk"} {
 		if !strings.Contains(service, `"`+direction+`"`) {
 			t.Errorf("control plane does not accept direction %q", direction)

@@ -1,0 +1,226 @@
+import { zodResolver } from "@hookform/resolvers/zod";
+import isEqual from "lodash-es/isEqual";
+import { useEffect, useMemo, useRef } from "react";
+import { type DeepPartial, useForm } from "react-hook-form";
+import { useModelLimits } from "@langwatch/model-provider-web/hooks/useModelLimits";
+import {
+  buildDefaultFormValues,
+  formSchema,
+  formSchemaForSave,
+  inputsAndOutputsToDemostrationColumns,
+  type PromptConfigFormValues,
+  refinedFormSchemaWithModelLimits,
+} from "@langwatch/prompt-web/surfaces/prompt-form";
+import { salvageValidData } from "@langwatch/workflow-web/utils/zodSalvage";
+
+interface UsePromptConfigFormProps {
+  configId?: string;
+  initialConfigValues?: DeepPartial<PromptConfigFormValues>;
+  onChange?: (formValues: PromptConfigFormValues) => void;
+}
+
+export const usePromptConfigForm = ({
+  configId,
+  onChange,
+  initialConfigValues = {},
+}: UsePromptConfigFormProps) => {
+  // Instance-specific flags to prevent sync loops (NOT module-level to avoid cross-instance interference)
+  const disableOnChangeRef = useRef(false);
+  const disableNodeSyncRef = useRef(false);
+  const disableFormSyncTimeoutRef = useRef<NodeJS.Timeout | null>(null);
+
+  // Track whether we've received meaningful config values (not just empty defaults).
+  // The forward sync must not push default form values onto a form that has already
+  // been reset with real data by PromptEditorDrawer's init effect.
+  const hasReceivedConfigRef = useRef(Object.keys(initialConfigValues).length > 0);
+  useEffect(() => {
+    if (Object.keys(initialConfigValues).length > 0) {
+      hasReceivedConfigRef.current = true;
+    }
+  }, [initialConfigValues]);
+
+  // Store schema in ref so resolver can access it.
+  // Uses the save-time schema so the system-prompt-required refinement
+  // (#3196) fires when methods.trigger() is called from the Save handler.
+  const schemaRef = useRef(formSchemaForSave);
+  /**
+   * Parse initial values once with schema defaults applied.
+   * Memoized to avoid re-parsing on every render.
+   * Uses generic salvage utility to preserve valid parts of corrupted data.
+   */
+  const defaults = useMemo(() => buildDefaultFormValues(), []);
+  const parsedInitialValues = useMemo(() => {
+    return salvageValidData(formSchema, initialConfigValues, defaults);
+  }, [initialConfigValues, defaults]);
+
+  const methods = useForm<PromptConfigFormValues>({
+    /**
+     * Use parsed values with defaults applied
+     * @see https://react-hook-form.com/docs/useform#defaultValues
+     */
+    defaultValues: parsedInitialValues,
+    resolver: (data, context, options) => {
+      // Use ref to get current schema (updated by useEffect). The schema
+      // validates PromptConfigFormValues while preserving the schema's exact
+      // Zod 4 input and output types.
+      const resolver = zodResolver(schemaRef.current);
+      return resolver(data, context, options);
+    },
+  });
+
+  const formData = methods.watch();
+  const model = formData.version?.configData?.llm?.model;
+  const { limits: modelLimits } = useModelLimits({ model });
+
+  const dynamicSchema = useMemo(
+    () => refinedFormSchemaWithModelLimits(modelLimits),
+    [modelLimits],
+  );
+
+  // Update schema ref when limits change
+  useEffect(() => {
+    schemaRef.current = dynamicSchema;
+
+    // Clamp max_tokens to model limit when limits change (prevents validation error)
+    if (modelLimits?.maxOutputTokens) {
+      const currentMaxTokens = methods.getValues("version.configData.llm.maxTokens");
+      if (
+        currentMaxTokens !== undefined &&
+        currentMaxTokens > modelLimits.maxOutputTokens
+      ) {
+        methods.setValue(
+          "version.configData.llm.maxTokens",
+          modelLimits.maxOutputTokens,
+          { shouldDirty: false },
+        );
+      }
+    }
+
+    // Re-validate when schema changes
+    if (methods.formState.isDirty) {
+      void methods.trigger("version.configData.llm");
+    }
+  }, [dynamicSchema, modelLimits, methods]);
+  const messages = methods.watch("version.configData.messages");
+  // Messages should always be an array, but we're being defensive here.
+  const systemMessage = Array.isArray(messages)
+    ? messages.find(({ role }) => role === "system")?.content
+    : undefined;
+
+  /**
+   * In the case that we're using system messages,
+   * make sure to keep the prompt synced
+   */
+  useEffect(() => {
+    if (systemMessage) {
+      const currentMessages = methods.getValues("version.configData.messages");
+      if (!Array.isArray(currentMessages)) return;
+
+      const currentPrompt = currentMessages.find((msg) => msg.role === "system")?.content;
+      // Only sync when value differs; do not mark dirty for this derived update
+      if (currentPrompt !== systemMessage) {
+        methods.setValue(
+          "version.configData.messages",
+          currentMessages.map((msg) =>
+            msg.role === "system" ? { ...msg, content: systemMessage } : msg,
+          ),
+          {
+            shouldDirty: false,
+          },
+        );
+      }
+    }
+  }, [systemMessage, messages, methods]);
+
+  // Handle syncing the inputs/outputs with the demonstrations columns
+  useEffect(() => {
+    const inputs = formData.version?.configData.inputs ?? [];
+    const outputs = formData.version?.configData.outputs ?? [];
+    const newColumns = inputsAndOutputsToDemostrationColumns(inputs, outputs);
+    const currentColumns =
+      formData.version?.configData.demonstrations?.inline?.columnTypes ?? [];
+    const currentRecords =
+      formData.version?.configData.demonstrations?.inline?.records ?? {};
+
+    if (!isEqual(newColumns, currentColumns)) {
+      methods.setValue(
+        "version.configData.demonstrations.inline.columnTypes",
+        newColumns,
+      );
+      methods.setValue(
+        "version.configData.demonstrations.inline.records",
+        currentRecords,
+      );
+    }
+  }, [formData, methods]);
+
+  // Track current version to detect external upgrades
+  const currentVersionRef = useRef(parsedInitialValues?.versionMetadata?.versionNumber);
+
+  // Provides forward sync of parent component to form values
+  useEffect(() => {
+    if (disableNodeSyncRef.current) return;
+    // Don't forward-sync until we've received real config values.
+    // Without this guard, the forward sync can push default placeholder
+    // values (e.g. "input") onto a form that PromptEditorDrawer has
+    // already reset with the real config (e.g. "llm_output").
+    if (!hasReceivedConfigRef.current) return;
+
+    const newVersion = parsedInitialValues?.versionMetadata?.versionNumber;
+    const currentVersion = currentVersionRef.current;
+
+    // If version changed externally (e.g., upgrade clicked), do a full reset
+    if (newVersion !== undefined && newVersion !== currentVersion) {
+      currentVersionRef.current = newVersion;
+      disableOnChangeRef.current = true;
+      methods.reset(parsedInitialValues);
+      setTimeout(() => {
+        disableOnChangeRef.current = false;
+      }, 100); // Longer delay to let debounced updates settle
+      return;
+    }
+
+    // Don't overwrite user edits while the form is dirty. The debounced
+    // reverse sync will eventually write the user's changes to the store;
+    // once the store catches up, parsedInitialValues will reflect the
+    // user's values and the field-level sync becomes a no-op.
+    if (methods.formState.isDirty) return;
+
+    disableOnChangeRef.current = true;
+    const currentRuntimeParameters = methods.getValues("version.parameters");
+    const nextRuntimeParameters = parsedInitialValues?.version?.parameters ?? {};
+    if (!isEqual(currentRuntimeParameters, nextRuntimeParameters)) {
+      methods.setValue("version.parameters", nextRuntimeParameters);
+    }
+    // Use parsed values to ensure defaults are applied
+    for (const [key, value] of Object.entries(
+      parsedInitialValues?.version?.configData ?? {},
+    )) {
+      const currentValue = methods.getValues(`version.configData.${key}` as any);
+      if (!isEqual(currentValue, value)) {
+        methods.setValue(`version.configData.${key}` as any, value as any);
+      }
+    }
+    setTimeout(() => {
+      disableOnChangeRef.current = false;
+    }, 1);
+  }, [parsedInitialValues, methods]);
+
+  // Provides reverse sync of form values to the parent component
+  useEffect(() => {
+    if (disableOnChangeRef.current) return;
+    disableNodeSyncRef.current = true;
+    onChange?.(formData);
+    if (disableFormSyncTimeoutRef.current) {
+      clearTimeout(disableFormSyncTimeoutRef.current);
+    }
+    disableFormSyncTimeoutRef.current = setTimeout(() => {
+      disableNodeSyncRef.current = false;
+    }, 1);
+  }, [formData, onChange]);
+
+  return {
+    methods,
+    configId,
+  };
+};

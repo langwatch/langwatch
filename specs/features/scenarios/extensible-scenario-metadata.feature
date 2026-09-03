@@ -44,7 +44,7 @@ Feature: Extensible metadata on scenario run events
       | targetType        | prompt        |
       | simulationSuiteId | suite_789     |
 
-  # Bound: platform/app/src/server/scenarios/schemas/__tests__/extensible-metadata.unit.test.ts
+  # Bound: packages/features/scenario/contract/tests/scenario-event-metadata.unit.test.ts
   @unit
   Scenario: Event parsing preserves additional metadata fields
     Given a SCENARIO_RUN_STARTED event with extra metadata fields

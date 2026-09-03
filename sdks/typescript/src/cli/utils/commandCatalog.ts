@@ -117,10 +117,7 @@ interface FeatureMeta {
 }
 
 const flattenFeatures = (features: GeneratedFeature[]): GeneratedFeature[] =>
-  features.flatMap((feature) => [
-    feature,
-    ...flattenFeatures(feature.children ?? []),
-  ]);
+  features.flatMap((feature) => [feature, ...flattenFeatures(feature.children ?? [])]);
 
 /** Command string (`trace search`) -> metadata declared by the feature map. */
 const featureMetaIndex = (): Map<string, FeatureMeta> => {
@@ -156,9 +153,7 @@ const renderedHelp = (entry: Omit<CatalogEntry, "tokenCost">): string => {
   const usage = ["langwatch", entry.path, usageArgs(entry.args)]
     .filter((part) => part.length > 0)
     .join(" ");
-  const flagLines = entry.flags.map(
-    (flag) => `\n  ${flag.name}  ${flag.description}`,
-  );
+  const flagLines = entry.flags.map((flag) => `\n  ${flag.name}  ${flag.description}`);
   return `${usage} — ${entry.description}${flagLines.join("")}`;
 };
 

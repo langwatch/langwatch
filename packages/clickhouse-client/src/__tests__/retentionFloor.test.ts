@@ -13,8 +13,7 @@ const NINETY_DAYS = 90 * DAY_MS;
 const DEFAULT_DAYS = 49;
 const NOW = Date.UTC(2026, 7, 17, 12, 0, 0);
 
-const DEFAULT_LOOKBACK =
-  DEFAULT_DAYS * DAY_MS + DEFAULT_RETENTION_FLOOR_MARGIN_MS;
+const DEFAULT_LOOKBACK = DEFAULT_DAYS * DAY_MS + DEFAULT_RETENTION_FLOOR_MARGIN_MS;
 
 function providerReturning(days: number | null): RetentionDaysProvider {
   return { getRetentionDays: vi.fn(async () => days) };
@@ -37,9 +36,7 @@ describe("resolving a retention floor for a read", () => {
         nowMs: NOW,
       });
 
-      expect(NOW - floor).toBe(
-        400 * DAY_MS + DEFAULT_RETENTION_FLOOR_MARGIN_MS,
-      );
+      expect(NOW - floor).toBe(400 * DAY_MS + DEFAULT_RETENTION_FLOOR_MARGIN_MS);
       expect(NOW - floor).toBeGreaterThan(DEFAULT_LOOKBACK);
     });
 
@@ -160,9 +157,7 @@ describe("resolving a retention floor for a read", () => {
       );
 
       expect(getRetentionDays).toHaveBeenCalledTimes(1);
-      expect(floors.every((floor) => NOW - floor === DEFAULT_LOOKBACK)).toBe(
-        true,
-      );
+      expect(floors.every((floor) => NOW - floor === DEFAULT_LOOKBACK)).toBe(true);
     });
   });
 

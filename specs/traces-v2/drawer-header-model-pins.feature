@@ -14,7 +14,7 @@ Feature: The trace drawer header names the model once
   # their own pin: that is a choice, not a duplicate the drawer imposed.
   #
   # Implementation:
-  #   platform/app/src/features/traces-v2/components/TraceDrawer/drawerHeader/DrawerHeader.tsx
+  #   packages/features/trace/web/src/ui/sections/explorer/trace-drawer/drawer-header/drawer-header.tsx
 
   Background:
     Given the user is authenticated with "traces:view" permission

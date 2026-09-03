@@ -19,10 +19,18 @@ export type {
   RequestContext,
 } from "./context/core";
 export {
+  configureLogger,
+  createLoggerFactory,
   type CreateLoggerOptions,
   consoleIgnoreFields,
   createLogger,
+  type LoggerConfiguration,
+  type LoggerFactory,
+  type LoggerFormat,
+  loggerConfigurationFrom,
   type Logger,
+  type ProcessLoggerInputs,
+  type ResolvedLoggerConfiguration,
 } from "./logger";
 export {
   getLogLevelFromStatusCode,
@@ -37,3 +45,4 @@ export {
   type ValidationIssueMeta,
   type ValidationMeta,
 } from "./validation/validationMeta";
+export { createWarnThrottle, type WarnThrottle } from "./warn-throttle";

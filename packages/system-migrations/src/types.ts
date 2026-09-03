@@ -19,11 +19,7 @@
  * both returns the tenant to its legacy path (no consumer reads it as
  * finalized) and pins it there until a human moves it again.
  */
-export type TenantMigrationStatus =
-  | "migrated"
-  | "finalized"
-  | "parked"
-  | "rolled_back";
+export type TenantMigrationStatus = "migrated" | "finalized" | "parked" | "rolled_back";
 
 /**
  * The two terminal states the runner never re-runs: `finalized` is the

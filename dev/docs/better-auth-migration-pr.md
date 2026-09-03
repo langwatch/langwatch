@@ -7,6 +7,7 @@ bugs** (18 pre-existing or latent-exposed, 19 migration-specific
 regressions) caught across 49 iterations of progressive auditing.
 
 > **Reading guide**
+>
 > - If you have 5 minutes: read [Why now](#why-now), [What changes for
 >   users](#what-changes-for-users), [HIGH severity regressions](#-high--3-bugs-would-have-broken-production-hard),
 >   then jump to [How to merge](#how-to-merge).
@@ -59,6 +60,7 @@ write.
 ## Architecture
 
 **Before:**
+
 - `src/pages/api/auth/[...nextauth].ts` hosts the NextAuth handler
 - `src/server/auth.ts` exports a 484-line `authOptions` config with 7
   providers, a custom `signIn` callback doing SSO domain matching, and
@@ -68,6 +70,7 @@ write.
 - 8 client files import from `next-auth/react`
 
 **After:**
+
 - `src/pages/api/auth/[...all].ts` hosts the BetterAuth handler via
   `toNodeHandler(auth.handler)` (a standard Node handler — the only
   thing Next.js-specific is the catch-all route)
@@ -97,6 +100,7 @@ write.
 ## Files touched
 
 **Net additions (new functionality):**
+
 - `src/server/better-auth/index.ts` (280 lines)
 - `src/server/better-auth/hooks.ts` (220 lines)
 - `src/server/better-auth/sso.ts` (25 lines)
@@ -116,6 +120,7 @@ write.
 - `e2e/auth-regression/better-auth-compat-smoketest.ts` (20 compat layer checks)
 
 **Net deletions:**
+
 - `src/pages/api/auth/[...nextauth].ts` (NextAuth handler)
 - `src/utils/auth.ts` (`getNextAuthSessionToken` cookie helper — unused)
 - `ee/admin/sessionHandler.ts` (`handleAdminImpersonationSession` — now
@@ -126,6 +131,7 @@ write.
   `hooks.test.ts`)
 
 **Rewrites:**
+
 - `src/server/auth.ts` (484 → ~140 lines, compat layer)
 - `src/pages/api/admin/impersonate.ts` (session-token cookie lookup →
   BetterAuth session id lookup)
@@ -133,6 +139,7 @@ write.
   read/write `Account.password` instead of `User.password`)
 
 **Consumer-only imports changed (34 server + 8 client files):**
+
 - `getServerSession(authOptions(req))` → `getServerAuthSession({req})`
 - `next-auth/react` imports → `~/utils/auth-client` imports
 - `import type { Session } from "next-auth"` →
@@ -141,6 +148,7 @@ write.
 ## Database migrations
 
 **Migration 1: `20260410230000_better_auth_additive`** — ADDITIVE, idempotent
+
 - `ALTER TABLE "Account" ADD COLUMN IF NOT EXISTS "password" TEXT`
 - `ALTER TABLE "Account" ALTER COLUMN "type" SET DEFAULT 'oauth'`
 - `ALTER TABLE "Session" ADD COLUMN IF NOT EXISTS "ipAddress" TEXT`
@@ -154,6 +162,7 @@ write.
 - `ALTER TABLE "VerificationToken" ADD COLUMN IF NOT EXISTS "updatedAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP`
 
 **Migration 2: `20260410233000_better_auth_destructive`** — the cutover
+
 - `INSERT INTO "Account" (id, userId, type, provider, providerAccountId, password, createdAt, updatedAt) SELECT 'cred_' || id, id, 'credential', 'credential', id, password, NOW(), NOW() FROM "User" WHERE "password" IS NOT NULL ON CONFLICT DO NOTHING` — moves legacy bcrypt hashes into `Account.password`
 - `ALTER TABLE "User" DROP COLUMN IF EXISTS "password"` — drops the old column
 - `TRUNCATE "Session"` — force logout (approved)
@@ -165,6 +174,7 @@ development and caught two bugs that would have broken the first deploy.
 ## Testing
 
 **Unit tests (128/128 passing in auth-scoped files):**
+
 - `better-auth/__tests__/sso.test.ts` — 9 tests for `isSsoProviderMatch` and `extractEmailDomain`
 - `better-auth/__tests__/hooks.test.ts` — 20 tests for the database hooks with mocked prisma (SSO hard-block, org auto-add resilience, etc.)
 - `better-auth/__tests__/fallbackName.test.ts` — 15 tests for OAuth profile name precedence
@@ -181,12 +191,14 @@ development and caught two bugs that would have broken the first deploy.
 - `user.deactivation.unit.test.ts` — 2 tests locked to the iter-24 SessionService wiring
 
 **Integration smoketests (68 checks against real Postgres):**
+
 - `e2e/auth-regression/better-auth-smoketest.ts` — 39 checks: credentials signin/signup, wrong password, nonexistent user, deactivated user, session lookup, lastLoginAt update, signout, admin impersonation start/stop, expired impersonation, legacy bcrypt hash compat, SCIM `UserService.create`, session TTL (30 days), deleted-target fallback
 - `e2e/auth-regression/better-auth-sso-smoketest.ts` — 11 checks: new SSO user auto-add, non-SSO no-op, provider match, Auth0 WAAD prefix, stale account cleanup, deactivated blocking, mixed-case matching, idempotency
 - `e2e/auth-regression/better-auth-compat-smoketest.ts` — 20 checks: no cookie, fresh signin, tampered cookie, admin impersonation round-trip, expired impersonation, concurrent calls, Headers object, pendingSsoSetup flag
 
 **Real-HTTP end-to-end validation** (bookended with server reboots
 against an isolated Postgres on port 5571):
+
 - Cloud mode (`NEXTAUTH_PROVIDER=auth0`, fake Auth0 creds):
   - `/sign-up/email` returns `EMAIL_PASSWORD_SIGN_UP_DISABLED` ✓
   - `/sign-in/email` returns `EMAIL_PASSWORD_DISABLED` ✓
@@ -219,6 +231,7 @@ against an isolated Postgres on port 5571):
   - Simulated orphan temp col alongside boolean ✓
 
 **Browser QA (Playwright MCP, iter 12):**
+
 - Credentials signin via UI → dashboard
 - Onboarding flow (org + team + project creation)
 - Logout via user menu → callbackUrl preserved to `/auth/signin`
@@ -238,11 +251,13 @@ surfaced a different class of bug that the previous ones missed.
 **Severity summary for the impatient:**
 
 ### 🔴 HIGH — 3 bugs, would have broken production hard
+
 Bugs **#1** (cloud-mode credential bypass), **#2** (Redis-only sessions
 breaking impersonation), **#3** (server-side getSession returning null
 for admins). Detailed inline below.
 
 ### 🟡 MEDIUM — 14 bugs, silent/subtle but real
+
 Bugs **#4**–**#14** plus **#28**, **#30**, **#33**, **#35**, **#36** —
 SSO hard-block, account switch via link flow, OAuth error page bypass,
 Auth0 callback URL mismatch, AUTH0 URL crash at boot, orphan user on
@@ -252,6 +267,7 @@ revocation bypass, tRPC register no rate limit, invite-accept race,
 tRPC register no validation, tRPC changePassword no rate limit.
 
 ### 🟢 LOW — 20 bugs, operational/UX polish or dev-only
+
 Bugs **#15**–**#27**, **#29**, **#31**, **#32**, **#34**, **#37** —
 see full list below.
 
@@ -319,9 +335,9 @@ verified.
    default `errorURL` is `${baseURL}/error` which hits the built-in
    BetterAuth HTML error page, not our `/auth/error` with friendly
    messages. Fix: `onAPIError: { errorURL: \`${env.NEXTAUTH_URL}/auth/error\` }`.
-   Plus a `normalizeErrorCode` helper maps BetterAuth's native codes
-   (`email_doesn't_match`, `LINKING_DIFFERENT_EMAILS_NOT_ALLOWED`) to
-   the legacy UI codes (`DIFFERENT_EMAIL_NOT_ALLOWED`).
+Plus a `normalizeErrorCode` helper maps BetterAuth's native codes
+(`email_doesn't_match`, `LINKING_DIFFERENT_EMAILS_NOT_ALLOWED`) to
+the legacy UI codes (`DIFFERENT_EMAIL_NOT_ALLOWED`).
 
 8. **OAuth callback path mismatch breaks Auth0/Okta** — BetterAuth's
    genericOAuth plugin uses `/api/auth/oauth2/callback/{provider}`, but
@@ -469,7 +485,7 @@ verified.
     `UserService.deactivate` writes `deactivatedAt`" — true as a
     literal grep claim, but missed react-admin's dynamic-proxy write
     path. Fixed by intercepting `resource === "user" && method ===
-    "update"` in `src/pages/api/admin/[resource].ts` BEFORE
+"update"` in `src/pages/api/admin/[resource].ts` BEFORE
     `defaultHandler` runs and routing the side-effect fields
     (`deactivatedAt`, `email`) through `UserService` instead. Added
     explicit audit log calls for the side-effect writes since the
@@ -573,17 +589,17 @@ verified.
       bouncer wins. The user is silently dumped on
       `/onboarding/welcome` with no explanation, never seeing
       the error UI in `src/pages/invite/accept.tsx:63-82`.
-    Iter 47's expired-invite test caught it: nav trail shows
-    `/invite/accept → /onboarding/welcome` with the alert never
-    rendered. Iter 44's wrong-email test was ALSO affected — it
-    was using a much looser body-text check that happened to pass
-    by coincidence. Fix: new `noOrgBouncerRoutes` list in
-    `src/hooks/useRequiredSession.ts` containing `/invite/accept`
-    plus the `/onboarding/*` routes; checked early in
-    `useOrganizationTeamProject`'s redirect effect to skip the
-    bouncer for routes where zero-org users are in a legitimate
-    state. Verified: iter 44's wrong-email test now correctly
-    shows the error AND iter 47's expired-invite test passes.
+      Iter 47's expired-invite test caught it: nav trail shows
+      `/invite/accept → /onboarding/welcome` with the alert never
+      rendered. Iter 44's wrong-email test was ALSO affected — it
+      was using a much looser body-text check that happened to pass
+      by coincidence. Fix: new `noOrgBouncerRoutes` list in
+      `src/hooks/useRequiredSession.ts` containing `/invite/accept`
+      plus the `/onboarding/*` routes; checked early in
+      `useOrganizationTeamProject`'s redirect effect to skip the
+      bouncer for routes where zero-org users are in a legitimate
+      state. Verified: iter 44's wrong-email test now correctly
+      shows the error AND iter 47's expired-invite test passes.
 
 34. **`rateLimit` in-memory store leaked expired entries** (LOW
     dev/test hygiene) — The new `src/server/rateLimit.ts` helper
@@ -629,7 +645,7 @@ verified.
     the attacker can sign in from another device, persist past
     session expiry, or pivot to other accounts (password reuse).
     Fix: per-user `rateLimit({key: user.changePassword:${userId},
-    windowSeconds: 60*15, max: 5})` mirroring `/forget-password`'s
+windowSeconds: 60*15, max: 5})` mirroring `/forget-password`'s
     budget. Verified by `iter49-bug36-changepw-rate-limit.ts`
     that does 5 wrong attempts (UNAUTHORIZED), then a 6th
     (TOO_MANY_REQUESTS), then verifies even the CORRECT password
@@ -646,7 +662,7 @@ verified.
     and both delete — leaving the user with zero accounts and
     no way to sign in. Fix: wrap count + findFirst + delete in
     a single `prisma.$transaction(..., { isolationLevel:
-    "Serializable" })`. Verified by
+"Serializable" })`. Verified by
     `iter49-bug37-unlink-race.ts` which fires two parallel
     `unlinkAccount` calls against a 2-account user and verifies
     exactly ONE succeeds (200) and the other is rejected (400),
@@ -659,6 +675,7 @@ caching, hook propagation semantics). **37 bugs total.**
 
 **Key insight**: the bugs were found across 7 different audit axes,
 each catching a distinct class:
+
 - Unit tests with mocks (iters 5–11): config, migration, basic hooks
 - Real-server HTTP smoketests (iters 12, 16, 18, 19, 23, 24, 29):
   cache coherence, session persistence, CSRF protection
@@ -996,7 +1013,7 @@ this is okay.
 4. Curl `POST /api/auth/sign-out` with valid session. **Expected:** 200
    AND the session row is deleted from the DB AND the Redis cache for
    that token is cleared. Verify with `SELECT * FROM "Session" WHERE
-   "sessionToken" = 'X'` → 0 rows.
+"sessionToken" = 'X'` → 0 rows.
 
 #### C2. Cross-origin sign-out rejected (bug #31)
 
@@ -1010,11 +1027,13 @@ this is okay.
 1. On your machine, serve an HTML file containing:
    ```html
    <form action="https://<staging>/api/auth/sign-up/email" method="POST">
-     <input name="email" value="attacker@test.com">
-     <input name="password" value="attackerpass123">
-     <input name="name" value="Attacker">
+     <input name="email" value="attacker@test.com" />
+     <input name="password" value="attackerpass123" />
+     <input name="name" value="Attacker" />
    </form>
-   <script>document.forms[0].submit()</script>
+   <script>
+     document.forms[0].submit();
+   </script>
    ```
 2. Load the file from a different origin than staging.
 3. **Expected:** browser sends `Sec-Fetch-Site: cross-site` +
@@ -1090,10 +1109,10 @@ All 78 checks should pass. If any fails, do NOT merge.
 - [ ] Customer-facing communication: if you want to warn customers
       about the forced re-login, post in #announcements or email the
       enterprise customers' main admin 24h in advance. Tell them:
-      *"As part of a security improvement, you'll be asked to sign in
+      _"As part of a security improvement, you'll be asked to sign in
       again after our next deploy. Your data, settings, and
       organization access are unchanged. Password users re-enter their
-      password; SSO users bounce through Google/Auth0 as usual."*
+      password; SSO users bounce through Google/Auth0 as usual."_
 
 ### Merge + deploy sequence
 
@@ -1101,12 +1120,14 @@ This is the literal step-by-step for the person on deploy duty:
 
 1. **Immediately before merge**: take a **manual** Postgres snapshot.
    Note the snapshot id/timestamp in the deploy chat thread.
+
    ```sh
    # Example for RDS; adapt to your provider.
    aws rds create-db-snapshot \
      --db-instance-identifier langwatch-prod \
      --db-snapshot-identifier "pre-better-auth-$(date -u +%Y%m%d-%H%M%S)"
    ```
+
    Wait for the snapshot to reach `available` status before merging.
 
 2. **Merge the PR** via the GitHub UI. Use a **merge commit** (not
@@ -1115,15 +1136,18 @@ This is the literal step-by-step for the person on deploy duty:
 3. **Watch CI on `main`** until the release pipeline starts.
 
 4. **Run the migrations manually** (don't let auto-deploy run them):
+
    ```sh
    # In the deploy container on main after build, BEFORE the app restarts:
    npx prisma migrate deploy
    ```
+
    Verify the output lists both new migrations:
    - `20260410230000_better_auth_additive` ✓
    - `20260410233000_better_auth_destructive` ✓
 
 5. **Verify DB state** before restarting the app:
+
    ```sh
    psql $DATABASE_URL -c "\d \"Account\"" | grep password   # should exist
    psql $DATABASE_URL -c "\d \"User\"" | grep password      # should NOT exist
@@ -1164,6 +1188,7 @@ for users who signed in between the cutover and the rollback
 timestamps can't be invented from booleans.
 
 **Rollback steps:**
+
 1. Scale the app to zero.
 2. Restore the pre-merge snapshot to a new DB instance.
 3. Flip the `DATABASE_URL` to the restored instance.
@@ -1196,6 +1221,7 @@ independent of the DB schema. Stale entries will expire via their TTL.
 ## Appendix: files NOT in this PR that you might expect
 
 These exist in the worktree but are intentionally NOT committed:
+
 - `.claude/ralph-loop-progress.md` — the 4900-line iteration log of the
   ralph audit. Kept locally for reference; not useful in the git
   history.

@@ -1,0 +1,757 @@
+/**
+ * Field mappings from Elasticsearch field paths to ClickHouse table and column access.
+ *
+ * This module maps the ES nested document structure to CH's denormalized table structure.
+ * ES uses nested objects (spans.*, evaluations.*, events.*) while CH uses separate tables
+ * with JOINs and Map columns for attributes.
+ */
+
+/**
+ * Identity columns always included in trace_summaries dedup subqueries.
+ * These are required for deduplication (TraceId, UpdatedAt),
+ * tenant isolation (TenantId), and time filtering (OccurredAt).
+ */
+export const TRACE_IDENTITY_COLUMNS = ["TenantId", "TraceId", "OccurredAt", "UpdatedAt"] as const;
+
+/**
+ * All trace_summaries columns that analytics queries may reference.
+ * Excludes wide payload columns (ComputedInput, ComputedOutput) that
+ * are never needed by analytics aggregations.
+ */
+export const TRACE_ANALYTICS_COLUMNS = [
+  ...TRACE_IDENTITY_COLUMNS,
+  "CreatedAt",
+  "TotalCost",
+  "NonBilledCost",
+  "TotalDurationMs",
+  "TimeToFirstTokenMs",
+  "TotalPromptTokenCount",
+  "TotalCompletionTokenCount",
+  "TokensPerSecond",
+  "SpanCount",
+  "TraceName",
+  "ContainsErrorStatus",
+  "ErrorMessage",
+  "TopicId",
+  "SubTopicId",
+  "AnnotationIds",
+  "HasAnnotation",
+  "Models",
+  "Attributes",
+] as const;
+
+/**
+ * Identity columns always included in evaluation_runs subqueries.
+ * Required for deduplication, tenant isolation, and JOIN keys.
+ */
+export const EVALUATION_IDENTITY_COLUMNS = [
+  "TenantId",
+  "TraceId",
+  "EvaluationId",
+  "UpdatedAt",
+] as const;
+
+/**
+ * All evaluation_runs columns that analytics queries may reference.
+ */
+export const EVALUATION_ANALYTICS_COLUMNS = [
+  ...EVALUATION_IDENTITY_COLUMNS,
+  "EvaluatorId",
+  "EvaluatorName",
+  "EvaluatorType",
+  "Score",
+  "Passed",
+  "Label",
+  "Status",
+  "IsGuardrail",
+] as const;
+
+/**
+ * Identity columns always included in stored_spans subqueries.
+ */
+export const SPAN_IDENTITY_COLUMNS = ["TenantId", "TraceId", "SpanId"] as const;
+
+/**
+ * All stored_spans columns that analytics queries may reference.
+ * Excludes wide columns like Input, Output, and the full SpanAttributes map
+ * when only specific attribute keys are needed.
+ */
+export const SPAN_ANALYTICS_COLUMNS = [
+  ...SPAN_IDENTITY_COLUMNS,
+  "SpanAttributes",
+  "StartTime",
+  "EndTime",
+  "DurationMs",
+  "StatusCode",
+  `"Events.Name"`,
+  `"Events.Timestamp"`,
+  `"Events.Attributes"`,
+] as const;
+
+/**
+ * The ClickHouse table that contains the data for a field
+ */
+export type CHTable = "trace_summaries" | "stored_spans" | "evaluation_runs";
+
+/**
+ * Field mapping configuration for the legacy `trace_summaries` SQL builder
+ * (`aggregation-builder.ts`). The ADR-034 routing metadata (`availableOn`)
+ * previously carried here has moved to
+ * `../routing/field-availability.ts` where the
+ * router + slim/rollup builders consume it directly.
+ */
+export interface FieldMapping {
+  /** The ClickHouse table containing this field */
+  table: CHTable;
+  /** The ClickHouse column expression (may include map access) */
+  column: string;
+  /** Optional description for documentation */
+  description?: string;
+  /** Whether this field requires array handling */
+  isArray?: boolean;
+  /** For Map fields, the type of value extraction needed */
+  mapValueType?: "string" | "json_array" | "number";
+}
+
+/**
+ * ES field path to CH field mapping.
+ *
+ * Maps Elasticsearch field paths used in analytics metrics and filters
+ * to their corresponding ClickHouse table and column expressions.
+ */
+export const fieldMappings: Record<string, FieldMapping> = {
+  // ===== Trace Identity Fields =====
+  trace_id: {
+    table: "trace_summaries",
+    column: "TraceId",
+    description: "Unique trace identifier",
+  },
+  project_id: {
+    table: "trace_summaries",
+    column: "TenantId",
+    description: "Project/tenant identifier",
+  },
+
+  // ===== Trace Name =====
+  trace_name: {
+    table: "trace_summaries",
+    column: "TraceName",
+    description: "Name of the root span (trace name)",
+  },
+
+  // ===== Timestamp Fields =====
+  "timestamps.started_at": {
+    table: "trace_summaries",
+    column: "OccurredAt",
+    description: "When the trace started (event time)",
+  },
+  "timestamps.occurred_at": {
+    table: "trace_summaries",
+    column: "OccurredAt",
+    description: "When the trace occurred (event time)",
+  },
+  "timestamps.inserted_at": {
+    table: "trace_summaries",
+    column: "CreatedAt",
+    description: "When the record was inserted",
+  },
+  "timestamps.updated_at": {
+    table: "trace_summaries",
+    column: "UpdatedAt",
+    description: "When the record was last updated",
+  },
+
+  // ===== Metadata Fields (stored in Attributes Map) =====
+  "metadata.user_id": {
+    table: "trace_summaries",
+    column: "Attributes['langwatch.user_id']",
+    description: "User identifier",
+    mapValueType: "string",
+  },
+  "metadata.thread_id": {
+    table: "trace_summaries",
+    column: "Attributes['gen_ai.conversation.id']",
+    description: "Thread/conversation identifier",
+    mapValueType: "string",
+  },
+  "metadata.customer_id": {
+    table: "trace_summaries",
+    column: "Attributes['langwatch.customer_id']",
+    description: "Customer identifier",
+    mapValueType: "string",
+  },
+  "metadata.labels": {
+    table: "trace_summaries",
+    column: "Attributes['langwatch.labels']",
+    description: "Labels array (stored as JSON string)",
+    mapValueType: "json_array",
+  },
+  "metadata.topic_id": {
+    table: "trace_summaries",
+    column: "TopicId",
+    description: "Topic identifier",
+  },
+  "metadata.subtopic_id": {
+    table: "trace_summaries",
+    column: "SubTopicId",
+    description: "Subtopic identifier",
+  },
+  "metadata.prompt_ids": {
+    table: "trace_summaries",
+    column: "Attributes['langwatch.prompt_ids']",
+    description: "Prompt IDs array (stored as JSON string)",
+    mapValueType: "json_array",
+  },
+
+  // ===== Performance Metrics =====
+  "metrics.total_time_ms": {
+    table: "trace_summaries",
+    column: "TotalDurationMs",
+    description: "Total trace duration in milliseconds",
+  },
+  "metrics.first_token_ms": {
+    table: "trace_summaries",
+    column: "TimeToFirstTokenMs",
+    description: "Time to first token in milliseconds",
+  },
+  "metrics.total_cost": {
+    table: "trace_summaries",
+    column: "TotalCost",
+    description: "Total cost of the trace",
+  },
+  "metrics.prompt_tokens": {
+    table: "trace_summaries",
+    column: "TotalPromptTokenCount",
+    description: "Total prompt token count",
+  },
+  "metrics.completion_tokens": {
+    table: "trace_summaries",
+    column: "TotalCompletionTokenCount",
+    description: "Total completion token count",
+  },
+  tokens_per_second: {
+    table: "trace_summaries",
+    column: "TokensPerSecond",
+    description: "Pre-computed tokens per second",
+  },
+
+  // ===== Error Fields =====
+  "error.has_error": {
+    table: "trace_summaries",
+    column: "ContainsErrorStatus",
+    description: "Whether trace contains any errors",
+  },
+  "error.message": {
+    table: "trace_summaries",
+    column: "ErrorMessage",
+    description: "Error message if any",
+  },
+
+  // ===== Span Fields (requires JOIN with stored_spans) =====
+  "spans.span_id": {
+    table: "stored_spans",
+    column: "SpanId",
+    description: "Span identifier",
+  },
+  "spans.type": {
+    table: "stored_spans",
+    column: "SpanAttributes['langwatch.span.type']",
+    description: "Span type (llm, agent, tool, etc.)",
+    mapValueType: "string",
+  },
+  "spans.model": {
+    table: "stored_spans",
+    column: "SpanAttributes['gen_ai.request.model']",
+    description: "Model name used in the span",
+    mapValueType: "string",
+  },
+  "spans.timestamps.started_at": {
+    table: "stored_spans",
+    column: "StartTime",
+    description: "Span start time",
+  },
+  "spans.timestamps.finished_at": {
+    table: "stored_spans",
+    column: "EndTime",
+    description: "Span end time",
+  },
+  "spans.timestamps.first_token_at": {
+    table: "stored_spans",
+    column: "SpanAttributes['langwatch.first_token_at']",
+    description: "First token timestamp for the span",
+    mapValueType: "string",
+  },
+  "spans.metrics.completion_tokens": {
+    table: "stored_spans",
+    column: "SpanAttributes['gen_ai.usage.output_tokens']",
+    description: "Completion/output tokens for the span (canonical OTel name)",
+    mapValueType: "number",
+  },
+  "spans.metrics.prompt_tokens": {
+    table: "stored_spans",
+    column: "SpanAttributes['gen_ai.usage.input_tokens']",
+    description: "Prompt/input tokens for the span (canonical OTel name)",
+    mapValueType: "number",
+  },
+  "spans.contexts.document_id": {
+    table: "stored_spans",
+    column: "SpanAttributes['langwatch.rag.contexts']",
+    description: "RAG document IDs (extracted via JSON from contexts)",
+    mapValueType: "json_array",
+    isArray: true,
+  },
+  "spans.contexts.content": {
+    table: "stored_spans",
+    column: "SpanAttributes['langwatch.rag.contexts']",
+    description: "RAG document content (extracted via JSON from contexts)",
+    mapValueType: "json_array",
+    isArray: true,
+  },
+
+  // ===== Evaluation Fields (requires JOIN with evaluation_runs) =====
+  "evaluations.evaluator_id": {
+    table: "evaluation_runs",
+    column: "EvaluatorId",
+    description: "Evaluator identifier",
+  },
+  "evaluations.evaluation_id": {
+    table: "evaluation_runs",
+    column: "EvaluationId",
+    description: "Evaluation instance identifier",
+  },
+  "evaluations.name": {
+    table: "evaluation_runs",
+    column: "EvaluatorName",
+    description: "Evaluator name",
+  },
+  "evaluations.type": {
+    table: "evaluation_runs",
+    column: "EvaluatorType",
+    description: "Evaluator type",
+  },
+  "evaluations.score": {
+    table: "evaluation_runs",
+    column: "Score",
+    description: "Evaluation score",
+  },
+  "evaluations.passed": {
+    table: "evaluation_runs",
+    column: "Passed",
+    description: "Whether evaluation passed (0/1)",
+  },
+  "evaluations.label": {
+    table: "evaluation_runs",
+    column: "Label",
+    description: "Evaluation label",
+  },
+  "evaluations.status": {
+    table: "evaluation_runs",
+    column: "Status",
+    description: "Evaluation processing status",
+  },
+  "evaluations.is_guardrail": {
+    table: "evaluation_runs",
+    column: "IsGuardrail",
+    description: "Whether this is a guardrail evaluation",
+  },
+
+  // ===== Event Fields (stored in stored_spans.Events arrays) =====
+  "events.event_type": {
+    table: "stored_spans",
+    column: "Events.Name",
+    description: "Event type/name",
+    isArray: true,
+  },
+  "events.event_id": {
+    table: "stored_spans",
+    column: "SpanId", // Events don't have separate IDs, use parent span
+    description: "Event identifier (uses span ID)",
+  },
+  "events.timestamps.started_at": {
+    table: "stored_spans",
+    column: "Events.Timestamp",
+    description: "Event timestamp",
+    isArray: true,
+  },
+  "events.metrics.key": {
+    table: "stored_spans",
+    column: "Events.Attributes",
+    description: "Event metrics (stored in attributes map)",
+    isArray: true,
+  },
+  "events.metrics.value": {
+    table: "stored_spans",
+    column: "Events.Attributes",
+    description: "Event metric values",
+    isArray: true,
+  },
+  "events.event_details.key": {
+    table: "stored_spans",
+    column: "Events.Attributes",
+    description: "Event detail keys",
+    isArray: true,
+  },
+  "events.event_details.value": {
+    table: "stored_spans",
+    column: "Events.Attributes",
+    description: "Event detail values",
+    isArray: true,
+  },
+
+  // ===== Annotation Fields =====
+  annotations: {
+    table: "trace_summaries",
+    column: "AnnotationIds",
+    description: "Annotation IDs on trace",
+  },
+
+  // ===== Model Fields (for grouping) =====
+  models: {
+    table: "trace_summaries",
+    column: "Models",
+    description: "Array of models used in trace",
+    isArray: true,
+  },
+};
+
+/**
+ * Get the CH field mapping for an ES field path
+ */
+export function getFieldMapping(esField: string): FieldMapping | undefined {
+  return fieldMappings[esField];
+}
+
+/**
+ * Determine which table is needed for a given ES field
+ */
+export function getTableForField(esField: string): CHTable {
+  const mapping = fieldMappings[esField];
+  return mapping?.table ?? "trace_summaries";
+}
+
+/**
+ * Get the CH column expression for an ES field
+ */
+export function getColumnExpression(esField: string): string {
+  const mapping = fieldMappings[esField];
+  if (!mapping) {
+    // Fallback: try to construct a reasonable column name
+    // Replace dots with underscores and capitalize
+    return esField.replace(/\./g, "_");
+  }
+  return mapping.column;
+}
+
+/**
+ * Check if a field requires a JOIN to a different table
+ */
+export function requiresJoin(esField: string): CHTable | null {
+  const table = getTableForField(esField);
+  return table !== "trace_summaries" ? table : null;
+}
+
+/**
+ * Get all fields that require a specific table JOIN
+ */
+export function getFieldsRequiringTable(table: CHTable): string[] {
+  return Object.entries(fieldMappings)
+    .filter(([_, mapping]) => mapping.table === table)
+    .map(([field, _]) => field);
+}
+
+/**
+ * Table alias conventions for JOINs
+ */
+export const tableAliases: Record<CHTable, string> = {
+  trace_summaries: "ts",
+  stored_spans: "ss",
+  evaluation_runs: "es",
+};
+
+/**
+ * Get the alias for a table
+ */
+export function getTableAlias(table: CHTable): string {
+  return tableAliases[table];
+}
+
+/**
+ * Build JOIN clause for a table, selecting only the columns needed.
+ *
+ * @param table - The table to JOIN
+ * @param requiredColumns - Optional set of columns needed by the query.
+ *   When provided, only these columns (plus identity columns) are selected.
+ *   When omitted, all analytics columns for the table are selected.
+ * @param spanTimeFilter - Optional SQL fragment bounding `StartTime` on the
+ *   `stored_spans` subquery (e.g. `AND StartTime >= {startDate} - INTERVAL 2 DAY
+ *   AND StartTime < {endDate} + INTERVAL 2 DAY`). Without it the subquery filters
+ *   on `TenantId` only and cold-scans every weekly partition (incl. S3-tiered
+ *   ones). The caller passes the fragment matching its date regime; the referenced
+ *   params are bound by the outer query. Ignored for non-`stored_spans` tables.
+ * @param evalTimeFilter - Optional SQL fragment bounding the `evaluation_runs`
+ *   subquery's partition column (e.g. `AND ScheduledAt >= {startDate} - INTERVAL
+ *   7 DAY AND UpdatedAt >= {startDate} - INTERVAL 7 DAY`). Same disease as
+ *   `spanTimeFilter`: without it the subquery — and its IN-tuple dedup inner —
+ *   filter on `TenantId` only and walk the tenant's entire history across every
+ *   partition. Applied to BOTH the outer subquery and the dedup inner, since the
+ *   inner GROUP BY is the scan that actually walks the partitions. Ignored for
+ *   non-`evaluation_runs` tables.
+ */
+export function buildJoinClause({
+  table,
+  requiredColumns,
+  spanTimeFilter,
+  evalTimeFilter,
+}: {
+  table: CHTable;
+  requiredColumns?: ReadonlySet<string>;
+  spanTimeFilter?: string;
+  evalTimeFilter?: string;
+}): string {
+  const alias = tableAliases[table];
+  const baseAlias = tableAliases.trace_summaries;
+
+  switch (table) {
+    case "stored_spans": {
+      const columns = requiredColumns
+        ? mergeWithIdentity(requiredColumns, SPAN_IDENTITY_COLUMNS)
+        : SPAN_ANALYTICS_COLUMNS;
+      const timeBound = spanTimeFilter ? ` ${spanTimeFilter}` : "";
+      return `JOIN (SELECT ${Array.from(columns).join(", ")} FROM stored_spans WHERE TenantId = {tenantId:String}${timeBound}) ${alias} ON ${baseAlias}.TenantId = ${alias}.TenantId AND ${baseAlias}.TraceId = ${alias}.TraceId`;
+    }
+    case "evaluation_runs": {
+      const columns = requiredColumns
+        ? mergeWithIdentity(requiredColumns, EVALUATION_IDENTITY_COLUMNS)
+        : EVALUATION_ANALYTICS_COLUMNS;
+      const evalTimeBound = evalTimeFilter ? ` ${evalTimeFilter}` : "";
+      return `JOIN (
+        SELECT ${Array.from(columns).join(", ")} FROM evaluation_runs
+        WHERE TenantId = {tenantId:String}${evalTimeBound}
+          AND (TenantId, EvaluationId, UpdatedAt) IN (
+            SELECT TenantId, EvaluationId, max(UpdatedAt)
+            FROM evaluation_runs
+            WHERE TenantId = {tenantId:String}${evalTimeBound}
+            GROUP BY TenantId, EvaluationId
+          )
+      ) ${alias} ON ${baseAlias}.TenantId = ${alias}.TenantId AND ${baseAlias}.TraceId = ${alias}.TraceId`;
+    }
+    default:
+      return "";
+  }
+}
+
+/**
+ * Merge required columns with identity columns, ensuring identity columns
+ * are always present.
+ */
+function mergeWithIdentity(required: ReadonlySet<string>, identity: readonly string[]): string[] {
+  const merged = new Set<string>(identity);
+  for (const col of required) {
+    merged.add(col);
+  }
+  return Array.from(merged);
+}
+
+/**
+ * Non-identity columns from stored_spans that may appear in SQL expressions.
+ * Used by `extractReferencedSpanColumns` to detect which columns a query needs.
+ */
+const SPAN_SELECTABLE_COLUMNS = [
+  "SpanAttributes",
+  "StartTime",
+  "EndTime",
+  "DurationMs",
+  "StatusCode",
+  `"Events.Name"`,
+  `"Events.Timestamp"`,
+  `"Events.Attributes"`,
+] as const;
+
+/**
+ * Non-identity columns from evaluation_runs that may appear in SQL expressions.
+ */
+const EVALUATION_SELECTABLE_COLUMNS = [
+  "EvaluatorId",
+  "EvaluatorName",
+  "EvaluatorType",
+  "Score",
+  "Passed",
+  "Label",
+  "Status",
+  "IsGuardrail",
+] as const;
+
+/**
+ * Characters that can appear immediately after a column name in SQL.
+ * Used to prevent false-positive substring matches (e.g. "Status" matching "StatusCode").
+ */
+const COLUMN_BOUNDARY = /(?=[\s,)=<>!\[\.'"]|$)/;
+
+/**
+ * Build a regex that matches a column name at a word boundary in SQL context.
+ * Handles both quoted ("Events.Name") and unqualified column names,
+ * optionally prefixed with a table alias (e.g. `ss.SpanAttributes`).
+ */
+function buildColumnPattern(col: string, alias: string): RegExp {
+  const rawCol = col.replace(/"/g, "");
+  // Escape special regex chars in the column name (e.g. dots in "Events.Name")
+  const escaped = rawCol.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+  // Match alias.Column or an unqualified column token, but not a suffix inside
+  // another identifier. The left boundary applies to the whole match (before
+  // the optional alias too), so neither "Attributes" matches the tail of
+  // "SpanAttributes", nor "ts." matches the tail of "Events." in
+  // "Events.Attributes".
+  const pattern = `(?<![\\w."])(?:${alias}\\.)?(?:"?${escaped}"?)${COLUMN_BOUNDARY.source}`;
+  return new RegExp(pattern);
+}
+
+/**
+ * Extract which stored_spans columns are referenced in a set of SQL expressions.
+ *
+ * Scans the expressions for references to known span column names (including
+ * through the table alias `ss.`). Returns the set of column names suitable for
+ * passing to `buildJoinClause` as `requiredColumns`.
+ *
+ * WHY: The full SpanAttributes Map column can be kilobytes per span.
+ * Selecting only the columns actually referenced avoids reading unused data
+ * and prevents ClickHouse OOM on large result sets.
+ */
+export function extractReferencedSpanColumns(expressions: string[]): ReadonlySet<string> {
+  const joined = expressions.join(" ");
+  const columns = new Set<string>();
+  const alias = tableAliases.stored_spans;
+
+  for (const col of SPAN_SELECTABLE_COLUMNS) {
+    if (buildColumnPattern(col, alias).test(joined)) {
+      columns.add(col);
+    }
+  }
+
+  return columns;
+}
+
+/**
+ * Build a JOIN-subquery projection that materializes only the referenced keys
+ * of `SpanAttributes` as a narrow reconstructed map, e.g.
+ * `map('langwatch.span.type', SpanAttributes['langwatch.span.type']) AS SpanAttributes`.
+ *
+ * `SpanAttributes` is a `Map(String, String)` whose values can be multi-megabyte
+ * (RAG contexts, full input/output IO). Selecting the whole column into a JOIN
+ * subquery buffers every value on the join side even when the outer query only
+ * reads one small key (e.g. the span type), which drove a per-query 3.5 GiB
+ * MEMORY_LIMIT_EXCEEDED in prod. The reconstructed map keeps the column name and
+ * type identical, so outer `ss.SpanAttributes['key']` accesses are unchanged.
+ */
+export function spanAttributesNarrowProjection(keys: readonly string[]): string {
+  const entries = keys.map((key) => `'${key}', SpanAttributes['${key}']`).join(", ");
+  return `map(${entries}) AS SpanAttributes`;
+}
+
+/**
+ * Narrow the `SpanAttributes` entry of a stored_spans required-column set to a
+ * reconstructed map of only the referenced keys, when it is safe to do so.
+ *
+ * Safe means every `SpanAttributes` mention in the expressions is a plain
+ * single-quoted key access (`SpanAttributes['key']`) with no generic use of the
+ * whole map (e.g. `mapKeys(SpanAttributes)`). If any mention cannot be reduced to
+ * a known key, the whole map is kept so no referenced value is dropped. Returns
+ * the input set unchanged when SpanAttributes is not selected or cannot be
+ * narrowed.
+ */
+export function narrowSpanAttributesColumns({
+  columns,
+  expressions,
+}: {
+  columns: ReadonlySet<string>;
+  expressions: string[];
+}): ReadonlySet<string> {
+  if (!columns.has("SpanAttributes")) {
+    return columns;
+  }
+
+  const joined = expressions.join(" ");
+  const allRefs = joined.match(/SpanAttributes/g) ?? [];
+  const keyMatches = [...joined.matchAll(/SpanAttributes\['([^'\]]+)'\]/g)];
+
+  // Only narrow when EVERY SpanAttributes reference is a clean keyed access;
+  // any generic or unparseable use means we cannot know which values are needed.
+  if (keyMatches.length === 0 || allRefs.length !== keyMatches.length) {
+    return columns;
+  }
+
+  const keys = [
+    ...new Set(
+      keyMatches.map((match) => match[1]).filter((key): key is string => key !== undefined),
+    ),
+  ];
+  const narrowed = new Set(columns);
+  narrowed.delete("SpanAttributes");
+  narrowed.add(spanAttributesNarrowProjection(keys));
+  return narrowed;
+}
+
+/**
+ * Extract which evaluation_runs columns are referenced in a set of SQL expressions.
+ */
+export function extractReferencedEvaluationColumns(expressions: string[]): ReadonlySet<string> {
+  const joined = expressions.join(" ");
+  const columns = new Set<string>();
+  const alias = tableAliases.evaluation_runs;
+
+  for (const col of EVALUATION_SELECTABLE_COLUMNS) {
+    if (buildColumnPattern(col, alias).test(joined)) {
+      columns.add(col);
+    }
+  }
+
+  return columns;
+}
+
+/**
+ * Extract which trace_summaries columns are referenced in a set of SQL
+ * expressions.
+ *
+ * Scans the expressions for references to known trace analytics column names
+ * (including through the table alias `ts.`). Returns the set of column names
+ * suitable for passing to `dedupedTraceSummaries` so the deduped subquery only
+ * reads the columns actually used, instead of the full analytics set with its
+ * wide Attributes map.
+ */
+export function extractReferencedTraceColumns(expressions: string[]): ReadonlySet<string> {
+  const joined = expressions.join(" ");
+  const columns = new Set<string>();
+  const alias = tableAliases.trace_summaries;
+
+  for (const col of TRACE_ANALYTICS_COLUMNS) {
+    if (buildColumnPattern(col, alias).test(joined)) {
+      columns.add(col);
+    }
+  }
+
+  return columns;
+}
+
+/**
+ * Build a qualified column reference with table alias
+ */
+export function qualifiedColumn(esField: string): string {
+  const mapping = fieldMappings[esField];
+  if (!mapping) {
+    return esField;
+  }
+
+  const alias = tableAliases[mapping.table];
+  const column = mapping.column;
+
+  // If column already starts with a function or is complex, don't prefix
+  if (column.includes("(") || column.includes("[")) {
+    // For map access, we need to prefix the table alias
+    if (column.includes("[")) {
+      const parts = column.split("[");
+      return `${alias}.${parts[0]}[${parts.slice(1).join("[")}`;
+    }
+    return column;
+  }
+
+  return `${alias}.${column}`;
+}

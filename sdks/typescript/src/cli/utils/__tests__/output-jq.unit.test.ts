@@ -98,7 +98,9 @@ describe("applyJq", () => {
       // to null, which is exactly the fabricated answer this list exists for.
       [".traces[-]"],
     ])("throws rather than answering null for %s", (expression) => {
-      expect(() => applyJq(expression, DATA)).toThrow(/unsupported syntax|must start with/);
+      expect(() => applyJq(expression, DATA)).toThrow(
+        /unsupported syntax|must start with/,
+      );
     });
 
     it("throws on an empty segment", () => {

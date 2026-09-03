@@ -57,7 +57,10 @@ let buffer = "";
 let failed = false;
 
 const deadline = setTimeout(() => {
-  console.error("smoke: TIMEOUT after 60s; events so far:", events.map((e) => e.type));
+  console.error(
+    "smoke: TIMEOUT after 60s; events so far:",
+    events.map((e) => e.type),
+  );
   failed = true;
   child.kill("SIGKILL");
 }, 60_000);
@@ -124,8 +127,7 @@ child.on("exit", (code) => {
     return true;
   });
   const terminal = events.find((e) => e.type === "turn_done");
-  const terminalOk =
-    terminal?.turnId === "smoke-1" && terminal?.outcome === "error";
+  const terminalOk = terminal?.turnId === "smoke-1" && terminal?.outcome === "error";
   const turnEvents = events.filter((e) => e.turnId === "smoke-1");
   const terminalIsLastForTurn =
     turnEvents.length > 0 && turnEvents[turnEvents.length - 1]?.type === "turn_done";

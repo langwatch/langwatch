@@ -14,11 +14,12 @@ bundle or a test, opened a socket by being imported.
 Collaborators and the logger arrive once at construction; the methods take only
 what varies per call. Same idiom as `@langwatch/authz`.
 
-| Service | Holds | Answers |
-|---|---|---|
-| `RedisConfigService` | nothing — pure and stateless, like `AuthzEngine` | `resolve(env)`, `isConfigured(env)` |
+| Service                  | Holds                                            | Answers                                               |
+| ------------------------ | ------------------------------------------------ | ----------------------------------------------------- |
+| `RedisConfigService`     | nothing — pure and stateless, like `AuthzEngine` | `resolve(env)`, `isConfigured(env)`                   |
 | `RedisConnectionService` | a config service + the logger for what it builds | `connect(env)`, `connectStandalone({ url, dbIndex })` |
-| `RedisReadinessService` | a logger | `ping({ connection, timeoutMs, target })` |
+| `RedisReadinessService`  | a logger                                         | `ping({ connection, timeoutMs, target })`             |
+| `RedisShutdownService`   | the close state for one owner                    | `shutdown(connection)`                                |
 
 ```text
   RedisEnvironment                  the raw env values, supplied by the caller
@@ -35,6 +36,9 @@ what varies per call. Same idiom as `@langwatch/authz`.
         │                                (Redis | Cluster)
         ▼
   RedisReadinessService.ping()      ──▶ resolves, or rejects. Never exits.
+        │
+        ▼
+  RedisShutdownService.shutdown()   ──▶ disconnects once per owned connection
 ```
 
 `null` is a supported outcome, not an error: deployments and test runs without
@@ -44,7 +48,9 @@ fallback.
 ## Using it
 
 The app's composition root builds the one connection and hands it out as
-`getApp().redis`; nothing else in the platform constructs a client.
+`getApp().redis`; nothing else in the platform constructs a client. The same
+composition root should keep one `RedisShutdownService` and use it when the App
+closes, rather than calling `disconnect()` at individual call sites.
 
 ```ts
 const redis = new RedisConnectionService({ logger }).connect({
@@ -61,7 +67,7 @@ process and close what they open: `replayPreset` (which needs
 cluster) and the `migrateObjectStorage` task, which boots no App at all.
 
 For a decision that must be made before any connection exists — better-auth
-picks its session-storage strategy at module scope — ask the *configuration*,
+picks its session-storage strategy at module scope — ask the _configuration_,
 not a client:
 
 ```ts

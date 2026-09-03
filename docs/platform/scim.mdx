@@ -6,7 +6,13 @@ keywords: scim, provisioning, deprovisioning, okta, azure ad, identity provider,
 ---
 
 <Note>
-  **Available on Enterprise plans.** SCIM provisioning needs an Enterprise plan, and a self-hosted deployment needs an Enterprise license. The plan is checked on every call, not only when a token is created, so if it lapses, tokens that already exist stop verifying and your identity provider's requests are refused. Minting a token through the [SCIM Tokens API](/api-reference/scim-tokens/overview) without an Enterprise plan is refused with HTTP 402 and the error code `enterprise_plan_required`. To enable it, reach out to [enterprise@langwatch.ai](mailto:enterprise@langwatch.ai).
+  **Available on Enterprise plans.** SCIM provisioning needs an Enterprise plan, and a
+  self-hosted deployment needs an Enterprise license. The plan is checked on every call,
+  not only when a token is created, so if it lapses, tokens that already exist stop
+  verifying and your identity provider's requests are refused. Minting a token through the
+  [SCIM Tokens API](/api-reference/scim-tokens/overview) without an Enterprise plan is
+  refused with HTTP 402 and the error code `enterprise_plan_required`. To enable it, reach
+  out to [enterprise@langwatch.ai](mailto:enterprise@langwatch.ai).
 </Note>
 
 SCIM (System for Cross-domain Identity Management) 2.0 allows your identity provider to automatically manage user lifecycle in LangWatch, provisioning new users when they join your organization and deprovisioning them when they leave, without any manual intervention.
@@ -41,9 +47,8 @@ https://your-langwatch-instance.example.com/api/scim/v2
 4. **Copy the token immediately**: it will not be shown again
 
 <Warning>
-  Store your SCIM bearer token securely. Once you close the dialog, the token
-  value cannot be retrieved. If you lose the token, revoke it and generate a new
-  one.
+  Store your SCIM bearer token securely. Once you close the dialog, the token value cannot
+  be retrieved. If you lose the token, revoke it and generate a new one.
 </Warning>
 
 You can generate multiple tokens (e.g., one per integration) and revoke them individually from the token table.
@@ -52,10 +57,10 @@ You can generate multiple tokens (e.g., one per integration) and revoke them ind
 
 Use the SCIM Base URL and bearer token to configure SCIM in your identity provider:
 
-| Setting | Value |
-|---------|-------|
+| Setting       | Value                                  |
+| ------------- | -------------------------------------- |
 | SCIM Base URL | `https://app.langwatch.ai/api/scim/v2` |
-| Bearer Token | Your generated token |
+| Bearer Token  | Your generated token                   |
 
 Refer to your identity provider's own documentation for where to enter these values:
 
@@ -75,7 +80,7 @@ LangWatch SCIM 2.0 supports the following user operations:
 | **List Users**          | Lists all users in the organization, with optional `userName` filtering |
 | **Update User (PUT)**   | Replaces user attributes (name, email, active status)                   |
 | **Update User (PATCH)** | Partially updates user attributes (e.g., deactivate only)               |
-| **Delete User**         | Deactivates the user (soft delete, their data is preserved)            |
+| **Delete User**         | Deactivates the user (soft delete, their data is preserved)             |
 
 ### SCIM Endpoints
 
@@ -129,7 +134,9 @@ When your identity provider **suspends** a user (`PATCH active: false`):
 - Re-activating (`active: true`) immediately restores access
 
 <Info>
-  Use `active: false` for temporary suspension and DELETE for permanent offboarding. DELETE removes all memberships and role bindings, re-provisioning the user starts from scratch.
+  Use `active: false` for temporary suspension and DELETE for permanent offboarding.
+  DELETE removes all memberships and role bindings, re-provisioning the user starts from
+  scratch.
 </Info>
 
 ---

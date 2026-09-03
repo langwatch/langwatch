@@ -49,19 +49,18 @@ export const skillsInstallCommand = async (
   announceRoot(root, options);
 
   if (force) {
-    const proceed = await confirmForcedOverwrite(
-      planForcedClobbers(targets, root),
-      { yes: options.yes === true, dryRun, options },
-    );
+    const proceed = await confirmForcedOverwrite(planForcedClobbers(targets, root), {
+      yes: options.yes === true,
+      dryRun,
+      options,
+    });
     if (!proceed) {
       console.log("Aborted. Nothing was written.");
       return;
     }
   }
 
-  const results = targets.map((skill) =>
-    installSkill({ skill, root, dryRun, force }),
-  );
+  const results = targets.map((skill) => installSkill({ skill, root, dryRun, force }));
 
   await printResult(
     { dir: root, bundleVersion: SKILLS_BUNDLE_VERSION, dryRun, results },

@@ -68,9 +68,7 @@ export function startBrowserTracing({
       resource: resourceFromAttributes({
         [ATTR_SERVICE_NAME]: RUM_SERVICE_NAME,
         ...(serviceVersion ? { [ATTR_SERVICE_VERSION]: serviceVersion } : {}),
-        ...(environment
-          ? { [ATTR_DEPLOYMENT_ENVIRONMENT_NAME]: environment }
-          : {}),
+        ...(environment ? { [ATTR_DEPLOYMENT_ENVIRONMENT_NAME]: environment } : {}),
       }),
       spanProcessors: [
         new SessionSpanProcessor(),

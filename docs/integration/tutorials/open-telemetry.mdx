@@ -11,6 +11,7 @@ The LangWatch SDKs are built entirely on top of the [OpenTelemetry (OTel)](https
 It's important to understand that LangWatch traces and spans **are** standard OpenTelemetry traces and spans. LangWatch adds specific semantic attributes (like `langwatch.span.type`, `langwatch.inputs`, `langwatch.outputs`, `langwatch.metadata`) to these standard spans to power its observability features.
 
 This foundation provides several benefits:
+
 - **Interoperability:** Traces generated with LangWatch can be sent to any OTel-compatible backend (Jaeger, Tempo, Datadog, etc.) alongside your other application traces.
 - **Familiar API:** If you're already familiar with OpenTelemetry concepts and APIs, working with LangWatch's manual instrumentation will feel natural.
 - **Reuse Existing Setup:** LangWatch integrates with your existing OTel `TracerProvider` and instrumentation.
@@ -27,13 +28,13 @@ When you use standard OTel auto-instrumentation for libraries like web framework
 
 Here are common scenarios where combining LangWatch with OTel auto-instrumentation provides significant value:
 
-*   **Web Frameworks:** Using libraries like `opentelemetry-instrumentation-fastapi` (Python) or `@opentelemetry/instrumentation-express` (TypeScript), an incoming HTTP request automatically starts a trace. When your request handler calls a function instrumented with LangWatch, those LangWatch spans become children of the incoming request span.
+- **Web Frameworks:** Using libraries like `opentelemetry-instrumentation-fastapi` (Python) or `@opentelemetry/instrumentation-express` (TypeScript), an incoming HTTP request automatically starts a trace. When your request handler calls a function instrumented with LangWatch, those LangWatch spans become children of the incoming request span.
 
-*   **HTTP Clients:** If your LLM application makes outbound API calls using libraries instrumented by `opentelemetry-instrumentation-requests` (Python) or `@opentelemetry/instrumentation-http` (TypeScript), these HTTP request spans will automatically appear within your LangWatch trace.
+- **HTTP Clients:** If your LLM application makes outbound API calls using libraries instrumented by `opentelemetry-instrumentation-requests` (Python) or `@opentelemetry/instrumentation-http` (TypeScript), these HTTP request spans will automatically appear within your LangWatch trace.
 
-*   **Task Queues:** When a request handled by your web server (and traced by LangWatch) enqueues a background job using `opentelemetry-instrumentation-celery` (Python) or similar task queue instrumentations, the trace context is automatically propagated.
+- **Task Queues:** When a request handled by your web server (and traced by LangWatch) enqueues a background job using `opentelemetry-instrumentation-celery` (Python) or similar task queue instrumentations, the trace context is automatically propagated.
 
-*   **Databases & ORMs:** Using libraries like `opentelemetry-instrumentation-sqlalchemy` (Python) or `@opentelemetry/instrumentation-mongodb` (TypeScript), any database queries executed during your LLM processing will appear as spans within the relevant LangWatch trace.
+- **Databases & ORMs:** Using libraries like `opentelemetry-instrumentation-sqlalchemy` (Python) or `@opentelemetry/instrumentation-mongodb` (TypeScript), any database queries executed during your LLM processing will appear as spans within the relevant LangWatch trace.
 
 ## Basic Setup and Configuration
 
@@ -89,13 +90,13 @@ import { setupObservability } from "langwatch/observability/node";
 
 const handle = setupObservability({
   langwatch: {
-    apiKey: process.env.LANGWATCH_API_KEY
+    apiKey: process.env.LANGWATCH_API_KEY,
   },
-  serviceName: "my-service"
+  serviceName: "my-service",
 });
 
 // Graceful shutdown
-process.on('SIGTERM', async () => {
+process.on("SIGTERM", async () => {
   await handle.shutdown();
   process.exit(0);
 });
@@ -109,12 +110,10 @@ import { ConsoleSpanExporter } from "@opentelemetry/sdk-trace-base";
 const handle = setupObservability({
   langwatch: {
     apiKey: process.env.LANGWATCH_API_KEY,
-    processorType: 'batch'
+    processorType: "batch",
   },
   serviceName: "my-service",
-  spanProcessors: [
-    new BatchSpanProcessor(new ConsoleSpanExporter())
-  ]
+  spanProcessors: [new BatchSpanProcessor(new ConsoleSpanExporter())],
 });
 ```
 
@@ -134,7 +133,7 @@ from opentelemetry.trace import Status, StatusCode
 with langwatch.span(name="my-operation") as span:
     span.set_attribute("custom.attribute", "value")
     span.add_event("operation_started", {"detail": "more info"})
-    
+
     try:
         # ... your logic ...
         span.set_status(Status(StatusCode.OK))
@@ -165,7 +164,7 @@ from opentelemetry import context, trace
 async def process_with_context(user_id: str):
     with langwatch.span(name="process-user") as span:
         span.set_attribute("user.id", user_id)
-        
+
         # Propagate context to async operations
         ctx = trace.set_span(context.active(), span)
         await context.with_(ctx, process_user_data, user_id)
@@ -191,17 +190,17 @@ tracer.startActiveSpan("my-operation", (span) => {
     span.setInput("Hello, world!");
     span.setAttributes({
       "custom.business_unit": "marketing",
-      "custom.campaign_id": "summer-2024"
+      "custom.campaign_id": "summer-2024",
     });
-    
+
     // ... your logic ...
-    
+
     span.setOutput("Hello! How can I help you?");
     span.setStatus({ code: SpanStatusCode.OK });
   } catch (error) {
     span.setStatus({
       code: SpanStatusCode.ERROR,
-      message: error.message
+      message: error.message,
     });
     span.recordException(error);
     throw error;
@@ -221,7 +220,7 @@ try {
 } catch (error) {
   span.setStatus({
     code: SpanStatusCode.ERROR,
-    message: error.message
+    message: error.message,
   });
   span.recordException(error);
   throw error;
@@ -236,19 +235,19 @@ import { context, trace } from "@opentelemetry/api";
 async function processWithContext(userId: string) {
   const span = tracer.startSpan("process-user");
   const ctx = trace.setSpan(context.active(), span);
-  
+
   try {
     // Propagate context to async operations
     await context.with(ctx, async () => {
       await processUserData(userId);
       await updateUserProfile(userId);
     });
-    
+
     span.setStatus({ code: SpanStatusCode.OK });
   } catch (error) {
     span.setStatus({
       code: SpanStatusCode.ERROR,
-      message: error.message
+      message: error.message,
     });
     span.recordException(error);
     throw error;
@@ -341,18 +340,22 @@ import { JaegerExporter } from "@opentelemetry/exporter-jaeger";
 import { LangWatchExporter } from "langwatch";
 
 const handle = setupObservability({
-  langwatch: 'disabled', // Disable default LangWatch integration
+  langwatch: "disabled", // Disable default LangWatch integration
   serviceName: "my-service",
   spanProcessors: [
     // Send to Jaeger for debugging
-    new BatchSpanProcessor(new JaegerExporter({
-      endpoint: "http://localhost:14268/api/traces"
-    })),
+    new BatchSpanProcessor(
+      new JaegerExporter({
+        endpoint: "http://localhost:14268/api/traces",
+      }),
+    ),
     // Send to LangWatch for production monitoring
-    new BatchSpanProcessor(new LangWatchExporter({
-      apiKey: process.env.LANGWATCH_API_KEY
-    }))
-  ]
+    new BatchSpanProcessor(
+      new LangWatchExporter({
+        apiKey: process.env.LANGWATCH_API_KEY,
+      }),
+    ),
+  ],
 });
 ```
 
@@ -364,17 +367,17 @@ import { MongoDBInstrumentation } from "@opentelemetry/instrumentation-mongodb";
 
 const handle = setupObservability({
   langwatch: {
-    apiKey: process.env.LANGWATCH_API_KEY
+    apiKey: process.env.LANGWATCH_API_KEY,
   },
   serviceName: "my-service",
   instrumentations: [
     new HttpInstrumentation({
-      ignoreIncomingPaths: ['/health', '/metrics'],
-      ignoreOutgoingUrls: ['https://external-service.com/health']
+      ignoreIncomingPaths: ["/health", "/metrics"],
+      ignoreOutgoingUrls: ["https://external-service.com/health"],
     }),
     new ExpressInstrumentation(),
-    new MongoDBInstrumentation()
-  ]
+    new MongoDBInstrumentation(),
+  ],
 });
 ```
 
@@ -435,14 +438,17 @@ langwatch.setup(
 
 ```typescript TypeScript Sampling Configuration
 import { setupObservability } from "langwatch/observability/node";
-import { TraceIdRatioBasedSampler, ParentBasedSampler } from "@opentelemetry/sdk-trace-base";
+import {
+  TraceIdRatioBasedSampler,
+  ParentBasedSampler,
+} from "@opentelemetry/sdk-trace-base";
 
 const handle = setupObservability({
   langwatch: {
-    apiKey: process.env.LANGWATCH_API_KEY
+    apiKey: process.env.LANGWATCH_API_KEY,
   },
   serviceName: "my-service",
-  sampler: new TraceIdRatioBasedSampler(0.1) // 10% sampling
+  sampler: new TraceIdRatioBasedSampler(0.1), // 10% sampling
 });
 ```
 
@@ -453,31 +459,34 @@ import { TraceIdRatioBasedSampler } from "@opentelemetry/sdk-trace-base";
 const handle = setupObservability({
   langwatch: {
     apiKey: process.env.LANGWATCH_API_KEY,
-    processorType: 'batch'
+    processorType: "batch",
   },
   serviceName: "my-service",
-  
+
   // Performance tuning
   spanLimits: {
     attributeCountLimit: 64,
     eventCountLimit: 32,
-    linkCountLimit: 32
+    linkCountLimit: 32,
   },
-  
+
   // Sampling for high volume
   sampler: new TraceIdRatioBasedSampler(0.05), // 5% sampling
-  
+
   // Batch processing configuration
   spanProcessors: [
-    new BatchSpanProcessor(new LangWatchExporter({
-      apiKey: process.env.LANGWATCH_API_KEY
-    }), {
-      maxQueueSize: 4096,
-      maxExportBatchSize: 1024,
-      scheduledDelayMillis: 1000,
-      exportTimeoutMillis: 30000
-    })
-  ]
+    new BatchSpanProcessor(
+      new LangWatchExporter({
+        apiKey: process.env.LANGWATCH_API_KEY,
+      }),
+      {
+        maxQueueSize: 4096,
+        maxExportBatchSize: 1024,
+        scheduledDelayMillis: 1000,
+        exportTimeoutMillis: 30000,
+      },
+    ),
+  ],
 });
 ```
 
@@ -589,13 +598,10 @@ import OpenAI from "openai";
 // 1. Setup Observability
 const handle = setupObservability({
   langwatch: {
-    apiKey: process.env.LANGWATCH_API_KEY
+    apiKey: process.env.LANGWATCH_API_KEY,
   },
   serviceName: "rag-service",
-  instrumentations: [
-    new HttpInstrumentation(),
-    new ExpressInstrumentation()
-  ]
+  instrumentations: [new HttpInstrumentation(), new ExpressInstrumentation()],
 });
 
 const tracer = getLangWatchTracer("rag-service");
@@ -607,32 +613,32 @@ async function retrieveDocuments(query: string): Promise<string[]> {
     try {
       span.setType("rag");
       span.setInput({ query });
-      
+
       console.log(`Retrieving documents for: ${query}`);
-      
+
       // Simulate RAG retrieval
       const chunks = [
         { document_id: "doc-abc", content: "LangWatch uses OpenTelemetry." },
-        { document_id: "doc-def", content: "Express integrates with OpenTelemetry." }
+        { document_id: "doc-def", content: "Express integrates with OpenTelemetry." },
       ];
-      
+
       span.setAttributes({
         "rag.chunks_count": chunks.length,
-        "rag.query": query
+        "rag.query": query,
       });
-      
+
       // Simulate processing time
-      await new Promise(resolve => setTimeout(resolve, 100));
-      
-      const results = chunks.map(c => c.content);
+      await new Promise((resolve) => setTimeout(resolve, 100));
+
+      const results = chunks.map((c) => c.content);
       span.setOutput({ documents: results });
       span.setStatus({ code: SpanStatusCode.OK });
-      
+
       return results;
     } catch (error) {
       span.setStatus({
         code: SpanStatusCode.ERROR,
-        message: error.message
+        message: error.message,
       });
       span.recordException(error);
       throw error;
@@ -641,28 +647,31 @@ async function retrieveDocuments(query: string): Promise<string[]> {
 }
 
 // 3. Define Background Task
-async function processResultBackground(resultId: string, llmOutput: string): Promise<string> {
+async function processResultBackground(
+  resultId: string,
+  llmOutput: string,
+): Promise<string> {
   return tracer.startActiveSpan("background-processing", async (span) => {
     try {
       span.setType("background_job");
       span.setInput({ resultId, llmOutput });
-      
+
       console.log(`[Background] Processing result ${resultId}...`);
-      
+
       // Simulate background processing
-      await new Promise(resolve => setTimeout(resolve, 1000));
-      
+      await new Promise((resolve) => setTimeout(resolve, 1000));
+
       const result = `Processed: ${llmOutput.substring(0, 10)}...`;
-      
+
       span.setOutput({ result });
       span.setStatus({ code: SpanStatusCode.OK });
-      
+
       console.log(`[Background] Finished processing ${resultId}`);
       return result;
     } catch (error) {
       span.setStatus({
         code: SpanStatusCode.ERROR,
-        message: error.message
+        message: error.message,
       });
       span.recordException(error);
       throw error;
@@ -676,36 +685,36 @@ async function handleRequest(userQuery: string): Promise<string> {
     try {
       span.setType("request");
       span.setInput({ userQuery });
-      
+
       // Get context documents
       const contextDocs = await retrieveDocuments(userQuery);
-      
+
       // Call OpenAI
       const completion = await client.chat.completions.create({
         model: "gpt-5-mini",
         messages: [
           { role: "system", content: `Use this context: ${contextDocs.join(" ")}` },
-          { role: "user", content: userQuery }
+          { role: "user", content: userQuery },
         ],
         temperature: 0.5,
       });
-      
+
       const llmResult = completion.choices[0].message.content || "No response";
-      
+
       // Trigger background processing
       const resultId = `res_${Date.now()}`;
       processResultBackground(resultId, llmResult).catch(console.error);
-      
+
       console.log(`Enqueued background processing task ${resultId}`);
-      
+
       span.setOutput({ result: llmResult });
       span.setStatus({ code: SpanStatusCode.OK });
-      
+
       return llmResult;
     } catch (error) {
       span.setStatus({
         code: SpanStatusCode.ERROR,
-        message: error.message
+        message: error.message,
       });
       span.recordException(error);
       throw error;
@@ -718,10 +727,10 @@ async function main() {
   console.log("Simulating web request...");
   const finalAnswer = await handleRequest("How does LangWatch work with Express?");
   console.log(`\nFinal Answer returned to user: ${finalAnswer}`);
-  
+
   // Allow time for background task
-  await new Promise(resolve => setTimeout(resolve, 2000));
-  
+  await new Promise((resolve) => setTimeout(resolve, 2000));
+
   // Graceful shutdown
   await handle.shutdown();
 }
@@ -793,17 +802,15 @@ import { ConsoleSpanExporter } from "@opentelemetry/sdk-trace-base";
 
 const handle = setupObservability({
   langwatch: {
-    apiKey: process.env.LANGWATCH_API_KEY
+    apiKey: process.env.LANGWATCH_API_KEY,
   },
   serviceName: "my-service",
-  spanProcessors: [
-    new ConsoleSpanExporter()
-  ],
+  spanProcessors: [new ConsoleSpanExporter()],
   debug: {
     consoleTracing: true,
     consoleLogging: true,
-    logLevel: 'debug'
-  }
+    logLevel: "debug",
+  },
 });
 ```
 
@@ -814,13 +821,13 @@ const span = tracer.startSpan("custom-operation");
 span.setAttributes({
   "custom.business_unit": "marketing",
   "custom.campaign_id": "summer-2024",
-  "custom.user_tier": "premium"
+  "custom.user_tier": "premium",
 });
 
 // Add events to the span
 span.addEvent("user_action", {
   action: "button_click",
-  button_id: "cta-primary"
+  button_id: "cta-primary",
 });
 
 span.end();
@@ -879,7 +886,7 @@ tracer.startActiveSpan("operation", (span) => {
   } catch (error) {
     span.setStatus({
       code: SpanStatusCode.ERROR,
-      message: error.message
+      message: error.message,
     });
     span.recordException(error);
     throw error;
@@ -891,7 +898,7 @@ tracer.startActiveSpan("operation", (span) => {
 // Set meaningful attributes
 span.setAttributes({
   "user.id": userId,
-  "operation.type": "database_query"
+  "operation.type": "database_query",
 });
 
 // Use LangWatch-specific methods
@@ -950,17 +957,17 @@ provider.add_span_processor(SimpleSpanProcessor(ConsoleSpanExporter()))
 // Enable detailed logging during migration
 const handle = setupObservability({
   langwatch: {
-    apiKey: process.env.LANGWATCH_API_KEY
+    apiKey: process.env.LANGWATCH_API_KEY,
   },
   serviceName: "my-service",
   debug: {
     consoleTracing: true,
     consoleLogging: true,
-    logLevel: 'debug'
+    logLevel: "debug",
   },
   advanced: {
-    throwOnSetupError: true
-  }
+    throwOnSetupError: true,
+  },
 });
 ```
 
@@ -975,4 +982,3 @@ When using OpenTelemetry with LangWatch, consider these performance implications
 3. **Error Handling:** Ensure spans are always ended, even when exceptions occur
 4. **Batch Processing:** Use batch processors for high-volume applications
 5. **Sampling:** Implement sampling to reduce overhead in production
-

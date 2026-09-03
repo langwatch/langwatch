@@ -15,10 +15,12 @@ on:
       - ".github/workflows/langwatch-chart.yml"
       # The shutdown budget is the one place where a code constant and a
       # chart value must agree: the pod's terminationGracePeriodSeconds is
-      # sized from the same numbers budget.ts derives. Without this path a
-      # change to those constants never runs the workers-shutdown job, and
-      # the chart would keep asserting a margin the code no longer uses.
-      - "platform/app/src/server/shutdown/**"
+      # sized from the same numbers the two process configs derive. Without
+      # these paths a change to those constants never runs the
+      # workers-shutdown job, and the chart would keep asserting a margin the
+      # code no longer uses.
+      - "apps/api/src/platform/config/**"
+      - "apps/worker/src/platform/config/**"
       # This job is the only thing in CI that builds the app image and runs a
       # stack against it — publish-docker-app fires on `release: published`, so
       # on a pull request nothing else touches the Dockerfile at all. Without
@@ -44,10 +46,12 @@ on:
       - ".github/workflows/langwatch-chart.yml"
       # The shutdown budget is the one place where a code constant and a
       # chart value must agree: the pod's terminationGracePeriodSeconds is
-      # sized from the same numbers budget.ts derives. Without this path a
-      # change to those constants never runs the workers-shutdown job, and
-      # the chart would keep asserting a margin the code no longer uses.
-      - "platform/app/src/server/shutdown/**"
+      # sized from the same numbers the two process configs derive. Without
+      # these paths a change to those constants never runs the
+      # workers-shutdown job, and the chart would keep asserting a margin the
+      # code no longer uses.
+      - "apps/api/src/platform/config/**"
+      - "apps/worker/src/platform/config/**"
       # This job is the only thing in CI that builds the app image and runs a
       # stack against it — publish-docker-app fires on `release: published`, so
       # on a pull request nothing else touches the Dockerfile at all. Without
@@ -185,6 +189,10 @@ jobs:
         if: "!cancelled()"
         run: ./tests/workers-shutdown.sh
 
+      - name: "assert ClickHouse pool sizing follows fleet capacity"
+        if: "!cancelled()"
+        run: ./tests/clickhouse-pool-sizing.sh
+
       # In local-filesystem mode the app and the workers mount one ReadWriteOnce
       # PVC, and a helm upgrade rolls both Deployments at once. The pre-upgrade
       # hook that orders them is a template over several values, so which
@@ -206,9 +214,6 @@ jobs:
     # `changes` gate to read `heavy` from, so the draft check is inline.
     if: github.event_name != 'pull_request' || github.event.pull_request.draft == false
     runs-on: ubuntu-latest
-    defaults:
-      run:
-        working-directory: platform/app
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
       - uses: azure/setup-helm@9bc31f4ebc9c6b171d7bfbaa5d006ae7abdb4310 # v5
@@ -218,13 +223,12 @@ jobs:
       - run: helm repo add langwatch https://langwatch.github.io/langwatch
       - uses: ./.github/actions/setup-pnpm-node
         with:
-          install: "@langwatch/web..."
+          install: "@langwatch/platform-api..."
       - name: Generate required files
         run: pnpm start:prepare:files
       # The integration config's globalSetup runs ClickHouse migrations via
       # goose before any test file executes, helm-backed or not.
       - name: Install Goose migration tool
-        working-directory: .
         run: bash .github/scripts/install-goose.sh
       - name: Run helm behavioral suites
         env:
@@ -232,8 +236,13 @@ jobs:
           # job exists precisely so these suites cannot quietly not run.
           REQUIRE_HELM_TESTS: "1"
         run: |
-          pnpm test:unit run src/server/stored-objects/__tests__/helm-and-docs-shape.unit.test.ts
-          pnpm test:integration run src/server/stored-objects/__tests__/helm-azure-identity.integration.test.ts
+          pnpm --filter @langwatch/stored-object-server exec vitest run \
+            src/__tests__/stored-object-helm-and-docs-shape.unit.test.ts \
+            src/__tests__/stored-object-helm-azure-identity.integration.test.ts
+          pnpm --filter @langwatch/evaluation-server exec vitest run \
+            src/__tests__/helm-langevals-memory.unit.test.ts
+          pnpm --filter @langwatch/auth-server exec vitest run \
+            src/transport/better-auth/__tests__/helm-auth-base-url.unit.test.ts
 
   e2e:
     name: "e2e: ${{ matrix.name }}"

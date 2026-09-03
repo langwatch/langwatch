@@ -344,10 +344,7 @@ export class WebhooksApiService {
     return res.data;
   }
 
-  async test(
-    id: string,
-    options?: MutationOptions,
-  ): Promise<WebhookTestResult> {
+  async test(id: string, options?: MutationOptions): Promise<WebhookTestResult> {
     const res = await this.request<{ data: WebhookTestResult }>(
       "test webhook endpoint",
       `/api/webhooks/v1/endpoints/${encodeURIComponent(id)}/test`,

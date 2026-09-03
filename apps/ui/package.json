@@ -1,0 +1,149 @@
+{
+  "name": "@langwatch/ui",
+  "version": "0.1.0",
+  "private": true,
+  "description": "LangWatch browser process composition.",
+  "files": [
+    "src"
+  ],
+  "type": "module",
+  "main": "./src/index.ts",
+  "types": "./src/index.ts",
+  "exports": {
+    ".": {
+      "types": "./src/index.ts",
+      "default": "./src/index.ts"
+    },
+    "./public-config": {
+      "types": "./src/behavior/public-config.ts",
+      "default": "./src/behavior/public-config.ts"
+    },
+    "./design-system": {
+      "types": "./src/behavior/design-system.ts",
+      "default": "./src/behavior/design-system.ts"
+    },
+    "./langy-theme": {
+      "types": "./src/model/langy-theme.ts",
+      "default": "./src/model/langy-theme.ts"
+    },
+    "./analytics-client": {
+      "types": "./src/behavior/analytics-client.ts",
+      "default": "./src/behavior/analytics-client.ts"
+    },
+    "./posthog-analytics": {
+      "types": "./src/behavior/posthog-analytics.ts",
+      "default": "./src/behavior/posthog-analytics.ts"
+    },
+    "./gtag-readiness": {
+      "types": "./src/behavior/gtag-readiness.ts",
+      "default": "./src/behavior/gtag-readiness.ts"
+    },
+    "./browser-tracing": {
+      "types": "./src/behavior/browser-tracing.ts",
+      "default": "./src/behavior/browser-tracing.ts"
+    },
+    "./navigation-tracing": {
+      "types": "./src/behavior/navigation-tracing.ts",
+      "default": "./src/behavior/navigation-tracing.ts"
+    },
+    "./poll-for-global": {
+      "types": "./src/behavior/poll-for-global.ts",
+      "default": "./src/behavior/poll-for-global.ts"
+    }
+  },
+  "scripts": {
+    "dev": "vite --configLoader runner",
+    "build": "NODE_ENV=production vite build --configLoader runner",
+    "typecheck": "tsc --noEmit && tsc --noEmit -p tsconfig.test.json",
+    "test": "vitest run",
+    "test:unit": "vitest run",
+    "test:e2e": "playwright test --config=e2e/playwright.config.ts",
+    "test:e2e:save-auth-state": "tsx e2e/save-auth-state.ts"
+  },
+  "dependencies": {
+    "@better-auth/passkey": "1.7.1",
+    "@chakra-ui/react": "^3.36.0",
+    "@langwatch/agent-contract": "workspace:*",
+    "@langwatch/agent-web": "workspace:*",
+    "@langwatch/analytics-web": "workspace:*",
+    "@langwatch/annotation-web": "workspace:*",
+    "@langwatch/api-key-web": "workspace:*",
+    "@langwatch/auth-web": "workspace:*",
+    "@langwatch/authz-contract": "workspace:*",
+    "@langwatch/authz-web": "workspace:*",
+    "@langwatch/automation-web": "workspace:*",
+    "@langwatch/config": "workspace:*",
+    "@langwatch/data-privacy-web": "workspace:*",
+    "@langwatch/data-retention-web": "workspace:*",
+    "@langwatch/dataset-web": "workspace:*",
+    "@langwatch/design-system": "workspace:*",
+    "@langwatch/enterprise-billing-web": "workspace:*",
+    "@langwatch/enterprise-governance-web": "workspace:*",
+    "@langwatch/enterprise-licensing-web": "workspace:*",
+    "@langwatch/enterprise-scim-web": "workspace:*",
+    "@langwatch/evaluator-web": "workspace:*",
+    "@langwatch/experiment-web": "workspace:*",
+    "@langwatch/gateway-web": "workspace:*",
+    "@langwatch/github-web": "workspace:*",
+    "@langwatch/handled-error": "workspace:*",
+    "@langwatch/langy-web": "workspace:*",
+    "@langwatch/model-provider-contract": "workspace:*",
+    "@langwatch/model-provider-web": "workspace:*",
+    "@langwatch/monitor-web": "workspace:*",
+    "@langwatch/navigation-web": "workspace:*",
+    "@langwatch/notification-web": "workspace:*",
+    "@langwatch/onboarding-web": "workspace:*",
+    "@langwatch/ops-web": "workspace:*",
+    "@langwatch/organization-web": "workspace:*",
+    "@langwatch/platform-api-client": "workspace:*",
+    "@langwatch/project-web": "workspace:*",
+    "@langwatch/prompt-web": "workspace:*",
+    "@langwatch/react-rum": "workspace:*",
+    "@langwatch/scenario-web": "workspace:*",
+    "@langwatch/secret-web": "workspace:*",
+    "@langwatch/topic-web": "workspace:*",
+    "@langwatch/trace-web": "workspace:*",
+    "@langwatch/ui-drawer": "workspace:*",
+    "@langwatch/user-contract": "workspace:*",
+    "@langwatch/user-web": "workspace:*",
+    "@langwatch/workflow-web": "workspace:*",
+    "@tanstack/react-query": "5.101.4",
+    "@trpc/client": "11.18.0",
+    "@trpc/react-query": "11.18.0",
+    "better-auth": "^1.7.1",
+    "lucide-react": "^1.22.0",
+    "nprogress": "^0.2.0",
+    "posthog-js": "^1.396.9",
+    "react": "^19.2.7",
+    "react-contextual-analytics": "^1.1.2",
+    "react-dom": "^19.2.7",
+    "react-error-boundary": "^6.1.2",
+    "react-router": "^8.0.1",
+    "superjson": "^2.2.6",
+    "zod": "^4.4.3"
+  },
+  "devDependencies": {
+    "@ai-sdk/openai": "^3.0.79",
+    "@langwatch/prisma-client": "workspace:*",
+    "@langwatch/scenario": "^1.3.0",
+    "@langwatch/scenario-server": "workspace:*",
+    "@opentelemetry/api": "^1.9.1",
+    "@opentelemetry/sdk-trace-base": "2.10.0",
+    "@opentelemetry/semantic-conventions": "^1.41.1",
+    "@playwright/test": "^1.61.1",
+    "@testing-library/react": "^16.3.2",
+    "@types/nprogress": "^0.2.3",
+    "@types/react": "^19.2.14",
+    "@types/react-dom": "^19.2.3",
+    "@vitejs/plugin-react": "^6.0.3",
+    "ai": "^6.0.217",
+    "dotenv": "^17.4.2",
+    "jsdom": "^30.0.1",
+    "nanoid": "^6.0.0",
+    "playwright": "1.61.1",
+    "tsx": "^4.22.4",
+    "typescript": "^7.0.2",
+    "vite": "^8.1.2",
+    "vitest": "^4.1.9"
+  }
+}

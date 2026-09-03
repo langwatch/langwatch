@@ -10,7 +10,8 @@ SCIM Groups allow your identity provider to push group memberships into LangWatc
 Whether the group is SCIM-synced or created manually in the UI, groups are an **Enterprise** feature in LangWatch.
 
 <Info>
-  SCIM Groups are an **Enterprise** feature. See [SCIM Provisioning](/platform/scim) for setting up user provisioning first.
+  SCIM Groups are an **Enterprise** feature. See [SCIM Provisioning](/platform/scim) for
+  setting up user provisioning first.
 </Info>
 
 ---
@@ -29,12 +30,12 @@ Whether the group is SCIM-synced or created manually in the UI, groups are an **
 
 Navigate to **Settings → Groups** to see all groups pushed from your identity provider. Each row shows:
 
-| Column | Description |
-|--------|-------------|
-| **Group** | The group name as defined in your IdP |
-| **Source** | `SCIM` for IdP-managed groups, `Manual` for manually created groups |
-| **Access** | The role bindings assigned to this group |
-| **Members** | Number of users currently in the group |
+| Column      | Description                                                         |
+| ----------- | ------------------------------------------------------------------- |
+| **Group**   | The group name as defined in your IdP                               |
+| **Source**  | `SCIM` for IdP-managed groups, `Manual` for manually created groups |
+| **Access**  | The role bindings assigned to this group                            |
+| **Members** | Number of users currently in the group                              |
 
 Click any group row to open the detail panel where you can manage bindings and members.
 
@@ -50,16 +51,17 @@ Open a group and use the **Access granted** section to add role bindings:
 4. Click **Add**
 
 <Tip>
-  You can add multiple bindings to a single group, for example, _Member on the whole organization_ plus _Admin on Team Platform_.
+  You can add multiple bindings to a single group, for example, _Member on the whole
+  organization_ plus _Admin on Team Platform_.
 </Tip>
 
 ### Role Scopes
 
-| Scope | What it grants |
-|-------|---------------|
+| Scope            | What it grants                                                    |
+| ---------------- | ----------------------------------------------------------------- |
 | **Organization** | Access across the entire organization at the specified role level |
-| **Team** | Access to a specific team and all its projects |
-| **Project** | Access to a single project only |
+| **Team**         | Access to a specific team and all its projects                    |
+| **Project**      | Access to a single project only                                   |
 
 ---
 
@@ -70,6 +72,7 @@ A user may belong to multiple groups, each with different role assignments. Lang
 **Hierarchy:** `ADMIN > MEMBER > VIEWER`
 
 If a user is in:
+
 - Group A → Member on Team Engineering
 - Group B → Admin on Team Engineering
 
@@ -110,7 +113,9 @@ When your IdP suspends a user (sets `active: false`):
 - Re-activating (`active: true`) immediately restores access
 
 <Info>
-  Use `PATCH active=false` for temporary suspension (e.g. leave of absence). Use DELETE for permanent offboarding. The distinction matters because DELETE removes all role bindings and group memberships, re-provisioning the user starts from scratch.
+  Use `PATCH active=false` for temporary suspension (e.g. leave of absence). Use DELETE
+  for permanent offboarding. The distinction matters because DELETE removes all role
+  bindings and group memberships, re-provisioning the user starts from scratch.
 </Info>
 
 ---
@@ -127,7 +132,8 @@ You can also create groups manually without an identity provider:
 Manual groups behave identically to SCIM groups for role assignment. Members must already be in your organization to be added.
 
 <Note>
-  Manual groups are not synced with any identity provider. Membership must be managed from within LangWatch.
+  Manual groups are not synced with any identity provider. Membership must be managed from
+  within LangWatch.
 </Note>
 
 ---
@@ -136,19 +142,19 @@ Manual groups behave identically to SCIM groups for role assignment. Members mus
 
 LangWatch supports the following SCIM group operations:
 
-| Endpoint | Methods |
-|----------|---------|
-| `/api/scim/v2/Groups` | `GET`, `POST` |
+| Endpoint                   | Methods                         |
+| -------------------------- | ------------------------------- |
+| `/api/scim/v2/Groups`      | `GET`, `POST`                   |
 | `/api/scim/v2/Groups/{id}` | `GET`, `PUT`, `PATCH`, `DELETE` |
 
 ### Supported PATCH Operations
 
-| Operation | Example | Effect |
-|-----------|---------|--------|
-| `add members` | Add users to group | Users inherit group's roles |
-| `remove members` | Remove users from group | Roles revoked for removed users |
-| `replace displayName` | Rename the group | Group name updated in LangWatch |
-| `replace members` | Full member replacement | Adds new, removes old members |
+| Operation             | Example                 | Effect                          |
+| --------------------- | ----------------------- | ------------------------------- |
+| `add members`         | Add users to group      | Users inherit group's roles     |
+| `remove members`      | Remove users from group | Roles revoked for removed users |
+| `replace displayName` | Rename the group        | Group name updated in LangWatch |
+| `replace members`     | Full member replacement | Adds new, removes old members   |
 
 A `replace` that carries no member list leaves the group's membership alone — replacing an unrelated attribute never removes anyone. Sending `members` as an empty list is a member list, and does clear the group, as does an explicit `null`.
 
@@ -201,7 +207,8 @@ In addition to the UI and SCIM provisioning, groups can be managed programmatica
 See the [Groups API Reference](/api-reference/groups/overview) for full endpoint documentation.
 
 <Info>
-SCIM-managed groups cannot have their members or names modified via the REST API. Those operations are reserved for the identity provider.
+  SCIM-managed groups cannot have their members or names modified via the REST API. Those
+  operations are reserved for the identity provider.
 </Info>
 
 ---

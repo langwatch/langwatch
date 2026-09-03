@@ -1,0 +1,125 @@
+{
+  "version": 0,
+  "services": [
+    {
+      "file": "packages/enterprise/features/billing/server/src/services/notification.service.ts",
+      "moduleLines": 670,
+      "methodLines": 93,
+      "statements": 24,
+      "complexity": 24,
+      "lineLength": 237
+    },
+    {
+      "file": "packages/enterprise/features/billing/server/src/services/seat-event-subscription.service.ts",
+      "moduleLines": 605,
+      "methodLines": 144,
+      "statements": 24,
+      "complexity": 24,
+      "lineLength": 160
+    },
+    {
+      "file": "packages/enterprise/features/governance/server/src/services/puller-databricks-warehouse-cost.service.ts",
+      "moduleLines": 684,
+      "methodLines": 80,
+      "statements": 24,
+      "complexity": 24,
+      "lineLength": 160
+    },
+    {
+      "file": "packages/enterprise/features/webhook/server/src/services/webhook-delivery.service.ts",
+      "moduleLines": 1166,
+      "methodLines": 80,
+      "statements": 24,
+      "complexity": 24,
+      "lineLength": 160
+    },
+    {
+      "file": "packages/features/authz/server/src/services/authz.service.ts",
+      "moduleLines": 775,
+      "methodLines": 80,
+      "statements": 24,
+      "complexity": 24,
+      "lineLength": 160
+    },
+    {
+      "file": "packages/features/dataset/server/src/services/dataset-chunk.service.ts",
+      "moduleLines": 1015,
+      "methodLines": 155,
+      "statements": 24,
+      "complexity": 24,
+      "lineLength": 160
+    },
+    {
+      "file": "packages/features/dataset/server/src/services/dataset.service.ts",
+      "moduleLines": 665,
+      "methodLines": 80,
+      "statements": 24,
+      "complexity": 24,
+      "lineLength": 160
+    },
+    {
+      "file": "packages/features/langy/server/src/services/langy-cli-envelope.service.ts",
+      "moduleLines": 500,
+      "methodLines": 118,
+      "statements": 24,
+      "complexity": 24,
+      "lineLength": 160
+    },
+    {
+      "file": "packages/features/langy/server/src/services/langy-conversation.service.ts",
+      "moduleLines": 1250,
+      "methodLines": 80,
+      "statements": 24,
+      "complexity": 24,
+      "lineLength": 160
+    },
+    {
+      "file": "packages/features/langy/server/src/services/langy-credential.service.ts",
+      "moduleLines": 500,
+      "methodLines": 87,
+      "statements": 24,
+      "complexity": 24,
+      "lineLength": 160
+    },
+    {
+      "file": "packages/features/organization/server/src/services/organization.service.ts",
+      "moduleLines": 1388,
+      "methodLines": 136,
+      "statements": 24,
+      "complexity": 24,
+      "lineLength": 160
+    },
+    {
+      "file": "packages/features/prompt/server/src/services/prompt.service.ts",
+      "moduleLines": 1485,
+      "methodLines": 206,
+      "statements": 24,
+      "complexity": 31,
+      "lineLength": 160
+    },
+    {
+      "file": "packages/features/stored-object/server/src/services/stored-object.service.ts",
+      "moduleLines": 635,
+      "methodLines": 83,
+      "statements": 24,
+      "complexity": 24,
+      "lineLength": 160
+    },
+    {
+      "file": "packages/features/trace/server/src/services/trace-io-extraction.service.ts",
+      "moduleLines": 636,
+      "methodLines": 90,
+      "statements": 24,
+      "complexity": 24,
+      "lineLength": 160
+    },
+    {
+      "file": "packages/features/trace/server/src/services/trace-projection-lean.service.ts",
+      "moduleLines": 500,
+      "methodLines": 98,
+      "statements": 24,
+      "complexity": 24,
+      "lineLength": 160
+    }
+  ]
+}

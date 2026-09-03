@@ -1,0 +1,58 @@
+id: no-same-name-delegation-ts
+message: >
+  This method's whole body forwards to a method of the same name on a
+  collaborator. One or two of those is a facade; a class made of them is a
+  layer, not a component — every reader pays an extra file to learn nothing,
+  and every new operation has to be declared twice. Count them before you keep
+  them: if most of the class is same-name delegation and it holds no rules of
+  its own, delete the class and let the caller hold the collaborator. The one
+  facade the feature layout does require is `app/<feature>.app.ts`, which this
+  rule already skips. See dev/docs/best_practices/overengineering.md.
+severity: warning
+language: TypeScript
+rule:
+  any:
+    - pattern:
+        context: "class C { $M($ARG: $T): $R { return this.$P.$M($ARG); } }"
+        selector: method_definition
+    - pattern:
+        context: "class C { async $M($ARG: $T): $R { return this.$P.$M($ARG); } }"
+        selector: method_definition
+    - pattern:
+        context: "class C { $M($ARG: $T): $R { return this.$P.$Q.$M($ARG); } }"
+        selector: method_definition
+    - pattern:
+        context: "class C { async $M($ARG: $T): $R { return this.$P.$Q.$M($ARG); } }"
+        selector: method_definition
+    # The arrow-property spelling. A facade that binds `this` by field, or
+    # types each member off the interface it re-states, writes its delegations
+    # this way — matching only method syntax missed two governance layers of
+    # 99 delegations each entirely.
+    - pattern:
+        context: "class C { readonly $M: $T = ($$$A) => this.$P.$M($$$B); }"
+        selector: public_field_definition
+    - pattern:
+        context: "class C { $M: $T = ($$$A) => this.$P.$M($$$B); }"
+        selector: public_field_definition
+    - pattern:
+        context: "class C { $M = ($$$A) => this.$P.$M($$$B); }"
+        selector: public_field_definition
+    - pattern:
+        context: "class C { $M = ($$$A): $R => this.$P.$M($$$B); }"
+        selector: public_field_definition
+    - pattern:
+        context: "class C { $M = async ($$$A) => this.$P.$M($$$B); }"
+        selector: public_field_definition
+    - pattern:
+        context: "class C { $M = async ($$$A): $R => this.$P.$M($$$B); }"
+        selector: public_field_definition
+files:
+  - "packages/**/*.ts"
+  - "apps/**/*.ts"
+ignores:
+  - "**/*.d.ts"
+  - "**/__tests__/**"
+  - "**/*.test.ts"
+  - "**/generated/**"
+  # The feature layout requires exactly one facade both transports call.
+  - "**/app/*.app.ts"

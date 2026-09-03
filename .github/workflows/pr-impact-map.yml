@@ -44,20 +44,20 @@ jobs:
           script: |
             const MARKER = "<!-- pr-impact-map -->";
 
-            // First match wins, so order is load-bearing: `platform/app/**` would
-            // otherwise swallow migrations, specs and tests. Lockfiles are
+            // First match wins, so order is load-bearing: a broad `apps/**`
+            // would otherwise swallow migrations, specs and tests. Lockfiles are
             // pulled out above the language buckets so a dependency bump does
             // not masquerade as a large Go or app change — but `go.mod` and
             // `package.json` stay with their language, because those express
             // intent rather than churn.
             const CATEGORIES = [
-              ["Migrations",     p => /^platform\/app\/(prisma|scripts|elastic)\/migrations\//.test(p)],
+              ["Migrations",     p => /^packages\/prisma-client\/prisma\/migrations\//.test(p) || /^apps\/api\/src\/tasks\/clickhouse-migrate\/migrations\//.test(p)],
               ["Specs",          p => p.startsWith("specs/")],
               ["Tests",          p => /(^|\/)__tests__\//.test(p)
                                    || /\.(test|spec)\.[cm]?[jt]sx?$/.test(p)
                                    || /_test\.go$/.test(p)
                                    || /(^|\/)test_[^/]+\.py$/.test(p)
-                                   || p.startsWith("tests/agentic-e2e/")],
+                                   || p.startsWith("dev/tests/agentic-e2e/")],
               ["CI/CD",          p => p.startsWith(".github/")],
               ["Deploy",         p => p.startsWith("charts/")
                                    || /^infra\/docker\/Dockerfile/.test(p)
@@ -73,10 +73,9 @@ jobs:
               // `services/`, which the Go-services regex would otherwise claim first.
               ["Python",         p => /^services\/langevals\//.test(p)],
               ["Go services",    p => /^(services|pkg|cmd)\//.test(p) || p === "go.mod"],
-              ["App · Server",   p => p.startsWith("platform/app/src/server/")
-                                   || p.endsWith("schema.prisma")
-                                   || /^platform\/app\/src\/(mcp|tasks|workers)/.test(p)],
-              ["App · Frontend", p => /^platform\/app\/src\/(components|pages|app|hooks|stores|styles|features|optimization_studio)\//.test(p)
+              ["App · Server",   p => /^apps\/(api|worker)\//.test(p)
+                                   || p.endsWith("schema.prisma")],
+              ["App · Frontend", p => /^apps\/ui\//.test(p)
                                    || p.endsWith(".tsx")],
               ["Other",          () => true],
             ];

@@ -38,13 +38,15 @@ describe("LocalPromptsService", () => {
 
         const result = await service.get(handle);
 
-        expect(result).toEqual(expect.objectContaining({
-          model: mockPrompt.model,
-          messages: mockPrompt.messages,
-          temperature: mockPrompt.modelParameters?.temperature,
-          maxTokens: mockPrompt.modelParameters?.max_tokens,
-          handle: handle,
-        }));
+        expect(result).toEqual(
+          expect.objectContaining({
+            model: mockPrompt.model,
+            messages: mockPrompt.messages,
+            temperature: mockPrompt.modelParameters?.temperature,
+            maxTokens: mockPrompt.modelParameters?.max_tokens,
+            handle: handle,
+          }),
+        );
 
         expect(mockFileManager.loadLocalPrompt).toHaveBeenCalledWith(filePath);
       });
@@ -72,13 +74,15 @@ describe("LocalPromptsService", () => {
 
         const result = await service.get(handle);
 
-        expect(result).toEqual(expect.objectContaining({
-          model: mockPrompt.model,
-          messages: mockPrompt.messages,
-          temperature: mockPrompt.modelParameters?.temperature,
-          maxTokens: mockPrompt.modelParameters?.max_tokens,
-          handle: handle,
-        }));
+        expect(result).toEqual(
+          expect.objectContaining({
+            model: mockPrompt.model,
+            messages: mockPrompt.messages,
+            temperature: mockPrompt.modelParameters?.temperature,
+            maxTokens: mockPrompt.modelParameters?.max_tokens,
+            handle: handle,
+          }),
+        );
 
         expect(mockFileManager.loadLocalPrompt).toHaveBeenCalledWith(
           "prompts/.materialized/my-handle.prompt.yaml",
@@ -108,13 +112,15 @@ describe("LocalPromptsService", () => {
 
         const result = await service.get(handle);
 
-        expect(result).toEqual(expect.objectContaining({
-          model: mockPrompt.model,
-          messages: mockPrompt.messages,
-          temperature: mockPrompt.modelParameters?.temperature,
-          maxTokens: mockPrompt.modelParameters?.max_tokens,
-          handle: handle,
-        }));
+        expect(result).toEqual(
+          expect.objectContaining({
+            model: mockPrompt.model,
+            messages: mockPrompt.messages,
+            temperature: mockPrompt.modelParameters?.temperature,
+            maxTokens: mockPrompt.modelParameters?.max_tokens,
+            handle: handle,
+          }),
+        );
 
         expect(mockFileManager.loadLocalPrompt).toHaveBeenCalledWith(
           "prompts/.materialized/my-handle.prompt.yaml",
@@ -136,8 +142,7 @@ describe("LocalPromptsService", () => {
 
     describe("when explicitly referenced file fails to load", () => {
       const filePath = "missing-file.prompt.yaml";
-      const errorMessage =
-        "Local prompt file not found: missing-file.prompt.yaml";
+      const errorMessage = "Local prompt file not found: missing-file.prompt.yaml";
       let result: PromptData | null;
 
       beforeEach(async () => {

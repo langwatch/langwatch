@@ -49,9 +49,7 @@ export async function handleListScenarios(params: {
     lines.push("");
   }
 
-  lines.push(
-    "> Use `platform_get_scenario` with the ID to see full scenario details.",
-  );
+  lines.push("> Use `platform_get_scenario` with the ID to see full scenario details.");
 
   return lines.join("\n");
 }

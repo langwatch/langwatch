@@ -34,10 +34,16 @@ describe("parseConfig", () => {
       const config = parseConfig(
         JSON.stringify({
           ...validConfig,
-          model: { ...validConfig.model, samplingParams: { temperature: 1 }, name: "Nice Name" },
+          model: {
+            ...validConfig.model,
+            samplingParams: { temperature: 1 },
+            name: "Nice Name",
+          },
         }),
       );
-      expect((config.model as Record<string, unknown>).samplingParams).toEqual({ temperature: 1 });
+      expect((config.model as Record<string, unknown>).samplingParams).toEqual({
+        temperature: 1,
+      });
       expect((config.model as Record<string, unknown>).name).toBe("Nice Name");
     });
   });
@@ -64,11 +70,20 @@ describe("parseConfig", () => {
   describe("when invalid input", () => {
     it("names the offending field", () => {
       expect(() =>
-        parseConfig(JSON.stringify({ ...validConfig, model: { ...validConfig.model, api: "grpc" } })),
+        parseConfig(
+          JSON.stringify({
+            ...validConfig,
+            model: { ...validConfig.model, api: "grpc" },
+          }),
+        ),
       ).toThrow(/model\.api/);
-      expect(() => parseConfig(JSON.stringify({ personaPrompt: "x" }))).toThrow(/invalid/);
+      expect(() => parseConfig(JSON.stringify({ personaPrompt: "x" }))).toThrow(
+        /invalid/,
+      );
       // A corrupt file names itself, so the boot log points at the path.
-      expect(() => parseConfig("not json")).toThrow(/\.langy-worker\.json: not valid JSON/);
+      expect(() => parseConfig("not json")).toThrow(
+        /\.langy-worker\.json: not valid JSON/,
+      );
     });
   });
 });

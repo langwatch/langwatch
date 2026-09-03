@@ -1,0 +1,75 @@
+{
+  "name": "@langwatch/langy-web",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Browser-safe Langy behaviour and reusable presentation.",
+  "files": [
+    "src"
+  ],
+  "type": "module",
+  "main": "./src/index.ts",
+  "types": "./src/index.ts",
+  "exports": {
+    ".": {
+      "types": "./src/index.ts",
+      "default": "./src/index.ts"
+    },
+    "./asaplangy": {
+      "types": "./src/features/asaplangy/index.ts",
+      "default": "./src/features/asaplangy/index.ts"
+    },
+    "./langy-theme.css": "./src/ui/elements/langy-theme.css",
+    "./screens/langy-layout": {
+      "types": "./src/screens/langy-layout/index.ts",
+      "default": "./src/screens/langy-layout/index.ts"
+    }
+  },
+  "scripts": {
+    "typecheck": "tsc --noEmit",
+    "test": "vitest run",
+    "test:unit": "vitest run",
+    "generate:langy-skills": "tsx scripts/generate-langy-skills.ts"
+  },
+  "dependencies": {
+    "@ai-sdk/react": "^3.0.219",
+    "@chakra-ui/charts": "^3.36.0",
+    "@chakra-ui/react": "^3.36.0",
+    "@emotion/react": "^11.14.0",
+    "@langwatch/design-system": "workspace:*",
+    "@langwatch/feature-flag-contract": "workspace:*",
+    "@langwatch/github-web": "workspace:*",
+    "@langwatch/langy-contract": "workspace:*",
+    "@langwatch/model-provider-contract": "workspace:*",
+    "@langwatch/model-provider-web": "workspace:*",
+    "@langwatch/ops-web": "workspace:*",
+    "@langwatch/platform-api-client": "workspace:*",
+    "@langwatch/trace-contract": "workspace:*",
+    "@langwatch/trace-web": "workspace:*",
+    "@langwatch/ui-drawer": "workspace:*",
+    "@langwatch/workflow-web": "workspace:*",
+    "@tanstack/react-virtual": "^3.14.5",
+    "ai": "^6.0.217",
+    "lucide-react": "^1.22.0",
+    "motion": "^12.42.2",
+    "react": "^19.2.7",
+    "react-dom": "^19.2.7",
+    "react-error-boundary": "^6.1.2",
+    "react-feather": "^2.0.10",
+    "react-router": "^8.0.1",
+    "recharts": "^3.9.1",
+    "zod": "^4.4.3",
+    "zustand": "^4.5.7"
+  },
+  "devDependencies": {
+    "@tanstack/react-query": "5.101.4",
+    "@testing-library/jest-dom": "^7.0.1",
+    "@testing-library/react": "^16.3.2",
+    "@testing-library/user-event": "^14.6.1",
+    "@trpc/client": "11.18.0",
+    "@types/react": "^19.2.17",
+    "@types/react-dom": "^19.2.3",
+    "jsdom": "^30.0.1",
+    "typescript": "^7.0.2",
+    "vitest": "^4.1.9"
+  }
+}

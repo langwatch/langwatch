@@ -21,10 +21,7 @@ export const getOrganizationCommand = async (): Promise<CommandResult | void> =>
         ["Slug", organization.slug],
         ["Support contact", orDash(organization.supportContact)],
         ["Presence", organization.presenceEnabled ? "enabled" : "disabled"],
-        [
-          "Trace sharing",
-          organization.traceSharingEnabled ? "enabled" : "disabled",
-        ],
+        ["Trace sharing", organization.traceSharingEnabled ? "enabled" : "disabled"],
         ["Primary intent", orDash(organization.primaryIntent)],
         ["Storage bucket", orDash(organization.s3Bucket)],
         ["Storage endpoint", orDash(organization.s3Endpoint)],

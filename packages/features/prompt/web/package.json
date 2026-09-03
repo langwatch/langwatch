@@ -1,0 +1,148 @@
+{
+  "name": "@langwatch/prompt-web",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Browser-safe Prompt UI primitives and presentation helpers.",
+  "files": [
+    "src"
+  ],
+  "type": "module",
+  "exports": {
+    "./components/llmPromptConfigs/constants": {
+      "types": "./src/model/llmPromptConfigs/constants.ts",
+      "default": "./src/model/llmPromptConfigs/constants.ts"
+    },
+    "./components/llmPromptConfigs/LlmConfigField": {
+      "types": "./src/ui/elements/llmPromptConfigs/llm-config-field.tsx",
+      "default": "./src/ui/elements/llmPromptConfigs/llm-config-field.tsx"
+    },
+    "./components/llmPromptConfigs/LLMConfigPopover": {
+      "types": "./src/ui/elements/llmPromptConfigs/llm-config-popover.tsx",
+      "default": "./src/ui/elements/llmPromptConfigs/llm-config-popover.tsx"
+    },
+    "./components/llmPromptConfigs/LLMModelDisplay": {
+      "types": "./src/ui/elements/llmPromptConfigs/llm-model-display.tsx",
+      "default": "./src/ui/elements/llmPromptConfigs/llm-model-display.tsx"
+    },
+    "./components/outputs/OutputsSection": {
+      "types": "./src/ui/elements/outputs/outputs-section.tsx",
+      "default": "./src/ui/elements/outputs/outputs-section.tsx"
+    },
+    "./components/prompts/PromptEditorDrawer": {
+      "types": "./src/ui/sections/prompts/prompt-editor-drawer.tsx",
+      "default": "./src/ui/sections/prompts/prompt-editor-drawer.tsx"
+    },
+    "./drawers": {
+      "types": "./src/ui/sections/drawers.ts",
+      "default": "./src/ui/sections/drawers.ts"
+    },
+    "./prompts/hooks/useLatestPromptVersion": {
+      "types": "./src/behavior/prompts/use-latest-prompt-version.ts",
+      "default": "./src/behavior/prompts/use-latest-prompt-version.ts"
+    },
+    "./prompts/utils/llmPromptConfigUtils": {
+      "types": "./src/behavior/prompts/llm-prompt-config-utils.ts",
+      "default": "./src/behavior/prompts/llm-prompt-config-utils.ts"
+    },
+    "./screens/prompt-studio": {
+      "types": "./src/screens/prompt-studio/index.ts",
+      "default": "./src/screens/prompt-studio/index.ts"
+    },
+    "./surfaces/api-snippet": {
+      "types": "./src/surfaces/api-snippet/index.ts",
+      "default": "./src/surfaces/api-snippet/index.ts"
+    },
+    "./surfaces/llm-parameters": {
+      "types": "./src/surfaces/llm-parameters/index.ts",
+      "default": "./src/surfaces/llm-parameters/index.ts"
+    },
+    "./surfaces/prompt-form": {
+      "types": "./src/surfaces/prompt-form/index.ts",
+      "default": "./src/surfaces/prompt-form/index.ts"
+    },
+    "./surfaces/prompt-layout": {
+      "types": "./src/surfaces/prompt-layout/index.ts",
+      "default": "./src/surfaces/prompt-layout/index.ts"
+    },
+    "./surfaces/prompt-reference": {
+      "types": "./src/surfaces/prompt-reference/index.ts",
+      "default": "./src/surfaces/prompt-reference/index.ts"
+    },
+    "./surfaces/prompt-textarea": {
+      "types": "./src/surfaces/prompt-textarea/index.ts",
+      "default": "./src/surfaces/prompt-textarea/index.ts"
+    },
+    "./surfaces/prompt-version": {
+      "types": "./src/surfaces/prompt-version/index.ts",
+      "default": "./src/surfaces/prompt-version/index.ts"
+    },
+    "./surfaces/variable-type": {
+      "types": "./src/surfaces/variable-type/index.ts",
+      "default": "./src/surfaces/variable-type/index.ts"
+    },
+    "./surfaces/variables": {
+      "types": "./src/surfaces/variables/index.ts",
+      "default": "./src/surfaces/variables/index.ts"
+    }
+  },
+  "scripts": {
+    "typecheck": "tsc --noEmit",
+    "test": "vitest run",
+    "test:unit": "vitest run"
+  },
+  "dependencies": {
+    "@chakra-ui/react": "^3.36.0",
+    "@copilotkit/react-core": "~1.8.14",
+    "@copilotkit/react-ui": "~1.8.14",
+    "@copilotkit/runtime-client-gql": "1.8.13",
+    "@dnd-kit/core": "^6.3.1",
+    "@dnd-kit/sortable": "^10.0.0",
+    "@dnd-kit/utilities": "3.2.2",
+    "@hookform/resolvers": "^5.4.0",
+    "@langwatch/dataset-contract": "workspace:*",
+    "@langwatch/dataset-web": "workspace:*",
+    "@langwatch/design-system": "workspace:*",
+    "@langwatch/experiment-contract": "workspace:*",
+    "@langwatch/experiment-web": "workspace:*",
+    "@langwatch/model-provider-contract": "workspace:*",
+    "@langwatch/model-provider-web": "workspace:*",
+    "@langwatch/observability": "workspace:*",
+    "@langwatch/platform-api-client": "workspace:*",
+    "@langwatch/prompt-contract": "workspace:*",
+    "@langwatch/scenario-contract": "workspace:*",
+    "@langwatch/topic-contract": "workspace:*",
+    "@langwatch/trace-contract": "workspace:*",
+    "@langwatch/ui-drawer": "workspace:*",
+    "@langwatch/workflow-contract": "workspace:*",
+    "@langwatch/workflow-web": "workspace:*",
+    "@xyflow/react": "^12.11.1",
+    "ajv": "^8.20.0",
+    "clsx": "2.1.1",
+    "immer": "^11.1.8",
+    "langwatch": "workspace:*",
+    "lodash-es": "^4.17.21",
+    "lucide-react": "^1.22.0",
+    "react": "^19.2.7",
+    "react-feather": "^2.0.10",
+    "react-hook-form": "^7.80.0",
+    "react-icons": "^5.5.0",
+    "rich-textarea": "^0.27.0",
+    "usehooks-ts": "^3.1.1",
+    "zod": "^4.4.3",
+    "zod-validation-error": "^5.0.0",
+    "zustand": "^4.5.7"
+  },
+  "devDependencies": {
+    "@testing-library/jest-dom": "^7.0.1",
+    "@testing-library/react": "^16.3.2",
+    "@testing-library/user-event": "^14.6.1",
+    "@types/lodash-es": "^4.17.12",
+    "@types/react": "^19.2.14",
+    "@types/react-dom": "^19.2.3",
+    "jsdom": "^30.0.1",
+    "react-dom": "^19.2.7",
+    "typescript": "^7.0.2",
+    "vite": "^8.1.2",
+    "vitest": "^4.1.9"
+  }
+}

@@ -2,15 +2,7 @@
  * Integration tests for PromptsFacade with MSW.
  * Tests CRUD operations and get prompt behavior with mocked API.
  */
-import {
-  describe,
-  expect,
-  it,
-  beforeAll,
-  beforeEach,
-  afterAll,
-  afterEach,
-} from "vitest";
+import { describe, expect, it, beforeAll, beforeEach, afterAll, afterEach } from "vitest";
 import { setupServer } from "msw/node";
 import { createOpenApiHttp } from "openapi-msw";
 import * as fs from "fs";
@@ -74,10 +66,7 @@ const setupCliRunner = () => {
   return { cli, testDir, originalCwd };
 };
 
-const teardownCliRunner = (params: {
-  testDir: string;
-  originalCwd: string;
-}) => {
+const teardownCliRunner = (params: { testDir: string; originalCwd: string }) => {
   const { testDir, originalCwd } = params;
   process.chdir(originalCwd);
   fs.rmSync(testDir, { recursive: true, force: true });

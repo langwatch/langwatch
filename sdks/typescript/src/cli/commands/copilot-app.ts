@@ -87,12 +87,7 @@ export async function connectCopilotApp(
     );
   }
 
-  const execPath = findCopilotApp(
-    deps.platform,
-    deps.home,
-    deps.exists,
-    deps.env,
-  );
+  const execPath = findCopilotApp(deps.platform, deps.home, deps.exists, deps.env);
   if (!execPath) {
     throw new CopilotAppConnectError(
       "not-installed",

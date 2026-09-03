@@ -91,15 +91,31 @@ export class TurnEventMapper {
         const delta = event.assistantMessageEvent as
           | { type?: string; delta?: string }
           | undefined;
-        if (delta?.type === "text_delta" && typeof delta.delta === "string" && delta.delta !== "") {
-          return [{ type: "delta", turnId: this.turnId, text: boundText({ text: delta.delta }) }];
+        if (
+          delta?.type === "text_delta" &&
+          typeof delta.delta === "string" &&
+          delta.delta !== ""
+        ) {
+          return [
+            {
+              type: "delta",
+              turnId: this.turnId,
+              text: boundText({ text: delta.delta }),
+            },
+          ];
         }
         if (
           delta?.type === "thinking_delta" &&
           typeof delta.delta === "string" &&
           delta.delta !== ""
         ) {
-          return [{ type: "reasoning", turnId: this.turnId, text: boundText({ text: delta.delta }) }];
+          return [
+            {
+              type: "reasoning",
+              turnId: this.turnId,
+              text: boundText({ text: delta.delta }),
+            },
+          ];
         }
         return [];
       }

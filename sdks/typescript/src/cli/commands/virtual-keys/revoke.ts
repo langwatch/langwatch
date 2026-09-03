@@ -28,7 +28,9 @@ export const revokeVirtualKeyCommand = async (
         console.log();
         console.log(chalk.gray("Status: ") + chalk.red(vk.status));
         if (vk.revoked_at) {
-          console.log(chalk.gray("Revoked at: ") + new Date(vk.revoked_at).toLocaleString());
+          console.log(
+            chalk.gray("Revoked at: ") + new Date(vk.revoked_at).toLocaleString(),
+          );
         }
         console.log();
       },

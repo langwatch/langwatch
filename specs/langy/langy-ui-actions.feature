@@ -306,7 +306,7 @@ Feature: Langy drives the open page through typed UI actions
     browser store and an execution pipeline.
 
     A headless stand-in for the page closes that gap
-    (platform/app/e2e/langy/fake-workbench-tab.ts). It listens to the same turn
+    (the fake workbench tab, deleted with the platform application). It listens to the same turn
     stream the panel listens to, claims through the same mutation, applies the
     same transforms to the same store, saves the same document, and starts runs
     through the same route. What it stands in for is the rendering, not the

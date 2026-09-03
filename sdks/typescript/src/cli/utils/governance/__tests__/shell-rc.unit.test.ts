@@ -193,8 +193,7 @@ describe("persistBlockToRc", () => {
     persistBlockToRc("zsh", "export FOO=bar");
     persistBlockToRc("zsh", "export FOO=baz");
     const content = fs.readFileSync(rcPath("zsh"), "utf8");
-    const beginCount = (content.match(/# >>> langwatch begin >>>/g) ?? [])
-      .length;
+    const beginCount = (content.match(/# >>> langwatch begin >>>/g) ?? []).length;
     expect(beginCount).toBe(1);
     expect(content).toMatch(/export FOO=baz/);
     expect(content).not.toMatch(/export FOO=bar/);
@@ -220,8 +219,7 @@ describe("persistBlockToRc", () => {
     persistBlockToRc("zsh", first);
     persistBlockToRc("zsh", second);
     const content = fs.readFileSync(rcPath("zsh"), "utf8");
-    const beginCount = (content.match(/# >>> langwatch begin >>>/g) ?? [])
-      .length;
+    const beginCount = (content.match(/# >>> langwatch begin >>>/g) ?? []).length;
     expect(beginCount).toBe(1);
     expect(content).toContain("Authorization=Bearer sk-lw-new");
     expect(content).not.toContain("sk-lw-old");
@@ -304,16 +302,14 @@ describe("removeBlockFromRc", () => {
   describe("when removing the global gateway block", () => {
     it("removes it via the default markers", () => {
       persistBlockToRc("zsh", "export ANTHROPIC_BASE_URL=http://gw");
-      expect(
-        fs.readFileSync(rcPath("zsh"), "utf8"),
-      ).toContain("# >>> langwatch begin >>>");
+      expect(fs.readFileSync(rcPath("zsh"), "utf8")).toContain(
+        "# >>> langwatch begin >>>",
+      );
 
       const removed = removeBlockFromRc("zsh", GATEWAY_RC_MARKERS);
 
       expect(removed).toBe(true);
-      expect(fs.readFileSync(rcPath("zsh"), "utf8")).not.toContain(
-        "langwatch begin",
-      );
+      expect(fs.readFileSync(rcPath("zsh"), "utf8")).not.toContain("langwatch begin");
     });
   });
 

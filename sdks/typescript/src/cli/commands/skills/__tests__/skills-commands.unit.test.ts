@@ -70,9 +70,7 @@ describe("the skills commands", () => {
   });
 
   it("get prints the raw skill body, and structured data with -o json", async () => {
-    const stdoutSpy = vi
-      .spyOn(process.stdout, "write")
-      .mockImplementation(() => true);
+    const stdoutSpy = vi.spyOn(process.stdout, "write").mockImplementation(() => true);
     await skillsGetCommand("tracing", {});
     const raw = stdoutSpy.mock.calls.flat().join("");
     expect(raw).toBe(skill("tracing").body);
@@ -101,13 +99,18 @@ describe("the skills commands", () => {
     await expect(skillsInstallCommand([], { dir: root })).rejects.toMatchObject({
       code: "validation_error",
     });
-    await expect(
-      skillsInstallCommand(["nope"], { dir: root }),
-    ).rejects.toMatchObject({ code: "validation_error" });
+    await expect(skillsInstallCommand(["nope"], { dir: root })).rejects.toMatchObject({
+      code: "validation_error",
+    });
   });
 
   it("install --all --dry-run reports every skill and writes nothing", async () => {
-    await skillsInstallCommand([], { dir: root, all: true, dryRun: true, output: "json" });
+    await skillsInstallCommand([], {
+      dir: root,
+      all: true,
+      dryRun: true,
+      output: "json",
+    });
     const parsed = JSON.parse(logged()) as {
       dryRun: boolean;
       results: { action: string }[];
@@ -152,19 +155,19 @@ describe("the skills commands", () => {
       code: "validation_error",
       message: expect.stringContaining("-y"),
     });
-    expect(
-      fs.existsSync(path.join(root, "skills", "tracing", "SKILL.md")),
-    ).toBe(true);
+    expect(fs.existsSync(path.join(root, "skills", "tracing", "SKILL.md"))).toBe(true);
   });
 
   it("uninstall --dry-run needs no confirmation and removes nothing", async () => {
     installSkill({ skill: skill("tracing"), root });
-    await skillsUninstallCommand(["tracing"], { dir: root, dryRun: true, output: "json" });
+    await skillsUninstallCommand(["tracing"], {
+      dir: root,
+      dryRun: true,
+      output: "json",
+    });
     const parsed = JSON.parse(logged()) as { results: { action: string }[] };
     expect(parsed.results[0]!.action).toBe("removed");
-    expect(
-      fs.existsSync(path.join(root, "skills", "tracing", "SKILL.md")),
-    ).toBe(true);
+    expect(fs.existsSync(path.join(root, "skills", "tracing", "SKILL.md"))).toBe(true);
   });
 
   describe("when one skill's path cannot be read during uninstall --all", () => {
@@ -190,9 +193,7 @@ describe("the skills commands", () => {
       const prompts = parsed.results.find((r) => r.slug === "prompts")!;
 
       expect(tracing.action).toBe("removed");
-      expect(
-        fs.existsSync(path.join(root, "skills", "tracing", "SKILL.md")),
-      ).toBe(false);
+      expect(fs.existsSync(path.join(root, "skills", "tracing", "SKILL.md"))).toBe(false);
 
       expect(prompts.action).toBe("skipped");
       expect(prompts.failed).toBe(true);
@@ -292,9 +293,7 @@ describe("the skills commands", () => {
 
       const prompts = parsed.results.find((r) => r.slug === "prompts")!;
       expect(prompts.action).toBe("created");
-      expect(
-        fs.existsSync(path.join(root, "skills", "prompts", "SKILL.md")),
-      ).toBe(true);
+      expect(fs.existsSync(path.join(root, "skills", "prompts", "SKILL.md"))).toBe(true);
 
       expect(process.exitCode).toBe(1);
     });
@@ -306,8 +305,8 @@ describe("the skills commands", () => {
   });
 
   it("install rejects an empty --dir instead of writing into the cwd", async () => {
-    await expect(
-      skillsInstallCommand(["tracing"], { dir: "  " }),
-    ).rejects.toMatchObject({ code: "validation_error" });
+    await expect(skillsInstallCommand(["tracing"], { dir: "  " })).rejects.toMatchObject({
+      code: "validation_error",
+    });
   });
 });

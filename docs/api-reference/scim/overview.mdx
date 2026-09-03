@@ -4,7 +4,13 @@ description: "The SCIM 2.0 endpoints an identity provider calls to provision and
 ---
 
 <Note>
-  **Available on Enterprise plans.** SCIM provisioning needs an Enterprise plan, and a self-hosted deployment needs an Enterprise license. The plan is checked on every call, not only when a token is minted, so if the plan lapses, tokens that already exist stop verifying and your identity provider's requests are refused with HTTP 403. Minting a token through the [SCIM Tokens](/api-reference/scim-tokens/overview) API without an Enterprise plan is refused with HTTP 402 and the error code `enterprise_plan_required`. To enable it, reach out to [enterprise@langwatch.ai](mailto:enterprise@langwatch.ai).
+  **Available on Enterprise plans.** SCIM provisioning needs an Enterprise plan, and a
+  self-hosted deployment needs an Enterprise license. The plan is checked on every call,
+  not only when a token is minted, so if the plan lapses, tokens that already exist stop
+  verifying and your identity provider's requests are refused with HTTP 403. Minting a
+  token through the [SCIM Tokens](/api-reference/scim-tokens/overview) API without an
+  Enterprise plan is refused with HTTP 402 and the error code `enterprise_plan_required`.
+  To enable it, reach out to [enterprise@langwatch.ai](mailto:enterprise@langwatch.ai).
 </Note>
 
 ## Intro
@@ -35,23 +41,23 @@ The three discovery endpoints (`/ServiceProviderConfig`, `/ResourceTypes`, `/Sch
 
 ## Endpoints
 
-| Method | Path | Description |
-|--------|------|-------------|
-| `GET` | `/ServiceProviderConfig` | What this SCIM implementation supports |
-| `GET` | `/ResourceTypes` | The resource types served here |
-| `GET` | `/Schemas` | The schemas for those resource types |
-| `GET` | `/Users` | List provisioned users |
-| `POST` | `/Users` | Provision a user |
-| `GET` | `/Users/{id}` | Get a provisioned user |
-| `PUT` | `/Users/{id}` | Replace a provisioned user |
-| `PATCH` | `/Users/{id}` | Update a provisioned user |
-| `DELETE` | `/Users/{id}` | Deprovision a user |
-| `GET` | `/Groups` | List provisioned groups |
-| `POST` | `/Groups` | Provision a group |
-| `GET` | `/Groups/{id}` | Get a provisioned group |
-| `PUT` | `/Groups/{id}` | Replace a provisioned group |
-| `PATCH` | `/Groups/{id}` | Update a provisioned group |
-| `DELETE` | `/Groups/{id}` | Deprovision a group |
+| Method   | Path                     | Description                            |
+| -------- | ------------------------ | -------------------------------------- |
+| `GET`    | `/ServiceProviderConfig` | What this SCIM implementation supports |
+| `GET`    | `/ResourceTypes`         | The resource types served here         |
+| `GET`    | `/Schemas`               | The schemas for those resource types   |
+| `GET`    | `/Users`                 | List provisioned users                 |
+| `POST`   | `/Users`                 | Provision a user                       |
+| `GET`    | `/Users/{id}`            | Get a provisioned user                 |
+| `PUT`    | `/Users/{id}`            | Replace a provisioned user             |
+| `PATCH`  | `/Users/{id}`            | Update a provisioned user              |
+| `DELETE` | `/Users/{id}`            | Deprovision a user                     |
+| `GET`    | `/Groups`                | List provisioned groups                |
+| `POST`   | `/Groups`                | Provision a group                      |
+| `GET`    | `/Groups/{id}`           | Get a provisioned group                |
+| `PUT`    | `/Groups/{id}`           | Replace a provisioned group            |
+| `PATCH`  | `/Groups/{id}`           | Update a provisioned group             |
+| `DELETE` | `/Groups/{id}`           | Deprovision a group                    |
 
 ## How SCIM objects map onto LangWatch
 

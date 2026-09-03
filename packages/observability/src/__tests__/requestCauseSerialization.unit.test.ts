@@ -97,9 +97,7 @@ describe("emitted request-log records", () => {
     });
 
     it("does not emit the cause as an empty object", () => {
-      expect(
-        Object.keys(warnRecord()?.[REQUEST_CAUSE_FIELD] ?? {}),
-      ).not.toHaveLength(0);
+      expect(Object.keys(warnRecord()?.[REQUEST_CAUSE_FIELD] ?? {})).not.toHaveLength(0);
     });
 
     it("carries no field named error, so nothing downstream reads it as one", () => {

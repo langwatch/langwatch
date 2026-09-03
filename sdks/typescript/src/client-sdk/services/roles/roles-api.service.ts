@@ -7,8 +7,9 @@
 import { resolveEndpoint } from "@/internal/endpoint";
 import {
   createManagementRequest,
-  resolveManagementToken,
+  managementPath,
   type ManagementRequest,
+  resolveManagementToken,
 } from "../_shared/management-request";
 
 export interface CustomRole {
@@ -71,21 +72,21 @@ export class RolesApiService {
   async list(): Promise<{ roles: CustomRole[] }> {
     return this.#request({
       operation: "list custom roles",
-      path: "/api/roles",
+      path: managementPath("/api/roles"),
     });
   }
 
   async get(id: string): Promise<CustomRole> {
     return this.#request({
       operation: `fetch custom role "${id}"`,
-      path: `/api/roles/${encodeURIComponent(id)}`,
+      path: managementPath(`/api/roles/${encodeURIComponent(id)}`),
     });
   }
 
   async create(input: CreateRoleInput): Promise<CustomRole> {
     return this.#request({
       operation: "create custom role",
-      path: "/api/roles",
+      path: managementPath("/api/roles"),
       method: "POST",
       body: input,
     });
@@ -100,7 +101,7 @@ export class RolesApiService {
   }): Promise<CustomRole> {
     return this.#request({
       operation: `update custom role "${id}"`,
-      path: `/api/roles/${encodeURIComponent(id)}`,
+      path: managementPath(`/api/roles/${encodeURIComponent(id)}`),
       method: "PATCH",
       body: input,
     });
@@ -109,7 +110,7 @@ export class RolesApiService {
   async delete(id: string): Promise<{ success: true }> {
     return this.#request({
       operation: `delete custom role "${id}"`,
-      path: `/api/roles/${encodeURIComponent(id)}`,
+      path: managementPath(`/api/roles/${encodeURIComponent(id)}`),
       method: "DELETE",
     });
   }
@@ -117,7 +118,7 @@ export class RolesApiService {
   async permissions(): Promise<PermissionCatalog> {
     return this.#request({
       operation: "fetch the permission catalog",
-      path: "/api/roles/permissions",
+      path: managementPath("/api/roles/permissions"),
     });
   }
 }

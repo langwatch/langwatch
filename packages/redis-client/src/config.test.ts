@@ -29,9 +29,9 @@ describe("RedisConfigService", () => {
     });
 
     it("accepts entries that carry a scheme", () => {
-      expect(
-        config.resolve({ clusterEndpoints: "redis://one:6390" }),
-      ).toMatchObject({ endpoints: [{ host: "one", port: 6390 }] });
+      expect(config.resolve({ clusterEndpoints: "redis://one:6390" })).toMatchObject({
+        endpoints: [{ host: "one", port: 6390 }],
+      });
     });
 
     it("ignores blank entries and surrounding whitespace", () => {
@@ -97,17 +97,17 @@ describe("RedisConfigService", () => {
     /** @scenario "A database index outside the valid range falls back to zero" */
     it("falls back to database 0 for an out-of-range index", () => {
       for (const dbIndex of ["16", "99", "-1"]) {
-        expect(
-          config.resolve({ url: "redis://localhost:6379", dbIndex }),
-        ).toMatchObject({ db: 0 });
+        expect(config.resolve({ url: "redis://localhost:6379", dbIndex })).toMatchObject({
+          db: 0,
+        });
       }
     });
 
     it("falls back to database 0 for a malformed or absent index", () => {
       for (const dbIndex of [void 0, "", "two", "1.5"]) {
-        expect(
-          config.resolve({ url: "redis://localhost:6379", dbIndex }),
-        ).toMatchObject({ db: 0 });
+        expect(config.resolve({ url: "redis://localhost:6379", dbIndex })).toMatchObject({
+          db: 0,
+        });
       }
     });
 

@@ -5,13 +5,17 @@ import { checkOrgApiKey } from "../../utils/apiKey";
 import { failSpinner } from "../../utils/spinnerError";
 import type { CommandResult } from "../../utils/output";
 
-export const rollWebhookSecretCommand = async (id: string): Promise<CommandResult | void> => {
+export const rollWebhookSecretCommand = async (
+  id: string,
+): Promise<CommandResult | void> => {
   const apiKey = checkOrgApiKey();
   const service = new WebhooksApiService({ apiKey });
   const spinner = createSpinner("Rolling signing secret...").start();
   try {
     const endpoint = await service.rollSecret(id);
-    spinner.succeed(`Secret rolled for ${endpoint.id}; deliveries sign with it immediately`);
+    spinner.succeed(
+      `Secret rolled for ${endpoint.id}; deliveries sign with it immediately`,
+    );
     return {
       data: endpoint,
       table: () => {

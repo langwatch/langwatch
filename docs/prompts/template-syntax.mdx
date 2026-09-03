@@ -35,12 +35,12 @@ Customer: {{ user.name }} ({{ user.email }})
 
 The variables available depend on how you invoke the prompt:
 
-| Context | Variables |
-|---------|-----------|
-| **SDK `compile()`** | Any key-value pairs you pass in |
-| **Prompt Playground** | Values set in the Variables tab |
-| **Optimization Studio** | Node inputs defined in the workflow |
-| **Scenario adapters** | `input`, `messages`, and adapter-specific fields |
+| Context                 | Variables                                        |
+| ----------------------- | ------------------------------------------------ |
+| **SDK `compile()`**     | Any key-value pairs you pass in                  |
+| **Prompt Playground**   | Values set in the Variables tab                  |
+| **Optimization Studio** | Node inputs defined in the workflow              |
+| **Scenario adapters**   | `input`, `messages`, and adapter-specific fields |
 
 ## Conditionals
 
@@ -72,17 +72,17 @@ How can I help you today?
 
 ### Operators
 
-| Operator | Meaning |
-|----------|---------|
-| `==` | Equal |
-| `!=` | Not equal |
-| `>` | Greater than |
-| `<` | Less than |
-| `>=` | Greater than or equal |
-| `<=` | Less than or equal |
+| Operator   | Meaning                                              |
+| ---------- | ---------------------------------------------------- |
+| `==`       | Equal                                                |
+| `!=`       | Not equal                                            |
+| `>`        | Greater than                                         |
+| `<`        | Less than                                            |
+| `>=`       | Greater than or equal                                |
+| `<=`       | Less than or equal                                   |
 | `contains` | String contains substring, or array contains element |
-| `and` | Both conditions true |
-| `or` | Either condition true |
+| `and`      | Both conditions true                                 |
+| `or`       | Either condition true                                |
 
 ```liquid
 {% if input contains "refund" %}You handle refunds.{% else %}You are a general assistant.{% endif %}
@@ -121,13 +121,13 @@ Produces: `Topics: AI, ML, NLP`
 
 Inside a `for` block, these variables are available:
 
-| Variable | Description |
-|----------|-------------|
-| `forloop.index` | Current iteration (1-based) |
-| `forloop.index0` | Current iteration (0-based) |
-| `forloop.first` | `true` on the first iteration |
-| `forloop.last` | `true` on the last iteration |
-| `forloop.length` | Total number of items |
+| Variable         | Description                   |
+| ---------------- | ----------------------------- |
+| `forloop.index`  | Current iteration (1-based)   |
+| `forloop.index0` | Current iteration (0-based)   |
+| `forloop.first`  | `true` on the first iteration |
+| `forloop.last`   | `true` on the last iteration  |
+| `forloop.length` | Total number of items         |
 
 ### Nested loops and conditionals
 
@@ -150,38 +150,41 @@ Filters transform a value. Chain them with the pipe character (`|`).
 
 ### String filters
 
-| Filter | Example | Result |
-|--------|---------|--------|
-| `upcase` | `{{ "alice" \| upcase }}` | `ALICE` |
-| `downcase` | `{{ "HELLO" \| downcase }}` | `hello` |
-| `capitalize` | `{{ "hello world" \| capitalize }}` | `Hello world` |
-| `truncate` | `{{ "A long sentence" \| truncate: 10 }}` | `A long ...` |
-| `strip` | `{{ "  hi  " \| strip }}` | `hi` |
-| `replace` | `{{ "Hello" \| replace: "Hello", "Hi" }}` | `Hi` |
-| `append` | `{{ "hello" \| append: " world" }}` | `hello world` |
-| `prepend` | `{{ "world" \| prepend: "hello " }}` | `hello world` |
-| `split` | `{{ "a,b,c" \| split: "," }}` | array `["a","b","c"]` |
+| Filter       | Example                                   | Result                |
+| ------------ | ----------------------------------------- | --------------------- |
+| `upcase`     | `{{ "alice" \| upcase }}`                 | `ALICE`               |
+| `downcase`   | `{{ "HELLO" \| downcase }}`               | `hello`               |
+| `capitalize` | `{{ "hello world" \| capitalize }}`       | `Hello world`         |
+| `truncate`   | `{{ "A long sentence" \| truncate: 10 }}` | `A long ...`          |
+| `strip`      | `{{ "  hi  " \| strip }}`                 | `hi`                  |
+| `replace`    | `{{ "Hello" \| replace: "Hello", "Hi" }}` | `Hi`                  |
+| `append`     | `{{ "hello" \| append: " world" }}`       | `hello world`         |
+| `prepend`    | `{{ "world" \| prepend: "hello " }}`      | `hello world`         |
+| `split`      | `{{ "a,b,c" \| split: "," }}`             | array `["a","b","c"]` |
 
 ### Array filters
 
-| Filter | Example | Result |
-|--------|---------|--------|
-| `join` | `{{ tags \| join: ", " }}` | `ai, ml` |
-| `first` | `{{ items \| first }}` | First element |
-| `last` | `{{ items \| last }}` | Last element |
-| `size` | `{{ items \| size }}` | Number of elements |
-| `sort` | `{{ items \| sort }}` | Sorted array |
-| `reverse` | `{{ items \| reverse }}` | Reversed array |
+| Filter    | Example                    | Result             |
+| --------- | -------------------------- | ------------------ |
+| `join`    | `{{ tags \| join: ", " }}` | `ai, ml`           |
+| `first`   | `{{ items \| first }}`     | First element      |
+| `last`    | `{{ items \| last }}`      | Last element       |
+| `size`    | `{{ items \| size }}`      | Number of elements |
+| `sort`    | `{{ items \| sort }}`      | Sorted array       |
+| `reverse` | `{{ items \| reverse }}`   | Reversed array     |
 
 ### Other filters
 
-| Filter | Example | Result |
-|--------|---------|--------|
+| Filter    | Example                         | Result                    |
+| --------- | ------------------------------- | ------------------------- |
 | `default` | `{{ name \| default: "User" }}` | `User` when name is empty |
-| `json` | `{{ data \| json }}` | JSON-encoded string |
+| `json`    | `{{ data \| json }}`            | JSON-encoded string       |
 
 <Note>
-  **Truncate behavior differs between SDKs.** In the TypeScript SDK (LiquidJS), `truncate: N` outputs N characters of content then appends `"..."`. In the Python SDK (python-liquid), `truncate: N` means N total characters including the `"..."` suffix. Keep this in mind if you rely on exact output length.
+  **Truncate behavior differs between SDKs.** In the TypeScript SDK (LiquidJS), `truncate:
+  N` outputs N characters of content then appends `"..."`. In the Python SDK
+  (python-liquid), `truncate: N` means N total characters including the `"..."` suffix.
+  Keep this in mind if you rely on exact output length.
 </Note>
 
 ## Assignment

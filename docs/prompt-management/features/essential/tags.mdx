@@ -11,11 +11,11 @@ Tags let you label specific prompt versions for different deployment stages. Ins
 
 LangWatch provides three built-in tags:
 
-| Tag | Behavior |
-|-----|----------|
-| `latest` | Automatically assigned to the newest version on every save. Cannot be removed. |
-| `production` | Assign this to the version you want your production application to use. |
-| `staging` | Assign this to the version you want your staging environment to use. |
+| Tag          | Behavior                                                                       |
+| ------------ | ------------------------------------------------------------------------------ |
+| `latest`     | Automatically assigned to the newest version on every save. Cannot be removed. |
+| `production` | Assign this to the version you want your production application to use.        |
+| `staging`    | Assign this to the version you want your staging environment to use.           |
 
 ## Assigning Tags via the Deploy Dialog
 
@@ -87,7 +87,8 @@ LangWatch supports a shorthand syntax for specifying tags in prompt identifiers:
 This works anywhere a prompt identifier is accepted: REST API, SDK, and config files.
 
 <Warning>
-  You cannot use both shorthand syntax and the `?tag=` query parameter at the same time. If both are provided, the API returns a 422 error.
+  You cannot use both shorthand syntax and the `?tag=` query parameter at the same time.
+  If both are provided, the API returns a 422 error.
 </Warning>
 
 ## Custom Tags
@@ -112,16 +113,18 @@ Use `platform_create_prompt_tag` to create a custom tag, then `platform_assign_p
 
 ### Managing Custom Tags
 
-| Operation | API Endpoint | MCP Tool |
-|-----------|-------------|----------|
-| List all tags | `GET /api/prompts/tags` | `platform_list_prompt_tags` |
-| Create tag | `POST /api/prompts/tags` | `platform_create_prompt_tag` |
-| Rename tag | `PUT /api/prompts/tags/{tag}` | `platform_rename_prompt_tag` |
-| Delete tag | `DELETE /api/prompts/tags/{tag}` | `platform_delete_prompt_tag` |
+| Operation             | API Endpoint                       | MCP Tool                     |
+| --------------------- | ---------------------------------- | ---------------------------- |
+| List all tags         | `GET /api/prompts/tags`            | `platform_list_prompt_tags`  |
+| Create tag            | `POST /api/prompts/tags`           | `platform_create_prompt_tag` |
+| Rename tag            | `PUT /api/prompts/tags/{tag}`      | `platform_rename_prompt_tag` |
+| Delete tag            | `DELETE /api/prompts/tags/{tag}`   | `platform_delete_prompt_tag` |
 | Assign tag to version | `PUT /api/prompts/{id}/tags/{tag}` | `platform_assign_prompt_tag` |
 
 <Note>
-  Custom tag names must not be purely numeric and cannot be "latest". The `latest` tag is protected and cannot be renamed or deleted. `production` and `staging` are default seeded tags that can be renamed or deleted like any custom tag.
+  Custom tag names must not be purely numeric and cannot be "latest". The `latest` tag is
+  protected and cannot be renamed or deleted. `production` and `staging` are default
+  seeded tags that can be renamed or deleted like any custom tag.
 </Note>
 
 ## Tag Management via SDKs
@@ -152,7 +155,8 @@ await langwatch.prompts.tags.delete("canary");
 ```
 
 <Warning>
-  The TypeScript SDK does not currently support `tags.rename()`. Use the REST API or Python SDK for renaming tags.
+  The TypeScript SDK does not currently support `tags.rename()`. Use the REST API or
+  Python SDK for renaming tags.
 </Warning>
 
 ### Python SDK
@@ -243,13 +247,13 @@ platform_update_prompt({
 
 Tag CRUD endpoints are **organization-scoped** (use an org-level API key). The assign endpoint is **project-scoped**.
 
-| Method | Endpoint | Description |
-|--------|----------|-------------|
-| `GET` | `/api/prompts/tags` | List all tags for the organization |
-| `POST` | `/api/prompts/tags` | Create a new tag (`{ "name": "canary" }`) |
-| `PUT` | `/api/prompts/tags/:tag` | Rename a tag (`{ "name": "new-name" }`) |
-| `DELETE` | `/api/prompts/tags/:tag` | Delete a tag (cascades removal from all versions) |
-| `PUT` | `/api/prompts/:id/tags/:tag` | Assign a tag to a version (`{ "versionId": "..." }`) |
+| Method   | Endpoint                     | Description                                          |
+| -------- | ---------------------------- | ---------------------------------------------------- |
+| `GET`    | `/api/prompts/tags`          | List all tags for the organization                   |
+| `POST`   | `/api/prompts/tags`          | Create a new tag (`{ "name": "canary" }`)            |
+| `PUT`    | `/api/prompts/tags/:tag`     | Rename a tag (`{ "name": "new-name" }`)              |
+| `DELETE` | `/api/prompts/tags/:tag`     | Delete a tag (cascades removal from all versions)    |
+| `PUT`    | `/api/prompts/:id/tags/:tag` | Assign a tag to a version (`{ "versionId": "..." }`) |
 
 ## CLI
 

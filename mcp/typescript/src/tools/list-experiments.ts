@@ -38,13 +38,9 @@ const escapeMarkdownTableCell = (value: string): string =>
 const formatInlineCode = (value: string): string =>
   `\`${value.replace(/[\\`|]/g, (c) => `\\${c}`).replace(/\n/g, " ")}\``;
 
-export async function handleExperimentList(params: {
-  limit?: number;
-}): Promise<string> {
+export async function handleExperimentList(params: { limit?: number }): Promise<string> {
   const requested =
-    typeof params.limit === "number" && params.limit > 0
-      ? params.limit
-      : DEFAULT_LIMIT;
+    typeof params.limit === "number" && params.limit > 0 ? params.limit : DEFAULT_LIMIT;
   const effectiveLimit = Math.min(requested, MAX_LIMIT);
 
   const search = new URLSearchParams();

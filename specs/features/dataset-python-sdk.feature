@@ -5,7 +5,7 @@ Feature: Dataset Python SDK
 
   # All scenarios remain @unimplemented because parity bindings (`/** @scenario */`
   # JSDoc) only resolve in TypeScript test roots scanned by
-  # platform/app/scripts/check-feature-parity.ts: platform/app/src, platform/app/ee,
+  # packages/architecture-lint/src/check-feature-parity.ts: [gone] src, [gone] ee,
   # mcp/typescript/src, sdks/typescript/src, sdks/python/src — but `sdks/python/src`
   # has no `.test.ts` files; Python tests live in `sdks/python/tests/*.py`.
   # The scenarios below are AUDIT_MANIFEST KEEP-class — covered by

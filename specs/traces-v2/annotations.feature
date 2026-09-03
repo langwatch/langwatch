@@ -209,7 +209,7 @@ Feature: Per-message actions in ConversationView
   # A single turn no longer has a one-click dataset action in the
   # conversation: capturing one turn goes through "Edit trace" to that turn
   # and the drawer header's add-to-dataset, and the annotation queue's session
-  # flow captures turns in bulk (specs/annotations/annotation-queue-workflow.feature).
+  # flow captures turns in bulk (packages/features/annotation/specs/annotation-queue-workflow.feature).
 
   Scenario: Drawer header surfaces a conversation-level add-to-dataset entry
     # Lives in TraceOverflowMenu, shown when the trace belongs to a

@@ -1,0 +1,276 @@
+import type { Command, CommandHandler, FoldProjectionStore } from "@langwatch/eventing";
+import { createTenantId, defineCommandSchema, EventUtils } from "@langwatch/eventing";
+import { createLogger } from "@langwatch/observability";
+import {
+  SIMULATION_EVENT_VERSIONS,
+  SIMULATION_RUN_COMMAND_TYPES,
+  SIMULATION_RUN_EVENT_TYPES,
+} from "@langwatch/scenario-contract";
+import type { TraceSummaryData } from "@langwatch/trace-contract";
+import type { ComputeRunMetricsCommandData } from "@langwatch/scenario-contract";
+import { computeRunMetricsCommandDataSchema } from "@langwatch/scenario-contract";
+import type {
+  SimulationProcessingEvent,
+  SimulationRunMetricsComputedEvent,
+  SimulationRunMetricsComputedEventData,
+} from "@langwatch/scenario-contract";
+
+const logger = createLogger("langwatch:simulation-processing:compute-run-metrics");
+
+const MAX_RETRIES = 3;
+export const COMPUTE_METRICS_RETRY_DELAY_MS = 10_000;
+
+/**
+ * The retry above, as the queue that carries it is told to stage it.
+ *
+ * Every other routing key on `event-sourcing/jobs` travels between the legacy
+ * registry and the packaged worker inside a pipeline definition, which is a
+ * static description handed across intact. This one does not: the retry is a
+ * queue job registered against the pipeline SERVICE after registration, so its
+ * name, delay and deduplication are spelled at the registration site rather
+ * than declared by `simulation_processing`. Two spellings would be two keys on
+ * one queue, and the consumer that did not stage a key never drains it — which
+ * is why they are decided here, beside the handler that schedules them, and
+ * read by whichever composition holds the live service.
+ */
+export const scenarioDeferredComputeRunMetricsJob = {
+  name: "deferredComputeRunMetrics",
+  delayMs: COMPUTE_METRICS_RETRY_DELAY_MS,
+  /**
+   * A run that is still waiting on its trace summary reschedules on every
+   * attempt, so the id has to collapse those onto one queue entry rather than
+   * accumulate one per attempt — `retryCount` is deliberately absent from it.
+   */
+  makeJobId(payload: ComputeRunMetricsCommandData): string {
+    return `compute-metrics-retry:${payload.tenantId}:${payload.scenarioRunId}:${payload.traceId}`;
+  },
+  spanAttributes(payload: ComputeRunMetricsCommandData): Record<string, string | number | boolean> {
+    return {
+      "deferred.tenant_id": payload.tenantId,
+      "deferred.scenario_run_id": payload.scenarioRunId,
+      "deferred.trace_id": payload.traceId,
+      "deferred.retry_count": payload.retryCount,
+    };
+  },
+};
+
+export interface ComputeRunMetricsDeps {
+  traceSummaryStore: FoldProjectionStore<TraceSummaryData>;
+  scheduleRetry: (payload: ComputeRunMetricsCommandData) => Promise<void>;
+  /**
+   * Derives per-role cost/latency for a trace from stored_spans. Replaces the
+   * old per-span fold accumulation: role costs are no longer carried on the
+   * trace summary, so they are computed here (once per trace, when its metrics
+   * are needed) instead of on the hot fold path for every span of every trace.
+   */
+  deriveScenarioRoleMetrics: (params: {
+    tenantId: string;
+    traceId: string;
+    occurredAtMs?: number;
+    foldVersion?: number;
+  }) => Promise<{
+    scenarioRoleCosts: Record<string, number>;
+    scenarioRoleLatencies: Record<string, number>;
+  }>;
+}
+
+const SCHEMA = defineCommandSchema(
+  SIMULATION_RUN_COMMAND_TYPES.COMPUTE_METRICS,
+  computeRunMetricsCommandDataSchema,
+  "Command to compute simulation run cost/latency metrics from trace data",
+);
+
+/**
+ * Command handler for computing simulation run metrics.
+ *
+ * Supports two modes:
+ * 1. ECST mode: metrics provided in payload (from trace-side subscriber) - emits event directly
+ * 2. Pull mode: no metrics in payload (from simulation-side subscriber) - reads trace summary
+ *
+ * When a trace summary is not yet available, schedules a deferred retry.
+ *
+ * Uses constructor DI — instantiate with deps and pass via `.withCommandInstance()`.
+ */
+/*
+ * `occurredAt` is carried through every retry by the `...data` spread and never
+ * restamped. It becomes the emitted event's `occurredAt`, which is both the
+ * ReplacingMergeTree version and the monthly partition key of
+ * `simulation_run_metrics`. Migrations 00080 and 00081 state this invariant —
+ * "a retry re-inserts a row with the SAME OccurredAt" — and a fresh clock
+ * reading breaks it: a retry that crosses a month boundary lands in a partition
+ * where the engine cannot collapse it, leaving one trace with two rows forever.
+ */
+export class ComputeRunMetricsAdapter implements CommandHandler<
+  Command<ComputeRunMetricsCommandData>,
+  SimulationProcessingEvent
+> {
+  static readonly schema = SCHEMA;
+
+  static create(deps: ComputeRunMetricsDeps): ComputeRunMetricsAdapter {
+    return new ComputeRunMetricsAdapter(deps);
+  }
+
+  constructor(private readonly deps: ComputeRunMetricsDeps) {}
+
+  async handle(
+    command: Command<ComputeRunMetricsCommandData>,
+  ): Promise<SimulationProcessingEvent[]> {
+    const { tenantId: tenantIdStr, data } = command;
+    const tenantId = createTenantId(tenantIdStr);
+    const { scenarioRunId, traceId } = data;
+
+    logger.debug(
+      {
+        tenantId,
+        scenarioRunId,
+        traceId,
+        hasMetrics: !!data.metrics,
+        retryCount: data.retryCount,
+      },
+      "Handling compute run metrics command",
+    );
+
+    // ECST path: metrics provided in payload
+    let metrics = data.metrics;
+
+    // Pull fallback: read from trace summary store
+    if (!metrics) {
+      const traceSummary = await this.deps.traceSummaryStore.get(traceId, {
+        tenantId,
+        aggregateId: traceId,
+      });
+
+      if (!traceSummary) {
+        logger.debug(
+          { tenantId, scenarioRunId, traceId, retryCount: data.retryCount },
+          "Trace summary not available yet",
+        );
+
+        if (data.retryCount < MAX_RETRIES) {
+          await this.deps.scheduleRetry({
+            ...data,
+            retryCount: data.retryCount + 1,
+          });
+        } else {
+          // Error, not warn: giving up here means this run's cost and
+          // latency never exist. No later event repairs it — the retry was
+          // the only path — so a run silently carries no metrics forever.
+          // Logged with everything needed to find it, and with the window
+          // that was actually waited, because "the trace was slower than the
+          // budget" and "the trace never arrived" need different responses.
+          logger.error(
+            {
+              tenantId,
+              scenarioRunId,
+              traceId,
+              attempts: MAX_RETRIES,
+              waitedMs: MAX_RETRIES * COMPUTE_METRICS_RETRY_DELAY_MS,
+            },
+            "Gave up computing trace metrics: the trace summary never arrived, so this run has no cost or latency",
+          );
+        }
+
+        return [];
+      }
+
+      // Role cost/latency are derived from stored_spans (not carried on the
+      // summary anymore); totalCost is still a summary scalar.
+      const { scenarioRoleCosts: roleCosts, scenarioRoleLatencies: roleLatencies } =
+        await this.deps.deriveScenarioRoleMetrics({
+          tenantId: tenantIdStr,
+          traceId,
+          occurredAtMs: traceSummary.occurredAt,
+          foldVersion: traceSummary.spanCount,
+        });
+
+      // Summary exists but not yet populated (cost enrichment still in progress).
+      // Treat like missing summary — schedule retry so we pick it up later.
+      // Role latency is enough on its own: a scenario trace can have
+      // role-bearing spans with latency but no cost (totalCost null, roleCosts
+      // empty), and those metrics are still worth emitting.
+      if (
+        Object.keys(roleCosts).length === 0 &&
+        Object.keys(roleLatencies).length === 0 &&
+        traceSummary.totalCost === null
+      ) {
+        logger.debug(
+          { tenantId, scenarioRunId, traceId, retryCount: data.retryCount },
+          "Trace summary exists but has no metrics yet",
+        );
+
+        if (data.retryCount < MAX_RETRIES) {
+          await this.deps.scheduleRetry({
+            ...data,
+            retryCount: data.retryCount + 1,
+          });
+        } else {
+          logger.error(
+            {
+              tenantId,
+              scenarioRunId,
+              traceId,
+              attempts: MAX_RETRIES,
+              waitedMs: MAX_RETRIES * COMPUTE_METRICS_RETRY_DELAY_MS,
+            },
+            "Gave up computing trace metrics: the trace summary stayed empty, so this run has no cost or latency",
+          );
+        }
+
+        return [];
+      }
+
+      metrics = {
+        totalCost: traceSummary.totalCost ?? 0,
+        roleCosts,
+        roleLatencies,
+      };
+    }
+
+    const eventData: SimulationRunMetricsComputedEventData = {
+      scenarioRunId,
+      traceId,
+      totalCost: metrics.totalCost,
+      roleCosts: metrics.roleCosts,
+      roleLatencies: metrics.roleLatencies,
+    };
+
+    const event = EventUtils.createEvent<SimulationRunMetricsComputedEvent>({
+      aggregateType: "simulation_run",
+      aggregateId: scenarioRunId,
+      tenantId,
+      type: SIMULATION_RUN_EVENT_TYPES.METRICS_COMPUTED,
+      version: SIMULATION_EVENT_VERSIONS.METRICS_COMPUTED,
+      data: eventData,
+      occurredAt: data.occurredAt,
+      idempotencyKey: `${tenantIdStr}:${scenarioRunId}:${traceId}:computeRunMetrics`,
+    });
+
+    logger.debug(
+      { tenantId, scenarioRunId, traceId, eventId: event.id },
+      "Emitting simulation run metrics computed event",
+    );
+
+    return [event];
+  }
+
+  static getAggregateId(payload: ComputeRunMetricsCommandData): string {
+    return payload.scenarioRunId;
+  }
+
+  static getSpanAttributes(
+    payload: ComputeRunMetricsCommandData,
+  ): Record<string, string | number | boolean> {
+    return {
+      "payload.scenarioRun.id": payload.scenarioRunId,
+      "payload.traceId": payload.traceId,
+      "payload.hasMetrics": !!payload.metrics,
+      "payload.retryCount": payload.retryCount,
+    };
+  }
+
+  static makeJobId(payload: ComputeRunMetricsCommandData): string {
+    return `${payload.tenantId}:${payload.scenarioRunId}:${payload.traceId}:compute-run-metrics`;
+  }
+}
+
+export { ComputeRunMetricsAdapter as ComputeRunMetricsCommand };

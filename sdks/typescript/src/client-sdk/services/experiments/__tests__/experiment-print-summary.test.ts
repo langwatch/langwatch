@@ -6,7 +6,15 @@
  * reflection via `Object.assign` on an Object.create'd Experiment prototype to populate
  * the cumulative arrays without going through the network.
  */
-import { describe, it, expect, vi, beforeEach, afterEach, type MockInstance } from "vitest";
+import {
+  describe,
+  it,
+  expect,
+  vi,
+  beforeEach,
+  afterEach,
+  type MockInstance,
+} from "vitest";
 import { Experiment } from "../experiment";
 import type { BatchEntry, EvaluationResult } from "../types";
 
@@ -110,9 +118,7 @@ describe("Experiment.printSummary", () => {
     /** @scenario printSummary does not exit when exitOnFailure is false even with failures */
     it("prints the failure count but does not exit", () => {
       const exp = buildExperimentFixture({
-        evaluations: [
-          evaluation({ passed: false }),
-        ],
+        evaluations: [evaluation({ passed: false })],
       });
 
       exp.printSummary(false);
@@ -165,9 +171,7 @@ describe("Experiment.printSummary", () => {
           evaluation({ passed: true, target_id: "gpt-4o" }),
           evaluation({ passed: false, target_id: "gpt-4o", index: 1 }),
         ],
-        entries: [
-          { index: 0, entry: null, duration: 100, error: null, trace_id: "t1" },
-        ],
+        entries: [{ index: 0, entry: null, duration: 100, error: null, trace_id: "t1" }],
       });
 
       exp.printSummary(false);

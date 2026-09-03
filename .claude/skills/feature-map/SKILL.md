@@ -40,6 +40,7 @@ Each feature has two main access paths:
 - **`platform`** — no-code via UI or MCP tools (UI route, MCP tool, platform skill)
 
 Plus cross-cutting:
+
 - **`api`** — REST/Hono API endpoint namespace (used by both code and platform)
 - **`docs`** — canonical documentation URL
 
@@ -49,21 +50,22 @@ Fields point to **namespaces**, not individual methods. E.g., `"python": "langwa
 
 How code and platform relate for each feature:
 
-| sync value | meaning | example |
-|---|---|---|
-| `null` | separate or one-mode only | annotations (platform only) |
-| `"bidirectional"` | code ↔ platform, synced | prompts (via `prompt sync`) |
-| `"code-to-platform"` | code generates, platform displays | tracing, experiments |
-| `"platform-to-code"` | platform configures, code consumes | — (none currently) |
+| sync value           | meaning                            | example                     |
+| -------------------- | ---------------------------------- | --------------------------- |
+| `null`               | separate or one-mode only          | annotations (platform only) |
+| `"bidirectional"`    | code ↔ platform, synced            | prompts (via `prompt sync`) |
+| `"code-to-platform"` | code generates, platform displays  | tracing, experiments        |
+| `"platform-to-code"` | platform configures, code consumes | — (none currently)          |
 
 `plannedSync` captures known future intent (e.g., scenarios will become `"bidirectional"`).
 
 ## Where to Find Things in the Codebase
 
 ### API Endpoints
+
 - **Hono routes** (current): `platform/app/src/app/api/` — each `[[...route]]/app.ts` is a Hono app
   - traces: `platform/app/src/app/api/traces/[[...route]]/app.ts`
-  - scenarios: `platform/app/src/app/api/scenarios/[[...route]]/app.ts`
+  - scenarios: `packages/features/scenario/server/src/transport/api-rest/` (packaged, mounted by `createAppRestFeatures`)
   - prompts: `platform/app/src/app/api/prompts/[[...route]]/app.ts`
   - evaluators: `platform/app/src/app/api/evaluators/[[...route]]/app.ts`
   - datasets: `platform/app/src/app/api/dataset/[[...route]]/`
@@ -73,63 +75,76 @@ How code and platform relate for each feature:
 - **tRPC routers**: `platform/app/src/server/api/routers/` registered in `platform/app/src/server/api/root.ts`
 
 ### Platform UI
+
 - **Route definitions**: `platform/app/src/utils/routes.ts` — `projectRoutes` object has every page route
 - **Sidebar menu**: `platform/app/src/components/MainMenu.tsx` — sections: Observe, Evaluate, Library
 - **Feature icons**: `platform/app/src/utils/featureIcons.ts`
 
 ### MCP Tools
+
 - **All tools**: `mcp/typescript/src/index.ts` — every `server.tool()` call
 - **Tool handlers**: `mcp/typescript/src/tools/*.ts`
 - Currently 21 tools: 2 docs, 1 discovery, 3 observability, 4 prompt, 5 scenario, 4 evaluator, 2 model-provider
 
 ### CLI Commands
+
 - **Entry point**: `sdks/typescript/src/cli/index.ts`
 - **Command implementations**: `sdks/typescript/src/cli/commands/`
 - Currently: `login` + `prompt` subcommands (init, create, add, remove, list, sync, pull, push)
 
 ### SDKs
+
 - **Python**: `sdks/python/src/langwatch/__init__.py` (top-level exports), modules: `experiment`, `evaluation`, `dataset`, `evaluators`, `prompts`, `dspy`
 - **TypeScript**: `sdks/typescript/src/index.ts` — `LangWatch` class with `.prompts`, `.experiments`, `.evaluations`, `.evaluators`, `.datasets`, `.traces`
 - **Scenario SDK** (separate): `@langwatch/scenario` (TS) / `langwatch-scenario` (Python)
 
 ### Skills (external, for users)
+
 - **Location**: `skills/*/SKILL.md`
 - **Feature skills**: tracing, evaluations, scenarios, prompts (each handles both code and platform approaches)
 - **Meta skills**: level-up (orchestrates all feature skills)
 - **Cross-cutting**: analytics
 
 ### Documentation
+
 - **LangWatch docs**: served via `fetch_langwatch_docs` MCP tool, index at `https://langwatch.ai/docs/llms.txt`
 - **Scenario docs**: served via `fetch_scenario_docs` MCP tool, index at `https://langwatch.ai/scenario/llms.txt`
 
 ## How to Update the Feature Map
 
 ### When a new API endpoint is added
+
 1. Read `feature-map.json`
 2. Find the feature entry by `id`
 3. Update `surfaces.api` with the route namespace
 4. If it's a new feature, create a new entry under the right category
 
 ### When a new MCP tool is added
+
 1. Verify the tool exists in `mcp/typescript/src/index.ts`
 2. Add the tool name to `surfaces.platform.mcp` array
 
 ### When a new skill is created
+
 1. Verify the skill exists in `skills/{name}/SKILL.md`
 2. Add to `surfaces.code.skill` (for code-path skills) or `surfaces.platform.skill` (for platform-path skills)
 
 ### When a new CLI command is added
+
 1. Verify it exists in `sdks/typescript/src/cli/commands/`
 2. Add to `surfaces.code.cli` array
 
 ### When SDK surface changes
+
 1. Update `surfaces.code.sdk` with the namespace
 
 ### When sync capability changes
+
 1. Move value from `plannedSync` to `sync`
 2. Or set new `plannedSync` for future plans
 
 ### When a completely new feature is added
+
 1. Decide which category it belongs to based on the hierarchy rules above
 2. Create a new entry with all known surfaces
 3. Set `sync` appropriately
@@ -138,6 +153,7 @@ How code and platform relate for each feature:
 ## Validation
 
 After any change, verify:
+
 - Every `api` value corresponds to a route in `platform/app/src/app/api/` or `platform/app/src/pages/api/`
 - Every `mcp` tool name appears in `mcp/typescript/src/index.ts`
 - Every `skill` name has a `skills/{name}/SKILL.md`

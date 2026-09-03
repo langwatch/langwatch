@@ -3,13 +3,13 @@
 #
 # Usage:
 #   dev/scripts/dev.sh                # interactive preset picker
-#   dev/scripts/dev.sh all-local      # local CH+PG+Redis+app, no NLP
+#   dev/scripts/dev.sh all-local      # local CH+PG+Redis+ui+api+workers, no NLP
 #   dev/scripts/dev.sh all-local-nlp  # all-local + nlpgo + langevals
 #   dev/scripts/dev.sh dev-storage    # local CH+PG+Redis, stored-objects -> dev S3
-#   dev/scripts/dev.sh dev-infra      # local redis + workers + app, everything else against shared dev
+#   dev/scripts/dev.sh dev-infra      # local redis + workers, everything else against shared dev
 #   dev/scripts/dev.sh frontend-only  # no compose, pure pnpm dev against .env URLs
 #   dev/scripts/dev.sh migration      # postgres + clickhouse on host ports for prisma migrate
-#   dev/scripts/dev.sh full-local     # all-local-nlp + workers + ai-server
+#   dev/scripts/dev.sh full-local     # all-local-nlp + a dedicated workers container
 #   dev/scripts/dev.sh help           # non-interactive preset reference
 #   dev/scripts/dev.sh down           # stop all services
 #   dev/scripts/dev.sh ps | logs | clean | rebuild
@@ -27,7 +27,7 @@ LangWatch dev environment
 
 Presets — pass as the first arg or pick interactively:
 
-  all-local       Local postgres + redis + clickhouse + app + workers.
+  all-local       Local postgres + redis + clickhouse + ui + api + workers.
                   No NLP. Stored-objects fall back to local-FS. Fast iteration
                   default.
 
@@ -36,36 +36,35 @@ Presets — pass as the first arg or pick interactively:
   dev-storage     Local CH + PG + Redis + workers. Stored-objects route to the
                   dev S3 bucket runtime-storage-dev in lw-dev (eu-central-1).
                   Real AWS S3 driver under test without polluting shared dev
-                  tables. Requires fresh AWS SSO credentials in platform/app/.env
-                  — run `bash platform/app/scripts/refresh-dev-s3-env.sh` first
+                  tables. Requires fresh AWS SSO credentials in .env
+                  — run `bash dev/scripts/refresh-dev-s3-env.sh` first
                   if S3_SESSION_TOKEN is missing or stale.
 
-  dev-infra       Local app + local Redis + local workers container.
-                  Postgres, ClickHouse, NLP, and S3 stay remote (shared dev
-                  infrastructure). Redis and the `workers` compose service
-                  are brought up so BullMQ jobs / GroupQueue streams stay
-                  isolated to this operator and background processing
-                  matches production's container layout. App still runs via
-                  `pnpm dev` on the host for hot-reload. Most faithful e2e
-                  short of running prod. WARNING: other developers see your
-                  data in dev CH / dev PG.
+  dev-infra       Local Redis + local workers container; the ui and api
+                  applications run on the host. Postgres, ClickHouse, NLP and
+                  S3 stay remote (shared dev infrastructure). Redis and the
+                  `workers` compose service are brought up so BullMQ jobs /
+                  GroupQueue streams stay isolated to this operator and
+                  background processing matches production's container layout.
+                  The applications still run via `pnpm dev` on the host for
+                  hot-reload. Most faithful e2e short of running prod.
+                  WARNING: other developers see your data in dev CH / dev PG.
 
   frontend-only   No compose. Pure `pnpm dev` against the URLs in your
-                  platform/app/.env. UI / design / static iteration. Workers
-                  still run in-process via `pnpm dev`; set
-                  START_WORKERS=false on the command line if you want pure
-                  Vite with no background processing.
+                  .env. UI / design / static iteration. `pnpm dev` runs all
+                  three applications; for the browser application alone, run
+                  `pnpm dev:ui` instead.
 
   migration       postgres + clickhouse on HOST ports (5432 / 8123). Run
-                  `pnpm prisma migrate dev` and `pnpm clickhouse:migrate`
-                  from your host shell. No app, no workers.
+                  `pnpm prisma:migrate` and `pnpm clickhouse:migrate` from your
+                  host shell. No applications, no workers.
 
-  full-local      Kitchen-sink local: all-local-nlp + dedicated workers
-                  container + ai-server. Slowest boot.
+  full-local      Kitchen-sink local: all-local-nlp + a dedicated workers
+                  container. Slowest boot.
 
-URL-override model: each preset writes `platform/app/.env.dev-up` listing only
+URL-override model: each preset writes `.env.dev-up` listing only
 the URLs whose services start locally. compose loads this overlay AFTER
-platform/app/.env (your source of truth), so non-overridden URLs keep their
+.env (your source of truth), so non-overridden URLs keep their
 .env values. CREDENTIALS NEVER GO IN THE OVERLAY — only non-rotating
 infra shape (bucket/endpoint/region/connection-host).
 
@@ -103,9 +102,9 @@ LAST_CHOICE_FILE="/tmp/.langwatch-dev-last-choice-v4-${COMPOSE_PROJECT_NAME:-lan
 
 check_env_files() {
   local missing=0
-  if [ ! -f "platform/app/.env" ]; then
-    echo "WARNING: platform/app/.env not found"
-    echo "  → cp platform/app/.env.example platform/app/.env"
+  if [ ! -f ".env" ]; then
+    echo "WARNING: .env not found"
+    echo "  → cp .env.example .env"
     missing=1
   fi
   if [ $missing -eq 1 ]; then
@@ -120,13 +119,13 @@ check_env_files() {
 
 # Fail-fast on insecure SaaS-mode config.
 check_saas_ssrf_guard() {
-  if [ ! -f "platform/app/.env" ]; then return 0; fi
-  if ! grep -qE "^IS_SAAS[[:space:]]*=[[:space:]]*['\"]?true['\"]?[[:space:]]*$" platform/app/.env; then
+  if [ ! -f ".env" ]; then return 0; fi
+  if ! grep -qE "^IS_SAAS[[:space:]]*=[[:space:]]*['\"]?true['\"]?[[:space:]]*$" .env; then
     return 0
   fi
-  if ! grep -qE "^BLOCK_LOCAL_HTTP_CALLS[[:space:]]*=[[:space:]]*['\"]?(true|1|yes)['\"]?[[:space:]]*$" platform/app/.env; then
+  if ! grep -qE "^BLOCK_LOCAL_HTTP_CALLS[[:space:]]*=[[:space:]]*['\"]?(true|1|yes)['\"]?[[:space:]]*$" .env; then
     cat >&2 <<'EOF'
-ERROR: platform/app/.env has IS_SAAS=true but BLOCK_LOCAL_HTTP_CALLS is not
+ERROR: .env has IS_SAAS=true but BLOCK_LOCAL_HTTP_CALLS is not
        explicitly set to a truthy value. SaaS mode requires SSRF blocking;
        absence of the variable counts as disabled. Add:
          BLOCK_LOCAL_HTTP_CALLS=true
@@ -173,7 +172,7 @@ redis_port_in_use() {
 # speaks the Redis protocol with no auth/TLS gate by issuing PING and checking
 # for a PONG reply. If redis-cli is unavailable we cannot verify it, so we
 # degrade to "not usable" and the caller refuses to reuse an unverifiable
-# listener (rather than silently breaking the in-process BullMQ workers).
+# listener (rather than silently breaking the BullMQ workers).
 redis_listener_is_usable() {
   command -v redis-cli >/dev/null 2>&1 || return 1
   redis-cli -u redis://localhost:6379 ping 2>/dev/null | grep -qx 'PONG'
@@ -224,18 +223,18 @@ EOF
 # Skip with QUICKSTART_NO_REFRESH=1 if you want to manage creds manually
 # (e.g. you've pasted in an IAM-user access key instead of using SSO).
 check_dev_s3_credentials() {
-  if [ ! -f "platform/app/.env" ]; then
+  if [ ! -f ".env" ]; then
     return 0
   fi
   local has_token
-  has_token=$(grep -E "^S3_SESSION_TOKEN[[:space:]]*=[[:space:]]*['\"]?.+['\"]?[[:space:]]*$" platform/app/.env || true)
+  has_token=$(grep -E "^S3_SESSION_TOKEN[[:space:]]*=[[:space:]]*['\"]?.+['\"]?[[:space:]]*$" .env || true)
   if [ -n "$has_token" ]; then
     return 0
   fi
 
   if [ "${QUICKSTART_NO_REFRESH:-0}" = "1" ]; then
     cat >&2 <<'EOF'
-ERROR: dev-storage requires S3_SESSION_TOKEN in platform/app/.env but
+ERROR: dev-storage requires S3_SESSION_TOKEN in .env but
        QUICKSTART_NO_REFRESH=1 was set. Set the credentials manually
        (e.g. an IAM user's access key) or unset QUICKSTART_NO_REFRESH
        and let the launcher rotate SSO creds for you.
@@ -243,8 +242,8 @@ EOF
     exit 1
   fi
 
-  echo "No S3_SESSION_TOKEN in platform/app/.env — auto-refreshing AWS SSO credentials..."
-  if ! bash platform/app/scripts/refresh-dev-s3-env.sh; then
+  echo "No S3_SESSION_TOKEN in .env — auto-refreshing AWS SSO credentials..."
+  if ! bash dev/scripts/refresh-dev-s3-env.sh; then
     cat >&2 <<'EOF'
 ERROR: refresh-dev-s3-env.sh failed. Inspect the output above. Common causes:
   - lw-dev-sso profile not configured (~/.aws/config)
@@ -261,14 +260,12 @@ ensure_prepared() {
   check_saas_ssrf_guard
   check_stateful_collision
   check_host_redis_collision
-  ( cd platform/app
-    if [ ! -d node_modules ]; then
-      echo "Installing host dependencies (for prep)..."
-      pnpm install
-    fi
-    echo "Preparing files..."
-    pnpm run start:prepare:files
-  )
+  if [ ! -d node_modules ]; then
+    echo "Installing host dependencies (for prep)..."
+    pnpm install
+  fi
+  echo "Preparing files..."
+  pnpm run start:prepare:files
 }
 
 # ---------------------------------------------------------------------------
@@ -278,13 +275,13 @@ ensure_prepared() {
 
 write_overrides() {
   local preset="$1"
-  local out="platform/app/.env.dev-up"
+  local out=".env.dev-up"
   write_dev_overrides "$preset" "$out"
   if [ -s "$out" ]; then
     echo "URL overrides for preset=$preset written to $out:"
     sed 's/^/  /' "$out" >&2
   else
-    echo "No URL overrides for preset=$preset — your platform/app/.env values are used as-is."
+    echo "No URL overrides for preset=$preset — your .env values are used as-is."
   fi
 }
 
@@ -306,6 +303,7 @@ find_free_port() {
 run_all_local() {
   ensure_prepared
   export APP_PORT=$(find_free_port 5560)
+  export API_PORT=$(find_free_port 6560)
   . "$(dirname "$0")/lib/sanitize-dev-env.sh"
   sanitize_localhost_dev_env
   write_overrides all-local
@@ -316,6 +314,7 @@ run_all_local() {
 run_all_local_nlp() {
   ensure_prepared
   export APP_PORT=$(find_free_port 5560)
+  export API_PORT=$(find_free_port 6560)
   . "$(dirname "$0")/lib/sanitize-dev-env.sh"
   sanitize_localhost_dev_env
   write_overrides all-local-nlp
@@ -329,23 +328,24 @@ run_dev_storage() {
   check_dev_s3_credentials
   ensure_prepared
   export APP_PORT=$(find_free_port 5560)
+  export API_PORT=$(find_free_port 6560)
   . "$(dirname "$0")/lib/sanitize-dev-env.sh"
   sanitize_localhost_dev_env
   write_overrides dev-storage
   echo "Starting: postgres + redis + clickhouse + app + workers (preset=dev-storage)"
-  echo "  Stored-objects route to s3://runtime-storage-dev/ via SSO credentials in platform/app/.env"
+  echo "  Stored-objects route to s3://runtime-storage-dev/ via SSO credentials in .env"
   $COMPOSE --profile workers up
 }
 
 run_dev_infra() {
-  # Local app + local Redis + local workers compose + remote everything else.
-  # Redis runs locally so BullMQ queues / GroupQueue streams / the fold cache
-  # stay isolated to this operator (using shared dev Redis would collide with
-  # other developers' jobs). The `workers` compose service runs alongside so
-  # background jobs match production layout instead of relying on the host
-  # `pnpm dev` in-process worker. DB / CH / NLP / S3 all stay remote per the
-  # operator's .env. Warn loudly first — operators routinely write into
-  # shared dev tables when running this.
+  # Host-side ui + api, local Redis, a local workers container, and remote
+  # everything else. Redis runs locally so BullMQ queues / GroupQueue streams /
+  # the fold cache stay isolated to this operator (using shared dev Redis would
+  # collide with other developers' jobs). The `workers` compose service runs
+  # instead of the host's own worker process, so background jobs match the
+  # production layout. DB / CH / NLP / S3 all stay remote per the operator's
+  # .env. Warn loudly first — operators routinely write into shared dev tables
+  # when running this.
   cat <<'EOF'
 
 ╔════════════════════════════════════════════════════════════╗
@@ -371,69 +371,68 @@ EOF
   ensure_prepared
   write_overrides dev-infra
   echo "Starting: redis + workers compose services (preset=dev-infra)"
-  echo "  App runs via 'pnpm dev' from platform/app/ on the host for hot-reload."
-  echo "  Workers run in the compose 'workers' container (not in-process)."
-  echo "  DB / ClickHouse / NLP / S3 come from platform/app/.env (shared dev)."
+  echo "  The ui and api applications run via 'pnpm dev:app' on the host for hot-reload."
+  echo "  Workers run in the compose 'workers' container."
+  echo "  DB / ClickHouse / NLP / S3 come from .env (shared dev)."
   $COMPOSE --profile workers up -d redis workers
   cat <<'EOF'
 
 Redis is running detached on localhost:6379.
 Workers compose container is running detached. Next:
 
-  cd platform/app
-  pnpm dev
+  pnpm dev:app        # ui + api on the host; the workers container has the rest
 
 Stop redis + workers with: dev/scripts/dev.sh down
 EOF
 }
 
 run_frontend_only() {
-  # frontend-only runs no app/DB/CH compose — DB, ClickHouse, NLP and S3 all
-  # come from the operator's .env (shared dev). BUT `pnpm dev` starts the
-  # BullMQ workers in-process by default (set START_WORKERS=false for pure
-  # Vite), and those workers need Redis. Bring up only the lightweight `redis`
-  # compose service locally — sharing dev Redis would collide with other
-  # developers' jobs (same reason dev-infra runs Redis locally). The overlay
-  # pins REDIS_URL=redis://localhost:6379 so the host-side `pnpm dev` reaches it.
+  # frontend-only runs no application/DB/CH compose — DB, ClickHouse, NLP and
+  # S3 all come from the operator's .env (shared dev). BUT `pnpm dev` runs all
+  # three applications, and the worker needs Redis. Bring up only the
+  # lightweight `redis` compose service locally — sharing dev Redis would
+  # collide with other developers' jobs (same reason dev-infra runs Redis
+  # locally). The overlay pins REDIS_URL=redis://localhost:6379 so the
+  # host-side `pnpm dev` reaches it.
   #
   # If a host process already owns 6379 (e.g. the operator runs their own
   # redis), reuse it ONLY when it answers PING with PONG — i.e. a real,
   # auth-free local Redis. A non-Redis listener, or a Redis that requires
-  # auth/TLS, would let `pnpm dev` start but silently break the in-process
-  # BullMQ workers later, so fail loudly instead of reusing it. If 6379 is
-  # free, bring up our own lightweight redis container.
+  # auth/TLS, would let `pnpm dev` start but silently break the BullMQ workers
+  # later, so fail loudly instead of reusing it. If 6379 is free, bring up our
+  # own lightweight redis container.
   write_overrides frontend-only
   if redis_port_in_use && redis_listener_is_usable; then
-    echo "Port 6379 already has a usable Redis — reusing it for in-process workers (not starting a redis container)."
+    echo "Port 6379 already has a usable Redis — reusing it for the worker lane (not starting a redis container)."
   elif redis_port_in_use; then
     cat >&2 <<'EOF'
 ERROR: Port 6379 has a listener, but it could not be verified as a usable
        local Redis (redis-cli PING did not return PONG, or redis-cli is not
-       installed). frontend-only points the in-process BullMQ workers at
+       installed). frontend-only points the BullMQ workers at
        redis://localhost:6379, so reusing a non-Redis process — or a Redis
        that needs auth/TLS — would silently break job processing. Fix one of:
          - install redis-cli so the launcher can verify the listener, or
          - stop whatever owns 6379 / repoint it at a plain local Redis, or
          - free port 6379 so this launcher can start its own redis container.
-       Pure Vite with no workers: START_WORKERS=false pnpm dev.
+       The browser application alone, with no workers: pnpm dev:ui.
 EOF
     exit 1
   else
     echo "Starting: redis compose service (preset=frontend-only)"
     $COMPOSE up -d redis
-    echo "Redis is running detached on localhost:6379 (for in-process workers)."
+    echo "Redis is running detached on localhost:6379 (for the worker lane)."
   fi
-  echo "Preset: frontend-only — no app compose. Run 'pnpm dev' from platform/app/ to start."
+  echo "Preset: frontend-only — no application compose. Run 'pnpm dev' from the repo root to start."
   echo ""
-  echo "Tip: pure UI / design / static iteration. URLs come from platform/app/.env."
+  echo "Tip: pure UI / design / static iteration. URLs come from .env."
   echo "     For services on top: switch to all-local, all-local-nlp, or full-local."
-  echo "     Pure Vite with no background processing: START_WORKERS=false pnpm dev."
+  echo "     The browser application alone, no background processing: pnpm dev:ui."
   echo "     Stop redis with: dev/scripts/dev.sh down"
   # Skip flags must be on the shell env of the pnpm dev subprocess, NOT in
-  # .env.dev-up: start:prepare:db runs the migrations before the app boots
-  # dotenv, so it reads the shell environment, not the overlay file. Frontend-only
+  # .env.dev-up: the migration scripts run before any application boots dotenv,
+  # so they read the shell environment, not the overlay file. Frontend-only
   # targets shared dev infra whose ClickHouse schema we don't own, so skip migrate.
-  (cd platform/app && SKIP_CLICKHOUSE_MIGRATE=true SKIP_PRISMA_MIGRATE=true pnpm dev)
+  SKIP_CLICKHOUSE_MIGRATE=true SKIP_PRISMA_MIGRATE=true pnpm dev
 }
 
 run_migration() {
@@ -444,13 +443,12 @@ run_migration() {
   cat <<EOF
 
 Postgres: localhost:5432  Clickhouse: localhost:8123
-DATABASE_URL and CLICKHOUSE_URL pinned to localhost in platform/app/.env.dev-up.
+DATABASE_URL and CLICKHOUSE_URL pinned to localhost in .env.dev-up.
 
 Run migrations from your host shell:
 
-  cd platform/app
-  pnpm prisma migrate dev          # for postgres schema changes
-  pnpm clickhouse:migrate           # for clickhouse schema changes
+  pnpm prisma:migrate      # for postgres schema changes
+  pnpm clickhouse:migrate  # for clickhouse schema changes
 
 Stop with: dev/scripts/dev.sh down
 EOF
@@ -459,7 +457,7 @@ EOF
 run_full_local() {
   ensure_prepared
   export APP_PORT=$(find_free_port 5560)
-  export AI_SERVER_PORT=$(find_free_port 3456)
+  export API_PORT=$(find_free_port 6560)
   . "$(dirname "$0")/lib/sanitize-dev-env.sh"
   sanitize_localhost_dev_env
   write_overrides full-local
@@ -554,7 +552,7 @@ Pick a preset:
   4) dev-infra       Local app + Redis + workers, shared dev infra for PG/CH/NLP/S3. Most faithful e2e.
   5) frontend-only   No compose. UI / design / static iteration.
   6) migration       postgres + clickhouse on host ports for prisma migrate (no app, no workers).
-  7) full-local      Kitchen-sink local: all-local-nlp + dedicated workers container + ai-server.
+  7) full-local      Kitchen-sink local: all-local-nlp + a dedicated workers container.
 
   d) down            stop all services
   l) logs            tail compose logs

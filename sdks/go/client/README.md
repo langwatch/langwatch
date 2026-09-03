@@ -55,11 +55,11 @@ func main() {
 LangWatch accepts two credential families, both handled transparently. Configure
 them with options or the matching environment variables:
 
-| Option | Environment variable | Purpose |
-| --- | --- | --- |
-| `client.WithAPIKey(key)` | `LANGWATCH_API_KEY` | API key or Personal Access Token |
-| `client.WithProjectID(id)` | `LANGWATCH_PROJECT_ID` | Project ID (required for PATs) |
-| `client.WithEndpoint(url)` | `LANGWATCH_ENDPOINT` | Base URL (self-hosted / staging) |
+| Option                     | Environment variable   | Purpose                          |
+| -------------------------- | ---------------------- | -------------------------------- |
+| `client.WithAPIKey(key)`   | `LANGWATCH_API_KEY`    | API key or Personal Access Token |
+| `client.WithProjectID(id)` | `LANGWATCH_PROJECT_ID` | Project ID (required for PATs)   |
+| `client.WithEndpoint(url)` | `LANGWATCH_ENDPOINT`   | Base URL (self-hosted / staging) |
 
 An explicit option always wins over the environment.
 
@@ -88,18 +88,18 @@ lw, err := client.New(
 Reach resources through the service fields on `*client.Client`. Every method
 takes a `context.Context` first and returns a typed error on failure.
 
-| Field | Resource |
-| --- | --- |
-| `lw.Prompts` | Prompt configs, versions and tags |
-| `lw.Datasets` | Datasets and records |
-| `lw.Traces` | Trace search and retrieval |
-| `lw.Annotations` | Human annotations on traces |
-| `lw.Events` | Tracked events by trace id, incl. thumbs up/down feedback |
-| `lw.Evaluations` | Submit evaluation results by trace id |
-| `lw.Triggers` | Alerting / automation triggers |
-| `lw.Monitors` | Evaluation monitors |
-| `lw.Scenarios` | Simulation scenarios and runs |
-| `lw.Projects` | Organization projects (admin key) |
+| Field            | Resource                                                  |
+| ---------------- | --------------------------------------------------------- |
+| `lw.Prompts`     | Prompt configs, versions and tags                         |
+| `lw.Datasets`    | Datasets and records                                      |
+| `lw.Traces`      | Trace search and retrieval                                |
+| `lw.Annotations` | Human annotations on traces                               |
+| `lw.Events`      | Tracked events by trace id, incl. thumbs up/down feedback |
+| `lw.Evaluations` | Submit evaluation results by trace id                     |
+| `lw.Triggers`    | Alerting / automation triggers                            |
+| `lw.Monitors`    | Evaluation monitors                                       |
+| `lw.Scenarios`   | Simulation scenarios and runs                             |
+| `lw.Projects`    | Organization projects (admin key)                         |
 
 ### Prompts
 
@@ -389,13 +389,13 @@ for rec, err := range lw.Datasets.AllRecords(ctx, "golden-examples", client.List
 }
 ```
 
-| Iterator | Yields | Pages by |
-|----------|--------|----------|
+| Iterator                                        | Yields           | Pages by                |
+| ----------------------------------------------- | ---------------- | ----------------------- |
 | `lw.Datasets.AllRecords(ctx, slugOrID, params)` | `map[string]any` | offset (`page`/`limit`) |
-| `lw.Datasets.All(ctx, params)` | `client.Dataset` | offset (`page`/`limit`) |
-| `lw.Traces.All(ctx, params)` | `client.Trace` | cursor (`scrollId`) |
-| `lw.Scenarios.AllRuns(ctx, params)` | `map[string]any` | cursor (`nextCursor`) |
-| `lw.Projects.All(ctx, params)` | `client.Project` | offset (`page`/`limit`) |
+| `lw.Datasets.All(ctx, params)`                  | `client.Dataset` | offset (`page`/`limit`) |
+| `lw.Traces.All(ctx, params)`                    | `client.Trace`   | cursor (`scrollId`)     |
+| `lw.Scenarios.AllRuns(ctx, params)`             | `map[string]any` | cursor (`nextCursor`)   |
+| `lw.Projects.All(ctx, params)`                  | `client.Project` | offset (`page`/`limit`) |
 
 Every iterator:
 

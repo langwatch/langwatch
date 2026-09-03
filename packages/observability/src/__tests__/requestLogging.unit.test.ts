@@ -182,7 +182,6 @@ describe("requestLogging", () => {
           statusCode: 500,
         });
       });
-
     });
 
     describe("when the response succeeds", () => {
@@ -346,9 +345,7 @@ describe("requestLogging", () => {
 
     describe("when bearer authorization is present", () => {
       it("returns true", () => {
-        expect(hasAuthorizationToken({ authorization: "Bearer abc123" })).toBe(
-          true,
-        );
+        expect(hasAuthorizationToken({ authorization: "Bearer abc123" })).toBe(true);
       });
     });
 
@@ -378,18 +375,14 @@ describe("requestLogging", () => {
 
     describe("when authorization uses Basic scheme", () => {
       it("returns true", () => {
-        expect(hasAuthorizationToken({ authorization: "Basic xyz" })).toBe(
-          true,
-        );
+        expect(hasAuthorizationToken({ authorization: "Basic xyz" })).toBe(true);
       });
     });
 
     describe("when authorization header uses lowercase key", () => {
       it("returns true", () => {
         // The function signature accepts `authorization` (lowercase) by definition
-        expect(
-          hasAuthorizationToken({ authorization: "Bearer token123" }),
-        ).toBe(true);
+        expect(hasAuthorizationToken({ authorization: "Bearer token123" })).toBe(true);
       });
     });
 

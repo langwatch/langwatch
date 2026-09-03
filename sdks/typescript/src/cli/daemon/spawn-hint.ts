@@ -30,10 +30,7 @@ const WINDOW_MS = 60_000;
 const MISSES_BEFORE_SPAWN = 2;
 
 function hintPath(identity: DaemonIdentity): string {
-  return path.join(
-    identity.socketDir,
-    `${identity.fingerprint.slice(0, 16)}.hint`,
-  );
+  return path.join(identity.socketDir, `${identity.fingerprint.slice(0, 16)}.hint`);
 }
 
 /**

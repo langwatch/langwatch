@@ -30,7 +30,7 @@ then the daemon reaps it.
    persisted record.
 2. The reaper fires on **dead launcher OR stale heartbeat** (`app/daemon.go:126-127`).
    A lingering redis must **not** key off stale-heartbeat (while up, the heartbeat
-   is fresh; and "redis unused while up" is explicitly *not* what we detect). The
+   is fresh; and "redis unused while up" is explicitly _not_ what we detect). The
    linger is purely "keep it 20 min **after down**", so the trigger is
    **launcher-liveness + a 20-min grace**, not heartbeat staleness.
 3. `System.SpawnDetached` (`app/ports.go:87`, `adapters/system/system.go:63-86`)
@@ -40,7 +40,7 @@ then the daemon reaps it.
 4. `clickhousedocker` already persists a chosen host port in
    `<home>/clickhouse/endpoint.json` and reuses it across restarts
    (`adapters/clickhousedocker/server.go:43-58,183-214`) — the template for a
-   per-slug persisted record, but there's no existing *separate-instance-per-slug*
+   per-slug persisted record, but there's no existing _separate-instance-per-slug_
    adapter; that part is genuinely new.
 
 ## Design
@@ -73,8 +73,8 @@ Owns `<home>/redis/`. `New(havenHome, sys)` takes the concrete `system.System`
   down→up-within-window path that preserves state); else `FreePorts(1)` (persist),
   `mkdir data`, `SpawnDetached(["redis-server", ...], dir, redis.log)`, poll-ping
   ready, write record. Flags: `--port <p> --bind 127.0.0.1 --dir <dir>/data
-  --save "" --appendonly no --daemonize no --maxmemory <cap> --maxmemory-policy
-  noeviction` (no disk snapshots — the linger keeps state in the live process;
+--save "" --appendonly no --daemonize no --maxmemory <cap> --maxmemory-policy
+noeviction` (no disk snapshots — the linger keeps state in the live process;
   noeviction so queue keys are never dropped). Friendly `brew install redis` error
   if `redis-server` is not on PATH.
 - `Stop(slug)`: `Terminate(PID)` (SIGTERM, SIGKILL fallback) + remove data dir +

@@ -1,0 +1,113 @@
+/// <reference path="../../model/ambient.d.ts" />
+import { Box, Card, Container, Heading, Text, VStack } from "@chakra-ui/react";
+import type { ReactNode } from "react";
+
+import "./auth-front-door.css";
+import { FullLogo } from "./full-logo";
+
+/**
+ * The card every unauthenticated screen is: the mark, one heading, one column
+ * of content. The same component on every installation and at every step, so
+ * a person moving between them sees one surface rather than a series of pages
+ * that happen to look alike.
+ *
+ * The surface is glass: a translucent 14 pixel card whose border and fill
+ * come from the stylesheet's per-mode tokens, with the shell's ground
+ * blurring through it — the same panel treatment the site's dark sections
+ * use, and its light-glass counterpart on paper. The serif display voice
+ * belongs to the value panel beside the card, never to the card itself.
+ *
+ * Alignment is one rule, applied throughout: the identity block (mark,
+ * heading and the intro line under it) is centred, and everything a person
+ * reads or operates below it is a full-width left-aligned column. Footers
+ * that are a single line of prose centre themselves; nothing else does. The
+ * intro is a header slot rather than a row of the form, because it answers
+ * the heading, not the field.
+ *
+ * Responsive shape:
+ *
+ *   - on a phone it goes full bleed. A bordered card inset in a viewport that
+ *     is barely wider than the card wastes the only space there is, and the
+ *     border reads as a frame around nothing.
+ *   - on anything larger it is a single centered card in a narrow column,
+ *     because a log-in form is a short list of short fields and stretching it
+ *     across a desktop makes each row a journey.
+ */
+export function AuthCard({
+  title,
+  intro,
+  finePrint,
+  children,
+}: {
+  title: string;
+  /** One quiet line answering the heading. Part of the identity block:
+   *  centred and balanced with it, never a row of the form below. */
+  intro?: string;
+  /** The small print under everything: terms, privacy, nothing louder. */
+  finePrint?: ReactNode;
+  children: ReactNode;
+}) {
+  return (
+    <Container
+      maxW={{ base: "100%", sm: "408px" }}
+      paddingX={{ base: 0, sm: 2 }}
+      // High enough on the page to be the first thing seen, low enough that a
+      // phone keyboard opening under it does not push the fields off screen.
+      marginY={{ base: 6, md: "8vh" }}
+    >
+      <Card.Root
+        className="lw-front-door-card"
+        width="full"
+        borderWidth={{ base: 0, sm: "1px" }}
+        borderRadius={{ base: 0, sm: "14px" }}
+        data-auth-card
+      >
+        <Card.Header paddingTop="34px" paddingX="32px" paddingBottom={0}>
+          <VStack gap="12px">
+            {/* Named so the entrance can address the identity block: the same
+                wordmark the loading screen shows, settling in place. */}
+            <Box data-auth-card-logo display="flex" justifyContent="center">
+              <FullLogo width={112} height={27.5} />
+            </Box>
+            <Heading
+              as="h1"
+              fontSize="19px"
+              fontWeight={600}
+              letterSpacing="-0.015em"
+              textAlign="center"
+              css={{ textWrap: "balance" }}
+            >
+              {title}
+            </Heading>
+            {intro ? (
+              <Text
+                fontSize="13.5px"
+                lineHeight="1.55"
+                color="fg.muted"
+                textAlign="center"
+                maxWidth="36ch"
+                marginTop="-4px"
+                css={{ textWrap: "balance" }}
+              >
+                {intro}
+              </Text>
+            ) : null}
+          </VStack>
+        </Card.Header>
+        <Card.Body paddingX="32px" paddingTop="22px" paddingBottom="32px">
+          {/* Named for the entrance: the rows rise in one after another, and
+              the stagger is applied from the stylesheet rather than by giving
+              every screen an animation prop to pass down. */}
+          <VStack width="full" align="stretch" gap="14px" data-auth-card-body>
+            {children}
+          </VStack>
+          {finePrint ? (
+            <Box paddingTop="18px" textAlign="center">
+              {finePrint}
+            </Box>
+          ) : null}
+        </Card.Body>
+      </Card.Root>
+    </Container>
+  );
+}

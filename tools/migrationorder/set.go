@@ -19,6 +19,9 @@ type Set struct {
 	// restructure. Entries found there on the base branch are merged history —
 	// a branch that moves them is not adding them.
 	PreviousDirectories []string
+	// ForbiddenDirectories are old roots that may still exist in base history
+	// but must never contain entries at the branch head.
+	ForbiddenDirectories []string
 	// Key extracts the numeric ordering key from an entry name; its first
 	// capture group must be the digits the entries sort by.
 	Key *regexp.Regexp
@@ -32,21 +35,32 @@ type Set struct {
 var Sets = []Set{
 	{
 		Name:                "Prisma",
-		Directory:           "platform/app/prisma/migrations",
-		PreviousDirectories: []string{"langwatch/prisma/migrations"},
-		Key:                 regexp.MustCompile(`^(\d{14})_`),
-		Format:              "YYYYMMDDHHMMSS_name",
+		Directory:           "packages/prisma-client/prisma/migrations",
+		PreviousDirectories: []string{"platform/app/prisma/migrations", "langwatch/prisma/migrations"},
+		ForbiddenDirectories: []string{
+			"platform/app/prisma/migrations",
+			"langwatch/prisma/migrations",
+		},
+		Key:    regexp.MustCompile(`^(\d{14})_`),
+		Format: "YYYYMMDDHHMMSS_name",
 		// A literal key rather than a $(date) expansion: free keys count up from
 		// the newest timestamp in play, so twins renamed from one comment get
 		// distinct names instead of colliding on the same second.
 		Render: func(key int64) string { return fmt.Sprintf("%014d", key) },
 	},
 	{
-		Name:                "ClickHouse",
-		Directory:           "platform/app/src/server/clickhouse/migrations",
-		PreviousDirectories: []string{"langwatch/src/server/clickhouse/migrations"},
-		Key:                 regexp.MustCompile(`^(\d{5})_.*\.sql$`),
-		Format:              "NNNNN_name.sql",
-		Render:              func(key int64) string { return fmt.Sprintf("%05d", key) },
+		Name:      "ClickHouse",
+		Directory: "apps/api/src/tasks/clickhouse-migrate/migrations",
+		PreviousDirectories: []string{
+			"platform/app/src/server/clickhouse/migrations",
+			"langwatch/src/server/clickhouse/migrations",
+		},
+		ForbiddenDirectories: []string{
+			"platform/app/src/server/clickhouse/migrations",
+			"langwatch/src/server/clickhouse/migrations",
+		},
+		Key:    regexp.MustCompile(`^(\d{5})_.*\.sql$`),
+		Format: "NNNNN_name.sql",
+		Render: func(key int64) string { return fmt.Sprintf("%05d", key) },
 	},
 }

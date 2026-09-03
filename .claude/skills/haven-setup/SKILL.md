@@ -23,7 +23,7 @@ curl -s -o /dev/null -w "%{http_code}\n" "https://app.<slug>.langwatch.localhost
 
 (`<slug>` is the sanitized worktree directory name — `make haven status` shows it if unsure.) If both indicate it's up, stop here and report the URL. A background task ID from an earlier turn is NOT proof it's still alive — session/task boundaries can silently kill orphaned background processes (including the portless proxy daemon, see Gotcha 3). Always verify live state, never trust a remembered task ID.
 
-**If that `curl` returns `000`/times out (on WSL2 especially), do NOT conclude "app not up yet" and just wait longer** — confirmed live: this burned many turns and several "is it ready yet?" round-trips where the app had been healthy the whole time and the *DNS resolution itself* was broken (Gotcha 4). Before assuming a slow cold boot, disambiguate in ~5s:
+**If that `curl` returns `000`/times out (on WSL2 especially), do NOT conclude "app not up yet" and just wait longer** — confirmed live: this burned many turns and several "is it ready yet?" round-trips where the app had been healthy the whole time and the _DNS resolution itself_ was broken (Gotcha 4). Before assuming a slow cold boot, disambiguate in ~5s:
 
 ```bash
 getent hosts app.<slug>.langwatch.localhost   # glibc/curl's actual resolution path
@@ -41,7 +41,7 @@ There is no separate setup step any more (ADR-064 deleted `haven setup`): `up` i
 
 ## Step 2: Decide which services haven should manage
 
-Read `platform/app/.env` for `DATABASE_URL`, `CLICKHOUSE_URL`, `REDIS_URL`. If they already point at `localhost`/`127.0.0.1` and those services are actually reachable (the user said so, or you verified with e.g. `pg_isready` / `redis-cli ping` / a ClickHouse HTTP ping), reuse them instead of letting haven spin up its own containers:
+Read `.env` for `DATABASE_URL`, `CLICKHOUSE_URL`, `REDIS_URL`. If they already point at `localhost`/`127.0.0.1` and those services are actually reachable (the user said so, or you verified with e.g. `pg_isready` / `redis-cli ping` / a ClickHouse HTTP ping), reuse them instead of letting haven spin up its own containers:
 
 ```bash
 LANGWATCH_HAVEN_CH=0     # reuse local ClickHouse (.env CLICKHOUSE_URL)
@@ -53,7 +53,7 @@ Only pass the flags for services that are actually already local — don't blank
 
 **Telemetry noise** (PostHog/GTM/Crisp/Pendo): this sandbox usually has no real internet DNS for third-party hosts, so these fail loudly in the browser console (`ERR_NAME_NOT_RESOLVED`, `[PostHog.js] Failed to fetch`) — harmless to the app itself, but noise when reading console output for a real bug. If the user wants it quiet, comment out `POSTHOG_KEY` in `.env` (gates `posthog.init()` in `src/hooks/usePostHog.ts` — commenting it out is enough, no other var needed). Don't flip `IS_SAAS` to achieve this — it's a much broader flag (billing, license enforcement, plan limits) with side effects well beyond telemetry.
 
-**Observability** (`LANGWATCH_HAVEN_OBS=0` to skip): the LGTM stack shares ClickHouse's colima VM. If colima doesn't work on this host (see Step 3 — true on WSL2), observability won't either, so skip it whenever colima is unavailable OR the user just wants a fast/local run without it. Default to `LANGWATCH_HAVEN_OBS=0` unless the user wants the Grafana stack. **Consequence of skipping it:** the `dev:haven` npm script hardcodes `FORCE_COLOR=1`, which per `tools/thuishaven/cmd/root.go`'s `resolveAgent()` *overrides* haven's own non-tty auto-detection — so without observability, `server.log` becomes your only full-detail log source, and you MUST also pass `HAVEN_AGENT=1` (Step 4) or long structured log fields get silently truncated by the redrawing TUI.
+**Observability** (`LANGWATCH_HAVEN_OBS=0` to skip): the LGTM stack shares ClickHouse's colima VM. If colima doesn't work on this host (see Step 3 — true on WSL2), observability won't either, so skip it whenever colima is unavailable OR the user just wants a fast/local run without it. Default to `LANGWATCH_HAVEN_OBS=0` unless the user wants the Grafana stack. **Consequence of skipping it:** the `dev:haven` npm script hardcodes `FORCE_COLOR=1`, which per `tools/thuishaven/cmd/root.go`'s `resolveAgent()` _overrides_ haven's own non-tty auto-detection — so without observability, `server.log` becomes your only full-detail log source, and you MUST also pass `HAVEN_AGENT=1` (Step 4) or long structured log fields get silently truncated by the redrawing TUI.
 
 ## Step 3: Check colima — decides langyagent's isolation tier
 
@@ -89,7 +89,7 @@ find ~/.langwatch/portless/langyagent -iname opencode.log 2>/dev/null | xargs ta
 # look for: level=ERROR message="stream error" ... error.error="AI_APICallError: failed to execute HTTP request to provider API"
 ```
 
-Fix — disable require-TLS for local dev (config-only, no rebuild; safe because `LANGY_UNSAFE_HOST_ACCESS=1` already accepts reduced isolation, so this defense-in-depth layer for the *sandboxed* tier has no teeth to lose here):
+Fix — disable require-TLS for local dev (config-only, no rebuild; safe because `LANGY_UNSAFE_HOST_ACCESS=1` already accepts reduced isolation, so this defense-in-depth layer for the _sandboxed_ tier has no teeth to lose here):
 
 ```bash
 LANGY_EGRESS_REQUIRE_TLS=false
@@ -102,7 +102,7 @@ Add it to the Step 5 command alongside `LANGY_UNSAFE_HOST_ACCESS=1`. Verify by s
 `resolveWorkerCallbackUrl()` / `resolveWorkerGatewayBaseUrl()` (`platform/app/src/server/app-layer/langy/LangyCredentialService.ts`) check `LANGY_WORKER_CALLBACK_URL` / `LANGY_WORKER_GATEWAY_URL` **before** haven's own correctly-resolved URLs. If the user has previously run the stack via the `k8s` skill (Minikube), `.env` may have these hardcoded to `host.minikube.internal:<port>` — which doesn't resolve outside a Minikube VM and silently breaks **every** LLM call and turn-output callback under haven (symptom: chat sends, worker creates fine, but no reply ever arrives — no visible error to the user, just retries forever). Check:
 
 ```bash
-grep -n "LANGY_WORKER_CALLBACK_URL\|LANGY_WORKER_GATEWAY_URL" platform/app/.env
+grep -n "LANGY_WORKER_CALLBACK_URL\|LANGY_WORKER_GATEWAY_URL" .env
 ```
 
 If either is set to a `minikube`/`docker.internal`-style host and you're running under haven (not actually inside that k8s pod), comment both out (don't delete — the user may switch back to the k8s workflow later) with a one-line note why. Confirm the fix by checking for `lookup host.minikube.internal ... no such host` in the logs after a restart — that error should disappear.
@@ -143,14 +143,14 @@ tail -n 40 ~/.portless/proxy.log
 ls -la ~/.portless/    # look for files NOT owned by your user
 ```
 
-**You do NOT need sudo for this** — deleting a file only requires write permission on its *containing directory*, not the file itself, and `~/.portless` is owned by you (only the two marker files inside it are stray root-owned leftovers). Just delete them yourself and let portless regenerate them fresh:
+**You do NOT need sudo for this** — deleting a file only requires write permission on its _containing directory_, not the file itself, and `~/.portless` is owned by you (only the two marker files inside it are stray root-owned leftovers). Just delete them yourself and let portless regenerate them fresh:
 
 ```bash
 rm -f ~/.portless/proxy.tls ~/.portless/ca.srl
 make haven up   # up re-installs and re-trusts the CA by itself
 ```
 
-It'll still fall back to the unprivileged port (1355) since there's no interactive TTY for the sudo *elevation* itself (that part genuinely can't be done non-interactively without the user's password) — that's fine, just means the app URL is `https://app.<slug>.langwatch.localhost:1355` instead of the clean port-443 form. Note the `:1355` in every URL you report back. Only ask the user to run something themselves if `make haven up` still fails after clearing these files.
+It'll still fall back to the unprivileged port (1355) since there's no interactive TTY for the sudo _elevation_ itself (that part genuinely can't be done non-interactively without the user's password) — that's fine, just means the app URL is `https://app.<slug>.langwatch.localhost:1355` instead of the clean port-443 form. Note the `:1355` in every URL you report back. Only ask the user to run something themselves if `make haven up` still fails after clearing these files.
 
 ## Gotcha 4: `*.langwatch.localhost` stops resolving (WSL2 resolv.conf drift)
 
@@ -194,11 +194,13 @@ When the log looks frozen, prefer **browser-side signal** over waiting on stdout
 ```js
 async (page) => {
   const browser = page.context().browser();
-  const ctx = await browser.newContext({ ignoreHTTPSErrors: true });  // sidesteps CA trust, no OS changes
+  const ctx = await browser.newContext({ ignoreHTTPSErrors: true }); // sidesteps CA trust, no OS changes
   const p = await ctx.newPage();
-  await p.goto('https://app.<slug>.langwatch.localhost<port>/auth/signin', { waitUntil: 'domcontentloaded' });
+  await p.goto("https://app.<slug>.langwatch.localhost<port>/auth/signin", {
+    waitUntil: "domcontentloaded",
+  });
   // ... login with the seed identity above, click "Open Langy assistant", fill the composer, click Send, poll innerText ...
-}
+};
 ```
 
 Do NOT try to verify the authenticated flow via the raw `http://127.0.0.1:<app-port>/` origin instead of the real hostname — `NEXTAUTH_URL` (set by `.env.portless` to the real hostname) makes the auth layer 403 any sign-in request whose Origin doesn't match exactly. The direct-IP origin is fine for an anonymous health check (`curl` 200 on `/`) but will never get you past login.

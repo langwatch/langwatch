@@ -21,13 +21,12 @@ export const updateMonitorCommand = async (
     executionMode?: string;
     sample?: string;
     parameters?: string;
-  }
+  },
 ): Promise<CommandResult | void> => {
   await resolveCredentials();
 
   const apiKey = scopedApiKey() ?? process.env.LANGWATCH_API_KEY ?? "";
-  const endpoint =
-    resolveControlPlaneUrl();
+  const endpoint = resolveControlPlaneUrl();
 
   const spinner = createSpinner(`Updating monitor "${id}"...`).start();
 
@@ -39,15 +38,11 @@ export const updateMonitorCommand = async (
   try {
     const body: Record<string, unknown> = {};
     if (options.name) body.name = options.name;
-    if (options.enabled !== undefined)
-      body.enabled = options.enabled === "true";
+    if (options.enabled !== undefined) body.enabled = options.enabled === "true";
     if (options.executionMode) body.executionMode = options.executionMode;
     if (options.sample) body.sample = parseFloat(options.sample);
     if (options.parameters) {
-      body.parameters = JSON.parse(options.parameters) as Record<
-        string,
-        unknown
-      >;
+      body.parameters = JSON.parse(options.parameters) as Record<string, unknown>;
     }
 
     const response = await fetch(`${endpoint}/api/monitors/${id}`, {
@@ -96,7 +91,7 @@ export const updateMonitorCommand = async (
       console.log(`  ${chalk.gray("ID:")}      ${chalk.green(monitor.id)}`);
       console.log(`  ${chalk.gray("Name:")}    ${chalk.cyan(monitor.name)}`);
       console.log(
-        `  ${chalk.gray("Enabled:")} ${monitor.enabled ? chalk.green("yes") : chalk.gray("no")}`
+        `  ${chalk.gray("Enabled:")} ${monitor.enabled ? chalk.green("yes") : chalk.gray("no")}`,
       );
       console.log();
     },

@@ -1,9 +1,5 @@
 import { describe, expect, it, vi } from "vitest";
-import {
-  AcquireAbortedError,
-  ConcurrencyLimiter,
-  QueueFullError,
-} from "../rateLimit";
+import { AcquireAbortedError, ConcurrencyLimiter, QueueFullError } from "../rateLimit";
 import { ClickHouseQueryClient } from "../client";
 
 /** A task whose completion the test controls. */
@@ -21,27 +17,23 @@ describe("ConcurrencyLimiter", () => {
   describe("given an invalid concurrency limit", () => {
     describe("when the limiter is built", () => {
       it.each([0, -1, 2.5])("refuses to be built with %s", (maxConcurrent) => {
-        expect(() => new ConcurrencyLimiter({ maxConcurrent })).toThrow(
-          RangeError,
-        );
+        expect(() => new ConcurrencyLimiter({ maxConcurrent })).toThrow(RangeError);
       });
     });
   });
 
   describe("given an invalid queue bound", () => {
     describe("when the limiter is built", () => {
-      it.each([
-        -1,
-        2.5,
-        Number.NaN,
-        Number.POSITIVE_INFINITY,
-      ])("refuses to be built with %s", (maxQueued) => {
-        // `waiting.length >= NaN` is false forever, so an unvalidated NaN
-        // unbounds the queue and removes the only thing this module is for.
-        expect(() =>
-          new ConcurrencyLimiter({ maxConcurrent: 1, maxQueued }),
-        ).toThrow(RangeError);
-      });
+      it.each([-1, 2.5, Number.NaN, Number.POSITIVE_INFINITY])(
+        "refuses to be built with %s",
+        (maxQueued) => {
+          // `waiting.length >= NaN` is false forever, so an unvalidated NaN
+          // unbounds the queue and removes the only thing this module is for.
+          expect(() => new ConcurrencyLimiter({ maxConcurrent: 1, maxQueued })).toThrow(
+            RangeError,
+          );
+        },
+      );
     });
   });
 
@@ -160,7 +152,10 @@ describe("ConcurrencyLimiter", () => {
         const controller = new AbortController();
 
         void limiter.run({ task: () => gate.promise });
-        const waiting = limiter.run({ task: async () => "never", signal: controller.signal });
+        const waiting = limiter.run({
+          task: async () => "never",
+          signal: controller.signal,
+        });
         await Promise.resolve();
         expect(limiter.stats().queued).toBe(1);
 

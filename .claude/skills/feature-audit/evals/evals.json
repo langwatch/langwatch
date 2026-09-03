@@ -1,0 +1,17 @@
+{
+  "skill_name": "feature-audit",
+  "evals": [
+    {
+      "id": 1,
+      "prompt": "Audit packages/features/experiment for layout and boundary problems.",
+      "expected_output": "Runs architecture-lint filtered to the package, parity, tsc and tests first, then reports findings with file:line and rule names, classifies absences as STALE / DELIBERATE / REAL GAP, and changes nothing.",
+      "files": []
+    },
+    {
+      "id": 2,
+      "prompt": "Is the gateway feature clean enough to open a PR?",
+      "expected_output": "Produces the structured audit report with mechanical counts, findings ordered by severity, and a recommended fix order; distinguishes baselined violations from new ones.",
+      "files": []
+    }
+  ]
+}

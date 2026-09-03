@@ -7,10 +7,7 @@ import {
   listPublishedSkills,
   renderSkill,
 } from "../_compiler/native.js";
-import {
-  FEATURE_SKILLS,
-  NATIVE_ONLY_SKILLS,
-} from "../_lib/feature-skills.js";
+import { FEATURE_SKILLS, NATIVE_ONLY_SKILLS } from "../_lib/feature-skills.js";
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const skillsRoot = path.resolve(__dirname, "..");
@@ -24,16 +21,24 @@ describe("native skill generation", () => {
   describe("given the published skill set", () => {
     it("includes every curated feature skill", () => {
       const slugs = skills.map((s) => s.slug);
-      for (const f of FEATURE_SKILLS) expect(slugs, `missing feature skill: ${f}`).toContain(f);
+      for (const f of FEATURE_SKILLS)
+        expect(slugs, `missing feature skill: ${f}`).toContain(f);
     });
 
     it("includes every recipe on disk — what we publish, Langy has", () => {
       const recipeDirs = fs
         .readdirSync(path.join(skillsRoot, "recipes"), { withFileTypes: true })
-        .filter((e) => e.isDirectory() && fs.existsSync(path.join(skillsRoot, "recipes", e.name, "SKILL.mdx")))
+        .filter(
+          (e) =>
+            e.isDirectory() &&
+            fs.existsSync(path.join(skillsRoot, "recipes", e.name, "SKILL.mdx")),
+        )
         .map((e) => e.name)
         .sort();
-      const recipeSlugs = skills.filter((s) => s.isRecipe).map((s) => s.slug).sort();
+      const recipeSlugs = skills
+        .filter((s) => s.isRecipe)
+        .map((s) => s.slug)
+        .sort();
       expect(recipeSlugs).toEqual(recipeDirs);
       expect(recipeSlugs.length, "expected recipes to be included").toBeGreaterThan(0);
     });
@@ -51,7 +56,9 @@ describe("native skill generation", () => {
       const slugs = skills.map((s) => s.slug);
       expect(new Set(slugs).size, "duplicate slug").toBe(slugs.length);
       for (const slug of slugs) {
-        expect(slug, `invalid opencode slug: ${slug}`).toMatch(/^[a-z0-9][a-z0-9-]{0,63}$/);
+        expect(slug, `invalid opencode slug: ${slug}`).toMatch(
+          /^[a-z0-9][a-z0-9-]{0,63}$/,
+        );
       }
     });
   });
@@ -62,15 +69,23 @@ describe("native skill generation", () => {
         const m = renderSkill(skill).match(/^---\n([\s\S]*?)\n---\n/);
         expect(m, `${skill.slug}: no frontmatter block`).not.toBeNull();
         expect(m![1], `${skill.slug}: frontmatter missing name`).toMatch(/^name:\s*\S/m);
-        expect(m![1], `${skill.slug}: frontmatter missing description`).toMatch(/^description:\s*\S/m);
+        expect(m![1], `${skill.slug}: frontmatter missing description`).toMatch(
+          /^description:\s*\S/m,
+        );
       }
     });
 
     it("inlines shared partials — no leftover MDX import or unrendered component", () => {
       for (const skill of skills) {
-        const noCode = renderSkill(skill).replace(/```[\s\S]*?```/g, "").replace(/`[^`\n]*`/g, "");
-        expect(noCode, `${skill.slug}: leftover import`).not.toMatch(/^import\s+\w+\s+from\s+['"][^'"]+\.mdx?['"]/m);
-        expect(noCode, `${skill.slug}: unrendered component`).not.toMatch(/^<[A-Z]\w*\s*\/>\s*$/m);
+        const noCode = renderSkill(skill)
+          .replace(/```[\s\S]*?```/g, "")
+          .replace(/`[^`\n]*`/g, "");
+        expect(noCode, `${skill.slug}: leftover import`).not.toMatch(
+          /^import\s+\w+\s+from\s+['"][^'"]+\.mdx?['"]/m,
+        );
+        expect(noCode, `${skill.slug}: unrendered component`).not.toMatch(
+          /^<[A-Z]\w*\s*\/>\s*$/m,
+        );
         expect(noCode, `${skill.slug}: leftover _shared ref`).not.toContain("_shared/");
       }
     });
@@ -100,8 +115,13 @@ describe("native skill generation", () => {
 
     it("matches the sources — regenerate with `bash skills/_compiled/generate.sh`", () => {
       for (const skill of skills) {
-        const committed = fs.readFileSync(path.join(nativeDir, skill.slug, "SKILL.md"), "utf8");
-        expect(committed, `${skill.slug}: committed native output is stale`).toBe(renderSkill(skill));
+        const committed = fs.readFileSync(
+          path.join(nativeDir, skill.slug, "SKILL.md"),
+          "utf8",
+        );
+        expect(committed, `${skill.slug}: committed native output is stale`).toBe(
+          renderSkill(skill),
+        );
       }
     });
 
@@ -123,10 +143,7 @@ describe("native skill generation", () => {
         .sort();
       expect(embeddedDirs).toEqual(skills.map((s) => s.slug).sort());
       for (const slug of embeddedDirs) {
-        const embedded = fs.readFileSync(
-          path.join(embedRoot, slug, "SKILL.md"),
-          "utf8",
-        );
+        const embedded = fs.readFileSync(path.join(embedRoot, slug, "SKILL.md"), "utf8");
         expect(embedded, `${slug}: Go embed copy is stale`).toBe(
           fs.readFileSync(path.join(nativeDir, slug, "SKILL.md"), "utf8"),
         );
@@ -218,7 +235,15 @@ describe("native skill generation", () => {
   describe("given Langy's AGENTS.md routing table", () => {
     const readAgentsMd = () =>
       fs.readFileSync(
-        path.resolve(skillsRoot, "..", "services", "langyagent", "internal", "assets", "AGENTS.md"),
+        path.resolve(
+          skillsRoot,
+          "..",
+          "services",
+          "langyagent",
+          "internal",
+          "assets",
+          "AGENTS.md",
+        ),
         "utf8",
       );
 
@@ -235,11 +260,17 @@ describe("native skill generation", () => {
 
     it("routes only to skills that exist in the shipped image", () => {
       const routed = new Set(routingRows().map((row) => row.skill));
-      expect(routed.size, "no skill rows found — did the routing table move?").toBeGreaterThan(0);
+      expect(
+        routed.size,
+        "no skill rows found — did the routing table move?",
+      ).toBeGreaterThan(0);
 
       const shipped = new Set(skills.map((s) => s.slug));
       for (const name of routed) {
-        expect(shipped.has(name), `AGENTS.md routes to a skill that does not ship: ${name}`).toBe(true);
+        expect(
+          shipped.has(name),
+          `AGENTS.md routes to a skill that does not ship: ${name}`,
+        ).toBe(true);
       }
     });
 

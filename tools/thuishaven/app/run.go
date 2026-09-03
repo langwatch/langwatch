@@ -81,7 +81,7 @@ func (o *Orchestrator) RunHeavy(ctx context.Context, r HeavyRun) error {
 	// train the reader to ignore the line that matters.
 	//
 	// STDERR, not stdout: the wrapped command owns stdout, and a caller piping
-	// `haven run --sh 'biome ... --reporter=json'` must get its JSON and nothing
+	// `haven run --sh 'oxlint ... --format=json'` must get its JSON and nothing
 	// else. The reader still sees these lines either way.
 	if queued {
 		fmt.Fprintf(os.Stderr, "haven: waited %s for a heavy slot\n", waited.Round(time.Second))

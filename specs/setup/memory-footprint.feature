@@ -11,7 +11,7 @@ Feature: Reduced server memory footprint
   # below.
   #
   # The process TOPOLOGY — one Node process or two — is a separate concern,
-  # specified in specs/setup/in-process-workers-dev.feature and decided in
+  # specified in specs/setup/dev-process-topology.feature and decided in
   # dev/docs/adr/004-docker-dev-environment.md. This feature is about what a
   # process loads, not how many of them run.
 
@@ -68,13 +68,30 @@ Feature: Reduced server memory footprint
     Then no Chakra UI, Ark UI, Emotion, react-dom or react-router module is resident
     And evaluator display names still resolve for legacy evaluation responses
 
+  # The guard walks from the API and worker entrypoints, every composition
+  # module they wire, and every server package's sources. It lives in
+  # packages/architecture-lint/tests/frontend-boundary.unit.test.ts — the
+  # platform application that used to host it is gone, and the boundary it
+  # describes outlived it.
   @unit
   Scenario: Server code cannot reach browser-only UI, even transitively
-    Given a module under src/server
+    Given a module a backend process loads at boot
     When it imports a UI toolkit, or a component that imports one
     Then the boundary guard fails and names the offending import chain
     But a type-only import of a component's types is allowed, since types are erased
-    And server-rendered email templates may use React, since emails are React-rendered
+    And the mail package may use React, since its templates are React-rendered
+
+  # A separate refusal from the one above, and a stricter one. A module in a
+  # browser package that looks framework-free today acquires a React edge the
+  # next time somebody edits it, and nothing in that review would say a backend
+  # process is downstream. So the tree is the boundary, not the toolkit.
+  @unit
+  Scenario: Backend code never imports a module out of a browser package
+    Given a browser package built for the UI
+    When backend code imports one of its modules for a value
+    Then the boundary guard fails and names the chain to that module
+    And it refuses even when the module imports no browser toolkit itself
+    But naming one of its types stays allowed, since types are erased
 
   # Separately, a guard closes a footprint-adjacent foot-gun found while
   # profiling `pnpm start`: env-load.ts loads .env with `override: true`, so a

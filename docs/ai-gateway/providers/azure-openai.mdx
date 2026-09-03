@@ -12,9 +12,9 @@ Under **Settings → Model Providers**:
 
 1. **Add provider → Azure OpenAI**.
 2. Paste:
-    - **Endpoint**: e.g. `https://my-resource.openai.azure.com`.
-    - **API key**: Azure OpenAI key (hex string).
-    - **API version**: e.g. `2024-08-01-preview` (pin explicitly; don't rely on "latest").
+   - **Endpoint**: e.g. `https://my-resource.openai.azure.com`.
+   - **API key**: Azure OpenAI key (hex string).
+   - **API version**: e.g. `2024-08-01-preview` (pin explicitly; don't rely on "latest").
 3. (Optional) **Default deployment name**: if clients send a bare model name, the gateway maps it to this deployment.
 4. Save.
 
@@ -25,9 +25,9 @@ Azure OpenAI binds models to **deployments**, which have customer-chosen names. 
 ```json
 {
   "model_aliases": {
-    "gpt-4o":       "azure/my-gpt-4o-deployment",
-    "gpt-5-mini":   "azure/my-mini-deployment",
-    "o3":           "azure/my-o3-deployment"
+    "gpt-4o": "azure/my-gpt-4o-deployment",
+    "gpt-5-mini": "azure/my-mini-deployment",
+    "o3": "azure/my-o3-deployment"
   }
 }
 ```

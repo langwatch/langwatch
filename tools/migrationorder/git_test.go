@@ -10,7 +10,7 @@ import (
 	"github.com/langwatch/langwatch/tools/migrationorder"
 )
 
-const clickhouseDir = "platform/app/src/server/clickhouse/migrations"
+const clickhouseDir = "apps/api/src/tasks/clickhouse-migrate/migrations"
 
 func gitIn(t *testing.T, root string, args ...string) {
 	t.Helper()
@@ -137,6 +137,28 @@ func TestRepoInputsRelocatedSet(t *testing.T) {
 	}
 }
 
+func TestRepoInputsFindsPrismaMigrationsInTheOldRoot(t *testing.T) {
+	root := initRepo(t)
+	commitMigrationAt(t, root, "platform/app/prisma/migrations", "20260827120000_old_root/migration.sql")
+	gitIn(t, root, "checkout", "-q", "-b", "feature")
+
+	inputs, err := migrationorder.Repo{Root: root}.Inputs(t.Context(), "main")
+	if err != nil {
+		t.Fatal(err)
+	}
+	index := slices.IndexFunc(inputs, func(in migrationorder.Input) bool {
+		return in.Set.Name == "Prisma"
+	})
+	if index < 0 {
+		t.Fatalf("no Prisma input in %+v", inputs)
+	}
+
+	want := []string{"platform/app/prisma/migrations/20260827120000_old_root"}
+	if !slices.Equal(inputs[index].Misplaced, want) {
+		t.Fatalf("Misplaced = %v, want %v", inputs[index].Misplaced, want)
+	}
+}
+
 func TestTopLevelEntries(t *testing.T) {
 	tests := []struct {
 		name      string
@@ -147,30 +169,30 @@ func TestTopLevelEntries(t *testing.T) {
 		{
 			name: "prisma directories dedupe to one entry and the lock file is dropped",
 			paths: []string{
-				"platform/app/prisma/migrations/20260102000000_new/migration.sql",
-				"platform/app/prisma/migrations/20260102000000_new/README.md",
-				"platform/app/prisma/migrations/20260101000000_old/migration.sql",
-				"platform/app/prisma/migrations/migration_lock.toml",
+				"packages/prisma-client/prisma/migrations/20260102000000_new/migration.sql",
+				"packages/prisma-client/prisma/migrations/20260102000000_new/README.md",
+				"packages/prisma-client/prisma/migrations/20260101000000_old/migration.sql",
+				"packages/prisma-client/prisma/migrations/migration_lock.toml",
 			},
-			directory: "platform/app/prisma/migrations",
+			directory: "packages/prisma-client/prisma/migrations",
 			want:      []string{"20260101000000_old", "20260102000000_new"},
 		},
 		{
 			name: "clickhouse files are taken flat and sorted",
 			paths: []string{
-				"platform/app/src/server/clickhouse/migrations/00041_b.sql",
-				"platform/app/src/server/clickhouse/migrations/00040_a.sql",
+				"apps/api/src/tasks/clickhouse-migrate/migrations/00041_b.sql",
+				"apps/api/src/tasks/clickhouse-migrate/migrations/00040_a.sql",
 			},
-			directory: "platform/app/src/server/clickhouse/migrations",
+			directory: "apps/api/src/tasks/clickhouse-migrate/migrations",
 			want:      []string{"00040_a.sql", "00041_b.sql"},
 		},
 		{
 			name: "paths outside the directory are ignored, prefix-alikes included",
 			paths: []string{
-				"platform/app/prisma/migrations_archive/20260101000000_old/migration.sql",
-				"platform/app/prisma/schema.prisma",
+				"packages/prisma-client/prisma/migrations_archive/20260101000000_old/migration.sql",
+				"packages/prisma-client/prisma/schema.prisma",
 			},
-			directory: "platform/app/prisma/migrations",
+			directory: "packages/prisma-client/prisma/migrations",
 			want:      nil,
 		},
 	}

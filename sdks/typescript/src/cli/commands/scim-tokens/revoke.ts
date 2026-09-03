@@ -3,9 +3,7 @@ import { ScimTokensApiService } from "@/client-sdk/services/scim-tokens/scim-tok
 import type { CommandResult } from "../../utils/output";
 import { runManagement } from "../management/_shared";
 
-export const revokeScimTokenCommand = async (
-  id: string,
-): Promise<CommandResult | void> =>
+export const revokeScimTokenCommand = async (id: string): Promise<CommandResult | void> =>
   runManagement({
     action: "revoke SCIM token",
     pending: `Revoking SCIM token "${id}"...`,

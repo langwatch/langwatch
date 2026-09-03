@@ -6,7 +6,10 @@ vi.stubGlobal("fetch", mockFetch);
 
 const initResponse = (): Response =>
   new Response(
-    JSON.stringify({ slug: "trailing-slash-eval", path: "/acme/experiments/trailing-slash-eval" }),
+    JSON.stringify({
+      slug: "trailing-slash-eval",
+      path: "/acme/experiments/trailing-slash-eval",
+    }),
     { status: 200, headers: { "content-type": "application/json" } },
   );
 

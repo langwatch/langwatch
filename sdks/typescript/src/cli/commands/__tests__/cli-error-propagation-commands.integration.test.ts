@@ -6,15 +6,7 @@
  * various payload shapes) so regressions in error propagation are caught
  * at the boundary the user actually experiences.
  */
-import {
-  describe,
-  expect,
-  it,
-  beforeAll,
-  afterAll,
-  beforeEach,
-  afterEach,
-} from "vitest";
+import { describe, expect, it, beforeAll, afterAll, beforeEach, afterEach } from "vitest";
 import * as fs from "fs";
 import * as path from "path";
 import * as os from "os";
@@ -101,7 +93,12 @@ interface CliResult {
   exitCode: number | null;
 }
 
-function runCli(args: string[], cwd: string, timeoutMs = 15000): Promise<CliResult> {
+function runCli(
+  args: string[],
+  cwd: string,
+  timeoutMs = 15000,
+  sessionProjectId?: string,
+): Promise<CliResult> {
   return new Promise((resolve) => {
     // This suite asserts on the human (text) rendering. An agent-mode marker
     // inherited from the runner's environment (CLAUDECODE etc.) would flip
@@ -111,12 +108,31 @@ function runCli(args: string[], cwd: string, timeoutMs = 15000): Promise<CliResu
     for (const marker of AGENT_MODE_ENV_VARS) {
       delete baseEnv[marker];
     }
+    const sessionConfigPath = path.join(cwd, "config.json");
+    if (sessionProjectId) {
+      delete baseEnv.LANGWATCH_API_KEY;
+      fs.writeFileSync(
+        sessionConfigPath,
+        JSON.stringify({
+          access_token: "test-session",
+          control_plane_url: baseUrl,
+          gateway_url: baseUrl,
+          personal_project: {
+            api_key: "test",
+            id: sessionProjectId,
+            validated_at: Math.floor(Date.now() / 1000),
+          },
+        }),
+      );
+    }
     const child = spawn("node", [CLI_PATH, ...args], {
       cwd,
       stdio: ["ignore", "pipe", "pipe"],
       env: {
         ...baseEnv,
-        LANGWATCH_API_KEY: "test",
+        ...(sessionProjectId
+          ? { LANGWATCH_CLI_CONFIG: sessionConfigPath }
+          : { LANGWATCH_API_KEY: "test" }),
         LANGWATCH_ENDPOINT: baseUrl,
       },
     });
@@ -171,9 +187,7 @@ describe("CLI error propagation across commands", () => {
 
       expect(result.exitCode).toBe(1);
       expect(result.combined.toLowerCase()).toContain("already exists");
-      expect(result.combined.toLowerCase()).not.toContain(
-        "error: internal server error",
-      );
+      expect(result.combined.toLowerCase()).not.toContain("error: internal server error");
     });
   });
 
@@ -216,15 +230,13 @@ describe("CLI error propagation across commands", () => {
       );
 
       expect(result.exitCode).toBe(1);
-      expect(result.combined.toLowerCase()).toContain(
-        "must be a valid evaluator type",
-      );
+      expect(result.combined.toLowerCase()).toContain("must be a valid evaluator type");
     });
   });
 
   describe("secret create", () => {
     it("surfaces the raw body when the server omits error/message fields", async () => {
-      pushResponse("POST", "/api/secrets", {
+      pushResponse("POST", "/api/v1/secret", {
         status: 500,
         body: { code: "DB_DOWN", traceId: "abc-123" },
       });
@@ -232,6 +244,8 @@ describe("CLI error propagation across commands", () => {
       const result = await runCli(
         ["secret", "create", "MY_SECRET", "--value", "sekret"],
         testDir,
+        15000,
+        "project-test",
       );
 
       expect(result.exitCode).toBe(1);
@@ -256,9 +270,7 @@ describe("CLI error propagation across commands", () => {
       );
 
       expect(result.exitCode).toBe(1);
-      expect(result.combined.toLowerCase()).toContain(
-        "missing required input",
-      );
+      expect(result.combined.toLowerCase()).toContain("missing required input");
     });
   });
 

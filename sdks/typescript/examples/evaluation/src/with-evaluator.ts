@@ -12,7 +12,9 @@ import { LangWatch } from "langwatch";
 
 // Check for required environment variables
 if (!process.env.LANGWATCH_API_KEY) {
-  console.error("❌ LANGWATCH_API_KEY is required. Create a .env file with your API key.");
+  console.error(
+    "❌ LANGWATCH_API_KEY is required. Create a .env file with your API key.",
+  );
   console.error("   Get your API key from https://app.langwatch.ai");
   process.exit(1);
 }
@@ -90,7 +92,7 @@ const main = async () => {
         data: { response },
       });
     },
-    { concurrency: 2 }
+    { concurrency: 2 },
   );
 
   console.log("\n✅ Evaluation complete!");

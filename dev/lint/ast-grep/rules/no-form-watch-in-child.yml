@@ -26,7 +26,9 @@ rule:
         pattern: $F
         stopBy: end
 files:
-  - "platform/app/src/components/**/*.tsx"
+  - "apps/ui/src/**/*.tsx"
+  - "packages/features/*/web/src/**/*.tsx"
+  - "packages/enterprise/features/*/web/src/**/*.tsx"
 ignores:
   - "**/*.test.tsx"
   - "**/*.spec.tsx"

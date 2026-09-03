@@ -11,10 +11,10 @@ There are two ways to run experiments in your CI/CD pipeline:
 
 Choose based on your needs:
 
-| Approach | Best For |
-|----------|----------|
+| Approach                 | Best For                                                                            |
+| ------------------------ | ----------------------------------------------------------------------------------- |
 | **Platform Experiments** | Non-technical team members can modify experiments; configuration lives in LangWatch |
-| **Experiments via SDK** | Version control your experiment config; full flexibility in code |
+| **Experiments via SDK**  | Version control your experiment config; full flexibility in code                    |
 
 ---
 
@@ -31,10 +31,12 @@ Configure your experiment once in the LangWatch Experiments via UI, then trigger
    - Run it once to verify it works
 
 2. **Get your experiment slug** from the URL:
+
    ```
    https://app.langwatch.ai/your-project/experiments/your-experiment-slug
                                                       ^^^^^^^^^^^^^^^^^^^^
    ```
+
    Or open the **Run Options** menu in the experiment toolbar and choose **Run in CI/CD** for ready-to-copy snippets.
 
 3. **Run from CI/CD:**
@@ -46,7 +48,8 @@ import langwatch
 
 result = langwatch.experiment.run("your-experiment-slug")
 result.print_summary()
-```
+
+````
   </Tab>
   <Tab title="TypeScript">
 ```typescript
@@ -55,7 +58,8 @@ import { LangWatch } from "langwatch";
 const langwatch = new LangWatch();
 const result = await langwatch.experiments.run("your-experiment-slug");
 result.printSummary();
-```
+````
+
   </Tab>
 </Tabs>
 
@@ -79,7 +83,7 @@ jobs:
       - name: Set up Python
         uses: actions/setup-python@v5
         with:
-          python-version: '3.11'
+          python-version: "3.11"
 
       - name: Install LangWatch
         run: pip install langwatch
@@ -177,15 +181,17 @@ Define your entire experiment in code. This gives you full control and version c
 import langwatch
 
 # Load your dataset
+
 dataset = langwatch.dataset.get_dataset("my-dataset").to_pandas()
 
 # Initialize experiment
+
 experiment = langwatch.experiment.init("ci-quality-check")
 
 # Run through each test case
-for idx, row in experiment.loop(dataset.iterrows()):
-    # Call your LLM/agent
-    response = my_llm(row["input"])
+
+for idx, row in experiment.loop(dataset.iterrows()): # Call your LLM/agent
+response = my_llm(row["input"])
 
     # Run evaluators
     experiment.evaluate(
@@ -199,8 +205,10 @@ for idx, row in experiment.loop(dataset.iterrows()):
     )
 
 # Print summary and exit with code 1 on failure
+
 experiment.print_summary()
-```
+
+````
   </Tab>
   <Tab title="TypeScript">
 ```typescript
@@ -236,7 +244,8 @@ await experiment.run(
 
 // Print summary and exit with code 1 on failure
 experiment.printSummary();
-```
+````
+
   </Tab>
 </Tabs>
 
@@ -258,7 +267,7 @@ jobs:
       - name: Set up Python
         uses: actions/setup-python@v5
         with:
-          python-version: '3.11'
+          python-version: "3.11"
 
       - name: Install dependencies
         run: |
@@ -346,6 +355,7 @@ Both approaches output a CI-friendly summary:
 ```
 
 The `print_summary()` method:
+
 - Outputs results in a structured format
 - Returns exit code 1 if any evaluations failed (unless `exit_on_failure=False`)
 - Provides a link to view detailed results in LangWatch
@@ -358,33 +368,14 @@ The `print_summary()` method:
 
 <Tabs>
   <Tab title="Platform Experiment">
-```yaml
-evaluate:
-  stage: test
-  image: python:3.11
-  script:
-    - pip install langwatch
-    - python -c "
-      import langwatch
-      result = langwatch.experiment.run('my-experiment')
-      result.print_summary()
-      "
-  variables:
-    LANGWATCH_API_KEY: $LANGWATCH_API_KEY
-```
+    ```yaml evaluate: stage: test image: python:3.11 script: - pip install langwatch -
+    python -c " import langwatch result = langwatch.experiment.run('my-experiment')
+    result.print_summary() " variables: LANGWATCH_API_KEY: $LANGWATCH_API_KEY ```
   </Tab>
   <Tab title="via SDK">
-```yaml
-evaluate:
-  stage: test
-  image: python:3.11
-  script:
-    - pip install langwatch openai
-    - python scripts/run_evaluation.py
-  variables:
-    LANGWATCH_API_KEY: $LANGWATCH_API_KEY
-    OPENAI_API_KEY: $OPENAI_API_KEY
-```
+    ```yaml evaluate: stage: test image: python:3.11 script: - pip install langwatch
+    openai - python scripts/run_evaluation.py variables: LANGWATCH_API_KEY:
+    $LANGWATCH_API_KEY OPENAI_API_KEY: $OPENAI_API_KEY ```
   </Tab>
 </Tabs>
 
@@ -396,21 +387,19 @@ evaluate:
 version: 2.1
 
 jobs:
-  evaluate:
-    docker:
-      - image: python:3.11
-    steps:
-      - checkout
-      - run:
-          name: Run experiment
-          command: |
-            pip install langwatch
-            python -c "
-            import langwatch
-            result = langwatch.experiment.run('my-experiment')
-            result.print_summary()
-            "
-```
+evaluate:
+docker: - image: python:3.11
+steps: - checkout - run:
+name: Run experiment
+command: |
+pip install langwatch
+python -c "
+import langwatch
+result = langwatch.experiment.run('my-experiment')
+result.print_summary()
+"
+
+````
   </Tab>
   <Tab title="via SDK">
 ```yaml
@@ -428,7 +417,8 @@ jobs:
       - run:
           name: Run experiment
           command: python scripts/run_evaluation.py
-```
+````
+
   </Tab>
 </Tabs>
 
@@ -446,18 +436,19 @@ from langwatch.evaluation import (
 )
 
 try:
-    result = langwatch.experiment.run("my-experiment", timeout=300)
-    result.print_summary()
+result = langwatch.experiment.run("my-experiment", timeout=300)
+result.print_summary()
 except EvaluationNotFoundError:
-    print("Experiment not found - check the slug")
-    exit(1)
+print("Experiment not found - check the slug")
+exit(1)
 except EvaluationTimeoutError as e:
-    print(f"Timeout: only {e.progress}/{e.total} completed")
-    exit(1)
+print(f"Timeout: only {e.progress}/{e.total} completed")
+exit(1)
 except EvaluationRunFailedError as e:
-    print(f"Run failed: {e.error_message}")
-    exit(1)
-```
+print(f"Run failed: {e.error_message}")
+exit(1)
+
+````
   </Tab>
   <Tab title="TypeScript">
 ```typescript
@@ -480,7 +471,8 @@ try {
   }
   process.exit(1);
 }
-```
+````
+
   </Tab>
 </Tabs>
 
@@ -498,6 +490,7 @@ curl -X POST "https://app.langwatch.ai/api/evaluations/v3/{slug}/run" \
 ```
 
 Response:
+
 ```json
 {
   "runId": "run_abc123",
@@ -515,6 +508,7 @@ curl "https://app.langwatch.ai/api/evaluations/v3/runs/{runId}" \
 ```
 
 Response (completed):
+
 ```json
 {
   "runId": "run_abc123",
@@ -544,7 +538,11 @@ Returns the per-row dataset entries (input, output, trace id, duration) and eval
 ## Next Steps
 
 <CardGroup cols={2}>
-  <Card title="Experiments via UI" icon="window" href="/evaluations/experiments/ui/answer-correctness">
+  <Card
+    title="Experiments via UI"
+    icon="window"
+    href="/evaluations/experiments/ui/answer-correctness"
+  >
     Create experiments in the platform UI
   </Card>
   <Card title="Experiments via SDK" icon="code" href="/evaluations/experiments/sdk">

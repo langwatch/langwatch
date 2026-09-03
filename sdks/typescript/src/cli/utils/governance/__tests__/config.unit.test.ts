@@ -180,9 +180,7 @@ describe("governance config persistence", () => {
         }),
       );
       const loaded = loadConfig();
-      expect(loaded.default_personal_vk?.secret).toBe(
-        "vk-lw-01HZX9N4TESTULIDTESTULID00",
-      );
+      expect(loaded.default_personal_vk?.secret).toBe("vk-lw-01HZX9N4TESTULIDTESTULID00");
     });
   });
 

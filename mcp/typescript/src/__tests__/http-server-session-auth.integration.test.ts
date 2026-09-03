@@ -67,14 +67,11 @@ describe("Credentials in query parameters", () => {
 
     const sessionId = await readSessionId(sseResponse);
 
-    const response = await fetch(
-      `${harness.baseUrl}/messages?sessionId=${sessionId}`,
-      {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: toolsListBody(),
-      }
-    );
+    const response = await fetch(`${harness.baseUrl}/messages?sessionId=${sessionId}`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: toolsListBody(),
+    });
 
     expect(response.status).toBe(401);
     controller.abort();

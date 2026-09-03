@@ -49,11 +49,12 @@ export const uploadCommand = async (
 
   const service = createDatasetService();
 
-  const strategyLabel = ifExists === "append"
-    ? "Uploading"
-    : ifExists === "replace"
-      ? "Replacing records and uploading"
-      : "Uploading (error if exists)";
+  const strategyLabel =
+    ifExists === "append"
+      ? "Uploading"
+      : ifExists === "replace"
+        ? "Replacing records and uploading"
+        : "Uploading (error if exists)";
 
   const spinner = createSpinner(
     `${strategyLabel} ${filename} to dataset "${slugOrId}"...`,
@@ -82,7 +83,9 @@ export const uploadCommand = async (
           console.log(`  ${chalk.bold("Slug:")}    ${result.dataset.slug}`);
           console.log(`  ${chalk.bold("ID:")}      ${result.dataset.id}`);
           if (result.dataset.platformUrl) {
-            console.log(`  ${chalk.bold("View:")}    ${chalk.underline(result.dataset.platformUrl)}`);
+            console.log(
+              `  ${chalk.bold("View:")}    ${chalk.underline(result.dataset.platformUrl)}`,
+            );
           }
         }
       },

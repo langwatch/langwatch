@@ -53,10 +53,11 @@ export type DatasetEntry<T extends Record<string, unknown> = Record<string, unkn
 /**
  * A dataset containing metadata and entries.
  */
-export type Dataset<T extends Record<string, unknown> = Record<string, unknown>> = DatasetMetadata & {
-  /** Array of dataset entries */
-  entries: DatasetEntry<T>[];
-};
+export type Dataset<T extends Record<string, unknown> = Record<string, unknown>> =
+  DatasetMetadata & {
+    /** Array of dataset entries */
+    entries: DatasetEntry<T>[];
+  };
 
 /**
  * Options for getting a dataset.

@@ -15,12 +15,12 @@ override the default.
 
 ## The four personas
 
-| Persona | Detection signal | Default landing | Why this surface |
-|---------|------------------|-----------------|------------------|
-| **Org admin** (governance-relevant role on at least one org) | `RoleBinding` carries `organization:manage` OR `governance:view` | [`/governance`](/ai-governance/governance-dashboard): the bird-eye dashboard | Their job is org-wide oversight; first paint shows usage-by-team graphs, anomaly alerts, drill-in to per-team, per-user activity. Their own personal traces are secondary. |
-| **Personal-only user** (no project membership beyond their own personal workspace) | `OrganizationUser` role=member AND `Project.isPersonal=true` AND no `TeamUser` membership beyond personal | [`/me`](/ai-governance/personal-portal/end-user): the AI Tools Portal + Trace Ingest section | Their primary use case is *"sign in, install Claude Code, Cursor template, see my own usage"*. AI Tools Portal tile-grid + Trace Ingest catalog is the headline. |
-| **Project-only user** (LLMOps customer, no personal-workspace activity) | `TeamUser` membership exists with `Team.isPersonal=false` AND no traces in `Project.isPersonal` | `/<project>/traces`, the existing LLMOps trace explorer | Existing LLMOps customer story stays unchanged. First paint is the Trace Explorer, not /me. |
-| **Mixed** (personal + project membership) | Combination of above | [`/me`](/ai-governance/personal-portal/end-user) (default) OR last-touched (cookie-tracked) | Cookie remembers where the user last spent time. New mixed user lands at /me first paint to discover the AI Tools Portal, then uses the workspace switcher to flip to project work. |
+| Persona                                                                            | Detection signal                                                                                          | Default landing                                                                              | Why this surface                                                                                                                                                                    |
+| ---------------------------------------------------------------------------------- | --------------------------------------------------------------------------------------------------------- | -------------------------------------------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| **Org admin** (governance-relevant role on at least one org)                       | `RoleBinding` carries `organization:manage` OR `governance:view`                                          | [`/governance`](/ai-governance/governance-dashboard): the bird-eye dashboard                 | Their job is org-wide oversight; first paint shows usage-by-team graphs, anomaly alerts, drill-in to per-team, per-user activity. Their own personal traces are secondary.          |
+| **Personal-only user** (no project membership beyond their own personal workspace) | `OrganizationUser` role=member AND `Project.isPersonal=true` AND no `TeamUser` membership beyond personal | [`/me`](/ai-governance/personal-portal/end-user): the AI Tools Portal + Trace Ingest section | Their primary use case is _"sign in, install Claude Code, Cursor template, see my own usage"_. AI Tools Portal tile-grid + Trace Ingest catalog is the headline.                    |
+| **Project-only user** (LLMOps customer, no personal-workspace activity)            | `TeamUser` membership exists with `Team.isPersonal=false` AND no traces in `Project.isPersonal`           | `/<project>/traces`, the existing LLMOps trace explorer                                      | Existing LLMOps customer story stays unchanged. First paint is the Trace Explorer, not /me.                                                                                         |
+| **Mixed** (personal + project membership)                                          | Combination of above                                                                                      | [`/me`](/ai-governance/personal-portal/end-user) (default) OR last-touched (cookie-tracked)  | Cookie remembers where the user last spent time. New mixed user lands at /me first paint to discover the AI Tools Portal, then uses the workspace switcher to flip to project work. |
 
 ## How detection works
 
@@ -79,6 +79,6 @@ a later iteration). Today, the per-user override is the only knob.
 - [Workspaces](/ai-governance/workspaces): how the workspace switcher
   works for mixed-persona users.
 - [`governance-home-routing.feature`](https://github.com/langwatch/langwatch/blob/main/specs/ai-gateway/governance/governance-home-routing.feature)
- , the executable BDD spec that governs the routing logic.
+  , the executable BDD spec that governs the routing logic.
 - [`persona-aware-chrome.feature`](https://github.com/langwatch/langwatch/blob/main/specs/ai-gateway/governance/persona-aware-chrome.feature)
- , what each persona sees in the navigation chrome.
+  , what each persona sees in the navigation chrome.

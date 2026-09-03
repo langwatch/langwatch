@@ -1,46 +1,49 @@
 // ---------------------------------------------------------------------------
-// @langwatch/api -- Public API
+// @langwatch/api -- the transport-agnostic half
+//
+// Everything here is true of a LangWatch API call whatever carries it: the
+// error vocabulary and its wire envelope, the access-policy vocabulary that
+// says what credential an operation accepts, the capability ports, and the
+// Standard Schema boundary. None of it imports a transport framework.
+//
+// The Hono service framework is `@langwatch/api/rest`; the tRPC root and its
+// policy middleware are `@langwatch/api/trpc`. Neither is re-exported here on
+// purpose: a consumer that wants a transport names it.
 // ---------------------------------------------------------------------------
 
-export { createService, ServiceBuilder, VersionBuilder } from "./builder.js";
-export { isRpcPath } from "./version-builder.js";
-export type { RpcConfig, RpcPath } from "./version-builder.js";
-export { createErrorHandler, formatError } from "./errors.js";
-export { loggerMiddleware, tracerMiddleware } from "./middleware.js";
+export {
+  AuthenticatedActorRequiredError,
+  ApiVersionConflictError,
+  createErrorHandler,
+  formatError,
+  ProjectInputMismatchError,
+  InvalidApiVersionError,
+} from "./errors.js";
 
-import type { Hono } from "hono";
-import { handle } from "hono/vercel";
+export type { RateLimiter, ResponseCache } from "./ports.js";
 
-export function routeHandlers(app: Hono) {
-  const h = handle(app);
-  return { GET: h, POST: h, PUT: h, DELETE: h, PATCH: h } as const;
-}
+export type { ApiSchema, ApiSchemaOutput } from "./schema.js";
+
+// ---------------------------------------------------------------------------
+// The access-policy vocabulary: what credential an operation accepts, and what
+// that credential can reach. Read by the REST route registry, the OpenAPI
+// security generator and the authorization audit alike, so it belongs to no
+// one transport.
+// ---------------------------------------------------------------------------
+
 export {
-  createSSEResponse,
-  type SSEConfig,
-  type SSEHandler,
-  type TypedSSEStream,
-} from "./sse.js";
-export {
-  type BaseApp,
-  type DateVersion,
-  type EndpointConfig,
-  type EndpointDocs,
-  type EndpointRegistration,
-  type Handler,
-  type HttpMethod,
-  httpStatusText,
-  isDateVersion,
-  type MountedRoute,
-  type ServiceConfig,
-  VERSION_LATEST,
-  VERSION_PREVIEW,
-  type VersionStatus,
-} from "./types.js";
-export {
-  type ResolvedEndpoint,
-  type ResolvedVersion,
-  resolveRequestVersion,
-  resolveVersions,
-  type VersionDefinition,
-} from "./versioning.js";
+  type AccessPolicy,
+  anyAuthenticated,
+  apiKeyPermission,
+  type CredentialClass,
+  credentialClassFor,
+  describeAccessPolicy,
+  type HandlerCredential,
+  handlerManagedAuth,
+  internalSecret,
+  isApiKeyReachable,
+  policyPermissions,
+  publicEndpoint,
+  requires,
+  requiresOnProject,
+} from "./access-policy.js";

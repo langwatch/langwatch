@@ -135,8 +135,8 @@ def apply_tool_reasoning_compatibility(kwargs: dict) -> dict:
 
 # The gpt-5 models that DO accept a temperature, so the family test does not
 # claim them: the image models take one, the text models do not
-# (`platform/app/src/server/modelProviders/llmModels.json` is the catalog this
-# was read from — 46 of the family refuse, these two accept).
+# (`packages/features/model-provider/contract/src/catalog/model-catalog.json`
+# is the catalogue this was read from — 46 of the family refuse, these two accept).
 #
 # The exceptions are listed rather than inverting this into an allowlist of the
 # 46, because the two errors are not symmetric. Pinning a model that would have

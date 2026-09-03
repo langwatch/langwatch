@@ -8,7 +8,9 @@ keywords: vercel ai sdk, langwatch, tracing, observability, vercel, ai, sdk
 import TypeScriptIntro from "/snippets/typescript-intro.mdx";
 
 <Tip>
-  **Quick setup?** Instead of following these steps manually, [copy a prompt](/skills/code-prompts#instrument-my-code) into your coding agent and it will set this up for you automatically.
+  **Quick setup?** Instead of following these steps manually, [copy a
+  prompt](/skills/code-prompts#instrument-my-code) into your coding agent and it will set
+  this up for you automatically.
 </Tip>
 
 <TypeScriptIntro />
@@ -31,12 +33,14 @@ yarn add langwatch ai @ai-sdk/openai
 ```bash bun
 bun add langwatch ai @ai-sdk/openai
 ```
+
 </CodeGroup>
 
 ## Usage
 
 <Info>
-The LangWatch API key is configured by default via the `LANGWATCH_API_KEY` environment variable.
+  The LangWatch API key is configured by default via the `LANGWATCH_API_KEY` environment
+  variable.
 </Info>
 
 Set up observability and enable telemetry on your Vercel AI SDK calls:
@@ -67,12 +71,12 @@ The Vercel AI SDK automatically sends traces to LangWatch when `experimental_tel
 Pass `experimental_telemetry.metadata` to tag the call. LangWatch reads these
 keys from it:
 
-| Key | What it does |
-|---|---|
-| `labels` | An array of labels. Filter the trace list by them. |
-| `thread_id` | Groups the call into a conversation with every other call that sends the same id. |
-| `user_id` | The end user the call belongs to. |
-| `customer_id` | The customer or tenant the call belongs to. |
+| Key           | What it does                                                                      |
+| ------------- | --------------------------------------------------------------------------------- |
+| `labels`      | An array of labels. Filter the trace list by them.                                |
+| `thread_id`   | Groups the call into a conversation with every other call that sends the same id. |
+| `user_id`     | The end user the call belongs to.                                                 |
+| `customer_id` | The customer or tenant the call belongs to.                                       |
 
 Any other key becomes custom metadata on the trace, filterable by its own name.
 

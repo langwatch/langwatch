@@ -25,9 +25,7 @@ export const TRANSIENT_NETWORK_CODES: ReadonlySet<string> = new Set([
 ]);
 
 /** Statuses the server uses for "busy, come back". */
-export const TRANSIENT_HTTP_STATUSES: ReadonlySet<number> = new Set([
-  429, 502, 503,
-]);
+export const TRANSIENT_HTTP_STATUSES: ReadonlySet<number> = new Set([429, 502, 503]);
 
 export interface TransientClassificationInput {
   error: unknown;
@@ -64,8 +62,7 @@ const DRIVER_TIMEOUT_MESSAGE = /^timeout error\.?$/i;
 
 function isDriverTimeout(error: Error): boolean {
   return (
-    error.name === "TimeoutError" ||
-    DRIVER_TIMEOUT_MESSAGE.test(error.message.trim())
+    error.name === "TimeoutError" || DRIVER_TIMEOUT_MESSAGE.test(error.message.trim())
   );
 }
 

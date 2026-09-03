@@ -10,13 +10,13 @@ Feature: Prompt spans on the playground — trace→playground resume parity wit
   #   sdks/python/src/langwatch/prompts/decorators/prompt_tracing.py
   #   sdks/python/src/langwatch/attributes.py (LangWatchPrompt* keys)
   # Trace-UI consumers that depend on this shape:
-  #   platform/app/src/features/traces-v2/utils/promptAttributes.ts
-  #   platform/app/src/features/traces-v2/components/TraceDrawer/PromptAccordion.tsx
-  #   platform/app/src/features/traces-v2/utils/findPromptReferenceInAncestors.ts
+  #   packages/features/trace/web/src/model/prompt-attributes.ts
+  #   packages/features/trace/web/src/ui/sections/explorer/trace-drawer/prompt-accordion.tsx
+  #   [gone] src/features/traces-v2/utils/findPromptReferenceInAncestors.ts
   #
   # Bindings:
   #   - Emission scenarios (1, 3, 4, 5, 6): services/nlpgo/tests/integration/prompt_spans_playground_test.go
-  #   - Drawer / Open-in-Prompts scenario (2): platform/app/src/features/traces-v2/.../PromptAccordion.integration.test.ts
+  #   - Drawer / Open-in-Prompts scenario (2): [gone] src/features/traces-v2/.../PromptAccordion.integration.test.ts
 
   Background:
     Given the nlpgo service is running and the project is on the Go-NLP execution path

@@ -47,8 +47,7 @@ export async function createApiKey(data: {
 }
 
 export async function revokeApiKey(id: string): Promise<{ success: boolean }> {
-  return makeRequest(
-    "DELETE",
-    `/api/api-keys/${encodeURIComponent(id)}`,
-  ) as Promise<{ success: boolean }>;
+  return makeRequest("DELETE", `/api/api-keys/${encodeURIComponent(id)}`) as Promise<{
+    success: boolean;
+  }>;
 }

@@ -13,7 +13,11 @@ Two recent PRs surfaced an architectural tension around resolving project defaul
 
 Both PRs touched the same files with different conventions, so the codebase needed a written rule for where this kind of logic lives.
 
-The de-facto convention in `platform/app/src/server/app-layer/projects/` already follows the service-and-repository split: `project.service.ts` holds the business layer, and `repositories/project.repository.ts` is a pure data interface (with `NullProjectRepository` and `ProjectPrismaRepository` implementations). The convention was never written down.
+The Project feature now provides the canonical service-and-repository split in
+`packages/features/project/server/`: `services/project.service.ts` holds the
+business layer and `repositories/prisma/prisma.project.repository.ts` is its
+private persistence adapter. The old application-local implementation was
+removed once its compatibility callers migrated.
 
 ## Decision
 
@@ -28,7 +32,7 @@ Concretely:
 ## Rationale
 
 - The DB stores `defaultModel: string | null`. The "if null, fall back to the first usable provider" rule is a business decision, not a data fact. Mixing it into the repository conflates "what is stored" with "what is effective" — and the distinction matters for settings UIs, debugging, and migrations that need to preserve null vs. non-null intent.
-- Putting resolution in the service keeps the repository thin and testable in isolation (no testcontainers required to exercise resolution logic), lets the resolution strategy vary per caller, and aligns with the existing `app-layer/projects/{service.ts, repositories/}` structure.
+- Putting resolution in the service keeps the repository thin and testable in isolation (no testcontainers required to exercise resolution logic), lets the resolution strategy vary per caller, and aligns with the canonical Project feature package.
 - The alternative (repository owns resolution) was rejected because (a) it loses the raw view callers need for settings/debugging, (b) it ties resolution tests to DB setup, and (c) it creates ambiguity when multiple resolution strategies are needed (different defaults for prompts vs. evaluators vs. scenarios).
 
 ## Consequences
@@ -41,5 +45,5 @@ Concretely:
 
 - PR #1174 — initial proposal to centralize via a resolution-aware repository
 - PR #3537 — service-layer `resolveDefaultModel` (canonical)
-- `platform/app/src/server/app-layer/projects/` — de-facto convention this ADR codifies
+- `packages/features/project/server/` — canonical service/repository example
 - `dev/docs/adr/TEMPLATE.md` — template used for this file

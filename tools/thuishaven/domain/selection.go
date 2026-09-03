@@ -6,15 +6,11 @@ import (
 )
 
 // Selection is a worktree's sticky service choice (ADR-064): which optional
-// services `haven up` runs here. app always runs and is not selectable.
-// Expressed as deltas on up (`haven up +langy`, `haven up -nlp`), persisted
-// per worktree, shown by status. The zero value is NOT a fresh worktree's
-// default — that is DefaultSelection.
+// services `haven up` runs here. The three Node lanes — ui, api and workers —
+// always run and are not selectable. Expressed as deltas on up (`haven up
+// +langy`, `haven up -nlp`), persisted per worktree, shown by status. The zero
+// value is NOT a fresh worktree's default — that is DefaultSelection.
 type Selection struct {
-	// Workers true runs the background workers as their own standalone lane;
-	// false (the default) hosts them inside the app process, saving the RAM
-	// of a second Node process.
-	Workers bool `json:"workers"`
 	Gateway bool `json:"gateway"`
 	NLP     bool `json:"nlp"`
 	// Langy is off by default: it costs a container image and a hard memory
@@ -29,12 +25,22 @@ type Selection struct {
 	IDP bool `json:"idp"`
 }
 
-// DefaultSelection is a fresh worktree's lean default: app (workers
-// in-process), gateway, nlp and the idp simulator — no langy.
+// DefaultSelection is a fresh worktree's lean default: the three Node lanes,
+// gateway, nlp and the idp simulator — no langy.
 func DefaultSelection() Selection { return Selection{Gateway: true, NLP: true, IDP: true} }
 
 // SelectableServices are the names ±deltas accept, in display order.
-var SelectableServices = []string{"workers", "gateway", "nlp", "langy", "idp"}
+var SelectableServices = []string{"gateway", "nlp", "langy", "idp"}
+
+// RetiredSelectionServices are ±names that used to pick something and no longer
+// can, with what to say instead. `workers` was the choice between a standalone
+// worker lane and hosting the queue stack inside the app process; the worker is
+// its own application now, so the lane always runs and there is nothing left to
+// select. Refused by name rather than falling into the generic "unknown
+// service" error, which would read as a typo.
+var RetiredSelectionServices = map[string]string{
+	"workers": "the background worker is its own process now — every stack runs the ui, api and workers lanes, so there is nothing to select",
+}
 
 // ApplySelectionDeltas folds `+svc` / `-svc` arguments into a selection.
 func ApplySelectionDeltas(sel Selection, deltas []string) (Selection, error) {
@@ -43,9 +49,10 @@ func ApplySelectionDeltas(sel Selection, deltas []string) (Selection, error) {
 			return sel, fmt.Errorf("unrecognised argument %q — services are picked with +service or -service (services: %s)", d, strings.Join(SelectableServices, ", "))
 		}
 		on := d[0] == '+'
+		if note, retired := RetiredSelectionServices[d[1:]]; retired {
+			return sel, fmt.Errorf("%q no longer selects anything — %s", d[1:], note)
+		}
 		switch d[1:] {
-		case "workers":
-			sel.Workers = on
 		case "gateway":
 			sel.Gateway = on
 		case "nlp":
@@ -64,7 +71,7 @@ func ApplySelectionDeltas(sel Selection, deltas []string) (Selection, error) {
 // SelectionFromStack derives what a running stack actually runs, so a plain
 // `up` can tell "already matches the selection" from "needs a restart".
 func SelectionFromStack(st Stack) Selection {
-	sel := Selection{Workers: st.HasStandaloneWorkers}
+	var sel Selection
 	for _, svc := range st.Services {
 		local := svc.Port != 0 && !svc.IsFallback
 		switch svc.Name {
@@ -82,23 +89,26 @@ func SelectionFromStack(st Stack) Selection {
 }
 
 // CLIServiceName maps an internal service name to its CLI spelling — the CLI
-// says langy, never langyagent (ADR-064: one name).
+// says langy, never langyagent (ADR-064: one name), and it says ui for the
+// routed `app` hostname, which is the browser application's lane. The hostname
+// keeps the name app.<slug> because the API is served under it at /api; the
+// LANE is the Vite process alone, and `haven logs ui` / `haven restart ui`
+// must name the same thing the supervisor labels.
 func CLIServiceName(internal string) string {
-	if internal == "langyagent" {
+	switch internal {
+	case "langyagent":
 		return "langy"
+	case "app":
+		return "ui"
+	default:
+		return internal
 	}
-	return internal
 }
 
 // Describe renders the selection for humans: what runs, what is off, and the
 // exact delta that adds it.
 func (s Selection) Describe() string {
-	on := []string{"app"}
-	if s.Workers {
-		on = append(on, "workers (own lane)")
-	} else {
-		on = append(on, "workers (in-process)")
-	}
+	on := []string{"ui", "api", "workers"}
 	var off []string
 	add := func(enabled bool, name string) {
 		if enabled {

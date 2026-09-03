@@ -10,16 +10,16 @@ event vocabulary, and durable/ephemeral split remain in force.
 
 ## Context
 
-Before this decision, Langy's durable events landed in the ClickHouse
-`event_log`, its conversation and turn folds were also stored in ClickHouse,
-and all four Langy reactors were attached to the conversation fold. That design
-created two problems for an interactive product:
+Langy's durable events land in the ClickHouse `event_log`, while interactive
+workflow state needs a lower-latency operational store. Attaching every
+post-event action to a ClickHouse conversation fold creates two problems for
+an interactive product:
 
 - operational reads wait on an eventually consistent analytical database; and
 - workflow decisions receive a captured read projection as if it were durable
   process state.
 
-The old delayed liveness reactor demonstrated the second problem directly. Its
+The delayed liveness action demonstrates the second problem directly. Its
 captured fold was stale by the time the timer fired, so it had to re-read
 ClickHouse before deciding whether the turn had completed. The old fold hot path
 needed a Redis write-through cache because the ClickHouse write did not wait for
@@ -189,7 +189,7 @@ copying its sensitive payload.
 
 Responsibility is split as follows:
 
-| Existing reactor                   | New owner                               |
+| Responsibility                     | Owner                                   |
 | ---------------------------------- | --------------------------------------- |
 | `spawnAgent`                       | Process-manager worker-dispatch intent  |
 | `agentTurnLiveness`                | Heartbeat-aware direct event subscriber |
@@ -211,12 +211,9 @@ suppresses automatic title effects.
 We will write this manager explicitly. The pilot will not introduce a saga DSL,
 a workflow graph, a generic state-machine compiler, or a new service.
 
-### 5. A narrow process outbox is required before effects own production
+### 5. Process effects use the transactional intent outbox
 
-The existing `ReactorOutbox` remains specific to alert settlement and delivery.
-Langy will not reuse or generalize it.
-
-The process manager does need a small transactional outbox. Updating process
+The process manager needs a transactional outbox. Updating process
 state and then directly calling the worker leaves a crash window; calling the
 worker first can duplicate work if the state transaction fails. The process
 transition and its intent must commit together.
@@ -390,6 +387,6 @@ observed-liveness input contract, and is the natural follow-up.
 - Behavioral spec: [`specs/langy/langy-projection-independent-reactions.feature`](../../../specs/langy/langy-projection-independent-reactions.feature)
 - Current pipeline: `platform/app/src/server/event-sourcing/pipelines/langy-conversation-processing/pipeline.ts`
 - Current process manager: `platform/app/src/server/event-sourcing/pipelines/langy-conversation-processing/process-manager/`
-- Current direct subscribers: `platform/app/src/server/app-layer/langy/subscribers/`
+- Current direct subscribers: `packages/features/langy/server/src/subscribers/`
 - Current registration: `platform/app/src/server/event-sourcing/pipelineRegistry.ts`
-- Related ADRs: ADR-030 (alert outbox), ADR-034 (ClickHouse analytics materialization), ADR-046 (Langy event-sourced conversations)
+- Related ADRs: [Eventing framework boundary](../../../packages/eventing/adrs/20260820-eventing-framework-boundary.md), ADR-034 (ClickHouse analytics materialization), ADR-046 (Langy event-sourced conversations)

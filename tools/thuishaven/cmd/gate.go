@@ -28,7 +28,7 @@ func runHeavy(ctx context.Context, d deps, inv invocation) error {
 	}
 	return d.orch.RunHeavy(ctx, app.HeavyRun{
 		Shell:   shell,
-		Dir:     d.lwDir,
+		Dir:     d.worktree,
 		AgentID: inv.value("--agent-id"),
 		// The gate decided the width; this only applies it. A count that will not
 		// parse is treated as absent rather than fatal, because refusing to run

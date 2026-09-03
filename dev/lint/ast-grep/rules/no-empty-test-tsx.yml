@@ -13,7 +13,9 @@ rule:
     - pattern: test($NAME, () => {})
     - pattern: test($NAME, async () => {})
 files:
-  - "platform/app/**/*.test.tsx"
-  - "platform/app/**/*.spec.tsx"
+  - "apps/**/*.test.tsx"
+  - "packages/**/*.test.tsx"
+  - "apps/**/*.spec.tsx"
+  - "packages/**/*.spec.tsx"
   - "sdks/typescript/**/*.test.tsx"
   - "packages/**/*.test.tsx"

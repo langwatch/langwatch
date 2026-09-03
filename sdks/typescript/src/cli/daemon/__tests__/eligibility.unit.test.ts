@@ -57,23 +57,25 @@ describe("evaluateEligibility", () => {
 
   describe("when the user opts out via LANGWATCH_NO_DAEMON", () => {
     it("refuses", () => {
-      expect(
-        evaluateEligibility(piped({ env: { LANGWATCH_NO_DAEMON: "1" } })),
-      ).toEqual({ eligible: false, reason: "disabled-by-env" });
+      expect(evaluateEligibility(piped({ env: { LANGWATCH_NO_DAEMON: "1" } }))).toEqual({
+        eligible: false,
+        reason: "disabled-by-env",
+      });
     });
 
     it("ignores an explicit falsy value", () => {
-      expect(
-        evaluateEligibility(piped({ env: { LANGWATCH_NO_DAEMON: "0" } })),
-      ).toEqual({ eligible: true });
+      expect(evaluateEligibility(piped({ env: { LANGWATCH_NO_DAEMON: "0" } }))).toEqual({
+        eligible: true,
+      });
     });
   });
 
   describe("when the user opts out persistently (`config set daemon off`)", () => {
     it("refuses", () => {
-      expect(
-        evaluateEligibility(piped({ daemonDisabledByConfig: true })),
-      ).toEqual({ eligible: false, reason: "disabled-by-config" });
+      expect(evaluateEligibility(piped({ daemonDisabledByConfig: true }))).toEqual({
+        eligible: false,
+        reason: "disabled-by-config",
+      });
     });
 
     it("lets the per-invocation env opt-out keep its own reason", () => {
@@ -111,9 +113,10 @@ describe("evaluateEligibility", () => {
       // Served, `readStdin()` would resolve "" on the daemon's immediate EOF —
       // and the SECOND such request would never settle at all, because
       // process.stdin has already emitted `end`.
-      expect(
-        evaluateEligibility(piped({ stdinCarriesData: true })),
-      ).toEqual({ eligible: false, reason: "piped-stdin" });
+      expect(evaluateEligibility(piped({ stdinCarriesData: true }))).toEqual({
+        eligible: false,
+        reason: "piped-stdin",
+      });
     });
 
     it("refuses --stdin even when fd 0 could not be inspected", () => {
@@ -152,9 +155,9 @@ describe("evaluateEligibility", () => {
     });
 
     it("keeps serving the tag commands that never prompt", () => {
-      expect(
-        evaluateEligibility(piped({ args: ["prompt", "tag", "list"] })),
-      ).toEqual({ eligible: true });
+      expect(evaluateEligibility(piped({ args: ["prompt", "tag", "list"] }))).toEqual({
+        eligible: true,
+      });
     });
 
     it("keeps serving a --tag VALUE, which the phrase rule exists to spare", () => {
@@ -209,9 +212,10 @@ describe("evaluateEligibility", () => {
     });
 
     it("finds the command name past leading flags", () => {
-      expect(
-        evaluateEligibility(piped({ args: ["--verbose", "login"] })),
-      ).toEqual({ eligible: false, reason: "denied-command" });
+      expect(evaluateEligibility(piped({ args: ["--verbose", "login"] }))).toEqual({
+        eligible: false,
+        reason: "denied-command",
+      });
     });
   });
 
@@ -243,18 +247,17 @@ describe("evaluateEligibility", () => {
 
   describe("when a denied name appears somewhere other than the command", () => {
     it("refuses anyway, because a needless cold start is the cheap mistake", () => {
-      expect(
-        evaluateEligibility(piped({ args: ["prompt", "get", "open"] })),
-      ).toEqual({ eligible: false, reason: "denied-command" });
+      expect(evaluateEligibility(piped({ args: ["prompt", "get", "open"] }))).toEqual({
+        eligible: false,
+        reason: "denied-command",
+      });
     });
   });
 
   describe("when the command would never terminate", () => {
     it("refuses --follow", () => {
       expect(
-        evaluateEligibility(
-          piped({ args: ["ingest", "tail", "src-1", "--follow"] }),
-        ),
+        evaluateEligibility(piped({ args: ["ingest", "tail", "src-1", "--follow"] })),
       ).toEqual({ eligible: false, reason: "long-running-flag" });
     });
 
@@ -310,15 +313,15 @@ describe("evaluateEligibility", () => {
     it("still serves a command behind a boolean global option", () => {
       // `--agent` takes no value, so `trace` is the command — and `list`,
       // following an operand rather than a flag, is what proves it.
-      expect(
-        evaluateEligibility(piped({ args: ["--agent", "trace", "list"] })),
-      ).toEqual({ eligible: true });
+      expect(evaluateEligibility(piped({ args: ["--agent", "trace", "list"] }))).toEqual({
+        eligible: true,
+      });
     });
 
     it("reads an option that carries its own value as not eating the command", () => {
-      expect(
-        evaluateEligibility(piped({ args: ["--output=json", "trace"] })),
-      ).toEqual({ eligible: true });
+      expect(evaluateEligibility(piped({ args: ["--output=json", "trace"] }))).toEqual({
+        eligible: true,
+      });
     });
   });
 
@@ -490,21 +493,15 @@ describe("isDaemonDisabledByConfig", () => {
   it("disables the daemon when the persisted config says daemon off", () => {
     fs.writeFileSync(configFile, JSON.stringify({ daemon: "off" }));
 
-    expect(
-      isDaemonDisabledByConfig({ LANGWATCH_CLI_CONFIG: configFile }),
-    ).toBe(true);
+    expect(isDaemonDisabledByConfig({ LANGWATCH_CLI_CONFIG: configFile })).toBe(true);
   });
 
   it("keeps the daemon enabled when the config says on, or the field is absent", () => {
     fs.writeFileSync(configFile, JSON.stringify({ daemon: "on" }));
-    expect(
-      isDaemonDisabledByConfig({ LANGWATCH_CLI_CONFIG: configFile }),
-    ).toBe(false);
+    expect(isDaemonDisabledByConfig({ LANGWATCH_CLI_CONFIG: configFile })).toBe(false);
 
     fs.writeFileSync(configFile, JSON.stringify({ control_plane_url: "x" }));
-    expect(
-      isDaemonDisabledByConfig({ LANGWATCH_CLI_CONFIG: configFile }),
-    ).toBe(false);
+    expect(isDaemonDisabledByConfig({ LANGWATCH_CLI_CONFIG: configFile })).toBe(false);
   });
 
   it("keeps the daemon enabled when the config file does not exist", () => {
@@ -518,8 +515,6 @@ describe("isDaemonDisabledByConfig", () => {
   it("keeps the daemon enabled when the config file is corrupt — never breaks a command", () => {
     fs.writeFileSync(configFile, "not json {");
 
-    expect(
-      isDaemonDisabledByConfig({ LANGWATCH_CLI_CONFIG: configFile }),
-    ).toBe(false);
+    expect(isDaemonDisabledByConfig({ LANGWATCH_CLI_CONFIG: configFile })).toBe(false);
   });
 });

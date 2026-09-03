@@ -13,10 +13,10 @@ No per-user setup, no IT tickets.
 
 The numbers below are hands-on time at the LangWatch admin console, not net of organisational approvals.
 
-| Path | Hands-on time | Net of approvals |
-|------|---------------|--------------------|
-| **Self-serve** (existing email signup, no SSO yet) | ~5 minutes | ~5 minutes |
-| **With Okta / Azure AD / Google Workspace SSO** | ~30 minutes | Days, depending on IT / security review of a new SAML or OIDC app |
+| Path                                               | Hands-on time | Net of approvals                                                  |
+| -------------------------------------------------- | ------------- | ----------------------------------------------------------------- |
+| **Self-serve** (existing email signup, no SSO yet) | ~5 minutes    | ~5 minutes                                                        |
+| **With Okta / Azure AD / Google Workspace SSO**    | ~30 minutes   | Days, depending on IT / security review of a new SAML or OIDC app |
 
 If your IT team is the bottleneck, you can start on the self-serve path today (skip §1 below) and add SSO later. The providers, routing policies, and budgets you set up keep working unchanged when SSO drops in.
 
@@ -46,7 +46,8 @@ skip to §1 below.
 <Note>
   On SaaS, governance rollout is managed per organization: if you don't see the **Govern** menu, or AI-tools device login is refused with a governance error, contact your LangWatch account rep.
 
-  You can reach `/governance` with no project created yet: governance is org-scoped, not project-scoped.
+You can reach `/governance` with no project created yet: governance is org-scoped, not project-scoped.
+
 </Note>
 
 ## 1. Connect SSO
@@ -55,31 +56,23 @@ In **Settings → SSO**, click **Connect identity provider**.
 
 <Tabs>
   <Tab title="Okta (SAML)">
-    1. In Okta admin, create a new SAML 2.0 application.
-    2. **Single sign-on URL**:
-       `https://app.langwatch.ai/api/auth/sso/{your-org-slug}/callback`
-    3. **Audience URI**: `https://app.langwatch.ai`
-    4. Map the **NameID** to email and add the standard claims
-       (`email`, `firstName`, `lastName`).
-    5. Download the IdP metadata XML.
-    6. Paste it into LangWatch's **Connect identity provider** form.
-    7. (Optional) Enable **SCIM provisioning** so users are
-       auto-created the first time they sign in.
+    1. In Okta admin, create a new SAML 2.0 application. 2. **Single sign-on URL**:
+    `https://app.langwatch.ai/api/auth/sso/{your - org - slug}/callback` 3. **Audience
+    URI**: `https://app.langwatch.ai` 4. Map the **NameID** to email and add the standard
+    claims (`email`, `firstName`, `lastName`). 5. Download the IdP metadata XML. 6. Paste
+    it into LangWatch's **Connect identity provider** form. 7. (Optional) Enable **SCIM
+    provisioning** so users are auto-created the first time they sign in.
   </Tab>
   <Tab title="Azure AD (OIDC)">
-    1. In Azure portal, register a new application.
-    2. Set redirect URI to
-       `https://app.langwatch.ai/api/auth/sso/{your-org-slug}/callback`
-    3. Generate a client secret.
-    4. Note the tenant ID, client ID, client secret.
-    5. Paste into LangWatch's **Connect identity provider** form.
+    1. In Azure portal, register a new application. 2. Set redirect URI to
+    `https://app.langwatch.ai/api/auth/sso/{your - org - slug}/callback` 3. Generate a
+    client secret. 4. Note the tenant ID, client ID, client secret. 5. Paste into
+    LangWatch's **Connect identity provider** form.
   </Tab>
   <Tab title="Google Workspace (OIDC)">
-    1. In Google Cloud Console, create OAuth 2.0 credentials.
-    2. Set authorized redirect URI to
-       `https://app.langwatch.ai/api/auth/sso/{your-org-slug}/callback`
-    3. Restrict to your Workspace domain.
-    4. Paste client ID + secret into LangWatch.
+    1. In Google Cloud Console, create OAuth 2.0 credentials. 2. Set authorized redirect
+    URI to `https://app.langwatch.ai/api/auth/sso/{your - org - slug}/callback` 3.
+    Restrict to your Workspace domain. 4. Paste client ID + secret into LangWatch.
   </Tab>
 </Tabs>
 
@@ -101,9 +94,10 @@ When you start out, scope at `Organization` so the credential
 is available everywhere. You can tighten later by creating
 team-scoped overrides.
 
-<Note>The provider entries here are the same ones the AI Gateway
-already uses for service virtual keys. Personal keys reuse them. There is
-no parallel pool.</Note>
+<Note>
+  The provider entries here are the same ones the AI Gateway already uses for service
+  virtual keys. Personal keys reuse them. There is no parallel pool.
+</Note>
 
 ## 3. Define routing policies
 
@@ -126,6 +120,7 @@ Two policies to create on day one:
 
     This is what every user's personal key references unless a
     team-level override exists.
+
   </Step>
   <Step title="evaluator-default">
     - Scope: Organization
@@ -143,14 +138,13 @@ Policies cascade: a `TEAM`-scoped policy with `isDefault=true`
 overrides the `ORG`-scoped default for members of that team.
 
 <Note>
-**Smoke-test before you publish the portal**: the org-default routing
-policy MUST have at least one provider in its chain before personal
-keys can serve traffic. If you publish `/me` to teammates with an
-empty `developer-default` policy, every issued VK provisions
-successfully but the first call returns `504 provider_timeout` (the
-gateway has nothing to forward to). After §2 (Connect providers) +
-this section, mint a test key against your own user, fire one
-completion, and confirm a 200 before announcing the portal.
+  **Smoke-test before you publish the portal**: the org-default routing policy MUST have
+  at least one provider in its chain before personal keys can serve traffic. If you
+  publish `/me` to teammates with an empty `developer-default` policy, every issued VK
+  provisions successfully but the first call returns `504 provider_timeout` (the gateway
+  has nothing to forward to). After §2 (Connect providers) + this section, mint a test key
+  against your own user, fire one completion, and confirm a 200 before announcing the
+  portal.
 </Note>
 
 ## 4. Set per-user budgets
@@ -166,6 +160,7 @@ budget. To exempt a power user, override at scope `User` with a
 specific user ID and a higher limit.
 
 You can also set:
+
 - **Team budgets**: cap an entire team's total spend.
 - **Project budgets**: cap a production agent's spend.
 - **Org budgets**: a hard ceiling for the whole organization.
@@ -241,15 +236,15 @@ RFC 8628 + every other OAuth library). Origin enforcement applies
 to all endpoints. Pass `Origin: <your-base-url>` from any client
 outside a browser.
 
-| Endpoint | Purpose | Success | Notable error states |
-|---|---|---|---|
-| `POST /api/auth/cli/device-code` | Mint a device-code + user-code pair | `200` JSON `{ device_code, user_code, verification_uri, verification_uri_complete, expires_in, interval }` | `400 invalid_request` |
-| `POST /api/auth/cli/exchange` | Long-poll for approval | `200` JSON `{ access_token, refresh_token, expires_in, refresh_expires_in, user, organization, default_personal_vk }` | `428 authorization_pending` (keep polling), `408 expired_token`, `410 access_denied`, `429 slow_down` (re-poll too fast, back off) |
-| `POST /api/auth/cli/refresh` | Rotate access token | `200` JSON `{ access_token, refresh_token, expires_in, refresh_expires_in }` (refresh-token rotation, the old token is invalidated) | `401 invalid_grant` (CLI must wipe local state) |
-| `POST /api/auth/cli/logout` | Revoke a refresh-token server-side | `200 { ok: true }` (idempotent) | None |
-| `GET /api/auth/cli/lookup?user_code=...` | Browser-side: verify a pasted user-code | `200 { user_code, status, created_at, expires_at }` | `401 unauthorized` (user must sign in first), `404 not_found`, `410 expired` |
-| `POST /api/auth/cli/approve` | Browser-side: user clicks "Approve" | `200 { ok, personal_vk_label, organization_id }` | `401 unauthorized`, `403 forbidden` (caller not in target org), `409 already_resolved` |
-| `POST /api/auth/cli/deny` | Browser-side: user clicks "Deny" | `200 { ok }` (idempotent) | `401 unauthorized` |
+| Endpoint                                 | Purpose                                 | Success                                                                                                                             | Notable error states                                                                                                               |
+| ---------------------------------------- | --------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------- |
+| `POST /api/auth/cli/device-code`         | Mint a device-code + user-code pair     | `200` JSON `{ device_code, user_code, verification_uri, verification_uri_complete, expires_in, interval }`                          | `400 invalid_request`                                                                                                              |
+| `POST /api/auth/cli/exchange`            | Long-poll for approval                  | `200` JSON `{ access_token, refresh_token, expires_in, refresh_expires_in, user, organization, default_personal_vk }`               | `428 authorization_pending` (keep polling), `408 expired_token`, `410 access_denied`, `429 slow_down` (re-poll too fast, back off) |
+| `POST /api/auth/cli/refresh`             | Rotate access token                     | `200` JSON `{ access_token, refresh_token, expires_in, refresh_expires_in }` (refresh-token rotation, the old token is invalidated) | `401 invalid_grant` (CLI must wipe local state)                                                                                    |
+| `POST /api/auth/cli/logout`              | Revoke a refresh-token server-side      | `200 { ok: true }` (idempotent)                                                                                                     | None                                                                                                                               |
+| `GET /api/auth/cli/lookup?user_code=...` | Browser-side: verify a pasted user-code | `200 { user_code, status, created_at, expires_at }`                                                                                 | `401 unauthorized` (user must sign in first), `404 not_found`, `410 expired`                                                       |
+| `POST /api/auth/cli/approve`             | Browser-side: user clicks "Approve"     | `200 { ok, personal_vk_label, organization_id }`                                                                                    | `401 unauthorized`, `403 forbidden` (caller not in target org), `409 already_resolved`                                             |
+| `POST /api/auth/cli/deny`                | Browser-side: user clicks "Deny"        | `200 { ok }` (idempotent)                                                                                                           | `401 unauthorized`                                                                                                                 |
 
 The browser approval surface is
 `https://<your-base-url>/cli/auth?user_code=XXXX-YYYY` (the
@@ -293,9 +288,10 @@ admins read.
   Budget bound produces real spans in the trace store and no ledger
   rows, so `/me/usage` stays at `$0.00`.
 
-  Bind a Budget to the user, to the personal team, or to the personal
-  virtual key ([step 4](#4-set-per-user-budgets)) before you send the
-  request, and the spend appears.
+Bind a Budget to the user, to the personal team, or to the personal
+virtual key ([step 4](#4-set-per-user-budgets)) before you send the
+request, and the spend appears.
+
 </Note>
 
 ## What's next

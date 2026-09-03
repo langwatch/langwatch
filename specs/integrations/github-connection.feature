@@ -1,11 +1,14 @@
 # The organization GitHub connection, one GitHub App installation per org
 #
 # Implementation:
-#   platform/app/src/server/app-layer/github/github-installations.service.ts (record/list/mint, webhook handling)
-#   platform/app/src/server/app-layer/github/githubAppToken.ts               (app JWT, installation tokens, GitHub API client)
-#   platform/app/src/server/routes/github.ts                                 (install / setup / webhook routes + legacy aliases)
-#   platform/app/src/server/api/routers/github.ts                            (connection status, repos, disconnect, live PR status)
-#   platform/app/src/pages/settings/integrations.tsx                         (the settings surface)
+#   packages/features/github/server/src/services/github-installations.service.ts (record/list/mint, webhook handling)
+#   packages/features/github/server/src/adapters/github-app-token.adapter.ts     (app JWT, installation tokens, GitHub API client)
+#   packages/features/github/contract/src/github.ts                                 (install / setup / webhook routes + legacy aliases)
+#   packages/features/github/server/src/services/github-connection.service.ts    (connection status, uninstall + install links, disconnect)
+#   packages/features/github/server/src/api/app-trpc/github.api.ts              (connection status, repos, disconnect, live PR status)
+#   [gone] src/runtime/app/internal-api/github.router.ts                  (process transport mount)
+#   packages/features/github/web/src/screens/integrations/                      (the settings surface)
+#   apps/ui/src/features/github/                                                 (its key, guard, chrome and host)
 #
 # Related specs:
 #   specs/langy/langy-github-install.feature          , Langy-specific use of this connection
@@ -63,6 +66,65 @@ Rule: Connection state is visible to members, managed by organization managers
     Given the instance is missing part of what starting an installation needs
     When I read the connection status
     Then no install link comes back
+
+Rule: The settings surface says what the connection can do and where each action goes
+
+  # Both halves of the install ceremony finish on github.com — connecting
+  # replaces the page with GitHub's own flow, disconnecting opens GitHub's
+  # uninstall page — so what the screen decides is WHERE it sends somebody, and
+  # that is what these pin. The install address itself is the server's: the App
+  # slug and the state never reach the browser's own code.
+
+  @unit
+  Scenario: An organization manager is offered the GitHub install
+    Given the instance has the GitHub App configured
+    And the "acme" organization has no GitHub installation
+    When an organization manager opens the GitHub integration settings
+    Then they are offered a way to connect GitHub
+    And the connection status is read for the organization they are in
+
+  @unit
+  Scenario: Connecting leaves for the server's own install address
+    Given the instance has the GitHub App configured
+    When I choose to connect GitHub
+    Then I leave for the install address the server handed back
+    And that address asks for a full-page round-trip back to this page
+
+  @unit
+  Scenario: A connected organization sees which accounts it reaches
+    Given the "acme" organization has an installation on a selected set of repositories
+    When I open the GitHub integration settings
+    Then I see the GitHub account name
+    And I see how many repositories the installation covers
+    And I see that GitHub is installed
+
+  @unit
+  Scenario: A single-repository install reads as one repository
+    Given the "acme" organization has an installation covering one repository
+    When I open the GitHub integration settings
+    Then the count is spelled in the singular
+
+  @unit
+  Scenario: Disconnecting hands the reader to GitHub to finish
+    Given the "acme" organization has an installation
+    When I choose to disconnect it
+    Then GitHub's uninstall page is opened for me
+    And the row says it updates once GitHub confirms
+    And the connection status is read again
+
+  @unit
+  Scenario: A failed installation is reported once and dropped from the address
+    Given GitHub sent me back with an installation failure
+    When I open the GitHub integration settings
+    Then I am told the installation failed and why
+    And the failure is removed from the address, so a reload does not repeat it
+
+  @unit
+  Scenario: The settings chrome frames the page before the organization lands
+    Given my organization has not been resolved yet
+    When I open the GitHub integration settings
+    Then the page shows that it is still loading
+    And no GitHub card is shown yet
 
 Rule: The instance binds to exactly one GitHub host
 

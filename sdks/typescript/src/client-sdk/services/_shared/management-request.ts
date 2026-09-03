@@ -38,11 +38,7 @@ export const MANAGEMENT_REQUEST_TIMEOUT_MS = 30_000;
  * constructor. An empty token is refused here so the caller reads what is
  * missing instead of a 401 from the platform.
  */
-export const resolveManagementToken = ({
-  apiKey,
-}: {
-  apiKey?: string;
-}): string => {
+export const resolveManagementToken = ({ apiKey }: { apiKey?: string }): string => {
   const token = apiKey ?? scopedApiKey() ?? process.env.LANGWATCH_API_KEY;
   if (!token) {
     throw new Error(
@@ -105,18 +101,15 @@ export const createManagementRequest = ({
     query,
     signal,
   }: ManagementRequestParams): Promise<T> => {
-    const response = await fetch(
-      `${endpoint}${path}${buildQueryString(query)}`,
-      {
-        ...(method ? { method } : {}),
-        headers: {
-          Authorization: `Bearer ${token}`,
-          "Content-Type": "application/json",
-        },
-        ...(body !== undefined ? { body: JSON.stringify(body) } : {}),
-        signal: signal ?? AbortSignal.timeout(MANAGEMENT_REQUEST_TIMEOUT_MS),
+    const response = await fetch(`${endpoint}${path}${buildQueryString(query)}`, {
+      ...(method ? { method } : {}),
+      headers: {
+        Authorization: `Bearer ${token}`,
+        "Content-Type": "application/json",
       },
-    );
+      ...(body !== undefined ? { body: JSON.stringify(body) } : {}),
+      signal: signal ?? AbortSignal.timeout(MANAGEMENT_REQUEST_TIMEOUT_MS),
+    });
 
     if (!response.ok) {
       // One read: a body consumed by a failed `json()` cannot be read again,
@@ -152,3 +145,20 @@ export const createManagementRequest = ({
 };
 
 export type ManagementRequest = ReturnType<typeof createManagementRequest>;
+
+/**
+ * The version namespace every management call addresses, spelled into the
+ * path. The bare alias is gone (packages/api/adrs/002): the framework
+ * families serve dated namespaces and `latest`, and the SDK tracks `latest`.
+ * A collection root mounts at the trailing slash — `/api/roles/latest/` —
+ * because the family root route is `/`.
+ *
+ * Only the four framework families (roles, role-bindings, scim-tokens,
+ * organization) take this; the instance-admin family is not on the framework
+ * and keeps its bare paths.
+ */
+export const managementPath = (path: string): string =>
+  path.replace(
+    /^(\/api\/[^/]+)(\/.*)?$/,
+    (_match, base: string, rest?: string) => `${base}/latest${rest ?? "/"}`,
+  );

@@ -1,8 +1,5 @@
 import type { paths } from "@/internal/generated/openapi/api-client";
-import {
-  createLangWatchApiClient,
-  type LangwatchApiClient,
-} from "@/internal/api/client";
+import { createLangWatchApiClient, type LangwatchApiClient } from "@/internal/api/client";
 import { type InternalConfig } from "@/client-sdk/types";
 import {
   extractStatusFromResponse,
@@ -35,9 +32,13 @@ export class ModelProvidersApiService {
   }
 
   private handleApiError(operation: string, error: unknown): never {
-    const message = formatApiErrorForOperation({ operation: operation, error: error, options: {
-      status: extractStatusFromResponse(error),
-    } });
+    const message = formatApiErrorForOperation({
+      operation: operation,
+      error: error,
+      options: {
+        status: extractStatusFromResponse(error),
+      },
+    });
     throw new ModelProvidersApiError(message, operation, error);
   }
 
@@ -47,16 +48,15 @@ export class ModelProvidersApiService {
     return data;
   }
 
-  async set(provider: string, params: UpdateModelProviderBody): Promise<ModelProvidersListResponse> {
-    const { data, error } = await this.apiClient.PUT(
-      "/api/model-providers/{provider}",
-      {
-        params: { path: { provider } },
-        body: params,
-      },
-    );
-    if (error)
-      this.handleApiError(`set model provider "${provider}"`, error);
+  async set(
+    provider: string,
+    params: UpdateModelProviderBody,
+  ): Promise<ModelProvidersListResponse> {
+    const { data, error } = await this.apiClient.PUT("/api/model-providers/{provider}", {
+      params: { path: { provider } },
+      body: params,
+    });
+    if (error) this.handleApiError(`set model provider "${provider}"`, error);
     return data;
   }
 }

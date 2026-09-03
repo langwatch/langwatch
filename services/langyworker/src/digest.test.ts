@@ -28,7 +28,12 @@ describe("renderMessageLine", () => {
 
   it("labels tool results with the tool name and error flag", () => {
     expect(
-      renderMessageLine({ role: "toolResult", toolName: "bash", isError: true, content: "boom" }),
+      renderMessageLine({
+        role: "toolResult",
+        toolName: "bash",
+        isError: true,
+        content: "boom",
+      }),
     ).toBe("toolResult(bash, error): boom");
   });
 
@@ -38,7 +43,10 @@ describe("renderMessageLine", () => {
   });
 
   it("caps one message at the per-message budget, marker included", () => {
-    const line = renderMessageLine({ role: "user", content: "x".repeat(DIGEST_MESSAGE_MAX_BYTES * 2) });
+    const line = renderMessageLine({
+      role: "user",
+      content: "x".repeat(DIGEST_MESSAGE_MAX_BYTES * 2),
+    });
     expect(line).toBeDefined();
     // The marker rides INSIDE the budget: a line that overshot it by the
     // marker's own length would break the cap buildHandoffDigest counts on.
@@ -89,7 +97,9 @@ describe("buildHandoffDigest", () => {
 
   describe("when garbage entries", () => {
     it("skips them instead of throwing", () => {
-      expect(buildHandoffDigest({ messages: [null, 42, {}, { role: "user", content: "ok" }] })).toBe("user: ok");
+      expect(
+        buildHandoffDigest({ messages: [null, 42, {}, { role: "user", content: "ok" }] }),
+      ).toBe("user: ok");
     });
 
     // A message whose content ARRAY holds a null is the harder case: the entry

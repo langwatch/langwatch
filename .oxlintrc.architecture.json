@@ -1,0 +1,500 @@
+{
+  "$schema": "./node_modules/oxlint/configuration_schema.json",
+  // Oxlint's default plugin set plus vitest and jest, which is what lets the
+  // test-quality rules below (noFocusedTests and friends, carried from the
+  // deleted biome.jsonc) be named at all. Setting this key
+  // REPLACES the default set, so the four defaults are restated here.
+  "plugins": ["react", "unicorn", "typescript", "oxc", "vitest", "jest"],
+  "jsPlugins": [
+    {
+      "name": "langwatch",
+      "specifier": "./packages/architecture-lint/oxlint-plugin.mjs"
+    }
+  ],
+  "rules": {
+    "langwatch/api-context-services": "error",
+    "langwatch/environment-boundaries": "error",
+    "langwatch/package-boundaries": "error",
+    "langwatch/feature-module-classes": "error",
+    "langwatch/service-classes": "error",
+    "langwatch/service-dependencies": "error"
+  },
+  "overrides": [
+    {
+      "files": ["packages/architecture-lint/src/**/*.ts"],
+      "rules": {
+        "langwatch/boolean-wall": "error",
+        "langwatch/logical-statement-spacing": "error"
+      }
+    },
+
+    // ------------------------------------------------------------------
+    // CODE QUALITY, packages/** only.
+    //
+    // These arrived when packages/** had no general-purpose linter at all:
+    // only the langwatch/* architecture rules above, which police boundaries
+    // and say nothing about whether the code inside a boundary is readable.
+    // oxlint already walked these paths for the architecture rules, so they
+    // rode along for free rather than adding another tool.
+    //
+    // A second block further down carries the ruleset the deleted platform
+    // application's biome.jsonc contributed. The two blocks are separate
+    // because the two trees arrived with different backlogs, not because they
+    // deserve different rules; converging them is follow-up work.
+    //
+    // EVERY RULE HERE IS `error`, AND EVERY ONE WAS MEASURED FIRST.
+    // There is no warn tier: oxlint has no reviewdog wiring here, so a
+    // warning would annotate nothing and block nothing. A rule earns its
+    // place by having a baseline of zero -- either because packages/**
+    // was already clean, or because this change made it clean. That is
+    // what keeps `pnpm lint:architecture` a gate rather than a report.
+    //
+    // The globs cover apps/** as well as packages/**: same rules, same
+    // doctrine, so a file does not change its checks by moving.
+    // ------------------------------------------------------------------
+    {
+      "files": [
+        "packages/**/*.ts",
+        "packages/**/*.tsx",
+        "packages/**/*.mts",
+        "packages/**/*.cts",
+        "apps/**/*.ts",
+        "apps/**/*.tsx",
+        "apps/**/*.mts",
+        "apps/**/*.cts"
+      ],
+      "rules": {
+        // -- Type-unsafety escape hatches ----------------------------
+        // `any` is already covered by dev/lint/ast-grep no-explicit-any.
+        // These are the other ways a type gets thrown away quietly.
+        //
+        // ban-ts-comment is the important one: it bans bare `@ts-ignore`
+        // (which silently does nothing when the line below is already
+        // clean, so it rots invisibly) and requires a >=3 character
+        // reason on every `@ts-expect-error`.
+        "typescript/ban-ts-comment": "error", // baseline 3, fixed here
+        "typescript/no-confusing-non-null-assertion": "error", // baseline 3, fixed here
+        "typescript/no-empty-object-type": "error", // baseline 2, fixed here
+        "typescript/no-unsafe-function-type": "error", // baseline 0
+        "typescript/no-wrapper-object-types": "error", // baseline 0
+        "typescript/no-misused-new": "error", // baseline 0
+        "typescript/no-this-alias": "error", // baseline 0
+        "typescript/no-unnecessary-type-constraint": "error", // baseline 0
+        "typescript/no-duplicate-enum-values": "error", // baseline 0
+        "typescript/prefer-literal-enum-member": "error", // baseline 0
+        "typescript/no-meaningless-void-operator": "error", // baseline 0
+
+        // -- Control flow you can read straight through --------------
+        //
+        // max-depth is the headline. Four nested blocks inside one
+        // function is already the point where a reader has to hold the
+        // whole stack in their head; past that it is the "deeply nested
+        // spaghetti" the coding standards exist to prevent. Baseline at
+        // max 4 was 35 hits in 15 files -- those 15 are pinned at 6 by
+        // the debt register below and can only shrink.
+        "max-depth": ["error", { "max": 4 }],
+
+        // Both lonely-if rules, because they catch opposite shapes and
+        // each one removes a level of nesting:
+        //   eslint  -- `else { if (x) {} }`      -> `else if (x)`
+        //   unicorn -- `if (a) { if (b) {} }`    -> `if (a && b)`
+        "no-lonely-if": "error", // baseline 1, fixed here
+        "unicorn/no-lonely-if": "error", // baseline 10, fixed here
+        "no-else-return": "error", // baseline 6, fixed here
+
+        // -- Constructs that read as a bug ---------------------------
+        "eqeqeq": ["error", "always", { "null": "ignore" }], // baseline 0
+        "no-self-compare": "error", // baseline 0
+        "no-return-assign": "error", // baseline 0
+        "no-constant-binary-expression": "error", // baseline 0
+        "no-unsafe-negation": "error", // baseline 0
+        "no-unneeded-ternary": "error", // baseline 0
+        "no-multi-assign": "error", // baseline 0
+        "no-sequences": "error", // baseline 2, fixed here
+        "no-labels": "error", // baseline 0
+        "guard-for-in": "error", // baseline 0
+        "no-param-reassign": "error", // baseline 6, fixed here
+        "no-useless-assignment": "error", // baseline 3, fixed here
+        "default-param-last": "error", // baseline 1, fixed here
+
+        // -- Errors and constructors ---------------------------------
+        "no-throw-literal": "error", // baseline 2, fixed here
+        "prefer-promise-reject-errors": "error", // baseline 0
+        "no-array-constructor": "error", // baseline 0
+        "no-new-wrappers": "error" // baseline 0
+      }
+    },
+
+    // no-useless-assignment -- 2 findings in 2 files, the whole of apps/**'s
+    // debt under the block above. Fix a file, delete its line.
+    {
+      "files": ["apps/server/src/services/node-deps.ts", "apps/server/src/services/runtime.ts"],
+      "rules": { "no-useless-assignment": "off" }
+    },
+
+    // ------------------------------------------------------------------
+    // MEASURED AND REJECTED, so the next person does not re-litigate them:
+    //
+    //   no-magic-numbers                19882   every threshold and index
+    //   id-length (min 2)                4163   `i`, `j`, `e` are conventional
+    //   require-await                    2351   async-for-interface is a real shape
+    //   typescript/no-non-null-assertion 1797   (489 source, 1308 test)
+    //   no-negated-condition              612   unicorn variant 311
+    //   max-classes-per-file (1)          332
+    //   no-await-in-loop                  388 in 170 files -- and sequential
+    //                                     iteration is often the point
+    //                                     (ordering, backpressure), which a
+    //                                     linter cannot tell from a missed
+    //                                     batch
+    //   no-nested-ternary                 258 in 140 files, no clean role
+    //   no-eq-null                        226   this is the `== null` idiom,
+    //                                     rejected on principle, not on count
+    //   max-params (max 4)                 85 in 69 files; at max 3 it is 241.
+    //                                     CLAUDE.md's named-parameters rule
+    //                                     wants this, but no threshold cheap
+    //                                     enough to adopt is tight enough to
+    //                                     mean anything -- the same trap
+    //                                     the second block below documents
+    //   typescript/no-extraneous-class     54 in 47 files
+    //   typescript/no-import-type-side-effects  34 in 33 files
+    //   no-loop-func                        2, and both are the same deliberate
+    //                                     abort-latch: the closure exists in
+    //                                     order to publish itself to the outer
+    //                                     `wake` binding. Adopting the rule
+    //                                     buys a rewrite of correct code or a
+    //                                     suppression, so it buys nothing
+    // ------------------------------------------------------------------
+
+    // ------------------------------------------------------------------
+    // eqeqeq carries `{ "null": "ignore" }` on purpose. `x == null` is
+    // the idiomatic single check for null-or-undefined and this codebase
+    // uses it deliberately -- 133 of the 226 raw eqeqeq hits were that
+    // idiom, and "fixing" them would have replaced one correct check
+    // with two. With the option on, the baseline is 0.
+    // ------------------------------------------------------------------
+
+    // ------------------------------------------------------------------
+    // no-shadow: a reused name is one of the cheapest ways to make a
+    // reader mistake one value for another. It is NOT enabled for
+    // packages/** as a whole -- 99 hits across 45 files, concentrated in
+    // web components and test setup. It IS enabled where the domain
+    // lives, which is where a shadowed identifier is most expensive:
+    // contract (already clean, 0 hits) and server source (7 hits across
+    // 5 files, fixed here).
+    //
+    // The remaining debt is web + tests. Narrowing the scope is the
+    // honest version of a baseline: everything inside it is clean and
+    // stays clean, instead of one number nobody reads.
+    // ------------------------------------------------------------------
+    {
+      "files": [
+        "packages/features/*/contract/src/**/*.ts",
+        "packages/features/*/server/src/**/*.ts",
+        "packages/enterprise/features/*/contract/src/**/*.ts",
+        "packages/enterprise/features/*/server/src/**/*.ts"
+      ],
+      "rules": {
+        "no-shadow": "error"
+      }
+    },
+
+    // ------------------------------------------------------------------
+    // DEBT REGISTER, max-depth only.
+    //
+    // These 15 files nest deeper than 4. They are pinned at 6 rather
+    // than switched off, so the rule still holds them and the list can
+    // only shrink: unnest a file and delete its line; no file can be
+    // added without a reviewer seeing it appear here. Every other file
+    // in packages/**, and every new file anywhere, is held to 4.
+    //
+    // Measured at the time of writing: 35 violations at max 4, 6 at
+    // max 5, 0 at max 6.
+    // ------------------------------------------------------------------
+    {
+      "files": [
+        "packages/features/analytics/server/src/clickhouse/filter-translator.ts",
+        "packages/features/analytics/server/src/services/analytics.tripwire.ts",
+        "packages/features/experiment/web/src/batch-evaluation-results.types.ts",
+        "packages/features/experiment/web/src/batch-results/comparison-charts.tsx",
+        "packages/features/langy/web/src/behaviour/langy-choices-timeline.ts",
+        "packages/features/ops/server/src/repositories/redis/queue.repository.ts",
+        "packages/features/trace/contract/src/trace-query-analysis.ts",
+        "packages/features/trace/server/src/services/canonical-extraction.rules.ts",
+        "packages/features/trace/server/src/services/canonicalisation/mastra.canonicaliser.ts",
+        "packages/features/trace/server/src/services/gen-ai-span.rules.ts",
+        "packages/features/trace/server/src/services/langwatch-value.rules.ts",
+        "packages/features/trace/server/src/services/trace-attribute-cap.rules.ts",
+        "packages/features/trace/web/src/prompt-attributes.ts",
+        "packages/features/trace/web/src/transcript/block-stack-items.ts",
+        "packages/features/trace/web/src/transcript/content-parser.ts"
+      ],
+      "rules": {
+        "max-depth": ["error", { "max": 6 }]
+      }
+    },
+
+    {
+      "files": [
+        "packages/features/*/server/src/services/**/*.service.ts",
+        "packages/enterprise/features/*/server/src/services/**/*.service.ts"
+      ],
+      "rules": {
+        "curly": "error",
+        "langwatch/logical-statement-spacing": "error",
+        "langwatch/max-statements-per-line": "error",
+        "langwatch/service-member-spacing": "error",
+        "langwatch/service-quality": "error",
+        "langwatch/awaited-return-chain": "error"
+      }
+    },
+
+    // ==================================================================
+    // CODE QUALITY, the second ruleset.
+    //
+    // These rules arrive from the deleted platform application's biome.jsonc:
+    // Biome was that application's general-purpose linter and Oxlint was the
+    // packages' one, and when Biome was removed this is where its ruleset had
+    // to live or stop existing. The application it was measured over is gone;
+    // the ruleset is not, so it applies to the trees the code moved into.
+    //
+    // Same doctrine as the packages/** block above, and the same reason for
+    // it: every rule is `error`, there is no warn tier, and every count below
+    // was measured with oxlint 1.78.0 at the commit that removed Biome. The
+    // counts are HISTORY now — they record what the rule found in the tree it
+    // came from, not what it finds here.
+    //
+    // Where Biome's severity was `warn` it was blocking on ADDED lines only,
+    // through a reviewdog pass that no longer exists. A warn tier cannot be
+    // carried across, so every rule here is `error`. The enumerated debt
+    // register that used to sit below is gone with the files it named.
+    // ==================================================================
+    {
+      "files": [
+        "apps/**/*.ts",
+        "apps/**/*.tsx",
+        "apps/**/*.mts",
+        "apps/**/*.cts",
+        "packages/**/*.ts",
+        "packages/**/*.tsx",
+        "packages/**/*.mts",
+        "packages/**/*.cts"
+      ],
+      "rules": {
+        // -- Constructs that cannot mean what they say -----------------
+        // Biome's error tier. Baseline 0 here, exactly as it was there.
+        "no-self-compare": "error", // was noSelfCompare
+        "no-constant-binary-expression": "error", // was noConstantBinaryExpressions
+        "no-sequences": "error", // was noCommaOperator
+        "no-label-var": "error", // was noLabelVar
+        "no-labels": "error", // was noConfusingLabels
+        "no-lone-blocks": "error", // was noUselessLoneBlockStatements
+        "unicorn/no-thenable": "error", // was noThenProperty
+        "no-throw-literal": "error", // was useThrowOnlyError
+        "guard-for-in": "error", // nearest to noForIn; see the note below
+
+        // `== null` is the deliberate single check for null-or-undefined,
+        // the same call the packages/** block above makes. Biome's
+        // noDoubleEquals ignores it by default too, so this is the same
+        // rule with the same exemption -- and the same count: 56, the exact
+        // number Biome reported. Registered below.
+        "eqeqeq": ["error", "always", { "null": "ignore" }], // was noDoubleEquals, 56
+
+        // The narrow half of noAssignInExpressions: an assignment used as a
+        // condition, 19 findings, registered below. oxlint has nothing for
+        // the general shape (`foo(a = 1)`), so the rest of the 26 Biome had
+        // is not covered -- recorded in the retirement list below.
+        "no-cond-assign": ["error", "always"],
+
+        // -- Readability, carried with a debt register -----------------
+        "no-unneeded-ternary": "error", // was noUselessTernary, 2
+        "default-param-last": "error", // was useDefaultParameterLast, 2
+        "unicorn/prefer-optional-catch-binding": "error", // was noUselessCatchBinding, 3
+        "no-param-reassign": "error", // was noParameterAssign, 10
+        "typescript/no-invalid-void-type": "error", // was noConfusingVoidType, 15
+        "no-else-return": "error", // was noUselessElse, 20
+        "unicorn/no-lonely-if": "error", // was useCollapsedIf, 29
+        "typescript/ban-ts-comment": "error", // was noTsIgnore, 37
+
+        // Biome's noReturnAssign flags `return a = b` whether or not it is
+        // parenthesised, which is eslint's "always" rather than its default
+        // "except-parens". At the default this measures 0 and would be
+        // inert; at "always" it measures 10, the number Biome had.
+        "no-return-assign": ["error", "always"],
+
+        // One rule where Biome had three: noUnusedImports (error, 42 live
+        // violations on this branch), noUnusedVariables (warn, 37) and
+        // noUnusedFunctionParameters (warn, 73). oxlint reports all three
+        // shapes as no-unused-vars: 151 findings over 93 files, registered
+        // below. The 42 unused imports were failing `pnpm lint` before this
+        // change, so the register records real debt, not a change of mind.
+        "no-unused-vars": "error",
+
+        // was noExcessiveNestedCallbacks. Non-test files only -- the
+        // test-file override below raises it, because the mandated
+        // describe("given") / describe("when") / it() nesting spends three
+        // levels before a callback in a test does anything at all, and at
+        // max 3 this reports 12,094 findings that are the house structure.
+        "max-nested-callbacks": ["error", { "max": 3 }],
+
+        // -- Biome's other error-tier rules, baseline 0 unless noted ---
+        "no-empty": "error", // was noEmptyBlockStatements, 4
+        "typescript/no-empty-object-type": "error", // was noEmptyInterface + noBannedTypes, 2
+        "typescript/no-unsafe-function-type": "error", // was noBannedTypes
+        "typescript/no-wrapper-object-types": "error", // was noBannedTypes
+        "typescript/no-this-alias": "error", // was noUselessThisAlias
+        "typescript/no-unnecessary-type-constraint": "error", // was noUselessTypeConstraint
+        "typescript/no-misused-new": "error", // was noMisleadingInstantiator
+        "typescript/no-extra-non-null-assertion": "error", // was noExtraNonNullAssertion
+        "typescript/no-non-null-asserted-optional-chain": "error", // was noNonNullAssertedOptionalChain
+        "typescript/no-unsafe-declaration-merging": "error", // was noUnsafeDeclarationMerging
+        "typescript/adjacent-overload-signatures": "error", // was useAdjacentOverloadSignatures
+        "typescript/prefer-namespace-keyword": "error", // was useNamespaceKeyword
+        "typescript/no-namespace": "error", // was noNamespace
+        "typescript/no-inferrable-types": "error", // was noInferrableTypes
+        "typescript/prefer-function-type": "error", // was useShorthandFunctionType
+        "no-loss-of-precision": "error", // was noPrecisionLoss
+        "no-var": "error", // was noVar
+        "prefer-const": "error", // was useConst, 5
+        "prefer-rest-params": "error", // was noArguments
+        "no-array-constructor": "error", // was useArrayLiterals
+
+        // The house rule the app's Biome config carried as
+        // style/noRestrictedImports. The wrappers force a transparent
+        // backdrop, wire focus and scroll defaults and add an inline error
+        // boundary; the raw Chakra primitives reintroduce the dark overlay
+        // we explicitly do not want. Baseline 0, as it was under Biome.
+        "no-restricted-imports": [
+          "error",
+          {
+            "paths": [
+              {
+                "name": "@chakra-ui/react",
+                "importNames": ["Dialog", "Drawer", "Modal"],
+                "message": "Import Dialog or Drawer from ~/components/ui/dialog and ~/components/ui/drawer instead. Modal-style flows also use the Dialog wrapper (see AICreateModal, RunScenarioModal, etc.) -- there is no Modal wrapper. The wrappers force a transparent backdrop (no dark grey overlay), wire focus/scroll defaults, and add an inline error boundary. Raw Chakra primitives reintroduce the dark backdrop we explicitly do not want."
+              }
+            ]
+          }
+        ]
+      }
+    },
+
+    // ------------------------------------------------------------------
+    // BIOME RULES WITH NO OXLINT EQUIVALENT, so the next person does not
+    // spend an afternoon looking for one. Each is a real rule that this
+    // repository ran until Biome was removed; none is retired because it
+    // stopped being desirable.
+    //
+    //   noFloatingPromises        39   TYPE-AWARE. oxlint ships
+    //   noMisusedPromises         19   typescript/no-floating-promises and
+    //                                  typescript/no-misused-promises, but
+    //                                  they need `--type-aware` and the
+    //                                  oxlint-tsgolint companion binary,
+    //                                  which is not a dependency of this
+    //                                  repository. Enabling the names
+    //                                  without it silences nothing and
+    //                                  reports nothing. This is the largest
+    //                                  single loss in the migration and the
+    //                                  blocker named by
+    //                                  specs/dependencies/oxc-toolchain.feature
+    //                                  ("Type-aware promise checks remain
+    //                                  blocking").
+    //   useOptionalChain           2   Same reason: oxlint's
+    //   useLiteralKeys             0   typescript/prefer-optional-chain and
+    //                                  typescript/dot-notation exist but are
+    //                                  type-aware only. Verified inert
+    //                                  without --type-aware on a fixture
+    //                                  (`foo && foo.bar`, `o["k"]`).
+    //   noMisrefactoredShorthandAssign  `a =- b` for `a -= b`. oxlint and
+    //                                  eslint have no rule for it at all.
+    //   noImplicitAnyLet          35   No oxlint rule. `let x;` widening to
+    //   noEvolvingTypes           46   any is a TypeScript-semantics check
+    //                                  and lands with type-aware linting or
+    //                                  not at all.
+    //   useAsConstAssertion            No oxlint rule.
+    //   useForOf                       No oxlint rule (unicorn/no-for-loop
+    //                                  does not exist in 1.78.0).
+    //   useSpreadOverApply             oxlint's prefer-spread is a different
+    //                                  rule: 212 findings here against
+    //                                  Biome's 0, so it is not a carry.
+    //   noForIn                    2   guard-for-in above is the nearest,
+    //                                  and it is narrower: it requires a
+    //                                  guard rather than banning for-in.
+    //   noExcessiveCognitiveComplexity 1194  No oxlint rule. eslint's
+    //                                  `complexity` is cyclomatic, not
+    //                                  cognitive, and was not a carry Biome
+    //                                  itself accepted (its baseline was
+    //                                  four figures and it never blocked).
+    //   Next.js rules                  noHeadElement, noImgElement,
+    //                                  noDocumentImportInPage,
+    //                                  noHeadImportInDocument,
+    //                                  noNextAsyncClientComponent,
+    //                                  noUnwantedPolyfillio,
+    //                                  useGoogleFontPreconnect,
+    //                                  useGoogleFontDisplay, noSyncScripts.
+    //                                  The app is a Vite app; these had
+    //                                  nothing to match before the move and
+    //                                  have nothing now.
+    //
+    // MEASURED AND LEFT OFF, same rule as the packages/** list above -- a
+    // backlog big enough that a register would be the whole tree:
+    //
+    //   max-lines-per-function    4730  (Biome noExcessiveLinesPerFunction,
+    //                                   warn, 747 on the surviving paths)
+    //   typescript/consistent-type-imports 260 in 205 files (useImportType)
+    //   max-params                 223  (useMaxParams; the packages/** list
+    //                                   above already rejects it)
+    //   no-shadow                  433  (on for packages/** contract and
+    //                                   server only, same reasoning)
+    //   max-depth                   82  (on for packages/** with a register)
+    //   no-useless-assignment       25
+    //   vitest/no-disabled-tests    43  (noSkippedTests, Biome warn)
+    //   jest/no-standalone-expect  135  (noMisplacedAssertion, Biome warn)
+    //   typescript/no-explicit-any 1395  already covered by
+    //                                   dev/lint/ast-grep no-explicit-any
+    // ------------------------------------------------------------------
+
+    // ------------------------------------------------------------------
+    // TEST FILES.
+    //
+    // Biome scoped its test-quality rules to test files for a reason it
+    // wrote down: unscoped, noFocusedTests matches any function called
+    // `fit(...)` and fires on a production zoom hook. Same scoping here.
+    // ------------------------------------------------------------------
+    {
+      "files": [
+        "apps/**/*.test.ts",
+        "apps/**/*.test.tsx",
+        "apps/**/*.spec.ts",
+        "apps/**/*.spec.tsx",
+        "apps/**/__tests__/**",
+        "packages/**/*.test.ts",
+        "packages/**/*.test.tsx",
+        "packages/**/*.spec.ts",
+        "packages/**/*.spec.tsx",
+        "packages/**/__tests__/**"
+      ],
+      "rules": {
+        "vitest/no-focused-tests": "error", // was noFocusedTests, 0
+        "jest/no-export": "error", // was noExportsInTest, 0
+        "jest/max-nested-describe": "error", // was noExcessiveNestedTestSuites, 0
+        "jest/no-duplicate-hooks": "error", // was noDuplicateTestHooks, 3
+        "jest/prefer-hooks-on-top": "error", // was useTestHooksOnTop, 1
+
+        // A suite spends three callback levels on describe("given") /
+        // describe("when") / it() before it nests anything of its own, so
+        // the limit is raised rather than switched off: at 6 the tree is
+        // clean, at 5 it is 70 findings, and the rule still holds the shape
+        // it exists to hold.
+        "max-nested-callbacks": ["error", { "max": 6 }],
+
+        // Biome turned noEmptyBlockStatements off for test files.
+        "no-empty": "off"
+      }
+    }
+
+    // The debt register that used to close this file is GONE. Every entry in
+    // it named a file in the deleted platform application, so it pinned
+    // nothing; a register that names no existing file reads as coverage and
+    // is only noise. The rules above stand unconditionally.
+  ]
+}

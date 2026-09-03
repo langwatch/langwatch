@@ -1,0 +1,99 @@
+{
+  "name": "@langwatch/dataset-web",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Browser-safe Dataset UI, state, and upload helpers.",
+  "files": [
+    "src"
+  ],
+  "type": "module",
+  "main": "./src/index.ts",
+  "types": "./src/index.ts",
+  "exports": {
+    ".": {
+      "types": "./src/index.ts",
+      "default": "./src/index.ts"
+    },
+    "./components/AddOrEditDatasetDrawer": {
+      "types": "./src/ui/sections/datasets/add-or-edit-dataset-drawer.tsx",
+      "default": "./src/ui/sections/datasets/add-or-edit-dataset-drawer.tsx"
+    },
+    "./components/datasets/DatasetPickerList": {
+      "types": "./src/ui/elements/datasets/dataset-picker-list.tsx",
+      "default": "./src/ui/elements/datasets/dataset-picker-list.tsx"
+    },
+    "./components/datasets/editor/DatasetEditorTable": {
+      "types": "./src/ui/sections/datasets/editor/dataset-editor-table.tsx",
+      "default": "./src/ui/sections/datasets/editor/dataset-editor-table.tsx"
+    },
+    "./components/datasets/editor/DatasetPreviewTable": {
+      "types": "./src/ui/elements/datasets/editor/dataset-preview-table.tsx",
+      "default": "./src/ui/elements/datasets/editor/dataset-preview-table.tsx"
+    },
+    "./components/datasets/editor/renderDatasetImage": {
+      "types": "./src/ui/elements/datasets/editor/render-dataset-image.tsx",
+      "default": "./src/ui/elements/datasets/editor/render-dataset-image.tsx"
+    },
+    "./components/datasets/editor/useDatasetRecordSync": {
+      "types": "./src/behavior/datasets/editor/use-dataset-record-sync.ts",
+      "default": "./src/behavior/datasets/editor/use-dataset-record-sync.ts"
+    },
+    "./components/datasets/UploadCSVDrawer": {
+      "types": "./src/ui/sections/datasets/upload-csv-drawer.tsx",
+      "default": "./src/ui/sections/datasets/upload-csv-drawer.tsx"
+    },
+    "./drawers": {
+      "types": "./src/ui/sections/drawers.ts",
+      "default": "./src/ui/sections/drawers.ts"
+    },
+    "./screens/datasets": {
+      "types": "./src/screens/datasets/index.ts",
+      "default": "./src/screens/datasets/index.ts"
+    }
+  },
+  "scripts": {
+    "typecheck": "tsc --noEmit",
+    "test": "vitest run",
+    "test:unit": "vitest run"
+  },
+  "dependencies": {
+    "@chakra-ui/react": "^3.36.0",
+    "@dnd-kit/core": "^6.3.1",
+    "@dnd-kit/sortable": "^10.0.0",
+    "@dnd-kit/utilities": "3.2.2",
+    "@emotion/react": "^11.14.0",
+    "@hookform/resolvers": "^5.4.0",
+    "@langwatch/dataset-contract": "workspace:*",
+    "@langwatch/design-system": "workspace:*",
+    "@langwatch/observability": "workspace:*",
+    "@langwatch/platform-api-client": "workspace:*",
+    "@langwatch/ui-drawer": "workspace:*",
+    "@langwatch/workflow-web": "workspace:*",
+    "@tanstack/react-query": "5.101.4",
+    "@tanstack/react-table": "^8.21.3",
+    "@tanstack/react-virtual": "^3.14.5",
+    "date-fns": "^4.1.0",
+    "lucide-react": "^1.22.0",
+    "nanoid": "^5.1.5",
+    "papaparse": "^5.5.3",
+    "react": "^19.2.7",
+    "react-feather": "^2.0.10",
+    "react-hook-form": "^7.80.0",
+    "react-papaparse": "^4.4.0",
+    "use-debounce": "^10.1.1",
+    "zustand": "^4.5.7"
+  },
+  "devDependencies": {
+    "@testing-library/jest-dom": "^7.0.1",
+    "@testing-library/react": "^16.3.2",
+    "@testing-library/user-event": "^14.6.1",
+    "@types/node": "^22.0.0",
+    "@types/papaparse": "^5.3.15",
+    "@types/react": "^19.2.14",
+    "@types/react-dom": "^19.2.4",
+    "jsdom": "^30.0.1",
+    "react-dom": "^19.2.7",
+    "typescript": "^7.0.2",
+    "vitest": "^4.1.9"
+  }
+}

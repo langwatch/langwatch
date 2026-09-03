@@ -3,15 +3,7 @@
  * authentication, authorization, network failures, rate limiting,
  * and plan-limit responses.
  */
-import {
-  describe,
-  expect,
-  it,
-  beforeAll,
-  afterAll,
-  beforeEach,
-  afterEach,
-} from "vitest";
+import { describe, expect, it, beforeAll, afterAll, beforeEach, afterEach } from "vitest";
 import * as fs from "fs";
 import * as path from "path";
 import * as os from "os";
@@ -158,9 +150,7 @@ describe("CLI error edge cases", () => {
       const result = await runCli(["prompt", "list"], testDir);
 
       expect(result.exitCode).toBe(1);
-      expect(result.combined.toLowerCase()).toMatch(
-        /api key|unauthorized|invalid/,
-      );
+      expect(result.combined.toLowerCase()).toMatch(/api key|unauthorized|invalid/);
     });
   });
 
@@ -174,15 +164,10 @@ describe("CLI error edge cases", () => {
         },
       });
 
-      const result = await runCli(
-        ["dataset", "create", "my-dataset"],
-        testDir,
-      );
+      const result = await runCli(["dataset", "create", "my-dataset"], testDir);
 
       expect(result.exitCode).toBe(1);
-      expect(result.combined.toLowerCase()).toMatch(
-        /limit|plan|upgrade|free plan/,
-      );
+      expect(result.combined.toLowerCase()).toMatch(/limit|plan|upgrade|free plan/);
     });
   });
 
@@ -231,9 +216,7 @@ describe("CLI error edge cases", () => {
         const result = await runCli(["prompt", "list"], testDir);
         expect(result.exitCode).toBe(1);
         // We accept either the message or just the 502 status as a signal.
-        expect(result.combined.toLowerCase()).toMatch(
-          /502|bad gateway|nginx|html/,
-        );
+        expect(result.combined.toLowerCase()).toMatch(/502|bad gateway|nginx|html/);
       } finally {
         server.removeAllListeners("request");
         for (const l of originalListeners) {

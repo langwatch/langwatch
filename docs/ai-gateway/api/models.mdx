@@ -21,12 +21,32 @@ OpenAI-shape `list` object:
 {
   "object": "list",
   "data": [
-    { "id": "claude",             "object": "model", "created": 1712000000, "owned_by": "anthropic"    },
-    { "id": "gpt-4o",             "object": "model", "created": 1712000000, "owned_by": "azure_openai" },
-    { "id": "gpt-5-mini",         "object": "model", "created": 1712000000, "owned_by": "openai"       },
-    { "id": "claude-haiku-*",     "object": "model", "created": 1712000000, "owned_by": "anthropic"    },
-    { "id": "anthropic/*",        "object": "model", "created": 1712000000, "owned_by": "anthropic"    },
-    { "id": "openai/*",           "object": "model", "created": 1712000000, "owned_by": "openai"       }
+    { "id": "claude", "object": "model", "created": 1712000000, "owned_by": "anthropic" },
+    {
+      "id": "gpt-4o",
+      "object": "model",
+      "created": 1712000000,
+      "owned_by": "azure_openai"
+    },
+    {
+      "id": "gpt-5-mini",
+      "object": "model",
+      "created": 1712000000,
+      "owned_by": "openai"
+    },
+    {
+      "id": "claude-haiku-*",
+      "object": "model",
+      "created": 1712000000,
+      "owned_by": "anthropic"
+    },
+    {
+      "id": "anthropic/*",
+      "object": "model",
+      "created": 1712000000,
+      "owned_by": "anthropic"
+    },
+    { "id": "openai/*", "object": "model", "created": 1712000000, "owned_by": "openai" }
   ]
 }
 ```
@@ -41,7 +61,12 @@ OpenAI-shape `list` object:
 
 A discovered model from a provider that has a [routing handle](/ai-gateway/model-naming#routing-handles) is listed under the handle-qualified id, for example `europe/claude-sonnet-5`. That is the name that reaches that exact provider, so two providers of the same type keep separate entries instead of collapsing into one. `owned_by` stays the provider type in both entries, because it is what a picker groups by.
 
-<Note>The list is deliberately permissive, it covers everything the VK could plausibly route, not a strict enumeration. `models_allowed` globs and provider shortcuts may not expand to real upstream models until you send a real request. The gateway's per-request model resolution remains the source of truth for "will this actually route?"</Note>
+<Note>
+  The list is deliberately permissive, it covers everything the VK could plausibly route,
+  not a strict enumeration. `models_allowed` globs and provider shortcuts may not expand
+  to real upstream models until you send a real request. The gateway's per-request model
+  resolution remains the source of truth for "will this actually route?"
+</Note>
 
 ## Permissions
 

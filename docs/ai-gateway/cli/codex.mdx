@@ -49,7 +49,12 @@ model_provider = "langwatch"
 model_reasoning_effort = "low"
 ```
 
-<Note>Pin to a Bifrost-registered model name. Codex's default `gpt-5.4` (and aliases like `gpt-5-mini` without a date suffix) currently resolve to "provider is required" via the gateway because Bifrost's model registry only matches concrete names. `gpt-4o-mini` works today; `gpt-5` family pins like `gpt-5-2025-08-07` work as Bifrost adds them.</Note>
+<Note>
+  Pin to a Bifrost-registered model name. Codex's default `gpt-5.4` (and aliases like
+  `gpt-5-mini` without a date suffix) currently resolve to "provider is required" via the
+  gateway because Bifrost's model registry only matches concrete names. `gpt-4o-mini`
+  works today; `gpt-5` family pins like `gpt-5-2025-08-07` work as Bifrost adds them.
+</Note>
 
 ### Cross-provider routing (Anthropic via /v1/messages, Gemini via /v1/beta)
 
@@ -76,7 +81,7 @@ Example, engineers type `gpt-4o`, the VK routes to Azure:
 ```json
 {
   "model_aliases": {
-    "gpt-4o":   "azure/gpt-4o-eastus-deployment",
+    "gpt-4o": "azure/gpt-4o-eastus-deployment",
     "gpt-5-mini": "openai/gpt-5-mini"
   }
 }
@@ -103,7 +108,11 @@ OPENAI_EXTRA_HEADERS='{"X-LangWatch-Cache":"disable"}' \
 codex exec "benchmark"
 ```
 
-<Note>OpenAI CLI, SDK support for custom headers varies; the header-injection method above is pseudo-code for illustration. Practical override: add `cache.mode: disable` to a dedicated "cold-benchmark" VK.</Note>
+<Note>
+  OpenAI CLI, SDK support for custom headers varies; the header-injection method above is
+  pseudo-code for illustration. Practical override: add `cache.mode: disable` to a
+  dedicated "cold-benchmark" VK.
+</Note>
 
 ### Team-scoped daily budget
 
@@ -135,5 +144,6 @@ The combination that's been most-tested with Codex on v1:
   Codex. To give a model a backup, map its name on the routing policy, or
   point a [model tier](/ai-gateway/model-aliases) to a model from each
   provider and let Codex ask for the tier.
+
 - Personal-access VK bound to the engineer.
 - Monthly `principal` budget with `warn` at 80%, `block` at 100%.

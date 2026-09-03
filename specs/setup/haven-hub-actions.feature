@@ -13,7 +13,7 @@ Feature: The haven hub — one place to see and act on every stack
   # d+confirm downs, x+type-the-name destroys) and `app/hub_test.go`
   # (TestDownStack, TestDestroyWorktree with the primary-checkout and
   # running-from refusals). The parity checker
-  # (`platform/app/scripts/check-feature-parity.ts`) scans tools/thuishaven's
+  # (`packages/architecture-lint/src/check-feature-parity.ts`) scans tools/thuishaven's
   # Go tests: @unit scenarios are bound by `// @scenario` annotations above
   # those test funcs; the live-terminal flows remain `@unimplemented`.
 

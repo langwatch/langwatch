@@ -1,0 +1,41 @@
+{
+  "name": "@langwatch/share-server",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Canonical server-side Share service and private persistence.",
+  "files": [
+    "src"
+  ],
+  "type": "module",
+  "main": "./src/index.ts",
+  "types": "./src/index.ts",
+  "exports": {
+    ".": {
+      "types": "./src/index.ts",
+      "default": "./src/index.ts"
+    }
+  },
+  "scripts": {
+    "typecheck": "tsc --noEmit",
+    "test": "vitest run",
+    "test:unit": "vitest run"
+  },
+  "dependencies": {
+    "@langwatch/actor": "workspace:*",
+    "@langwatch/authz-contract": "workspace:*",
+    "@langwatch/data-retention-contract": "workspace:*",
+    "@langwatch/observability": "workspace:*",
+    "@langwatch/prisma-client": "workspace:*",
+    "@langwatch/project-contract": "workspace:*",
+    "@langwatch/share-contract": "workspace:*",
+    "@trpc/server": "^11.18.0",
+    "ioredis": "5.10.1",
+    "nanoid": "^5.1.5",
+    "zod": "^4.4.3"
+  },
+  "devDependencies": {
+    "@langwatch/test-harness": "workspace:*",
+    "typescript": "^7.0.2",
+    "vitest": "^4.1.9"
+  }
+}

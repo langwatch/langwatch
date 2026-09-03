@@ -27,13 +27,9 @@ const summarizePassRate = (
 ): string => {
   const entries = Object.values(evaluations ?? {});
   if (entries.length === 0) return chalk.gray("—");
-  const passEntries = entries.filter(
-    (e) => typeof e.averagePassed === "number",
-  );
+  const passEntries = entries.filter((e) => typeof e.averagePassed === "number");
   if (passEntries.length === 0) {
-    const scoreEntries = entries.filter(
-      (e) => typeof e.averageScore === "number",
-    );
+    const scoreEntries = entries.filter((e) => typeof e.averageScore === "number");
     if (scoreEntries.length === 0) return chalk.gray("—");
     const avg =
       scoreEntries.reduce((sum, e) => sum + (e.averageScore ?? 0), 0) /
@@ -41,8 +37,7 @@ const summarizePassRate = (
     return `${avg.toFixed(2)} avg`;
   }
   const avg =
-    passEntries.reduce((sum, e) => sum + (e.averagePassed ?? 0), 0) /
-    passEntries.length;
+    passEntries.reduce((sum, e) => sum + (e.averagePassed ?? 0), 0) / passEntries.length;
   return `${(avg * 100).toFixed(0)}% pass`;
 };
 
@@ -74,9 +69,7 @@ export const experimentListRunsCommand = async (
   })();
 
   const service = new ExperimentsApiService();
-  const spinner = createSpinner(
-    `Fetching runs for "${experimentSlug}"...`,
-  ).start();
+  const spinner = createSpinner(`Fetching runs for "${experimentSlug}"...`).start();
 
   try {
     const result = await service.listRuns({

@@ -72,7 +72,7 @@ Shared, machine-wide (one daemon, all worktrees):
 
 var envHelpText = `Environment variables.
 
-    Most of the knobs below also resolve from platform/app/.env (then
+    Most of the knobs below also resolve from .env (then
     .env.portless), so a lasting preference like "this machine runs native
     ClickHouse, never provision one" lives next to the URL it belongs with and
     travels into every new worktree. An exported variable still wins, for
@@ -153,7 +153,7 @@ var envHelpText = `Environment variables.
                                  worktree and agent authenticates with the same
                                  key. Same story for the rest of the seeded
                                  identity (admin login, PATs) — see
-                                 platform/app/prisma/seed.ts's header comment.
+                                 the seed script's header comment.
 
   ClickHouse
     LANGWATCH_HAVEN_CH=0         Do not manage ClickHouse (use .env CLICKHOUSE_URL).

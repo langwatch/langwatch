@@ -19,17 +19,13 @@ export const createScimTokenCommand = async (
     pending: "Creating SCIM token...",
     run: () =>
       new ScimTokensApiService().create(
-        options.description !== undefined
-          ? { description: options.description }
-          : {},
+        options.description !== undefined ? { description: options.description } : {},
       ),
     succeed: () => "Created SCIM token",
     table: (token) => {
       console.log();
       console.log(
-        chalk.bold.yellow(
-          "⚠  Save the token below NOW. It will not be shown again.",
-        ),
+        chalk.bold.yellow("⚠  Save the token below NOW. It will not be shown again."),
       );
       console.log();
       console.log(`  ${chalk.green(token.token)}`);

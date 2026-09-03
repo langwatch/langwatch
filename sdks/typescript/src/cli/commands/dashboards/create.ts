@@ -9,7 +9,9 @@ import type { CommandResult } from "../../utils/output";
  * Returns the created dashboard rather than printing it: the output port
  * renders it in whatever format the caller asked for (utils/output.ts).
  */
-export const createDashboardCommand = async (name: string): Promise<CommandResult | void> => {
+export const createDashboardCommand = async (
+  name: string,
+): Promise<CommandResult | void> => {
   await resolveCredentials();
 
   const service = new DashboardsApiService();
@@ -26,7 +28,9 @@ export const createDashboardCommand = async (name: string): Promise<CommandResul
       data: dashboard,
       table: () => {
         if (dashboard.platformUrl) {
-          console.log(`  ${chalk.bold("View:")}  ${chalk.underline(dashboard.platformUrl)}`);
+          console.log(
+            `  ${chalk.bold("View:")}  ${chalk.underline(dashboard.platformUrl)}`,
+          );
         }
       },
     };

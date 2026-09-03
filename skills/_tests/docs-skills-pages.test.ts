@@ -52,22 +52,22 @@ const STATIC_ACCORDION_HEADER =
 // from the same selection the publish sync writes (recipes nest under
 // recipes/<slug>). The accordion download URLs must only ever reference these.
 const publishedPaths = new Set(
-  listPublishedSkills(skillsRoot).map((s) => (s.isRecipe ? `recipes/${s.slug}` : s.slug))
+  listPublishedSkills(skillsRoot).map((s) => (s.isRecipe ? `recipes/${s.slug}` : s.slug)),
 );
 
 describe("docs skills directory pages", () => {
   describe("given the publish sync defines which skills exist in langwatch/skills", () => {
     const manifestSkills = Object.values(manifest).flatMap((sections) =>
       Object.values(sections).flatMap((entries) =>
-        entries.filter((e) => e.skill).map((e) => e.skill!.replace("langwatch/skills/", ""))
-      )
+        entries.filter((e) => e.skill).map((e) => e.skill!.replace("langwatch/skills/", "")),
+      ),
     );
 
     it("only lists skills that resolve inside the published repo layout", () => {
       const unknown = manifestSkills.filter((p) => !publishedPaths.has(p));
       expect(
         unknown,
-        `these manifest skills would 404 on raw.githubusercontent.com/langwatch/skills: ${unknown.join(", ")}`
+        `these manifest skills would 404 on raw.githubusercontent.com/langwatch/skills: ${unknown.join(", ")}`,
       ).toEqual([]);
     });
 
@@ -76,7 +76,7 @@ describe("docs skills directory pages", () => {
       const missing = [...publishedPaths].filter((p) => !listed.has(p));
       expect(
         missing,
-        `published skills missing from the docs directory pages: ${missing.join(", ")}`
+        `published skills missing from the docs directory pages: ${missing.join(", ")}`,
       ).toEqual([]);
     });
   });
@@ -89,7 +89,7 @@ describe("docs skills directory pages", () => {
           .flatMap((entries) => entries.filter((e) => e.skill))
           .map(
             (e) =>
-              `https://raw.githubusercontent.com/langwatch/skills/main/${e.skill!.replace("langwatch/skills/", "")}/SKILL.md`
+              `https://raw.githubusercontent.com/langwatch/skills/main/${e.skill!.replace("langwatch/skills/", "")}/SKILL.md`,
           );
         expect(urls.sort(), `${name} download URLs`).toEqual(expected.sort());
       }
@@ -120,10 +120,15 @@ describe("docs skills directory pages", () => {
       for (const { name, content } of pageFiles) {
         const attrValues = [
           ...extractAll(content, /data-[\w-]+="([^"]*)"/g),
-          ...extractAll(content, /data-[\w-]+=\{("(?:[^"\\]|\\.)*")\}/g).map((v) => JSON.parse(v) as string),
+          ...extractAll(content, /data-[\w-]+=\{("(?:[^"\\]|\\.)*")\}/g).map(
+            (v) => JSON.parse(v) as string,
+          ),
         ];
         const offenders = attrValues.filter((v) => /[^\x20-\x7E]/.test(v));
-        expect(offenders, `${name} non-ASCII data attribute values: ${offenders.join(" | ")}`).toEqual([]);
+        expect(
+          offenders,
+          `${name} non-ASCII data attribute values: ${offenders.join(" | ")}`,
+        ).toEqual([]);
       }
     });
 
@@ -145,7 +150,9 @@ describe("docs skills directory pages", () => {
           let cursor = -1;
           for (const entry of entries) {
             const idx = block.indexOf(`data-track-title={${JSON.stringify(entry.title)}}`);
-            expect(idx, `${name} ${sectionId}: "${entry.title}" present in order`).toBeGreaterThan(cursor);
+            expect(idx, `${name} ${sectionId}: "${entry.title}" present in order`).toBeGreaterThan(
+              cursor,
+            );
             cursor = idx;
           }
         }
@@ -156,7 +163,7 @@ describe("docs skills directory pages", () => {
       // sync-prompts.sh runs the compiler before generating, so every
       // promptFile in the manifest must be a compiler output name.
       const knownStems = listPublishedSkills(skillsRoot).map((s) =>
-        s.isRecipe ? `recipes-${s.slug}` : s.slug
+        s.isRecipe ? `recipes-${s.slug}` : s.slug,
       );
       const validNames = new Set([
         ...knownStems.map((s) => `${s}.docs.txt`),
@@ -166,7 +173,9 @@ describe("docs skills directory pages", () => {
         .flatMap((sections) => Object.values(sections).flat())
         .map((e) => e.promptFile)
         .filter((f) => !validNames.has(f));
-      expect(bad, `manifest promptFile entries with no compiler output: ${bad.join(", ")}`).toEqual([]);
+      expect(bad, `manifest promptFile entries with no compiler output: ${bad.join(", ")}`).toEqual(
+        [],
+      );
     });
   });
 
@@ -184,7 +193,7 @@ describe("docs skills directory pages", () => {
       });
       expect(
         offenders,
-        `snippet imports disable server-side rendering of the accordions:\n  ${offenders.join("\n  ")}`
+        `snippet imports disable server-side rendering of the accordions:\n  ${offenders.join("\n  ")}`,
       ).toEqual([]);
     });
 
@@ -204,7 +213,7 @@ describe("docs skills directory pages", () => {
       expect(js).toContain("data-copy-source");
       expect(js).toContain(".lw-prompt-source code");
       expect(js, "keyboard activation must cover all interactive controls").toContain(
-        ".lw-accordion-header, .lw-accordion-action, .lw-accordion-cmd-box"
+        ".lw-accordion-header, .lw-accordion-action, .lw-accordion-cmd-box",
       );
     });
 
@@ -216,7 +225,10 @@ describe("docs skills directory pages", () => {
         const inertHeaders = content.match(STATIC_ACCORDION_HEADER)?.length ?? 0;
         for (const cls of ["lw-accordion-header", "lw-accordion-action", "lw-accordion-cmd-box"]) {
           const total = content.match(new RegExp(`className="${cls}[" ]`, "g"))?.length ?? 0;
-          const buttons = content.match(new RegExp(`className="${cls}[" ][^>]*role="button" tabIndex=\\{0\\}`, "g"))?.length ?? 0;
+          const buttons =
+            content.match(
+              new RegExp(`className="${cls}[" ][^>]*role="button" tabIndex=\\{0\\}`, "g"),
+            )?.length ?? 0;
           const interactive = cls === "lw-accordion-header" ? total - inertHeaders : total;
           expect(buttons, `${name}: ${cls} keyboard semantics`).toBe(interactive);
         }
@@ -226,13 +238,13 @@ describe("docs skills directory pages", () => {
     it("leaves the static card header inert because nothing handles its click", () => {
       const js = fs.readFileSync(path.join(docsRoot, "posthog.js"), "utf8");
       expect(js, "the header click handler must skip static cards").toContain(
-        "lw-accordion-static"
+        "lw-accordion-static",
       );
       for (const { name, content } of pageFiles) {
         for (const [, attrs] of content.matchAll(STATIC_ACCORDION_HEADER)) {
           expect(
             attrs!.trim(),
-            `${name}: a static card header must claim no button semantics`
+            `${name}: a static card header must claim no button semantics`,
           ).toBe("");
         }
       }

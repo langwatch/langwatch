@@ -7,23 +7,18 @@
  * about whether a service actually throws what these tests say it throws.
  *
  * The wire shapes below are not invented. They are what
- * `platform/app/src/app/api/middleware/error-handler.ts` emits — the handler every
+ * `packages/api/src/errors.ts` emits — the handler every
  * `SecuredApp` mounts via `onError` — which flattens a `HandledError` to
  * `{ error: <kind>, message, ...meta }` at its `httpStatus`.
  */
-import {
-  describe,
-  it,
-  expect,
-  beforeAll,
-  beforeEach,
-  afterAll,
-  afterEach,
-} from "vitest";
+import { describe, it, expect, beforeAll, beforeEach, afterAll, afterEach } from "vitest";
 import { http, HttpResponse } from "msw";
 import { setupServer } from "msw/node";
 
-import { TracesApiService, TracesApiError } from "@/client-sdk/services/traces/traces-api.service";
+import {
+  TracesApiService,
+  TracesApiError,
+} from "@/client-sdk/services/traces/traces-api.service";
 import { createLangWatchApiClient } from "../client";
 import { LangWatchHandledError, isLangWatchHandledError } from "../errors";
 
@@ -53,6 +48,7 @@ describe("given the API returns a handled domain error", () => {
               // `meta` is SPREAD across the top level by the server handler.
               id: "trace-abc",
               projectId: "project-1",
+              retryable: false,
             },
             { status: 404 },
           ),
@@ -74,6 +70,7 @@ describe("given the API returns a handled domain error", () => {
 
       expect(domain.kind).toBe("trace_not_found");
       expect(domain.httpStatus).toBe(404);
+      expect(domain.retryable).toBe(false);
       expect(domain.meta).toEqual({ id: "trace-abc", projectId: "project-1" });
     });
 
@@ -103,6 +100,7 @@ describe("given the API returns a handled domain error", () => {
               error: "Could not reach the model gateway",
               domainError: {
                 kind: "model_provider_unavailable",
+                retryable: true,
                 meta: { provider: "openai" },
                 httpStatus: 424,
                 telemetry: {
@@ -110,8 +108,8 @@ describe("given the API returns a handled domain error", () => {
                   spanId: "00f067aa0ba902b7",
                 },
                 reasons: [
-                  { kind: "gateway_timeout", meta: { afterMs: 30000 } },
-                  { kind: "unknown" },
+                  { kind: "gateway_timeout", retryable: true, meta: { afterMs: 30000 } },
+                  { kind: "unknown", retryable: false },
                 ],
               },
             },
@@ -135,10 +133,11 @@ describe("given the API returns a handled domain error", () => {
       )) as LangWatchHandledError;
 
       expect(error.kind).toBe("model_provider_unavailable");
+      expect(error.retryable).toBe(true);
       expect(error.meta).toEqual({ provider: "openai" });
       expect(error.reasons).toEqual([
-        { kind: "gateway_timeout", meta: { afterMs: 30000 } },
-        { kind: "unknown" },
+        { kind: "gateway_timeout", retryable: true, meta: { afterMs: 30000 } },
+        { kind: "unknown", retryable: false },
       ]);
     });
   });

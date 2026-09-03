@@ -16,6 +16,7 @@ OpenLLMetry provides an OpenTelemetry-based instrumentation package for CrewAI.
 
 You can find more details and installation instructions on their GitHub repository:
 [traceloop/openllmetry/packages/opentelemetry-instrumentation-crewai](https://github.com/traceloop/openllmetry/tree/main/packages/opentelemetry-instrumentation-crewai)
+
 </CodeGroupItem>
 
 <CodeGroupItem title="OpenInference">
@@ -23,6 +24,7 @@ OpenInference, by Arize AI, also offers an instrumentation solution for CrewAI, 
 
 For more information and setup guides, please visit their GitHub repository:
 [Arize-ai/openinference/python/instrumentation/openinference-instrumentation-crewai](https://github.com/Arize-ai/openinference/tree/main/python/instrumentation/openinference-instrumentation-crewai)
+
 </CodeGroupItem>
 </CodeGroup>
 
@@ -133,10 +135,11 @@ if __name__ == "__main__":
 </CodeGroup>
 
 <Note>
-  Ensure you have the respective community instrumentation library installed:
-  - For OpenLLMetry: `pip install opentelemetry-instrumentation-crewai`
-  - For OpenInference: `pip install openinference-instrumentation-crewai`
-  Consult the specific library's documentation for the exact package name and instrumentor class if the above assumptions are incorrect.
+  Ensure you have the respective community instrumentation library installed: - For
+  OpenLLMetry: `pip install opentelemetry-instrumentation-crewai` - For OpenInference:
+  `pip install openinference-instrumentation-crewai` Consult the specific library's
+  documentation for the exact package name and instrumentor class if the above assumptions
+  are incorrect.
 </Note>
 
 ### 2. Direct Instrumentation
@@ -214,7 +217,8 @@ if __name__ == "__main__":
 </CodeGroup>
 
 ### Key points for community instrumentors:
--   These instrumentors typically patch CrewAI at a global level or integrate deeply with its execution flow, meaning all CrewAI operations (agents, tasks, tools) should be captured once instrumented.
--   If using `langwatch.setup(instrumentors=[...])`, LangWatch handles the setup and lifecycle of the instrumentor.
--   If instrumenting directly (e.g., `CrewAIInstrumentor().instrument()`), ensure that the `TracerProvider` used by the instrumentor is the same one LangWatch is exporting from. This usually means LangWatch is configured to use an existing global provider or one you explicitly pass to `langwatch.setup()`.
--   Always refer to the specific documentation of the community instrumentor (OpenLLMetry or OpenInference) for the most accurate and up-to-date installation and usage instructions, including the correct class names for instrumentors and any specific setup requirements.
+
+- These instrumentors typically patch CrewAI at a global level or integrate deeply with its execution flow, meaning all CrewAI operations (agents, tasks, tools) should be captured once instrumented.
+- If using `langwatch.setup(instrumentors=[...])`, LangWatch handles the setup and lifecycle of the instrumentor.
+- If instrumenting directly (e.g., `CrewAIInstrumentor().instrument()`), ensure that the `TracerProvider` used by the instrumentor is the same one LangWatch is exporting from. This usually means LangWatch is configured to use an existing global provider or one you explicitly pass to `langwatch.setup()`.
+- Always refer to the specific documentation of the community instrumentor (OpenLLMetry or OpenInference) for the most accurate and up-to-date installation and usage instructions, including the correct class names for instrumentors and any specific setup requirements.

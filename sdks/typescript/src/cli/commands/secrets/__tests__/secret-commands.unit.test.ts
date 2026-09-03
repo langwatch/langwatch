@@ -1,7 +1,12 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
 
 vi.mock("../../../utils/apiKey", () => ({
-  resolveCredentials: vi.fn(async () => ({ apiKey: "test-key", source: "env", endpoint: "https://app.langwatch.ai" })),
+  resolveCredentials: vi.fn(async () => ({
+    apiKey: "test-key",
+    source: "env",
+    endpoint: "https://app.langwatch.ai",
+    projectId: "proj_123",
+  })),
 }));
 
 vi.mock("ora", () => ({
@@ -63,8 +68,8 @@ describe("listSecretsCommand()", () => {
 
     await listSecretsCommand();
     expect(mockFetch).toHaveBeenCalledWith(
-      expect.stringContaining("/api/secrets"),
-      expect.objectContaining({ headers: expect.any(Object) })
+      expect.stringContaining("/api/v1/secret?projectId=proj_123"),
+      expect.objectContaining({ method: "GET", headers: expect.any(Object) }),
     );
   });
 
@@ -109,13 +114,19 @@ describe("getSecretCommand()", () => {
 
     await getSecretCommand("secret_abc");
     expect(mockFetch).toHaveBeenCalledWith(
-      expect.stringContaining("/api/secrets/secret_abc"),
-      expect.any(Object)
+      expect.stringContaining("/api/v1/secret/secret_abc?projectId=proj_123"),
+      expect.objectContaining({
+        method: "GET",
+      }),
     );
   });
 
   it("exits when secret not found", async () => {
-    mockFetch.mockResolvedValue({ ok: false, status: 404, text: async () => "Not found" });
+    mockFetch.mockResolvedValue({
+      ok: false,
+      status: 404,
+      text: async () => "Not found",
+    });
     await expect(getSecretCommand("nonexistent")).rejects.toThrow(ProcessExitError);
   });
 });
@@ -140,18 +151,18 @@ describe("createSecretCommand()", () => {
 
     await createSecretCommand("MY_API_KEY", { value: "sk-123" });
     expect(mockFetch).toHaveBeenCalledWith(
-      expect.stringContaining("/api/secrets"),
+      expect.stringContaining("/api/v1/secret"),
       expect.objectContaining({
         method: "POST",
         body: expect.stringContaining("MY_API_KEY"),
-      })
+      }),
     );
   });
 
   it("rejects invalid name format", async () => {
-    await expect(
-      createSecretCommand("invalid-name", { value: "test" })
-    ).rejects.toThrow(ProcessExitError);
+    await expect(createSecretCommand("invalid-name", { value: "test" })).rejects.toThrow(
+      ProcessExitError,
+    );
   });
 
   it("exits on conflict (409)", async () => {
@@ -160,9 +171,7 @@ describe("createSecretCommand()", () => {
       status: 409,
       text: async () => "Already exists",
     });
-    await expect(
-      createSecretCommand("MY_KEY", { value: "val" })
-    ).rejects.toThrow(ProcessExitError);
+    await expect(createSecretCommand("MY_KEY", { value: "val" })).rejects.toThrow(ProcessExitError);
   });
 });
 
@@ -186,19 +195,24 @@ describe("updateSecretCommand()", () => {
 
     await updateSecretCommand("secret_abc", { value: "new-value" });
     expect(mockFetch).toHaveBeenCalledWith(
-      expect.stringContaining("/api/secrets/secret_abc"),
+      expect.stringContaining("/api/v1/secret/secret_abc"),
       expect.objectContaining({
         method: "PUT",
-        body: expect.stringContaining("new-value"),
-      })
+        body: JSON.stringify({
+          projectId: "proj_123",
+          value: "new-value",
+        }),
+      }),
     );
   });
 
   it("exits when secret not found", async () => {
-    mockFetch.mockResolvedValue({ ok: false, status: 404, text: async () => "Not found" });
-    await expect(
-      updateSecretCommand("bad_id", { value: "val" })
-    ).rejects.toThrow(ProcessExitError);
+    mockFetch.mockResolvedValue({
+      ok: false,
+      status: 404,
+      text: async () => "Not found",
+    });
+    await expect(updateSecretCommand("bad_id", { value: "val" })).rejects.toThrow(ProcessExitError);
   });
 });
 
@@ -222,13 +236,20 @@ describe("deleteSecretCommand()", () => {
 
     await deleteSecretCommand("secret_abc");
     expect(mockFetch).toHaveBeenCalledWith(
-      expect.stringContaining("/api/secrets/secret_abc"),
-      expect.objectContaining({ method: "DELETE" })
+      expect.stringContaining("/api/v1/secret/secret_abc"),
+      expect.objectContaining({
+        method: "DELETE",
+        body: JSON.stringify({ projectId: "proj_123" }),
+      }),
     );
   });
 
   it("exits when secret not found", async () => {
-    mockFetch.mockResolvedValue({ ok: false, status: 404, text: async () => "Not found" });
+    mockFetch.mockResolvedValue({
+      ok: false,
+      status: 404,
+      text: async () => "Not found",
+    });
     await expect(deleteSecretCommand("bad_id")).rejects.toThrow(ProcessExitError);
   });
 });

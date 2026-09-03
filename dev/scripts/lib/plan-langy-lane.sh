@@ -2,15 +2,15 @@
 # Decide whether `pnpm dev` starts the Langy agent manager, and on which port.
 #
 # The decision has more branches than the other Go lanes, so it lives here
-# rather than inline in start.sh: langyagent takes its listen port from PORT
+# rather than inline in dev-stack.sh: langyagent takes its listen port from PORT
 # (which the launcher already uses for the app) and fails fast without its
 # secret and its two roots, so a lane started into a setup that cannot run it
 # restarts for as long as the stack is up.
 #
-# Usage from platform/app/scripts/start.sh:
+# Usage from dev/scripts/dev-stack.sh:
 #
-#   . "$(dirname "$0")/../../../dev/scripts/lib/plan-langy-lane.sh"
-#   plan_langy_lane "$(dirname "$0")/.." "$_APP_PORT"
+#   . "$(dirname "$0")/lib/plan-langy-lane.sh"
+#   plan_langy_lane "$REPO_ROOT" "$_APP_PORT"
 #   # reads LANGY_LANE_DECISION, LANGY_LANE_REASON, LANGY_LANE_PORT
 #
 # See specs/setup/dev-langy-agent-lane.feature.
@@ -44,9 +44,9 @@ _langy_port_listening() { lsof -i ":$1" -sTCP:LISTEN >/dev/null 2>&1; }
 # .env.portless would count as present here, start the lane, and the manager
 # would still exit for a missing setting, on every restart.
 _langy_setting_present() {
-  local var="$1" app_dir="$2"
+  local var="$1" repo_root="$2"
   [ -n "${!var:-}" ] && return 0
-  _service_address_from_env_file "$var" "$app_dir/.env" >/dev/null
+  _service_address_from_env_file "$var" "$repo_root/.env" >/dev/null
 }
 
 _langy_skip() {
@@ -79,7 +79,7 @@ _langy_python_shim_dir() {
 }
 
 plan_langy_lane() {
-  local app_dir="${1:-.}"
+  local repo_root="${1:-.}"
   local app_port="${2:-5560}"
 
   LANGY_LANE_DECISION="skip"
@@ -91,7 +91,7 @@ plan_langy_lane() {
     return 0
   fi
 
-  resolve_service_address OPENCODE_AGENT_URL "$app_dir" langy
+  resolve_service_address OPENCODE_AGENT_URL "$repo_root" langy
 
   local port=""
   if [ -z "${OPENCODE_AGENT_URL:-}" ]; then
@@ -119,12 +119,12 @@ plan_langy_lane() {
 
   local var missing=""
   for var in LANGY_INTERNAL_SECRET SESSIONS_ROOT LANGY_WORKSPACE_ROOT; do
-    if ! _langy_setting_present "$var" "$app_dir"; then
+    if ! _langy_setting_present "$var" "$repo_root"; then
       missing="${missing:+$missing, }${var}"
     fi
   done
   if [ -n "$missing" ]; then
-    _langy_skip "skipped (platform/app/.env has no ${missing}); run \`bash dev/scripts/dogfood/langy-local.sh\` for the block to paste"
+    _langy_skip "skipped (.env has no ${missing}); run \`bash dev/scripts/dogfood/langy-local.sh\` for the block to paste"
     return 0
   fi
 
@@ -136,7 +136,7 @@ plan_langy_lane() {
   # which reaches the reader as "Langy stopped mid-reply" and says nothing
   # about a missing build. Name the repo's copy and say when it is not there.
   local repo
-  repo="$(cd "$app_dir/../.." 2>/dev/null && pwd)"
+  repo="$(cd "$repo_root" 2>/dev/null && pwd)"
   LANGY_LANE_WORKER_BINARY="${repo}/services/langyworker/out/langy-worker"
   if [ ! -x "$LANGY_LANE_WORKER_BINARY" ]; then
     LANGY_LANE_REASON="${LANGY_LANE_REASON}, chats need \`pnpm --filter @langwatch/langyworker build:binary\` first"

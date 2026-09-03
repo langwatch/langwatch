@@ -1,0 +1,36 @@
+{
+  "name": "@langwatch/enterprise-plan-gate",
+  "version": "0.1.0",
+  "private": true,
+  "description": "The Enterprise plan gate: the refusal, the capability vocabulary, and the REST and tRPC middleware that enforce it.",
+  "license": "SEE LICENSE IN ../LICENSE.md",
+  "files": [
+    "src"
+  ],
+  "type": "module",
+  "main": "./src/index.ts",
+  "types": "./src/index.ts",
+  "exports": {
+    ".": {
+      "types": "./src/index.ts",
+      "default": "./src/index.ts"
+    }
+  },
+  "scripts": {
+    "typecheck": "tsc --noEmit",
+    "test": "vitest run",
+    "test:unit": "vitest run"
+  },
+  "dependencies": {
+    "@langwatch/entitlement-contract": "workspace:*",
+    "@langwatch/handled-error": "workspace:*",
+    "@trpc/server": "^11.18.0",
+    "hono": "^4.12.27"
+  },
+  "devDependencies": {
+    "@langwatch/enterprise-licensing-contract": "workspace:*",
+    "@types/node": "^26.0.1",
+    "typescript": "^7.0.2",
+    "vitest": "^4.1.9"
+  }
+}

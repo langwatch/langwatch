@@ -28,9 +28,7 @@ export const permissionsCell = (apiKey: ApiKeyDetail): string => {
 /** The bindings a key holds, or what it means to hold none. */
 export const printBindings = (apiKey: ApiKeyDetail): void => {
   if (apiKey.roleBindings.length === 0) {
-    console.log(
-      chalk.gray("  No bindings: this key grants no access anywhere."),
-    );
+    console.log(chalk.gray("  No bindings: this key grants no access anywhere."));
     console.log(
       chalk.cyan(
         `  langwatch api-keys update ${apiKey.id} --binding role:scopeType:scopeId`,

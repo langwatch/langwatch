@@ -6,7 +6,12 @@ sidebarTitle: Helm
 
 The AI Gateway ships as a sub-chart (`charts/gateway/`) of the LangWatch umbrella chart (`charts/langwatch/`). Installing the umbrella with `gateway.chartManaged: true` (the default) lifts the gateway pod alongside `langwatch-app` in the same release. The gateway runs as a separate Kubernetes Deployment (own pod, own container, own service) and reaches the LangWatch control plane for VK resolution, budget enforcement, and guardrail execution.
 
-<Note>The gateway sub-chart's `version` and `appVersion` are bumped in **lockstep** with the umbrella `langwatch` chart by release-please (`.github/release-please-config.json` `.` package extra-files). `helm install langwatch/langwatch@3.x` always pulls a matching gateway sub-chart, operators should never need to pin them separately.</Note>
+<Note>
+  The gateway sub-chart's `version` and `appVersion` are bumped in **lockstep** with the
+  umbrella `langwatch` chart by release-please (`.github/release-please-config.json` `.`
+  package extra-files). `helm install langwatch/langwatch@3.x` always pulls a matching
+  gateway sub-chart, operators should never need to pin them separately.
+</Note>
 
 ## Pre-create the runtime secrets
 
@@ -37,8 +42,8 @@ In the chart, leaving `image.tag: ""` (the default) resolves to `.Chart.AppVersi
 ```yaml
 gateway:
   image:
-    repository: docker.io/langwatch/ai-gateway   # default
-    tag: ""                                       # default → .Chart.AppVersion (lockstep)
+    repository: docker.io/langwatch/ai-gateway # default
+    tag: "" # default → .Chart.AppVersion (lockstep)
     pullPolicy: IfNotPresent
 ```
 
@@ -48,7 +53,7 @@ In your umbrella `values.yaml`:
 
 ```yaml
 gateway:
-  chartManaged: true                              # default; flip to false to disable
+  chartManaged: true # default; flip to false to disable
 
   # Where the gateway reaches the control plane. The default targets the
   # langwatch-app Service in the same namespace.
@@ -57,9 +62,9 @@ gateway:
 
   # Secret you pre-created above.
   secrets:
-    existingSecretName: langwatch-gateway-auth    # default for the umbrella chart
+    existingSecretName: langwatch-gateway-auth # default for the umbrella chart
     internalSecretKey: LW_GATEWAY_INTERNAL_SECRET # key WITHIN that Secret
-    jwtSecretKey: LW_GATEWAY_JWT_SECRET           # key WITHIN that Secret
+    jwtSecretKey: LW_GATEWAY_JWT_SECRET # key WITHIN that Secret
 
   # OTLP endpoint the gateway exports spans to. Default targets the
   # control plane's /api/otel ingest, which routes spans into the
@@ -74,7 +79,7 @@ gateway:
     enabled: true
     className: nginx
     host: gateway.your-corp.com
-    path: /v1                                     # only /v1/* needs to be public
+    path: /v1 # only /v1/* needs to be public
     pathType: Prefix
     tls:
       enabled: true
@@ -83,7 +88,7 @@ gateway:
   # Edge protection. Cap request body before auth runs so a misconfigured
   # caller can't OOM the pod. 10 MiB fits ~3 MiB prompts plus base64 images.
   security:
-    maxRequestBodyBytes: 33554432                 # 32 MiB
+    maxRequestBodyBytes: 33554432 # 32 MiB
 ```
 
 The full set of overridable fields lives in `charts/gateway/values.yaml` (canonical for everything not exposed at the umbrella surface). All defaults are production-safe; you should only need to override `controlPlane.baseUrl`, `secrets.existingSecretName`, `ingress.host`, and the OTLP endpoint.
@@ -100,16 +105,16 @@ helm upgrade --install langwatch langwatch/langwatch \
 
 Source of truth: `charts/gateway/templates/configmap.yaml` (commit `d14576b1e`) and `charts/gateway/templates/deployment.yaml`. The chart wires only the env vars the Go gateway actually reads, knobs in `values.yaml` that don't appear here are forward-compat surface for v1.1 (e.g. `cache.bootstrapAllKeys`, `admin.*`) and are silently ignored by the running binary. The canonical names are derived by `services/aigateway/config.go` `pkg/config.Hydrate`, which walks the Config struct's `env:"…"` tags and joins parent/child with `_`.
 
-| Env var | Source | Purpose |
-|---|---|---|
-| `SERVER_ADDR` | configmap (`":5563"`) | Public listen addr. Service `targetPort` matches |
-| `LOG_LEVEL` | configmap (`logging.level`) | `debug`, `info`, `warn`, `error` |
-| `LW_GATEWAY_BASE_URL` | configmap (`controlPlane.baseUrl`) | Where the gateway reaches `/api/internal/gateway/*` on the control plane |
-| `OTEL_OTLP_ENDPOINT` | configmap (`otel.endpoint`, only when set) | OTLP/HTTP ingest URL |
-| `SERVER_MAX_REQUEST_BODY_BYTES` | configmap (`security.maxRequestBodyBytes`) | Body-size cap, rendered as `%d` int |
-| `LW_GATEWAY_INTERNAL_SECRET` | Secret `secrets.existingSecretName` | HMAC for `/api/internal/gateway/*` calls |
-| `LW_GATEWAY_JWT_SECRET` | Secret `secrets.existingSecretName` | HS256 for resolve-key JWT |
-| `LW_GATEWAY_JWT_SECRET_PREVIOUS` | Secret (only when `secrets.jwtSecretPreviousKey` is set) | Retired key during rotation overlap |
+| Env var                          | Source                                                   | Purpose                                                                  |
+| -------------------------------- | -------------------------------------------------------- | ------------------------------------------------------------------------ |
+| `SERVER_ADDR`                    | configmap (`":5563"`)                                    | Public listen addr. Service `targetPort` matches                         |
+| `LOG_LEVEL`                      | configmap (`logging.level`)                              | `debug`, `info`, `warn`, `error`                                         |
+| `LW_GATEWAY_BASE_URL`            | configmap (`controlPlane.baseUrl`)                       | Where the gateway reaches `/api/internal/gateway/*` on the control plane |
+| `OTEL_OTLP_ENDPOINT`             | configmap (`otel.endpoint`, only when set)               | OTLP/HTTP ingest URL                                                     |
+| `SERVER_MAX_REQUEST_BODY_BYTES`  | configmap (`security.maxRequestBodyBytes`)               | Body-size cap, rendered as `%d` int                                      |
+| `LW_GATEWAY_INTERNAL_SECRET`     | Secret `secrets.existingSecretName`                      | HMAC for `/api/internal/gateway/*` calls                                 |
+| `LW_GATEWAY_JWT_SECRET`          | Secret `secrets.existingSecretName`                      | HS256 for resolve-key JWT                                                |
+| `LW_GATEWAY_JWT_SECRET_PREVIOUS` | Secret (only when `secrets.jwtSecretPreviousKey` is set) | Retired key during rotation overlap                                      |
 
 The deployment template intentionally does not inject `GATEWAY_ADMIN_AUTH_TOKEN` or `GATEWAY_OTEL_DEFAULT_AUTH_TOKEN`, the gateway has no admin/pprof listener and no OTLP auth-token field on its config struct, and silently dropping them at the env-var layer would mislead operators. OTLP authentication for self-hosters is delivered via `OTEL_OTLP_HEADERS` (e.g. `Authorization=Bearer …`) on the OTel config struct in `pkg/config/otel.go`. See `charts/gateway/templates/deployment.yaml` for the rationale comment.
 
@@ -178,7 +183,12 @@ See [Scaling](/ai-gateway/self-hosting/scaling) for HPA configuration and replic
 
 The gateway binary exposes Prometheus metrics at `/metrics` (port 5563). For the metric names + labels, see [Observability](/ai-gateway/observability).
 
-<Note>The chart does not currently render a `ServiceMonitor` object. Scrape via your own ServiceMonitor pointed at the gateway Service (port 80, target 5563), or via Pod-level annotations if your Prometheus uses the legacy annotation-based discovery. Chart-managed `ServiceMonitor` is on the v1.1 roadmap.</Note>
+<Note>
+  The chart does not currently render a `ServiceMonitor` object. Scrape via your own
+  ServiceMonitor pointed at the gateway Service (port 80, target 5563), or via Pod-level
+  annotations if your Prometheus uses the legacy annotation-based discovery. Chart-managed
+  `ServiceMonitor` is on the v1.1 roadmap.
+</Note>
 
 ## Probes
 
@@ -212,7 +222,12 @@ The probe is disabled by default (empty list) so greenfield and air-gapped-via-f
 ## Admin listener
 
 <Note>
-**v1 status:** the chart's `gateway.admin.*` value keys are forward-compat surface, the v1 gateway binary does not expose an admin/pprof listener and the deployment template does not inject `GATEWAY_ADMIN_ADDR`, `GATEWAY_ADMIN_AUTH_TOKEN` (see the rationale comment in `charts/gateway/templates/deployment.yaml`). The three postures below describe the planned v1.1 contract; setting the values today is a no-op. For live diagnostics in v1, fall back to `kubectl exec` + the production-runbook recipes.
+  **v1 status:** the chart's `gateway.admin.*` value keys are forward-compat surface, the
+  v1 gateway binary does not expose an admin/pprof listener and the deployment template
+  does not inject `GATEWAY_ADMIN_ADDR`, `GATEWAY_ADMIN_AUTH_TOKEN` (see the rationale
+  comment in `charts/gateway/templates/deployment.yaml`). The three postures below
+  describe the planned v1.1 contract; setting the values today is a no-op. For live
+  diagnostics in v1, fall back to `kubectl exec` + the production-runbook recipes.
 </Note>
 
 The gateway's `net/http/pprof` diagnostic surface (v1.1) will ship behind a dedicated listener. Three deployment postures, pick the one that matches your cluster:
@@ -247,7 +262,7 @@ gateway:
   admin:
     addr: "0.0.0.0:6060"
     existingAuthSecretName: gateway-admin-token
-    authSecretKey: token                # key within the Secret; default "token"
+    authSecretKey: token # key within the Secret; default "token"
 ```
 
 Where:
@@ -261,6 +276,7 @@ kubectl create secret generic gateway-admin-token \
 Listener binds on all interfaces and enforces `Authorization: Bearer <token>` on every request. Token comparison uses `crypto/subtle.ConstantTimeCompare`, no timing side-channel on length or prefix. The chart NEVER materialises the token into its own values or ConfigMap; only the reference to the pre-existing Secret flows through.
 
 Pick this for:
+
 - non-k8s deploys (systemd, Nomad, plain Docker) where `kubectl port-forward` isn't available;
 - k8s deploys behind a corporate VPN or internal LB where operators want direct HTTP access without going through `kubectl exec`.
 
@@ -295,7 +311,12 @@ Every `RequireBearer` 401 emits a clean `WWW-Authenticate: Bearer realm=gateway-
 The startup log line is enriched with `auth_required` and `loopback_only` booleans so operators have an audit breadcrumb:
 
 ```json
-{"msg":"admin_listening","addr":"0.0.0.0:6060","auth_required":true,"loopback_only":false}
+{
+  "msg": "admin_listening",
+  "addr": "0.0.0.0:6060",
+  "auth_required": true,
+  "loopback_only": false
+}
 ```
 
 Grep for this in your log pipeline if you want to assert on it in a compliance check.
@@ -318,8 +339,8 @@ gateway:
     # Optional, lock provider egress to explicit CIDRs (stricter than default).
     # Default: allow any IP EXCEPT RFC1918 ranges (see below).
     egressToProviders:
-      - cidr: 104.18.0.0/16    # cloudflare (fronts most providers)
-      - cidr: 52.0.0.0/8       # aws us-east-1 (Anthropic, Bedrock)
+      - cidr: 104.18.0.0/16 # cloudflare (fronts most providers)
+      - cidr: 52.0.0.0/8 # aws us-east-1 (Anthropic, Bedrock)
 ```
 
 ### What the default policy allows
@@ -338,7 +359,13 @@ Everything else is rejected, including traffic from other namespaces, lateral po
 - OTLP `:4318`, only rendered when `gateway.networkPolicy.egressToOTLP` is non-empty.
 - Provider upstreams on `:443`, default `any IP EXCEPT RFC1918` (10/8, 172.16/12, 192.168/16). Teams with explicit compliance posture should override `egressToProviders` with a concrete CIDR allowlist.
 
-<Note>The "any IP except RFC1918" default is a compromise: allowing any IP locks lateral movement out of the pod (no hitting internal services by accident) while still working for OpenAI/Anthropic/Bedrock/Vertex/Gemini without operators having to pin CIDR ranges per provider. If your cluster's CNI enforces egress strictly, you can tighten this via `egressToProviders`.</Note>
+<Note>
+  The "any IP except RFC1918" default is a compromise: allowing any IP locks lateral
+  movement out of the pod (no hitting internal services by accident) while still working
+  for OpenAI/Anthropic/Bedrock/Vertex/Gemini without operators having to pin CIDR ranges
+  per provider. If your cluster's CNI enforces egress strictly, you can tighten this via
+  `egressToProviders`.
+</Note>
 
 ### Verifying the policy rendered
 
@@ -380,7 +407,7 @@ gateway:
   shutdown:
     preDrainWaitSeconds: 5
     timeoutSeconds: 60
-  terminationGracePeriodSeconds: 75   # MUST be ≥ preDrainWaitSeconds + timeoutSeconds + slack
+  terminationGracePeriodSeconds: 75 # MUST be ≥ preDrainWaitSeconds + timeoutSeconds + slack
 ```
 
 `timeoutSeconds` defaults above the gateway's 45 s non-streaming heartbeat interval on purpose. That interval is the line between a request that is merely slow and one that is stuck, so a shorter window would cut off exactly the requests the heartbeat exists to keep alive. Narrow it and the gateway says so at boot with a `graceful_shutdown_shorter_than_heartbeat_interval` warning.
@@ -398,7 +425,7 @@ gateway:
   shutdown:
     preDrainWaitSeconds: 15
     timeoutSeconds: 60
-  terminationGracePeriodSeconds: 85   # 15 + 60 + 10 slack
+  terminationGracePeriodSeconds: 85 # 15 + 60 + 10 slack
 ```
 
 ### Observability
@@ -412,10 +439,10 @@ Both are unlabelled in the registry; per-pod series come from the `pod` target l
 
 Pairing the two during drain gives two operationally distinct patterns:
 
-| Pattern | Meaning |
-|---|---|
-| `draining=1` + `in_flight` monotonically decreasing to 0 | **healthy drain**: nothing to do |
-| `draining=1` + `in_flight` flat for > grace | **stuck handler**: upstream hang or a breaker without a deadline. Pod is about to SIGKILL |
+| Pattern                                                  | Meaning                                                                                   |
+| -------------------------------------------------------- | ----------------------------------------------------------------------------------------- |
+| `draining=1` + `in_flight` monotonically decreasing to 0 | **healthy drain**: nothing to do                                                          |
+| `draining=1` + `in_flight` flat for > grace              | **stuck handler**: upstream hang or a breaker without a deadline. Pod is about to SIGKILL |
 
 See [Production runbook → Recipe 7](/ai-gateway/cookbooks/production-runbook#recipe-7--stuck-drain) for the diagnostic ladder when handlers don't exit within the grace.
 
@@ -426,10 +453,11 @@ Edge protection lives under a dedicated `security` stanza separate from per-upst
 ```yaml
 gateway:
   security:
-    maxRequestBodyBytes: 33554432   # 32 MiB, default
+    maxRequestBodyBytes: 33554432 # 32 MiB, default
 ```
 
 Why not `budget` or `upstream`? These three concerns fail in different directions and alert differently:
+
 - `security`, edge, fails fast with 413, operator bumps when large base64 images are legitimate;
 - `budget`, accounting, reconciles asynchronously from the spend commands the gateway emits, operator investigates spend accumulation (see [Recipe 6](/ai-gateway/cookbooks/production-runbook#recipe-6-budget-spend-not-accumulating));
 - `upstream`, per-provider, fails mid-flight with circuit-breaker trips.
@@ -449,9 +477,9 @@ Slowloris-style attacks complete TLS + headers, then trickle the body at 1 B/s h
 ```yaml
 gateway:
   security:
-    readHeaderTimeout: 5s    # TLS-handshake-then-stall probes
-    readTimeout: 60s         # full body read; stops byte-trickle
-    idleTimeout: 120s        # keep-alive cap; MUST exceed nginx keepalive_timeout
+    readHeaderTimeout: 5s # TLS-handshake-then-stall probes
+    readTimeout: 60s # full body read; stops byte-trickle
+    idleTimeout: 120s # keep-alive cap; MUST exceed nginx keepalive_timeout
 ```
 
 Notable omissions:

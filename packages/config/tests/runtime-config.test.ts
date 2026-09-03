@@ -1,0 +1,323 @@
+import { describe, expect, it } from "vitest";
+import { z } from "zod";
+import {
+  Config,
+  ConfigValue,
+  compileRuntimeConfig,
+  environmentBooleanSchema,
+  environmentExactOneSchema,
+  environmentLegacyTruthySchema,
+  environmentNotExactOneSchema,
+  environmentOneOrTrueSchema,
+  environmentPresenceSchema,
+  InvalidRuntimeConfigError,
+  portSchema,
+  RuntimeConfig,
+} from "../src";
+
+const serviceSchema = z.object({
+  PORT: portSchema.default(5_560),
+  ENABLED: environmentBooleanSchema.default(false),
+});
+
+function unsupportedConfigValueFixture() {
+  // @ts-expect-error Config.value accepts primitive defaults or explicit Zod schemas.
+  return Config.value({ unsupported: true });
+}
+
+void unsupportedConfigValueFixture;
+
+describe("RuntimeConfig", () => {
+  it("exports compatibility parsers for legacy process controls", () => {
+    expect(environmentPresenceSchema.parse("0")).toBe(true);
+    expect(environmentPresenceSchema.parse("")).toBe(false);
+    expect(environmentExactOneSchema.parse("1")).toBe(true);
+    expect(environmentExactOneSchema.parse("true")).toBe(false);
+    expect(environmentNotExactOneSchema.parse("1")).toBe(false);
+    expect(environmentLegacyTruthySchema.parse("yes")).toBe(true);
+    expect(environmentLegacyTruthySchema.parse("false")).toBe(false);
+    // The App reads IS_SAAS as `=== "1" || ?.toLowerCase() === "true"`, and two
+    // processes deriving one deployment fact from one variable have to agree on
+    // every spelling of it. "yes" is the spelling that separates this from the
+    // legacy-truthy schema next door.
+    expect(environmentOneOrTrueSchema.parse("1")).toBe(true);
+    expect(environmentOneOrTrueSchema.parse("true")).toBe(true);
+    expect(environmentOneOrTrueSchema.parse("TRUE")).toBe(true);
+    expect(environmentOneOrTrueSchema.parse("True")).toBe(true);
+    expect(environmentOneOrTrueSchema.parse(true)).toBe(true);
+    expect(environmentOneOrTrueSchema.parse("yes")).toBe(false);
+    expect(environmentOneOrTrueSchema.parse("0")).toBe(false);
+    expect(environmentOneOrTrueSchema.parse("")).toBe(false);
+    expect(environmentOneOrTrueSchema.parse(undefined)).toBe(false);
+  });
+
+  /** @scenario Nested semantic keys derive environment bindings */
+  it("resolves nested semantic definitions from environment bindings", () => {
+    const definition = RuntimeConfig.define({
+      rateLimit: { ttlMs: 15_000, enabled: true },
+      endpoint: Config.url({ optional: true }),
+    });
+
+    const config = RuntimeConfig.create({
+      name: "nested service",
+      definition,
+      source: {
+        RATE_LIMIT_TTL_MS: "2500",
+        RATE_LIMIT_ENABLED: "false",
+        ENDPOINT: "https://example.test",
+      },
+    });
+
+    expect(config.value).toEqual({
+      rateLimit: { ttlMs: 2500, enabled: false },
+      endpoint: "https://example.test",
+    });
+    const ttlMs: number = config.value.rateLimit.ttlMs;
+    const enabled: boolean = config.value.rateLimit.enabled;
+    const endpoint: string | undefined = config.value.endpoint;
+    const nestedValues: {
+      rateLimit: { ttlMs: number; enabled: boolean };
+      endpoint: string | undefined;
+    } = config.value;
+    void ttlMs;
+    void enabled;
+    void endpoint;
+    void nestedValues;
+    expect(Object.isFrozen(config.value.rateLimit)).toBe(true);
+    expect(config.schema.parse(config.value)).toEqual(config.value);
+    expect(
+      compileRuntimeConfig(definition).parse({
+        rateLimit: { ttlMs: 123, enabled: true },
+        endpoint: "https://example.test",
+      }),
+    ).toEqual({
+      rateLimit: { ttlMs: 123, enabled: true },
+      endpoint: "https://example.test",
+    });
+  });
+
+  describe("given a leaf marked optional", () => {
+    // `optional` is what separates a URL a deployment may omit from one it must
+    // set, and it is a single ternary in `configUrl` / `configSecret`. Nothing
+    // exercised the absent case, so making those helpers ignore the flag
+    // entirely left the suite green.
+    it("resolves to undefined when the environment does not set it", () => {
+      const config = RuntimeConfig.create({
+        name: "optional service",
+        definition: RuntimeConfig.define({
+          endpoint: Config.url({ optional: true }),
+          token: Config.secret({ optional: true }),
+        }),
+        source: {},
+      });
+
+      expect(config.value).toEqual({ endpoint: undefined, token: undefined });
+    });
+
+    it("still refuses a value of the wrong shape when one is set", () => {
+      expect(() =>
+        RuntimeConfig.create({
+          name: "optional service",
+          definition: RuntimeConfig.define({ endpoint: Config.url({ optional: true }) }),
+          source: { ENDPOINT: "not a url" },
+        }),
+      ).toThrow(InvalidRuntimeConfigError);
+    });
+  });
+
+  describe("given a leaf that is not optional", () => {
+    it("refuses to resolve when the environment does not set it", () => {
+      expect(() =>
+        RuntimeConfig.create({
+          name: "required service",
+          definition: RuntimeConfig.define({ endpoint: Config.url() }),
+          source: {},
+        }),
+      ).toThrow(InvalidRuntimeConfigError);
+    });
+
+    it("refuses to resolve a secret the environment does not set", () => {
+      // Distinct from the empty-string case below: `min(1)` rejects "" whether
+      // or not the leaf is optional, so only an absent value tells the two
+      // apart.
+      expect(() =>
+        RuntimeConfig.create({
+          name: "required service",
+          definition: RuntimeConfig.define({ token: Config.secret() }),
+          source: {},
+        }),
+      ).toThrow(InvalidRuntimeConfigError);
+    });
+
+    it("refuses an empty secret", () => {
+      expect(() =>
+        RuntimeConfig.create({
+          name: "required service",
+          definition: RuntimeConfig.define({ token: Config.secret() }),
+          source: { TOKEN: "" },
+        }),
+      ).toThrow(InvalidRuntimeConfigError);
+    });
+  });
+
+  it("exports the inferred value shape for service factories", () => {
+    const definition = RuntimeConfig.define({
+      endpoint: Config.url({ optional: true }),
+      token: Config.secret({ optional: true }),
+      retries: Config.integer(2),
+      region: Config.value("local"),
+    });
+
+    type ServiceConfig = ConfigValue<typeof definition>;
+    type ExpectedServiceConfig = {
+      endpoint: string | undefined;
+      token: string | undefined;
+      retries: number;
+      region: string;
+    };
+    const serviceConfig = {} as ServiceConfig;
+    const expected: ExpectedServiceConfig = serviceConfig;
+    const roundTrip: ServiceConfig = expected;
+    void expected;
+    void roundTrip;
+    expect(definition).toHaveProperty("endpoint");
+  });
+
+  /** @scenario Two leaves cannot claim one environment variable */
+  it("rejects duplicate normalized environment bindings, naming both leaves", () => {
+    expect(() =>
+      RuntimeConfig.create({
+        name: "duplicate service",
+        definition: { fooBar: 1, foo_bar: 2 },
+        source: {},
+      }),
+    ).toThrow(
+      "Duplicate configuration environment binding: foo_bar (FOO_BAR) is already bound by fooBar.",
+    );
+  });
+
+  describe("given a definition that binds environment variables", () => {
+    /** @scenario A refusal names the configuration leaf and the variable behind it */
+    it("names the leaf path a service consumes rather than the variable alone", () => {
+      let error: unknown;
+      try {
+        RuntimeConfig.create({
+          name: "api",
+          definition: RuntimeConfig.define({
+            infrastructure: { redis: { url: Config.url() } },
+          }),
+          source: {},
+        });
+      } catch (caught) {
+        error = caught;
+      }
+
+      expect(error).toBeInstanceOf(InvalidRuntimeConfigError);
+      expect(error).toMatchObject({
+        runtime: "api",
+        issues: [
+          {
+            path: "infrastructure.redis.url",
+            code: "invalid_type",
+            env: "INFRASTRUCTURE_REDIS_URL",
+          },
+        ],
+      });
+    });
+
+    /** @scenario A refusal names the configuration leaf and the variable behind it */
+    it("carries the variable an operator has to set beside the leaf that refused", () => {
+      let error: unknown;
+      try {
+        RuntimeConfig.create({
+          name: "api",
+          definition: RuntimeConfig.define({
+            infrastructure: { redis: { url: Config.url({ env: "REDIS_URL" }) } },
+          }),
+          source: { REDIS_URL: "not a url" },
+        });
+      } catch (caught) {
+        error = caught;
+      }
+
+      // The compatibility alias, not the derived name: a leaf that declares its
+      // own binding is exactly the case where the derived one would send an
+      // operator to a variable the deployment does not read.
+      expect(error).toMatchObject({
+        issues: [{ path: "infrastructure.redis.url", env: "REDIS_URL" }],
+      });
+      expect(String(error)).toContain("infrastructure.redis.url (REDIS_URL,");
+      expect(String(error)).not.toContain("not a url");
+    });
+  });
+
+  it("supports required and defaulted semantic leaves", () => {
+    const definition = RuntimeConfig.define({
+      requiredPort: Config.integer(),
+      retries: Config.integer(3),
+      region: Config.value("local"),
+    });
+    const config = RuntimeConfig.create({
+      name: "leaf service",
+      definition,
+      source: { REQUIRED_PORT: "8080" },
+    });
+
+    expect(config.value).toEqual({
+      requiredPort: 8080,
+      retries: 3,
+      region: "local",
+    });
+  });
+
+  /** @scenario Schema defaults make a local service bootable */
+  it("uses defaults declared beside the service schema", () => {
+    const config = RuntimeConfig.create({
+      name: "example service",
+      schema: serviceSchema,
+      source: {},
+    });
+
+    expect(config.value).toEqual({ PORT: 5_560, ENABLED: false });
+  });
+
+  /** @scenario A runtime parses only its own schema */
+  it("normalizes values and strips unrelated environment entries", () => {
+    const config = RuntimeConfig.create({
+      name: "example service",
+      schema: serviceSchema,
+      source: {
+        PORT: "6560",
+        ENABLED: "false",
+        UNRELATED_SECRET: "must-not-cross-the-boundary",
+      },
+    });
+
+    expect(config.value).toEqual({ PORT: 6_560, ENABLED: false });
+    expect(config.value).not.toHaveProperty("UNRELATED_SECRET");
+  });
+
+  /** @scenario Invalid runtime configuration fails before service construction */
+  it("reports paths and issue codes without echoing source values", () => {
+    // The schema form, where the runtime owns the field names and nothing knows
+    // which variable each one came from, so no binding rides along.
+    let error: unknown;
+    try {
+      RuntimeConfig.create({
+        name: "example service",
+        schema: serviceSchema,
+        source: { PORT: "a-secret-looking-invalid-value" },
+      });
+    } catch (caught) {
+      error = caught;
+    }
+
+    expect(error).toBeInstanceOf(InvalidRuntimeConfigError);
+    expect(error).toMatchObject({
+      runtime: "example service",
+      issues: [{ path: "PORT", code: "invalid_type" }],
+    });
+    expect((error as InvalidRuntimeConfigError).issues[0]).not.toHaveProperty("env");
+    expect(String(error)).not.toContain("a-secret-looking-invalid-value");
+  });
+});

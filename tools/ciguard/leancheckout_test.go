@@ -45,14 +45,14 @@ const bareJob = `jobs:
         run: echo hi
 `
 
-// allowlistJob names one file and nothing else, the way shard-durations takes
-// only the committed vitest.durations.json.
+// allowlistJob names one path and nothing else, the way deployment-impact-check
+// takes only .github/scripts.
 const allowlistJob = `jobs:
-  shard-durations:
+  deployment-impact:
     steps:
       - uses: actions/checkout@abc123
         with:
-          sparse-checkout: platform/app/vitest.durations.json
+          sparse-checkout: .github/scripts
           sparse-checkout-cone-mode: false
 `
 

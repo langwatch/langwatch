@@ -2,7 +2,7 @@
 // writeup, given the files it changed and who opened it.
 //
 // The deployment-impact workflow triggers on `charts/**`, `services/**`,
-// `dev/docs/adr/**`, `dev/docs/best_practices/**`, `platform/app/.env.example`
+// `dev/docs/adr/**`, `dev/docs/best_practices/**`, `.env.example`
 // and `docs/self-hosting/**`. Those globs match every dependency bump in
 // services/langevals, services/aigateway and services/nlpgo, and every chart's
 // Chart.lock — so a routine version bump is asked for a writeup about operator
@@ -37,10 +37,7 @@ import { resolve } from "node:path";
 import { pathToFileURL } from "node:url";
 
 /** Logins whose pull requests get the hand-edited-manifest exemption. */
-export const DEPENDENCY_BOTS: readonly string[] = [
-  "dependabot[bot]",
-  "renovate[bot]",
-];
+export const DEPENDENCY_BOTS: readonly string[] = ["dependabot[bot]", "renovate[bot]"];
 
 /** Auto-generated resolution snapshots: no deployment surface by construction. */
 const LOCKFILES: readonly string[] = [

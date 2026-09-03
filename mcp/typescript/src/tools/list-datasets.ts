@@ -41,9 +41,11 @@ async function fetchAllDatasets(): Promise<{
  * Lists all datasets in the LangWatch project, formatted as an
  * AI-readable digest or raw JSON.
  */
-export async function handleListDatasets(params: {
-  format?: "digest" | "json";
-} = {}): Promise<string> {
+export async function handleListDatasets(
+  params: {
+    format?: "digest" | "json";
+  } = {},
+): Promise<string> {
   if (params.format === "json") {
     const { datasets, total } = await fetchAllDatasets();
     return JSON.stringify({ data: datasets, total }, null, 2);
@@ -66,9 +68,7 @@ export async function handleListDatasets(params: {
       const colNames = ds.columnTypes.map((c) => c.name).join(", ");
       lines.push(`**Columns**: ${colNames}`);
     }
-    lines.push(
-      `**Records**: ${ds.recordCount ?? "unknown"}`,
-    );
+    lines.push(`**Records**: ${ds.recordCount ?? "unknown"}`);
     lines.push("");
   }
 

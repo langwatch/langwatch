@@ -40,18 +40,18 @@ Code is organized into three layers. The **domain layer** (Service + Repository)
 
 ## When to Use
 
-| Layer | Responsibility | Examples |
-|-------|----------------|----------|
-| Router | Request/response handling, auth. Lets domain errors through untouched | `suite.router.ts`, `dataset.router.ts` |
-| Service | Business logic, orchestration, validation | `DatasetService`, `SuiteService` |
-| Repository | Pure data access (CRUD), no business logic | `DatasetRepository`, `SuiteRepository` |
+| Layer      | Responsibility                                                        | Examples                               |
+| ---------- | --------------------------------------------------------------------- | -------------------------------------- |
+| Router     | Request/response handling, auth. Lets domain errors through untouched | `suite.router.ts`, `dataset.router.ts` |
+| Service    | Business logic, orchestration, validation                             | `DatasetService`, `SuiteService`       |
+| Repository | Pure data access (CRUD), no business logic                            | `DatasetRepository`, `SuiteRepository` |
 
 ## Repository Layer
 
 Thin wrapper over the database. No business logic.
 
 ```typescript
-// platform/app/src/server/datasets/dataset.repository.ts
+// packages/features/dataset/server/src/repositories/prisma/prisma.dataset.repository.ts
 export class DatasetRepository {
   constructor(private readonly prisma: PrismaClient) {}
 
@@ -68,18 +68,48 @@ export class DatasetRepository {
 ```
 
 **Repository rules:**
+
 - Constructor takes only database client
 - Methods are simple CRUD operations
 - No default resolution or business validation
 - Can include project-scoping guards at data level
 - Allocates user-facing ids via `generate(KSUID_RESOURCES.X).toString()` — see [ksuids.md](./ksuids.md). Don't rely on the Prisma column default for any entity that shows up in a URL, API response, or export.
 
+### Never `include` a related row a transport will return
+
+`include: { user: true }` selects **every** column of that table. If the row
+travels out of a tRPC procedure or a REST handler — and most rows a repository
+returns do — every one of those columns reaches the browser, because a
+procedure with no output schema publishes exactly what its handler returns.
+For `User` that is `email`, `emailVerified`, `pendingSsoSetup`,
+`twoFactorEnabled`, `lastLoginAt`, `deactivatedAt`, `lastHomePath` and
+`userHashKey`, the per-user HMAC key ADR-101 §4 mints for identity event
+hashing.
+
+Use `select` and name the columns the screen renders:
+
+```typescript
+// The avatar and its tooltip. Nothing else leaves the database.
+const reviewerSelect = { select: { id: true, name: true, image: true } };
+```
+
+This has been fixed twice for the same reason, in `annotation.getByTraceIds`
+and then in the annotation queue reads. A type annotation on the repository
+method does **not** protect you: TypeScript narrows what a caller may read, and
+the object still carries every column onto the wire. Either `select` narrowly,
+or map to a DTO before the transport returns it — which is what the SCIM
+provisioning service does with `toScimUser`, and why its wide include is
+harmless.
+
+A `Promise<unknown>` on the port makes this invisible: nobody can see what the
+endpoint publishes, and the browser reads the fields off `{}`. Type the port.
+
 ## Service Layer
 
 Business logic, orchestration, default resolution.
 
 ```typescript
-// platform/app/src/server/datasets/dataset.service.ts
+// packages/features/dataset/server/src/services/dataset.service.ts
 export class DatasetService {
   constructor(
     private readonly prisma: PrismaClient,
@@ -97,13 +127,15 @@ export class DatasetService {
 
   async upsertDataset(params: UpsertDatasetParams) {
     // Business logic: resolve name, check conflicts, migrate columns
-    const resolvedName = name ?? (await this.resolveExperimentName(projectId, experimentId));
+    const resolvedName =
+      name ?? (await this.resolveExperimentName(projectId, experimentId));
     // ... orchestrate repositories
   }
 }
 ```
 
 **Service rules:**
+
 - Use `static create()` factory method for instantiation
 - Orchestrate multiple repositories
 - Apply business rules, validation, default resolution
@@ -114,14 +146,14 @@ export class DatasetService {
 Services throw framework-agnostic errors from a per-domain `errors.ts`. **Read
 [`error-handling.md`](./error-handling.md) and
 [ADR-045](../adr/045-domain-errors-handled-boundary.md) before adding one** —
-they own the decision of *when* an error is a `HandledError` and what goes on it.
+they own the decision of _when_ an error is a `HandledError` and what goes on it.
 The short version, and the part that concerns this pattern:
 
 A failure the caller can act on is a `HandledError` subclass with a stable
 `code`. It crosses the boundary with meaning, and no router has to hand-map it:
 
 ```typescript
-// platform/app/src/server/datasets/errors.ts
+// packages/features/dataset/server/src/services/errors.ts
 export class DatasetNameTakenError extends HandledError {
   declare readonly code: "dataset_name_taken";
 
@@ -142,7 +174,7 @@ does not rebuild a `TRPCError` around the caught message. That older shape
 router) is exactly what ADR-045 replaced: it puts server prose on the wire as if
 it were API copy, and it has to be rewritten at every call site that rethrows.
 
-Anything you *cannot* name — a dropped connection, a bug — stays a plain `Error`
+Anything you _cannot_ name — a dropped connection, a bug — stays a plain `Error`
 and correctly degrades to "unknown" at the boundary. Do not dress it up.
 
 Adding a handled code is three edits, not one: the subclass here, the code in
@@ -182,30 +214,30 @@ export { suiteTargetSchema, type SuiteTarget } from "~/server/suites/types";
 ```typescript
 // BAD: Domain type defined in API layer, imported by service
 // server/api/routers/suites/schemas.ts   <-- defined here
-// server/suites/suite.service.ts         <-- imports from API layer (wrong direction)
+// packages/features/suite/server/src/services/suite.service.ts  <-- imports from API layer (wrong direction)
 ```
 
 **Rule of thumb:** If a type represents a business concept (not just a request shape), it belongs in the domain layer. Request-specific schemas (like `createSuiteSchema` with its validation messages) can stay in the router schemas file since they're API concerns.
 
 ## Decision Checklist
 
-| Question | Answer |
-|----------|--------|
-| Is it storage/retrieval? | Repository |
+| Question                                   | Answer            |
+| ------------------------------------------ | ----------------- |
+| Is it storage/retrieval?                   | Repository        |
 | Is it exposing functionality (HTTP, tRPC)? | Router/Controller |
-| Is it unique business logic? | Service |
-| Need CRUD only? | Repository |
-| Need default resolution? | Service |
-| Need to orchestrate multiple entities? | Service |
-| Need validation beyond schema? | Service |
+| Is it unique business logic?               | Service           |
+| Need CRUD only?                            | Repository        |
+| Need default resolution?                   | Service           |
+| Need to orchestrate multiple entities?     | Service           |
+| Need validation beyond schema?             | Service           |
 
 ## Testing
 
 Follow the [Testing Philosophy](../TESTING_PHILOSOPHY.md):
 
-| Test Type | What to Test | Database |
-|-----------|--------------|----------|
-| **Integration** | Service + Repository together | Real (testcontainers) |
-| **Unit** | Pure logic only (e.g., `resolveDefaults`) | None needed |
+| Test Type       | What to Test                              | Database              |
+| --------------- | ----------------------------------------- | --------------------- |
+| **Integration** | Service + Repository together             | Real (testcontainers) |
+| **Unit**        | Pure logic only (e.g., `resolveDefaults`) | None needed           |
 
 **Avoid mocking repositories** - it tests implementation details. If the service works with a real database, it works.

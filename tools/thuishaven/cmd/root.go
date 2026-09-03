@@ -122,7 +122,6 @@ type deps struct {
 	params   app.UpParams
 	opts     app.PlanOptions
 	worktree string
-	lwDir    string
 	isAgent  bool
 }
 
@@ -130,11 +129,14 @@ type deps struct {
 // only function that knows the full dependency graph.
 func wire(logger *zap.Logger, isAgent bool) deps {
 	cwd, _ := os.Getwd()
+	// The workspace root is the whole of the "where does haven run things"
+	// answer now: every lane is `pnpm --filter <package>` from here, the
+	// .env/.env.portless layers live here, and there is no single application
+	// directory left to point at.
 	worktree := gitTopLevel(cwd)
-	lwDir := filepath.Join(worktree, "platform", "app")
 
 	naming := domain.DefaultNaming(devEnv("LANGWATCH_LOCAL_TLD"))
-	proxy := portlessproxy.New(naming, lwDir)
+	proxy := portlessproxy.New(naming, worktree)
 	store := fileregistry.New(havenHome())
 	sup := procsupervisor.New(isAgent)
 	sys := system.New()
@@ -179,7 +181,7 @@ func wire(logger *zap.Logger, isAgent bool) deps {
 
 	// Resolved through the operator's own .env, not the full dotenv layering: the
 	// overlay haven writes is loaded last with override:true, so a knob read only
-	// from the shell would let haven's default beat a platform/app/.env line that
+	// from the shell would let haven's default beat a .env line that
 	// says otherwise — and the opt-in would silently not work.
 	//
 	// It must exclude .env.portless specifically, because this is the one knob
@@ -241,10 +243,9 @@ func wire(logger *zap.Logger, isAgent bool) deps {
 			},
 			Extras: func() dashboard.Extras { return dashboardExtras(orch.HubView(worktree, worktree)) },
 		}),
-		params:   app.UpParams{WorktreeDir: worktree, LwDir: lwDir, Branch: gitBranch(worktree), ExplicitSlug: os.Getenv("LANGWATCH_SLUG"), IsBaseline: os.Getenv("HAVEN_BASELINE") == "1", IsLinkedWorktree: gitIsLinkedWorktree(worktree), UntrustedCheckout: os.Getenv("HAVEN_UNTRUSTED_CHECKOUT") == "1"},
+		params:   app.UpParams{WorktreeDir: worktree, Branch: gitBranch(worktree), ExplicitSlug: os.Getenv("LANGWATCH_SLUG"), IsBaseline: os.Getenv("HAVEN_BASELINE") == "1", IsLinkedWorktree: gitIsLinkedWorktree(worktree), UntrustedCheckout: os.Getenv("HAVEN_UNTRUSTED_CHECKOUT") == "1"},
 		opts:     optionsFromEnv(worktree),
 		worktree: worktree,
-		lwDir:    lwDir,
 		isAgent:  isAgent,
 	}
 }
@@ -298,9 +299,10 @@ func optionsFromEnv(repoRoot string) app.PlanOptions {
 // services the developer believes they turned off. They are refused with their
 // replacement instead, exactly like a removed command spelling.
 //
-// Only the values that used to change what ran are refused: WORKERS_IN_PROCESS=1
-// is still how `pnpm dev` (outside haven) asks for a single process, so a
-// checkout carrying it must not be blocked from starting a stack.
+// The two worker knobs are refused on ANY value, not just the one that used to
+// change what ran: the background worker is its own application now, nothing
+// reads either variable, and a .env still carrying one describes a topology
+// that no longer exists.
 var removedSelectionEnv = []struct {
 	name        string
 	applied     func(value string) bool
@@ -310,24 +312,28 @@ var removedSelectionEnv = []struct {
 	{name: "LANGWATCH_SKIP_NLP", applied: isTrue, replacement: "haven up -nlp"},
 	{name: "LANGWATCH_SKIP_AIGATEWAY", applied: isTrue, replacement: "haven up -gateway"},
 	{name: "LANGWATCH_SKIP_LANGYAGENT", applied: isTrue, replacement: "haven up -langy"},
-	{name: "WORKERS_IN_PROCESS", applied: isFalse, replacement: "haven up +workers"},
+	{
+		name:    "WORKERS_IN_PROCESS",
+		applied: isSet,
+		note:    "the background worker is its own process (apps/worker) — every stack runs the ui, api and workers lanes, and nothing reads this variable",
+	},
 	{
 		name:    "START_WORKERS",
-		applied: isFalse,
-		note:    "the worker stack is part of the app now, and `haven up +workers` only moves it into its own lane",
+		applied: isSet,
+		note:    "the workers lane always runs, so nothing reads this variable",
 	},
 }
 
-// isTrue and isFalse read a removed knob for intent, not for one literal.
+// isTrue reads a removed knob for intent, not for one literal.
 //
-// The consumers outside haven each spell truthiness their own way — start.sh
-// tests LANGWATCH_SKIP_* against "1" and START_WORKERS against "true" or "1",
-// start.ts tests WORKERS_IN_PROCESS against "1" or "true" — so matching any one
-// of them exactly would let the others through. And the two directions of being
-// wrong are not symmetric: refusing a value that never did anything costs one
-// line deleted from a .env, while missing one means haven silently runs a
-// service the developer believes they turned off, which is the failure this
-// whole mechanism exists to prevent. So both predicates read generously.
+// The consumers outside haven each spell truthiness their own way — the preset
+// launchers test LANGWATCH_SKIP_* against "1", other readers accept "true" — so
+// matching any one of them exactly would let the others through. And the two
+// directions of being wrong are not symmetric: refusing a value that never did
+// anything costs one line deleted from a .env, while missing one means haven
+// silently runs a service the developer believes they turned off, which is the
+// failure this whole mechanism exists to prevent. So the predicate reads
+// generously.
 func isTrue(v string) bool {
 	switch strings.ToLower(strings.TrimSpace(v)) {
 	case "1", "true", "yes", "on":
@@ -336,13 +342,13 @@ func isTrue(v string) bool {
 	return false
 }
 
-// isFalse is "set to something, and that something is not true" — so "0",
-// "false", "FALSE" and "off" all count, as does any value the app would not
-// read as on. An empty value does not: blanking a line is how a .env unsets a
-// knob, and there is no intent left in it to refuse.
-func isFalse(v string) bool {
-	return strings.TrimSpace(v) != "" && !isTrue(v)
-}
+// isSet is "the variable carries a value at all", in either direction. It is
+// what a knob nothing reads any more wants: there is no value of
+// WORKERS_IN_PROCESS that describes a topology this repository still has, so
+// naming it is a stale line to delete whichever way it was set. An empty value
+// does not count — blanking a line is how a .env unsets a knob, and there is no
+// intent left in it to refuse.
+func isSet(v string) bool { return strings.TrimSpace(v) != "" }
 
 // rejectRemovedSelectionEnv fails `up` when a removed selection variable is still
 // set to the value that used to matter, naming the one command that replaces it.
@@ -758,7 +764,7 @@ func runUpgrade(ctx context.Context, d deps, _ invocation) error {
 }
 
 // devEnv reads one of haven's own knobs: the process environment first, then
-// the merged dotenv layers (platform/app/.env, then platform/app/.env.portless).
+// the merged dotenv layers (.env, then .env.portless).
 //
 // The same precedence Prisma and tsx give the app's settings, and for the same
 // reason: a preference like "never manage ClickHouse, this machine runs a
@@ -813,29 +819,29 @@ func resolveKnob(
 	return v, ok
 }
 
-// dotenvKnobs loads the dotenv layers once per process, from the
-// platform/app directory of the checkout haven was invoked in.
+// dotenvKnobs loads the dotenv layers once per process, from the workspace root
+// of the checkout haven was invoked in — where every application resolves them.
 func dotenvKnobs() map[string]string {
 	dotenvOnce.Do(func() {
 		cwd, _ := os.Getwd()
-		dotenvVars = domain.LoadDotenv(filepath.Join(gitTopLevel(cwd), "platform", "app"))
+		dotenvVars = domain.LoadDotenv(gitTopLevel(cwd))
 	})
 	return dotenvVars
 }
 
 // operatorEnvLookup is dotenvLookup restricted to files a human wrote: the
-// process environment and platform/app/.env, never the .env.portless overlay haven
+// process environment and .env, never the .env.portless overlay haven
 // generates. Use it for any knob haven also *writes*, so that reading a
 // preference cannot pick up haven's own last answer instead of the operator's.
 func operatorEnvLookup(key string) (string, bool) {
 	return resolveKnob(key, os.LookupEnv, operatorEnvKnobs)
 }
 
-// operatorEnvKnobs loads only platform/app/.env — deliberately not the overlay.
+// operatorEnvKnobs loads only .env — deliberately not the overlay.
 func operatorEnvKnobs() map[string]string {
 	operatorEnvOnce.Do(func() {
 		cwd, _ := os.Getwd()
-		operatorEnvVars = operatorEnvIn(filepath.Join(gitTopLevel(cwd), "platform", "app"))
+		operatorEnvVars = operatorEnvIn(gitTopLevel(cwd))
 	})
 	return operatorEnvVars
 }

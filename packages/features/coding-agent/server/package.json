@@ -1,0 +1,59 @@
+{
+  "name": "@langwatch/coding-agent-server",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Canonical coding-agent session read service.",
+  "files": [
+    "src"
+  ],
+  "type": "module",
+  "imports": {
+    "#*": "./src/*.ts"
+  },
+  "main": "./src/index.ts",
+  "types": "./src/index.ts",
+  "exports": {
+    ".": {
+      "types": "./src/index.ts",
+      "default": "./src/index.ts"
+    },
+    "./testing": {
+      "types": "./src/testing.ts",
+      "default": "./src/testing.ts"
+    }
+  },
+  "scripts": {
+    "typecheck": "tsc --noEmit",
+    "test": "vitest run",
+    "test:integration": "vitest run --config vitest.integration.config.ts"
+  },
+  "dependencies": {
+    "@clickhouse/client": "^1.23.0",
+    "@langwatch/api": "workspace:*",
+    "@langwatch/authz-contract": "workspace:*",
+    "@langwatch/coding-agent-contract": "workspace:*",
+    "@langwatch/eventing": "workspace:*",
+    "@langwatch/github-contract": "workspace:*",
+    "@langwatch/handled-error": "workspace:*",
+    "@langwatch/log-contract": "workspace:*",
+    "@langwatch/metric-contract": "workspace:*",
+    "@langwatch/model-provider-contract": "workspace:*",
+    "@langwatch/observability": "workspace:*",
+    "@langwatch/project-contract": "workspace:*",
+    "@langwatch/trace-contract": "workspace:*",
+    "@trpc/server": "^11.18.0",
+    "hono": "^4.12.27",
+    "hono-openapi": "^1.3.1",
+    "ioredis": "^5.9.3",
+    "zod": "^4.4.3"
+  },
+  "devDependencies": {
+    "@langwatch/group-queue": "workspace:*",
+    "@langwatch/metric-server": "workspace:*",
+    "@langwatch/trace-server": "workspace:*",
+    "@testcontainers/redis": "^12.0.4",
+    "@types/node": "^26.0.1",
+    "typescript": "^7.0.2",
+    "vitest": "^4.1.9"
+  }
+}

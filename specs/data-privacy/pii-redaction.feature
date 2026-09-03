@@ -244,7 +244,7 @@ Feature: Redacting personal data from traces
   # would stop it finding real personal data. The scenarios below are the ones
   # that would fail if that happened.
   #
-  # Bindings: platform/app/src/server/data-privacy/redaction/__tests__/essentialPii.prefilter.unit.test.ts
+  # Bindings: packages/redaction/src/__tests__/essentialPii.prefilter.unit.test.ts
   @unit
   Scenario: Personal data is still redacted when the text holds no address marker
     When a trace is ingested whose input contains a card number, an IBAN, an IP

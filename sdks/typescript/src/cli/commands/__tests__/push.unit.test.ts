@@ -152,9 +152,7 @@ describe("pushPrompts", () => {
       await pushPrompts({ config, lock, promptsApiService, result });
 
       const syncCall = mockSync.mock.calls[0]![0];
-      expect(syncCall.configData.outputs[0].identifier).toBe(
-        "custom_output_name"
-      );
+      expect(syncCall.configData.outputs[0].identifier).toBe("custom_output_name");
     });
 
     it("defaults to 'output' when response_format has no name", async () => {
@@ -204,9 +202,7 @@ describe("pushPrompts", () => {
       vi.mocked(FileManager.loadLocalPrompt).mockReturnValue({
         model: "openai/gpt-4o",
         modelParameters: { temperature: 0.7 },
-        messages: [
-          { role: "system", content: "You are a helpful assistant." },
-        ],
+        messages: [{ role: "system", content: "You are a helpful assistant." }],
       } as any);
 
       mockSync.mockResolvedValue({

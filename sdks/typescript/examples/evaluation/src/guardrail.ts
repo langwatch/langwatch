@@ -17,7 +17,9 @@ import { setupObservability } from "langwatch/observability/node";
 
 // Check for required environment variables
 if (!process.env.LANGWATCH_API_KEY) {
-  console.error("❌ LANGWATCH_API_KEY is required. Create a .env file with your API key.");
+  console.error(
+    "❌ LANGWATCH_API_KEY is required. Create a .env file with your API key.",
+  );
   console.error("   Get your API key from https://app.langwatch.ai");
   process.exit(1);
 }
@@ -75,17 +77,14 @@ const processMessage = async (userInput: string): Promise<string> => {
 
   // Run guardrail to check for PII - this creates a span attached to the current trace
   try {
-    const guardrail = await langwatch.evaluations.evaluate(
-      "presidio/pii_detection",
-      {
-        data: {
-          input: userInput,
-          output: generatedResponse,
-        },
-        name: "PII Detection Guardrail",
-        asGuardrail: true,
-      }
-    );
+    const guardrail = await langwatch.evaluations.evaluate("presidio/pii_detection", {
+      data: {
+        input: userInput,
+        output: generatedResponse,
+      },
+      name: "PII Detection Guardrail",
+      asGuardrail: true,
+    });
 
     console.log(`🔍 Guardrail Result:`);
     console.log(`   - Status: ${guardrail.status}`);
@@ -132,12 +131,14 @@ const main = async () => {
         } finally {
           span.end();
         }
-      }
+      },
     );
   }
 
   console.log("\n✅ Guardrail demo complete!");
-  console.log("Check the LangWatch dashboard to see the traces with nested guardrail spans.");
+  console.log(
+    "Check the LangWatch dashboard to see the traces with nested guardrail spans.",
+  );
 
   // Give time for spans to flush
   await new Promise((resolve) => setTimeout(resolve, 2000));

@@ -9,7 +9,7 @@
 > successor; ADR-046 explicitly scopes the Redis token buffer OUT of itself.
 > Number 044 now belongs to scheduled-reports automation, so citing it here
 > would point at an unrelated document. The design lives in the code:
-> `platform/app/src/server/app-layer/langy/streaming/` and `services/langyagent/`.
+> `packages/features/langy/server/src/streaming/` and `services/langyagent/`.
 
 **Builds on:** the event-driven-turns design (out-of-band spawn + Redis token
 buffer + liveness), ADR-046 (event-sourced Langy conversations: durable
@@ -28,19 +28,20 @@ opencode → manager /chat (ndjson) → runTurn (worker) → Redis token buffer
 
 That path is the **truth**: durable, replayable, survives refresh, and the
 authoritative final answer is the `turn_finalized` event, not the tokens. But it
-is deliberately *slow at the edge* for good reasons that we do not want to
+is deliberately _slow at the edge_ for good reasons that we do not want to
 change:
 
-- `runTurn` runs **out of band** — it is dispatched by the `spawnAgent` reactor
-  off `agent_turn_started`, not on the browser's request socket. Time-to-first
-  token includes event dispatch → GroupQueue drain → reactor → pool → manager
+- `runTurn` runs **out of band** — it is dispatched by the conversation
+  process manager's worker intent after `agent_turn_started`, not on the
+  browser's request socket. Time-to-first token includes event dispatch →
+  Group Queue drain → intent executor → pool → manager
   spawn.
 - The token buffer **batches** `CHUNK_TOKENS = 64` words before flushing a
   `delta` to Redis (bounds XADD volume on a fast stream), and the reader picks it
-  up via `XREAD BLOCK`. So the durable answer *visibly* arrives in ~64-word
+  up via `XREAD BLOCK`. So the durable answer _visibly_ arrives in ~64-word
   chunks, never token-by-token.
 
-The result is correct and resumable but not *fast* to first paint or *smooth* as
+The result is correct and resumable but not _fast_ to first paint or _smooth_ as
 it types. We want a genuinely low-latency "it's typing" experience without giving
 up the durable stream's correctness, replay, or the reconciled final answer.
 
@@ -64,12 +65,12 @@ reconciled final message; it survives refresh (the buffered tail is the
 A thin pipe of the opencode `text-delta` tokens straight to the UI, with minimal
 parsing, ephemeral, not persisted, and dying on disconnect. Three layers:
 
-1. **Manager (Go) — a *multiplexed frame*, not a second endpoint.** The manager
+1. **Manager (Go) — a _multiplexed frame_, not a second endpoint.** The manager
    already tails opencode `/event` **once** per turn in `streamSessionEvents`
    and unmarshals each event for session routing + terminal detection. When that
    already-parsed event is a text delta, it additionally writes a compact
    `{"type":"langy.token","text":"<verbatim delta>"}` ndjson frame — flushed
-   immediately, *before* the verbatim full-event line — then forwards the full
+   immediately, _before_ the verbatim full-event line — then forwards the full
    event line exactly as before. The delta text is passed through verbatim; the
    only new work is one map lookup + one small write per delta.
 
@@ -119,7 +120,7 @@ limiter.
 The optimistic (fast) text and the durable (`useChat`) text are reconciled by a
 pure, length-monotone rule (`reconcileOptimisticText`):
 
-- Render the **fast** text only while it is a *superset* of the durable text
+- Render the **fast** text only while it is a _superset_ of the durable text
   (`fast.startsWith(durable) && fast.length > durable.length`); otherwise render
   the durable text.
 - This shows the fast lead immediately (durable starts empty, and `"".startsWith`
@@ -129,7 +130,7 @@ pure, length-monotone rule (`reconcileOptimisticText`):
 - On `turn_finalized`, `isStreaming` flips false: `MessageContent` switches from
   `StreamingText` to the Markdown render of the **persisted** message and settles
   tool-call cards. The optimistic text is no longer consulted. Because the
-  durable buffer flushes its tail on `markEnd` *before* `end`, the durable text
+  durable buffer flushes its tail on `markEnd` _before_ `end`, the durable text
   is complete at that instant — no flash of shorter text.
 - On mid-stream refresh, Stream B is gone (nothing replays it) but Stream A
   replays the buffered token tail via `GET /conversations/:id/stream`. No lost
@@ -167,7 +168,7 @@ pure, length-monotone rule (`reconcileOptimisticText`):
   perturbing Stream A.
 - **Lower `CHUNK_TOKENS` / drop batching on the durable buffer.** Rejected: that
   trades away the XADD-volume bound that protects Redis on fast streams, and
-  still carries the out-of-band spawn latency. Stream B gets speed *without*
+  still carries the out-of-band spawn latency. Stream B gets speed _without_
   touching the durable path's tuning.
 - **Publish tokens onto the tenant `BroadcastService`.** Rejected: tenant-wide
   fan-out + a shared rate limiter is the wrong shape for a per-turn token torrent;

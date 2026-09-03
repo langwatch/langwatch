@@ -6,7 +6,7 @@ Feature: Typed permission declarations
   runtime failure in production
 
   # Spec for ADR-092 delivery-plan PR 4, decision 25 (the declared surface).
-  # The registry (packages/authz/src/registry.ts) already states, per
+  # The registry (packages/features/authz/contract/src/registry.ts) states, per
   # resource, the scope tiers it can be granted at; this feature makes the
   # declaration surfaces derive their typing from that single source. The
   # scenarios about compile errors are bound by type-assertion tests that
@@ -331,3 +331,16 @@ Feature: Typed permission declarations
     Given a procedure whose input schema the sweep cannot read
     When the sweep walks the router
     Then the procedure is reported rather than skipped
+
+  # A transport handed its base parser as a port cannot chain a second
+  # `.input()` onto it — tRPC types that call as a conditional on the input
+  # already accumulated, and a conditional over an unresolved type parameter
+  # never takes the merging branch — so it composes with one intersection
+  # instead. Reading only the outer parser would leave those procedures' scope
+  # ids unchecked behind an allowlist.
+  @unit
+  Scenario: An input composed as an intersection is inspected, not skipped
+    Given a procedure whose input intersects two object parsers
+    When the sweep walks the router
+    Then a scope id either parser carries is checked at its own tier
+    And an intersection with a member the sweep cannot read is still reported

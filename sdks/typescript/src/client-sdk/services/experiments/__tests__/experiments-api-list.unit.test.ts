@@ -57,9 +57,7 @@ describe("ExperimentsApiService list endpoints", () => {
           const result = await service.listExperiments();
 
           expect(result).toEqual(payload);
-          expect(fetchedUrl()).toBe(
-            "https://api.langwatch.test/api/experiments",
-          );
+          expect(fetchedUrl()).toBe("https://api.langwatch.test/api/experiments");
         });
       });
 
@@ -82,19 +80,14 @@ describe("ExperimentsApiService list endpoints", () => {
       describe("when called", () => {
         it("throws ExperimentsApiServiceError with 'list experiments' operation", async () => {
           mockFetch.mockResolvedValueOnce(
-            jsonResponse(
-              { error: "Missing credentials" },
-              { status: 401 },
-            ),
+            jsonResponse({ error: "Missing credentials" }, { status: 401 }),
           );
 
           const service = new ExperimentsApiService();
           const err = await service.listExperiments().catch((e) => e);
 
           expect(err).toBeInstanceOf(ExperimentsApiServiceError);
-          expect((err as ExperimentsApiServiceError).operation).toBe(
-            "list experiments",
-          );
+          expect((err as ExperimentsApiServiceError).operation).toBe("list experiments");
         });
       });
     });
@@ -134,10 +127,7 @@ describe("ExperimentsApiService list endpoints", () => {
       describe("when the API returns 404", () => {
         it("throws ExperimentsApiServiceError mentioning the slug", async () => {
           mockFetch.mockResolvedValueOnce(
-            jsonResponse(
-              { error: "Experiment not found" },
-              { status: 404 },
-            ),
+            jsonResponse({ error: "Experiment not found" }, { status: 404 }),
           );
 
           const service = new ExperimentsApiService();

@@ -28,7 +28,9 @@ export const listModelProvidersCommand = async (): Promise<CommandResult | void>
     // Response is an object keyed by provider name
     const providerEntries = Object.entries(providers);
 
-    spinner.succeed(`Found ${providerEntries.length} model provider${providerEntries.length !== 1 ? "s" : ""}`);
+    spinner.succeed(
+      `Found ${providerEntries.length} model provider${providerEntries.length !== 1 ? "s" : ""}`,
+    );
 
     return {
       data: providers,
@@ -37,9 +39,7 @@ export const listModelProvidersCommand = async (): Promise<CommandResult | void>
           console.log();
           console.log(chalk.gray("No model providers configured."));
           console.log(chalk.gray("Set one up with:"));
-          console.log(
-            chalk.cyan('  langwatch model-provider set openai --enabled true'),
-          );
+          console.log(chalk.cyan("  langwatch model-provider set openai --enabled true"));
           return;
         }
 
@@ -49,7 +49,10 @@ export const listModelProvidersCommand = async (): Promise<CommandResult | void>
           Provider: p.provider ?? key,
           Enabled: p.enabled ? chalk.green("✓") : chalk.red("✗"),
           "Default Model": "—",
-          "Has Keys": p.customKeys && Object.keys(p.customKeys).length > 0 ? chalk.green("✓") : chalk.gray("—"),
+          "Has Keys":
+            p.customKeys && Object.keys(p.customKeys).length > 0
+              ? chalk.green("✓")
+              : chalk.gray("—"),
         }));
 
         formatTable({

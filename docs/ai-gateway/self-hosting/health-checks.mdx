@@ -8,13 +8,13 @@ The gateway exposes three HTTP endpoints for Kubernetes probes plus one public s
 
 ## Endpoint summary
 
-| Endpoint   | Used by                                | Returns 200 when                                                    |
-|------------|----------------------------------------|---------------------------------------------------------------------|
-| `/healthz` | Kubernetes `livenessProbe`             | The Go process is responsive (no registered checks fail)            |
-| `/readyz`  | Kubernetes `readinessProbe` + LB       | The pod is not draining                                             |
-| `/startupz`| Kubernetes `startupProbe`              | Startup is marked complete, then mirrors `/readyz`                  |
-| `/health`  | Your status page / uptime monitor      | The process is up and the control plane has answered within the last 60s |
-| `/metrics` | Prometheus                              | Always, counter + histogram surface (see [Observability](/ai-gateway/observability)) |
+| Endpoint    | Used by                           | Returns 200 when                                                                     |
+| ----------- | --------------------------------- | ------------------------------------------------------------------------------------ |
+| `/healthz`  | Kubernetes `livenessProbe`        | The Go process is responsive (no registered checks fail)                             |
+| `/readyz`   | Kubernetes `readinessProbe` + LB  | The pod is not draining                                                              |
+| `/startupz` | Kubernetes `startupProbe`         | Startup is marked complete, then mirrors `/readyz`                                   |
+| `/health`   | Your status page / uptime monitor | The process is up and the control plane has answered within the last 60s             |
+| `/metrics`  | Prometheus                        | Always, counter + histogram surface (see [Observability](/ai-gateway/observability)) |
 
 The three probes are in-cluster signals. `/health` is the one meant to be reachable from outside; the chart publishes it through the ingress and leaves the rest internal.
 
@@ -22,10 +22,10 @@ The three probes return the same JSON shape:
 
 ```json
 {
-  "status":   "ok | degraded | starting | draining",
-  "version":  "git-<short-sha>",
+  "status": "ok | degraded | starting | draining",
+  "version": "git-<short-sha>",
   "uptime_s": 12.482,
-  "checks":   { "<name>": "ok | <failure detail>" }
+  "checks": { "<name>": "ok | <failure detail>" }
 }
 ```
 
@@ -43,7 +43,7 @@ Cheap by design. Never does network I/O. If this returns non-200 the kubelet kil
 
 ```yaml
 livenessProbe:
-  httpGet: { path: /healthz, port: http }   # http = 5563
+  httpGet: { path: /healthz, port: http } # http = 5563
   periodSeconds: 10
   timeoutSeconds: 2
   failureThreshold: 3
@@ -151,7 +151,7 @@ The chart publishes exactly this one path through the ingress, as an `Exact` mat
 ingress:
   host: gateway.your-corp.com
   healthPath:
-    enabled: true   # default
+    enabled: true # default
     path: /health
 ```
 
@@ -169,7 +169,7 @@ Point the monitor at `https://gateway.your-corp.com/health`. Set `ingress.health
 Match your `terminationGracePeriodSeconds` to `preDrainWaitSeconds + timeoutSeconds` plus a few seconds of slack:
 
 ```yaml
-terminationGracePeriodSeconds: 75  # chart default: 5 + 60 + 10 slack
+terminationGracePeriodSeconds: 75 # chart default: 5 + 60 + 10 slack
 ```
 
 `preDrainWaitSeconds` exists precisely to give the LB time to notice `/readyz=503` before the listener stops accepting, so if you still see a fraction of in-flight requests hit an already-draining replica during rolling deploys, bump `shutdown.preDrainWaitSeconds` (and `terminationGracePeriodSeconds` to match) rather than reaching for a manual `preStop` sleep. A `preStop` hook does the same job less precisely: it delays SIGTERM instead of delaying the listener shutdown, so the pod is not yet reporting `/readyz=503` for any of that time and the LB has no signal to act on.
@@ -195,10 +195,10 @@ On alert:
 
 ## Common failures
 
-| Symptom                                                         | Likely cause                                           | First step                                                         |
-|-----------------------------------------------------------------|--------------------------------------------------------|--------------------------------------------------------------------|
-| `/healthz` 200, `/v1/chat/completions` returns 500 `auth_upstream_unavailable` | Gateway can't reach control plane (`LW_GATEWAY_BASE_URL` wrong/missing) | Check the env var on the pod; confirm Service, DNS resolves       |
-| `/health` 503 with `control_plane: unreachable for Ns`           | Control plane down, unroutable, or the shared internal secret does not match (a mismatch 401s the probe and reads the same) | Compare `LW_GATEWAY_INTERNAL_SECRET` byte-for-byte between gateway and control-plane pods, then check the Service and DNS. The `statusprobe_control_plane_unreachable` log line carries the underlying probe failure |
-| `/health` 503 while completions still succeed                    | Expected during a control-plane outage longer than 60 s: warm keys keep serving from the auth cache, cold ones do not | Confirm it is a real outage and not a secret mismatch (row above, which reads identically), then fix whichever side is wrong. `/readyz` stays 200 on purpose so warm traffic keeps flowing |
-| `/readyz` flips to 503 mid-life                                  | Pod received `SIGTERM` (rolling deploy, eviction, OOMKill) | `kubectl describe pod` for the termination reason                   |
-| 502 from LB for a small window during rolling deploy             | LB hasn't yet removed the draining replica             | Raise `shutdown.preDrainWaitSeconds`, and `terminationGracePeriodSeconds` to match (see Graceful shutdown above) |
+| Symptom                                                                        | Likely cause                                                                                                                | First step                                                                                                                                                                                                           |
+| ------------------------------------------------------------------------------ | --------------------------------------------------------------------------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `/healthz` 200, `/v1/chat/completions` returns 500 `auth_upstream_unavailable` | Gateway can't reach control plane (`LW_GATEWAY_BASE_URL` wrong/missing)                                                     | Check the env var on the pod; confirm Service, DNS resolves                                                                                                                                                          |
+| `/health` 503 with `control_plane: unreachable for Ns`                         | Control plane down, unroutable, or the shared internal secret does not match (a mismatch 401s the probe and reads the same) | Compare `LW_GATEWAY_INTERNAL_SECRET` byte-for-byte between gateway and control-plane pods, then check the Service and DNS. The `statusprobe_control_plane_unreachable` log line carries the underlying probe failure |
+| `/health` 503 while completions still succeed                                  | Expected during a control-plane outage longer than 60 s: warm keys keep serving from the auth cache, cold ones do not       | Confirm it is a real outage and not a secret mismatch (row above, which reads identically), then fix whichever side is wrong. `/readyz` stays 200 on purpose so warm traffic keeps flowing                           |
+| `/readyz` flips to 503 mid-life                                                | Pod received `SIGTERM` (rolling deploy, eviction, OOMKill)                                                                  | `kubectl describe pod` for the termination reason                                                                                                                                                                    |
+| 502 from LB for a small window during rolling deploy                           | LB hasn't yet removed the draining replica                                                                                  | Raise `shutdown.preDrainWaitSeconds`, and `terminationGracePeriodSeconds` to match (see Graceful shutdown above)                                                                                                     |

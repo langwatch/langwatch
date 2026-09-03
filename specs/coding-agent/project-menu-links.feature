@@ -1,15 +1,15 @@
 # Project menu links for coding-agent activity
 #
 # Implementation:
-#   platform/app/prisma/schema.prisma                                                                              (Project.lastCodingAgentSessionAt / lastCodingAgentPullRequestAt)
-#   platform/app/src/server/app-layer/projects/project.service.ts                                                  (the throttled touch methods)
-#   platform/app/src/server/app-layer/projects/repositories/project.prisma.repository.ts                           (the staleness-guarded write)
-#   platform/app/src/server/event-sourcing/pipelines/coding-agent-processing/projections/codingAgentSessionSeen.touch.ts (the fold-commit stamp)
-#   platform/app/src/server/app-layer/github/github-pull-request-mapping.service.ts                                (the pull-request trigger)
-#   platform/app/src/components/sidebar/codingAgentActivity.ts                                                     (the recency rule)
-#   platform/app/src/components/MainMenu.tsx                                                                       (the two destinations)
-#   platform/app/src/pages/[project]/sessions.tsx                                                                  (the project Sessions page)
-#   platform/app/src/pages/[project]/pull-requests.tsx                                                             (the project Pull Requests page)
+#   packages/prisma-client/prisma/schema.prisma                                                                    (Project.lastCodingAgentSessionAt / lastCodingAgentPullRequestAt)
+#   packages/features/project/server/src/services/project.service.ts                                               (the throttled touch methods)
+#   packages/features/project/server/src/repositories/prisma/prisma.project.repository.ts                         (the staleness-guarded write)
+#   packages/features/coding-agent/server/src/services/coding-agent-session-seen.service.ts (the fold-commit stamp)
+#   packages/features/github/server/src/services/github-pull-request-mapping.service.ts                          (the pull-request trigger)
+#   packages/features/navigation/web/src/model/coding-agent-activity.ts                                                     (the recency rule)
+#   packages/features/navigation/web/src/ui/sections/main-menu.tsx                                                                       (the two destinations)
+#   [gone] src/pages/[project]/sessions.tsx                                                                  (the project Sessions page)
+#   [gone] src/pages/[project]/pull-requests.tsx                                                             (the project Pull Requests page)
 #
 # Related specs:
 #   specs/coding-agent/sessions-screen.feature       , what the Sessions table shows

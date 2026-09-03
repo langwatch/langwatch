@@ -45,9 +45,7 @@ export const skillsUpdateCommand = async (
   const targets =
     names.length > 0
       ? resolveTargets({ names })
-      : SKILLS_BUNDLE.filter((skill) =>
-          fs.existsSync(skillFilePath({ root, skill })),
-        );
+      : SKILLS_BUNDLE.filter((skill) => fs.existsSync(skillFilePath({ root, skill })));
 
   announceRoot(root, options);
 
@@ -56,19 +54,18 @@ export const skillsUpdateCommand = async (
   // destroys content we did not write without confirmation") holds for every
   // forcing path, not just the one that happens to need it today.
   if (force) {
-    const proceed = await confirmForcedOverwrite(
-      planForcedClobbers(targets, root),
-      { yes: options.yes === true, dryRun, options },
-    );
+    const proceed = await confirmForcedOverwrite(planForcedClobbers(targets, root), {
+      yes: options.yes === true,
+      dryRun,
+      options,
+    });
     if (!proceed) {
       console.log("Aborted. Nothing was written.");
       return;
     }
   }
 
-  const results = targets.map((skill) =>
-    updateSkill({ skill, root, dryRun, force }),
-  );
+  const results = targets.map((skill) => updateSkill({ skill, root, dryRun, force }));
 
   await printResult(
     { dir: root, bundleVersion: SKILLS_BUNDLE_VERSION, dryRun, results },

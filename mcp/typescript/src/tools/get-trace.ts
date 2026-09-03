@@ -44,7 +44,7 @@ export async function handleGetTrace(params: {
   }
 
   lines.push(
-    '\n> Tip: Use `get_trace` with `format: "json"` to get the full raw trace data.'
+    '\n> Tip: Use `get_trace` with `format: "json"` to get the full raw trace data.',
   );
 
   return lines.join("\n");

@@ -1,8 +1,8 @@
 # Trace Table — Gherkin Spec
-# Implementation: platform/app/src/features/traces-v2/components/TraceTable/**
-#                 platform/app/src/features/traces-v2/components/TracesPage/TracesPage.tsx
-#                 platform/app/src/features/traces-v2/stores/{filterStore,viewStore,selectionStore}.ts
-#                 platform/app/src/features/traces-v2/hooks/useTraceListQuery.ts
+# Implementation: [gone] src/features/traces-v2/components/TraceTable/**
+#                 packages/features/trace/web/src/ui/sections/explorer/traces-page/traces-page.tsx
+#                 packages/features/trace/web/src/{filter,view,selection}.store.ts
+#                 packages/features/trace/web/src/ui/sections/explorer/hooks/use-trace-list-query.ts
 # Audited 2026-05-01: scenarios that described unimplemented behaviour have
 # been deleted or tagged @planned. The big movers were
 #   - default columns / column ordering (now sourced from viewStore.builtInLenses)

@@ -1,9 +1,6 @@
 import { describe, expect, it } from "vitest";
 
-import {
-  formatLoginCeremony,
-  type LoginCeremonyInput,
-} from "../login-ceremony";
+import { formatLoginCeremony, type LoginCeremonyInput } from "../login-ceremony";
 
 const baseInput: LoginCeremonyInput = {
   email: "jane@acme.com",
@@ -67,9 +64,7 @@ describe("formatLoginCeremony", () => {
           "gemini",
           "opencode",
         ]) {
-          expect(toolLines.some((line) => getCommandSlug(line) === slug)).toBe(
-            true,
-          );
+          expect(toolLines.some((line) => getCommandSlug(line) === slug)).toBe(true);
         }
       });
 
@@ -91,9 +86,7 @@ describe("formatLoginCeremony", () => {
             { name: "openai", displayName: "OpenAI", configured: true },
           ],
         });
-        expect(lines).toContain(
-          "Model providers you can issue a virtual key for:",
-        );
+        expect(lines).toContain("Model providers you can issue a virtual key for:");
         // NOT labelled "AI tools" — that confusion is the bug being fixed.
         expect(lines).not.toContain("Your AI tools are ready:");
         const providerLines = lines.filter((l) => l.startsWith("  •"));
@@ -129,9 +122,7 @@ describe("formatLoginCeremony", () => {
 
       it("omits the providers section when the array is empty", () => {
         const lines = formatLoginCeremony({ ...baseInput, providers: [] });
-        expect(lines).not.toContain(
-          "Model providers you can issue a virtual key for:",
-        );
+        expect(lines).not.toContain("Model providers you can issue a virtual key for:");
       });
     });
   });
@@ -202,9 +193,7 @@ describe("formatLoginCeremony", () => {
       it("renders no budget section at all", () => {
         const lines = formatLoginCeremony({ ...baseInput, budgets: [] });
         expect(lines).not.toContain("Budgets that apply to your key:");
-        expect(
-          lines.find((l) => l.includes("budget")),
-        ).toBeUndefined();
+        expect(lines.find((l) => l.includes("budget"))).toBeUndefined();
       });
 
       it("suppresses the legacy collapsed line even when also supplied", () => {
@@ -215,9 +204,7 @@ describe("formatLoginCeremony", () => {
           budget: { period: "monthly", limitUsd: 100, usedUsd: 2.43 },
           budgets: [],
         });
-        expect(
-          lines.find((l) => l.startsWith("Monthly budget:")),
-        ).toBeUndefined();
+        expect(lines.find((l) => l.startsWith("Monthly budget:"))).toBeUndefined();
       });
     });
 
@@ -257,9 +244,7 @@ describe("formatLoginCeremony", () => {
             },
           ],
         });
-        expect(lines).toContain(
-          "  $1.00 used of $10.00 all time (personal budget)",
-        );
+        expect(lines).toContain("  $1.00 used of $10.00 all time (personal budget)");
       });
     });
 
@@ -272,9 +257,7 @@ describe("formatLoginCeremony", () => {
         const budgetLines = lines.filter((l) => l.includes(" used of "));
         expect(budgetLines).toHaveLength(3);
         expect(budgetLines[0]).toContain("(personal budget)");
-        expect(budgetLines[1]).toContain(
-          "(department budget (Engineering))",
-        );
+        expect(budgetLines[1]).toContain("(department budget (Engineering))");
         expect(budgetLines[2]).toContain("(whole organization budget)");
       });
     });
@@ -309,9 +292,7 @@ describe("formatLoginCeremony", () => {
           budget: { period: "monthly", limitUsd: 100, usedUsd: 2.43 },
           budgets: [orgBudget],
         });
-        expect(
-          lines.find((l) => l.startsWith("Monthly budget:")),
-        ).toBeUndefined();
+        expect(lines.find((l) => l.startsWith("Monthly budget:"))).toBeUndefined();
         expect(lines).toContain(
           "  $2.43 used of $100.00 this month (whole organization budget), resets Aug 1",
         );

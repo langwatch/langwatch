@@ -1,8 +1,8 @@
 # Conversation context — remaining-turn counts
 #
 # Implementation:
-#   platform/app/src/features/traces-v2/components/TraceDrawer/ConversationContext.tsx
-#   platform/app/src/features/traces-v2/hooks (useConversationContext — position / total)
+#   packages/features/trace/web/src/ui/sections/explorer/trace-drawer/conversation-context.tsx
+#   [gone] src/features/traces-v2/hooks (useConversationContext — position / total)
 #
 # Motivation (round 5): the Conversation Context pane shows the previous
 # turn, the current turn, and the next turn, with a "Start of

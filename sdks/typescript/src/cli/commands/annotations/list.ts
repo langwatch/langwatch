@@ -30,7 +30,7 @@ export const listAnnotationsCommand = async (options: {
     // Handle both array and {data: [...]} response shapes
     const annotations = Array.isArray(result)
       ? result
-      : (result as unknown as { data: typeof result }).data ?? [];
+      : ((result as unknown as { data: typeof result }).data ?? []);
 
     spinner.succeed(
       `Found ${annotations.length} annotation${annotations.length !== 1 ? "s" : ""}`,

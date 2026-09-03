@@ -4,9 +4,16 @@ description: Define detection rules that fire AnomalyAlerts when activity-event 
 sidebarTitle: Anomaly rules
 ---
 
-<Info>**Pairs with:** [AI Gateway → Budgets](/ai-gateway/budgets). Budgets enforce hard spend limits; anomaly rules detect patterns *before* a budget breach (spend-spike, geo-mismatch, off-hours).</Info>
+<Info>
+  **Pairs with:** [AI Gateway → Budgets](/ai-gateway/budgets). Budgets enforce hard spend limits;
+  anomaly rules detect patterns *before* a budget breach (spend-spike, geo-mismatch, off-hours).
+</Info>
 
-<Note>**Available on Enterprise plans.** Non-enterprise organizations see an upgrade card on `/governance/anomaly-rules` instead of the composer. See [Open-core licensing](/ai-governance/open-core-licensing) for the full Apache 2.0, Enterprise split.</Note>
+<Note>
+  **Available on Enterprise plans.** Non-enterprise organizations see an upgrade card on
+  `/governance/anomaly-rules` instead of the composer. See [Open-core
+  licensing](/ai-governance/open-core-licensing) for the full Apache 2.0, Enterprise split.
+</Note>
 
 Anomaly rules are the "Detect" layer of the [governance control plane](/ai-governance/control-plane#tier-3--audit-log-ingest). The composer at `/governance/anomaly-rules` accepts a rule definition and persists it; the [event-sourcing detector](/ai-gateway/governance/activity-monitor-event-sourcing) evaluates each rule against incoming events and produces an `AnomalyAlert` row when a violation is detected.
 
@@ -16,15 +23,15 @@ This page documents what the detector evaluates today and what is preview-only, 
 
 The composer's rule-type dropdown surfaces every shape the schema can hold; the detector only evaluates one of them today.
 
-| Rule type | Detector coverage | What it detects | Threshold config keys |
-|-----------|------------------|------------------|------------------------|
-| **`spend_spike`** | ✅ Live | Cost-USD growth in a rolling window vs a baseline window | `windowSec`, `baselineOffsetSec`, `ratioVsBaseline`, `minBaselineUsd` |
-| `rate_limit` | ⏳ Preview | Volume of actions per actor per window | (config schema TBD) |
-| `tool_mismatch` | ⏳ Preview | Tool invocation outside the policy_rules.tools.allow set | (config schema TBD) |
-| `after_hours` | ⏳ Preview | Activity outside org-configured business-hours window | (config schema TBD) |
-| `unusual_model` | ⏳ Preview | Model used for actor that's not on their typical short-list | (config schema TBD) |
-| `pii_leak` | ⏳ Preview | Outbound payload matches a PII regex set | (config schema TBD) |
-| `custom` | ⏳ Preview | User-defined CEL, SQL predicate | (config schema TBD) |
+| Rule type         | Detector coverage | What it detects                                             | Threshold config keys                                                 |
+| ----------------- | ----------------- | ----------------------------------------------------------- | --------------------------------------------------------------------- |
+| **`spend_spike`** | ✅ Live           | Cost-USD growth in a rolling window vs a baseline window    | `windowSec`, `baselineOffsetSec`, `ratioVsBaseline`, `minBaselineUsd` |
+| `rate_limit`      | ⏳ Preview        | Volume of actions per actor per window                      | (config schema TBD)                                                   |
+| `tool_mismatch`   | ⏳ Preview        | Tool invocation outside the policy_rules.tools.allow set    | (config schema TBD)                                                   |
+| `after_hours`     | ⏳ Preview        | Activity outside org-configured business-hours window       | (config schema TBD)                                                   |
+| `unusual_model`   | ⏳ Preview        | Model used for actor that's not on their typical short-list | (config schema TBD)                                                   |
+| `pii_leak`        | ⏳ Preview        | Outbound payload matches a PII regex set                    | (config schema TBD)                                                   |
+| `custom`          | ⏳ Preview        | User-defined CEL, SQL predicate                             | (config schema TBD)                                                   |
 
 **⏳ Preview** rules can be created and the row shows `active` in the list, but the detector logs `debug` and skips them, no AnomalyAlert is produced. Until the detector slice for each ships, treat them as "save the rule for the future, don't expect alerts."
 
@@ -39,15 +46,15 @@ Open `/governance/anomaly-rules` → click **New anomaly rule**.
 
 Fields the detector reads:
 
-| Field | Typical value | What it does |
-|-------|---------------|---------------|
-| **Name** | `Spend spike on Cowork prod` | Free-text label; surfaces in `recentAnomalies` and the alert dispatch payload. |
-| **Severity** | `warning`, `critical` | Drives the `/governance` KPI breakdown (`anomalyBreakdown.{critical,warning,info}`) and downstream dispatch routing once C3 ships. |
-| **Rule type** | `spend_spike` | Pick exactly this, see coverage table above. |
-| **Scope** | `organization`, `source_type`, `source` | Filters which IngestionSources the rule applies to (see Scope coverage below). |
-| **Scope ID** | (cuid) | Required when scope is `source_type` or `source`. The IngestionSource ID can be copied from `/governance/ingestion-sources/<id>` or the URL of the per-source detail page. |
-| **Threshold config** | (JSON object, see below) | The detector's per-rule-type tuning knobs. |
-| **Destination config** | `{}` (today) | Reserved for future Slack, PagerDuty, SIEM dispatch, see Dispatch coverage below. |
+| Field                  | Typical value                           | What it does                                                                                                                                                               |
+| ---------------------- | --------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| **Name**               | `Spend spike on Cowork prod`            | Free-text label; surfaces in `recentAnomalies` and the alert dispatch payload.                                                                                             |
+| **Severity**           | `warning`, `critical`                   | Drives the `/governance` KPI breakdown (`anomalyBreakdown.{critical,warning,info}`) and downstream dispatch routing once C3 ships.                                         |
+| **Rule type**          | `spend_spike`                           | Pick exactly this, see coverage table above.                                                                                                                               |
+| **Scope**              | `organization`, `source_type`, `source` | Filters which IngestionSources the rule applies to (see Scope coverage below).                                                                                             |
+| **Scope ID**           | (cuid)                                  | Required when scope is `source_type` or `source`. The IngestionSource ID can be copied from `/governance/ingestion-sources/<id>` or the URL of the per-source detail page. |
+| **Threshold config**   | (JSON object, see below)                | The detector's per-rule-type tuning knobs.                                                                                                                                 |
+| **Destination config** | `{}` (today)                            | Reserved for future Slack, PagerDuty, SIEM dispatch, see Dispatch coverage below.                                                                                          |
 
 ### Threshold config: `spend_spike`
 
@@ -60,30 +67,30 @@ Fields the detector reads:
 }
 ```
 
-| Key | Default | Meaning |
-|-----|---------|---------|
-| `windowSec` | `86400` (24 h) | The "current" window the detector sums spend across, ending at the latest event timestamp. |
-| `baselineOffsetSec` | `604800` (7 d) | How far back from the current window the detector pulls the baseline window from. With the defaults, the baseline is the same-shape 24-hour window from 7 days ago. |
-| `ratioVsBaseline` | `2.0` | Multiplier, the detector fires when current spend ≥ baseline × ratio. `2.0` means "double the spend of last week's same-window." |
-| `minBaselineUsd` | `1.0` | Floor, the detector skips evaluation when the baseline window is below this value. Prevents trivial alerts on cold sources where last week's spend was ~$0.01 and a 2× rise is meaningless. |
+| Key                 | Default        | Meaning                                                                                                                                                                                     |
+| ------------------- | -------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `windowSec`         | `86400` (24 h) | The "current" window the detector sums spend across, ending at the latest event timestamp.                                                                                                  |
+| `baselineOffsetSec` | `604800` (7 d) | How far back from the current window the detector pulls the baseline window from. With the defaults, the baseline is the same-shape 24-hour window from 7 days ago.                         |
+| `ratioVsBaseline`   | `2.0`          | Multiplier, the detector fires when current spend ≥ baseline × ratio. `2.0` means "double the spend of last week's same-window."                                                            |
+| `minBaselineUsd`    | `1.0`          | Floor, the detector skips evaluation when the baseline window is below this value. Prevents trivial alerts on cold sources where last week's spend was ~$0.01 and a 2× rise is meaningless. |
 
 Sensible starting values:
 
-| Goal | `windowSec` | `baselineOffsetSec` | `ratioVsBaseline` | `minBaselineUsd` |
-|------|---------------|------------------------|----------------------|---------------------|
-| Day-over-week catch (default) | 86400 | 604800 | 2.0 | 1.0 |
-| Hour-over-day catch (tighter) | 3600 | 86400 | 3.0 | 0.10 |
-| Week-over-week catch (looser) | 604800 | 2592000 | 1.5 | 5.0 |
+| Goal                          | `windowSec` | `baselineOffsetSec` | `ratioVsBaseline` | `minBaselineUsd` |
+| ----------------------------- | ----------- | ------------------- | ----------------- | ---------------- |
+| Day-over-week catch (default) | 86400       | 604800              | 2.0               | 1.0              |
+| Hour-over-day catch (tighter) | 3600        | 86400               | 3.0               | 0.10             |
+| Week-over-week catch (looser) | 604800      | 2592000             | 1.5               | 5.0              |
 
 ## Scope coverage
 
-| Scope | Detector coverage | Notes |
-|-------|------------------|-------|
-| `organization` | ✅ Evaluated | Fires on any IngestionSource in the org. Best default. |
-| `source_type` | ✅ Evaluated | Fires on every source whose `sourceType` matches (e.g. all `otel_generic` sources). |
-| `source` | ✅ Evaluated | Fires on a single named IngestionSource. |
-| `team` | ⏳ Preview | Persisted but not filtered by the detector today. Don't rely on it. |
-| `project` | ⏳ Preview | Same. |
+| Scope          | Detector coverage | Notes                                                                               |
+| -------------- | ----------------- | ----------------------------------------------------------------------------------- |
+| `organization` | ✅ Evaluated      | Fires on any IngestionSource in the org. Best default.                              |
+| `source_type`  | ✅ Evaluated      | Fires on every source whose `sourceType` matches (e.g. all `otel_generic` sources). |
+| `source`       | ✅ Evaluated      | Fires on a single named IngestionSource.                                            |
+| `team`         | ⏳ Preview        | Persisted but not filtered by the detector today. Don't rely on it.                 |
+| `project`      | ⏳ Preview        | Same.                                                                               |
 
 ## Dispatch coverage (C3 in flight)
 
@@ -93,10 +100,10 @@ C3 (in flight on the [governance platform](https://github.com/langwatch/langwatc
 
 ```json
 {
-  "slack":     { "webhookUrl": "https://hooks.slack.com/services/..." },
+  "slack": { "webhookUrl": "https://hooks.slack.com/services/..." },
   "pagerduty": { "routingKey": "..." },
-  "webhook":   { "url": "https://your-siem.example.com/ingest", "secret": "..." },
-  "email":     { "addresses": ["sec-on-call@your-company.com"] }
+  "webhook": { "url": "https://your-siem.example.com/ingest", "secret": "..." },
+  "email": { "addresses": ["sec-on-call@your-company.com"] }
 }
 ```
 

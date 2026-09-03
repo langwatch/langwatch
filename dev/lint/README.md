@@ -12,12 +12,12 @@ Both are invoked by explicit path (`ast-grep -c`, `semgrep --config`), so
 neither depends on sitting at the repo root. Four sibling configs do, and stay
 there for reasons worth knowing before you try to tidy them away:
 
-| File | Why it cannot move |
-|---|---|
-| `/.coderabbit.yaml` | CodeRabbit reads the repository root only |
-| `/.gitleaks.toml` | `gitleaks` itself takes `--config`, but CodeRabbit's gitleaks tool exposes only `enabled`, so a moved allowlist silently stops applying to reviews |
-| `/.golangci.yml` | discovered by walking up from the linted package; not finding it means default linters, not an error |
-| `/.dockerignore` | build-context root. A per-Dockerfile `<name>.dockerignore` works, but six Dockerfiles build from this context and a forgotten one ships `node_modules` |
+| File                | Why it cannot move                                                                                                                                     |
+| ------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| `/.coderabbit.yaml` | CodeRabbit reads the repository root only                                                                                                              |
+| `/.gitleaks.toml`   | `gitleaks` itself takes `--config`, but CodeRabbit's gitleaks tool exposes only `enabled`, so a moved allowlist silently stops applying to reviews     |
+| `/.golangci.yml`    | discovered by walking up from the linted package; not finding it means default linters, not an error                                                   |
+| `/.dockerignore`    | build-context root. A per-Dockerfile `<name>.dockerignore` works, but six Dockerfiles build from this context and a forgotten one ships `node_modules` |
 
 ## The ast-grep ruleset used to be CodeRabbit's
 
@@ -35,12 +35,19 @@ owner. See `dev/lint/ast-grep/README.md`.
 
 The division that keeps review comments worth reading:
 
-| Kind of rule | Home |
-|---|---|
-| Expressible as Biome config | `platform/app/biome.json` |
-| Expressible as a syntactic pattern | `/dev/lint/ast-grep/rules/` |
-| Expressible as a semantic pattern | `/dev/lint/semgrep/langwatch.yml` |
-| Genuinely needs judgement | `path_instructions` in `/.coderabbit.yaml` |
+| Kind of rule                             | Home                                       |
+| ---------------------------------------- | ------------------------------------------ |
+| Expressible as oxlint config             | `/.oxlintrc.architecture.json`             |
+| Expressible as a syntactic pattern       | `/dev/lint/ast-grep/rules/`                |
+| Expressible as a semantic pattern        | `/dev/lint/semgrep/langwatch.yml`          |
+| Genuinely needs judgement                | `path_instructions` in `/.coderabbit.yaml` |
+
+**There is one general-purpose JavaScript and TypeScript linter, and it is
+oxlint.** `/.oxlintrc.architecture.json` covers `packages/**` and `apps/**` in
+two rule blocks, because the two rulesets arrived from two tools with different
+baselines rather than because they deserve different rules; converging them is
+follow-up work. Every rule in it is `error`. Formatting is oxfmt's, configured
+in `/.oxfmtrc.json`.
 
 A rule in more than one home gets reported twice — once deterministically and
 once probabilistically — which is how a review thread fills up with mechanics

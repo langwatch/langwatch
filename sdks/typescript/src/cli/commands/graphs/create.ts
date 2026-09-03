@@ -58,7 +58,11 @@ export const createGraphCommand = async (
       process.exit(1);
     }
 
-    const graph = await response.json() as { id: string; name: string; dashboardId: string | null };
+    const graph = (await response.json()) as {
+      id: string;
+      name: string;
+      dashboardId: string | null;
+    };
     spinner.succeed(`Graph "${graph.name}" created (${graph.id})`);
 
     return {
@@ -66,7 +70,9 @@ export const createGraphCommand = async (
       table: () => {
         console.log();
         console.log(`  ${chalk.gray("ID:")}        ${chalk.green(graph.id)}`);
-        console.log(`  ${chalk.gray("Dashboard:")} ${graph.dashboardId ?? chalk.gray("—")}`);
+        console.log(
+          `  ${chalk.gray("Dashboard:")} ${graph.dashboardId ?? chalk.gray("—")}`,
+        );
         console.log();
       },
     };

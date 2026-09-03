@@ -64,7 +64,7 @@ A real golden pipeline either (a) rebuilds the VM from scratch from a declarativ
 
 ### 3. The in-VM NEXTAUTH_URL quirk is the tip of a config-drift iceberg
 
-The golden's `platform/app/.env` pins `NEXTAUTH_URL` to the golden's hostname. Any fork fails Better Auth sign-in until overridden. `~/boxd-fork.sh` handles this for manual forks. CI needs the equivalent, and the same treatment will likely be needed for OAuth callback URLs, webhook destinations, CORS allowlists, email-link generation, and anything else with a hardcoded `*.boxd.sh` URL. These surface one at a time as "preview broken for feature X" bugs.
+The golden's `.env` pins `NEXTAUTH_URL` to the golden's hostname. Any fork fails Better Auth sign-in until overridden. `~/boxd-fork.sh` handles this for manual forks. CI needs the equivalent, and the same treatment will likely be needed for OAuth callback URLs, webhook destinations, CORS allowlists, email-link generation, and anything else with a hardcoded `*.boxd.sh` URL. These surface one at a time as "preview broken for feature X" bugs.
 
 ### 4. State contamination across PRs (resolved via no-direct-access policy)
 
@@ -80,7 +80,7 @@ Boxd publishes no REST API, no webhooks, no GitHub Action, no Terraform provider
 
 ### 6. Fork-to-healthy time is unmeasured
 
-`boxd fork` on a 100GB VM is fast *to allocate* (COW) but convergence to a domain-level healthy state (login works, trace ingest works) is unmeasured. "Curl returns 200" will declare success while Clickhouse is still replaying, producing a broken reviewer link. A real readiness probe is needed — and `boxd exec` + health curl + retry loop is more shell-script surface.
+`boxd fork` on a 100GB VM is fast _to allocate_ (COW) but convergence to a domain-level healthy state (login works, trace ingest works) is unmeasured. "Curl returns 200" will declare success while Clickhouse is still replaying, producing a broken reviewer link. A real readiness probe is needed — and `boxd exec` + health curl + retry loop is more shell-script surface.
 
 ## Challenge findings
 
@@ -96,15 +96,15 @@ Full output is in the investigation transcript; the three points that most chang
 
 ## Strategies considered
 
-| # | Strategy | Verdict | Why |
-|---|----------|---------|-----|
-| A | GH Actions → `BOXD_TOKEN` + external CLI. One VM per PR, fork-from-golden, destroy on close. Refresh golden on main via `exec`. | Viable but fragile | Hits all six findings above. Quota + golden-refresh + config drift are the real blockers. Token rotation is manual. |
-| B | GH Actions → SSH to `boxd.sh` with dedicated CI keypair. Same flow as A. | Viable but fragile | Same failure modes as A; swaps token-rotation pain for SSH-key pairing pain. Matches user's original intuition. |
-| C | Hybrid: CI posts to a webhook on a persistent `pr-controller` Boxd VM; controller runs `boxd fork/exec/destroy` using in-VM automatic auth. | Nicer auth story | Avoids CI-side credential mgmt (in-VM auth is automatic via the `10.1.0.1:9002` metadata server). But it's new infra (controller service + retry semantics), and the controller itself counts against the 10-VM cap. |
-| D | Shared preview VM with per-PR docker-compose projects and per-port proxies (1 Boxd VM total). | **Best within Boxd** | Sidesteps the 10-VM cap entirely. Cost: noisy-neighbor risk; bad migration breaks all previews. Acceptable for a small team if migration-changing PRs are flagged. |
-| E | Helm-chart preview envs on Kubernetes (one namespace per PR). | **Recommended if a cluster exists** | LangWatch already ships this chart. Real API, quotas per namespace, observable, API-driven teardown. Trades Boxd's dev-loop ergonomics for production-grade preview infra. |
-| F | Stateless Next.js preview (Vercel/Render/Fly/Cloud Run) pointing at shared staging backing services. | **Recommended if UI-only review suffices** | Seconds-to-deploy, no VM caps, near-zero idle cost. Loses per-PR data isolation — PRs with schema changes must fall back to A/D/E. |
-| G | Do nothing automatic. Keep `/boxd golden` manual; CI refreshes only the golden VM on main merge (partial goal). | Minimal | Solves half the ask. Zero new failure modes. A sensible stepping stone before going further. |
+| #   | Strategy                                                                                                                                    | Verdict                                    | Why                                                                                                                                                                                                                  |
+| --- | ------------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------ | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| A   | GH Actions → `BOXD_TOKEN` + external CLI. One VM per PR, fork-from-golden, destroy on close. Refresh golden on main via `exec`.             | Viable but fragile                         | Hits all six findings above. Quota + golden-refresh + config drift are the real blockers. Token rotation is manual.                                                                                                  |
+| B   | GH Actions → SSH to `boxd.sh` with dedicated CI keypair. Same flow as A.                                                                    | Viable but fragile                         | Same failure modes as A; swaps token-rotation pain for SSH-key pairing pain. Matches user's original intuition.                                                                                                      |
+| C   | Hybrid: CI posts to a webhook on a persistent `pr-controller` Boxd VM; controller runs `boxd fork/exec/destroy` using in-VM automatic auth. | Nicer auth story                           | Avoids CI-side credential mgmt (in-VM auth is automatic via the `10.1.0.1:9002` metadata server). But it's new infra (controller service + retry semantics), and the controller itself counts against the 10-VM cap. |
+| D   | Shared preview VM with per-PR docker-compose projects and per-port proxies (1 Boxd VM total).                                               | **Best within Boxd**                       | Sidesteps the 10-VM cap entirely. Cost: noisy-neighbor risk; bad migration breaks all previews. Acceptable for a small team if migration-changing PRs are flagged.                                                   |
+| E   | Helm-chart preview envs on Kubernetes (one namespace per PR).                                                                               | **Recommended if a cluster exists**        | LangWatch already ships this chart. Real API, quotas per namespace, observable, API-driven teardown. Trades Boxd's dev-loop ergonomics for production-grade preview infra.                                           |
+| F   | Stateless Next.js preview (Vercel/Render/Fly/Cloud Run) pointing at shared staging backing services.                                        | **Recommended if UI-only review suffices** | Seconds-to-deploy, no VM caps, near-zero idle cost. Loses per-PR data isolation — PRs with schema changes must fall back to A/D/E.                                                                                   |
+| G   | Do nothing automatic. Keep `/boxd golden` manual; CI refreshes only the golden VM on main merge (partial goal).                             | Minimal                                    | Solves half the ask. Zero new failure modes. A sensible stepping stone before going further.                                                                                                                         |
 
 ## Findings for the implementer
 
@@ -114,7 +114,7 @@ Do **not** skip straight to writing workflow YAML. In order:
 2. **Time a `boxd fork` of `langwatch-main-golden-image` to domain-level health**, end-to-end, manually, from a cold cache. Instrument it. Numbers, not vibes. This is the load-bearing number for "is this CI-fast?"
 3. **Decide whether per-PR data isolation is actually required.** If UI review is the real goal, strategy F is 10× cheaper. If isolated data matters (testing migrations, seeding fixtures), strategies A/C/D/E are candidates.
 4. **If proceeding with Boxd (A/B/C/D): design golden refresh as a rebuild or snapshot, not a `git pull` on a live VM.** See finding §2.
-5. **Budget time for the NEXTAUTH_URL class of bugs.** Audit `platform/app/.env` and the golden's `.env` for any hardcoded `*.boxd.sh` host. Plan for an env-override phase in the fork boot script. See finding §3.
+5. **Budget time for the NEXTAUTH_URL class of bugs.** Audit `.env` and the golden's `.env` for any hardcoded `*.boxd.sh` host. Plan for an env-override phase in the fork boot script. See finding §3.
 6. **Build the reaper before the happy path, and wire FIFO eviction into the fork path.** Before every `boxd fork pr<N>`, list current `pr<N>` VMs and destroy the oldest if the soft cap (e.g. 4) would be exceeded. Separately: a scheduled workflow that lists all `pr<N>` VMs, checks each PR's state via `gh pr view --json state`, and destroys `CLOSED` / `MERGED` orphans. Both guards are needed — FIFO handles missed close events in the moment, the scheduled reaper handles the long tail.
 7. **Required secrets (all set at the repo/org level, owned by the bot identity — never tied to a personal account):** For A: `BOXD_TOKEN` (JWT issued via `ssh boxd.sh token create` from the bot's linked SSH session). For B: `BOXD_SSH_KEY` (ed25519 private key generated for the bot, public key paired once to the org Boxd account) plus `boxd.sh` entries in `known_hosts`. Already-existing repo secrets like `DOCKERHUB_TOKEN` / `SLACK_RELEASE_NOTIFICATION_WEBHOOK_URL` are the pattern to follow for storage and access control.
 8. **Concurrency group:** `boxd-pr-${{ github.event.pull_request.number }}` with `cancel-in-progress: true`. Matches existing SDK-workflow convention in the repo.

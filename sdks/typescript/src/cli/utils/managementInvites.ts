@@ -37,13 +37,7 @@ const EMAIL_SHAPE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
  * An invite batch is all-or-nothing at the platform, so one mistyped address
  * costs the caller the whole run. `source` names which one was wrong.
  */
-const parseEmail = ({
-  value,
-  source,
-}: {
-  value: string;
-  source: string;
-}): string => {
+const parseEmail = ({ value, source }: { value: string; source: string }): string => {
   const email = value.trim();
   if (!EMAIL_SHAPE.test(email)) {
     throw new ManagementFlagError(
@@ -94,9 +88,7 @@ export interface InviteFlagInput {
  * an invite with per-person teams is a JSON batch, which the same command
  * accepts through `--json`, `--file` or `--stdin`.
  */
-export const composeInvitesFromFlags = (
-  options: InviteFlagInput,
-): InviteInput[] => {
+export const composeInvitesFromFlags = (options: InviteFlagInput): InviteInput[] => {
   const emails = (options.email ?? []).map((email) => email.trim()).filter(Boolean);
   if (emails.length === 0) {
     throw new ManagementFlagError(
@@ -153,11 +145,7 @@ const parseTeamAssignment = ({
   roleSource: string;
 }): TeamAssignment => {
   const assignment = team as Partial<TeamAssignment> | null;
-  if (
-    !assignment ||
-    typeof assignment.teamId !== "string" ||
-    !assignment.teamId.trim()
-  ) {
+  if (!assignment || typeof assignment.teamId !== "string" || !assignment.teamId.trim()) {
     throw new ManagementFlagError(`${source} has no teamId.`);
   }
   const customRoleId = parseCustomRoleId({
@@ -229,9 +217,7 @@ export const parseInvitesJson = (raw: string): InviteInput[] => {
   try {
     parsed = JSON.parse(raw);
   } catch {
-    throw new ManagementFlagError(
-      "Invalid JSON: could not parse the invite batch.",
-    );
+    throw new ManagementFlagError("Invalid JSON: could not parse the invite batch.");
   }
 
   const invites = Array.isArray(parsed)
@@ -244,9 +230,7 @@ export const parseInvitesJson = (raw: string): InviteInput[] => {
     );
   }
   if (invites.length === 0) {
-    throw new ManagementFlagError(
-      "Invalid invite batch: the invites array is empty.",
-    );
+    throw new ManagementFlagError("Invalid invite batch: the invites array is empty.");
   }
 
   return invites.map((entry, index) => parseInviteEntry({ entry, index }));

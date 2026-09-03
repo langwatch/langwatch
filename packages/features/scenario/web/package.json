@@ -1,0 +1,97 @@
+{
+  "name": "@langwatch/scenario-web",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Browser-safe Scenario library and target-selection UI.",
+  "files": [
+    "src"
+  ],
+  "type": "module",
+  "main": "./src/index.ts",
+  "types": "./src/index.ts",
+  "exports": {
+    ".": {
+      "types": "./src/index.ts",
+      "default": "./src/index.ts"
+    },
+    "./screens/simulations": {
+      "types": "./src/screens/simulations/index.ts",
+      "default": "./src/screens/simulations/index.ts"
+    },
+    "./screens/agent-testing": {
+      "types": "./src/screens/agent-testing/index.ts",
+      "default": "./src/screens/agent-testing/index.ts"
+    },
+    "./drawers": {
+      "types": "./src/screens/drawers.ts",
+      "default": "./src/screens/drawers.ts"
+    }
+  },
+  "scripts": {
+    "typecheck": "tsc --noEmit",
+    "test": "vitest run",
+    "test:unit": "vitest run"
+  },
+  "dependencies": {
+    "@chakra-ui/react": "^3.36.0",
+    "@copilotkit/runtime-client-gql": "1.8.13",
+    "@emotion/react": "^11.14.0",
+    "@hookform/resolvers": "^5.4.0",
+    "@langwatch/agent-contract": "workspace:*",
+    "@langwatch/agent-web": "workspace:*",
+    "@langwatch/analytics-web": "workspace:*",
+    "@langwatch/authz-contract": "workspace:*",
+    "@langwatch/design-system": "workspace:*",
+    "@langwatch/experiment-contract": "workspace:*",
+    "@langwatch/feature-flag-contract": "workspace:*",
+    "@langwatch/handled-error": "workspace:*",
+    "@langwatch/ksuid": "^2.0.2",
+    "@langwatch/langy-web": "workspace:*",
+    "@langwatch/model-provider-contract": "workspace:*",
+    "@langwatch/model-provider-web": "workspace:*",
+    "@langwatch/observability": "workspace:*",
+    "@langwatch/platform-api-client": "workspace:*",
+    "@langwatch/prompt-web": "workspace:*",
+    "@langwatch/scenario-contract": "workspace:*",
+    "@langwatch/suite-contract": "workspace:*",
+    "@langwatch/suite-web": "workspace:*",
+    "@langwatch/trace-contract": "workspace:*",
+    "@langwatch/trace-web": "workspace:*",
+    "@langwatch/ui-drawer": "workspace:*",
+    "@langwatch/workflow-contract": "workspace:*",
+    "@langwatch/workflow-web": "workspace:*",
+    "@tanstack/react-table": "^8.21.3",
+    "@tanstack/react-virtual": "^3.14.5",
+    "date-fns": "^4.4.0",
+    "lucide-react": "^1.22.0",
+    "posthog-js": "^1.396.9",
+    "react": "^19.2.7",
+    "react-feather": "^2.0.10",
+    "react-hook-form": "^7.80.0",
+    "react-icons": "^5.7.0",
+    "usehooks-ts": "^3.1.1",
+    "zod": "^4.4.3",
+    "zustand": "^4.5.7"
+  },
+  "devDependencies": {
+    "@tanstack/react-query": "5.101.4",
+    "@testing-library/jest-dom": "^7.0.1",
+    "@testing-library/react": "^16.3.2",
+    "@testing-library/user-event": "^14.6.1",
+    "@trpc/client": "11.18.0",
+    "@trpc/server": "11.18.0",
+    "@types/react": "^19.2.14",
+    "@types/react-dom": "^19.2.3",
+    "jsdom": "^30.0.1",
+    "react-dom": "^19.2.7",
+    "react-router": "^8.0.1",
+    "typescript": "^7.0.2",
+    "vite": "^8.1.2",
+    "vitest": "^4.1.9"
+  },
+  "peerDependencies": {
+    "@chakra-ui/react": "^3.36.0",
+    "react": "^19.2.7",
+    "react-dom": "^19.2.7"
+  }
+}

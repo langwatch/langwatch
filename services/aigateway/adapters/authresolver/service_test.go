@@ -90,7 +90,7 @@ func repoRoot(t *testing.T) string {
 // upstream fail a test instead of arriving as a production warning.
 func changeKindsFromSchema(t *testing.T) []string {
 	t.Helper()
-	body, err := os.ReadFile(filepath.Join(repoRoot(t), "platform", "app", "prisma", "schema.prisma"))
+	body, err := os.ReadFile(filepath.Join(repoRoot(t), "packages", "prisma-client", "prisma", "schema.prisma"))
 	require.NoError(t, err)
 	block := changeKindEnumRe.FindSubmatch(body)
 	require.NotNil(t, block, "GatewayChangeEventKind is not in schema.prisma; this test is looking in the wrong place")

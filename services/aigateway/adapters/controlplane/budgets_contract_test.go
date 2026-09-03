@@ -157,7 +157,9 @@ func TestConfigWireProviderExclusions(t *testing.T) {
 // silently stripping the provider filter (or the routing mode) off the
 // wire while the UI keeps displaying both as active.
 func TestControlPlaneMaterialiserEmitsTheBudgetContract(t *testing.T) {
-	src := readControlPlaneSource(t, "src", "server", "gateway", "config.materialiser.ts")
+	src := readControlPlaneSource(t,
+		"packages", "features", "gateway", "server", "src", "services",
+		"gateway-config-materialisation.service.ts")
 
 	for _, needle := range []string{
 		`provider_key: b.providerKey`,
@@ -170,7 +172,7 @@ func TestControlPlaneMaterialiserEmitsTheBudgetContract(t *testing.T) {
 		`routing_policy_name: vk.routingPolicy?.name ?? null`,
 	} {
 		if !strings.Contains(src, needle) {
-			t.Errorf("config.materialiser.ts no longer emits %q: the bundle contract has drifted", needle)
+			t.Errorf("gateway-config-materialisation.service.ts no longer emits %q: the bundle contract has drifted", needle)
 		}
 	}
 	// routing_mode none must arrive with a one-attempt fallback budget so
@@ -178,7 +180,7 @@ func TestControlPlaneMaterialiserEmitsTheBudgetContract(t *testing.T) {
 	// Whitespace-tolerant: a formatter may break this expression across
 	// lines without breaking the contract it expresses.
 	if !regexp.MustCompile(`vk\.routingMode\s*===\s*"NONE"\s*\?\s*1`).MatchString(src) {
-		t.Error("config.materialiser.ts no longer pins max_attempts to 1 for routing mode NONE")
+		t.Error("gateway-config-materialisation.service.ts no longer pins max_attempts to 1 for routing mode NONE")
 	}
 }
 
@@ -187,13 +189,15 @@ func TestControlPlaneMaterialiserEmitsTheBudgetContract(t *testing.T) {
 // "|provider:" splits a provider filter into its own bucket, ":" joins a
 // group bucket as <groupId>:<userId>.
 func TestControlPlaneBucketSeparatorsAreStable(t *testing.T) {
-	src := readControlPlaneSource(t, "src", "server", "gateway", "budgetResolution.service.ts")
+	src := readControlPlaneSource(t,
+		"packages", "features", "gateway", "server", "src", "adapters",
+		"gateway-bucket-scope.adapter.ts")
 
 	if !strings.Contains(src, `const PROVIDER_BUCKET_SEPARATOR = "|provider:"`) {
-		t.Error("budgetResolution.service.ts changed the provider bucket separator")
+		t.Error("gateway-bucket-scope.adapter.ts changed the provider bucket separator")
 	}
 	if !strings.Contains(src, "`${groupId}:${principalUserId}`") {
-		t.Error("budgetResolution.service.ts changed the group bucket key shape")
+		t.Error("gateway-bucket-scope.adapter.ts changed the group bucket key shape")
 	}
 	// A dispatch with no reported provider must debit unfiltered budgets
 	// only: attribution by guess mis-bills a governance control.
@@ -214,8 +218,8 @@ func TestSpanAttributeContractForProviderAttribution(t *testing.T) {
 		"the Go constant is the wire name the control plane reads")
 
 	accumulation := readControlPlaneSource(t,
-		"src", "server", "event-sourcing", "pipelines", "trace-processing",
-		"projections", "services", "trace-attribute-accumulation.service.ts")
+		"packages", "features", "trace", "server", "src", "services",
+		"trace-attribute-extraction.service.ts")
 	if !strings.Contains(accumulation, `"`+customertracebridge.AttrModelProviderID+`"`) {
 		t.Error("the accumulation allowlist dropped langwatch.model_provider_id, so the fold will never see the provider")
 	}
@@ -226,16 +230,17 @@ func TestSpanAttributeContractForProviderAttribution(t *testing.T) {
 		"the span attribute and the spend command field must name the same thing")
 
 	commands := readControlPlaneSource(t,
-		"src", "server", "event-sourcing", "pipelines", "gateway-spend-processing",
-		"schemas", "commands.ts")
+		"packages", "features", "gateway", "server", "src", "processes",
+		"gateway-spend-commands.process.ts")
 	if !strings.Contains(commands, commandField+": z.string()") {
 		t.Error("the spend command schema no longer declares model_provider_id, so no debit can name a provider")
 	}
 
 	debits := readControlPlaneSource(t,
-		"ee", "governance", "process-manager", "gatewayDebits.process.ts")
-	if !strings.Contains(debits, "payload."+commandField) {
-		t.Error("gatewayDebits.process.ts no longer reads model_provider_id, so provider-filtered budgets stop accruing")
+		"packages", "enterprise", "features", "governance", "server", "src", "processes",
+		"gateway-debit.process.ts")
+	if !regexp.MustCompile(commandField + `:\s*\w+\.` + commandField).MatchString(debits) {
+		t.Error("gateway-debit.process.ts no longer carries model_provider_id into the debit payload, so provider-filtered budgets stop accruing")
 	}
 }
 
@@ -244,9 +249,10 @@ func TestSpanAttributeContractForProviderAttribution(t *testing.T) {
 // malformed stored row degrades instead of taking the key offline, and the
 // Go side treats an empty slice the same way.
 func TestProvidersAllowedEmptyListNormalization(t *testing.T) {
-	src := readControlPlaneSource(t, "src", "server", "gateway", "virtualKey.config.ts")
+	src := readControlPlaneSource(t,
+		"packages", "features", "gateway", "contract", "src", "virtual-key-config.ts")
 	if !regexp.MustCompile(`v\s*&&\s*v\.length\s*>\s*0\s*\?\s*v\s*:\s*null`).MatchString(src) {
-		t.Error("virtualKey.config.ts no longer normalizes an empty providersAllowed to null")
+		t.Error("virtual-key-config.ts no longer normalizes an empty providersAllowed to null")
 	}
 
 	assert.True(t, domain.BundleConfig{ProvidersAllowed: []string{}}.AllowsProvider("mp_any"),

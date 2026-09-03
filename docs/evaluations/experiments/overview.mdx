@@ -5,7 +5,9 @@ description: Run batch tests on your LLM applications to measure quality, compar
 ---
 
 <Tip>
-  **Let your agent set this up.** [Copy the evaluations prompt](/skills/code-prompts#set-up-evaluations) into your coding agent to get started automatically.
+  **Let your agent set this up.** [Copy the evaluations
+  prompt](/skills/code-prompts#set-up-evaluations) into your coding agent to get started
+  automatically.
 </Tip>
 
 Experiments let you systematically test your LLM applications before deploying to production. Run your prompts, models, or agents against datasets and measure quality with evaluators.
@@ -54,15 +56,17 @@ Choose your preferred approach:
 import langwatch
 
 # Load your dataset
+
 df = langwatch.dataset.get_dataset("my-dataset").to_pandas()
 
 # Initialize experiment
+
 evaluation = langwatch.experiment.init("prompt-v2-test")
 
 # Run through dataset
-for idx, row in evaluation.loop(df.iterrows()):
-    # Execute your LLM
-    response = my_llm(row["input"])
+
+for idx, row in evaluation.loop(df.iterrows()): # Execute your LLM
+response = my_llm(row["input"])
 
     # Run evaluators
     evaluation.evaluate(
@@ -74,7 +78,8 @@ for idx, row in evaluation.loop(df.iterrows()):
             "contexts": row["contexts"],
         },
     )
-```
+
+````
   </Tab>
   <Tab title="TypeScript">
 ```typescript
@@ -107,7 +112,8 @@ await evaluation.run(
   },
   { concurrency: 4 }
 );
-```
+````
+
   </Tab>
 </Tabs>
 
@@ -121,7 +127,11 @@ After running an experiment, you can:
 - **Export data** - Download results for further analysis
 
 <Frame>
-<img src="/images/offline-evaluation/Screenshot_2025-04-17_at_16.53.38.png" alt="Experiment results showing comparison between runs" style={{ maxWidth: '600px' }} />
+  <img
+    src="/images/offline-evaluation/Screenshot_2025-04-17_at_16.53.38.png"
+    alt="Experiment results showing comparison between runs"
+    style={{ maxWidth: "600px" }}
+  />
 </Frame>
 
 ## CI/CD Integration

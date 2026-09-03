@@ -144,8 +144,7 @@ export const ATTR_LANGWATCH_PROMPT_SELECTED_ID = "langwatch.prompt.selected.id";
  * LangWatch prompt version number attribute key
  * Used to track the version number of a prompt
  */
-export const ATTR_LANGWATCH_PROMPT_VERSION_NUMBER =
-  "langwatch.prompt.version.number";
+export const ATTR_LANGWATCH_PROMPT_VERSION_NUMBER = "langwatch.prompt.version.number";
 
 /**
  * LangWatch LangChain tags attribute key
@@ -157,8 +156,7 @@ export const ATTR_LANGWATCH_LANGCHAIN_TAGS = "langwatch.langchain.tags";
  * LangWatch LangChain event name attribute key
  * Used to identify the specific LangChain event type
  */
-export const ATTR_LANGWATCH_LANGCHAIN_EVENT_NAME =
-  "langwatch.langchain.event_name";
+export const ATTR_LANGWATCH_LANGCHAIN_EVENT_NAME = "langwatch.langchain.event_name";
 
 /**
  * LangWatch LangChain run ID attribute key
@@ -182,8 +180,7 @@ export const ATTR_LANGWATCH_LANGCHAIN_RUN_TYPE = "langwatch.langchain.run.type";
  * LangWatch LangChain run metadata attribute key
  * Used to store metadata associated with a LangChain run
  */
-export const ATTR_LANGWATCH_LANGCHAIN_RUN_METADATA =
-  "langwatch.langchain.run.metadata";
+export const ATTR_LANGWATCH_LANGCHAIN_RUN_METADATA = "langwatch.langchain.run.metadata";
 
 /**
  * LangWatch LangChain run extra parameters attribute key
@@ -196,5 +193,4 @@ export const ATTR_LANGWATCH_LANGCHAIN_RUN_EXTRA_PARAMS =
  * LangWatch LangChain run parent ID attribute key
  * Used to identify the parent run in a hierarchical structure
  */
-export const ATTR_LANGWATCH_LANGCHAIN_RUN_PARENT_ID =
-  "langwatch.langchain.run.parent.id";
+export const ATTR_LANGWATCH_LANGCHAIN_RUN_PARENT_ID = "langwatch.langchain.run.parent.id";

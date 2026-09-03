@@ -8,18 +8,28 @@ keywords: LangWatch, Go, Golang, SDK, integration, guide, setup, tracing, spans,
 import LLMsTxtProtip from "/snippets/llms-txt-protip.mdx";
 
 <Tip>
-  **Quick setup?** Instead of following these steps manually, [copy a prompt](/skills/code-prompts#instrument-my-code) into your coding agent and it will set this up for you automatically.
+  **Quick setup?** Instead of following these steps manually, [copy a
+  prompt](/skills/code-prompts#instrument-my-code) into your coding agent and it will set
+  this up for you automatically.
 </Tip>
 
-<div className="not-prose" style={{display: "flex", gap: "8px", padding: "0"}}>
+<div className="not-prose" style={{ display: "flex", gap: "8px", padding: "0" }}>
   <div>
     <a href="https://github.com/langwatch/langwatch/tree/main/sdks/go" target="_blank">
-      <img src="https://img.shields.io/badge/repo-langwatch-blue?style=flat&logo=Github" noZoom alt="LangWatch Go Repo" />
+      <img
+        src="https://img.shields.io/badge/repo-langwatch-blue?style=flat&logo=Github"
+        noZoom
+        alt="LangWatch Go Repo"
+      />
     </a>
   </div>
   <div>
     <a href="https://pkg.go.dev/github.com/langwatch/langwatch/sdks/go" target="_blank">
-      <img src="https://pkg.go.dev/badge/github.com/langwatch/langwatch/sdks/go.svg" noZoom alt="Go Reference" />
+      <img
+        src="https://pkg.go.dev/badge/github.com/langwatch/langwatch/sdks/go.svg"
+        noZoom
+        alt="Go Reference"
+      />
     </a>
   </div>
 </div>
@@ -38,7 +48,8 @@ Before you begin, ensure you have:
 - Basic familiarity with Go and OpenTelemetry concepts
 
 <Tip>
-If you're new to OpenTelemetry, the LangWatch SDK handles the setup for you. You only need to understand the basic concepts of traces and spans.
+  If you're new to OpenTelemetry, the LangWatch SDK handles the setup for you. You only
+  need to understand the basic concepts of traces and spans.
 </Tip>
 
 ## Setup
@@ -49,15 +60,17 @@ Get started in just a few minutes by installing the SDK and instrumenting your a
 <Step title="Get your LangWatch API Key">
   Sign up at [app.langwatch.ai](https://app.langwatch.ai) and find your API key in your project settings. Set it as an environment variable:
 
-  ```bash
-  export LANGWATCH_API_KEY="your-langwatch-api-key"
-  export LANGWATCH_PROJECT_ID="your-project-id"  # Required for service API keys
-  export OPENAI_API_KEY="your-openai-api-key"
-  ```
+```bash
+export LANGWATCH_API_KEY="your-langwatch-api-key"
+export LANGWATCH_PROJECT_ID="your-project-id"  # Required for service API keys
+export OPENAI_API_KEY="your-openai-api-key"
+```
 
-  <Note>
-    `LANGWATCH_PROJECT_ID` is required when using a **service API key** (e.g. for CI/CD or multi-project setups). Project API keys obtained from the project settings page already have the project context built in.
-  </Note>
+<Note>
+  `LANGWATCH_PROJECT_ID` is required when using a **service API key** (e.g. for CI/CD or
+  multi-project setups). Project API keys obtained from the project settings page already
+  have the project context built in.
+</Note>
 
   <Check>
   You can verify your API key is set by running `echo $LANGWATCH_API_KEY`
@@ -67,10 +80,10 @@ Get started in just a few minutes by installing the SDK and instrumenting your a
 <Step title="Install SDK Packages">
   Add the required dependencies to your Go module:
 
-  ```bash
-  go get github.com/langwatch/langwatch/sdks/go
-  go get github.com/langwatch/langwatch/sdks/go/instrumentation/openai
-  ```
+```bash
+go get github.com/langwatch/langwatch/sdks/go
+go get github.com/langwatch/langwatch/sdks/go/instrumentation/openai
+```
 
   <Check>
   Verify installation by running `go mod tidy` and checking that all dependencies are resolved.
@@ -80,24 +93,24 @@ Get started in just a few minutes by installing the SDK and instrumenting your a
 <Step title="Configure the LangWatch Exporter">
   Set up the LangWatch exporter in your application initialization:
 
-  ```go
-  func setupLangWatch(ctx context.Context) func(context.Context) {
-  	// Create LangWatch exporter - reads LANGWATCH_API_KEY from environment
-  	exporter, err := langwatch.NewDefaultExporter(ctx)
-  	if err != nil {
-  		log.Fatalf("failed to create LangWatch exporter: %v", err)
-  	}
+```go
+func setupLangWatch(ctx context.Context) func(context.Context) {
+	// Create LangWatch exporter - reads LANGWATCH_API_KEY from environment
+	exporter, err := langwatch.NewDefaultExporter(ctx)
+	if err != nil {
+		log.Fatalf("failed to create LangWatch exporter: %v", err)
+	}
 
-  	tp := sdktrace.NewTracerProvider(sdktrace.WithBatcher(exporter))
-  	otel.SetTracerProvider(tp)
+	tp := sdktrace.NewTracerProvider(sdktrace.WithBatcher(exporter))
+	otel.SetTracerProvider(tp)
 
-  	return func(ctx context.Context) {
-  		if err := tp.Shutdown(ctx); err != nil {
-  			log.Printf("Error shutting down tracer provider: %v", err)
-  		}
-  	}
-  }
-  ```
+	return func(ctx context.Context) {
+		if err := tp.Shutdown(ctx); err != nil {
+			log.Printf("Error shutting down tracer provider: %v", err)
+		}
+	}
+}
+```
 
   <Warning>
   **Critical: Always call the shutdown function!** The `defer shutdown(ctx)` call is essential. Without it, traces buffered in memory will be lost when your application exits. The shutdown function flushes all pending traces to LangWatch and releases resources. Never skip this step, especially in short-lived applications like CLI tools or serverless functions.
@@ -107,15 +120,15 @@ Get started in just a few minutes by installing the SDK and instrumenting your a
 <Step title="Instrument Your OpenAI Client">
   Add the LangWatch middleware to your OpenAI client:
 
-  ```go
-  client := openai.NewClient(
-  	oaioption.WithAPIKey(os.Getenv("OPENAI_API_KEY")),
-  	oaioption.WithMiddleware(otelopenai.Middleware("my-app",
-  		otelopenai.WithCaptureInput(),
-  		otelopenai.WithCaptureOutput(),
-  	)),
-  )
-  ```
+```go
+client := openai.NewClient(
+	oaioption.WithAPIKey(os.Getenv("OPENAI_API_KEY")),
+	oaioption.WithMiddleware(otelopenai.Middleware("my-app",
+		otelopenai.WithCaptureInput(),
+		otelopenai.WithCaptureOutput(),
+	)),
+)
+```
 
   <Tip>
   The middleware automatically captures all OpenAI API calls, including streaming responses, token usage, and model information.
@@ -125,20 +138,20 @@ Get started in just a few minutes by installing the SDK and instrumenting your a
 <Step title="Create Your First Trace">
   Start a root span to capture your LLM interaction:
 
-  ```go
-  tracer := langwatch.Tracer("my-app")
-  ctx, span := tracer.Start(ctx, "ChatWithUser")
-  defer span.End()
+```go
+tracer := langwatch.Tracer("my-app")
+ctx, span := tracer.Start(ctx, "ChatWithUser")
+defer span.End()
 
-  // Your OpenAI call remains unchanged!
-  response, err := client.Chat.Completions.New(ctx, openai.ChatCompletionNewParams{
-  	Model: openai.ChatModelGPT4oMini,
-  	Messages: []openai.ChatCompletionMessageParamUnion{
-  		openai.SystemMessage("You are a helpful assistant."),
-  		openai.UserMessage("Hello, OpenAI!"),
-  	},
-  })
-  ```
+// Your OpenAI call remains unchanged!
+response, err := client.Chat.Completions.New(ctx, openai.ChatCompletionNewParams{
+	Model: openai.ChatModelGPT4oMini,
+	Messages: []openai.ChatCompletionMessageParamUnion{
+		openai.SystemMessage("You are a helpful assistant."),
+		openai.UserMessage("Hello, OpenAI!"),
+	},
+})
+```
 
   <Check>
   View your traces at [app.langwatch.ai](https://app.langwatch.ai) within seconds of making your first API call.
@@ -235,7 +248,8 @@ The Go SDK is designed to feel familiar to anyone who has used OpenTelemetry. It
 - Apply [Labels](/concepts#labels-your-organizational-superpowers) for custom categorization and filtering.
 
 <Tip>
-For detailed API documentation of all available methods and options, see the [Go SDK API Reference](/integration/go/reference).
+  For detailed API documentation of all available methods and options, see the [Go SDK API
+  Reference](/integration/go/reference).
 </Tip>
 
 ### Creating a Trace
@@ -245,7 +259,8 @@ A trace represents a single, end-to-end task, like handling a user request. You 
 Before creating traces, ensure you have configured the SDK as shown in the [Setup Guide](/integration/go/guide#setup).
 
 <Tip>
-For complete API documentation of the `Tracer()` and `LangWatchSpan` methods, see the [Core SDK section](/integration/go/reference#core-sdk-langwatch) in the reference.
+  For complete API documentation of the `Tracer()` and `LangWatchSpan` methods, see the
+  [Core SDK section](/integration/go/reference#core-sdk-langwatch) in the reference.
 </Tip>
 
 ```go
@@ -267,7 +282,7 @@ func handleMessage(ctx context.Context, userMessage string) {
 	span.RecordInputString(userMessage)
 
 	// ... Your business logic ...
-	
+
 	// 4. (Optional) Record the final output
 	span.RecordOutputString("This was the AI's response.")
 }
@@ -286,7 +301,7 @@ import (
 func retrieveDocuments(ctx context.Context, query string) {
 	// Assumes a trace has already been started in the parent context `ctx`
 	tracer := langwatch.Tracer("retrieval-logic")
-	
+
 	_, span := tracer.Start(ctx, "RetrieveDocumentsFromVectorDB")
 	defer span.End()
 
@@ -301,7 +316,8 @@ func retrieveDocuments(ctx context.Context, query string) {
 ```
 
 <Note>
-The context `ctx` is crucial. It carries the active span information, ensuring that `tracer.Start()` correctly creates a nested span instead of a new trace.
+  The context `ctx` is crucial. It carries the active span information, ensuring that
+  `tracer.Start()` correctly creates a nested span instead of a new trace.
 </Note>
 
 ## Integrations
@@ -309,6 +325,7 @@ The context `ctx` is crucial. It carries the active span information, ensuring t
 LangWatch offers integrations with popular OpenAI, and any other OpenAI-compatible providers:
 
 See the dedicated guides for more details:
+
 - [Anthropic](/integration/go/integrations/anthropic) - Claude models via OpenAI-compatible API
 - [OpenAI](/integration/go/integrations/open-ai) - GPT models and OpenAI API
 - [Azure OpenAI](/integration/go/integrations/azure-openai) - Azure-hosted OpenAI models
@@ -319,18 +336,20 @@ See the dedicated guides for more details:
 - [OpenRouter](/integration/go/integrations/openrouter) - Multi-provider model access
 
 <Tip>
-For detailed configuration options and middleware settings, see the [OpenAI Instrumentation section](/integration/go/reference#openai-instrumentation) in the API reference.
+  For detailed configuration options and middleware settings, see the [OpenAI
+  Instrumentation section](/integration/go/reference#openai-instrumentation) in the API
+  reference.
 </Tip>
 
 ## Environment Variables
 
 The SDK respects these environment variables for configuration:
 
-| Variable | Description |
-| --- | --- |
-| `LANGWATCH_API_KEY` | **Required.** Your LangWatch API key. |
-| `LANGWATCH_PROJECT_ID` | Your LangWatch project ID. **Required** when using a service API key. |
-| `LANGWATCH_ENDPOINT` | The LangWatch collector endpoint. Defaults to `https://app.langwatch.ai`. |
+| Variable               | Description                                                               |
+| ---------------------- | ------------------------------------------------------------------------- |
+| `LANGWATCH_API_KEY`    | **Required.** Your LangWatch API key.                                     |
+| `LANGWATCH_PROJECT_ID` | Your LangWatch project ID. **Required** when using a service API key.     |
+| `LANGWATCH_ENDPOINT`   | The LangWatch collector endpoint. Defaults to `https://app.langwatch.ai`. |
 
 ## Filtering Spans
 
@@ -381,33 +400,36 @@ exporter, err := langwatch.NewExporter(ctx,
 
 The SDK provides several matcher types:
 
-| Matcher | Description |
-| --- | --- |
-| `Equals(s)` | Exact string match |
-| `EqualsIgnoreCase(s)` | Case-insensitive exact match |
-| `StartsWith(prefix)` | Prefix match |
-| `StartsWithIgnoreCase(prefix)` | Case-insensitive prefix match |
-| `MatchRegex(re)` | Regular expression match |
-| `MustMatchRegex(pattern)` | Regex match (panics on invalid pattern) |
+| Matcher                        | Description                             |
+| ------------------------------ | --------------------------------------- |
+| `Equals(s)`                    | Exact string match                      |
+| `EqualsIgnoreCase(s)`          | Case-insensitive exact match            |
+| `StartsWith(prefix)`           | Prefix match                            |
+| `StartsWithIgnoreCase(prefix)` | Case-insensitive prefix match           |
+| `MatchRegex(re)`               | Regular expression match                |
+| `MustMatchRegex(pattern)`      | Regex match (panics on invalid pattern) |
 
 <Note>
-Filters use AND semantics when combined - a span must pass all filters to be exported. Within a `Criteria`, matchers use OR semantics - a span matches if it matches any of the matchers in the list.
+  Filters use AND semantics when combined - a span must pass all filters to be exported.
+  Within a `Criteria`, matchers use OR semantics - a span matches if it matches any of the
+  matchers in the list.
 </Note>
 
 <Tip>
-For detailed filter API documentation and more examples, see the [Filtering section](/integration/go/reference#filtering) in the API reference.
+  For detailed filter API documentation and more examples, see the [Filtering
+  section](/integration/go/reference#filtering) in the API reference.
 </Tip>
 
 ## Features
 
-* 🔗 **OpenTelemetry integration** - Works with your existing OTel setup
-* 🚀 **OpenAI instrumentation** - Automatic tracing for OpenAI API calls
-* 🌐 **Multi-provider support** - OpenAI, Anthropic, Azure, local models, and more
-* 📊 **Rich LLM telemetry** - Capture inputs, outputs, token usage, and model information
-* 🔍 **Specialized span types** - LLM, Chain, Tool, Agent, RAG, and more
-* 🧵 **Thread support** - Group related LLM interactions together
-* 📝 **Custom input/output recording** - Fine-grained control over what's captured
-* 🔄 **Streaming support** - Real-time capture of streaming responses
+- 🔗 **OpenTelemetry integration** - Works with your existing OTel setup
+- 🚀 **OpenAI instrumentation** - Automatic tracing for OpenAI API calls
+- 🌐 **Multi-provider support** - OpenAI, Anthropic, Azure, local models, and more
+- 📊 **Rich LLM telemetry** - Capture inputs, outputs, token usage, and model information
+- 🔍 **Specialized span types** - LLM, Chain, Tool, Agent, RAG, and more
+- 🧵 **Thread support** - Group related LLM interactions together
+- 📝 **Custom input/output recording** - Fine-grained control over what's captured
+- 🔄 **Streaming support** - Real-time capture of streaming responses
 
 Since LangWatch is built on OpenTelemetry, it also supports any library or framework that integrates with OpenTelemetry.
 
@@ -415,16 +437,18 @@ Since LangWatch is built on OpenTelemetry, it also supports any library or frame
 
 Explore real working examples to learn different patterns and use cases:
 
-| Example | What It Shows | Description |
-|---------|---------------|-------------|
-| **Simple** | Basic OpenAI instrumentation | Simple chat completion with tracing |
-| **Custom Input/Output** | Recording custom data | Fine-grained control over captured data |
-| **Streaming** | Streaming completions | Real-time capture of streaming responses |
-| **Threads** | Grouping conversations | Managing multi-turn conversations |
-| **RAG** | Retrieval patterns | Document retrieval and context tracking |
+| Example                 | What It Shows                | Description                              |
+| ----------------------- | ---------------------------- | ---------------------------------------- |
+| **Simple**              | Basic OpenAI instrumentation | Simple chat completion with tracing      |
+| **Custom Input/Output** | Recording custom data        | Fine-grained control over captured data  |
+| **Streaming**           | Streaming completions        | Real-time capture of streaming responses |
+| **Threads**             | Grouping conversations       | Managing multi-turn conversations        |
+| **RAG**                 | Retrieval patterns           | Document retrieval and context tracking  |
 
 <Tip>
-For comprehensive code examples including RAG pipelines, error handling, and best practices, see the [Complete Example section](/integration/go/reference#complete-example) in the API reference.
+  For comprehensive code examples including RAG pipelines, error handling, and best
+  practices, see the [Complete Example
+  section](/integration/go/reference#complete-example) in the API reference.
 </Tip>
 
 ## Troubleshooting
@@ -432,21 +456,25 @@ For comprehensive code examples including RAG pipelines, error handling, and bes
 ### Common Issues
 
 **No traces appearing in LangWatch dashboard:**
+
 - Verify your `LANGWATCH_API_KEY` is set correctly
 - Check that you're calling the shutdown function to flush traces
 - Ensure your application is making OpenAI API calls
 
 **Import errors:**
+
 - Run `go mod tidy` to ensure all dependencies are properly resolved
 - Verify you're using Go 1.19 or later
 
 **OpenTelemetry configuration errors:**
+
 - Check that the LangWatch endpoint URL is correct
 - Verify your API key has the correct permissions
 
 ### Getting Help
 
 If you're still having issues:
+
 - Check the [API reference](/integration/go/reference) for detailed function documentation
 - Review the [OpenTelemetry Go documentation](https://opentelemetry.io/docs/languages/go/)
 - Join our [community support](https://docs.langwatch.ai/support) for additional help
@@ -456,4 +484,4 @@ If you're still having issues:
 - Learn about specific [OpenAI integration](/integration/go/integrations/open-ai) patterns
 - Check the [API reference](/integration/go/reference) for detailed documentation
 - Explore [span types](/integration/go/reference#langwatch-span-types) for specialized LLM operations
-- Review [collected attributes](/integration/go/reference#collected-attributes) for comprehensive tracing data 
+- Review [collected attributes](/integration/go/reference#collected-attributes) for comprehensive tracing data

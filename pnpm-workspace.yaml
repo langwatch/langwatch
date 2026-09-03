@@ -3,30 +3,36 @@
 #
 # This used to be six independent install roots with six lockfiles: the repo
 # root, platform/app/, sdks/typescript/, mcp/typescript/, skills/ and
-# tests/agentic-e2e/. mcp/typescript was BOTH its own root and a member of
+# dev/tests/agentic-e2e/. mcp/typescript was BOTH its own root and a member of
 # platform/app/'s workspace, so CI installed it twice on every app build; skills/
-# and tests/agentic-e2e/ needed `--ignore-workspace` to escape a workspace they
+# and dev/tests/agentic-e2e/ needed `--ignore-workspace` to escape a workspace they
 # were never members of; and each root carried its own `overrides` block, so a
 # security pin applied in one could be silently absent from another.
 #
 # One install from the repo root now covers all of it.
 packages:
-  - "platform/app"
+  - "apps/*"
   - "packages/*"
+  - "packages/features/*/*"
+  - "packages/enterprise"
+  - "packages/enterprise/composition/*"
+  - "packages/enterprise/plan-gate"
+  - "packages/enterprise/features/*/*"
   - "mcp/typescript"
   - "plugins/*"
   - "sdks/typescript"
   - "services/langyworker"
   - "skills"
-  - "tests/agentic-e2e"
+  - "dev/tests/agentic-e2e"
 
 # pnpm 10 already defaults this to false. It is stated explicitly because the
-# merge is what made it load-bearing: sdks/typescript/ is the package `langwatch`
-# and platform/app/ (now @langwatch/web) depends on `langwatch@1.0.0`, meaning the
-# PUBLISHED SDK. With the two in one workspace, flipping this to true silently
-# switches the app — and everything built from it, including the production
+# six-root merge is what made it load-bearing: sdks/typescript/ is the package
+# `langwatch`, and a member depending on `langwatch@<range>` means the PUBLISHED
+# SDK. With both in one workspace, flipping this to true would silently switch
+# every such member — and everything built from them, including the production
 # image — onto the SDK working copy. Linking the working copy is a deliberate
-# change (`"langwatch": "workspace:*"`), not something to acquire by accident.
+# change (`"langwatch": "workspace:*"`, which is what the packages that need the
+# working copy declare today), not something to acquire by accident.
 linkWorkspacePackages: false
 
 # Supply-chain age gate. Previously set only on platform/app/'s root, so five of
@@ -95,10 +101,10 @@ minimumReleaseAgeExclude:
 # deliberately NOT carried up, because each is a DIRECT dependency of the
 # project that pinned it and its own declaration governs it just as well:
 #
-#   zod: ^4.0.14                   (sdks/typescript) — the app is on zod ^3.25.76
-#                                  and @langwatch/langy compiles against it via
-#                                  the `zod/v4` subpath. Global would force the
-#                                  app to zod 4 and break that arrangement.
+#   zod: ^4.0.14                   (sdks/typescript) — every first-party package
+#                                  now declares Zod 4 directly. A global pin is
+#                                  still unnecessary and would also rewrite
+#                                  private third-party dependency graphs.
 #
 #   ...and sdks/typescript's whole OpenTelemetry pin set, eleven entries in
 #   all: api, api-logs 0.205.0, sdk-logs 0.205.0, core, resources,
@@ -117,7 +123,6 @@ overrides:
   pino: ^10.3.1
   pino-pretty: ^13.1.3
   thread-stream: ^4.0.0
-  prettier: ^3.8.1
   ai: ^6.0.161
   react: ^19.2.7
   react-dom: ^19.2.7
@@ -133,6 +138,27 @@ overrides:
   # receives it. 0.5.0 is the version that must exist regardless, so it is the
   # one everything gets.
   "@better-auth/utils": 0.5.0
+  # One copy of the Node typings, for the same reason as the line above: a
+  # second copy is a second set of GLOBAL module declarations, so `stream/web`
+  # from one is not the `stream/web` from the other and every type crossing
+  # them stops being itself. The tree carried five majors — 10.17.60, 18.19.130,
+  # 22.20.1, 24.13.3 and 26.2.0 — because @types packages depend on @types/node
+  # themselves and pnpm gives each its own. The 18.x copy is the one that bit:
+  # @types/ssh2@1.15.5 depends on `@types/node: ^18.11.18` and opens with
+  # `/// <reference types="node" />`, which resolves to ITS OWN copy, so any
+  # program reaching @types/ssh2 (via @langwatch/test-harness ->
+  # @testcontainers/clickhouse -> testcontainers -> @types/dockerode) loaded
+  # BOTH 18 and 26. That is what made `ReadableStream<any>` unassignable to
+  # `ReadableStream<Uint8Array>` in apps/api/src/rest/body-limit.ts — the
+  # detail named `import("stream/web")` and `import("node:stream/web")` as
+  # different types — and what made every ioredis `.on(...)` / `.once(...)`
+  # a union of two incompatible EventEmitter bases ("this expression is not
+  # callable"). The shared source was correct throughout; only the programs
+  # that pulled a second copy were red. ^26.0.1 is what the workspace already
+  # declares almost everywhere; the stragglers on ^22/^24 were drift, not a
+  # requirement. Do NOT narrow this to a path-scoped pin: six different
+  # packages request the 18.x line, so pinning one edge just moves the bug.
+  "@types/node": ^26.0.1
   # Raised from ^8.5.13 to clear a postcss parsing DoS: the caret already
   # permitted 8.5.23, but resolution was sitting on a vulnerable 8.5.x.
   postcss: ^8.5.23
@@ -318,6 +344,9 @@ packageExtensions:
   "@google-cloud/dlp":
     dependencies:
       protobufjs: "^7.5.4"
+
+patchedDependencies:
+  "@langwatch/ksuid@2.0.2": patches/@langwatch__ksuid@2.0.2.patch
 
 # Union of the three roots' allowlists. node-pty is skills/ and mcp/typescript's;
 # the rest came from platform/app/.

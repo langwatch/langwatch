@@ -1,17 +1,17 @@
 # Trace edit mode: correcting a trace inside the drawer
 #
 # Implementation:
-#   platform/app/src/features/traces-v2/stores/traceEditStore.ts                                (draft state)
-#   platform/app/src/features/traces-v2/hooks/useTraceEditOverlay.ts                            (correction read + appliers)
-#   platform/app/src/features/traces-v2/components/TraceDrawer/editMode/EditModeBar.tsx         (bar, save, discard)
-#   platform/app/src/features/traces-v2/components/TraceDrawer/editMode/EditableIOField.tsx     (input/output editor)
-#   platform/app/src/features/traces-v2/components/TraceDrawer/editMode/SpanNameTypeEditor.tsx  (name + type editor)
-#   platform/app/src/features/traces-v2/components/TraceDrawer/editMode/EditedOriginalToggle.tsx (edited vs original)
-#   platform/app/src/features/traces-v2/components/TraceDrawer/TraceEditDiffDialog.tsx          (unified diff)
-#   platform/app/src/features/traces-v2/components/TraceDrawer/AttributeTable.tsx               (editable span params)
-#   platform/app/src/features/traces-v2/components/TraceDrawer/editMode/TraceEditableInput.tsx  (trace input editor)
-#   platform/app/src/features/traces-v2/components/TraceDrawer/editMode/useTraceMetadataEditing.ts (trace metadata editor)
-#   platform/app/src/server/traces/edit-overlay/traceMetadataEditableKeys.ts                    (which metadata keys are editable)
+#   packages/features/trace/web/src/trace-edit.store.ts                                (draft state)
+#   packages/features/trace/web/src/ui/sections/explorer/hooks/use-trace-edit-overlay.ts                            (correction read + appliers)
+#   packages/features/trace/web/src/ui/sections/explorer/trace-drawer/edit-mode/edit-mode-bar.tsx         (bar, save, discard)
+#   packages/features/trace/web/src/ui/sections/explorer/trace-drawer/edit-mode/editable-io-field.tsx     (input/output editor)
+#   packages/features/trace/web/src/ui/sections/explorer/trace-drawer/edit-mode/span-name-type-editor.tsx  (name + type editor)
+#   packages/features/trace/web/src/ui/sections/explorer/trace-drawer/edit-mode/edited-original-toggle.tsx (edited vs original)
+#   packages/features/trace/web/src/ui/sections/explorer/trace-drawer/trace-edit-diff-dialog.tsx          (unified diff)
+#   packages/features/trace/web/src/ui/sections/explorer/trace-drawer/attribute-table.tsx               (editable span params)
+#   packages/features/trace/web/src/ui/sections/explorer/trace-drawer/edit-mode/trace-editable-input.tsx  (trace input editor)
+#   packages/features/trace/web/src/ui/sections/explorer/trace-drawer/edit-mode/use-trace-metadata-editing.ts (trace metadata editor)
+#   packages/features/trace/contract/src/trace-metadata-editable-keys.ts                    (which metadata keys are editable)
 #
 # Motivation: a reviewer curating production traces into an evaluation dataset
 # needs to correct the trace where they are already reading it. Bouncing to a

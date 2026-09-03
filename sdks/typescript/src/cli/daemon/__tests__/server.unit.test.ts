@@ -167,9 +167,7 @@ describe("stagingSocketPath", () => {
   describe("given the shared socket path", () => {
     describe("when a daemon derives the name it will bind", () => {
       it("stays in the same directory, so publishing is a same-filesystem link", () => {
-        expect(path.dirname(stagingSocketPath(shared, 4242))).toBe(
-          path.dirname(shared),
-        );
+        expect(path.dirname(stagingSocketPath(shared, 4242))).toBe(path.dirname(shared));
       });
 
       it("stays within the sockaddr_un budget the shared path was sized against", () => {
@@ -192,9 +190,7 @@ describe("stagingSocketPath", () => {
 
     describe("when two daemons race to start", () => {
       it("gives them different files to bind", () => {
-        expect(stagingSocketPath(shared, 101)).not.toBe(
-          stagingSocketPath(shared, 102),
-        );
+        expect(stagingSocketPath(shared, 101)).not.toBe(stagingSocketPath(shared, 102));
         expect(stagingSocketPath(shared, 101)).not.toBe(shared);
       });
     });

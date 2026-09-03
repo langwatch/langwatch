@@ -74,8 +74,7 @@ export const renderSkillFileResults = ({
   dryRun?: boolean;
 }): void => {
   for (const result of results) {
-    const action =
-      (dryRun ? DRY_RUN_ACTION[result.action] : undefined) ?? result.action;
+    const action = (dryRun ? DRY_RUN_ACTION[result.action] : undefined) ?? result.action;
     const color = ACTION_COLOR[result.action];
     const reason = result.reason !== undefined ? chalk.gray(` — ${result.reason}`) : "";
     console.log(`  ${color(action.padEnd(14))}${result.path}${reason}`);
@@ -97,9 +96,7 @@ const isTableOutput = (options: RawOutputFlags): boolean =>
  */
 export const isInteractiveConsole = (options: RawOutputFlags): boolean => {
   const resolved = resolveOutputOptions({ ...options });
-  return (
-    process.stdin.isTTY === true && resolved.format === "table" && !resolved.agent
-  );
+  return process.stdin.isTTY === true && resolved.format === "table" && !resolved.agent;
 };
 
 /** Ask a yes/no question on the terminal. Only ever called when interactive. */

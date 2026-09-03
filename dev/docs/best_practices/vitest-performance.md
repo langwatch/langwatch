@@ -1,16 +1,16 @@
 # Vitest performance & memory
 
-Why the unit config (`platform/app/vitest.config.ts`) is shaped the way it is, and
+Why the unit configs (each package's and application's own `vitest.config.ts`) are shaped the way they are, and
 what we tried from <https://vitest.dev/guide/improving-performance> that did NOT
 pay off. Numbers are from a controlled benchmark (2026-07-21) on
 `src/features/traces-v2` (68 files, 705 tests) unless noted, `maxWorkers: 50%`.
 
 ## The pool: `vmForks`, not `vmThreads`
 
-| pool | peak RSS | wall | notes |
-|---|---|---|---|
+| pool              | peak RSS    | wall | notes                                         |
+| ----------------- | ----------- | ---- | --------------------------------------------- |
 | `vmThreads` (old) | **2.56 GB** | 8.2s | VM context leaks into the shared process heap |
-| `vmForks` (now) | **573 MB** | 9.5s | child process reclaims everything on exit |
+| `vmForks` (now)   | **573 MB**  | 9.5s | child process reclaims everything on exit     |
 
 A VM pool (`vm*`) reuses a Node `vm` context, which is fast but leaks by design —
 that's why `vmMemoryLimit` exists (recycle a worker before it grows unbounded).

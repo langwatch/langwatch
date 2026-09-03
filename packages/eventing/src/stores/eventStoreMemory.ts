@@ -1,0 +1,78 @@
+import type { AggregateType } from "../domain/aggregateType";
+import type { Event } from "../domain/types";
+import { compareOrdinal } from "../utils/compareOrdinal";
+import { AbstractEventStore } from "./abstractEventStore";
+import { eventToRecord } from "./eventStoreUtils";
+import type { EventRepository } from "./repositories/eventRepository.types";
+import { EventRepositoryMemory } from "./repositories/eventRepositoryMemory";
+
+/**
+ * Simple in-memory EventStore used for tests and local development.
+ *
+ * **WARNING: NOT THREAD-SAFE**
+ * This implementation is NOT safe for concurrent access.
+ *
+ * **Use Cases:**
+ * - Unit tests
+ * - Local development
+ * - Single-threaded environments
+ *
+ * **DO NOT USE in production with multiple workers/processes.**
+ * Use `EventingClickHouseEventStore` or another thread-safe implementation instead.
+ *
+ * Extends {@link AbstractEventStore} with:
+ * - `postProcessEvents()`: sorts by timestamp then id, then deep clones to prevent mutation
+ */
+export class EventStoreMemory<
+  EventType extends Event = Event,
+> extends AbstractEventStore<EventType> {
+  private constructor(repository: EventRepository) {
+    super(repository);
+  }
+
+  static createForTesting<EventType extends Event = Event>(
+    repository?: EventRepository,
+  ): EventStoreMemory<EventType> {
+    return new EventStoreMemory<EventType>(repository ?? EventRepositoryMemory.createForTesting());
+  }
+
+  static createForLocalDevelopment<EventType extends Event = Event>(
+    repository?: EventRepository,
+  ): EventStoreMemory<EventType> {
+    return new EventStoreMemory<EventType>(
+      repository ?? EventRepositoryMemory.createForLocalDevelopment(),
+    );
+  }
+
+  protected override postProcessEvents(events: EventType[]): EventType[] {
+    // Sort by createdAt for consistent ordering (memory store doesn't
+    // guarantee order). The id tie-break is plain relational (byte-wise),
+    // never localeCompare — it must match ClickHouse's EventId ordering and
+    // the shared cursor comparator on same-millisecond ties.
+    const sorted = [...events].sort((a, b) => {
+      if (a.createdAt !== b.createdAt) return a.createdAt - b.createdAt;
+      return compareOrdinal(a.id, b.id);
+    });
+
+    // Deep clone to prevent mutation
+    return sorted.map((event) => ({
+      ...event,
+      data: JSON.parse(JSON.stringify(event.data)),
+      metadata: { ...event.metadata },
+    }));
+  }
+
+  /**
+   * Seeds the event store with events for a given aggregate.
+   * Useful in tests.
+   */
+  async seed(
+    _aggregateId: string,
+    events: EventType[],
+    _tenantId: string,
+    _aggregateType: AggregateType,
+  ): Promise<void> {
+    const records = events.map((event) => eventToRecord(event));
+    await this.repository.insertEventRecords(records);
+  }
+}

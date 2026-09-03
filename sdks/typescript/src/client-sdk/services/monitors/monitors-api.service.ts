@@ -86,7 +86,10 @@ export class MonitorsApiService {
       } catch {
         // leave as raw text
       }
-      const message = formatApiErrorMessage({ error: parsed, options: { status: response.status } });
+      const message = formatApiErrorMessage({
+        error: parsed,
+        options: { status: response.status },
+      });
       throwIfHandledError({
         operation: options?.method ?? "GET",
         error: parsed,
@@ -126,15 +129,21 @@ export class MonitorsApiService {
   }
 
   async toggle(id: string, enabled: boolean): Promise<MonitorResponse> {
-    return this.request<MonitorResponse>(`/api/monitors/${encodeURIComponent(id)}/toggle`, {
-      method: "POST",
-      body: JSON.stringify({ enabled }),
-    });
+    return this.request<MonitorResponse>(
+      `/api/monitors/${encodeURIComponent(id)}/toggle`,
+      {
+        method: "POST",
+        body: JSON.stringify({ enabled }),
+      },
+    );
   }
 
   async delete(id: string): Promise<MonitorDeleteResponse> {
-    return this.request<MonitorDeleteResponse>(`/api/monitors/${encodeURIComponent(id)}`, {
-      method: "DELETE",
-    });
+    return this.request<MonitorDeleteResponse>(
+      `/api/monitors/${encodeURIComponent(id)}`,
+      {
+        method: "DELETE",
+      },
+    );
   }
 }

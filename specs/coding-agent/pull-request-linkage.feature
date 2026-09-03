@@ -1,27 +1,25 @@
 # Pull request linkage, sessions mapped to GitHub pull requests and priced
 #
 # Implementation:
-#   platform/app/src/server/app-layer/github/github-pull-request-mapping.service.ts   (branch-to-PR mapping + negative cache)
-#   platform/app/src/server/app-layer/github/githubPullRequestEvent.ts                 (the pull_request webhook payload, validated)
-#   platform/app/src/server/routes/github.ts                                           (the webhook delivery target)
-#   platform/app/src/server/app-layer/github/github-pull-request-status.service.ts    (live status, Redis-cached, never the queue)
-#   platform/app/src/server/event-sourcing/pipelines/coding-agent-processing/subscribers/pullRequestMapping.subscriber.ts (fold trigger)
-#   platform/app/src/server/app-layer/coding-agent/pull-request-assignment.ts          (session-to-PR tenure rule)
-#   platform/app/src/server/app-layer/coding-agent/pull-request-share.ts                (the proportional rule: one session's cost split across the PRs it drove)
-#   platform/app/src/server/app-layer/coding-agent/pull-request-usage.service.ts       (org-first usage rollup)
-#   platform/app/src/server/app-layer/coding-agent/coding-agent-source-type.ts         (agent id to ingestion source type)
-#   platform/app/src/server/app-layer/coding-agent/repositories/coding-agent-session-events.repository.ts (per-model totals)
-#   platform/app/src/server/organizations/resolveCallerProjectScope.ts                 (the caller's permission cut and how each project is named, shared by both read surfaces)
-#   platform/app/src/app/api/coding-agent/[[...route]]/                                (the usage REST endpoint)
-#   platform/app/src/pages/me/pull-requests.tsx                                        (the personal Pull Requests page)
-#   platform/app/src/components/me/PullRequestsTable.tsx                               (the table)
-#   platform/app/src/components/me/PullRequestDetailDrawer.tsx                          (one pull request in full)
-#   platform/app/src/components/me/PullRequestStatusBadge.tsx                           (a status drawn the way GitHub draws it)
-#   platform/app/src/components/me/usePullRequestSort.ts                                (the table's order, and the way back to it)
-#   platform/app/src/components/me/AgentLabel.tsx                                       (an assistant named like its product)
+#   packages/features/github/server/src/services/github-pull-request-mapping.service.ts (branch-to-PR mapping + negative cache)
+#   packages/features/github/server/src/adapters/github-pull-request-event.adapter.ts   (the pull_request webhook payload, validated)
+#   packages/features/github/contract/src/github.ts                                           (the webhook delivery target)
+#   packages/features/github/server/src/services/github-pull-request-status.service.ts  (live status, Redis-cached, never the queue)
+#   packages/features/coding-agent/server/src/subscribers/pull-request-mapping.subscriber.ts (fold trigger)
+#   packages/features/coding-agent/server/src/services/coding-agent-pull-request-assignment.service.ts (session-to-PR tenure rule)
+#   packages/features/coding-agent/server/src/services/coding-agent-pull-request-usage.service.ts      (org-first usage rollup)
+#   packages/features/coding-agent/server/src/repositories/coding-agent-session-event/clickhouse.repository.ts (per-model totals)
+#   [gone] src/server/organizations/resolveCallerProjectScope.ts                 (the caller's permission cut and how each project is named, shared by both read surfaces)
+#   [gone] src/app/api/coding-agent/[[...route]]/                                (the usage REST endpoint)
+#   [gone] src/pages/me/pull-requests.tsx                                        (the personal Pull Requests page)
+#   packages/features/coding-agent/web/src/pull-requests-table.tsx                               (the table)
+#   packages/features/coding-agent/web/src/pull-request-detail-drawer.tsx                          (one pull request in full)
+#   packages/features/coding-agent/web/src/pull-request-status-badge.tsx                           (a status drawn the way GitHub draws it)
+#   [gone] src/components/me/usePullRequestSort.ts                                (the table's order, and the way back to it)
+#   packages/features/coding-agent/web/src/agent-label.tsx                                       (an assistant named like its product)
 #
 # Related specs:
-#   specs/coding-agent/session-git-context.feature   , where the repo+branch identity comes from
+#   packages/features/coding-agent/specs/session-git-context.feature, where the repo+branch identity comes from
 #   specs/integrations/github-connection.feature     , the org-level GitHub connection this rides
 #
 # Motivation: the ledger question "what did this pull request cost in assistant

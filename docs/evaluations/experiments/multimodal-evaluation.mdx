@@ -7,6 +7,7 @@ description: Evaluate image generation, document parsing, and other multimodal A
 LangWatch supports multimodal evaluation out of the box. You can evaluate image inputs and outputs using any vision-capable model (GPT-4o, GPT-5.2, Claude Sonnet, Gemini, etc.) through the built-in LLM-as-a-Judge evaluators, no custom code required.
 
 This covers common multimodal use cases:
+
 - **Image generation quality**: score outputs of image generation models
 - **Document parsing**: evaluate extracted metadata from PDFs and scanned documents
 - **Content moderation**: detect NSFW or low-quality uploaded images
@@ -20,24 +21,28 @@ This covers common multimodal use cases:
 - **Category**: classification evaluation (e.g. "Classify the image as: excellent, good, poor")
 
 **See also:**
+
 - [Dataset Images](/datasets/dataset-images): Setting up image columns in datasets
 - [Saved Evaluators](/evaluations/evaluators/saved-evaluators): Reuse evaluators via API
-</Info>
+  </Info>
 
 ## Supported Image Formats
 
 Images can be provided in any of these formats:
 
-| Format | Example |
-|--------|---------|
-| **Image URL** | `https://example.com/photo.png` |
-| **Base64 data URI** | `data:image/png;base64,iVBORw0KGgo...` |
-| **Markdown image** | `![alt text](https://example.com/photo.png)` |
+| Format              | Example                                      |
+| ------------------- | -------------------------------------------- |
+| **Image URL**       | `https://example.com/photo.png`              |
+| **Base64 data URI** | `data:image/png;base64,iVBORw0KGgo...`       |
+| **Markdown image**  | `![alt text](https://example.com/photo.png)` |
 
 Supported extensions: `.png`, `.jpg`, `.jpeg`, `.gif`, `.webp`, `.svg`, `.bmp`, `.tiff`
 
 <Note>
-Image detection is strict by design, a field is treated as an image only when the **entire value** is an image URL or base64 string. Mixed text-and-image content is sent as plain text. This prevents unintended multipart content when a field happens to contain an image URL as part of a longer string.
+  Image detection is strict by design, a field is treated as an image only when the
+  **entire value** is an image URL or base64 string. Mixed text-and-image content is sent
+  as plain text. This prevents unintended multipart content when a field happens to
+  contain an image URL as part of a longer string.
 </Note>
 
 ## Evaluating Images via UI
@@ -50,7 +55,10 @@ Image detection is strict by design, a field is treated as an image only when th
 
 <div style={{ display: "flex", justifyContent: "center" }}>
   <Frame caption="Set column type to image" style={{ maxWidth: "300px" }}>
-    <img src="/images/dataset-image-select.png" alt="Column type selector showing image option" />
+    <img
+      src="/images/dataset-image-select.png"
+      alt="Column type selector showing image option"
+    />
   </Frame>
 </div>
 
@@ -66,10 +74,14 @@ Image detection is strict by design, a field is treated as an image only when th
 The evaluator automatically detects image values and sends them as multipart content to the vision model. No special configuration needed.
 
 <Frame caption="Image evaluation workbench, LLM-as-a-Judge scoring virtual try-on quality with three image columns mapped to evaluator variables">
-  <img src="/images/evaluations/multimodal-image-evaluation-workbench.png" alt="LangWatch experiments workbench showing image evaluation with LLM-as-a-Judge score evaluator" />
+  <img
+    src="/images/evaluations/multimodal-image-evaluation-workbench.png"
+    alt="LangWatch experiments workbench showing image evaluation with LLM-as-a-Judge score evaluator"
+  />
 </Frame>
 
 In this example, a virtual try-on pipeline is evaluated with three image columns:
+
 - **original** → mapped to `contexts` (the person's photo)
 - **request** → mapped to `input` (the clothing item)
 - **generated** → mapped to `output` (the try-on result)
@@ -87,10 +99,14 @@ Use this workflow to **iterate on your evaluator prompt** until you have reliabl
 For more advanced evaluation pipelines, you can create a **Custom Workflow Evaluator** in the Evaluators page. This gives you a visual workflow builder where you can chain multiple LLM nodes, add image variables to prompts, and build multi-step evaluation logic.
 
 <Frame caption="Custom workflow evaluator with image variables mapped to prompt template fields">
-  <img src="/images/evaluations/multimodal-custom-workflow-evaluator.png" alt="LangWatch custom workflow evaluator showing image variables in prompt template" />
+  <img
+    src="/images/evaluations/multimodal-custom-workflow-evaluator.png"
+    alt="LangWatch custom workflow evaluator showing image variables in prompt template"
+  />
 </Frame>
 
 In the workflow builder:
+
 1. Add **image-typed variables** to your prompt node inputs
 2. Use `{{ "{{variable_name}}" }}` syntax to reference images in the prompt template
 3. Map dataset columns to the image variables in the entry node
@@ -114,18 +130,18 @@ df = langwatch.datasets.get_dataset("my-image-dataset").to_pandas()
 
 experiment = langwatch.experiment.init("image-quality-evaluation")
 
-for index, row in experiment.loop(df.iterrows()):
-    # Use your saved image evaluator
-    experiment.evaluate(
-        "evaluators/image-quality-scorer",  # Your saved evaluator slug
-        index=index,
-        data={
-            "input": row["request_image"],      # Image URL or base64
-            "output": row["generated_image"],    # Image URL or base64
-            "contexts": [row["original_photo"]], # List of context images
-        },
-    )
-```
+for index, row in experiment.loop(df.iterrows()): # Use your saved image evaluator
+experiment.evaluate(
+"evaluators/image-quality-scorer", # Your saved evaluator slug
+index=index,
+data={
+"input": row["request_image"], # Image URL or base64
+"output": row["generated_image"], # Image URL or base64
+"contexts": [row["original_photo"]], # List of context images
+},
+)
+
+````
 
 ```typescript TypeScript
 import { LangWatch } from "langwatch";
@@ -150,7 +166,8 @@ await experiment.run(
   },
   { concurrency: 4 }
 );
-```
+````
+
 </CodeGroup>
 
 ### Custom Scoring with Vision Models
@@ -254,21 +271,24 @@ EOF
 ```
 
 <Warning>
-Base64 image payloads can be large. The evaluator API supports request bodies up to **30 MB**. If you are working with many high-resolution images, prefer using image URLs over base64 encoding.
+  Base64 image payloads can be large. The evaluator API supports request bodies up to **30
+  MB**. If you are working with many high-resolution images, prefer using image URLs over
+  base64 encoding.
 </Warning>
 
 ## Model Compatibility
 
 Image evaluation requires a **vision-capable model**. Any model supported by [litellm](https://docs.litellm.ai/docs/providers) with vision capabilities works, including:
 
-| Provider | Models |
-|----------|--------|
-| OpenAI | `gpt-4o`, `gpt-4o-mini`, `gpt-5.2` |
+| Provider  | Models                                          |
+| --------- | ----------------------------------------------- |
+| OpenAI    | `gpt-4o`, `gpt-4o-mini`, `gpt-5.2`              |
 | Anthropic | `claude-sonnet-4-5-20250929`, `claude-opus-4-6` |
-| Google | `gemini-2.0-flash`, `gemini-2.5-pro` |
+| Google    | `gemini-2.0-flash`, `gemini-2.5-pro`            |
 
 <Note>
-If a non-vision model is selected, the evaluator falls back to sending plain text descriptions. For accurate image evaluation, always select a vision-capable model.
+  If a non-vision model is selected, the evaluator falls back to sending plain text
+  descriptions. For accurate image evaluation, always select a vision-capable model.
 </Note>
 
 ## Next Steps

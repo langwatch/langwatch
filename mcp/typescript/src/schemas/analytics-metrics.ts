@@ -158,8 +158,7 @@ export const analyticsMetrics: MetricInfo[] = [
     name: "evaluation_pass_rate",
     label: "Evaluation Pass Rate",
     allowedAggregations: ["avg", "sum", "min", "max", "median", "p99", "p95", "p90"],
-    description:
-      "Percentage of traces passing evaluation (requires evaluator_id key)",
+    description: "Percentage of traces passing evaluation (requires evaluator_id key)",
   },
   {
     category: "evaluations",

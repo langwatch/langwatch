@@ -4,7 +4,11 @@ description: Where the LangWatch CLI, AI Gateway, web app, and Activity Monitor 
 sidebarTitle: Control plane
 ---
 
-<Info>**Pairs with:** [AI Gateway → Overview](/ai-gateway/overview). The gateway is the data plane (request path); this page is the control plane (configuration + fold processing) that sits next to it in the same compose stack and Helm chart.</Info>
+<Info>
+  **Pairs with:** [AI Gateway → Overview](/ai-gateway/overview). The gateway is the data
+  plane (request path); this page is the control plane (configuration + fold processing)
+  that sits next to it in the same compose stack and Helm chart.
+</Info>
 
 LangWatch is a **control plane** above every AI tool an enterprise uses,
 including the ones whose API key path you do not own. The
@@ -20,12 +24,12 @@ The governance product UI splits into two functional layers. The
 distinction matters when reading the rest of this doc and the
 existing routes:
 
-| Surface | Purpose | Audience | Where it lives |
-|---------|---------|----------|----------------|
-| `/governance` | Daily-use **org governance home**: spend, ingestion-source health, anomalies, per-user breakdown. Read-mostly. | Org admins whose org's `setupState.governanceActive` is `true` (see [Persona-based home routing](#persona-based-home-routing--the-setup-state-signal) below) | Top-level route, org-scoped. |
-| `/me`, `/me/settings` | Daily-use **personal home**: your usage, your budget, your personal VK, your IDE setup snippet. | Any user with a personal VK | Top-level route, principal-scoped. |
-| `/[project]/...` | LLMOps daily-use, traces, evals, datasets, scenarios, workflows. | Project members | Per-project routes. **Unchanged** from current LangWatch. |
-| `/governance/ingestion-sources`, `/governance/anomaly-rules`, `/gateway/routing-policies` | Admin-authoring (CRUD), create, rotate, archive sources, write rules, publish routing policies. | The governance pages open on `governance:view` and `/gateway/routing-policies` on `routingPolicies:view`. Each write control needs the matching `:manage` grant (`ingestionSources:manage`, `anomalyRules:manage`, `routingPolicies:manage`) and is hidden without it. | Governance sub-routes, deliberately separate from daily-use surfaces. |
+| Surface                                                                                   | Purpose                                                                                                        | Audience                                                                                                                                                                                                                                                               | Where it lives                                                        |
+| ----------------------------------------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | --------------------------------------------------------------------- |
+| `/governance`                                                                             | Daily-use **org governance home**: spend, ingestion-source health, anomalies, per-user breakdown. Read-mostly. | Org admins whose org's `setupState.governanceActive` is `true` (see [Persona-based home routing](#persona-based-home-routing--the-setup-state-signal) below)                                                                                                           | Top-level route, org-scoped.                                          |
+| `/me`, `/me/settings`                                                                     | Daily-use **personal home**: your usage, your budget, your personal VK, your IDE setup snippet.                | Any user with a personal VK                                                                                                                                                                                                                                            | Top-level route, principal-scoped.                                    |
+| `/[project]/...`                                                                          | LLMOps daily-use, traces, evals, datasets, scenarios, workflows.                                               | Project members                                                                                                                                                                                                                                                        | Per-project routes. **Unchanged** from current LangWatch.             |
+| `/governance/ingestion-sources`, `/governance/anomaly-rules`, `/gateway/routing-policies` | Admin-authoring (CRUD), create, rotate, archive sources, write rules, publish routing policies.                | The governance pages open on `governance:view` and `/gateway/routing-policies` on `routingPolicies:view`. Each write control needs the matching `:manage` grant (`ingestionSources:manage`, `anomalyRules:manage`, `routingPolicies:manage`) and is hidden without it. | Governance sub-routes, deliberately separate from daily-use surfaces. |
 
 The whole governance product sits at the top level, not under Settings.
 The daily home is `/governance`, and the create, rotate and archive tools
@@ -107,13 +111,13 @@ without touching any other.
 
 ## The five integration tiers
 
-| Tier | Mode | Customer owns the key path? | What you can do |
-|------|------|------------------------------|-----------------|
-| **1** | Gateway proxy | Yes | Mid-flight inspect, rewrite, **block**. Mint per-user virtual keys. Enforce policy + budget before the call leaves the gateway. |
-| **2** | BYOK endpoint routing | Sometimes | Customer points a SaaS platform's "custom LLM endpoint" at the gateway. Same depth as Tier 1 *for traffic that flows through it*. |
-| **3** | Audit log ingest | No | Pull from a closed platform's compliance API into [`IngestionSource`](#tier-3--audit-log-ingest) records. Detect anomalies, alert, **trigger admin-API revoke** out-of-band. |
-| **4** | OTel, SDK instrumentation | Partial | Customer's agent code (or an opt-in SaaS like Claude Cowork) emits OpenTelemetry to LangWatch. Per-turn detail, no block, but full trace context. |
-| **5** | Sandboxed runtime | Yes (you host it) | LangWatch runs the agent. Egress policy, MCP allowlist, file-system jail, tool approval. Maximum control. |
+| Tier  | Mode                      | Customer owns the key path? | What you can do                                                                                                                                                              |
+| ----- | ------------------------- | --------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| **1** | Gateway proxy             | Yes                         | Mid-flight inspect, rewrite, **block**. Mint per-user virtual keys. Enforce policy + budget before the call leaves the gateway.                                              |
+| **2** | BYOK endpoint routing     | Sometimes                   | Customer points a SaaS platform's "custom LLM endpoint" at the gateway. Same depth as Tier 1 _for traffic that flows through it_.                                            |
+| **3** | Audit log ingest          | No                          | Pull from a closed platform's compliance API into [`IngestionSource`](#tier-3--audit-log-ingest) records. Detect anomalies, alert, **trigger admin-API revoke** out-of-band. |
+| **4** | OTel, SDK instrumentation | Partial                     | Customer's agent code (or an opt-in SaaS like Claude Cowork) emits OpenTelemetry to LangWatch. Per-turn detail, no block, but full trace context.                            |
+| **5** | Sandboxed runtime         | Yes (you host it)           | LangWatch runs the agent. Egress policy, MCP allowlist, file-system jail, tool approval. Maximum control.                                                                    |
 
 Every real customer is a mix. A typical large enterprise adopts:
 **Tier 1** for Claude Code, Codex, Cursor, Gemini CLI, custom
@@ -268,7 +272,7 @@ here so the broader story is visible.
 The current branch (PR #3524) implements Tier 1 end-to-end:
 
 - ✅ **CLI** (`langwatch login --device`, `langwatch claude/codex/
-  cursor/gemini`, `langwatch instrument <tool>`, `langwatch whoami`,
+cursor/gemini`, `langwatch instrument <tool>`, `langwatch whoami`,
   `langwatch me`, `langwatch logout`).
 - ✅ **Personal Workspace** (Team + Project with `isPersonal` flag).
 - ✅ **Personal Virtual Keys** (issued on the first gateway call, not at
@@ -280,7 +284,7 @@ The current branch (PR #3524) implements Tier 1 end-to-end:
 - ✅ **`/governance`** admin oversight dashboard
   (org-admin-only via `organization:manage` permission, plus the
   governance flag). Wired to real `api.activityMonitor.{summary,
-  spendByUser, ingestionSourcesHealth, recentAnomalies}` tRPC
+spendByUser, ingestionSourcesHealth, recentAnomalies}` tRPC
   procedures; **no mocked fixtures**: empty data renders a setup
   checklist (publish a RoutingPolicy, connect an IngestionSource),
   data renders live cards + per-user table + source-health strip.
@@ -292,16 +296,16 @@ The current branch (PR #3524) implements Tier 1 end-to-end:
 - ✅ **Helm `NOTES.txt` + post-install checklist** for self-hosted
   bootstrap.
 - ✅ **`IngestionSource` schema** (Postgres) + `trace_summaries.SourceType`
-  + `SourceId` columns (ClickHouse), the data model for Tier 3
-  + Tier 4. Seven `sourceType` values supported on the schema
-  side (see Tier 3 above).
+  - `SourceId` columns (ClickHouse), the data model for Tier 3
+  - Tier 4. Seven `sourceType` values supported on the schema
+    side (see Tier 3 above).
 - ✅ **`IngestionSourceService` + REST receivers + tRPC admin
   router.** `POST /api/ingest/otel/:sourceId` (Tier 4 entry
   point) and `POST /api/ingest/webhook/:sourceId` (Tier 3 push
   destination) accept events authenticated by a per-source
   `Bearer lw_is_*` secret, return 202, flip `lastEventAt` on the
   source. `api.ingestionSources.{list,get,create,update,
-  rotateSecret,archive}` exposes the management surface to the
+rotateSecret,archive}` exposes the management surface to the
   admin UI; raw secret is returned exactly once on create /
   rotate, never echoed back afterwards.
 - ✅ **`api.governance.setupState`**, the persona-routing
@@ -368,6 +372,6 @@ Governance sits behind a single fence on each surface:
   [Coding CLI Integrations](/ai-gateway/cli/overview).
 - For the read-only CLI checks on ingestion sources
   (`langwatch governance status`, `langwatch ingest list | health |
-  tail`): [CLI ingest debug](/ai-governance/cli-debug).
+tail`): [CLI ingest debug](/ai-governance/cli-debug).
 - For the architecture deep-dive once published:
   `architecture.md` (in flight on this branch).

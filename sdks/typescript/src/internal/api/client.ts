@@ -61,7 +61,6 @@ const handledErrorMiddleware: Middleware = {
   },
 };
 
-
 /**
  * Creates a new LangWatch API client.
  * @param apiKey - The API key or Personal Access Token used for authentication.
@@ -84,8 +83,7 @@ export const createLangWatchApiClient = (
   // resolver's output, personal by default and `--project` when given) wins
   // over the global env, and a plain SDK embed that scopes nothing falls back
   // to the environment unchanged.
-  projectId: string | undefined = scopedProjectId() ??
-    process.env.LANGWATCH_PROJECT_ID,
+  projectId: string | undefined = scopedProjectId() ?? process.env.LANGWATCH_PROJECT_ID,
 ) => {
   const client = openApiCreateClient<paths>({
     baseUrl: resolveEndpoint(endpoint),
@@ -104,6 +102,5 @@ export const createLangWatchApiClient = (
 
   return client;
 };
-
 
 export type LangwatchApiClient = ReturnType<typeof createLangWatchApiClient>;

@@ -6,10 +6,7 @@ import {
   type ExperimentRunDatasetEntry,
   type ExperimentRunEvaluation,
 } from "@/client-sdk/services/experiments/experiments-api.service";
-import {
-  deriveRunStatus,
-  isTerminalStatus,
-} from "@/client-sdk/services/experiments/run-status";
+import { deriveRunStatus, isTerminalStatus } from "@/client-sdk/services/experiments/run-status";
 import { resolveCredentials } from "../../utils/apiKey";
 import { failSpinner } from "../../utils/spinnerError";
 import { formatTable } from "../../utils/formatting";
@@ -27,8 +24,7 @@ export interface ExperimentResultsOptions {
 
 const DEFAULT_LIMIT = 20;
 
-const rowKey = (index: number, targetId?: string | null): string =>
-  `${index}:${targetId ?? ""}`;
+const rowKey = (index: number, targetId?: string | null): string => `${index}:${targetId ?? ""}`;
 
 const summarizeEntry = (entry: Record<string, unknown>): string => {
   // Pick something meaningful: input, question, query, prompt, or first string field
@@ -39,9 +35,7 @@ const summarizeEntry = (entry: Record<string, unknown>): string => {
       return value.length > 60 ? `${value.slice(0, 57)}...` : value;
     }
   }
-  const firstString = Object.entries(entry).find(
-    ([, v]) => typeof v === "string" && v.length > 0,
-  );
+  const firstString = Object.entries(entry).find(([, v]) => typeof v === "string" && v.length > 0);
   if (firstString) {
     const v = firstString[1] as string;
     return v.length > 60 ? `${v.slice(0, 57)}...` : v;
@@ -75,8 +69,7 @@ export const experimentResultsCommand = async ({
 }): Promise<CommandResult | void> => {
   await resolveCredentials();
 
-  const filter: ExperimentResultsFilter =
-    options.filter === "failed" ? "failed" : "all";
+  const filter: ExperimentResultsFilter = options.filter === "failed" ? "failed" : "all";
   const limit = (() => {
     const parsed = options.limit ? parseInt(options.limit, 10) : DEFAULT_LIMIT;
     return Number.isFinite(parsed) && parsed > 0 ? parsed : DEFAULT_LIMIT;
@@ -126,21 +119,17 @@ export const experimentResultsCommand = async ({
     const datasetKeys = new Set(
       results.dataset.map((entry) => rowKey(entry.index, entry.targetId)),
     );
-    const rowIndependentEvaluations = results.evaluations.filter(
-      (evaluation) => {
-        if (evaluatorFilter && evaluation.evaluator !== evaluatorFilter) {
-          return false;
-        }
-        return !datasetKeys.has(rowKey(evaluation.index, evaluation.targetId));
-      },
-    );
+    const rowIndependentEvaluations = results.evaluations.filter((evaluation) => {
+      if (evaluatorFilter && evaluation.evaluator !== evaluatorFilter) {
+        return false;
+      }
+      return !datasetKeys.has(rowKey(evaluation.index, evaluation.targetId));
+    });
 
     // Determine evaluator columns to show
     const evaluatorNames = evaluatorFilter
       ? [evaluatorFilter]
-      : Array.from(
-          new Set(results.evaluations.map((e) => e.evaluator)),
-        ).slice(0, 3); // cap visible columns to keep table readable
+      : Array.from(new Set(results.evaluations.map((e) => e.evaluator))).slice(0, 3); // cap visible columns to keep table readable
 
     let rows = results.dataset.map((entry) => ({
       entry,
@@ -170,10 +159,7 @@ export const experimentResultsCommand = async ({
       rows = rows.filter((r) =>
         isFailedRow({
           entry: r.entry,
-          evaluations: [
-            ...r.evaluations,
-            ...(rowIndependentByIndex.get(r.entry.index) ?? []),
-          ],
+          evaluations: [...r.evaluations, ...(rowIndependentByIndex.get(r.entry.index) ?? [])],
         }),
       );
     }
@@ -193,18 +179,15 @@ export const experimentResultsCommand = async ({
     // Carry a row-independent evaluation only when its row is in the answer,
     // so a verdict never describes a row the caller cannot see.
     const returnedIndices = new Set(rows.map((row) => row.entry.index));
-    const returnedRowIndependent = rowIndependentEvaluations.filter(
-      (evaluation) => returnedIndices.has(evaluation.index),
+    const returnedRowIndependent = rowIndependentEvaluations.filter((evaluation) =>
+      returnedIndices.has(evaluation.index),
     );
 
     return {
       data: {
         ...results,
         dataset: rows.map((row) => row.entry),
-        evaluations: [
-          ...rows.flatMap((row) => row.evaluations),
-          ...returnedRowIndependent,
-        ],
+        evaluations: [...rows.flatMap((row) => row.evaluations), ...returnedRowIndependent],
         meta: {
           totalMatching,
           /** Rows in `dataset`. Equal to `totalMatching`: the answer is whole. */
@@ -221,9 +204,7 @@ export const experimentResultsCommand = async ({
            * different runs. A caller comparing a before against an after has
            * to pin the run, and cannot know to unless it is told.
            */
-          runSelection: options.runId?.trim()
-            ? "explicit"
-            : "latest-at-call-time",
+          runSelection: options.runId?.trim() ? "explicit" : "latest-at-call-time",
           filter,
           evaluator: evaluatorFilter ?? null,
         },
@@ -249,9 +230,7 @@ export const experimentResultsCommand = async ({
               ),
             );
           } else if (runStatus === "interrupted") {
-            console.log(
-              chalk.gray("No rows were recorded before the run was interrupted."),
-            );
+            console.log(chalk.gray("No rows were recorded before the run was interrupted."));
           } else {
             console.log(chalk.gray("No rows recorded for this run."));
           }
@@ -269,28 +248,18 @@ export const experimentResultsCommand = async ({
               evaluatorCols[name] = chalk.red("error");
             } else if (typeof e.score === "number") {
               const passedSuffix =
-                e.passed === false
-                  ? chalk.red(" ✗")
-                  : e.passed === true
-                    ? chalk.green(" ✓")
-                    : "";
+                e.passed === false ? chalk.red(" ✗") : e.passed === true ? chalk.green(" ✓") : "";
               evaluatorCols[name] = `${e.score.toFixed(2)}${passedSuffix}`;
             } else if (e.label) {
               evaluatorCols[name] = e.label;
             } else if (typeof e.passed === "boolean") {
-              evaluatorCols[name] = e.passed
-                ? chalk.green("pass")
-                : chalk.red("fail");
+              evaluatorCols[name] = e.passed ? chalk.green("pass") : chalk.red("fail");
             } else {
               evaluatorCols[name] = chalk.gray("—");
             }
           }
           const status = entry.error
-            ? chalk.red(
-                entry.error.length > 40
-                  ? `${entry.error.slice(0, 37)}...`
-                  : entry.error,
-              )
+            ? chalk.red(entry.error.length > 40 ? `${entry.error.slice(0, 37)}...` : entry.error)
             : evaluations.some(isFailedEvaluation)
               ? chalk.red("failed")
               : chalk.green("ok");

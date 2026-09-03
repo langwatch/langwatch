@@ -67,12 +67,8 @@ describe("the skills installer, given a temp install root", () => {
   it("installs a feature skill to skills/<slug> and a recipe to skills/recipes/<slug>", () => {
     const tracing = installSkill({ skill: skill("tracing"), root });
     expect(tracing.action).toBe("created");
-    expect(tracing.path).toBe(
-      path.join(root, "skills", "tracing", "SKILL.md"),
-    );
-    expect(fs.readFileSync(tracing.path, "utf8")).toBe(
-      renderSkillFile(skill("tracing")),
-    );
+    expect(tracing.path).toBe(path.join(root, "skills", "tracing", "SKILL.md"));
+    expect(fs.readFileSync(tracing.path, "utf8")).toBe(renderSkillFile(skill("tracing")));
 
     const recipe = installSkill({ skill: skill("debug-instrumentation"), root });
     expect(recipe.path).toBe(
@@ -153,7 +149,9 @@ describe("the skills installer, given a temp install root", () => {
     editBody(managed);
 
     expect(planUninstall({ skill: skill("tracing"), root }).action).toBe("skipped");
-    expect(planUninstall({ skill: skill("tracing"), root, yes: true }).action).toBe("removed");
+    expect(planUninstall({ skill: skill("tracing"), root, yes: true }).action).toBe(
+      "removed",
+    );
   });
 
   it("updates only managed files whose content drifted from the bundle", () => {
@@ -172,9 +170,7 @@ describe("the skills installer, given a temp install root", () => {
 
     const applied = updateSkill({ skill: skill("tracing"), root });
     expect(applied.action).toBe("updated");
-    expect(fs.readFileSync(managed, "utf8")).toBe(
-      renderSkillFile(skill("tracing")),
-    );
+    expect(fs.readFileSync(managed, "utf8")).toBe(renderSkillFile(skill("tracing")));
 
     // A file without the marker is never overwritten by update.
     const foreign = skillFilePath({ root, skill: skill("prompts") });
@@ -196,9 +192,7 @@ describe("the skills installer, given a temp install root", () => {
 
     const forced = updateSkill({ skill: skill("tracing"), root, force: true });
     expect(forced.action).toBe("updated");
-    expect(fs.readFileSync(managed, "utf8")).toBe(
-      renderSkillFile(skill("tracing")),
-    );
+    expect(fs.readFileSync(managed, "utf8")).toBe(renderSkillFile(skill("tracing")));
   });
 
   it("update refreshes a stale-version managed install without --force", () => {
@@ -213,9 +207,7 @@ describe("the skills installer, given a temp install root", () => {
 
     const result = updateSkill({ skill: skill("tracing"), root });
     expect(result.action).toBe("updated");
-    expect(fs.readFileSync(target, "utf8")).toBe(
-      renderSkillFile(skill("tracing")),
-    );
+    expect(fs.readFileSync(target, "utf8")).toBe(renderSkillFile(skill("tracing")));
   });
 
   describe("given a marker that is not the file's last line", () => {
@@ -432,13 +424,9 @@ describe("the skills installer, given a temp install root", () => {
 
   describe("given a --dir value no shell expanded", () => {
     it("expands a leading ~ against the home directory", () => {
-      expect(resolveSkillsRoot("~/.agents")).toBe(
-        path.join(os.homedir(), ".agents"),
-      );
+      expect(resolveSkillsRoot("~/.agents")).toBe(path.join(os.homedir(), ".agents"));
       expect(resolveSkillsRoot("~")).toBe(os.homedir());
-      expect(resolveSkillsRoot("  ~/.agents  ")).toBe(
-        path.join(os.homedir(), ".agents"),
-      );
+      expect(resolveSkillsRoot("  ~/.agents  ")).toBe(path.join(os.homedir(), ".agents"));
     });
 
     it("never creates a directory literally named ~", () => {
@@ -451,9 +439,7 @@ describe("the skills installer, given a temp install root", () => {
     });
 
     it("leaves a ~ that is not a leading path segment alone", () => {
-      expect(resolveSkillsRoot("./tmp/~backup")).toBe(
-        path.resolve("./tmp/~backup"),
-      );
+      expect(resolveSkillsRoot("./tmp/~backup")).toBe(path.resolve("./tmp/~backup"));
     });
   });
 
@@ -463,7 +449,9 @@ describe("the skills installer, given a temp install root", () => {
         ...skill("tracing"),
         slug: "../../../etc/evil",
       };
-      expect(() => skillFilePath({ root, skill: traversal })).toThrow(/single path segment/);
+      expect(() => skillFilePath({ root, skill: traversal })).toThrow(
+        /single path segment/,
+      );
 
       const nested: BundledSkill = { ...skill("tracing"), slug: "a/b" };
       expect(() => skillFilePath({ root, skill: nested })).toThrow(/single path segment/);

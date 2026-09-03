@@ -95,7 +95,7 @@ setup-hooks:
 # Run a Go service via the mono-binary.
 # Usage: make service svc=aigateway
 #
-# Sources every var from platform/app/.env into the Go process's environment.
+# Sources every var from .env into the Go process's environment.
 # The gateway + control-plane intentionally share secrets (LW_GATEWAY_*,
 # LW_VIRTUAL_KEY_PEPPER etc.) — one flat .env is simpler than namespace
 # prefixes. Vars the Go service doesn't need are ignored.
@@ -119,7 +119,7 @@ setup-hooks:
 # the default port, and wrong everywhere else with no error anywhere: the
 # gateway still proxies LLM traffic and returns 200, it just ships spend,
 # budget and auth traffic to whichever control plane that port belongs to.
-DEV_ENV_FILE ?= platform/app/.env
+DEV_ENV_FILE ?= .env
 service:
 	@test -n "$(svc)" || (echo "usage: make service svc=<name>" && exit 1)
 	@_snap=$$(export -p) && \
@@ -135,7 +135,7 @@ service:
 # Usage: make service-watch svc=aigateway
 service-watch:
 	@test -n "$(svc)" || (echo "usage: make watch svc=<name>" && exit 1)
-	@test -f $(DEV_ENV_FILE) || (echo "$(DEV_ENV_FILE) not found — seed platform/app/.env first" && exit 1)
+	@test -f $(DEV_ENV_FILE) || (echo "$(DEV_ENV_FILE) not found — seed .env first" && exit 1)
 	@which air > /dev/null 2>&1 || (echo "Installing air..." && go install github.com/air-verse/air@latest)
 	@_snap=$$(export -p) && \
 		set -a && . $(DEV_ENV_FILE) && set +a && \
@@ -152,12 +152,12 @@ service-watch:
 # all-local, all-local-nlp, dev-storage, dev-infra, frontend-only,
 # migration, full-local.
 
-# Refresh AWS SSO credentials in platform/app/.env so `make quickstart
+# Refresh AWS SSO credentials in .env so `make quickstart
 # dev-storage` can talk to runtime-storage-dev. SSO temporary tokens
 # expire ~hourly; this rotates the three S3_*_KEY/TOKEN lines in
-# platform/app/.env, leaving S3_BUCKET_NAME/S3_ENDPOINT/S3_REGION alone.
+# .env, leaving S3_BUCKET_NAME/S3_ENDPOINT/S3_REGION alone.
 refresh-dev-s3:
-	@bash platform/app/scripts/refresh-dev-s3-env.sh
+	@bash dev/scripts/refresh-dev-s3-env.sh
 
 # Run all *.unit.bats tests under dev/scripts/__tests__/. Dev-only — these
 # tests cover shell behavior of `dev.sh` / `write-dev-overrides.sh` /
@@ -294,24 +294,24 @@ else
 	@:
 endif
 
-# Run the app (pnpm dev, which also auto-starts the Go aigateway) alongside
-# the Go nlpgo engine. nlpgo is the `nlpgo` subcommand of the cmd/service
-# monobinary, run the same way as aigateway (`make service svc=nlpgo`). We pin
-# SERVER_ADDR=:5561 so it binds the port the app expects (LANGWATCH_NLP_SERVICE
-# → http://localhost:5561) and doesn't collide with langevals on :5562.
-# LANGWATCH_ENDPOINT points nlpgo's evaluator/agent-workflow callbacks back at
-# the local app.
+# The whole local stack in one terminal: the three applications (ui, api,
+# workers) plus the Go aigateway and nlpgo engines. `pnpm dev` starts all five
+# itself now — dev/scripts/dev-stack.sh derives every port and skips a Go lane
+# that is already listening — so this target is one line pointing at it, kept
+# because `make start` is in the README and in muscle memory.
 start:
-	cd platform/app && pnpm concurrently --kill-others \
-		'pnpm dev' \
-		'SERVER_ADDR=:5561 LANGWATCH_ENDPOINT=http://localhost:5560 make -C .. service svc=nlpgo'
+	pnpm dev
 
 start/postgres:
 	@echo "Starting Postgres..."
 	@docker compose -f infra/compose.yml --project-directory . up -d postgres
 
+# A watching typecheck of one application (default apps/api):
+#   make tsc-watch app=apps/ui
+# It never takes a check-queue slot — a `--watch` run would hold one for the
+# whole session, which is exactly what the queue exists to prevent.
 tsc-watch:
-	cd platform/app && pnpm tsc-watch
+	pnpm exec tsc --noEmit --watch --preserveWatchOutput -p $(or $(app),apps/api)/tsconfig.json
 
 # Single entry point — interactive launcher or non-interactive mode runner.
 # (#3860 AC#1, AC#2). Positional usage via MAKECMDGOALS:
@@ -374,10 +374,23 @@ endif
 worktree:
 	@./dev/scripts/worktree.sh $(WORKTREE_ARG)
 
+# Describe the REST surface the API process actually mounts, and say how it
+# differs from the frozen document.
+#
+# The DOCUMENT IS FROZEN. `apps/api/src/features/discovery/openapi-document.json`
+# is served by three routes and both SDKs generate clients from it, so nothing
+# here writes it — not this target, not the task it runs. What the generator
+# produces goes to a scratch file, and the check prints what a person would
+# have to look at before replacing the artifact by hand.
+#
+# To regenerate the CLIENTS from the document as it stands, run the two
+# commands the output names.
 sync-all-openapi:
-	cd platform/app && pnpm run task generateOpenAPISpec
-	cd sdks/typescript && pnpm run generate:openapi-types
-	cd sdks/python && make generate/api-client
+	@pnpm --filter @langwatch/platform-api task:openapi-check
+	@echo ""
+	@echo "The frozen document was NOT written. To refresh the clients from it as it stands:"
+	@echo "    cd sdks/typescript && pnpm run generate:openapi-types"
+	@echo "    cd sdks/python && make generate/api-client"
 
 # Included last on purpose (see the note next to `include dev/boxd.mk`): the
 # `make haven <sub>` passthrough must define its no-op goals after the real

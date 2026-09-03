@@ -2,8 +2,7 @@
   overflow-x: visible !important;
 }
 
-a[href="https://github.com/langwatch/langwatch"] .text-sm
-{
+a[href="https://github.com/langwatch/langwatch"] .text-sm {
   white-space: nowrap;
 }
 
@@ -157,10 +156,22 @@ code {
 }
 
 /* Copied toggle — both icons rendered, CSS shows/hides via data-copied */
-.lw-copy-btn .lw-check-icon { display: none; }
-.lw-copy-btn .lw-copy-icon { display: flex; align-items: center; gap: 6px; }
-.lw-copy-btn[data-copied] .lw-copy-icon { display: none; }
-.lw-copy-btn[data-copied] .lw-check-icon { display: flex; align-items: center; gap: 6px; }
+.lw-copy-btn .lw-check-icon {
+  display: none;
+}
+.lw-copy-btn .lw-copy-icon {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+.lw-copy-btn[data-copied] .lw-copy-icon {
+  display: none;
+}
+.lw-copy-btn[data-copied] .lw-check-icon {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
 .lw-copy-btn[data-copied] {
   background: #ecfdf5;
   color: #059669;
@@ -168,8 +179,12 @@ code {
 }
 
 /* CopyLine copied toggle */
-.lw-copy-prompt[data-copied] .lw-copy-line-icon { display: none !important; }
-.lw-copy-prompt[data-copied] .lw-copy-line-check { display: flex !important; }
+.lw-copy-prompt[data-copied] .lw-copy-line-icon {
+  display: none !important;
+}
+.lw-copy-prompt[data-copied] .lw-copy-line-check {
+  display: flex !important;
+}
 
 /* Dark mode overrides */
 .dark .lw-copy-prompt {
@@ -255,8 +270,12 @@ code {
   min-width: 0;
   font-size: 14px;
 }
-.lw-info-box-content p { margin: 0 0 8px; }
-.lw-info-box-content p:last-child { margin-bottom: 0; }
+.lw-info-box-content p {
+  margin: 0 0 8px;
+}
+.lw-info-box-content p:last-child {
+  margin-bottom: 0;
+}
 .lw-info-box-content pre {
   margin: 8px 0 0 !important;
 }
@@ -271,7 +290,9 @@ code {
   border-color: #374151;
   background: rgba(255, 255, 255, 0.03);
 }
-.dark .lw-info-box-icon { color: #9ca3af; }
+.dark .lw-info-box-icon {
+  color: #9ca3af;
+}
 
 /* ── Skill Accordion ── */
 .lw-accordion {
@@ -294,16 +315,22 @@ code {
   transition: background 0.15s;
   list-style: none;
 }
-.lw-accordion-header:hover { background: #f9fafb; }
+.lw-accordion-header:hover {
+  background: #f9fafb;
+}
 
-.lw-accordion-title { font-size: 14px; }
+.lw-accordion-title {
+  font-size: 14px;
+}
 
 .lw-accordion-chevron {
   flex-shrink: 0;
   transition: transform 0.2s;
   color: #9ca3af;
 }
-.lw-accordion[data-open] .lw-accordion-chevron { transform: rotate(180deg); }
+.lw-accordion[data-open] .lw-accordion-chevron {
+  transform: rotate(180deg);
+}
 
 /* Body: server-rendered but hidden until opened, so crawlers index the
    install commands and prompts without any JavaScript. */
@@ -312,15 +339,23 @@ code {
   padding: 0 16px 16px;
   border-top: 1px solid #e5e7eb;
 }
-.lw-accordion[data-open] .lw-accordion-body { display: block; }
+.lw-accordion[data-open] .lw-accordion-body {
+  display: block;
+}
 
 /* Static variant: always open, header is a plain title bar. */
-.lw-accordion-static .lw-accordion-header { cursor: default; }
-.lw-accordion-static .lw-accordion-header:hover { background: transparent; }
+.lw-accordion-static .lw-accordion-header {
+  cursor: default;
+}
+.lw-accordion-static .lw-accordion-header:hover {
+  background: transparent;
+}
 
 /* Server-rendered prompt text backing the "Copy Full Prompt" action.
    Kept in the DOM (crawlable, copyable via posthog.js) but never shown. */
-.lw-prompt-source { display: none; }
+.lw-prompt-source {
+  display: none;
+}
 
 /* Install + Usage command row */
 .lw-accordion-commands {
@@ -351,7 +386,9 @@ code {
   cursor: pointer;
   transition: border-color 0.15s;
 }
-.lw-accordion-cmd-box:hover { border-color: #d1d5db; }
+.lw-accordion-cmd-box:hover {
+  border-color: #d1d5db;
+}
 .lw-accordion-cmd-box code {
   font-size: 13px;
   font-family: var(--font-mono, monospace);
@@ -372,9 +409,16 @@ code {
 }
 
 /* Copied state for command boxes */
-.lw-accordion-cmd-box[data-copied] { border-color: #059669; background: #ecfdf5; }
-.lw-accordion-cmd-box[data-copied] .lw-copy-line-icon { display: none !important; }
-.lw-accordion-cmd-box[data-copied] .lw-copy-line-check { display: inline-flex !important; }
+.lw-accordion-cmd-box[data-copied] {
+  border-color: #059669;
+  background: #ecfdf5;
+}
+.lw-accordion-cmd-box[data-copied] .lw-copy-line-icon {
+  display: none !important;
+}
+.lw-accordion-cmd-box[data-copied] .lw-copy-line-check {
+  display: inline-flex !important;
+}
 
 /* Action buttons */
 .lw-accordion-actions {
@@ -433,23 +477,57 @@ code {
   background: #ecfdf5;
   border-color: #059669;
 }
-.lw-accordion-action[data-copied] .lw-copy-line-icon { display: none !important; }
-.lw-accordion-action[data-copied] .lw-copy-line-check { display: flex !important; }
+.lw-accordion-action[data-copied] .lw-copy-line-icon {
+  display: none !important;
+}
+.lw-accordion-action[data-copied] .lw-copy-line-check {
+  display: flex !important;
+}
 
 /* Dark mode — accordion */
-.dark .lw-accordion { border-color: #374151; }
-.dark .lw-accordion-header:hover { background: rgba(255, 255, 255, 0.03); }
-.dark .lw-accordion-static .lw-accordion-header:hover { background: transparent; }
-.dark .lw-accordion-body { border-top-color: #374151; }
-.dark .lw-accordion-cmd-box { background: rgba(255, 255, 255, 0.05); border-color: #374151; }
-.dark .lw-accordion-cmd-box:hover { border-color: #6b7280; }
-.dark .lw-accordion-cmd-box[data-copied] { background: rgba(5, 150, 105, 0.15); border-color: rgba(5, 150, 105, 0.4); }
-.dark .lw-accordion-action { border-color: #374151; }
-.dark .lw-accordion-action-icon { border-color: #374151; }
-.dark .lw-accordion-action:hover { background: rgba(255, 255, 255, 0.03); border-color: #6b7280; }
-.dark .lw-accordion-action[data-copied] { background: rgba(5, 150, 105, 0.15); border-color: rgba(5, 150, 105, 0.4); }
-.dark .lw-accordion-chevron { color: #6b7280; }
-.dark .lw-slash-command { color: #fe9a00; }
+.dark .lw-accordion {
+  border-color: #374151;
+}
+.dark .lw-accordion-header:hover {
+  background: rgba(255, 255, 255, 0.03);
+}
+.dark .lw-accordion-static .lw-accordion-header:hover {
+  background: transparent;
+}
+.dark .lw-accordion-body {
+  border-top-color: #374151;
+}
+.dark .lw-accordion-cmd-box {
+  background: rgba(255, 255, 255, 0.05);
+  border-color: #374151;
+}
+.dark .lw-accordion-cmd-box:hover {
+  border-color: #6b7280;
+}
+.dark .lw-accordion-cmd-box[data-copied] {
+  background: rgba(5, 150, 105, 0.15);
+  border-color: rgba(5, 150, 105, 0.4);
+}
+.dark .lw-accordion-action {
+  border-color: #374151;
+}
+.dark .lw-accordion-action-icon {
+  border-color: #374151;
+}
+.dark .lw-accordion-action:hover {
+  background: rgba(255, 255, 255, 0.03);
+  border-color: #6b7280;
+}
+.dark .lw-accordion-action[data-copied] {
+  background: rgba(5, 150, 105, 0.15);
+  border-color: rgba(5, 150, 105, 0.4);
+}
+.dark .lw-accordion-chevron {
+  color: #6b7280;
+}
+.dark .lw-slash-command {
+  color: #fe9a00;
+}
 
 /* Sidebar page icons (nav group marks).
    The theme aligns the icon img to the top of the row's line box, so a 16px

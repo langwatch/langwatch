@@ -8,7 +8,9 @@ keywords: demo, agent billing, rebilling example, webhook receiver example, refe
 [`langwatch/agent-billing-demo`](https://github.com/langwatch/agent-billing-demo) is a deliberately small agent-platform SaaS: customers sign up, create agents, and chat with them. The platform meters every LLM call and rebills its customers, with **zero metering code of its own**. It exists so you can see the whole [metering and rebilling pattern](/ai-gateway/cookbooks/metering-and-rebilling) running, then copy it.
 
 <Tip>
-Point your coding agent at the repo as the canonical integration example for gateway provisioning, webhook ingestion, and budgets. Every file is written to be copied from, and the README carries the same contracts these docs document.
+  Point your coding agent at the repo as the canonical integration example for gateway
+  provisioning, webhook ingestion, and budgets. Every file is written to be copied from,
+  and the README carries the same contracts these docs document.
 </Tip>
 
 ## What it demonstrates
@@ -28,11 +30,11 @@ A React + Tailwind single page app, built by Vite and served by the Express serv
 
 One `POST` mints the virtual key and attaches three real budgets to it:
 
-| Budget | Scope | Window | Limit | On breach |
-|---|---|---|---|---|
-| Hard cap | `virtual_key` | `manual` | $5.00 | `block` |
-| Soft cap | `virtual_key` | `manual` | $2.50 | `warn` |
-| Per-seat allowance | `attributed_user` anchored to the key | `month` | $1.00 | `block` |
+| Budget             | Scope                                 | Window   | Limit | On breach |
+| ------------------ | ------------------------------------- | -------- | ----- | --------- |
+| Hard cap           | `virtual_key`                         | `manual` | $5.00 | `block`   |
+| Soft cap           | `virtual_key`                         | `manual` | $2.50 | `warn`    |
+| Per-seat allowance | `attributed_user` anchored to the key | `month`  | $1.00 | `block`   |
 
 The form then redirects into the dashboard with a success toast naming the caps it just created, so the customer sees the outcome instead of a spinner. A workspace name that is already taken comes back as a structured `409` carrying `code: "customer_exists"` and an offer to open the existing workspace, never a database error.
 
@@ -70,14 +72,14 @@ The message you tried to send is handed back for a retry.
 
 Every surface you would copy exists in both languages, self-contained:
 
-| Surface | TypeScript | Python |
-|---|---|---|
-| Signature verification | `ts/src/verify-signature.ts` | `python/verify_signature.py` |
-| Webhook receiver | `ts/src/receiver.ts` | `python/receiver.py` |
-| Billing ledger | `ts/src/ledger.ts` | `python/ledger.py` |
-| Reconciliation | `ts/src/reconcile.ts` | `python/reconcile.py` |
-| Provisioning | `ts/src/provision.ts` | `python/provision.py` |
-| App shell | `app/` (Express + React, `:4100`) | `python/app.py` (FastAPI, `:4200`) |
+| Surface                | TypeScript                        | Python                             |
+| ---------------------- | --------------------------------- | ---------------------------------- |
+| Signature verification | `ts/src/verify-signature.ts`      | `python/verify_signature.py`       |
+| Webhook receiver       | `ts/src/receiver.ts`              | `python/receiver.py`               |
+| Billing ledger         | `ts/src/ledger.ts`                | `python/ledger.py`                 |
+| Reconciliation         | `ts/src/reconcile.ts`             | `python/reconcile.py`              |
+| Provisioning           | `ts/src/provision.ts`             | `python/provision.py`              |
+| App shell              | `app/` (Express + React, `:4100`) | `python/app.py` (FastAPI, `:4200`) |
 
 The app's own receiver lives at `app/src/webhooks.ts` and implements the identical contract as the standalone one. Both standalone receivers run side by side against the same LangWatch instance, each registered as its own endpoint with its own secret; every request lands in both ledgers, signed and deduped, which doubles as a demonstration that delivery is consumer-agnostic.
 

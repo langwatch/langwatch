@@ -3,7 +3,7 @@ import superjson from "superjson";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { runWithContext } from "../context";
 import { getLogContext } from "../context/logging";
-import { consoleIgnoreFields, createLogger } from "../logger";
+import { configureLogger, consoleIgnoreFields, createLogger, resetLoggerCache } from "../logger";
 
 vi.mock("@opentelemetry/api", () => ({
   context: { active: vi.fn(() => ({})) },
@@ -25,6 +25,7 @@ function captureDest() {
 describe("createLogger", () => {
   beforeEach(() => {
     vi.clearAllMocks();
+    configureLogger({ environment: "test" });
   });
 
   it("returns a pino logger with the given name", () => {
@@ -37,24 +38,17 @@ describe("createLogger", () => {
     expect(typeof logger.debug).toBe("function");
   });
 
-  it("sets level to error in test environment", () => {
-    const pinoLogLevel = process.env.PINO_LOG_LEVEL;
-    const legacyLogLevel = process.env._LOG_LEVEL;
+  it("sets level to error for injected test configuration", () => {
+    const logger = createLogger("test-level");
 
-    delete process.env.PINO_LOG_LEVEL;
-    delete process.env._LOG_LEVEL;
+    expect(logger.level).toBe("error");
+  });
 
-    try {
-      const logger = createLogger("test-level");
+  it("uses the configured log level", () => {
+    configureLogger({ environment: "test", level: "warn" });
+    resetLoggerCache();
 
-      expect(logger.level).toBe("error");
-    } finally {
-      if (pinoLogLevel === undefined) delete process.env.PINO_LOG_LEVEL;
-      else process.env.PINO_LOG_LEVEL = pinoLogLevel;
-
-      if (legacyLogLevel === undefined) delete process.env._LOG_LEVEL;
-      else process.env._LOG_LEVEL = legacyLogLevel;
-    }
+    expect(createLogger("configured-level").level).toBe("warn");
   });
 
   describe("when disableContext is true", () => {
@@ -107,8 +101,7 @@ describe("createLogger", () => {
           level: "error",
           serializers: {
             error: (err: unknown) => {
-              if (!(err instanceof Error))
-                return pino.stdSerializers.err(err as Error);
+              if (!(err instanceof Error)) return pino.stdSerializers.err(err as Error);
               const serialized = superjson.serialize(err);
               return {
                 ...pino.stdSerializers.err(err),
@@ -136,8 +129,7 @@ describe("createLogger", () => {
           level: "error",
           serializers: {
             error: (err: unknown) => {
-              if (!(err instanceof Error))
-                return pino.stdSerializers.err(err as Error);
+              if (!(err instanceof Error)) return pino.stdSerializers.err(err as Error);
               return pino.stdSerializers.err(err);
             },
           },

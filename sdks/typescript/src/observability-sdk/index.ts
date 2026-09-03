@@ -52,11 +52,7 @@ export {
   type LangWatchTracer,
 } from "./tracer";
 
-export {
-  getDataCaptureMode,
-  shouldCaptureInput,
-  shouldCaptureOutput,
-} from "./config.js";
+export { getDataCaptureMode, shouldCaptureInput, shouldCaptureOutput } from "./config.js";
 
 export {
   type SemConvAttributes,

@@ -58,18 +58,21 @@ with langwatch.trace(name="my-agent-turn"):
 
 The gateway reads these on each request and attaches its own span as a child of your trace. The LangWatch UI shows the LLM call nested under your agent span with no cost duplication.
 
-<Note>`get_gateway_headers()` ships in LangWatch Python SDK ≥ `v0.22.0` alongside the gateway GA. Check your installed version with `pip show langwatch`.</Note>
+<Note>
+  `get_gateway_headers()` ships in LangWatch Python SDK ≥ `v0.22.0` alongside the gateway
+  GA. Check your installed version with `pip show langwatch`.
+</Note>
 
 ### Response headers for correlation
 
 Every gateway response carries these headers so clients can stitch the span back into their own trace without needing the LangWatch SDK:
 
-| Header | Value |
-|---|---|
-| `X-LangWatch-Trace-Id` | 32-hex trace id. Matches the incoming `traceparent` trace id if one was supplied; otherwise a freshly-minted trace id |
-| `X-LangWatch-Span-Id` | 16-hex gateway span id |
-| `traceparent` | W3C traceparent re-injected for downstream stitching, pass it to any further hop you call |
-| `X-LangWatch-Gateway-Request-Id` | `req_` + 30 hex characters, gateway-scoped. Use this in support tickets |
+| Header                           | Value                                                                                                                 |
+| -------------------------------- | --------------------------------------------------------------------------------------------------------------------- |
+| `X-LangWatch-Trace-Id`           | 32-hex trace id. Matches the incoming `traceparent` trace id if one was supplied; otherwise a freshly-minted trace id |
+| `X-LangWatch-Span-Id`            | 16-hex gateway span id                                                                                                |
+| `traceparent`                    | W3C traceparent re-injected for downstream stitching, pass it to any further hop you call                             |
+| `X-LangWatch-Gateway-Request-Id` | `req_` + 30 hex characters, gateway-scoped. Use this in support tickets                                               |
 
 ```python
 resp = client.chat.completions.with_raw_response.create(

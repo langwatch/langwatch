@@ -3,7 +3,7 @@ image:
   # .github/workflows/publish-docker-app.yml on every `langwatch@*` release.
   # Self-hosters who mirror to an internal registry override `repository`.
   repository: docker.io/langwatch/langyagent
-  tag: ""            # defaults to .Chart.AppVersion; releases also publish `latest` and `<short-sha>`
+  tag: "" # defaults to .Chart.AppVersion; releases also publish `latest` and `<short-sha>`
   pullPolicy: IfNotPresent
 
 # Lift this pod as part of the umbrella chart. Set false to run the agent
@@ -38,7 +38,7 @@ environment: ""
 manager:
   port: 8080
   maxWorkers: 20
-  workerIdleMs: 600000        # 10 min — idle workers are reaped
+  workerIdleMs: 600000 # 10 min — idle workers are reaped
   # How long to wait for a freshly-spawned worker's opencode to bind before
   # aborting the spawn. Under gVisor (runsc), process/syscall startup is
   # materially slower than runc: a cold opencode boot on the dev gVisor node
@@ -302,14 +302,14 @@ networkPolicy:
   # Operators on a non-standard topology (a service CIDR outside RFC1918, extra
   # VPC CIDRs) APPEND their ranges here — the template iterates the list.
   privateExcept:
-    - 10.0.0.0/8          # RFC1918 (covers the EKS default service CIDR 10.100/16)
-    - 172.16.0.0/12       # RFC1918 (covers the EKS default service CIDR 172.20/16)
-    - 192.168.0.0/16      # RFC1918
-    - 169.254.0.0/16      # link-local + cloud metadata (169.254.169.254)
-    - 100.64.0.0/10       # RFC 6598 CGNAT — EKS "custom networking" / secondary
-                          # CIDR places PODS (and sometimes NODES + the apiserver
-                          # ENI) here; NOT covered by RFC1918, so it MUST be
-                          # excluded or a worker reaches neighbours on :443.
+    - 10.0.0.0/8 # RFC1918 (covers the EKS default service CIDR 10.100/16)
+    - 172.16.0.0/12 # RFC1918 (covers the EKS default service CIDR 172.20/16)
+    - 192.168.0.0/16 # RFC1918
+    - 169.254.0.0/16 # link-local + cloud metadata (169.254.169.254)
+    - 100.64.0.0/10 # RFC 6598 CGNAT — EKS "custom networking" / secondary
+      # CIDR places PODS (and sometimes NODES + the apiserver
+      # ENI) here; NOT covered by RFC1918, so it MUST be
+      # excluded or a worker reaches neighbours on :443.
   # IPv6 side of the external-HTTPS rule (`::/0` with the excepts below):
   # OPT-IN, and only for genuinely dual-stack clusters. On an IPv4-only EKS
   # cluster the v6 block is not just dead weight, it BREAKS enforcement: the
@@ -322,8 +322,8 @@ networkPolicy:
   # DENIES v6 (fail closed), it does not allow it.
   allowExternalHttpsIpv6: false
   privateExceptV6:
-    - fd00::/8            # unique-local (incl. IPv6 metadata fd00:ec2::254)
-    - fe80::/10           # link-local
+    - fd00::/8 # unique-local (incl. IPv6 metadata fd00:ec2::254)
+    - fe80::/10 # link-local
 
 # Egress enforcement (ADR-076) — the per-worker L7 egress adapter. Monitor
 # first, enforce last: the default posture is monitor-only. These map to the

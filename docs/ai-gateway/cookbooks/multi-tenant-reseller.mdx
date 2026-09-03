@@ -30,11 +30,11 @@ Key properties:
 
 Decide your scope granularity:
 
-| Model | VK per | Budget scope | Use case |
-|---|---|---|---|
-| **Per customer** | one VK per tenant | `virtual_key` | Most SaaS apps, one account = one VK |
-| **Per seat** | one VK per LangWatch user | `principal` | Internal platform teams where every seat is a real LangWatch user |
-| **Per team** | one VK per sub-org | `team`-scope budgets | Customers have their own teams/projects |
+| Model            | VK per                    | Budget scope         | Use case                                                          |
+| ---------------- | ------------------------- | -------------------- | ----------------------------------------------------------------- |
+| **Per customer** | one VK per tenant         | `virtual_key`        | Most SaaS apps, one account = one VK                              |
+| **Per seat**     | one VK per LangWatch user | `principal`          | Internal platform teams where every seat is a real LangWatch user |
+| **Per team**     | one VK per sub-org        | `team`-scope budgets | Customers have their own teams/projects                           |
 
 For this walkthrough, assume **per-customer** model. Note that `principal` budgets target real LangWatch user accounts, which your external customers are not; for reseller tenancy the per-customer unit is the virtual key itself.
 
@@ -42,11 +42,11 @@ For this walkthrough, assume **per-customer** model. Note that `principal` budge
 
 Your LangWatch org owns a single ModelProvider row per upstream (OpenAI, Anthropic) at ORGANIZATION scope. End-users never see these. Configure them under **Settings → Model Providers → Add Model Provider** (Scope = Organization), then open each row's **Advanced (Gateway)** tab and set the per-credential gateway caps:
 
-| Field | Suggested value |
-|---|---|
-| RPM | 100000 (your bulk-purchase cap from the upstream) |
-| Fallback priority | 10 for primary, 20 for backup |
-| Provider config (JSON) | region/deployment overrides as needed |
+| Field                  | Suggested value                                   |
+| ---------------------- | ------------------------------------------------- |
+| RPM                    | 100000 (your bulk-purchase cap from the upstream) |
+| Fallback priority      | 10 for primary, 20 for backup                     |
+| Provider config (JSON) | region/deployment overrides as needed             |
 
 No separate "binding" entity to mint. The ModelProvider id is what your code references:
 
@@ -80,7 +80,7 @@ export async function provisionCustomer(customerId: string, planLimitUsd: string
       budget: {
         limit_usd: planLimitUsd, // from your plans table
         window: "month",
-        on_breach: "block",      // or warn for grace periods
+        on_breach: "block", // or warn for grace periods
       },
       config: {
         modelsAllowed: ["gpt-5-mini", "gpt-5", "claude-haiku-4-5-20251001"],

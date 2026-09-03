@@ -7,9 +7,7 @@
  * coalesces traces with no recorded origin into "application", so filtering
  * by `application` also matches traces whose origin was never stamped.
  */
-export function parseOriginOption(
-  origin: string | undefined,
-): string[] | undefined {
+export function parseOriginOption(origin: string | undefined): string[] | undefined {
   if (origin === undefined) return undefined;
 
   const values = origin

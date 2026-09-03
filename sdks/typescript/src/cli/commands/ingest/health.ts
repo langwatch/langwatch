@@ -17,9 +17,7 @@ export async function ingestHealthCommand(
 ): Promise<void> {
   const cfg = loadConfig();
   if (!isLoggedIn(cfg)) {
-    process.stderr.write(
-      "Not logged in. Run `langwatch login --device` first.\n",
-    );
+    process.stderr.write("Not logged in. Run `langwatch login --device` first.\n");
     process.exit(1);
   }
 
@@ -37,16 +35,16 @@ export async function ingestHealthCommand(
   }
 
   const { source, health } = result;
-  console.log(
-    `${chalk.bold(source.name)}  ${chalk.gray("(" + source.id + ")")}`,
-  );
+  console.log(`${chalk.bold(source.name)}  ${chalk.gray("(" + source.id + ")")}`);
   console.log(`Status:        ${colorStatus(source.status)}`);
   console.log(`Events (24h):  ${health.events24h}`);
   console.log(`Events (7d):   ${health.events7d}`);
   console.log(`Events (30d):  ${health.events30d}`);
   console.log(
     `Last event:    ${
-      health.lastSuccessIso ? humanRelative(new Date(health.lastSuccessIso)) : chalk.gray("—")
+      health.lastSuccessIso
+        ? humanRelative(new Date(health.lastSuccessIso))
+        : chalk.gray("—")
     }`,
   );
 }

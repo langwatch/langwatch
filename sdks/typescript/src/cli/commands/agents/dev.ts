@@ -150,9 +150,8 @@ export async function startAgentDevSession(
   // real URL still stashed under devTunnel. Restore it before provisioning:
   // if THIS session dies before its own write-back, the agent is left on the
   // real URL rather than on a dead tunnel.
-  const staleStash = (
-    agent.config as { devTunnel?: { previousUrl?: string } } | undefined
-  )?.devTunnel;
+  const staleStash = (agent.config as { devTunnel?: { previousUrl?: string } } | undefined)
+    ?.devTunnel;
   if (updateUrl && staleStash?.previousUrl) {
     try {
       const fresh = await service.get(agent.id);
@@ -181,9 +180,7 @@ export async function startAgentDevSession(
       ),
     );
   }
-  const secret = useAuthProxy
-    ? crypto.randomBytes(24).toString("base64url")
-    : undefined;
+  const secret = useAuthProxy ? crypto.randomBytes(24).toString("base64url") : undefined;
 
   let proxy: AuthProxy | undefined;
   if (useAuthProxy && secret) {
@@ -213,9 +210,7 @@ export async function startAgentDevSession(
   let needsRestore = false;
 
   if (updateUrl) {
-    const spinner = createSpinner(
-      `Pointing agent "${agent.name}" at the tunnel...`,
-    ).start();
+    const spinner = createSpinner(`Pointing agent "${agent.name}" at the tunnel...`).start();
     try {
       const fresh = await service.get(agent.id);
       const config = applyDevTunnel({
@@ -258,9 +253,7 @@ export async function startAgentDevSession(
         if (restored) {
           await service.update(agent.id, { config: restored });
           console.log(
-            `Restored agent "${agent.name}"${
-              previousUrl ? ` to ${chalk.cyan(previousUrl)}` : ""
-            }.`,
+            `Restored agent "${agent.name}"${previousUrl ? ` to ${chalk.cyan(previousUrl)}` : ""}.`,
           );
         }
       } catch {
@@ -286,23 +279,18 @@ export async function startAgentDevSession(
   // event racing a crash handler) shares the ONE in-flight restore instead of
   // starting another.
   let shutdownPromise: Promise<void> | undefined;
-  const shutdown = (code = 0): Promise<void> =>
-    (shutdownPromise ??= performShutdown(code));
+  const shutdown = (code = 0): Promise<void> => (shutdownPromise ??= performShutdown(code));
 
   const attachTunnelEnd = (attached: TunnelHandle): void => {
     attached.once("exit", () => {
       if (shutdownPromise || attached !== currentTunnel) return;
-      console.error(
-        chalk.yellow("The tunnel process ended. Restoring the agent URL."),
-      );
+      console.error(chalk.yellow("The tunnel process ended. Restoring the agent URL."));
       void shutdown(0);
     });
     attached.once("error", (error) => {
       if (shutdownPromise || attached !== currentTunnel) return;
       console.error(
-        chalk.yellow(
-          `The tunnel reported an error (${error.message}). Restoring the agent URL.`,
-        ),
+        chalk.yellow(`The tunnel reported an error (${error.message}). Restoring the agent URL.`),
       );
       void shutdown(1);
     });
@@ -318,9 +306,7 @@ export async function startAgentDevSession(
     try {
       const response = await fetch(currentTunnelUrl, {
         method: "GET",
-        signal: AbortSignal.timeout(
-          hooks.healthProbeTimeoutMs ?? HEALTH_PROBE_TIMEOUT_MS,
-        ),
+        signal: AbortSignal.timeout(hooks.healthProbeTimeoutMs ?? HEALTH_PROBE_TIMEOUT_MS),
       });
       return response.status !== 530;
     } catch {
@@ -341,9 +327,7 @@ export async function startAgentDevSession(
 
   const reprovisionTunnel = async (): Promise<void> => {
     console.error(
-      chalk.yellow(
-        "The tunnel stopped answering. Provisioning a replacement tunnel...",
-      ),
+      chalk.yellow("The tunnel stopped answering. Provisioning a replacement tunnel..."),
     );
     const previous = currentTunnel;
     const started = await startQuickTunnel({ localUrl: tunnelTarget });
@@ -366,8 +350,7 @@ export async function startAgentDevSession(
   // A bring-your-own tunnel is not ours to replace, and with --no-update-url
   // the caller pointed things at the printed URL themselves, so a silent swap
   // would strand them. Both only get the warning.
-  const canReprovision =
-    updateUrl && !options.tunnelUrl && currentTunnel !== undefined;
+  const canReprovision = updateUrl && !options.tunnelUrl && currentTunnel !== undefined;
   let consecutiveFailures = 0;
 
   const runHealthCheck = async (): Promise<void> => {
@@ -417,9 +400,7 @@ export async function startAgentDevSession(
 }
 
 /** The `agent dev` command action: run the session until a signal ends it. */
-export const agentDevCommand = async (
-  options: AgentDevOptions,
-): Promise<void> => {
+export const agentDevCommand = async (options: AgentDevOptions): Promise<void> => {
   const session = await startAgentDevSession(options);
 
   // A session is event-driven, and with `--tunnel-url` there is neither a

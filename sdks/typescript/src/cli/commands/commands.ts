@@ -8,11 +8,7 @@
  * list. The human rendering is the same compact tree `help-tree` prints.
  */
 import { buildProgram } from "../program";
-import {
-  buildCatalog,
-  flattenCatalog,
-  renderHelpTree,
-} from "../utils/commandCatalog";
+import { buildCatalog, flattenCatalog, renderHelpTree } from "../utils/commandCatalog";
 import type { CommandResult, RawOutputFlags } from "../utils/output";
 
 export interface CommandsOptions extends RawOutputFlags {
@@ -20,9 +16,7 @@ export interface CommandsOptions extends RawOutputFlags {
   flat?: boolean;
 }
 
-export const commandsCommand = (
-  options?: CommandsOptions,
-): CommandResult => {
+export const commandsCommand = (options?: CommandsOptions): CommandResult => {
   const catalog = buildCatalog(buildProgram());
   return {
     data: { commands: options?.flat ? flattenCatalog(catalog) : catalog },

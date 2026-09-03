@@ -158,8 +158,7 @@ const runHook = ({
  * when the hook has already exited. Give it a moment before concluding nothing
  * was sent, otherwise the silent cases would pass for the wrong reason.
  */
-const settle = (): Promise<void> =>
-  new Promise((resolve) => setTimeout(resolve, 250));
+const settle = (): Promise<void> => new Promise((resolve) => setTimeout(resolve, 250));
 
 beforeAll(async () => {
   if (!existsSync(hookScript) || !existsSync(guidanceScript)) {

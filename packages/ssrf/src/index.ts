@@ -159,13 +159,7 @@ function parsePrefix({ cidr, rfc }: { cidr: string; rfc: string }): Prefix {
 }
 
 /** Whether addr (already unmapped) falls inside prefix. */
-function prefixContains({
-  prefix,
-  addr,
-}: {
-  prefix: Prefix;
-  addr: Uint8Array;
-}): boolean {
+function prefixContains({ prefix, addr }: { prefix: Prefix; addr: Uint8Array }): boolean {
   if (prefix.bytes.length !== addr.length) return false; // different family
   let bits = prefix.bits;
   let i = 0;
@@ -280,8 +274,7 @@ export function classify(ip: string): Category {
   if (!raw) return "special";
   const addr = unmap(raw);
 
-  if (METADATA_ADDRESSES.some((m) => bytesEqual({ a: m, b: addr })))
-    return "metadata";
+  if (METADATA_ADDRESSES.some((m) => bytesEqual({ a: m, b: addr }))) return "metadata";
   for (const prefix of SPECIAL_PREFIXES) {
     if (prefixContains({ prefix, addr })) return "special";
   }

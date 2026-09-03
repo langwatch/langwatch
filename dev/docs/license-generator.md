@@ -13,7 +13,7 @@ that unlocked the Enterprise feature surface without a signed license file.
 That was removed because:
 
 1. **It bakes the bypass into the codebase.** Any reader of `/dev/docs/`,
-   `platform/app/.env.example`, or `git log` learns how to skip licensing in one
+   `.env.example`, or `git log` learns how to skip licensing in one
    line. The friction protecting the Enterprise tier should be **getting a
    license**, not finding the env var.
 2. **It papers over real plan-resolution bugs.** When the bypass is on,
@@ -29,9 +29,9 @@ Used by every dogfood / QA / seed flow that needs Enterprise surfaces unlocked.
 
 ## Pre-requisites
 
-- `LANGWATCH_LICENSE_PRIVATE_KEY` set in `platform/app/.env` (RSA private key, paired with
+- `LANGWATCH_LICENSE_PRIVATE_KEY` set in `.env` (RSA private key, paired with
   the public key compiled into the verifier at
-  `platform/app/ee/licensing/signing.ts`). Ask the maintainer for the dev key —
+  `packages/enterprise/features/licensing/server/src/adapters/node.license-cryptography.adapter.ts`). Ask the maintainer for the dev key —
   it is **not** checked into the repo.
 - Postgres reachable via `DATABASE_URL`.
 - The target organization already exists (the script writes a `License` row
@@ -56,12 +56,12 @@ LANGWATCH_LICENSE_PRIVATE_KEY=$(cat private.pem) \
 
 Arguments:
 
-| Flag | Required | Default | Description |
-|---|---|---|---|
-| `--org-id` | yes | — | Target `Organization.id` to attach the license to. Org must already exist. |
-| `--plan` | no | `ENTERPRISE` | One of `ENTERPRISE` / `GROWTH` / `PRO`. Plan templates live at `platform/app/ee/licensing/planTemplates.ts`. |
-| `--max-members` | no | `50` | Seat cap. Must be ≥ 1. |
-| `--email` | no | `<orgSlug>@local.test` | Issued-to email for the license metadata + audit-trail field. |
+| Flag            | Required | Default                | Description                                                                                                  |
+| --------------- | -------- | ---------------------- | ------------------------------------------------------------------------------------------------------------ |
+| `--org-id`      | yes      | —                      | Target `Organization.id` to attach the license to. Org must already exist.                                   |
+| `--plan`        | no       | `ENTERPRISE`           | One of `ENTERPRISE` / `GROWTH` / `PRO`. Plan templates live at `packages/enterprise/features/licensing/contract/src/license-plan-templates.ts`. |
+| `--max-members` | no       | `50`                   | Seat cap. Must be ≥ 1.                                                                                       |
+| `--email`       | no       | `<orgSlug>@local.test` | Issued-to email for the license metadata + audit-trail field.                                                |
 
 Output: prints the encoded license key to stdout + writes/updates the
 `Organization.license` + `Organization.licenseExpiresAt` columns. The
@@ -90,18 +90,19 @@ await applyLicenseToOrg({
 });
 ```
 
-The dogfood seed at `platform/app/scripts/seed-gateway-dogfood.ts` ships an
-idempotent `ensureOrgHasLicense(orgId)` helper that wraps `applyLicenseToOrg`
-— skips if the org already has a valid license, warns if the env var is
-unset, and is safe to call on every seed run.
+The dogfood seed shipped an idempotent `ensureOrgHasLicense(orgId)` helper that
+wrapped `applyLicenseToOrg` — skipping if the org already had a valid license,
+warning if the env var was unset, and safe to call on every seed run. That
+script (`scripts/seed-gateway-dogfood.ts`) did not survive the platform split;
+reinstate the helper alongside whichever seed you wire this into.
 
 ## When to use
 
 - **Self-hosted dogfood** — generate an Enterprise license for the dogfood
   org so multi-user / governance / ingestion-source surfaces unlock.
-- **QA scripts** — `platform/app/scripts/_qa-*.mjs` create test orgs; each one
-  needs a license matching the test's plan-tier expectations. Wire the
-  generator into the QA bootstrap.
+- **QA scripts** — the monolith's `scripts/_qa-*.mjs` created test orgs; each
+  such script needs a license matching the test's plan-tier expectations. Wire
+  the generator into the QA bootstrap.
 - **Local-dev seed** — when running `pnpm dev:seed` against a fresh DB,
   the seed script generates a license for the seed org so the developer
   starts with the full surface unlocked locally. Same code path as
@@ -113,7 +114,7 @@ unset, and is safe to call on every seed run.
 ## What about FREE-plan reproduction?
 
 The FREE plan is the default — you don't need to generate a license. Just
-*don't* call the generator. `getActivePlan()` returns FREE when no `License`
+_don't_ call the generator. `getActivePlan()` returns FREE when no `License`
 row exists for the org (or all rows are expired).
 
 ## Security notes
@@ -125,7 +126,7 @@ row exists for the org (or all rows are expired).
   unlock anything for other orgs on the same instance. So even if a dev
   generates a wide-window license for their dogfood org, the blast radius
   is one org on their local stack.
-- The verifier uses the *public* key compiled into `signing.ts`. It does
+- The verifier uses the _public_ key compiled into `signing.ts`. It does
   not touch `LANGWATCH_LICENSE_PRIVATE_KEY` at runtime — that variable is only read
   by the generator script. Production deployments should not have
   `LANGWATCH_LICENSE_PRIVATE_KEY` set in their environment.

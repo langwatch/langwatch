@@ -38,11 +38,15 @@ describe("runtime safety", () => {
 
     expect(() => {
       const logger = telemetry.createLogger("browser-runtime-smoke");
+      expect(logger.level).toBe("info");
       logger.info({ runtime: "browser" }, "browser logger is operational");
       logger.error(
         { error: new Error("browser error") },
         "browser error serialization is operational",
       );
+
+      telemetry.configureLogger({ environment: "production" });
+      expect(telemetry.createLogger("browser-configured-runtime-smoke").level).toBe("info");
     }).not.toThrow();
   });
 
@@ -59,9 +63,10 @@ describe("runtime safety", () => {
         platform: "node",
         stdin: {
           contents: `
-            import { createLogger } from "./src/index.ts";
+            import { configureLogger, createLogger } from "./src/index.ts";
             import { runWithContext } from "./src/context/index.ts";
 
+            configureLogger({ environment: "test", level: "error" });
             const logger = createLogger("node-runtime-smoke");
             runWithContext({ organizationId: "runtime-org" }, () => {
               logger.error(
@@ -77,13 +82,6 @@ describe("runtime safety", () => {
       });
 
       const { stdout } = await execFileAsync(process.execPath, [outputFile], {
-        env: {
-          ...process.env,
-          LOG_CONSOLE_LEVEL: "error",
-          NODE_ENV: "development",
-          PINO_LOG_LEVEL: "error",
-          PINO_OTEL_ENABLED: "false",
-        },
         timeout: 10_000,
       });
 

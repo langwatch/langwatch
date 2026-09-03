@@ -44,9 +44,7 @@ export const listSpendEventsCommand = async (options: {
       : now - 24 * 60 * 60 * 1000;
   const to = options.to !== undefined ? parseInstant(options.to, "--to") : now;
   const limit =
-    options.limit !== undefined
-      ? parsePositiveInt(options.limit, "--limit")
-      : undefined;
+    options.limit !== undefined ? parsePositiveInt(options.limit, "--limit") : undefined;
   const service = new SpendEventsApiService({ apiKey });
   const spinner = createSpinner("Fetching spend events...").start();
   try {
@@ -61,7 +59,9 @@ export const listSpendEventsCommand = async (options: {
       model: options.model,
       status: options.status,
     });
-    spinner.succeed(`${page.data.length} event${page.data.length !== 1 ? "s" : ""}${page.next_cursor ? " (more available)" : ""}`);
+    spinner.succeed(
+      `${page.data.length} event${page.data.length !== 1 ? "s" : ""}${page.next_cursor ? " (more available)" : ""}`,
+    );
     return {
       data: page,
       table: () => {
@@ -93,7 +93,16 @@ export const listSpendEventsCommand = async (options: {
                   ? chalk.yellow("settled")
                   : chalk.red(e.data.error?.class ?? "error"),
           })),
-          headers: ["Request id", "Occurred at", "Model", "End user", "In/Out", "Cache r/w", "Cost USD", "Status"],
+          headers: [
+            "Request id",
+            "Occurred at",
+            "Model",
+            "End user",
+            "In/Out",
+            "Cache r/w",
+            "Cost USD",
+            "Status",
+          ],
           colorMap: { "Request id": chalk.gray, Model: chalk.cyan },
         });
         if (page.next_cursor) {
