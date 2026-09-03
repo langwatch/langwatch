@@ -10,16 +10,16 @@ import (
 type Input struct {
 	// Primary — auto-detected from cgroups, or set explicitly. Error if neither.
 	// These are parsed manually in Load() to support Kubernetes quantity syntax (e.g. "500m", "4Gi").
-	CPU      int   `validate:"gte=1"`
-	RAMBytes int64 `validate:"gte=536870912"` // min 512MB
-	Replicated    bool   `env:"CH_REPLICATED"`
-	ClusterName   string `env:"CH_CLUSTER" default:"default"`
-	Shard         string `env:"CH_SHARD" default:"shard_01"`
-	Replica       string `env:"CH_REPLICA"`
-	KeeperNodes   string `env:"CH_KEEPER_NODES"`
-	KeeperPort    int    `env:"CH_KEEPER_PORT" default:"9181"`
-	DataNodes     string `env:"CH_DATA_NODES"`
-	DataNodePort  int    `env:"CH_DATA_NODE_PORT" default:"9000"`
+	CPU          int    `validate:"gte=1"`
+	RAMBytes     int64  `validate:"gte=536870912"` // min 512MB
+	Replicated   bool   `env:"CH_REPLICATED"`
+	ClusterName  string `env:"CH_CLUSTER" default:"default"`
+	Shard        string `env:"CH_SHARD" default:"shard_01"`
+	Replica      string `env:"CH_REPLICA"`
+	KeeperNodes  string `env:"CH_KEEPER_NODES"`
+	KeeperPort   int    `env:"CH_KEEPER_PORT" default:"9181"`
+	DataNodes    string `env:"CH_DATA_NODES"`
+	DataNodePort int    `env:"CH_DATA_NODE_PORT" default:"9000"`
 
 	// Auth
 	Password          string `env:"CLICKHOUSE_PASSWORD" validate:"required"`
@@ -27,26 +27,26 @@ type Input struct {
 
 	// LangWatchQL access model (issue langwatch-saas#1168, Design C). When the
 	// chart mounts CLICKHOUSE_LWQL_PASSWORD_FILE the server owns the LWQL access
-	// model: renderLwql emits the langwatch_lwql restricted user, its
+	// model: renderLWQL emits the langwatch_lwql restricted user, its
 	// lwql_restricted profile, grants and row filters as config. Absent on
 	// installs that do not use LangWatchQL (or that point it at an external
-	// ClickHouse) — the renderer self-gates on LwqlPassword and skips otherwise.
+	// ClickHouse) — the renderer self-gates on LWQLPassword and skips otherwise.
 	//
-	// LwqlPassword is read from CLICKHOUSE_LWQL_PASSWORD_FILE in Load() (like
+	// LWQLPassword is read from CLICKHOUSE_LWQL_PASSWORD_FILE in Load() (like
 	// Password), never from a plain env, so it is hashed from the same mounted
 	// Secret the app authenticates with.
-	LwqlPassword string
-	LwqlDatabase string `env:"CLICKHOUSE_LWQL_DATABASE" default:"langwatch"`
+	LWQLPassword string
+	LWQLDatabase string `env:"CLICKHOUSE_LWQL_DATABASE" default:"langwatch"`
 
 	// lwql_postgres named collection — the ClickHouse→PostgreSQL bridge the
 	// LWQL PostgreSQL-resident views read through. Rendered only when both the
 	// host and the (plaintext, unhashable) reader password are provided.
-	// LwqlPgPassword is read from CLICKHOUSE_LWQL_PG_PASSWORD_FILE in Load().
-	LwqlPgHost     string `env:"CLICKHOUSE_LWQL_PG_HOST"`
-	LwqlPgPort     int    `env:"CLICKHOUSE_LWQL_PG_PORT" default:"5432"`
-	LwqlPgDatabase string `env:"CLICKHOUSE_LWQL_PG_DATABASE"`
-	LwqlPgUser     string `env:"CLICKHOUSE_LWQL_PG_USER"`
-	LwqlPgPassword string
+	// LWQLPgPassword is read from CLICKHOUSE_LWQL_PG_PASSWORD_FILE in Load().
+	LWQLPgHost     string `env:"CLICKHOUSE_LWQL_PG_HOST"`
+	LWQLPgPort     int    `env:"CLICKHOUSE_LWQL_PG_PORT" default:"5432"`
+	LWQLPgDatabase string `env:"CLICKHOUSE_LWQL_PG_DATABASE"`
+	LWQLPgUser     string `env:"CLICKHOUSE_LWQL_PG_USER"`
+	LWQLPgPassword string
 
 	// Backups — independent of cold storage, uses same S3-compatible credentials
 	BackupEnabled bool `env:"BACKUP_ENABLED"`
@@ -71,29 +71,29 @@ type Input struct {
 	SystemLogTTLDays int    `env:"SYSTEM_LOG_TTL_DAYS" default:"30"`
 
 	// System logs — each log has enable + TTL + optional flush settings
-	EnableQueryLog     bool `env:"ENABLE_QUERY_LOG" default:"true"`
-	QueryLogTTLDays    int  `env:"QUERY_LOG_TTL_DAYS" default:"7"`
-	QueryLogFlushMs    int  `env:"QUERY_LOG_FLUSH_INTERVAL_MS" default:"7500"`
-	EnablePartLog      bool `env:"ENABLE_PART_LOG" default:"true"`
-	PartLogTTLDays     int  `env:"PART_LOG_TTL_DAYS" default:"14"`
-	EnableMetricLog    bool `env:"ENABLE_METRIC_LOG"`
-	MetricLogTTLDays   int  `env:"METRIC_LOG_TTL_DAYS" default:"7"`
-	MetricLogFlushMs   int  `env:"METRIC_LOG_FLUSH_INTERVAL_MS" default:"30000"`
-	MetricLogCollectMs int  `env:"METRIC_LOG_COLLECT_INTERVAL_MS" default:"10000"`
-	EnableTraceLog     bool `env:"ENABLE_TRACE_LOG"`
-	TraceLogTTLDays    int  `env:"TRACE_LOG_TTL_DAYS" default:"3"`
-	EnableTextLog      bool `env:"ENABLE_TEXT_LOG"`
-	TextLogTTLDays     int  `env:"TEXT_LOG_TTL_DAYS" default:"3"`
-	TextLogLevel       string `env:"TEXT_LOG_LEVEL" default:"warning"`
-	EnableSessionLog   bool `env:"ENABLE_SESSION_LOG"`
-	SessionLogTTLDays  int  `env:"SESSION_LOG_TTL_DAYS" default:"30"`
-	EnableAsyncMetricLog  bool `env:"ENABLE_ASYNC_METRIC_LOG"`
-	AsyncMetricLogTTLDays int  `env:"ASYNC_METRIC_LOG_TTL_DAYS" default:"7"`
-	EnableOtelSpanLog     bool `env:"ENABLE_OTEL_SPAN_LOG"`
-	OtelSpanLogTTLDays    int  `env:"OTEL_SPAN_LOG_TTL_DAYS" default:"7"`
-	EnableProfileLog   bool `env:"ENABLE_PROCESSORS_PROFILE_LOG"`
-	EnableBlobLog      bool `env:"ENABLE_BLOB_STORAGE_LOG"`
-	EnablePrometheus   bool `env:"ENABLE_PROMETHEUS_METRICS"`
+	EnableQueryLog        bool   `env:"ENABLE_QUERY_LOG" default:"true"`
+	QueryLogTTLDays       int    `env:"QUERY_LOG_TTL_DAYS" default:"7"`
+	QueryLogFlushMs       int    `env:"QUERY_LOG_FLUSH_INTERVAL_MS" default:"7500"`
+	EnablePartLog         bool   `env:"ENABLE_PART_LOG" default:"true"`
+	PartLogTTLDays        int    `env:"PART_LOG_TTL_DAYS" default:"14"`
+	EnableMetricLog       bool   `env:"ENABLE_METRIC_LOG"`
+	MetricLogTTLDays      int    `env:"METRIC_LOG_TTL_DAYS" default:"7"`
+	MetricLogFlushMs      int    `env:"METRIC_LOG_FLUSH_INTERVAL_MS" default:"30000"`
+	MetricLogCollectMs    int    `env:"METRIC_LOG_COLLECT_INTERVAL_MS" default:"10000"`
+	EnableTraceLog        bool   `env:"ENABLE_TRACE_LOG"`
+	TraceLogTTLDays       int    `env:"TRACE_LOG_TTL_DAYS" default:"3"`
+	EnableTextLog         bool   `env:"ENABLE_TEXT_LOG"`
+	TextLogTTLDays        int    `env:"TEXT_LOG_TTL_DAYS" default:"3"`
+	TextLogLevel          string `env:"TEXT_LOG_LEVEL" default:"warning"`
+	EnableSessionLog      bool   `env:"ENABLE_SESSION_LOG"`
+	SessionLogTTLDays     int    `env:"SESSION_LOG_TTL_DAYS" default:"30"`
+	EnableAsyncMetricLog  bool   `env:"ENABLE_ASYNC_METRIC_LOG"`
+	AsyncMetricLogTTLDays int    `env:"ASYNC_METRIC_LOG_TTL_DAYS" default:"7"`
+	EnableOtelSpanLog     bool   `env:"ENABLE_OTEL_SPAN_LOG"`
+	OtelSpanLogTTLDays    int    `env:"OTEL_SPAN_LOG_TTL_DAYS" default:"7"`
+	EnableProfileLog      bool   `env:"ENABLE_PROCESSORS_PROFILE_LOG"`
+	EnableBlobLog         bool   `env:"ENABLE_BLOB_STORAGE_LOG"`
+	EnablePrometheus      bool   `env:"ENABLE_PROMETHEUS_METRICS"`
 
 	// Query limits (0 = unlimited)
 	MaxExecutionTime    int    `env:"MAX_EXECUTION_TIME"`
@@ -117,6 +117,14 @@ type Input struct {
 	ClickHouseHost string `env:"CLICKHOUSE_HOST" default:"localhost"`
 	ClickHousePort int    `env:"CLICKHOUSE_PORT" default:"9000"`
 	ClickHouseUser string `env:"CLICKHOUSE_USER" default:"default"`
+}
+
+// lwqlSecretFile binds an env var naming a mounted secret file to the Input
+// field its trimmed contents load into. Used only by Load()'s file-only LWQL
+// password loop.
+type lwqlSecretFile struct {
+	envKey string
+	dest   *string
 }
 
 // Load reads configuration from env vars + cgroup auto-detection.
@@ -172,12 +180,9 @@ func Load() (*Input, error) {
 	// fail-open-to-skip contract as the SaaS render-config.sh). An empty file is
 	// treated as absent so an operator Secret without the key stays inert rather
 	// than provisioning a user with an empty password.
-	for _, lwqlSecret := range []struct {
-		envKey string
-		dest   *string
-	}{
-		{"CLICKHOUSE_LWQL_PASSWORD_FILE", &i.LwqlPassword},
-		{"CLICKHOUSE_LWQL_PG_PASSWORD_FILE", &i.LwqlPgPassword},
+	for _, lwqlSecret := range []lwqlSecretFile{
+		{"CLICKHOUSE_LWQL_PASSWORD_FILE", &i.LWQLPassword},
+		{"CLICKHOUSE_LWQL_PG_PASSWORD_FILE", &i.LWQLPgPassword},
 	} {
 		path := os.Getenv(lwqlSecret.envKey)
 		if path == "" {
@@ -195,4 +200,3 @@ func Load() (*Input, error) {
 
 	return i, nil
 }
-

@@ -54,7 +54,7 @@ func RenderAll(log *zap.Logger, input *config.Input, computed *config.Computed, 
 		{"network", func() error { return renderNetwork(computed, configD) }},
 		{"custom-settings-prefixes", func() error { return renderCustomSettingsPrefixes(configD) }},
 		{"access-management", func() error { return renderAccessManagement(usersD) }},
-		{"lwql", func() error { return renderLwql(input, usersD, configD) }},
+		{"lwql", func() error { return renderLWQL(input, usersD, configD) }},
 	} {
 		if err := s.fn(); err != nil {
 			return fmt.Errorf("%s: %w", s.name, err)
@@ -66,7 +66,7 @@ func RenderAll(log *zap.Logger, input *config.Input, computed *config.Computed, 
 	// named-collection store (Design C, issue langwatch-saas#1168): whoever
 	// owns the ClickHouse server owns the access model, so a chart-managed
 	// server renders the LangWatchQL user, profile, grants, row filters and the
-	// lwql_postgres named collection directly as config (renderLwql, above,
+	// lwql_postgres named collection directly as config (renderLWQL, above,
 	// self-gated on the mounted password) rather than accepting SQL-created
 	// entities into a replicated directory. That deletes the AC8 defect class
 	// outright — no `user_directories` merge hazard, no startup-fatal

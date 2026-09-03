@@ -4,6 +4,11 @@ import (
 	"path/filepath"
 )
 
+// customSettingsPrefixesConfig maps to custom-settings-prefixes.yaml.
+type customSettingsPrefixesConfig struct {
+	CustomSettingsPrefixes string `yaml:"custom_settings_prefixes"`
+}
+
 // renderCustomSettingsPrefixes writes custom-settings-prefixes.yaml declaring
 // the `custom_` settings prefix. A LangWatchQL deployment prerequisite: the
 // per-query tenant capability travels as a `custom_`-prefixed setting, and
@@ -12,9 +17,28 @@ import (
 // Unconditional — the prefix declaration alone changes nothing for a server
 // that never uses such a setting.
 func renderCustomSettingsPrefixes(configD string) error {
-	return writeYAML(filepath.Join(configD, "custom-settings-prefixes.yaml"), map[string]any{
-		"custom_settings_prefixes": "custom_",
+	return writeYAML(filepath.Join(configD, "custom-settings-prefixes.yaml"), customSettingsPrefixesConfig{
+		CustomSettingsPrefixes: "custom_",
 	})
+}
+
+// accessManagementConfig maps to zz-access-management.yaml: the access-DDL
+// grants the `default` (admin) user needs to create the LangWatchQL access
+// model through SQL.
+type accessManagementConfig struct {
+	Users accessManagementUsers `yaml:"users"`
+}
+
+type accessManagementUsers struct {
+	Default accessManagementGrants `yaml:"default"`
+}
+
+type accessManagementGrants struct {
+	AccessManagement       int `yaml:"access_management"`
+	NamedCollectionControl int `yaml:"named_collection_control"`
+	ShowNamedCollections   int `yaml:"show_named_collections"`
+	// show_named_collections_secrets is deliberately absent — see the doc on
+	// renderAccessManagement.
 }
 
 // renderAccessManagement writes zz-access-management.yaml granting the
@@ -32,14 +56,13 @@ func renderCustomSettingsPrefixes(configD string) error {
 // order and the later file wins, so this must sort after any file declaring
 // `access_management: 0` for the same user.
 func renderAccessManagement(usersD string) error {
-	return writeYAML(filepath.Join(usersD, "zz-access-management.yaml"), map[string]any{
-		"users": map[string]any{
-			"default": map[string]any{
-				"access_management":        1,
-				"named_collection_control": 1,
-				"show_named_collections":   1,
+	return writeYAML(filepath.Join(usersD, "zz-access-management.yaml"), accessManagementConfig{
+		Users: accessManagementUsers{
+			Default: accessManagementGrants{
+				AccessManagement:       1,
+				NamedCollectionControl: 1,
+				ShowNamedCollections:   1,
 			},
 		},
 	})
 }
-

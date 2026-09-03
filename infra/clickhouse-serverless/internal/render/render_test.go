@@ -534,7 +534,7 @@ func TestRenderAll_NoKeeperBackedAccessStores(t *testing.T) {
 // an install that does not use LangWatchQL (or points it at external
 // ClickHouse) carries no langwatch_lwql identity.
 // @scenario "No LangWatchQL config is written without a mounted password"
-func TestRenderAll_LwqlSkippedWithoutPassword(t *testing.T) {
+func TestRenderAll_LWQLSkippedWithoutPassword(t *testing.T) {
 	dir := t.TempDir()
 	input := testInput()
 	computed := config.ComputeFromResources(input.CPU, input.RAMBytes, input)
@@ -555,16 +555,16 @@ func TestRenderAll_LwqlSkippedWithoutPassword(t *testing.T) {
 // are rendered as config, and the PostgreSQL bridge collection appears when its
 // host and password are supplied.
 // @scenario "A chart-managed server renders the LangWatchQL access model as config"
-func TestRenderAll_LwqlRendersAccessModel(t *testing.T) {
+func TestRenderAll_LWQLRendersAccessModel(t *testing.T) {
 	dir := t.TempDir()
 	input := testInput()
-	input.LwqlPassword = "lwql-secret"
-	input.LwqlDatabase = "langwatch"
-	input.LwqlPgHost = "pg.internal"
-	input.LwqlPgPort = 5432
-	input.LwqlPgDatabase = "langwatch"
-	input.LwqlPgUser = "lwql_ro"
-	input.LwqlPgPassword = "pg-secret"
+	input.LWQLPassword = "lwql-secret"
+	input.LWQLDatabase = "langwatch"
+	input.LWQLPgHost = "pg.internal"
+	input.LWQLPgPort = 5432
+	input.LWQLPgDatabase = "langwatch"
+	input.LWQLPgUser = "lwql_ro"
+	input.LWQLPgPassword = "pg-secret"
 	computed := config.ComputeFromResources(input.CPU, input.RAMBytes, input)
 
 	if err := render.RenderAll(testLogger(), input, computed, dir); err != nil {
@@ -623,12 +623,12 @@ func TestRenderAll_LwqlRendersAccessModel(t *testing.T) {
 // user still renders but the bridge collection is omitted rather than written
 // with an empty password.
 // @scenario "The lwql_postgres bridge is omitted without its PostgreSQL password"
-func TestRenderAll_LwqlNamedCollectionOmittedWithoutPgPassword(t *testing.T) {
+func TestRenderAll_LWQLNamedCollectionOmittedWithoutPgPassword(t *testing.T) {
 	dir := t.TempDir()
 	input := testInput()
-	input.LwqlPassword = "lwql-secret"
-	input.LwqlPgHost = "pg.internal"
-	// LwqlPgPassword deliberately empty.
+	input.LWQLPassword = "lwql-secret"
+	input.LWQLPgHost = "pg.internal"
+	// LWQLPgPassword deliberately empty.
 	computed := config.ComputeFromResources(input.CPU, input.RAMBytes, input)
 
 	if err := render.RenderAll(testLogger(), input, computed, dir); err != nil {
@@ -648,13 +648,13 @@ func TestRenderAll_LwqlNamedCollectionOmittedWithoutPgPassword(t *testing.T) {
 // bridge collection is omitted, matching the bash renderer + terraform contract
 // which requires host, database, and password together.
 // @scenario "The lwql_postgres bridge is omitted without its PostgreSQL database"
-func TestRenderAll_LwqlNamedCollectionOmittedWithoutPgDatabase(t *testing.T) {
+func TestRenderAll_LWQLNamedCollectionOmittedWithoutPgDatabase(t *testing.T) {
 	dir := t.TempDir()
 	input := testInput()
-	input.LwqlPassword = "lwql-secret"
-	input.LwqlPgHost = "pg.internal"
-	input.LwqlPgPassword = "pg-secret"
-	// LwqlPgDatabase deliberately empty.
+	input.LWQLPassword = "lwql-secret"
+	input.LWQLPgHost = "pg.internal"
+	input.LWQLPgPassword = "pg-secret"
+	// LWQLPgDatabase deliberately empty.
 	computed := config.ComputeFromResources(input.CPU, input.RAMBytes, input)
 
 	if err := render.RenderAll(testLogger(), input, computed, dir); err != nil {
@@ -674,14 +674,14 @@ func TestRenderAll_LwqlNamedCollectionOmittedWithoutPgDatabase(t *testing.T) {
 // named collection defaults to lwql_ro, matching the bash renderer's
 // ${CLICKHOUSE_LWQL_PG_USER:-lwql_ro}.
 // @scenario "The lwql_postgres bridge user defaults to lwql_ro when unset"
-func TestRenderAll_LwqlNamedCollectionDefaultsPgUser(t *testing.T) {
+func TestRenderAll_LWQLNamedCollectionDefaultsPgUser(t *testing.T) {
 	dir := t.TempDir()
 	input := testInput()
-	input.LwqlPassword = "lwql-secret"
-	input.LwqlPgHost = "pg.internal"
-	input.LwqlPgDatabase = "langwatch"
-	input.LwqlPgPassword = "pg-secret"
-	// LwqlPgUser deliberately empty.
+	input.LWQLPassword = "lwql-secret"
+	input.LWQLPgHost = "pg.internal"
+	input.LWQLPgDatabase = "langwatch"
+	input.LWQLPgPassword = "pg-secret"
+	// LWQLPgUser deliberately empty.
 	computed := config.ComputeFromResources(input.CPU, input.RAMBytes, input)
 
 	if err := render.RenderAll(testLogger(), input, computed, dir); err != nil {

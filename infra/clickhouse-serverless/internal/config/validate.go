@@ -27,8 +27,8 @@ func (i *Input) Validate() error {
 	// <databases> row-filter section) and into GRANT statements, so anything
 	// that is not a plain identifier must fail the render rather than produce
 	// malformed config or an unintended grant (mirrors render-config.sh).
-	if i.LwqlDatabase != "" && !isPlainIdentifier(i.LwqlDatabase) {
-		errs = append(errs, fmt.Sprintf("CLICKHOUSE_LWQL_DATABASE: not a plain identifier: %q", i.LwqlDatabase))
+	if i.LWQLDatabase != "" && !IsPlainIdentifier(i.LWQLDatabase) {
+		errs = append(errs, fmt.Sprintf("CLICKHOUSE_LWQL_DATABASE: not a plain identifier: %q", i.LWQLDatabase))
 	}
 
 	// Conditional: replicated fields required when CH_REPLICATED=true
@@ -65,10 +65,10 @@ func validateReplicated(i *Input) []string {
 	return errs
 }
 
-// isPlainIdentifier reports whether s is a non-empty run of [A-Za-z0-9_], the
+// IsPlainIdentifier reports whether s is a non-empty run of [A-Za-z0-9_], the
 // same character class render-config.sh enforces before interpolating a name
 // into config tag names or GRANT statements.
-func isPlainIdentifier(s string) bool {
+func IsPlainIdentifier(s string) bool {
 	if s == "" {
 		return false
 	}

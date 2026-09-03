@@ -15,6 +15,14 @@ import (
 // six *_pg entries are the PostgreSQL-engine bridge tables. A catalog addition
 // needs a matching entry here and fails closed without one (the new view's
 // source has no grant, so queries on it are refused rather than unbounded).
+//
+// This list is maintained by hand against three others that must agree, and
+// there is a known drift today (batch_evaluations is present here and in the
+// SaaS renderer but absent from the app catalog). Keep the four in sync when
+// editing:
+//   - infra/clickhouse-serverless/render-config.sh (SaaS bash renderer)
+//   - platform/app/src/server/analytics/lwql/catalog/lwqlViews.ts (native views)
+//   - platform/app/src/server/analytics/lwql/catalog/postgresViews.ts (PG bridge)
 var lwqlSourceTables = []string{
 	"trace_summaries",
 	"stored_spans",
@@ -36,6 +44,8 @@ var lwqlSourceTables = []string{
 // lwql_* prefixed, so the wildcard grant does not reach them and each needs its
 // own SELECT grant. Grant only, no filter: the views are SQL SECURITY INVOKER,
 // so every read through them hits the source tables' row filters above.
+//
+// Maintained by hand alongside lwqlSourceTables — see the sync note there.
 var lwqlViewNames = []string{
 	"traces",
 	"spans",
@@ -54,7 +64,69 @@ var lwqlViewNames = []string{
 	"prompt_versions",
 }
 
-// renderLwql writes the LangWatchQL access model as ClickHouse config when the
+// lwqlUsersFile is users.d/lwql.yaml: the restricted profile beside its only
+// consumer, the langwatch_lwql user.
+type lwqlUsersFile struct {
+	Profiles lwqlProfiles `yaml:"profiles"`
+	Users    lwqlUsers    `yaml:"users"`
+}
+
+type lwqlProfiles struct {
+	LWQLRestricted lwqlProfile `yaml:"lwql_restricted"`
+}
+
+type lwqlUsers struct {
+	LangwatchLWQL lwqlUser `yaml:"langwatch_lwql"`
+}
+
+type lwqlUser struct {
+	PasswordSHA256Hex string       `yaml:"password_sha256_hex"`
+	Networks          lwqlNetworks `yaml:"networks"`
+	Profile           string       `yaml:"profile"`
+	Quota             string       `yaml:"quota"`
+	Grants            lwqlGrants   `yaml:"grants"`
+	// Databases is a db-name → table-name → row filter tree. The keys are data
+	// (the configured database, and the source-table set above), not a fixed
+	// config shape, so this stays a map rather than a struct per table.
+	Databases map[string]map[string]lwqlRowFilter `yaml:"databases"`
+}
+
+type lwqlNetworks struct {
+	IP string `yaml:"ip"`
+}
+
+type lwqlGrants struct {
+	Query []string `yaml:"query"`
+}
+
+type lwqlRowFilter struct {
+	Filter string `yaml:"filter"`
+}
+
+// lwqlServerConfig is config.d/lwql-server.yaml: the server-level prerequisites
+// for the restricted profile plus the optional PostgreSQL bridge collection.
+type lwqlServerConfig struct {
+	AccessControlImprovements lwqlAccessControlImprovements `yaml:"access_control_improvements"`
+	NamedCollections          *lwqlNamedCollections         `yaml:"named_collections,omitempty"`
+}
+
+type lwqlAccessControlImprovements struct {
+	SettingsConstraintsReplacePrevious bool `yaml:"settings_constraints_replace_previous"`
+}
+
+type lwqlNamedCollections struct {
+	LWQLPostgres lwqlPostgresCollection `yaml:"lwql_postgres"`
+}
+
+type lwqlPostgresCollection struct {
+	Host     string `yaml:"host"`
+	Port     int    `yaml:"port"`
+	Database string `yaml:"database"`
+	User     string `yaml:"user"`
+	Password string `yaml:"password"`
+}
+
+// renderLWQL writes the LangWatchQL access model as ClickHouse config when the
 // chart mounts the langwatch_lwql password (issue langwatch-saas#1168, Design
 // C): the whole model is static — one restricted user, one profile, a fixed
 // grant/filter set — so it belongs in config the server re-reads at every boot,
@@ -62,15 +134,23 @@ var lwqlViewNames = []string{
 // block; the app's SQL self-provisioning is retained only as the external-BYO
 // fallback, never for a chart-managed server.
 //
-// Self-gates on LwqlPassword: absent, nothing is written and the server carries
+// Self-gates on LWQLPassword: absent, nothing is written and the server carries
 // no LWQL identity, exactly as before this feature existed.
-func renderLwql(input *config.Input, usersD, configD string) error {
-	if input.LwqlPassword == "" {
+func renderLWQL(input *config.Input, usersD, configD string) error {
+	if input.LWQLPassword == "" {
 		return nil
 	}
-	db := input.LwqlDatabase
+	db := input.LWQLDatabase
 	if db == "" {
 		db = "langwatch"
+	}
+	// The database name is the only caller-controlled value interpolated into
+	// the GRANT statements and the row-filter tag names below, so it is guarded
+	// at the point of interpolation rather than only at config-load
+	// (config.Validate also checks it). Anything but a plain identifier fails
+	// the render rather than emitting a malformed grant or an unintended one.
+	if !config.IsPlainIdentifier(db) {
+		return fmt.Errorf("lwql: database name is not a plain identifier: %q", db)
 	}
 
 	// One fixed tenant filter for every source table. The tenant is supplied
@@ -87,41 +167,36 @@ func renderLwql(input *config.Input, usersD, configD string) error {
 	grants := []string{fmt.Sprintf("GRANT SELECT ON %s.lwql_*", db)}
 	// Row filters: the key map keyed directly on the query setting, then the
 	// shared tenant filter on every source table.
-	databaseFilters := map[string]any{
-		"lwql_api_key_tenant_map": map[string]any{
-			"filter": "KeyHash = getSetting('custom_api_key_hash')",
-		},
+	tableFilters := map[string]lwqlRowFilter{
+		"lwql_api_key_tenant_map": {Filter: "KeyHash = getSetting('custom_api_key_hash')"},
 	}
 	for _, table := range lwqlSourceTables {
 		grants = append(grants, fmt.Sprintf("GRANT SELECT ON %s.%s", db, table))
-		databaseFilters[table] = map[string]any{"filter": tenantFilter}
+		tableFilters[table] = lwqlRowFilter{Filter: tenantFilter}
 	}
 	for _, view := range lwqlViewNames {
 		grants = append(grants, fmt.Sprintf("GRANT SELECT ON %s.%s", db, view))
 	}
 
-	sum := sha256.Sum256([]byte(input.LwqlPassword))
+	sum := sha256.Sum256([]byte(input.LWQLPassword))
 
 	// users.d/lwql.yaml — the restricted profile and the user in one file.
 	// ClickHouse merges users.d, so keeping the profile beside its only
 	// consumer is fine and keeps the whole LWQL identity in one place.
-	if err := writeYAML(filepath.Join(usersD, "lwql.yaml"), map[string]any{
-		"profiles": map[string]any{
-			"lwql_restricted": lwqlRestrictedProfile(),
-		},
-		"users": map[string]any{
-			"langwatch_lwql": map[string]any{
-				"password_sha256_hex": fmt.Sprintf("%x", sum),
-				"networks":            map[string]any{"ip": "::/0"},
-				"profile":             "lwql_restricted",
-				"quota":               "default",
-				"grants":              map[string]any{"query": grants},
-				"databases": map[string]any{
-					db: databaseFilters,
-				},
+	usersFile := lwqlUsersFile{
+		Profiles: lwqlProfiles{LWQLRestricted: lwqlRestrictedProfile()},
+		Users: lwqlUsers{
+			LangwatchLWQL: lwqlUser{
+				PasswordSHA256Hex: fmt.Sprintf("%x", sum),
+				Networks:          lwqlNetworks{IP: "::/0"},
+				Profile:           "lwql_restricted",
+				Quota:             "default",
+				Grants:            lwqlGrants{Query: grants},
+				Databases:         map[string]map[string]lwqlRowFilter{db: tableFilters},
 			},
 		},
-	}); err != nil {
+	}
+	if err := writeYAML(filepath.Join(usersD, "lwql.yaml"), usersFile); err != nil {
 		return err
 	}
 
@@ -132,32 +207,32 @@ func renderLwql(input *config.Input, usersD, configD string) error {
 	// profile mark custom_api_key_hash changeable_in_readonly under readonly=1;
 	// without it the server rejects the profile. (The custom_ prefix itself is
 	// declared unconditionally by renderCustomSettingsPrefixes.)
-	serverConfig := map[string]any{
-		"access_control_improvements": map[string]any{
-			"settings_constraints_replace_previous": true,
+	serverConfig := lwqlServerConfig{
+		AccessControlImprovements: lwqlAccessControlImprovements{
+			SettingsConstraintsReplacePrevious: true,
 		},
 	}
 	// lwql_postgres named collection: rendered only with both a host and the
 	// plaintext reader password (ClickHouse must dial PostgreSQL with the real
 	// value, so unlike every other rendered credential this one is NOT hashed —
 	// the first plaintext secret on the pod's config disk, by necessity).
-	if input.LwqlPgHost != "" && input.LwqlPgPassword != "" && input.LwqlPgDatabase != "" {
+	if input.LWQLPgHost != "" && input.LWQLPgPassword != "" && input.LWQLPgDatabase != "" {
 		// The SaaS render-config.sh hardcodes the reader role as lwql_ro; this
-		// path parameterizes it via CLICKHOUSE_LWQL_PG_USER (input.LwqlPgUser) so
+		// path parameterizes it via CLICKHOUSE_LWQL_PG_USER (input.LWQLPgUser) so
 		// a BYO PostgreSQL can name the role whatever its own conventions require.
 		// An unset user still defaults to lwql_ro, matching the bash renderer's
 		// ${CLICKHOUSE_LWQL_PG_USER:-lwql_ro}.
-		pgUser := input.LwqlPgUser
+		pgUser := input.LWQLPgUser
 		if pgUser == "" {
 			pgUser = "lwql_ro"
 		}
-		serverConfig["named_collections"] = map[string]any{
-			"lwql_postgres": map[string]any{
-				"host":     input.LwqlPgHost,
-				"port":     input.LwqlPgPort,
-				"database": input.LwqlPgDatabase,
-				"user":     pgUser,
-				"password": input.LwqlPgPassword,
+		serverConfig.NamedCollections = &lwqlNamedCollections{
+			LWQLPostgres: lwqlPostgresCollection{
+				Host:     input.LWQLPgHost,
+				Port:     input.LWQLPgPort,
+				Database: input.LWQLPgDatabase,
+				User:     pgUser,
+				Password: input.LWQLPgPassword,
 			},
 		}
 	}
@@ -171,27 +246,64 @@ func renderLwql(input *config.Input, usersD, configD string) error {
 // mirror DEFAULT_LWQL_RESOURCE_LIMITS in the app repo and are pinned const on
 // top of readonly=1. An empty-string value marshals to an empty XML element,
 // the config equivalent of the SaaS <changeable_in_readonly/> / <const/> tags.
-func lwqlRestrictedProfile() map[string]any {
-	const empty = ""
-	return map[string]any{
-		"readonly":                        1,
-		"custom_api_key_hash":             "''",
-		"max_execution_time":              10,
-		"max_memory_usage":                1_000_000_000,
-		"max_threads":                     4,
-		"max_concurrent_queries_for_user": 10,
-		"max_rows_to_read":                1_000_000_000,
-		"max_bytes_to_read":               10_000_000_000,
-		"read_overflow_mode":              "throw",
-		"constraints": map[string]any{
-			"custom_api_key_hash":             map[string]any{"changeable_in_readonly": empty},
-			"max_execution_time":              map[string]any{"const": empty},
-			"max_memory_usage":                map[string]any{"const": empty},
-			"max_threads":                     map[string]any{"const": empty},
-			"max_concurrent_queries_for_user": map[string]any{"const": empty},
-			"max_rows_to_read":                map[string]any{"const": empty},
-			"max_bytes_to_read":               map[string]any{"const": empty},
-			"read_overflow_mode":              map[string]any{"const": empty},
+func lwqlRestrictedProfile() lwqlProfile {
+	empty := ""
+	constEmpty := lwqlConstraint{Const: &empty}
+	return lwqlProfile{
+		Readonly:                    1,
+		CustomAPIKeyHash:            "''",
+		MaxExecutionTime:            10,
+		MaxMemoryUsage:              1_000_000_000,
+		MaxThreads:                  4,
+		MaxConcurrentQueriesForUser: 10,
+		MaxRowsToRead:               1_000_000_000,
+		MaxBytesToRead:              10_000_000_000,
+		ReadOverflowMode:            "throw",
+		Constraints: lwqlConstraints{
+			CustomAPIKeyHash:            lwqlConstraint{ChangeableInReadonly: &empty},
+			MaxExecutionTime:            constEmpty,
+			MaxMemoryUsage:              constEmpty,
+			MaxThreads:                  constEmpty,
+			MaxConcurrentQueriesForUser: constEmpty,
+			MaxRowsToRead:               constEmpty,
+			MaxBytesToRead:              constEmpty,
+			ReadOverflowMode:            constEmpty,
 		},
 	}
+}
+
+// lwqlProfile is the lwql_restricted settings profile.
+type lwqlProfile struct {
+	Readonly                    int             `yaml:"readonly"`
+	CustomAPIKeyHash            string          `yaml:"custom_api_key_hash"`
+	MaxExecutionTime            int             `yaml:"max_execution_time"`
+	MaxMemoryUsage              int64           `yaml:"max_memory_usage"`
+	MaxThreads                  int             `yaml:"max_threads"`
+	MaxConcurrentQueriesForUser int             `yaml:"max_concurrent_queries_for_user"`
+	MaxRowsToRead               int64           `yaml:"max_rows_to_read"`
+	MaxBytesToRead              int64           `yaml:"max_bytes_to_read"`
+	ReadOverflowMode            string          `yaml:"read_overflow_mode"`
+	Constraints                 lwqlConstraints `yaml:"constraints"`
+}
+
+// lwqlConstraints pins each profile setting under readonly=1: every ceiling is
+// const, and only custom_api_key_hash is changeable_in_readonly.
+type lwqlConstraints struct {
+	CustomAPIKeyHash            lwqlConstraint `yaml:"custom_api_key_hash"`
+	MaxExecutionTime            lwqlConstraint `yaml:"max_execution_time"`
+	MaxMemoryUsage              lwqlConstraint `yaml:"max_memory_usage"`
+	MaxThreads                  lwqlConstraint `yaml:"max_threads"`
+	MaxConcurrentQueriesForUser lwqlConstraint `yaml:"max_concurrent_queries_for_user"`
+	MaxRowsToRead               lwqlConstraint `yaml:"max_rows_to_read"`
+	MaxBytesToRead              lwqlConstraint `yaml:"max_bytes_to_read"`
+	ReadOverflowMode            lwqlConstraint `yaml:"read_overflow_mode"`
+}
+
+// lwqlConstraint carries exactly one of const / changeable_in_readonly. The
+// value is an empty string on purpose — it marshals to an empty XML element,
+// the config equivalent of the SaaS <const/> / <changeable_in_readonly/> tags.
+// The unused key stays nil (omitempty) so only the intended one is emitted.
+type lwqlConstraint struct {
+	Const                *string `yaml:"const,omitempty"`
+	ChangeableInReadonly *string `yaml:"changeable_in_readonly,omitempty"`
 }
