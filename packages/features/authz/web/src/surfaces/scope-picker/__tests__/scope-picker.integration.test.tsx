@@ -64,6 +64,47 @@ describe("given a set of scope chips", () => {
   });
 });
 
+// Pins the "System" chip behaviour the model-providers settings table
+// relies on: env-var-fed providers (no DB row, no scope attachments)
+// render a "System" chip rather than an empty Scope cell.
+//
+// Specs bound here:
+//   - specs/model-providers/role-based-default-models.feature
+//     ("System chip renders for env-var-fed providers")
+describe("ProviderScopeChips", () => {
+  describe("when no scopes are attached", () => {
+    /** @scenario System chip renders for env-var-fed providers */
+    it("renders a 'System' chip when system=true", () => {
+      withChakra(<ProviderScopeChips scopes={[]} system />);
+      expect(screen.getByText("System")).toBeInTheDocument();
+    });
+
+    it("renders nothing when system is not set (in-progress drawer state)", () => {
+      const { container } = withChakra(<ProviderScopeChips scopes={[]} />);
+      expect(container.firstChild).toBeNull();
+    });
+
+    it("renders nothing when scopes are undefined and system is unset", () => {
+      const { container } = withChakra(<ProviderScopeChips />);
+      expect(container.firstChild).toBeNull();
+    });
+  });
+
+  describe("when scopes are attached", () => {
+    it("renders the scope chip and ignores system flag", () => {
+      withChakra(
+        <ProviderScopeChips
+          system
+          scopes={[{ scopeType: "ORGANIZATION", scopeId: "org-1", name: "Acme" }]}
+        />,
+      );
+      // The Acme chip wins; no System fallback.
+      expect(screen.getByText("Acme")).toBeInTheDocument();
+      expect(screen.queryByText("System")).not.toBeInTheDocument();
+    });
+  });
+});
+
 describe("given a selection that already names a team and a project", () => {
   describe("when the whole organization is then picked", () => {
     it("keeps the organization and drops what it already implies", () => {
