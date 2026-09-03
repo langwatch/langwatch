@@ -59,6 +59,28 @@ export interface PulledContribution {
   amountNanoUsd?: number | null;
   /** Monotonic pull time. The ONLY field a restatement can be ordered by. */
   observedAtMs: number;
+  /**
+   * What this item held before its most recent CHANGE, when that older
+   * figure was observed, and when the change itself was observed. All three
+   * absent until an observation actually moves the item's figure.
+   *
+   * Kept per item rather than as a running cell-level "was $X" because the
+   * cell's markers have to be a function of the observations themselves, not
+   * of the order the log happened to deliver them in: two items restated in
+   * one cell, replayed the other way round, otherwise name a prior total the
+   * day never actually held.
+   *
+   * `priorObservedAtMs` exists to rank evidence, not to be reported: a stale
+   * re-delivery may be a closer look at what the item held before the change
+   * than the one already recorded, and only the newer of the two should win.
+   *
+   * Optional for the same reason `amountNanoUsd` is: the map round-trips
+   * through `PulledItemsJson` and rows written before this existed have none.
+   */
+  priorAmountNanoMinor?: number;
+  priorAmountNanoUsd?: number | null;
+  priorObservedAtMs?: number;
+  revisedAtMs?: number;
   tokensInput: number;
   tokensOutput: number;
   tokensCacheRead: number;
@@ -122,11 +144,22 @@ export interface GovernanceCostRollupState {
    * How many times a provider has revised this cell, to what from, and when
    * it last happened.
    *
-   * All three move together and only when the cell's dollar figure actually
-   * CHANGES. A re-pull that re-confirms the same amount is an observation, not
-   * a revision: bumping the count for it would make the screen say "revised,
-   * was $X" with X equal to the figure on display, which is a marker that
-   * contradicts itself. What such a re-pull does move is `lastObservedAt`.
+   * All three answer only to an actual CHANGE in the figure. A re-pull that
+   * re-confirms the same amount is an observation, not a revision: treating it
+   * as one would make the screen say "revised, was $X" with X equal to the
+   * figure on display, a marker that contradicts itself. What such a re-pull
+   * does move is `lastObservedAt`.
+   *
+   * `previousAmountNanoUsd` and `revisedAt` are DERIVED from `pulledItems` on
+   * every write rather than accumulated, so that both are a function of the
+   * observations alone. Accumulating them read the cell's running total at the
+   * moment an event landed, which made a cell holding two restated items name
+   * a different prior amount, and a different revision time, depending on
+   * which correction the log delivered last.
+   *
+   * `revisionCount` is the exception: it counts the deliveries that moved the
+   * figure, so a log replayed newest-first can under-count. Recovering it
+   * exactly needs every observation of an item rather than its newest two.
    *
    * `revisedAt` is epoch ms, taken from the pull that carried the new figure.
    */
@@ -539,16 +572,45 @@ export class GovernanceCostRollupFoldProjection
   ): GovernanceCostRollupState {
     const d = event.data;
     const previous = state.pulledItems[d.restatementKey];
-    // A restatement is only a restatement if it is NEWER. A redelivered stale
-    // observation must not un-correct a figure the provider already fixed.
-    if (previous && previous.observedAtMs >= d.observedAtMs) return state;
-
-    const amountBefore = governanceCostRollupTotals(state).amountNanoUsd;
-    const dims = dimensionsOf(event as never);
     // Same reason as the key: an event written before money carried a
     // currency names its amount `costNanoUsd`, and read literally that amount
     // would be `undefined` here and every total from this cell onward `NaN`.
     const money = readPulledUsageMoney(d);
+
+    // A stale re-delivery must not un-correct a figure the provider already
+    // fixed, but it is not worthless either: it is evidence of what the item
+    // held at an EARLIER time, which is exactly what "was $X" needs. Folding
+    // it in as a prior is what lets a reversed log reach the same markers as
+    // an in-order one.
+    if (previous && previous.observedAtMs >= d.observedAtMs) {
+      // Only a stale look that DIFFERS from where the item stands now is
+      // evidence of a change, and only the newest such look is the figure the
+      // item held immediately before it.
+      const revealsChange = money.costNanoMinor !== previous.amountNanoMinor;
+      const isCloserLook =
+        d.observedAtMs < previous.observedAtMs &&
+        (previous.priorObservedAtMs === undefined ||
+          d.observedAtMs > previous.priorObservedAtMs);
+      if (!revealsChange || !isCloserLook) return state;
+
+      return this.withDerivedRevisionMarkers({
+        ...state,
+        pulledItems: {
+          ...state.pulledItems,
+          [d.restatementKey]: {
+            ...previous,
+            priorAmountNanoMinor: money.costNanoMinor,
+            priorAmountNanoUsd: money.costNanoUsd,
+            priorObservedAtMs: d.observedAtMs,
+            // The change landed somewhere between this look and the newest
+            // one. The newest is the only bound the log actually witnessed.
+            revisedAtMs: previous.observedAtMs,
+          },
+        },
+      });
+    }
+
+    const dims = dimensionsOf(event as never);
     const observed: GovernanceCostRollupState = {
       ...state,
       ...dims,
@@ -560,6 +622,23 @@ export class GovernanceCostRollupFoldProjection
           amountNanoMinor: money.costNanoMinor,
           amountNanoUsd: money.costNanoUsd,
           observedAtMs: d.observedAtMs,
+          // Only a pull that MOVES the figure rewrites what came before it. A
+          // confirming re-pull carries the existing markers forward untouched,
+          // so a settled "revised, was $X" survives being looked at again.
+          ...(previous !== undefined &&
+          previous.amountNanoMinor !== money.costNanoMinor
+            ? {
+                priorAmountNanoMinor: previous.amountNanoMinor,
+                priorAmountNanoUsd: previous.amountNanoUsd,
+                priorObservedAtMs: previous.observedAtMs,
+                revisedAtMs: d.observedAtMs,
+              }
+            : {
+                priorAmountNanoMinor: previous?.priorAmountNanoMinor,
+                priorAmountNanoUsd: previous?.priorAmountNanoUsd,
+                priorObservedAtMs: previous?.priorObservedAtMs,
+                revisedAtMs: previous?.revisedAtMs,
+              }),
           tokensInput: d.tokensInput,
           tokensOutput: d.tokensOutput,
           tokensCacheRead: d.tokensCacheRead,
@@ -572,25 +651,72 @@ export class GovernanceCostRollupFoldProjection
       // assignment because a second item's older observation must not drag it
       // back; the early return above only guards re-delivery of the SAME item.
       lastObservedAt: Math.max(state.lastObservedAt, d.observedAtMs),
+      revisionCount:
+        previous !== undefined &&
+        previous.amountNanoMinor !== money.costNanoMinor
+          ? state.revisionCount + 1
+          : state.revisionCount,
     };
 
-    // A revision is a CHANGE to the day's figure, not merely a second look at
-    // it. The provider re-reporting the same amount is the confirming
-    // observation §15 relies on, and treating it as a revision would put
-    // "revised, was $X" on a cell whose X never moved.
-    const restated =
-      previous !== undefined &&
-      governanceCostRollupTotals(observed).amountNanoUsd !== amountBefore;
-    if (!restated) return observed;
+    return this.withDerivedRevisionMarkers(observed);
+  }
 
-    return {
-      ...observed,
-      revisionCount: state.revisionCount + 1,
-      previousAmountNanoUsd: amountBefore,
-      // The observation time, not the clock, for the same replay reason
-      // `lastObservedAt` takes it.
-      revisedAt: d.observedAtMs,
-    };
+  /**
+   * Restates the cell's "revised, was $X" markers from the item map.
+   *
+   * Derived rather than accumulated because the accumulating version read the
+   * running total at the moment an event landed, so a cell holding two items
+   * reported a different prior amount — and a different revision time —
+   * depending on which restatement the log delivered last. Recomputing from
+   * the items makes both a function of the observations alone.
+   */
+  private withDerivedRevisionMarkers(
+    state: GovernanceCostRollupState,
+  ): GovernanceCostRollupState {
+    let newestKey: string | null = null;
+    let revisedAt: number | null = null;
+
+    for (const [key, item] of Object.entries(state.pulledItems)) {
+      // A revision is a CHANGE to the figure, not merely a second look at it.
+      // The provider re-reporting the same amount is the confirming
+      // observation §15 relies on, and treating it as a revision would put
+      // "revised, was $X" on a cell whose X never moved. Items that never
+      // moved carry no `revisedAtMs` at all.
+      if (item.revisedAtMs === undefined) continue;
+      // Ties broken by key so two items revised in the same pull still name
+      // one winner, whichever order they arrived in.
+      if (
+        revisedAt === null ||
+        item.revisedAtMs > revisedAt ||
+        (item.revisedAtMs === revisedAt && key < newestKey!)
+      ) {
+        revisedAt = item.revisedAtMs;
+        newestKey = key;
+      }
+    }
+
+    if (newestKey === null) {
+      return { ...state, revisedAt: null, previousAmountNanoUsd: null };
+    }
+
+    // "was $X" is the whole cell as it stood immediately before its newest
+    // revision: that one item at its prior figure, every other item where it
+    // stands now. Totalled through the same helper the live figure uses, so
+    // the two cannot drift on currency handling.
+    const newest = state.pulledItems[newestKey]!;
+    const before = governanceCostRollupTotals({
+      ...state,
+      pulledItems: {
+        ...state.pulledItems,
+        [newestKey]: {
+          ...newest,
+          amountNanoMinor: newest.priorAmountNanoMinor!,
+          amountNanoUsd: newest.priorAmountNanoUsd,
+        },
+      },
+    }).amountNanoUsd;
+
+    return { ...state, revisedAt, previousAmountNanoUsd: before };
   }
 
   private addGatewayOutcome(

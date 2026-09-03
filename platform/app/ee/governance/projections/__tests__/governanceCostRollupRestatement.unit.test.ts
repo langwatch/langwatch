@@ -193,6 +193,107 @@ describe("the restatement marker", () => {
     });
   });
 
+  describe("given a settled day is pulled again and nothing moved", () => {
+    it("still says it was revised, and still names the same prior figure", () => {
+      const CONFIRMING_PULL = Date.parse("2026-08-05T04:00:00.000Z");
+      const state = fold([
+        observedEvent({
+          costNanoMinor: 12_340_000_000,
+          observedAtMs: FIRST_PULL,
+        }),
+        observedEvent({
+          costNanoMinor: 9_000_000_000,
+          observedAtMs: SECOND_PULL,
+        }),
+        observedEvent({
+          costNanoMinor: 9_000_000_000,
+          observedAtMs: CONFIRMING_PULL,
+        }),
+      ]);
+
+      // The day really was revised, and a later look that agrees with the
+      // correction is not grounds to stop saying so.
+      expect(state.revisedAt).toBe(SECOND_PULL);
+      expect(state.previousAmountNanoUsd).toBe(12_340_000_000);
+      // The anchor still moves — that pull did touch the day.
+      expect(state.lastObservedAt).toBe(CONFIRMING_PULL);
+    });
+  });
+
+  describe("given two different items in the cell are each restated", () => {
+    // Two provider buckets land in one day x dimension cell, then both get
+    // corrected. The stale guard is per item, so it never fires here — both
+    // corrections are new to their OWN item however they are delivered.
+    const OPEN_A = 10_000_000_000;
+    const OPEN_B = 20_000_000_000;
+    const NEW_A = 15_000_000_000;
+    const NEW_B = 30_000_000_000;
+    const RESTATED_A_AT = Date.parse("2026-08-03T04:00:00.000Z");
+    const RESTATED_B_AT = Date.parse("2026-08-04T04:00:00.000Z");
+
+    const opening = [
+      observedEvent({
+        costNanoMinor: OPEN_A,
+        restatementKey: "bucket-a",
+        observedAtMs: FIRST_PULL,
+      }),
+      observedEvent({
+        costNanoMinor: OPEN_B,
+        restatementKey: "bucket-b",
+        observedAtMs: FIRST_PULL,
+      }),
+    ];
+    const restatementOfA = observedEvent({
+      costNanoMinor: NEW_A,
+      restatementKey: "bucket-a",
+      observedAtMs: RESTATED_A_AT,
+    });
+    const restatementOfB = observedEvent({
+      costNanoMinor: NEW_B,
+      restatementKey: "bucket-b",
+      observedAtMs: RESTATED_B_AT,
+    });
+
+    it("reports the newest correction, whichever order the two arrive in", () => {
+      const inOrder = fold([...opening, restatementOfA, restatementOfB]);
+      const reversed = fold([...opening, restatementOfB, restatementOfA]);
+
+      // B's correction is the newer of the two, so it is the one the cell
+      // reports no matter which correction the log happens to deliver last.
+      expect(inOrder.revisedAt).toBe(RESTATED_B_AT);
+      expect(reversed.revisedAt).toBe(RESTATED_B_AT);
+    });
+
+    it("names the same prior figure, whichever order the two arrive in", () => {
+      const inOrder = fold([...opening, restatementOfA, restatementOfB]);
+      const reversed = fold([...opening, restatementOfB, restatementOfA]);
+
+      // "was $X" means what the day held immediately before its newest
+      // correction: A already corrected, B not yet. Deriving it from whatever
+      // the running total happened to be when the last event landed made the
+      // reversed delivery say $40 — a figure the day never held.
+      const beforeNewestCorrection = NEW_A + OPEN_B;
+      expect(inOrder.previousAmountNanoUsd).toBe(beforeNewestCorrection);
+      expect(reversed.previousAmountNanoUsd).toBe(beforeNewestCorrection);
+    });
+
+    it("agrees on the total and the count either way", () => {
+      const inOrder = fold([...opening, restatementOfA, restatementOfB]);
+      const reversed = fold([...opening, restatementOfB, restatementOfA]);
+
+      // These two were already order-independent; they are asserted so a fix
+      // to the markers above cannot quietly break them.
+      expect(governanceCostRollupTotals(inOrder).amountNanoUsd).toBe(
+        NEW_A + NEW_B,
+      );
+      expect(governanceCostRollupTotals(reversed).amountNanoUsd).toBe(
+        NEW_A + NEW_B,
+      );
+      expect(inOrder.revisionCount).toBe(2);
+      expect(reversed.revisionCount).toBe(2);
+    });
+  });
+
   describe("given a gateway outcome", () => {
     it("never marks the day revised, because nothing restates one", () => {
       const state = fold([
@@ -276,6 +377,19 @@ describe("the last-observed anchor", () => {
       // Both anchors sit in the past of the run itself, which is the property
       // a clock read would violate.
       expect(original.lastObservedAt).toBeLessThan(Date.now());
+
+      // The anchor is not the only field a replay has to reproduce. Asserting
+      // it alone passed even while the revision markers below diverged by
+      // delivery order, which is exactly how that defect stayed hidden.
+      expect(replayed.revisedAt).toBe(original.revisedAt);
+      expect(replayed.previousAmountNanoUsd).toBe(
+        original.previousAmountNanoUsd,
+      );
+      // `revisionCount` is deliberately not asserted here. It counts the
+      // deliveries that moved the figure, and recovering that count from a
+      // log delivered newest-first needs every observation of the item, not
+      // just the newest two. Left as its own decision rather than quietly
+      // redefined into "how many items changed".
     });
   });
 
