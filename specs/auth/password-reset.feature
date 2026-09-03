@@ -177,12 +177,18 @@ Feature: Forgot / reset password on credential (email-mode) sign-in
   # finishing, it can be waved away, and it never opens a system prompt on its
   # own - the ceremony starts on a real gesture, the same rule the sign-in
   # screen's conditional offer obeys.
+  #
+  # The offer is TAKEN here rather than somewhere else. The reset signed them
+  # in, so the ceremony this screen can run is the same one the settings page
+  # runs, and sending somebody to a settings page to press a second button was
+  # a step that existed only because this screen used to have no session.
 
   @integration
   Scenario: A completed reset offers a passkey rather than assuming one
     Given I have just set a new password from a valid link
     Then the screen confirms the reset and offers to add a passkey
     And signing in is still the plain, unmissable way on
+    And no device prompt has opened, because I have not asked for one
 
   @integration
   Scenario: Declining the offer costs nothing
@@ -190,6 +196,22 @@ Feature: Forgot / reset password on credential (email-mode) sign-in
     When I dismiss the offer
     Then the confirmation and the way to sign in are both still there
     And the offer does not come back on this screen
+
+  @integration
+  Scenario: Accepting the offer adds the passkey on this screen
+    Given I am offered a passkey after resetting my password
+    When I ask for one
+    Then the screen waits on my device and says whose prompt it is
+    And once the device answers the screen says the passkey was added
+    And the way on is still there throughout
+
+  @integration
+  Scenario: A refused ceremony says so in words and leaves the way on
+    Given I asked for a passkey after resetting my password
+    When the ceremony is refused
+    Then the screen shows the copy registered for that refusal
+    And it never shows the code itself or an internal message
+    And the way on is still there
 
   # --- Full end-to-end (manual dogfood) ---
 

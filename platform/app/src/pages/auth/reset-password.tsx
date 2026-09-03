@@ -1,7 +1,7 @@
 import { Box, Button, Text, VStack } from "@chakra-ui/react";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { passwordProblem } from "@langwatch/identity";
-import { useState } from "react";
+import { useRef, useState } from "react";
 import { useForm } from "react-hook-form";
 import { z } from "zod";
 import { AuthCard } from "~/components/auth/AuthCard";
@@ -12,6 +12,10 @@ import {
   AUTH_PRIMARY_STYLE,
   AuthPrimaryButton,
 } from "~/features/auth/components/AuthPrimaryButton";
+import {
+  PasskeyCeremonyPanel,
+  passkeyCeremonyTitle,
+} from "~/features/auth/components/PasskeyCeremonyPanel";
 import { PasswordInput } from "~/features/auth/components/PasswordInput";
 import {
   useAuthAnalytics,
@@ -19,14 +23,17 @@ import {
 } from "~/features/auth/hooks/useAuthAnalytics";
 import { AUTH_SURFACE } from "~/features/auth/logic/authAnalytics";
 import { usePublishAuthStage } from "~/features/auth/logic/groundStage";
+import {
+  endPasskeyCeremony,
+  startPasskeyCeremony,
+  usePasskeyCeremony,
+} from "~/features/auth/logic/passkeyCeremony";
+import { passkeyFailureFrom } from "~/features/auth/logic/passkeyFailure";
 import { HandledErrorAlert } from "~/features/errors";
 import { readHandledError } from "~/features/errors/logic/readHandledError";
 import { authClient } from "~/utils/auth-client";
 import Link from "~/utils/compat/next-link";
 import { useSearchParams } from "~/utils/compat/next-navigation";
-
-/** Where somebody goes to add a passkey once they are back in. */
-const AUTHENTICATION_SETTINGS = "/settings/security";
 
 // The one password policy, from the module that owns it — restating it here
 // as zod constraints is how reset drifted to accepting what sign-up refuses
@@ -280,6 +287,81 @@ function ResetPasswordForm({ token }: { token: string }) {
 }
 
 /**
+ * The offer's four states, and what each of them owes the person.
+ *
+ * State and callbacks, no JSX: the card below renders them.
+ *
+ * The ceremony starts on the CLICK and on nothing else. That is the same
+ * real-gesture rule the sign-in screen's conditional offer obeys, and it is
+ * the reason nothing here runs on mount: a system prompt opening over a
+ * confirmation somebody came to read is an ambush, whatever it is offering.
+ *
+ * A prompt somebody opened and closed is a DECISION rather than a failure, so
+ * it says nothing and leaves the offer exactly where it was. Only a refusal
+ * that actually went wrong is reported, and it is reported as a code the
+ * registry has words for — the wire message for a handled refusal IS the code
+ * slug (#5984), so the raw one would put `identity_passkey_ceremony_failed` on
+ * a screen somebody is trying to leave.
+ */
+function usePostResetPasskeyOffer() {
+  const ceremony = usePasskeyCeremony();
+  // This card's ceremony, not somebody else's: the store is module-scoped and
+  // one surface at a time draws it.
+  const registering = ceremony?.purpose === "register" ? ceremony : null;
+  const [isDismissed, setIsDismissed] = useState(false);
+  const [isAdded, setIsAdded] = useState(false);
+  const [failure, setFailure] = useState<unknown>(null);
+  const attempt = useRef<{ abandoned: boolean } | null>(null);
+
+  const run = async (current: { abandoned: boolean }) => {
+    try {
+      const result = await authClient.passkey.addPasskey({});
+      if (current.abandoned) return;
+      if (result?.error) {
+        // Status 0 is the system prompt closed by hand. Saying "something went
+        // wrong" about a decision would be telling somebody off for deciding.
+        if (result.error.status !== 0) {
+          setFailure(passkeyFailureFrom(result.error));
+        }
+        return;
+      }
+      setIsAdded(true);
+    } catch (error) {
+      // A throw from the WebAuthn client: unsupported, an insecure origin, a
+      // ceremony that never started. It never reached the server.
+      if (!current.abandoned) setFailure(passkeyFailureFrom(error));
+    } finally {
+      // Cancelling already stood the panel down; ending it again from an
+      // abandoned attempt would take down the one that replaced it.
+      if (!current.abandoned) endPasskeyCeremony();
+    }
+  };
+
+  const add = () => {
+    setFailure(null);
+    const current = { abandoned: false };
+    attempt.current = current;
+    startPasskeyCeremony({
+      purpose: "register",
+      cancel: () => {
+        current.abandoned = true;
+      },
+      retry: add,
+    });
+    void run(current);
+  };
+
+  return {
+    registering,
+    isDismissed,
+    isAdded,
+    failure,
+    add,
+    dismiss: () => setIsDismissed(true),
+  };
+}
+
+/**
  * The reset landed, and the reset SIGNED THEM IN: the link proved the
  * address and the password they just set is the credential, so there was
  * nothing left for the log-in screen to check. The card used to send them
@@ -289,24 +371,32 @@ function ResetPasswordForm({ token }: { token: string }) {
  * This is also one of the three moments ADR-120 names for offering a
  * passkey: they have just proved control of the address, they are thinking
  * about how they get in, and the most recent thing they learned is that the
- * password did not work. The offer takes them to the one place a passkey can
- * be made, which — being signed in now — is one click away rather than a
- * sign-in away. Nothing on this card opens a system prompt itself: the
- * real-gesture rule holds, and the ceremony starts on that page.
+ * password did not work. Being signed in, the offer is TAKEN here — the same
+ * ceremony the settings page runs, on the screen somebody is already looking
+ * at. It used to be a link to that page, which was a second button to find
+ * and press for a thing they had already said yes to, and it existed only
+ * because this screen had no session to run a ceremony with.
  *
- * It never stands in the way. Continuing is the plain, unmissable action;
- * the offer sits under it and can be waved off, and waving it off leaves the
- * card exactly as it would have been.
+ * It never stands in the way. Continuing is the plain, unmissable action and
+ * is on the card in every one of the offer's states; the offer sits under it
+ * and can be waved off, and waving it off leaves the card exactly as it would
+ * have been.
  */
 function PasswordUpdatedCard() {
-  const [offerDismissed, setOfferDismissed] = useState(false);
-  const offerPasskey = !offerDismissed;
+  const offer = usePostResetPasskeyOffer();
 
   return (
     <AuthCard
       title="Password updated"
       intro="You are signed in with your new password. Every other device was signed out."
     >
+      {/* At the top, like every other failure on these screens: an alert that
+          opened under the offer would say its piece below the fold. */}
+      <HandledErrorAlert
+        error={offer.failure}
+        fallbackTitle="That passkey wasn't created"
+        className="lw-auth-alert"
+      />
       {/* A link wearing the primary action, so it spreads the shared values
           rather than restating them. */}
       <Button {...AUTH_PRIMARY_STYLE} asChild>
@@ -314,48 +404,91 @@ function PasswordUpdatedCard() {
           Continue
         </Link>
       </Button>
-      {offerPasskey ? (
-        <VStack
-          width="full"
-          align="stretch"
-          gap="10px"
-          data-testid="post-reset-passkey-offer"
-        >
-          <Text fontSize="13px" lineHeight="1.6" color="fg.muted">
-            Next time, skip the password. A passkey uses the fingerprint, face
-            or screen lock your device already has, and there is nothing to
-            forget.
-          </Text>
-          <Button
-            asChild
-            variant="outline"
-            width="full"
-            minHeight="42px"
-            fontSize="13.5px"
-            borderRadius={SHAPE.control}
-            borderColor="auth.fieldBorder"
-          >
-            <Link
-              href={AUTHENTICATION_SETTINGS}
-              data-testid="reset-add-passkey"
-            >
-              Add a passkey
-            </Link>
-          </Button>
-          <Button
-            variant="plain"
-            size="sm"
-            alignSelf="center"
-            fontSize="13px"
-            color="fg.muted"
-            onClick={() => setOfferDismissed(true)}
-            data-testid="reset-dismiss-passkey"
-          >
-            Not now
-          </Button>
-        </VStack>
-      ) : null}
+      <PostResetPasskeyOffer offer={offer} />
     </AuthCard>
+  );
+}
+
+/** Whichever of the offer's states is current, under the way on. */
+function PostResetPasskeyOffer({
+  offer,
+}: {
+  offer: ReturnType<typeof usePostResetPasskeyOffer>;
+}) {
+  if (offer.registering) {
+    return (
+      <VStack width="full" align="stretch" gap="12px">
+        {/* The panel carries no heading of its own — every surface that draws
+            it names the state in its own furniture, and this card's one
+            heading is already spoken for. */}
+        <Text
+          fontSize="14px"
+          fontWeight={600}
+          textAlign="center"
+          data-testid="reset-passkey-ceremony-title"
+        >
+          {passkeyCeremonyTitle(offer.registering)}
+        </Text>
+        <PasskeyCeremonyPanel ceremony={offer.registering} />
+      </VStack>
+    );
+  }
+
+  if (offer.isAdded) {
+    return (
+      <VStack width="full" align="stretch" gap="6px">
+        <Text
+          fontSize="13.5px"
+          fontWeight={600}
+          data-testid="reset-passkey-added"
+        >
+          Passkey added
+        </Text>
+        <Text fontSize="13px" lineHeight="1.6" color="fg.muted">
+          Next time you can sign in with your fingerprint, face or screen lock
+          instead of typing a password.
+        </Text>
+      </VStack>
+    );
+  }
+
+  if (offer.isDismissed) return null;
+
+  return (
+    <VStack
+      width="full"
+      align="stretch"
+      gap="10px"
+      data-testid="post-reset-passkey-offer"
+    >
+      <Text fontSize="13px" lineHeight="1.6" color="fg.muted">
+        Next time, skip the password. A passkey uses the fingerprint, face or
+        screen lock your device already has, and there is nothing to forget.
+      </Text>
+      <Button
+        variant="outline"
+        width="full"
+        minHeight="42px"
+        fontSize="13.5px"
+        borderRadius={SHAPE.control}
+        borderColor="auth.fieldBorder"
+        onClick={offer.add}
+        data-testid="reset-add-passkey"
+      >
+        Add a passkey
+      </Button>
+      <Button
+        variant="plain"
+        size="sm"
+        alignSelf="center"
+        fontSize="13px"
+        color="fg.muted"
+        onClick={offer.dismiss}
+        data-testid="reset-dismiss-passkey"
+      >
+        Not now
+      </Button>
+    </VStack>
   );
 }
 

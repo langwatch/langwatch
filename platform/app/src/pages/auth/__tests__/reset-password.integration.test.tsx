@@ -8,6 +8,7 @@
  */
 import { ChakraProvider, defaultSystem } from "@chakra-ui/react";
 import {
+  act,
   cleanup,
   fireEvent,
   render,
@@ -17,20 +18,25 @@ import {
 import type { ReactNode } from "react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
-const { mockResetPassword, searchParamsRef, publicEnvRef } = vi.hoisted(() => ({
-  mockResetPassword: vi.fn(),
-  searchParamsRef: {
-    current: new URLSearchParams("token=tok_valid") as URLSearchParams | null,
-  },
-  publicEnvRef: {
-    current: {
-      NEXTAUTH_PROVIDER: "email",
-    } as Record<string, unknown>,
-  },
-}));
+const { mockResetPassword, mockAddPasskey, searchParamsRef, publicEnvRef } =
+  vi.hoisted(() => ({
+    mockResetPassword: vi.fn(),
+    mockAddPasskey: vi.fn(),
+    searchParamsRef: {
+      current: new URLSearchParams("token=tok_valid") as URLSearchParams | null,
+    },
+    publicEnvRef: {
+      current: {
+        NEXTAUTH_PROVIDER: "email",
+      } as Record<string, unknown>,
+    },
+  }));
 
 vi.mock("~/utils/auth-client", () => ({
-  authClient: { resetPassword: mockResetPassword },
+  authClient: {
+    resetPassword: mockResetPassword,
+    passkey: { addPasskey: mockAddPasskey },
+  },
 }));
 
 vi.mock("~/hooks/usePublicEnv", () => ({
@@ -56,7 +62,11 @@ vi.mock("~/utils/compat/next-link", () => ({
   ),
 }));
 
+import { endPasskeyCeremony } from "~/features/auth/logic/passkeyCeremony";
 import ResetPassword from "../reset-password";
+
+/** A ceremony that never resolves, so the waiting state stays up to be read. */
+const neverAnswers = () => new Promise<never>(() => void 0);
 
 const setToken = (token: string | null) => {
   searchParamsRef.current = token
@@ -108,6 +118,7 @@ describe("ResetPassword page", () => {
       data: { status: true },
       error: null,
     });
+    mockAddPasskey.mockResolvedValue({ data: {}, error: null });
     setToken("tok_valid");
     publicEnvRef.current = {
       NEXTAUTH_PROVIDER: "email",
@@ -115,11 +126,12 @@ describe("ResetPassword page", () => {
   });
 
   afterEach(() => {
+    act(() => endPasskeyCeremony());
     cleanup();
   });
 
   describe("when the token is valid and the passwords match", () => {
-    /** @scenario Submitting a valid new password with a token resets it and returns to sign-in */
+    /** @scenario Submitting a valid new password with a token resets it and signs me in */
     it("calls resetPassword with the new password and token, then confirms with a sign-in link", async () => {
       const { container } = renderPage();
       fillAndSubmit({
@@ -284,20 +296,20 @@ describe("ResetPassword page", () => {
         expect(screen.getByTestId("reset-sign-in").getAttribute("href")).toBe(
           "/",
         );
-        // Signed in by the reset, so the offer goes straight to the page a
-        // passkey is made on — no sign-in step in between.
-        expect(
-          screen.getByTestId("reset-add-passkey").getAttribute("href"),
-        ).toBe("/settings/security");
+        // The reset signed them in, so the passkey is made HERE rather than
+        // behind a second button on a settings page.
+        const add = screen.getByTestId("reset-add-passkey");
+        expect(add).toHaveTextContent(/add a passkey/i);
+        expect(add.getAttribute("href")).toBeNull();
       });
 
       /** @scenario A completed reset offers a passkey rather than assuming one */
       it("opens no device prompt of its own", async () => {
         await resetSuccessfully();
 
-        // The offer is a link to the one place a passkey can be made. A
-        // completed reset ends every session, so no ceremony could run here —
-        // and the real-gesture rule is kept for free.
+        // The ceremony starts on a real gesture and on nothing else. A prompt
+        // over a confirmation somebody came to read is an ambush.
+        expect(mockAddPasskey).not.toHaveBeenCalled();
         expect(screen.queryByTestId("passkey-ceremony")).toBeNull();
       });
     });
@@ -312,6 +324,79 @@ describe("ResetPassword page", () => {
         expect(
           screen.getByRole("heading", { name: /password updated/i }),
         ).toBeTruthy();
+        expect(screen.getByTestId("reset-sign-in")).toBeTruthy();
+      });
+    });
+
+    describe("when the offer is taken", () => {
+      /** @scenario Accepting the offer adds the passkey on this screen */
+      it("waits on the device, says whose prompt it is, and keeps the way on", async () => {
+        mockAddPasskey.mockImplementation(neverAnswers);
+        await resetSuccessfully();
+        fireEvent.click(screen.getByTestId("reset-add-passkey"));
+
+        expect(await screen.findByTestId("passkey-ceremony")).toBeTruthy();
+        expect(mockAddPasskey).toHaveBeenCalledTimes(1);
+        expect(
+          screen.getByTestId("passkey-ceremony-explainer").textContent,
+        ).toMatch(/your browser or device/i);
+        // Registering from here is a passkey specifically, so the panel offers
+        // no "use a different method" — there is no other method to offer.
+        expect(
+          screen.queryByTestId("passkey-ceremony-other-methods"),
+        ).toBeNull();
+        expect(screen.getByTestId("reset-sign-in")).toBeTruthy();
+      });
+
+      /** @scenario Accepting the offer adds the passkey on this screen */
+      it("says the passkey was added once the device answers", async () => {
+        await resetSuccessfully();
+        fireEvent.click(screen.getByTestId("reset-add-passkey"));
+
+        expect(await screen.findByTestId("reset-passkey-added")).toBeTruthy();
+        expect(screen.queryByTestId("passkey-ceremony")).toBeNull();
+        expect(screen.queryByTestId("post-reset-passkey-offer")).toBeNull();
+        expect(screen.getByTestId("reset-sign-in")).toBeTruthy();
+      });
+
+      /** @scenario Declining the offer costs nothing */
+      it("says nothing at all about a system prompt somebody closed", async () => {
+        // Status 0 is the prompt dismissed by hand: a decision, not a fault.
+        mockAddPasskey.mockResolvedValue({ error: { status: 0 } });
+        await resetSuccessfully();
+        fireEvent.click(screen.getByTestId("reset-add-passkey"));
+
+        await waitFor(() => {
+          expect(screen.queryByTestId("passkey-ceremony")).toBeNull();
+        });
+        expect(screen.queryByRole("alert")).toBeNull();
+        // The offer is still there to take again, deliberately.
+        expect(screen.getByTestId("reset-add-passkey")).toBeTruthy();
+      });
+    });
+
+    describe("when the ceremony is refused", () => {
+      /** @scenario A refused ceremony says so in words and leaves the way on */
+      it("shows the registry's words for it, never the code, and keeps the way on", async () => {
+        mockAddPasskey.mockResolvedValue({ error: { status: 500 } });
+        await resetSuccessfully();
+        fireEvent.click(screen.getByTestId("reset-add-passkey"));
+
+        expect(await screen.findByRole("alert")).toBeTruthy();
+        expect(document.body.textContent).not.toContain(
+          "identity_passkey_ceremony_failed",
+        );
+        expect(screen.getByTestId("reset-sign-in")).toBeTruthy();
+      });
+
+      /** @scenario A refused ceremony says so in words and leaves the way on */
+      it("reports a ceremony that never reached the server the same way", async () => {
+        mockAddPasskey.mockRejectedValue(new Error("no authenticator"));
+        await resetSuccessfully();
+        fireEvent.click(screen.getByTestId("reset-add-passkey"));
+
+        expect(await screen.findByRole("alert")).toBeTruthy();
+        expect(document.body.textContent).not.toContain("no authenticator");
         expect(screen.getByTestId("reset-sign-in")).toBeTruthy();
       });
     });
