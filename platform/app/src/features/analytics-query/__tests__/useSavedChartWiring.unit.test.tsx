@@ -13,7 +13,7 @@
  * hook underneath it are real, so what `update` is called with is what would
  * reach the server.
  *
- * @see specs/analytics/governed-sql-saved-charts.feature
+ * @see specs/analytics/lwql-saved-charts.feature
  */
 
 import { act, renderHook } from "@testing-library/react";
@@ -49,9 +49,9 @@ vi.mock("~/utils/api", () => ({
 
 vi.mock("~/features/errors", () => ({ showErrorToast: vi.fn() }));
 
-import type { UseGovernedSqlQuery } from "../hooks/useGovernedSqlQuery";
+import type { UseLangWatchQLQuery } from "../hooks/useLangWatchQLQuery";
 import { useSavedChartWiring } from "../hooks/useSavedChartWiring";
-import type { GovernedSqlParameterValue } from "../logic/governedSqlRequestState";
+import type { LangWatchQLParameterValue } from "../logic/lwqlRequestState";
 
 const PROJECT_ID = "proj-1";
 
@@ -77,10 +77,10 @@ const SAVED_CHART = {
  * which is how a chart "opens": the wiring pushes the saved SQL and parameters
  * back through the same setters the editor uses.
  */
-function fakeQuery(): UseGovernedSqlQuery {
+function fakeQuery(): UseLangWatchQLQuery {
   let draft: {
     readonly sql: string;
-    readonly parameters: Readonly<Record<string, GovernedSqlParameterValue>>;
+    readonly parameters: Readonly<Record<string, LangWatchQLParameterValue>>;
   } = { sql: "", parameters: {} };
 
   return {
@@ -102,6 +102,7 @@ function fakeQuery(): UseGovernedSqlQuery {
       draft = { ...draft, parameters };
     },
     setTimeWindow: vi.fn(),
+    setGranularity: vi.fn(),
     runQuery: vi.fn(),
     reload: vi.fn(),
     cancelQuery: vi.fn(),

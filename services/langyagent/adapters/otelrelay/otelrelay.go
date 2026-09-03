@@ -119,6 +119,13 @@ type WorkerInfo struct {
 	// never read from the worker's OTLP.
 	SourceOrganizationID string
 	SourceProjectID      string
+	// Harness names the coding-agent harness this worker runs on
+	// (domain.HarnessOpenCode | domain.HarnessPi), normalized by the pool at
+	// Register. It gates the LLM proxy's span synthesis: a pi worker exports
+	// no OTLP of its own, so the relay retells each mediated LLM call as one
+	// gen_ai span into the customer's trace; opencode workers keep exporting
+	// their own spans and get none synthesized.
+	Harness string
 }
 
 // workerEntry is one registered worker: its info plus the conversation's
@@ -148,6 +155,35 @@ type workerEntry struct {
 	// answers the NEXT call with a terminal 400 carrying this body instead of
 	// proxying. Cleared by a clean stream, a new turn, or clearLLMError.
 	llmStreamCut []byte
+	// loggedParamsDropped holds every gateway params-dropped set already
+	// logged for this worker, so a busy turn logs each distinct set once,
+	// not once per LLM call. A set the worker saw earlier stays deduped even
+	// when another set arrives in between.
+	loggedParamsDropped map[string]struct{}
+}
+
+// maxLoggedParamsDroppedSets caps how many distinct drop sets one worker
+// logs. The set names come from the caller's own request body, so an unknown
+// field the caller varies per call would otherwise grow the map without a
+// bound. Past the cap the operator already has every set worth reading.
+const maxLoggedParamsDroppedSets = 32
+
+// noteParamsDropped records a gateway drop set and reports whether it is new
+// for this worker; the caller logs only when it is.
+func (e *workerEntry) noteParamsDropped(set string) bool {
+	e.mu.Lock()
+	defer e.mu.Unlock()
+	if _, seen := e.loggedParamsDropped[set]; seen {
+		return false
+	}
+	if len(e.loggedParamsDropped) >= maxLoggedParamsDroppedSets {
+		return false
+	}
+	if e.loggedParamsDropped == nil {
+		e.loggedParamsDropped = make(map[string]struct{}, 1)
+	}
+	e.loggedParamsDropped[set] = struct{}{}
+	return true
 }
 
 func (e *workerEntry) setTurn(sc trace.SpanContext) {
@@ -300,7 +336,7 @@ type Options struct {
 // ctx is the manager-lifetime context (carries the logger); Shutdown stops the
 // listener.
 func New(ctx context.Context, opts Options) (*Relay, error) {
-	ln, err := net.Listen("tcp", "127.0.0.1:0")
+	ln, err := (&net.ListenConfig{}).Listen(ctx, "tcp", "127.0.0.1:0")
 	if err != nil {
 		return nil, fmt.Errorf("otelrelay listen: %w", err)
 	}

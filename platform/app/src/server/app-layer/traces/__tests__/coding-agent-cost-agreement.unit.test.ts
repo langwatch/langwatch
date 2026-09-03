@@ -11,9 +11,12 @@
  *
  * The fixture is a real turn, taken off a local session's `api_request` log.
  * The span states how many tokens went to the cache but never how long the
- * entry lives, so the writes price short-lived and the figure sits under what
- * Anthropic charged. Both numbers are pinned here: the one every surface must
- * agree on, and the bill it does not yet reach.
+ * entry lives; the lifetime follows the call's request context
+ * (`llm_request.context`), measured against Claude Code's live traffic: a
+ * main-thread call writes hour-long entries, a sub-agent call five-minute
+ * ones. Both prices are pinned here: the charged figure a main-thread call
+ * must reach on every surface, and the short-lived one a sub-agent call — or
+ * a call with no stated context — stays at.
  *
  * The span goes in as claude actually emits it, bare `input_tokens` /
  * `cache_creation_tokens` under the CLI's own names, and every surface runs
@@ -59,16 +62,14 @@ const CALL = {
 
 /**
  * What Anthropic charged for that turn, straight off the call's own
- * `api_request` log event. Not read at runtime, and deliberately not what the
- * surfaces are asserted against: reaching it needs the provider's own 5m/1h
- * breakdown on the span, which arrives on the log stream instead. It is pinned
- * so the size of that gap is visible rather than folklore.
+ * `api_request` log event. A main-thread call's writes are hour-long, and
+ * every surface must reach this figure for one.
  */
 const CHARGED_USD = 0.1930215;
 
 /**
- * What the surfaces do compute: every cache write priced short-lived, which is
- * the only rate a span with no stated lifetime supports.
+ * The same call with five-minute writes: what a sub-agent call prices at, and
+ * the conservative answer for a call that states no context at all.
  */
 const SHORT_LIVED_USD = 0.126069;
 
@@ -78,50 +79,55 @@ const SHORT_LIVED_USD = 0.126069;
  */
 const CENTS_OF_A_CENT = 6;
 
-function claudeCallEvent(): SpanReceivedEvent {
+function claudeCallEvent(
+  extra: Record<string, string | number> = {},
+): SpanReceivedEvent {
   return createSpanReceivedEvent({
     traceId: TRACE_ID,
     spanId: SPAN_ID,
     name: "claude_code.llm_request",
     startTimeUnixNano: String(START_MS * 1_000_000),
     endTimeUnixNano: String(END_MS * 1_000_000),
-    attributes: { ...CALL, "langwatch.span.type": "llm" },
+    attributes: { ...CALL, ...extra, "langwatch.span.type": "llm" },
   });
 }
+
+type CallExtra = Record<string, string | number>;
 
 const noopFoldStore = { store: async () => {}, get: async () => null };
 const noopAppendStore = { append: async () => {}, bulkAppend: async () => {} };
 
 /** The trace header, and the trace list's cost column. */
-function traceSummaryCost(): number | null {
+function traceSummaryCost(extra: CallExtra = {}): number | null {
   return new TraceSummaryFoldProjection({
     store: noopFoldStore,
-  }).handleTraceSpanReceived(claudeCallEvent(), createInitState()).totalCost;
+  }).handleTraceSpanReceived(claudeCallEvent(extra), createInitState())
+    .totalCost;
 }
 
 /** The analytics fold, which answers cost-over-time when the rollup cannot. */
-function traceAnalyticsCost(): number | null {
+function traceAnalyticsCost(extra: CallExtra = {}): number | null {
   const projection = new TraceAnalyticsFoldProjection({
     store: noopFoldStore,
   });
   return projection.handleTraceSpanReceived(
-    claudeCallEvent(),
+    claudeCallEvent(extra),
     projection.init(),
   ).totalCost;
 }
 
 /** The per-minute rollup the analytics graphs read by default. */
-function analyticsRollupCost(): number {
+function analyticsRollupCost(extra: CallExtra = {}): number {
   return new TraceAnalyticsRollupMapProjection({
     store: noopAppendStore as never,
-  }).mapTraceSpanReceived(claudeCallEvent()).costSum;
+  }).mapTraceSpanReceived(claudeCallEvent(extra)).costSum;
 }
 
 /** `stored_spans.Cost`: the waterfall's per-span figure, and the CSV export's. */
-function storedSpanCost(): number | null {
+function storedSpanCost(extra: CallExtra = {}): number | null {
   return new SpanStorageMapProjection({
     store: noopAppendStore as never,
-  }).mapTraceSpanReceived(claudeCallEvent()).cost;
+  }).mapTraceSpanReceived(claudeCallEvent(extra)).cost;
 }
 
 /**
@@ -129,10 +135,10 @@ function storedSpanCost(): number | null {
  * repository selects the same canonical attributes ingest wrote, so the row is
  * built from the normalized span rather than from the raw wire values.
  */
-function recomputedSummaryRowCost(): number | null {
+function recomputedSummaryRowCost(extra: CallExtra = {}): number | null {
   const attrs = new SpanStorageMapProjection({
     store: noopAppendStore as never,
-  }).mapTraceSpanReceived(claudeCallEvent()).spanAttributes;
+  }).mapTraceSpanReceived(claudeCallEvent(extra)).spanAttributes;
   const attr = (key: string): string => String(attrs[key] ?? "");
 
   return mapSpanSummaryRow({
@@ -174,10 +180,10 @@ function recomputedSummaryRowCost(): number | null {
  * uses: the stored span becomes a span detail, the detail becomes a transcript
  * entry, and the entries accumulate.
  */
-function terminalFooterCost(): number {
+function terminalFooterCost(extra: CallExtra = {}): number {
   const stored = new SpanStorageMapProjection({
     store: noopAppendStore as never,
-  }).mapTraceSpanReceived(claudeCallEvent());
+  }).mapTraceSpanReceived(claudeCallEvent(extra));
   const span = mapNormalizedSpanToSpan(stored);
 
   const detail = {
@@ -195,36 +201,96 @@ function terminalFooterCost(): number {
   } as unknown as SpanDetail;
 
   const transcript = buildCodingAgentTranscript({ spans: [detail], logs: [] });
-  return buildEntryTimeline(transcript.entries).at(-1)?.cumulativeCostUsd ?? 0;
+  return (
+    buildEntryTimeline({ entries: transcript.entries }).at(-1)
+      ?.cumulativeCostUsd ?? 0
+  );
+}
+
+function allSurfaces(extra: CallExtra = {}): Record<string, number | null> {
+  return {
+    traceSummary: traceSummaryCost(extra),
+    traceAnalytics: traceAnalyticsCost(extra),
+    analyticsRollup: analyticsRollupCost(extra),
+    storedSpan: storedSpanCost(extra),
+    recomputedSummaryRow: recomputedSummaryRowCost(extra),
+    terminalFooter: terminalFooterCost(extra),
+  };
 }
 
 describe("the cost of one claude code model call", () => {
-  describe("given a call whose cache writes carry no stated lifetime", () => {
-    /** @scenario "Every surface prices one call at one number" */
-    it("prices it the same on every surface a customer can read", () => {
-      const surfaces = {
-        traceSummary: traceSummaryCost(),
-        traceAnalytics: traceAnalyticsCost(),
-        analyticsRollup: analyticsRollupCost(),
-        storedSpan: storedSpanCost(),
-        recomputedSummaryRow: recomputedSummaryRowCost(),
-        terminalFooter: terminalFooterCost(),
-      };
+  describe("given a main-thread call (llm_request.context: interaction)", () => {
+    /** @scenario "A main-thread call's cache writes price as hour-long entries" */
+    it("prices the call at the amount the provider charged, on every surface", () => {
+      for (const [surface, cost] of Object.entries(
+        allSurfaces({ "llm_request.context": "interaction" }),
+      )) {
+        expect(cost, `${surface} priced the call differently`).toBeCloseTo(
+          CHARGED_USD,
+          CENTS_OF_A_CENT,
+        );
+      }
+    });
+  });
 
-      for (const [surface, cost] of Object.entries(surfaces)) {
+  describe("given a sub-agent call (llm_request.context: tool)", () => {
+    /** @scenario "A sub-agent call's cache writes price as five-minute entries" */
+    it("prices the writes short-lived, on every surface", () => {
+      for (const [surface, cost] of Object.entries(
+        allSurfaces({ "llm_request.context": "tool" }),
+      )) {
         expect(cost, `${surface} priced the call differently`).toBeCloseTo(
           SHORT_LIVED_USD,
           CENTS_OF_A_CENT,
         );
       }
     });
+  });
 
-    /** @scenario "A call that does not say how long its cache lives is priced as before" */
-    it("prices the writes short-lived, below what the provider charged", () => {
-      // The distance between these two is what carrying the provider's own
-      // 5m/1h breakdown onto the span would close.
-      expect(traceSummaryCost()).toBeCloseTo(SHORT_LIVED_USD, CENTS_OF_A_CENT);
+  describe("given a main-thread call known only by its query source", () => {
+    /** @scenario "A main-thread call known only by its query source prices the same way" */
+    it("prices the call at the charged amount, on every surface", () => {
+      // Claude names the main thread twice: `llm_request.context` on the span
+      // and `query_source` on the log side. The session fold reads both, so
+      // the trace surfaces must too, or one span reads hour-long in the Usage
+      // tab and five-minute in the trace header.
+      for (const [surface, cost] of Object.entries(
+        allSurfaces({ query_source: "repl_main_thread" }),
+      )) {
+        expect(cost, `${surface} priced the call differently`).toBeCloseTo(
+          CHARGED_USD,
+          CENTS_OF_A_CENT,
+        );
+      }
+    });
+  });
+
+  describe("given a call whose cache writes carry no stated lifetime", () => {
+    /** @scenario "A call with no stated context prices its writes conservatively" */
+    /** @scenario "Every surface prices one call at one number" */
+    it("prices it short-lived, the same on every surface a customer can read", () => {
+      for (const [surface, cost] of Object.entries(allSurfaces())) {
+        expect(cost, `${surface} priced the call differently`).toBeCloseTo(
+          SHORT_LIVED_USD,
+          CENTS_OF_A_CENT,
+        );
+      }
+      // Never overstates: the conservative rate sits under the charged one.
       expect(SHORT_LIVED_USD).toBeLessThan(CHARGED_USD);
+    });
+  });
+
+  describe("given a call whose span already states an hour-long count", () => {
+    /** @scenario "A provider-stated split is never overwritten" */
+    it("keeps the provider's own count over the context rule", () => {
+      // A sub-agent call (5m by the rule) whose span nonetheless states the
+      // full write as hour-long: the stated split must win.
+      const cost = traceSummaryCost({
+        "llm_request.context": "tool",
+        "gen_ai.usage.cache_creation_1h.input_tokens":
+          CALL.cache_creation_tokens,
+      });
+      expect(cost).toBeCloseTo(CHARGED_USD, CENTS_OF_A_CENT);
     });
   });
 });

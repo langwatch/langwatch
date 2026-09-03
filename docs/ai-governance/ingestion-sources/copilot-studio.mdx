@@ -1,62 +1,110 @@
 ---
-title: Microsoft Copilot Studio (Purview)
-description: Setup contract only, Azure AD app registration is captured; the Purview Audit poller is pending.
+title: Microsoft Copilot Studio
+description: Read Copilot Studio conversations from your Power Platform Dataverse environment. Each conversation becomes a trace with turns, tool calls, and attribution to the person who asked.
 sidebarTitle: Microsoft Copilot Studio
 ---
 
-<Info>**Pairs with:** [Ingestion Sources index](/ai-governance/ingestion-sources/index). Microsoft Copilot Studio is on the adapter roadmap; configuration contract is captured today, the Purview poller worker is pending.</Info>
+The source type is `copilot_studio_dataverse`. It connects to one Power
+Platform environment and queries the `conversationtranscripts` table on a
+15-minute cadence.
 
-`copilot_studio` polls the Microsoft Purview Audit API for Copilot Studio activity. Today the source can be created and the per-platform credentials are persisted, but the cron worker that calls Purview hasn't shipped, events do not flow yet.
+## What it reads
 
-The configuration contract below lets admins pre-stage Azure AD app registrations and trust policies; the matching adapter is on the [roadmap](/ai-governance/ingestion-sources/index#adapter-roadmap).
+The puller queries two Dataverse tables per run:
 
-## Currently implemented
+| Table | What it provides |
+|---|---|
+| `conversationtranscripts` | Every conversation, stored as Bot Framework activity blobs |
+| `bot` | Agent names, so conversations show which agent answered |
 
-- **CRUD:** the source can be created via the admin composer at `/settings/governance/ingestion-sources` and via `api.ingestionSources.create`. It appears in `langwatch ingest list` with status `awaiting_first_event`.
-- **Receiver:** none. There is no `POST /api/ingest/copilot/:id` endpoint and the OTLP, webhook receivers reject `copilot_studio` sources with `400 wrong_endpoint`.
-- **Poller:** none.
-- **Normaliser:** none.
-- **Status flip:** the source stays `awaiting_first_event` indefinitely until the poller ships.
+Each conversation produces one trace, with:
+- Each user question paired with the agent's answer as a turn
+- Tool calls the agent made, including unfinished ones
+- The person's directory account identifier on each question
+- A flag when the agent was edited after the conversation happened
+- A label when the conversation was a design-time test
 
-## What the admin configures upstream
+## What the admin sets up
 
-The composer collects:
+### In the Microsoft Entra admin centre
 
-| Field | Required | Stored | Used by |
-|---|---|---|---|
-| Azure AD tenant ID | yes | `IngestionSource.payloadConfig.tenantId` | (future poller) |
-| App registration client ID | yes | `payloadConfig.clientId` | (future poller) |
-| App registration client secret | yes | `payloadConfig.clientSecret` (hashed server-side) | (future poller) |
-| Polling cadence (seconds) | no | `payloadConfig.pollEverySec` (default 300) | (future poller) |
+Done once for the whole organisation:
 
-In the Azure portal:
+1. **App registrations** → New registration. Give it a name (e.g. `langwatch-copilot-reader`), choose the single-tenant option.
+2. Copy the **Application (client) ID** and **Directory (tenant) ID** from the overview page.
+3. **Certificates & secrets** → New client secret. Copy the **Value** column immediately; Microsoft never shows it again.
+4. *(Optional)* **API permissions** → Microsoft Graph → Application permissions → `Directory.Read.All` → Grant admin consent. This lets LangWatch show department and job title beside each conversation. Skip it and conversations still arrive, without the org context.
 
-1. **App registrations → New registration**, name it `langwatch-copilot-audit-reader`.
-2. **API permissions → Add → Microsoft Graph → Application permissions → `AuditLog.Read.All`**, then **Grant admin consent**.
-3. **Certificates & secrets → New client secret**, copy the value into the LangWatch composer.
-4. Optionally restrict the app to specific Azure subscriptions, regions per your security policy.
+### In the Power Platform admin centre
 
-There is no LangWatch-side URL or bearer secret to paste back into Microsoft. The future poller will hold the relationship: LangWatch calls Purview's `manage.office.com` Audit API on a schedule using the app registration above.
+Repeated for every environment that has agents:
 
-## What event shape we accept today
+5. **Environments** → pick the environment → Settings → Users + permissions → Application users → New app user.
+6. Paste the Application ID, choose a business unit, and assign the **Service Reader** role.
 
-None, no events flow until the poller ships. `langwatch ingest tail <sourceId>` prints:
+<Note>Service Reader is the tightest stock role that grants read access to both `bot` and `conversationtranscripts` at organisation-wide reach. The similarly named Bot Transcript Viewer only reads records the account created itself, which for a service account is none. See the [security roles reference](https://learn.microsoft.com/en-us/power-platform/admin/security-roles-privileges) for details.</Note>
 
-```text
-No events for this source yet. Once your upstream platform starts
-sending OTel/audit logs to /api/ingest/* with the source's bearer
-secret, events will land here.
-```
+### In LangWatch
 
-(The hint mentions `/api/ingest/*` because that's the universal advice for push-mode sources; for `copilot_studio` specifically, no push endpoint exists. Once the poller lands, this empty-state hint will be replaced with poller-specific guidance.)
+Create a source of type **Microsoft Copilot Studio** and fill in:
 
-## What is still envelope-only, follow-up work
+| Field | Required | Description |
+|---|---|---|
+| Power Platform environment URL | yes | `https://org12345.crm.dynamics.com`, from the admin centre |
+| Microsoft Entra tenant ID | yes | The directory the app registration lives in |
+| App registration client ID | yes | From the app registration overview |
+| App registration client secret | yes | The secret value (shown once) |
 
-Everything below is the adapter slice that has not yet shipped:
+The environment URL must be an `https` address on a domain Microsoft serves
+Power Platform from (`.dynamics.com`, `.microsoftdynamics.us`,
+`.appsplatform.us`, `.dynamics.cn`). Environments on a custom domain need a
+support ticket.
 
-- **Purview poller worker.** A cron job that authenticates as the app registration, calls `https://manage.office.com/api/v1.0/<tenantId>/activity/feed/subscriptions/content` to pull new content blobs, and walks them for Copilot Studio activity (`RecordType` = Copilot* operations).
-- **Purview event → governance event mapping.** Purview's audit JSON has `Operation`, `UserId`, `RecordType`, `ResultStatus` etc. The mapping into Actor, Action, Target, `eventType` is pending and will live in a `purview.ts` normaliser alongside `otel.ts`.
-- **Subscription bootstrap.** Purview audit feed subscriptions need to be created via API on first connect (`PUT /subscriptions/start?contentType=Audit.General`). The bootstrap will live in the poller worker on first run, idempotent.
-- **Watermark + dedup.** Purview content blobs have stable IDs; the worker will track high-water content IDs in `IngestionSource.payloadConfig.watermark` to avoid replays.
+## How a run works
 
-When the poller ships, this page is updated with the real event shape, the CLI verification flow, and the per-source detail behaviour.
+1. The puller exchanges the application credentials for a short-lived token scoped to the environment.
+2. It reads the agent table once (for names).
+3. It pages through the transcript table from where the last run left off.
+4. Multi-row conversations are stitched back together by their shared name and start time.
+5. Activities are paired into turns and emitted as OTLP spans.
+
+The cursor is a `(createdon, conversationtranscriptid)` pair so it never
+skips or re-reads a row. Default cadence is every 15 minutes.
+
+## Security boundaries
+
+- **Credentials stay in the environment.** Every request goes to the configured
+  Power Platform address. A next-page link pointing elsewhere stops the walk.
+  Redirects are never followed.
+- **The environment URL is checked at save time.** An address outside Microsoft's
+  known Power Platform domains is refused before it is stored.
+- **Directory access is optional.** When `Directory.Read.All` is granted, the
+  puller resolves the person's directory identifier to a name and department.
+  Without it, conversations still arrive with the raw `aadObjectId` only.
+
+## What shows up
+
+Each conversation trace includes these attributes:
+
+- `copilot_studio.agent_name`: the agent that answered
+- `copilot_studio.agent_changed_since`: `true` when the agent was edited after the conversation
+- `copilot_studio.design_mode`: `true` for conversations held while building the agent
+- `copilot_studio.transcript_batches`: which pieces this conversation was built from
+- `copilot_studio.conversation_incomplete`: `true` when a piece is missing from the middle
+- `langwatch.user.id`: the person's directory account on each user turn
+
+The model attribute is `microsoft/copilot-studio`, a product label, not a
+priced model. The agent record in the environment does not expose which model
+the agent uses.
+
+## Limitations
+
+- Microsoft deletes transcripts roughly 30 days out, so the first run's lookback
+  is capped at 30 days.
+- Dataverse caps a single transcript row at roughly 1 MB. Long conversations are
+  stored across multiple rows; the puller stitches them, but a missing piece
+  (a row that was already deleted) marks the conversation incomplete.
+- Agent names require the credential to read the `bot` table. If it cannot, conversations
+  still arrive but without an agent name, and the log says why.
+- The transcript has no token counts and no cost figures. Those come from Azure
+  cost reports, which require a separate billing-plan setup.

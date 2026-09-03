@@ -187,6 +187,100 @@ describe("CodingAgentSessionFoldProjection", () => {
       expect(state.sessionId).toBe(SESSION_ID);
       expect(state.agent).toBe("claude_code");
     });
+
+    /** @scenario "The session's cost is computed from tokens, same formula as the trace" */
+    it("computes the span's cost and keeps the reported figure beside it", () => {
+      const projection = makeProjection();
+      let state = initStateOf(projection);
+
+      // What the agent states it was billed for the turn.
+      state = projection.handleCodingAgentSessionLogFactsContributed(
+        logFactsEvent({
+          facts: { "event.name": "claude_code.api_request", cost_usd: 0.25 },
+        }),
+        state,
+      );
+
+      state = projection.handleCodingAgentSessionSpanFactsContributed(
+        spanFactsEvent({
+          name: "claude_code.llm_request",
+          spanId: "llm-priced",
+          facts: {
+            model: "claude-sonnet-4-5",
+            input_tokens: 100,
+            output_tokens: 50,
+            cache_read_tokens: 900,
+          },
+        }),
+        state,
+      );
+
+      // Two figures, two homes: the session's cost is the span's tokens
+      // priced against the registry — the same formula the trace pipeline
+      // applies to the same span — and what the agent reported rides beside
+      // it. Folding either into the other would charge the turn twice, at
+      // two different rates.
+      expect(state.agentReportedCostUsd).toBe(0.25);
+      // 100 in x $3/M + 50 out x $15/M + 900 cache-read x $0.30/M.
+      expect(state.costUsd).toBeCloseTo(0.00132, 6);
+    });
+  });
+
+  describe("when claude llm_request spans price their cache writes", () => {
+    const pricedCall = (context: string | undefined) => {
+      const projection = makeProjection();
+      return projection.handleCodingAgentSessionSpanFactsContributed(
+        spanFactsEvent({
+          name: "claude_code.llm_request",
+          spanId: `llm-ttl-${context ?? "none"}`,
+          facts: {
+            model: "claude-sonnet-4-5",
+            cache_creation_tokens: 17_854,
+            ...(context !== undefined
+              ? { "llm_request.context": context }
+              : {}),
+          },
+        }),
+        initStateOf(projection),
+      );
+    };
+
+    it("prices a main-thread call's writes at the hour-long rate", () => {
+      // 17,854 writes at sonnet-4.5's $6/M hour-long rate vs $3.75/M
+      // five-minute rate — the same lifetime rule the trace pipeline's
+      // extractor stamps on the identical span.
+      expect(pricedCall("interaction").costUsd).toBeCloseTo(
+        17_854 * 0.000006,
+        6,
+      );
+    });
+
+    it("prices a sub-agent call's writes at the five-minute rate", () => {
+      expect(pricedCall("tool").costUsd).toBeCloseTo(17_854 * 0.00000375, 6);
+    });
+
+    it("prices a call with no stated context conservatively", () => {
+      expect(pricedCall(undefined).costUsd).toBeCloseTo(17_854 * 0.00000375, 6);
+    });
+
+    /** @scenario "A main-thread call known only by its query source prices the same way" */
+    it("prices a call named main-thread by its query source at the hour-long rate", () => {
+      const projection = makeProjection();
+      const state = projection.handleCodingAgentSessionSpanFactsContributed(
+        spanFactsEvent({
+          name: "claude_code.llm_request",
+          spanId: "llm-ttl-query-source",
+          facts: {
+            model: "claude-sonnet-4-5",
+            cache_creation_tokens: 17_854,
+            query_source: "repl_main_thread",
+          },
+        }),
+        initStateOf(projection),
+      );
+
+      expect(state.costUsd).toBeCloseTo(17_854 * 0.000006, 6);
+    });
   });
 
   describe("when a tool span FAILED", () => {
@@ -284,8 +378,10 @@ describe("CodingAgentSessionFoldProjection", () => {
     });
   });
 
-  describe("when the authoritative cost arrives on a log", () => {
-    it("sums it into the session", () => {
+  describe("when the agent reports its own bill on a log", () => {
+    /** @scenario "The agent-reported figure is kept as a drift signal" */
+    /** @scenario "an agent that states its own price keeps it beside the computed one" */
+    it("sums it beside the computed cost, never into it", () => {
       const projection = makeProjection();
       let state = initStateOf(projection);
 
@@ -303,7 +399,10 @@ describe("CodingAgentSessionFoldProjection", () => {
         state,
       );
 
-      expect(state.costUsd).toBe(0.75);
+      expect(state.agentReportedCostUsd).toBe(0.75);
+      // The session's cost is computed from its spans' tokens; a span-bearing
+      // agent's api_request event contributes only the reported figure.
+      expect(state.costUsd).toBe(0);
     });
   });
 
@@ -435,8 +534,8 @@ describe("CodingAgentSessionFoldProjection", () => {
       ...overrides,
     });
 
-    /** @scenario Repository identity and worktree set once and do not move */
-    it("keeps the first repository and worktree when a later event names another", () => {
+    /** @scenario Repository identity and worktree follow the latest context event */
+    it("moves the repository and worktree to the latest event's answer", () => {
       const projection = makeProjection();
       let state = initStateOf(projection);
 
@@ -457,10 +556,37 @@ describe("CodingAgentSessionFoldProjection", () => {
         state,
       );
 
+      expect(state.repositoryHost).toBe("gitlab.com");
+      expect(state.repositoryOwner).toBe("other");
+      expect(state.repositoryName).toBe("gadgets");
+      expect(state.gitWorktree).toBe("gadgets-hotfix");
+    });
+
+    /** @scenario A context event that omits a field keeps the previous value */
+    it("keeps the declared repository and worktree when a later event omits them", () => {
+      const projection = makeProjection();
+      let state = initStateOf(projection);
+
+      state = projection.handleCodingAgentSessionLogFactsContributed(
+        logFactsEvent({ facts: contextFacts() }),
+        state,
+      );
+      state = projection.handleCodingAgentSessionLogFactsContributed(
+        logFactsEvent({
+          facts: {
+            "event.name": "langwatch.session_context",
+            "vcs.ref.head.name": "feat/only-a-branch",
+          },
+          timeMs: 2_500,
+        }),
+        state,
+      );
+
       expect(state.repositoryHost).toBe("github.com");
       expect(state.repositoryOwner).toBe("acme");
       expect(state.repositoryName).toBe("widgets");
       expect(state.gitWorktree).toBe("widgets");
+      expect(state.gitBranch).toBe("feat/only-a-branch");
     });
 
     /** @scenario The branch follows the latest session context event */
@@ -720,6 +846,147 @@ describe("CodingAgentSessionFoldProjection", () => {
         state,
       );
       expect(state.title).toBe("Read notes.txt and summarize it");
+    });
+
+    /** @scenario "The session's own name outranks the generated title" */
+    /** @scenario "The session's own name outranks the prompt-derived name" */
+    it("holds the session's name over both derived titles", () => {
+      const projection = makeProjection();
+      let state = initStateOf(projection);
+
+      state = projection.handleCodingAgentSessionLogFactsContributed(
+        logFactsEvent({
+          facts: {
+            "event.name": "langwatch.session_context",
+            "coding_agent.name": "claude_code",
+            "langwatch.session.name": "pr-reviewer",
+          },
+        }),
+        state,
+      );
+      state = projection.handleCodingAgentSessionLogFactsContributed(
+        logFactsEvent({
+          facts: promptFacts("Good morning. Use the review skill."),
+          timeMs: 2_000,
+        }),
+        state,
+      );
+      state = projection.handleCodingAgentSessionLogFactsContributed(
+        logFactsEvent({
+          facts: {
+            "event.name": "claude_code.api_response_body",
+            "langwatch.session.title": "Review the open pull requests",
+          },
+          timeMs: 3_000,
+        }),
+        state,
+      );
+
+      // Neither the prompt nor the regenerated conversation title moved it.
+      expect(state.title).toBe("pr-reviewer");
+      expect(state.titleSource).toBe("name");
+    });
+
+    /** @scenario "A renamed session renames its row" */
+    it("folds the newest name in place", () => {
+      const projection = makeProjection();
+      let state = initStateOf(projection);
+
+      const declared = (title: string) =>
+        logFactsEvent({
+          facts: {
+            "event.name": "langwatch.session_context",
+            "coding_agent.name": "claude_code",
+            "langwatch.session.name": title,
+          },
+        });
+
+      state = projection.handleCodingAgentSessionLogFactsContributed(
+        declared("pr-reviewer"),
+        state,
+      );
+      state = projection.handleCodingAgentSessionLogFactsContributed(
+        declared("pr-hound"),
+        state,
+      );
+
+      expect(state.title).toBe("pr-hound");
+    });
+
+    /** @scenario "A blank name does not rename the session" */
+    it("keeps the previous title when a later name is whitespace", () => {
+      const projection = makeProjection();
+      let state = initStateOf(projection);
+
+      const declared = (title: string) =>
+        logFactsEvent({
+          facts: {
+            "event.name": "langwatch.session_context",
+            "coding_agent.name": "claude_code",
+            "langwatch.session.name": title,
+          },
+        });
+
+      state = projection.handleCodingAgentSessionLogFactsContributed(
+        declared("pr-reviewer"),
+        state,
+      );
+      state = projection.handleCodingAgentSessionLogFactsContributed(
+        declared("   "),
+        state,
+      );
+
+      expect(state.title).toBe("pr-reviewer");
+    });
+
+    /** @scenario "A context record with no repository still folds its titles" */
+    it("folds a context that names no repository", () => {
+      const projection = makeProjection();
+      let state = initStateOf(projection);
+
+      state = projection.handleCodingAgentSessionLogFactsContributed(
+        logFactsEvent({
+          facts: {
+            "event.name": "langwatch.session_context",
+            "coding_agent.name": "codex",
+            "langwatch.session.title": "Read notes.txt",
+            "langwatch.session.name": "pr-reviewer",
+          },
+          agent: "codex",
+        }),
+        state,
+      );
+
+      expect(state.repositoryHost).toBeNull();
+      expect(state.repositoryName).toBeNull();
+      // The name wins over the prompt-derived title on the same record.
+      expect(state.title).toBe("pr-reviewer");
+      expect(state.titleSource).toBe("name");
+    });
+
+    /** @scenario "A row from before the source column still takes a generated title" */
+    it("lets a generated title replace a title with no recorded source", () => {
+      const projection = makeProjection();
+      // A pre-00083 row decodes with a title and no source; it must keep the
+      // old newest-wins behaviour rather than freezing on its first title.
+      const decoded = {
+        ...initStateOf(projection),
+        title: "Good morning.",
+        titleSource: null,
+      };
+
+      const state = projection.handleCodingAgentSessionLogFactsContributed(
+        logFactsEvent({
+          facts: {
+            "event.name": "claude_code.api_response_body",
+            "langwatch.session.title": "Review the open pull requests",
+          },
+        }),
+        decoded,
+      );
+
+      expect(state.title).toBe("Review the open pull requests");
+      expect(state.titleSource).toBe("generated");
     });
   });
 
@@ -1239,8 +1506,28 @@ describe("coding-agent session fold, per-agent gating", () => {
       expect(state.outputTokens).toBe(50);
       expect(state.cacheReadTokens).toBe(1_000);
       expect(state.cacheCreationTokens).toBe(200);
-      expect(state.costUsd).toBeCloseTo(0.42);
       expect(state.models).toEqual(["claude-fable-5"]);
+      expect(state.costUsd).toBeCloseTo(0.42);
+    });
+
+    /** @scenario "A logs-only agent keeps its reported cost as the session cost" */
+    it("keeps the reported cost as the session's cost, with no span to compute from", () => {
+      const projection = makeProjection();
+
+      const state = projection.handleCodingAgentSessionLogFactsContributed(
+        logFactsEvent({
+          agent: "claude_cowork",
+          facts: {
+            "event.name": "claude_code.api_request",
+            cost_usd: 0.42,
+            model: "claude-fable-5",
+          },
+        }),
+        initStateOf(projection),
+      );
+
+      expect(state.costUsd).toBeCloseTo(0.42);
+      expect(state.agentReportedCostUsd).toBeCloseTo(0.42);
     });
 
     it("folds the tool run — name, count, step — from the tool_result event", () => {
@@ -1355,7 +1642,7 @@ describe("coding-agent session fold, per-agent gating", () => {
 
   describe("when a span-bearing agent's api_request event contributes", () => {
     /** @scenario re-delivered telemetry does not inflate a session */
-    it("folds cost only — its tokens arrive on the llm_request span", () => {
+    it("folds the reported cost only — its tokens arrive on the llm_request span", () => {
       const projection = makeProjection();
 
       const state = projection.handleCodingAgentSessionLogFactsContributed(
@@ -1371,8 +1658,10 @@ describe("coding-agent session fold, per-agent gating", () => {
         initStateOf(projection),
       );
 
-      expect(state.costUsd).toBeCloseTo(0.42);
-      // The double-count gate: these fold from the span for claude_code.
+      expect(state.agentReportedCostUsd).toBeCloseTo(0.42);
+      // The double-count gate: these fold from the span for claude_code,
+      // including the computed cost.
+      expect(state.costUsd).toBe(0);
       expect(state.modelCalls).toBe(0);
       expect(state.inputTokens).toBe(0);
       expect(state.outputTokens).toBe(0);
@@ -1409,11 +1698,16 @@ describe("coding-agent session fold, per-agent gating", () => {
 });
 
 describe("coding-agent session fold, codex", () => {
-  /** A live turn span's facts, verbatim spellings from codex-rs 0.147. */
+  /**
+   * A live turn span from codex-rs 0.147, as the fold receives it: after
+   * canonicalisation, where the input has already been made the disjoint
+   * non-cached bucket (2936 of the 13944 codex reported, the other 11008
+   * being the cache read).
+   */
   const codexTurnFacts = {
     "gen_ai.request.model": "gpt-5.6-sol",
     "gen_ai.response.model": "gpt-5.6-sol",
-    "gen_ai.usage.input_tokens": "13944",
+    "gen_ai.usage.input_tokens": "2936",
     "gen_ai.usage.output_tokens": "7",
     "gen_ai.usage.cache_read.input_tokens": "11008",
     "gen_ai.usage.cache_creation.input_tokens": "0",
@@ -1452,7 +1746,77 @@ describe("coding-agent session fold, codex", () => {
       expect(state.attempts).toBe(1);
     });
 
-    it("derives the non-cached input when codex's own count is absent", () => {
+    /** @scenario "a codex session is priced from the tokens it reported" */
+    it("prices the turn from its tokens, since codex states no cost", () => {
+      const projection = makeProjection();
+
+      const state = projection.handleCodingAgentSessionSpanFactsContributed(
+        spanFactsEvent({
+          name: "session_task.turn",
+          spanId: "turn-priced",
+          agent: "codex",
+          facts: codexTurnFacts,
+        }),
+        initStateOf(projection),
+      );
+
+      // 2,936 non-cached input + 11,008 cache-read + 7 output at gpt-5.6-sol's
+      // registry rates. The figure is the registry's, not one written here, so
+      // the assertion is that a price was worked out at all.
+      expect(state.costUsd).toBeGreaterThan(0);
+      expect(state.costUsd).toBeLessThan(1);
+    });
+
+    /** @scenario "a codex session is priced from the tokens it reported" */
+    it("adds a second turn's price to the session's total", () => {
+      const projection = makeProjection();
+
+      const first = projection.handleCodingAgentSessionSpanFactsContributed(
+        spanFactsEvent({
+          name: "session_task.turn",
+          spanId: "turn-priced-1",
+          agent: "codex",
+          facts: codexTurnFacts,
+        }),
+        initStateOf(projection),
+      );
+      const second = projection.handleCodingAgentSessionSpanFactsContributed(
+        spanFactsEvent({
+          name: "session_task.turn",
+          spanId: "turn-priced-2",
+          agent: "codex",
+          facts: codexTurnFacts,
+        }),
+        first,
+      );
+
+      expect(first.costUsd).toBeGreaterThan(0);
+      expect(second.costUsd).toBeCloseTo(first.costUsd * 2, 10);
+    });
+
+    /** @scenario "a turn priced at an unknown model costs nothing rather than guessing" */
+    it("counts the tokens but charges nothing for a model in no price list", () => {
+      const projection = makeProjection();
+
+      const state = projection.handleCodingAgentSessionSpanFactsContributed(
+        spanFactsEvent({
+          name: "session_task.turn",
+          spanId: "turn-unpriced",
+          agent: "codex",
+          facts: {
+            ...codexTurnFacts,
+            "gen_ai.request.model": "a-model-no-registry-lists",
+            "gen_ai.response.model": "a-model-no-registry-lists",
+          },
+        }),
+        initStateOf(projection),
+      );
+
+      expect(state.inputTokens).toBe(2_936);
+      expect(state.costUsd).toBe(0);
+    });
+
+    it("reads the input the canonicalisation settled on, without deriving it again", () => {
       const projection = makeProjection();
       const {
         "codex.turn.token_usage.non_cached_input_tokens": _omit,
@@ -1469,7 +1833,9 @@ describe("coding-agent session fold, codex", () => {
         initStateOf(projection),
       );
 
-      expect(state.inputTokens).toBe(13_944 - 11_008);
+      // Taking the cache off a second time would leave nothing here, which
+      // is what a session whose turns all read zero input looked like.
+      expect(state.inputTokens).toBe(2_936);
       expect(state.cacheReadTokens).toBe(11_008);
     });
 

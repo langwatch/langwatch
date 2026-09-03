@@ -20,6 +20,7 @@
  * an error class). That invariant is what makes it safe to summarise a session of
  * unknown size — it is the same one that let us delete MAX_PROCESSED_SPANS.
  */
+import { z } from "zod";
 
 /** One thing the agent did, in the order it did it. */
 export interface SessionStep {
@@ -31,6 +32,17 @@ export interface SessionStep {
   /** Used to keep the sequence true even when spans arrive out of order. */
   startedAtMs: number;
 }
+
+/**
+ * Who set the session's `title`, in rank order: the harness's own session
+ * name beats the generated conversation title beats the prompt-derived name.
+ *
+ * A schema rather than a bare union because the value is also decoded back
+ * from a row column, so the names have to exist at runtime. One declaration
+ * serves both, and the two cannot drift apart.
+ */
+export const sessionTitleSourceSchema = z.enum(["prompt", "generated", "name"]);
+export type SessionTitleSource = z.infer<typeof sessionTitleSourceSchema>;
 
 /**
  * One converged metric unit, as its contribution delivered it. A cumulative
@@ -92,7 +104,9 @@ export interface CodingAgentSessionData {
    *     the whole history the scalar above keeps only the present tense of. A
    *     session that lands one change and moves on drove both branches, and
    *     both of their pull requests.
-   *   - title is LAST-NON-EMPTY-WINS, like every other regenerated label.
+   *   - title is LAST-NON-EMPTY-WINS within its source rank: the harness's
+   *     own session name outranks the generated conversation title, which
+   *     outranks the prompt-derived name.
    *
    * Degradation, stated: agents with no companion emitter carry nulls here.
    * Null means nothing reported it, never "this session has no repository".
@@ -104,6 +118,15 @@ export interface CodingAgentSessionData {
   gitBranches: string[];
   gitWorktree: string | null;
   title: string | null;
+  /**
+   * Which source set `title`. Its own field rather than an inference,
+   * because the fold's state is decoded back from the row (ADR-066) and the
+   * title alone cannot say whether a later generated title may replace it —
+   * getting that wrong renames a session away from the name its harness
+   * holds. Null on a row from before the column, which ranks as `generated`
+   * (the strongest source that existed then).
+   */
+  titleSource: SessionTitleSource | null;
 
   // ── Shape ─────────────────────────────────────────────────────────────
   modelCalls: number;
@@ -155,7 +178,19 @@ export interface CodingAgentSessionData {
    * cache is burning money in a way raw token counts do not show.
    */
   cacheCreationTokens: number;
+  /**
+   * Priced from the session's own tokens against the model registry — the
+   * same formula the trace pipeline applies to the same calls, so a session
+   * and its traces state one figure. A logs-only agent, with no token-bearing
+   * span to compute from, carries its reported cost here instead.
+   */
   costUsd: number;
+  /**
+   * What the agent says it was billed, summed off its api_request events.
+   * Kept beside the computed cost, never shown as it: the two drifting apart
+   * per model is the alarm that a price went stale — ours or theirs.
+   */
+  agentReportedCostUsd: number;
 
   // ── Time ──────────────────────────────────────────────────────────────
   /** Wall-clock inside model calls, and inside tools. */

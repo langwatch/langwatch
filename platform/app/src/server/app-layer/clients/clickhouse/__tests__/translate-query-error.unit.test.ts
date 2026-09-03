@@ -5,7 +5,12 @@ import {
   QueryScanLimitExceededError,
   QueryTimeoutError,
 } from "~/server/app-layer/traces/errors";
-import { translateClickHouseQueryError } from "../translate-query-error";
+import {
+  isClickHouseObjectUnavailableError,
+  isClickHouseUnknownIdentifierError,
+  translateClickHouseQueryError,
+  unknownIdentifierFromError,
+} from "../translate-query-error";
 
 describe("translateClickHouseQueryError", () => {
   describe("given a MEMORY_LIMIT_EXCEEDED driver error", () => {
@@ -191,5 +196,179 @@ describe("translateClickHouseQueryError", () => {
         QueryScanLimitExceededError,
       );
     });
+  });
+});
+
+describe("isClickHouseObjectUnavailableError", () => {
+  it.each([
+    [
+      "UNKNOWN_TABLE by driver properties",
+      { code: "60", type: "UNKNOWN_TABLE" },
+      "boom",
+    ],
+    [
+      "UNKNOWN_DATABASE by driver properties",
+      { code: "81", type: "UNKNOWN_DATABASE" },
+      "boom",
+    ],
+    [
+      "ACCESS_DENIED by driver properties",
+      { code: "497", type: "ACCESS_DENIED" },
+      "boom",
+    ],
+    [
+      "UNKNOWN_TABLE from raw HTTP text",
+      {},
+      "Code: 60. DB::Exception: Table lwql.traces does not exist. (UNKNOWN_TABLE)",
+    ],
+    [
+      "ACCESS_DENIED from raw HTTP text",
+      {},
+      "Code: 497. DB::Exception: lwql_reader: Not enough privileges. (ACCESS_DENIED)",
+    ],
+  ])("recognises %s", (_case, props, message) => {
+    const raw = Object.assign(new Error(message), props);
+
+    expect(isClickHouseObjectUnavailableError(raw)).toBe(true);
+  });
+
+  it("does not classify by a variant name echoed from the query", () => {
+    // The engine echoes the submitted query in the message; only the anchored
+    // `Code: <n>.` prefix the engine writes itself gets a vote.
+    const raw = new Error(
+      "Code: 62. DB::Exception: Syntax error near UNKNOWN_TABLE",
+    );
+
+    expect(isClickHouseObjectUnavailableError(raw)).toBe(false);
+  });
+
+  it("is false for unrelated errors and non-Error values", () => {
+    expect(
+      isClickHouseObjectUnavailableError(
+        Object.assign(new Error("boom"), { code: "241" }),
+      ),
+    ).toBe(false);
+    expect(isClickHouseObjectUnavailableError("nope")).toBe(false);
+  });
+});
+
+describe("isClickHouseUnknownIdentifierError", () => {
+  describe.each([
+    [
+      // Verbatim from a real 25.x server, captured through the driver: no
+      // `Code: 47.` prefix, because the driver strips its own and sets `code`
+      // and `type` as properties instead. Backticks, not single quotes. An
+      // earlier fixture here guessed single quotes and passed, while the
+      // extractor read nothing at all off the live engine.
+      "the analyzer's sentence, as a real server delivers it",
+      { code: "47", type: "UNKNOWN_IDENTIFIER" },
+      "Unknown expression identifier `trace_idd` in scope SELECT trace_idd FROM lwql.traces LIMIT 1. ",
+    ],
+    [
+      "the same sentence arriving as raw HTTP text",
+      {},
+      "Code: 47. DB::Exception: Unknown expression identifier `trace_idd` in scope SELECT trace_idd FROM traces. (UNKNOWN_IDENTIFIER)",
+    ],
+    [
+      "the older non-analyzer path, which single-quotes",
+      {},
+      "Code: 47. DB::Exception: Missing columns: 'trace_idd' while processing query: 'SELECT trace_idd FROM traces', required columns: 'trace_idd'. (UNKNOWN_IDENTIFIER)",
+    ],
+  ])("given %s", (_case, props, message) => {
+    const raised = () => Object.assign(new Error(message), props);
+
+    it("recognises it", () => {
+      expect(isClickHouseUnknownIdentifierError(raised())).toBe(true);
+    });
+
+    it("names the column, and nothing else from the message", () => {
+      expect(unknownIdentifierFromError(raised())).toBe("trace_idd");
+    });
+  });
+
+  it("recognises it from the driver's type property with no message to read", () => {
+    // The real driver sets `code` AND `type` AND a readable message; this is
+    // the degenerate case where only the properties survive.
+    const raw = Object.assign(new Error("boom"), {
+      code: "47",
+      type: "UNKNOWN_IDENTIFIER",
+    });
+
+    expect(isClickHouseUnknownIdentifierError(raw)).toBe(true);
+    // No sentence to match, so no name. The refusal is still coded.
+    expect(unknownIdentifierFromError(raw)).toBeUndefined();
+  });
+
+  it("does not classify by the variant name echoed from the query", () => {
+    const raw = new Error(
+      "Code: 62. DB::Exception: Syntax error near UNKNOWN_IDENTIFIER",
+    );
+
+    expect(isClickHouseUnknownIdentifierError(raw)).toBe(false);
+  });
+
+  it("is false for unrelated errors and non-Error values", () => {
+    expect(
+      isClickHouseUnknownIdentifierError(
+        Object.assign(new Error("boom"), { code: "241" }),
+      ),
+    ).toBe(false);
+    expect(isClickHouseUnknownIdentifierError("nope")).toBe(false);
+  });
+
+  /**
+   * The reason the extractor is narrow rather than generous. The engine's
+   * message carries the submitted query and the objects it touched, so a
+   * looser read would hand the caller the deployment's shape along with their
+   * typo.
+   */
+  describe("given a message it cannot read with confidence", () => {
+    it.each([
+      ["no quoted name at all", "Code: 47. DB::Exception: something else"],
+      [
+        "a captured token that is not an identifier",
+        "Code: 47. DB::Exception: Unknown expression identifier 'SELECT * FROM secrets' in scope",
+      ],
+    ])("returns nothing for %s", (_case, message) => {
+      expect(unknownIdentifierFromError(new Error(message))).toBeUndefined();
+    });
+
+    it("takes only the quoted token, not what follows it", () => {
+      // A message whose text after the closing quote is hostile. The capture
+      // stops at that quote and the shape check passes on `a`, so what comes
+      // back is the column name and nothing after it. This is the case the
+      // regex is doing work on rather than the shape check.
+      const identifier = unknownIdentifierFromError(
+        new Error(
+          "Code: 47. DB::Exception: Missing columns: 'a' OR 1=1 --' while processing query",
+        ),
+      );
+
+      expect(identifier).toBe("a");
+    });
+
+    it("never returns the message itself", () => {
+      const message =
+        "Code: 47. DB::Exception: Missing columns: 'x' while processing query: 'SELECT secret FROM internal_audit'";
+      const identifier = unknownIdentifierFromError(new Error(message));
+
+      expect(identifier).toBe("x");
+      expect(message).toContain("internal_audit");
+      expect(identifier).not.toContain("internal_audit");
+    });
+  });
+
+  /**
+   * On the application's own connection every column name is one this
+   * repository wrote, so a rejected one is a bug and must degrade to
+   * "unknown". Only the LangWatchQL executor, where the SQL is the customer's,
+   * opts in.
+   */
+  it("is not mapped by the generic read-path translation", () => {
+    const raw = new Error(
+      "Code: 47. DB::Exception: Unknown expression identifier 'x'. (UNKNOWN_IDENTIFIER)",
+    );
+
+    expect(translateClickHouseQueryError(raw, 1)).toBe(raw);
   });
 });

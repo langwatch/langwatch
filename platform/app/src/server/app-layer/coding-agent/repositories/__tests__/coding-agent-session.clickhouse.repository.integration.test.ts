@@ -68,6 +68,7 @@ function sessionRow(
     gitBranches: ["main", "feat/session-git-context"],
     gitWorktree: "widgets-feat",
     title: "Add git context to the session row",
+    titleSource: "",
     modelCalls: 3,
     toolCalls: 5,
     subAgents: 1,
@@ -92,6 +93,7 @@ function sessionRow(
     cacheReadTokens: 9_000_000_000,
     cacheCreationTokens: 10,
     costUsd: 1.25,
+    agentReportedCostUsd: 0,
     modelCallMs: 5000,
     toolMs: 1234,
     ttftMsTotal: 300,
@@ -612,6 +614,29 @@ describe("coding_agent_sessions by repository branch", () => {
     expect(
       listed.map((row) => row.sessionId).includes(`${tag}-elsewhere`),
     ).toBe(false);
+  });
+
+  it("fetches the same row shape by session id, whatever repository the row names", async () => {
+    const listed = await sessions.listBySessionIds({
+      tenantIds: [tenantId],
+      sessionIds: [`${tag}-moved`],
+      startedAtFromMs: baseMs - 60_000,
+    });
+
+    expect(listed).toHaveLength(1);
+    expect(listed[0]!.sessionId).toBe(`${tag}-moved`);
+    expect(listed[0]!.gitBranches).toEqual(["feat/first", "feat/second"]);
+    expect(listed[0]!.title).toBe("Ship both branches");
+  });
+
+  it("answers nothing for a session id never folded", async () => {
+    const listed = await sessions.listBySessionIds({
+      tenantIds: [tenantId],
+      sessionIds: [`${tag}-never-existed`],
+      startedAtFromMs: baseMs - 60_000,
+    });
+
+    expect(listed).toEqual([]);
   });
 });
 

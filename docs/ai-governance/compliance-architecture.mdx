@@ -6,7 +6,7 @@ sidebarTitle: Compliance architecture
 
 <Info>**Pairs with:** [AI Gateway → Audit](/ai-gateway/audit). The gateway emits the spans; governance processing folds them into OCSF-mapped events for SIEM export.</Info>
 
-<Note>**Available on Enterprise plans.** The OCSF/SIEM export, configurable retention, and tamper-evidence (post-GA follow-up) covered on this page require an Enterprise license. The Apache 2.0 floor still gives you a single trace store at the platform default retention window and an append-only event_log; the compliance underwriting documented below is the Enterprise extension. See [Open-core licensing](/ai-governance/overview#open-core-licensing) for the full Apache 2.0, Enterprise split.</Note>
+<Note>**Available on Enterprise plans.** The OCSF/SIEM export, configurable retention, and tamper-evidence (post-GA follow-up) covered on this page require an Enterprise license. The Apache 2.0 floor still gives you a single trace store at the platform default retention window and an append-only event_log; the compliance underwriting documented below is the Enterprise extension. See [Open-core licensing](/ai-governance/open-core-licensing) for the full Apache 2.0, Enterprise split.</Note>
 
 LangWatch AI Gateway governance is built on a **unified observability substrate**: every audit event, OTel span, webhook delivery, and S3 replay row lands in the same trace store that powers the rest of the platform. That single store is what underwrites the compliance posture below: one source of truth, one append-only event log, one set of retention controls, one set of access controls.
 
@@ -107,7 +107,7 @@ LangWatch's RBAC layer (`platform/app/src/server/api/rbac.ts`) is the single sou
 
 **Chrome visibility gates**: `hasPermission('governance:view') && release_ui_ai_governance_enabled` for the Govern sidebar section; `hasPermission('virtualKeys:view') && release_ui_ai_gateway_menu_enabled` for the AI Gateway sidebar section. The feature flags are operator rollout knobs; the permissions are the audience predicate. Two flags preserve pilot flexibility so Gateway and Governance can roll out independently.
 
-**tRPC + REST enforcement**: every governance procedure currently checks `organization:manage` (broad). Granularization to the new dedicated permissions (`governance:manage`, `ingestionSources:manage`, etc.) is a deferred follow-up, existing checks still work; the catalog addition unblocks the gate-side migration.
+**tRPC + REST enforcement**: every governance procedure checks the dedicated permission for its resource. Reads use `<resource>:view` (`governance:view`, `ingestionSources:view`, `anomalyRules:view`, `activityMonitor:view`, `routingPolicies:view`) and writes use `<resource>:manage`. The page guards match the read grant, so the custom-role delegation above reaches the pages and each panel names the grant it still needs.
 
 ### 4. Org-tenancy isolation
 

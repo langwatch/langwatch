@@ -3,6 +3,7 @@ import { generate } from "@langwatch/ksuid";
 import type { JsonValue } from "@prisma/client/runtime/client";
 import { TRPCError } from "@trpc/server";
 import type { Node } from "@xyflow/react";
+import { on } from "events";
 import { nanoid } from "nanoid";
 import { z } from "zod";
 import {
@@ -10,7 +11,7 @@ import {
   ExperimentType,
   type Prisma,
 } from "~/generated/prisma/client";
-import { KSUID_RESOURCES } from "~/utils/constants";
+import { probeProjectPermission } from "~/server/app-layer/permissions/imperative";
 import { persistedEvaluationsV3StateSchema } from "../../../experiments-v3/types/persistence";
 import {
   type Entry,
@@ -23,6 +24,7 @@ import { getApp } from "../../app-layer/app";
 import { DspyStepNotFoundError } from "../../app-layer/dspy-steps/errors";
 import { DatasetService } from "../../datasets/dataset.service";
 import { prisma } from "../../db";
+import { ExperimentTypeMismatchError } from "../../experiments/errors";
 import { ExperimentService } from "../../experiments/experiment.service";
 import type {
   DSPyRunsSummary,
@@ -37,7 +39,6 @@ import {
 import { ExperimentRunService } from "../../experiments-v3/services/experiment-run.service";
 import { getVersionMap } from "../../experiments-v3/services/getVersionMap";
 import { coerceMonitorMappings } from "../../tracer/tracesMapping";
-import { checkProjectPermission, hasProjectPermission } from "../rbac";
 import {
   type createInnerTRPCContext,
   createTRPCRouter,
@@ -50,10 +51,19 @@ import {
 
 type TRPCContext = ReturnType<typeof createInnerTRPCContext>;
 
-/** Maps experiment handled errors to TRPCError using the code discriminant. */
+/**
+ * Maps experiment domain errors to TRPCError using the code discriminant.
+ *
+ * Only the two that have to change shape are listed. Every other handled
+ * error travels on unchanged, which is what keeps its code and its meta
+ * reaching the client instead of being flattened into prose here.
+ */
 const mapExperimentError = (error: unknown): never => {
   if (HandledError.isHandled(error) && error.code === "experiment_not_found") {
     throw new TRPCError({ code: "NOT_FOUND", message: error.message });
+  }
+  if (error instanceof ExperimentTypeMismatchError) {
+    throw new TRPCError({ code: "BAD_REQUEST", message: error.message });
   }
   throw error;
 };
@@ -72,7 +82,7 @@ export const experimentsRouter = createTRPCRouter({
         commitMessage: z.string().optional(),
       }),
     )
-    .use(checkProjectPermission("workflows:create"))
+    .permission("workflows:create")
     .mutation(async ({ ctx, input }) => {
       const experiments = experimentService();
 
@@ -223,74 +233,32 @@ export const experimentsRouter = createTRPCRouter({
         projectId: z.string(),
         experimentId: z.string().optional(),
         state: persistedEvaluationsV3StateSchema,
+        /**
+         * The version the client last read. Sending it turns the save into a
+         * compare-and-set: a save on top of someone else's newer state is
+         * refused instead of overwriting it. Omitted means last-write-wins,
+         * which is what the existing autosave does until it tracks versions.
+         */
+        expectedVersion: z.number().int().optional(),
       }),
     )
-    .use(checkProjectPermission("workflows:create"))
+    .permission("experiments:update")
     .mutation(async ({ ctx, input }) => {
       const experiments = experimentService();
-      const experimentId =
-        input.experimentId ?? generate(KSUID_RESOURCES.EXPERIMENT).toString();
 
-      // Check if experiment actually exists in DB to determine if this is a
-      // create or update. The service rejects archived rows with NOT_FOUND so
-      // a stale client autosaving an archived experiment cannot silently
-      // resurrect or mutate it through `prisma.upsert`.
-      const existingSlug = await experiments
-        .getExistingSlugForUpsert({
+      const saved = await experiments
+        .saveWorkbenchState({
           projectId: input.projectId,
-          id: experimentId,
+          id: input.experimentId,
+          state: input.state,
+          expectedVersion: input.expectedVersion,
+          actor: { userId: ctx.session?.user?.id, label: "user" },
         })
         .catch(mapExperimentError);
-      const isNewExperiment = existingSlug === null;
-
-      // For new experiments, deduplicate the slug to avoid constraint violations
-      // For existing experiments, keep the same slug to avoid breaking URLs
-      const name =
-        input.state.name ||
-        (await experiments.findNextDraftName({
-          projectId: input.projectId,
-        }));
-
-      const rawSlug = input.state.experimentSlug ?? experimentId.slice(-8);
-      let slug: string;
-      if (isNewExperiment) {
-        slug = await experiments.generateUniqueSlug({
-          baseSlug: rawSlug,
-          projectId: input.projectId,
-        });
-      } else {
-        slug = existingSlug;
-      }
-
-      // Convert to plain JSON for Prisma storage
-      const workbenchStateJson = JSON.parse(JSON.stringify(input.state));
-
-      await experiments.saveWithSlugRetry({
-        initialSlug: slug,
-        execute: (s) => {
-          const data = {
-            name,
-            slug: s,
-            projectId: input.projectId,
-            type: ExperimentType.EVALUATIONS_V3,
-            workbenchState: workbenchStateJson,
-          };
-          return prisma.experiment.upsert({
-            where: { id: experimentId, projectId: input.projectId },
-            update: data,
-            create: { ...data, id: experimentId },
-          });
-        },
-        regenerateSlug: () =>
-          experiments.generateUniqueSlug({
-            baseSlug: rawSlug,
-            projectId: input.projectId,
-          }),
-      });
 
       const updatedExperiment = await experiments.findById({
         projectId: input.projectId,
-        id: experimentId,
+        id: saved.experimentId,
       });
 
       if (!updatedExperiment) {
@@ -300,7 +268,7 @@ export const experimentsRouter = createTRPCRouter({
         });
       }
 
-      return updatedExperiment;
+      return { ...updatedExperiment, version: saved.version };
     }),
 
   getEvaluationsV3BySlug: protectedProcedure
@@ -310,28 +278,188 @@ export const experimentsRouter = createTRPCRouter({
         experimentSlug: z.string(),
       }),
     )
-    .use(checkProjectPermission("experiments:view"))
+    .permission("experiments:view")
     .query(async ({ input }) => {
-      const experiment = await experimentService()
-        .getBySlug({
+      // The seam decides what a workbench read means (archived reads as gone,
+      // a row of another type is refused) and owns the version. The full row
+      // rides alongside it because clients still read `name`, `createdAt` and
+      // the rest of the experiment; both are point lookups on the same row, so
+      // they go out together rather than one after the other.
+      const [experiment, workbench] = await Promise.all([
+        experimentService()
+          .getBySlug({
+            projectId: input.projectId,
+            slug: input.experimentSlug,
+          })
+          .catch(mapExperimentError),
+        experimentService()
+          .getWorkbenchState({
+            projectId: input.projectId,
+            slug: input.experimentSlug,
+          })
+          .catch(mapExperimentError),
+      ]);
+
+      return {
+        ...experiment,
+        workbenchState: workbench.state,
+        version: workbench.version,
+      };
+    }),
+
+  /**
+   * The cheap staleness probe: the version and nothing else. A returning tab
+   * compares it with the version it loaded and only refetches the whole state
+   * when it is behind, so tab switching costs one point read, not one blob.
+   */
+  getWorkbenchVersion: protectedProcedure
+    .input(
+      z.object({
+        projectId: z.string(),
+        experimentSlug: z.string(),
+      }),
+    )
+    .permission("experiments:view")
+    .query(async ({ input }) => {
+      const workbench = await experimentService()
+        .getWorkbenchState({
           projectId: input.projectId,
           slug: input.experimentSlug,
         })
         .catch(mapExperimentError);
+      return {
+        experimentId: workbench.experimentId,
+        version: workbench.version,
+        updatedAt: workbench.updatedAt,
+        // Who wrote the version the probing tab is comparing against. A tab
+        // that has to tell its reader their work is out of date owes them the
+        // name: Langy usually wrote it, on their behalf, in the page they are
+        // looking at, and "somewhere else" reads as a stranger.
+        ...(workbench.actorLabel !== undefined
+          ? { actorLabel: workbench.actorLabel }
+          : {}),
+        // The run that wrote it, when a run did. A tab coming back from the
+        // background adopts a version its own run wrote instead of standing
+        // down over a write it already holds every cell of.
+        ...(workbench.runId !== undefined ? { runId: workbench.runId } : {}),
+      };
+    }),
 
-      if (experiment.type !== ExperimentType.EVALUATIONS_V3) {
-        throw new TRPCError({
-          code: "BAD_REQUEST",
-          message: "Experiment is not an EVALUATIONS_V3 type",
-        });
+  /**
+   * SSE subscription pushing `experiment_updated` signals when a workbench
+   * save lands, whoever wrote it: the editor's own autosave, a Langy backend
+   * write, or the REST API. Signal-then-refetch like `langy.onConversationUpdate`;
+   * the payload never carries state.
+   */
+  onExperimentUpdate: protectedProcedure
+    .input(z.object({ projectId: z.string() }))
+    .permission("experiments:view")
+    .subscription(async function* (opts) {
+      const { projectId } = opts.input;
+      const emitter = getApp().broadcast.getTenantEmitter(projectId);
+      try {
+        for await (const eventArgs of on(emitter, "experiment_updated", {
+          // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment -- input-bearing subscriptions leave opts.signal untyped (same as langy/traces routers)
+          signal: (opts as { signal?: AbortSignal }).signal,
+        })) {
+          yield eventArgs[0] as { event?: unknown; timestamp?: number };
+        }
+      } finally {
+        getApp().broadcast.cleanupTenantEmitter(projectId);
       }
+    }),
+
+  listWorkbenchVersions: protectedProcedure
+    .input(
+      z.object({
+        projectId: z.string(),
+        experimentId: z.string(),
+        limit: z.number().int().min(1).max(100).optional(),
+        cursor: z.number().int().optional(),
+      }),
+    )
+    .permission("experiments:view")
+    .query(async ({ input }) => {
+      const page = await experimentService()
+        .listWorkbenchVersions({
+          projectId: input.projectId,
+          id: input.experimentId,
+          limit: input.limit,
+          cursor: input.cursor,
+        })
+        .catch(mapExperimentError);
+
+      // The history names the person who saved each version, and the service
+      // stores only their id. Resolved here rather than in the service because
+      // it is a display concern: the REST surface publishes the id and lets
+      // the caller decide, while this list is read straight into a drawer.
+      const authorIds = [
+        ...new Set(
+          page.versions
+            .map((version) => version.authorId)
+            .filter((id): id is string => !!id),
+        ),
+      ];
+      const authors =
+        authorIds.length > 0
+          ? await prisma.user.findMany({
+              where: { id: { in: authorIds } },
+              select: { id: true, name: true },
+            })
+          : [];
+      const nameById = new Map(
+        authors.map((author) => [author.id, author.name]),
+      );
 
       return {
-        ...experiment,
-        workbenchState: experiment.workbenchState as z.infer<
-          typeof persistedEvaluationsV3StateSchema
-        > | null,
+        ...page,
+        versions: page.versions.map((version) => ({
+          ...version,
+          authorName: version.authorId
+            ? (nameById.get(version.authorId) ?? null)
+            : null,
+        })),
       };
+    }),
+
+  commitWorkbenchVersion: protectedProcedure
+    .input(
+      z.object({
+        projectId: z.string(),
+        experimentId: z.string(),
+        commitMessage: z.string().min(1),
+      }),
+    )
+    .permission("experiments:update")
+    .mutation(async ({ ctx, input }) => {
+      return await experimentService()
+        .commitWorkbenchVersion({
+          projectId: input.projectId,
+          id: input.experimentId,
+          commitMessage: input.commitMessage,
+          actor: { userId: ctx.session?.user?.id, label: "user" },
+        })
+        .catch(mapExperimentError);
+    }),
+
+  restoreWorkbenchVersion: protectedProcedure
+    .input(
+      z.object({
+        projectId: z.string(),
+        experimentId: z.string(),
+        version: z.number().int().min(1),
+      }),
+    )
+    .permission("experiments:update")
+    .mutation(async ({ ctx, input }) => {
+      return await experimentService()
+        .restoreWorkbenchVersion({
+          projectId: input.projectId,
+          id: input.experimentId,
+          version: input.version,
+          actor: { userId: ctx.session?.user?.id, label: "user" },
+        })
+        .catch(mapExperimentError);
     }),
 
   saveAsMonitor: protectedProcedure
@@ -341,7 +469,7 @@ export const experimentsRouter = createTRPCRouter({
         experimentId: z.string(),
       }),
     )
-    .use(checkProjectPermission("workflows:create"))
+    .permission("workflows:create")
     .mutation(async ({ input }) => {
       const experiment =
         await experimentService().findByIdWithWorkflowCurrentVersion({
@@ -415,7 +543,7 @@ export const experimentsRouter = createTRPCRouter({
         experimentSlug: z.string().optional(),
       }),
     )
-    .use(checkProjectPermission("experiments:view"))
+    .permission("experiments:view")
     .query(async ({ input }) => {
       if (input.experimentId) {
         return await experimentService()
@@ -447,7 +575,7 @@ export const experimentsRouter = createTRPCRouter({
         randomSeed: z.number().optional(),
       }),
     )
-    .use(checkProjectPermission("experiments:view"))
+    .permission("experiments:view")
     .query(async ({ input }) => {
       const experiment = await experimentService()
         .getBySlug({
@@ -476,7 +604,7 @@ export const experimentsRouter = createTRPCRouter({
 
   getAllByProjectId: protectedProcedure
     .input(z.object({ projectId: z.string() }))
-    .use(checkProjectPermission("experiments:view"))
+    .permission("experiments:view")
     .query(async ({ input }) => {
       return await experimentService().getAll({
         projectId: input.projectId,
@@ -491,7 +619,7 @@ export const experimentsRouter = createTRPCRouter({
         pageSize: z.number().optional(),
       }),
     )
-    .use(checkProjectPermission("experiments:view"))
+    .permission("experiments:view")
     .query(async ({ input }) => {
       const pageOffset = input.pageOffset ?? 0;
       const pageSize = input.pageSize ?? 25;
@@ -587,7 +715,7 @@ export const experimentsRouter = createTRPCRouter({
 
   getExperimentDSPyRuns: protectedProcedure
     .input(z.object({ projectId: z.string(), experimentSlug: z.string() }))
-    .use(checkProjectPermission("experiments:view"))
+    .permission("experiments:view")
     .query(async ({ input }) => {
       const experiment = await experimentService()
         .getBySlug({
@@ -669,7 +797,7 @@ export const experimentsRouter = createTRPCRouter({
         index: z.string(),
       }),
     )
-    .use(checkProjectPermission("experiments:view"))
+    .permission("experiments:view")
     .query(async ({ input }) => {
       const experiment = await experimentService()
         .getBySlug({
@@ -723,7 +851,7 @@ export const experimentsRouter = createTRPCRouter({
 
   getExperimentBatchEvaluationRuns: protectedProcedure
     .input(z.object({ projectId: z.string(), experimentId: z.string() }))
-    .use(checkProjectPermission("experiments:view"))
+    .permission("experiments:view")
     .query(async ({ input }) => {
       const experiment = await experimentService()
         .getById({
@@ -749,7 +877,7 @@ export const experimentsRouter = createTRPCRouter({
         runId: z.string(),
       }),
     )
-    .use(checkProjectPermission("experiments:view"))
+    .permission("experiments:view")
     .query(async ({ input }) => {
       const experiment = await experimentService()
         .getById({
@@ -796,7 +924,7 @@ export const experimentsRouter = createTRPCRouter({
         experimentId: z.string(),
       }),
     )
-    .use(checkProjectPermission("workflows:delete"))
+    .permission("workflows:delete")
     .mutation(async ({ input }) => {
       return await experimentService()
         .archive({ projectId: input.projectId, id: input.experimentId })
@@ -812,10 +940,10 @@ export const experimentsRouter = createTRPCRouter({
         copyDatasets: z.boolean().optional(),
       }),
     )
-    .use(checkProjectPermission("evaluations:manage"))
+    .permission("evaluations:manage")
     .mutation(async ({ ctx, input }) => {
       // Check that the user has at least evaluations:manage permission on the source project
-      const hasSourcePermission = await hasProjectPermission(
+      const hasSourcePermission = await probeProjectPermission(
         ctx,
         input.sourceProjectId,
         "evaluations:manage",
@@ -829,9 +957,9 @@ export const experimentsRouter = createTRPCRouter({
         });
       }
 
-      const experiment = await ExperimentService.create(
-        ctx.prisma,
-      ).findByIdWithWorkflowLatestVersion({
+      const experiment = await ExperimentService.create({
+        prisma: ctx.prisma,
+      }).findByIdWithWorkflowLatestVersion({
         projectId: input.sourceProjectId,
         id: input.experimentId,
       });
@@ -945,7 +1073,7 @@ export const experimentsRouter = createTRPCRouter({
    */
   getLastExperiment: protectedProcedure
     .input(z.object({ projectId: z.string() }))
-    .use(checkProjectPermission("experiments:view"))
+    .permission("experiments:view")
     .query(async ({ input }) => {
       return await experimentService().getLatest({
         projectId: input.projectId,

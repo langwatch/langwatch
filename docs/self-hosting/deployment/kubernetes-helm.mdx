@@ -383,6 +383,12 @@ clickhouse:
     clusterName: "my_cluster"
 ```
 
+The chart-managed ClickHouse is pinned to a version the release is tested
+against. An external instance is yours, so the version is your choice.
+LangWatch supports ClickHouse 25.8 and later, including 26.x and ClickHouse
+Cloud. The app runs its ClickHouse migrations at startup, so the version has to
+accept every migration in the release you deploy.
+
 ### Auto-Tuning
 
 The `clickhouse-serverless` subchart automatically tunes ClickHouse parameters based on the CPU and memory you allocate:

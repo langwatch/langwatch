@@ -186,6 +186,36 @@ backend for you:
         clusters). Expect a brief downtime per upgrade; set app/workers
         deployment.strategy explicitly to override. Zero-downtime
         upgrades require S3-backed stored objects instead of local-FS.
+{{- if and .Values.workers.enabled .Values.app.storedObjects.localFilesystem.serializeUpgrades }}
+      • That rollout is per Deployment, and a helm upgrade rolls both at
+        once. So two hook Jobs keep the workers off the volume while the
+        app rolls: a pre-upgrade Job scales the workers to 0 and waits
+        for their pods to go away, and a post-upgrade Job holds them at 0
+        until the app rollout finishes, then scales them back to
+        workers.replicaCount. Without the second Job the new workers pod
+        follows the still-terminating old app pod back to the old node
+        and wedges the new app pod there. The Jobs need a ServiceAccount
+        token and a small namespaced Role (get on the app and the workers
+        Deployments, patch on the workers' scale, read on pods). Turn
+        them off with
+        app.storedObjects.localFilesystem.serializeUpgrades=false if you
+        order the rollout yourself or your cluster forbids that RBAC. If
+        the pre-upgrade Job fails, the upgrade stops and the workers stay
+        at 0: read the Job logs, then run the upgrade again to bring them
+        back.
+      • Both Jobs run on `helm rollback` too. They cannot cover a
+        rollback to a chart version from before they existed, because
+        helm runs the TARGET revision's hooks: scale
+        {{ .Release.Name }}-workers to 0 by hand before such a downgrade
+        and back up after it.
+{{- else if .Values.workers.enabled }}
+      • Upgrade ordering is OFF
+        (app.storedObjects.localFilesystem.serializeUpgrades=false), and
+        the app and the workers both mount this volume. Scale the workers
+        to 0 yourself before every upgrade and back up after it, or the
+        two rollouts can wedge each other on an RWO multi-attach error on
+        a cluster with more than one node.
+{{- end }}
       • GitOps (ArgoCD / Flux): the dataset-migration hook maps to a
         PostSync hook, which already waits for the rollout to be healthy;
         plain Helm should upgrade with --wait when crossing the ADR-032

@@ -27,12 +27,12 @@ After sign-in you'll land on `/governance` (the org governance home, see the [co
 
 ```
 HTTP 409, error: "no_default_routing_policy"
-Ask your admin to publish a default routing policy at Settings → Routing Policies.
+Ask your admin to publish a default routing policy at Gateway → Routing Policies.
 ```
 
 Publish at least one policy *before* opening CLI sign-in to your team:
 
-1. Navigate to **Settings → Routing Policies** (`/settings/routing-policies`).
+1. Navigate to **Gateway → Routing Policies** (`/gateway/routing-policies`).
 2. Click **+ New routing policy**.
 3. Pick a recommended starter shape: "Anthropic primary, OpenAI fallback, prompt caching on" works on day one.
 4. Tick **Mark as default** before saving.
@@ -45,7 +45,7 @@ The same chain controls cost, latency, fallback, and prompt caching across every
 
 For a brand-new org, the cheapest first source is `otel_generic`, it's available on the **Apache 2.0** open-core floor (no Enterprise license required) and accepts any OTLP/HTTP push:
 
-1. Navigate to **Settings → AI Governance → Ingestion Sources** (`/settings/governance/ingestion-sources`).
+1. Navigate to **Governance → Inventory → Sources tab** (`/governance/inventory?tab=sources`).
 2. Click **+ New source**, pick **Generic OTLP (`otel_generic`)**, and fill the form.
 3. The backend mints a `lw_is_<base64url>` ingest secret and shows it **once** in a one-time-reveal modal, copy it now. The list endpoint never returns it again.
 4. Paste the secret into the upstream platform's OTLP exporter as `Authorization: Bearer lw_is_<secret>`. The receiver endpoint is on the same host as the rest of LangWatch.
@@ -56,9 +56,9 @@ If no upstream is ready yet, skip this step. Your gateway itself is an implicit 
 
 ## Step 4: Import the AI Tools Portal starter pack
 
-The [AI Tools Portal](/ai-governance/personal-portal/overview) is the card grid every developer sees on `/me`. A fresh org has an empty catalog; the [admin editor](/ai-governance/personal-portal/admin-catalog) at `/settings/governance/tool-catalog` shows you a one-click **Import starter pack** CTA on first visit:
+The [AI Tools Portal](/ai-governance/personal-portal/overview) is the card grid every developer sees on `/me`. A fresh org has an empty catalog; the [admin editor](/ai-governance/personal-portal/admin-catalog) at `/governance/inventory?tab=catalog` shows you a one-click **Import starter pack** CTA on first visit:
 
-1. Navigate to **Settings → AI Governance → Tool catalog** (`/settings/governance/tool-catalog`).
+1. Navigate to **Governance → Inventory → Catalog tab** (`/governance/inventory?tab=catalog`).
 2. Click **Import starter pack**.
 
 What you get out of the box:
@@ -108,7 +108,7 @@ langwatch ingest health <sourceId>
 
 Budgets are the gateway's hard cost gate. With a default routing policy in place, you can attach budgets at four scopes: **organization**, **team**, **project**, and **principal**. Org-wide is the broadest safety net, set this first if your org doesn't yet have per-team budgets dialled in.
 
-1. Navigate to **Gateway → Budgets** under any project (`/<project>/gateway/budgets`).
+1. Navigate to **Gateway → Budgets** (`/gateway/budgets`).
 2. Click **+ New budget**.
 3. Pick **Organization, all AI spend** in the Scope dropdown. The picker also offers Team, Project, and Principal scopes for narrower caps.
 4. Pick a window (`Per calendar month` is the default), a USD limit, and an `On breach` action (`Block` rejects requests at the limit, `Warn` tags responses but keeps serving).
@@ -124,7 +124,7 @@ Budgets enforce *at* the limit. [Anomaly rules](/ai-governance/anomaly-rules) de
 
 Write a starter `spend_spike` rule:
 
-1. Navigate to **Settings → AI Governance → Anomaly Rules** (`/settings/governance/anomaly-rules`).
+1. Navigate to **Governance → Anomaly Rules** (`/governance/anomaly-rules`).
 2. Click **+ New anomaly rule**.
 3. Fill in:
    - **Name**: `Daily spend doubles vs last week`
@@ -156,7 +156,7 @@ The detector starts evaluating from the next ingest event. When today's 24h spen
 | Symptom | Likely cause | Fix |
 |---|---|---|
 | Developer sees `409 no_default_routing_policy` on `langwatch login` | Step 2 skipped or no policy marked default | [Routing Policies](/ai-gateway/governance/routing-policies): pick one, tick **Mark as default**. |
-| `/me` shows "your IT team is still setting things up" empty state | Step 4 skipped | Open `/settings/governance/tool-catalog` → **Import starter pack**. |
+| `/me` shows "your IT team is still setting things up" empty state | Step 4 skipped | Open `/governance/inventory?tab=catalog` → **Import starter pack**. |
 | Ingestion source sits at `awaiting_first_event` forever | Source-type doesn't have a wired adapter yet | [Ingestion Sources index → State of each receiver](/ai-governance/ingestion-sources/index#state-of-each-receiver--at-a-glance): three rows are setup-contract-only as of this release. |
 | `/governance` doesn't appear in your sidebar | Org's [setup-state OR-of-flags](/ai-governance/control-plane#persona-based-home-routing--the-setup-state-signal) hasn't tripped yet | Need any 3 of 5: Personal VKs, Routing Policies, Ingestion Sources, Anomaly Rules, Recent activity (30d). After Steps 2–7 above, you'll have 4. |
 | Member colleague got an `Access Restricted` page on `/settings/audit-log` | Working as designed, audit log is admin-only | Either elevate them to `Admin` or grant a custom role with `organization:manage` (delegable via the `CustomRolePermissions` JSON column). |

@@ -9,6 +9,7 @@ from .state import get_api_key, get_endpoint
 from .__version__ import __version__
 from .utils.initialization import ensure_setup, setup
 from .prompts.types import FetchPolicy
+from .agent import AgentCall, AgentReply, Message, Param, connect_agent
 
 # Imported eagerly rather than lazily like the facades: a webhook receiver
 # verifies a delivery inside a request handler and never calls setup(), and
@@ -52,6 +53,8 @@ if TYPE_CHECKING:
     from .agents import AgentsFacade
     from .scenarios import ScenariosFacade
     from .suites import SuitesFacade
+    from .run_plans import RunPlansFacade
+    from .test_suites import TestSuitesFacade
     from .triggers import TriggersFacade
     from .workflows import WorkflowsFacade
     from .dashboards import DashboardsFacade
@@ -76,6 +79,8 @@ if TYPE_CHECKING:
     agents: AgentsFacade
     scenarios: ScenariosFacade
     suites: SuitesFacade
+    run_plans: RunPlansFacade
+    test_suites: TestSuitesFacade
     triggers: TriggersFacade
     workflows: WorkflowsFacade
     dashboards: DashboardsFacade
@@ -123,6 +128,8 @@ _LAZY_FACADES = {
     "agents": (".agents", "AgentsFacade"),
     "scenarios": (".scenarios", "ScenariosFacade"),
     "suites": (".suites", "SuitesFacade"),
+    "run_plans": (".run_plans", "RunPlansFacade"),
+    "test_suites": (".test_suites", "TestSuitesFacade"),
     "triggers": (".triggers", "TriggersFacade"),
     "workflows": (".workflows", "WorkflowsFacade"),
     "dashboards": (".dashboards", "DashboardsFacade"),
@@ -137,6 +144,7 @@ _LAZY_FACADES = {
     "spend_events": (".spend_events", "SpendEventsFacade"),
     "webhooks": (".webhooks", "WebhooksFacade"),
     "secrets": (".secrets", "SecretsFacade"),
+    "cache": (".cache", "CacheFacade"),
     "teams": (".teams", "TeamsFacade"),
     "projects": (".projects", "ProjectsFacade"),
 }
@@ -254,9 +262,17 @@ __all__ = [
     "langchain",
     "dspy",
     "FetchPolicy",
+    "connect_agent",
+    "AgentCall",
+    "AgentReply",
+    "Message",
+    "Param",
+    "agent",
     "agents",
     "scenarios",
     "suites",
+    "run_plans",
+    "test_suites",
     "triggers",
     "workflows",
     "dashboards",
@@ -270,6 +286,7 @@ __all__ = [
     "spend_events",
     "webhooks",
     "secrets",
+    "cache",
     "monitors",
     "teams",
     "projects",

@@ -27,7 +27,7 @@ import {
 } from "~/server/featureFlag";
 import { checkFlagEnvOverride } from "~/server/featureFlag/envOverride";
 import {
-  featureFlagRulesSchema,
+  featureFlagRulesWriteSchema,
   resolveEffectiveForListing,
 } from "~/server/featureFlag/rules";
 import { AnomalyStateStore } from "~/server/observability/anomalyState";
@@ -47,19 +47,23 @@ const opsViewProbe = checkOpsPermission({
 const opsManagePermission = checkOpsPermission({ permission: "ops:manage" });
 
 /**
- * The extra gate on anything that can destroy a queue payload.
+ * The extra gate on an ops write whose damage nobody will notice in time.
  *
  * `ops:manage` already resolves through the admin allow-list, but it is not
  * enough on its own here for two reasons. It is inherited by an impersonation
  * session — `resolveOpsScope` deliberately falls back to the impersonator's own
  * grant — and "acting as" another user is the wrong posture for irreversible
  * infrastructure surgery, because the audit trail names the impersonated
- * account. And deleting a blob is unrecoverable and silent at the queue level:
- * the job that referenced it completes without its handler ever running, so
- * there is no failure for anyone to notice. A typed confirmation makes that a
- * deliberate act rather than a mis-click.
+ * account. And the damage is silent: deleting a blob completes the job that
+ * referenced it without its handler ever running, and pinning an organization
+ * back onto the legacy authorization path changes which tables answer every
+ * permission check for that tenant without failing anything. A typed
+ * confirmation makes either a deliberate act rather than a mis-click.
+ *
+ * A confirmation dialog in the ops UI is not this guard — every one of these
+ * procedures is callable directly.
  */
-function requireBlobStoreWriteAuth(
+function requireDestructiveOpsAuth(
   ctx: {
     session: { user: { impersonator?: { email?: string | null } | null } };
   },
@@ -69,7 +73,7 @@ function requireBlobStoreWriteAuth(
     throw new TRPCError({
       code: "FORBIDDEN",
       message:
-        "Blob store changes cannot be made from an impersonated session. Sign in directly to continue.",
+        "This action cannot be run from an impersonated session. Sign in directly to continue.",
     });
   }
   if (!confirm) {
@@ -347,9 +351,14 @@ export const opsRouter = createTRPCRouter({
         groupId: z.string(),
       }),
     )
-    .mutation(async ({ input }) => {
+    .mutation(async ({ ctx, input }) => {
       const ops = requireOps();
-      return ops.queues.unblockGroup(input);
+      return ops.queues.unblockGroup({
+        ...input,
+        // Opaque id, not email: the audit trail must trace the actor without
+        // carrying PII into the log stream.
+        requestedBy: ctx.session.user.id,
+      });
     }),
 
   unblockAll: protectedProcedure
@@ -359,9 +368,14 @@ export const opsRouter = createTRPCRouter({
         queueName: z.string(),
       }),
     )
-    .mutation(async ({ input }) => {
+    .mutation(async ({ ctx, input }) => {
       const ops = requireOps();
-      return ops.queues.unblockAll(input);
+      return ops.queues.unblockAll({
+        ...input,
+        // Opaque id, not email: the audit trail must trace the actor without
+        // carrying PII into the log stream.
+        requestedBy: ctx.session.user.id,
+      });
     }),
 
   drainGroup: protectedProcedure
@@ -372,9 +386,14 @@ export const opsRouter = createTRPCRouter({
         groupId: z.string(),
       }),
     )
-    .mutation(async ({ input }) => {
+    .mutation(async ({ ctx, input }) => {
       const ops = requireOps();
-      return ops.queues.drainGroup(input);
+      return ops.queues.drainGroup({
+        ...input,
+        // Opaque id, not email: the audit trail must trace the actor without
+        // carrying PII into the log stream.
+        requestedBy: ctx.session.user.id,
+      });
     }),
 
   pausePipeline: protectedProcedure
@@ -448,9 +467,14 @@ export const opsRouter = createTRPCRouter({
         groupIdContains: z.string().optional(),
       }),
     )
-    .mutation(async ({ input }) => {
+    .mutation(async ({ ctx, input }) => {
       const ops = requireOps();
-      return ops.queues.drainTenant(input);
+      return ops.queues.drainTenant({
+        ...input,
+        // Opaque id, not email: the audit trail must trace the actor without
+        // carrying PII into the log stream.
+        requestedBy: ctx.session.user.id,
+      });
     }),
 
   retryBlocked: protectedProcedure
@@ -937,9 +961,14 @@ export const opsRouter = createTRPCRouter({
         groupId: z.string(),
       }),
     )
-    .mutation(async ({ input }) => {
+    .mutation(async ({ ctx, input }) => {
       const ops = requireOps();
-      return ops.queues.moveToDlq(input);
+      return ops.queues.moveToDlq({
+        ...input,
+        // Opaque id, not email: the audit trail must trace the actor without
+        // carrying PII into the log stream.
+        requestedBy: ctx.session.user.id,
+      });
     }),
 
   moveAllBlockedToDlq: protectedProcedure
@@ -951,9 +980,14 @@ export const opsRouter = createTRPCRouter({
         errorFilter: z.string().optional(),
       }),
     )
-    .mutation(async ({ input }) => {
+    .mutation(async ({ ctx, input }) => {
       const ops = requireOps();
-      return ops.queues.moveAllBlockedToDlq(input);
+      return ops.queues.moveAllBlockedToDlq({
+        ...input,
+        // Opaque id, not email: the audit trail must trace the actor without
+        // carrying PII into the log stream.
+        requestedBy: ctx.session.user.id,
+      });
     }),
 
   replayFromDlq: protectedProcedure
@@ -1327,7 +1361,7 @@ export const opsRouter = createTRPCRouter({
     .input(
       z.object({
         key: z.string().min(1).max(200),
-        rules: featureFlagRulesSchema.max(50),
+        rules: featureFlagRulesWriteSchema,
       }),
     )
     .mutation(async ({ ctx, input }) => {
@@ -1366,7 +1400,7 @@ export const opsRouter = createTRPCRouter({
   //
   // Reads are ops:view. Everything that can destroy a payload additionally
   // requires a non-impersonated session and a typed confirmation — see
-  // `requireBlobStoreWriteAuth`.
+  // `requireDestructiveOpsAuth`.
   // ---------------------------------------------------------------------------
 
   listBlobQueues: protectedProcedure.use(opsViewPermission).query(async () => {
@@ -1419,7 +1453,7 @@ export const opsRouter = createTRPCRouter({
     )
     .mutation(async ({ ctx, input }) => {
       if (!input.dryRun) {
-        requireBlobStoreWriteAuth(ctx, input.confirm);
+        requireDestructiveOpsAuth(ctx, input.confirm);
       }
       return requireOps().blobStore.runCleanup({
         dryRun: input.dryRun,
@@ -1440,7 +1474,7 @@ export const opsRouter = createTRPCRouter({
       }),
     )
     .mutation(async ({ ctx, input }) => {
-      requireBlobStoreWriteAuth(ctx, input.confirm);
+      requireDestructiveOpsAuth(ctx, input.confirm);
       return requireOps().blobStore.deleteBlob({
         queueName: input.queueName,
         projectId: input.projectId,
@@ -1462,16 +1496,212 @@ export const opsRouter = createTRPCRouter({
     .query(() => systemMigrationsService.getOverview()),
 
   /**
+   * The cloud rollout's enrollment listing: which organizations are enrolled
+   * for which migrations, with the names the operator recognizes. Carries
+   * `isSaaS` so the page can say honestly that a self-hosted installation
+   * has nothing to enroll.
+   */
+  listMigrationEnrollments: protectedProcedure
+    .use(opsViewPermission)
+    .query(({ ctx }) =>
+      systemMigrationsService.getEnrollments({
+        requestedBy: ctx.session.user.id,
+      }),
+    ),
+
+  /**
+   * The organization lookup behind the page's pickers: enroll, targeted run
+   * and rollback all act on an organization found by name or exact id.
+   */
+  searchMigrationOrganizations: protectedProcedure
+    .use(opsViewPermission)
+    .input(z.object({ query: z.string().max(200) }))
+    .query(({ input }) =>
+      systemMigrationsService.searchOrganizations({ query: input.query }),
+    ),
+
+  /**
+   * Enroll one organization for one registered migration. Takes effect on
+   * the next pass - enrollment is read fresh each time. The service refuses
+   * duplicates, unknown migrations, unknown organizations, migrations that
+   * admit every organization already, and any enrollment on a self-hosted
+   * installation, each with a handled error the page renders.
+   */
+  enrollMigrationTenant: protectedProcedure
+    .use(opsManagePermission)
+    .input(
+      z.object({
+        organizationId: z.string().min(1).max(200),
+        migrationName: z.string().min(1).max(200),
+        // Typed confirmation for the cutover migration, same reasoning as
+        // the rollback's: enrolling an organization for cutover is what lets
+        // the next pass flip which tables answer every permission check for
+        // it.
+        confirm: z.literal("ENROLL").optional(),
+      }),
+    )
+    .mutation(async ({ ctx, input }) => {
+      // The preparation migrations are behavior-neutral (backfill and
+      // genesis change nothing about who decides); the cutover has the
+      // rollback's blast radius, so it takes the rollback's guard. Which is
+      // which comes from the migration's own declaration, so this gate and
+      // the page that asks for the confirmation cannot drift apart.
+      if (
+        systemMigrationsService.requiresOperatorConfirmation({
+          migrationName: input.migrationName,
+        })
+      ) {
+        requireDestructiveOpsAuth(ctx, input.confirm);
+      }
+      await systemMigrationsService.enroll({
+        organizationId: input.organizationId,
+        migrationName: input.migrationName,
+        actorUserId: ctx.session.user.id,
+      });
+      return { enrolled: true };
+    }),
+
+  /**
+   * Enroll a sampled cohort of organizations for one migration in a single
+   * action. The service draws the sample from organizations not yet
+   * enrolled, excluding enterprise plans and private-dataplane routes by
+   * data rather than by any list in code. The cutover keeps its typed
+   * confirmation: a cohort of cutovers is the same flip N times over.
+   *
+   * Either exclusion can be lifted for one draw, separately, so finishing a
+   * proven rollout does not mean enrolling the held-back organizations one
+   * id at a time. Both default to false here as well as in the service: an
+   * older client that sends neither field gets the safe pool.
+   */
+  enrollMigrationCohort: protectedProcedure
+    .use(opsManagePermission)
+    .input(
+      z.object({
+        migrationName: z.string().min(1).max(200),
+        sampleSize: z.number().int().min(1).max(1000),
+        includeEnterprise: z.boolean().default(false),
+        includePrivateDataplane: z.boolean().default(false),
+        confirm: z.literal("ENROLL").optional(),
+      }),
+    )
+    .mutation(async ({ ctx, input }) => {
+      if (
+        systemMigrationsService.requiresOperatorConfirmation({
+          migrationName: input.migrationName,
+        })
+      ) {
+        requireDestructiveOpsAuth(ctx, input.confirm);
+      }
+      return systemMigrationsService.enrollCohort({
+        migrationName: input.migrationName,
+        sampleSize: input.sampleSize,
+        actorUserId: ctx.session.user.id,
+        includeEnterprise: input.includeEnterprise,
+        includePrivateDataplane: input.includePrivateDataplane,
+      });
+    }),
+
+  /**
+   * Withdraw an enrollment: later passes stop processing the organization
+   * for that migration. State already recorded stays exactly as it is -
+   * pausing the rollout is this action's whole job; undoing it is the
+   * rollback's. Refused for a migration that admits every organization
+   * anyway, where the row it deletes pauses nothing.
+   */
+  withdrawMigrationTenant: protectedProcedure
+    .use(opsManagePermission)
+    .input(
+      z.object({
+        organizationId: z.string().min(1).max(200),
+        migrationName: z.string().min(1).max(200),
+      }),
+    )
+    .mutation(async ({ ctx, input }) => {
+      await systemMigrationsService.withdraw({
+        organizationId: input.organizationId,
+        migrationName: input.migrationName,
+        actorUserId: ctx.session.user.id,
+      });
+      return { withdrawn: true };
+    }),
+
+  /**
+   * Run one migration for one organization now. Awaited: the operator asked
+   * about one organization and gets the status it ended the run in. The
+   * service refuses unknown migrations, unknown organizations, an
+   * organization outside the migration's cohort (cloud, and only for a
+   * migration enrollment still paces) and an organization whose claim
+   * another pass already holds, each with a handled error the page renders.
+   */
+  runSystemMigrationForOrganization: protectedProcedure
+    .use(opsManagePermission)
+    .input(
+      z.object({
+        organizationId: z.string().min(1).max(200),
+        migrationName: z.string().min(1).max(200),
+        // Typed confirmation for the cutover migration - a targeted cutover
+        // run is exactly the flip the enrollment confirmation guards.
+        confirm: z.literal("RUN").optional(),
+      }),
+    )
+    .mutation(async ({ ctx, input }) => {
+      if (
+        systemMigrationsService.requiresOperatorConfirmation({
+          migrationName: input.migrationName,
+        })
+      ) {
+        requireDestructiveOpsAuth(ctx, input.confirm);
+      }
+      return systemMigrationsService.runForOrganization({
+        organizationId: input.organizationId,
+        migrationName: input.migrationName,
+        actorUserId: ctx.session.user.id,
+      });
+    }),
+
+  /**
    * Kick a migration pass now instead of waiting for the next worker boot -
-   * the lever for widening a cloud cohort or re-verifying held tenants
-   * after remediation. Fire-and-forget: the fleet-wide lease already
-   * guarantees a single driver, so the worst case for a double click is a
-   * pass that stands down immediately.
+   * the lever for processing a fresh enrollment right away or re-verifying
+   * held tenants after remediation. Fire-and-forget: per-organization claims
+   * already keep two passes off the same organization, so the worst case for
+   * a double click is a pass that finds everything claimed and does nothing.
    */
   runSystemMigrationPass: protectedProcedure
     .use(opsManagePermission)
     .mutation(() => {
       systemMigrationsService.startPass();
       return { started: true };
+    }),
+
+  /**
+   * The operator rollback: pin a migrated or finalized organization back
+   * onto its legacy path. Both are already live on the ledger; the service
+   * refuses anything else with a handled error. An already `rolled_back`
+   * organization RETRIES — calling this again re-applies the rollback's
+   * effects against the standing pin, which is how a rollback whose effect
+   * died halfway is finished. Rolled-back tenants are terminal for the
+   * runner — later passes leave them alone.
+   */
+  rollBackSystemMigrationTenant: protectedProcedure
+    .use(opsManagePermission)
+    .input(
+      z.object({
+        migrationName: z.string().min(1).max(200),
+        tenantId: z.string().min(1).max(200),
+        // Typed confirmation, same reasoning as `deleteBlob`.
+        confirm: z.literal("ROLL BACK").optional(),
+      }),
+    )
+    .mutation(async ({ ctx, input }) => {
+      // Same posture as the blob-store writes: this procedure is callable
+      // without the dialog, and it decides which tables answer every
+      // permission check for an entire organization.
+      requireDestructiveOpsAuth(ctx, input.confirm);
+      await systemMigrationsService.rollBack({
+        migrationName: input.migrationName,
+        tenantId: input.tenantId,
+        actorUserId: ctx.session.user.id,
+      });
+      return { rolledBack: true };
     }),
 });

@@ -64,6 +64,19 @@ import { nanoUsdToDecimalString } from "./wireMoney";
 const EVENTS_TABLE = "gateway_budget_ledger_events" as const;
 const TOTALS_TABLE = "gateway_budget_scope_totals" as const;
 
+/**
+ * How far back the budget detail page's recent-activity panel looks. Wide
+ * enough to cover several periods of the longest recurring window the
+ * product offers, a month, and narrow enough that the read prunes to a
+ * handful of `toYYYYMM(OccurredAt)` partitions.
+ *
+ * A TOTAL-window budget never resets, so its history can run past this
+ * bound. The panel still shows only the last 90 days for it: it answers
+ * "what has been happening lately", not "everything this budget ever
+ * spent", which is what the totals on the same page are for.
+ */
+const RECENT_EVENTS_LOOKBACK_DAYS = 90;
+
 const logger = createLogger("langwatch:gateway:budget-clickhouse-repository");
 
 export type BudgetDebitRow = {
@@ -838,7 +851,7 @@ export class GatewayBudgetClickHouseRepository {
       const seen = existing.get(pulledRequestId(row.restatementKey));
       if (!seen) return true;
       return !(
-        Number(seen.AmountNanoUSD) === row.amountNanoUsd &&
+        BigInt(seen.AmountNanoUSD ?? 0) === BigInt(row.amountNanoUsd) &&
         Number(seen.TokensInput) === row.tokensInput &&
         Number(seen.TokensOutput) === row.tokensOutput &&
         Number(seen.TokensCacheRead) === row.tokensCacheRead &&
@@ -1390,13 +1403,39 @@ export class GatewayBudgetClickHouseRepository {
    * descending. Used by the budget detail page to render the recent-activity
    * panel (post-cutover replacement for `prisma.gatewayBudgetLedger.findMany`
    * in budget.service.ts:getDetail).
+   *
+   * Takes the full tenant fan-out because the ledger is sharded on
+   * TenantId = the project the trace landed in: an org, team, principal,
+   * or per-member group budget accrues rows under every project that
+   * emitted a matching trace, so reading a single tenant would render
+   * "No usage yet" on a budget that is actively debiting.
+   *
+   * Bounded by {@link RECENT_EVENTS_LOOKBACK_DAYS} on `OccurredAt`, the
+   * table's partition key: without it ClickHouse opens every monthly
+   * partition the budget has ever written to before it can sort and take
+   * the top rows. The panel asks for recent activity, so the window is
+   * part of the question, not a shortcut.
    */
   async recentEventsForBudget(
-    tenantId: string,
+    tenantIds: string[],
     budgetId: string,
     limit = 20,
   ): Promise<LedgerEventRow[]> {
-    const client = await this.resolveClient(tenantId);
+    if (tenantIds.length === 0) return [];
+    const params: Record<string, string | number> = {
+      budgetId,
+      limit,
+      since: Date.now() - RECENT_EVENTS_LOOKBACK_DAYS * 24 * 60 * 60 * 1000,
+    };
+    const tenantPlaceholders = tenantIds
+      .map((id, i) => {
+        params[`tenant${i}`] = id;
+        return `{tenant${i}:String}`;
+      })
+      .join(",");
+    // Any tenant resolves the client — the events table is a single
+    // physical table; `resolveClient` only differs by project for routing.
+    const client = await this.resolveClient(tenantIds[0]!);
     const result = await client.query({
       query: `
         SELECT
@@ -1412,12 +1451,13 @@ export class GatewayBudgetClickHouseRepository {
           Status AS status,
           toUnixTimestamp64Milli(OccurredAt) AS occurredAtMs
         FROM ${EVENTS_TABLE}
-        WHERE TenantId = {tenantId:String}
+        WHERE TenantId IN (${tenantPlaceholders})
           AND BudgetId = {budgetId:String}
+          AND OccurredAt >= fromUnixTimestamp64Milli({since:Int64})
         ORDER BY OccurredAt DESC
         LIMIT {limit:UInt32}
       `,
-      query_params: { tenantId, budgetId, limit },
+      query_params: params,
       format: "JSONEachRow",
     });
     type Row = Omit<LedgerEventRow, "occurredAt" | "status" | "amountUsd"> & {

@@ -571,7 +571,30 @@ function collectRecognizerSpans({
  * digit run that parses as a dialable number matches. Two rules hold it to
  * digits a customer wrote as a number. It never runs on an identifier-shaped
  * value, and a match inside a longer token that carries letters is dropped.
+ *
+ * It is also, by a wide margin, the most expensive thing this file does. The
+ * library treats every single digit as a candidate and then tries to parse it,
+ * so 200 KB of ordinary text costs 160 ms with a version number in it and
+ * 240 ms as JSON with numeric fields, both finding nothing. The whole secrets
+ * pass over the same text is under 4 ms. `ENOUGH_DIGITS_FOR_A_NUMBER` is what
+ * keeps that cost off text that cannot hold a number at all.
  */
+
+/**
+ * The shortest example number libphonenumber has for any country is 7 digits
+ * (Tristan da Cunha, +290 8999), so text whose longest digit window is shorter
+ * than that holds no number the detector could return. The floor here is 6,
+ * one below that minimum, so the gate stays on the safe side of the shortest
+ * number in the metadata rather than exactly on it.
+ *
+ * Digits count as one window while no more than four separators divide them,
+ * which is the library's own allowance between digit blocks. The class here is
+ * every non-alphanumeric character, a superset of the punctuation the library
+ * accepts, so the window can only come out longer than the library would read
+ * and the gate can only err towards running the detector.
+ */
+const ENOUGH_DIGITS_FOR_A_NUMBER = /\d(?:[^0-9A-Za-z]{0,4}\d){5}/;
+
 function collectPhoneSpans({
   text,
   allowed,
@@ -585,6 +608,7 @@ function collectPhoneSpans({
 }): Span[] {
   if (isIdentifierShaped) return [];
   if (allowed && !allowed.has("PHONE_NUMBER")) return [];
+  if (!ENOUGH_DIGITS_FOR_A_NUMBER.test(text)) return [];
   const spans: Span[] = [];
   try {
     for (const phone of findPhoneNumbersInText(text, {

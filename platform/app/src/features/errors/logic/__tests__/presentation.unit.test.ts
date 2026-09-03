@@ -89,6 +89,47 @@ describe("explainHandledError", () => {
       expect(description).toBe("");
     });
 
+    /** @scenario "The refusal names the reserved parameter the caller actually supplied" */
+    it("names the granularity step when that is the parameter supplied", () => {
+      const { description } = explainHandledError(
+        shape({
+          code: "lwql_reserved_parameter_supplied",
+          meta: { parameters: ["period_granularity_seconds"] },
+        }),
+      );
+
+      expect(description).toContain("period_granularity_seconds");
+      // The bug this pins: the copy named the window pair unconditionally, so
+      // a caller that sent only the step was told to remove two parameters it
+      // had never sent.
+      expect(description).not.toContain("period_start");
+      expect(description).not.toContain("period_end");
+    });
+
+    /** @scenario "The refusal names the reserved parameter the caller actually supplied" */
+    it("names every supplied reserved parameter, and agrees in number", () => {
+      const { description } = explainHandledError(
+        shape({
+          code: "lwql_reserved_parameter_supplied",
+          meta: { parameters: ["period_start", "period_end"] },
+        }),
+      );
+
+      expect(description).toContain("period_start and period_end");
+      expect(description).toContain("come from");
+      expect(description).toContain("Remove them");
+    });
+
+    /** @scenario "meta is read only where the client knows its shape" */
+    it("still says something useful when the supplied names are absent", () => {
+      const { title, description } = explainHandledError(
+        shape({ code: "lwql_reserved_parameter_supplied", meta: {} }),
+      );
+
+      expect(title.length).toBeGreaterThan(0);
+      expect(description).toContain("Remove them from your parameters");
+    });
+
     /** @scenario "meta is read only where the client knows its shape" */
     it("ignores meta of the wrong type rather than rendering it", () => {
       const { description } = explainHandledError(
@@ -245,6 +286,21 @@ describe("explainHandledError", () => {
       // registry had only `validation_error` left to go on.
       expect(title).not.toBe("Check your input");
       expect(description).not.toContain("Some of the values aren't valid");
+    });
+  });
+
+  describe("given a deployment whose dataset storage is not writable", () => {
+    /** @scenario The customer reads copy written for the code */
+    it("says nothing was saved and that an administrator has to act", () => {
+      const { title, description } = explainHandledError(
+        shape({ code: "storage_not_writable", httpStatus: 500 }),
+      );
+
+      expect(title).not.toContain("storage_not_writable");
+      expect(description).toContain("Nothing was saved");
+      expect(description).toContain("administrator");
+      expect(description).not.toContain("S3_BUCKET_NAME");
+      expect(description).not.toContain("LANGWATCH_LOCAL_STORAGE_PATH");
     });
   });
 
@@ -431,6 +487,27 @@ describe("explainHandledError", () => {
       );
     });
 
+    it("names the model when the rejected field is the per-send modelOverride", () => {
+      // The Langy composer sends the picked model as `modelOverride`; the
+      // customer is looking at a model picker, so the card says "the model".
+      const { title, description } = explainHandledError(
+        shape({
+          code: "validation_error",
+          httpStatus: 422,
+          meta: {
+            fieldErrors: {
+              modelOverride: [
+                "modelOverride must be in 'provider/model' shape",
+              ],
+            },
+          },
+        }),
+      );
+
+      expect(title).toBe("Check your input");
+      expect(description).toBe("There's a problem with the model.");
+    });
+
     it("names them the way the screen does, not the way the schema does", () => {
       // `slug` is the wire key; the field the user is looking at is labelled
       // "URL slug". Quoting the key back reads as a different thing entirely.
@@ -574,6 +651,12 @@ describe("explainHandledError", () => {
        * the list is once again only our own words.
        */
       const ALLOWED_PER_CODE: Record<string, Set<string>> = {
+        // `reason` is the sentence parameter-spec.ts wrote for this exact
+        // declaration ("it is a turn field the platform sends on every
+        // call"), authored here and never relayed from the SDK. The shape
+        // check picks its sentence from the rule that failed rather than
+        // repeating the schema's own message, which names the parameter.
+        agent_parameter_invalid: new Set(["reason"]),
         // The provider's own reason for rejecting delivery is the entire
         // value of this error — "invite the bot with /invite @LangWatch".
         // Authored server-side by `explainSlackPostError`, never relayed.
@@ -588,6 +671,11 @@ describe("explainHandledError", () => {
         // generic line cannot do. Authored in the automations app layer, never
         // relayed.
         graph_alert_incomplete: new Set(["reason"]),
+        // `reason` is the sentence the agent test prefetch or the type check
+        // wrote for this exact agent ("Only HTTP, code, workflow and connected
+        // agents can be tested"). Authored in `agent-test-run.ts` and
+        // `agent-test-prefetch.ts`, never relayed from an SDK or a customer.
+        agent_test_refused: new Set(["reason"]),
       };
 
       /**
@@ -655,6 +743,57 @@ describe("explainHandledError", () => {
         expect(title[0], `${code} title`).toBe(title[0]?.toUpperCase());
         expect(title.endsWith("."), `${code} title`).toBe(false);
       }
+    });
+  });
+});
+
+describe("agent_payload_too_large", () => {
+  describe("when the session is what broke the cap", () => {
+    /** @scenario "A session above the cap is refused with a typed error" */
+    it("tells the reader to return a small session value", () => {
+      const { description } = explainHandledError(
+        shape({
+          code: "agent_payload_too_large",
+          httpStatus: 413,
+          meta: { what: "session", sizeBytes: 70002, limitBytes: 65536 },
+        }),
+      );
+
+      expect(description).toContain("session");
+      expect(description).toContain("conversation id");
+      expect(description).not.toContain("attachments");
+    });
+  });
+
+  describe("when the result is what broke the cap", () => {
+    it("names the result and keeps the trimming advice", () => {
+      const { description } = explainHandledError(
+        shape({
+          code: "agent_payload_too_large",
+          httpStatus: 413,
+          meta: { what: "result" },
+        }),
+      );
+
+      expect(description).toContain("The result is above the size limit");
+    });
+  });
+});
+
+describe("agent_test_refused", () => {
+  describe("when the reason is longer than a sentence", () => {
+    /** @scenario "Technical detail stops at the trace id" */
+    it("clamps it, the way every server-supplied sentence here is clamped", () => {
+      const { description } = explainHandledError(
+        shape({
+          code: "agent_test_refused",
+          httpStatus: 400,
+          meta: { reason: "a".repeat(400) },
+        }),
+      );
+
+      expect(description).toContain("\u2026");
+      expect(description.length).toBeLessThan(300);
     });
   });
 });

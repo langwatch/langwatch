@@ -130,9 +130,18 @@ export class AuthzCollectorService {
   async collectGrants({
     principal,
     organizationId,
+    reader,
   }: {
     principal: AuthzPrincipalRef;
     organizationId: string;
+    /**
+     * An already-open pass, for a caller collecting SEVERAL snapshots that
+     * feed one decision (the api-key ceiling intersects the key's and the
+     * owner's): sharing the pass shares its routing decision, so a gate
+     * expiry between the collects cannot intersect a legacy binding list
+     * with a ledger one. Omitted, the collect opens its own pass.
+     */
+    reader?: AuthzReadRepository;
   }): Promise<CollectedGrants> {
     switch (principal.type) {
       case "anonymous":
@@ -144,14 +153,28 @@ export class AuthzCollectorService {
           organizationId,
           organizationRole: null,
           isOrgMember: false,
+          membershipDisabled: false,
           bindings: [],
           legacyTeamMemberships: [],
           customRolePermissions: new Map(),
         };
+      // One pass, one head. A collect is several reads and the reader in
+      // front of them may route per organization on a cached, TTL-bounded
+      // decision; opening a pass fixes that decision for the whole snapshot,
+      // so an expiry mid-collect cannot hand the engine half a legacy
+      // binding list and half a ledger one (`beginPass` on the port).
       case "apiKey":
-        return this.collectApiKeyGrants({ principal, organizationId });
+        return this.collectApiKeyGrants({
+          principal,
+          organizationId,
+          reader: reader ?? this.beginPass(),
+        });
       case "user":
-        return this.collectUserGrants({ principal, organizationId });
+        return this.collectUserGrants({
+          principal,
+          organizationId,
+          reader: reader ?? this.beginPass(),
+        });
       default: {
         // A principal kind added to the union without a collect path here
         // would otherwise silently resolve to "no grants" - a fail-open
@@ -189,7 +212,13 @@ export class AuthzCollectorService {
       { kind: scope.kind, id: scope.id },
       ...(scope.parents ?? []),
     ];
-    const rows = await this.reader.findShareLinks({
+    // Same one-pass discipline as collectGrants above: the composition
+    // root holds ONE reader for the process's lifetime, and a routed
+    // reader's head decision is memoized per instance. A gated read taken
+    // on that instance directly would pin the organization's head until
+    // the pod restarted — defeating the rollback lever. The pass-scoped
+    // reader pins for exactly this read and is then dropped.
+    const rows = await this.beginPass().findShareLinks({
       projectId: scope.projectId,
       tokens: scope.shareTokens,
       links,
@@ -214,14 +243,24 @@ export class AuthzCollectorService {
       }));
   }
 
+  /** The reader for ONE snapshot: the routing decision behind it is taken
+   *  once and held for every read the snapshot is built from. A reader that
+   *  owns a single head offers no `beginPass` and is used directly. Public
+   *  so a caller pairing snapshots can hand the same pass to each collect. */
+  beginPass(): AuthzReadRepository {
+    return this.reader.beginPass?.() ?? this.reader;
+  }
+
   private async collectApiKeyGrants({
     principal,
     organizationId,
+    reader,
   }: {
     principal: Extract<AuthzPrincipalRef, { type: "apiKey" }>;
     organizationId: string;
+    reader: AuthzReadRepository;
   }): Promise<CollectedGrants> {
-    const bindings = await this.reader.findApiKeyBindings({
+    const bindings = await reader.findApiKeyBindings({
       apiKeyId: principal.id,
       organizationId,
     });
@@ -233,12 +272,17 @@ export class AuthzCollectorService {
       // as the §9 ceiling, never as an addition.
       organizationRole: null,
       isOrgMember: false,
+      // A key holds no membership of its own, so it is never "disabled" -
+      // a disabled OWNER bites through the §9 ceiling instead, where the
+      // owner's own snapshot reports it.
+      membershipDisabled: false,
       bindings,
       legacyTeamMemberships: [],
       customRolePermissions: await this.prefetchCustomRolePermissions({
         principal,
         organizationId,
         customRoleIds: dedupeCustomRoleIds(bindings, []),
+        reader,
       }),
     };
   }
@@ -246,18 +290,20 @@ export class AuthzCollectorService {
   private async collectUserGrants({
     principal,
     organizationId,
+    reader,
   }: {
     principal: Extract<AuthzPrincipalRef, { type: "user" }>;
     organizationId: string;
+    reader: AuthzReadRepository;
   }): Promise<CollectedGrants> {
-    const [organizationRole, directBindings, groupBindings, legacyRows] =
+    const [membership, directBindings, groupBindings, legacyRows] =
       await Promise.all([
-        this.reader.findOrganizationRole({
+        reader.findOrganizationMembership({
           userId: principal.id,
           organizationId,
         }),
-        this.reader.findUserBindings({ userId: principal.id, organizationId }),
-        this.reader.findGroupBindings({
+        reader.findUserBindings({ userId: principal.id, organizationId }),
+        reader.findGroupBindings({
           userId: principal.id,
           organizationId,
         }),
@@ -266,24 +312,38 @@ export class AuthzCollectorService {
         // exist (the TeamUser union at the end of legacy
         // hasOrganizationPermissionLegacy); the engine applies the
         // per-scope gating rules.
-        this.reader.findLegacyTeamMemberships({
+        reader.findLegacyTeamMemberships({
           userId: principal.id,
           organizationId,
         }),
       ]);
 
     const bindings = [...directBindings, ...groupBindings];
+    // A seat-disabled membership is NOT a membership: the person keeps their
+    // row, their role and everything they did, and holds no access until an
+    // admin re-enables them (seat-reconciliation.feature). Reporting it as a
+    // membership is what let a disabled member keep every permission - only
+    // the org switcher hid the organization, and a direct call still worked.
+    //
+    // `organizationRole` follows `isOrgMember` rather than the stored role:
+    // the engine reads it to apply the EXTERNAL cap, and a role that outlived
+    // its membership would be answering for a principal who has none.
+    // `membershipDisabled` is carried separately so the denial can say WHICH
+    // gate closed instead of claiming they were never here.
+    const isOrgMember = membership != null && !membership.disabled;
     return {
       principal,
       organizationId,
-      organizationRole,
-      isOrgMember: organizationRole != null,
+      organizationRole: isOrgMember ? membership.role : null,
+      isOrgMember,
+      membershipDisabled: membership?.disabled ?? false,
       bindings,
       legacyTeamMemberships: legacyRows,
       customRolePermissions: await this.prefetchCustomRolePermissions({
         principal,
         organizationId,
         customRoleIds: dedupeCustomRoleIds(bindings, legacyRows),
+        reader,
       }),
     };
   }
@@ -292,14 +352,16 @@ export class AuthzCollectorService {
     principal,
     organizationId,
     customRoleIds,
+    reader,
   }: {
     principal: AuthzPrincipalRef;
     organizationId: string;
     customRoleIds: string[];
+    reader: AuthzReadRepository;
   }): Promise<Map<string, readonly string[]>> {
     if (customRoleIds.length === 0) return new Map();
     return parseCustomRolePermissions(
-      await this.reader.findCustomRolePermissions({
+      await reader.findCustomRolePermissions({
         organizationId,
         principal,
         customRoleIds,

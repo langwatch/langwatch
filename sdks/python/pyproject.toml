@@ -1,6 +1,6 @@
 [project]
 name = "langwatch"
-version = "1.2.0" # remember to also update it in src/langwatch/__version__.py
+version = "1.3.1" # remember to also update it in src/langwatch/__version__.py
 description = "LangWatch Python SDK, for monitoring your LLMs"
 authors = [{ name = "Langwatch Engineers", email = "engineering@langwatch.ai" }]
 requires-python = ">=3.10,<3.14"
@@ -22,7 +22,7 @@ classifiers = [
 
 dependencies = [
     "nanoid>=2.0.0,<3.0.0",
-    "coolname>=2.2.0",
+    "coolname>=5.0.0",
     "httpx>=0.27.0",
     "openinference-instrumentation-haystack>=0.1.20",
     "openinference-instrumentation-langchain>=0.1.24",
@@ -38,22 +38,24 @@ dependencies = [
     "deprecated>=1.2.18",
     "python-liquid>=2.2.0",
     "pydantic>=2",
-    "attrs>=24",
+    "attrs>=26.1.0",
     "pksuid>=1.1.2",
     "pyyaml>=6.0.2",
     # Progress bars for experiment loop()/aloop(); pure-python and tiny, so a
     # declared dependency rather than an optional (it always runs there).
     "tqdm>=4.62.0",
+    # The outbound relay of connected agents (langwatch.agent), pure Python.
+    "websockets>=12",
 ]
 
 [project.optional-dependencies]
-langchain = ["langchain-core>=0.3.0,<2.0.0"]
-dspy = ["dspy-ai>=3.0.3,<4"]
-litellm = ["litellm>=1.84.0"]
-dev = ["ruff>=0.11.1"]
+langchain = ["langchain-core>=1.5.4,<2.0.0"]
+dspy = ["dspy-ai>=3.3.0,<4"]
+litellm = ["litellm>=1.96.0"]
+dev = ["ruff>=0.16.2"]
 tests = [
-    "pytest>=7.4.2,<10.0.0",
-    "pytest-asyncio>=0.21.1,<1.5.0",
+    "pytest>=9.1.1,<10.0.0",
+    "pytest-asyncio>=1.4.0,<1.5.0",
     "factory-boy>=3.3.0,<4.0.0",
 ]
 
@@ -75,47 +77,47 @@ markers = [
 ]
 
 [dependency-groups]
-dev = ["black>=26.3.1"]
+dev = ["black>=26.5.1"]
 examples = [
     "anthropic>=0.36.0,<0.122.0",
     "chainlit>=2.11.1,<3",
-    "cloudpickle>=3.1.1",
-    "dspy-ai>=3.0.3,<4",
-    "faiss-cpu>=1.8.0,<2.0.0",
-    "fastapi>=0.115.12",
-    "haystack-ai>=2.13.2,<3.0.0",
-    "jupyter>=1.0.0,<2.0.0",
+    "cloudpickle>=3.1.2",
+    "dspy-ai>=3.3.0,<4",
+    "faiss-cpu>=1.15.0,<2.0.0",
+    "fastapi>=0.141.1",
+    "haystack-ai>=3.0.0,<4.0.0",
+    "jupyter>=1.1.1,<2.0.0",
     "langchain>=1.0.0,<2.0.0",
-    "langchain-community>=0.3.0,<1.0.0",
-    "langchain-openai>=1.1.14,<2.0.0",
+    "langchain-community>=0.4.2,<1.0.0",
+    "langchain-openai>=1.4.3,<2.0.0",
     "langchain-text-splitters>=1.1.2,<2.0.0",
     "langchain-google-vertexai>=2.0.0,<4.0.0",
-    "litellm>=1.84.0",
-    "openinference-instrumentation-dspy>=0.1.23,<0.2.0",
-    "opentelemetry-instrumentation-fastapi>=0.53b1",
+    "litellm>=1.96.0",
+    "openinference-instrumentation-dspy>=0.1.39,<0.2.0",
+    "opentelemetry-instrumentation-fastapi>=0.65b0",
     "langgraph>=1.0.0,<2.0.0",
-    "openai>=1.68.2,<2.54.0", # cap re-verified against openai 2.43.0 (2.8+ historically called model_dump(by_alias=None) which pydantic-core rejected)
+    "openai>=1.68.2,<2.55.0", # cap re-verified against openai 2.43.0 (2.8+ historically called model_dump(by_alias=None) which pydantic-core rejected)
     "pydantic>=2.11.0", # chainlit <2.11.1 was broken with pydantic >=2.10.2; fixed in chainlit 2.11.1
-    "pytest>=7.4.2,<10.0.0",
+    "pytest>=9.1.1,<10.0.0",
     "python-dotenv==1.2.2",
-    "streamlit>=1.37.1,<2.0.0",
+    "streamlit>=1.61.1,<2.0.0",
     "uvicorn>=0.38.0,<0.53.0",
-    "json-repair>=0.42.0",
+    "json-repair>=0.63.0",
     "openinference-instrumentation-openai>=0.1.30",
-    "opentelemetry-instrumentation-langchain>=0.40.4",
-    "openinference-instrumentation-litellm>=0.1.19",
+    "opentelemetry-instrumentation-langchain>=0.62.3",
+    "openinference-instrumentation-litellm>=0.1.36",
     "pandas>=2.2.3",
-    "fonttools>=4.62.0",  # security: CVE-2025-66034 (#328)
-    "jupyterlab>=4.5.6",  # security: CVE-2025-59842 (#319)
-    "langsmith>=0.8.0",  # security: CVE-2026-45134 (#1175)
-    "pypdf>=6.8.0",  # security: CVE-2026-31826 (#543)
-    "strands-agents[otel]>=1.14.0,<2.0.0",
-    "nltk>=3.9.4",
+    "fonttools>=4.63.0",  # security: CVE-2025-66034 (#328)
+    "jupyterlab>=4.6.3",  # security: CVE-2025-59842 (#319)
+    "langsmith>=0.10.18",  # security: CVE-2026-45134 (#1175)
+    "pypdf>=6.15.0",  # security: CVE-2026-31826 (#543)
+    "strands-agents[otel]>=1.51.0,<2.0.0",
+    "nltk>=3.10.2",
     "unstructured[pdf]>=0.18.18",
 ]
 tests = [
     "factory-boy>=3.3.3",
-    "pytest-asyncio>=0.21.2",
+    "pytest-asyncio>=1.4.0",
     "python-dotenv==1.2.2"
 ]
 

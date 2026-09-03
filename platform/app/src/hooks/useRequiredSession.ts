@@ -7,6 +7,7 @@ export const publicRoutes = [
   "/auth/signup",
   "/auth/forgot-password",
   "/auth/reset-password",
+  "/auth/verify-email",
   "/auth/error",
 ];
 
@@ -29,6 +30,10 @@ export const publicRoutes = [
  */
 export const noOrgBouncerRoutes = [
   "/invite/accept",
+  // Join before create (ADR-117 §6). A brand-new account is signed in and has
+  // no organization by definition when it lands here, which is the state this
+  // step exists to resolve — the bouncer must not resolve it first.
+  "/auth/join",
   // The CLI device-login approval page. The global bouncer (e.g.
   // CommandBar's useOrganizationTeamProject) must never swallow
   // /cli/auth?user_code=… into onboarding — the page handles the no-org
@@ -38,16 +43,35 @@ export const noOrgBouncerRoutes = [
   "/onboarding/[team]/project",
   "/onboarding/product",
   // Org-scoped governance pages — admin in an empty org (no project yet)
-  // must still reach /governance + /settings/governance/* to set up
-  // sources, rules, routing policies. Bouncing them to /onboarding/welcome
-  // is wrong: they ALREADY have an org, they just haven't created a
-  // project yet (and may never need to — governance is org-scoped).
+  // must still reach /governance/* to set up sources and rules. Bouncing
+  // them to /onboarding/welcome is wrong: they ALREADY have an org, they
+  // just haven't created a project yet (and may never need to; governance
+  // is org-scoped).
   "/governance",
-  "/settings/governance",
-  "/settings/governance/ingestion-sources",
-  "/settings/governance/ingestion-sources/[id]",
-  "/settings/governance/anomaly-rules",
-  "/settings/routing-policies",
+  "/governance/inventory",
+  "/governance/inventory/[id]",
+  "/governance/people",
+  "/governance/costs",
+  "/governance/billed",
+  // The retired addresses stay exempt so each redirect route renders
+  // before the bouncer fires (cost-centers precedent below).
+  "/governance/catalog",
+  "/governance/catalog/[id]",
+  "/governance/ingestion-sources",
+  "/governance/ingestion-sources/[id]",
+  "/governance/anomaly-rules",
+  "/governance/tool-catalog",
+  "/governance/departments",
+  "/governance/cost-centers",
+  "/governance/teams",
+  "/governance/teams/[id]",
+  "/governance/users",
+  "/governance/users/[id]",
+  // Routing policies is a gateway page, and it is the one an admin in an
+  // empty org has to reach first: `langwatch login` fails with
+  // no_default_routing_policy until a default policy exists, and that
+  // happens before the org has any project.
+  "/gateway/routing-policies",
   // Personal-scope pages — persona-1 (org-less CLI/IDE devs) is a
   // first-class persona per the persona-aware-chrome spec. They have
   // a legitimate home at /me + /me/configure without needing to create

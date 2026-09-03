@@ -12,7 +12,7 @@
  * Only the tRPC client is faked, at its module boundary, so the branch under
  * test is the real one.
  *
- * @see specs/analytics/governed-sql-saved-charts.feature
+ * @see specs/analytics/lwql-saved-charts.feature
  */
 
 import { act, renderHook } from "@testing-library/react";

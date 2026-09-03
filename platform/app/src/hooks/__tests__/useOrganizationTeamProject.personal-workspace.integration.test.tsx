@@ -37,7 +37,6 @@ const { mockOrganizationsQuery, mockRouter, mockLocalStorage, idleQuery } =
       selectedOrganizationId: "",
       selectedTeamId: "",
       selectedProjectSlug: "",
-      lastVisitedHomeKind: "",
     } as Record<string, string>,
   }));
 
@@ -87,6 +86,19 @@ function renderResolution() {
       redirectToProjectOnboarding: false,
     }),
   );
+}
+
+/**
+ * The next organization-scoped page, resolved after the one on screen is
+ * gone. What the first page left behind is all this one has to go on, which
+ * is what makes the return trip observable rather than a read of storage.
+ */
+function renderAfterReturningToOrganizationWork() {
+  cleanup();
+  mockRouter.route = "/settings/model-providers";
+  mockRouter.pathname = "/settings/model-providers";
+  mockRouter.asPath = "/settings/model-providers";
+  return renderResolution();
 }
 
 describe("useOrganizationTeamProject personal-workspace resolution", () => {
@@ -374,6 +386,70 @@ describe("useOrganizationTeamProject personal-workspace resolution", () => {
 
       expect(result.current.team?.id).toBe("team-personal");
       expect(result.current.project?.id).toBe("proj-personal");
+    });
+  });
+
+  describe("given /me and a stale project remembered from an earlier organization-scoped visit", () => {
+    beforeEach(() => {
+      mockRouter.route = "/me";
+      mockRouter.pathname = "/me";
+      mockRouter.asPath = "/me";
+      // Two projects, and the one jane left is the second: with a single
+      // project, coming back to the first and coming back to the one she left
+      // are the same page, and the test would hold whatever the code did.
+      mockOrganizationsQuery.mockReturnValue(
+        loadedOrganizationsQuery([
+          PERSONAL_TEAM,
+          {
+            ...SHARED_TEAM,
+            projects: [
+              { id: "proj-other", name: "ACME Other", slug: "acme-other" },
+              ...SHARED_TEAM.projects,
+            ],
+          },
+        ]),
+      );
+      mockLocalStorage.selectedTeamId = "team-shared";
+      mockLocalStorage.selectedProjectSlug = "acme-app";
+    });
+
+    // The remembered slug resolved before any personal-workspace preference
+    // could apply, so /me ran Langy and every other personal feature against
+    // the shared project.
+    /** @scenario A project remembered from an earlier organization-scoped visit does not follow jane onto the personal-workspace page */
+    it("resolves the personal team and project, not the remembered shared ones", () => {
+      const { result } = renderResolution();
+
+      expect(result.current.team?.id).toBe("team-personal");
+      expect(result.current.project?.id).toBe("proj-personal");
+    });
+
+    /** @scenario Organization-scoped work goes on in the project jane left, after a visit to the personal-workspace page */
+    it("opens the project she left when she goes back to organization-scoped work", () => {
+      renderResolution();
+
+      const { result } = renderAfterReturningToOrganizationWork();
+
+      expect(result.current.team?.id).toBe("team-shared");
+      expect(result.current.project?.slug).toBe("acme-app");
+    });
+  });
+
+  describe("given /me and nothing remembered yet", () => {
+    beforeEach(() => {
+      mockRouter.route = "/me";
+      mockRouter.pathname = "/me";
+      mockRouter.asPath = "/me";
+    });
+
+    /** @scenario The personal workspace is not what the next organization-scoped page is about */
+    it("opens the shared team on the next organization-scoped page", () => {
+      renderResolution();
+
+      const { result } = renderAfterReturningToOrganizationWork();
+
+      expect(result.current.team?.id).toBe("team-shared");
+      expect(result.current.project?.id).toBe("proj-app");
     });
   });
 

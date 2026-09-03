@@ -58,6 +58,25 @@ export function resolveHardFloorMs(): number | null {
 }
 
 /**
+ * How many files the shard was given, said so that a sharded run and a whole
+ * one both read plainly.
+ *
+ * A sharded run has two counts and they are far apart: the reporter is handed
+ * the whole suite before the sequencer splits it, so `selected` is the same
+ * number on every shard while the shard itself holds a quarter of it.
+ */
+function describeFileCount({
+  selected,
+  shardSelected,
+}: {
+  selected: number;
+  shardSelected: number | null | undefined;
+}): string {
+  if (shardSelected == null) return `${selected} selected`;
+  return `${shardSelected} in this shard (of ${selected} selected)`;
+}
+
+/**
  * What the floor prints and the code it exits with, given what the shard knew
  * when it fired. Split out from the timer so the exit contract can be asserted
  * without wedging a real run.
@@ -71,12 +90,17 @@ export function hardFloorReport({
   sawFailure: boolean;
   modules: {
     selected: number;
+    shardSelected?: number | null;
     started: number;
     reported: number;
     unreportedFiles: readonly string[];
   };
 }): { exitCode: 0 | 1; lines: string[] } {
-  const { selected, started, reported, unreportedFiles } = modules;
+  const { selected, shardSelected, started, reported, unreportedFiles } =
+    modules;
+  // What this shard was given, which on a sharded run is a quarter or so of
+  // `selected`. Without it the counts below compare a shard against the suite.
+  const mine = shardSelected ?? selected;
   const exitCode = sawFailure || unreportedFiles.length > 0 ? 1 : 0;
   const minutes = Number((hardFloorMs / 60_000).toFixed(2));
 
@@ -89,12 +113,13 @@ export function hardFloorReport({
   }
   const suffix = causes.length > 0 ? ` (${causes.join(", and ")})` : "";
 
+  const counted = describeFileCount({ selected, shardSelected });
   const lines = [
     `[unit globalSetup] hard floor reached at ${minutes} min - forcing process.exit(${exitCode}) to release the CI step from a vitest finalize wedge${suffix}`,
-    `[unit globalSetup] test files: ${selected} selected, ${started} started, ${reported} reported a result`,
+    `[unit globalSetup] test files: ${counted}, ${started} started, ${reported} reported a result`,
   ];
 
-  if (started < selected) {
+  if (started < mine) {
     lines.push(
       "[unit globalSetup] the shard still had files to start, so the floor cut a run that was working rather than one that was wedged. Read that as a shard too slow for the floor, not as a hang.",
     );

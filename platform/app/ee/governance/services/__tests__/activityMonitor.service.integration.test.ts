@@ -32,12 +32,16 @@ import type { ClickHouseClient } from "@clickhouse/client";
 import { nanoid } from "nanoid";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import type { Organization, Project } from "~/generated/prisma/client";
-
+import { getApp } from "~/server/app-layer/app";
 import { prisma } from "~/server/db";
 import {
   cleanupTestData,
   getTestClickHouseClient,
 } from "~/server/event-sourcing/__tests__/integration/testContainers";
+import {
+  clearClickHouseTestApp,
+  installClickHouseTestApp,
+} from "~/test-utils/clickhouseTestApp";
 import { ActivityMonitorService } from "../activity-monitor/activityMonitor.service";
 import {
   ensureHiddenGovernanceProject,
@@ -197,6 +201,9 @@ describe("ActivityMonitorService — read-side queries against unified trace sto
       throw new Error("ClickHouse test container not available");
     }
     ch = maybeCh;
+    // The service resolves its org client through getApp().clickhouse now
+    // (two-door access), so the fixture installs the App the seam expects.
+    installClickHouseTestApp({ resolveClient: async () => ch });
 
     primaryOrg = await prisma.organization.create({
       data: {
@@ -373,6 +380,7 @@ describe("ActivityMonitorService — read-side queries against unified trace sto
   });
 
   afterAll(async () => {
+    await clearClickHouseTestApp();
     await ch
       .command({
         query:
@@ -415,7 +423,10 @@ describe("ActivityMonitorService — read-side queries against unified trace sto
         },
       });
       try {
-        const service = ActivityMonitorService.create(prisma);
+        const service = ActivityMonitorService.create({
+          prisma,
+          repository: getApp().governance.activityMonitor,
+        });
         const summary = await service.summary({
           organizationId: orphanOrg.id,
           windowDays: 7,
@@ -432,7 +443,10 @@ describe("ActivityMonitorService — read-side queries against unified trace sto
 
   describe("when querying summary() with governance-origin traces seeded", () => {
     it("returns spend rolled up from governance-origin traces in the window", async () => {
-      const service = ActivityMonitorService.create(prisma);
+      const service = ActivityMonitorService.create({
+        prisma,
+        repository: getApp().governance.activityMonitor,
+      });
       const summary = await service.summary({
         organizationId: primaryOrg.id,
         windowDays: 7,
@@ -444,7 +458,10 @@ describe("ActivityMonitorService — read-side queries against unified trace sto
     });
 
     it("rolls up active users from langwatch.user_id in governance traces only", async () => {
-      const service = ActivityMonitorService.create(prisma);
+      const service = ActivityMonitorService.create({
+        prisma,
+        repository: getApp().governance.activityMonitor,
+      });
       const summary = await service.summary({
         organizationId: primaryOrg.id,
         windowDays: 7,
@@ -455,7 +472,10 @@ describe("ActivityMonitorService — read-side queries against unified trace sto
     });
 
     it("excludes cross-org governance traces (TenantId isolation)", async () => {
-      const service = ActivityMonitorService.create(prisma);
+      const service = ActivityMonitorService.create({
+        prisma,
+        repository: getApp().governance.activityMonitor,
+      });
       const summary = await service.summary({
         organizationId: primaryOrg.id,
         windowDays: 30,
@@ -468,7 +488,10 @@ describe("ActivityMonitorService — read-side queries against unified trace sto
 
   describe("when querying spendByUser()", () => {
     it("returns per-user spend rollup sorted by spend desc", async () => {
-      const service = ActivityMonitorService.create(prisma);
+      const service = ActivityMonitorService.create({
+        prisma,
+        repository: getApp().governance.activityMonitor,
+      });
       const rows = await service.spendByUser({
         organizationId: primaryOrg.id,
         windowDays: 7,
@@ -489,7 +512,10 @@ describe("ActivityMonitorService — read-side queries against unified trace sto
 
   describe("when querying spendByTeam()", () => {
     it("rolls up spend by IngestionSource.teamId with an Org-wide bucket for null-teamId sources", async () => {
-      const service = ActivityMonitorService.create(prisma);
+      const service = ActivityMonitorService.create({
+        prisma,
+        repository: getApp().governance.activityMonitor,
+      });
       // windowDays=15 (not 14) to comfortably include Carol's row at
       // `now - 14 * day` regardless of test-execution latency between
       // fixture insert and query — at exactly windowDays=14 the row
@@ -529,14 +555,20 @@ describe("ActivityMonitorService — read-side queries against unified trace sto
     });
 
     it("excludes cross-org governance traces (TenantId isolation)", async () => {
-      const service = ActivityMonitorService.create(prisma);
+      const service = ActivityMonitorService.create({
+        prisma,
+        repository: getApp().governance.activityMonitor,
+      });
       const rows = await service.spendByTeam({
         organizationId: primaryOrg.id,
         windowDays: 30,
       });
       // Cross-org trace had spend=$50; if any leaked, primary's largest row
       // would be far above $2 + $0.25.
-      const totalReturned = rows.reduce((sum, r) => sum + r.spendUsd, 0);
+      const totalReturned = rows.reduce(
+        (sum, r) => sum + Number(r.spendUsd),
+        0,
+      );
       expect(totalReturned).toBeLessThan(10);
       // Cross-org Team is a Team but its id should never surface here.
       const allTeamIds = rows.map((r) => r.teamId).filter(Boolean);
@@ -550,7 +582,10 @@ describe("ActivityMonitorService — read-side queries against unified trace sto
           slug: `no-gov-${nanoid(6)}`,
         },
       });
-      const service = ActivityMonitorService.create(prisma);
+      const service = ActivityMonitorService.create({
+        prisma,
+        repository: getApp().governance.activityMonitor,
+      });
       const rows = await service.spendByTeam({
         organizationId: orgNoGov.id,
         windowDays: 30,
@@ -562,7 +597,10 @@ describe("ActivityMonitorService — read-side queries against unified trace sto
 
   describe("when querying spendByUser() with pagination + sort args (v2 spec line 157)", () => {
     it("limit + offset paginate the same ordering — sortBy='spend' desc returns bob ($1.50) on page 0, alice ($0.50) on page 1", async () => {
-      const service = ActivityMonitorService.create(prisma);
+      const service = ActivityMonitorService.create({
+        prisma,
+        repository: getApp().governance.activityMonitor,
+      });
       const page0 = await service.spendByUser({
         organizationId: primaryOrg.id,
         windowDays: 30,
@@ -586,7 +624,10 @@ describe("ActivityMonitorService — read-side queries against unified trace sto
     });
 
     it("sortDir='asc' inverts the ordering — carol ($0.25) is the smallest spender so she comes first", async () => {
-      const service = ActivityMonitorService.create(prisma);
+      const service = ActivityMonitorService.create({
+        prisma,
+        repository: getApp().governance.activityMonitor,
+      });
       const rows = await service.spendByUser({
         organizationId: primaryOrg.id,
         windowDays: 30,
@@ -600,7 +641,10 @@ describe("ActivityMonitorService — read-side queries against unified trace sto
     });
 
     it("sortBy='lastActivity' desc puts the recently-active users before carol's 14d-old row", async () => {
-      const service = ActivityMonitorService.create(prisma);
+      const service = ActivityMonitorService.create({
+        prisma,
+        repository: getApp().governance.activityMonitor,
+      });
       const rows = await service.spendByUser({
         organizationId: primaryOrg.id,
         windowDays: 30,
@@ -617,7 +661,10 @@ describe("ActivityMonitorService — read-side queries against unified trace sto
     });
 
     it("legacy callers (no pagination/sort args) still get the v1 default — top-N by spend desc", async () => {
-      const service = ActivityMonitorService.create(prisma);
+      const service = ActivityMonitorService.create({
+        prisma,
+        repository: getApp().governance.activityMonitor,
+      });
       const rows = await service.spendByUser({
         organizationId: primaryOrg.id,
         windowDays: 30,
@@ -634,7 +681,10 @@ describe("ActivityMonitorService — read-side queries against unified trace sto
 
   describe("when querying spendByTeam() with pagination + sort args (v2 spec line 157)", () => {
     it("limit caps the page; offset paginates — limit=1 offset=0 gets primary team, offset=1 gets Org-wide", async () => {
-      const service = ActivityMonitorService.create(prisma);
+      const service = ActivityMonitorService.create({
+        prisma,
+        repository: getApp().governance.activityMonitor,
+      });
       const page0 = await service.spendByTeam({
         organizationId: primaryOrg.id,
         windowDays: 30,
@@ -658,7 +708,10 @@ describe("ActivityMonitorService — read-side queries against unified trace sto
     });
 
     it("sortDir='asc' inverts the ordering — Org-wide ($0.25) before primary team ($2.00)", async () => {
-      const service = ActivityMonitorService.create(prisma);
+      const service = ActivityMonitorService.create({
+        prisma,
+        repository: getApp().governance.activityMonitor,
+      });
       const rows = await service.spendByTeam({
         organizationId: primaryOrg.id,
         windowDays: 30,
@@ -671,7 +724,10 @@ describe("ActivityMonitorService — read-side queries against unified trace sto
     });
 
     it("sortBy='lastActivity' desc puts the team with the recent activity first", async () => {
-      const service = ActivityMonitorService.create(prisma);
+      const service = ActivityMonitorService.create({
+        prisma,
+        repository: getApp().governance.activityMonitor,
+      });
       const rows = await service.spendByTeam({
         organizationId: primaryOrg.id,
         windowDays: 30,
@@ -686,7 +742,10 @@ describe("ActivityMonitorService — read-side queries against unified trace sto
     });
 
     it("sortBy='requests' desc orders by raw request count, not spend", async () => {
-      const service = ActivityMonitorService.create(prisma);
+      const service = ActivityMonitorService.create({
+        prisma,
+        repository: getApp().governance.activityMonitor,
+      });
       const rows = await service.spendByTeam({
         organizationId: primaryOrg.id,
         windowDays: 30,
@@ -700,7 +759,10 @@ describe("ActivityMonitorService — read-side queries against unified trace sto
     });
 
     it("legacy callers (no pagination/sort args) still get the v1 default — top-N by spend desc", async () => {
-      const service = ActivityMonitorService.create(prisma);
+      const service = ActivityMonitorService.create({
+        prisma,
+        repository: getApp().governance.activityMonitor,
+      });
       const rows = await service.spendByTeam({
         organizationId: primaryOrg.id,
         windowDays: 30,
@@ -714,7 +776,10 @@ describe("ActivityMonitorService — read-side queries against unified trace sto
 
   describe("when querying ingestionSourcesHealth()", () => {
     it("returns per-source eventsLast24h across pushed and pulled event stores", async () => {
-      const service = ActivityMonitorService.create(prisma);
+      const service = ActivityMonitorService.create({
+        prisma,
+        repository: getApp().governance.activityMonitor,
+      });
       const rows = await service.ingestionSourcesHealth({
         organizationId: primaryOrg.id,
       });
@@ -729,7 +794,10 @@ describe("ActivityMonitorService — read-side queries against unified trace sto
 
   describe("when querying sourceHealthMetrics() for a single source", () => {
     it("returns 24h/7d/30d event counts + lastSuccessIso", async () => {
-      const service = ActivityMonitorService.create(prisma);
+      const service = ActivityMonitorService.create({
+        prisma,
+        repository: getApp().governance.activityMonitor,
+      });
       const metrics = await service.sourceHealthMetrics({
         organizationId: primaryOrg.id,
         sourceId: primarySourceId,
@@ -744,7 +812,10 @@ describe("ActivityMonitorService — read-side queries against unified trace sto
 
   describe("when querying eventsForSource() for the trace drill-down list", () => {
     it("returns governance-origin traces matching the sourceId filter", async () => {
-      const service = ActivityMonitorService.create(prisma);
+      const service = ActivityMonitorService.create({
+        prisma,
+        repository: getApp().governance.activityMonitor,
+      });
       const rows = await service.eventsForSource({
         organizationId: primaryOrg.id,
         sourceId: primarySourceId,
@@ -760,7 +831,7 @@ describe("ActivityMonitorService — read-side queries against unified trace sto
           eventType: "anthropic_admin",
           action: "usage_report",
           target: "claude-haiku-4-5",
-          costUsd: 0.0042,
+          costUsd: "0.0042",
           tokensInput: 8,
           tokensOutput: 5,
         }),
@@ -774,7 +845,10 @@ describe("ActivityMonitorService — read-side queries against unified trace sto
 
   describe("when querying spendOverTime() for the bird's-eye stacked-area chart", () => {
     it("returns dense daily buckets covering windowDays — empty days emit `points: []` so the X axis has no gaps", async () => {
-      const service = ActivityMonitorService.create(prisma);
+      const service = ActivityMonitorService.create({
+        prisma,
+        repository: getApp().governance.activityMonitor,
+      });
       const result = await service.spendOverTime({
         organizationId: primaryOrg.id,
         windowDays: 30,
@@ -804,7 +878,10 @@ describe("ActivityMonitorService — read-side queries against unified trace sto
     });
 
     it("groups by team — primary team appears in the recent bucket; Org-wide in the 14d-ago bucket", async () => {
-      const service = ActivityMonitorService.create(prisma);
+      const service = ActivityMonitorService.create({
+        prisma,
+        repository: getApp().governance.activityMonitor,
+      });
       const result = await service.spendOverTime({
         organizationId: primaryOrg.id,
         windowDays: 30,
@@ -813,7 +890,7 @@ describe("ActivityMonitorService — read-side queries against unified trace sto
 
       const totalSpend = result.buckets
         .flatMap((b) => b.points)
-        .reduce((sum, p) => sum + p.spendUsd, 0);
+        .reduce((sum, p) => sum + Number(p.spendUsd), 0);
       // tr-primary-1 ($0.50) + tr-primary-2 ($1.50) + tr-primary-3 ($0.25)
       // governance-origin only — app trace ($99) excluded.
       expect(totalSpend).toBeCloseTo(2.25, 2);
@@ -822,7 +899,7 @@ describe("ActivityMonitorService — read-side queries against unified trace sto
         .flatMap((b) => b.points)
         .filter((p) => p.key === primaryTeamId);
       const primarySpend = primaryTeamPoints.reduce(
-        (sum, p) => sum + p.spendUsd,
+        (sum, p) => sum + Number(p.spendUsd),
         0,
       );
       expect(primarySpend).toBeCloseTo(2.0, 2);
@@ -831,7 +908,7 @@ describe("ActivityMonitorService — read-side queries against unified trace sto
         .flatMap((b) => b.points)
         .filter((p) => p.key === "__org_wide__");
       const orgWideSpend = orgWidePoints.reduce(
-        (sum, p) => sum + p.spendUsd,
+        (sum, p) => sum + Number(p.spendUsd),
         0,
       );
       expect(orgWideSpend).toBeCloseTo(0.25, 2);
@@ -839,7 +916,10 @@ describe("ActivityMonitorService — read-side queries against unified trace sto
     });
 
     it("groups by user — alice + bob in recent bucket, carol in 14d-ago bucket", async () => {
-      const service = ActivityMonitorService.create(prisma);
+      const service = ActivityMonitorService.create({
+        prisma,
+        repository: getApp().governance.activityMonitor,
+      });
       const result = await service.spendOverTime({
         organizationId: primaryOrg.id,
         windowDays: 30,
@@ -866,7 +946,10 @@ describe("ActivityMonitorService — read-side queries against unified trace sto
     });
 
     it("groups by model — claude-sonnet-4 only; app-model is excluded by origin filter", async () => {
-      const service = ActivityMonitorService.create(prisma);
+      const service = ActivityMonitorService.create({
+        prisma,
+        repository: getApp().governance.activityMonitor,
+      });
       const result = await service.spendOverTime({
         organizationId: primaryOrg.id,
         windowDays: 30,
@@ -882,7 +965,10 @@ describe("ActivityMonitorService — read-side queries against unified trace sto
     });
 
     it("honors TenantId isolation — cross-org $50 spend never appears in primary org's series", async () => {
-      const service = ActivityMonitorService.create(prisma);
+      const service = ActivityMonitorService.create({
+        prisma,
+        repository: getApp().governance.activityMonitor,
+      });
       const result = await service.spendOverTime({
         organizationId: primaryOrg.id,
         windowDays: 30,
@@ -896,12 +982,18 @@ describe("ActivityMonitorService — read-side queries against unified trace sto
       ).toBeUndefined();
       // Total spend bounded by primary's seeded amount (2.25) — proves no
       // cross-org $50 leaked even into a different attribution dimension.
-      const totalSpend = flatPoints.reduce((sum, p) => sum + p.spendUsd, 0);
+      const totalSpend = flatPoints.reduce(
+        (sum, p) => sum + Number(p.spendUsd),
+        0,
+      );
       expect(totalSpend).toBeCloseTo(2.25, 2);
     });
 
     it("orders points within a bucket by spend desc — largest contributor first for stable Recharts stack rendering", async () => {
-      const service = ActivityMonitorService.create(prisma);
+      const service = ActivityMonitorService.create({
+        prisma,
+        repository: getApp().governance.activityMonitor,
+      });
       const result = await service.spendOverTime({
         organizationId: primaryOrg.id,
         windowDays: 30,
@@ -912,8 +1004,8 @@ describe("ActivityMonitorService — read-side queries against unified trace sto
       const populated = result.buckets.find((b) => b.points.length >= 2);
       expect(populated).toBeDefined();
       // Sorted desc: bob (1.5) before alice (0.5).
-      expect(populated!.points[0]!.spendUsd).toBeGreaterThanOrEqual(
-        populated!.points[1]!.spendUsd,
+      expect(Number(populated!.points[0]!.spendUsd)).toBeGreaterThanOrEqual(
+        Number(populated!.points[1]!.spendUsd),
       );
     });
 
@@ -925,7 +1017,10 @@ describe("ActivityMonitorService — read-side queries against unified trace sto
         },
       });
       try {
-        const service = ActivityMonitorService.create(prisma);
+        const service = ActivityMonitorService.create({
+          prisma,
+          repository: getApp().governance.activityMonitor,
+        });
         const result = await service.spendOverTime({
           organizationId: orphan.id,
           windowDays: 7,

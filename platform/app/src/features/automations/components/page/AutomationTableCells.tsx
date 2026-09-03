@@ -358,6 +358,12 @@ export function TableShell({ children }: { children: React.ReactNode }) {
       <Box
         overflowX="auto"
         css={{
+          // Percentage column widths only bind under a fixed layout, and they
+          // only mean anything above a floor: without one, `width="full"`
+          // shrinks the table to the shell at any cost, and the cost is the
+          // Name column collapsing to its longest single word. Below this the
+          // shell scrolls instead.
+          "& table": { tableLayout: "fixed", minWidth: "1000px" },
           "& thead th": {
             backgroundColor: "var(--chakra-colors-bg-subtle)",
             fontSize: "11px",

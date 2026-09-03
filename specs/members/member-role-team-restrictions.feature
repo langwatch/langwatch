@@ -286,6 +286,13 @@ Feature: Member Role Team Restrictions
     Then the change is refused
     And the refusal names the team
 
+  @integration
+  Scenario: Two team admins removed at the same time cannot both succeed
+    Given a team whose only two admins are being removed concurrently
+    When both removals race each other
+    Then at most one of them commits
+    And the team keeps at least one admin
+
   # "Has an admin" counts people. A group given the Admin role on a team
   # administers it through every one of its members, so a change the group can
   # absorb is not taking the team's last admin away, and a team administered
@@ -329,3 +336,33 @@ Feature: Member Role Team Restrictions
     Given a member with a personal workspace
     When an organization admin moves them to a Lite Member seat
     Then their personal workspace access rows are untouched
+
+  # ============================================================================
+  # Inviting a Lite Member with no team
+  # ============================================================================
+  #
+  # A lite seat carries no organization-wide access of its own: the invite
+  # grants what its teams grant and nothing else. So a lite invite naming no
+  # team produces somebody who can sign in, see nothing, and hold a seat while
+  # they do it, and the admin only finds out when that person tells them.
+  #
+  # Warned rather than refused: assigning the team afterwards is a legitimate
+  # way to work, and the admin is the one who knows whether they mean to.
+
+  @integration
+  Scenario: Inviting a Lite Member with no team warns that they will see nothing
+    Given I am inviting someone as a Lite Member
+    When no team is assigned to them
+    Then I am told they will not be able to see anything
+    And I am told I can add a team later
+
+  @integration
+  Scenario: The warning does not block the invitation
+    Given I am inviting someone as a Lite Member with no team
+    Then I can still send the invitation
+
+  @integration
+  Scenario: Inviting a full member with no team is not warned about
+    Given I am inviting someone as a full member
+    When no team is assigned to them
+    Then no warning about team access is shown

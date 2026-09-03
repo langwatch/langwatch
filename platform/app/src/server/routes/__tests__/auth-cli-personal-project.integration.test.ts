@@ -42,12 +42,18 @@ vi.mock("~/server/auth", () => ({
 }));
 // Write-permission RBAC has its own coverage (auth-cli-personal-guard); here
 // it is granted by default and denied per-test to exercise the endpoint gate.
-vi.mock("~/server/api/rbac", async (importActual) => {
-  const actual = await importActual<typeof import("~/server/api/rbac")>();
-  return { ...actual, hasProjectPermission: vi.fn().mockResolvedValue(true) };
+// The approval route reads probeProjectPermission from the app-layer
+// imperative module (it moved off ~/server/api/rbac with ADR-092); mocking
+// the old path leaves the real check running and the deny test inert.
+vi.mock("~/server/app-layer/permissions/imperative", async (importActual) => {
+  const actual =
+    await importActual<
+      typeof import("~/server/app-layer/permissions/imperative")
+    >();
+  return { ...actual, probeProjectPermission: vi.fn().mockResolvedValue(true) };
 });
 
-import { hasProjectPermission } from "~/server/api/rbac";
+import { probeProjectPermission } from "~/server/app-layer/permissions/imperative";
 import { prisma } from "~/server/db";
 import {
   getTestClickHouseClient,
@@ -59,8 +65,11 @@ import {
   clearClickHouseTestApp,
   installClickHouseTestApp,
 } from "~/test-utils/clickhouseTestApp";
+import { wireDefaultTestApp } from "~/test-utils/wireDefaultTestApp";
 import { app as meApp } from "../../../app/api/me/[[...route]]/app";
 import { app } from "../auth-cli";
+
+wireDefaultTestApp();
 
 /** The container's connection, handed to the test App the CLI routes read. */
 let redisConnection: Redis | null = null;
@@ -307,27 +316,22 @@ afterAll(async () => {
     select: { id: true },
   });
   const teamIds = personalTeams.map((t) => t.id);
-  await prisma.roleBinding
-    .deleteMany({ where: { organizationId: ORG_ID } })
-    .catch(() => {});
-  await prisma.project
-    .deleteMany({ where: { teamId: { in: teamIds } } })
-    .catch(() => {});
-  await prisma.teamUser
-    .deleteMany({ where: { teamId: { in: teamIds } } })
-    .catch(() => {});
-  await prisma.team
-    .deleteMany({ where: { id: { in: teamIds } } })
-    .catch(() => {});
-  await prisma.organizationUser
-    .deleteMany({ where: { organizationId: ORG_ID } })
-    .catch(() => {});
-  await prisma.user
-    .deleteMany({ where: { id: { in: [USER_ID, OTHER_USER_ID] } } })
-    .catch(() => {});
-  await prisma.organization
-    .deleteMany({ where: { id: ORG_ID } })
-    .catch(() => {});
+  await prisma.roleBinding.deleteMany({ where: { organizationId: ORG_ID } });
+  // The device-session exchange mints a user-scoped CLI ApiKey (plus its
+  // private custom role); ApiKey→Organization is a Restrict relation, so
+  // these must go before the organization delete or it silently no-ops.
+  await prisma.apiKey.deleteMany({ where: { organizationId: ORG_ID } });
+  await prisma.customRole.deleteMany({ where: { organizationId: ORG_ID } });
+  await prisma.project.deleteMany({ where: { teamId: { in: teamIds } } });
+  await prisma.teamUser.deleteMany({ where: { teamId: { in: teamIds } } });
+  await prisma.team.deleteMany({ where: { id: { in: teamIds } } });
+  await prisma.organizationUser.deleteMany({
+    where: { organizationId: ORG_ID },
+  });
+  await prisma.user.deleteMany({
+    where: { id: { in: [USER_ID, OTHER_USER_ID] } },
+  });
+  await prisma.organization.deleteMany({ where: { id: ORG_ID } });
   await stopTestContainers().catch(() => {});
 });
 
@@ -447,6 +451,93 @@ describe("/me credentials delivery, given a token whose user is no longer an act
     await prisma.user.deleteMany({ where: { id: offboardId } }).catch(() => {});
   });
 
+  /** @scenario a disabled member's pre-disable token cannot mint or return a personal key */
+  it("refuses a member whose seat was disabled, revokes the token, and creates nothing", async () => {
+    const disabledId = `usr-disabled-${suffix}`;
+    const token = `lw_at_disabled${suffix.replace(/[^a-z0-9]/gi, "")}`;
+    // Everything the scenario says must not appear: the personal team, its
+    // project, and any role binding in the tenant.
+    const provisioned = async () => ({
+      teams: await personalTeamCount(disabledId),
+      projects: await prisma.project.count({
+        where: {
+          team: { organizationId: ORG_ID },
+          ownerUserId: disabledId,
+          isPersonal: true,
+        },
+      }),
+      bindings: await prisma.roleBinding.count({
+        where: { organizationId: ORG_ID, userId: disabledId },
+      }),
+    });
+
+    try {
+      // An active member when the token was issued; an admin then disabled
+      // the seat. The row stays, with its role — only the access is gone.
+      await seedUserWithCliToken({
+        id: disabledId,
+        email: `disabled-${suffix}@example.com`,
+        name: `Disabled ${suffix}`,
+        token,
+        member: true,
+      });
+      await prisma.organizationUser.updateMany({
+        where: { userId: disabledId, organizationId: ORG_ID },
+        data: { disabledAt: new Date() },
+      });
+      const before = await provisioned();
+
+      const res = await app.request("/api/auth/cli/personal-project", {
+        headers: { authorization: `Bearer ${token}` },
+      });
+
+      expect(res.status).toBe(403);
+      expect(await provisioned()).toEqual(before);
+      expect(await redisConnection!.get(`lwcli:access:${token}`)).toBeNull();
+    } finally {
+      await prisma.organizationUser.deleteMany({
+        where: { userId: disabledId, organizationId: ORG_ID },
+      });
+      await prisma.user.deleteMany({ where: { id: disabledId } });
+    }
+  });
+
+  /** @scenario a disabled member's session cannot be renewed */
+  it("refuses to rotate a disabled member's refresh token, and revokes it", async () => {
+    // A session started while active; the seat is disabled afterwards.
+    // Rotation mints a new pair, so it re-derives membership like every
+    // other minting endpoint — otherwise the hour-long access token would
+    // roll forward for ninety days.
+    const flow = await runDeviceFlow();
+    expect(flow.exchangeStatus).toBe(200);
+    const refreshToken = flow.exchange.refresh_token;
+
+    await prisma.organizationUser.updateMany({
+      where: { userId: USER_ID, organizationId: ORG_ID },
+      data: { disabledAt: new Date() },
+    });
+    try {
+      const res = await app.request("/api/auth/cli/refresh", {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({ refresh_token: refreshToken }),
+      });
+
+      expect(res.status).toBe(401);
+      const body = (await res.json()) as Record<string, unknown>;
+      expect(body.error).toBe("invalid_grant");
+      expect(body.access_token).toBeUndefined();
+      expect(
+        await redisConnection!.get(`lwcli:refresh:${refreshToken}`),
+      ).toBeNull();
+    } finally {
+      await prisma.organizationUser.updateMany({
+        where: { userId: USER_ID, organizationId: ORG_ID },
+        data: { disabledAt: null },
+      });
+    }
+  });
+
   /** @scenario a deactivated user's token cannot mint or return a personal key */
   it("refuses a deactivated user even while org membership lingers", async () => {
     const deactId = `usr-deact-${suffix}`;
@@ -533,7 +624,7 @@ describe("/me credentials delivery, given POST /api/auth/cli/project-key (headle
 
   /** @scenario the project-key endpoint refuses a project the caller cannot write to */
   it("denies a project the caller cannot write, without leaking the key", async () => {
-    vi.mocked(hasProjectPermission).mockResolvedValueOnce(false);
+    vi.mocked(probeProjectPermission).mockResolvedValueOnce(false);
 
     const { status, json } = await projectKey(
       exchange.access_token,

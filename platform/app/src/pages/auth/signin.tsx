@@ -14,6 +14,11 @@ import { zodResolver } from "@hookform/resolvers/zod";
 import { useEffect, useState } from "react";
 import { useForm } from "react-hook-form";
 import { z } from "zod";
+import {
+  FrontDoorShell,
+  IdentifierFirstSignIn,
+  useIdentityFrontDoor,
+} from "~/features/auth-front-door";
 import { safeRedirectTarget, signIn, useSession } from "~/utils/auth-client";
 import { replaceLocation } from "~/utils/browserNavigation";
 import Link from "~/utils/compat/next-link";
@@ -25,7 +30,37 @@ import { usePublicEnv } from "../../hooks/usePublicEnv";
 import { authFailureMessage } from "./authFailureMessage";
 import { isStableAuthError, normalizeErrorCode, SignInError } from "./error";
 
+/**
+ * Which sign-in screen this deployment has (ADR-117 §7).
+ *
+ * Until the flip, and after a rollback, the legacy screen below answers
+ * exactly as it always has: this component adds a branch in front of it and
+ * changes nothing inside it. Neither renders until the deployment has said
+ * which one it is, because guessing would flash the wrong door on every load.
+ */
 export default function SignIn() {
+  const frontDoor = useIdentityFrontDoor();
+
+  if (!frontDoor.isResolved) return null;
+  if (frontDoor.enabled) {
+    return (
+      // The same room as sign-up, same seats: words on the left, card on the
+      // right. The panel greets rather than pitches, because somebody logging
+      // in already made the decision the sign-up headline argues for.
+      <FrontDoorShell
+        headline={"Let's see what your agents\nhave been up to."}
+        headlineAccent="up to"
+        tagline="Log in and pick up where you left off."
+      >
+        <IdentifierFirstSignIn />
+      </FrontDoorShell>
+    );
+  }
+
+  return <LegacySignIn />;
+}
+
+function LegacySignIn() {
   const { data: session } = useSession();
   const query = useSearchParams();
   const rawError = query?.get("error");
@@ -152,9 +187,6 @@ function SignInForm() {
         title: "Could not sign in",
         description: message,
         type: "error",
-        meta: {
-          closable: true,
-        },
       });
     }
   };

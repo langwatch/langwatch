@@ -2,7 +2,7 @@ import { TupleParam } from "@clickhouse/client";
 import { createLogger } from "@langwatch/observability";
 import { getLangWatchTracer } from "langwatch";
 import type { PrismaClient } from "~/generated/prisma/client";
-import { getClickHouseClientForProject } from "~/server/clickhouse/clickhouseClient";
+import { getApp } from "~/server/app-layer/app";
 import { prisma as defaultPrisma } from "~/server/db";
 import { ExperimentService } from "~/server/experiments/experiment.service";
 import {
@@ -39,8 +39,16 @@ interface ClickHouseCountRow {
 }
 
 type ProjectClickHouseClient = NonNullable<
-  Awaited<ReturnType<typeof getClickHouseClientForProject>>
+  Awaited<ReturnType<typeof projectClickHouseClient>>
 >;
+
+/** The App's per-tenant resolver, preserving this service's documented
+ *  no-client semantics: null when ClickHouse is not enabled, never a throw. */
+async function projectClickHouseClient(projectId: string) {
+  const { clickhouse } = getApp();
+  if (!clickhouse.enabled) return null;
+  return clickhouse.resolveClient(projectId);
+}
 
 /**
  * ClickHouse backend for experiment run queries.
@@ -122,7 +130,7 @@ export class ExperimentRunService {
         },
       },
       async () => {
-        const clickHouseClient = await getClickHouseClientForProject(projectId);
+        const clickHouseClient = await projectClickHouseClient(projectId);
         if (!clickHouseClient) {
           throw new Error(
             `ClickHouse client unavailable for project ${projectId}`,
@@ -225,7 +233,7 @@ export class ExperimentRunService {
         },
       },
       async () => {
-        const clickHouseClient = await getClickHouseClientForProject(projectId);
+        const clickHouseClient = await projectClickHouseClient(projectId);
         if (!clickHouseClient) {
           throw new Error(
             `ClickHouse client unavailable for project ${projectId}`,
@@ -300,7 +308,7 @@ export class ExperimentRunService {
         },
       },
       async () => {
-        const clickHouseClient = await getClickHouseClientForProject(projectId);
+        const clickHouseClient = await projectClickHouseClient(projectId);
         if (!clickHouseClient) {
           throw new Error(
             `ClickHouse client unavailable for project ${projectId}`,
@@ -430,7 +438,7 @@ export class ExperimentRunService {
         attributes: { "tenant.id": projectId, "run.id": runId },
       },
       async () => {
-        const clickHouseClient = await getClickHouseClientForProject(projectId);
+        const clickHouseClient = await projectClickHouseClient(projectId);
         if (!clickHouseClient) {
           // Deliberately `null`, not `throw` — see method JSDoc above for
           // why this method diverges from the rest of the class.
@@ -682,17 +690,23 @@ export class ExperimentRunService {
     }
 
     // Fetch cost/duration summary per run.
+    //
+    // `CarriedOver = 0` everywhere: a run holds a snapshot of the whole board,
+    // and the cells it copied in were paid for by the run that produced them.
+    // What the run reports it spent, and how long it took, is its own work
+    // only. The per-evaluator breakdown above deliberately keeps carried rows,
+    // because a pass rate describes the board the run stands for.
     const costResult = await clickHouseClient.query({
       query: `
         SELECT
           ExperimentId,
           RunId,
-          sumIf(TargetCost, ResultType = 'target') AS datasetCost,
-          sumIf(EvaluationCost, ResultType = 'evaluator') AS evaluationsCost,
-          avgIf(TargetCost, ResultType = 'target' AND TargetCost IS NOT NULL) AS datasetAverageCost,
-          avgIf(TargetDurationMs, ResultType = 'target' AND TargetDurationMs IS NOT NULL) AS datasetAverageDuration,
-          avgIf(EvaluationCost, ResultType = 'evaluator' AND EvaluationCost IS NOT NULL) AS evaluationsAverageCost,
-          avgIf(EvaluationDurationMs, ResultType = 'evaluator' AND EvaluationDurationMs IS NOT NULL) AS evaluationsAverageDuration
+          sumIf(TargetCost, ResultType = 'target' AND CarriedOver = 0) AS datasetCost,
+          sumIf(EvaluationCost, ResultType = 'evaluator' AND CarriedOver = 0) AS evaluationsCost,
+          avgIf(TargetCost, ResultType = 'target' AND CarriedOver = 0 AND TargetCost IS NOT NULL) AS datasetAverageCost,
+          avgIf(TargetDurationMs, ResultType = 'target' AND CarriedOver = 0 AND TargetDurationMs IS NOT NULL) AS datasetAverageDuration,
+          avgIf(EvaluationCost, ResultType = 'evaluator' AND CarriedOver = 0 AND EvaluationCost IS NOT NULL) AS evaluationsAverageCost,
+          avgIf(EvaluationDurationMs, ResultType = 'evaluator' AND CarriedOver = 0 AND EvaluationDurationMs IS NOT NULL) AS evaluationsAverageDuration
         FROM experiment_run_items
         ${buildDedupedRunItemsWhere()}
         GROUP BY ExperimentId, RunId
@@ -890,9 +904,9 @@ export class ExperimentRunService {
         },
       },
       async (span) => {
-        const experiment = await ExperimentService.create(
-          this.prisma,
-        ).findIdBySlug({
+        const experiment = await ExperimentService.create({
+          prisma: this.prisma,
+        }).findIdBySlug({
           projectId: params.projectId,
           slug: params.experimentSlug,
         });

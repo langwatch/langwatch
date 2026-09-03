@@ -11,19 +11,19 @@
 import { describe, expect, it } from "vitest";
 
 import { ADVERSARIAL_VEGA_FIXTURES } from "../../__tests__/fixtures/adversarial";
-import {
-  GOVERNED_FIXTURE_COLUMNS,
-  GOVERNED_FIXTURE_ROW_COUNTS,
-} from "../../__tests__/fixtures/governedDatasetRegistry";
 import { INVALID_VEGA_FIXTURES } from "../../__tests__/fixtures/invalid";
+import {
+  LWQL_FIXTURE_COLUMNS,
+  LWQL_FIXTURE_ROW_COUNTS,
+} from "../../__tests__/fixtures/lwqlDatasetRegistry";
 import { VALID_VEGA_FIXTURES } from "../../__tests__/fixtures/valid";
 import { validateVegaLiteSpec } from "../validateVegaLiteSpec";
 
 const validate = (spec: unknown) =>
   validateVegaLiteSpec({
     spec,
-    columnsByDataset: GOVERNED_FIXTURE_COLUMNS,
-    rowCountsByDataset: GOVERNED_FIXTURE_ROW_COUNTS,
+    columnsByDataset: LWQL_FIXTURE_COLUMNS,
+    rowCountsByDataset: LWQL_FIXTURE_ROW_COUNTS,
   });
 
 interface FixtureOutcome {
@@ -71,7 +71,7 @@ const namesFailing = (
   holds: (outcome: FixtureOutcome) => boolean,
 ): string[] => outcomes.filter((o) => !holds(o)).map((o) => o.name);
 
-describe("the governed Vega-Lite fixture corpus", () => {
+describe("the LangWatchQL Vega-Lite fixture corpus", () => {
   describe("given fixtures for every rejection path", () => {
     describe("when each fixture is validated", () => {
       /** @scenario "The adversarial corpus is refused" */

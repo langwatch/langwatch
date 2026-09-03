@@ -71,7 +71,7 @@ describe("<AiToolsPortal /> curated-empty fallback", () => {
       ).toBeInTheDocument();
 
       const cta = screen.getByRole("link", { name: /add your first tools/i });
-      expect(cta).toHaveAttribute("href", "/settings/governance/tool-catalog");
+      expect(cta).toHaveAttribute("href", "/governance/inventory?tab=catalog");
     });
 
     it("does not render any install-the-CLI affordance", () => {

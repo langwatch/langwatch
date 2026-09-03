@@ -21,9 +21,25 @@
  *
  * Environment:
  *   CHECK_SLOTS=N            How many checks may proceed at once. 0 (or "off")
- *                            disables the queue entirely. Unset derives a limit
- *                            from the machine, and is off under CI, where one
- *                            job runs one check.
+ *                            disables the queue entirely — from a person's
+ *                            shell. Agent shells carry CLAUDECODE, and there a
+ *                            gate-off is ignored: an agent may not remove the
+ *                            machine-wide serialization that exists because of
+ *                            agents. Unset derives a limit from the machine,
+ *                            and is off under CI, where one job runs one check.
+ *   CHECK_QUEUE_HELD=<pid>   Set by the queue itself on everything below a
+ *                            wrapper that already counted the run. Honored
+ *                            only when the pid is a live ancestor AND that
+ *                            process is one of the queue's own wrappers, so
+ *                            neither a copied pid nor a shell's own $$ gates
+ *                            anything off.
+ *   CHECK_PRESSURE=<level>   Forces the memory-pressure level (green, amber or
+ *                            red) instead of measuring it. Unset measures; a
+ *                            misspelling measures too. Under amber or red the
+ *                            derived limit narrows to one run, GOMEMLIMIT
+ *                            drops to its floor and GOMAXPROCS is halved, so
+ *                            the check pays for the shortage instead of
+ *                            everything else on the machine.
  *   CHECK_QUEUE_DIR=<path>   Where the shared state lives.
  *   CHECK_QUEUE_POLL_MS=N    How often a waiter re-checks (default 500).
  *   CHECK_QUEUE_HEARTBEAT_MS How often a waiting run repeats itself so it never
@@ -38,10 +54,11 @@
  * the read-decide-write step between processes.
  *
  * `haven typecheck` (ADR-064) holds one of its own RAM slots and passes
- * CHECK_SLOTS=0 to the run it spawns, so a run is never counted twice.
+ * CHECK_SLOTS=0 with its pid in CHECK_QUEUE_HELD to the run it spawns, so a
+ * run is never counted twice.
  */
 
-import { spawn } from "node:child_process";
+import { spawn, spawnSync } from "node:child_process";
 import { randomBytes } from "node:crypto";
 import fs from "node:fs";
 import os from "node:os";
@@ -69,23 +86,188 @@ const stderr = (line) => process.stderr.write(line);
 const sleep = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
 
 /**
+ * The CI convention: the variable is set to something that is not one of the
+ * values meaning "no". CI and CLAUDECODE both follow it, so the slot limit and
+ * the pressure policy read them by one rule that cannot drift apart. Mirrors
+ * isTruthyEnv in tools/thuishaven/domain/checkslots.go.
+ */
+function isTruthyEnv(value) {
+  const normalized = (value ?? "").trim().toLowerCase();
+  return normalized !== "" && normalized !== "0" && normalized !== "false";
+}
+
+/**
+ * How much trouble the machine is in: "green", "amber" or "red". A mirror of
+ * domain/pressure.go in tools/thuishaven, which is the source of truth for the
+ * thresholds (ADR-090): swap above 40% is amber and above 75% red, compressor
+ * occupancy above 10% of RAM is amber and above 20% red, and either signal
+ * alone can raise the level. CHECK_PRESSURE forces a level the same way for an
+ * operator and for the tests; a misspelling measures, like a CHECK_SLOTS typo.
+ *
+ * A machine this cannot read is green: a governor that cannot see must not
+ * throttle. Only darwin is measured, because the thrash this exists to stop is
+ * the compressor-and-swap spiral of a memory-oversubscribed Mac.
+ *
+ * CI is green whatever the machine says. The queue already stands down there,
+ * and the same reasoning retires the pressure policy with it: a runner runs one
+ * job and nobody is typing on it, so halving its cores buys back an interactive
+ * machine that does not exist and only makes the job slower. This is what makes
+ * "CI is unaffected" true rather than a side effect of the runner's kernel.
+ */
+function resolvePressure(env) {
+  const forced = (env.CHECK_PRESSURE ?? "").trim().toLowerCase();
+  if (forced === "green" || forced === "amber" || forced === "red") {
+    return forced;
+  }
+  if (isTruthyEnv(env.CI)) return "green";
+  if (process.platform !== "darwin") return "green";
+
+  const probe = (command, args) => {
+    try {
+      const result = spawnSync(command, args, { encoding: "utf8", timeout: 2000 });
+      return result.status === 0 ? (result.stdout ?? "") : "";
+    } catch {
+      return "";
+    }
+  };
+
+  // "total = 11264.00M  used = 10096.94M  free = ...", used over total.
+  let swapFraction = 0;
+  const swap = probe("sysctl", ["-n", "vm.swapusage"]);
+  const total = /total = ([\d.]+)([MG])/.exec(swap);
+  const used = /used = ([\d.]+)([MG])/.exec(swap);
+  const inBytes = (m) =>
+    Number.parseFloat(m[1]) * (m[2] === "G" ? 2 ** 30 : 2 ** 20);
+  if (total && used && inBytes(total) > 0) {
+    swapFraction = inBytes(used) / inBytes(total);
+  }
+
+  // The page size is in the header (16384 on Apple silicon, 4096 on Intel) and
+  // the line is "Pages occupied by compressor", not "stored in": the stored
+  // figure is several times larger and reading it would cry red on a healthy
+  // machine. Both traps are documented at the Go mirror.
+  let compFraction = 0;
+  const vmstat = probe("vm_stat", []);
+  const pageSize = /page size of (\d+) bytes/.exec(vmstat);
+  const occupied = /Pages occupied by compressor:\s+(\d+)/.exec(vmstat);
+  if (pageSize && occupied && os.totalmem() > 0) {
+    compFraction =
+      (Number.parseInt(occupied[1], 10) * Number.parseInt(pageSize[1], 10)) /
+      os.totalmem();
+  }
+
+  if (swapFraction > 0.75 || compFraction > 0.2) return "red";
+  if (swapFraction > 0.4 || compFraction > 0.1) return "amber";
+  return "green";
+}
+
+/**
+ * One field of `pid` read through ps, because Node knows only its own process.
+ * Null when it cannot be read. `-ww` because ps otherwise cuts a command line
+ * at the terminal width, and the script path this reads for sits at the end of
+ * one.
+ */
+function psField(pid, field) {
+  try {
+    const args = ["-ww", "-o", `${field}=`, "-p", String(pid)];
+    const result = spawnSync("ps", args, {
+      encoding: "utf8",
+      timeout: 2000,
+    });
+    if (result.status !== 0) return null;
+    const value = (result.stdout ?? "").trim();
+    return value === "" ? null : value;
+  } catch {
+    return null;
+  }
+}
+
+/** The parent of `pid`, or null when it cannot be read. */
+function parentOfPid(pid) {
+  const parent = Number.parseInt(psField(pid, "ppid") ?? "", 10);
+  return Number.isInteger(parent) && parent > 0 ? parent : null;
+}
+
+/**
+ * Whether a command line is one of the two programs that hand a slot down: this
+ * script, and the haven binary whose `slot run` does the same job in Go.
+ */
+function isQueueCommand(command) {
+  if (!command) return false;
+  if (command.includes("check-queue.mjs")) return true;
+  const executable = path.basename(command.trim().split(/\s+/)[0] ?? "");
+  return executable === "haven" || executable.startsWith("haven.");
+}
+
+/**
+ * Whether `candidate` is a slot-holding wrapper above this process: it must sit
+ * in the live parent chain AND be one of the queue's own programs. Ancestry
+ * alone proves nothing, because a shell is an ancestor of everything it runs,
+ * so `CHECK_QUEUE_HELD=$$` would otherwise hand any agent the gate-off. A chain
+ * that cannot be read answers no: a marker that cannot be verified must gate
+ * nothing off.
+ *
+ * This is a lock on an honest door, not a vault. Anyone who may spawn processes
+ * on the machine may also spawn one named `haven`. It stops the one-token
+ * bypasses, which is what the queue needs: the runs it serializes are all
+ * started by the wrappers themselves.
+ */
+function heldByQueueAncestor(candidate) {
+  if (!Number.isInteger(candidate) || candidate <= 1) return false;
+  if (!isQueueCommand(psField(candidate, "args"))) return false;
+  let current = process.pid;
+  for (let hop = 0; hop < 64; hop++) {
+    const parent = parentOfPid(current);
+    if (parent === null || parent <= 1) return false;
+    if (parent === candidate) return true;
+    current = parent;
+  }
+  return false;
+}
+
+/**
  * Resolves how many checks may proceed at once.
  *
  * An explicit CHECK_SLOTS always wins, including under CI, which is what lets
- * the tests exercise the queue on a CI runner. Unset, CI gets no queue at all
- * (one job runs one check, so a gate could only add risk) and a developer
- * machine gets a limit bounded by both memory and cores: tsgo is memory-hungry
- * AND parallel, so the tighter of the two bounds is the honest one. Never below
- * 1, or the queue would deadlock every run.
+ * the tests exercise the queue on a CI runner. One exception: a gate-off value
+ * from an agent shell is ignored, see the comment at the check. Unset, CI gets
+ * no queue at all (one job runs one check, so a gate could only add risk) and a
+ * developer machine gets a limit bounded by both memory and cores: tsgo is
+ * memory-hungry AND parallel, so the tighter of the two bounds is the honest
+ * one. Never below 1, or the queue would deadlock every run.
+ *
+ * A machine already under memory pressure gets one slot, whatever the formula
+ * says. The formula assumes an otherwise idle machine, and pressure is the
+ * machine reporting that assumption false: its RAM is spoken for, so a second
+ * concurrent check is paid for in everyone's swap. Only the derived default
+ * narrows; an explicit CHECK_SLOTS is the operator's call either way.
  */
-function resolveSlots(env) {
+function resolveSlots(env, pressure = "green") {
   const raw = (env.CHECK_SLOTS ?? "").trim();
   if (raw !== "") {
-    if (/^(off|none|unlimited|false)$/i.test(raw)) {
-      return { slots: 0, source: "CHECK_SLOTS" };
-    }
     const parsed = Number.parseInt(raw, 10);
-    if (Number.isNaN(parsed) || parsed < 0) {
+    const gateOff = /^(off|none|unlimited|false)$/i.test(raw) || parsed === 0;
+    if (gateOff) {
+      // The gate-off is the operator's lever, and agents are who the queue
+      // exists to serialize, so from an agent shell (Claude Code sets
+      // CLAUDECODE in every shell it spawns) it is honored only when the queue
+      // itself asked for it: a wrapper that already counted the run puts its
+      // own pid in CHECK_QUEUE_HELD, and only a live ancestor that is itself
+      // one of the queue's wrappers counts, so neither a copied pid nor a
+      // shell's own `$$` gates anything off. Observed in the wild: an agent
+      // prefixed CHECK_SLOTS=0 onto a whole-tree typecheck to jump the queue,
+      // and the machine ran three checks at once, 14 GB into swap.
+      if (!isTruthyEnv(env.CLAUDECODE)) {
+        return { slots: 0, source: "CHECK_SLOTS" };
+      }
+      const held = Number.parseInt((env.CHECK_QUEUE_HELD ?? "").trim(), 10);
+      if (heldByQueueAncestor(held)) {
+        return { slots: 0, source: "held" };
+      }
+      stderr(
+        `${PREFIX} CHECK_SLOTS=${raw} is ignored in an agent shell; the machine policy applies. Only a person may turn the queue off.\n`,
+      );
+    } else if (Number.isNaN(parsed) || parsed < 0) {
       stderr(
         `${PREFIX} ignoring CHECK_SLOTS=${raw}, expected a non-negative integer\n`,
       );
@@ -94,9 +276,12 @@ function resolveSlots(env) {
     }
   }
 
-  const ci = (env.CI ?? "").trim().toLowerCase();
-  if (ci !== "" && ci !== "0" && ci !== "false") {
+  if (isTruthyEnv(env.CI)) {
     return { slots: 0, source: "CI" };
+  }
+
+  if (pressure !== "green") {
+    return { slots: 1, source: "pressure" };
   }
 
   const byMemory = Math.floor(os.totalmem() / RAM_BUDGET_BYTES);
@@ -399,30 +584,75 @@ function delegateToHaven(commandArgv, env) {
  * Kept in step with domain.CheckGoMemLimit in tools/thuishaven, which is what
  * actually runs on a machine with haven installed. This is the fallback.
  */
-function goMemLimit() {
+function goMemLimit(pressure = "green") {
   if (process.env.GOMEMLIMIT) return process.env.GOMEMLIMIT;
+  // Under pressure the floor, outright: the ceiling is garbage the runtime
+  // has not collected because it was told there was room, and on a machine
+  // that is already compressing and swapping every granted gigabyte is paid
+  // by evicting someone else's pages. The floor trades that for the run's own
+  // GC time, which is the trade a pressured machine wants.
+  if (pressure !== "green") return "3GiB";
   const gib = Math.max(3, Math.min(6, Math.floor(os.totalmem() / 2 ** 31)));
   return `${gib}GiB`;
 }
 
+/**
+ * The parallelism the queue grants the Go-runtime tools it wraps. Green sets
+ * nothing (every core is the right spend for one run on an idle machine);
+ * under pressure half the cores, never below two, so the run stops being
+ * eleven threads all taking page faults while somebody tries to type. An
+ * operator's explicit GOMAXPROCS always wins.
+ */
+function goMaxProcs(pressure = "green") {
+  if (process.env.GOMAXPROCS) return process.env.GOMAXPROCS;
+  if (pressure === "green") return null;
+  const cpus =
+    typeof os.availableParallelism === "function"
+      ? os.availableParallelism()
+      : os.cpus().length;
+  return String(Math.max(2, Math.floor(cpus / 2)));
+}
+
 /** Runs the command with stdio inherited, forwarding signals, resolving its exit code. */
-function runCommand(commandArgv) {
+function runCommand(commandArgv, pressure = "green") {
   return new Promise((resolve) => {
-    const child = spawn(commandArgv[0], commandArgv.slice(1), {
-      stdio: "inherit",
+    const childEnv = {
+      ...process.env,
       // We are the slot for everything below us. Without this, a run holding
       // the only slot queues behind itself the moment it reaches a bin shim
       // (`pnpm typecheck` spawns .bin/tsgo, which is one) or a nested package
-      // script, and waits out the whole maximum wait before starting.
-      env: { ...process.env, CHECK_SLOTS: "0", GOMEMLIMIT: goMemLimit() },
-    });
+      // script, and waits out the whole maximum wait before starting. The pid
+      // marker is what keeps this working in agent shells, where a bare
+      // CHECK_SLOTS=0 is ignored; it only convinces a descendant, so an agent
+      // cannot borrow it.
+      CHECK_SLOTS: "0",
+      CHECK_QUEUE_HELD: String(process.pid),
+      GOMEMLIMIT: goMemLimit(pressure),
+    };
+    const procs = goMaxProcs(pressure);
+    if (procs !== null) childEnv.GOMAXPROCS = procs;
     // Handling these keeps the wrapper alive through a Ctrl-C so it releases its
     // slot after the child is done, instead of dying first and leaving an entry
     // for the next run to prune.
+    // Which signals were forwarded, not merely whether any was. A run that is
+    // interrupted and then killed by the OS dies of a signal nobody forwarded,
+    // and that is the death worth naming; a flag would have suppressed it
+    // because an earlier SIGINT set it.
+    // They go on before the spawn, not after. A signal keeps its default
+    // disposition until the first listener exists, so one arriving between the
+    // two ends the wrapper in the kernel: the interrupt reaches nobody and the
+    // command runs on with no parent. Occupancy follows the wrapper's pid, so
+    // the queue then counts that slot free and can start another check on top
+    // of a run that is still using the machine, which is the oversubscription
+    // the queue exists to prevent. No handler can see a null child, because a
+    // signal raised during this synchronous block only reaches JS a turn later.
+    let child = null;
+    const forwarded = new Set();
     const handlers = ["SIGINT", "SIGTERM", "SIGHUP"].map((signal) => {
       const handler = () => {
+        forwarded.add(signal);
         try {
-          child.kill(signal);
+          child?.kill(signal);
         } catch {
           // The child is already gone; its exit event is what resolves us.
         }
@@ -433,23 +663,51 @@ function runCommand(commandArgv) {
     const detach = () => {
       for (const { signal, handler } of handlers) process.off(signal, handler);
     };
+    child = spawn(commandArgv[0], commandArgv.slice(1), {
+      stdio: "inherit",
+      env: childEnv,
+    });
     child.on("error", (err) => {
       detach();
       stderr(`${PREFIX} could not run ${commandArgv[0]}: ${err.message}\n`);
       resolve(127);
     });
     child.on("exit", (code, signal) => {
-      detach();
-      resolve(signal ? 128 + (os.constants.signals[signal] ?? 0) : (code ?? 0));
+      // One turn later, so that a signal delivered to the whole process group
+      // is in the record before it is read. A Ctrl-C at a terminal reaches the
+      // wrapper and the child together, and the child's exit can be handled
+      // first, with our own handler for the same signal still pending.
+      // Detaching here rather than there would drop that handler outright.
+      setImmediate(() => {
+        detach();
+        // A child that dies by a signal this wrapper never forwarded was killed
+        // from outside: an operator, or the OS reclaiming memory. Without this
+        // line the run ends in a bare exit 137, which reads as "the queue killed
+        // it" and teaches people (and agents) to bypass the queue with
+        // CHECK_SLOTS=0, removing the serialization for the whole machine.
+        if (signal && !forwarded.has(signal)) {
+          stderr(
+            `${PREFIX} ${commandArgv[0]} was killed from outside by ${signal}. ` +
+              `The queue never kills runs; the likely cause is an operator kill or the OS reclaiming memory. ` +
+              `Re-run the same command. Do not set CHECK_SLOTS=0.\n`,
+          );
+        }
+        resolve(signal ? 128 + (os.constants.signals[signal] ?? 0) : (code ?? 0));
+      });
     });
   });
 }
 
 /** `--explain` output: the resolved limit, where it came from, and who holds what. */
 async function explain(env) {
-  const { slots, source } = resolveSlots(env);
+  const pressure = resolvePressure(env);
+  const { slots, source } = resolveSlots(env, pressure);
   const dir = resolveQueueDir(env);
-  stderr(`slots=${slots} source=${source}\ndir=${dir}\n`);
+  stderr(`slots=${slots} source=${source}\npressure=${pressure}\n`);
+  stderr(`gomemlimit=${goMemLimit(pressure)}\n`);
+  const procs = goMaxProcs(pressure);
+  if (procs !== null) stderr(`gomaxprocs=${procs}\n`);
+  stderr(`dir=${dir}\n`);
   if (slots <= 0) {
     stderr("queue=off\n");
     return 0;
@@ -486,8 +744,11 @@ async function main(argv, env) {
     return 2;
   }
 
-  const { slots } = resolveSlots(env);
-  if (slots <= 0) return runCommand(commandArgv);
+  // Measured once: the level shapes the slot count and the child's
+  // environment together, and two measurements could disagree.
+  const pressure = resolvePressure(env);
+  const { slots } = resolveSlots(env, pressure);
+  if (slots <= 0) return runCommand(commandArgv, pressure);
 
   const delegated = await delegateToHaven(commandArgv, env);
   if (delegated !== null) return delegated;
@@ -543,7 +804,7 @@ async function main(argv, env) {
   }
 
   try {
-    return await runCommand(commandArgv);
+    return await runCommand(commandArgv, pressure);
   } finally {
     release();
   }

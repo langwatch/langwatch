@@ -92,15 +92,38 @@ describe("sessionContextFingerprint", () => {
           branch: "main",
           worktree: "review",
         }),
-      ).toBe("github.com/langwatch/langwatch@main#review");
+      ).toBe("github.com/langwatch/langwatch@main#review!~");
     });
   });
 
   describe("given a detached head in the main checkout", () => {
     it("leaves the missing fields empty rather than absent", () => {
       expect(sessionContextFingerprint({ repository })).toBe(
-        "github.com/langwatch/langwatch@#",
+        "github.com/langwatch/langwatch@#!~",
       );
+    });
+  });
+
+  describe("given the titles the record can carry", () => {
+    it("changes when either title changes, so a rename re-posts", () => {
+      const base = sessionContextFingerprint({ repository });
+      const derived = sessionContextFingerprint(
+        { repository },
+        { title: "Fix the build" },
+      );
+      const declared = sessionContextFingerprint(
+        { repository },
+        { title: "Fix the build", name: "pr-reviewer" },
+      );
+      expect(new Set([base, derived, declared]).size).toBe(3);
+    });
+  });
+
+  describe("given a session outside any repository", () => {
+    it("still names the titles it carries", () => {
+      expect(
+        sessionContextFingerprint({}, { name: "pr-reviewer" }),
+      ).toBe("@#!~pr-reviewer");
     });
   });
 

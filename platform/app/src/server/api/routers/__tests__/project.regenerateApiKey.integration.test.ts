@@ -10,10 +10,13 @@
 import { nanoid } from "nanoid";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import { OrganizationUserRole, TeamUserRole } from "~/generated/prisma/client";
+import { wireDefaultTestApp } from "~/test-utils/wireDefaultTestApp";
 import { TokenResolver } from "../../../api-key/token-resolver";
 import { prisma } from "../../../db";
 import { appRouter } from "../../root";
 import { createInnerTRPCContext } from "../../trpc";
+
+wireDefaultTestApp();
 
 describe("project.regenerateApiKey integration", () => {
   const testNamespace = `regen-api-key-${nanoid(8)}`;

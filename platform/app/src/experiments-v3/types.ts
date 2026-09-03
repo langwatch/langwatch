@@ -274,6 +274,33 @@ export const COMPARISON_EVALUATOR_TYPE = "langevals/select_best_compare";
 /** @deprecated Legacy two-slot judge. Read for back-compat; never written. */
 export const LEGACY_PAIRWISE_EVALUATOR_TYPE = "langevals/pairwise_compare";
 
+/**
+ * Whether this evaluator type is allowed to own a standalone comparison column.
+ *
+ * A `comparison` config is what turns an evaluator from a chip attached to
+ * every target column into a column of its own that judges the other columns
+ * against each other. Only the comparison judge can do that. Any other type
+ * given a `comparison` becomes a column that renders as a comparison and runs
+ * as something that never receives the candidates it is asked to compare.
+ *
+ * The legacy two-slot judge counts: its saved rows open in the same form and
+ * dispatch to the current judge.
+ */
+export const isComparisonEvaluatorType = (
+  evaluatorType: string | undefined,
+): boolean =>
+  evaluatorType === COMPARISON_EVALUATOR_TYPE ||
+  evaluatorType === LEGACY_PAIRWISE_EVALUATOR_TYPE;
+
+/**
+ * What every refusal of that invariant tells the caller. One wording, shared by
+ * the payload schema, the transform, the store and the save seam, so an agent
+ * reads the same instruction whichever of them stopped it.
+ */
+export const COMPARISON_COLUMN_REFUSAL =
+  `Only the Comparison judge (${COMPARISON_EVALUATOR_TYPE}) can be a standalone comparison column. ` +
+  `Omit "comparison" and this evaluator attaches to every target column as a score.`;
+
 export const comparisonEvaluatorConfigSchema = z.object({
   variants: z.array(z.string()).default([]),
   variantOutputPaths: z.record(z.string(), z.array(z.string())).optional(),
@@ -336,9 +363,18 @@ export type EvaluatorConfig = Omit<
 
 /**
  * Agent types for targets (matches database agent types).
- * Used to determine which type of DSL node to generate.
+ *
+ * Says how the column runs the agent: which DSL node the row becomes, or, for
+ * a connected agent, that the row is one turn through the relay rather than a
+ * node at all.
  */
-export const agentTypeEnum = z.enum(["code", "signature", "workflow", "http"]);
+export const agentTypeEnum = z.enum([
+  "code",
+  "signature",
+  "workflow",
+  "http",
+  "connected",
+]);
 export type AgentTypeEnum = z.infer<typeof agentTypeEnum>;
 
 /**
@@ -587,6 +623,32 @@ export type EvaluationsV3State = {
   // Metadata
   experimentId?: string;
   experimentSlug?: string;
+  /**
+   * The saved version this store loaded, echoed on every autosave so a
+   * concurrent writer turns the save into a 409 instead of a silent clobber.
+   * Not part of the persisted blob: it identifies the blob's revision.
+   */
+  workbenchVersion?: number;
+  /**
+   * Set when the server holds a newer version than this store and the
+   * workbench has unsaved edits, so reloading is the user's call. A clean
+   * workbench reloads silently and never sets this.
+   */
+  staleWorkbench?: { serverVersion: number; actorLabel?: string };
+  /**
+   * The runs this page started, by id.
+   *
+   * A run writes its cells into the saved workbench state, which advances the
+   * counter. Without knowing which runs are its own, the page reads that bump
+   * as somebody else's write, stands down, and asks the reader to reload over
+   * unsaved edits the run had nothing to do with. The page already holds every
+   * cell such a run produced, because it streamed them, so a version its own
+   * run wrote is adopted rather than reloaded.
+   *
+   * Not persisted, and absent server-side: it describes an open page, not the
+   * experiment.
+   */
+  runsStartedHere?: string[];
   name: string;
 
   // Multiple datasets with active selection
@@ -621,6 +683,12 @@ export type EvaluationsV3Actions = {
   setName: (name: string) => void;
   setExperimentId: (id: string) => void;
   setExperimentSlug: (slug: string) => void;
+  setWorkbenchVersion: (version: number | undefined) => void;
+  setStaleWorkbench: (
+    stale: { serverVersion: number; actorLabel?: string } | undefined,
+  ) => void;
+  /** Records that this page started a run, so it can adopt that run's write. */
+  rememberRunStartedHere: (runId: string) => void;
 
   // Dataset management actions
   addDataset: (dataset: DatasetReference) => void;
@@ -670,8 +738,42 @@ export type EvaluationsV3Actions = {
 
   // Target actions
   addTarget: (target: TargetConfig) => void;
+  /**
+   * Copy a target, keeping its wiring: its own mappings and every evaluator's
+   * mappings for it. Returns the copy's id.
+   *
+   * `name` only lands for evaluator targets, the one kind that carries a name
+   * in workbench state; prompt, agent and workflow targets take their name from
+   * the entity they reference.
+   */
+  duplicateTarget: ({
+    targetId,
+    name,
+  }: {
+    targetId: string;
+    name?: string;
+  }) => string | undefined;
+  /**
+   * Run one transform-backed workbench action from `actions/manifest.ts`
+   * against the live store — the browser leg of the agent's UI-action channel
+   * (specs/langy/langy-ui-actions.feature). Parses the payload with the
+   * action's own schema, applies its transform in ONE `set` (one undo entry),
+   * and returns the transform's result. THROWS on an unknown or non-transform
+   * kind, an invalid payload, or a transform refusal — unlike the silent
+   * no-op UI actions, the caller here is a machine that needs the reason.
+   * Typed loosely because `types.ts` cannot import the manifest (its schemas
+   * import this file).
+   */
+  applyWorkbenchAction: (args: { kind: string; payload: unknown }) => unknown;
   updateTarget: (targetId: string, updates: Partial<TargetConfig>) => void;
   removeTarget: (targetId: string) => void;
+  /** Write a target's unsaved prompt draft, and the variables that came with it */
+  setTargetPrompt: (payload: {
+    targetId: string;
+    localPromptConfig: LocalPromptConfig;
+    inputs?: Field[];
+    outputs?: Field[];
+  }) => void;
   /** Set a mapping for a target input field for a specific dataset */
   setTargetMapping: (
     targetId: string,
@@ -820,6 +922,14 @@ export type TableMeta = {
   evaluatorsMap: Map<string, EvaluatorConfig>;
   openTargetEditor: (target: TargetConfig) => void;
   handleDuplicateTarget: (target: TargetConfig) => void;
+  /** Absent while the Langy UI-action channel is flagged off. */
+  handleOptimizeTarget?: ({
+    target,
+    name,
+  }: {
+    target: TargetConfig;
+    name: string;
+  }) => void;
   handleSwitchTarget: (target: TargetConfig) => void;
   handleRemoveTarget: (targetId: string) => void;
   handleAddEvaluator: () => void;
@@ -923,6 +1033,7 @@ export const createInitialUIState = (): UIState => ({
 
 export const createInitialState = (): EvaluationsV3State => ({
   name: "New Evaluation",
+  runsStartedHere: [],
   datasets: [createInitialDataset()],
   activeDatasetId: DEFAULT_TEST_DATA_ID,
   evaluators: [],

@@ -1,16 +1,17 @@
-import { Text, useDisclosure, VStack } from "@chakra-ui/react";
+import { Text, VStack } from "@chakra-ui/react";
 import type { DatasetActionParams } from "@langwatch/automations/providers/dataset";
 import type { SavedTriggerRow } from "@langwatch/automations/providers/types";
 import { Database } from "lucide-react";
 import { useEffect } from "react";
-import { AddOrEditDatasetDrawer } from "~/components/AddOrEditDatasetDrawer";
 import { DatasetSelector } from "~/components/datasets/DatasetSelector";
 import type { Dataset } from "~/generated/prisma/client";
+import { useDrawer } from "~/hooks/useDrawer";
 import {
   type DatasetColumns,
   datasetColumnsSchema,
 } from "~/server/datasets/types";
 import { api } from "~/utils/api";
+import { keepDraftOnSubFlowReturn } from "../../state/subFlow";
 import type { ClientDef, ConfigFormProps, SummaryIdentity } from "../types";
 
 /** A single dataset column's trace source. Mirrors the `traceMappingEntrySchema`
@@ -139,7 +140,7 @@ function DatasetConfigForm({
     { projectId: ctx.projectId },
     { enabled: !!ctx.projectId, refetchOnWindowFocus: false },
   );
-  const createDataset = useDisclosure();
+  const { openDrawer, goBack } = useDrawer();
 
   // Picking a dataset derives a default column mapping from that dataset's
   // columns and stores it on the slice, so the saved trigger carries a
@@ -178,30 +179,52 @@ function DatasetConfigForm({
         localStorageDatasetId={slice.datasetId}
         errors={{}}
         setValue={(_field: string, value: string) => selectDataset(value)}
-        onCreateNew={createDataset.onOpen}
+        onCreateNew={openDatasetCreation}
       />
       <Text color="fg.muted" textStyle="xs">
         Columns map to the matching trace fields automatically; refine the
         mapping from the dataset view after creating.
       </Text>
-      {/* A project with no dataset yet has nothing to pick, so the automation
-          cannot be finished without creating one from here. The new dataset's
-          own columns drive the mapping, the same as picking an existing one. */}
-      <AddOrEditDatasetDrawer
-        open={createDataset.open}
-        onClose={createDataset.onClose}
-        onSuccess={({ datasetId, columnTypes }) => {
-          createDataset.onClose();
-          void datasets.refetch();
-          onChange({
-            ...slice,
-            datasetId,
-            mapping: deriveMappingFromColumns(columnTypes),
-          });
-        }}
-      />
     </VStack>
   );
+
+  /**
+   * Hands over to the dataset drawer and returns with `goBack`, the way every
+   * drawer-to-drawer step works. The automation draft lives in a singleton
+   * store and the authoring drawer stays in the navigation stack, so the draft
+   * survives this drawer's unmount.
+   *
+   * `onClose` runs on both endings, so the return trip is written once. The
+   * picker clears its selection before handing over, so an ending without a
+   * created dataset puts the previous target back rather than leaving the
+   * section silently incomplete.
+   */
+  function openDatasetCreation() {
+    const previousDatasetId = slice.datasetId;
+    let hasCreatedDataset = false;
+
+    openDrawer("addOrEditDataset", {
+      onSuccess: ({ datasetId, columnTypes }) => {
+        hasCreatedDataset = true;
+        void datasets.refetch();
+        onChange({
+          ...slice,
+          datasetId,
+          mapping: deriveMappingFromColumns(columnTypes),
+        });
+      },
+      onClose: () => {
+        if (!hasCreatedDataset && previousDatasetId) {
+          onChange({ ...slice, datasetId: previousDatasetId });
+        }
+        // The drawer opens blank unless the return says otherwise, so that
+        // a sub-flow the user walks away from cannot seed the next
+        // automation with this draft.
+        keepDraftOnSubFlowReturn();
+        goBack();
+      },
+    });
+  }
 }
 
 const client: ClientDef<DatasetSlice> = {

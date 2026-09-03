@@ -411,7 +411,10 @@ function AutomationsPage() {
 
   const FilterValue = ({ children }: { children: React.ReactNode }) => {
     return (
-      <Box padding={1} borderRightRadius="md">
+      // minWidth 0 opts out of the flex child's min-width: auto, so a long
+      // unbreakable value (a monitor id) clamps inside the chip instead of
+      // widening it past its border.
+      <Box padding={1} borderRightRadius="md" minWidth={0} overflow="hidden">
         <HoverableBigText lineClamp={1} expandable={false}>
           {children}
         </HoverableBigText>
@@ -765,26 +768,34 @@ function AutomationsPage() {
                       <Table.Root variant="line" width="full">
                         <Table.Header>
                           <Table.Row>
-                            <Table.ColumnHeader>Name</Table.ColumnHeader>
-                            <Table.ColumnHeader>Sends</Table.ColumnHeader>
-                            <Table.ColumnHeader whiteSpace="nowrap">
+                            <Table.ColumnHeader width="20%">
+                              Name
+                            </Table.ColumnHeader>
+                            <Table.ColumnHeader width="18%">
+                              Sends
+                            </Table.ColumnHeader>
+                            <Table.ColumnHeader width="18%" whiteSpace="nowrap">
                               Schedule
                             </Table.ColumnHeader>
-                            <Table.ColumnHeader whiteSpace="nowrap">
+                            <Table.ColumnHeader width="12%" whiteSpace="nowrap">
                               <MetricHeader
                                 label="Next run"
                                 help="When this next goes out, straight from the scheduler. A paused report has no next run."
                               />
                             </Table.ColumnHeader>
-                            <Table.ColumnHeader whiteSpace="nowrap">
+                            <Table.ColumnHeader width="12%" whiteSpace="nowrap">
                               <MetricHeader
                                 label="Last run"
                                 help="The last time this was sent."
                               />
                             </Table.ColumnHeader>
-                            <Table.ColumnHeader>Delivery</Table.ColumnHeader>
-                            <Table.ColumnHeader>Active</Table.ColumnHeader>
-                            <Table.ColumnHeader />
+                            <Table.ColumnHeader width="9%">
+                              Delivery
+                            </Table.ColumnHeader>
+                            <Table.ColumnHeader width="6%">
+                              Active
+                            </Table.ColumnHeader>
+                            <Table.ColumnHeader width="5%" />
                           </Table.Row>
                         </Table.Header>
                         <Table.Body>
@@ -830,7 +841,13 @@ function AutomationsPage() {
                                       graphNameById={graphNameById}
                                     />
                                   </Table.Cell>
-                                  <Table.Cell whiteSpace="nowrap">
+                                  {/* No nowrap here: a cadence plus an IANA
+                                      zone ("Weekly · Monday 09:00
+                                      Europe/Amsterdam") is far wider than this
+                                      column, and under a fixed layout a
+                                      nowrap cell prints straight over its
+                                      neighbour instead of widening. */}
+                                  <Table.Cell>
                                     <Text textStyle="sm">
                                       {schedule?.cron
                                         ? describeSchedule(
@@ -894,29 +911,37 @@ function AutomationsPage() {
                       <Table.Root variant="line" width="full">
                         <Table.Header>
                           <Table.Row>
-                            <Table.ColumnHeader>Name</Table.ColumnHeader>
-                            <Table.ColumnHeader>Watches</Table.ColumnHeader>
-                            <Table.ColumnHeader>Delivery</Table.ColumnHeader>
-                            <Table.ColumnHeader whiteSpace="nowrap">
+                            <Table.ColumnHeader width="20%">
+                              Name
+                            </Table.ColumnHeader>
+                            <Table.ColumnHeader width="22%">
+                              Watches
+                            </Table.ColumnHeader>
+                            <Table.ColumnHeader width="16%">
+                              Delivery
+                            </Table.ColumnHeader>
+                            <Table.ColumnHeader width="12%" whiteSpace="nowrap">
                               <MetricHeader
                                 label="Last fired"
                                 help="When this automation last fired and ran its delivery. Automations on a digest schedule also show when the next bundled send is due."
                               />
                             </Table.ColumnHeader>
-                            <Table.ColumnHeader whiteSpace="nowrap">
+                            <Table.ColumnHeader width="10%" whiteSpace="nowrap">
                               <MetricHeader
                                 label="Fires (30 days)"
                                 help="Times this automation fired in the last 30 days."
                               />
                             </Table.ColumnHeader>
-                            <Table.ColumnHeader whiteSpace="nowrap">
+                            <Table.ColumnHeader width="9%" whiteSpace="nowrap">
                               <MetricHeader
                                 label="Status"
                                 help="A graph-watching automation is firing while its metric is past the threshold, and back to OK when it recovers."
                               />
                             </Table.ColumnHeader>
-                            <Table.ColumnHeader>Active</Table.ColumnHeader>
-                            <Table.ColumnHeader />
+                            <Table.ColumnHeader width="6%">
+                              Active
+                            </Table.ColumnHeader>
+                            <Table.ColumnHeader width="5%" />
                           </Table.Row>
                         </Table.Header>
                         <Table.Body>
@@ -941,9 +966,9 @@ function AutomationsPage() {
                                   <Table.Cell fontWeight="medium">
                                     {trigger.name}
                                   </Table.Cell>
-                                  <Table.Cell maxWidth="360px">
+                                  <Table.Cell>
                                     {isWatchingGraph ? (
-                                      <VStack gap={0} align="start">
+                                      <VStack gap={0} align="start" minWidth={0}>
                                         <GraphWatchCell
                                           graphName={
                                             trigger.customGraph?.name ?? null
@@ -972,16 +997,28 @@ function AutomationsPage() {
                                     )}
                                   </Table.Cell>
                                   <Table.Cell>
-                                    <VStack align="start" gap={0}>
+                                    <VStack align="start" gap={0} minWidth={0}>
                                       <Text textStyle="sm" fontWeight="medium">
                                         {triggerActionName(trigger.action)}
                                       </Text>
-                                      <Box textStyle="xs" color="fg.muted">
+                                      {/* Clamped, so it needs a reveal: the
+                                          destination (a long email, a webhook
+                                          URL) is the whole point of the cell.
+                                          Not expandable — the dialog wants a
+                                          string and these are nodes. */}
+                                      <HoverableBigText
+                                        textStyle="xs"
+                                        color="fg.muted"
+                                        width="full"
+                                        lineClamp={2}
+                                        overflowWrap="anywhere"
+                                        expandable={false}
+                                      >
                                         {actionItems(
                                           trigger.action,
                                           actionParams,
                                         )}
-                                      </Box>
+                                      </HoverableBigText>
                                       {trigger.action ===
                                         "SEND_SLACK_MESSAGE" &&
                                       actionParams.slackBotTokenSet ? (
@@ -1077,21 +1114,24 @@ function TraceFilterCell({
   applyChecks: (checks: Monitor[]) => React.ReactNode;
 }) {
   return (
-    <VStack gap={2} align="stretch">
+    <VStack gap={2} align="stretch" minWidth={0}>
       <Text textStyle="sm" fontWeight="medium" lineClamp={1}>
         Trace filter
       </Text>
       {applyChecks(checks)}
       {filterQuery ? (
         // ADR-043: a trace-subject automation shows its search query.
-        <Code
-          size="sm"
-          variant="surface"
-          whiteSpace="pre-wrap"
-          wordBreak="break-word"
-        >
-          {filterQuery}
-        </Code>
+        <HoverableBigText lineClamp={2} expandedVersion={filterQuery}>
+          <Code
+            size="sm"
+            variant="surface"
+            display="block"
+            minWidth={0}
+            wordBreak="break-word"
+          >
+            {filterQuery}
+          </Code>
+        </HoverableBigText>
       ) : filters && typeof filters === "string" && filters !== "{}" ? (
         <FilterDisplay filters={filters} hasBorder={true} />
       ) : null}

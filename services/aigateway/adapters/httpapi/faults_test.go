@@ -2,6 +2,7 @@ package httpapi
 
 import (
 	"context"
+	"encoding/json"
 	"errors"
 	"fmt"
 	"net/http"
@@ -9,6 +10,7 @@ import (
 	"strconv"
 	"strings"
 	"testing"
+	"unicode/utf8"
 
 	"github.com/prometheus/client_golang/prometheus/testutil"
 	"github.com/stretchr/testify/assert"
@@ -72,6 +74,88 @@ func TestWriteErrorLogsUpstreamRejectionAsCustomerFault(t *testing.T) {
 	assert.Equal(t, "customer", entry.ContextMap()["fault"])
 }
 
+// @scenario "A forwarded provider rejection names the provider's own reason"
+func TestWriteErrorLogsTheProviderReasonFromTheForwardedBody(t *testing.T) {
+	// The line that named nothing: the codex backend answered 400 with the
+	// parameter it refused, the client got that body verbatim, and the log said
+	// only "codex backend HTTP 400". Every codex turn in production failed for
+	// a week's worth of debugging over a sentence we already held.
+	logs := observedWriteError(t, context.Background(), &domain.UpstreamError{
+		StatusCode: 400,
+		Message:    "codex backend HTTP 400",
+		Body:       []byte(`{"detail":"Unsupported parameter: prompt_cache_retention"}`),
+	})
+	fields := requireSingleFailureLog(t, logs).ContextMap()
+	assert.Equal(t, "Unsupported parameter: prompt_cache_retention", fields["upstream_reason"])
+	assert.Equal(t, int64(400), fields["status"])
+}
+
+// @scenario "A forwarded provider rejection names the provider's own reason"
+func TestUpstreamReasonReadsEveryShapeProvidersUse(t *testing.T) {
+	cases := []struct {
+		name string
+		body string
+		want string
+	}{
+		{"openai and anthropic", `{"error":{"type":"invalid_request_error","message":"credit balance too low"}}`, "credit balance too low"},
+		{"the codex backend", `{"detail":"Unsupported parameter: prompt_cache_retention"}`, "Unsupported parameter: prompt_cache_retention"},
+		{"a bare message", `{"message":"model not found"}`, "model not found"},
+		{"a plain error string", `{"error":"invalid virtual key"}`, "invalid virtual key"},
+		{"a body with nothing in it", "", ""},
+	}
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			assert.Equal(t, tc.want, upstreamReason([]byte(tc.body)))
+		})
+	}
+}
+
+// @scenario "A forwarded provider rejection names the provider's own reason"
+func TestUpstreamReasonNeverQuotesABodyItCannotRead(t *testing.T) {
+	// An edge page or a plain-text rejection can reflect the request that
+	// caused it. Quoting one would copy a prompt, a key or personal data onto
+	// an operator's log line, so an unreadable body is described by its size.
+	//
+	// The stand-in key is assembled rather than written out: a test about not
+	// leaking a credential should not commit something shaped like one.
+	credential := "sk-" + "live-" + strings.Repeat("0", 24)
+	reflected := "Bad request: input=my patient's diagnosis is ... key=" + credential
+	reason := upstreamReason([]byte(reflected))
+	assert.NotContains(t, reason, "patient")
+	assert.NotContains(t, reason, credential)
+	assert.Equal(t, fmt.Sprintf("unrecognized upstream body, %d bytes", len(reflected)), reason)
+
+	edge := "<html>\n<body>error 1010</body>\n</html>"
+	assert.Equal(t, fmt.Sprintf("unrecognized upstream body, %d bytes", len(edge)),
+		upstreamReason([]byte(edge)),
+		"the operator still learns a body came back, and how big")
+}
+
+// @scenario "A forwarded provider rejection names the provider's own reason"
+func TestUpstreamReasonIsBoundedAndNotRepeated(t *testing.T) {
+	t.Run("when the body is longer than the cap", func(t *testing.T) {
+		long := strings.Repeat("x", upstreamReasonLimit*4)
+		reason := upstreamReason([]byte(`{"detail":"` + long + `"}`))
+		assert.Len(t, reason, upstreamReasonLimit,
+			"a provider answering at length must not take the log line over")
+		assert.True(t, strings.HasSuffix(reason, "..."), "a cut reason says it was cut")
+	})
+
+	t.Run("when the cut lands inside a multi-byte character", func(t *testing.T) {
+		long := strings.Repeat("é", upstreamReasonLimit*4)
+		reason := upstreamReason([]byte(`{"detail":"` + long + `"}`))
+		assert.LessOrEqual(t, len(reason), upstreamReasonLimit,
+			"the cap counts bytes, so a half-written character cannot push past it")
+		assert.True(t, utf8.ValidString(reason), "a cut reason stays valid UTF-8")
+	})
+
+	t.Run("when our message already states the reason", func(t *testing.T) {
+		body := []byte(`{"error":{"message":"credit balance too low"}}`)
+		assert.Empty(t, unstatedReason("credit balance too low", body))
+		assert.Equal(t, "credit balance too low", unstatedReason("provider HTTP 402", body))
+	})
+}
+
 // @scenario "A gateway-classified error is logged by its error code"
 func TestWriteErrorLogsHerrCodesWithTheirFault(t *testing.T) {
 	cases := []struct {
@@ -82,6 +166,18 @@ func TestWriteErrorLogsHerrCodesWithTheirFault(t *testing.T) {
 		{domain.ErrBudgetExceeded, "customer", zapcore.InfoLevel},
 		{domain.ErrProviderTimeout, "provider", zapcore.WarnLevel},
 		{domain.ErrInternal, "platform", zapcore.ErrorLevel},
+		// A settings mistake is the customer's to fix, and reading it as a
+		// provider fault put it on the warn line operators watch for provider
+		// outages while sending the customer to a provider status page.
+		{domain.ErrProviderCredentialInvalid, "customer", zapcore.InfoLevel},
+		{domain.ErrProviderConfigInvalid, "customer", zapcore.InfoLevel},
+		{domain.ErrProviderCredentialRejected, "customer", zapcore.InfoLevel},
+		// The host never answered — that one really is the provider's.
+		{domain.ErrProviderConnectionFailed, "provider", zapcore.WarnLevel},
+		// Nobody's fault. Attributed to the customer because that is where the
+		// action was (they left), and kept at info so a client on a flaky
+		// network never reaches the line operators watch.
+		{domain.ErrRequestAbandoned, "customer", zapcore.InfoLevel},
 	}
 	for _, tc := range cases {
 		logs := observedWriteError(t, context.Background(),
@@ -92,6 +188,39 @@ func TestWriteErrorLogsHerrCodesWithTheirFault(t *testing.T) {
 		assert.Equal(t, tc.fault, fields["fault"], "code %s", tc.code)
 		assert.Equal(t, tc.code.String(), fields["code"])
 	}
+}
+
+// @scenario "A forwarded provider rejection names the provider's own reason"
+//
+// The customer-facing message states what to do; the cause states why, and
+// only one of the two can be both actionable and safe to show a customer.
+// Bifrost splits a failure into a category ("error creating auth token
+// source") and a wrapped cause, the gateway carried only the category, and the
+// category is one string for six credential problems with different
+// fixes — which is what made a production Vertex failure undiagnosable from
+// the logs.
+func TestWriteErrorLogsTheUnderlyingCauseOfAHandledError(t *testing.T) {
+	err := herr.New(context.Background(), domain.ErrProviderCredentialInvalid,
+		herr.M{"message": "The credentials configured for this model provider were not accepted."},
+		errors.New("error creating auth token source: invalid google auth credentials: missing 'type'"))
+
+	entry := requireSingleFailureLog(t, observedWriteError(t, context.Background(), err))
+
+	assert.Equal(t, "invalid google auth credentials: missing 'type'",
+		strings.TrimPrefix(entry.ContextMap()["upstream_reason"].(string),
+			"error creating auth token source: "),
+		"the operator reads which of the credential failures this was")
+}
+
+// A cause the customer-facing message already states is not printed twice.
+func TestWriteErrorDoesNotRepeatACauseTheMessageAlreadyStates(t *testing.T) {
+	err := herr.New(context.Background(), domain.ErrProviderConfigInvalid,
+		herr.M{"message": "deployments not set for this provider"},
+		errors.New("deployments not set"))
+
+	entry := requireSingleFailureLog(t, observedWriteError(t, context.Background(), err))
+
+	assert.Nil(t, entry.ContextMap()["upstream_reason"])
 }
 
 // @scenario "An unexpected error is logged with platform fault"
@@ -211,6 +340,9 @@ func TestFaultForCodeAttributesEveryCodeTheGatewayAuthors(t *testing.T) {
 		domain.ErrNoProviderConfigured, domain.ErrEndUserRequired,
 		domain.ErrCodexSessionExpired,
 		domain.ErrProviderError, domain.ErrProviderTimeout,
+		domain.ErrProviderCredentialInvalid, domain.ErrProviderCredentialRejected,
+		domain.ErrProviderConfigInvalid, domain.ErrProviderConnectionFailed,
+		domain.ErrRequestAbandoned,
 		domain.ErrChainExhausted, domain.ErrCircuitOpen,
 	}
 	for _, code := range notOurFault {
@@ -267,6 +399,30 @@ func TestWriteErrorDoesNotCountRateLimitedRejections(t *testing.T) {
 	assert.Equal(t, 0, clientRejectSeries(t, rec))
 }
 
+func TestWriteErrorDoesNotCountAbandonedRequests(t *testing.T) {
+	// The second exclusion inside recordClientReject, and the one the fault
+	// table cannot express: request_abandoned is a customer fault, so the
+	// faultForCode gate lets it through and only the explicit exclusion stops
+	// it. A caller disconnecting is not a rejection the gateway issued, and a
+	// client on a flaky network would otherwise read on the per-key alert as
+	// one looping on malformed bodies.
+	rec := gatewaymetrics.New()
+	observedWriteError(t, meteredContext(rec, "vk_flaky_client"),
+		herr.New(context.Background(), domain.ErrRequestAbandoned, herr.M{"message": "caller left"}))
+	assert.Equal(t, 0, clientRejects(t, rec, "request_abandoned", "vk_flaky_client"))
+	assert.Equal(t, 0, clientRejectSeries(t, rec))
+}
+
+// A control for the two exclusions above: the same call path, on a code that
+// IS a rejection the gateway issued, does count. Without it both exclusion
+// tests would keep passing if recordClientReject stopped counting anything.
+func TestWriteErrorStillCountsRejectionsTheGatewayIssued(t *testing.T) {
+	rec := gatewaymetrics.New()
+	observedWriteError(t, meteredContext(rec, "vk_bad_body"),
+		herr.New(context.Background(), domain.ErrBadRequest, herr.M{"message": "no model"}))
+	assert.Equal(t, 1, clientRejects(t, rec, "bad_request", "vk_bad_body"))
+}
+
 // @scenario "A rejection on an unmetered path is still written"
 func TestWriteErrorWithoutARecorderStillAnswers(t *testing.T) {
 	var w *httptest.ResponseRecorder
@@ -292,4 +448,119 @@ func TestWriteErrorLogsCarryBundleIdentity(t *testing.T) {
 	assert.Equal(t, "project_x", fields["project_id"])
 	assert.Equal(t, "org_y", fields["organization_id"])
 	assert.Equal(t, "vk_z", fields["virtual_key_id"])
+}
+
+// Attribution has to travel WITH the error. The gateway authors most of its
+// failures rather than forwarding a provider response, so there is no upstream
+// status for a client, an agent or a support conversation to infer "whose
+// problem is this" from — and until writeError stamped it, a gateway-authored
+// error reached the client with no fault at all while the log line beside it
+// had one.
+//
+// @scenario "A gateway-classified error is logged by its error code"
+func TestWrittenErrorsCarryTheirFaultOnTheWire(t *testing.T) {
+	// The status is the whole point of the change — "a 5xx here made agent
+	// clients retry a dead credential ten times" — and it was pinned by nothing:
+	// setting provider_credential_invalid to 500 left the entire package green.
+	// A terminal 4xx for the setup failures is what stops the retry loop, so it
+	// is asserted here beside the fault rather than left to the registration.
+	cases := []struct {
+		code       herr.Code
+		fault      string
+		wantStatus int
+	}{
+		{domain.ErrProviderCredentialInvalid, "customer", http.StatusBadRequest},
+		{domain.ErrProviderConfigInvalid, "customer", http.StatusBadRequest},
+		{domain.ErrProviderCredentialRejected, "customer", http.StatusUnauthorized},
+		{domain.ErrProviderTimeout, "provider", http.StatusGatewayTimeout},
+		{domain.ErrProviderConnectionFailed, "provider", http.StatusBadGateway},
+		// 499: the caller hung up. Not 504, which would blame a provider that
+		// was answering fine.
+		{domain.ErrRequestAbandoned, "customer", 499},
+		{domain.ErrInternal, "platform", http.StatusInternalServerError},
+	}
+	for _, tc := range cases {
+		t.Run(tc.code.String(), func(t *testing.T) {
+			w, _ := observedWriteErrorResponse(t, context.Background(),
+				herr.New(context.Background(), tc.code, herr.M{"message": "boom"}))
+
+			// The envelope nests the whole failure under `error` (herr.WriteHTTP
+			// -> ErrorResponse), so reading `code`/`fault` off the top level
+			// finds nothing and would pass for an error carrying neither.
+			var body struct {
+				Error struct {
+					Code  string `json:"code"`
+					Fault string `json:"fault"`
+				} `json:"error"`
+			}
+			require.NoError(t, json.Unmarshal(w.Body.Bytes(), &body))
+			assert.Equal(t, tc.code.String(), body.Error.Code)
+			assert.Equal(t, tc.fault, body.Error.Fault)
+			assert.Equalf(t, tc.wantStatus, w.Code,
+				"%s reaches the client as this status; a retryable 5xx on a terminal failure is the retry loop this change exists to stop", tc.code)
+		})
+	}
+}
+
+// A construction site that knows better than the code-level default has said
+// so deliberately, and must not be overwritten by it.
+func TestWrittenErrorsKeepAnExplicitFault(t *testing.T) {
+	w, _ := observedWriteErrorResponse(t, context.Background(),
+		herr.New(context.Background(), domain.ErrProviderError,
+			herr.M{"message": "boom", "fault": "customer"}))
+
+	var body struct {
+		Error struct {
+			Fault string `json:"fault"`
+		} `json:"error"`
+	}
+	require.NoError(t, json.Unmarshal(w.Body.Bytes(), &body))
+	assert.Equal(t, "customer", body.Error.Fault)
+}
+
+// The seam between the two planes, asserted end to end on the bytes rather than
+// on either side's idea of them: what writeError puts on the wire is what
+// readHandledError.fromCanonicalEnvelope reads, and what the customer then sees
+// rendered. Every field below is load-bearing somewhere in that chain —
+// `tips` and `docs_url` become the remediation list and the docs link, `fault`
+// picks the log level and the headline, and `meta.provider` / `meta.model` are
+// what let the copy say "Google Vertex AI" and name the model instead of
+// "this provider".
+//
+// @scenario "A terminal provider failure tells the caller how to fix it"
+func TestWrittenErrorsCarryRemediationForTheClientToRender(t *testing.T) {
+	w, _ := observedWriteErrorResponse(t, context.Background(),
+		herr.New(context.Background(), domain.ErrProviderCredentialInvalid, herr.M{
+			"message":  "The credentials configured for this model provider were not accepted.",
+			"provider": "vertex",
+			"model":    "gemini-2.5-flash",
+		}))
+
+	var body struct {
+		Error struct {
+			Code    string         `json:"code"`
+			Message string         `json:"message"`
+			Fault   string         `json:"fault"`
+			Tips    []string       `json:"tips"`
+			DocsURL string         `json:"docs_url"`
+			Meta    map[string]any `json:"meta"`
+		} `json:"error"`
+	}
+	require.NoError(t, json.Unmarshal(w.Body.Bytes(), &body))
+
+	assert.Equal(t, "provider_credential_invalid", body.Error.Code)
+	assert.Equal(t, "customer", body.Error.Fault)
+	assert.Equal(t, "https://docs.langwatch.ai/ai-gateway/providers/vertex", body.Error.DocsURL,
+		"a Vertex failure links Vertex's own setup page")
+	assert.Contains(t, strings.Join(body.Error.Tips, "\n"), "service-account JSON document",
+		"the reader is told what a Vertex credential actually is")
+	assert.LessOrEqual(t, len(body.Error.Tips), 4,
+		"the client truncates past MAX_TIPS, so anything beyond it is written to be discarded")
+
+	assert.Equal(t, "vertex", body.Error.Meta["provider"])
+	assert.Equal(t, "gemini-2.5-flash", body.Error.Meta["model"])
+	for _, promoted := range []string{"tips", "docs_url", "fault"} {
+		assert.NotContainsf(t, body.Error.Meta, promoted,
+			"%s is promoted to a first-class field and must not also sit in meta", promoted)
+	}
 }

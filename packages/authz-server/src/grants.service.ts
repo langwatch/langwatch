@@ -1,17 +1,19 @@
 /**
  * ADR-092 §11 (setting) + §10 (offboarding) — the one write surface for
- * grants. Every mutation validates against the registry/tenancy, bumps the
- * org's authz epoch so caches and passports die on the caller's next
- * request, and emits an audit event. Storage is behind
- * AuthzGrantsRepository - the Prisma implementation (and its transactions)
- * lives in the app; ./grant-validation.ts owns what a write must satisfy,
- * and ./offboard.ts owns the offboarding transaction and its proof.
- *
- * Migration note (stage D0): the eight legacy RoleBinding write paths
- * (member add, invites, SCIM, groups, API keys, project creation, role
- * editor, better-auth hooks) route through this service as they migrate;
- * new code starts here.
+ * grants. Every mutation validates against the registry/tenancy and bumps
+ * the org's authz epoch so caches and passports die on the caller's next
+ * request. Storage is behind AuthzGrantsRepository — since delivery-plan
+ * PR 2 the app's implementation emits grants ledger commands (the actor
+ * every write carries is stamped onto the fact), and the audit trail is the
+ * ledger's insert-only subscriber (decision 17), not a direct write here.
+ * ./grant-validation.ts owns what a write must satisfy, and ./offboard.ts
+ * owns the offboarding flow and its proof.
  */
+import {
+  type Actor,
+  type LedgerActor,
+  toLedgerActor,
+} from "@langwatch/actor";
 import { type AuthzScopeRef, scopeOrganizationId } from "@langwatch/authz";
 import type { AuthzCollectorService } from "./authz-collector.service";
 import type {
@@ -20,6 +22,7 @@ import type {
   RoleBindingWrite,
 } from "./authz-grants.repository";
 import type { AuthzReadRepository } from "./authz-read.repository";
+import type { GrantEventSource } from "./ledger/facts";
 import {
   assertBindingInOrganization,
   assertRoleUsable,
@@ -33,7 +36,9 @@ import {
 } from "./grant-validation";
 import { offboardUserFromOrganization } from "./offboard";
 
-/** The app's audit writer (EE) - every grant mutation records one event. */
+/** The app's audit writer (EE). Grant mutations no longer write it
+ *  directly (decision 17: the ledger's audit subscriber owns that trail);
+ *  migrations still record their one summary entry through this. */
 export type AuthzAuditWriter = (entry: {
   userId: string;
   organizationId: string;
@@ -41,7 +46,7 @@ export type AuthzAuditWriter = (entry: {
   metadata: Record<string, unknown>;
 }) => Promise<unknown>;
 
-/** The app's redis-backed epoch bump (src/server/authz/epoch.ts). */
+/** The app's redis-backed epoch bump (src/server/app-layer/authz/epoch.ts). */
 export type AuthzEpochBumper = (args: {
   organizationId: string;
 }) => Promise<void>;
@@ -55,18 +60,35 @@ export type GrantRole =
   | { builtin: "ADMIN" | "MEMBER" | "VIEWER" }
   | { customRoleId: string };
 
-type Actor = { userId: string };
+/**
+ * Who caused a grant write.
+ *
+ * Two shapes, and the second is the whole point of the union. `{ userId }`
+ * is what every boundary holding a raw session id already passes, and it
+ * stays valid unchanged. Everything else is the shared vocabulary from
+ * `@langwatch/actor` — which is how a write with no person behind it names
+ * the surface that made it: `{ type: "system", name: "scim" }` for a
+ * directory sync, `{ type: "system", name: "joinRequests" }` for a
+ * policy-driven approval. The name comes from that package's closed
+ * `SYSTEM_ACTORS` registry, so no call site here can invent a
+ * `"system:..."` string, and `toLedgerActor` stays the one seam that
+ * serializes either half.
+ *
+ * Taking the package's union OUTRIGHT would have invalidated every existing
+ * `{ userId }` call site, which is the one thing this must not do — so it is
+ * admitted alongside rather than in place of it.
+ */
+export type GrantActor = { userId: string } | Actor;
 
 /**
  * The app-owned effect seams, composed once in the app's runtime
- * (platform/app/src/server/authz/runtime.ts): the EE audit writer, the
+ * (platform/app/src/server/app-layer/authz/runtime.ts): the EE audit writer, the
  * KSUID minter for binding ids, the redis-backed epoch bump, and the
  * collector factory the offboarding proof re-binds to its transaction
  * (injected rather than constructed so this module keeps no value import of
  * the collector).
  */
 export type GrantsServiceDeps = {
-  audit: AuthzAuditWriter;
   newBindingId: () => string;
   bumpEpoch: AuthzEpochBumper;
   collectorFor: (reader: AuthzReadRepository) => AuthzCollectorService;
@@ -78,17 +100,46 @@ export class GrantsService {
     private readonly deps: GrantsServiceDeps,
   ) {}
 
-  /** INSERT (who, role, where) — visible on the next check. */
+  /**
+   * Retire every cached snapshot for the organization, without writing a
+   * grant.
+   *
+   * Grant writes bump the epoch themselves, so this exists for the facts that
+   * change who may act WITHOUT touching a grant — today that is exactly one:
+   * enabling or disabling a membership's seat. Those are plain column writes
+   * on `OrganizationUser`, so without this a disabled member keeps answering
+   * from a cached snapshot until it ages out, and the revocation an admin
+   * just performed appears not to have happened.
+   */
+  async invalidateOrganization({
+    organizationId,
+  }: {
+    organizationId: string;
+  }): Promise<void> {
+    await this.deps.bumpEpoch({ organizationId });
+  }
+
+  /**
+   * INSERT (who, role, where) — visible on the next check.
+   *
+   * `source` is WHERE the grant came from, which the actor cannot say: a
+   * SCIM reconciler and a join-request approval both act as the platform,
+   * and only the source separates "the directory says so" from "an admin
+   * approved a request". It defaults to this service, which is what a
+   * hand-made grant through the settings UI or the REST API is.
+   */
   async attach({
     actor,
     who,
     role,
     where,
+    source = "grants-service",
   }: {
-    actor: Actor;
+    actor: GrantActor;
     who: GrantPrincipal;
     role: GrantRole;
     where: AuthzScopeRef;
+    source?: GrantEventSource;
   }): Promise<{ bindingId: string }> {
     if (where.type === "resource") {
       throw new GrantValidationError(RESOURCE_SCOPE_REJECTION, {
@@ -107,7 +158,7 @@ export class GrantsService {
 
     const row = this.bindingRow({ who, role, where, organizationId });
     try {
-      await repository.createBinding(row);
+      await repository.createBinding({ row, actor: writeActor(actor), source });
     } catch (error) {
       rethrowKnownWriteFailure(error, {
         scopeType: where.type,
@@ -115,12 +166,7 @@ export class GrantsService {
       });
     }
 
-    await this.recordAndBump({
-      actor,
-      organizationId,
-      action: "authz.grants.attach",
-      metadata: { bindingId: row.bindingId, who, role, scope: where },
-    });
+    await this.deps.bumpEpoch({ organizationId });
     return { bindingId: row.bindingId };
   }
 
@@ -131,7 +177,7 @@ export class GrantsService {
     organizationId,
     role,
   }: {
-    actor: Actor;
+    actor: GrantActor;
     bindingId: string;
     organizationId: string;
     role: GrantRole;
@@ -146,20 +192,17 @@ export class GrantsService {
     try {
       await repository.updateBindingRole({
         bindingId,
+        organizationId,
         role: "customRoleId" in role ? "CUSTOM" : role.builtin,
         customRoleId: "customRoleId" in role ? role.customRoleId : null,
+        actor: writeActor(actor),
       });
     } catch (error) {
       // A role change can collide with a sibling binding the principal
       // already holds at the same scope - same knowable failure as attach.
       rethrowKnownWriteFailure(error, { bindingId });
     }
-    await this.recordAndBump({
-      actor,
-      organizationId,
-      action: "authz.grants.update",
-      metadata: { bindingId, role },
-    });
+    await this.deps.bumpEpoch({ organizationId });
   }
 
   /** DELETE the row — access gone on the next check. */
@@ -168,7 +211,7 @@ export class GrantsService {
     bindingId,
     organizationId,
   }: {
-    actor: Actor;
+    actor: GrantActor;
     bindingId: string;
     organizationId: string;
   }): Promise<void> {
@@ -179,16 +222,15 @@ export class GrantsService {
       organizationId,
     });
     try {
-      await repository.deleteBinding({ bindingId });
+      await repository.deleteBinding({
+        bindingId,
+        organizationId,
+        actor: writeActor(actor),
+      });
     } catch (error) {
       rethrowKnownWriteFailure(error, { bindingId });
     }
-    await this.recordAndBump({
-      actor,
-      organizationId,
-      action: "authz.grants.revoke",
-      metadata: { bindingId },
-    });
+    await this.deps.bumpEpoch({ organizationId });
   }
 
   /**
@@ -203,7 +245,7 @@ export class GrantsService {
     to,
     role,
   }: {
-    actor: Actor;
+    actor: GrantActor;
     who: GrantPrincipal;
     from: AuthzScopeRef;
     to: AuthzScopeRef;
@@ -235,6 +277,7 @@ export class GrantsService {
           principal: principalWhere(who),
         },
         create: row,
+        actor: writeActor(actor),
       });
     } catch (error) {
       rethrowKnownWriteFailure(error, {
@@ -242,12 +285,7 @@ export class GrantsService {
         scopeId: to.id,
       });
     }
-    await this.recordAndBump({
-      actor,
-      organizationId,
-      action: "authz.grants.replace",
-      metadata: { who, from, to, role, bindingId: row.bindingId },
-    });
+    await this.deps.bumpEpoch({ organizationId });
     return { bindingId: row.bindingId };
   }
 
@@ -261,7 +299,7 @@ export class GrantsService {
     userId,
     organizationId,
   }: {
-    actor: Actor;
+    actor: GrantActor;
     userId: string;
     organizationId: string;
   }): Promise<{
@@ -274,25 +312,12 @@ export class GrantsService {
     const result = await offboardUserFromOrganization({
       repository: this.repository,
       collectorFor: this.deps.collectorFor,
+      actor: writeActor(actor),
       userId,
       organizationId,
     });
 
-    await this.recordAndBump({
-      actor,
-      organizationId,
-      action: "authz.grants.offboard",
-      metadata: {
-        offboardedUserId: userId,
-        removed: result.removed,
-        ownedApiKeyIds: result.needsHumanDecision.ownedApiKeys.map(
-          (key) => key.id,
-        ),
-        personalTeamIds: result.needsHumanDecision.personalTeams.map(
-          (team) => team.id,
-        ),
-      },
-    });
+    await this.deps.bumpEpoch({ organizationId });
 
     return result;
   }
@@ -319,29 +344,16 @@ export class GrantsService {
     };
   }
 
-  /**
-   * Epoch first, audit second, and deliberately not one unit of work. The
-   * bump is what makes the write VISIBLE to the next check; a failed audit
-   * must never leave a committed grant change sitting behind a stale cache,
-   * so the audit error propagates only after the bump has happened.
-   */
-  private async recordAndBump({
-    actor,
-    organizationId,
-    action,
-    metadata,
-  }: {
-    actor: Actor;
-    organizationId: string;
-    action: string;
-    metadata: Record<string, unknown>;
-  }): Promise<void> {
-    await this.deps.bumpEpoch({ organizationId });
-    await this.deps.audit({
-      userId: actor.userId,
-      organizationId,
-      action,
-      metadata,
-    });
-  }
+}
+
+/**
+ * The durable record, minted through the ONE seam that owns that mapping.
+ * The raw-id shape is lifted into the vocabulary first rather than
+ * shortcut to a literal, so both halves serialize by exactly the same rule
+ * — and a change to how an actor is stored stays a change in one file.
+ */
+function writeActor(actor: GrantActor): LedgerActor {
+  return toLedgerActor(
+    "userId" in actor ? { type: "user", id: actor.userId } : actor,
+  );
 }

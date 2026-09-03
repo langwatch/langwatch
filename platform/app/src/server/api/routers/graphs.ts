@@ -1,11 +1,15 @@
 import { TRPCError } from "@trpc/server";
 import { nanoid } from "nanoid";
 import { z } from "zod";
-import { BUILDER_CHART_KIND } from "~/server/analytics/chartKinds";
+import { allocateNextGridRow } from "~/server/analytics/allocateNextGridRow";
+import {
+  BUILDER_CHART_KIND,
+  WORKBENCH_SQL_CHART_KIND,
+} from "~/server/analytics/chartKinds";
 import { dashboardBelongsToProject } from "~/server/analytics/dashboardBelongsToProject";
+import { placeableKindFilter } from "~/server/analytics/placeableKindFilter";
 import { redactActionParamsFor } from "~/server/app-layer/automations/providers/registry";
 import { type FilterField, filterFieldsEnum } from "../../filters/types";
-import { checkProjectPermission } from "../rbac";
 import { createTRPCRouter, protectedProcedure } from "../trpc";
 
 /**
@@ -35,7 +39,7 @@ export const graphsRouter = createTRPCRouter({
         rowSpan: z.number().min(1).max(2).optional(),
       }),
     )
-    .use(checkProjectPermission("analytics:create"))
+    .permission("analytics:create")
     .mutation(async ({ ctx, input }) => {
       const graph = JSON.parse(input.graph);
 
@@ -53,19 +57,15 @@ export const graphsRouter = createTRPCRouter({
         });
       }
 
-      // If no gridRow provided, find the next available row.
-      //
-      // Deliberately not filtered by `kind`: the grid is one shared space, so
-      // the next free row has to account for every chart occupying it. Scoping
-      // this to builder rows would place a new chart on top of a saved
-      // workbench chart the moment those gain dashboard placement.
+      // If no gridRow provided, find the next available row. Shared with
+      // `placeChart` so the two writers that can put a chart on this grid
+      // never disagree about which row is free.
       let gridRow = input.gridRow;
       if (gridRow === undefined && input.dashboardId) {
-        const lastGraph = await ctx.prisma.customGraph.findFirst({
-          where: { dashboardId: input.dashboardId, projectId: input.projectId },
-          orderBy: { gridRow: "desc" },
+        gridRow = await allocateNextGridRow(ctx.prisma, {
+          dashboardId: input.dashboardId,
+          projectId: input.projectId,
         });
-        gridRow = (lastGraph?.gridRow ?? -1) + 1;
       }
 
       const customGraph = await ctx.prisma.customGraph.create({
@@ -97,15 +97,29 @@ export const graphsRouter = createTRPCRouter({
         dashboardId: z.string().optional(),
       }),
     )
-    .use(checkProjectPermission("analytics:view"))
+    .permission("analytics:view")
     .query(async ({ input, ctx }) => {
       const { projectId, dashboardId } = input;
       const prisma = ctx.prisma;
 
+      // Placed workbench charts join the grid, but only when reading one
+      // dashboard. The unscoped read (`dashboardId` absent) is the chart
+      // *picker* the builder offers, and a saved workbench chart is not
+      // something a builder graph can be composed from — including them there
+      // would offer a member a chart the builder cannot open.
+      //
+      // Gated on the workbench flag so a deployment with the feature off sees
+      // exactly the grid it saw before, even if rows exist from a trial —
+      // the same gate every placement mutation below applies, so what the
+      // grid shows and what a card action may touch cannot disagree.
+      const placeable = dashboardId
+        ? await placeableKindFilter({ prisma, projectId })
+        : { kind: BUILDER_CHART_KIND };
+
       const graphs = await prisma.customGraph.findMany({
         where: {
           projectId,
-          kind: BUILDER_CHART_KIND,
+          ...placeable,
           ...(dashboardId ? { dashboardId } : {}),
         },
         orderBy: dashboardId
@@ -116,12 +130,24 @@ export const graphsRouter = createTRPCRouter({
         },
       });
 
+      // A workbench row's `graph` column is its definition — `{ sql,
+      // parameters, vegaLiteSpec }`. The grid does not draw from it: the
+      // widget reads its own chart through the saved-chart service, which
+      // parses the versioned schema and refuses a row this build cannot read.
+      // Sending it here too would put a member's stored SQL in the dashboard
+      // payload for no one to use.
+      const withoutWorkbenchDefinitions = graphs.map((graph) =>
+        graph.kind === WORKBENCH_SQL_CHART_KIND
+          ? { ...graph, graph: null }
+          : graph,
+      );
+
       // The included trigger row carries provider secrets in actionParams
       // (the encrypted Slack bot token per ADR-041, webhook header values
       // per ADR-040 §3) — strip them per the trigger's own action before the
       // rows leave the server, the same registry-driven redaction the
       // automations router applies on its read paths.
-      return graphs.map((graph) =>
+      return withoutWorkbenchDefinitions.map((graph) =>
         graph.trigger
           ? {
               ...graph,
@@ -138,27 +164,37 @@ export const graphsRouter = createTRPCRouter({
     }),
   delete: protectedProcedure
     .input(z.object({ projectId: z.string(), id: z.string() }))
-    .use(checkProjectPermission("analytics:delete"))
+    .permission("analytics:delete")
     .mutation(async ({ ctx, input }) => {
       const { id } = input;
       const prisma = ctx.prisma;
 
+      // Removing a card removes the row, whichever kind it is — a member who
+      // deletes a workbench widget from a dashboard means the widget, and
+      // leaving the row behind would strand a chart on no dashboard. Scoped by
+      // the same flag the read is: with the workbench off a `workbench_sql`
+      // row is not on this grid, so deleting one by id answers not-found.
+      const placeable = await placeableKindFilter({
+        prisma,
+        projectId: input.projectId,
+      });
+
       const graph = await prisma.customGraph.findUnique({
-        where: { id, projectId: input.projectId, kind: BUILDER_CHART_KIND },
+        where: { id, projectId: input.projectId, ...placeable },
       });
       if (!graph) {
         throw new TRPCError({ code: "NOT_FOUND", message: "Graph not found" });
       }
 
       await prisma.customGraph.delete({
-        where: { id, projectId: input.projectId, kind: BUILDER_CHART_KIND },
+        where: { id, projectId: input.projectId, ...placeable },
       });
 
       return graph;
     }),
   getById: protectedProcedure
     .input(z.object({ projectId: z.string(), id: z.string() }))
-    .use(checkProjectPermission("analytics:view"))
+    .permission("analytics:view")
     .query(async ({ ctx, input }) => {
       const { id } = input;
       const prisma = ctx.prisma;
@@ -248,7 +284,7 @@ export const graphsRouter = createTRPCRouter({
         filterParams: z.any().optional(),
       }),
     )
-    .use(checkProjectPermission("analytics:update"))
+    .permission("analytics:update")
     .mutation(async ({ ctx, input }) => {
       const prisma = ctx.prisma;
 
@@ -284,13 +320,23 @@ export const graphsRouter = createTRPCRouter({
         rowSpan: z.number().min(1).max(2),
       }),
     )
-    .use(checkProjectPermission("analytics:update"))
+    .permission("analytics:update")
     .mutation(async ({ ctx, input }) => {
+      // Placement, not definition: where a card sits on the grid is a fact
+      // about the dashboard rather than about the chart's shape, so both kinds
+      // are movable — while the workbench is on for this project. The
+      // kind-scoped reads that matter are the ones that *interpret* `graph` —
+      // `getById` and `update` below — and they stay builder-only.
+      const placeable = await placeableKindFilter({
+        prisma: ctx.prisma,
+        projectId: input.projectId,
+      });
+
       return ctx.prisma.customGraph.update({
         where: {
           id: input.graphId,
           projectId: input.projectId,
-          kind: BUILDER_CHART_KIND,
+          ...placeable,
         },
         data: {
           gridColumn: input.gridColumn,
@@ -316,14 +362,19 @@ export const graphsRouter = createTRPCRouter({
         ),
       }),
     )
-    .use(checkProjectPermission("analytics:update"))
+    .permission("analytics:update")
     .mutation(async ({ ctx, input }) => {
+      const placeable = await placeableKindFilter({
+        prisma: ctx.prisma,
+        projectId: input.projectId,
+      });
+
       const updates = input.layouts.map((layout) =>
         ctx.prisma.customGraph.update({
           where: {
             id: layout.graphId,
             projectId: input.projectId,
-            kind: BUILDER_CHART_KIND,
+            ...placeable,
           },
           data: {
             gridColumn: layout.gridColumn,

@@ -205,7 +205,7 @@ vi.mock("~/utils/api", async () => {
   // pull their own tRPC queries these tests do not care about; the shared
   // harness answers every one of them inert. Only the langy surface and the
   // model picker below are explicit.
-  const { createTrpcUtils, withFallback } = await import(
+  const { createTrpcUtils, modelProviderRouter, withFallback } = await import(
     "./support/langyApiMock"
   );
 
@@ -491,6 +491,9 @@ vi.mock("~/utils/api", async () => {
           isPending: false,
         }),
       },
+      warmWorker: {
+        useMutation: () => ({ mutate: () => undefined }),
+      },
       stopTurn: {
         useMutation: () => ({
           mutateAsync: async (variables: {
@@ -524,23 +527,7 @@ vi.mock("~/utils/api", async () => {
     // no-ops that only need to EXIST at render time.
     useUtils: () => trpcUtils,
     useContext: () => trpcUtils,
-    modelProvider: {
-      getResolvedDefault: {
-        // A resolved model is configured: these tests exercise conversation
-        // history on a usable Langy, so langyNeedsModel must be false (else
-        // LangySidebar renders the inline model-setup screen over the panel).
-        useQuery: () => ({
-          data: { model: "openai/gpt-5-mini" },
-          isLoading: false,
-        }),
-      },
-      listAllForProjectForFrontend: {
-        useQuery: () => ({
-          data: { providers: [] },
-          isLoading: false,
-        }),
-      },
-    },
+    modelProvider: modelProviderRouter(),
     virtualKeys: {
       list: {
         useQuery: () => ({ data: undefined, isLoading: false }),

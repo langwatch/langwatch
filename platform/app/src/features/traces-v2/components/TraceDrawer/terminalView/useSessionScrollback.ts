@@ -1,7 +1,10 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import type { TranscriptEntry } from "~/server/app-layer/traces/coding-agent-transcript.derivation";
 import { api } from "~/utils/api";
-import { useConversationContext } from "../../../hooks/useConversationContext";
+import {
+  type ConversationTurn,
+  useConversationContext,
+} from "../../../hooks/useConversationContext";
 import {
   type LoadedTurn,
   mergeSessionTurns,
@@ -28,14 +31,17 @@ interface TurnTarget {
 /**
  * What the top of the screen is currently offering.
  *
+ * - `pending`: the session's turn list is still being read, so whether
+ *   anything sits above this turn is not yet known.
  * - `hidden`: the trace belongs to no session, so there is nothing above it.
- * - `available`: earlier turns exist and are one gesture away.
+ * - `available`: earlier turns exist and are ready to load.
  * - `loading`: one is being read.
  * - `error`: the read failed and can be retried.
  * - `start`: the oldest loaded turn is the session's first.
  * - `unavailable`: the session is longer than the turn list can reach.
  */
 export type ScrollbackStatus =
+  | "pending"
   | "hidden"
   | "available"
   | "loading"
@@ -51,6 +57,16 @@ export interface SessionScrollback {
   status: ScrollbackStatus;
   /** Turns of the session still older than the oldest one loaded. */
   earlierCount: number;
+  /**
+   * Totals of those unloaded earlier turns, from the session's turn list, so
+   * the bottom bar can count the whole session up to the reader's position.
+   * Loading a turn moves its share from here into the loaded entries, so the
+   * sum the bar shows stays put. Null when the trace has no walkable session,
+   * and a field is null when one of those turns does not carry it.
+   */
+  earlierTotals: EarlierTotals | null;
+  /** When the session's first turn started; null without a walkable session. */
+  sessionStartAtMs: number | null;
   loadEarlier: () => void;
 }
 
@@ -122,16 +138,20 @@ function deriveStatus({
   hasSession,
   conversationId,
   turnCount,
+  isTurnListLoading,
   phase,
   earlierCount,
 }: {
   hasSession: boolean;
   conversationId: string | null;
   turnCount: number;
+  /** The session's turn list read is still in flight. */
+  isTurnListLoading: boolean;
   phase: Ledger["phase"];
   earlierCount: number;
 }): ScrollbackStatus {
   if (!hasSession) {
+    if (conversationId && isTurnListLoading) return "pending";
     return conversationId && turnCount >= CONVERSATION_TURN_CAP
       ? "unavailable"
       : "hidden";
@@ -281,6 +301,115 @@ interface SessionScrollbackInput {
 }
 
 /**
+ * Where the opened turn sits in the session, and how far back the loaded
+ * window already reaches.
+ *
+ * A turn the session does not list is a turn with no history to walk, so it
+ * has no position and nothing above it, whatever the ledger holds.
+ */
+function useSessionPosition({
+  turns,
+  traceId,
+  conversationId,
+  loadedCount,
+}: {
+  turns: ConversationTurn[];
+  traceId: string;
+  conversationId: string | null;
+  /** Earlier turns already on the ledger. */
+  loadedCount: number;
+}): { openedIndex: number; hasSession: boolean; oldestLoadedIndex: number } {
+  const openedIndex = useMemo(
+    () => turns.findIndex((turn) => turn.traceId === traceId),
+    [turns, traceId],
+  );
+  const hasSession = Boolean(conversationId) && openedIndex >= 0;
+  return {
+    openedIndex,
+    hasSession,
+    oldestLoadedIndex: hasSession ? Math.max(openedIndex - loadedCount, 0) : 0,
+  };
+}
+
+/**
+ * The opened turn as a ledger entry, stable while its parts are, so the merge
+ * below it does not rebuild on every render.
+ */
+function useOpenedTurn({
+  traceId,
+  timestamp,
+  entries,
+  toolSpans,
+}: LoadedTurn): LoadedTurn {
+  return useMemo(
+    () => ({ traceId, timestamp, entries, toolSpans }),
+    [traceId, timestamp, entries, toolSpans],
+  );
+}
+
+/**
+ * What the bottom bar counts from the turns above the loaded window. A field is
+ * null when one of those turns does not carry it, which is not the same as
+ * zero: the session total for that field cannot be stated at all, and the bar
+ * leaves it out rather than reporting a sum that is short by the turns it could
+ * not read. Cost is null for a reader without `cost:view`, since the turn list
+ * carries no spend for them.
+ */
+export type EarlierTotals = {
+  tokens: number | null;
+  costUsd: number | null;
+};
+
+/**
+ * The sum, or null when one of the values is absent. A turn that carries no
+ * total is not a turn that counted for nothing, so a sum that skips it is not a
+ * total at all.
+ */
+function sumOrNull(values: (number | null | undefined)[]): number | null {
+  let sum = 0;
+  for (const value of values) {
+    if (value == null) return null;
+    sum += value;
+  }
+  return sum;
+}
+
+/**
+ * Where the bottom bar counts from: the totals of the turns above the loaded
+ * window, and the session's own start.
+ *
+ * Each turn's totals come from the session's turn list, so no transcript read
+ * is needed, and loading a turn moves its share from this sum into the loaded
+ * entries: the bar's total at a fixed position never moves.
+ */
+function useSessionBaseline({
+  hasSession,
+  turns,
+  oldestLoadedIndex,
+}: {
+  hasSession: boolean;
+  turns: ConversationTurn[];
+  oldestLoadedIndex: number;
+}): {
+  earlierTotals: EarlierTotals | null;
+  sessionStartAtMs: number | null;
+} {
+  const earlierTotals = useMemo(() => {
+    if (!hasSession) return null;
+    const earlier = turns.slice(0, oldestLoadedIndex);
+    return {
+      tokens: sumOrNull(earlier.map((turn) => turn.totalTokens)),
+      costUsd: sumOrNull(earlier.map((turn) => turn.totalCost)),
+    };
+  }, [hasSession, turns, oldestLoadedIndex]);
+
+  return {
+    earlierTotals,
+    sessionStartAtMs: hasSession ? (turns[0]?.timestamp ?? null) : null,
+  };
+}
+
+/**
  * The session behind the opened turn, read backwards on demand.
  *
  * The opened turn is always the newest thing on screen and is never re-read
@@ -295,50 +424,52 @@ export function useSessionScrollback({
   openedTranscript,
   openedToolSpans,
 }: SessionScrollbackInput): SessionScrollback {
-  const { turns } = useConversationContext(conversationId, traceId);
+  const { turns, isLoading: isTurnListLoading } = useConversationContext(
+    conversationId,
+    traceId,
+  );
   const key = `${projectId}|${traceId}|${conversationId ?? ""}`;
   const { current, loadTurn } = useTurnLedger({ key, projectId });
 
-  const openedIndex = useMemo(
-    () => turns.findIndex((turn) => turn.traceId === traceId),
-    [turns, traceId],
-  );
-  // A turn the session does not list is a turn with no history to walk, so it
-  // has no position and nothing above it, whatever the ledger holds.
-  const hasSession = Boolean(conversationId) && openedIndex >= 0;
-  const oldestLoadedIndex = hasSession
-    ? Math.max(openedIndex - current.turns.length, 0)
-    : 0;
+  const { openedIndex, hasSession, oldestLoadedIndex } = useSessionPosition({
+    turns,
+    traceId,
+    conversationId,
+    loadedCount: current.turns.length,
+  });
   const earlierCount = oldestLoadedIndex;
 
   const status = deriveStatus({
     hasSession,
     conversationId,
     turnCount: turns.length,
+    isTurnListLoading,
     phase: current.phase,
     earlierCount,
   });
 
-  const openedTimestamp =
-    turns[openedIndex]?.timestamp ??
-    occurredAtMs ??
-    openedTranscript[0]?.atMs ??
-    0;
-  const opened = useMemo<LoadedTurn>(
-    () => ({
-      traceId,
-      timestamp: openedTimestamp,
-      entries: openedTranscript,
-      toolSpans: openedToolSpans,
-    }),
-    [traceId, openedTimestamp, openedTranscript, openedToolSpans],
-  );
+  const opened = useOpenedTurn({
+    traceId,
+    timestamp:
+      turns[openedIndex]?.timestamp ??
+      occurredAtMs ??
+      openedTranscript[0]?.atMs ??
+      0,
+    entries: openedTranscript,
+    toolSpans: openedToolSpans,
+  });
 
   const merged = useMergedTurns({
     current,
     opened,
     turnCount: turns.length,
     firstTurnNumber: oldestLoadedIndex + 1,
+  });
+
+  const { earlierTotals, sessionStartAtMs } = useSessionBaseline({
+    hasSession,
+    turns,
+    oldestLoadedIndex,
   });
 
   const loadEarlier = useCallback(() => {
@@ -351,14 +482,20 @@ export function useSessionScrollback({
 
   return useMemo(
     () => ({
-      entries: merged.entries,
-      rowKeys: merged.rowKeys,
-      toolSpans: merged.toolSpans,
-      turnDividers: merged.turnDividers,
+      ...merged,
       status,
       earlierCount,
+      earlierTotals,
+      sessionStartAtMs,
       loadEarlier,
     }),
-    [merged, status, earlierCount, loadEarlier],
+    [
+      merged,
+      status,
+      earlierCount,
+      earlierTotals,
+      sessionStartAtMs,
+      loadEarlier,
+    ],
   );
 }

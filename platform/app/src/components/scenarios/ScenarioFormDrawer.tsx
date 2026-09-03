@@ -11,6 +11,7 @@ import {
   VStack,
 } from "@chakra-ui/react";
 import { generate } from "@langwatch/ksuid";
+import { History, Lock, Play } from "lucide-react";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import {
   type FieldErrors,
@@ -18,10 +19,12 @@ import {
   useFormState,
   useWatch,
 } from "react-hook-form";
+import { CaseVersionChip } from "~/components/agent-testing/shared/CaseVersionChip";
 import {
   applyHandledErrorToForm,
   FormServerError,
   HandledErrorState,
+  readHandledError,
   showErrorToast,
 } from "~/features/errors";
 import type { Scenario } from "~/generated/prisma/client";
@@ -53,6 +56,7 @@ import {
   ScenarioForm,
   type ScenarioFormData,
   type ScenarioInitialData,
+  type ScenarioTestSuiteOption,
 } from "./ScenarioForm";
 import { ScenarioParametersDialog } from "./ScenarioParametersDialog";
 import { ScenarioRunModelDialog } from "./ScenarioRunModelDialog";
@@ -63,7 +67,30 @@ export type ScenarioFormDrawerProps = {
   onClose?: () => void;
   onSuccess?: (scenario: Scenario) => void;
   scenarioId?: string;
+  /**
+   * Which interface opened the editor. "agent-testing" adds the line under
+   * the title, the test suite field and the plain Save button, and stays on
+   * the page after a run starts. Absent keeps the editor as v1 draws it.
+   */
+  variant?: ScenarioEditorVariant;
+  /** The suite a new scenario starts in, so a scenario made inside a suite lands in it. */
+  testSuiteId?: string | null;
+  /**
+   * Called instead of leaving for the v1 simulations page once a run starts.
+   * Agent Testing stays where it is and opens the run in a drawer.
+   */
+  onRunStarted?: (params: { scenarioId: string; batchRunId: string }) => void;
 } & Partial<ScenarioInitialData>;
+
+export type ScenarioEditorVariant = "agent-testing";
+
+/** What the Agent Testing editor says a scenario is for. */
+export const AGENT_TESTING_EDITOR_DESCRIPTION =
+  "Test your agent on a critical path or edge case";
+
+/** Why Run is off on a scenario that has never run. */
+export const NO_REMEMBERED_TARGET_HINT =
+  "Run this scenario from the table first, to choose the agent it runs against.";
 
 /**
  * Model overrides chosen in the run dialog. Omitted on a plain save so the
@@ -74,6 +101,11 @@ type ModelOverrides = {
   simulatorModel: string | null;
   judgeModel: string | null;
 };
+
+/** What a save without a run confirms. Every surface calls the record a scenario. */
+function savedToastTitle({ isUpdate }: { isUpdate: boolean }): string {
+  return isUpdate ? "Scenario updated" : "Scenario created";
+}
 
 /**
  * URL-based wrapper for ScenarioFormDrawer.
@@ -89,7 +121,13 @@ export function ScenarioFormDrawerFromUrl(
   // passed.  Fall back to checking the URL so the drawer actually opens.
   const open = props.open ?? drawerOpen("scenarioEditor");
   return (
-    <ScenarioFormDrawer {...props} open={open} scenarioId={params.scenarioId} />
+    <ScenarioFormDrawer
+      {...props}
+      open={open}
+      scenarioId={params.scenarioId}
+      testSuiteId={props.testSuiteId ?? params.testSuiteId}
+      variant={props.variant ?? (params.variant as ScenarioEditorVariant)}
+    />
   );
 }
 
@@ -120,6 +158,13 @@ export function ScenarioFormDrawer(props: ScenarioFormDrawerProps) {
     projectSlug: project?.slug,
   });
   const scenarioId = props.scenarioId;
+  const isAgentTesting = props.variant === "agent-testing";
+
+  // A save that lost a race: somebody else stored a newer version while this
+  // form held an older one. The editor offers the reload; nothing is written.
+  const [staleVersion, setStaleVersion] = useState<number | null>(null);
+  // Remounts the form after a stale reload so it reads the fresh record.
+  const [reloadNonce, setReloadNonce] = useState(0);
 
   // Target selection with localStorage persistence
   const { target: persistedTarget, setTarget: persistTarget } =
@@ -164,7 +209,6 @@ export function ScenarioFormDrawer(props: ScenarioFormDrawerProps) {
         title: "Agent created",
         description: `"${agent.name}" is now selected as the target.`,
         type: "success",
-        meta: { closable: true },
       });
     };
     setFlowCallbacks("agentHttpEditor", { onSave: onAgentSaved });
@@ -206,6 +250,10 @@ export function ScenarioFormDrawer(props: ScenarioFormDrawerProps) {
   // stays as it is rather than being replaced by an error with their edits
   // inside it.
   const hasReadFailed = !!scenarioId && isScenarioReadFailed && !scenario;
+  // The version this form is editing. A save sends it as the expected
+  // version, so a save over somebody else's newer save is refused rather
+  // than written.
+  const loadedVersion = scenario?.version ?? null;
   const createMutation = api.scenarios.create.useMutation({
     onSuccess: (data: Scenario) => {
       void utils.scenarios.getAll.invalidate({ projectId: project?.id ?? "" });
@@ -227,6 +275,14 @@ export function ScenarioFormDrawer(props: ScenarioFormDrawerProps) {
   const updateMutation = api.scenarios.update.useMutation({
     onSuccess: (data: Scenario) => {
       void utils.scenarios.getAll.invalidate({ projectId: project?.id ?? "" });
+      // The saved record goes into the cache before the refetch, not after
+      // it. `loadedVersion` reads from here, and a person who saves twice in
+      // a row would otherwise send the version of the save before and be
+      // refused for a conflict with their own write.
+      utils.scenarios.getById.setData(
+        { projectId: project?.id ?? "", id: data.id },
+        data,
+      );
       void utils.scenarios.getById.invalidate({
         projectId: project?.id ?? "",
         id: data.id,
@@ -234,6 +290,12 @@ export function ScenarioFormDrawer(props: ScenarioFormDrawerProps) {
       props.onSuccess?.(data);
     },
     onError: (error) => {
+      const handled = readHandledError(error);
+      if (handled?.code === "scenario_stale_version") {
+        const current = handled.meta.currentVersion;
+        setStaleVersion(typeof current === "number" ? current : 0);
+        return;
+      }
       if (
         formInstance &&
         applyHandledErrorToForm({
@@ -287,6 +349,12 @@ export function ScenarioFormDrawer(props: ScenarioFormDrawerProps) {
           id: scenarioId,
           ...data,
           ...(models ?? {}),
+          // Only the Agent Testing editor guards against a lost race; the
+          // other write surfaces save over whatever is there, as they always
+          // did.
+          ...(isAgentTesting && loadedVersion !== null
+            ? { expectedVersion: loadedVersion }
+            : {}),
         });
       } catch {
         // Error toast already surfaced by updateMutation.onError; return null
@@ -294,7 +362,7 @@ export function ScenarioFormDrawer(props: ScenarioFormDrawerProps) {
         return null;
       }
     },
-    [updateMutation],
+    [updateMutation, isAgentTesting, loadedVersion],
   );
 
   const createScenario = useCallback(
@@ -382,7 +450,6 @@ export function ScenarioFormDrawer(props: ScenarioFormDrawerProps) {
           description:
             "Please select a prompt or agent to run the scenario against.",
           type: "warning",
-          meta: { closable: true },
         });
         return;
       }
@@ -412,13 +479,12 @@ export function ScenarioFormDrawer(props: ScenarioFormDrawerProps) {
               toaster.create({
                 title: "Configure scenario mappings",
                 description:
-                  'Map at least one scenario input — "input" or "messages" — to an agent input before running this workflow agent.',
+                  'Map at least one scenario input, "input" or "messages", to an agent input before running this workflow agent.',
                 type: "warning",
                 action: {
                   label: "Open agent editor",
                   onClick: openAgentEditor,
                 },
-                meta: { closable: true },
               });
               // Auto-open the editor now; the toast action above is the manual
               // fallback if this auto-open races, is dismissed, or fails.
@@ -457,6 +523,7 @@ export function ScenarioFormDrawer(props: ScenarioFormDrawerProps) {
     ],
   );
 
+  const onRunStarted = props.onRunStarted;
   const confirmRunWithModels = useCallback(async () => {
     const form = formInstance;
     const target = pendingRunTarget;
@@ -491,6 +558,12 @@ export function ScenarioFormDrawer(props: ScenarioFormDrawerProps) {
         // Fire the run — no callbacks, simulations page picks up via SSE
         void runScenario({ scenarioId: savedScenario.id, target, batchRunId });
 
+        // Agent Testing stays on its page and opens the run in a drawer.
+        if (onRunStarted) {
+          onRunStarted({ scenarioId: savedScenario.id, batchRunId });
+          return;
+        }
+
         // Navigate to simulations — drawer closes implicitly via route change.
         // Intentionally NOT calling onClose() here: closeDrawer() does its
         // own router.push to strip drawer.* params, which would race with
@@ -513,6 +586,7 @@ export function ScenarioFormDrawer(props: ScenarioFormDrawerProps) {
     router,
     runSimulatorModel,
     runJudgeModel,
+    onRunStarted,
   ]);
   const handleSaveWithoutRunning = useCallback(async () => {
     const form = formInstance;
@@ -522,9 +596,8 @@ export function ScenarioFormDrawer(props: ScenarioFormDrawerProps) {
         const saved = await handleSave({ data, skipTransition: true });
         if (saved) {
           toaster.create({
-            title: scenario ? "Scenario updated" : "Scenario created",
+            title: savedToastTitle({ isUpdate: !!scenario }),
             type: "success",
-            meta: { closable: true },
           });
           onClose();
         }
@@ -532,7 +605,14 @@ export function ScenarioFormDrawer(props: ScenarioFormDrawerProps) {
         // Error already handled by mutation onError callback
       }
     }, openParametersOnInvalid)();
-  }, [handleSave, scenario, formInstance, onClose, openParametersOnInvalid]);
+  }, [
+    handleSave,
+    scenario,
+    formInstance,
+    onClose,
+    openParametersOnInvalid,
+    isAgentTesting,
+  ]);
   const setFormRef = useCallback(
     (form: UseFormReturn<ScenarioFormData> | null) => {
       setFormInstance(form);
@@ -555,8 +635,12 @@ export function ScenarioFormDrawer(props: ScenarioFormDrawerProps) {
         parameters: parseScenarioParameterDefinitions(scenario.parameters),
       };
     }
+    // A new scenario made from inside a test suite starts filed in it.
+    if (props.testSuiteId !== undefined && props.testSuiteId !== null) {
+      return { ...(initialFormData ?? {}), testSuiteId: props.testSuiteId };
+    }
     return initialFormData ?? undefined;
-  }, [scenario, initialFormData]);
+  }, [scenario, initialFormData, props.testSuiteId]);
 
   return (
     <Drawer.Root
@@ -570,9 +654,25 @@ export function ScenarioFormDrawer(props: ScenarioFormDrawerProps) {
           {/* Being pointed at a scenario is enough to be editing one. Keying
               this off the loaded record alone retitled the drawer "Create
               Scenario" for the whole of the read. */}
-          <Heading size="md">
-            {scenarioId || scenario ? "Edit Scenario" : "Create Scenario"}
-          </Heading>
+          <VStack align="start" gap={1}>
+            {isAgentTesting ? (
+              <HStack gap={2}>
+                <Heading size="md">
+                  {scenarioId || scenario ? "Edit scenario" : "New scenario"}
+                </Heading>
+                <CaseVersionChip version={scenario?.version} />
+              </HStack>
+            ) : (
+              <Heading size="md">
+                {scenarioId || scenario ? "Edit Scenario" : "Create Scenario"}
+              </Heading>
+            )}
+            {isAgentTesting && (
+              <Text fontSize="sm" color="fg.muted">
+                {AGENT_TESTING_EDITOR_DESCRIPTION}
+              </Text>
+            )}
+          </VStack>
         </Drawer.Header>
         <Drawer.Body padding={0} overflow="hidden">
           <Grid templateColumns="1fr 320px" height="full" overflow="hidden">
@@ -593,17 +693,40 @@ export function ScenarioFormDrawer(props: ScenarioFormDrawerProps) {
               ) : (
                 <>
                   {formInstance && <FormServerError form={formInstance} />}
-                  <ScenarioForm
-                    key={scenarioId ?? "new"}
-                    defaultValues={defaultValues}
-                    formRef={setFormRef}
-                  />
+                  {staleVersion !== null && (
+                    <StaleVersionNotice
+                      currentVersion={staleVersion}
+                      onReload={() => {
+                        void (async () => {
+                          await refetchScenario();
+                          setStaleVersion(null);
+                          setReloadNonce((nonce) => nonce + 1);
+                        })();
+                      }}
+                    />
+                  )}
+                  {isAgentTesting ? (
+                    <ScenarioFormWithSuites
+                      key={`${scenarioId ?? "new"}-${reloadNonce}`}
+                      defaultValues={defaultValues}
+                      formRef={setFormRef}
+                    />
+                  ) : (
+                    <ScenarioForm
+                      key={`${scenarioId ?? "new"}-${reloadNonce}`}
+                      defaultValues={defaultValues}
+                      formRef={setFormRef}
+                    />
+                  )}
                 </>
               )}
             </GridItem>
             {/* Right: Help Sidebar */}
             <GridItem overflowY="auto" padding={4} bg="bg.muted">
-              <ScenarioEditorSidebar form={formInstance} />
+              <ScenarioEditorSidebar
+                form={formInstance}
+                variant={props.variant}
+              />
             </GridItem>
           </Grid>
         </Drawer.Body>
@@ -619,6 +742,21 @@ export function ScenarioFormDrawer(props: ScenarioFormDrawerProps) {
             </HStack>
           )}
           <HStack gap={2} flexShrink={0}>
+            {isAgentTesting && scenarioId && (
+              <Button
+                variant="ghost"
+                size="sm"
+                onClick={() =>
+                  openDrawer("scenarioVersionHistory", {
+                    urlParams: { scenarioId },
+                  })
+                }
+                data-testid="editor-history"
+              >
+                <History size={14} />
+                History
+              </Button>
+            )}
             <Button variant="outline" size="sm" onClick={onClose}>
               Cancel
             </Button>
@@ -626,7 +764,34 @@ export function ScenarioFormDrawer(props: ScenarioFormDrawerProps) {
                 and nothing to save at all once the read has failed: the body
                 is an error state, not a form. `handleSave` refuses either way,
                 so this is what says so rather than what enforces it. */}
-            {!hasReadFailed && (
+            {/* Agent Testing reads three plain buttons: Cancel, Save, Run.
+                The Run button uses the agent this scenario last ran against,
+                which the run dialog on the table remembers. */}
+            {!hasReadFailed && isAgentTesting && (
+              <>
+                <Button
+                  variant="outline"
+                  size="sm"
+                  loading={isSubmitting}
+                  onClick={() => void handleSaveWithoutRunning()}
+                >
+                  Save
+                </Button>
+                <Button
+                  colorPalette="blue"
+                  size="sm"
+                  loading={isSubmitting}
+                  disabled={!selectedTarget || isHydrating}
+                  title={selectedTarget ? undefined : NO_REMEMBERED_TARGET_HINT}
+                  onClick={() => void handleSaveAndRun(selectedTarget)}
+                  data-testid="editor-run"
+                >
+                  <Play size={14} />
+                  Run
+                </Button>
+              </>
+            )}
+            {!hasReadFailed && !isAgentTesting && (
               <SaveAndRunMenu
                 selectedTarget={selectedTarget}
                 onTargetChange={handleTargetChange}
@@ -685,11 +850,91 @@ export function ScenarioFormDrawer(props: ScenarioFormDrawerProps) {
             title: "Prompt created",
             description: `"${prompt.name}" is now selected as the target.`,
             type: "success",
-            meta: { closable: true },
           });
         }}
       />
     </Drawer.Root>
+  );
+}
+
+/**
+ * The form with the test suite field filled from the project.
+ *
+ * Only the Agent Testing editor reads the test suite list, and it reads it here
+ * rather than in the drawer, so every other surface never asks for it.
+ */
+function ScenarioFormWithSuites({
+  defaultValues,
+  formRef,
+}: {
+  defaultValues?: Partial<ScenarioFormData>;
+  formRef: (form: UseFormReturn<ScenarioFormData> | null) => void;
+}) {
+  const { project } = useOrganizationTeamProject();
+  const { data: testSuites } = api.suites.testSuites.getAll.useQuery(
+    { projectId: project?.id ?? "" },
+    { enabled: !!project?.id },
+  );
+  const testSuiteOptions: ScenarioTestSuiteOption[] = useMemo(
+    () =>
+      (testSuites ?? []).map((testSuite) => ({
+        id: testSuite.id,
+        name: testSuite.name,
+      })),
+    [testSuites],
+  );
+
+  return (
+    <ScenarioForm
+      defaultValues={defaultValues}
+      formRef={formRef}
+      testSuiteOptions={testSuiteOptions}
+    />
+  );
+}
+
+/**
+ * Says the scenario changed since it was loaded, and offers the reload.
+ *
+ * The refused save wrote nothing, so nothing is lost by leaving the form as
+ * it is. Reloading is the destructive choice: it replaces the form with the
+ * newer version, and the edits in it go with it. The button says so, so the
+ * person can copy what they typed before pressing it.
+ *
+ * @see specs/scenarios/scenario-versioning.feature
+ */
+function StaleVersionNotice({
+  currentVersion,
+  onReload,
+}: {
+  currentVersion: number;
+  onReload: () => void;
+}) {
+  return (
+    <VStack
+      align="start"
+      gap={2}
+      borderWidth="1px"
+      borderColor="orange.solid"
+      borderRadius="lg"
+      padding={3}
+      marginBottom={4}
+      data-testid="scenario-stale-version"
+    >
+      <Text fontSize="sm" fontWeight="medium">
+        This scenario changed since it was opened
+      </Text>
+      <Text fontSize="xs" color="fg.muted">
+        Somebody else saved{" "}
+        {currentVersion > 0 ? `version ${currentVersion}` : "a newer version"}{" "}
+        while this one was open. Nothing was written, so your edits are still
+        here. Reloading replaces them with the newer version, so copy anything
+        you want to keep first.
+      </Text>
+      <Button size="xs" variant="outline" onClick={onReload}>
+        Discard my edits and reload
+      </Button>
+    </VStack>
   );
 }
 
@@ -788,9 +1033,9 @@ function FooterParameters({
   const parameters = useWatch({ control: form.control, name: "parameters" });
   const { errors } = useFormState({ control: form.control });
   const invalid = !!errors.parameters;
-  const names = (parameters ?? [])
-    .map((definition) => definition.name)
-    .filter((name) => name.length > 0);
+  const declared = (parameters ?? []).filter(
+    (definition) => definition.name.length > 0,
+  );
 
   return (
     <HStack
@@ -809,8 +1054,13 @@ function FooterParameters({
         Parameters
       </Text>
       <HStack gap={1} flexWrap="wrap">
-        {names.map((name, index) => (
-          <ParameterChip key={`${name}-${index}`} name={name} onOpen={onOpen} />
+        {declared.map((definition, index) => (
+          <ParameterChip
+            key={`${definition.name}-${index}`}
+            name={definition.name}
+            isSecret={definition.secret === true}
+            onOpen={onOpen}
+          />
         ))}
         <Button
           type="button"
@@ -831,12 +1081,22 @@ function FooterParameters({
 
 const ChipButton = chakra("button");
 
-function ParameterChip({ name, onOpen }: { name: string; onOpen: () => void }) {
+function ParameterChip({
+  name,
+  isSecret,
+  onOpen,
+}: {
+  name: string;
+  isSecret: boolean;
+  onOpen: () => void;
+}) {
   return (
     <ChipButton
       type="button"
       onClick={onOpen}
-      aria-label={`Edit parameter ${name}`}
+      aria-label={
+        isSecret ? `Edit secret parameter ${name}` : `Edit parameter ${name}`
+      }
       data-testid={`scenario-parameter-chip-${name}`}
       bg="bg.muted"
       paddingX={2}
@@ -844,8 +1104,12 @@ function ParameterChip({ name, onOpen }: { name: string; onOpen: () => void }) {
       borderRadius="full"
       fontSize="xs"
       cursor="pointer"
+      display="inline-flex"
+      alignItems="center"
+      gap={1}
       _hover={{ bg: "bg.emphasized" }}
     >
+      {isSecret && <Lock size={10} />}
       {name}
     </ChipButton>
   );

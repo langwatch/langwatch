@@ -27,6 +27,12 @@ export type FormSnapshot = {
   /** Human-readable label the user typed (or the humanized default). */
   name: string;
   /**
+   * The slug that addresses this instance in a gateway model string. Empty
+   * means the operator wants no handle, which is a real choice: it releases
+   * the name for another provider in the organization.
+   */
+  routingHandle: string;
+  /**
    * Tenant anchor for the write. A provider belongs to an organization
    * and reaches the scopes attached to it, so the organization is always
    * the answer and the project is the narrower handle when there is one.
@@ -165,6 +171,7 @@ export function useProviderFormSubmit({
       projectTopicClusteringModel,
       projectEmbeddingsModel,
       name,
+      routingHandle,
       scopes,
       scopeType,
       scopeId,
@@ -235,7 +242,6 @@ export function useProviderFormSubmit({
             } before saving.`,
             type: "error",
             duration: 5000,
-            meta: { closable: true },
           });
           setIsSaving(false);
           return;
@@ -312,6 +318,9 @@ export function useProviderFormSubmit({
         organizationId,
         provider: provider.provider,
         name: trimmedName === "" ? undefined : trimmedName,
+        // Always sent, because an empty string is how the operator clears the
+        // handle. Leaving it out on a clear would keep the old one.
+        routingHandle: (routingHandle ?? "").trim(),
         enabled: true,
         customKeys: customKeysToSend,
         customModels,
@@ -429,7 +438,6 @@ export function useProviderFormSubmit({
             description: reasons,
             type: "warning",
             duration: 8000,
-            meta: { closable: true },
           });
         }
       }
@@ -461,7 +469,6 @@ export function useProviderFormSubmit({
         title: "Model Provider Updated",
         type: "success",
         duration: 3000,
-        meta: { closable: true },
       });
       onSuccess?.();
     } catch (err) {

@@ -2,11 +2,21 @@ import { generate } from "@langwatch/ksuid";
 import { createLogger } from "@langwatch/observability";
 import { nanoid } from "nanoid";
 import type { Project } from "~/generated/prisma/client";
+import { lwqlTenantCapability } from "~/server/analytics/lwql/capability";
+import { lwqlConnectionFromEnv } from "~/server/analytics/lwql/executor";
+import type { LwqlKeyMapRepository } from "~/server/analytics/lwql/lwqlKeyMap.repository";
+import {
+  type LwqlKeyMapRow,
+  lwqlKeyMapTableQualifiedName,
+  productionLangWatchQLNames,
+} from "~/server/analytics/lwql/productionProvisioning";
+import { parseConnectionUrl } from "~/server/clickhouse/goose";
 import { createStoredObjectsService } from "~/server/stored-objects/stored-objects-factory";
 import { generateApiKey } from "~/server/utils/apiKeyGenerator";
 import { KSUID_RESOURCES } from "~/utils/constants";
 import { captureException } from "~/utils/posthogErrorCapture";
 import { slugify } from "~/utils/slugify";
+import { mintProjectSlug } from "./projectSlug";
 import type {
   PaginatedResult,
   PresenceConfig,
@@ -165,7 +175,15 @@ export interface CreateProjectParams {
 }
 
 export class ProjectService {
-  constructor(readonly repo: ProjectRepository) {}
+  constructor(
+    readonly repo: ProjectRepository,
+    /**
+     * Absent only where the caller cannot reach ClickHouse at all. A new
+     * project's key-map row is then left to the deploy-time backfill, the
+     * same way a failed write is.
+     */
+    private readonly lwqlKeyMap?: LwqlKeyMapRepository,
+  ) {}
 
   async getById(id: string): Promise<Project | null> {
     return this.repo.getById(id);
@@ -244,10 +262,7 @@ export class ProjectService {
 
     const projectNanoId = nanoid();
     const projectId = `project_${projectNanoId}`;
-    const slug =
-      slugify(params.name, { lower: true, strict: true }) +
-      "-" +
-      projectNanoId.substring(0, 6);
+    const slug = mintProjectSlug({ name: params.name, projectNanoId });
 
     const existing = await this.repo.findBySlugInTeam({ slug, teamId });
     if (existing) {
@@ -256,7 +271,7 @@ export class ProjectService {
       );
     }
 
-    return this.repo.create({
+    const project = await this.repo.create({
       id: projectId,
       name: params.name,
       slug,
@@ -265,6 +280,63 @@ export class ProjectService {
       teamId,
       apiKey: generateApiKey(),
     });
+
+    await this.syncLwqlKeyMapRow(project);
+
+    return project;
+  }
+
+  /**
+   * Best-effort: inserts this project's key-map row immediately, so it can
+   * authenticate to LangWatchQL without waiting for the next scheduled
+   * provisioning backfill (`src/tasks/provisionLwql.ts`). Never throws — a
+   * failure here must not block project creation; the backfill task picks up
+   * any row this misses on its next run. No-ops when LWQL is not configured.
+   */
+  private async syncLwqlKeyMapRow(project: Project): Promise<void> {
+    const connection = lwqlConnectionFromEnv();
+    if (!connection) return;
+
+    if (!project.lwqlKey) {
+      logger.error(
+        { projectId: project.id },
+        "new project has an empty lwqlKey — cannot sync its LangWatchQL key-map row; it will not be able to authenticate to LangWatchQL until this is corrected",
+      );
+      return;
+    }
+
+    try {
+      const names = productionLangWatchQLNames({ connection });
+      // Same qualification as the deploy-time task: the key-map table is
+      // always migration 00084's, under the app's own ClickHouse database —
+      // not `names.database`. See `lwqlKeyMapTableQualifiedName`'s doc
+      // comment.
+      const { database: sourceDatabase } = parseConnectionUrl();
+      const row: LwqlKeyMapRow = {
+        KeyHash: lwqlTenantCapability({ secret: project.lwqlKey }),
+        TenantId: project.id,
+      };
+      if (!this.lwqlKeyMap) {
+        throw new Error(
+          "No LangWatchQL key-map repository is wired — the row was not written",
+        );
+      }
+      await this.lwqlKeyMap.insertRow({
+        table: lwqlKeyMapTableQualifiedName({
+          names,
+          sourceDatabase,
+        }),
+        row,
+      });
+    } catch (error) {
+      logger.error(
+        { projectId: project.id, error },
+        "failed to sync lwql key-map row for new project; continuing — the scheduled provisioning backfill will pick it up",
+      );
+      captureException(new Error("Failed to sync lwql key-map row"), {
+        extra: { projectId: project.id, error },
+      });
+    }
   }
 
   async update({
@@ -353,6 +425,8 @@ export class ProjectService {
     organizationId: string;
     page: number;
     limit: number;
+    /** See {@link ProjectRepository.findAllByOrganization}. */
+    projectIds?: string[];
   }): Promise<PaginatedResult<Project>> {
     return this.repo.findAllByOrganization(params);
   }

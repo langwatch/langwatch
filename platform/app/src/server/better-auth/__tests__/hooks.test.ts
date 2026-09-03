@@ -1,5 +1,5 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
-import type { PrismaClient } from "~/generated/prisma/client";
+import { Prisma, type PrismaClient } from "~/generated/prisma/client";
 
 vi.mock("~/server/app-layer/app", () => ({
   // Consumers that degrade without Redis read through this one.
@@ -14,6 +14,19 @@ vi.mock("~/server/app-layer/app", () => ({
 
 const { mockTrackServerEvent } = vi.hoisted(() => ({
   mockTrackServerEvent: vi.fn(),
+}));
+
+// The organization grant an SSO auto-join or an applied invite carries is a
+// ledger command (ADR-092 delivery-plan PR 2), so the writer is the seam.
+const ledger = vi.hoisted(() => ({
+  attachBindings: vi.fn(),
+  revokeBindings: vi.fn(),
+  revokeBindingsWhere: vi.fn(),
+  defineRole: vi.fn(),
+  deleteRole: vi.fn(),
+}));
+vi.mock("~/server/app-layer/authz/ledger", () => ({
+  grantsLedgerWriter: () => ledger,
 }));
 
 vi.mock("~/server/posthog", () => ({
@@ -46,16 +59,27 @@ type PrismaMockOverrides = Record<string, PrismaMockTable | unknown>;
 
 const makePrismaMock = (overrides: PrismaMockOverrides = {}): PrismaClient => {
   const base: PrismaMockOverrides = {
+    // Applying an invite opens a transaction of its own — the membership row
+    // and the acceptance land together — and refuses to run on somebody
+    // else's transaction client. `$connect` is what marks this stub as the
+    // root client it stands in for.
+    $connect: vi.fn(),
     organization: { findUnique: vi.fn().mockResolvedValue(null) },
-    organizationInvite: { findFirst: vi.fn().mockResolvedValue(null) },
+    organizationInvite: {
+      findFirst: vi.fn().mockResolvedValue(null),
+      // The acceptance claim is a compare-and-set: `applyInvite` claims the
+      // row with updateMany and writes the membership only if it matched.
+      // Zero here is the honest default for a mock whose findFirst says
+      // there is no invite to claim.
+      updateMany: vi.fn().mockResolvedValue({ count: 0 }),
+    },
     organizationUser: {
       create: vi.fn().mockResolvedValue(undefined),
       createMany: vi.fn().mockResolvedValue({ count: 0 }),
       count: vi.fn().mockResolvedValue(0),
     },
     roleBinding: {
-      create: vi.fn().mockResolvedValue(undefined),
-      deleteMany: vi.fn().mockResolvedValue({ count: 0 }),
+      findMany: vi.fn().mockResolvedValue([]),
     },
     user: {
       findUnique: vi.fn().mockResolvedValue(null),
@@ -67,15 +91,16 @@ const makePrismaMock = (overrides: PrismaMockOverrides = {}): PrismaClient => {
     },
   };
   const merged: PrismaMockOverrides = { ...base, ...overrides };
-  // Support both $transaction forms: array form (returns the ops) and
-  // callback form (invokes the callback with this same mock as `tx`, so
-  // tests continue to assert against `prisma.xxx` spies).
+  // One $transaction handling both forms: the array form awaits the
+  // already-started writes, and the callback form hands this same mock back
+  // as `tx`, so tests keep asserting against the `prisma.xxx` spies. An
+  // override that brings its own $transaction wins.
   if (!merged.$transaction) {
     merged.$transaction = vi.fn().mockImplementation(async (arg: unknown) => {
       if (typeof arg === "function") {
         return (arg as (tx: unknown) => unknown)(merged);
       }
-      return arg;
+      return Promise.all(arg as Promise<unknown>[]);
     });
   }
   return merged as unknown as PrismaClient;
@@ -108,6 +133,10 @@ describe("beforeUserCreate", () => {
 describe("afterUserCreate", () => {
   beforeEach(() => {
     mockTrackServerEvent.mockClear();
+    ledger.attachBindings.mockClear();
+    ledger.revokeBindingsWhere.mockClear();
+    ledger.attachBindings.mockResolvedValue({ attached: [], duplicates: [] });
+    ledger.revokeBindingsWhere.mockResolvedValue(0);
   });
 
   describe("for every new user", () => {
@@ -193,6 +222,22 @@ describe("afterUserCreate", () => {
       expect(prisma.organizationUser.create).toHaveBeenCalledWith({
         data: { userId: "user_1", organizationId: "org_1", role: "MEMBER" },
       });
+
+      // The organization-scoped grant lands beside the membership row.
+      expect(ledger.attachBindings).toHaveBeenCalledWith(
+        expect.objectContaining({
+          organizationId: "org_1",
+          onDuplicate: "skip",
+          bindings: [
+            expect.objectContaining({
+              principal: { userId: "user_1" },
+              role: "MEMBER",
+              scopeType: "ORGANIZATION",
+              scopeId: "org_1",
+            }),
+          ],
+        }),
+      );
     });
   });
 
@@ -236,9 +281,11 @@ describe("afterUserCreate", () => {
       };
 
       const inviteUpdate = vi.fn().mockResolvedValue(undefined);
+      // Acceptance is the claim, not a later write: applyInvite moves the
+      // row to ACCEPTED and writes the membership in one transaction, so a
+      // matched claim is what the membership hangs off.
+      const inviteClaim = vi.fn().mockResolvedValue({ count: 1 });
       const orgUserCreateMany = vi.fn().mockResolvedValue({ count: 1 });
-      const roleBindingCreate = vi.fn().mockResolvedValue(undefined);
-      const roleBindingDeleteMany = vi.fn().mockResolvedValue({ count: 0 });
 
       const prisma = makePrismaMock({
         organization: {
@@ -250,15 +297,12 @@ describe("afterUserCreate", () => {
         organizationInvite: {
           findFirst: vi.fn().mockResolvedValue(pendingInvite),
           update: inviteUpdate,
+          updateMany: inviteClaim,
         },
         organizationUser: {
           create: vi.fn(),
           createMany: orgUserCreateMany,
           count: vi.fn().mockResolvedValue(0),
-        },
-        roleBinding: {
-          create: roleBindingCreate,
-          deleteMany: roleBindingDeleteMany,
         },
       });
 
@@ -282,14 +326,64 @@ describe("afterUserCreate", () => {
         skipDuplicates: true,
       });
 
-      // 3 RoleBinding creates: 1 ORG-scope (ADMIN) + 2 TEAM-scope.
-      expect(roleBindingCreate).toHaveBeenCalledTimes(3);
+      // The grants are the behaviour, the batching shape is not: assert the
+      // emitted bindings — the invite's ORG-scoped ADMIN plus both team
+      // assignments — wherever the writer put them.
+      const emitted = ledger.attachBindings.mock.calls.flatMap(
+        (call: any[]) => call[0].bindings,
+      );
+      expect(emitted).toHaveLength(3);
+      expect(emitted).toEqual(
+        expect.arrayContaining([
+          expect.objectContaining({
+            principal: { userId: "user_1" },
+            role: "ADMIN",
+            customRoleId: null,
+            scopeType: "ORGANIZATION",
+            scopeId: "org_1",
+          }),
+          expect.objectContaining({
+            principal: { userId: "user_1" },
+            role: "ADMIN",
+            customRoleId: null,
+            scopeType: "TEAM",
+            scopeId: "team_1",
+          }),
+          expect.objectContaining({
+            principal: { userId: "user_1" },
+            role: "MEMBER",
+            customRoleId: "cr_1",
+            scopeType: "TEAM",
+            scopeId: "team_2",
+          }),
+        ]),
+      );
+      // The invite's teams still land as one command, so the invitee cannot
+      // land in the first team and not the second.
+      const teamCommand = ledger.attachBindings.mock.calls
+        .map((call: any[]) => call[0])
+        .find((envelope: any) => envelope.bindings[0]?.scopeType === "TEAM");
+      expect(teamCommand.bindings.map((b: any) => b.scopeId)).toEqual([
+        "team_1",
+        "team_2",
+      ]);
 
-      // Invite flipped to ACCEPTED so the link stops looking outstanding.
-      expect(inviteUpdate).toHaveBeenCalledWith({
-        where: { id: "inv_1", organizationId: "org_1" },
-        data: { status: "ACCEPTED" },
-      });
+      // Invite flipped to ACCEPTED so the link stops looking outstanding -
+      // and the claim is guarded, so only an invite that is still open can
+      // be the one this membership came from.
+      expect(inviteClaim).toHaveBeenCalledWith(
+        expect.objectContaining({
+          where: expect.objectContaining({
+            id: "inv_1",
+            organizationId: "org_1",
+            status: "PENDING",
+          }),
+          data: expect.objectContaining({
+            status: "ACCEPTED",
+            acceptedByUserId: "user_1",
+          }),
+        }),
+      );
     });
   });
 
@@ -343,6 +437,50 @@ describe("afterUserCreate", () => {
           user: { id: "user_1", email: "u@acme.com", name: "User" },
         }),
       ).resolves.toBeUndefined();
+    });
+  });
+
+  describe("when a concurrent callback already created the membership row", () => {
+    it("re-asserts the organization grant instead of assuming it landed", async () => {
+      // The membership row and the grant beside it no longer share a
+      // transaction, so the other callback may have died between them. P2002
+      // says the row is there; it says nothing about the grant.
+      const alreadyExists = new Prisma.PrismaClientKnownRequestError(
+        "Unique constraint failed",
+        { code: "P2002", clientVersion: "7.0.0" },
+      );
+      const prisma = makePrismaMock({
+        organization: {
+          findUnique: vi.fn().mockResolvedValue({
+            id: "org_1",
+            ssoDomain: "acme.com",
+          }),
+        },
+        organizationUser: {
+          create: vi.fn().mockRejectedValue(alreadyExists),
+          count: vi.fn().mockResolvedValue(0),
+        },
+      });
+
+      await afterUserCreate({
+        prisma,
+        user: { id: "user_1", email: "u@acme.com", name: "User" },
+      });
+
+      expect(ledger.attachBindings).toHaveBeenCalledWith(
+        expect.objectContaining({
+          organizationId: "org_1",
+          onDuplicate: "skip",
+          bindings: [
+            expect.objectContaining({
+              principal: { userId: "user_1" },
+              role: "MEMBER",
+              scopeType: "ORGANIZATION",
+              scopeId: "org_1",
+            }),
+          ],
+        }),
+      );
     });
   });
 });

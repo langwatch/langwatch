@@ -171,8 +171,6 @@ interface FormState {
   name: string;
   slug: string;
   phoneNumber: string;
-  ssoDomain: string;
-  ssoProvider: string;
   usageSpendingMaxLimit: string;
   signedDPA: boolean;
   promoCode: string;
@@ -221,8 +219,6 @@ function OrganizationEditDrawer({
       name: organization.name ?? "",
       slug: organization.slug ?? "",
       phoneNumber: organization.phoneNumber ?? "",
-      ssoDomain: organization.ssoDomain ?? "",
-      ssoProvider: organization.ssoProvider ?? "",
       usageSpendingMaxLimit:
         organization.usageSpendingMaxLimit?.toString() ?? "",
       signedDPA: !!organization.signedDPA,
@@ -254,10 +250,10 @@ function OrganizationEditDrawer({
     if (form.slug !== organization.slug) data.slug = form.slug;
     if (form.phoneNumber !== (organization.phoneNumber ?? ""))
       data.phoneNumber = nullIfEmpty(form.phoneNumber);
-    if (form.ssoDomain !== (organization.ssoDomain ?? ""))
-      data.ssoDomain = nullIfEmpty(form.ssoDomain);
-    if (form.ssoProvider !== (organization.ssoProvider ?? ""))
-      data.ssoProvider = nullIfEmpty(form.ssoProvider);
+    // No `ssoDomain` / `ssoProvider` diff: this drawer no longer edits them,
+    // so it can no longer send them. The server refuses such a write once
+    // connection routing is enforced; not sending one is how this surface
+    // stops asking for a refusal.
     const nextLimit = numOrNull(form.usageSpendingMaxLimit);
     if (nextLimit !== organization.usageSpendingMaxLimit) {
       data.usageSpendingMaxLimit = nextLimit;
@@ -301,7 +297,6 @@ function OrganizationEditDrawer({
             title: "Organization updated",
             type: "success",
             duration: 3000,
-            meta: { closable: true },
           });
           onClose();
         },
@@ -411,25 +406,19 @@ function OrganizationEditDrawer({
               />
 
               <SectionHeading>Authentication</SectionHeading>
-              <Field.Root>
-                <Field.Label>SSO domain</Field.Label>
-                <Input
-                  value={form.ssoDomain}
-                  onChange={(e) => setField("ssoDomain", e.target.value)}
-                  placeholder="e.g. acme.com"
-                />
-                <Field.HelperText>
-                  Lowercased server-side. Users with this email domain can sign
-                  in via SSO.
-                </Field.HelperText>
-              </Field.Root>
-              <Field.Root>
-                <Field.Label>SSO provider</Field.Label>
-                <Input
-                  value={form.ssoProvider}
-                  onChange={(e) => setField("ssoProvider", e.target.value)}
-                />
-              </Field.Root>
+              {/*
+                The two free-text single sign-on fields used to live here.
+                They are gone rather than disabled: a connection is a guarded
+                lifecycle with history, and an input that writes a string
+                cannot express claiming a domain, approving that claim, or
+                vouching for it. Editing them is refused once connection
+                routing is enforced, so leaving them here would have offered a
+                control whose only answer is a refusal.
+              */}
+              <Text fontSize="sm" color="fg.muted">
+                Single sign-on for this organization is set up on its
+                connection, under Backoffice &rarr; Single Sign-On.
+              </Text>
 
               <SectionHeading>License</SectionHeading>
               <Field.Root>

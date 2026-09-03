@@ -1,3 +1,5 @@
+import { claudeCacheWritesLongLived } from "~/server/app-layer/traces/canonicalisation/extractors/claudeCode";
+import { computeSpanCost } from "~/server/app-layer/traces/model-cost-matching";
 import {
   CODING_AGENT_REGISTRY,
   EVENTS_FOLD_TOOL_RUNS_AGENT_IDS,
@@ -9,6 +11,7 @@ import {
   normalizeEventName,
   normalizeMetricName,
   parseMcpToolName,
+  SESSION_NAME_FACT_KEY,
   SESSION_TITLE_FACT_KEY,
   SESSION_TITLE_FALLBACK_FACT_KEY,
 } from "./coding-agent-normalization";
@@ -16,7 +19,12 @@ import type {
   CodingAgentSessionData,
   MetricSeriesFact,
   SessionStep,
+  SessionTitleSource,
 } from "./coding-agent-session.types";
+import {
+  SESSION_CONTEXT_ATTR,
+  SESSION_CONTEXT_EVENT,
+} from "./session-context-memo";
 
 /**
  * Derive a coding-agent SESSION from its contributions (ADR-056,
@@ -114,9 +122,10 @@ const CLAUDE = {
  *     `modelCallMs` (zero reads as "not measured"); TTFT arrives on the
  *     `codex.turn_ttft` EVENT instead, and tool runs on `tool_result` events
  *     (`foldsToolRunsFromEvents` on the definition — codex has no tool span).
- *   - `gen_ai.usage.input_tokens` INCLUDES the cache buckets, unlike the
- *     disjoint claude spellings — {@link codexTurnTokenFacts} re-derives the
- *     disjoint input before the shared fold runs.
+ *   - codex reports an input that INCLUDES the cache buckets, unlike the
+ *     disjoint claude spellings. The canonicalisation takes the cache off it,
+ *     so `gen_ai.usage.input_tokens` is already disjoint here and
+ *     {@link codexTurnTokenFacts} only respells the keys.
  */
 const CODEX = {
   SPAN: {
@@ -130,7 +139,6 @@ const CODEX = {
     OUTPUT_TOKENS: "gen_ai.usage.output_tokens",
     CACHE_READ_TOKENS: "gen_ai.usage.cache_read.input_tokens",
     CACHE_CREATION_TOKENS: "gen_ai.usage.cache_creation.input_tokens",
-    NON_CACHED_INPUT_TOKENS: "codex.turn.token_usage.non_cached_input_tokens",
     RESPONSE_MODEL: "gen_ai.response.model",
   },
 } as const;
@@ -144,18 +152,59 @@ const CODEX = {
  */
 const LANGWATCH = {
   EVENT: {
-    SESSION_CONTEXT: "session_context",
+    SESSION_CONTEXT: SESSION_CONTEXT_EVENT,
   },
   ATTR: {
-    REPOSITORY_HOST: "vcs.repository.host",
-    REPOSITORY_OWNER: "vcs.repository.owner",
-    REPOSITORY_NAME: "vcs.repository.name",
-    BRANCH: "vcs.ref.head.name",
-    WORKTREE: "vcs.worktree.name",
+    ...SESSION_CONTEXT_ATTR,
     TITLE: SESSION_TITLE_FACT_KEY,
     TITLE_FALLBACK: SESSION_TITLE_FALLBACK_FACT_KEY,
+    NAME: SESSION_NAME_FACT_KEY,
   },
 } as const;
+
+/**
+ * The title tiers, weakest first. `withTitle` compares against this table so
+ * the precedence lives in exactly one place.
+ */
+const TITLE_RANK: Record<SessionTitleSource, number> = {
+  prompt: 1,
+  generated: 2,
+  name: 3,
+};
+
+/**
+ * Fold one title candidate onto the session by source rank: the harness's
+ * own session name beats the generated conversation title beats the
+ * prompt-derived name. Within a rank the newest non-empty value wins IN
+ * PLACE — that is what makes a rename land — except the prompt tier, which
+ * only ever fills an empty row. Whitespace is no title at any rank: it would
+ * outrank real names and render as a blank row.
+ *
+ * A row from before the source column decodes with a title and no source;
+ * it ranks as `generated`, the strongest source that existed then, so a
+ * newer generated title still replaces it and a name still wins.
+ */
+function withTitle({
+  state,
+  value,
+  source,
+}: {
+  state: CodingAgentSessionData;
+  value: string | null;
+  source: SessionTitleSource;
+}): CodingAgentSessionData {
+  const title = value?.trim() || null;
+  if (title === null) return state;
+  if (source === "prompt" && state.title !== null) return state;
+  const current =
+    state.titleSource !== null
+      ? TITLE_RANK[state.titleSource]
+      : state.title !== null
+        ? TITLE_RANK.generated
+        : 0;
+  if (TITLE_RANK[source] < current) return state;
+  return { ...state, title, titleSource: source };
+}
 
 /**
  * Claude's span names carry their own namespace, so the name alone is the
@@ -247,6 +296,7 @@ export function createInitCodingAgentSession(): CodingAgentSessionData {
     gitBranches: [],
     gitWorktree: null,
     title: null,
+    titleSource: null,
 
     modelCalls: 0,
     toolCalls: 0,
@@ -272,6 +322,7 @@ export function createInitCodingAgentSession(): CodingAgentSessionData {
     cacheReadTokens: 0,
     cacheCreationTokens: 0,
     costUsd: 0,
+    agentReportedCostUsd: 0,
 
     modelCallMs: 0,
     toolMs: 0,
@@ -574,32 +625,74 @@ function foldModelCall(
 }
 
 /**
- * Codex's turn tokens, respelled into the disjoint claude vocabulary
+ * What one turn cost: the model registry's price for the call's own tokens.
+ *
+ * Every span-bearing agent's session is priced this way — the trace pipeline
+ * prices the identical span against the same registry, so a session and its
+ * traces state one figure by construction. What an agent reports about its
+ * own bill (claude's `cost_usd`) rides agentReportedCostUsd beside this,
+ * never instead of it.
+ *
+ * The facts are the respelled ones, whose `input_tokens` is the disjoint
+ * non-cached bucket, and whose cache buckets are the gen_ai keys
+ * {@link computeSpanCost} reads. An unpriced model comes back zero rather
+ * than an invented rate.
+ */
+function pricedFromTokens(facts: Record<string, unknown>): number {
+  return computeSpanCost({
+    attrs: facts,
+    model: str(facts.model) ?? undefined,
+    promptTokens: num(facts.input_tokens),
+    completionTokens: num(facts.output_tokens),
+  });
+}
+
+/**
+ * A Claude Code call's tokens, respelled into the gen_ai keys
+ * {@link computeSpanCost} reads. The llm_request span carries the CLI's bare
+ * spellings, whose `input_tokens` is already the disjoint non-cached bucket,
+ * so this is a respelling plus one judgment: the cache-write lifetime the
+ * call's request context implies ({@link claudeCacheWritesLongLived}) — the
+ * same stamp the trace pipeline's extractor puts on the identical span, so
+ * the session and the trace price one call to one figure.
+ */
+function claudeCallTokenFacts(
+  attrs: Record<string, unknown>,
+): Record<string, unknown> {
+  const cacheWriteTokens = num(attrs.cache_creation_tokens);
+  return {
+    ...attrs,
+    "gen_ai.usage.cache_read.input_tokens": num(attrs.cache_read_tokens),
+    "gen_ai.usage.cache_creation.input_tokens": cacheWriteTokens,
+    ...(cacheWriteTokens > 0 &&
+    claudeCacheWritesLongLived({
+      llmRequestContext: str(attrs["llm_request.context"]),
+      querySource: str(attrs.query_source),
+    })
+      ? { "gen_ai.usage.cache_creation_1h.input_tokens": cacheWriteTokens }
+      : {}),
+  };
+}
+
+/**
+ * Codex's turn tokens, respelled into the claude vocabulary
  * {@link foldModelCall} reads — one fold, one convention.
  *
- * The re-derivation is the point: codex's `gen_ai.usage.input_tokens` is the
- * WHOLE input, cache included (13944 = 11008 cache-read + 2936 non-cached on
- * a live turn), while the shared fold's `input_tokens` is the disjoint
- * non-cached bucket. Codex's own non-cached count is preferred; when a build
- * omits it, the subtraction recovers it from the gen_ai buckets.
+ * Only a respelling: codex reports the WHOLE input, cache included, and the
+ * canonicalisation already took the cache off it, so `gen_ai.usage.input_tokens`
+ * is the disjoint non-cached bucket by the time a span reaches this fold. That
+ * is the same value the trace is priced from, which is what makes a codex
+ * session and its trace state one figure.
  */
 function codexTurnTokenFacts(
   attrs: Record<string, unknown>,
 ): Record<string, unknown> {
-  const cacheRead = num(attrs[CODEX.ATTR.CACHE_READ_TOKENS]);
-  const cacheCreation = num(attrs[CODEX.ATTR.CACHE_CREATION_TOKENS]);
-  const wholeInput = num(attrs[CODEX.ATTR.INPUT_TOKENS]);
-  const nonCachedInput =
-    attrs[CODEX.ATTR.NON_CACHED_INPUT_TOKENS] !== undefined
-      ? num(attrs[CODEX.ATTR.NON_CACHED_INPUT_TOKENS])
-      : Math.max(0, wholeInput - cacheRead - cacheCreation);
-
   return {
     ...attrs,
-    input_tokens: nonCachedInput,
+    input_tokens: num(attrs[CODEX.ATTR.INPUT_TOKENS]),
     output_tokens: num(attrs[CODEX.ATTR.OUTPUT_TOKENS]),
-    cache_read_tokens: cacheRead,
-    cache_creation_tokens: cacheCreation,
+    cache_read_tokens: num(attrs[CODEX.ATTR.CACHE_READ_TOKENS]),
+    cache_creation_tokens: num(attrs[CODEX.ATTR.CACHE_CREATION_TOKENS]),
     model:
       str(attrs["gen_ai.request.model"]) ??
       str(attrs[CODEX.ATTR.RESPONSE_MODEL]),
@@ -643,9 +736,16 @@ export function applySpanToCodingAgentSession({
 
   if (span.name === CLAUDE.SPAN.LLM_REQUEST) {
     // Identity still rides the span; only the counted facts are the log's.
-    return isLogsOnly
-      ? withIdentity(state, attrs)
-      : foldModelCall(withIdentity(state, attrs), attrs, durationMs);
+    if (isLogsOnly) return withIdentity(state, attrs);
+    const folded = foldModelCall(withIdentity(state, attrs), attrs, durationMs);
+    // Priced from the span's tokens with the same formula and the same
+    // cache-write lifetime the trace pipeline applies to the identical span,
+    // so the session and its traces state one figure. The cost the agent
+    // reports about itself lands on agentReportedCostUsd instead.
+    return {
+      ...folded,
+      costUsd: folded.costUsd + pricedFromTokens(claudeCallTokenFacts(attrs)),
+    };
   }
 
   if (span.name === CODEX.SPAN.TURN) {
@@ -653,13 +753,11 @@ export function applySpanToCodingAgentSession({
     // declined foreign spans reusing this bare name, and one that still
     // arrives labeled as another agent contributes identity only.
     if (agent !== "codex" || isLogsOnly) return withIdentity(state, attrs);
+    const facts = codexTurnTokenFacts(attrs);
     // Fallback duration 0, not the span's: the turn's wall time includes the
     // tools that ran inside it, and zero reads honestly as "not measured".
-    return foldModelCall(
-      withIdentity(state, attrs),
-      codexTurnTokenFacts(attrs),
-      0,
-    );
+    const folded = foldModelCall(withIdentity(state, attrs), facts, 0);
+    return { ...folded, costUsd: folded.costUsd + pricedFromTokens(facts) };
   }
 
   if (span.name === CLAUDE.SPAN.SUBAGENT_SPAWN) {
@@ -843,10 +941,13 @@ export function applyLogToCodingAgentSession({
     case CLAUDE.EVENT.USER_PROMPT: {
       const command = str(attrs.command_name);
       return {
-        ...base,
-        // The first prompt names an unnamed session; a generated title
-        // (API_RESPONSE below) replaces it whenever one arrives.
-        title: base.title ?? str(attrs[LANGWATCH.ATTR.TITLE_FALLBACK]),
+        // The first prompt names an unnamed session; the generated title
+        // (API_RESPONSE below) and the session's own name replace it.
+        ...withTitle({
+          state: base,
+          value: str(attrs[LANGWATCH.ATTR.TITLE_FALLBACK]),
+          source: "prompt",
+        }),
         prompts: base.prompts + 1,
         // The length, never the text.
         promptChars: base.promptChars + num(attrs.prompt_length),
@@ -864,48 +965,80 @@ export function applyLogToCodingAgentSession({
       };
 
     case CLAUDE.EVENT.API_REQUEST: {
-      // The authoritative cost: the agent reports what it was actually billed,
-      // which no span carries.
-      const withCost = { ...base, costUsd: base.costUsd + num(attrs.cost_usd) };
+      // What the agent says it was billed, kept NEXT TO the computed cost
+      // rather than as it. The two disagreeing is a signal, not noise: the
+      // reported figure caught the registry pricing hour-long cache writes
+      // short-lived, and the computed one caught the agent still billing a
+      // model at a withdrawn price. Neither is trusted alone.
+      const reported = num(attrs.cost_usd);
+      const withReported = {
+        ...base,
+        agentReportedCostUsd: base.agentReportedCostUsd + reported,
+      };
       // For a logs-only agent this event IS the model call — the same facts
-      // the llm_request span carries for Claude Code fold from here instead.
-      return isLogsOnly ? foldModelCall(withCost, attrs, 0) : withCost;
+      // the llm_request span carries for Claude Code fold from here instead —
+      // and with no token-bearing span to compute from, the reported figure
+      // is also the session's cost.
+      return isLogsOnly
+        ? foldModelCall(
+            { ...withReported, costUsd: withReported.costUsd + reported },
+            attrs,
+            0,
+          )
+        : withReported;
     }
 
-    case CLAUDE.EVENT.API_RESPONSE: {
+    case CLAUDE.EVENT.API_RESPONSE:
       // The generated conversation title, already parsed out of the response
-      // body by the dispatcher. Last non-empty wins: the agent regenerates
-      // the title as the conversation turns, and the newest one describes it.
-      const title = str(attrs[LANGWATCH.ATTR.TITLE]);
-      return title !== null ? { ...base, title } : base;
-    }
+      // body by the dispatcher. Last non-empty wins within its rank: the
+      // agent regenerates the title as the conversation turns, and the
+      // newest one describes it — but it never replaces the session's own
+      // name.
+      return withTitle({
+        state: base,
+        value: str(attrs[LANGWATCH.ATTR.TITLE]),
+        source: "generated",
+      });
 
     case LANGWATCH.EVENT.SESSION_CONTEXT: {
-      // Repository identity and worktree are once-set: a session is one
-      // checkout, so the first answer stands. The branch is the exception:
-      // it moves during a session, and the branch a session ENDS on is the
-      // one its pull request comes from. Every branch it passed through joins
-      // the set as well, because a session that moves on has still driven the
-      // branch it left, and the pull request it opened there.
+      // Everything here is present tense, last write wins: a resumed session
+      // moves between branches, worktrees and even repositories, and the row
+      // answers where it is NOW. Per-branch history lives on the fact rows
+      // (the contribute command stamps each one with the context active when
+      // it happened), so nothing is lost by letting the scalars move. Every
+      // branch the session passed through also joins the set, because a
+      // session that moves on has still driven the branch it left, and the
+      // pull request it opened there.
       const branch = str(attrs[LANGWATCH.ATTR.BRANCH]);
+      // Two titles can ride the record. The context title is the codex
+      // harvest's prompt-derived name (codex withholds prompt text from its
+      // own events), so it fills an empty row only. The session NAME is the
+      // one the harness itself holds — claude's --name and /rename, codex's
+      // thread name — mirrored by the capture seams: the newest name
+      // replaces the title in place and neither derived tier may clobber it.
+      const named = withTitle({
+        state: withTitle({
+          state: base,
+          value: str(attrs[LANGWATCH.ATTR.TITLE]),
+          source: "prompt",
+        }),
+        value: str(attrs[LANGWATCH.ATTR.NAME]),
+        source: "name",
+      });
       return {
-        ...base,
+        ...named,
         repositoryHost:
-          base.repositoryHost ?? str(attrs[LANGWATCH.ATTR.REPOSITORY_HOST]),
+          str(attrs[LANGWATCH.ATTR.REPOSITORY_HOST]) ?? base.repositoryHost,
         repositoryOwner:
-          base.repositoryOwner ?? str(attrs[LANGWATCH.ATTR.REPOSITORY_OWNER]),
+          str(attrs[LANGWATCH.ATTR.REPOSITORY_OWNER]) ?? base.repositoryOwner,
         repositoryName:
-          base.repositoryName ?? str(attrs[LANGWATCH.ATTR.REPOSITORY_NAME]),
-        gitWorktree: base.gitWorktree ?? str(attrs[LANGWATCH.ATTR.WORKTREE]),
+          str(attrs[LANGWATCH.ATTR.REPOSITORY_NAME]) ?? base.repositoryName,
+        gitWorktree: str(attrs[LANGWATCH.ATTR.WORKTREE]) ?? base.gitWorktree,
         gitBranch: branch ?? base.gitBranch,
         gitBranches:
           branch !== null
             ? addToBoundedSet(base.gitBranches, branch)
             : base.gitBranches,
-        // The codex harvest names the session from its transcript (codex
-        // withholds prompt text from its own events). Fill-if-empty, same as
-        // the prompt-derived name: a generated title outranks it.
-        title: base.title ?? str(attrs[LANGWATCH.ATTR.TITLE]),
       };
     }
 

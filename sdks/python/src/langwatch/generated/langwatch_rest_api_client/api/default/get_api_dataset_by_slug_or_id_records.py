@@ -56,7 +56,7 @@ def _build_response(*, client: AuthenticatedClient | Client, response: httpx.Res
 def sync_detailed(
     slug_or_id: str,
     *,
-    client: AuthenticatedClient | Client,
+    client: AuthenticatedClient,
     page: int | Unset = 1,
     limit: int | Unset = 50,
 ) -> Response[Any]:
@@ -91,7 +91,7 @@ def sync_detailed(
 async def asyncio_detailed(
     slug_or_id: str,
     *,
-    client: AuthenticatedClient | Client,
+    client: AuthenticatedClient,
     page: int | Unset = 1,
     limit: int | Unset = 50,
 ) -> Response[Any]:

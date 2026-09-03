@@ -17,7 +17,7 @@ describe("ExperimentService slug deduplication", () => {
 
   beforeAll(async () => {
     project = await getTestProject("experiment-slug-dedup");
-    service = ExperimentService.create(prisma);
+    service = ExperimentService.create({ prisma });
   });
 
   afterEach(async () => {

@@ -1,49 +1,82 @@
 import { describe, expect, it } from "vitest";
-import { cohortIncludes } from "../cohort";
+import {
+  migrationRunsOnThisInstallation,
+  organizationMigrates,
+} from "../cohort";
 
-describe("cohortIncludes", () => {
+/** The cohort question for a migration enrollment still paces. */
+function paced(
+  args: Partial<Parameters<typeof organizationMigrates>[0]>,
+): boolean {
+  return organizationMigrates({
+    isSaaS: true,
+    enrolledAutomatically: false,
+    enrolled: false,
+    ...args,
+  });
+}
+
+describe("organizationMigrates", () => {
   describe("when the installation is self-hosted", () => {
-    /** @scenario "A self-hosted installation migrates every organization automatically" */
-    it("includes every organization with no configuration", () => {
+    /** @scenario "A self-hosted installation migrates every organization" */
+    it("includes every organization, enrolled or not", () => {
+      expect(paced({ isSaaS: false, enrolled: false })).toBe(true);
+      expect(paced({ isSaaS: false, enrolled: true })).toBe(true);
+    });
+  });
+
+  describe("when the installation is cloud and the migration is paced by enrollment", () => {
+    /** @scenario "Cloud rollout processes only enrolled organizations" */
+    it("includes exactly the enrolled organizations", () => {
+      expect(paced({ enrolled: true })).toBe(true);
+      expect(paced({ enrolled: false })).toBe(false);
+    });
+  });
+
+  describe("when the installation is cloud and the migration is enrolled automatically", () => {
+    /** @scenario "A migration can declare that every organization is in its cohort" */
+    it("includes an organization nobody enrolled", () => {
+      expect(paced({ enrolledAutomatically: true, enrolled: false })).toBe(
+        true,
+      );
+    });
+  });
+});
+
+describe("migrationRunsOnThisInstallation", () => {
+  describe("when the installation is cloud", () => {
+    /** @scenario "Cloud rollout is unaffected by the self-hosted release declaration" */
+    it("runs every registered migration whatever it declares", () => {
       expect(
-        cohortIncludes({ isSaaS: false, cohort: undefined, tenantId: "any" }),
+        migrationRunsOnThisInstallation({
+          isSaaS: true,
+          runsAutomaticallyOnSelfHosted: false,
+        }),
       ).toBe(true);
       expect(
-        cohortIncludes({ isSaaS: false, cohort: "none", tenantId: "any" }),
+        migrationRunsOnThisInstallation({
+          isSaaS: true,
+          runsAutomaticallyOnSelfHosted: true,
+        }),
       ).toBe(true);
     });
   });
 
-  describe("when the installation is cloud", () => {
-    it("includes nothing by default", () => {
+  describe("when the installation is self-hosted", () => {
+    /** @scenario "A migration not yet released for self-hosting never runs there" */
+    it("runs only the migrations released for self-hosting", () => {
       expect(
-        cohortIncludes({ isSaaS: true, cohort: undefined, tenantId: "org1" }),
+        migrationRunsOnThisInstallation({
+          isSaaS: false,
+          runsAutomaticallyOnSelfHosted: false,
+        }),
       ).toBe(false);
       expect(
-        cohortIncludes({ isSaaS: true, cohort: "", tenantId: "org1" }),
-      ).toBe(false);
-      expect(
-        cohortIncludes({ isSaaS: true, cohort: "none", tenantId: "org1" }),
-      ).toBe(false);
-    });
-
-    it('includes everything on "all"', () => {
-      expect(
-        cohortIncludes({ isSaaS: true, cohort: "all", tenantId: "org1" }),
+        migrationRunsOnThisInstallation({
+          isSaaS: false,
+          runsAutomaticallyOnSelfHosted: true,
+        }),
       ).toBe(true);
-    });
-
-    it("includes exactly the listed organizations", () => {
-      const cohort = "org1, org2";
-      expect(cohortIncludes({ isSaaS: true, cohort, tenantId: "org1" })).toBe(
-        true,
-      );
-      expect(cohortIncludes({ isSaaS: true, cohort, tenantId: "org2" })).toBe(
-        true,
-      );
-      expect(cohortIncludes({ isSaaS: true, cohort, tenantId: "org3" })).toBe(
-        false,
-      );
     });
   });
 });

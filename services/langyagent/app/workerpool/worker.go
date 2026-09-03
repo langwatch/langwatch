@@ -80,10 +80,16 @@ type Worker struct {
 	projectID         string
 	langwatchEndpoint string
 
+	// prewarmed records that a pre-warm, not a turn, spawned this worker. Set
+	// once before the worker is published to the registry, immutable after, so
+	// it is read without the lock. The manager's pre-first-frame status reads
+	// it: a pre-warmed worker's first turn already has its boot behind it.
+	prewarmed bool
+
 	mu sync.Mutex
 	// lastSeen drives the idle reaper.
 	lastSeen time.Time
-	// inFlight serialises turns on the same conversation. Two simultaneous
+	// inFlight serializes turns on the same conversation. Two simultaneous
 	// /worker requests for one conversationID would otherwise both subscribe to
 	// the same /event stream and each terminate on the other's terminal event,
 	// splicing replies. ClaimTurn/Release wrap it.
@@ -133,6 +139,15 @@ func (w *Worker) shouldReap(cutoff time.Duration) bool {
 	return !w.inFlight && time.Since(w.lastSeen) > cutoff
 }
 
+// idleSince reports the worker's idle state for capacity eviction: whether no
+// turn is in flight, and when it was last active. Callers rank idle workers by
+// lastSeen and take the least-recently-active one first.
+func (w *Worker) idleSince() (idle bool, lastSeen time.Time) {
+	w.mu.Lock()
+	defer w.mu.Unlock()
+	return !w.inFlight, w.lastSeen
+}
+
 // ClaimTurn takes turnId-idempotent ownership for one turn — the caller MUST call
 // Release() when the turn is done (success or error) after a granted claim. See
 // app.ClaimOutcome: the SAME turnId in flight or recently completed is a benign
@@ -167,6 +182,11 @@ func (w *Worker) HasServedTurn() bool {
 	return len(w.handled) > 0
 }
 
+// Prewarmed reports whether a pre-warm spawned this worker (see the field).
+func (w *Worker) Prewarmed() bool {
+	return w.prewarmed
+}
+
 // Release marks the worker idle again and records the turn as recently-handled so
 // a re-dispatch arriving after completion is a benign no-op.
 func (w *Worker) Release() {
@@ -181,6 +201,12 @@ func (w *Worker) Release() {
 	// after completion; a turn longer than the timeout can be killed mid-stream.
 	w.lastSeen = time.Now()
 	w.mu.Unlock()
+
+	// Outside w.mu: the agent takes its own locks, and the turn is already
+	// recorded as finished above. See app.TurnBoundary for what this clears.
+	if boundary, ok := w.agent.(app.TurnBoundary); ok {
+		boundary.TurnEnded()
+	}
 }
 
 // rememberHandled records a completed turnId in the bounded FIFO set. Caller holds
@@ -247,8 +273,12 @@ func (w *Worker) PostMessage(ctx context.Context, system, prompt, historySeed, r
 	if !w.promptDelivered && historySeed != "" {
 		prompt = historySeed + "\n\n" + prompt
 	}
+	// The claimed turn's id rides the Turn so an agent whose wire protocol names
+	// turns (pi) tags this exact turn, the id a later AbortTurn will name.
+	turnID := w.currentTurnID
 	w.mu.Unlock()
 	err := w.agent.Post(ctx, w.endpoint, w.openCodeSessionID, app.Turn{
+		TurnID:      turnID,
 		System:      system,
 		Prompt:      prompt,
 		ResumeToken: resumeToken,
@@ -269,6 +299,39 @@ func (w *Worker) NotifyShutdownImminent(ctx context.Context, deadline time.Time)
 	return w.agent.NotifyShutdownImminent(ctx, w.endpoint, w.openCodeSessionID, deadline)
 }
 
+// AbortTurn asks this worker's agent to abort the named in-flight turn, the
+// worker half of Pool.CancelTurn (ADR-078). turnID-guarded under w.mu: only
+// the turn actually in flight can be aborted, so a stale cancel (the user
+// stopped a turn that already finished, and a new one started) can never halt
+// the wrong generation. An empty turnID is a no-op: a cancel needs a name.
+//
+// The abort is an OPTIONAL agent capability (app.TurnAborter): an agent that
+// does not implement it (opencode today) is a silent no-op, fail-open, so
+// the stop stays truthful on the durable record and only the token burn
+// continues. Best-effort by design: a failed abort is logged, never surfaced.
+func (w *Worker) AbortTurn(ctx context.Context, turnID string) {
+	if turnID == "" {
+		return
+	}
+	w.mu.Lock()
+	claimed := w.inFlight && w.currentTurnID == turnID
+	w.mu.Unlock()
+	if !claimed {
+		return
+	}
+	aborter, ok := w.agent.(app.TurnAborter)
+	if !ok {
+		return
+	}
+	if err := aborter.AbortTurn(ctx, w.endpoint, w.openCodeSessionID, turnID); err != nil {
+		clog.Get(ctx).Warn("abort turn failed, the generation runs to completion on its own",
+			zap.String("conversation", w.conversationID),
+			zap.String("turn_id", turnID),
+			zap.Error(err),
+		)
+	}
+}
+
 // isInFlight reports whether a turn currently owns this worker (Claimed but not
 // yet Released). The shutdown-handoff step waits on this clearing so the
 // in-flight turn's StreamEvents can forward the terminal `handoff` frame to the
@@ -281,7 +344,7 @@ func (w *Worker) isInFlight() bool {
 
 // StreamEvents tails the worker's /event stream and forwards this session's
 // events as ndjson into the sink until a terminal event lands or ctx is
-// cancelled.
+// canceled.
 func (w *Worker) StreamEvents(ctx context.Context, sink app.ChatSink) error {
 	return w.agent.Stream(ctx, w.endpoint, w.openCodeSessionID, sink)
 }

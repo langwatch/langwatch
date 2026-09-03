@@ -411,6 +411,7 @@ describe("Flow Callbacks", () => {
   });
 
   describe("clearFlowCallbacks", () => {
+    /** @scenario "Closing a drawer clears the callbacks of the flows" */
     it("clears all flow callbacks", () => {
       setFlowCallbacks("promptList", { onSelect: vi.fn() });
       setFlowCallbacks("agentList", { onSelect: vi.fn() });
@@ -420,6 +421,42 @@ describe("Flow Callbacks", () => {
       clearFlowCallbacks();
 
       expect(getAllFlowCallbacks()).toEqual({});
+    });
+
+    describe("when a mounted component holds the registration", () => {
+      /** @scenario "A registration a mounted component holds survives a close" */
+      it("keeps the one registered with keepOnClose and drops the rest", () => {
+        const onSaved = vi.fn();
+        setFlowCallbacks(
+          "agentTestingCaseEditor",
+          { onSaved },
+          { keepOnClose: true },
+        );
+        setFlowCallbacks("promptList", { onSelect: vi.fn() });
+
+        clearFlowCallbacks();
+
+        expect(Object.keys(getAllFlowCallbacks())).toEqual([
+          "agentTestingCaseEditor",
+        ]);
+        expect(getFlowCallbacks("agentTestingCaseEditor")?.onSaved).toBe(
+          onSaved,
+        );
+      });
+
+      /** @scenario "A component takes its own registration back" */
+      it("drops it once the component registers an empty set", () => {
+        setFlowCallbacks(
+          "agentTestingCaseEditor",
+          { onSaved: vi.fn() },
+          { keepOnClose: true },
+        );
+        setFlowCallbacks("agentTestingCaseEditor", {});
+
+        clearFlowCallbacks();
+
+        expect(getAllFlowCallbacks()).toEqual({});
+      });
     });
   });
 

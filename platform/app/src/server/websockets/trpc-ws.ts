@@ -16,11 +16,12 @@
 
 import { createLogger } from "@langwatch/observability";
 import { applyWSSHandler } from "@trpc/server/adapters/ws";
-import type { Server as HttpServer, IncomingMessage } from "http";
+import type { IncomingMessage } from "http";
 import { WebSocketServer } from "ws";
 import { env } from "~/env.mjs";
 import { appRouter } from "../api/root";
 import { createTRPCContext } from "../api/trpc";
+import type { UpgradeRouter } from "./upgrade-router";
 
 const PATH = "/api/trpc-ws";
 const logger = createLogger("langwatch:server:websockets:trpc-ws");
@@ -46,9 +47,10 @@ function buildOriginAllowlist(): Set<string> | null {
   }
 }
 
-export function setupTRPCWebSocket(server: HttpServer): TRPCWebSocketHandle {
-  // `noServer: true` — we route by URL pathname so other future WS endpoints
-  // can share the same HTTP server without their upgrades fighting.
+export function setupTRPCWebSocket(router: UpgradeRouter): TRPCWebSocketHandle {
+  // `noServer: true`: the shared upgrade router owns the listener and hands
+  // this path's upgrades over, so other WS endpoints share the HTTP server
+  // without their upgrades fighting.
   const wss = new WebSocketServer({ noServer: true });
   const allowedOrigins = buildOriginAllowlist();
 
@@ -61,10 +63,7 @@ export function setupTRPCWebSocket(server: HttpServer): TRPCWebSocketHandle {
     );
   }
 
-  server.on("upgrade", (req, socket, head) => {
-    const url = new URL(req.url ?? "/", "http://localhost");
-    if (url.pathname !== PATH) return;
-
+  router.register(PATH, (req, socket, head) => {
     // Origin allowlist — cookie-based auth means we must enforce same-origin
     // on the upgrade. Otherwise a logged-in user on evil.com could open a
     // WS back to our origin and call procedures with their session. We
@@ -75,7 +74,7 @@ export function setupTRPCWebSocket(server: HttpServer): TRPCWebSocketHandle {
         {
           origin: origin ?? null,
           hasAllowlist: !!allowedOrigins,
-          path: url.pathname,
+          path: PATH,
         },
         "rejecting WS upgrade: origin not allowed",
       );

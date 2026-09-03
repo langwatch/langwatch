@@ -7,6 +7,7 @@ import {
   fireEvent,
   render,
   screen,
+  waitFor,
   within,
 } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
@@ -29,6 +30,7 @@ const mocks = vi.hoisted(() => ({
   },
   items: [] as unknown[],
   scoreTypes: [] as { id: string; name: string; active: boolean }[],
+  queues: [] as { id: string; name: string }[],
   query: {} as Record<string, string>,
   openDrawer: vi.fn(),
   push: vi.fn(),
@@ -37,6 +39,12 @@ const mocks = vi.hoisted(() => ({
   downloadCsv: vi.fn(),
   periodIsDefault: true,
   queueReadArgs: null as Record<string, unknown> | null,
+  // Stable across renders, unlike the invalidators built inside useUtils, so a
+  // test can say whether the picker's list was refreshed.
+  invalidateQueues: vi.fn(),
+  // What the component wants done once a removal lands. Held so a test can run
+  // it, which is the only way the refresh is reachable from here.
+  deleteOnSuccess: null as ((result: { deleted: number }) => void) | null,
 }));
 
 vi.mock("~/hooks/useAnnotationQueues", () => ({
@@ -72,6 +80,7 @@ vi.mock("~/utils/api", () => ({
         getPendingItemsCount: { invalidate: vi.fn() },
         getAssignedItemsCount: { invalidate: vi.fn() },
         getQueueItemsCounts: { invalidate: vi.fn() },
+        getQueues: { invalidate: mocks.invalidateQueues },
       },
     }),
     annotationScore: {
@@ -79,8 +88,14 @@ vi.mock("~/utils/api", () => ({
     },
     annotation: {
       deleteQueueItems: {
-        useMutation: () => ({ mutate: mocks.deleteMutate, isLoading: false }),
+        useMutation: (options?: {
+          onSuccess?: (result: { deleted: number }) => void;
+        }) => {
+          mocks.deleteOnSuccess = options?.onSuccess ?? null;
+          return { mutate: mocks.deleteMutate, isLoading: false };
+        },
       },
+      getQueues: { useQuery: () => ({ data: mocks.queues }) },
     },
   },
 }));
@@ -237,8 +252,14 @@ beforeEach(() => {
   mocks.requestEnable.mockResolvedValue(true);
   mocks.query = {};
   mocks.scoreTypes = [];
+  mocks.queues = [];
   mocks.periodIsDefault = true;
   mocks.queueReadArgs = null;
+  mocks.invalidateQueues.mockClear();
+  mocks.deleteOnSuccess = null;
+  // Column choices live in the browser, so one test's picks must not decide
+  // what the next one starts from.
+  window.localStorage.clear();
   setItems([{ id: "item-1", traceId: "trace-1" }]);
 });
 afterEach(cleanup);
@@ -351,6 +372,28 @@ describe("AnnotationsTable columns and row actions", () => {
       expect(columnHeaders()).not.toContain("Date annotated");
     });
 
+    /** @scenario "The row's actions stay reachable however wide the table is" */
+    it("pins the actions column to the edge of the table's own scroll", () => {
+      renderQueuePage();
+
+      const actionsHeader = screen.getAllByRole("columnheader").at(-1)!;
+      const actionsCell = screen.getAllByRole("row")[1]!.lastElementChild!;
+      for (const cell of [actionsHeader, actionsCell]) {
+        const style = getComputedStyle(cell);
+        expect(style.position).toBe("sticky");
+        expect(style.right).toBe("0px");
+      }
+    });
+
+    /** @scenario "A queue page filters by status" */
+    it("names the status it is filtering by", () => {
+      renderQueuePage();
+
+      expect(
+        screen.getByRole("button", { name: /Status: Pending/ }),
+      ).toBeInTheDocument();
+    });
+
     /** @scenario "A queue page filters by status" */
     it("offers pending, completed and all", async () => {
       const user = userEvent.setup({ pointerEventsCheck: 0 });
@@ -454,23 +497,51 @@ describe("AnnotationsTable columns and row actions", () => {
       fireEvent.click(screen.getByRole("button", { name: /Export/ }));
 
       const call = mocks.downloadCsv.mock.calls[0]?.[0];
+      // The columns the table shows, in table order. "Helpfulness" is a score
+      // type of its own and off by default, so it is not here; the folded
+      // Scores column is what carries the answers, and it names the type.
       expect(call.fields).toEqual([
-        "Date queued",
-        "Status",
-        "Queued by",
         "Trace ID",
+        "Status",
+        "People",
+        "Date queued",
         "Input",
         "Output",
+        "Scores",
         "Comments",
         "Suggestions",
-        "Helpfulness",
         "Annotators",
       ]);
       expect(call.rows).toHaveLength(2);
       expect(call.rows[0]).toContain("trace-1");
       expect(call.rows[0]).toContain("Pending");
-      expect(call.rows[0]).toContain("good (on point)");
+      expect(call.rows[0]).toContain("Helpfulness: good (on point)");
       expect(call.fileName).toBe("Annotations - 2026-08-08.csv");
+    });
+
+    /** @scenario "A queue page exports the rows on screen" */
+    it("drops a column from the file when the reviewer hides it", async () => {
+      const user = userEvent.setup({ pointerEventsCheck: 0 });
+      mocks.scoreTypes = [{ id: "score-1", name: "Helpfulness", active: true }];
+      renderQueuePage();
+
+      await user.click(
+        screen.getByRole("button", {
+          name: "Show or hide columns in the table",
+        }),
+      );
+      await user.click(
+        await screen.findByRole("checkbox", { name: "Suggestions" }),
+      );
+      // ...and take a score type's own column, which is off by default, on.
+      await user.click(
+        await screen.findByRole("checkbox", { name: "Helpfulness" }),
+      );
+      await user.click(screen.getByRole("button", { name: /Export/ }));
+
+      const call = mocks.downloadCsv.mock.calls[0]?.[0];
+      expect(call.fields).not.toContain("Suggestions");
+      expect(call.fields).toContain("Helpfulness");
     });
   });
 
@@ -591,26 +662,69 @@ describe("AnnotationsTable columns and row actions", () => {
   });
 
   describe("given the project collects scores", () => {
-    /** @scenario "One column per active score type" */
-    it("adds one column per active score type and one cell per row", () => {
+    const twoActiveScoreTypes = () => {
       mocks.scoreTypes = [
         { id: "score-1", name: "Helpfulness", active: true },
         { id: "score-2", name: "Tone", active: true },
         { id: "score-3", name: "Retired", active: false },
       ];
+      setItems([
+        {
+          id: "item-1",
+          traceId: "trace-1",
+          annotations: [
+            annotation({
+              scoreOptions: {
+                "score-1": { value: "good", reason: "on point" },
+              },
+            }),
+          ],
+        },
+      ]);
+    };
+
+    /** @scenario "Every score is folded into one Scores column" */
+    it("folds the scores into one column instead of one column per type", () => {
+      twoActiveScoreTypes();
       renderQueuePage();
 
       const headers = columnHeaders();
-      expect(headers).toContain("Helpfulness");
-      expect(headers).toContain("Tone");
+      expect(headers).toContain("Scores");
+      // One column per type is what made a project with a dozen of them
+      // unreadable; they are on offer in the columns menu, not on by default.
+      expect(headers).not.toContain("Helpfulness");
+      expect(headers).not.toContain("Tone");
       expect(headers).not.toContain("Retired");
+      expect(screen.getByText("Helpfulness: good")).toBeInTheDocument();
       expect(screen.getAllByRole("row")[1]!.children).toHaveLength(
         headers.length,
       );
     });
 
+    /** @scenario "A score type can be given its own column" */
+    it("adds a column for a score type the reviewer picks", async () => {
+      const user = userEvent.setup({ pointerEventsCheck: 0 });
+      twoActiveScoreTypes();
+      renderQueuePage();
+
+      await user.click(
+        screen.getByRole("button", {
+          name: "Show or hide columns in the table",
+        }),
+      );
+      await user.click(
+        await screen.findByRole("checkbox", { name: "Helpfulness" }),
+      );
+
+      expect(columnHeaders()).toContain("Helpfulness");
+      expect(columnHeaders()).not.toContain("Tone");
+      expect(screen.getAllByRole("row")[1]!.children).toHaveLength(
+        columnHeaders().length,
+      );
+    });
+
     /** @scenario "Score types that are all inactive add no columns" */
-    it("adds no score column when none is active", () => {
+    it("offers no score type when none is active", () => {
       mocks.scoreTypes = [
         { id: "score-1", name: "Retired", active: false },
         { id: "score-2", name: "Also retired", active: false },
@@ -622,6 +736,169 @@ describe("AnnotationsTable columns and row actions", () => {
       expect(screen.getAllByRole("row")[1]!.children).toHaveLength(
         headers.length,
       );
+    });
+  });
+
+  describe("given the inbox pools several queues", () => {
+    const twoQueues = () => {
+      mocks.queues = [
+        { id: "queue-1", name: "Tone review" },
+        { id: "queue-2", name: "Safety review" },
+      ];
+    };
+
+    describe("when no queue has been picked", () => {
+      /** @scenario "The inbox reads every queue until one is picked" */
+      it("reads them all and says so", () => {
+        twoQueues();
+        renderQueuePage({ showQueueAndUser: true });
+
+        expect(
+          screen.getByRole("button", { name: /Queues: All/ }),
+        ).toBeInTheDocument();
+        expect(mocks.queueReadArgs?.queueIds).toEqual([]);
+      });
+    });
+
+    describe("when the reviewer picks one of them", () => {
+      /** @scenario "The inbox narrows to the queues the reviewer picks" */
+      it("narrows the read to a picked queue and names it", async () => {
+        const user = userEvent.setup({ pointerEventsCheck: 0 });
+        twoQueues();
+        renderQueuePage({ showQueueAndUser: true });
+
+        await user.click(screen.getByRole("button", { name: /Queues:/ }));
+        await user.click(
+          await screen.findByRole("checkbox", { name: "Safety review" }),
+        );
+
+        expect(mocks.queueReadArgs?.queueIds).toEqual(["queue-2"]);
+        expect(
+          screen.getByRole("button", { name: /Queues: Safety review/ }),
+        ).toBeInTheDocument();
+      });
+    });
+
+    describe("when the reviewer picks one of them from a later page", () => {
+      /** @scenario "Picking a queue takes the reviewer back to the first page" */
+      it("goes back to the first page", async () => {
+        const user = userEvent.setup({ pointerEventsCheck: 0 });
+        twoQueues();
+        mocks.query = { pageOffset: "25" };
+        renderQueuePage({ showQueueAndUser: true });
+
+        await user.click(screen.getByRole("button", { name: /Queues:/ }));
+        await user.click(
+          await screen.findByRole("checkbox", { name: "Safety review" }),
+        );
+
+        // pageOffset drops out of the query entirely at offset zero, so an
+        // empty query IS page one.
+        expect(mocks.push).toHaveBeenCalledWith(
+          { pathname: "/[project]/annotations", query: {} },
+          undefined,
+          { shallow: true },
+        );
+      });
+    });
+
+    describe("when items are removed from a queue", () => {
+      /** @scenario "The queue filter is refreshed when items leave a queue" */
+      it("reads the filter's list again", async () => {
+        twoQueues();
+        renderQueuePage({ showQueueAndUser: true });
+        expect(mocks.invalidateQueues).not.toHaveBeenCalled();
+
+        // A non-member reaches a queue only through items assigned to them, so
+        // the removal that empties that set is the one that changes the list.
+        mocks.deleteOnSuccess?.({ deleted: 1 });
+
+        await waitFor(() =>
+          expect(mocks.invalidateQueues).toHaveBeenCalledTimes(1),
+        );
+      });
+    });
+
+    describe("when the page is already one queue", () => {
+      /** @scenario "A page that is one queue offers no queue filter" */
+      it("offers no queue filter", () => {
+        twoQueues();
+        renderQueuePage({ queueId: "queue-1" });
+
+        expect(
+          screen.queryByRole("button", { name: /Queues:/ }),
+        ).not.toBeInTheDocument();
+      });
+    });
+  });
+
+  describe("given the reviewer wants fewer columns", () => {
+    describe("when the reviewer turns one off in the menu", () => {
+      /** @scenario "A column the reviewer hides stays hidden" */
+      it("hides it and remembers the choice", async () => {
+        const user = userEvent.setup({ pointerEventsCheck: 0 });
+        const view = renderQueuePage();
+        expect(columnHeaders()).toContain("Suggestions");
+
+        await user.click(
+          screen.getByRole("button", {
+            name: "Show or hide columns in the table",
+          }),
+        );
+        await user.click(
+          await screen.findByRole("checkbox", { name: "Suggestions" }),
+        );
+
+        expect(columnHeaders()).not.toContain("Suggestions");
+
+        view.unmount();
+        renderQueuePage();
+
+        expect(columnHeaders()).not.toContain("Suggestions");
+        // Input and output are what the reviewer is judging, so they are never
+        // the thing a stored choice quietly drops.
+        expect(columnHeaders()).toContain("Input");
+        expect(columnHeaders()).toContain("Output");
+      });
+    });
+
+    describe("when the project gains a column their choice never mentioned", () => {
+      /** @scenario "A column added after the reviewer chose still appears" */
+      it("shows the new column", () => {
+        // What an older build wrote: the reviewer hid one column, back when
+        // Suggestions did not exist yet. A store of the visible set would now
+        // read as "Suggestions off"; storing the choice per column instead lets
+        // the new column's own default decide.
+        window.localStorage.setItem(
+          "annotations:columns:project-1",
+          JSON.stringify({ comments: false }),
+        );
+
+        renderQueuePage();
+
+        expect(columnHeaders()).toContain("Suggestions");
+        expect(columnHeaders()).not.toContain("Comments");
+      });
+    });
+  });
+
+  describe("given the columns menu sits behind a tooltip", () => {
+    describe("when the list renders", () => {
+      /** @scenario "The columns menu keeps the button as its own trigger" */
+      it("leaves the button to the menu rather than to its tooltip", () => {
+        renderQueuePage();
+
+        const trigger = screen.getByRole("button", {
+          name: "Show or hide columns in the table",
+        });
+
+        // The tooltip and the menu trigger both clone themselves onto their
+        // child. Let the tooltip win and the menu has no anchor left to measure
+        // against, and it opens in the corner of the page instead of under the
+        // button. Where it lands needs a browser to see; whose button this is
+        // does not, and it is the half that goes wrong.
+        expect(trigger).toHaveAttribute("data-scope", "popover");
+      });
     });
   });
 

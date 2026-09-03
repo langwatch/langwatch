@@ -6,7 +6,6 @@ import (
 	"errors"
 	"fmt"
 	"io"
-	"net/url"
 	"os"
 	"os/exec"
 	"path/filepath"
@@ -15,6 +14,7 @@ import (
 
 	"github.com/langwatch/langwatch/services/langyagent/app"
 	"github.com/langwatch/langwatch/services/langyagent/domain"
+	"github.com/langwatch/langwatch/services/langyagent/internal/workerenv"
 )
 
 // ProvisionInput is everything Provision needs to lay down a worker's opencode
@@ -189,6 +189,62 @@ func (a *Agent) Provision(in ProvisionInput) error {
 		// home lives under the user's ~, which opencode flags as external and asks
 		// about on the very first file touch.
 		"permission": "allow",
+		// The build agent (opencode's default; PostMessage never selects another)
+		// gets Langy's own prompt, which REPLACES the stock coding-agent prompt,
+		// and a tool surface scoped to the role. A "deny" here removes the tool
+		// from the advertised schema, not just from execution: per-agent rules
+		// merge after the root "allow" and the last match wins.
+		//
+		// Both denials are "the product has no way to show this yet", not a
+		// judgement about the capability:
+		//   task     — a subagent runs opencode's stock coding-agent prompt, the
+		//              exact thing this block retires, and the panel has no way to
+		//              show a subagent's work. Re-enable once a subagent can
+		//              inherit this prompt and report into the turn;
+		//   question — opencode's interactive prompt has no surface in the panel,
+		//              so a headless worker blocks on an answer that can never
+		//              arrive. Langy asks through the choices card instead.
+		//              Re-enable if the panel ever renders opencode's own prompt.
+		//
+		// webfetch STAYS. Langy answers questions about the user's agents, and the
+		// answers are not all inside LangWatch's docs: a provider's error code, a
+		// framework's changelog, a model's release notes. Removing the tool would
+		// not remove the capability either, since bash reaches the network too.
+		//
+		// Be exact about what the per-worker egress adapter enforces on a stock
+		// install: rung 1 only, which is TLS required, SNI cross-checked, and
+		// throttled. DESTINATION policy is monitor-only until a project sets an
+		// allow-list or an operator turns on LANGY_EGRESS_ENFORCE_FLOOR (ADR-076),
+		// so out of the box the proxy decides HOW a request may leave and not
+		// WHERE it may go. Where it may go is the Scope rule in AGENTS.md.
+		//
+		// bash, read, grep, glob, edit/write, skill and todowrite stay: the CLI,
+		// the GitHub skill's repo work, dataset file preparation, and the plan
+		// panel all run on them.
+		//
+		// The skill rule is a different shape and does a different job. opencode
+		// ships one built-in skill, customize-opencode, which the two disable
+		// switches in buildWorkerEnv do not touch: they turn off the directory
+		// scans, and this one is embedded in the binary. Its own description
+		// scopes it to editing opencode's config, agents, plugins and permission
+		// rules, which is not something Langy does for a customer, so the 516
+		// characters it renders are prompt weight for nothing. A rule under "skill"
+		// removes it from <available_skills> as well as from execution, because
+		// opencode builds that block from the skills the agent's permission
+		// ruleset allows. The pattern is a name and not "*", so the skill tool
+		// itself stays enabled and every skill we ship still reaches the prompt.
+		"agent": map[string]any{
+			"build": map[string]any{
+				"prompt": LangyAgentPrompt,
+				"permission": map[string]any{
+					"task":     "deny",
+					"question": "deny",
+					"skill": map[string]any{
+						"customize-opencode": "deny",
+					},
+				},
+			},
+		},
 	}
 	// opencode's NATIVE OTel export (traces + logs over standard
 	// OTEL_EXPORTER_OTLP_* env). Bootstraps in ~0s — unlike the removed external
@@ -271,39 +327,25 @@ func (a *Agent) Provision(in ProvisionInput) error {
 		return fmt.Errorf("chown config: %w", err)
 	}
 
-	// The identity plugin (see langyIdentityPluginJS) rides the same config
-	// dir. opencode scans plugin/*.js there at boot, so dropping the file is
-	// the whole wiring.
-	pluginPath := filepath.Join(configDir, langyIdentityPluginFilename)
-	if err := os.MkdirAll(filepath.Dir(pluginPath), 0o700); err != nil {
-		return fmt.Errorf("mkdir plugin dir: %w", err)
-	}
-	if err := in.Runner.Chown(filepath.Dir(pluginPath), in.UID); err != nil {
-		return fmt.Errorf("chown plugin dir: %w", err)
-	}
-	if err := os.WriteFile(pluginPath, []byte(langyIdentityPluginJS), 0o600); err != nil {
-		return fmt.Errorf("write identity plugin: %w", err)
-	}
-	// WriteFile's mode applies only on create; a plugin file surviving from an
-	// earlier provision keeps whatever mode it had, so tighten it explicitly.
-	if err := os.Chmod(pluginPath, 0o600); err != nil {
-		return fmt.Errorf("chmod identity plugin: %w", err)
-	}
-	if err := in.Runner.Chown(pluginPath, in.UID); err != nil {
-		return fmt.Errorf("chown identity plugin: %w", err)
+	// A worker home surviving from an earlier provision may still carry the
+	// retired identity plugin (it rewrote "OpenCode" to "Langy" in opencode's
+	// built-in prompt; the build agent's own prompt made it obsolete). opencode
+	// auto-loads every plugin/*.js under the config dir, so a leftover must be
+	// removed, not ignored.
+	if err := os.RemoveAll(filepath.Join(configDir, "plugin")); err != nil {
+		return fmt.Errorf("remove retired plugin dir: %w", err)
 	}
 
-	// Per-worker AGENTS.md with ${LANGWATCH_ENDPOINT} substituted. The embedded
-	// AGENTS.md keeps the literal placeholder; we resolve it here so each worker
-	// emits concrete URLs in its replies. The template bytes are read once at
-	// Pool.New (from the embedded assets) — only the per-worker ReplaceAll happens
-	// here, so a spawn no longer touches disk for AGENTS.md.
+	// The operating contract, written through byte for byte. The template bytes
+	// are read once at Pool.New (from the embedded assets), so a spawn does not
+	// touch disk for AGENTS.md. Nothing is substituted into it: the prompt
+	// reaches the user through the reply, so an address only the worker can use
+	// must never enter it.
 	if in.AgentsTemplate == "" {
 		return fmt.Errorf("AGENTS.md template unavailable")
 	}
-	rendered := strings.ReplaceAll(in.AgentsTemplate, "${LANGWATCH_ENDPOINT}", in.Creds.LangwatchEndpoint)
 	agentsPath := filepath.Join(in.Home, "AGENTS.md")
-	if err := os.WriteFile(agentsPath, []byte(rendered), 0o600); err != nil {
+	if err := os.WriteFile(agentsPath, []byte(in.AgentsTemplate), 0o600); err != nil {
 		return fmt.Errorf("write AGENTS.md: %w", err)
 	}
 	if err := in.Runner.Chown(agentsPath, in.UID); err != nil {
@@ -342,7 +384,7 @@ func (a *Agent) Spawn(ctx context.Context, in SpawnInput) (*exec.Cmd, error) {
 	cmd := in.Runner.CommandContext(ctx, in.BinaryPath,
 		"serve", "--port", strconv.Itoa(in.Port), "--hostname", "127.0.0.1",
 	)
-	cmd.Env = buildWorkerEnv(in.ConversationID, in.Home, in.Creds, in.OpenCodePassword, in.EgressPort, in.Mediation, in.Capabilities)
+	cmd.Env = buildWorkerEnv(in.Home, in.ConversationID, in.Creds, in.OpenCodePassword, in.EgressPort, in.Mediation, in.Capabilities)
 	cmd.Dir = in.Home
 	// Discard opencode's stdout/stderr. opencode emits LLM completions, tool
 	// outputs (env dumps, file contents), and the raw user prompt — all of which
@@ -369,35 +411,6 @@ func skillsDir(workerHome string) string {
 	return filepath.Join(workerHome, ".config", "opencode", "skills")
 }
 
-// workerInheritedEnvKeys is the complete set of manager environment variables
-// a worker may inherit. Everything security-sensitive is injected explicitly
-// below from the turn's scoped Credentials/Capabilities instead of relying on
-// naming conventions. An allowlist means a newly introduced manager secret is
-// private by default, regardless of its name.
-var workerInheritedEnvKeys = []string{
-	"PATH",
-	"LANG",
-	"LC_ALL",
-	"LC_CTYPE",
-	"TZ",
-	"TERM",
-	"COLORTERM",
-	"NO_COLOR",
-	"FORCE_COLOR",
-	"SSL_CERT_FILE",
-	"SSL_CERT_DIR",
-}
-
-func workerBaseEnv() []string {
-	out := make([]string, 0, len(workerInheritedEnvKeys))
-	for _, key := range workerInheritedEnvKeys {
-		if value, ok := os.LookupEnv(key); ok {
-			out = append(out, key+"="+value)
-		}
-	}
-	return out
-}
-
 // mediatedLLMPlaceholderKey is what a mediated worker sends as its OpenAI API
 // key. NOT a credential: the manager's LLM relay replaces the Authorization
 // header with the real virtual key on the forward. It exists only because the
@@ -412,36 +425,30 @@ const mediatedLLMPlaceholderKey = "langy-mediated"
 // The name has no models.dev catalog entry, so nothing merges over it.
 const gatewayProviderID = "langwatch"
 
-// langyIdentityPluginFilename is where Provision writes the identity plugin,
-// relative to the worker's opencode config dir. opencode auto-discovers every
-// plugin/*.js file under its config directories, so no "plugin" entry is
-// needed in config.json (which stays free of plugin specs; see
-// TestProvision_WritesCLIOnlyConfig).
-const langyIdentityPluginFilename = "plugin/langy-identity.js"
-
-// langyIdentityPluginJS renames the agent's identity in opencode's stock
-// system prompt. opencode selects a per-model default prompt that opens with
-// "You are OpenCode, ..." and offers no config field to rename the agent, but
-// its plugin hook `experimental.chat.system.transform` receives the assembled
-// system prompt before the LLM call. The hook rewrites "OpenCode" to "Langy"
-// IN PLACE (the caller keeps using the same array instance, so reassigning
-// output.system would be lost) and leaves every other byte of whichever
-// default prompt opencode picked untouched. The file has zero imports and no
-// build step, so loading it costs nothing at worker bootstrap, unlike the
-// removed 2 MB external OTel plugin bundle.
-const langyIdentityPluginJS = `// Introduce the agent as Langy in opencode's default system prompt while
-// keeping the rest of the prompt exactly as opencode ships it.
-export default async () => ({
-  "experimental.chat.system.transform": async (_input, output) => {
-    if (!output || !Array.isArray(output.system)) return;
-    for (let i = 0; i < output.system.length; i++) {
-      if (typeof output.system[i] === "string") {
-        output.system[i] = output.system[i].replaceAll("OpenCode", "Langy");
-      }
-    }
-  },
-});
-`
+// LangyAgentPrompt is the build agent's own system prompt. Setting a prompt on
+// an agent makes opencode drop its per-model coding-agent prompt entirely (the
+// "You are OpenCode, …" text) instead of appending to it, so this short block
+// is the whole persona slot. The operating contract stays in AGENTS.md, which
+// opencode appends as an instructions file regardless of the agent prompt —
+// keep the two non-overlapping: persona here, rules there. Exported because it
+// is the ONE Langy persona: the pi adapter writes the same text as its
+// wrapper's personaPrompt, so the persona cannot drift between harnesses.
+const LangyAgentPrompt = "You are Langy, the AI assistant built into LangWatch, operating the user's " +
+	"LangWatch project from inside the product. You work by running the `langwatch` " +
+	"CLI in your shell and reading its JSON output. The AGENTS.md instructions " +
+	"document is your operating contract and applies to every reply. When a request " +
+	"maps to a real action, you act first and answer from the result. " +
+	// Without this the stock coding-agent persona leaks back in through the
+	// model's priors: asked to refactor a file, Langy answers "I can't find
+	// src/agent.py in this workspace, paste the contents and I'll fix it" —
+	// claiming to have searched a checkout it never had. Working on the user's
+	// source IS the job when they ask for it; the GitHub skill clones the
+	// repository first (see AGENTS.md). What is wrong is narrating a workspace
+	// that was never obtained, so this fixes the premise, not the capability.
+	"Your shell does not start with a copy of the user's code in it. When their " +
+	"source is the ask, the repository is cloned first and the work happens there, " +
+	"so never report a file as missing, never describe reading or editing one you " +
+	"have not obtained, and never ask the user to paste their code."
 
 // buildWorkerEnv assembles the environment for a worker's opencode subprocess:
 // the allowlisted inherited env plus per-worker credentials and the per-worker
@@ -457,8 +464,8 @@ export default async () => ({
 // LLM traffic go direct (they have their own explicit NetworkPolicy egress
 // rules; routing them through the per-worker proxy would add a hop and expose
 // LLM streaming to the throttle).
-func buildWorkerEnv(conversationID, workerHome string, creds domain.Credentials, openCodePassword string, egressPort int, med Mediation, caps []app.Capability) []string {
-	env := workerBaseEnv()
+func buildWorkerEnv(workerHome, conversationID string, creds domain.Credentials, openCodePassword string, egressPort int, med Mediation, caps []app.Capability) []string {
+	env := workerenv.BaseEnv()
 
 	// LLM wiring. Mediated (phase 2): OPENAI_BASE_URL points at the manager's
 	// loopback relay, which injects the REAL virtual key + the turn's traceparent
@@ -485,6 +492,10 @@ func buildWorkerEnv(conversationID, workerHome string, creds domain.Credentials,
 		// below) and the LLM virtual key (above).
 		"LANGWATCH_API_KEY="+creds.LangwatchAPIKey,
 		"LANGWATCH_ENDPOINT="+creds.LangwatchEndpoint,
+		// The CLI's `ui call` names the conversation it is driving with this.
+		// A claim, not a credential: the control plane verifies the id belongs
+		// to the session key's owning user before doing anything.
+		"LANGY_CONVERSATION_ID="+conversationID,
 		// Requires opencode's HTTP control server to authenticate with HTTP
 		// Basic (user "opencode", this password) instead of serving every
 		// request unauthenticated. This is the sibling-isolation guarantee
@@ -492,6 +503,15 @@ func buildWorkerEnv(conversationID, workerHome string, creds domain.Credentials,
 		// the world-readable /proc/<pid>/cmdline — only in /proc/<pid>/environ,
 		// which is 0400 and UID-gated.
 		"OPENCODE_SERVER_PASSWORD="+openCodePassword,
+		// opencode also scans ~/.claude/skills and ~/.agents/skills and folds
+		// whatever it finds into the system prompt. The worker's HOME is its
+		// own session dir, but those two scans resolve the real account home,
+		// so on a host-tier manager the operator's personal skills reach Langy.
+		// Measured on a dev box: 17 foreign skills, 8,191 characters, 22% of
+		// the assembled system message, one of them a credential broker. Langy
+		// runs exactly the skills we ship it.
+		"OPENCODE_DISABLE_EXTERNAL_SKILLS=1",
+		"OPENCODE_DISABLE_CLAUDE_CODE_SKILLS=1",
 	)
 	// Host-mediated worker telemetry (phase 1): opencode's native OTel export
 	// points at the manager's loopback relay. NO authorization header — the
@@ -512,7 +532,7 @@ func buildWorkerEnv(conversationID, workerHome string, creds domain.Credentials,
 	}
 	if egressPort > 0 {
 		proxyURL := fmt.Sprintf("http://127.0.0.1:%d", egressPort)
-		noProxy := noProxyHosts(creds)
+		noProxy := workerenv.NoProxyHosts(creds)
 		env = append(env,
 			// Lower- and upper-case both: `gh`/`git`/`curl` read the lower-case
 			// forms, some Go/Node tooling the upper-case ones.
@@ -536,43 +556,4 @@ func buildWorkerEnv(conversationID, workerHome string, creds domain.Credentials,
 		env = append(env, "NODE_EXTRA_CA_CERTS="+ca)
 	}
 	return env
-}
-
-// noProxyHosts is the NO_PROXY list for a worker: loopback plus the in-cluster
-// control-plane and gateway hosts, which egress via their own explicit
-// NetworkPolicy rules and must NOT be funnelled through the per-worker egress
-// adapter (ADR-076: "loopback and the in-cluster control-plane/gateway paths
-// are unaffected").
-func noProxyHosts(creds domain.Credentials) string {
-	hosts := []string{"127.0.0.1", "localhost", "::1"}
-	seen := map[string]struct{}{"127.0.0.1": {}, "localhost": {}, "::1": {}}
-	for _, raw := range []string{creds.LangwatchEndpoint, creds.GatewayBaseURL} {
-		h := hostFromURL(raw)
-		if h == "" {
-			continue
-		}
-		if _, dup := seen[h]; dup {
-			continue
-		}
-		seen[h] = struct{}{}
-		hosts = append(hosts, h)
-	}
-	return strings.Join(hosts, ",")
-}
-
-// hostFromURL extracts the bare hostname from a URL, tolerating a value with no
-// scheme. Returns "" when nothing host-like can be parsed.
-func hostFromURL(raw string) string {
-	raw = strings.TrimSpace(raw)
-	if raw == "" {
-		return ""
-	}
-	if !strings.Contains(raw, "://") {
-		raw = "//" + raw
-	}
-	u, err := url.Parse(raw)
-	if err != nil {
-		return ""
-	}
-	return u.Hostname()
 }

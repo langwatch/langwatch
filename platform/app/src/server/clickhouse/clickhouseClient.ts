@@ -14,7 +14,8 @@ const logger = createLogger("langwatch:clickhouse:routing");
 
 /**
  * Resolver function that returns the appropriate ClickHouseClient for a given
- * tenant (projectId). Repositories use this instead of holding a fixed client,
+ * tenant — a project for most callers, an organization for the ones whose
+ * aggregate is one. Repositories use this instead of holding a fixed client,
  * enabling per-tenant routing to private ClickHouse instances.
  *
  * The type is exported; a resolver is not. One is built in the composition
@@ -79,35 +80,165 @@ function parsePrivateEnvVars(
 /** Cache of custom ClickHouse clients keyed by organizationId. */
 const customClientCache = new Map<string, ClickHouseClient>();
 
-/** Cache of projectId → organizationId to avoid repeated DB lookups. */
-const projectOrgCache = new Map<string, string>();
+/** Cache of tenantId → organizationId to avoid repeated DB lookups. */
+const tenantOrgCache = new Map<string, string>();
 
 /**
- * Returns the appropriate ClickHouse client for a given project.
+ * Tenants already known to name a user. Kept separately from
+ * `tenantOrgCache` because a user has no organization to key there — the
+ * answer is the shared instance, not an org id.
  *
- * Resolves the project's organization (cached), then checks for a private
- * ClickHouse env var for that org. Falls back to the shared client.
+ * Grows with the number of DISTINCT users a process resolves, which unlike
+ * projects and organizations is not bounded by how many exist: a backfill
+ * walks the whole user table. Accepted because the entries are ids, and
+ * because the lookups it saves are on the hot path of every identity append.
+ *
+ * Deleting a user does NOT evict them, also deliberately. Their id keeps
+ * answering "shared" instead of throwing, and that is not a residency
+ * question: shared is where that person's history already sits, so a late
+ * append lands beside its own siblings rather than on somebody else's
+ * instance. The only guarantee it softens is that an id we cannot place
+ * throws. Erasure appends for a user around their deletion, so evicting on
+ * delete would have to be ordered against that — for a case where the wrong
+ * answer is "wrote to the right instance anyway".
  */
-export async function getClickHouseClientForProject(
-  projectId: string,
-): Promise<ClickHouseClient | null> {
-  let orgId = projectOrgCache.get(projectId);
+const userTenantCache = new Set<string>();
 
-  if (!orgId) {
-    const project = await prisma.project.findUnique({
-      where: { id: projectId },
-      select: { team: { select: { organizationId: true } } },
-    });
-    if (!project) {
-      throw new Error(
-        `Cannot resolve ClickHouse client: project "${projectId}" not found. Refusing to fall back to shared client to prevent data leakage.`,
-      );
-    }
-    orgId = project.team.organizationId;
-    projectOrgCache.set(projectId, orgId);
+/**
+ * Returns the appropriate ClickHouse client for a given tenant.
+ *
+ * THREE kinds of tenant reach this function, one per kind of aggregate the
+ * event store holds:
+ *
+ *   - a PROJECT, which is what a tenant was and mostly still is;
+ *   - an ORGANIZATION, since the grants ledger (ADR-092 §13) put an
+ *     aggregate per organization into the same store;
+ *   - a USER, since the identity aggregate (D01, ADR-101 §6) is keyed by the
+ *     person rather than by anything they belong to.
+ *
+ * The first two resolve the same way, because routing is per-organization
+ * for both: a project contributes the organization that owns it, and an
+ * organization contributes itself. That organization (cached) decides
+ * whether a private ClickHouse env var applies.
+ *
+ * ── Why a USER is its own kind, and not resolved into an organization ───
+ *
+ * The user IS the tenant for a user-scoped aggregate, and the id stays the
+ * user's. It is tempting to resolve one into an organization the way a
+ * project resolves into its owner, and that is the trap: a tenant is a
+ * PROJECT id, one user reaches many projects across many organizations, and
+ * there is no "the organization" for them to contribute. Any mapping we
+ * invented would be picking one of several equally true answers. The
+ * identity aggregate is keyed by user precisely because the user is the
+ * thing that persists across all of them.
+ *
+ * A single sentinel — rewriting every user-scoped append to one "global"
+ * TENANT id — was the other candidate and is worse: it would throw away the
+ * scoping that makes every guarantee in this file checkable, and one
+ * unplaceable user would become indistinguishable from every other. The
+ * tenant id stays the user's. It is the INSTANCE that is global.
+ *
+ * That leaves one question this function actually has to answer — which
+ * instance — and user data always lands on the shared one. Identity history
+ * is platform-level rather than any organization's data: it is how a person
+ * signs in, which is true of them before, across and after every
+ * organization they belong to. So a user tenant does not consult private
+ * routing at all — the answer does not depend on it, and there is nothing
+ * for a membership to change.
+ *
+ * This kind arrived unsupported: appends for it threw the refusal below, so
+ * no identity event ever reached the log, the fold never ran, and the
+ * backfill's parity proof reported `identifier_missing` for every user on
+ * every pass. Nothing was corrupted — the guard refused rather than writing
+ * somewhere wrong — but nothing could ever finish either.
+ *
+ * ── The order below ────────────────────────────────────────────────────
+ *
+ * The user is asked for FIRST and asked for DIRECTLY: one lookup that says
+ * user or not, rather than reaching the answer by elimination. Deriving it —
+ * "no project and no organization, so it must be a person" — makes the most
+ * important routing decision in this file the one nothing states, and every
+ * future tenant kind silently joins that same branch.
+ *
+ * Both caches are consulted before either query, so asking about the user
+ * first costs a project tenant one extra lookup on its first resolution and
+ * nothing afterwards.
+ *
+ * An id that names none of the three kinds is still an error rather than the
+ * shared client: a tenant we cannot place is exactly the one whose data must
+ * not land on somebody else's instance.
+ */
+export async function getClickHouseClientForTenant(
+  tenantId: string,
+): Promise<ClickHouseClient | null> {
+  if (userTenantCache.has(tenantId)) return sharedClickHouseClientOrThrow();
+
+  const cachedOrgId = tenantOrgCache.get(tenantId);
+  if (cachedOrgId) return getClickHouseClientForOrganization(cachedOrgId);
+
+  if (await tenantIsUser(tenantId)) {
+    userTenantCache.add(tenantId);
+    return sharedClickHouseClientOrThrow();
   }
 
+  const orgId = await organizationIdForTenant(tenantId);
+  tenantOrgCache.set(tenantId, orgId);
   return getClickHouseClientForOrganization(orgId);
+}
+
+/**
+ * Which organization's instance this tenant routes to. Called only once the
+ * tenant is known not to be a user, so it answers for the two kinds that
+ * resolve per-organization: a project names its owner, an organization names
+ * itself.
+ *
+ * An id that is none of the three throws rather than resolving — by the time
+ * this runs, every kind we support has been asked for.
+ */
+async function organizationIdForTenant(tenantId: string): Promise<string> {
+  const project = await prisma.project.findUnique({
+    where: { id: tenantId },
+    select: { team: { select: { organizationId: true } } },
+  });
+  if (project) return project.team.organizationId;
+
+  const organization = await prisma.organization.findUnique({
+    where: { id: tenantId },
+    select: { id: true },
+  });
+  if (organization) return organization.id;
+
+  throw new Error(
+    `Cannot resolve ClickHouse client: tenant "${tenantId}" is neither a project, an organization, nor a user. Refusing to fall back to shared client to prevent data leakage.`,
+  );
+}
+
+/**
+ * Whether this tenant names a USER, whose events go to the shared instance.
+ *
+ * Only the row's existence is asked. Which organizations they belong to, and
+ * whether any of those has a private ClickHouse, does not enter into it: user
+ * data lands on the shared instance either way, so there is no membership for
+ * a query to discover and nothing about it that can later change the answer.
+ */
+async function tenantIsUser(tenantId: string): Promise<boolean> {
+  const user = await prisma.user.findUnique({
+    where: { id: tenantId },
+    select: { id: true },
+  });
+  return user !== null;
+}
+
+/** The shared client, or the configuration error that explains its absence. */
+function sharedClickHouseClientOrThrow(): ClickHouseClient {
+  const shared = _getSharedClickHouseClient();
+  if (!shared) {
+    throw new Error(
+      "ClickHouse is not configured. Set the CLICKHOUSE_URL environment variable. " +
+        "See dev/docs/adr/004-docker-dev-environment.md for setup instructions.",
+    );
+  }
+  return shared;
 }
 
 /**
@@ -120,16 +251,7 @@ export async function getClickHouseClientForOrganization(
   organizationId: string,
 ): Promise<ClickHouseClient> {
   const route = privateClickHouseUrls.get(organizationId);
-  if (!route) {
-    const shared = _getSharedClickHouseClient();
-    if (!shared) {
-      throw new Error(
-        "ClickHouse is not configured. Set the CLICKHOUSE_URL environment variable. " +
-          "See dev/docs/adr/004-docker-dev-environment.md for setup instructions.",
-      );
-    }
-    return shared;
-  }
+  if (!route) return sharedClickHouseClientOrThrow();
 
   return getOrCreateCustomClient(organizationId, route);
 }
@@ -185,9 +307,6 @@ export function isClickHouseEnabled(): boolean {
   );
 }
 
-/** Re-export for infrastructure-only use (metrics collection, not tenant data). */
-export { _getSharedClickHouseClient as getSharedClickHouseClient } from "./client";
-
 /**
  * Returns a cached ClickHouse client for the given org and URL,
  * creating one if it doesn't exist yet.
@@ -240,14 +359,17 @@ export function getCustomClientCacheSize(): number {
 }
 
 /**
- * Clears the project → org cache. Useful for testing.
+ * Clears the tenant → org cache. Useful for testing.
  */
-export function clearProjectOrgCache(): void {
-  projectOrgCache.clear();
+export function clearTenantOrgCache(): void {
+  tenantOrgCache.clear();
 }
 
 /**
- * Returns the parsed private ClickHouse URLs map. Exposed for testing.
+ * Returns the parsed private ClickHouse URLs map. Two production consumers on
+ * top of the tests: `tasks/clickhouseMigrate.ts` runs each private instance's
+ * migrations off the values, and the system-migrations composition reads the
+ * KEYS as the private-dataplane organizations a cohort enrollment must skip.
  */
 export function getPrivateClickHouseUrls(): ReadonlyMap<string, string> {
   // Projected, not returned directly. The backing map now holds a route object

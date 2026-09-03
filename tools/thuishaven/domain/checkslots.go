@@ -22,41 +22,131 @@ const checkRAMPerRun = 6 << 30
 // is worth starting.
 const checkCPUsPerRun = 4
 
-// CheckEnv carries the two environment values the limit is resolved from.
+// CheckEnv carries the environment the limit is resolved from.
 type CheckEnv struct {
 	CheckSlots string // CHECK_SLOTS
 	CI         string // CI
+	Claudecode string // CLAUDECODE, set in every shell an agent runs
+	// HeldByQueue reports that CHECK_QUEUE_HELD names a live ancestor of this
+	// process that is itself one of the queue's wrappers: the queue spawned the
+	// run and already counted it. The caller resolves it, because the domain
+	// does not inspect processes.
+	HeldByQueue bool
+}
+
+// CheckMachine carries the machine facts the limit is resolved from.
+type CheckMachine struct {
+	TotalRAMBytes uint64
+	NumCPU        int
+	Pressure      Pressure
+}
+
+// ResolveCheckPressure reads the CHECK_PRESSURE override, falling back to what
+// the machine measured. The override exists for two reasons that are really
+// one: tests need a deterministic level, and an operator who knows better than
+// the heuristic (a machine that is about to get busy, or one whose swap is
+// disabled for a good reason) needs the same lever. A value that is not one of
+// the three level names falls back to the measurement, exactly like a
+// CHECK_SLOTS typo: a misspelling must not change the policy.
+//
+// CI reads green whatever the machine says. The queue already stands down
+// there, and the same reasoning retires the pressure policy with it: a runner
+// runs one job and nobody is typing on it, so halving its cores buys back an
+// interactive machine that does not exist and only makes the job slower. A
+// swap figure read inside a container describes the host, not this job. The
+// level is measured on macOS only, so today CI is green by accident of the
+// runner's kernel on a Linux runner and by this rule everywhere; the rule is
+// what makes "CI is unaffected" true rather than lucky.
+func ResolveCheckPressure(override string, measured Pressure, ci string) Pressure {
+	switch strings.ToLower(strings.TrimSpace(override)) {
+	case "green":
+		return Green
+	case "amber":
+		return Amber
+	case "red":
+		return Red
+	}
+	if isTruthyEnv(ci) {
+		return Green
+	}
+	return measured
+}
+
+// isTruthyEnv reads the CI convention: the variable is set to something that
+// is not one of the values meaning "no". CI and CLAUDECODE both follow it, so
+// the slot limit and the pressure policy read them by one rule that cannot
+// drift apart.
+func isTruthyEnv(value string) bool {
+	normalized := strings.ToLower(strings.TrimSpace(value))
+	return normalized != "" && normalized != "0" && normalized != "false"
 }
 
 // ResolveCheckSlots resolves how many whole-repo checks may run at once, and
-// names where the answer came from ("CHECK_SLOTS", "CI" or "machine").
+// names where the answer came from ("CHECK_SLOTS", "held", "CI", "machine" or
+// "pressure").
 //
 // An explicit CHECK_SLOTS always wins, including under CI — that is what lets
 // tests exercise the queue on a CI runner. "0" (or off/none/unlimited/false)
-// disables the gate. Unset, CI gets no queue at all (one job runs one check),
-// and a developer machine gets a limit bounded by both memory and cores —
-// tsgo is memory-hungry AND parallel, so the tighter bound is the honest one —
-// never below 1, or the queue would deadlock every run.
-func ResolveCheckSlots(totalRAMBytes uint64, numCPU int, env CheckEnv) (int, string) {
+// disables the gate — from a person's shell. From an agent shell (CLAUDECODE
+// set) a gate-off is ignored and the derived limit applies, unless the queue
+// itself spawned the run (HeldByQueue): the queue exists to serialize agents,
+// so a lever any agent may pull is not a limit. Unset, CI gets no queue at all
+// (one job runs one check), and a developer machine gets a limit bounded by
+// both memory and cores — tsgo is memory-hungry AND parallel, so the tighter
+// bound is the honest one — never below 1, or the queue would deadlock every
+// run.
+//
+// A machine already under memory pressure gets one slot, whatever the formula
+// says. The formula assumes an otherwise idle machine, and pressure is the
+// machine reporting that assumption false: its RAM is spoken for, so a second
+// concurrent check is paid for in everyone's swap. Only the derived default
+// narrows. An explicit CHECK_SLOTS is the operator's call either way.
+func ResolveCheckSlots(machine CheckMachine, env CheckEnv) (int, string) {
 	raw := strings.TrimSpace(env.CheckSlots)
 	if raw != "" {
-		switch strings.ToLower(raw) {
-		case "off", "none", "unlimited", "false":
-			return 0, "CHECK_SLOTS"
-		}
-		if parsed, err := strconv.Atoi(raw); err == nil && parsed >= 0 {
+		if gateOffRequested(raw) {
+			if !isTruthyEnv(env.Claudecode) {
+				return 0, "CHECK_SLOTS"
+			}
+			if env.HeldByQueue {
+				return 0, "held"
+			}
+			// An agent shell may not turn the queue off: fall through to the
+			// derived limit as if CHECK_SLOTS were unset.
+		} else if parsed, err := strconv.Atoi(raw); err == nil && parsed > 0 {
 			return parsed, "CHECK_SLOTS"
 		}
 		// An unparseable value falls through to the derived default, exactly
 		// like the JS wrapper: a typo must not turn the gate off.
 	}
-	ci := strings.ToLower(strings.TrimSpace(env.CI))
-	if ci != "" && ci != "0" && ci != "false" {
+	if isTruthyEnv(env.CI) {
 		return 0, "CI"
 	}
-	byMemory := int(totalRAMBytes / checkRAMPerRun)
-	byCPU := numCPU / checkCPUsPerRun
+	if machine.Pressure > Green {
+		return 1, "pressure"
+	}
+	byMemory := int(machine.TotalRAMBytes / checkRAMPerRun)
+	byCPU := machine.NumCPU / checkCPUsPerRun
 	return max(1, min(byMemory, byCPU)), "machine"
+}
+
+// gateOffRequested reads the values that ask for the queue to be off entirely.
+func gateOffRequested(raw string) bool {
+	switch strings.ToLower(raw) {
+	case "off", "none", "unlimited", "false":
+		return true
+	}
+	parsed, err := strconv.Atoi(raw)
+	return err == nil && parsed == 0
+}
+
+// GateOffIgnored reports that this environment asked for the gate to be off
+// and was refused: the ask came from an agent shell and not from the queue
+// itself. ResolveCheckSlots stays silent about it, so callers use this to say
+// why the limit still applies.
+func GateOffIgnored(env CheckEnv) bool {
+	return gateOffRequested(strings.TrimSpace(env.CheckSlots)) &&
+		isTruthyEnv(env.Claudecode) && !env.HeldByQueue
 }
 
 // CheckGoMemLimit is the soft memory cap set on the Go-runtime tools the queue
@@ -74,10 +164,38 @@ func ResolveCheckSlots(totalRAMBytes uint64, numCPU int, env CheckEnv) (int, str
 // the price of collecting continuously to miss it. 6 itself is a judgement
 // between measured points and wants a re-measure on an unloaded machine; see
 // ADR-100, which records what the samples do and do not establish.
-func CheckGoMemLimit(totalRAMBytes uint64, existing string) string {
+//
+// A machine under memory pressure gets the floor outright. The ceiling is
+// garbage the runtime has not collected because it was told there was room;
+// on a machine that is already compressing and swapping there is no room, and
+// every gigabyte the ceiling grants is paid by evicting someone else's pages.
+// The floor trades that for the run's own GC time, which is the trade a
+// pressured machine wants: the check pays, not everything else.
+func CheckGoMemLimit(totalRAMBytes uint64, existing string, pressure Pressure) string {
 	if existing != "" {
 		return existing
 	}
+	if pressure > Green {
+		return "3GiB"
+	}
 	gib := int(totalRAMBytes / (2 << 30))
 	return fmt.Sprintf("%dGiB", clampInt(gib, 3, 6))
+}
+
+// CheckGoMaxProcs is the parallelism the queue grants the Go-runtime tools it
+// wraps. On a green machine it grants nothing: an empty string means "do not
+// set it" and the tool uses every core, which is the right spend for one run
+// on an idle machine. Under pressure it halves the cores, never below two:
+// eleven runnable threads on a machine that has to page every allocation in
+// is eleven threads taking page faults, and half of them buys back an
+// interactive machine for a modest wall-clock cost. An operator's explicit
+// GOMAXPROCS always wins, whatever the level.
+func CheckGoMaxProcs(numCPU int, existing string, pressure Pressure) string {
+	if existing != "" {
+		return existing
+	}
+	if pressure == Green {
+		return ""
+	}
+	return strconv.Itoa(max(2, numCPU/2))
 }

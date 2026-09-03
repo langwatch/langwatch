@@ -74,6 +74,16 @@ Feature: Langy recognises its own CLI behind a shell tool call
       When the LangWatch CLI exits with an error
       Then the recorded tool result keeps the error text the CLI printed
 
+    # The CLI documents its --jq flag with the example ".traces[].traceId". The
+    # "[]" in that sentence parses as an empty array, so every usage text and
+    # every --help was recorded as the JSON document []. The agent read a
+    # rejected command as "no results" and reported that as a count.
+    @unit
+    Scenario: A rejected command is never read as an empty result
+      When the LangWatch CLI rejects a flag and prints its usage text
+      Then the recorded tool result is that text, not a fragment of JSON from inside it
+      And the same holds for a command that only printed its help
+
   # A failure the CLI described precisely — what went wrong, why, and what to do
   # about it — used to reach the panel as a bare sentence, because the envelope
   # kept only the message and threw the structure away. The card then had nothing
@@ -156,6 +166,30 @@ Feature: Langy recognises its own CLI behind a shell tool call
       When Langy's tool call fails
       Then the code is selectable on the card
       And one action copies the whole failure for a support thread
+
+  # A count that hit a malformed response printed a Python traceback, and the
+  # most quotable line of it, the exception class and its message, was lifted
+  # into the card body. A traceback is the engine talking to itself: file paths,
+  # line numbers and class names, none of it written for a reader
+  # (dev/docs/best_practices/error-handling.md).
+  Rule: A failure card never draws a traceback as its body
+
+    @unit
+    Scenario: A traceback is kept out of the card body
+      When Langy's tool call fails with a traceback and no structured failure
+      Then the card says the step couldn't be completed
+      And it adds no detail line taken from the traceback
+
+    @unit
+    Scenario: A one-line failure sentence is still shown as a detail
+      When Langy's tool call fails with a plain sentence and no structured failure
+      Then the card shows that sentence as its detail
+
+    @integration
+    Scenario: The traceback stays reachable behind the disclosure
+      When Langy's tool call fails with a traceback and no structured failure
+      Then the traceback is not in the card body
+      And one action reveals the whole traceback on the card
 
   # The user asked Langy to create a scenario on a free plan that already had
   # three. The card told them their access in the project didn't cover the

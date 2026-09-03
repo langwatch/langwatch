@@ -1,7 +1,7 @@
 /**
- * tRPC adapter for the governed SQL workbench's experimental switch.
+ * tRPC adapter for the LangWatchQL workbench's experimental switch.
  *
- * The decision itself stays in `governedSqlEnabled`; this is only the shape that
+ * The decision itself stays in `lwqlEnabled`; this is only the shape that
  * lets a procedure declare the gate instead of remembering to call it. Written
  * out by hand in every resolver, the gate held only for as long as nobody added
  * a sixth procedure and forgot the line — and a forgotten line does not fail,
@@ -12,13 +12,13 @@
  * touch the project should not learn from the answer whether the experiment is
  * switched on for it.
  *
- * @see ~/server/analytics/governed-sql/access — the decision this adapts
- * @see specs/analytics/governed-sql-workbench.feature
- * @see specs/analytics/governed-sql-saved-charts.feature
+ * @see ~/server/analytics/lwql/access — the decision this adapts
+ * @see specs/analytics/lwql-workbench.feature
+ * @see specs/analytics/lwql-saved-charts.feature
  */
 
-import { governedSqlEnabled } from "~/server/analytics/governed-sql/access";
-import { GovernedSqlNotEnabledError } from "~/server/analytics/governed-sql/errors";
+import { lwqlEnabled } from "~/server/analytics/lwql/access";
+import { LangWatchQLNotEnabledError } from "~/server/analytics/lwql/errors";
 import type { PermissionMiddleware } from "~/server/api/rbac";
 
 /**
@@ -32,15 +32,15 @@ export const enforceWorkbenchEnabled: PermissionMiddleware<{
   projectId: string;
 }> = async ({ ctx, input, next }) => {
   if (
-    !(await governedSqlEnabled({
+    !(await lwqlEnabled({
       projectId: input.projectId,
       prisma: ctx.prisma,
     }))
   ) {
     // A typed handled error, not a bare FORBIDDEN: `handledErrorMiddleware`
-    // serialises `code: "governed_sql_not_enabled"` onto the wire, which is
+    // serialises `code: "lwql_not_enabled"` onto the wire, which is
     // what the workbench keys its copy off.
-    throw new GovernedSqlNotEnabledError();
+    throw new LangWatchQLNotEnabledError();
   }
   return next();
 };

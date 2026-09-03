@@ -20,17 +20,21 @@
  * a form binds to, so nothing is lost by deciding it one layer down.
  *
  * @see ~/server/analytics/saved-workbench-charts — the service and its schema
- * @see specs/analytics/governed-sql-saved-charts.feature
+ * @see specs/analytics/lwql-saved-charts.feature
  */
 
 import { z } from "zod";
 
+import {
+  lwqlGranularityStepSchema,
+  lwqlTimeWindowSchema,
+} from "~/server/analytics/lwql/timeWindowSchema";
 import { SavedWorkbenchChartService } from "~/server/analytics/saved-workbench-charts/savedWorkbenchChart.service";
 
-import { checkProjectPermission } from "../../rbac";
 import { createTRPCRouter, protectedProcedure } from "../../trpc";
 import { getUserProtectionsForProject } from "../../utils";
 
+import { resolveLangWatchQLCaller } from "./lwqlCaller";
 import { enforceWorkbenchEnabled } from "./workbenchAccessMiddleware";
 
 const projectScopeSchema = z.object({ projectId: z.string() });
@@ -42,7 +46,7 @@ const nameSchema = z.string().min(1).max(200);
 /** Every saved workbench chart in the project. */
 const getAll = protectedProcedure
   .input(projectScopeSchema)
-  .use(checkProjectPermission("analytics:view"))
+  .permission("analytics:view")
   .use(enforceWorkbenchEnabled)
   .query(async ({ ctx, input }) => {
     return await SavedWorkbenchChartService.create(ctx.prisma).getAll({
@@ -53,7 +57,7 @@ const getAll = protectedProcedure
 /** One saved chart, with its query, parameters and specification. */
 const getById = protectedProcedure
   .input(chartScopeSchema)
-  .use(checkProjectPermission("analytics:view"))
+  .permission("analytics:view")
   .use(enforceWorkbenchEnabled)
   .query(async ({ ctx, input }) => {
     return await SavedWorkbenchChartService.create(ctx.prisma).getById({
@@ -78,7 +82,7 @@ const create = protectedProcedure
       definition: z.unknown(),
     }),
   )
-  .use(checkProjectPermission("analytics:create"))
+  .permission("analytics:create")
   .use(enforceWorkbenchEnabled)
   .mutation(async ({ ctx, input }) => {
     return await SavedWorkbenchChartService.create(ctx.prisma).createChart({
@@ -104,7 +108,7 @@ const update = protectedProcedure
       definition: z.unknown().optional(),
     }),
   )
-  .use(checkProjectPermission("analytics:update"))
+  .permission("analytics:update")
   .use(enforceWorkbenchEnabled)
   .mutation(async ({ ctx, input }) => {
     return await SavedWorkbenchChartService.create(ctx.prisma).updateChart({
@@ -124,7 +128,7 @@ const update = protectedProcedure
 
 const deleteChart = protectedProcedure
   .input(chartScopeSchema)
-  .use(checkProjectPermission("analytics:delete"))
+  .permission("analytics:delete")
   .use(enforceWorkbenchEnabled)
   .mutation(async ({ ctx, input }) => {
     await SavedWorkbenchChartService.create(ctx.prisma).deleteChart({
@@ -134,10 +138,67 @@ const deleteChart = protectedProcedure
     return { success: true };
   });
 
+/**
+ * Runs one saved chart and returns its result.
+ *
+ * A sibling of `getById` rather than a new surface — running is reading with
+ * execution attached — chained through the same permission and switch gates as
+ * every other procedure here. The period and the datapoint step are supplied by
+ * this request, never read out of the stored definition: they are the surface's
+ * to set, which is the whole reserved-parameter contract. Handled errors
+ * propagate untouched, like on `create`: the boundary serialises their code plus
+ * `meta`, and the workbench renders registry copy keyed by that code — including
+ * `lwql_granularity_too_fine`'s bucket arithmetic.
+ *
+ * `onBudgetOverflow` defaults to refusing, so every existing caller keeps the
+ * behaviour it had. A dashboard widget passes `"coarsen"` because its saved
+ * step meets whatever period the dashboard's control is set to: refusing there
+ * would blank a card whose owner changed nothing. The substitution is reported
+ * back as `coarsenedFromSeconds` rather than applied silently.
+ */
+const run = protectedProcedure
+  .input(
+    chartScopeSchema.extend({
+      timeWindow: lwqlTimeWindowSchema.optional(),
+      /**
+       * The datapoint step, in seconds — restricted to the offered steps
+       * ({@link lwqlGranularityStepSchema}) so an off-list value is a schema
+       * rejection here rather than reaching the service's backstop.
+       */
+      granularitySeconds: lwqlGranularityStepSchema.optional(),
+      onBudgetOverflow: z.enum(["refuse", "coarsen"]).optional(),
+    }),
+  )
+  .permission("analytics:view")
+  .use(enforceWorkbenchEnabled)
+  .mutation(async ({ ctx, input }) => {
+    const { project, protections } = await resolveLangWatchQLCaller({
+      ctx,
+      projectId: input.projectId,
+    });
+
+    return SavedWorkbenchChartService.create(ctx.prisma).runChart({
+      id: input.id,
+      projectId: input.projectId,
+      project,
+      protections,
+      input: {
+        ...(input.timeWindow ? { timeWindow: input.timeWindow } : {}),
+        ...(input.granularitySeconds === undefined
+          ? {}
+          : { granularitySeconds: input.granularitySeconds }),
+        ...(input.onBudgetOverflow
+          ? { onBudgetOverflow: input.onBudgetOverflow }
+          : {}),
+      },
+    });
+  });
+
 export const savedWorkbenchChartsRouter = createTRPCRouter({
   getAll,
   getById,
   create,
   update,
+  run,
   delete: deleteChart,
 });

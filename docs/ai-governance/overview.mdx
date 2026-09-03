@@ -46,13 +46,13 @@ Every span the wrapper produces lands in the developer's own Trace Explorer, wit
 
 ### For an admin
 
-The bird-eye view at `/governance` is the daily home for admin oversight: org-wide spend, top spenders, open anomaly count, ingestion-source health, recent activity. Below it, `/settings/governance/*` is the authoring surface where routing policies, ingestion sources, anomaly rules, the AI Tools Portal catalog, and the audit log all live.
+The bird-eye view at `/governance` is the daily home for admin oversight: org-wide spend, top spenders, open anomaly count, ingestion-source health, recent activity. Below it, `/governance/*` is the authoring surface where routing policies, ingestion sources, anomaly rules, the AI Tools Portal catalog, and the audit log all live.
 
 <Frame caption="The /governance dashboard. KPI summary (org-wide spend, active users, open anomalies), 30-day spend-over-time chart bucketed per team, spend-share-across-teams bar, ingestion-source health, recent activity. Read-mostly oversight, the place admins check before standup.">
   ![Governance bird-eye](/images/ai-governance/post-bypass/06-governance-birdeye.png)
 </Frame>
 
-The Tool Catalog at `/settings/governance/tool-catalog` stocks the developer-facing `/me` portal. Pick a fixed roster of coding assistants and model providers, scope to the org or to specific teams, publish.
+The Tool Catalog at `/governance/inventory?tab=catalog` stocks the developer-facing `/me` portal. Pick a fixed roster of coding assistants and model providers, scope to the org or to specific teams, publish.
 
 <Frame caption="Tool Catalog editor. Three tile classes, preset picker, custom icon upload, scope binding, publish lifecycle.">
   ![Tool catalog editor](/images/ai-governance/post-bypass/07-tool-catalog.png)
@@ -80,7 +80,7 @@ LangWatch governance is shaped around two people who never need the same screen:
 - **End user**: a developer or analyst who needs a Personal Virtual Key, wants to see their own usage and budget at `/me`, and sometimes switches between Personal, Team, and Project workspaces. They never see the admin surface.
 - **Admin**: an org-level operator who configures ingestion sources, publishes routing policies, defines anomaly rules, and signs off on OCSF and SIEM export. They never see the end-user `/me` chrome.
 
-The persona-aware chrome (single-chip header on `/me`, full sidebar on `/settings/governance/*`) keeps both surfaces clean, so neither has to navigate around the other.
+The persona-aware chrome (single-chip header on `/me`, full sidebar on `/governance/*`) keeps both surfaces clean, so neither has to navigate around the other.
 
 ## Get started
 

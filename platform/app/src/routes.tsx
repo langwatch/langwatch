@@ -5,12 +5,13 @@ import {
   createBrowserRouter,
   Outlet,
   type RouteObject,
-  redirect,
   useLocation,
   useNavigation,
 } from "react-router";
+import { LegacyPrefixRedirect } from "~/components/LegacyPrefixRedirect";
 import { PageErrorFallback } from "~/components/ui/PageErrorFallback";
 import { InnerProviders } from "./AppProviders";
+import { legacyRedirectRoutes } from "./legacyRedirects";
 import NotFoundOrErrorPage from "./pages/_not-found";
 import { reloadOnChunkError } from "./utils/chunkReload";
 
@@ -78,7 +79,15 @@ const routes: RouteObject[] = [
     path: "/auth/reset-password",
     ...page(() => import("./pages/auth/reset-password")),
   },
+  // The email-verification magic link lands here; it renders only (D01).
+  {
+    path: "/auth/verify-email",
+    ...page(() => import("./pages/auth/verify-email")),
+  },
   { path: "/auth/error", ...page(() => import("./pages/auth/error")) },
+  // Join before create (ADR-117 §6): a new account passes through here on its
+  // way to making an organization. Renders nothing until D12 fills it.
+  { path: "/auth/join", ...page(() => import("./pages/auth/join")) },
 
   // Top-level pages
   { path: "/", ...page(() => import("./pages/index")) },
@@ -201,84 +210,87 @@ const routes: RouteObject[] = [
         ...page(() => import("./pages/settings/usage")),
       },
       {
-        path: "/settings/routing-policies",
-        ...page(() => import("./pages/settings/routing-policies")),
-      },
-      {
         path: "/settings/email-suppressions",
         ...page(() => import("./pages/settings/email-suppressions")),
       },
       {
-        // Top-level governance home (admin oversight dashboard).
-        // Sub-routes for admin authoring (ingestion-sources, anomaly-rules,
-        // routing-policies) stay under /settings/* per the daily-use vs
-        // admin-authoring distinction.
+        // Governance home (admin oversight dashboard). The whole family
+        // lives at the top level: it is org-scoped, not a settings page.
         path: "/governance",
-        ...page(() => import("./pages/settings/governance")),
+        ...page(() => import("./pages/governance/index")),
       },
       {
-        // Back-compat alias for the original path. Any existing bookmarks
-        // / docs referencing /settings/governance still land on the same
-        // dashboard. Removed in a future cleanup once nothing links here.
-        path: "/settings/governance",
-        ...page(() => import("./pages/settings/governance")),
+        // The inventory: a tabbed shell — Catalog (the tool-tiles editor)
+        // and Sources (the ingestion-sources table). The retired
+        // /governance/{catalog,ingestion-sources,tool-catalog} addresses
+        // redirect here via legacyRedirectRoutes.
+        path: "/governance/inventory",
+        ...page(() => import("@ee/governance/dashboard/pages/inventory")),
       },
       {
-        path: "/settings/governance/ingestion-sources",
-        ...page(
-          () => import("@ee/governance/dashboard/pages/ingestion-sources"),
-        ),
-      },
-      {
-        path: "/settings/governance/ingestion-sources/:id",
+        path: "/governance/inventory/:id",
         ...page(
           () =>
             import("@ee/governance/dashboard/pages/ingestion-source-detail"),
         ),
       },
       {
-        path: "/settings/governance/anomaly-rules",
+        path: "/governance/anomaly-rules",
         ...page(() => import("@ee/governance/dashboard/pages/anomaly-rules")),
       },
       {
-        path: "/settings/governance/tool-catalog",
-        ...page(() => import("./pages/settings/governance/tool-catalog")),
+        path: "/governance/people",
+        ...page(() => import("./pages/governance/people")),
       },
       {
-        path: "/settings/governance/departments",
-        ...page(() => import("./pages/settings/governance/departments")),
+        // Behind release_ui_governance_billed_cost_enabled (the pages
+        // guard themselves); the nav items are filtered on the same flag.
+        path: "/governance/costs",
+        ...page(() => import("./pages/governance/costs")),
       },
       {
-        // Redirect the pre-rename path so old bookmarks do not 404.
-        path: "/settings/governance/cost-centers",
-        loader: () => redirect("/settings/governance/departments"),
+        path: "/governance/billed",
+        ...page(() => import("./pages/governance/billed")),
+      },
+      {
+        // The people page has been cost centers and then departments; old
+        // bookmarks land on the newest name in one hop (the legacy
+        // /settings/governance/cost-centers address chains through here,
+        // and /governance/departments redirects via legacyRedirectRoutes).
+        path: "/governance/cost-centers",
+        element: (
+          <LegacyPrefixRedirect
+            from="/governance/cost-centers"
+            to="/governance/people"
+          />
+        ),
       },
       {
         // View-all teams listing - bird's-eye `View all teams →` lands here.
         // 500-row paginated list with sort chips for spend / requests /
         // last-activity. Per-row click-through routes to the team detail
         // page below.
-        path: "/settings/governance/teams",
-        ...page(() => import("./pages/settings/governance/teams")),
+        path: "/governance/teams",
+        ...page(() => import("./pages/governance/teams")),
       },
       {
         // Per-team detail - single-row scoped view of `spendByTeam` filtered
         // to the URL-encoded team id, four-stat KPI grid + breadcrumb back
         // to the listing. Detail-data depth (per-day trend, per-user
         // breakdown, model mix) defers to a follow-up.
-        path: "/settings/governance/teams/:id",
-        ...page(() => import("./pages/settings/governance/teams/[id]")),
+        path: "/governance/teams/:id",
+        ...page(() => import("./pages/governance/teams/[id]")),
       },
       {
         // View-all users listing - bird's-eye `View all users →` lands here.
-        path: "/settings/governance/users",
-        ...page(() => import("./pages/settings/governance/users")),
+        path: "/governance/users",
+        ...page(() => import("./pages/governance/users")),
       },
       {
         // Per-user detail - single-row scoped view keyed off the
         // URL-encoded actor id (email / sub claim).
-        path: "/settings/governance/users/:id",
-        ...page(() => import("./pages/settings/governance/users/[id]")),
+        path: "/governance/users/:id",
+        ...page(() => import("./pages/governance/users/[id]")),
       },
 
       // Personal-scope governance routes (must precede the /:project catch-all
@@ -316,59 +328,67 @@ const routes: RouteObject[] = [
         ...page(() => import("./pages/me/budget/request")),
       },
 
-      // CLI device-flow approval (RFC 8628 user-facing screen)
+      // AI Gateway: org-scoped admin pages live under /gateway/** at the top
+      // level, like /governance. Every gateway resource (VirtualKey /
+      // GatewayBudget / ModelProvider) is org-keyed by the schema, so the
+      // chrome reflects that. Kept OUT of the project layout route below:
+      // these are not /:project/* routes, so Langy must not mount on them.
+      // The static /gateway segment always wins over the /:project catch-all,
+      // and project slug minting refuses reserved top-level names.
       {
-        path: "/cli/auth",
-        ...page(() => import("./pages/cli/auth")),
-      },
-
-      // AI Gateway — org-scoped admin pages live under /settings/gateway/**
-      // alongside model-providers, routing-policies, audit-log etc. Every
-      // gateway resource (VirtualKey / GatewayBudget / ModelProvider) is
-      // org-keyed by the schema, so the chrome reflects that. Kept OUT of the
-      // project layout route below — these are /settings/* routes, not
-      // /:project/* routes, so Langy must not mount on them.
-      {
-        path: "/settings/gateway",
-        ...page(() => import("./pages/settings/gateway/index")),
+        path: "/gateway",
+        ...page(() => import("./pages/gateway/index")),
       },
       {
-        path: "/settings/gateway/virtual-keys",
-        ...page(() => import("./pages/settings/gateway/virtual-keys")),
+        path: "/gateway/virtual-keys",
+        ...page(() => import("./pages/gateway/virtual-keys")),
       },
       {
-        path: "/settings/gateway/virtual-keys/:id",
-        ...page(() => import("./pages/settings/gateway/virtual-keys/[id]")),
+        path: "/gateway/virtual-keys/:id",
+        ...page(() => import("./pages/gateway/virtual-keys/[id]")),
       },
       {
-        path: "/settings/gateway/budgets",
-        ...page(() => import("./pages/settings/gateway/budgets")),
+        path: "/gateway/budgets",
+        ...page(() => import("./pages/gateway/budgets")),
       },
       {
-        path: "/settings/gateway/budgets/:id",
-        ...page(() => import("./pages/settings/gateway/budgets/[id]")),
+        path: "/gateway/budgets/:id",
+        ...page(() => import("./pages/gateway/budgets/[id]")),
       },
       {
-        path: "/settings/gateway/usage",
-        ...page(() => import("./pages/settings/gateway/usage")),
+        path: "/gateway/routing-policies",
+        ...page(() => import("./pages/gateway/routing-policies")),
       },
       {
-        path: "/settings/gateway/cache-rules",
-        ...page(() => import("./pages/settings/gateway/cache-rules")),
+        path: "/gateway/usage",
+        ...page(() => import("./pages/gateway/usage")),
       },
       {
-        path: "/settings/gateway/guardrails",
-        ...page(() => import("./pages/settings/gateway/guardrails")),
+        path: "/gateway/cache-rules",
+        ...page(() => import("./pages/gateway/cache-rules")),
       },
       {
-        path: "/settings/gateway/billing-events",
-        ...page(() => import("./pages/settings/gateway/billing-events")),
+        path: "/gateway/guardrails",
+        ...page(() => import("./pages/gateway/guardrails")),
       },
       {
-        path: "/settings/gateway/webhooks",
-        ...page(() => import("./pages/settings/gateway/webhooks")),
+        path: "/gateway/billing-events",
+        ...page(() => import("./pages/gateway/billing-events")),
       },
+      {
+        path: "/gateway/webhooks",
+        ...page(() => import("./pages/gateway/webhooks")),
+      },
+      ...legacyRedirectRoutes,
     ],
+  },
+
+  // CLI device-flow approval (RFC 8628 user-facing screen). Top level, like
+  // /onboarding: it is a confirm-a-code screen, not a page of the app, and
+  // the Langy panel must not mount on it.
+  {
+    path: "/cli/auth",
+    ...page(() => import("./pages/cli/auth")),
   },
 
   // Project routes — wrapped in a layout route that mounts Langy ONCE per
@@ -593,6 +613,16 @@ const routes: RouteObject[] = [
         ...page(() => import("./pages/[project]/experiments/[experiment]")),
       },
 
+      // Agent Testing (catch-all, behind release_ui_agent_testing_v2_enabled)
+      {
+        path: "/:project/agent-testing",
+        ...page(() => import("./pages/[project]/agent-testing/[[...path]]")),
+      },
+      {
+        path: "/:project/agent-testing/*",
+        ...page(() => import("./pages/[project]/agent-testing/[[...path]]")),
+      },
+
       // Simulations (catch-all)
       {
         path: "/:project/simulations/scenarios",
@@ -679,6 +709,10 @@ const routes: RouteObject[] = [
   {
     path: "/ops/backoffice/subscriptions",
     ...page(() => import("./pages/ops/backoffice/subscriptions")),
+  },
+  {
+    path: "/ops/backoffice/sso-connections",
+    ...page(() => import("./pages/ops/backoffice/sso-connections")),
   },
 
   // @project redirect - Next.js parallel route that redirects /@project/path to /:project/path

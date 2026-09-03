@@ -4,6 +4,10 @@ import {
   RoleBindingScopeType,
   TeamUserRole,
 } from "~/generated/prisma/client";
+import {
+  type GrantsLedgerWriter,
+  grantsLedgerWriter,
+} from "~/server/app-layer/authz/ledger";
 import type {
   CreateProjectInput,
   CreateTeamWithBindingInput,
@@ -20,7 +24,10 @@ import type {
 } from "./project.repository";
 
 export class PrismaProjectRepository implements ProjectRepository {
-  constructor(private readonly prisma: PrismaClient) {}
+  constructor(
+    private readonly prisma: PrismaClient,
+    private readonly writer: GrantsLedgerWriter = grantsLedgerWriter(),
+  ) {}
 
   async getById(id: string): Promise<Project | null> {
     return this.prisma.project.findUnique({ where: { id } });
@@ -221,12 +228,18 @@ export class PrismaProjectRepository implements ProjectRepository {
     organizationId,
     page,
     limit,
+    projectIds,
   }: {
     organizationId: string;
     page: number;
     limit: number;
+    projectIds?: string[];
   }): Promise<PaginatedResult<Project>> {
-    const where = { archivedAt: null, team: { organizationId } };
+    const where = {
+      archivedAt: null,
+      team: { organizationId },
+      ...(projectIds ? { id: { in: projectIds } } : {}),
+    };
     const [data, total] = await Promise.all([
       this.prisma.project.findMany({
         where,
@@ -274,15 +287,22 @@ export class PrismaProjectRepository implements ProjectRepository {
       },
     });
 
-    await this.prisma.roleBinding.create({
-      data: {
-        id: input.roleBindingId,
-        organizationId: input.organizationId,
-        userId: input.userId,
-        role: TeamUserRole.ADMIN,
-        scopeType: RoleBindingScopeType.TEAM,
-        scopeId: team.id,
-      },
+    // The team row is not a grant fact; the creator's admin grant on it is,
+    // so it is emitted as a command once the scope it points at exists.
+    await this.writer.attachBindings({
+      organizationId: input.organizationId,
+      bindings: [
+        {
+          bindingId: input.roleBindingId,
+          principal: { userId: input.userId },
+          role: TeamUserRole.ADMIN,
+          customRoleId: null,
+          scopeType: RoleBindingScopeType.TEAM,
+          scopeId: team.id,
+        },
+      ],
+      actor: { type: "user", id: input.userId },
+      onDuplicate: "skip",
     });
 
     return team;

@@ -5,8 +5,7 @@ import {
 } from "@langwatch/automations/cadences";
 import { createLogger } from "@langwatch/observability";
 import type { Context } from "hono";
-import { describeRoute } from "hono-openapi";
-import { resolver } from "hono-openapi/zod";
+import { describeRoute, resolver } from "hono-openapi";
 import { z } from "zod";
 import type { AuthMiddlewareVariables } from "~/app/api/middleware/auth";
 import { badRequestSchema } from "~/app/api/shared/schemas";

@@ -1,6 +1,7 @@
 import { Hono } from "hono";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
+import type { Permission } from "~/server/api/rbac";
 import { resolveApiKeyPermission } from "~/server/rbac/role-binding-resolver";
 import {
   apiKeyCeilingDenialResponse,
@@ -23,9 +24,15 @@ vi.mock("~/server/rbac/role-binding-resolver", () => ({
   resolveApiKeyPermission: vi.fn(),
 }));
 
-const resolveMock = vi.mocked(resolveApiKeyPermission);
+// The ceiling resolves its service from the App.
+vi.mock("~/server/app-layer/app", async () => {
+  const { appCredentialPermissionsMock } = await import(
+    "~/test-utils/appCredentialPermissionsMock"
+  );
+  return appCredentialPermissionsMock();
+});
 
-const prisma = {} as never;
+const resolveMock = vi.mocked(resolveApiKeyPermission);
 
 const project = {
   id: "proj1",
@@ -42,6 +49,17 @@ const apiKeyToken: ResolvedToken = {
   project,
 };
 
+const langySessionKeyToken: ResolvedToken = {
+  type: "apiKey",
+  apiKeyId: "langykey1",
+  userId: "user1",
+  organizationId: "org1",
+  ingestSourceType: null,
+  ingestionTemplateId: null,
+  isLangySessionKey: true,
+  project,
+};
+
 const legacyProjectKeyToken: ResolvedToken = {
   type: "legacyProjectKey",
   project,
@@ -51,7 +69,10 @@ const legacyProjectKeyToken: ResolvedToken = {
  * Mounts the middleware behind a stub that seeds `resolvedToken`, so the test
  * drives it through a real Hono request rather than a hand-built context.
  */
-function appWith(resolved: ResolvedToken | undefined) {
+function appWith(
+  resolved: ResolvedToken | undefined,
+  permission: Permission = "project:update",
+) {
   const handler = vi.fn((c: { text: (body: string) => Response }) =>
     c.text("reached"),
   );
@@ -60,10 +81,7 @@ function appWith(resolved: ResolvedToken | undefined) {
     if (resolved) c.set("resolvedToken" as never, resolved as never);
     await next();
   });
-  app.use(
-    "*",
-    requireApiKeyPermission({ prisma, permission: "project:update" }),
-  );
+  app.use("*", requireApiKeyPermission({ permission }));
   app.get("/", handler as never);
   return { app, handler };
 }
@@ -80,7 +98,6 @@ describe("enforceApiKeyCeiling()", () => {
 
         await expect(
           enforceApiKeyCeiling({
-            prisma,
             resolved: apiKeyToken,
             permission: "project:update",
           }),
@@ -94,7 +111,6 @@ describe("enforceApiKeyCeiling()", () => {
 
         await expect(
           enforceApiKeyCeiling({
-            prisma,
             resolved: apiKeyToken,
             permission: "project:update",
           }),
@@ -107,7 +123,6 @@ describe("enforceApiKeyCeiling()", () => {
         resolveMock.mockResolvedValue(true);
 
         await enforceApiKeyCeiling({
-          prisma,
           resolved: apiKeyToken,
           permission: "project:update",
         });
@@ -125,6 +140,68 @@ describe("enforceApiKeyCeiling()", () => {
     });
   });
 
+  /**
+   * A refused Langy session key has two causes that look identical at the
+   * ceiling, and only one of them has an action behind it. The customer can
+   * be granted a permission they lack; nobody can be granted one Langy is
+   * never delegated, so telling them to widen the key sends them to a door
+   * that does not open. Langy did exactly that with `triggers:create`, and
+   * offered to retry once the user "granted the permission".
+   */
+  describe("given the ephemeral key a Langy chat mints", () => {
+    describe("when the permission is one Langy is never delegated", () => {
+      /** @scenario "A permission Langy is never delegated says so" */
+      it("says it is not delegable rather than not granted", async () => {
+        resolveMock.mockResolvedValue(false);
+
+        // `secrets:view` — the incident grain was `triggers:create`, but that
+        // is delegable since the 2026-08-21 widening; secrets have no safe
+        // read and will never be delegated.
+        await expect(
+          enforceApiKeyCeiling({
+            resolved: langySessionKeyToken,
+            permission: "secrets:view",
+          }),
+        ).rejects.toMatchObject({
+          code: "api_key_permission_not_delegable",
+        });
+      });
+    });
+
+    describe("when the permission is one Langy may hold", () => {
+      /**
+       * The session key mirrors its owner, so a delegable permission can still
+       * be refused because the human does not hold it — and there, widening
+       * the key or asking an admin is exactly the right advice.
+       */
+      it("keeps the ordinary refusal", async () => {
+        resolveMock.mockResolvedValue(false);
+
+        await expect(
+          enforceApiKeyCeiling({
+            resolved: langySessionKeyToken,
+            permission: "prompts:create",
+          }),
+        ).rejects.toMatchObject({ code: "api_key_permission_denied" });
+      });
+    });
+  });
+
+  describe("given an ordinary API key", () => {
+    describe("when the permission is one Langy is never delegated", () => {
+      it("keeps the ordinary refusal, since the Langy policy is not its rule", async () => {
+        resolveMock.mockResolvedValue(false);
+
+        await expect(
+          enforceApiKeyCeiling({
+            resolved: apiKeyToken,
+            permission: "triggers:create",
+          }),
+        ).rejects.toMatchObject({ code: "api_key_permission_denied" });
+      });
+    });
+  });
+
   describe("given a legacy project key", () => {
     /**
      * Characterization, not endorsement: legacy project keys are exempt from
@@ -135,7 +212,6 @@ describe("enforceApiKeyCeiling()", () => {
     it("skips the ceiling entirely", async () => {
       await expect(
         enforceApiKeyCeiling({
-          prisma,
           resolved: legacyProjectKeyToken,
           permission: "project:update",
         }),
@@ -177,6 +253,30 @@ describe("requireApiKeyPermission()", () => {
         expect(handler).not.toHaveBeenCalled();
       });
     });
+
+    describe("when a Langy session key asks for a permission it is never delegated", () => {
+      it("answers 403 with the not-delegable code and a tip that does not send the user to an admin", async () => {
+        resolveMock.mockResolvedValue(false);
+        const { app, handler } = appWith(
+          langySessionKeyToken,
+          // Never delegable: secrets have no safe read (the original incident
+          // grain, `triggers:create`, is delegable since the 2026-08-21
+          // widening).
+          "secrets:view",
+        );
+
+        const res = await app.request("/");
+        const body = (await res.json()) as {
+          error: string;
+          tips?: string[];
+        };
+
+        expect(res.status).toBe(403);
+        expect(body.error).toBe("api_key_permission_not_delegable");
+        expect(body.tips?.join(" ")).toContain("LangWatch");
+        expect(handler).not.toHaveBeenCalled();
+      });
+    });
   });
 
   describe("given a legacy project key", () => {
@@ -193,19 +293,21 @@ describe("requireApiKeyPermission()", () => {
 
   describe("given no token was resolved onto the context", () => {
     /**
-     * The middleware passes the request through when nothing authenticated it.
-     * That is safe only while it is chained behind the unified auth middleware,
-     * which rejects unauthenticated callers first — mounted alone, this gate
-     * does nothing. Pinned so the fail-open is an asserted decision and any
-     * future mis-wiring has to change a test to land.
+     * A permission gate running with nobody authenticated is a mis-wired
+     * route — the unified auth middleware was not mounted before it. The
+     * gate refuses rather than waving the request through: the old
+     * pass-through meant a route that forgot its auth middleware silently
+     * lost its permission check too. The plain Error degrades to the
+     * generic unknown response at the boundary (ADR-045).
      */
-    it("passes the request through without any permission check", async () => {
+    /** @scenario "The permission gate refuses a request nobody authenticated" */
+    it("refuses the request instead of passing it through", async () => {
       const { app, handler } = appWith(undefined);
 
       const res = await app.request("/");
 
-      expect(res.status).toBe(200);
-      expect(handler).toHaveBeenCalled();
+      expect(res.status).toBe(500);
+      expect(handler).not.toHaveBeenCalled();
       expect(resolveMock).not.toHaveBeenCalled();
     });
   });

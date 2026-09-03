@@ -15,6 +15,7 @@
  */
 
 import { beforeEach, describe, expect, it, vi } from "vitest";
+import type { PrismaClient } from "~/generated/prisma/client";
 import { ScimService } from "../scim.service";
 import { scimPatchRequestSchema } from "../scim.types";
 import { ScimGroupService } from "../scim-group.service";
@@ -83,9 +84,7 @@ function createMockPrisma() {
       .fn()
       .mockImplementation((ops: unknown[]) => Promise.all(ops)),
   };
-  return mock as unknown as Parameters<typeof ScimService.create>[0] &
-    Parameters<typeof ScimGroupService.create>[0] &
-    typeof mock;
+  return mock as unknown as PrismaClient & typeof mock;
 }
 
 describe("SCIM PATCH op casing", () => {
@@ -137,7 +136,7 @@ describe("SCIM PATCH op casing", () => {
           deactivatedAt: new Date(),
         });
 
-        const result = await ScimService.create(prisma).updateUser({
+        const result = await ScimService.create({ prisma }).updateUser({
           id: "user-1",
           organizationId: "org-1",
           patchRequest: parsePatch({
@@ -156,8 +155,8 @@ describe("SCIM PATCH op casing", () => {
 
     describe("when the operation adds a group member", () => {
       it("adds the member to the group", async () => {
-        await ScimGroupService.create(prisma).updateGroup({
-          externalScimId: "group-1",
+        await ScimGroupService.create({ prisma }).updateGroup({
+          scimResourceId: "group-1",
           organizationId: "org-1",
           patchRequest: parsePatch({
             schemas: [PATCH_SCHEMA],
@@ -177,8 +176,8 @@ describe("SCIM PATCH op casing", () => {
 
     describe("when the operation removes a group member", () => {
       it("removes the member from the group", async () => {
-        await ScimGroupService.create(prisma).updateGroup({
-          externalScimId: "group-1",
+        await ScimGroupService.create({ prisma }).updateGroup({
+          scimResourceId: "group-1",
           organizationId: "org-1",
           patchRequest: parsePatch({
             schemas: [PATCH_SCHEMA],
@@ -194,8 +193,8 @@ describe("SCIM PATCH op casing", () => {
 
     describe("when the operation renames the group", () => {
       it("renames the group", async () => {
-        await ScimGroupService.create(prisma).updateGroup({
-          externalScimId: "group-1",
+        await ScimGroupService.create({ prisma }).updateGroup({
+          scimResourceId: "group-1",
           organizationId: "org-1",
           patchRequest: parsePatch({
             schemas: [PATCH_SCHEMA],

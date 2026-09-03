@@ -14,7 +14,7 @@ parsing + cursor-based resume.
 
 <Info>**Pairs with:** [Ingestion sources](/ai-governance/ingestion-sources/index) (the broader substrate that pull-mode lands events into) and [CLI debugging](/ai-governance/cli-debug) (`langwatch ingest tail` shows pulled events alongside pushed ones).</Info>
 
-<Warning>**Available on Enterprise plans.** Pull-mode connectors ship as part of the Enterprise multi-source governance ingestion stack. Apache 2.0 deployments use single-source `otel_generic` push only. See [Open-core licensing](/ai-governance/overview#open-core-licensing).</Warning>
+<Warning>**Available on Enterprise plans.** Pull-mode connectors ship as part of the Enterprise multi-source governance ingestion stack. Apache 2.0 deployments use single-source `otel_generic` push only. See [Open-core licensing](/ai-governance/open-core-licensing).</Warning>
 
 Inspired by Singer Tap, Airbyte CDK, Apache Camel, Kafka Connect (pull
 side). The goal is the same: **one declarative config → one universal
@@ -181,8 +181,8 @@ auto-discover it; no other glue code needed.
 
 The Copilot Studio reference puller wraps `http_polling` with a
 locked-down config matching Microsoft's documented audit-log API
-shape. Admins enable it at **Settings → Governance → Ingestion
-sources → Add → Microsoft Copilot Studio**, enter their tenant
+shape. Admins enable it at **Governance → Ingestion Sources → Add →
+Microsoft Copilot Studio**, enter their tenant
 credentials, and the framework handles the rest. URL + auth shape are
 fixed (only credentials are admin-editable).
 

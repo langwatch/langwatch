@@ -114,7 +114,6 @@ function toastQueued({
     title: "Added to annotation queue",
     description: sentDescription({ created, skipped }),
     type: "success",
-    meta: { closable: true },
     action: {
       label: destination.label,
       onClick: () => onView(destination.href),

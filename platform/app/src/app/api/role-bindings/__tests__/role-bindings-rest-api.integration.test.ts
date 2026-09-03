@@ -32,6 +32,7 @@ import {
 import type { Session } from "~/server/auth";
 import { prisma } from "~/server/db";
 import { resolveApiKeyPermission } from "~/server/rbac/role-binding-resolver";
+import { RoleBindingService } from "~/server/role-bindings/role-binding.service";
 import { cleanupTestRows } from "~/test-utils/cleanupTestRows";
 import {
   ENTERPRISE_TEST_PLAN,
@@ -526,6 +527,59 @@ describe("Feature: Role bindings REST API", () => {
           },
         }),
       ).toBe(1);
+    });
+
+    describe("when the grants projection has not caught up with the write", () => {
+      it("answers the created binding rather than failing a write that landed", async () => {
+        const member = await seedOrgMember({
+          prisma,
+          ns,
+          organizationId: seeded.organization.id,
+          role: OrganizationUserRole.MEMBER,
+          label: "lagging",
+          hasOrgBinding: true,
+        });
+        // The listing the response is composed from is fed by the projection,
+        // and the writer's wait for it is bounded and timeout-tolerant, so an
+        // empty listing right after a successful append is ordinary lag.
+        const lagging = vi
+          .spyOn(RoleBindingService.prototype, "listForOrg")
+          .mockResolvedValue([]);
+
+        try {
+          const response = await postBinding({
+            userId: member.userId,
+            role: "MEMBER",
+            scopeType: "TEAM",
+            scopeId: teamBId,
+          });
+
+          expect(response.status).toBe(201);
+          const body = await response.json();
+          expect(body.id).toBeTruthy();
+          expect(body.principal).toEqual({
+            type: "user",
+            id: member.userId,
+            name: null,
+          });
+          expect(body.role).toBe("MEMBER");
+          expect(body.scopeId).toBe(teamBId);
+        } finally {
+          lagging.mockRestore();
+        }
+
+        // The row the caller was told about really is there.
+        expect(
+          await prisma.roleBinding.count({
+            where: {
+              organizationId: seeded.organization.id,
+              userId: member.userId,
+              scopeType: RoleBindingScopeType.TEAM,
+              scopeId: teamBId,
+            },
+          }),
+        ).toBe(1);
+      });
     });
 
     /** @scenario A binding into a personal workspace is refused */

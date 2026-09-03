@@ -1,5 +1,5 @@
 import { z } from "zod";
-import { authz, authzCollector } from "~/server/authz/runtime";
+import { authz, authzCollector } from "~/server/app-layer/authz/runtime";
 import { authorizeInResolver } from "../rbac";
 import { createTRPCRouter, protectedProcedure } from "../trpc";
 
@@ -18,7 +18,14 @@ export const authzRouter = createTRPCRouter({
         organizationId: z.string().optional(),
       }),
     )
-    .use(authorizeInResolver)
+    .use(
+      authorizeInResolver({
+        projectId:
+          "resolves the caller's OWN effective permissions at this scope; a non-member resolves to the empty set (no default access)",
+        organizationId:
+          "resolves the caller's OWN effective permissions at this scope; a non-member resolves to the empty set (no default access)",
+      }),
+    )
     .query(async ({ ctx, input }) => {
       const scope = await authzCollector.resolveScopeRef({
         projectId: input.projectId,

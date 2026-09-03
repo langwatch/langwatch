@@ -22,7 +22,7 @@ fi
 COMPILER="$TSX skills/_compiler/compile.ts"
 OUT_DIR="skills/_compiled"
 
-SKILLS="tracing experiments online-evaluations evaluations scenarios connect-agent prompts agent-performance agent-improve level-up datasets"
+SKILLS="tracing experiments online-evaluations evaluations scenarios connect-agent prompts agent-performance agent-improve level-up datasets context-sweet-spot provider-cost-comparison"
 
 for skill in $SKILLS; do
   echo "Compiling $skill..."
@@ -30,7 +30,7 @@ for skill in $SKILLS; do
   $COMPILER --skills "$skill" --mode docs > "$OUT_DIR/$skill.docs.txt"
 done
 
-RECIPES="debug-instrumentation agent-best-practices debug-with-langwatch eval-triage setup-lw evaluate-multimodal generate-rag-dataset test-compliance test-cli-usability"
+RECIPES="debug-instrumentation agent-best-practices debug-with-langwatch eval-triage setup-lw evaluate-multimodal generate-rag-dataset test-compliance test-cli-usability lwql-charts"
 
 for recipe in $RECIPES; do
   echo "Compiling recipe $recipe..."
@@ -44,3 +44,11 @@ echo "Done. Generated $(ls -1 $OUT_DIR/*.txt 2>/dev/null | wc -l) files in $OUT_
 # public skill directory publishes (see skills/_compiler/native.ts).
 echo "Generating native (opencode) skills..."
 $TSX skills/_compiler/native.ts
+
+# Mirror the native set into the langyagent Go embed tree. The Dockerfile
+# overlays the same content at image build, so the committed copy only serves
+# local (host-tier) manager builds — but a stale copy there means local Langy
+# runs older skills than production. skills/_tests/native-skills.test.ts pins
+# the two trees equal.
+echo "Syncing native skills into services/langyagent/internal/assets/skills/..."
+rsync -a --delete skills/_compiled/native/ services/langyagent/internal/assets/skills/

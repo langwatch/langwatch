@@ -19,6 +19,7 @@ import {
   deriveTraceStatus,
   TRACE_STATUS_CLICKHOUSE_EXPRESSION,
 } from "./derive-trace-status";
+import { deriveTraceTimestamp } from "./derive-trace-timestamp";
 import { PageTooDeepError } from "./errors";
 import type {
   ExpressionCategoricalDef,
@@ -1311,7 +1312,7 @@ function presentMediaRefs(
   return refs.length > 0 ? refs : undefined;
 }
 
-function mapToTraceListItem(row: TraceSummaryData): TraceListItem {
+export function mapToTraceListItem(row: TraceSummaryData): TraceListItem {
   const status = deriveTraceStatus(row);
 
   const totalTokens =
@@ -1319,7 +1320,10 @@ function mapToTraceListItem(row: TraceSummaryData): TraceListItem {
 
   return {
     traceId: row.traceId,
-    timestamp: row.occurredAt,
+    timestamp: deriveTraceTimestamp({
+      occurredAt: row.occurredAt,
+      storageAnchorMs: row.storageAnchorMs,
+    }),
     name: row.attributes["langwatch.span.name"] ?? row.traceId.slice(0, 8),
     serviceName: row.attributes["service.name"] ?? "",
     durationMs: row.totalDurationMs,

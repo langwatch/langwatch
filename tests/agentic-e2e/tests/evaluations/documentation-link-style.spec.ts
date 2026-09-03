@@ -35,12 +35,6 @@ test("documentation links use normal text with an underline and section carets s
     .locator("svg")
     .locator("xpath=..");
   await expect(observeCaret).toHaveCSS("opacity", "0.5");
-  const governSection = page.getByRole("button", { name: "Expand Govern" });
-  await expect(governSection.locator("svg")).toHaveCount(1);
-  await expect(governSection.locator("svg").locator("xpath=..")).toHaveCSS(
-    "opacity",
-    "0.5",
-  );
   await page.screenshot({
     path: testInfo.outputPath("online-evals-underlined-link.png"),
   });

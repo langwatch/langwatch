@@ -1,5 +1,7 @@
 import { nanoid } from "nanoid";
 import type { PrismaClient } from "~/generated/prisma/client";
+import { BUILDER_CHART_KIND } from "~/server/analytics/chartKinds";
+import { placeableKindFilter } from "~/server/analytics/placeableKindFilter";
 import { DashboardRepository } from "./dashboard.repository";
 import { DashboardNotFoundError, DashboardReorderError } from "./errors";
 
@@ -25,10 +27,28 @@ export class DashboardService {
   }
 
   /**
-   * Gets all dashboards for a project.
+   * Gets all dashboards for a project, each with its placeable-card count.
+   *
+   * The count applies the same flag-aware kind gate the graph-card procedures
+   * apply by default, so the list never advertises a card the dashboard read
+   * excludes.
+   *
+   * `builderCountOnly` overrides that gate to builder-charts-only. The v1 REST
+   * surface needs it: its detail read (`getById` / `repository.findById`)
+   * hardcodes the same narrowing to keep a workbench chart's stored SQL out of
+   * the response, so its list read has to match or `graphCount` promises rows
+   * the detail response will never return. The in-app UI's tRPC read wants the
+   * wider count instead — it renders workbench cards through their own gated
+   * surface — so it calls this with the default left alone.
    */
-  async getAll(projectId: string) {
-    return await this.repository.findAll({ projectId });
+  async getAll(projectId: string, options?: { builderCountOnly?: boolean }) {
+    const graphKindWhere = options?.builderCountOnly
+      ? { kind: BUILDER_CHART_KIND }
+      : await placeableKindFilter({
+          prisma: this.prisma,
+          projectId,
+        });
+    return await this.repository.findAll({ projectId, graphKindWhere });
   }
 
   /**

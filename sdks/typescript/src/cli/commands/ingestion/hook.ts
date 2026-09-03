@@ -61,8 +61,14 @@ import {
   stateFilePath,
   writeFingerprint,
 } from "@/cli/utils/governance/hook-state";
+import { drainSessionContextSpool } from "@/cli/utils/governance/session-context-spool";
+import {
+  defaultClaudeSessionRegistryDir,
+  readClaudeSessionName,
+} from "@/cli/utils/governance/claude-session-registry";
 import {
   buildSessionContextLogPayload,
+  normalizeSessionName,
   parseOtlpHeaders,
   parseTraceparent,
   sessionContextFingerprint,
@@ -79,9 +85,13 @@ import {
  * `CLAUDE_PROJECT_DIR` in its environment, and reading either would report the
  * wrong session, on the wrong checkout, under the wrong agent.
  *
- * `projectDirVar` matters because a session can `cd` away from where it
- * started: Claude Code exports the root it was launched in, so that beats the
- * payload's `cwd`. Codex and opencode publish no such variable, and their
+ * The payload's `cwd` beats `projectDirVar`. Claude Code's payload `cwd` is
+ * the harness's own working directory: a `cd` inside the Bash tool never moves
+ * it, and a native worktree switch (EnterWorktree) does. `CLAUDE_PROJECT_DIR`
+ * stays pinned to the directory the session was launched in, so preferring it
+ * would keep reporting the launch checkout after the session moved into a
+ * worktree to work on another branch. It remains the fallback for a payload
+ * with no `cwd`. Codex and opencode publish no such variable, and their
  * payload `cwd` is already the session's own directory.
  */
 const TOOLS: Record<
@@ -112,6 +122,8 @@ export interface HookCommandOptions {
   now?: () => number;
   /** Where per-session fingerprints live. Defaults under the config home. */
   stateDir?: string;
+  /** Claude's live session registry. Defaults under claude's config home. */
+  claudeRegistryDir?: string;
   /** Reads the CLI's device config, the fallback telemetry target. */
   readCliConfig?: () => CliTelemetryConfig;
 }
@@ -122,12 +134,12 @@ export interface HookCommandOptions {
  * plane: a CLI that was never signed in has neither, and that is the
  * "no telemetry configured" case rather than an error.
  */
-type CliTelemetryConfig = Partial<
+export type CliTelemetryConfig = Partial<
   Pick<GovernanceConfig, "control_plane_url" | "default_personal_ingest_keys">
 >;
 
 /** Where one record goes and what authenticates it. */
-interface TelemetryTarget {
+export interface TelemetryTarget {
   endpoint: string;
   headers: Record<string, string>;
 }
@@ -144,6 +156,7 @@ export async function hookCommand({
   fetchImpl = fetch,
   now = Date.now,
   stateDir = defaultStateDir(),
+  claudeRegistryDir,
   readCliConfig = loadConfig,
 }: HookCommandOptions): Promise<void> {
   try {
@@ -155,6 +168,7 @@ export async function hookCommand({
       fetchImpl,
       now,
       stateDir,
+      claudeRegistryDir,
       readCliConfig,
     });
   } catch (error) {
@@ -170,6 +184,7 @@ async function runHook({
   fetchImpl,
   now,
   stateDir,
+  claudeRegistryDir,
   readCliConfig,
 }: {
   tool: string;
@@ -179,6 +194,7 @@ async function runHook({
   fetchImpl: typeof fetch;
   now: () => number;
   stateDir: string;
+  claudeRegistryDir?: string;
   readCliConfig: () => CliTelemetryConfig;
 }): Promise<void> {
   const spec = TOOLS[tool.trim().toLowerCase().replace(/-/g, "_")];
@@ -215,10 +231,83 @@ async function runHook({
     env,
   });
 
+  await postOwnSessionContext({
+    spec,
+    agent,
+    sessionId,
+    input,
+    env,
+    runGit,
+    fetchImpl,
+    now,
+    stateDir,
+    claudeRegistryDir,
+    target,
+  });
+
+  // Whatever this hook had to say about its own directory is said. Anything
+  // the agent declared from a shell that could not reach the collector goes
+  // out now, last, so the declared checkout is the session's current one.
+  await drainSessionContextSpool({
+    stateDir,
+    now,
+    post: (payload) => postSessionContext({ target, env, payload, fetchImpl }),
+  });
+}
+
+/**
+ * Post the context of the directory this hook runs in. Every reason not to
+ * post is a debug line and a return: a hook is never allowed to be why a
+ * session broke.
+ */
+async function postOwnSessionContext({
+  spec,
+  agent,
+  sessionId,
+  input,
+  env,
+  runGit,
+  fetchImpl,
+  now,
+  stateDir,
+  claudeRegistryDir,
+  target,
+}: {
+  spec: (typeof TOOLS)[string];
+  agent: string;
+  sessionId: string;
+  input: ReturnType<typeof parseHookInput>;
+  env: NodeJS.ProcessEnv;
+  runGit: GitRunner;
+  fetchImpl: typeof fetch;
+  now: () => number;
+  stateDir: string;
+  claudeRegistryDir?: string;
+  target: TelemetryTarget;
+}): Promise<void> {
   const projectDir = spec.projectDirVar ? env[spec.projectDirVar] : undefined;
-  const directory = firstNonEmpty(projectDir, input.cwd) ?? process.cwd();
-  const context = readSessionContext({ directory, runGit });
-  if (!context) {
+  const directory = firstNonEmpty(input.cwd, projectDir) ?? process.cwd();
+  // The session's own name, as claude itself holds it. The SessionStart
+  // payload carries it at start; the live registry is what makes a
+  // mid-session /rename observable from the Stop hook, which runs after
+  // every turn. Codex and opencode hold no such registry, so for them the
+  // record carries no name and the harvest names their sessions instead.
+  const name =
+    agent === "claude_code"
+      ? normalizeSessionName(
+          input.sessionTitle ??
+            readClaudeSessionName({
+              sessionId,
+              registryDir:
+                claudeRegistryDir ?? defaultClaudeSessionRegistryDir(env),
+            }),
+        )
+      : null;
+  // Outside a repository the record can still carry the session's name, and
+  // the name alone is worth a post: it is what labels the session before its
+  // first prompt. With neither identity nor a name there is nothing to say.
+  const context = readSessionContext({ directory, runGit }) ?? {};
+  if (!context.repository && !name) {
     debug({
       message: `no git repository with an origin remote at ${directory}`,
       env,
@@ -226,7 +315,7 @@ async function runHook({
     return;
   }
 
-  const fingerprint = sessionContextFingerprint(context);
+  const fingerprint = sessionContextFingerprint(context, { name });
   pruneStaleState({ stateDir, now });
 
   const stateFile = stateFilePath({ stateDir, agent, sessionId });
@@ -243,6 +332,7 @@ async function runHook({
     timeUnixNano: `${now()}000000`,
     scopeVersion: LANGWATCH_SDK_VERSION,
     trace: parseTraceparent(env.TRACEPARENT),
+    name,
   });
 
   const posted = await postSessionContext({
@@ -279,8 +369,11 @@ async function runHook({
  * and `langwatch ingest install`: the control plane the CLI is signed in to,
  * and the ingest key minted for this agent. Null when neither source can name
  * a collector, which is the "no telemetry configured" no-op.
+ *
+ * Shared with `langwatch ingest context`, which posts the same record from
+ * the same sources when the agent declares its context itself.
  */
-function resolveTarget({
+export function resolveTarget({
   env,
   agent,
   readCliConfig,
@@ -308,7 +401,7 @@ function resolveTarget({
   };
 }
 
-async function postSessionContext({
+export async function postSessionContext({
   target,
   env,
   payload,

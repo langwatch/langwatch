@@ -93,6 +93,40 @@ export class LangyConversationNotOwnedError extends HandledError {
   }
 }
 
+/**
+ * A caller opted into conversation-id ADOPTION (`adoptConversationId: true`)
+ * with an id that cannot be adopted: it fails the shape gate, or it collides
+ * with an archived conversation whose closed history must not be silently
+ * resurrected (HTTP 409).
+ *
+ * Loud on purpose. Adoption exists for callers that key continuity on an
+ * externally-chosen id (scenario runs bind `{{ threadId }}` once per run); the
+ * pre-adoption behavior — silently minting a fresh id — degraded every
+ * multi-turn run to single-turn with no signal anywhere (#7187). An adoption
+ * that cannot happen must therefore fail the turn, never fall back.
+ */
+export class LangyConversationIdUnadoptableError extends HandledError {
+  declare readonly code: "langy_conversation_id_unadoptable";
+
+  constructor(
+    public readonly conversationId: string,
+    reason: "invalid_shape" | "archived",
+  ) {
+    super(
+      "langy_conversation_id_unadoptable",
+      reason === "archived"
+        ? "This conversation id belongs to an archived conversation and cannot be adopted."
+        : "This conversation id cannot be adopted: use 6-120 characters from [A-Za-z0-9_-].",
+      {
+        meta: { conversationId, reason },
+        httpStatus: 409,
+        ...remediation("langy_conversation_id_unadoptable"),
+      },
+    );
+    this.name = "LangyConversationIdUnadoptableError";
+  }
+}
+
 /** No model is configured for the project's Langy (HTTP 409). */
 export class LangyModelNotConfiguredError extends HandledError {
   declare readonly code: "langy_model_not_configured";

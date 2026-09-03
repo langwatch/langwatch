@@ -5,15 +5,16 @@
 
 import { app as scimApp } from "@ee/scim/routes";
 import { app as webhooksApp } from "@ee/scim/webhooks";
-import { LEGACY_CALLBACK_PROVIDER_IDS } from "@ee/sso/providers";
-import { type Context, Hono } from "hono";
-import { createServiceApp, publicEndpoint } from "~/server/api/security";
+import { Hono } from "hono";
 import { app as adminApp } from "../../ee/admin/routes/admin";
+import { app as agentCacheApp } from "../app/api/agent-cache/[[...route]]/app";
+import { app as agentsAliasApp } from "../app/api/agents/[[...route]]/alias";
 import { app as agentsApp } from "../app/api/agents/[[...route]]/app";
 import { app as analyticsApp } from "../app/api/analytics/[...route]/app";
 import { app as analyticsSqlApp } from "../app/api/analytics-sql/[[...route]]/app";
 import { app as apiKeysApp } from "../app/api/api-keys/[[...route]]/app";
 import { app as codingAgentApp } from "../app/api/coding-agent/[[...route]]/app";
+import { app as codingAgentV1App } from "../app/api/coding-agent/[[...route]]/app.v1";
 import { app as copilotKitApp } from "../app/api/copilotkit/[[...route]]/app";
 import { app as dashboardsApp } from "../app/api/dashboards/[[...route]]/app";
 import { app as datasetApp } from "../app/api/dataset/[[...route]]/app";
@@ -36,8 +37,10 @@ import { app as organizationApp } from "../app/api/organization/[[...route]]/app
 import { app as organizationsApp } from "../app/api/organizations/[[...route]]/app";
 import { app as projectsApp } from "../app/api/projects/[[...route]]/app";
 import { app as promptsApp } from "../app/api/prompts/[[...route]]/app";
+import { app as queryApp } from "../app/api/query/[[...route]]/app";
 import { app as roleBindingsApp } from "../app/api/role-bindings/[[...route]]/app";
 import { app as rolesApp } from "../app/api/roles/[[...route]]/app";
+import { app as runPlansApp } from "../app/api/run-plans/[[...route]]/app";
 import { app as scenarioEventsApp } from "../app/api/scenario-events/[[...route]]/app";
 import { app as scenariosApp } from "../app/api/scenarios/[[...route]]/app";
 import { app as scimTokensApp } from "../app/api/scim-tokens/[[...route]]/app";
@@ -45,6 +48,7 @@ import { app as secretsApp } from "../app/api/secrets/[[...route]]/app";
 import { app as simulationRunsApp } from "../app/api/simulation-runs/[[...route]]/app";
 import { app as suitesApp } from "../app/api/suites/[[...route]]/app";
 import { app as teamsApp } from "../app/api/teams/[[...route]]/app";
+import { app as testSuitesApp } from "../app/api/test-suites/[[...route]]/app";
 import { app as tracesApp } from "../app/api/traces/[[...route]]/app";
 import { app as triggersApp } from "../app/api/triggers/[[...route]]/app";
 import { app as userAvatarApp } from "../app/api/user-avatar/[[...route]]/app";
@@ -58,6 +62,7 @@ import { app as bugReportsApp } from "./routes/bug-reports";
 import { app as collectorApp } from "./routes/collector";
 import { app as cronApp } from "./routes/cron";
 import { app as datasetGenerateApp } from "./routes/dataset-generate";
+import { app as elevenLabsApp } from "./routes/elevenlabs";
 import { app as evaluationsLegacyApp } from "./routes/evaluations-legacy";
 import {
   app as experimentsV3App,
@@ -72,6 +77,7 @@ import { app as ingestionRoutesApp } from "./routes/ingest/ingestionRoutes";
 import { app as langyApiApp } from "./routes/langy-api";
 import { app as langyInternalApp } from "./routes/langy-internal";
 import { app as langyRelayApp } from "./routes/langy-relay";
+import { app as langyUiActionsApp } from "./routes/langy-ui-actions";
 import { app as miscApp } from "./routes/misc";
 import { app as opsApp } from "./routes/ops";
 import { app as otelApp } from "./routes/otel";
@@ -89,44 +95,36 @@ import { app as workflowsApp } from "./routes/workflows";
 export function createApiRouter() {
   const api = new Hono();
 
-  // Legacy OAuth callback rewrites — customer IdPs registered with old URLs.
-  // These only rewrite the path and re-dispatch to /api/auth/oauth2/callback/*
-  // (handled by authApp), so they carry a public policy and are registered
-  // through the builder rather than raw Hono.
-  const legacyOAuthCallbacks = createServiceApp({
-    basePath: "/api/auth/callback",
-  });
-  const rewriteCallback = (provider: string) => (c: Context) => {
-    const url = new URL(c.req.url);
-    url.pathname = `/api/auth/oauth2/callback/${provider}`;
-    return api.fetch(new Request(url.toString(), c.req.raw));
-  };
-  // Driven off the same list the providers pin their `redirectURI` to, so a
-  // provider cannot be added on one side and forgotten on the other. Without a
-  // rewrite the round-trip still lands on the `/api/auth/*` catch-all, but it
-  // reaches better-auth's core social callback rather than the genericOAuth
-  // plugin's own, which is a second code path nobody chose.
-  for (const provider of LEGACY_CALLBACK_PROVIDER_IDS) {
-    legacyOAuthCallbacks
-      .access(
-        publicEndpoint(
-          "legacy IdP callback URL; rewrites to /api/auth/oauth2/callback/* and re-dispatches",
-        ),
-      )
-      .all(`/${provider}`, rewriteCallback(provider));
-  }
-  api.route("/", legacyOAuthCallbacks.hono);
+  // The legacy IdP callback rewrite lived here until better-auth 1.7. It took
+  // `/api/auth/callback/<provider>` — the URL customer IdPs were registered
+  // with — and re-dispatched it to the genericOAuth plugin's own
+  // `/api/auth/oauth2/callback/<provider>`, because that was a second, more
+  // specific code path and landing on the core social callback instead was
+  // "a code path nobody chose".
+  //
+  // 1.7 removed the plugin's endpoints entirely: generic-oauth providers are
+  // registered as first-class social providers now, so the CORE callback is
+  // the only one there is — and it is mounted at exactly the path the rewrite
+  // was rewriting away from. Keeping it would rewrite a working URL to a 404,
+  // which is the whole of enterprise SSO. The catch-all serves it correctly,
+  // so the right move is to stop intercepting it.
+  //
+  // `LEGACY_CALLBACK_PROVIDER_IDS` still pins each provider's `redirectURI`
+  // (ee/sso/providers.ts) — the URL is unchanged, only who answers it.
 
   // ORDERING: specific paths before catch-all siblings with same basePath
   api.route("/", datasetGenerateApp); // /api/dataset/generate (before datasetApp's /:slugOrId)
   api.route("/", workflowsApp); // /api/workflows/code-completion, /post_event
   api.route("/", healthChecksApp); // /api/health/collector, /evaluations, etc.
 
-  api.route("/", agentsApp);
+  api.route("/", agentsApp); // /api/v1/agents, connect and call included
+  api.route("/", agentsAliasApp); // deprecated alias: /api/agents
   api.route("/", analyticsApp);
-  api.route("/", analyticsSqlApp); // /api/v1/projects/:projectId/analytics/* — governed SQL
+  api.route("/", analyticsSqlApp); // /api/v1/projects/:projectId/analytics/charts/* — saved workbench charts only; the raw-LWQL routes this app used to serve were removed (issue #7565)
+  api.route("/", queryApp); // /api/v1/query — LWQL query domain, REST; the only HTTP door for raw LangWatchQL
   api.route("/", copilotKitApp);
   api.route("/", codingAgentApp);
+  api.route("/", codingAgentV1App); // /api/v1/coding-agent/* — organization-key door
   api.route("/", dashboardsApp);
   api.route("/", datasetApp);
   api.route("/", evaluatorsApp);
@@ -180,8 +178,11 @@ export function createApiRouter() {
   api.route("/", scenarioEventsApp);
   api.route("/", scenariosApp);
   api.route("/", secretsApp);
+  api.route("/", agentCacheApp);
   api.route("/", simulationRunsApp);
-  api.route("/", suitesApp);
+  api.route("/", suitesApp); // deprecated alias of the two families below
+  api.route("/", runPlansApp); // /api/v1/run-plans
+  api.route("/", testSuitesApp); // /api/v1/test-suites
   api.route("/", teamsApp);
   api.route("/", webhookPlatformApp);
   api.route("/", gatewaySpendApp);
@@ -195,8 +196,10 @@ export function createApiRouter() {
   api.route("/", rumApp); // /api/rum/v1/traces — browser telemetry proxy
   api.route("/", playgroundApp);
   api.route("/", langyApiApp); // /api/langy/conversations — key-authed turns
+  api.route("/", langyUiActionsApp); // /api/langy/ui/actions — agent-to-page dispatch
   api.route("/", langyInternalApp);
   api.route("/", langyRelayApp);
+  api.route("/", elevenLabsApp); // /api/elevenlabs/webhook/:modelProviderId
   api.route("/", githubApp);
   api.route("/", scenarioGenerateApp);
   api.route("/", scimApp);

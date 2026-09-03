@@ -3,7 +3,7 @@
  * that the gateway invokes per direction on inbound + outbound traffic.
  *
  * VK opt-in lives on vk.config.guardrailAttachments[]; this router is the
- * admin surface (CRUD) for /settings/gateway/guardrails.
+ * admin surface (CRUD) for /gateway/guardrails.
  *
  * Spec: specs/ai-gateway/governance/guardrails-project-scope.feature
  */
@@ -16,7 +16,6 @@ import {
 
 import { GatewayGuardrailService } from "~/server/gateway/guardrail.service";
 
-import { checkProjectPermission } from "../rbac";
 import { createTRPCRouter, protectedProcedure } from "../trpc";
 
 const directionSchema = z.nativeEnum(GatewayGuardrailDirection);
@@ -25,7 +24,7 @@ const failureModeSchema = z.nativeEnum(GatewayGuardrailFailureMode);
 export const gatewayGuardrailsRouter = createTRPCRouter({
   list: protectedProcedure
     .input(z.object({ projectId: z.string() }))
-    .use(checkProjectPermission("gatewayGuardrails:view"))
+    .permission("gatewayGuardrails:view")
     .query(async ({ ctx, input }) => {
       const service = GatewayGuardrailService.create(ctx.prisma);
       return await service.list(input.projectId);
@@ -33,7 +32,7 @@ export const gatewayGuardrailsRouter = createTRPCRouter({
 
   get: protectedProcedure
     .input(z.object({ projectId: z.string(), id: z.string() }))
-    .use(checkProjectPermission("gatewayGuardrails:view"))
+    .permission("gatewayGuardrails:view")
     .query(async ({ ctx, input }) => {
       const service = GatewayGuardrailService.create(ctx.prisma);
       return await service.get(input.id, input.projectId);
@@ -50,7 +49,7 @@ export const gatewayGuardrailsRouter = createTRPCRouter({
         failureMode: failureModeSchema.optional(),
       }),
     )
-    .use(checkProjectPermission("gatewayGuardrails:manage"))
+    .permission("gatewayGuardrails:manage")
     .mutation(async ({ ctx, input }) => {
       const service = GatewayGuardrailService.create(ctx.prisma);
       return await service.create({
@@ -76,7 +75,7 @@ export const gatewayGuardrailsRouter = createTRPCRouter({
         failureMode: failureModeSchema.optional(),
       }),
     )
-    .use(checkProjectPermission("gatewayGuardrails:manage"))
+    .permission("gatewayGuardrails:manage")
     .mutation(async ({ ctx, input }) => {
       const service = GatewayGuardrailService.create(ctx.prisma);
       return await service.update({
@@ -93,7 +92,7 @@ export const gatewayGuardrailsRouter = createTRPCRouter({
 
   archive: protectedProcedure
     .input(z.object({ projectId: z.string(), id: z.string() }))
-    .use(checkProjectPermission("gatewayGuardrails:manage"))
+    .permission("gatewayGuardrails:manage")
     .mutation(async ({ ctx, input }) => {
       const service = GatewayGuardrailService.create(ctx.prisma);
       await service.archive({

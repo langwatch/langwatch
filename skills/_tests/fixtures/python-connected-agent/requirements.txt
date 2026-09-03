@@ -1,0 +1,3 @@
+langwatch
+openai
+python-dotenv

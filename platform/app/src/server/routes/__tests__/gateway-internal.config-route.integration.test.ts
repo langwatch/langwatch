@@ -13,7 +13,7 @@
  *
  * The route takes its budget repository from `getApp()`; standing in for
  * the store means standing in for `getApp()`, wired to the same
- * `getClickHouseClientForProject` resolver the route used to build inline
+ * `getClickHouseClientForTenant` resolver the route used to build inline
  * — this test asserts on aliases/policy rules, not spend, so it does not
  * need to control which ClickHouse client that resolves to.
  *
@@ -24,7 +24,7 @@
 import { createHash, createHmac } from "crypto";
 import { nanoid } from "nanoid";
 import { afterAll, beforeAll, describe, expect, it, vi } from "vitest";
-import { getClickHouseClientForProject } from "~/server/clickhouse/clickhouseClient";
+import { getClickHouseClientForTenant } from "~/server/clickhouse/clickhouseClient";
 import { prisma } from "~/server/db";
 import {
   startTestContainers,
@@ -39,7 +39,7 @@ vi.mock("~/server/app-layer/app", () => ({
   getApp: () => ({
     gateway: {
       budgets: new GatewayBudgetClickHouseRepository(async (projectId) => {
-        const client = await getClickHouseClientForProject(projectId);
+        const client = await getClickHouseClientForTenant(projectId);
         if (!client) throw new Error("ClickHouse is not configured");
         return client;
       }),
@@ -57,6 +57,7 @@ const USER_ID = `usr-cfgroute-${suffix}`;
 const RP_ID = `rp-cfgroute-${suffix}`;
 const VK_ID = `vk-cfgroute-${suffix}`;
 const VK_EXPIRING_ID = `vk-cfgexp-${suffix}`;
+const MP_ID = `mp-cfgroute-${suffix}`;
 const SECRET = "0123456789abcdef0123456789abcdef";
 const DAY_MS = 24 * 60 * 60 * 1000;
 /** The key's expiration date as the gateway reads it: unix seconds. */
@@ -101,11 +102,23 @@ describe("GET /api/internal/gateway/config/:vk_id", () => {
         email: `cfgroute-${suffix}@acme.test`,
       },
     });
+    await prisma.modelProvider.create({
+      data: {
+        id: MP_ID,
+        name: "OpenAI",
+        provider: "openai",
+        enabled: true,
+        organizationId: ORG_ID,
+        customKeys: { OPENAI_API_KEY: "fake-before-rotation" },
+        scopes: { create: [{ scopeType: "ORGANIZATION", scopeId: ORG_ID }] },
+      },
+    });
     await prisma.routingPolicy.create({
       data: {
         id: RP_ID,
         organizationId: ORG_ID,
         name: `Cfg Policy ${suffix}`,
+        modelProviderIds: [MP_ID],
         modelAliases: { chat: "openai/gpt-5-mini" },
         policyRules: { models: { deny: ["^internal-.*$"], allow: null } },
       },
@@ -170,6 +183,7 @@ describe("GET /api/internal/gateway/config/:vk_id", () => {
       where: { id: { in: [VK_ID, VK_EXPIRING_ID] } },
     });
     await prisma.routingPolicy.deleteMany({ where: { id: RP_ID } });
+    await prisma.modelProvider.deleteMany({ where: { id: MP_ID } });
     await prisma.project.deleteMany({ where: { id: PROJECT_ID } });
     await prisma.team.deleteMany({ where: { id: TEAM_ID } });
     await prisma.user.deleteMany({ where: { id: USER_ID } });
@@ -194,6 +208,47 @@ describe("GET /api/internal/gateway/config/:vk_id", () => {
       };
       expect(bundle.model_aliases).toEqual({ chat: "openai/gpt-5-mini" });
       expect(bundle.policy_rules.models.deny).toEqual(["^internal-.*$"]);
+    });
+  });
+
+  // The gateway revalidates a cached bundle with If-None-Match rather than
+  // downloading it again. A rotated credential writes the provider row and
+  // nothing else, so a token that only tracks the key's revision answers 304
+  // to a bundle carrying the key the operator just replaced.
+  describe("when a provider credential is rotated", () => {
+    const path = `/api/internal/gateway/config/${VK_ID}`;
+
+    async function apiKeyOnBundle(res: Response) {
+      const bundle = (await res.json()) as {
+        providers: { id: string; credentials: { api_key?: string } }[];
+      };
+      return bundle.providers.find((p) => p.id === MP_ID)?.credentials.api_key;
+    }
+
+    /** @scenario "a credential written straight to the row still moves the version token" */
+    /** @scenario "a key nobody touched keeps its version token" */
+    it("answers a fresh bundle instead of confirming the cached one", async () => {
+      const cold = await app.fetch(signedRequest(path));
+      expect(cold.status).toBe(200);
+      const coldETag = cold.headers.get("ETag");
+      expect(coldETag).toBeTruthy();
+      expect(await apiKeyOnBundle(cold)).toBe("fake-before-rotation");
+
+      // What the gateway does every 60 seconds while nothing changes.
+      const revalidated = await app.fetch(signedRequest(path, coldETag ?? ""));
+      expect(revalidated.status).toBe(304);
+
+      await prisma.modelProvider.update({
+        where: { id: MP_ID },
+        data: { customKeys: { OPENAI_API_KEY: "fake-after-rotation" } },
+      });
+
+      const afterRotation = await app.fetch(
+        signedRequest(path, coldETag ?? ""),
+      );
+      expect(afterRotation.status).toBe(200);
+      expect(afterRotation.headers.get("ETag")).not.toBe(coldETag);
+      expect(await apiKeyOnBundle(afterRotation)).toBe("fake-after-rotation");
     });
   });
 

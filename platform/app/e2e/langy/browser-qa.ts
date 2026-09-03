@@ -21,6 +21,16 @@ import { ADMIN_EMAIL, ADMIN_PASSWORD, APP_BASE, PROJECT_SLUG } from "./config";
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const SCREENSHOT_DIR = path.resolve(__dirname, "scenario-logs", "screenshots");
+const VIDEO_DIR = path.resolve(__dirname, "scenario-logs", "videos");
+
+/**
+ * Opt-in video recording: LANGY_QA_VIDEO=1 records every page in the shared
+ * context to scenario-logs/videos as .webm. Playwright only finalizes the
+ * files when the CONTEXT closes, so a recording run must end with
+ * closeBrowserQA() (an afterAll in the suite, or the process exiting through
+ * vitest's teardown) or the videos stay half-written.
+ */
+const RECORD_VIDEO = process.env.LANGY_QA_VIDEO === "1";
 
 let browserPromise: Promise<Browser> | null = null;
 let contextPromise: Promise<BrowserContext> | null = null;
@@ -39,7 +49,17 @@ async function getSharedContext(): Promise<BrowserContext> {
   const browser = await browserPromise;
   contextPromise ??= (async () => {
     try {
-      const context = await browser.newContext({ ignoreHTTPSErrors: true });
+      const context = await browser.newContext({
+        ignoreHTTPSErrors: true,
+        ...(RECORD_VIDEO
+          ? {
+              recordVideo: {
+                dir: VIDEO_DIR,
+                size: { width: 1440, height: 900 },
+              },
+            }
+          : {}),
+      });
       const page = await context.newPage();
       await page.goto(`${APP_BASE}/auth/signin`, {
         waitUntil: "domcontentloaded",
@@ -61,8 +81,16 @@ async function getSharedContext(): Promise<BrowserContext> {
   return contextPromise;
 }
 
-/** Call in an `afterAll` if a test file wants a clean browser between files. */
+/**
+ * Call in an `afterAll` if a test file wants a clean browser between files.
+ * The context closes before the browser on purpose: with LANGY_QA_VIDEO=1
+ * that close is what finalizes the .webm files.
+ */
 export async function closeBrowserQA(): Promise<void> {
+  const context = contextPromise
+    ? await contextPromise.catch(() => null)
+    : null;
+  await context?.close().catch(() => {});
   const browser = browserPromise
     ? await browserPromise.catch(() => null)
     : null;
@@ -107,13 +135,16 @@ export async function browserQA(
   try {
     const context = await getSharedContext();
     page = await context.newPage();
-    // Org-scoped pages (e.g. AI Gateway's /settings/gateway/**) are absolute
-    // — a leading "/settings" (or any leading "/" the caller wants taken
-    // literally) skips the project-slug prefix. Project-scoped pages don't
-    // start with "/", e.g. "/prompts".
-    const target = (check.path ?? "").startsWith("/settings")
-      ? `${APP_BASE}${check.path}`
-      : `${APP_BASE}/${PROJECT_SLUG}${check.path ?? ""}`;
+    // Org-scoped pages are absolute: settings, and the top-level Gateway
+    // and Governance products. They skip the project-slug prefix.
+    // Project-scoped pages take the prefix, e.g. "/prompts".
+    const checkPath = check.path ?? "";
+    const isOrgScopedPath = ["/settings", "/gateway", "/governance"].some(
+      (prefix) => checkPath === prefix || checkPath.startsWith(`${prefix}/`),
+    );
+    const target = isOrgScopedPath
+      ? `${APP_BASE}${checkPath}`
+      : `${APP_BASE}/${PROJECT_SLUG}${checkPath}`;
     await page.goto(target, { waitUntil: "domcontentloaded", timeout: 30_000 });
     // The app is a client-rendered SPA shell — wait for actual content, not
     // just DOM-ready, or the screenshot captures a blank/loading frame.

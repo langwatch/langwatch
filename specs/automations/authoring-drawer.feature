@@ -234,16 +234,40 @@ Feature: Staged automation authoring drawer
       And no template section is shown
 
     # A project with no dataset has nothing to select, so the create
-    # affordance is the only way out of the section. It was rendered
-    # without a handler, which left the first add-to-dataset automation of
-    # every new project unfinishable from the drawer.
+    # affordance is the only way out of the section. Creation is the dataset
+    # drawer's job, so the section hands over to it and comes back.
     @integration
     Scenario: Creating a dataset from the automation is offered and works
       Given the user is configuring an add-to-dataset action
       And the project has no dataset yet
       When the user chooses to create a dataset
-      Then the dataset creation form opens
+      Then the dataset drawer opens
       And the created dataset becomes the automation's target
+      And the automation drawer is back with its draft intact
+
+    # The picker clears its selection when it hands over, so an ending
+    # without a created dataset has to put the earlier target back: without
+    # it the author opens the dataset drawer, changes their mind, and
+    # silently loses the dataset the automation already pointed at.
+    @integration
+    Scenario: Leaving the dataset drawer without creating keeps the dataset already chosen
+      Given the user is configuring an add-to-dataset action
+      And the user has chosen a dataset
+      When the user chooses to create a dataset
+      And the user closes the dataset drawer without creating one
+      Then the dataset chosen before is still the automation's target
+      And the automation drawer is back
+
+    # The draft is kept across the hand-over, so something has to discard it
+    # when the user never comes back. Otherwise the next new automation opens
+    # holding the abandoned one.
+    @unit
+    Scenario: An abandoned sub-flow does not seed the next automation
+      Given the user is configuring an add-to-dataset action
+      When the user chooses to create a dataset
+      And the user goes to another page instead of returning
+      And the user starts a new automation later
+      Then the new automation starts empty
 
   Rule: The Slack channel list never claims to be complete when it isn't
 

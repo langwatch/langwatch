@@ -13,11 +13,9 @@
  */
 import { type AuthzScopeRef, isRegistryPermission } from "@langwatch/authz";
 import { HandledError } from "@langwatch/handled-error";
-import {
-  type AuthzGrantsRepository,
-  type BindingPrincipalWhere,
-  BindingMissingError,
-  DuplicateBindingError,
+import type {
+  AuthzGrantsRepository,
+  BindingPrincipalWhere,
 } from "./authz-grants.repository";
 import type { GrantPrincipal, GrantRole } from "./grants.service";
 
@@ -25,6 +23,47 @@ export class GrantValidationError extends HandledError {
   constructor(message: string, meta: Record<string, unknown> = {}) {
     super("grant_validation_failed", message, { httpStatus: 400, meta });
     this.name = "GrantValidationError";
+  }
+}
+
+/**
+ * An identical grant (same principal, role, and scope) already exists.
+ *
+ * Speaks the REST surface's frozen contract (delivery-plan decision 21,
+ * `role-bindings-rest-api.feature`): the SAME code and status the
+ * `/role-bindings` API has always answered — a deterministic 409 a
+ * provisioning tool can treat as "already done". Reconciled here (PR 2)
+ * BEFORE the write paths moved onto the ledger, so the wire never wobbled
+ * between 400 `grant_validation_failed` and the contract.
+ *
+ * THE canonical thrower for `role_binding_already_exists`: every grant write
+ * that goes through GrantsService — which is every write the ledger owns —
+ * raises this class, lifted from the port's storage-level
+ * `DuplicateBindingError` by `rethrowKnownWriteFailure`. The two carry the
+ * same code on purpose: one is the storage signal, one is the customer's
+ * answer, and matching by code (never `instanceof`) is what keeps them
+ * interchangeable across a bundle or a serialisation boundary.
+ *
+ * One twin remains: `RoleBindingAlreadyExistsError`
+ * (`platform/app/src/server/role-bindings/errors.ts`) declares the same code
+ * for the legacy REST service that has not yet moved onto GrantsService. It
+ * goes when that path does; until then
+ * `platform/app/src/server/app-layer/authz/__tests__/duplicate-grant-code.unit.test.ts`
+ * pins the two to one customer-visible contract, so they cannot drift into
+ * answering the same code two different ways. A package cannot import the
+ * app's remediation registry, so the agent-facing `tips` for this code live
+ * there, keyed by code, and are attached by whichever class the path uses.
+ */
+export class DuplicateGrantError extends HandledError {
+  declare readonly code: "role_binding_already_exists";
+
+  constructor(meta: Record<string, unknown> = {}) {
+    super(
+      "role_binding_already_exists",
+      "An identical role binding already exists",
+      { httpStatus: 409, meta },
+    );
+    this.name = "DuplicateGrantError";
   }
 }
 
@@ -62,18 +101,36 @@ export function bindingNotFound(
  * fires when the principal already holds this SAME role at the scope.
  * Missing: the row went away between the pre-read and the write, which the
  * caller should see as the same not-found the pre-read produces.
+ *
+ * Matched by CODE, not `instanceof`: the port's `DuplicateBindingError` /
+ * `BindingMissingError` are the storage signal, and code is what survives a
+ * bundle boundary or a serialisation hop that `instanceof` does not. `error`
+ * is `unknown` here, so the shape is checked before the code is read.
  */
+function portErrorCode(error: unknown): string | undefined {
+  if (
+    typeof error === "object" &&
+    error !== null &&
+    "code" in error &&
+    typeof (error as { code: unknown }).code === "string"
+  ) {
+    return (error as { code: string }).code;
+  }
+  return undefined;
+}
+
 export function rethrowKnownWriteFailure(
   error: unknown,
   { bindingId, ...meta }: { bindingId?: string } & Record<string, unknown>,
 ): never {
-  if (error instanceof DuplicateBindingError) {
-    throw new GrantValidationError(
-      "This principal already holds this role at this scope - update or revoke the existing binding",
-      { ...meta, ...(bindingId ? { bindingId } : {}) },
-    );
+  const code = portErrorCode(error);
+  if (code === "role_binding_already_exists") {
+    throw new DuplicateGrantError({
+      ...meta,
+      ...(bindingId ? { bindingId } : {}),
+    });
   }
-  if (error instanceof BindingMissingError) {
+  if (code === "role_binding_not_found") {
     throw bindingNotFound({ ...meta, ...(bindingId ? { bindingId } : {}) });
   }
   throw error;

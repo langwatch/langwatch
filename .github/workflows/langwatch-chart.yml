@@ -185,6 +185,15 @@ jobs:
         if: "!cancelled()"
         run: ./tests/workers-shutdown.sh
 
+      # In local-filesystem mode the app and the workers mount one ReadWriteOnce
+      # PVC, and a helm upgrade rolls both Deployments at once. The pre-upgrade
+      # hook that orders them is a template over several values, so which
+      # installs it renders for, how long it waits, and what it may touch are
+      # only visible in the rendered output.
+      - name: "assert stored-objects upgrades move one volume consumer at a time"
+        if: "!cancelled()"
+        run: ./tests/stored-objects-upgrade-ordering.sh
+
   # The render job above proves the chart PARSES; these vitest suites
   # assert on what it EMITS (env selection per provider, identity guards,
   # migration postures, validation failures). They normally run inside the

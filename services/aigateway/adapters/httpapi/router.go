@@ -16,6 +16,7 @@ import (
 
 	"github.com/bytedance/sonic"
 	"github.com/go-chi/chi/v5"
+	"github.com/tidwall/gjson"
 	"go.uber.org/zap"
 
 	"github.com/langwatch/langwatch/pkg/clog"
@@ -24,6 +25,7 @@ import (
 	"github.com/langwatch/langwatch/pkg/health"
 	"github.com/langwatch/langwatch/pkg/herr"
 	"github.com/langwatch/langwatch/pkg/httpmiddleware"
+	"github.com/langwatch/langwatch/services/aigateway/adapters/controlplane"
 	"github.com/langwatch/langwatch/services/aigateway/adapters/gatewaymetrics"
 	"github.com/langwatch/langwatch/services/aigateway/adapters/gatewaytracer"
 	"github.com/langwatch/langwatch/services/aigateway/adapters/ottlserver"
@@ -79,6 +81,20 @@ type RouterDeps struct {
 	// reusing an already-bound port (specs/setup/
 	// aigateway-control-plane-target.feature).
 	ControlPlaneBaseURL string
+	// WebhookRelay forwards a vendor post-call delivery to the control
+	// plane, which owns the per-tenant secret that verifies it. Optional;
+	// when nil the webhook route is not mounted and a customer bills voice
+	// through the reconciler alone.
+	WebhookRelay WebhookRelay
+}
+
+// WebhookRelay hands one vendor delivery to the control plane byte for byte.
+// The gateway never verifies or parses a delivery: the secret is per tenant
+// and lives in the control plane's database.
+type WebhookRelay interface {
+	ForwardElevenLabsWebhook(
+		ctx context.Context, relay controlplane.WebhookRelay,
+	) (controlplane.WebhookRelayResult, error)
 }
 
 // NewRouter creates the chi router with all gateway routes mounted.
@@ -138,17 +154,51 @@ func NewRouter(deps RouterDeps) http.Handler {
 	r.Get("/debug/control-plane", debugControlPlaneHandler(deps.ControlPlaneBaseURL))
 
 	r.Route("/v1", func(v1 chi.Router) {
-		v1.Use(AuthMiddleware(deps.App.Auth()))
-		v1.Use(DispatchMetaMiddleware())
-		v1.Use(CustomerTraceMiddleware())
-		v1.Use(TraceRegistryMiddleware(deps.TraceRegistry, deps.DefaultExportEndpoint))
-		v1.Post("/chat/completions", chatHandler(deps))
-		v1.Post("/messages", messagesHandler(deps))
-		v1.Post("/responses", responsesHandler(deps))
-		v1.Post("/embeddings", embeddingsHandler(deps))
-		v1.Post("/audio/speech", speechHandler(deps))
-		v1.Post("/audio/transcriptions", transcriptionsHandler(deps))
-		v1.Get("/models", modelsHandler(deps))
+		// The ElevenLabs post-call webhook, and the one route under /v1 that
+		// carries no virtual key. The caller is ElevenLabs, which has no key
+		// and never will; the delivery authenticates itself with the HMAC the
+		// control plane checks against the tenant's stored secret.
+		//
+		// Under /v1 rather than a path of its own so that a self-hosted
+		// install that already publishes the gateway gets voice billing with
+		// no ingress change: the chart allowlists /v1 as a prefix. It is on
+		// the gateway rather than the control plane because a webhook has to
+		// be reachable from the vendor's network, the gateway is public by
+		// design, and the control plane is the admin surface that self-hosted
+		// customers keep behind a VPN.
+		if deps.WebhookRelay != nil {
+			v1.Post("/convai/webhook/{model_provider_id}", elevenLabsWebhookHandler(deps))
+		}
+
+		v1.Group(func(v1 chi.Router) {
+			v1.Use(AuthMiddleware(deps.App.Auth()))
+			v1.Use(DispatchMetaMiddleware())
+			v1.Use(CustomerTraceMiddleware())
+			v1.Use(TraceRegistryMiddleware(deps.TraceRegistry, deps.DefaultExportEndpoint))
+			v1.Post("/chat/completions", chatHandler(deps))
+			v1.Post("/messages", messagesHandler(deps))
+			v1.Post("/responses", responsesHandler(deps))
+			v1.Post("/embeddings", embeddingsHandler(deps))
+			v1.Post("/audio/speech", speechHandler(deps))
+			v1.Post("/audio/transcriptions", transcriptionsHandler(deps))
+			v1.Get("/models", modelsHandler(deps))
+			// Realtime voice session mints (ADR-097). Both paths mirror the
+			// vendor's own, so a vendor SDK pointed at the gateway base URL
+			// mints through us with no code change. The media socket the
+			// credential opens goes client to vendor and never comes here.
+			v1.Post("/realtime/client_secrets", openAIRealtimeSessionHandler(deps))
+			v1.Get("/convai/conversation/get-signed-url", elevenLabsSignedURLHandler(deps))
+			// ElevenLabs' own audio paths, mirrored for the same reason the
+			// mint above is: an ElevenLabs SDK reaches them by base URL alone,
+			// so a customer already using that SDK gets metering, budgets and
+			// traces without rewriting their calls into the OpenAI shape the
+			// /v1/audio routes take.
+			v1.Post("/text-to-speech/{voice_id}", elevenLabsSpeechHandler(deps))
+			v1.Post("/speech-to-text", elevenLabsTranscriptionHandler(deps))
+			// The OpenAI socket reports its usage to the client, not to us, so
+			// the client posts it back to close the session's spend record.
+			v1.Post("/realtime/sessions/{session_id}/usage", realtimeUsageHandler(deps))
+		})
 	})
 
 	// Gemini-native surface. gemini-cli (GOOGLE_GEMINI_BASE_URL) and the
@@ -468,6 +518,433 @@ func transcriptionsHandler(deps RouterDeps) http.HandlerFunc {
 	}
 }
 
+// maxRealtimeMintBodyBytes caps a session-mint body. An OpenAI session
+// declaration carries instructions, a tool list and turn-detection settings;
+// 256 KiB is far past any real one and well short of a payload worth
+// forwarding to a vendor by mistake.
+const maxRealtimeMintBodyBytes = 256 << 10
+
+// openAIRealtimeSessionHandler terminates POST /v1/realtime/client_secrets,
+// OpenAI's own mint path. The caller's session declaration is forwarded to
+// OpenAI as they wrote it, with the resolved model written back into
+// session.model, and the ephemeral secret comes back verbatim.
+//
+// The route states its own vendor through domain.OpenAIRealtimeSurface(). No
+// other provider serves this wire, and the body carries a customer's
+// instructions and tool definitions, so it must never reach a vendor the
+// caller did not name.
+func openAIRealtimeSessionHandler(deps RouterDeps) http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		bundle, ok := requireBundle(w, r, deps.Logger)
+		if !ok {
+			return
+		}
+		body, ok := readFullBody(deps.Logger, w, r, maxRealtimeMintBodyBytes)
+		if !ok {
+			return
+		}
+		if len(bytes.TrimSpace(body)) == 0 {
+			body = []byte(`{}`)
+		}
+		model := gjson.GetBytes(body, "session.model").String()
+
+		result, err := deps.App.HandleRealtimeSession(r.Context(), bundle, app.RealtimeMintDispatch{
+			Body:    body,
+			Model:   model,
+			Session: domain.RealtimeSessionRequest{Vendor: domain.RealtimeVendorOpenAI},
+			Surface: domain.OpenAIRealtimeSurface(),
+		})
+		if err != nil {
+			writeError(deps.Logger, w, r.Context(), err)
+			return
+		}
+		setMetaHeaders(w, result.Meta)
+		writeJSONResponse(w, result.Response)
+	}
+}
+
+// elevenLabsSignedURLHandler terminates
+// GET /v1/convai/conversation/get-signed-url, ElevenLabs' own mint path.
+//
+// The request carries no body, so the handler synthesizes one naming the
+// catalog model this session bills under, the same way the transcription
+// route does, and the body-reading stages of the pipeline see well-formed
+// JSON instead of a query string.
+func elevenLabsSignedURLHandler(deps RouterDeps) http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		bundle, ok := requireBundle(w, r, deps.Logger)
+		if !ok {
+			return
+		}
+		agentID := strings.TrimSpace(r.URL.Query().Get("agent_id"))
+		if agentID == "" {
+			writeError(deps.Logger, w, r.Context(), herr.New(r.Context(), domain.ErrBadRequest, herr.M{
+				"message": "agent_id query parameter is required: a signed URL is bound to one agent",
+				"fault":   "customer",
+			}))
+			return
+		}
+		// Marshaled rather than concatenated: agent_id is a raw query
+		// parameter, and strconv.Quote emits Go escapes such as \x01 for a
+		// control byte, which is not JSON. Every stage downstream parses
+		// this body.
+		body, err := sonic.Marshal(map[string]string{
+			"model":    domain.ElevenLabsConvAIModel,
+			"agent_id": agentID,
+		})
+		if err != nil {
+			writeError(deps.Logger, w, r.Context(), herr.New(r.Context(), domain.ErrInternal, herr.M{
+				"message": "could not build the session request body",
+				"fault":   "gateway",
+			}))
+			return
+		}
+
+		result, err := deps.App.HandleRealtimeSession(r.Context(), bundle, app.RealtimeMintDispatch{
+			Body:  body,
+			Model: domain.ElevenLabsConvAIModel,
+			Session: domain.RealtimeSessionRequest{
+				Vendor:  domain.RealtimeVendorElevenLabs,
+				AgentID: agentID,
+			},
+			Surface: domain.ElevenLabsConvAISurface(),
+		})
+		if err != nil {
+			writeError(deps.Logger, w, r.Context(), err)
+			return
+		}
+		setMetaHeaders(w, result.Meta)
+		writeJSONResponse(w, result.Response)
+	}
+}
+
+// maxElevenLabsSpeechBodyBytes caps a native synthesis body. The vendor's own
+// text limit is tens of thousands of characters, and the rest of the body is
+// voice settings, so a megabyte is far past any real request and well short of
+// a payload worth forwarding by mistake.
+const maxElevenLabsSpeechBodyBytes = 1 << 20
+
+// maxElevenLabsUploadBytes caps a native transcription upload, at the same
+// 26 MB the OpenAI-wire transcription route uses so the two audio routes agree.
+//
+// It is its own constant rather than the gateway-wide request ceiling because
+// this upload is held in memory twice: once as the parsed file, and again in
+// the multipart body rebuilt for the vendor, for as long as the vendor call
+// runs. The vendor accepts far larger files, and a caller who has one sends a
+// cloud_storage_url part instead, which ElevenLabs fetches itself and which
+// costs this process nothing.
+const maxElevenLabsUploadBytes = maxTranscriptionBodyBytes
+
+// elevenLabsSpeechHandler terminates POST /v1/text-to-speech/{voice_id},
+// ElevenLabs' own synthesis path.
+//
+// The body reaches the vendor as the caller wrote it. Only the model is read
+// here, so the virtual key's aliases, allowlist, budgets and spend record all
+// apply to it, and the response is the vendor's audio bytes unchanged.
+func elevenLabsSpeechHandler(deps RouterDeps) http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		bundle, ok := requireBundle(w, r, deps.Logger)
+		if !ok {
+			return
+		}
+		body, ok := readFullBody(deps.Logger, w, r, maxElevenLabsSpeechBodyBytes)
+		if !ok {
+			return
+		}
+		if gjson.GetBytes(body, "text").String() == "" {
+			writeError(deps.Logger, w, r.Context(), herr.New(r.Context(), domain.ErrBadRequest, herr.M{
+				"message": `text is required: ElevenLabs synthesis takes the text to speak in a top-level "text" field`,
+				"fault":   "customer",
+			}))
+			return
+		}
+		// Absent means the vendor's own default, so the gateway names that
+		// model rather than leaving the request unmetered and ungated.
+		model := gjson.GetBytes(body, domain.ElevenLabsModelField).String()
+		if model == "" {
+			model = domain.ElevenLabsDefaultSpeechModel
+		}
+
+		result, hw, err := withHeartbeat(r.Context(), w, deps.HeartbeatInterval, func() (*app.CompletionResult, error) {
+			return deps.App.HandleElevenLabsSpeech(r.Context(), bundle, app.ElevenLabsAudioDispatch{
+				Model: model,
+				Body:  body,
+				Route: domain.ElevenLabsAudioRequest{
+					VoiceID:  chi.URLParam(r, "voice_id"),
+					RawQuery: r.URL.RawQuery,
+				},
+			})
+		})
+		if err != nil {
+			writeError(deps.Logger, hw, r.Context(), err)
+			return
+		}
+		setMetaHeaders(hw, result.Meta)
+		writeJSONResponse(hw, result.Response)
+	}
+}
+
+// elevenLabsTranscriptionHandler terminates POST /v1/speech-to-text,
+// ElevenLabs' own transcription path.
+//
+// Multipart like the OpenAI-wire transcription route, and parsed here for the
+// same reason: this is the only layer holding the *http.Request. Every text
+// part is carried through to the vendor rather than filtered to a known list,
+// because on a route that mirrors a vendor's own path the caller's settings
+// are the request.
+func elevenLabsTranscriptionHandler(deps RouterDeps) http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		bundle, ok := requireBundle(w, r, deps.Logger)
+		if !ok {
+			return
+		}
+		upload, ok := parseElevenLabsUpload(deps, w, r)
+		if !ok {
+			return
+		}
+		// Not defaulted: ElevenLabs has no default transcription model, so a
+		// request without one is incomplete and guessing would bill a model
+		// the caller never chose. An empty value is refused by the resolver,
+		// which is the one place that says where each surface names its model.
+		result, hw, err := withHeartbeat(r.Context(), w, deps.HeartbeatInterval, func() (*app.CompletionResult, error) {
+			return deps.App.HandleElevenLabsTranscription(r.Context(), bundle, app.ElevenLabsAudioDispatch{
+				Model:  upload.Params[domain.ElevenLabsModelField],
+				Upload: upload,
+				Route:  domain.ElevenLabsAudioRequest{RawQuery: r.URL.RawQuery},
+			})
+		})
+		if err != nil {
+			writeError(deps.Logger, hw, r.Context(), err)
+			return
+		}
+		setMetaHeaders(hw, result.Meta)
+		writeJSONResponse(hw, result.Response)
+	}
+}
+
+// parseElevenLabsUpload reads the native transcription form into the shared
+// upload shape.
+//
+// The audio part is optional, because this vendor also accepts a
+// cloud_storage_url it fetches itself; a request with neither is refused here
+// rather than at the vendor. The size cap is the gateway's own request
+// ceiling: the vendor accepts far larger files through that URL, and a
+// multi-gigabyte upload through this process is not something to hold in
+// memory.
+func parseElevenLabsUpload(deps RouterDeps, w http.ResponseWriter, r *http.Request) (*domain.TranscriptionUpload, bool) {
+	if err := readElevenLabsForm(w, r); err != nil {
+		writeError(deps.Logger, w, r.Context(), err)
+		return nil, false
+	}
+	upload, err := elevenLabsUploadFromForm(r)
+	if err != nil {
+		writeError(deps.Logger, w, r.Context(), err)
+		return nil, false
+	}
+	return upload, true
+}
+
+// readElevenLabsForm caps the body and parses the multipart envelope.
+func readElevenLabsForm(w http.ResponseWriter, r *http.Request) error {
+	maxBytes := int64(maxElevenLabsUploadBytes)
+	if err := prepareRequestBody(w, r, maxBytes); err != nil {
+		return err
+	}
+	// Memory threshold: parts up to 10 MB stay in memory, larger ones spill to
+	// a temp file ParseMultipartForm cleans up on r.Body close.
+	//nolint:gosec // G120: prepareRequestBody already wrapped r.Body in a MaxBytesReader at maxBytes
+	if err := r.ParseMultipartForm(10 << 20); err != nil {
+		if bodyReadErrorCode(err) == domain.ErrPayloadTooLarge {
+			return herr.New(r.Context(), domain.ErrPayloadTooLarge, herr.M{
+				"message": fmt.Sprintf(
+					"the audio upload exceeds this gateway's %d byte limit; "+
+						"send a cloud_storage_url part instead for a file this large", maxBytes),
+			})
+		}
+		return herr.New(r.Context(), domain.ErrBadRequest, herr.M{
+			"message": "malformed multipart/form-data body: " + err.Error(),
+		})
+	}
+	return nil
+}
+
+// elevenLabsUploadFromForm lifts the parsed form into the shared upload shape.
+func elevenLabsUploadFromForm(r *http.Request) (*domain.TranscriptionUpload, error) {
+	upload := &domain.TranscriptionUpload{Params: elevenLabsFormValues(r)}
+	if err := refuseElevenLabsAsyncTranscription(r, upload.Params); err != nil {
+		return nil, err
+	}
+	file, header, err := r.FormFile("file")
+	if err != nil {
+		// No audio uploaded is a complete request when the caller named a
+		// cloud_storage_url, which this vendor fetches itself.
+		if upload.Params["cloud_storage_url"] != "" {
+			return upload, nil
+		}
+		return nil, herr.New(r.Context(), domain.ErrBadRequest, herr.M{
+			"message": `missing audio: send a "file" part, or a "cloud_storage_url" part for the provider to fetch`,
+			"fault":   "customer",
+		})
+	}
+	defer func() { _ = file.Close() }()
+	data, err := io.ReadAll(file)
+	if err != nil {
+		return nil, herr.New(r.Context(), domain.ErrBadRequest, herr.M{
+			"message": "failed reading uploaded file: " + err.Error(),
+		})
+	}
+	upload.File = data
+	upload.Filename = header.Filename
+	return upload, nil
+}
+
+// elevenLabsFormValues collects every text part the caller sent. They are all
+// carried through rather than filtered to a known list, because on a route
+// that mirrors a vendor's own path the caller's settings are the request, and
+// an allowlist goes stale the moment the vendor adds a parameter.
+func elevenLabsFormValues(r *http.Request) map[string]string {
+	values := map[string]string{}
+	if r.MultipartForm == nil {
+		return values
+	}
+	for name, part := range r.MultipartForm.Value {
+		if len(part) > 0 {
+			values[name] = part[0]
+		}
+	}
+	return values
+}
+
+// refuseElevenLabsAsyncTranscription rejects the vendor's own asynchronous
+// mode on this route.
+//
+// With a webhook part, ElevenLabs answers before it has transcribed anything
+// and delivers the result to a workspace webhook later. That first answer
+// carries no duration and no word timings, so the call would confirm its spend
+// record at zero seconds and bill nothing for audio the customer was charged
+// for. The gateway has no settlement path for those deliveries either: the
+// existing /v1/convai/webhook relay is for Conversational AI post-call
+// reports, which are a different payload keyed on a different id.
+//
+// Refusing says so, rather than billing zero and looking like it worked. The
+// synchronous request the caller can send instead is the one line of the fix.
+func refuseElevenLabsAsyncTranscription(r *http.Request, params map[string]string) error {
+	// The vendor names this parameter "webhook" and reports it back as
+	// `"param": "webhook"` on its own validation errors (measured against the
+	// live API, 2026-08-21). Any truthy spelling is refused, because the
+	// spelling that gets through is the one that bills nothing.
+	if value, ok := params["webhook"]; !ok || !isTruthyFormValue(value) {
+		return nil
+	}
+	return herr.New(r.Context(), domain.ErrBadRequest, herr.M{
+		"message": "webhook=true is not supported on this gateway route: the vendor answers " +
+			"before it has transcribed anything, so the call carries no duration to bill. " +
+			"Send the request without the webhook part and read the transcript from the response",
+		"fault": "customer",
+	})
+}
+
+// isTruthyFormValue reads a boolean the way a form part spells one.
+func isTruthyFormValue(value string) bool {
+	switch strings.ToLower(strings.TrimSpace(value)) {
+	case "true", "1", "yes", "on":
+		return true
+	default:
+		return false
+	}
+}
+
+// maxRealtimeUsageBodyBytes caps a usage report. It is one usage object.
+const maxRealtimeUsageBodyBytes = 64 << 10
+
+// realtimeUsageHandler terminates
+// POST /v1/realtime/sessions/{session_id}/usage.
+//
+// OpenAI reports a realtime session's usage over the socket, in
+// response.done, and that socket runs client to vendor. The client posts
+// what it read back here, and the control plane closes the session's spend
+// record with it.
+//
+// Deliberately outside the dispatch pipeline: this is a report about a
+// request that was already admitted, not a new one. Running it through the
+// chain would admit a second spend record, and the report itself calls no
+// provider, so there is nothing for a budget or a guardrail to gate.
+func realtimeUsageHandler(deps RouterDeps) http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		bundle, ok := requireBundle(w, r, deps.Logger)
+		if !ok {
+			return
+		}
+		sessionID := chi.URLParam(r, "session_id")
+		body, ok := readFullBody(deps.Logger, w, r, maxRealtimeUsageBodyBytes)
+		if !ok {
+			return
+		}
+		report := app.RealtimeUsagePost{SessionID: sessionID, Body: body}
+		if err := deps.App.ReportRealtimeUsage(r.Context(), bundle, report); err != nil {
+			writeError(deps.Logger, w, r.Context(), err)
+			return
+		}
+		w.Header().Set("Content-Type", "application/json")
+		w.WriteHeader(http.StatusAccepted)
+		_, _ = w.Write([]byte(`{"received":true}`))
+	}
+}
+
+// elevenLabsWebhookHandler terminates
+// POST /v1/convai/webhook/{model_provider_id}, the URL a customer pastes into
+// their own ElevenLabs dashboard (ADR-097).
+//
+// It relays and nothing else. The body is streamed to the control plane
+// exactly as received, because the vendor's HMAC covers those raw bytes and
+// any re-encoding here would fail every delivery. The gateway does not parse
+// the body, does not hold the tenant's secret, and does not decide whether the
+// delivery is genuine.
+//
+// A failure to reach the control plane answers 502, which is deliberate even
+// though the vendor may not retry. Acknowledging a delivery this gateway never
+// passed on would tell the vendor the report landed when it did not, and the
+// count of consecutive failures is what eventually disables the webhook, so
+// hiding them removes the only signal that the relay is broken. Nothing is
+// lost by the honest answer: the reconciler reads the same numbers back from
+// the vendor on its own schedule and bills the call regardless.
+func elevenLabsWebhookHandler(deps RouterDeps) http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		result, err := deps.WebhookRelay.ForwardElevenLabsWebhook(
+			r.Context(),
+			controlplane.WebhookRelay{
+				ModelProviderID: chi.URLParam(r, "model_provider_id"),
+				Signature:       r.Header.Get("ElevenLabs-Signature"),
+				ContentType:     r.Header.Get("Content-Type"),
+				Body:            r.Body,
+			},
+		)
+		if err != nil {
+			// An oversized delivery is the caller's shape, not our outage,
+			// and relaying a truncated one would fail its own HMAC and read
+			// as a forgery. 413 says which it is.
+			if errors.Is(err, controlplane.ErrWebhookTooLarge) {
+				w.Header().Set("Content-Type", "application/json")
+				w.WriteHeader(http.StatusRequestEntityTooLarge)
+				_, _ = w.Write([]byte(`{"error":"the delivery is too large to relay"}`))
+				return
+			}
+			deps.Logger.Warn("an ElevenLabs post-call delivery could not be relayed to the control plane",
+				zap.Error(err))
+			w.Header().Set("Content-Type", "application/json")
+			w.WriteHeader(http.StatusBadGateway)
+			_, _ = w.Write([]byte(`{"error":"the delivery could not be relayed"}`))
+			return
+		}
+		// The control plane's own status, unchanged: 404 keeps provider ids
+		// unprobeable, 401 is a real signature failure, and 200 is an
+		// acknowledgement it issued rather than one this hop invented.
+		w.Header().Set("Content-Type", "application/json")
+		w.WriteHeader(result.StatusCode)
+		_, _ = w.Write(result.Body)
+	}
+}
+
 // geminiPassthroughHandler terminates any POST /v1beta/... request.
 // Specifically targets the Gemini-native shape used by gemini-cli
 // (`GOOGLE_GEMINI_BASE_URL=http://…/gateway`) and the @google/genai
@@ -514,11 +991,16 @@ func geminiPassthroughHandler(deps RouterDeps) http.HandlerFunc {
 			RawQuery: r.URL.RawQuery,
 			Headers:  forwardedPassthroughHeaders(r.Header),
 			Stream:   isStream,
-			Surface:  domain.GeminiSurface(),
+		}
+		dispatch := app.PassthroughDispatch{
+			Body:    body,
+			Model:   model,
+			Meta:    meta,
+			Surface: domain.GeminiSurface(),
 		}
 
 		if isStream {
-			result, err := deps.App.HandlePassthroughStream(r.Context(), bundle, body, model, meta)
+			result, err := deps.App.HandlePassthroughStream(r.Context(), bundle, dispatch)
 			if err != nil {
 				writeError(deps.Logger, w, r.Context(), err)
 				return
@@ -529,7 +1011,7 @@ func geminiPassthroughHandler(deps RouterDeps) http.HandlerFunc {
 		}
 
 		result, hw, err := withHeartbeat(r.Context(), w, deps.HeartbeatInterval, func() (*app.CompletionResult, error) {
-			return deps.App.HandlePassthrough(r.Context(), bundle, body, model, meta)
+			return deps.App.HandlePassthrough(r.Context(), bundle, dispatch)
 		})
 		if err != nil {
 			writeError(deps.Logger, hw, r.Context(), err)
@@ -648,6 +1130,12 @@ func modelsHandler(deps RouterDeps) http.HandlerFunc {
 // instance) are attributed to the gateway rather than to an empty string:
 // `owned_by` is a required string in the OpenAI Model object, and a
 // blank one renders as an unlabelled row in model pickers.
+//
+// This stays the provider FAMILY even for an instance carrying a routing
+// handle. `owned_by` is the vendor a client groups the picker by, so putting
+// a handle here would file an Anthropic model under "europe". The handle
+// belongs in the id, which is what a caller sends, and Model.ListingSpelling
+// puts it there.
 func modelOwnedBy(m domain.Model) string {
 	if m.ProviderID == "" {
 		return "langwatch"
@@ -999,6 +1487,12 @@ func setMetaHeaders(w http.ResponseWriter, meta app.DispatchMeta) {
 	if meta.CustomerTraceparent != "" {
 		h.Set("Traceparent", meta.CustomerTraceparent)
 	}
+	if meta.GuardrailsNotApplied != "" {
+		h.Set("X-LangWatch-Guardrails-Not-Applied", meta.GuardrailsNotApplied)
+	}
+	if meta.RealtimeSessionID != "" {
+		h.Set("X-LangWatch-Session-Id", meta.RealtimeSessionID)
+	}
 }
 
 // Pre-allocated SSE framing bytes — three w.Write calls instead of one
@@ -1023,6 +1517,13 @@ var (
 // (specs/ai-gateway/error-transparency.feature). Everything else gets the
 // standard {"type":"error","error":{"type":"provider_error","message":...}}
 // object.
+//
+// A handled error never reaches the frame through err.Error(): herr.E renders
+// its whole Meta map and every wrapped reason into that string, so a frame
+// built from it carried the engine's internal cause — the one the JSON
+// boundary deliberately keeps to the log line — straight to the caller. The
+// customer copy the classifier wrote is used instead, so a failure reads the
+// same whether it arrives before the stream opens or during it.
 func streamErrorFrame(err error) []byte {
 	var ue *domain.UpstreamError
 	if errors.As(err, &ue) && len(ue.Body) > 0 && sonic.Valid(ue.Body) {
@@ -1030,6 +1531,17 @@ func streamErrorFrame(err error) []byte {
 	}
 	msg := err.Error()
 	errType := "provider_error"
+	var e herr.E
+	if errors.As(err, &e) {
+		// Never err.Error() for a handled error: it renders the whole Meta map
+		// and every wrapped reason. The code is the floor, the customer copy
+		// the classifier wrote is the message when there is one.
+		errType = string(e.Code)
+		msg = string(e.Code)
+		if text, ok := e.Meta["message"].(string); ok && text != "" {
+			msg = text
+		}
+	}
 	if ue != nil {
 		if ue.Message != "" {
 			msg = ue.Message
@@ -1134,10 +1646,37 @@ func writeError(logger *zap.Logger, w http.ResponseWriter, ctx context.Context, 
 	}
 	var e herr.E
 	if errors.As(err, &e) {
-		herr.WriteHTTP(w, e)
+		herr.WriteHTTP(w, domain.Remediate(withFault(e)))
 		return
 	}
-	herr.WriteHTTP(w, herr.New(ctx, domain.ErrInternal, nil))
+	herr.WriteHTTP(w, domain.Remediate(withFault(herr.New(ctx, domain.ErrInternal, nil))))
+}
+
+// withFault stamps the error's fault attribution onto the envelope, from the
+// one fault table the log line already uses.
+//
+// Attribution has to travel WITH the error. The gateway authors most of its
+// failures rather than forwarding a provider response, so there is no upstream
+// status for a client, an agent or a support conversation to infer "whose
+// problem is this" from. Doing it here, at the single write choke point, is
+// what makes it impossible for a gateway error to reach a client unattributed
+// — and keeps faultForCode as the only place the question is answered, rather
+// than asking every construction site to remember.
+//
+// An explicit fault already in meta wins: a construction site that knows
+// better than the code-level default (budget.go, classifyRequestBuildError)
+// has said so deliberately.
+func withFault(e herr.E) herr.E {
+	if _, ok := e.Meta["fault"]; ok {
+		return e
+	}
+	meta := make(herr.M, len(e.Meta)+1)
+	for k, v := range e.Meta {
+		meta[k] = v
+	}
+	meta["fault"] = string(faultForCode(e.Code))
+	e.Meta = meta
+	return e
 }
 
 // writeUpstreamError forwards a provider's terminal response to the client.
@@ -1204,13 +1743,16 @@ func writeUpstreamError(w http.ResponseWriter, ue *domain.UpstreamError) {
 	_, _ = w.Write(body)
 }
 
-var errorsRegistered bool
+// errorsRegisteredOnce guards a write into herr's package-level status map.
+// Every NewRouter reaches it, and the test binary builds routers from parallel
+// tests, so a plain bool here is a data race the race detector reports.
+var errorsRegisteredOnce sync.Once
 
 func registerErrorStatuses() {
-	if errorsRegistered {
-		return
-	}
-	errorsRegistered = true
+	errorsRegisteredOnce.Do(registerErrorStatusesOnce)
+}
+
+func registerErrorStatusesOnce() {
 	herr.RegisterStatus(domain.ErrInvalidAPIKey, http.StatusUnauthorized)
 	herr.RegisterStatus(domain.ErrKeyRevoked, http.StatusForbidden)
 	herr.RegisterStatus(domain.ErrKeyDisabled, http.StatusForbidden)
@@ -1222,8 +1764,28 @@ func registerErrorStatuses() {
 	herr.RegisterStatus(domain.ErrPolicyViolation, http.StatusForbidden)
 	herr.RegisterStatus(domain.ErrModelNotAllowed, http.StatusBadRequest)
 	herr.RegisterStatus(domain.ErrProviderNotBound, http.StatusBadRequest)
+	herr.RegisterStatus(domain.ErrModelNotRecognized, http.StatusBadRequest)
 	herr.RegisterStatus(domain.ErrProviderError, http.StatusBadGateway)
 	herr.RegisterStatus(domain.ErrProviderTimeout, http.StatusGatewayTimeout)
+	// The three terminal provider-setup failures. 400, like their siblings
+	// no_provider_configured and model_provider_not_bound: the request cannot
+	// be served until something in the customer's model provider settings
+	// changes, and a 5xx here is what made agent clients retry a dead
+	// credential ten times before giving up.
+	herr.RegisterStatus(domain.ErrProviderCredentialInvalid, http.StatusBadRequest)
+	herr.RegisterStatus(domain.ErrProviderConfigInvalid, http.StatusBadRequest)
+	// 401: the provider itself refused the credential, and forwarding its own
+	// verdict is what error-transparency promises.
+	herr.RegisterStatus(domain.ErrProviderCredentialRejected, http.StatusUnauthorized)
+	// 502: the provider was never reached. Retryable, unlike the three above.
+	herr.RegisterStatus(domain.ErrProviderConnectionFailed, http.StatusBadGateway)
+	// 499 is nginx's "client closed request": the caller hung up before a
+	// response was written. net/http has no constant for it because it is not
+	// an IANA status — it exists to be LOGGED, which is exactly what makes it
+	// right here. The alternatives both lie: 504 blames a provider that was
+	// answering, and a 2xx credits a request nobody received. Written as a
+	// literal because herrgen reads these registrations statically.
+	herr.RegisterStatus(domain.ErrRequestAbandoned, 499)
 	herr.RegisterStatus(domain.ErrBadRequest, http.StatusBadRequest)
 	herr.RegisterStatus(domain.ErrMissingModel, http.StatusBadRequest)
 	// Fail-closed attribution: the request is missing a required field
@@ -1246,4 +1808,11 @@ func registerErrorStatuses() {
 	// Retryable by contract: the control plane failed us, not the caller.
 	// A 5xx keeps client SDKs retrying instead of bubbling a config error.
 	herr.RegisterStatus(domain.ErrAuthUpstream, http.StatusServiceUnavailable)
+	// 429, like the rate limit above it: the key is at a cap that a call
+	// ending will clear, so a client should back off and try again rather
+	// than treat the refusal as terminal.
+	herr.RegisterStatus(domain.ErrRealtimeSessionLimit, http.StatusTooManyRequests)
+	// 503: the control plane could not record the session, which is our
+	// fault and passes.
+	herr.RegisterStatus(domain.ErrRealtimeRegistryUnavailable, http.StatusServiceUnavailable)
 }

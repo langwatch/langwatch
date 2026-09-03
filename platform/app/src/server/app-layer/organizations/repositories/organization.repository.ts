@@ -86,6 +86,20 @@ export interface OrganizationForBilling {
 }
 
 /**
+ * Why the billing lookup did or did not yield an organization.
+ *
+ * A nullable return cannot carry this: "there is no such organization" is an
+ * anomaly worth a warning, and "this organization does not buy usage" is the
+ * ordinary state of every free and legacy plan. Collapsing both into `null`
+ * left the caller with one branch and therefore one severity, so the routine
+ * case was reported at the anomaly's.
+ */
+export type BillingOrganizationLookup =
+  | { outcome: "usage_billed"; organization: OrganizationForBilling }
+  | { outcome: "not_found" }
+  | { outcome: "not_usage_billed" };
+
+/**
  * Input for creating an organization and assigning the user as admin.
  */
 export interface CreateAndAssignInput {
@@ -271,6 +285,12 @@ export interface MemberTeamBinding {
 export interface DeleteMemberInput {
   organizationId: string;
   userId: string;
+  /**
+   * Who removed them, when a person did. A service credential acts as
+   * nobody, so this is null there and the revocation is attributed to the
+   * organization service itself.
+   */
+  actingUserId?: string | null;
 }
 
 /**
@@ -365,7 +385,7 @@ export interface OrganizationRepository {
   ): Promise<OrganizationIntent | null>;
   getOrganizationForBilling(
     organizationId: string,
-  ): Promise<OrganizationForBilling | null>;
+  ): Promise<BillingOrganizationLookup>;
 
   // --- New methods for router delegation ---
 
@@ -560,8 +580,8 @@ export class NullOrganizationRepository implements OrganizationRepository {
 
   async getOrganizationForBilling(
     _organizationId: string,
-  ): Promise<OrganizationForBilling | null> {
-    return null;
+  ): Promise<BillingOrganizationLookup> {
+    return { outcome: "not_found" };
   }
 
   async createAndAssign(

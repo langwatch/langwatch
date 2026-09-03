@@ -116,7 +116,7 @@ Feature: AI Gateway Governance — Admin RoutingPolicies (decoupled from VK)
   @bdd @ui @routing-policy @admin-page
   Scenario: Admin RoutingPolicies page lists all policies grouped by scope
     Given org "acme" has 3 RoutingPolicies across ORG / TEAM / PROJECT scopes
-    When carol navigates to "/settings/routing-policies"
+    When carol navigates to "/gateway/routing-policies"
     Then she sees a list grouped by scope: "Organization defaults", "Team defaults", "Project defaults"
     And each group can be expanded to show its policies with name, model tier count, and provider count
     And a "Set as default" button is present for non-default policies in each group

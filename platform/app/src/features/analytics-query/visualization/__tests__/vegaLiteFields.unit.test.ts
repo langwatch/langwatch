@@ -7,9 +7,9 @@
 import { describe, expect, it } from "vitest";
 
 import {
-  GOVERNED_FIXTURE_COLUMNS,
-  GOVERNED_FIXTURE_ROW_COUNTS,
-} from "../../__tests__/fixtures/governedDatasetRegistry";
+  LWQL_FIXTURE_COLUMNS,
+  LWQL_FIXTURE_ROW_COUNTS,
+} from "../../__tests__/fixtures/lwqlDatasetRegistry";
 import {
   repeatOverRegisteredColumns,
   transformCreatedFields,
@@ -20,8 +20,8 @@ import { VEGA_LITE_SCHEMA_URL as S } from "../vegaLiteSchema";
 const validate = (spec: unknown) =>
   validateVegaLiteSpec({
     spec,
-    columnsByDataset: GOVERNED_FIXTURE_COLUMNS,
-    rowCountsByDataset: GOVERNED_FIXTURE_ROW_COUNTS,
+    columnsByDataset: LWQL_FIXTURE_COLUMNS,
+    rowCountsByDataset: LWQL_FIXTURE_ROW_COUNTS,
   });
 
 const bar = (extra: Record<string, unknown>) => ({

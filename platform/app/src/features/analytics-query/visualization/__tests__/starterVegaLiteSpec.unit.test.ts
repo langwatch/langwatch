@@ -17,7 +17,7 @@ import {
 import { validateVegaLiteSpec } from "../validateVegaLiteSpec";
 import type {
   DatasetRowCounts,
-  GovernedDatasetColumn,
+  LangWatchQLDatasetColumn,
 } from "../visualization.types";
 
 const DATASET = "query_result";
@@ -25,7 +25,7 @@ const ROWS: DatasetRowCounts = { [DATASET]: 12 };
 
 const COLUMN_SHAPES: readonly {
   name: string;
-  columns: readonly GovernedDatasetColumn[];
+  columns: readonly LangWatchQLDatasetColumn[];
 }[] = [
   {
     name: "a category and a number",
@@ -56,13 +56,16 @@ const COLUMN_SHAPES: readonly {
   { name: "no columns at all", columns: [] },
 ];
 
-const shapeNamed = (name: string): readonly GovernedDatasetColumn[] => {
+const shapeNamed = (name: string): readonly LangWatchQLDatasetColumn[] => {
   const shape = COLUMN_SHAPES.find((entry) => entry.name === name);
   if (!shape) throw new Error(`no column shape named ${name}`);
   return shape.columns;
 };
 
-const validate = (spec: unknown, columns: readonly GovernedDatasetColumn[]) =>
+const validate = (
+  spec: unknown,
+  columns: readonly LangWatchQLDatasetColumn[],
+) =>
   validateVegaLiteSpec({
     spec,
     columnsByDataset: { [DATASET]: columns },
@@ -70,9 +73,9 @@ const validate = (spec: unknown, columns: readonly GovernedDatasetColumn[]) =>
   });
 
 describe("the starting chart specification", () => {
-  describe("given the columns a governed result returned", () => {
+  describe("given the columns a LangWatchQL result returned", () => {
     describe("when a starter is built for each shape of result", () => {
-      it("produces one the governed validator accepts, every time", () => {
+      it("produces one the LangWatchQL validator accepts, every time", () => {
         for (const { name, columns } of COLUMN_SHAPES) {
           const spec = starterVegaLiteSpec({ columns, datasetName: DATASET });
           const result = validate(spec, columns);
