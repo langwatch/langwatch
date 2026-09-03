@@ -1,14 +1,19 @@
-import { existsSync, readFileSync, readdirSync, statSync } from "node:fs";
+import { existsSync, readFileSync, readdirSync } from "node:fs";
 import { builtinModules } from "node:module";
 import { dirname, isAbsolute, join, relative, resolve, sep } from "node:path";
 import ts from "typescript";
 import { z } from "zod";
 import { walkFiles } from "./files";
+import {
+  moduleImports,
+  resolveRelativeModule,
+  resolveSourceCandidate,
+  type ModuleImport,
+} from "./module-graph";
 import type { ArchitectureViolation, ClassifiedPackage } from "./types";
 
 const UI_FEATURE_CATALOGUE_PATH = join("apps", "ui", "src", "features", "catalogue.json");
 const SOURCE_FILE = /\.[cm]?[jt]sx?$/;
-const SOURCE_EXTENSION_CANDIDATES = [".ts", ".tsx", ".mts", ".mtsx", ".js", ".jsx"];
 const NODE_BUILTIN_SPECIFIERS = new Set(
   builtinModules.flatMap((specifier) => [specifier, `node:${specifier.replace(/^node:/, "")}`]),
 );
@@ -75,12 +80,7 @@ type UiFeatureCatalogue = z.infer<typeof uiFeatureCatalogueSchema>;
 type UiFeature = UiFeatureCatalogue["features"][number];
 type WebFeatureDeclaration = z.infer<typeof webFeatureDeclarationSchema>;
 
-type SourceImport = {
-  file: string;
-  line: number;
-  specifier: string;
-  nonLiteral: boolean;
-};
+type SourceImport = ModuleImport;
 
 type Capability = {
   packageName: string;
@@ -124,50 +124,6 @@ function isWithin(root: string, path: string): boolean {
   );
 }
 
-function importsIn(file: string): SourceImport[] {
-  const source = readFileSync(file, "utf8");
-  const sourceFile = ts.createSourceFile(
-    file,
-    source,
-    ts.ScriptTarget.Latest,
-    true,
-    file.endsWith("x") ? ts.ScriptKind.TSX : ts.ScriptKind.TS,
-  );
-  const found: SourceImport[] = [];
-
-  const addImport = (node: ts.Node, specifier: ts.Expression | undefined): void => {
-    const position = sourceFile.getLineAndCharacterOfPosition(node.getStart(sourceFile));
-    const isLiteral = specifier !== void 0 && ts.isStringLiteralLike(specifier);
-    found.push({
-      file,
-      line: position.line + 1,
-      specifier: isLiteral ? specifier.text : "<non-literal module specifier>",
-      nonLiteral: !isLiteral,
-    });
-  };
-
-  const visit = (node: ts.Node): void => {
-    if (ts.isImportDeclaration(node)) {
-      addImport(node.moduleSpecifier, node.moduleSpecifier);
-    } else if (ts.isExportDeclaration(node) && node.moduleSpecifier) {
-      addImport(node.moduleSpecifier, node.moduleSpecifier);
-    } else if (
-      ts.isImportEqualsDeclaration(node) &&
-      ts.isExternalModuleReference(node.moduleReference)
-    ) {
-      addImport(node.moduleReference, node.moduleReference.expression);
-    } else if (ts.isCallExpression(node)) {
-      const isDynamicImport = node.expression.kind === ts.SyntaxKind.ImportKeyword;
-      const isRequire = ts.isIdentifier(node.expression) && node.expression.text === "require";
-      if (isDynamicImport || isRequire) addImport(node, node.arguments[0]);
-    }
-    ts.forEachChild(node, visit);
-  };
-
-  visit(sourceFile);
-  return found;
-}
-
 function sourceFiles(root: string): string[] {
   return walkFiles(
     root,
@@ -179,25 +135,14 @@ function sourceFiles(root: string): string[] {
   );
 }
 
-function resolveSourceCandidate(candidate: string): string | undefined {
-  const candidates = [
-    candidate,
-    ...SOURCE_EXTENSION_CANDIDATES.map((extension) => `${candidate}${extension}`),
-    ...SOURCE_EXTENSION_CANDIDATES.map((extension) => join(candidate, `index${extension}`)),
-  ];
-  return candidates.find((path) => existsSync(path) && statSync(path).isFile());
-}
-
-function resolveRelativeSource(sourceImport: SourceImport): string | undefined {
-  if (!sourceImport.specifier.startsWith(".")) return void 0;
-  return resolveSourceCandidate(resolve(dirname(sourceImport.file), sourceImport.specifier));
-}
-
 function resolveUiSourceImport(sourceImport: SourceImport, sourceRoot: string): string | undefined {
-  const relativeTarget = resolveRelativeSource(sourceImport);
+  const relativeTarget = resolveRelativeModule({
+    file: sourceImport.file,
+    specifier: sourceImport.specifier,
+  });
   if (relativeTarget) return relativeTarget;
   if (!/^(?:~|@)\//.test(sourceImport.specifier)) return void 0;
-  return resolveSourceCandidate(resolve(sourceRoot, sourceImport.specifier.slice(2)));
+  return resolveSourceCandidate({ candidate: resolve(sourceRoot, sourceImport.specifier.slice(2)) });
 }
 
 function readUiFeatureCatalogue(root: string): {
@@ -585,7 +530,7 @@ function lintUiFeatureStructure(root: string): ArchitectureViolation[] {
     }
     if (module.kind === "entry") continue;
 
-    for (const sourceImport of importsIn(file)) {
+    for (const sourceImport of moduleImports({ file: file })) {
       if (sourceImport.nonLiteral) continue;
       const target = resolveUiSourceImport(sourceImport, sourceRoot);
       if (!target || !isWithin(featuresRoot, target)) continue;
@@ -755,7 +700,7 @@ function lintUiSourceBoundaries(
       });
     }
 
-    for (const sourceImport of importsIn(file)) {
+    for (const sourceImport of moduleImports({ file: file })) {
       if (sourceImport.nonLiteral) {
         violations.push({
           policy: "ui-static-module-specifier",
@@ -1030,7 +975,7 @@ function lintWebScreenClosures(
             allowed: "Receive browser data and actions from its owning frontend feature.",
           });
         }
-        for (const sourceImport of importsIn(current)) {
+        for (const sourceImport of moduleImports({ file: current })) {
           if (sourceImport.nonLiteral) {
             violations.push({
               policy: "ui-screen-closure",
@@ -1055,7 +1000,7 @@ function lintWebScreenClosures(
               message: `An owner-only screen may not import ${forbiddenImport}.`,
             });
           }
-          const targetFile = resolveRelativeSource(sourceImport);
+          const targetFile = resolveRelativeModule({ file: sourceImport.file, specifier: sourceImport.specifier });
           if (!targetFile) continue;
           if (!isWithin(sourceRoot, targetFile)) {
             violations.push({
@@ -1143,7 +1088,7 @@ function lintWebSurfaceClosures(
           });
           continue;
         }
-        for (const sourceImport of importsIn(current)) {
+        for (const sourceImport of moduleImports({ file: current })) {
           if (sourceImport.nonLiteral) {
             violations.push({
               policy: "ui-surface-closure",
@@ -1168,7 +1113,7 @@ function lintWebSurfaceClosures(
               message: `A shareable surface may not import ${forbiddenImport}.`,
             });
           }
-          const targetFile = resolveRelativeSource(sourceImport);
+          const targetFile = resolveRelativeModule({ file: sourceImport.file, specifier: sourceImport.specifier });
           if (!targetFile) continue;
           if (!isWithin(sourceRoot, targetFile)) {
             violations.push({
@@ -1390,7 +1335,7 @@ function lintWebPrivateStructure(webPackages: readonly WebPackage[]): Architectu
       }
       if (module.kind === "package-entry") continue;
 
-      for (const sourceImport of importsIn(file)) {
+      for (const sourceImport of moduleImports({ file: file })) {
         if (sourceImport.nonLiteral) continue;
         const targetFile = resolveUiSourceImport(sourceImport, sourceRoot);
         if (!targetFile || !isWithin(sourceRoot, targetFile)) continue;

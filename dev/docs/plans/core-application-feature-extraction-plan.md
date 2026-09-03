@@ -8955,7 +8955,13 @@ in `histogram-boundaries.ts` for the two deleted histograms
 
 ### Named absences this lane creates or inherits
 
-1. **The server-to-browser import guard is gone and has no replacement.**
+1. ~~**The server-to-browser import guard is gone and has no replacement.**~~
+   **Rebuilt 2026-09-03** — `packages/architecture-lint/tests/frontend-boundary.unit.test.ts`.
+   The rewrite this entry called for was done rather than deferred; the record
+   at the end of this document names the roots it walks, the two findings it
+   opens with, and the half of the old guard that stays absent. The rest of this
+   entry is the original assessment, kept for its evidence.
+
    `frontend-boundary.unit.test.ts` walked the value graph from
    `src/{server,app/api,pages/api,mcp,tasks}` to browser-only packages, and
    `CLAUDE.md` still cites it by path as an enforced, build-failing guard. It
@@ -9242,10 +9248,10 @@ capability that exists and is not reachable.
   a gateway already listening on `PORT + 3` may point at another worktree's
   control plane, but cannot ask it: the script that did
   (`GET /debug/control-plane`) went with the platform application.
-- **The transitive frontend-boundary guard has no home.** The rule stands —
-  no value-import chain from server code may reach a browser-only package — but
-  the graph walk that enforced it lived in the platform application's tests.
-  Recorded in `CLAUDE.md` as a rule without a guard.
+- ~~**The transitive frontend-boundary guard has no home.**~~ **Closed
+  2026-09-03** by the guard lane — see the record at the end of this document.
+  It is `packages/architecture-lint/tests/frontend-boundary.unit.test.ts` now,
+  and it is RED on two real findings rather than baselined green.
 - **`.env` must be moved by hand.** Every application resolves `.env` from the
   workspace root now. A checkout upgrading across this change runs
   `mv platform/app/.env .env` once; nothing can do it for them, because the
@@ -9783,3 +9789,155 @@ they are audit records of a point in time rather than live instructions.
 had already pointed its path filter at
 `apps/api/src/tasks/clickhouse-migrate/migrations/**`, which is what made this
 lane's `set.go` fix the only half still missing.
+
+## Guard lane — the frontend boundary is enforced again, 2026-09-03
+
+The largest thing Cutover C dropped is back. `frontend-boundary.unit.test.ts`
+walked the value-import graph from the platform application's backend trees to
+browser-only packages, `CLAUDE.md` cited it by path as an enforced,
+build-failing guard, and it went with `platform/app` because 19 of its 20 named
+subjects went with it too. The contract outlived every one of those subjects.
+
+It now lives at `packages/architecture-lint/tests/frontend-boundary.unit.test.ts`
+— the established home for repository-level guards, and where the ten other
+platform-era guards landed in the same cutover.
+
+```
+  ROOTS (1,978 files)                          FORBIDDEN
+
+  apps/api/src/api.main.ts             ─┐
+  apps/worker/src/worker.entrypoint.ts ─┤      react, react-dom, react-router,
+  **/*.composition.ts        (82)      ─┼──▶   react-feather, lucide-react,
+  packages/features/*/server/src (42)  ─┤      framer-motion, motion, @chakra-ui,
+  packages/*/src/server           (1)  ─┘      @ark-ui, @emotion, @zag-js,
+                                               3 browser @opentelemetry/*
+     value edges only; `import type` erased
+     3,648 modules reached                     ...and any module under
+     ~1.7s per walk, two walks, 5.0s total     apps/ui/ or packages/features/*/web/
+
+  TERMINAL: packages/mail/**  — walk stops on entry (react-email renders server-side)
+```
+
+### What it opens with: two findings, not a baseline
+
+Neither is written down as accepted. The test is **red**, and these are the
+reasons.
+
+**1. React is on the worker's boot graph.** Five roots, one cause:
+
+```
+apps/worker/src/worker.entrypoint.ts
+  -> apps/worker/src/app/worker-standalone.executable.ts
+  -> apps/worker/src/app/worker-standalone.composition.ts
+  -> apps/worker/src/app/worker-production.composition.ts
+  -> apps/worker/src/app/worker-automation-graph.composition.ts
+  -> apps/worker/src/features/automation/automation-notification-delivery.adapter.ts
+  -> apps/worker/src/features/automation/trigger-digest-mail.template.ts
+  -> package react
+```
+
+Two worker files render mail with react-email from inside the composition root:
+`features/automation/trigger-digest-mail.template.ts` and
+`features/identity/join-request-mail.adapter.ts` (a second seed, reached from
+the same roots). Both are deliberate and both carry a docblock explaining
+why — written with `createElement` rather than JSX because the strict feature
+layout admits no `.tsx`. The exception the contract grants is `@langwatch/mail`
+and only that, so these are outside it.
+
+The finding is not the React import on its own — it is that
+`packages/mail/src/templates/join-request-emails.tsx` **already exists** and
+renders the same mail, so there are twin templates and the exception is granted
+to the copy the worker does not use. Two ways out, both a decision rather than a
+guard change: move these two into `@langwatch/mail` (which is what the exception
+is for and what deletes the twin), or widen the terminal to name mail rendering
+wherever it happens and accept React on the worker boot graph deliberately.
+**No backend root imports `@langwatch/mail` at all today** — mail leaves through
+ports — so the exception as written is currently inert, which is its own signal.
+
+**2. Backend code reaches three modules inside browser packages.** Twelve roots,
+three causes:
+
+| Seed | Reached from |
+| --- | --- |
+| `packages/features/analytics/web/src/model/visualization/validation.ts` | `packages/features/dashboard/server/src/adapters/saved-workbench-chart-policy.adapter.ts`, and through its package barrel, ten `apps/api` compositions |
+| `apps/ui/src/behavior/public-config.projection.ts` | `apps/api/src/app-static/app-static.surface.ts` |
+| `apps/ui/src/behavior/public-config.ts` | `apps/api/src/app-static/app-static.handler.ts` |
+
+All three targets are framework-free today and each says so in a docblock;
+`analytics-web` even publishes a `./server/filters/*` family, so server
+consumption of that package is intentional. That is exactly why the rule is the
+tree and not the toolkit: a module in a browser package acquires a React edge
+the next time somebody edits it, and nothing in that review would say a backend
+process is downstream. The fix is a move, not an exemption — these are shared
+values, and a framework-free package both sides import is where they belong.
+
+### Decisions taken, so the next reader does not re-litigate them
+
+- **The resolver is shared, not new.** `src/module-graph.ts` now owns the AST
+  import scan, the source-candidate resolution, the workspace `exports` /
+  `imports` resolver, the forward walk and the backwards taint flood.
+  `frontend-ui-boundaries.ts` was repointed at it and lost its private copies of
+  the first three. A second resolver is not a duplicate function, it is a second
+  opinion about what the graph is.
+- **Two walks, not one.** A single walk settles each tainted file on one cause,
+  so a root reaching both a browser package and a browser module would be
+  reported under whichever the flood reached first. Two walks cost 1.7s each.
+- **`typescript@6`'s in-process API, deliberately.** ADR-099 routes static scans
+  through the platform application's single TS 7 session; that file is gone, and
+  `@langwatch/architecture-lint` pins `typescript@6.0.3` and parses in-process
+  in every existing rule. The batching ADR-099 asks for is honoured by caching
+  parses keyed on path + mtime + size, so no file is parsed twice.
+- **Subpath imports are resolved.** 110 edges in the feature packages are
+  `#`-prefixed, all through the identical `"#*": "./src/*.ts"` map. A resolver
+  ignorant of a manifest's `imports` drops them in silence, and a dropped edge
+  looks exactly like a clean graph. Pinned by a case.
+- **Workspace manifests are discovered by a depth-4 scan** of `apps`,
+  `packages`, `sdks`, `mcp`, `plugins`, `services` and `skills` rather than by
+  parsing `pnpm-workspace.yaml`. Four is what the deepest glob needs; the bound
+  is what keeps the scan out of `apps/ui/src`. 51 of 8,737 local value edges
+  stay unresolved, and all 51 are `@langwatch/ksuid` and `@langwatch/scenario`
+  — published packages, correctly not workspace members.
+- **`motion` joins the banned list**, alongside `framer-motion`. It is the same
+  library under its current name and already a web-package dependency; listing
+  only the old name is the gap that once hid `@langwatch/react-rum`.
+- **`.js` specifiers resolve to their TypeScript source.** The shared resolver
+  strips the extension and retries, which the UI rule did not do.
+
+### Still absent
+
+**The second half of the old guard was not rebuilt.** It walked the boundary the
+other way — from every `src/server` module the client trees value-imported, to
+prisma, redis, the EE audit writer and the authz composition root — and caught a
+class the browser walk cannot: one import from `rbac.ts` into the authz root put
+Prisma and redis in the browser bundle and failed eleven jsdom suites. Every one
+of its subjects is gone (`src/server/db.ts`, `src/server/redis.ts`,
+`src/server/api/rbac.ts`, `runtime/app/features/authz.ts`, `ee/audit-log/`), and
+so are both client trees. The equivalent question in the new shape is what
+`apps/ui` and the web packages reach through `packages/features/*/server`, and
+answering it needs a `SERVER_ONLY_STATE` for the package world that nobody has
+written down. `src/module-graph.ts` is general over roots and targets, so the
+walk is there when that list is.
+
+### Gates
+
+- `pnpm exec vitest run` in `packages/architecture-lint`: **37 of 38 files
+  green, 492 of 494 tests green.** The one red file is this guard, on the two
+  findings above; 13 of its 15 cases pass, including every self-validation case.
+  No other suite changed behaviour under the `frontend-ui-boundaries` repoint.
+- `tsc --noEmit -p tsconfig.json`: clean.
+- Runtime: **5.0s** for the guard file (4.7s of it the two module-scope walks),
+  18.4s for the whole package. The 60s ceiling is not close.
+- Feature parity: `4667` unbound, down one from the `4668` baseline — the two
+  scenarios in `specs/setup/memory-footprint.feature` bind, and one of them is
+  new. No other scenario title or tag was touched.
+
+### File → change
+
+| File | Change |
+| --- | --- |
+| `packages/architecture-lint/src/module-graph.ts` | NEW. The shared value-import graph: `moduleImports`, `valueImports`, `rendersJsx`, `resolveSourceCandidate`, `resolveRelativeModule`, `createWorkspaceModuleResolver`, `walkValueImportGraph`, `chainsToSeeds`. |
+| `packages/architecture-lint/tests/frontend-boundary.unit.test.ts` | NEW. The guard, 15 cases: two contract assertions and 13 that stop it passing vacuously. |
+| `packages/architecture-lint/src/frontend-ui-boundaries.ts` | Repointed at the shared resolver; its private `importsIn`, `resolveSourceCandidate` and `resolveRelativeSource` deleted. |
+| `packages/architecture-lint/src/index.ts` | Exports the module-graph surface. |
+| `specs/setup/memory-footprint.feature` | "Server code cannot reach browser-only UI, even transitively" re-worded for the new roots (title unchanged, so the binding holds); "Backend code never imports a module out of a browser package" added, `@unit`. |
+| `CLAUDE.md` | The row names the new path and both refusals. |
