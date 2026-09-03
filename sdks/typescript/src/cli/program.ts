@@ -3244,9 +3244,9 @@ export function buildProgram({ bin }: { bin?: string } = {}): Command {
     chartCmd
       .command("run <id>")
       .description("Run a saved chart's statement and print the result")
-      .option("--start <datetime>", "Period start for statements declaring {period_start:DateTime}")
-      .option("--end <datetime>", "Period end for statements declaring {period_end:DateTime}")
-      .option("--granularity <seconds>", "Datapoint step for statements declaring {period_granularity_seconds:UInt32}")
+      .option("--start <datetime>", "Period start for statements declaring {dashboard_context_period_start:DateTime}")
+      .option("--end <datetime>", "Period end for statements declaring {dashboard_context_period_end:DateTime}")
+      .option("--granularity <seconds>", "Datapoint step for statements declaring {dashboard_context_granularity_seconds:UInt32}")
       .option("--project <slug-or-id>", "Project to run against")
       .option("-f, --format <format>", "Output format: table (default) or json", "table"),
     async (
