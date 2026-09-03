@@ -271,10 +271,10 @@ configured only for the web role will log a warn per administrator and carry
 on.
 
 **Two additive migrations.**
-`20260827120014_sso_connection_last_reproof_at` adds the separate operational
+`20260831120012_sso_connection_last_reproof_at` adds the separate operational
 cursor table used to revisit connections round-robin without giving the
 event projection a second writer.
-`20260827120017_sso_connection_lapsed_domains` adds
+`20260831120015_sso_connection_lapsed_domains` adds
 `SsoConnection.lapsedDomains TEXT[]` and a GIN index on it. Neither needs a
 backfill or takes a lock of consequence on a table this size. Both are safe to
 deploy ahead of the code — the cursor stays empty and the column stays unread
