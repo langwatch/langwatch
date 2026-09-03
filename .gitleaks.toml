@@ -271,3 +271,19 @@ regexes = ['''^ik-lw-fresh1234567890_secret$''']
 description = "Documented `your-api-key` placeholder in the docs curl examples, not a credential"
 targetRules = ["curl-auth-header"]
 regexes = ['''^your-api-key$''']
+
+# `vk-lw-YOUR_VIRTUAL_KEY`, the placeholder an earlier commit on the AI Gateway
+# docs branch put in the `Authorization: Bearer` header of the DNS and TLS
+# verification example. The tip spells it `$LANGWATCH_VIRTUAL_KEY`, an env var
+# reference no rule fires on, but gitleaks scans the whole commit range on a
+# pull request, so the earlier commit still needs naming here. The same
+# placeholder reaches `docs/llms-full.txt`, which is generated from the pages.
+#
+# It is issued by nobody, authenticates against nothing, and there is nothing to
+# revoke. Scoped by VALUE and ANCHORED, for the reason given above the block
+# before it: a substring allowlist would also permit a real virtual key that
+# merely starts with this prefix.
+[[allowlists]]
+description = "Documented `vk-lw-YOUR_VIRTUAL_KEY` placeholder in the AI Gateway docs, not a credential"
+targetRules = ["curl-auth-header"]
+regexes = ['''^vk-lw-YOUR_VIRTUAL_KEY$''']
