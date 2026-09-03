@@ -35,13 +35,16 @@ const PACKAGE_ROOT = fileURLToPath(new URL("../../../", import.meta.url));
 const ROOTS = ["src", "ee"];
 
 /**
- * A call to papaparse's serializer, in any of its spellings.
- *
- * Anchored on the dot so the word alone does not match: "unparseable" appears
- * in dozens of comments and error codes, and `urlunparse(parts)` is a Python
- * stdlib signature quoted inside the Monaco autocomplete table.
+ * Any reference to papaparse's serializer by name — a direct `Parse.unparse(`,
+ * a destructured `import { unparse }`, or an alias like
+ * `const serialize = Parse.unparse`. All of them have to write the word
+ * somewhere, so matching the bare word catches the alias shapes a
+ * call-site-only regex misses. The word boundaries keep "unparseable" (comments
+ * and error codes) and `urlunparse(parts)` (a Python signature quoted in the
+ * Monaco autocomplete table) from matching: both bury the word inside a longer
+ * one, so the boundary fails.
  */
-const UNPARSE_CALL = /\.unparse\s*\(/;
+const UNPARSE_CALL = /\bunparse\b/;
 
 /**
  * An import of the guard module, by either path shape the codebase uses.
@@ -152,6 +155,8 @@ describe("the unparse detector", () => {
     ["a namespaced call", `const csv = Parse.unparse({ fields, data });`],
     ["a bare method call", `writer.unparse(rows)`],
     ["spaced", `Parse.unparse ({ fields, data })`],
+    ["a destructured import", `import { unparse } from "papaparse";`],
+    ["an alias assignment", `const serialize = Parse.unparse;`],
   ])("matches %s", (_label, source) => {
     expect(UNPARSE_CALL.test(source)).toBe(true);
   });
