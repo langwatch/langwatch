@@ -1,7 +1,7 @@
 #!/usr/bin/env bats
 # Unit tests for dev/scripts/dogfood/langy-local.sh, the Langy local dogfood
 # doctor. The script under test runs for real against a sandboxed repo
-# layout: a temp platform/app/.env, fake opencode/go shims on PATH, and real
+# layout: a temp platform/app/.env, a fake go shim on PATH, and real
 # loopback listeners standing in for the app / gateway / langyagent.
 #
 # Spec: specs/setup/langy-local-dogfood.feature
@@ -16,10 +16,9 @@ setup() {
   ENV_FILE="$TEST_DIR/platform/app/.env"
   : >"$ENV_FILE"
 
-  # Binaries the doctor requires: fake shims are enough — it only checks PATH.
-  printf '#!/bin/sh\nexit 0\n' >"$TEST_DIR/bin/opencode"
+  # Binaries the doctor requires: a fake shim is enough — it only checks PATH.
   printf '#!/bin/sh\nexit 0\n' >"$TEST_DIR/bin/go"
-  chmod +x "$TEST_DIR/bin/opencode" "$TEST_DIR/bin/go"
+  chmod +x "$TEST_DIR/bin/go"
 
   # A base port slot unlikely to collide; the doctor derives gateway = base+3.
   BASE_PORT=$((20000 + (RANDOM % 20000)))
@@ -45,7 +44,7 @@ listen_on() {
 write_full_env() {
   mkdir -p "$TEST_DIR/sessions" "$TEST_DIR/workspace"
   cat >"$ENV_FILE" <<EOF
-OPENCODE_AGENT_URL="http://localhost:${AGENT_PORT}"
+LANGY_AGENT_URL="http://localhost:${AGENT_PORT}"
 LANGY_INTERNAL_SECRET="test-secret"
 LANGY_UNSAFE_DEV_DISABLE_ISOLATION=true
 SESSIONS_ROOT="$TEST_DIR/sessions"
@@ -77,7 +76,7 @@ run_doctor() {
   run_doctor
   [ "$status" -ne 0 ]
   [[ "$output" == *"LANGY_INTERNAL_SECRET missing"* ]]
-  [[ "$output" == *"OPENCODE_AGENT_URL missing"* ]]
+  [[ "$output" == *"LANGY_AGENT_URL missing"* ]]
   [[ "$output" == *'LANGY_UNSAFE_DEV_DISABLE_ISOLATION=true'* ]]
   [[ "$output" == *"LANGY_INTERNAL_SECRET=\""* ]]
 }
