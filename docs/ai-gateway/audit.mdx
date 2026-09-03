@@ -15,7 +15,7 @@ Every gateway-resource mutation (Virtual Key, Budget, ModelProvider, Routing Pol
 
 ## What's logged
 
-Action codes for gateway mutations (TypeScript `const` union in `platform/app/src/server/gateway/auditLog.repository.ts`):
+Action codes for gateway mutations (the `GatewayAuditAction` string-literal union in `packages/features/gateway/server/src/ports/gateway-audit.port.ts`):
 
 Action codes use a `gateway.<resource>.<verb>` dotted-lowercase shape, parallel to platform-side codes (`organization.member.add`, `project.update`). Verbs are past-tense to match Stripe, GitHub, Slack, Datadog audit conventions.
 

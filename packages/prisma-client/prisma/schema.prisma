@@ -3444,7 +3444,7 @@ enum GatewayChangeEventKind {
 }
 
 // Gateway audit action codes - kept as a TypeScript const union in
-// platform/app/src/server/gateway/auditLog.repository.ts (no Prisma enum
+// packages/features/gateway/server/src/ports/gateway-audit.port.ts (no Prisma enum
 // because gateway rows now write to the shared `AuditLog` table whose
 // `action` column is a free-form String).
 //

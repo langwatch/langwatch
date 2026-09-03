@@ -75,7 +75,7 @@ Click **Create GitHub App**. On the resulting page:
 
 ## Plumb the secrets
 
-Add these to the control-plane env (`.env` or your secret manager). All are optional in the schema (`platform/app/src/env-create.mjs`); when the private key is unset the feature is silently off, the connect card reports the integration as unavailable, and no token can be minted.
+Add these to the control-plane env (`.env` or your secret manager). All are optional in the environment schema (`apps/api/src/platform/config/api.config.ts`); when the private key is unset the feature is silently off, the connect card reports the integration as unavailable, and no token can be minted.
 
 ```bash title=".env"
 GITHUB_LANGY_APP_ID="<App ID from registration>"

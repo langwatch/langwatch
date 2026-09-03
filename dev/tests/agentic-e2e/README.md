@@ -10,14 +10,14 @@ cd dev/tests/agentic-e2e
 docker compose up -d
 
 # 2. Run database migrations (first time only)
-cd ../../../platform/app
+cd ../../..
 pnpm prisma:migrate
 
-# 3. Start the app (in langwatch/ directory)
+# 3. Start the app (from the repository root)
 PORT=5570 pnpm dev
 
 # 4. Run tests (from dev/tests/agentic-e2e/ directory)
-cd ../../dev/tests/agentic-e2e
+cd dev/tests/agentic-e2e
 pnpm install   # First time only
 pnpm test
 ```
@@ -237,7 +237,7 @@ Reset the test database:
 ```bash
 docker compose down -v
 docker compose up -d
-cd ../../../platform/app && pnpm prisma:migrate
+cd ../../.. && pnpm prisma:migrate
 ```
 
 ## For AI Agents

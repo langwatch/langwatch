@@ -4,7 +4,7 @@ A `packages/features/<feature>/web` package holds React that needs data. This is
 where that data comes from, who owns the client, which tier a hook belongs in,
 and what the pattern deliberately does not solve.
 
-Read this before moving any browser code out of `platform/app`. Three lanes
+Read this before wiring data into any feature web package. Three lanes
 stopped on the same sentence — "the hooks cannot leave until there is a settled
 answer for how a feature web package reaches tRPC" — and this is that answer.
 
@@ -18,7 +18,7 @@ errors), [react.md](./react.md), [error-handling.md](./error-handling.md).
 
 ```
 ┌──────────────────────────────────────────────────────────────────────────┐
-│ platform/app  (being deleted)  →  apps/ui  (the browser process shell)    │
+│ apps/ui  (the browser process shell)                                     │
 │                                                                          │
 │   owns ONE tRPC client and ONE QueryClient, and mounts one Provider       │
 │   per feature package. Reads the environment. Chooses links, batching,    │
@@ -134,7 +134,7 @@ router type to export.
 ## The mounting, once, in the shell
 
 ```tsx
-// platform/app/src/utils/api.tsx today; apps/ui when the shell moves
+// apps/ui/src/ui/sections/ui-feature-shell.tsx
 const featureApiClient = useMemo(() => getUntypedClient(trpcClientInstance), [trpcClientInstance]);
 
 <api.Provider client={trpcClientInstance} queryClient={queryClient}>
@@ -206,11 +206,11 @@ in `traces-v2` today:
 None of that needs coordination, and none of it survives a binding that invents
 its own key namespace.
 
-### The counter-example, which is live in the repo
+### The counter-example, since fixed
 
-`platform/app/src/runtime/ui/features/agent-ui-host.adapter.tsx` keys its reads
-`["agent-ui", path, input]` and invalidates `["agent-ui"]` after every mutation.
-That key shares no prefix with any tRPC key, so:
+The platform host's Agent UI adapter keyed its reads `["agent-ui", path, input]`
+and invalidated `["agent-ui"]` after every mutation. That key shares no prefix
+with any tRPC key, so:
 
 - nothing the application invalidates reaches the Agent adapter's cache, and
 - nothing the Agent adapter writes is visible to `api.agents.*` hooks.
@@ -342,8 +342,8 @@ blocked only behind that, since its sole feature-ish dependency is `Link`.
 
 **The other three named primitives are not missing — they are forked.**
 `design-system` already has `dialog`, `drawer` and `toaster`;
-`platform/app/src/components/ui` has divergent copies (174 vs 83, 179 vs 66,
-220 vs 122 lines). The app's drawer imports `@langwatch/langy-web` for dock
+the platform monolith carried divergent copies (174 vs 83, 179 vs 66,
+220 vs 122 lines). That drawer imported `@langwatch/langy-web` for dock
 gap, dodge stagger and sidebar width, which by the rule above makes it a Langy
 component, not a primitive. Reconciling the three forks is a single-lane,
 repo-wide job (529 importing files across dialog/drawer/toaster/link/
@@ -439,7 +439,7 @@ decides the copy and whether to close the editor.
 ### 5. The components
 
 `editable-trace-name.tsx` and `trace-peek-summary.tsx` moved out of
-`platform/app` whole. Their only substantive change is that `projectId` arrives
+the platform monolith whole. Their only substantive change is that `projectId` arrives
 as a prop instead of from `useOrganizationTeamProject`, and the toast comes from
 `@langwatch/design-system/toaster`.
 
@@ -466,11 +466,10 @@ is unchecked is the *path* — nothing catches `tracesV2` being renamed on the
 router, or a procedure being removed. The failure mode is a runtime tRPC error
 on that one call, not a broken build.
 
-The check has to run where the real router type is in scope, and that is
-`platform/app/src/server/api/root.ts` — inside the application this programme is
-deleting, which no package may import and which is not accepting new files.
-
-**When `apps/api` owns the root router**, do both of these:
+The check has to run where the real router type is in scope, and that is now
+`apps/api/src/app-trpc` — the API process owns the root router since the
+platform monolith was deleted, so both of these are unblocked and neither is
+done yet:
 
 1. Add `apps/api/src/app-trpc/app-trpc.conformance.ts` — a type-only file
    asserting each feature's map against the real router:

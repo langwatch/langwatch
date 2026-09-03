@@ -43,12 +43,11 @@ The division that keeps review comments worth reading:
 | Genuinely needs judgement                | `path_instructions` in `/.coderabbit.yaml` |
 
 **There is one general-purpose JavaScript and TypeScript linter, and it is
-oxlint.** `/.oxlintrc.architecture.json` covers `packages/**` and
-`platform/app/**` in separate override blocks, because the two trees arrived
-with different baselines rather than because they deserve different rules.
-Every rule in it is `error`; where a tree already violates one, the offending
-files are named in the debt register at the bottom of that file, which can
-only shrink. Formatting is oxfmt's, configured in `/.oxfmtrc.json`.
+oxlint.** `/.oxlintrc.architecture.json` covers `packages/**` and `apps/**` in
+two rule blocks, because the two rulesets arrived from two tools with different
+baselines rather than because they deserve different rules; converging them is
+follow-up work. Every rule in it is `error`. Formatting is oxfmt's, configured
+in `/.oxfmtrc.json`.
 
 A rule in more than one home gets reported twice — once deterministically and
 once probabilistically — which is how a review thread fills up with mechanics

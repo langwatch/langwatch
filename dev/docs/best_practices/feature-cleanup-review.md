@@ -88,7 +88,7 @@ for by every reader and by the next person to hit that throw in production.
 
 If we can name the cause and the caller can act on it, it is a `HandledError`
 with a stable `code`, a customer-safe `message`, a correct `fault`, and an entry
-in `platform/app/src/features/errors/logic/presentation.ts` keyed by that code.
+in `apps/ui/src/model/errors/presentation.ts` keyed by that code.
 Add the code to `features/errors/logic/codes.ts` (sorted) in the same change.
 
 A plain `Error` subclass forces every transport to re-derive the status. The
@@ -132,7 +132,7 @@ import and export that.
   others. That is correct.
 - Hot correctness paths, where the module is already inside its quality ceiling
   and the only complaint is method length. Say so and move on.
-- Anything under `platform/app/` — new files go in `packages/**` or `apps/**`.
+- Anything under `platform/` — that tree is deleted; files go in `packages/**` or `apps/**`.
 
 ## Deliverable
 

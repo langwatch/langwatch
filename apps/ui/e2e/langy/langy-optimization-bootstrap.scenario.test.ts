@@ -8,7 +8,7 @@
  * workbench-state REST surface.
  *
  * RUN (one file per vitest run, see README):
- *   cd platform/app/e2e/langy && npx vitest run langy-optimization-bootstrap.scenario.test.ts --reporter=verbose
+ *   cd apps/ui/e2e/langy && npx vitest run langy-optimization-bootstrap.scenario.test.ts --reporter=verbose
  */
 
 import { openai } from "@ai-sdk/openai";

@@ -14,8 +14,9 @@ sidebarTitle: MCP server
 
 <Note>
   **Architecture: in-process service calls (not HTTP-shell over REST).** Governance MCP
-  tools register in `platform/app/src/mcp/handler.ts` via
-  `registerGovernanceMcpTools(server, prisma)` and call the governance services
+  tools register on every MCP session the hosted endpoint opens, through the session
+  tool registrar bound in `apps/api/src/features/mcp/hosted-mcp.mount.ts`, via
+  `registerGovernanceMcpTools(server, ctx)`, and call the governance services
   (`IngestionTemplateService`, `IngestionKeyService`, etc.) directly with `surface:
   "mcp"`. They do NOT route through `/api/governance/*` over HTTP. Reason: it avoids the
   project-API-key vs PAT auth mismatch and matches Sergey's explicit
@@ -95,7 +96,7 @@ Governance MCP tools register inside LangWatch's existing MCP server (served on 
 }
 ```
 
-The 9 governance tools register via `registerGovernanceMcpTools(server, ctx)` from `platform/app/src/mcp/governance-tools.ts` (Lane-Q at `7639b6c2b`). The same registration runs at all three `createMcpServer()` callsites in `handler.ts` so the tools are available regardless of which MCP transport the client chose.
+The 9 governance tools register via `registerGovernanceMcpTools(server, ctx)` from `packages/enterprise/features/governance/server/src/transport/api-mcp/governance-tools.api.ts`. The registrar is installed once, as the session-tool port that `apps/api/src/features/mcp/hosted-mcp.mount.ts` binds, and it runs for every session the endpoint opens, so the tools are available regardless of which MCP transport the client chose.
 
 <Note>
   **Dev-environment port routing**: in production, LangWatch listens on a single port and
@@ -111,7 +112,7 @@ The 9 governance tools register via `registerGovernanceMcpTools(server, ctx)` fr
 
 ## RBAC enforcement
 
-Governance tools enforce two distinct gates at the tool layer (`platform/app/src/mcp/governance-tools.ts`), BEFORE the service call:
+Governance tools enforce two distinct gates at the tool layer (`packages/enterprise/features/governance/server/src/transport/api-mcp/governance-tools.api.ts`), BEFORE the service call:
 
 **`AUTH_REQUIRED:`**, write tools (e.g. `governance_ingestion_templates_create`, `governance_ingestion_keys_mint`) called from a project-apiKey-only session without OAuth. Read tools are NOT subject to this gate; they work with project-apiKey-only sessions.
 
@@ -127,7 +128,7 @@ Governance tools enforce two distinct gates at the tool layer (`platform/app/src
 }
 ```
 
-**`FORBIDDEN:`**, the caller has a session but their organization role doesn't include the required permission (mirrors `hasOrganizationPermission` from `platform/app/src/server/api/rbac.ts`).
+**`FORBIDDEN:`**, the caller has a session but their organization role doesn't include the required permission (the same organization-permission decision the tRPC and REST surfaces make, `AuthzService.hasPermission` in `packages/features/authz/contract/src/authz.service.ts`).
 
 ```jsonc
 {
@@ -145,13 +146,13 @@ In both cases no record is created and no audit row is emitted (failed calls are
 
 The Path B mechanics (per `fc6d54100` + `7639b6c2b`):
 
-- **RBAC check happens at the MCP tool layer**, BEFORE the service call, the tool mirrors `hasOrganizationPermission` from `platform/app/src/server/api/rbac.ts` and returns `FORBIDDEN:` early if the required permission is missing. Services trust the surface, they do not gate on the MCP-resolved scope a second time. This split is intentional: the MCP tool owns the RBAC contract for its surface; the service owns the multitenancy + business-logic contract.
+- **RBAC check happens at the MCP tool layer**, BEFORE the service call, the tool asks the same permission probe the tRPC and REST surfaces ask, `AuthzService.hasPermission` (`packages/features/authz/contract/src/authz.service.ts`, resolved against the built-in role sets in `packages/features/authz/contract/src/roles.ts`), and returns `FORBIDDEN:` early if the required permission is missing. Services trust the surface, they do not gate on the MCP-resolved scope a second time. This split is intentional: the MCP tool owns the RBAC contract for its surface; the service owns the multitenancy + business-logic contract.
 - **`callerUserId` flows from the OAuth session**, the OAuth PKCE flow at `/api/mcp/authorize` captures the user's id, threads it through the session token cache and `SessionState`, and surfaces it as `ctx.callerUserId`. For `IngestionKeyService.{install, rotate}` it's required (write tools reject with `AUTH_REQUIRED:` if absent). For `IngestionTemplateService` authoring methods (which take `callerUserId` for the audit trail), same plumbing.
 - **Snake_case ↔ camelCase boundary**: MCP tool inputs use snake_case (`source_template_id`, `template_id`) per public-surface convention; the tool maps to camelCase (`sourceTemplateId`, `templateId`) before calling the service, since service signatures are camelCase. The mapping is the tool's job, not the service's.
 
 ## Audit emission
 
-Every state-changing tool call emits an audit row with `AuditLog.metadata.surface = "mcp"` (the shared `GovernanceCallSurface` type at `@ee/governance/services/auditSurface.ts`, threaded through every mutating governance service method as of Sergey's Lane B-3 at `fc6d54100`):
+Every state-changing tool call emits an audit row with `AuditLog.metadata.surface = "mcp"` (the shared `GovernanceCallSurface` type in `packages/enterprise/features/governance/contract/src/governance-audit.ts`, threaded through every mutating governance service method):
 
 | Tool                                                 | Audit row                                                              |
 | ---------------------------------------------------- | ---------------------------------------------------------------------- |
@@ -162,7 +163,7 @@ Every state-changing tool call emits an audit row with `AuditLog.metadata.surfac
 
 Payload shapes are identical to the REST API's audit rows apart from `metadata.surface`, every other field (actorUserId, apiKeyId, target, error) follows the same shape. This lets incident response queries answer "what did the agent do?" without changing the audit-row event-kind taxonomy.
 
-The contract is service-layer-asserted by `platform/app/src/mcp/__tests__/governance-tools.audit-uniform.integration.test.ts` (Lane B-MCP audit at `66fd35162`), 3 cases against real Postgres: `governance_ingestion_templates_create` stamps `metadata.surface = "mcp"`, `governance_ingestion_keys_mint` stamps `metadata.surface = "mcp"`, and the `AUTH_REQUIRED:` negative path fails before any audit row is written. No wire-level MCP test is needed (per the Path B architecture there is no MCP-over-HTTP wire to assert at).
+The contract is asserted at the application layer by `packages/enterprise/features/governance/server/src/app/__tests__/governance.app.unit.test.ts`, in the scenario "audit rows are identical apart from metadata.surface": the same template creation is driven over all four surfaces, tRPC, Hono REST, CLI and MCP, and the four writes come out field-for-field identical apart from `surface`. No wire-level MCP test is needed (per the Path B architecture there is no MCP-over-HTTP wire to assert at). The `AUTH_REQUIRED:` negative path, a write tool with no `callerUserId` failing before any audit row is written, is contract rather than covered ground: it carries no test of its own today.
 
 ## Agent setup from scratch
 

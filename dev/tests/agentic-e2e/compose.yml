@@ -3,8 +3,8 @@
 #
 # Usage (from dev/tests/agentic-e2e/ directory):
 #   docker compose up -d
-#   cd ../../../platform/app && pnpm dev  # or: pnpm build && PORT=5570 pnpm start
-#   cd ../../dev/tests/agentic-e2e && pnpm test
+#   cd ../../.. && pnpm dev  # or: pnpm build && PORT=5570 pnpm start
+#   cd dev/tests/agentic-e2e && pnpm test
 #   docker compose down
 #
 # The Next.js app runs on the host at localhost:5570 (set via PORT=5570)

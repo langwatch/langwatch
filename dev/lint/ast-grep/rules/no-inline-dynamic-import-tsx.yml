@@ -9,7 +9,8 @@ language: Tsx
 rule:
   pattern: import($MOD)
 files:
-  - "platform/app/src/**/*.tsx"
+  - "apps/**/*.tsx"
+  - "packages/**/*.tsx"
 ignores:
   - "**/routes.tsx"
   - "**/pages/**"

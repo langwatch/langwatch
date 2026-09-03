@@ -311,7 +311,7 @@ Whatever the declaration kind — declared, custom, or opted out — a runtime
 guard in front of it refuses any request whose input carries scope ids that
 do not all resolve to one organization
 (`AuthzService.checkScopeLineage`, adapted by
-`platform/app/src/server/api/trpc.scope-lineage-middleware.ts`). The
+`apps/api/src/api-request.policy.ts`). The
 declaration sweep closes tier-shadowing
 statically, but only for declarations it can see through; this guard removes
 the exploit's precondition everywhere instead — a check passing on your own
@@ -331,10 +331,9 @@ carrying at most one scope id costs nothing.
 - `@langwatch/authz-contract` — the portable contract and opaque witness type.
   Witness minting is private to the concrete `AuthzService`; application code
   receives witnesses through `authorize`, it never mints them.
-- `platform/app/src/server/app-layer/permissions/imperative.ts` — `require*`
-  and `probe*`.
-- `platform/app/src/server/api/trpc.permission-builder.ts` — the app's
-  declaration policy builder; `@langwatch/api/trpc` owns generic root creation.
+- `packages/api/src/access-policy.ts` — the imperative `requires*` helpers.
+- `apps/api/src/app-trpc/app-trpc.policy.ts` — the API process's own
+  declaration policy chain; `@langwatch/api/trpc` owns generic root creation.
 - `packages/api` — the service framework and its boot checks.
 - `specs/rbac/typed-permission-declarations.feature` — the behavioural
   contract; every guarantee above is a bound scenario.

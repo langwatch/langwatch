@@ -293,20 +293,20 @@ all of them.
 ## Where each piece lives in the repo
 
 ```
-platform/app/src/server/governance/                     # Personal workspace, VK, RoutingPolicy services
-platform/app/src/server/gateway/                        # AI Gateway (Bifrost-embedded), virtual keys, budgets
-platform/app/src/server/routes/auth-cli.ts              # Device-flow + access tokens + budget/status
-platform/app/src/server/routes/ingest/                  # IngestionSource receivers (this iter)
-platform/app/src/server/governance/activity-monitor/    # OCSF normalisation + adapters (this iter)
-packages/enterprise/features/governance/server/src/api/app-trpc/personal-virtual-key.api.ts
-packages/enterprise/features/governance/server/src/api/app-trpc/routing-policy.api.ts
-platform/app/src/server/api/routers/user.ts             # personalContext + personalUsage + personalBudget
-platform/app/src/components/me/                         # /me layout + dashboard
-platform/app/src/components/WorkspaceSwitcher.tsx       # Single context switcher
-platform/app/src/components/BudgetExceededBanner.tsx    # Cross-surface 402 renderer
-platform/app/src/pages/me/                              # /me + /me/settings
-platform/app/src/pages/settings/                        # Admin routing policies, ingestion sources, activity monitor
-platform/app/src/pages/cli/auth.tsx                     # Device-flow approval UX
+packages/enterprise/features/governance/server/src/services/    # Personal workspace, VK, RoutingPolicy services
+packages/enterprise/features/governance/server/src/adapters/    # Ingestion pullers + activity-source adapters
+packages/enterprise/features/governance/server/src/transport/api-rest/governance-ingest.api.ts    # IngestionSource receivers
+packages/enterprise/features/governance/server/src/transport/api-trpc/personal-virtual-key.api.ts
+packages/enterprise/features/governance/server/src/transport/api-trpc/routing-policy.api.ts
+packages/enterprise/features/governance/server/src/transport/api-trpc/personal-dashboard.api.ts   # personalContext + personalUsage + personalBudget
+packages/enterprise/features/governance/web/src/screens/governance/    # Admin routing policies, ingestion sources, activity monitor
+packages/features/gateway/server/src/                   # AI Gateway control plane: virtual keys, budgets
+packages/features/gateway/web/src/                      # Gateway screens; budget-exceeded 402 banner
+services/aigateway/                                     # AI Gateway data plane (Go, Bifrost-embedded)
+packages/features/auth/server/src/transport/api-rest/auth-cli-device-flow.api.ts   # Device-flow + access tokens
+packages/features/api-key/web/src/screens/api-key/cli-auth.screen.tsx   # Device-flow approval UX
+packages/features/user/web/src/screens/personal-workspace/    # /me overview, sessions, configure
+apps/ui/src/model/ui-route-table.ts                     # Where /me, /settings and /cli/auth are mounted
 
 sdks/typescript/src/cli/commands/                     # Unified langwatch CLI
 sdks/typescript/src/cli/utils/governance/             # Device-flow client, config, wrappers

@@ -159,12 +159,15 @@ of record (andre 199226d77 + 5fcadd586 + 391cfd989).
 
 ## Cross-references
 
-- `platform/app/scripts/dogfood/governance/mcp-client-probe.ts` — the
-  fixture-fast-loop equivalent of this runbook (no OAuth, project-apiKey
-  Bearer only — read tools + AUTH_REQUIRED negative case).
-- `platform/app/src/mcp/__tests__/governance-tools.audit-uniform.integration.test.ts` —
-  service-layer audit-uniform regression (asserts metadata.surface=mcp
-  on create + install).
+- The fixture-fast-loop equivalent of this runbook (no OAuth, project-apiKey
+  Bearer only — read tools + AUTH_REQUIRED negative case) was
+  `scripts/dogfood/governance/mcp-client-probe.ts` in the platform monolith. It
+  did not survive the split; nothing replaces it yet.
+- The service-layer audit-uniform regression (asserts metadata.surface=mcp on
+  create + install) likewise has no successor in the new layout. The governance
+  MCP tools themselves now live in
+  `packages/enterprise/features/governance/server/src/transport/api-mcp/governance-tools.api.ts`,
+  mounted by `apps/api/src/features/mcp/hosted-mcp.mount.ts`.
 - `feedback_fixtures_dont_replace_real_user_dogfood.md` — rchaves nudge
   memory; this runbook is the real-user-track companion to the probe.
 - `feedback_tsx_watch_no_auto_reload_on_git_pull.md` — if the tools

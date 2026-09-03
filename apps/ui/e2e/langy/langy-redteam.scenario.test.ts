@@ -12,7 +12,7 @@
 //
 // RUN: same env vars as langy.scenario.test.ts (see README.md).
 //
-//   cd platform/app/e2e/langy
+//   cd apps/ui/e2e/langy
 //   npx vitest run langy-redteam.scenario.test.ts --reporter=verbose
 
 import { setupScenarioTracing } from "@langwatch/scenario";

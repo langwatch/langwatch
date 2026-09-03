@@ -215,10 +215,12 @@ JS-safe range, LEFT-JOIN gaps surface as nulls where the interface said
 boundary catches all three; `.catch()` on individual fields provides safe
 defaults for expected variations, while fields without one fail fast on drift.
 
-Reference implementation: `platform/app/ee/governance/services/activity-monitor/activityMonitor.clickhouse.schemas.ts`
-and its three repositories (PR #7146). New `*.clickhouse.repository.ts` files
-should follow it; existing ones migrate opportunistically when their queries
-change anyway.
+Reference implementation:
+`packages/features/trace/server/src/repositories/clickhouse/trace-event-payload.repository.ts`
+(the pattern arrived with PR #7146's governance activity-monitor repositories,
+which did not survive the platform split in that shape). New
+`*.clickhouse.repository.ts` files should follow it; existing ones migrate
+opportunistically when their queries change anyway.
 
 ## JOINs — Prefer Not To, Then Prefer `IN`
 

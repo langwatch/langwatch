@@ -24,8 +24,10 @@ rules:
     languages: [typescript, javascript]
     paths:
       include:
-        - "platform/app/src/**/*.ts"
-        - "platform/app/src/**/*.tsx"
+        - "apps/**/src/**/*.ts"
+        - "apps/**/src/**/*.tsx"
+        - "packages/**/src/**/*.ts"
+        - "packages/**/src/**/*.tsx"
       exclude:
         - "**/__tests__/**"
         - "**/*.test.ts"
@@ -96,8 +98,8 @@ rules:
     languages: [generic]
     paths:
       include:
-        - "platform/app/src/server/clickhouse/migrations/**/*.sql"
-        - "platform/app/src/server/clickhouse/migrations/**/*.ts"
+        - "apps/api/src/tasks/clickhouse-migrate/migrations/**/*.sql"
+        - "apps/api/src/tasks/clickhouse-migrate/migrations/**/*.ts"
     pattern-either:
       - pattern-regex: '\$\{CLICKHOUSE_DATABASE\}\.\w+'
       - pattern-regex: '\b(FROM|JOIN|INTO|UPDATE|TABLE|VIEW|EXISTS|DROP)[[:space:]]+langwatch\.[a-z_]+'
@@ -118,8 +120,11 @@ rules:
     languages: [typescript, javascript]
     paths:
       include:
-        - "platform/app/src/server/clickhouse/**/*.ts"
-        - "platform/app/src/server/repositories/**/clickhouse*.ts"
+        - "packages/clickhouse-client/src/**/*.ts"
+        - "packages/features/*/server/src/clickhouse/**/*.ts"
+        - "packages/features/*/server/src/repositories/**/clickhouse*.ts"
+        - "packages/enterprise/features/*/server/src/repositories/**/clickhouse*.ts"
+        - "apps/api/src/**/clickhouse*.ts"
       exclude:
         - "**/migrations/**"
         - "**/__tests__/**"
@@ -148,8 +153,10 @@ rules:
     languages: [generic]
     paths:
       include:
-        - "platform/app/src/server/clickhouse/**/*.ts"
-        - "platform/app/src/server/clickhouse/**/*.sql"
+        - "packages/clickhouse-client/src/**/*.ts"
+        - "packages/features/*/server/src/clickhouse/**/*.ts"
+        - "apps/api/src/tasks/clickhouse-migrate/**/*.ts"
+        - "apps/api/src/tasks/clickhouse-migrate/**/*.sql"
       exclude:
         - "**/migrations/**"
         - "**/__tests__/**"

@@ -373,7 +373,7 @@ LangWatch accepts OTLP/HTTP at two distinct URLs. They share **everything that m
 
 The two URLs are split for **auth + routing convenience**, not for architectural reasons. Internally they share everything that matters:
 
-- **Same hardened OTLP parser**: `platform/app/src/server/otel/parseOtlpBody.ts` (`readOtlpBody` + `parseOtlpTraces`, `parseOtlpLogs`) handles gzip, deflate, brotli decompression, JSON + protobuf decode, and the JSON-then-protobuf-encode fallback path. Both URLs call into it. There is no parser-quality gap.
+- **Same hardened OTLP parser**: `packages/otlp/src/body.ts` (`readOtlpBody` + `parseOtlpTraces`, `parseOtlpLogs`) handles gzip, deflate, brotli decompression, JSON + protobuf decode, and the JSON-then-protobuf-encode fallback path. Both URLs call into it. There is no parser-quality gap.
 - **Same trace pipeline**: both URLs hand off to the existing `traces.collection.handleOtlpTraceRequest` (or `traces.logCollection.handleOtlpLogRequest` for log-shaped sources) that powers `/api/otel/v1/traces`. No parallel write path. No parallel storage.
 - **Same `recorded_spans` and `log_records` tables**, governance-ingested events land in the same ClickHouse storage that powers the rest of the platform. They're distinguished by reserved attribute namespaces stamped at the receiver edge:
   - `langwatch.origin.kind = "ingestion_source"`, discriminator
@@ -3246,7 +3246,7 @@ Every gateway-resource mutation (Virtual Key, Budget, ModelProvider, Routing Pol
 
 ## What's logged
 
-Action codes for gateway mutations (TypeScript `const` union in `platform/app/src/server/gateway/auditLog.repository.ts`):
+Action codes for gateway mutations (the `GatewayAuditAction` string-literal union in `packages/features/gateway/server/src/ports/gateway-audit.port.ts`):
 
 Action codes use a `gateway.<resource>.<verb>` dotted-lowercase shape, parallel to platform-side codes (`organization.member.add`, `project.update`). Verbs are past-tense to match Stripe, GitHub, Slack, Datadog audit conventions.
 
@@ -8725,20 +8725,20 @@ all of them.
 ## Where each piece lives in the repo
 
 ```
-platform/app/src/server/governance/                     # Personal workspace, VK, RoutingPolicy services
-platform/app/src/server/gateway/                        # AI Gateway (Bifrost-embedded), virtual keys, budgets
-platform/app/src/server/routes/auth-cli.ts              # Device-flow + access tokens + budget/status
-platform/app/src/server/routes/ingest/                  # IngestionSource receivers (this iter)
-platform/app/src/server/governance/activity-monitor/    # OCSF normalisation + adapters (this iter)
-packages/enterprise/features/governance/server/src/api/app-trpc/personal-virtual-key.api.ts
-packages/enterprise/features/governance/server/src/api/app-trpc/routing-policy.api.ts
-platform/app/src/server/api/routers/user.ts             # personalContext + personalUsage + personalBudget
-platform/app/src/components/me/                         # /me layout + dashboard
-platform/app/src/components/WorkspaceSwitcher.tsx       # Single context switcher
-platform/app/src/components/BudgetExceededBanner.tsx    # Cross-surface 402 renderer
-platform/app/src/pages/me/                              # /me + /me/settings
-platform/app/src/pages/settings/                        # Admin routing policies, ingestion sources, activity monitor
-platform/app/src/pages/cli/auth.tsx                     # Device-flow approval UX
+packages/enterprise/features/governance/server/src/services/    # Personal workspace, VK, RoutingPolicy services
+packages/enterprise/features/governance/server/src/adapters/    # Ingestion pullers + activity-source adapters
+packages/enterprise/features/governance/server/src/transport/api-rest/governance-ingest.api.ts    # IngestionSource receivers
+packages/enterprise/features/governance/server/src/transport/api-trpc/personal-virtual-key.api.ts
+packages/enterprise/features/governance/server/src/transport/api-trpc/routing-policy.api.ts
+packages/enterprise/features/governance/server/src/transport/api-trpc/personal-dashboard.api.ts   # personalContext + personalUsage + personalBudget
+packages/enterprise/features/governance/web/src/screens/governance/    # Admin routing policies, ingestion sources, activity monitor
+packages/features/gateway/server/src/                   # AI Gateway control plane: virtual keys, budgets
+packages/features/gateway/web/src/                      # Gateway screens; budget-exceeded 402 banner
+services/aigateway/                                     # AI Gateway data plane (Go, Bifrost-embedded)
+packages/features/auth/server/src/transport/api-rest/auth-cli-device-flow.api.ts   # Device-flow + access tokens
+packages/features/api-key/web/src/screens/api-key/cli-auth.screen.tsx   # Device-flow approval UX
+packages/features/user/web/src/screens/personal-workspace/    # /me overview, sessions, configure
+apps/ui/src/model/ui-route-table.ts                     # Where /me, /settings and /cli/auth are mounted
 
 sdks/typescript/src/cli/commands/                     # Unified langwatch CLI
 sdks/typescript/src/cli/utils/governance/             # Device-flow client, config, wrappers
@@ -12001,7 +12001,7 @@ Default role matrix assignments flow through SCIM, when an IdP pushes a user wit
 
 ## Changing the permission matrix
 
-Default roles are code-defined in `platform/app/src/server/api/rbac.ts`, see commit history for the shipping order. **Do not edit the default matrix in production**: changes to TEAM_ROLE_PERMISSIONS affect every team on the instance. Use a **custom role** instead: create it in the UI, assign the permissions you want, and assign it to specific users.
+Default roles are code-defined in `packages/features/authz/contract/src/roles.ts`, declared as differences rather than duplicate lists: `viewer` is the base set, `member` is `viewer` plus its additions, `admin` is `member` plus its additions, and `builtinRolePermissions()` resolves a role key to the permissions it ends up with. **Do not edit the default matrix in production**: a change to those built-in sets affects every team on the instance. Use a **custom role** instead: create it in the UI, assign the permissions you want, and assign it to specific users.
 
 For the policy rationale (why MEMBER can mint VKs but not create budgets, etc.), see [spec contract §10, Permissions](https://github.com/langwatch/langwatch/blob/main/specs/ai-gateway/_shared/contract.md#10-permissions).
 
@@ -15230,7 +15230,7 @@ sidebarTitle: REST API
   each governance verb is implemented.
 </Info>
 
-<Note>**Service-layer-shared, repository-pattern-backed.** Per `specs/ai-gateway/governance/governance-api-cli-mcp-coverage.feature`, every Hono route delegates to a shared service-layer function (`IngestionTemplateService.updateOttlRules`, `IngestionKeyService.install`, etc.). Services use repositories for persistence; services never import `prisma` directly. The umbrella spec also locks the no-bypass invariant, no UI page, route handler, CLI command, or MCP tool may call `prisma.<governanceModel>.*` directly. The governance repositories hold that boundary: see `platform/app/ee/governance/repositories/ingestionTemplate.repository.ts` and `governanceAudit.repository.ts` (the latter wraps every `AuditLog` write so audit emission also goes through the repository boundary). Repo methods accept `Prisma.TransactionClient | PrismaClient` so they work inside service `$transaction` blocks and against the top-level client transparently.</Note>
+<Note>**Service-layer-shared, repository-pattern-backed.** Per `specs/ai-gateway/governance/governance-api-cli-mcp-coverage.feature`, every Hono route delegates to a shared service-layer function (`IngestionTemplateService.updateOttlRules`, `IngestionKeyService.install`, etc.). Services use repositories for persistence; services never import `prisma` directly. The umbrella spec also locks the no-bypass invariant, no UI page, route handler, CLI command, or MCP tool may call `prisma.<governanceModel>.*` directly. The governance repositories hold that boundary: see `packages/enterprise/features/governance/server/src/repositories/prisma/prisma.ingestion-template.repository.ts` and `packages/enterprise/features/audit-log/server/src/repositories/prisma/prisma.audit-log.repository.ts` (the latter wraps every `AuditLog` write so audit emission also goes through the repository boundary). Repo methods accept `Prisma.TransactionClient | PrismaClient` so they work inside service `$transaction` blocks and against the top-level client transparently.</Note>
 
 ## Why a separate REST API alongside tRPC
 
@@ -15312,16 +15312,19 @@ The Zod schemas backing each request and response body are the same schemas the 
 
 ## OpenAPI spec generation + SDK regen
 
-Governance routes register through the same `describeRoute` + `hono-openapi` pipeline as the rest of the public REST API. The canonical OpenAPI spec lives at `platform/app/src/app/api/openapiLangWatch.json`, and both SDKs regenerate from it on the standard build target.
+Governance routes register through the same `describeRoute` + `hono-openapi` pipeline as the rest of the public REST API. The canonical OpenAPI document is a checked-in artifact at `apps/api/src/features/discovery/openapi-document.json` — three routes serve it and both SDKs generate their clients from it. The copy published alongside these docs is `docs/api-reference/openapiLangWatch.json`.
 
 ```bash
-# from platform/app/
-pnpm run task generateOpenAPISpec   # regenerate openapiLangWatch.json from the Hono routes
+# from the repo root: describe the live Hono routes and report how much of the
+# published surface the document can still cover. It writes to the path you name
+# (a scratch file otherwise) and never over the checked-in artifact, which is
+# replaced deliberately, with a diff in front of a person.
+pnpm --filter @langwatch/platform-api task:openapi-generate
 
 # from sdks/typescript/
 pnpm generate:openapi-types         # regenerate the TS generated client from that spec
 
-# from sdks/python/ (regenerates the spec first, then the client)
+# from sdks/python/
 make generate/api-client            # regenerate the Python generated client
 ```
 
@@ -15354,38 +15357,30 @@ The mutating verbs across the two shipped resources (`createOrgTemplate`, `updat
 
 ## Verifying the contract
 
-The wire shape, request bodies, response envelopes, status-code mapping, and surface attribution, is locked by two integration tests that run against real Postgres + the real Hono pipeline (no service mocks):
+The wire shape, request bodies, response envelopes, status-code mapping, and surface attribution, is locked by the governance transport and application suites, which drive the real Hono pipeline and the real application over stubbed services:
 
-**Ingestion-templates wire shape**: `platform/app/src/app/api/governance/__tests__/governance-rest-api.integration.test.ts`. 14 scenarios (Lane B-4 at `1839d9f54`) covering the full ingestion-templates verb set, 401, 400, 403, 404 envelopes, and a wire-level audit-uniform assertion that `metadata.surface === "hono"` for state-changing calls.
+**Ingestion-templates wire shape**: `packages/enterprise/features/governance/server/src/app/__tests__/governance.transport.unit.test.ts`. 20 cases covering the full ingestion-templates verb set, the 401, 400, 403 and 404 envelopes in this family's nested `{ error: { type, code, message } }` body, and the audit-uniform assertion that a state-changing call is attributed with `surface: "hono"`. It is the successor to the monolith's `governance-rest-api.integration.test.ts`: what that suite proved about the DOOR moved here, and what it proved about the DOMAIN moved to the service tests beside it.
 
-**Ingestion-key wire shape**: `platform/app/src/app/api/governance/__tests__/governance-ingestion-keys.integration.test.ts`. 9 scenarios (Lane B-6 at `60f769498`) covering the ingestion-key flows. Specifically locks:
+**Surface-spoof rejection**: same file. Fires Hono POSTs with `X-LangWatch-Surface` set to `cli` and to in-process values, and asserts only `cli` is honoured while everything else falls back to `"hono"`. `resolveSurfaceFromRequest` in `packages/enterprise/features/governance/server/src/transport/api-rest/governance.api.ts` filters the header against the `GovernanceCallSurface` vocabulary, which is what stops an external HTTP caller forging an in-process surface tag: `cli` is the only value the Hono surface accepts on inbound, and `trpc` and `mcp` are reachable only in-process.
+
+**Cross-surface audit uniformity**: `packages/enterprise/features/governance/server/src/app/__tests__/governance.app.unit.test.ts`, scenario "audit rows are identical apart from metadata.surface". Creates the same organization template over all four surfaces, tRPC, Hono REST, CLI and MCP, and asserts the four writes are field-for-field identical apart from `surface`. Surface attribution therefore cannot drift into a second opinion about what a write means, and there is no separate MCP-transport regression because the MCP tool reaches this same application call.
+
+**No-bypass invariant (CI-enforced)**: the `prisma-containment` policy in `packages/architecture-lint/src/prisma-boundaries.ts`, run by `pnpm lint:architecture`. It rejects any file importing generated Prisma outside a repository under `server/src/repositories/prisma/` or the Postgres composition adapter `server/src/adapters/postgres.<subject>.adapter.ts`. That is the umbrella spec's `@no-bypass` invariant enforced repo-wide rather than for governance alone, so the repository-pattern boundary cannot silently drift.
+
+**Ingestion-key flows**: `packages/enterprise/features/governance/server/src/ports/__tests__/ingestion-key.service.unit.test.ts` pins the service-level ordering, that a replacement key is minted only after the prior one is hard-revoked, and that an additive issue leaves another machine's key alone. The wire-level guarantees below are contract rather than covered ground, they carry no test of their own today:
 
 - the mint route returns a one-time `sk-lw-…` token and thereafter exposes only the prefix
-- `install` and `rotate` audit rows both stamp `metadata.surface === "hono"` end-to-end (cross-validates the B-3 surface threading at `fc6d54100`)
-- `rotate` emits `gateway.ingestion_key.minted` and revoking a key emits `gateway.ingestion_key.revoked` at the wire level, previously unit-only
-
-The setup pattern in this file (project + ingest-only RoleBinding + `aiTools:manage` caller) is the canonical reference for any downstream lane (CLI, MCP) that needs an ingestion-key test path.
-
-**No-bypass invariant (CI-enforced)**: `platform/app/ee/governance/repositories/__tests__/no-bypass.unit.test.ts`. 3 tests (Lane B-7 at `94c219035`) statically reject any future PR that adds a direct `prisma.ingestionTemplate.*` call outside the allowlist. Locks the umbrella spec's `@no-bypass` invariant in CI so the repository-pattern boundary won't silently drift.
-
-**MCP audit-uniform regression**: `platform/app/src/mcp/__tests__/governance-tools.audit-uniform.integration.test.ts`. 3 cases (Lane B-MCP audit at `66fd35162`) prove the Path B contract end-to-end: `governance_ingestion_templates_create` and `governance_ingestion_keys_mint` both stamp `metadata.surface === "mcp"` against real Postgres, and the `AUTH_REQUIRED:` negative case stays closed (write tool with no `callerUserId` fails before any audit row is written).
-
-**Cross-surface audit-uniformity regression**: `platform/app/ee/governance/services/__tests__/auditSurface.crossSurface.integration.test.ts`. Invokes `createOrgTemplate` via all four surfaces, tRPC service-direct, Hono REST, CLI REST (with `X-LangWatch-Surface: cli`), and MCP service-direct, in one test (Lane B-8 at `d96cd4300`, extended to 4 surfaces at `cb4c8224c`); asserts the four audit rows have **identical** payload shape, same `action`, same `targetKind`, same `organizationId`, same metadata-key-set, with only `metadata.surface` varying (`"trpc"`, `"hono"`, `"cli"`, `"mcp"`). Slug regex format identical, no default-fallback leakage.
-
-**Surface-spoof rejection regression**: same file as above (Lane B-8 extension at `cb4c8224c`). Fires three Hono POSTs with `X-LangWatch-Surface` set to `trpc`, `mcp`, and `evil`; asserts all three audit rows fall back to `metadata.surface === "hono"`. Locks Alexis's `GovernanceCallSurface` enum filter at `resolveSurfaceFromRequest` as the defense against external HTTP callers forging in-process surface tags, the only legal value the Hono surface accepts on inbound is `cli`; everything else falls through to the route's default `"hono"`. Together with the cross-surface uniformity test this exhaustively pins the umbrella spec's `@audit-uniform` invariant for v1.
+- `install` and `rotate` audit rows both stamp `surface: "hono"` end-to-end
+- `rotate` emits `gateway.ingestion_key.minted` and revoking a key emits `gateway.ingestion_key.revoked`
 
 To run locally:
 
 ```bash
-cd platform/app
-pnpm test:integration governance-rest-api.integration.test.ts
-pnpm test:integration governance-ingestion-keys.integration.test.ts
-pnpm test:integration governance-tools.audit-uniform.integration.test.ts
-pnpm test:integration auditSurface.crossSurface.integration.test.ts
-pnpm test:unit no-bypass.unit.test.ts
+pnpm --filter @langwatch/enterprise-governance-server test:unit
+pnpm lint:architecture
 ```
 
-Use these files as the authoritative reference when implementing a CLI command or MCP tool against a governance route, the request/response shape and audit-stamping invariants that live there are exactly what each route accepts, returns, and emits, and the no-bypass test will reject any direct-prisma shortcut at PR time.
+Use these files as the authoritative reference when implementing a CLI command or MCP tool against a governance route, the request/response shape and audit-stamping invariants that live there are exactly what each route accepts, returns, and emits, and the architecture lint will reject any direct-prisma shortcut at PR time.
 
 ## Cross-references
 
@@ -15396,7 +15391,7 @@ Use these files as the authoritative reference when implementing a CLI command o
 - [Compliance architecture](/ai-governance/compliance-architecture): how the OCSF v1.1 export consumes the same audit stream
 - Spec, `specs/ai-gateway/governance/governance-api-cli-mcp-coverage.feature`
 - v1 scope-fence audit, `specs/ai-gateway/governance/agentic-first-parity-v1-status.md` (12-resource × 4-surface matrix on shipped SHAs; scoring 2/12 full parity, 8/12 tRPC-only deferred to follow-on)
-- Wire-shape lock, `platform/app/src/app/api/governance/__tests__/governance-rest-api.integration.test.ts`
+- Wire-shape lock, `packages/enterprise/features/governance/server/src/app/__tests__/governance.transport.unit.test.ts`
 
 ---
 
@@ -17413,7 +17408,7 @@ Whatever OTLP body Cowork emits, `resource_spans` are walked, each span turns in
 langwatch ingest tail <sourceId> --follow
 ```
 
-You should see Cowork events landing as `tool.invocation` and `api.call`. If everything shows `agent.action`, the heuristic isn't matching Cowork's span names, file an issue with a sample span name and the [Cowork adapter](https://github.com/langwatch/langwatch/blob/main/platform/app/src/server/governance/activity-monitor/normalizers/otel.ts) heuristic will be tightened.
+You should see Cowork events landing as `tool.invocation` and `api.call`. If everything shows `agent.action`, the heuristic isn't matching Cowork's span names, file an issue with a sample span name and the heuristic will be tightened.
 
 ---
 
@@ -18537,8 +18532,9 @@ sidebarTitle: MCP server
 
 <Note>
   **Architecture: in-process service calls (not HTTP-shell over REST).** Governance MCP
-  tools register in `platform/app/src/mcp/handler.ts` via
-  `registerGovernanceMcpTools(server, prisma)` and call the governance services
+  tools register on every MCP session the hosted endpoint opens, through the session
+  tool registrar bound in `apps/api/src/features/mcp/hosted-mcp.mount.ts`, via
+  `registerGovernanceMcpTools(server, ctx)`, and call the governance services
   (`IngestionTemplateService`, `IngestionKeyService`, etc.) directly with `surface:
   "mcp"`. They do NOT route through `/api/governance/*` over HTTP. Reason: it avoids the
   project-API-key vs PAT auth mismatch and matches Sergey's explicit
@@ -18618,7 +18614,7 @@ Governance MCP tools register inside LangWatch's existing MCP server (served on 
 }
 ```
 
-The 9 governance tools register via `registerGovernanceMcpTools(server, ctx)` from `platform/app/src/mcp/governance-tools.ts` (Lane-Q at `7639b6c2b`). The same registration runs at all three `createMcpServer()` callsites in `handler.ts` so the tools are available regardless of which MCP transport the client chose.
+The 9 governance tools register via `registerGovernanceMcpTools(server, ctx)` from `packages/enterprise/features/governance/server/src/transport/api-mcp/governance-tools.api.ts`. The registrar is installed once, as the session-tool port that `apps/api/src/features/mcp/hosted-mcp.mount.ts` binds, and it runs for every session the endpoint opens, so the tools are available regardless of which MCP transport the client chose.
 
 <Note>
   **Dev-environment port routing**: in production, LangWatch listens on a single port and
@@ -18634,7 +18630,7 @@ The 9 governance tools register via `registerGovernanceMcpTools(server, ctx)` fr
 
 ## RBAC enforcement
 
-Governance tools enforce two distinct gates at the tool layer (`platform/app/src/mcp/governance-tools.ts`), BEFORE the service call:
+Governance tools enforce two distinct gates at the tool layer (`packages/enterprise/features/governance/server/src/transport/api-mcp/governance-tools.api.ts`), BEFORE the service call:
 
 **`AUTH_REQUIRED:`**, write tools (e.g. `governance_ingestion_templates_create`, `governance_ingestion_keys_mint`) called from a project-apiKey-only session without OAuth. Read tools are NOT subject to this gate; they work with project-apiKey-only sessions.
 
@@ -18650,7 +18646,7 @@ Governance tools enforce two distinct gates at the tool layer (`platform/app/src
 }
 ```
 
-**`FORBIDDEN:`**, the caller has a session but their organization role doesn't include the required permission (mirrors `hasOrganizationPermission` from `platform/app/src/server/api/rbac.ts`).
+**`FORBIDDEN:`**, the caller has a session but their organization role doesn't include the required permission (the same organization-permission decision the tRPC and REST surfaces make, `AuthzService.hasPermission` in `packages/features/authz/contract/src/authz.service.ts`).
 
 ```jsonc
 {
@@ -18668,13 +18664,13 @@ In both cases no record is created and no audit row is emitted (failed calls are
 
 The Path B mechanics (per `fc6d54100` + `7639b6c2b`):
 
-- **RBAC check happens at the MCP tool layer**, BEFORE the service call, the tool mirrors `hasOrganizationPermission` from `platform/app/src/server/api/rbac.ts` and returns `FORBIDDEN:` early if the required permission is missing. Services trust the surface, they do not gate on the MCP-resolved scope a second time. This split is intentional: the MCP tool owns the RBAC contract for its surface; the service owns the multitenancy + business-logic contract.
+- **RBAC check happens at the MCP tool layer**, BEFORE the service call, the tool asks the same permission probe the tRPC and REST surfaces ask, `AuthzService.hasPermission` (`packages/features/authz/contract/src/authz.service.ts`, resolved against the built-in role sets in `packages/features/authz/contract/src/roles.ts`), and returns `FORBIDDEN:` early if the required permission is missing. Services trust the surface, they do not gate on the MCP-resolved scope a second time. This split is intentional: the MCP tool owns the RBAC contract for its surface; the service owns the multitenancy + business-logic contract.
 - **`callerUserId` flows from the OAuth session**, the OAuth PKCE flow at `/api/mcp/authorize` captures the user's id, threads it through the session token cache and `SessionState`, and surfaces it as `ctx.callerUserId`. For `IngestionKeyService.{install, rotate}` it's required (write tools reject with `AUTH_REQUIRED:` if absent). For `IngestionTemplateService` authoring methods (which take `callerUserId` for the audit trail), same plumbing.
 - **Snake_case ↔ camelCase boundary**: MCP tool inputs use snake_case (`source_template_id`, `template_id`) per public-surface convention; the tool maps to camelCase (`sourceTemplateId`, `templateId`) before calling the service, since service signatures are camelCase. The mapping is the tool's job, not the service's.
 
 ## Audit emission
 
-Every state-changing tool call emits an audit row with `AuditLog.metadata.surface = "mcp"` (the shared `GovernanceCallSurface` type at `@ee/governance/services/auditSurface.ts`, threaded through every mutating governance service method as of Sergey's Lane B-3 at `fc6d54100`):
+Every state-changing tool call emits an audit row with `AuditLog.metadata.surface = "mcp"` (the shared `GovernanceCallSurface` type in `packages/enterprise/features/governance/contract/src/governance-audit.ts`, threaded through every mutating governance service method):
 
 | Tool                                                 | Audit row                                                              |
 | ---------------------------------------------------- | ---------------------------------------------------------------------- |
@@ -18685,7 +18681,7 @@ Every state-changing tool call emits an audit row with `AuditLog.metadata.surfac
 
 Payload shapes are identical to the REST API's audit rows apart from `metadata.surface`, every other field (actorUserId, apiKeyId, target, error) follows the same shape. This lets incident response queries answer "what did the agent do?" without changing the audit-row event-kind taxonomy.
 
-The contract is service-layer-asserted by `platform/app/src/mcp/__tests__/governance-tools.audit-uniform.integration.test.ts` (Lane B-MCP audit at `66fd35162`), 3 cases against real Postgres: `governance_ingestion_templates_create` stamps `metadata.surface = "mcp"`, `governance_ingestion_keys_mint` stamps `metadata.surface = "mcp"`, and the `AUTH_REQUIRED:` negative path fails before any audit row is written. No wire-level MCP test is needed (per the Path B architecture there is no MCP-over-HTTP wire to assert at).
+The contract is asserted at the application layer by `packages/enterprise/features/governance/server/src/app/__tests__/governance.app.unit.test.ts`, in the scenario "audit rows are identical apart from metadata.surface": the same template creation is driven over all four surfaces, tRPC, Hono REST, CLI and MCP, and the four writes come out field-for-field identical apart from `surface`. No wire-level MCP test is needed (per the Path B architecture there is no MCP-over-HTTP wire to assert at). The `AUTH_REQUIRED:` negative path, a write tool with no `callerUserId` failing before any audit row is written, is contract rather than covered ground: it carries no test of its own today.
 
 ## Agent setup from scratch
 
@@ -64043,10 +64039,10 @@ Docker Compose is the quickest way to try LangWatch locally. It runs the full st
 ```bash
 # Clone the repository
 git clone https://github.com/langwatch/langwatch.git
-cd platform/app
+cd langwatch/infra
 
 # Copy the example environment file
-cp .env.example .env
+cp ../.env.example .env
 
 # Start all services
 docker compose up
@@ -65495,7 +65491,7 @@ Click **Create GitHub App**. On the resulting page:
 
 ## Plumb the secrets
 
-Add these to the control-plane env (`.env` or your secret manager). All are optional in the schema (`platform/app/src/env-create.mjs`); when the private key is unset the feature is silently off, the connect card reports the integration as unavailable, and no token can be minted.
+Add these to the control-plane env (`.env` or your secret manager). All are optional in the environment schema (`apps/api/src/platform/config/api.config.ts`); when the private key is unset the feature is silently off, the connect card reports the integration as unavailable, and no token can be minted.
 
 ```bash title=".env"
 GITHUB_LANGY_APP_ID="<App ID from registration>"
@@ -66228,7 +66224,7 @@ Seats come in two kinds, and which one a person occupies follows from what they 
 | **Extended retention**                                  | Multi-class retention policies configured per category.                                                                                                                                                               |
 | **Support and SLA**                                     | Named contact, response targets, upgrade guidance.                                                                                                                                                                    |
 
-The Apache 2.0 floor and the Enterprise line are drawn per directory in the repository: the implementations of these capabilities live under [`platform/app/ee/`](https://github.com/langwatch/langwatch/tree/main/platform/app/ee), covered by the [Enterprise license](https://github.com/langwatch/langwatch/blob/main/platform/app/ee/LICENSE.md). See [Open-core licensing](/ai-governance/open-core-licensing) for the file-level map.
+The Apache 2.0 floor and the Enterprise line are drawn per directory in the repository: the implementations of these capabilities live under [`packages/enterprise/`](https://github.com/langwatch/langwatch/tree/main/packages/enterprise), covered by the [Enterprise license](https://github.com/langwatch/langwatch/blob/main/packages/enterprise/LICENSE.md). See [Open-core licensing](/ai-governance/open-core-licensing) for the file-level map.
 
 ## SSO requires a license
 

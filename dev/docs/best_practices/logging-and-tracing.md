@@ -115,7 +115,7 @@ identifier:
   input/output, anything a customer typed or a model produced.
 - Personal data proper — email addresses, names, phone numbers, postal
   addresses. These are what the PII redaction pass exists for; see
-  `platform/app/src/server/data-privacy/`.
+  `packages/features/data-privacy/server/src/`.
 
 ## Choosing a Level: Who Decides the Outcome
 

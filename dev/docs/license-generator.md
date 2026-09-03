@@ -31,7 +31,7 @@ Used by every dogfood / QA / seed flow that needs Enterprise surfaces unlocked.
 
 - `LANGWATCH_LICENSE_PRIVATE_KEY` set in `.env` (RSA private key, paired with
   the public key compiled into the verifier at
-  `platform/app/ee/licensing/signing.ts`). Ask the maintainer for the dev key —
+  `packages/enterprise/features/licensing/server/src/adapters/node.license-cryptography.adapter.ts`). Ask the maintainer for the dev key —
   it is **not** checked into the repo.
 - Postgres reachable via `DATABASE_URL`.
 - The target organization already exists (the script writes a `License` row
@@ -59,7 +59,7 @@ Arguments:
 | Flag            | Required | Default                | Description                                                                                                  |
 | --------------- | -------- | ---------------------- | ------------------------------------------------------------------------------------------------------------ |
 | `--org-id`      | yes      | —                      | Target `Organization.id` to attach the license to. Org must already exist.                                   |
-| `--plan`        | no       | `ENTERPRISE`           | One of `ENTERPRISE` / `GROWTH` / `PRO`. Plan templates live at `platform/app/ee/licensing/planTemplates.ts`. |
+| `--plan`        | no       | `ENTERPRISE`           | One of `ENTERPRISE` / `GROWTH` / `PRO`. Plan templates live at `packages/enterprise/features/licensing/contract/src/license-plan-templates.ts`. |
 | `--max-members` | no       | `50`                   | Seat cap. Must be ≥ 1.                                                                                       |
 | `--email`       | no       | `<orgSlug>@local.test` | Issued-to email for the license metadata + audit-trail field.                                                |
 
@@ -90,18 +90,19 @@ await applyLicenseToOrg({
 });
 ```
 
-The dogfood seed at `platform/app/scripts/seed-gateway-dogfood.ts` ships an
-idempotent `ensureOrgHasLicense(orgId)` helper that wraps `applyLicenseToOrg`
-— skips if the org already has a valid license, warns if the env var is
-unset, and is safe to call on every seed run.
+The dogfood seed shipped an idempotent `ensureOrgHasLicense(orgId)` helper that
+wrapped `applyLicenseToOrg` — skipping if the org already had a valid license,
+warning if the env var was unset, and safe to call on every seed run. That
+script (`scripts/seed-gateway-dogfood.ts`) did not survive the platform split;
+reinstate the helper alongside whichever seed you wire this into.
 
 ## When to use
 
 - **Self-hosted dogfood** — generate an Enterprise license for the dogfood
   org so multi-user / governance / ingestion-source surfaces unlock.
-- **QA scripts** — `platform/app/scripts/_qa-*.mjs` create test orgs; each one
-  needs a license matching the test's plan-tier expectations. Wire the
-  generator into the QA bootstrap.
+- **QA scripts** — the monolith's `scripts/_qa-*.mjs` created test orgs; each
+  such script needs a license matching the test's plan-tier expectations. Wire
+  the generator into the QA bootstrap.
 - **Local-dev seed** — when running `pnpm dev:seed` against a fresh DB,
   the seed script generates a license for the seed org so the developer
   starts with the full surface unlocked locally. Same code path as

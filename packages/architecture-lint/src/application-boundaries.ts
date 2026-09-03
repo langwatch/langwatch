@@ -751,7 +751,7 @@ function lintNewEnterpriseAliases(root: string): ArchitectureViolation[] {
         file: sourceImport.file,
         line: sourceImport.line,
         specifier: sourceImport.specifier,
-        message: "The legacy @ee alias cannot be introduced outside platform/app.",
+        message: "The legacy @ee alias cannot be introduced.",
         allowed: "Import the owning @langwatch/enterprise-<feature>-<surface> package.",
       });
     }

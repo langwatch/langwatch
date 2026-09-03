@@ -24,7 +24,7 @@ wiring inside the serving app beyond a single entry in that enumeration.
         │
         │  one loop / one spread / one install pass
         ▼
-  the serving process (apps/api, apps/worker, platform/app while it lives)
+  the serving process (apps/api, apps/worker)
 ```
 
 ## Why one list

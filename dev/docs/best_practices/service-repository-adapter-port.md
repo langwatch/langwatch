@@ -23,7 +23,7 @@ Nothing outside the adapter needs to know a repository class exists. Nothing
 below the adapter needs an untyped seam.
 
 ```
-composition root (apps/api, platform/app)
+composition root (apps/api, apps/worker)
     │  holds a real PrismaClient
     ▼
 Postgres<Subject>Adapter.create(prisma)          ← adapters/postgres.<subject>.adapter.ts
@@ -150,7 +150,7 @@ export class Postgres<Subject>Adapter {
 ### What the composition root calls
 
 ```ts
-// platform/app/src/server/app-layer/app.ts (or apps/api composition)
+// apps/api/src/app/*.composition.ts
 
 import { Postgres<Subject>Adapter } from "@langwatch/<feature>-server";
 

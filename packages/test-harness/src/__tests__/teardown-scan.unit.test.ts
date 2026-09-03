@@ -27,9 +27,6 @@ const PACKAGE_ROOT = resolve(__dirname, "../..");
 /** The workspace root, which is two levels above the app. */
 const REPO_ROOT = resolve(PACKAGE_ROOT, "../..");
 
-/** The platform application, while it still has sources to scan. */
-const APP_ROOT = resolve(REPO_ROOT, "platform/app");
-
 /**
  * Every root holding test files this rule covers, as name -> directory.
  *
@@ -41,19 +38,21 @@ const APP_ROOT = resolve(REPO_ROOT, "platform/app");
  * Every tree with test files in it.
  *
  * `ee/` was a root until the enterprise code moved under `packages/`, which
- * the packages root already walks. A root that no longer exists does not
- * narrow the scan — it fails the case that names it, and while it failed there
- * the packages root's own findings were never asserted at all. That is why the
- * entry is gone rather than left in as a harmless leftover, and why removing
- * it surfaces violations that were always present: an aborted guard reports no
- * offenders forever.
+ * the packages root already walks; `platform/app/src` was one until the
+ * monolith was deleted, and `apps/` took its place — the applications hold
+ * tests now, and a scan that named neither would report no offenders forever.
+ * A root that no longer exists does not narrow the scan — it fails the case
+ * that names it, and while it failed there the packages root's own findings
+ * were never asserted at all. That is why an entry is removed rather than left
+ * in as a harmless leftover, and why removing one surfaces violations that
+ * were always present: an aborted guard reports no offenders forever.
  */
 const TEST_ROOTS: Record<string, string> = Object.fromEntries(
   (
     [
       ["harness", resolve(PACKAGE_ROOT, "src")],
       ["packages", resolve(REPO_ROOT, "packages")],
-      ["platform", resolve(APP_ROOT, "src")],
+      ["apps", resolve(REPO_ROOT, "apps")],
     ] as const
   ).filter(([, directory]) => existsSync(directory)),
 );
@@ -303,7 +302,7 @@ describe("scanTestSourceForUnsafeDeleteMany", () => {
       expect(
         offenders,
         "Route these teardowns through cleanupTestRows " +
-          "(src/test-utils/cleanupTestRows.ts), or filter by a module-level " +
+          "(packages/test-harness/src/cleanup-test-rows.ts), or filter by a module-level " +
           "const id, which cannot be undefined (#6219).",
       ).toEqual([]);
     });

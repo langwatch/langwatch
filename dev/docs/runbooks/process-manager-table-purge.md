@@ -63,9 +63,12 @@ rather than a cleanup.
 
 ## Access path
 
-No psql bastion is needed. `platform/app/scripts/ops/purge-process-manager-tables.mjs`
-runs inside an app pod, which already has the Prisma client and the database
-credentials. Nothing here needs a new credential or a new network route.
+No psql bastion is needed. The purge runs inside an app pod, which already has
+the Prisma client and the database credentials, so nothing here needs a new
+credential or a new network route. The monolith's
+`scripts/ops/purge-process-manager-tables.mjs` did not survive the platform
+split — run the statements below directly against the pod's Prisma client until
+an equivalent task lands on `apps/api` or `apps/worker`.
 
 ## Procedure
 

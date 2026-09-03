@@ -21,7 +21,7 @@
  *
  * RUN (local haven — all LANGY_* vars already default to the seed identity):
  *
- *   cd platform/app/e2e/langy
+ *   cd apps/ui/e2e/langy
  *   npx vitest run langy-quality.scenario.test.ts --reporter=verbose
  *
  * RUN (against Langy's own production project — the measurements above came

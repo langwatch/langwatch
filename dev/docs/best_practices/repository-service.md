@@ -51,7 +51,7 @@ Code is organized into three layers. The **domain layer** (Service + Repository)
 Thin wrapper over the database. No business logic.
 
 ```typescript
-// platform/app/src/server/datasets/dataset.repository.ts
+// packages/features/dataset/server/src/repositories/prisma/prisma.dataset.repository.ts
 export class DatasetRepository {
   constructor(private readonly prisma: PrismaClient) {}
 
@@ -109,7 +109,7 @@ endpoint publishes, and the browser reads the fields off `{}`. Type the port.
 Business logic, orchestration, default resolution.
 
 ```typescript
-// platform/app/src/server/datasets/dataset.service.ts
+// packages/features/dataset/server/src/services/dataset.service.ts
 export class DatasetService {
   constructor(
     private readonly prisma: PrismaClient,
@@ -153,7 +153,7 @@ A failure the caller can act on is a `HandledError` subclass with a stable
 `code`. It crosses the boundary with meaning, and no router has to hand-map it:
 
 ```typescript
-// platform/app/src/server/datasets/errors.ts
+// packages/features/dataset/server/src/services/errors.ts
 export class DatasetNameTakenError extends HandledError {
   declare readonly code: "dataset_name_taken";
 

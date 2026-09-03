@@ -20,7 +20,9 @@ constraints:
       # Names that carry no behaviour at all.
       - regex: "^[\"'`]\\s*(?i)(works?|test|tests|it works|renders?|ok|basic|simple|happy path|sanity)\\s*[\"'`]$"
 files:
-  - "platform/app/**/*.test.tsx"
-  - "platform/app/**/*.spec.tsx"
+  - "apps/**/*.test.tsx"
+  - "packages/**/*.test.tsx"
+  - "apps/**/*.spec.tsx"
+  - "packages/**/*.spec.tsx"
   - "sdks/typescript/**/*.test.tsx"
   - "packages/**/*.test.tsx"

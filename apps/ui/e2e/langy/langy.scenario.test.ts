@@ -2,7 +2,7 @@
 // langy-agent.ts). All LANGY_*/LW_BASE_URL/LANGWATCH_API_KEY env vars default
 // to this repo's local haven seed identity (see config.ts) — a bare
 //
-//   cd platform/app/e2e/langy && npx vitest run langy.scenario.test.ts --reporter=verbose
+//   cd apps/ui/e2e/langy && npx vitest run langy.scenario.test.ts --reporter=verbose
 //
 // Just Works against a running `make haven up` stack. Override any of them
 // to point at a different stack (see README.md).

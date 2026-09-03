@@ -30,8 +30,15 @@ const PACKAGE_ROOT = resolve(__dirname, "../..");
 /** The workspace root, which is two levels above the app. */
 const REPO_ROOT = resolve(PACKAGE_ROOT, "../..");
 
-/** The platform application, while it still has sources to scan. */
-const APP_ROOT = resolve(REPO_ROOT, "platform/app");
+/**
+ * A synthetic base directory for the resolver's unit fixtures below.
+ *
+ * The whole-tree scan does not use it — that walks `git ls-files` from the
+ * workspace root and reads each config's own alias table. This is only a stable
+ * absolute prefix for the `resolveMockSpecifier` cases, which supply their own
+ * `fileExists` and never touch the disk, so it need not name a real directory.
+ */
+const APP_ROOT = resolve(REPO_ROOT, "apps/ui");
 
 const TEST_FILE_PATTERN = /\.(test|spec)\.(c|m)?[jt]sx?$/;
 const VITEST_CONFIG_PATTERN = /(^|\/)vitest[^/]*\.config\.(c|m)?[jt]s$/;

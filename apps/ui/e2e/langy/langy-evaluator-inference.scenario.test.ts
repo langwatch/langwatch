@@ -5,7 +5,7 @@
  * through the workbench-state REST surface: its type AND its mappings.
  *
  * RUN (one file per vitest run, see README):
- *   cd platform/app/e2e/langy && npx vitest run langy-evaluator-inference.scenario.test.ts --reporter=verbose
+ *   cd apps/ui/e2e/langy && npx vitest run langy-evaluator-inference.scenario.test.ts --reporter=verbose
  */
 
 import * as scenario from "@langwatch/scenario";

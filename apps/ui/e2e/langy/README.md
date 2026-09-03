@@ -26,7 +26,7 @@ reach the app's tRPC/SSE endpoints and sign in as a real user.
 ## Run
 
 ```bash
-cd platform/app/e2e/langy
+cd apps/ui/e2e/langy
 LANGY_APP_URL=<your app URL, e.g. https://app.<slug>.langwatch.localhost:1355> \
 LANGY_PROJECT_ID=<project id> \
 LANGY_ADMIN_EMAIL=<a real user's email on that project> \
@@ -74,7 +74,7 @@ rubric (`LANGY_CORE_RULE_CRITERIA`, etc.) that encodes Langy's AGENTS.md absolut
 rules. Run it the same way:
 
 ```bash
-cd platform/app/e2e/langy
+cd apps/ui/e2e/langy
 npx vitest run langy-dogfood.scenario.test.ts --reporter=verbose
 ```
 
@@ -236,11 +236,11 @@ a backend execution that still writes the right document. Every drop is logged
 with how long it waited (`tab.droppedActions`), so a flake reads as a timing
 report rather than a mystery.
 
-**A server-side edit needs the API bundle rebuilt, or the suite measures the
-old code.** haven's `api` lane runs `node dist/server/server.cjs` and only ever
-builds that bundle when the file is missing, so anything you change under
-`src/server/` is invisible to a suite until you run
-`pnpm --filter @langwatch/web build:server` and then `make haven restart api`.
+**A server-side edit reaches the suite only once the API lane has restarted.**
+haven's `api` lane runs `pnpm --filter @langwatch/platform-api dev`, which is
+`tsx watch`, so a change under `apps/api/src/` or a server package it imports is
+picked up when the watcher restarts the process — not mid-request. If a suite
+still measures the old code, force it with `make haven restart api`.
 `make haven restart app` bounces vite alone and does nothing for the API.
 
 ### Proving which leg carried an action

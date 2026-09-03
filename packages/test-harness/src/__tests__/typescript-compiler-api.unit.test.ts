@@ -33,9 +33,20 @@ const REPO_ROOT = resolve(PACKAGE_ROOT, "../..");
  */
 const HELD_ON_SIX = new Set(["sdks/typescript", "mcp/typescript"]);
 
-/** Where the workspace's own package manifests live, relative to the root. */
+/**
+ * Where the workspace's own package manifests live, relative to the root.
+ *
+ * `packages/` is walked at any depth: a feature package's manifest is three
+ * levels down (`packages/features/<feature>/<surface>/package.json`), so a
+ * single-segment alternation saw the flat packages and none of the 149 feature
+ * and enterprise ones. `apps/` replaced the `platform/` alternation when the
+ * monolith was deleted; without it the three applications were unscanned and
+ * the canary below had nothing left to find. `sdks/` stays single-segment on
+ * purpose — its `examples/` are standalone sample projects, not workspace
+ * packages this repo builds.
+ */
 const MANIFEST_PATTERN =
-  /^(package\.json|(platform|packages|plugins|sdks|mcp|skills)\/[^/]+\/package\.json|skills\/package\.json)$/;
+  /^(package\.json|(apps|plugins|sdks|mcp|skills)\/[^/]+\/package\.json|packages\/(?:[^/]+\/)+package\.json|skills\/package\.json)$/;
 
 const SOURCE_PATTERN = /\.(c|m)?[jt]sx?$/;
 
@@ -95,8 +106,16 @@ describe("given TypeScript 7 is the compiler", () => {
       }
 
       // A package this test cannot see is a package it cannot enforce, so the
-      // sweep failing to find the app at all is itself a failure.
-      expect(declared.has("platform/app/package.json")).toBe(true);
+      // sweep failing to find the applications at all is itself a failure.
+      // Three manifests rather than one, because the monolith they replaced was
+      // a single canary and losing it took the assertion with it.
+      for (const application of [
+        "apps/api/package.json",
+        "apps/ui/package.json",
+        "apps/worker/package.json",
+      ]) {
+        expect(declared.has(application), `${application} was not scanned`).toBe(true);
+      }
 
       const wrong = [...declared].filter(([manifest, version]) => {
         const held = [...HELD_ON_SIX].some((pkg) => manifest.startsWith(`${pkg}/`));

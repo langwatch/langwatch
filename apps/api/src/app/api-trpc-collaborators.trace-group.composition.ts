@@ -39,8 +39,8 @@
  *   - the tenant emitter both trace subscriptions stream off, which is the
  *     PROCESS's broadcast fabric rather than Trace's.
  *
- * Named as absent, because the implementation is still `platform/app`'s and no
- * core package owns it yet:
+ * Named as absent, because the implementation went with `platform/app` when the
+ * monolith was deleted and no core package owns it yet:
  *
  *   - {@link ApiTraceReadStackPort} — the ClickHouse trace read stack: the ten
  *     readers `TraceApp` is built from, the caller's read-time redactions, the
@@ -121,7 +121,8 @@ import type { ModelProviderTrpcChecks } from "../features/model-provider/model-p
 // ---------------------------------------------------------------------------
 
 /**
- * The ClickHouse trace READ stack, which has not left `platform/app`.
+ * The ClickHouse trace READ stack, which never left `platform/app` and went
+ * with it when the monolith was deleted.
  *
  * One port rather than nine, because it is one thing: everything a captured
  * trace has to pass through between the columns it is stored in and the shape a

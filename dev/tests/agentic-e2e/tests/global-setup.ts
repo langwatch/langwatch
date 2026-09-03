@@ -40,7 +40,7 @@ async function waitForApp(): Promise<void> {
   throw new Error(
     `\n❌ App not available at ${BASE_URL} after ${MAX_RETRIES} attempts.\n\n` +
       `Make sure the app is running:\n` +
-      `  1. cd platform/app\n` +
+      `  1. cd to the repository root\n` +
       `  2. PORT=5570 pnpm dev\n\n` +
       `Or check if infrastructure is running:\n` +
       `  docker compose -f compose.test.yml ps\n`,

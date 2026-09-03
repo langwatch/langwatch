@@ -9,7 +9,8 @@ language: TypeScript
 rule:
   pattern: import($MOD)
 files:
-  - "platform/app/src/**/*.ts"
+  - "apps/**/*.ts"
+  - "packages/**/*.ts"
 ignores:
   - "**/*.test.ts"
   - "**/*.spec.ts"

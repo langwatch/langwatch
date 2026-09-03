@@ -2,7 +2,7 @@ id: no-explicit-any-ts
 message: >
   Avoid `any` — prefer `unknown` + narrowing, or a real type. See
   langwatch CLAUDE.md and #3754 AC3. (`typescript/no-explicit-any` is
-  measured at 1395 in platform/app and left off in
+  measured at 1395 in the platform application and left off in
   /.oxlintrc.architecture.json; this rule is the deterministic gate.)
 severity: warning
 language: TypeScript
@@ -10,7 +10,8 @@ rule:
   kind: predefined_type
   regex: "^any$"
 files:
-  - "platform/app/src/**/*.ts"
+  - "apps/**/*.ts"
+  - "packages/**/*.ts"
 ignores:
   - "**/*.d.ts"
   - "**/__tests__/**"

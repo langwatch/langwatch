@@ -79,7 +79,7 @@ you already have, and its whole hierarchy rides on four glyphs at one monospace
 size: `❯` prompt, `⏺` call/message, `⎿` result, `✻` thinking. Chrome around it
 makes it read as a screenshot of a terminal rather than as the session.
 
-Components (`platform/app/src/features/traces-v2/components/TraceDrawer/terminalView/`):
+Components (`packages/features/trace/web/src/ui/sections/explorer/trace-drawer/terminal-view/`):
 `TerminalTab` (data boundary) · `TerminalView` (the screen + status line) ·
 `buildStepsFromSpans` (spans → steps) · `TerminalOutput` (ANSI tool output,
 click-to-copy) · `TerminalDiff` + `diff.ts` · `terminalSession.ts` (timeline,

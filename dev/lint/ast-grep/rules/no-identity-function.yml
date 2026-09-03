@@ -27,7 +27,6 @@ rule:
 files:
   - "packages/**/*.ts"
   - "apps/**/*.ts"
-  - "platform/app/src/**/*.ts"
 ignores:
   - "**/*.d.ts"
   - "**/__tests__/**"

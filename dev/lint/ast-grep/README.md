@@ -23,17 +23,17 @@ rules that apply to both file types are split into `_ts` / `_tsx` siblings.
 
 | Rule                                    | Forbids                                                                                            | Scope                                                    |
 | --------------------------------------- | -------------------------------------------------------------------------------------------------- | -------------------------------------------------------- |
-| `no-explicit-any` + `-tsx`              | `: any`, `as any`                                                                                  | `platform/app/src/**/*.{ts,tsx}`                         |
-| `no-identity-function`                  | a named function or `const` arrow that returns its own argument                                     | `packages/**`, `apps/**`, `platform/app/src/**` `*.ts`   |
+| `no-explicit-any` + `-tsx`              | `: any`, `as any`                                                                                  | `apps/**`, `packages/**` `*.{ts,tsx}`                    |
+| `no-identity-function`                  | a named function or `const` arrow that returns its own argument                                     | `packages/**`, `apps/**` `*.ts`                          |
 | `no-same-name-delegation`               | a method whose whole body forwards to the same name on a collaborator (skips `app/*.app.ts`)        | `packages/**`, `apps/**` `*.ts`                          |
-| `no-inline-dynamic-import` + `-tsx`     | inline `import(...)` outside the page-loader list / `pages/**`                                             | `platform/app/src/**/*.{ts,tsx}`                         |
-| `no-form-watch-in-child`                | `$form.watch()` in a child receiving `form` as a prop                                              | `platform/app/src/components/**/*.tsx`                   |
-| `no-export-star-shim` + `-tsx`          | `export * from "..."`. Disable inline with `// ast-grep-ignore: no-export-star-shim-{ts,tsx}`      | `platform/app/src/**/*.{ts,tsx}`                         |
-| `no-localhost-fallback` + `-tsx`        | `?? "http://localhost..."` and template-literal variants                                           | `platform/app/src/**/*.{ts,tsx}`                         |
-| `no-form-disable-on-isvalid`            | `disabled={!form.formState.isValid}` on submit buttons                                             | `platform/app/src/**/*.tsx`                              |
-| `require-bdd-describe-context` + `-tsx` | nested `describe` that names a topic instead of a `given`/`when` condition                         | test files under `platform/app/**`, `sdks/typescript/**` |
-| `require-boolean-name-prefix`           | `foo: boolean` without an `is`/`has`/`should`/`can`/`will` prefix or a domain-adjective equivalent | `platform/app/{src,ee}/**/*.ts`                          |
-| `require-fetch-timeout` + `-tsx`        | `fetch(...)` with no `signal` — a hung peer hangs the caller                                       | `platform/app/src/**`, `sdks/typescript/src/**`          |
+| `no-inline-dynamic-import` + `-tsx`     | inline `import(...)` outside the page-loader list / `pages/**`                                             | `apps/**`, `packages/**` `*.{ts,tsx}`                    |
+| `no-form-watch-in-child`                | `$form.watch()` in a child receiving `form` as a prop                                              | `apps/ui/src/**`, `packages/**/web/src/**` `*.tsx`       |
+| `no-export-star-shim` + `-tsx`          | `export * from "..."`. Disable inline with `// ast-grep-ignore: no-export-star-shim-{ts,tsx}`      | `apps/**`, `packages/**` `*.{ts,tsx}`                    |
+| `no-localhost-fallback` + `-tsx`        | `?? "http://localhost..."` and template-literal variants                                           | `apps/**`, `packages/**` `*.{ts,tsx}`                    |
+| `no-form-disable-on-isvalid`            | `disabled={!form.formState.isValid}` on submit buttons                                             | `apps/**`, `packages/**` `*.tsx`                         |
+| `require-bdd-describe-context` + `-tsx` | nested `describe` that names a topic instead of a `given`/`when` condition                         | test files under `apps/**`, `packages/**`, `sdks/typescript/**` |
+| `require-boolean-name-prefix`           | `foo: boolean` without an `is`/`has`/`should`/`can`/`will` prefix or a domain-adjective equivalent | `apps/**`, `packages/**` `*.ts`                          |
+| `require-fetch-timeout` + `-tsx`        | `fetch(...)` with no `signal` — a hung peer hangs the caller                                       | `apps/**`, `packages/**`, `sdks/typescript/src/**`       |
 | `no-test-without-assertion` + `-tsx`    | a test whose inline body contains no `expect`/`assert` — passes unless the code throws             | test files                                               |
 | `use-action-based-test-name` + `-tsx`   | `it("should …")`, and names carrying no behaviour (`works`, `renders`, `test`)                     | test files                                               |
 | `no-tautological-assertion` + `-tsx`    | `expect(X).toBe(X)` — an assertion that cannot fail                                                | test files                                               |
@@ -64,7 +64,7 @@ a `warning` here annotates and blocks nothing.
 `no-double-type-assertion` is the first `error` rule. It is scoped to the
 contract layer rather than the whole repo because that is where its baseline
 is clean: `as unknown as` appears 59 times in `packages/**` source (31 files)
-and 187 times in `platform/app/src`, but only twice under
+and 187 times in the platform application, but only twice under
 `packages/**/contract/src/**` — one was a cast around `URL`, which the
 package's own `lib` already declares (removed), and the other is the evaluator
 catalogue, where TypeScript rejects even a single assertion and the rule's

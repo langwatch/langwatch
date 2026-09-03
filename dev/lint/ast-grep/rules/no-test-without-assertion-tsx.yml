@@ -31,7 +31,9 @@ constraints:
       - kind: arrow_function
       - kind: function_expression
 files:
-  - "platform/app/**/*.test.tsx"
-  - "platform/app/**/*.spec.tsx"
+  - "apps/**/*.test.tsx"
+  - "packages/**/*.test.tsx"
+  - "apps/**/*.spec.tsx"
+  - "packages/**/*.spec.tsx"
   - "sdks/typescript/**/*.test.tsx"
   - "packages/**/*.test.tsx"

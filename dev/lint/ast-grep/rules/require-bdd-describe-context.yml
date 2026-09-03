@@ -21,7 +21,9 @@ constraints:
       # $TITLE is the string-literal node, quotes included.
       regex: '^["''`]\s*(?i)(given|when)\b'
 files:
-  - "platform/app/**/*.test.ts"
-  - "platform/app/**/*.spec.ts"
+  - "apps/**/*.test.ts"
+  - "packages/**/*.test.ts"
+  - "apps/**/*.spec.ts"
+  - "packages/**/*.spec.ts"
   - "sdks/typescript/**/*.test.ts"
   - "sdks/typescript/**/*.spec.ts"
