@@ -424,7 +424,7 @@ config — the reason this waits for wave 2). The rule then reads:
   is still shown alongside.
 
   "No conversion held" is **NULL, never 0**. The USD column is
-  `Nullable(Int64)` defaulting to NULL (migration 00087), because zero is
+  `Nullable(Int64)` defaulting to NULL (migration 00089), because zero is
   a legal cost — free-tier and zero-rated rows really do cost nothing —
   so a 0 sentinel cannot tell "we hold no USD figure" apart from "this
   cost nothing", and a reader charting it would draw the unpriced rows as
@@ -996,7 +996,7 @@ Sketches; exact DDL lands with the first migration PR.
 
 ```sql
 -- ClickHouse: the one summed table (fed by fold projection, NOT an MV).
--- As shipped in migration 00087 — read that file, not this block, when
+-- As shipped in migration 00089 — read that file, not this block, when
 -- the two ever disagree.
 CREATE TABLE governance_cost_rollup_1d (
     -- ---- the sort key: the fold's group key, exactly ----
