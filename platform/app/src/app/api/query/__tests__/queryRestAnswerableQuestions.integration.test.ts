@@ -831,10 +831,12 @@ describe("given the /api/v1/query REST door and a seed with known answers", () =
     await harness.admin.insert({
       table: `${database}.${harness.names.keyMapTable}`,
       format: "JSONEachRow",
-      values: [asking, other].map((project) => ({
-        KeyHash: lwqlTenantCapability({ secret: project.lwqlKey }),
-        TenantId: project.id,
-      })),
+      values: await Promise.all(
+        [asking, other].map(async (project) => ({
+          KeyHash: await lwqlTenantCapability({ secret: project.lwqlKey }),
+          TenantId: project.id,
+        })),
+      ),
     });
 
     await seedTenant({

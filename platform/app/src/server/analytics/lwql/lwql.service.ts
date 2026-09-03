@@ -585,7 +585,7 @@ export class LangWatchQLService {
       ...(Object.keys(executionParameters).length > 0
         ? { parameters: executionParameters }
         : {}),
-      tenantCapability: lwqlTenantCapability({
+      tenantCapability: await lwqlTenantCapability({
         secret: project.lwqlKey,
       }),
       limits: this.limits,

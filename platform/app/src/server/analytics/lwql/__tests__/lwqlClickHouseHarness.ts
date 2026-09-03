@@ -161,14 +161,17 @@ export interface LangWatchQLTenantFixture {
    * substring.
    */
   rawSecret: string;
-  /** `sha512(rawSecret)`, the only form that travels to ClickHouse. */
+  /**
+   * The bcrypt capability for `rawSecret` — the only form that travels to
+   * ClickHouse.
+   */
   keyHash: string;
 }
 
-function tenantFixture(
+async function tenantFixture(
   tenantId: string,
   rawSecret: string,
-): LangWatchQLTenantFixture {
+): Promise<LangWatchQLTenantFixture> {
   return {
     tenantId,
     rawSecret,
@@ -177,17 +180,21 @@ function tenantFixture(
     // own copy of the algorithm would drift into seeding a digest production
     // never computes — surfacing as every LangWatchQL read returning zero rows,
     // which is indistinguishable from a tenant that simply has no data. What
-    // pins the digest to SHA-512 is a known-answer assertion, in
+    // pins the digest to one algorithm is a known-answer assertion, in
     // `tenantIsolation.integration.test.ts`.
-    keyHash: lwqlTenantCapability({ secret: rawSecret }),
+    keyHash: await lwqlTenantCapability({ secret: rawSecret }),
   };
 }
 
-export const TENANT_A = tenantFixture(
+// Awaited at module scope because the capability is a KDF: every consumer below
+// reads `keyHash` synchronously, and a fixture holding a pending promise would
+// seed the key map with `[object Promise]` — a digest that matches nothing, and
+// so a whole isolation suite passing for the wrong reason.
+export const TENANT_A = await tenantFixture(
   "tenant-a",
   "raw-lwql-key-DO-NOT-LOG-abcdef123456",
 );
-export const TENANT_B = tenantFixture(
+export const TENANT_B = await tenantFixture(
   "tenant-b",
   "raw-lwql-key-VICTIM-DO-NOT-LOG-fedcba654321",
 );

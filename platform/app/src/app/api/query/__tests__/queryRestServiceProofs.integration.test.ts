@@ -634,10 +634,12 @@ describe("given the /api/v1/query REST family's service, isolation and policy pr
     await harness.admin.insert({
       table: `${database}.${harness.names.keyMapTable}`,
       format: "JSONEachRow",
-      values: [openProject, gatedProject].map((project) => ({
-        KeyHash: lwqlTenantCapability({ secret: project.lwqlKey }),
-        TenantId: project.id,
-      })),
+      values: await Promise.all(
+        [openProject, gatedProject].map(async (project) => ({
+          KeyHash: await lwqlTenantCapability({ secret: project.lwqlKey }),
+          TenantId: project.id,
+        })),
+      ),
     });
 
     for (const project of [openProject, gatedProject]) {
@@ -1601,7 +1603,7 @@ describe("given the /api/v1/query REST family's service, isolation and policy pr
       // Every request below is made as the gated project, so the *open*
       // project is the other tenant, and its very existence is one of the
       // things an error must not disclose.
-      const capability = lwqlTenantCapability({
+      const capability = await lwqlTenantCapability({
         secret: gatedProject.lwqlKey,
       });
 
