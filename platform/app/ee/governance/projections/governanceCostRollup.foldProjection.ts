@@ -192,6 +192,41 @@ export interface GovernanceCostRollupState {
   LastEventOccurredAt: number;
 }
 
+/**
+ * What an item records about its own last change, after a pull newer than
+ * anything it has seen.
+ *
+ * Only a pull that MOVES the figure rewrites what came before it. A confirming
+ * re-pull carries the existing markers forward untouched, so a settled
+ * "revised, was $X" survives the day being looked at again.
+ */
+function revisionMarkersAfterPull(
+  previous: PulledContribution | undefined,
+  movedTheFigure: boolean,
+  observedAtMs: number,
+): Pick<
+  PulledContribution,
+  | "priorAmountNanoMinor"
+  | "priorAmountNanoUsd"
+  | "priorObservedAtMs"
+  | "revisedAtMs"
+> {
+  if (movedTheFigure && previous !== undefined) {
+    return {
+      priorAmountNanoMinor: previous.amountNanoMinor,
+      priorAmountNanoUsd: previous.amountNanoUsd,
+      priorObservedAtMs: previous.observedAtMs,
+      revisedAtMs: observedAtMs,
+    };
+  }
+  return {
+    priorAmountNanoMinor: previous?.priorAmountNanoMinor,
+    priorAmountNanoUsd: previous?.priorAmountNanoUsd,
+    priorObservedAtMs: previous?.priorObservedAtMs,
+    revisedAtMs: previous?.revisedAtMs,
+  };
+}
+
 /** The UTC calendar day an instant belongs to, `YYYY-MM-DD`. */
 export function utcDayOf(occurredAtMs: number): string {
   return new Date(occurredAtMs).toISOString().slice(0, 10);
@@ -577,39 +612,13 @@ export class GovernanceCostRollupFoldProjection
     // would be `undefined` here and every total from this cell onward `NaN`.
     const money = readPulledUsageMoney(d);
 
-    // A stale re-delivery must not un-correct a figure the provider already
-    // fixed, but it is not worthless either: it is evidence of what the item
-    // held at an EARLIER time, which is exactly what "was $X" needs. Folding
-    // it in as a prior is what lets a reversed log reach the same markers as
-    // an in-order one.
     if (previous && previous.observedAtMs >= d.observedAtMs) {
-      // Only a stale look that DIFFERS from where the item stands now is
-      // evidence of a change, and only the newest such look is the figure the
-      // item held immediately before it.
-      const revealsChange = money.costNanoMinor !== previous.amountNanoMinor;
-      const isCloserLook =
-        d.observedAtMs < previous.observedAtMs &&
-        (previous.priorObservedAtMs === undefined ||
-          d.observedAtMs > previous.priorObservedAtMs);
-      if (!revealsChange || !isCloserLook) return state;
-
-      return this.withDerivedRevisionMarkers({
-        ...state,
-        pulledItems: {
-          ...state.pulledItems,
-          [d.restatementKey]: {
-            ...previous,
-            priorAmountNanoMinor: money.costNanoMinor,
-            priorAmountNanoUsd: money.costNanoUsd,
-            priorObservedAtMs: d.observedAtMs,
-            // The change landed somewhere between this look and the newest
-            // one. The newest is the only bound the log actually witnessed.
-            revisedAtMs: previous.observedAtMs,
-          },
-        },
-      });
+      return this.foldStaleObservation(state, previous, d, money);
     }
 
+    const movedTheFigure =
+      previous !== undefined &&
+      previous.amountNanoMinor !== money.costNanoMinor;
     const dims = dimensionsOf(event as never);
     const observed: GovernanceCostRollupState = {
       ...state,
@@ -622,23 +631,7 @@ export class GovernanceCostRollupFoldProjection
           amountNanoMinor: money.costNanoMinor,
           amountNanoUsd: money.costNanoUsd,
           observedAtMs: d.observedAtMs,
-          // Only a pull that MOVES the figure rewrites what came before it. A
-          // confirming re-pull carries the existing markers forward untouched,
-          // so a settled "revised, was $X" survives being looked at again.
-          ...(previous !== undefined &&
-          previous.amountNanoMinor !== money.costNanoMinor
-            ? {
-                priorAmountNanoMinor: previous.amountNanoMinor,
-                priorAmountNanoUsd: previous.amountNanoUsd,
-                priorObservedAtMs: previous.observedAtMs,
-                revisedAtMs: d.observedAtMs,
-              }
-            : {
-                priorAmountNanoMinor: previous?.priorAmountNanoMinor,
-                priorAmountNanoUsd: previous?.priorAmountNanoUsd,
-                priorObservedAtMs: previous?.priorObservedAtMs,
-                revisedAtMs: previous?.revisedAtMs,
-              }),
+          ...revisionMarkersAfterPull(previous, movedTheFigure, d.observedAtMs),
           tokensInput: d.tokensInput,
           tokensOutput: d.tokensOutput,
           tokensCacheRead: d.tokensCacheRead,
@@ -651,14 +644,55 @@ export class GovernanceCostRollupFoldProjection
       // assignment because a second item's older observation must not drag it
       // back; the early return above only guards re-delivery of the SAME item.
       lastObservedAt: Math.max(state.lastObservedAt, d.observedAtMs),
-      revisionCount:
-        previous !== undefined &&
-        previous.amountNanoMinor !== money.costNanoMinor
-          ? state.revisionCount + 1
-          : state.revisionCount,
+      revisionCount: movedTheFigure
+        ? state.revisionCount + 1
+        : state.revisionCount,
     };
 
     return this.withDerivedRevisionMarkers(observed);
+  }
+
+  /**
+   * Folds an observation that is NOT newer than the one the item already
+   * holds.
+   *
+   * Such a re-delivery must not un-correct a figure the provider already
+   * fixed, but it is not worthless either: it is evidence of what the item
+   * held at an EARLIER time, which is exactly what "was $X" needs. Taking it
+   * is what lets a log delivered newest-first reach the same markers as an
+   * in-order one.
+   */
+  private foldStaleObservation(
+    state: GovernanceCostRollupState,
+    previous: PulledContribution,
+    d: PulledUsageObservedEvent["data"],
+    money: ReturnType<typeof readPulledUsageMoney>,
+  ): GovernanceCostRollupState {
+    // Only a stale look that DIFFERS from where the item stands now is
+    // evidence of a change, and only the newest such look is the figure the
+    // item held immediately before it.
+    const revealsChange = money.costNanoMinor !== previous.amountNanoMinor;
+    const isCloserLook =
+      d.observedAtMs < previous.observedAtMs &&
+      (previous.priorObservedAtMs === undefined ||
+        d.observedAtMs > previous.priorObservedAtMs);
+    if (!revealsChange || !isCloserLook) return state;
+
+    return this.withDerivedRevisionMarkers({
+      ...state,
+      pulledItems: {
+        ...state.pulledItems,
+        [d.restatementKey]: {
+          ...previous,
+          priorAmountNanoMinor: money.costNanoMinor,
+          priorAmountNanoUsd: money.costNanoUsd,
+          priorObservedAtMs: d.observedAtMs,
+          // The change landed somewhere between this look and the newest one.
+          // The newest is the only bound the log actually witnessed.
+          revisedAtMs: previous.observedAtMs,
+        },
+      },
+    });
   }
 
   /**
