@@ -764,14 +764,14 @@ export interface paths {
         };
         /** @description Read one agent with its presence, its owner and the run parameters it declares. An id the project does not hold answers 404 agent_not_found. */
         get: operations["getAgent"];
-        /** @description Update an agent: any of name, type, configuration and workflow. The update is partial under PATCH and PUT alike. A connected agent takes no edit and answers 422 agent_register_only. */
+        /** @description Update an agent: any of name, type, configuration and workflow. The update is partial under PATCH and PUT alike. A connected agent takes only a new description; anything else answers 422 agent_register_only. */
         put: operations["replaceAgent"];
         post?: never;
         /** @description Archive an agent. It leaves the list and its runs stay. A connected agent that registers again restores its row. */
         delete: operations["archiveAgent"];
         options?: never;
         head?: never;
-        /** @description Update an agent: any of name, type, configuration and workflow. The update is partial under PATCH and PUT alike. A connected agent takes no edit and answers 422 agent_register_only. */
+        /** @description Update an agent: any of name, type, configuration and workflow. The update is partial under PATCH and PUT alike. A connected agent takes only a new description; anything else answers 422 agent_register_only. */
         patch: operations["updateAgent"];
         trace?: never;
     };
@@ -1031,29 +1031,9 @@ export interface paths {
         };
         /**
          * Get pull request coding agent usage
-         * @description Assistant usage for one pull request: sessions, tokens and cost, grouped by contributor and agent, plus per-model totals, over the pull request's whole lifetime rather than a time window. Every row and the totals split cost three ways: the part priced per token, the part a bundled subscription already covers, and the list-price total of both. Per-model totals carry the list price only. Cost is calculated from the tokens the agent reported and LangWatch's model prices, so it estimates spend rather than restating a provider invoice. Requires a personal-project API key; rows appear only for projects the calling user may view, and cost only for those they may price. Prefer `GET /api/v1/coding-agent/pull-request-usage`, which answers the same question with an organization API key alone and needs no X-Project-Id header.
+         * @description Assistant usage for one pull request: sessions, tokens and cost, grouped by contributor and agent, plus per-model totals, over the pull request's whole lifetime rather than a time window. Every row and the totals split cost three ways: the part priced per token, the part a bundled subscription already covers, and the list-price total of both. Per-model totals carry the list price only. Cost is calculated from the tokens the agent reported and LangWatch's model prices, so it estimates spend rather than restating a provider invoice. Requires a personal-project API key; rows appear only for projects the calling user may view, and cost only for those they may price.
          */
         get: operations["getApiCodingAgentPullRequestUsage"];
-        put?: never;
-        post?: never;
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/api/v1/coding-agent/pull-request-usage": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        /**
-         * Get pull request usage
-         * @description Assistant usage for one pull request: sessions, tokens and cost, grouped by contributor and agent, plus per-model totals, over the pull request's whole lifetime rather than a time window. Every row and the totals split cost three ways: the part priced per token, the part a bundled subscription already covers, and the list-price total of both. Per-model totals carry the list price only. Cost is calculated from the tokens the agent reported and LangWatch's model prices, so it estimates spend rather than restating a provider invoice. Authenticate with an organization API key and nothing else: no project id is sent anywhere. A key created for you reads with your own access; an organization service key, such as one a continuous integration job holds, reads with the access its bindings grant. Rows appear only for projects the key may view, and cost only for those it may price.
-         */
-        get: operations["getPullRequestUsage"];
         put?: never;
         post?: never;
         delete?: never;
@@ -5073,6 +5053,7 @@ export interface operations {
                     agents: {
                         name: string;
                         environment: string;
+                        description?: string;
                         /** @default {} */
                         parameters?: {
                             [key: string]: unknown;
@@ -8302,85 +8283,6 @@ export interface operations {
                     "application/json": {
                         error: string;
                         message?: string;
-                    };
-                };
-            };
-        };
-    };
-    getPullRequestUsage: {
-        parameters: {
-            query: {
-                /** @description The repository as "owner/name". */
-                repository: string;
-                /** @description The pull request number. */
-                pullRequest: number;
-                /** @description The GitHub host. Defaults to this instance's configured GitHub host, which is github.com unless an operator named a GitHub Enterprise Server. */
-                host?: string;
-            };
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        requestBody?: never;
-        responses: {
-            /** @description Success */
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": {
-                        pullRequest: {
-                            repositoryHost: string;
-                            repositoryFullName: string;
-                            prNumber: number;
-                            headBranch: string;
-                            htmlUrl: string;
-                            state: string;
-                            isDraft: boolean;
-                            authorLogin: string | null;
-                            prCreatedAtMs: number;
-                            prClosedAtMs: number | null;
-                            prMergedAtMs: number | null;
-                        };
-                        rows: {
-                            projectId: string;
-                            projectSlug: string;
-                            contributorLabel: string;
-                            contributorIsProject: boolean;
-                            agent: string;
-                            models: string[];
-                            sessionsCount: number;
-                            inputTokens: number;
-                            outputTokens: number;
-                            cacheReadTokens: number;
-                            cacheCreationTokens: number;
-                            totalTokens: number;
-                            costUsd: number | null;
-                            billedCostUsd: number | null;
-                            nonBilledCostUsd: number | null;
-                        }[];
-                        totals: {
-                            sessionsCount: number;
-                            inputTokens: number;
-                            outputTokens: number;
-                            cacheReadTokens: number;
-                            cacheCreationTokens: number;
-                            totalTokens: number;
-                            costUsd: number | null;
-                            billedCostUsd: number | null;
-                            nonBilledCostUsd: number | null;
-                        };
-                        modelBreakdown: {
-                            model: string;
-                            inputTokens: number;
-                            outputTokens: number;
-                            cacheReadTokens: number;
-                            cacheCreationTokens: number;
-                            totalTokens: number;
-                            costUsd: number | null;
-                            tokensKnown: boolean;
-                        }[];
                     };
                 };
             };
