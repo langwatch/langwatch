@@ -1,18 +1,17 @@
 /**
  * Chart mode drawing a categorical result in a real browser.
  *
- * `LangWatchQLChartMode.integration.test.tsx` replaces `vega-embed` at the
+ * `langwatch-ql-chart-mode.integration.test.tsx` replaces `vega-embed` at the
  * module boundary, so it can prove what the surface *asks* Vega for and
  * nothing about what Vega does with it. Here the whole runtime is real: a
  * result goes in, a validated specification is compiled by Vega-Lite, embedded
  * by Vega, and drawn as SVG — and the assertions are about the marks that come
  * out and the geometry they have.
  *
- * Only `next-dynamic` is stubbed, so the specification editor is a plain
- * textarea. The real one is Monaco, which `@monaco-editor/react` fetches from a
- * public CDN by default; a chart test that reached for it would be flaky and
- * would make a network call on a surface whose whole point is that it makes
- * none.
+ * Only `@monaco-editor/react` is stubbed, so the specification editor is a
+ * plain textarea. The real one fetches Monaco from a public CDN by default; a
+ * chart test that reached for it would be flaky and would make a network call
+ * on a surface whose whole point is that it makes none.
  *
  * Spec: packages/features/analytics/specs/analytics-lwql-workbench.feature
  */
@@ -42,7 +41,7 @@ vi.mock("@monaco-editor/react", () => {
   return { __esModule: true, default: StubSpecEditor };
 });
 
-import { LangWatchQLChartMode } from "../../ui/sections/themed-langwatch-ql-chart-mode";
+import { ThemedLangWatchQLChartMode } from "../../src/ui/sections/themed-langwatch-ql-chart-mode";
 import type { LangWatchQLDatasetColumn } from "../../src/ui/sections/chart";
 
 const COLUMNS: readonly LangWatchQLDatasetColumn[] = [
@@ -84,7 +83,7 @@ function ChartModeHost({ view }: { view: "chart" | "specification" }) {
   const [editedSpecText, setEditedSpecText] = useState<string | null>(null);
 
   return (
-    <LangWatchQLChartMode
+    <ThemedLangWatchQLChartMode
       result={RESULT}
       submittedLabel="SELECT evaluator_name, count() AS evaluations"
       view={view}
@@ -127,7 +126,11 @@ describe("LangWatchQL chart mode in real Chromium", () => {
         // The member writes their own bar specification over the starting
         // point in the Specification view, then returns to the chart — the
         // same component instance, so the edit survives the switch.
-        const editor = await screen.findByTestId("spec-editor-input");
+        // The specification editor is behind `lazy(() => import(...))` and a
+        // Suspense boundary, so the stub arrives a dynamic import after the
+        // first paint — longer than Testing Library's one-second default gives
+        // it when this lane's four files each drive their own Chromium.
+        const editor = await screen.findByTestId("spec-editor-input", {}, { timeout: 10_000 });
         await userEvent.fill(editor, JSON.stringify(BAR_SPECIFICATION));
         rerender(
           <ChakraProvider value={defaultSystem}>

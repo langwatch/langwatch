@@ -1,7 +1,7 @@
 /**
  * The workbench in a real browser: typing, running, and reading the result.
  *
- * What this tier adds over `LangWatchQLWorkbench.integration.test.tsx` is
+ * What this tier adds over `langwatch-ql-workbench.integration.test.tsx` is
  * layout. The result table windows its rows against the *measured* height of a
  * real scrolling box, so under jsdom — where every element is zero by zero —
  * the virtualizer can neither be shown to window nor shown to be wrong. Here
@@ -10,45 +10,42 @@
  *
  * Two seams are stubbed, and neither is what the scenario is about:
  *
- *   - the transport, at the same `getUntypedClient` seam the jsdom suite uses,
- *     so this suite is about the surface rather than about the endpoint;
- *   - `next-dynamic`, so the editor is a plain textarea. The real one is
- *     Monaco, which `@monaco-editor/react` fetches from a public CDN by
- *     default; a test that reached for it would be both flaky and a network
- *     call this feature exists to forbid.
+ *   - the transport, at the same `analyticsApi` seam the jsdom suite uses, so
+ *     this suite is about the surface rather than about the endpoint;
+ *   - `@monaco-editor/react`, so the editor is a plain textarea. The real one
+ *     fetches from a public CDN by default; a test that reached for it would be
+ *     both flaky and a network call this feature exists to forbid.
  *
  * Chart mode is stubbed for the same reason the jsdom suite stubs it — it has
- * its own real-browser suites: `LangWatchQLChartMode.browser.test.tsx`,
- * `LangWatchQLVegaChartWithoutEval.browser.test.tsx` and
- * `LangWatchQLVegaSpecNetworkSilence.browser.test.tsx`.
+ * its own real-browser suites: `langwatch-ql-chart-mode.browser.test.tsx`,
+ * `langwatch-ql-vega-chart-without-eval.browser.test.tsx` and
+ * `langwatch-ql-vega-spec-network-silence.browser.test.tsx`.
  *
  * Spec: packages/features/analytics/specs/analytics-lwql-workbench.feature
  */
 
-import { ChakraProvider, defaultSystem } from "@chakra-ui/react";
 import { cleanup, render, screen } from "@testing-library/react";
-import { MemoryRouter } from "react-router";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { page, userEvent } from "vitest/browser";
 import "@testing-library/jest-dom/vitest";
 
 import type { LangWatchQLQueryResult } from "@langwatch/analytics-contract";
 
-import { SCHEMA_RESPONSE } from "../../__tests__/lwql-fixtures";
+import { SCHEMA_RESPONSE } from "../../src/__tests__/lwql-fixtures";
 
 const harness = vi.hoisted(() => ({ mutation: vi.fn() }));
 
-vi.mock("@trpc/client", async (importOriginal) => {
-  const actual = await importOriginal<typeof import("@trpc/client")>();
-  return {
-    ...actual,
-    getUntypedClient: () => ({ mutation: harness.mutation }),
-  };
-});
-
 vi.mock("../../src/behavior/analytics-api", () => ({
-  api: {
-    useUtils: () => ({ client: {} }),
+  analyticsApi: {
+    useUtils: () => ({
+      client: {
+        analytics: {
+          lwql: {
+            query: { mutate: harness.mutation },
+          },
+        },
+      },
+    }),
     analytics: {
       lwql: {
         schema: {
@@ -111,20 +108,45 @@ vi.mock("../../src/ui/sections/lazy-langwatch-ql-chart-mode", () => ({
   LazyLangWatchQLChartMode: () => <div data-testid="stub-chart-mode" />,
 }));
 
-import { LangWatchQLWorkbench } from "../../ui/sections/langwatch-ql-workbench-panel";
+import { LangWatchQLWorkbench } from "../../src/ui/sections/langwatch-ql-workbench-panel";
+import { AnalyticsTestHarness, StubAnalyticsHost } from "../../src/testing";
 
 const SQL = "SELECT evaluator_id, score FROM analytics.evaluations_daily LIMIT 500";
 
 /**
- * The page the workbench is mounted on, period and all.
+ * The address the workbench is mounted at, period and all.
  *
- * The workbench reads the page's period selector for the time window it sends,
- * and the period selector reads the URL — so a render with no router around it
- * has nothing to read and throws before anything here can be observed.
+ * The workbench reads the page's period for the time window it sends, and the
+ * period is read off the analytics host rather than a router — so the range is
+ * a fixture on the stub host, the same way the jsdom suite states it.
  */
-const PAGE_URL =
-  "/my-project/analytics/query" +
-  "?startDate=2026-02-20T00%3A00%3A00.000Z&endDate=2026-02-27T00%3A00%3A00.000Z";
+const PAGE_QUERY = {
+  startDate: "2026-02-20T00:00:00.000Z",
+  endDate: "2026-02-27T00:00:00.000Z",
+};
+
+/** The whole page: the host that answers the address, and the workbench on it. */
+function renderWorkbench() {
+  return render(
+    <AnalyticsTestHarness
+      host={new StubAnalyticsHost({ route: { params: {}, query: PAGE_QUERY } })}
+    >
+      <LangWatchQLWorkbench projectId="project-1" />
+    </AnalyticsTestHarness>,
+  );
+}
+
+/**
+ * How long a first paint is given, and why it is not the library's default.
+ *
+ * The editor is behind `lazy(() => import("@monaco-editor/react"))` and a
+ * Suspense boundary, so even the stubbed module arrives a dynamic import later.
+ * Testing Library waits one second by default; with all four files of this lane
+ * driving their own Chromium context at once that budget is genuinely tight,
+ * and the wait failed roughly one run in four. The suite's own `poll` already
+ * uses ten seconds for the same reason.
+ */
+const MOUNT_TIMEOUT = { timeout: 10_000 };
 
 /** Enough rows that a window over them is a small fraction of the whole. */
 const ROW_COUNT = 500;
@@ -201,15 +223,9 @@ describe("the LangWatchQL workbench in real Chromium", () => {
     describe("when the member types a statement, runs it, and waits", () => {
       /** @scenario "A LangWatchQL query flows from editor to native table in a real browser" */
       it("shows the returned rows in the native result table beside the run statistics", async () => {
-        render(
-          <MemoryRouter initialEntries={[PAGE_URL]}>
-            <ChakraProvider value={defaultSystem}>
-              <LangWatchQLWorkbench projectId="project-1" />
-            </ChakraProvider>
-          </MemoryRouter>,
-        );
+        renderWorkbench();
 
-        const editor = await screen.findByTestId("lwql-editor-input");
+        const editor = await screen.findByTestId("lwql-editor-input", {}, MOUNT_TIMEOUT);
         await userEvent.click(editor);
         await userEvent.keyboard(SQL);
         expect(editor).toHaveValue(SQL);
@@ -219,7 +235,7 @@ describe("the LangWatchQL workbench in real Chromium", () => {
         // The statement went out exactly as typed, once.
         await poll(() => harness.mutation.mock.calls.length > 0);
         expect(harness.mutation).toHaveBeenCalledTimes(1);
-        expect(harness.mutation.mock.calls[0]?.[1]).toMatchObject({
+        expect(harness.mutation.mock.calls[0]?.[0]).toMatchObject({
           projectId: "project-1",
           sql: SQL,
         });
@@ -227,7 +243,7 @@ describe("the LangWatchQL workbench in real Chromium", () => {
         // The rows are in a real <table>, under the column names the response
         // carried, with the database's own types beneath them.
         await poll(() => renderedRows().length > 0);
-        const table = await screen.findByRole("table");
+        const table = await screen.findByRole("table", {}, MOUNT_TIMEOUT);
         expect(table.querySelector("thead")?.textContent).toContain("evaluator_id");
         expect(table.querySelector("thead")?.textContent).toContain("Nullable(Float64)");
         const firstRow = renderedRows()[0];
@@ -246,15 +262,9 @@ describe("the LangWatchQL workbench in real Chromium", () => {
 
       /** @scenario "A LangWatchQL query flows from editor to native table in a real browser" */
       it("windows the rows against the measured viewport and moves that window when the member scrolls", async () => {
-        render(
-          <MemoryRouter initialEntries={[PAGE_URL]}>
-            <ChakraProvider value={defaultSystem}>
-              <LangWatchQLWorkbench projectId="project-1" />
-            </ChakraProvider>
-          </MemoryRouter>,
-        );
+        renderWorkbench();
 
-        const editor = await screen.findByTestId("lwql-editor-input");
+        const editor = await screen.findByTestId("lwql-editor-input", {}, MOUNT_TIMEOUT);
         await userEvent.click(editor);
         await userEvent.keyboard(SQL);
         await userEvent.click(screen.getByRole("button", { name: "Run query" }));

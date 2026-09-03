@@ -33,7 +33,7 @@ vi.mock("@monaco-editor/react", () => {
   return { __esModule: true, default: StubSpecEditor };
 });
 
-import { LangWatchQLVegaLiteChart } from "../../ui/sections/themed-langwatch-ql-vega-lite-chart";
+import { ThemedLangWatchQLVegaLiteChart } from "../../src/ui/sections/themed-langwatch-ql-vega-lite-chart";
 import { validateVegaLiteSpec } from "@langwatch/analytics-contract/visualization/validation";
 import type {
   LangWatchQLDataset,
@@ -45,7 +45,7 @@ import {
   INVALID_VEGA_FIXTURES,
   LWQL_FIXTURE_COLUMNS,
   VALID_VEGA_FIXTURES,
-} from "../../__tests__/lwql-fixtures";
+} from "../../src/__tests__/lwql-fixtures";
 
 /**
  * Small datasets on purpose: the row ceilings are maxima, and what is under
@@ -162,7 +162,7 @@ const withChakra = (element: ReactElement) =>
 
 function chartOf(spec: unknown): ReactElement {
   return (
-    <LangWatchQLVegaLiteChart
+    <ThemedLangWatchQLVegaLiteChart
       spec={spec}
       datasets={DATASETS}
       columnsByDataset={COLUMNS_BY_DATASET}

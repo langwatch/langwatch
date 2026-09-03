@@ -45,7 +45,7 @@ vi.mock("@monaco-editor/react", () => {
 
 import embed from "vega-embed";
 
-import { LangWatchQLChartMode } from "../../ui/sections/themed-langwatch-ql-chart-mode";
+import { ThemedLangWatchQLChartMode } from "../../src/ui/sections/themed-langwatch-ql-chart-mode";
 import { lwqlVegaEmbedOptions, type LangWatchQLDatasetColumn } from "../../src/ui/sections/chart";
 import { buildLangWatchQLVegaSpec } from "@langwatch/analytics-contract/visualization";
 
@@ -182,7 +182,7 @@ describe("the LangWatchQL chart on a page that forbids string evaluation", () =>
             <ChakraProvider value={defaultSystem}>
               {/* Nothing here edits the specification, so the owner's half of
                   that state is a starter this test never changes. */}
-              <LangWatchQLChartMode
+              <ThemedLangWatchQLChartMode
                 result={RESULT}
                 editedSpecText={null}
                 onEditedSpecTextChange={() => undefined}

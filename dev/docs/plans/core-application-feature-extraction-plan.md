@@ -11283,9 +11283,12 @@ the browser lane's own job.
 **Closed 2026-09-03:** all four `analytics/web` browser files now import `../../src/…`,
 the two themed chart adapters under their real `Themed…` names and the workbench through
 `StubAnalyticsHost` rather than a `MemoryRouter` the package never depended on; its
-`analytics-api` mock exports `analyticsApi`, not the monolith's `api`.
-`test:browser` **4 files / 5 tests passed** in real chromium and `test` **34 files / 274
-tests passed** — CI still runs only the second, as `vitest.browser.config.ts` says.
+`analytics-api` mock exports `analyticsApi`, not the monolith's `api`, and the waits on
+the lazily-imported editor were given the suite's own ten-second budget instead of
+Testing Library's one second, which failed about one run in four under four parallel
+Chromium contexts. `test:browser` **4 files / 5 tests passed**, ten runs green, and
+`test` **34 files / 274 tests passed** — CI still runs only the second, as
+`vitest.browser.config.ts` says.
 
 ### Gates
 
