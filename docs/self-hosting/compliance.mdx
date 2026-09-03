@@ -6,7 +6,7 @@ sidebarTitle: Compliance
 
 LangWatch is open-core. The Apache 2.0 self-hosted floor gives you a
 single trace store, append-only event log, persona-aware chrome,
-governed CLI flow, and 30-day retention, enough to satisfy basic
+governed CLI flow, and 49-day default retention, enough to satisfy basic
 auditability and PII redaction. Going beyond that, multi-source
 ingestion, extended retention, anomaly detection, OCSF/SIEM export,
 tamper-evidence, requires an **Enterprise** license.
@@ -61,19 +61,19 @@ the *common-criteria* baseline:
 | CC6.6, Logical access (admin) | RBAC ADMIN role + `governance:manage` + `aiTools:manage` | Apache 2.0 |
 | CC6.7, Termination of access | CLI token revoke on user deactivation (CliTokenRevocationService, Phase 1B-1) | Apache 2.0 |
 | CC7.1, Detection | Anomaly rules on activity-event traffic (spend-spike, geo-mismatch, off-hours) | **Enterprise** |
-| CC7.2, Monitoring | Append-only event_log + 30-day retention | Apache 2.0 |
+| CC7.2, Monitoring | Append-only event_log + 49-day default retention | Apache 2.0 |
 | CC7.2, Monitoring (≥1y) | Per-scope retention policies with extended (multi-year) windows | **Enterprise** |
 | CC7.4, Incident response | OCSF v1.1 SIEM export with cursor pagination | **Enterprise** |
 | CC8.1, Change management | Per-org settings audit + SCIM provisioning history | **Enterprise** |
 
-**Bottom line**: self-hosted Apache 2.0 is sufficient for the access-control + 30-day-monitoring portions of SOC 2 CC. Detection (CC7.1) and long-window monitoring (CC7.2 ≥1y) and incident-response export (CC7.4) and change-mgmt audit (CC8.1) all require Enterprise.
+**Bottom line**: self-hosted Apache 2.0 is sufficient for the access-control + 49-day-monitoring portions of SOC 2 CC. Detection (CC7.1) and long-window monitoring (CC7.2 ≥1y) and incident-response export (CC7.4) and change-mgmt audit (CC8.1) all require Enterprise.
 
 ## ISO 27001: same shape
 
 ISO 27001 Annex A controls map onto the same self-hosted-vs-Enterprise
 boundary as SOC 2 above. The Apache 2.0 floor gives you A.5 (policies),
 A.8 (asset management, tenant boundaries), A.9 (access control), A.12.4
-(logging, 30-day window). Anomaly detection (A.12.4 ≥6-month retention),
+(logging, 49-day window). Anomaly detection (A.12.4 ≥6-month retention),
 SIEM export (A.16 incident management), and SCIM (A.9.2 user lifecycle)
 require Enterprise.
 
@@ -84,12 +84,12 @@ require Enterprise.
 | Art. 32(1)(a), pseudonymisation | PII redaction at trace ingest (Presidio) | Apache 2.0 |
 | Art. 32(1)(b), confidentiality | Per-org tenancy + Layer-1 cross-org guards | Apache 2.0 |
 | Art. 32(1)(d), restoration | Backups (env-configured), trace store replay | Apache 2.0 |
-| Art. 30, record of processing | event_log @ 30d retention | Apache 2.0 |
+| Art. 30, record of processing | event_log @ 49d retention | Apache 2.0 |
 | Art. 30, record of processing (extended) | event_log under extended per-scope retention policies | **Enterprise** |
 | Art. 33, breach notification | Anomaly rule dispatch (Slack, PagerDuty, SIEM webhook, email) | **Enterprise** |
 | Art. 35, DPIA evidence | OCSF/SIEM export bundle | **Enterprise** |
 
-If your processor agreement requires retention longer than 30 days OR a
+If your processor agreement requires retention longer than 49 days OR a
 named breach-notification mechanism (Art. 33's "without undue delay,
 where feasible, not later than 72 hours"), Enterprise is the right tier
 even for non-EU customers because GDPR's extra-territorial scope
@@ -110,7 +110,7 @@ HIPAA's covered-entity vs business-associate split + the §164.312
 technical safeguards map cleanly onto the open-core split:
 
 - **§164.312(a)(1) Access control**: Apache 2.0 RBAC catalog + per-project tenancy
-- **§164.312(b) Audit controls**: Apache 2.0 event_log @ 30d retention
+- **§164.312(b) Audit controls**: Apache 2.0 event_log @ 49d retention
 - **§164.312(b) ≥6yr retention**: Enterprise extended retention policies (multi-year windows)
 - **§164.312(c)(1) Integrity**: Enterprise tamper-evidence (post-GA follow-up)
 - **§164.312(d) Authentication**: Apache 2.0 SSO (env-configured) + Personal IDE keys
@@ -127,7 +127,7 @@ with explicit retention clauses, Enterprise is required.
 The EU AI Act's high-risk-AI logging requirements (Art. 12) and the
 provider/deployer record-keeping (Art. 18) map onto:
 
-- **Art. 12(1) automatic recording of events**: Apache 2.0 unified trace store + 30d retention
+- **Art. 12(1) automatic recording of events**: Apache 2.0 unified trace store + 49d retention
 - **Art. 12(2)(a) period of operation**: Apache 2.0 (trace timestamps in event_log)
 - **Art. 12(2)(b) reference DB used**: Apache 2.0 (`gen_ai.system` + `gen_ai.request.model` attrs on each span)
 - **Art. 12(2)(c) input data check**: Apache 2.0 (prompt + tool-call payloads on traces, redacted via Presidio)

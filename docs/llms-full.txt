@@ -61798,7 +61798,7 @@ sidebarTitle: Compliance
 
 LangWatch is open-core. The Apache 2.0 self-hosted floor gives you a
 single trace store, append-only event log, persona-aware chrome,
-governed CLI flow, and 30-day retention, enough to satisfy basic
+governed CLI flow, and 49-day default retention, enough to satisfy basic
 auditability and PII redaction. Going beyond that, multi-source
 ingestion, extended retention, anomaly detection, OCSF/SIEM export,
 tamper-evidence, requires an **Enterprise** license.
@@ -61853,19 +61853,19 @@ the *common-criteria* baseline:
 | CC6.6, Logical access (admin) | RBAC ADMIN role + `governance:manage` + `aiTools:manage` | Apache 2.0 |
 | CC6.7, Termination of access | CLI token revoke on user deactivation (CliTokenRevocationService, Phase 1B-1) | Apache 2.0 |
 | CC7.1, Detection | Anomaly rules on activity-event traffic (spend-spike, geo-mismatch, off-hours) | **Enterprise** |
-| CC7.2, Monitoring | Append-only event_log + 30-day retention | Apache 2.0 |
+| CC7.2, Monitoring | Append-only event_log + 49-day default retention | Apache 2.0 |
 | CC7.2, Monitoring (≥1y) | Per-scope retention policies with extended (multi-year) windows | **Enterprise** |
 | CC7.4, Incident response | OCSF v1.1 SIEM export with cursor pagination | **Enterprise** |
 | CC8.1, Change management | Per-org settings audit + SCIM provisioning history | **Enterprise** |
 
-**Bottom line**: self-hosted Apache 2.0 is sufficient for the access-control + 30-day-monitoring portions of SOC 2 CC. Detection (CC7.1) and long-window monitoring (CC7.2 ≥1y) and incident-response export (CC7.4) and change-mgmt audit (CC8.1) all require Enterprise.
+**Bottom line**: self-hosted Apache 2.0 is sufficient for the access-control + 49-day-monitoring portions of SOC 2 CC. Detection (CC7.1) and long-window monitoring (CC7.2 ≥1y) and incident-response export (CC7.4) and change-mgmt audit (CC8.1) all require Enterprise.
 
 ## ISO 27001: same shape
 
 ISO 27001 Annex A controls map onto the same self-hosted-vs-Enterprise
 boundary as SOC 2 above. The Apache 2.0 floor gives you A.5 (policies),
 A.8 (asset management, tenant boundaries), A.9 (access control), A.12.4
-(logging, 30-day window). Anomaly detection (A.12.4 ≥6-month retention),
+(logging, 49-day window). Anomaly detection (A.12.4 ≥6-month retention),
 SIEM export (A.16 incident management), and SCIM (A.9.2 user lifecycle)
 require Enterprise.
 
@@ -61876,12 +61876,12 @@ require Enterprise.
 | Art. 32(1)(a), pseudonymisation | PII redaction at trace ingest (Presidio) | Apache 2.0 |
 | Art. 32(1)(b), confidentiality | Per-org tenancy + Layer-1 cross-org guards | Apache 2.0 |
 | Art. 32(1)(d), restoration | Backups (env-configured), trace store replay | Apache 2.0 |
-| Art. 30, record of processing | event_log @ 30d retention | Apache 2.0 |
+| Art. 30, record of processing | event_log @ 49d retention | Apache 2.0 |
 | Art. 30, record of processing (extended) | event_log under extended per-scope retention policies | **Enterprise** |
 | Art. 33, breach notification | Anomaly rule dispatch (Slack, PagerDuty, SIEM webhook, email) | **Enterprise** |
 | Art. 35, DPIA evidence | OCSF/SIEM export bundle | **Enterprise** |
 
-If your processor agreement requires retention longer than 30 days OR a
+If your processor agreement requires retention longer than 49 days OR a
 named breach-notification mechanism (Art. 33's "without undue delay,
 where feasible, not later than 72 hours"), Enterprise is the right tier
 even for non-EU customers because GDPR's extra-territorial scope
@@ -61902,7 +61902,7 @@ HIPAA's covered-entity vs business-associate split + the §164.312
 technical safeguards map cleanly onto the open-core split:
 
 - **§164.312(a)(1) Access control**: Apache 2.0 RBAC catalog + per-project tenancy
-- **§164.312(b) Audit controls**: Apache 2.0 event_log @ 30d retention
+- **§164.312(b) Audit controls**: Apache 2.0 event_log @ 49d retention
 - **§164.312(b) ≥6yr retention**: Enterprise extended retention policies (multi-year windows)
 - **§164.312(c)(1) Integrity**: Enterprise tamper-evidence (post-GA follow-up)
 - **§164.312(d) Authentication**: Apache 2.0 SSO (env-configured) + Personal IDE keys
@@ -61919,7 +61919,7 @@ with explicit retention clauses, Enterprise is required.
 The EU AI Act's high-risk-AI logging requirements (Art. 12) and the
 provider/deployer record-keeping (Art. 18) map onto:
 
-- **Art. 12(1) automatic recording of events**: Apache 2.0 unified trace store + 30d retention
+- **Art. 12(1) automatic recording of events**: Apache 2.0 unified trace store + 49d retention
 - **Art. 12(2)(a) period of operation**: Apache 2.0 (trace timestamps in event_log)
 - **Art. 12(2)(b) reference DB used**: Apache 2.0 (`gen_ai.system` + `gen_ai.request.model` attrs on each span)
 - **Art. 12(2)(c) input data check**: Apache 2.0 (prompt + tool-call payloads on traces, redacted via Presidio)
@@ -65854,7 +65854,7 @@ Self-hosted LangWatch runs the same image that powers LangWatch Cloud. There is 
 
 ## What you get without a license
 
-Everything the platform stores on your own infrastructure is uncapped. Running unlicensed, you get:
+There is no volume cap on what the platform stores on your own infrastructure. Running unlicensed, you get:
 
 <CardGroup cols={2}>
 <Card title="Unlimited people" icon="users">
@@ -65865,8 +65865,8 @@ Members, lite members, teams, and projects. Invite your whole organization.
 Traces, spans, prompts, evaluations, scenarios and simulations, agents, experiments, datasets, dashboards, custom graphs, and automations.
 </Card>
 
-<Card title="Your full history" icon="clock-rotate-left">
-No visibility window on the data in your own ClickHouse. Retention is yours to configure.
+<Card title="Full trace content" icon="clock-rotate-left">
+No visibility window, so LangWatch never redacts older trace content. Events are kept for 49 days by default, and a license lets you set the retention window per organization, team or project.
 </Card>
 
 <Card title="The whole product surface" icon="grid-2">
@@ -65915,7 +65915,7 @@ Once a license is present **and the configured identity provider actually starts
 <Warning>
 **Upgrading a deployment that predates this gate, where everyone signs in through SSO.** Before the license gate existed, the SSO environment variables alone were enough, so an unlicensed deployment can have a whole team of identity-provider accounts on it. Those accounts have no password, so the door back in is **Forgot password**, and that needs a working outbound email provider. Before upgrading, either configure an email gateway (see [Email](/self-hosting/configuration/email)) or set `LANGWATCH_LICENSE_KEY`, which keeps SSO on with no password and no email involved at all.
 
-If you are already in this position, setting `LANGWATCH_LICENSE_KEY` and restarting is the recovery. It needs nothing but the key, as long as the identity provider variables that were already working are still in place: the key licenses SSO, it does not configure it.
+If you are already in this position, setting `LANGWATCH_LICENSE_KEY` and restarting is the recovery. It needs only the key, as long as the identity provider variables that were already working are still in place: the key licenses SSO, it does not configure it.
 </Warning>
 
 ## Activating a license
@@ -65955,7 +65955,7 @@ The SSO decision is made once at startup. Plan entitlements apply immediately, b
 
 ## Expiry
 
-Nothing is switched off on the day a license reaches its end date. No user is signed out, no membership is disabled, everyone keeps their access, and the Enterprise capabilities keep working. Losing company-wide login the morning a renewal slips is a worse outcome than serving a former customer for a few days, so the sign-in decision accepts any genuinely issued license regardless of its date, and logs a renewal reminder instead.
+The deployment keeps running on the day a license reaches its end date. No user is signed out, no membership is disabled, everyone keeps their access, and the Enterprise capabilities keep working. Losing company-wide login the morning a renewal slips is a worse outcome than serving a former customer for a few days, so the sign-in decision accepts any genuinely issued license regardless of its date, and logs a renewal reminder instead.
 
 The seat count keeps binding. A license we issued is a record of what was bought, so an expired one still covers the seats it sold: an organization holding more members than that is asked to disable the ones who no longer need access, and adding a new member is refused until the license is renewed. Everyone who already has a seat is unaffected.
 
@@ -73121,7 +73121,7 @@ Self-hosted deployments keep the same 49-day default. An Enterprise license unlo
   </Accordion>
 
   <Accordion title="Can I customize how long my data is retained?">
-    On LangWatch Cloud each plan includes a default retention window (see the table above), and extending it, a longer window or a higher volume of stored events, is available on **Enterprise plans**. Reach out to [enterprise@langwatch.ai](mailto:enterprise@langwatch.ai) to set this up. Self-hosted, the data is in your own database: retention is yours to configure with or without a license, and a license adds multi-class retention policies per data category.
+    On LangWatch Cloud each plan includes a default retention window (see the table above), and extending it, a longer window or a higher volume of stored events, is available on **Enterprise plans**. Reach out to [enterprise@langwatch.ai](mailto:enterprise@langwatch.ai) to set this up. Self-hosted, the data is in your own database and keeps the same 49-day default. A license adds per-scope retention policies, with a separate window for traces, scenarios and experiments.
   </Accordion>
 
   <Accordion title="Are webhooks and the billing events API included in my plan?">
