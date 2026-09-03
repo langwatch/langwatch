@@ -26,9 +26,14 @@ export {
   type SuiteRunModelsResolver,
 } from "./services/suite-run-models.service";
 export {
+  agentOwnerNameReader,
+  agentParameterDefinitionsOf,
   assertConnectedAgentsRunnable,
+  isAgentUnseen,
+  resolveConnectedReferences,
   type AgentOwnerNameReader,
   type ConnectedTargetAgent,
+  type ConnectedTargetReferenceReader,
 } from "./services/connected-target.service";
 export type { SuiteClickHouseClient } from "./ports/suite-clickhouse.port";
 export {

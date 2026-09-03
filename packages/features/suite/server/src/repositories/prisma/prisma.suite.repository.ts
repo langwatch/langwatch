@@ -87,13 +87,18 @@ export class PrismaSuiteRepository extends SuiteRepository {
 
   async resolveDynamicRunMembership(input: SuiteIdInput): Promise<string[]> {
     return this.database.$transaction(async (transaction) => {
+      // The row lock is by id and projectId alone. A `kind`/`archivedAt`
+      // predicate here would only ever narrow which row this locks, never
+      // widen it — and a plan row's kind is "run_plan" (see `create` above),
+      // not "custom", so a `kind = 'custom'` predicate locked zero rows and
+      // let two runs of the same plan each write a scenarioIds list from a
+      // read the other had already moved past. The existence and archived
+      // checks already happen below, on the read that decides what to write.
       await transaction.$executeRaw`
         SELECT id
         FROM "SimulationSuite"
         WHERE id = ${input.id}
           AND "projectId" = ${input.projectId}
-          AND kind = 'custom'
-          AND "archivedAt" IS NULL
         FOR UPDATE
       `;
 

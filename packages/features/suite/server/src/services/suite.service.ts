@@ -52,6 +52,13 @@ import {
 import type { SuiteExecutionPort } from "../ports/suite-execution.port";
 import type { SuiteRepository } from "../repositories/suite.repository";
 import type { SuiteRunReadRepository } from "../repositories/suite-run.repository";
+import {
+  agentOwnerNameReader,
+  assertConnectedAgentsRunnable,
+  isAgentUnseen,
+  resolveConnectedReferences,
+  type ConnectedTargetAgent,
+} from "./connected-target.service";
 
 const archivedSlugSuffix = "--archived";
 
@@ -208,8 +215,17 @@ export class SuiteService extends SuiteServiceContract {
       throw new AllScenariosArchivedError();
     }
 
-    const targetResolution = await this.resolveTargetReferences({
+    // A connected target may be named `<name>@<environment>`; from here on
+    // every target names an id, so two spellings of one agent fold together.
+    const namedTargets = await resolveConnectedReferences({
       targets: suite.targets,
+      projectId: parsed.projectId,
+      actor: parsed.actor,
+      agents,
+    });
+
+    const targetResolution = await this.resolveTargetReferences({
+      targets: namedTargets,
       projectId: parsed.projectId,
       organizationId: parsed.organizationId,
       agents,
@@ -223,6 +239,11 @@ export class SuiteService extends SuiteServiceContract {
     if (targetResolution.active.length === 0) {
       throw new AllTargetsArchivedError();
     }
+    await assertConnectedAgentsRunnable({
+      agents: targetResolution.connectedAgents,
+      actor: parsed.actor,
+      owners: agentOwnerNameReader(agents),
+    });
 
     const scenarioConfigs = await scenarios.getRunConfigs({
       ids: scenarioResolution.active,
@@ -265,8 +286,7 @@ export class SuiteService extends SuiteServiceContract {
     const parsed = suiteRunPlanInputSchema.parse(input);
     const { scenarios, agents, prompts, execution, repository } = this.options;
 
-    const targets = sortSuiteTargets(parsed.config.targets);
-    if (targets.length === 0) {
+    if (parsed.config.targets.length === 0) {
       throw new SuiteTargetsRequiredError();
     }
 
@@ -292,6 +312,16 @@ export class SuiteService extends SuiteServiceContract {
       throw new AllScenariosArchivedError();
     }
 
+    // A connected target may be named `<name>@<environment>`; from here on
+    // every target names an id, so two spellings of one agent fold together.
+    const namedTargets = await resolveConnectedReferences({
+      targets: parsed.config.targets,
+      projectId: parsed.projectId,
+      actor: parsed.actor,
+      agents,
+    });
+    const targets = sortSuiteTargets(namedTargets);
+
     const targetResolution = await this.resolveTargetReferences({
       targets,
       projectId: parsed.projectId,
@@ -307,6 +337,11 @@ export class SuiteService extends SuiteServiceContract {
     if (targetResolution.active.length === 0) {
       throw new AllTargetsArchivedError();
     }
+    await assertConnectedAgentsRunnable({
+      agents: targetResolution.connectedAgents,
+      actor: parsed.actor,
+      owners: agentOwnerNameReader(agents),
+    });
 
     const scenarioConfigs = await scenarios.getRunConfigs({
       ids: scenarioResolution.active,
@@ -532,6 +567,8 @@ export class SuiteService extends SuiteServiceContract {
     active: SuiteTarget[];
     archived: SuiteTarget[];
     missing: SuiteTarget[];
+    /** The active targets' own connected agents, for the ownership check. */
+    connectedAgents: ConnectedTargetAgent[];
   }> {
     const agentTargets = input.targets.filter((target) => SuiteService.isAgentTarget(target));
     const promptTargets = input.targets.filter((target) => target.type === "prompt");
@@ -555,17 +592,28 @@ export class SuiteService extends SuiteServiceContract {
     const active: SuiteTarget[] = [];
     const archived: SuiteTarget[] = [];
     const missing: SuiteTarget[] = [];
+    const connectedAgents: ConnectedTargetAgent[] = [];
     for (const target of agentTargets) {
       const agent = agentById.get(target.referenceId);
       if (!agent) missing.push(target);
-      else if (agent.archivedAt) archived.push(target);
-      else active.push(target);
+      else if (agent.archivedAt || isAgentUnseen(agent)) archived.push(target);
+      else {
+        active.push(target);
+        if (agent.type === "connected") {
+          connectedAgents.push({
+            id: agent.id,
+            name: agent.name ?? agent.id,
+            type: agent.type,
+            ownerUserId: agent.ownerUserId ?? null,
+          });
+        }
+      }
     }
     for (const target of promptTargets) {
       if (existingPromptIds.has(target.referenceId)) active.push(target);
       else missing.push(target);
     }
-    return { active, archived, missing };
+    return { active, archived, missing, connectedAgents };
   }
 
   /** The id a suite gets when composition did not supply a minter. */

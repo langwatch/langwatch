@@ -100,7 +100,14 @@ export class PrismaAgentRepository extends AgentRepository {
   }): Promise<AgentReferenceState[]> {
     return (await this.database.agent.findMany({
       where: { id: { in: input.ids }, projectId: input.projectId },
-      select: { id: true, archivedAt: true },
+      select: {
+        id: true,
+        archivedAt: true,
+        type: true,
+        name: true,
+        ownerUserId: true,
+        lastSeenAt: true,
+      },
     })) as AgentReferenceState[];
   }
 

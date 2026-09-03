@@ -16,9 +16,21 @@
  * one operation serves a browser session, an API key and a background job
  * without knowing which it is serving.
  */
-import type { AgentService } from "@langwatch/agent-contract";
+import type { AgentService, AgentWithFields } from "@langwatch/agent-contract";
 import { nanoid } from "nanoid";
 import type { AgentTestPort, AgentTestRunResult, AgentTestTurnResult } from "../ports/agent-test.port";
+import { declaredAgentParameters } from "../services/agent.service";
+import {
+  agentPresenceView,
+  type AgentPresence,
+} from "../services/connected-agent-presence.service";
+
+/** `AgentWithFields.ownerUserId` is optional; the presence view needs it settled. */
+function withOwnerUserId<T extends AgentWithFields>(
+  agent: T,
+): T & { ownerUserId: string | null } {
+  return { ...agent, ownerUserId: agent.ownerUserId ?? null };
+}
 
 /** What the process composes this feature's application from. */
 export interface AgentAppDependencies {
@@ -30,6 +42,18 @@ export interface AgentAppDependencies {
    * when this process holds no Workflow application.
    */
   testing?: AgentTestPort;
+  /**
+   * Reads presence (ADR-128) off the connected-agent runtime. Absent on a
+   * process that never installed the runtime (a test double, or a process
+   * that composes no connected-agent transport): every agent then reads as
+   * offline with no instances, the same degrade `NO_PRESENCE` gives one row.
+   */
+  connected?: {
+    presence: (input: {
+      projectId: string;
+      agents: { id: string; type: string }[];
+    }) => Promise<Map<string, AgentPresence>>;
+  };
 }
 
 export class AgentApp {
@@ -53,14 +77,59 @@ export class AgentApp {
     return `agent_${nanoid()}`;
   }
 
-  /** Every non-archived agent in one project. */
-  getAll(input: Parameters<AgentService["getAll"]>[0]) {
-    return this.dependencies.agents.getAll(input);
+  /**
+   * Every non-archived agent in one project, each carrying what ADR-128
+   * added: the parameters a connected agent declares, the owner of a
+   * personal one, and its presence. Other kinds read as offline with no
+   * instances and no owner.
+   */
+  async getAll(input: Parameters<AgentService["getAll"]>[0]) {
+    const agents = await this.dependencies.agents.getAll(input);
+    const owned = agents.map(withOwnerUserId);
+    const [owners, presence] = await this.readOwnersAndPresence({
+      agents: owned,
+      projectId: input.projectId,
+    });
+    return owned.map((agent) => this.toConnectedView(agent, owners, presence));
   }
 
-  /** One agent, by id, inside one project. */
-  getById(input: Parameters<AgentService["getById"]>[0]) {
-    return this.dependencies.agents.getById(input);
+  /** One agent, by id, inside one project, carrying the same connected view. */
+  async getById(input: Parameters<AgentService["getById"]>[0]) {
+    const agent = withOwnerUserId(await this.dependencies.agents.getById(input));
+    const [owners, presence] = await this.readOwnersAndPresence({
+      agents: [agent],
+      projectId: input.projectId,
+    });
+    return this.toConnectedView(agent, owners, presence);
+  }
+
+  /** The declared parameters, owner and presence one agent row carries. */
+  private toConnectedView<T extends AgentWithFields & { ownerUserId: string | null }>(
+    agent: T,
+    owners: Map<string, { userId: string; name: string | null }>,
+    presence: Map<string, AgentPresence>,
+  ) {
+    return {
+      ...agent,
+      parameters: declaredAgentParameters(agent),
+      ...agentPresenceView({ agent, owners, presence }),
+    };
+  }
+
+  /** The two reads a connected view is built from, run together. */
+  private readOwnersAndPresence({
+    agents,
+    projectId,
+  }: {
+    agents: { id: string; type: string; ownerUserId: string | null }[];
+    projectId: string;
+  }) {
+    return Promise.all([
+      this.dependencies.agents.ownersOf(agents),
+      this.dependencies.connected
+        ? this.dependencies.connected.presence({ projectId, agents })
+        : Promise.resolve(new Map<string, AgentPresence>()),
+    ]);
   }
 
   /** One page of the project's non-archived agents. */

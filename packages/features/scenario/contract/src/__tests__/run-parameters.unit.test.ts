@@ -276,4 +276,93 @@ describe("resolveRunParameters", () => {
       });
     });
   });
+
+  describe("given a target declaring a closed option list", () => {
+    const targetDefinitions: ScenarioParameterDefinition[] = [
+      { name: "model", options: ["gpt-5-mini", "gpt-5"] },
+    ];
+
+    /** @scenario "A value outside a closed option list is refused before scheduling" */
+    it("refuses a value outside the list and names the options", async () => {
+      await expect(
+        resolveRunParameters({
+          scenarios: [scenario({ parameters: [] })],
+          targetDefinitions,
+          values: { model: "gpt-4o" },
+        }),
+      ).rejects.toMatchObject({
+        code: "scenario_parameter_option_invalid",
+        meta: { name: "model", options: ["gpt-5-mini", "gpt-5"] },
+      });
+    });
+
+    it("accepts a value inside the list", async () => {
+      const resolved = await resolveRunParameters({
+        scenarios: [scenario({ parameters: [] })],
+        targetDefinitions,
+        values: { model: "gpt-5" },
+      });
+
+      expect(resolved.get("scen_1")?.parameters).toEqual({ model: "gpt-5" });
+    });
+  });
+
+  describe("given the scenario and the target declare different names", () => {
+    const targetDefinitions: ScenarioParameterDefinition[] = [{ name: "model" }];
+    const scenarios = [
+      scenario({ parameters: [{ name: "tenant", defaultValue: "acme" }] }),
+    ];
+
+    /** @scenario "Unknown parameter names are checked per target against its agent" */
+    it("accepts the target's name and refuses one neither declares", async () => {
+      const resolved = await resolveRunParameters({
+        scenarios,
+        targetDefinitions,
+        values: { model: "gpt-5-mini" },
+      });
+      expect(resolved.get("scen_1")?.parameters).toEqual({
+        tenant: "acme",
+        model: "gpt-5-mini",
+      });
+
+      await expect(
+        resolveRunParameters({
+          scenarios,
+          targetDefinitions,
+          values: { region: "eu" },
+        }),
+      ).rejects.toMatchObject({
+        code: "scenario_parameter_unknown",
+        meta: { unknownKeys: ["region"] },
+      });
+    });
+
+    /** @scenario "The refusal names the target it was resolved for" */
+    it("names the target the values were resolved for", async () => {
+      await expect(
+        resolveRunParameters({
+          scenarios,
+          targetDefinitions,
+          targetLabel: "support-agent · production",
+          values: { region: "eu" },
+        }),
+      ).rejects.toMatchObject({
+        meta: { targetLabel: "support-agent · production" },
+      });
+    });
+  });
+
+  describe("given the scenario and the target both default one name", () => {
+    /** @scenario "Scenario defaults win over agent defaults" */
+    it("reads the scenario's default", async () => {
+      const resolved = await resolveRunParameters({
+        scenarios: [
+          scenario({ parameters: [{ name: "model", defaultValue: "gpt-5" }] }),
+        ],
+        targetDefinitions: [{ name: "model", defaultValue: "gpt-5-mini" }],
+      });
+
+      expect(resolved.get("scen_1")?.parameters).toEqual({ model: "gpt-5" });
+    });
+  });
 });

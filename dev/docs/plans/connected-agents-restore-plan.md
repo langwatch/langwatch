@@ -798,3 +798,171 @@ tangled: mounting needs Slice 7, so the suite gap is the one piece of Slice 5
 still doable standalone). Either way, message `a9b5bb9332cf3e2d9` before
 touching `api-production.composition.ts`, `api-agents.composition.ts` or
 `app-trpc.features.ts`.
+
+## 12. Integration progress (2026-09-03, fourth pass — resume after kill)
+
+**Prerequisite fixes, both verified before anything else:**
+
+- `agent-test-scenario.ts`'s `agentTestTarget()` was left between
+  `agentTestScenarioConfig`'s docblock and the function itself; moved below
+  `agentTestScenarioConfig` with its own 4-line docblock, restoring the
+  original docblock to its function.
+- `run-parameters.unit.test.ts`'s four new scenarios (closed option lists,
+  per-target unknown-name checks, default precedence) were checked against
+  `resolveRunParameters`/`scenario-run-parameter.error.ts`: the production
+  code already implements `targetDefinitions`, `targetLabel` and
+  `scenario_parameter_option_invalid` in full — no production change was
+  needed. `pnpm --filter @langwatch/scenario-contract test`: 344/344.
+
+**Done, verified with the named test commands:**
+
+- **Suite gap (standalone, ahead of Slice 6)** —
+  `packages/features/suite/server/src/services/connected-target.service.ts`
+  gained `resolveConnectedReferences`, `isAgentUnseen`,
+  `agentParameterDefinitionsOf`, and `agentOwnerNameReader` (a redesign-at-
+  the-seam stand-in for main's `ownerNamesOf`: the branch's
+  `AgentService.ownersOf` already does that Prisma read, so this wraps it
+  rather than restating a `prisma.user` query — `ownerNamesOf` itself is a
+  **named absence**, superseded). All four/five are exported from
+  `packages/features/suite/server/src/index.ts`.
+  `packages/features/agent/contract/src/agent.queries.ts`'s
+  `agentReferenceStateSchema` gained optional `type`, `name`, `ownerUserId`,
+  `lastSeenAt` (main's `findManyIncludingArchived` returns full identity
+  rows; the branch's `findReferenceStates` returned only `{id, archivedAt}`,
+  so target resolution had no way to tell a connected agent apart or check
+  staleness/ownership). `prisma.agent.repository.ts`'s `findReferenceStates`
+  selects the four new columns.
+  `suite.service.ts`'s `run` and `runPlan` now: resolve `<name>@<environment>`
+  references before target resolution (`resolveConnectedReferences`), treat
+  `isAgentUnseen` the same as `archivedAt` in `resolveTargetReferences`
+  (which now also returns `connectedAgents: ConnectedTargetAgent[]` for the
+  active targets), and call `assertConnectedAgentsRunnable` before
+  `execution.execute`. `runPlan`'s persisted `targets` now carry the
+  resolved id, not the `<name>@<environment>` string, matching main's
+  `plan.targets` expectation.
+  Lifted the six integration scenarios from
+  `origin/main:platform/app/src/server/suites/__tests__/connected-targets.integration.test.ts`
+  verbatim by `@scenario` title into
+  `packages/features/suite/server/src/services/__tests__/connected-target.service.unit.test.ts`
+  — **deviation, recorded**: `.unit.test.ts` rather than `.integration.test.ts`,
+  because `@langwatch/suite-server` has no datastore lane (no
+  `vitest.config.ts`, every existing test in the package is fakes-driven);
+  the scenarios run through `SuiteService.runPlan` with an `AgentService`
+  fake backed by a small in-memory registry, the same level every other test
+  in this file's directory already uses. `result.planName` assertions from
+  main's test 5 were dropped: main auto-derives a plan name from target
+  labels when the caller sends none (`defaultPlanName`/`readRequestedPlanName`
+  in main's `runPlan`), which is a distinct, larger feature the branch's
+  `suiteRunPlanInputSchema` does not have (`name` is required, no
+  derivation) — **named absence**, out of scope for this gap.
+  `pnpm --filter @langwatch/suite-server test`: 9→9 files, 67/67 (+6 for the
+  new scenarios). `pnpm --filter @langwatch/agent-contract test`: 14/14.
+  `pnpm --filter @langwatch/agent-server test`: 100/100 (schema change is
+  additive, no regression).
+  Touched packages: `@langwatch/agent-contract`, `@langwatch/agent-server`
+  (repository only), `@langwatch/suite-server`.
+
+- **Slice 6** — `packages/features/agent/server/src/app/agent.app.ts` gained
+  an optional `connected?: { presence: (input) => Promise<Map<string,
+  AgentPresence>> }` dependency (narrower than §1.2's `{presence, runtime}`
+  shorthand: `runtime` is folded into the `presence` closure the composition
+  root supplies, since nothing else in `AgentApp` needs the raw runtime —
+  **recorded deviation**). `getAll`/`getById` now answer the enriched view
+  (`parameters` via `declaredAgentParameters`, `owner` via
+  `AgentService.ownersOf`, `status`/`instances` via `agentPresenceView`),
+  degrading to `NO_PRESENCE`/no owner when `connected` is absent (a process
+  that has not yet composed the runtime — true of `apps/api` today, until
+  Slice 7). `transport/api-trpc/agent.api.ts`'s `getAll`/`getById` already
+  just delegate to `ctx.app.agents.getAll/getById` and spread the result
+  through `withLegacyCopyCount`, so the tRPC door answers the view with no
+  edit needed there. **Recorded, not fixed this pass**: `agent-v1.api.ts`
+  (REST, built in Slice 5 before `AgentApp` had this capability) implements
+  its own independent presence/owner enrichment via the same
+  `readAgentPresence`/`agentPresenceView`/`toAgentListRow` functions rather
+  than going through `AgentApp` — behaviourally consistent (same underlying
+  reads) but the plan's "both doors read the app, so they cannot disagree"
+  is not yet literally true. A safe de-duplication for a later pass, not a
+  correctness gap.
+  New test `packages/features/agent/server/src/app/__tests__/agent.app.unit.test.ts`
+  (2 scenarios: enrichment present, enrichment absent).
+  `apps/api/src/api.application.ts` and `api-packaged-rest.composition.ts`
+  still construct `AgentApp` without `connected` (optional field, backward
+  compatible) — wiring a real `connected.presence` closure needs
+  `ApiConnectedAgentsComposition` (Slice 7).
+  `pnpm --filter @langwatch/agent-server test`: 11→12 files, 100→102
+  (+2). `pnpm --filter @langwatch/platform-api test:unit src/features/agent`:
+  7/7 (narrow path filter — `test:unit src/features/agent`, NOT `test:unit
+  run src/features/agent`, which mis-parses as two OR'd patterns and pulls
+  in unrelated files).
+
+- **Slice 7, worker half only** — the API half needs
+  `ApiConnectedAgentsComposition` inside `api-production.composition.ts`,
+  which agent `a8c54399437b5abf2` (the tRPC-flatten lane) was mid-edit on
+  for the whole of this pass; it had not signalled the file was free by the
+  time this pass ended, so no `apps/api` composition work was attempted.
+  The worker half has no such conflict and is done:
+  `apps/worker/src/app/worker-connected-agent-runtime.composition.ts` (new)
+  — `installWorkerConnectedAgentRuntime({redis, resources?})` calls
+  `installConnectedAgentRedis` and registers `closeConnectedAgentRuntime` on
+  the `ResourceScope` when Redis is configured, no-ops otherwise. Wired into
+  `worker-production.composition.ts` right after `processRedis` is derived
+  (~line 454), fixing the gap §4.2 names: the experiment orchestrator's
+  `relayDispatch` (`experiment-run-orchestrator.service.ts:1912`) calls
+  `getConnectedAgentRuntime().dispatcher` in this process, and before this
+  change it always ran on a private memory store that could never see an
+  instance the API process registered. Added `@langwatch/agent-server` as a
+  direct dependency of `apps/worker/package.json` (was transitive only, via
+  `@langwatch/experiment-server`) and ran `pnpm install --filter
+  "@langwatch/worker..."` to link it.
+  New test `apps/worker/src/app/__tests__/worker-connected-agent-runtime.composition.unit.test.ts`
+  (2 scenarios, `@langwatch/agent-server` mocked with `vi.hoisted` to avoid
+  touching the real module-singleton runtime).
+  **Verified the two config-leaf items (`infrastructure.connectedAgents.
+  replicaCount`/`relayMaxPayloadMb` in `api.config.ts`) were deliberately
+  NOT added this pass**: every `relayPayloadCaps()` call site in
+  `agent-server` (`connected-agent-connect.api.ts`,  `agent-call.api.ts`,
+  `agent-connect.api.ts`, `connected-agent-session.service.ts`) already
+  calls it with no argument, so a config leaf with no consumer would be
+  exactly the "unused config object" trap — this is deferred to land
+  together with `ApiConnectedAgentsComposition`, which is what will thread
+  the override down.
+  `pnpm --filter @langwatch/worker test`: 62→63 files, 510→512 (+2); one
+  pre-existing, unrelated file (`worker-production.composition.unit.test.ts`)
+  has 2 failures in its "monthly billing roll-up" describe block
+  (`resolveClickHouseClient`/`checkpointFindUnique` call-count assertions) —
+  **confirmed unrelated by temporarily reverting this pass's two-line
+  composition edit and re-running: same 2 failures, same file, before and
+  after**. Not touched, not this plan's concern.
+  Touched: `apps/worker/src/app/worker-connected-agent-runtime.composition.ts`
+  (new), `apps/worker/src/app/worker-production.composition.ts` (2-line
+  wiring), `apps/worker/package.json` (1 dependency).
+
+- **Architecture-lint / repo lint**: `pnpm -s lint` — zero findings in any
+  file this pass touched or created (checked by grepping the full run's
+  output for each filename). `pnpm --filter @langwatch/architecture-lint
+  test`: 43→44 files (unchanged), 609/610 (one pre-existing, unrelated NUL-byte
+  failure in `coding-agent-session-clickhouse-dedup.unit.test.ts`, already
+  recorded in §11 as not touched by this plan).
+
+**Not started — Slice 7 (apps/api half), 8, 9.** `ApiConnectedAgentsComposition`,
+`ApiConnectCredentialAdapter`, the config leaves, mounting `createAgentV1RestApp`,
+wiring `AgentApp`'s `connected.presence`, the upgrade router, and the drain
+order all remain exactly as §4.1 and §7 specify — blocked on
+`a8c54399437b5abf2` finishing `api-production.composition.ts`. Slice 8 (agents
+page UI slot) and Slice 9 (parity sweep) are untouched; no code for either
+exists yet, nothing was stubbed.
+
+**Resume point for the next pass**: message `a8c54399437b5abf2` (or check
+whether it has already messaged back) to confirm `api-production.composition.ts`,
+`api-agents.composition.ts` and `app-trpc.features.ts` are free, then do
+Slice 7's `apps/api` half in the order §4.1 lists: `api.config.ts`'s two
+config leaves first (now genuinely wireable), then
+`agent-connect-credential.adapter.ts`, then `ApiConnectedAgentsComposition`
+itself, then the `app-rest.packaged-families.ts` mount, then `AgentApp`'s
+`connected.presence` wiring in `api.application.ts`/`api-packaged-rest.composition.ts`,
+then the upgrade router plumbing into `api-http.listener.ts` (already has
+the `upgrades?` option from Slice 4 — just needs `ApiUpgradeRouter.create()`
+passed in), then the drain order in `api.process.ts`. The 15-scenario
+`connect.gateway.integration.test.ts` and the two apps/api-side REST route
+integration tests named in §5 land once the composition exists. Slice 8 and
+9 are unblocked only once Slice 7 is fully done.

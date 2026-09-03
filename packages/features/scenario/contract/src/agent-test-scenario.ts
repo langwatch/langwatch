@@ -12,6 +12,7 @@
  */
 
 import { INTERNAL_SET_PREFIX } from "./scenario-set-id";
+import type { TargetConfig } from "./scenario-execution-data";
 
 /** Suffix of the set that holds a project's agent test runs. */
 export const AGENT_TEST_SET_SUFFIX = "__agent-test";
@@ -49,4 +50,20 @@ export function agentTestScenarioConfig({ agentName }: { agentName: string }) {
     criteria: [] as string[],
     labels: [] as string[],
   };
+}
+
+/**
+ * The target a test points at, or nothing for a kind no run targets.
+ * A prompt or a signature has none, so "Test agent" refuses both.
+ */
+export function agentTestTarget(agent: { id: string; type: string }): TargetConfig | null {
+  switch (agent.type) {
+    case "http":
+    case "code":
+    case "workflow":
+    case "connected":
+      return { type: agent.type, referenceId: agent.id };
+    default:
+      return null;
+  }
 }

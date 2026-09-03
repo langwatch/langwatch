@@ -1,5 +1,5 @@
 import type { SuiteRunParameters, SuiteRunResult, SuiteTarget } from "@langwatch/suite-contract";
-import { getSuiteSetId } from "@langwatch/suite-contract";
+import { getSuiteSetId, targetKeyOf } from "@langwatch/suite-contract";
 import { createLogger } from "@langwatch/observability";
 import {
   generateBatchRunId,
@@ -130,26 +130,43 @@ export class SuiteExecutionService extends SuiteExecutionPort {
   }
 
   /**
-   * Run parameters per scenario, with the secret-bearing ones kept apart so
-   * they can be attached to the queued run rather than to its metadata.
+   * Run parameters per target, per scenario, with the secret-bearing ones
+   * kept apart so they can be attached to the queued run rather than to its
+   * metadata.
+   *
+   * A target's own `runParameters` are merged over the run's values, the
+   * target winning — the run dialog lets one agent run twice with different
+   * overrides ("prod-agent on gpt-5 vs prod-agent on gpt-5-mini"), and every
+   * such target must read its own values back, not the run's shared ones.
+   * Two targets that resolve to the same key (same agent, same overrides)
+   * resolve once. Secrets are run-level, so every target resolves the same
+   * ones; only the first target's resolution is kept.
    */
   private async resolveParameters(input: SuiteExecutionRequest): Promise<{
-    parameters: Map<string, SuiteRunParameters>;
+    parameters: Map<string, Map<string, SuiteRunParameters>>;
     secrets: Map<string, Record<string, string>>;
   }> {
-    const resolved = await this.scenarios.resolveRunParametersForScenarios({
-      scenarios: input.scenarioConfigs,
-      values: input.parameters,
-    });
+    const parameters = new Map<string, Map<string, SuiteRunParameters>>();
+    let secrets: Map<string, Record<string, string>> | undefined;
 
-    return {
-      parameters: new Map(resolved.map((item) => [item.scenarioId, item.parameters])),
-      secrets: new Map(
+    for (const target of input.activeTargets) {
+      const targetKey = targetKeyOf(target);
+      if (parameters.has(targetKey)) continue;
+
+      const resolved = await this.scenarios.resolveRunParametersForScenarios({
+        scenarios: input.scenarioConfigs,
+        values: { ...input.parameters, ...target.runParameters },
+      });
+
+      parameters.set(targetKey, new Map(resolved.map((item) => [item.scenarioId, item.parameters])));
+      secrets ??= new Map(
         resolved
           .filter((item) => Object.keys(item.secretParameters).length > 0)
           .map((item) => [item.scenarioId, item.secretParameters]),
-      ),
-    };
+      );
+    }
+
+    return { parameters, secrets: secrets ?? new Map() };
   }
 
   /** One run per scenario, per target, per repeat. */
@@ -182,7 +199,7 @@ export class SuiteExecutionService extends SuiteExecutionPort {
     items: SuiteExecutionItem[];
     batchRunId: string;
     setId: string;
-    parameters: Map<string, SuiteRunParameters>;
+    parameters: Map<string, Map<string, SuiteRunParameters>>;
     secrets: Map<string, Record<string, string>>;
   }): Promise<void> {
     const now = Date.now();
@@ -202,6 +219,7 @@ export class SuiteExecutionService extends SuiteExecutionPort {
     await Promise.allSettled(
       items.map((item) => {
         const secretParameters = secrets.get(item.scenarioId);
+        const targetParameters = parameters.get(targetKeyOf(item.target))?.get(item.scenarioId);
 
         return this.commands.queueSimulationRun({
           tenantId: input.projectId,
@@ -220,7 +238,7 @@ export class SuiteExecutionService extends SuiteExecutionPort {
               ...withResolvedModels(resolvedModelsByScenarioId.get(item.scenarioId)),
             },
             ...withNote(input.note),
-            ...SuiteExecutionService.withParameters(parameters.get(item.scenarioId)),
+            ...SuiteExecutionService.withParameters(targetParameters),
             ...SuiteExecutionService.withSecretParameterNames(secretParameters),
           },
           ...SuiteExecutionService.withSecretParameters(secretParameters),

@@ -173,4 +173,41 @@ describe("SuiteExecutionService", () => {
     });
     expect(commands.queueSimulationRun).toHaveBeenCalledTimes(1);
   });
+
+  describe("given a target that carries overrides of its own", () => {
+    /** @scenario "Each target receives its own parameters merged over the run parameters" */
+    it("merges them over the run's values, the target winning", async () => {
+      const commands = new Commands();
+      // Echoes back the merged `values` it was resolved with, so the
+      // assertions below can tell which target a call resolved for.
+      const resolve = vi
+        .fn()
+        .mockImplementation(async ({ values }: { values: Record<string, unknown> }) => [
+          { scenarioId: "scenario_1", parameters: values, secretParameters: {} },
+        ]);
+      const service = SuiteExecutionService.create({
+        commands,
+        ids: new Ids(),
+        scenarios: scenarios(resolve),
+      });
+
+      await service.execute(
+        input({
+          parameters: { region: "us-east" },
+          activeTargets: [
+            { type: "http", referenceId: "agent_1" },
+            { type: "http", referenceId: "agent_1", runParameters: { account_tier: "silver" } },
+          ],
+        }),
+      );
+
+      expect(commands.queueSimulationRun).toHaveBeenCalledTimes(2);
+      const [unmerged, merged] = commands.queueSimulationRun.mock.calls.map(
+        (call) => (call[0] as { metadata: { parameters?: Record<string, unknown> } }).metadata
+          .parameters,
+      );
+      expect(unmerged).toEqual({ region: "us-east" });
+      expect(merged).toEqual({ region: "us-east", account_tier: "silver" });
+    });
+  });
 });
