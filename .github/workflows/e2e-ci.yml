@@ -275,8 +275,8 @@ jobs:
         run: pnpm prisma:migrate
 
       - name: Setup ClickHouse
-        working-directory: apps/api
-        run: pnpm task:clickhouse-migrate
+        working-directory: apps/tasks
+        run: pnpm task clickhouse-migrate
 
       # The browser bundle only. apps/api and apps/worker run from source
       # through tsx and have no build of their own.

@@ -5,6 +5,7 @@
   "apps/api/",
   "apps/ui/",
   "apps/worker/",
+  "apps/tasks/",
   "packages/",
   "services/langevals/",
   "sdks/python/",

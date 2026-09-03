@@ -63,10 +63,7 @@ export {
   AiCallFailedError,
   wrapAiCall,
 } from "./services/ai-call-failure.service";
-export {
-  compileSafeRegex,
-  isSafeRegex,
-} from "./services/model-cost-regex-safety.service";
+export { compileSafeRegex, isSafeRegex } from "./services/model-cost-regex-safety.service";
 export { getModelLimits } from "./services/model-limits.service";
 export {
   deriveUnmappedCostSuggestion,
@@ -137,3 +134,13 @@ export {
   migrateCustomModelsRow,
   migrateModelProviderKeysRow,
 } from "./services/model-provider-legacy-migration.service";
+
+export {
+  ModelProviderCredentialsMigrateTask,
+  modelProviderCredentialCipherFromEnv,
+} from "./tasks/model-provider-credentials-migrate.task";
+export { ModelProviderCustomModelsMigrateTask } from "./tasks/model-provider-custom-models-migrate.task";
+export type {
+  ModelProviderMigrationDatabase,
+  ModelProviderMigrationOutcome,
+} from "./tasks/model-provider-migration.shared";

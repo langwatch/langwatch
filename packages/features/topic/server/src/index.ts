@@ -92,6 +92,7 @@ export {
   type TopicClusteringLangevalsResponse,
 } from "./ports/topic-clustering-langevals.port";
 export { RequestTopicClusteringTask } from "./intents/run-topic-clustering.intent";
+export { TopicClusteringRunTask } from "./tasks/topic-clustering-run.task";
 export { TopicClusteringSchedulePort } from "./ports/topic-clustering-schedule.port";
 export {
   TOPIC_CLUSTERING_PROCESS_NAME,

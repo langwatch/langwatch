@@ -13,6 +13,10 @@
     ".": {
       "types": "./src/index.ts",
       "default": "./src/index.ts"
+    },
+    "./retention-tables": {
+      "types": "./src/retention-tables.ts",
+      "default": "./src/retention-tables.ts"
     }
   },
   "scripts": {

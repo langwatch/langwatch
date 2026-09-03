@@ -81,7 +81,6 @@ packages/enterprise/
 ├── src/
 ├── composition/api/          # @langwatch/enterprise-api
 ├── composition/worker/       # @langwatch/enterprise-worker
-├── composition/web/          # @langwatch/enterprise-web
 └── features/<feature>/       # strict contract/server/web packages
 ```
 

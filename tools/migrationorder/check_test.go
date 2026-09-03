@@ -69,9 +69,9 @@ func TestCheck(t *testing.T) {
 			want: []migrationorder.Finding{{
 				Set:     "ClickHouse",
 				Entry:   "platform/app/src/server/clickhouse/migrations/00041_old_root.sql",
-				Problem: "is outside the canonical migration root apps/api/src/tasks/clickhouse-migrate/migrations",
+				Problem: "is outside the canonical migration root packages/clickhouse-client/migrations",
 				Fix: "git mv platform/app/src/server/clickhouse/migrations/00041_old_root.sql " +
-					"apps/api/src/tasks/clickhouse-migrate/migrations/00041_old_root.sql",
+					"packages/clickhouse-client/migrations/00041_old_root.sql",
 			}},
 		},
 		{
@@ -117,8 +117,8 @@ func TestCheck(t *testing.T) {
 				Set:     "ClickHouse",
 				Entry:   "00041_mine.sql",
 				Problem: "takes key 41, which 00041_theirs.sql already took on main",
-				Fix: "git mv apps/api/src/tasks/clickhouse-migrate/migrations/00041_mine.sql " +
-					"apps/api/src/tasks/clickhouse-migrate/migrations/00042_mine.sql",
+				Fix: "git mv packages/clickhouse-client/migrations/00041_mine.sql " +
+					"packages/clickhouse-client/migrations/00042_mine.sql",
 			}},
 		},
 		{
@@ -134,8 +134,8 @@ func TestCheck(t *testing.T) {
 				Set:     "ClickHouse",
 				Entry:   "00039_mine.sql",
 				Problem: "is numbered below 42, the newest migration on main, so it runs out of order or not at all",
-				Fix: "git mv apps/api/src/tasks/clickhouse-migrate/migrations/00039_mine.sql " +
-					"apps/api/src/tasks/clickhouse-migrate/migrations/00043_mine.sql",
+				Fix: "git mv packages/clickhouse-client/migrations/00039_mine.sql " +
+					"packages/clickhouse-client/migrations/00043_mine.sql",
 			}},
 		},
 		{
@@ -196,7 +196,7 @@ func TestCheck(t *testing.T) {
 				Set:     "ClickHouse",
 				Entry:   "00040_a.sql",
 				Problem: "already merged, and migrations that have run somewhere cannot change",
-				Fix:     "git checkout origin/main -- apps/api/src/tasks/clickhouse-migrate/migrations/00040_a.sql",
+				Fix:     "git checkout origin/main -- packages/clickhouse-client/migrations/00040_a.sql",
 			}},
 		},
 		{
@@ -224,15 +224,15 @@ func TestCheck(t *testing.T) {
 					Set:     "ClickHouse",
 					Entry:   "00041_one.sql",
 					Problem: "shares key 41 with another migration in this branch",
-					Fix: "git mv apps/api/src/tasks/clickhouse-migrate/migrations/00041_one.sql " +
-						"apps/api/src/tasks/clickhouse-migrate/migrations/00042_one.sql",
+					Fix: "git mv packages/clickhouse-client/migrations/00041_one.sql " +
+						"packages/clickhouse-client/migrations/00042_one.sql",
 				},
 				{
 					Set:     "ClickHouse",
 					Entry:   "00041_two.sql",
 					Problem: "shares key 41 with another migration in this branch",
-					Fix: "git mv apps/api/src/tasks/clickhouse-migrate/migrations/00041_two.sql " +
-						"apps/api/src/tasks/clickhouse-migrate/migrations/00043_two.sql",
+					Fix: "git mv packages/clickhouse-client/migrations/00041_two.sql " +
+						"packages/clickhouse-client/migrations/00043_two.sql",
 				},
 			},
 		},
@@ -249,8 +249,8 @@ func TestCheck(t *testing.T) {
 				Set:     "ClickHouse",
 				Entry:   "00039_$(curl evil).sql",
 				Problem: "is numbered below 40, the newest migration on main, so it runs out of order or not at all",
-				Fix: "git mv 'apps/api/src/tasks/clickhouse-migrate/migrations/00039_$(curl evil).sql' " +
-					"apps/api/src/tasks/clickhouse-migrate/migrations/00041'_$(curl evil).sql'",
+				Fix: "git mv 'packages/clickhouse-client/migrations/00039_$(curl evil).sql' " +
+					"packages/clickhouse-client/migrations/00041'_$(curl evil).sql'",
 			}},
 		},
 		{

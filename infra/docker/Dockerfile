@@ -75,19 +75,24 @@ COPY sdks/typescript ./sdks/typescript
 # (https://stackoverflow.com/questions/70154568/pnpm-equivalent-command-for-npm-ci):
 # the install layer must not be invalidated by a source edit.
 COPY apps/worker/package.json ./apps/worker/package.json
-# The interactive API process. It also owns both schema migrations the boot
-# below runs — the Prisma runner over @langwatch/prisma-client's history, and
-# the goose runner, TTL reconciler and ClickHouse SQL.
+# The interactive API process. It also owns the two openapi document tasks
+# that still live in apps/api; the goose runner and TTL reconciler moved to
+# packages/clickhouse-client, and the rest (Prisma, LangWatchQL) moved to
+# apps/tasks.
 COPY apps/api/package.json ./apps/api/package.json
 # The browser bundle. `@langwatch/ui` is a Vite build rather than a process:
 # it emits dist/client, which the API process serves.
 COPY apps/ui/package.json ./apps/ui/package.json
-# Three filters, because the three applications are three dependency subtrees
+# The boot-chain task runner: prisma-migrate, clickhouse-migrate,
+# lwql-provision, and every other feature-owned task.
+COPY apps/tasks/package.json ./apps/tasks/package.json
+# Four filters, because the four applications are four dependency subtrees
 # and none is a subset of the others.
-RUN CI=true pnpm install --frozen-lockfile --filter "@langwatch/platform-api..." --filter "@langwatch/worker..." --filter "@langwatch/ui..."
+RUN CI=true pnpm install --frozen-lockfile --filter "@langwatch/platform-api..." --filter "@langwatch/worker..." --filter "@langwatch/ui..." --filter "@langwatch/tasks..."
 COPY apps/worker ./apps/worker
 COPY apps/api ./apps/api
 COPY apps/ui ./apps/ui
+COPY apps/tasks ./apps/tasks
 # The trailing `...` on each filter makes pnpm build each application's
 # workspace DEPENDENCIES first, in topological order, and pnpm skips the
 # members that declare no `build`. That order is load-bearing twice over: the
@@ -115,7 +120,7 @@ RUN NODE_OPTIONS=--max-old-space-size=4096 pnpm --filter "@langwatch/ui..." --fi
 # openapi-typescript, a devDependency this very command is removing. Nothing
 # needs regenerating at this point; the dist was built in the step above, and
 # the Prisma client is regenerated explicitly after the prune below.
-RUN CI=true pnpm install --frozen-lockfile --prod --ignore-scripts --filter "@langwatch/platform-api..." --filter "@langwatch/worker..." --filter "@langwatch/ui..."
+RUN CI=true pnpm install --frozen-lockfile --prod --ignore-scripts --filter "@langwatch/platform-api..." --filter "@langwatch/worker..." --filter "@langwatch/ui..." --filter "@langwatch/tasks..."
 
 # ...and then actually reclaim the disk. The step above rewrites each member's
 # node_modules — the devDependency symlinks go — but it does NOT touch the
@@ -186,6 +191,8 @@ COPY --from=builder /app/sdks/typescript ./sdks/typescript
 COPY --from=builder /app/packages ./packages
 # The worker executable runs from source through tsx, the way apps/api does.
 COPY --from=builder /app/apps/worker ./apps/worker
+# The task runner. Runs from source through tsx, like apps/api and apps/worker.
+COPY --from=builder /app/apps/tasks ./apps/tasks
 # Same: run from source through tsx. The boot command below runs both schema
 # migrations from here before anything serves.
 COPY --from=builder /app/apps/api ./apps/api
@@ -203,10 +210,12 @@ EXPOSE 5560
 # Set bash as the default shell
 SHELL ["/bin/bash", "-c"]
 
-# The boot chain, all four steps from one directory. `apps/api` owns both
-# migrations — the Prisma runner over @langwatch/prisma-client's history and the
-# goose runner, TTL reconciler and ClickHouse SQL — as well as the LangWatchQL
-# provisioner and the process itself.
+# The boot chain: three tasks from apps/tasks, then the API process. Each
+# task is a `@langwatch/task` class resolved by name from apps/tasks' own
+# catalogue — prisma-migrate (packages/prisma-client's history),
+# clickhouse-migrate (the goose runner, TTL reconciler and ClickHouse SQL,
+# now packages/clickhouse-client's), and lwql-provision. The same words run
+# on a laptop: `pnpm --filter @langwatch/tasks task <name>`.
 #
 # The order is load-bearing: LangWatchQL provisioning reads both the Postgres
 # schema and the ClickHouse one, so it cannot run before either. Sequenced with
@@ -216,4 +225,4 @@ SHELL ["/bin/bash", "-c"]
 # `pnpm -s run start` is `tsx src/api.entrypoint.ts`. The API process serves the
 # REST, tRPC and SSE families AND the browser bundle it finds at
 # /app/apps/ui/dist/client, so this one container is the whole interactive tier.
-CMD cd /app/apps/api && pnpm -s run task:prisma-migrate && pnpm -s run task:clickhouse-migrate && pnpm -s run task:lwql-provision && pnpm -s run start
+CMD cd /app/apps/tasks && pnpm -s task prisma-migrate && pnpm -s task clickhouse-migrate && pnpm -s task lwql-provision && cd /app/apps/api && pnpm -s run start

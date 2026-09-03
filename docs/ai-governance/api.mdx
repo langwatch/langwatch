@@ -101,7 +101,7 @@ Governance routes register through the same `describeRoute` + `hono-openapi` pip
 # published surface the document can still cover. It writes to the path you name
 # (a scratch file otherwise) and never over the checked-in artifact, which is
 # replaced deliberately, with a diff in front of a person.
-pnpm --filter @langwatch/platform-api task:openapi-generate
+pnpm --filter @langwatch/platform-api task openapi-generate
 
 # from sdks/typescript/
 pnpm generate:openapi-types         # regenerate the TS generated client from that spec

@@ -19,7 +19,7 @@ const logger = createLogger("langwatch:tasks");
 async function main(): Promise<number> {
   const config = resolveTasksConfig(process.env).value;
   const host = TasksHost.create(config);
-  const catalogue = TaskCatalogue.create({ tasks: buildTasksCatalogue() });
+  const catalogue = TaskCatalogue.create({ tasks: buildTasksCatalogue({ host }) });
 
   return runTask({
     catalogue,

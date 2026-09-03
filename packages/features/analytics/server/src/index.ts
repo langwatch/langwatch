@@ -113,13 +113,7 @@ export { createQueryRestApp, registerQueryRoutes } from "./transport/api-rest/qu
 export type { SavedWorkbenchChartRestService } from "./transport/api-rest/langwatch-ql-route-guards";
 
 // The LangWatchQL key map: the row a project's access is granted by, written at
-// project creation by the repository below and repaired by the deploy backfill.
-export {
-  LWQL_KEY_MAP_INSERT_SETTINGS,
-  LwqlKeyMapClickHouseRepository,
-  type LwqlKeyMapRepository,
-  NullLwqlKeyMapRepository,
-} from "./repositories/clickhouse/clickhouse.langwatch-ql-key-map.repository";
+// project creation and repaired by the deploy backfill.
 export {
   LwqlKeyMapErrorSinkPort,
   LwqlKeyMapService,
@@ -141,3 +135,5 @@ export {
   productionPostgresReaderGrantStatements,
   withTenancyOptOut,
 } from "./langwatch-ql/production-provisioning";
+
+export { LwqlProvisionTask } from "./tasks/lwql-provision.task";

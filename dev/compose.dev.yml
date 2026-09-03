@@ -172,13 +172,14 @@ services:
       - api_modules:/apps/api/node_modules
       - ui_modules:/apps/ui/node_modules
       - worker_modules:/apps/worker/node_modules
+      - tasks_modules:/apps/tasks/node_modules
       - pnpm_store:/root/.local/share/pnpm/store
       - goose_bin:/opt/goose-bin
     command: >
       sh -c "
         corepack enable &&
         pnpm config set store-dir /root/.local/share/pnpm/store &&
-        mkdir -p /node_modules /apps/api/node_modules /apps/ui/node_modules /apps/worker/node_modules &&
+        mkdir -p /node_modules /apps/api/node_modules /apps/ui/node_modules /apps/worker/node_modules /apps/tasks/node_modules &&
         GOOSE_VERSION=v3.26.0 &&
         ARCH=$$(uname -m) &&
         if [ \"$$ARCH\" = \"aarch64\" ]; then GOOSE_ARCH=arm64; else GOOSE_ARCH=x86_64; fi &&
@@ -189,7 +190,7 @@ services:
           chmod +x /opt/goose-bin/goose &&
           printf '%s' \"$$GOOSE_MARKER\" > /opt/goose-bin/.goose-meta;
         fi &&
-        pnpm install --frozen-lockfile --filter '@langwatch/platform-api...' --filter '@langwatch/ui...' --filter '@langwatch/worker...' &&
+        pnpm install --frozen-lockfile --filter '@langwatch/platform-api...' --filter '@langwatch/ui...' --filter '@langwatch/worker...' --filter '@langwatch/tasks...' &&
         pnpm --filter @langwatch/mcp-server run build &&
         pnpm --filter @langwatch/prisma-client run prisma:generate
       "
@@ -298,13 +299,14 @@ services:
       - api_modules:/apps/api/node_modules
       - ui_modules:/apps/ui/node_modules
       - worker_modules:/apps/worker/node_modules
+      - tasks_modules:/apps/tasks/node_modules
       - goose_bin:/opt/goose-bin:ro
     command: >
       sh -c "
         export PATH=/opt/goose-bin:$$PATH &&
         corepack enable &&
         pnpm --filter @langwatch/prisma-client exec prisma migrate deploy &&
-        pnpm run task:clickhouse-migrate &&
+        (cd /apps/tasks && pnpm run task clickhouse-migrate) &&
         pnpm run dev
       "
     ports:
@@ -490,6 +492,8 @@ volumes:
     name: ${VOLUME_PREFIX:-langwatch}-ui-modules
   worker_modules:
     name: ${VOLUME_PREFIX:-langwatch}-worker-modules
+  tasks_modules:
+    name: ${VOLUME_PREFIX:-langwatch}-tasks-modules
   # The workspace-root store (/node_modules/.pnpm). Since ADR-076 the install
   # root is the repo root, so this is where every real package body lives — each
   # application's node_modules (above) holds only symlinks into it.

@@ -5,7 +5,7 @@ import {
   type RetroactiveMutationProgress,
 } from "@langwatch/data-retention-contract";
 import { z } from "zod";
-import { RETENTION_TABLE_CATEGORY_MAP } from "../../adapters/clickhouse.retention-table.adapter";
+import { RETENTION_TABLE_CATEGORY_MAP } from "@langwatch/data-retention-contract/retention-tables";
 import { RetroactiveRetentionRepository } from "../retroactive-retention.repository";
 
 const mutationRowSchema = z

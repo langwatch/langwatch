@@ -1,6 +1,6 @@
 # One task interface, and what langwatch-saas does without the submodule
 
-Status: proposed 2026-09-03. Part 1 is being built; part 2 needs a decision.
+Status: 2026-09-03. Part 1 is being built. Part 2 decided by Alex: the fallback (saas tasks stay private as plugins on `@langwatch/task`; `apps/tasks` loads `LANGWATCH_TASK_MODULES`); the recommended move-in may follow later.
 
 ## What exists
 
@@ -78,6 +78,55 @@ of stack-tracing. Tests travel with each task into the owning package's
 `__tests__`. The Docker CMD becomes
 `cd /app/apps/tasks && pnpm -s task prisma-migrate && pnpm -s task clickhouse-migrate && pnpm -s task lwql-provision && cd ../api && pnpm -s start`,
 and the same words work on a laptop: `pnpm --filter @langwatch/tasks task <name> [args]`.
+
+### What landed (2026-09-03, reviewed in `dev/docs/plans/tasks-lane-review.md`)
+
+Eight tasks are registered in `apps/tasks/src/tasks.catalogue.ts`:
+`prisma-migrate`, `clickhouse-migrate`, `lwql-provision`,
+`model-provider-migrate-custom-models`, `model-provider-migrate-credentials`,
+`webhook-signature-vectors`, `slack-alert` and `object-storage-migrate`.
+`apps/tasks` now carries a `prisma` dependency at the same pin as `apps/api`
+(fix 1) — the container CMD's first step, `prisma migrate deploy`, needs the
+CLI binary, and the image installs `--prod`, so it has to be a real
+dependency rather than inherited from a devDependency elsewhere in the
+workspace.
+
+Four tasks exist as `Task` subclasses but are not registered — each names its
+own `apps/tasks` blocker in its file (`apps/tasks/src/tasks.catalogue.ts`
+lists them by name too):
+
+  - `annotation-clickhouse-backfill` (annotation) — needs a queue write for
+    `bulkSyncAnnotations` on the trace pipeline.
+  - `dataset-content-backfill` (dataset) — needs `DatasetStorageResolver`,
+    built from the worker's stored-object runtime (`TasksHost.objectStorage`
+    is `never`).
+  - `stalled-runs-backfill` (scenario) — needs the real
+    `ScenarioExecutionService`, dispatched through a producer-only Eventing
+    pipeline over Group Queue infrastructure `apps/tasks` does not compose.
+  - `topic-clustering-run` (topic) — restored from main's `runTopicClustering`
+    as `packages/features/topic/server/src/tasks/topic-clustering-run.task.ts`,
+    but blocked on the same Eventing producer as `stalled-runs-backfill`:
+    `TopicClusteringCommandsPort` and `TraceTopicAssignmentPort` are both
+    dispatched through it.
+
+All four share one root cause: `apps/tasks` composes Prisma, ClickHouse and
+Redis, but no producer-only Eventing pipeline over Group Queue. Wiring one is
+follow-up work, not a one-line fix — it is the same infrastructure the API
+process's `ApiEventingInfrastructure` builds
+(`apps/api/src/platform/infrastructure/api-eventing.infrastructure.ts`), and
+building it for `apps/tasks` without integration coverage against a real
+Redis was judged too large a risk to land inside this review pass.
+
+`slack-alert` was restored from main and no longer hardcodes
+`baseHost: "https://app.langwatch.ai"` — it takes the base host as the task's
+second argument (falling back to `BASE_HOST`), and its Slack transport
+(`IncomingWebhook`) now lives in
+`packages/features/automation/server/src/adapters/slack-webhook.client.adapter.ts`,
+shared with the worker's real automation deliveries instead of duplicated.
+
+`cleanupOldLambdas` stays retired: nothing on this branch invokes Lambda
+(`LANGWATCH_NLP_LAMBDA_CONFIG` survives only as a capability flag), so there
+is no subject left to restore.
 
 ## Part 2: langwatch-saas without the submodule
 

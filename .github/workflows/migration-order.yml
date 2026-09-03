@@ -36,7 +36,7 @@ on:
     paths:
       - "packages/prisma-client/prisma/migrations/**"
       - "packages/prisma-client/prisma/migrations/**"
-      - "apps/api/src/tasks/clickhouse-migrate/migrations/**"
+      - "packages/clickhouse-client/migrations/**"
       # The checker and its own gate: a change to either has to run against
       # the real migration sets, not just its unit tests.
       - "tools/migrationorder/**"

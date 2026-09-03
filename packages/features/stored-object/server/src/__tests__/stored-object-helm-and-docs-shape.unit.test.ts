@@ -400,7 +400,7 @@ describe("Stored objects migration is idempotent at the SQL level", () => {
     /** @scenario "Stored objects migration is idempotent" */
     it("uses CREATE TABLE IF NOT EXISTS so a second run is a no-op", () => {
       const migration = readRepoFile(
-        "apps/api/src/tasks/clickhouse-migrate/migrations/00023_create_stored_objects.sql",
+        "packages/clickhouse-client/migrations/00023_create_stored_objects.sql",
       );
 
       // The IF NOT EXISTS clause makes the migration safe to re-run.

@@ -17,6 +17,9 @@ export const tasksConfigDefinition = RuntimeConfig.define({
   objectStorageBucket: Config.value(z.string().min(1).optional(), {
     env: "STORED_OBJECTS_BUCKET",
   }),
+  /** Consumed by `ModelProviderCredentialsMigrateTask`; absent means that
+   * task refuses at run time rather than at catalogue construction. */
+  credentialsSecret: Config.secret({ optional: true, env: "CREDENTIALS_SECRET" }),
   nodeEnvironment: Config.value(
     z.enum(["development", "test", "production"]).default("development"),
     {

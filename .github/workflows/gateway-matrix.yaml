@@ -210,13 +210,13 @@ jobs:
         # action that puts node-gyp on PATH.
         run: |
           npm install -g node-gyp@12.3.0
-          pnpm install --frozen-lockfile --filter "@langwatch/platform-api..."
+          pnpm install --frozen-lockfile --filter "@langwatch/platform-api..." --filter "@langwatch/tasks..."
 
       - name: Apply DB migrations
-        working-directory: apps/api
+        working-directory: apps/tasks
         env:
           DATABASE_URL: postgresql://postgres:postgres@localhost:5432/langwatch
-        run: pnpm run task:prisma-migrate
+        run: pnpm run task prisma-migrate
 
       - name: Start control plane (background)
         working-directory: apps/api

@@ -6,6 +6,7 @@ export type {
   SlackWebhookRequest,
   SlackWebhookTransport,
 } from "./adapters/slack-webhook.delivery.adapter";
+export { SlackWebhookClientAdapter } from "./adapters/slack-webhook.client.adapter";
 export { SlackProviderAdapter } from "./adapters/slack-provider.adapter";
 export type { AutomationSecretCrypto } from "./adapters/slack-provider.adapter";
 export {
@@ -287,3 +288,5 @@ export {
   AUTOMATION_OVERFLOW_FLUSH_METRIC_NAME,
   OtelAutomationSettlementObservabilityAdapter,
 } from "./adapters/otel.automation-settlement-observability.adapter";
+
+export { SlackAlertTask } from "./tasks/slack-alert.task";

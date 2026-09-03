@@ -61,21 +61,11 @@ export { parseJsonStringValues } from "./services/otlp-trace-request.rules";
 export { SpanRecordIdentity } from "./services/span-record-identity.rules";
 export { TraceListClickHouseRepository } from "./repositories/clickhouse/trace-list.repository";
 export { TraceSummaryClickHouseRepository } from "./repositories/clickhouse/trace-summary.repository";
-export { TraceAnalyticsClickHouseRepository } from "./repositories/clickhouse/trace-analytics.repository";
-export { TraceAnalyticsRollupClickHouseRepository } from "./repositories/clickhouse/trace-analytics-rollup.repository";
 export {
   NullTraceSummaryRepository,
   type FindByTraceIdOptions,
   type TraceSummaryRepository,
 } from "./repositories/trace-summary.repository";
-export {
-  NullTraceAnalyticsRepository,
-  type TraceAnalyticsRepository,
-} from "./repositories/trace-analytics.repository";
-export {
-  NullTraceAnalyticsRollupRepository,
-  type TraceAnalyticsRollupRepository,
-} from "./repositories/trace-analytics-rollup.repository";
 export type {
   TraceClickHouseClient,
   TraceClickHouseResolver,
@@ -158,7 +148,6 @@ export type {
   TraceQueryFieldValuesInput,
   TraceQueryFieldValuesResult,
 } from "./ports/query-field-values.port";
-export { SpanStorageMapProjection } from "./projections/span-storage.projection";
 export {
   MAX_PROCESSED_SPANS,
   TraceSummaryFoldProjection,
@@ -170,10 +159,6 @@ export {
   TraceAnalyticsFoldProjection,
   type TraceAnalyticsRow,
 } from "./projections/trace-derived.projection";
-export {
-  TraceAnalyticsRollupMapProjection,
-  type TraceAnalyticsRollupRow,
-} from "./projections/trace-rollup.projection";
 export { SpanStorageStore } from "./stores/eventing/eventing.span-storage.store";
 export { TraceAnalyticsStore } from "./stores/eventing/eventing.trace-derived.store";
 export { TraceAnalyticsRollupStore } from "./stores/eventing/eventing.trace-rollup.store";
@@ -364,10 +349,6 @@ export {
 } from "./subscribers/evaluation-trigger.subscriber";
 export { TraceExistencePort } from "./ports/trace-existence.port";
 export { ClickHouseTraceExistenceRepository } from "./repositories/clickhouse/trace-existence.repository";
-export {
-  TraceEditOverlayRepository,
-  type TraceEditOverlayRow,
-} from "./repositories/prisma/prisma.trace-edit-overlay.repository";
 export {
   TraceEditOverlayService,
   type TraceEditIOField,

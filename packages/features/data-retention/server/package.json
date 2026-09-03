@@ -14,10 +14,6 @@
       "types": "./src/index.ts",
       "default": "./src/index.ts"
     },
-    "./retention-tables": {
-      "types": "./src/adapters/clickhouse.retention-table.adapter.ts",
-      "default": "./src/adapters/clickhouse.retention-table.adapter.ts"
-    },
     "./testing": {
       "types": "./src/testing.ts",
       "default": "./src/testing.ts"

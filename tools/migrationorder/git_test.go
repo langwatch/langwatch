@@ -10,7 +10,7 @@ import (
 	"github.com/langwatch/langwatch/tools/migrationorder"
 )
 
-const clickhouseDir = "apps/api/src/tasks/clickhouse-migrate/migrations"
+const clickhouseDir = "packages/clickhouse-client/migrations"
 
 func gitIn(t *testing.T, root string, args ...string) {
 	t.Helper()
@@ -180,10 +180,10 @@ func TestTopLevelEntries(t *testing.T) {
 		{
 			name: "clickhouse files are taken flat and sorted",
 			paths: []string{
-				"apps/api/src/tasks/clickhouse-migrate/migrations/00041_b.sql",
-				"apps/api/src/tasks/clickhouse-migrate/migrations/00040_a.sql",
+				"packages/clickhouse-client/migrations/00041_b.sql",
+				"packages/clickhouse-client/migrations/00040_a.sql",
 			},
-			directory: "apps/api/src/tasks/clickhouse-migrate/migrations",
+			directory: "packages/clickhouse-client/migrations",
 			want:      []string{"00040_a.sql", "00041_b.sql"},
 		},
 		{

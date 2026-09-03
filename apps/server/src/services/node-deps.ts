@@ -27,6 +27,7 @@ export const APP_PACKAGE_NAMES = [
   "@langwatch/platform-api",
   "@langwatch/worker",
   "@langwatch/ui",
+  "@langwatch/tasks",
 ] as const;
 
 /**
@@ -38,10 +39,7 @@ export const APP_PACKAGE_NAMES = [
  * install on a customer machine). Exported for tests — the spec scenario
  * "The install still refuses to drift from the lockfile" binds to this.
  */
-export function workspaceInstallArgs(
-  rootDir: string,
-  { prod }: { prod: boolean },
-): string[] {
+export function workspaceInstallArgs(rootDir: string, { prod }: { prod: boolean }): string[] {
   return [
     "-C",
     rootDir,
@@ -122,11 +120,7 @@ export async function ensureLangwatchDeps(
   const cachedHash = existsSync(hashFile) ? readFileSync(hashFile, "utf8").trim() : null;
   const installFresh = topLevelLinksOk && cachedHash === installKey;
 
-  if (
-    installFresh &&
-    prismaClientGenerated(rootNodeModules, nodeModulesPath) &&
-    distAlreadyBuilt
-  ) {
+  if (installFresh && prismaClientGenerated(rootNodeModules, nodeModulesPath) && distAlreadyBuilt) {
     return;
   }
 
@@ -424,9 +418,7 @@ function prismaClientGeneratedIn(nodeModulesPath: string): boolean {
   if (!existsSync(pnpmDir)) return false;
   for (const entry of readdirSync(pnpmDir)) {
     if (!entry.startsWith("@prisma+client@")) continue;
-    if (
-      existsSync(join(pnpmDir, entry, "node_modules", ".prisma", "client", "index.js"))
-    ) {
+    if (existsSync(join(pnpmDir, entry, "node_modules", ".prisma", "client", "index.js"))) {
       return true;
     }
   }
@@ -501,7 +493,7 @@ export async function resolvePnpm(
  * serves everything (including the browser bundle apps/ui builds), and
  * apps/worker runs the background stack.
  */
-function locateAppDir(name: "api" | "worker" | "ui"): string | null {
+function locateAppDir(name: "api" | "worker" | "ui" | "tasks"): string | null {
   const dir = join(appRoot(), "apps", name);
   return existsSync(join(dir, "package.json")) ? dir : null;
 }
@@ -516,4 +508,9 @@ export function locateWorkerDir(): string | null {
 
 export function locateUiDir(): string | null {
   return locateAppDir("ui");
+}
+
+/** The task-launcher process — prisma-migrate, clickhouse-migrate, lwql-provision. */
+export function locateTasksDir(): string | null {
+  return locateAppDir("tasks");
 }

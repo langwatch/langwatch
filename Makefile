@@ -386,7 +386,7 @@ worktree:
 # To regenerate the CLIENTS from the document as it stands, run the two
 # commands the output names.
 sync-all-openapi:
-	@pnpm --filter @langwatch/platform-api task:openapi-check
+	@pnpm --filter @langwatch/platform-api task openapi-check
 	@echo ""
 	@echo "The frozen document was NOT written. To refresh the clients from it as it stands:"
 	@echo "    cd sdks/typescript && pnpm run generate:openapi-types"

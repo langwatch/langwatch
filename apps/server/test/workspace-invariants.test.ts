@@ -152,7 +152,7 @@ describe("the repo is a single pnpm workspace", () => {
   describe("when the package names are compared", () => {
     /** @scenario The application and the SDK no longer share a package name */
     it("gives each deployable the name the npx installer filters by, and the SDK its own", () => {
-      const deployables = ["apps/api", "apps/worker", "apps/ui"].map(
+      const deployables = ["apps/api", "apps/worker", "apps/ui", "apps/tasks"].map(
         (dir) => readJson(`${dir}/package.json`).name,
       );
       const sdk = readJson("sdks/typescript/package.json").name;

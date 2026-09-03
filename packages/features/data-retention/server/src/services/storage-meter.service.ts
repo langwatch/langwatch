@@ -1,13 +1,13 @@
 import { createLogger } from "@langwatch/observability";
 import { z } from "zod";
 import {
-  RETENTION_TABLE_CATEGORY_MAP,
-  PRODUCTION_STORAGE_METER_TABLES,
-} from "../adapters/clickhouse.retention-table.adapter";
-import {
   storageMeterTenantInputSchema,
   storageMeterTenantsInputSchema,
 } from "@langwatch/data-retention-contract";
+import {
+  RETENTION_TABLE_CATEGORY_MAP,
+  PRODUCTION_STORAGE_METER_TABLES,
+} from "@langwatch/data-retention-contract/retention-tables";
 import type { StorageMeterClickHouseResolver } from "../ports/storage-meter-clickhouse.port";
 import {
   RedisStorageMeterCacheStore,

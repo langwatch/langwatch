@@ -3,6 +3,7 @@ import { EMAIL_RX, type AlertType, type SlackPayload } from "@langwatch/automati
 import {
   AutomationNotificationDeliveryPort,
   SlackWebApiDeliveryAdapter,
+  SlackWebhookClientAdapter,
   SlackWebhookDeliveryAdapter,
   TEST_FIRE_TRIGGER_ID_SENTINEL,
   TriggerNoReplyService,
@@ -19,7 +20,6 @@ import type { MailRenderPort } from "@langwatch/mail";
 import type { TraceRecord } from "@langwatch/trace-contract";
 import type { EmailDeliveryPort } from "@langwatch/notification-server";
 import { createLogger, type Logger } from "@langwatch/observability";
-import { WorkerSlackWebhookClientAdapter } from "./slack-webhook.client.adapter";
 import { WorkerSlackWebApiTransportAdapter } from "./slack-web-api.transport.adapter";
 
 /** One settled match, as the digest renders it. */
@@ -73,12 +73,12 @@ export class WorkerAutomationNotificationDeliveryAdapter extends AutomationNotif
     unsubscribeSigningSecret?: string;
     /** Supplied once an SSRF-fenced outbound sender is composable here. */
     webhookTransport?: WebhookDeliveryTransport;
-    slackWebhookClient?: WorkerSlackWebhookClientAdapter;
+    slackWebhookClient?: SlackWebhookClientAdapter;
     slackApiTransport?: SlackApiTransport;
     logger?: Logger;
   }): WorkerAutomationNotificationDeliveryAdapter {
     const logger = options.logger ?? createLogger("langwatch:automations:delivery");
-    const slackClient = options.slackWebhookClient ?? WorkerSlackWebhookClientAdapter.create();
+    const slackClient = options.slackWebhookClient ?? SlackWebhookClientAdapter.create();
 
     return new WorkerAutomationNotificationDeliveryAdapter(
       options.mailer,

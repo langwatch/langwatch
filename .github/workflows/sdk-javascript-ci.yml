@@ -302,8 +302,8 @@ jobs:
         run: bash .github/scripts/install-goose.sh
 
       - name: Setup ClickHouse
-        working-directory: apps/api
-        run: pnpm task:clickhouse-migrate
+        working-directory: apps/tasks
+        run: pnpm task clickhouse-migrate
 
       # Build the browser bundle so the API process serves a real SPA rather
       # than 404ing every non-API route; the readiness probe below reads it.

@@ -14,6 +14,10 @@ import { TaskInfrastructureUnavailableError } from "./task.errors";
  * value rather than `unknown`. `config` is always present — every process
  * has *some* configuration, even if most of its leaves are unset — so it has
  * no `require*` counterpart.
+ *
+ * The type parameters default to `unknown` so a plugin can implement `Task`
+ * without the generated Prisma client. See
+ * `dev/docs/plans/tasks-launch-interface-and-saas.md` Part 2 for the rest.
  */
 export abstract class TaskHostPort<
   Config = unknown,

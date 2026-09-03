@@ -60,9 +60,7 @@ export {
   type DatasetMigrationSummary,
 } from "./adapters/postgres.dataset-migration.adapter";
 export { createDatasetNormalizeHandler } from "./jobs/dataset-normalize.job";
-export {
-  DatasetNormalizationService,
-} from "./services/dataset-normalization.service";
+export { DatasetNormalizationService } from "./services/dataset-normalization.service";
 export {
   DatasetContentRepository,
   type DatasetContentDatabase,
@@ -83,3 +81,5 @@ export {
   type DatasetGenerateRestPorts,
   type DatasetGenerateRestSession,
 } from "./transport/api-rest/dataset-generate.api";
+
+export { DatasetContentBackfillTask } from "./tasks/dataset-content-backfill.task";

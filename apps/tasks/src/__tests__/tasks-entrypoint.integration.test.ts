@@ -25,6 +25,6 @@ describe("apps/tasks entrypoint", () => {
 
       expect(laptop.stdout).toContain("wrote");
       expect(container.stdout).toContain("wrote");
-    }, 30_000);
+    }, 60_000);
   });
 });

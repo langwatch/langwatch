@@ -231,20 +231,21 @@ jobs:
             # The browser bundle. apps/ui is a build, not a process: the API
             # process serves this directory.
             "package/app/apps/ui/dist/client/index.html"
-            # The two Node processes, as SOURCE. Neither is bundled any more —
+            # The three Node processes, as SOURCE. None is bundled any more —
             # each declares `tsx` as a production dependency and its `start`
-            # script runs the entry point through it, so what the tarball has
-            # to carry is the entry point and the tree it imports.
+            # (or `task`) script runs the entry point through it, so what the
+            # tarball has to carry is the entry point and the tree it imports.
             "package/app/apps/api/src/api.entrypoint.ts"
             "package/app/apps/worker/src/worker.entrypoint.ts"
-            # The migration tasks the first boot runs, in the order the image
-            # runs them: Prisma, then ClickHouse, then LangWatchQL.
+            # The task launcher the first boot runs: prisma-migrate,
+            # clickhouse-migrate, then lwql-provision, in that order.
+            "package/app/apps/tasks/src/tasks.entrypoint.ts"
             "package/app/apps/api/prisma.config.ts"
-            "package/app/apps/api/src/tasks/clickhouse-migrate/clickhouse-migrate.entrypoint.ts"
-            "package/app/apps/api/src/tasks/lwql-provision/lwql-provision.entrypoint.ts"
+            "package/app/packages/prisma-client/prisma.config.ts"
             # goose reads the ClickHouse migrations from a directory beside the
-            # runner; from source that is the task's own migrations/ folder.
-            "package/app/apps/api/src/tasks/clickhouse-migrate/migrations"
+            # runner; from source that is packages/clickhouse-client's own
+            # migrations/ folder.
+            "package/app/packages/clickhouse-client/migrations"
             # The canonical Prisma schema and history the migrate task applies.
             "package/app/packages/prisma-client/prisma/schema.prisma"
             "package/app/packages/prisma-client/prisma/migrations"

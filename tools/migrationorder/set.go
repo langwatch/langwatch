@@ -50,12 +50,14 @@ var Sets = []Set{
 	},
 	{
 		Name:      "ClickHouse",
-		Directory: "apps/api/src/tasks/clickhouse-migrate/migrations",
+		Directory: "packages/clickhouse-client/migrations",
 		PreviousDirectories: []string{
+			"apps/api/src/tasks/clickhouse-migrate/migrations",
 			"platform/app/src/server/clickhouse/migrations",
 			"langwatch/src/server/clickhouse/migrations",
 		},
 		ForbiddenDirectories: []string{
+			"apps/api/src/tasks/clickhouse-migrate/migrations",
 			"platform/app/src/server/clickhouse/migrations",
 			"langwatch/src/server/clickhouse/migrations",
 		},

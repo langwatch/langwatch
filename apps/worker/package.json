@@ -119,7 +119,6 @@
     "@langwatch/trace-server": "workspace:*",
     "@langwatch/workflow-contract": "workspace:*",
     "@langwatch/workflow-server": "workspace:*",
-    "@slack/webhook": "^7.1.0",
     "ioredis": "5.10.1",
     "nanoid": "^6.0.0",
     "node-fetch-cache": "^5.1.0",

@@ -21,6 +21,12 @@
     "test": "vitest",
     "test:unit": "vitest run"
   },
+  "dependencies": {
+    "@clickhouse/client": "^1.23.0",
+    "@langwatch/data-retention-contract": "workspace:*",
+    "@langwatch/observability": "workspace:*",
+    "@langwatch/task": "workspace:*"
+  },
   "devDependencies": {
     "typescript": "^7.0.2",
     "vitest": "^4.1.9"

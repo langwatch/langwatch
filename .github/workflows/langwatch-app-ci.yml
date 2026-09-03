@@ -842,7 +842,7 @@ jobs:
         run: bash .github/scripts/start-clickhouse-with-storage-policy.sh
 
       - name: Run ClickHouse migrations
-        working-directory: apps/api
+        working-directory: apps/tasks
         # ClickHouse's HTTP probe can answer SELECT 1 via curl while the
         # Node @clickhouse/client still sees ECONNREFUSED on its first
         # connect (IPv6/IPv4 dual-stack bind race under --network host).
@@ -850,11 +850,11 @@ jobs:
         # cold-start window.
         run: |
           for i in 1 2 3; do
-            if pnpm task:clickhouse-migrate; then
+            if pnpm task clickhouse-migrate; then
               exit 0
             fi
             if [ "$i" -lt 3 ]; then
-              echo "task:clickhouse-migrate attempt $i failed; sleeping 5s and retrying"
+              echo "clickhouse-migrate attempt $i failed; sleeping 5s and retrying"
               sleep 5
             fi
           done
@@ -947,7 +947,7 @@ jobs:
           merge_base="$(git merge-base "$base_sha" HEAD)"
           reference_directory="$RUNNER_TEMP/architecture-lint-baselines"
           mkdir -p "$reference_directory"
-          for baseline in service-quality-baseline.json port-module-baseline.json; do
+          for baseline in service-quality-baseline.json port-module-baseline.json comment-block-roots.json; do
             source_path="packages/architecture-lint/src/$baseline"
             reference="$reference_directory/$baseline"
             if git cat-file -e "$merge_base:$source_path"; then
@@ -1141,7 +1141,7 @@ jobs:
       - uses: ./.github/actions/prepare-generated-files
 
       - name: Check the frozen OpenAPI document against the served surface
-        run: pnpm --filter @langwatch/platform-api run task:openapi-check
+        run: pnpm --filter @langwatch/platform-api run task openapi-check
 
       - name: Notify Slack on failure
         if: failure() && github.ref == 'refs/heads/main'

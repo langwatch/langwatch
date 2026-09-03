@@ -1,5 +1,5 @@
 import { describe, expect, it, vi } from "vitest";
-import { DatasetContentBackfillTask } from "../dataset-content-backfill.task";
+import { DatasetContentBackfillSweep } from "../dataset-content-backfill.task";
 
 const migrated = {
   status: "completed" as const,
@@ -17,7 +17,7 @@ describe("given a dataset content backfill", () => {
     it("does not touch the migration at all", async () => {
       const run = vi.fn();
 
-      await DatasetContentBackfillTask.withMigration({ run }).execute({
+      await DatasetContentBackfillSweep.withMigration({ run }).execute({
         skipped: true,
         dryRun: false,
       });
@@ -30,7 +30,7 @@ describe("given a dataset content backfill", () => {
     it("carries the flag through to the migration rather than deciding twice", async () => {
       const run = vi.fn(() => Promise.resolve(migrated));
 
-      await DatasetContentBackfillTask.withMigration({ run }).execute({
+      await DatasetContentBackfillSweep.withMigration({ run }).execute({
         skipped: false,
         dryRun: true,
       });
@@ -44,7 +44,7 @@ describe("given a dataset content backfill", () => {
       const run = vi.fn(() => Promise.resolve({ status: "schema-pending" as const }));
 
       await expect(
-        DatasetContentBackfillTask.withMigration({ run }).execute({
+        DatasetContentBackfillSweep.withMigration({ run }).execute({
           skipped: false,
           dryRun: false,
         }),

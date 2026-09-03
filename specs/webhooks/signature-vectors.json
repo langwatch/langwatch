@@ -1,5 +1,5 @@
 {
-  "$schema_note": "Generated file. Do not hand-edit: run `pnpm --filter @langwatch/worker task:webhook-signature-vectors`.",
+  "$schema_note": "Generated file. Do not hand-edit: run `pnpm --filter @langwatch/tasks task webhook-signature-vectors`.",
   "generated_by": "packages/egress/src/webhook/signature-vectors.ts",
   "generated_from": "packages/egress/src/webhook/signature.ts",
   "headers": {

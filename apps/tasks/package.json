@@ -11,21 +11,27 @@
   "types": "./src/index.ts",
   "scripts": {
     "task": "tsx $(test -f ../../.env && echo --env-file=../../.env) $(test -f ../../.env.portless && echo --env-file=../../.env.portless) src/tasks.entrypoint.ts",
-    "task:prisma-migrate": "tsx $(test -f ../../.env && echo --env-file=../../.env) $(test -f ../../.env.portless && echo --env-file=../../.env.portless) src/tasks.entrypoint.ts prisma-migrate",
     "typecheck": "tsc --noEmit && tsc --noEmit -p tsconfig.test.json",
     "test": "vitest run",
     "test:unit": "vitest run"
   },
   "dependencies": {
     "@clickhouse/client": "^1.23.0",
+    "@langwatch/analytics-server": "workspace:*",
+    "@langwatch/automation-server": "workspace:*",
+    "@langwatch/aws-client": "workspace:*",
+    "@langwatch/clickhouse-client": "workspace:*",
     "@langwatch/config": "workspace:*",
     "@langwatch/egress": "workspace:*",
     "@langwatch/handled-error": "workspace:*",
+    "@langwatch/model-provider-server": "workspace:*",
     "@langwatch/observability": "workspace:*",
     "@langwatch/prisma-client": "workspace:*",
     "@langwatch/redis-client": "workspace:*",
+    "@langwatch/stored-object-server": "workspace:*",
     "@langwatch/task": "workspace:*",
     "ioredis": "5.10.1",
+    "prisma": "7.9.1",
     "tsx": "^4.20.6",
     "zod": "^4.3.6"
   },

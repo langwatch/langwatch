@@ -133,3 +133,42 @@ export {
   S3StoredObjectDriver,
   type StoredObjectS3ClientPolicy,
 } from "./adapters/s3.stored-object-driver.adapter";
+
+export {
+  auditQueuesForCutover,
+  createMigrationTask,
+  ObjectStorageMigrateTask,
+  parseMigrationTaskConfig,
+  type MigrationTaskConfig,
+  type MigrationTaskPhase,
+} from "./tasks/object-storage-migrate.task";
+export { createMigrationInventory } from "./adapters/postgres.object-storage-migration-inventory.adapter";
+export {
+  MigrationBlockedError,
+  ObjectStorageMigration,
+  createMigrationStorageEndpoint,
+  type MigrationCopyReport,
+  type MigrationDataset,
+  type MigrationFinalizeReport,
+  type MigrationInventory,
+  type MigrationPageRequest,
+  type MigrationPlan,
+  type MigrationProject,
+  type MigrationProvider,
+  type MigrationStorageEndpoint,
+  type QueueMigrationBlocker,
+} from "./services/object-storage-migration.service";
+export {
+  MigrationS3StorageDriver,
+  resolveMigrationS3Region,
+  type MigrationS3Configuration,
+  type MigrationS3RegionConfiguration,
+} from "./adapters/aws.object-storage-migration.adapter";
+export {
+  MigrationCutoverRedisAudit,
+  type MigrationCutoverRedisConfig,
+} from "./adapters/redis.object-storage-migration.adapter";
+export {
+  auditGroupQueuesForStorageMigration,
+  type QueueAuditRedis,
+} from "./adapters/group-queue.object-storage-migration.adapter";

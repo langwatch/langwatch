@@ -144,3 +144,9 @@ export { DEFAULT_CLICKHOUSE_SETTINGS, READ_BACK_FOLD_INSERT_SETTINGS } from "./q
 /** The `CLICKHOUSE_URL__<label>__<org>` private-route key grammar.
  * Was `platform/app/src/server/clickhouse/privateRouteKey.ts`. */
 export * from "./privateRouteKey";
+
+/** The ClickHouse schema migration task — goose runner, TTL reconciliation,
+ * and the `@langwatch/task` catalogue entry that runs both. */
+export { ClickHouseMigrateTask } from "./tasks/clickhouse-migrate.task";
+export { parseConnectionUrl } from "./tasks/goose.migration-runner";
+export type { ClickHouseConfig } from "./tasks/goose.migration-runner";

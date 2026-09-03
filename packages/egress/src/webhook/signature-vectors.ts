@@ -21,7 +21,7 @@ import {
  * the algorithm.
  *
  * Regenerate with
- * `pnpm --filter @langwatch/worker task:webhook-signature-vectors`. The
+ * `pnpm --filter @langwatch/tasks task webhook-signature-vectors`. The
  * companion unit test beside this file fails when the committed file drifts
  * from what the generator would write, so a change to the signing code cannot
  * land without the vectors moving with it.
@@ -371,7 +371,7 @@ const VERIFICATION_VECTORS: VerificationVector[] = [
 export function buildVectors(): SignatureVectorFile {
   return {
     $schema_note:
-      "Generated file. Do not hand-edit: run `pnpm --filter @langwatch/worker task:webhook-signature-vectors`.",
+      "Generated file. Do not hand-edit: run `pnpm --filter @langwatch/tasks task webhook-signature-vectors`.",
     generated_by: "packages/egress/src/webhook/signature-vectors.ts",
     generated_from: "packages/egress/src/webhook/signature.ts",
     headers: {

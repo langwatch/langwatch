@@ -7,7 +7,7 @@ import type { DataRetentionService } from "@langwatch/data-retention-contract";
 import {
   RETENTION_TABLE_CATEGORY_MAP,
   type RetentionManagedTable,
-} from "@langwatch/data-retention-server/retention-tables";
+} from "@langwatch/data-retention-contract/retention-tables";
 import { PLATFORM_DEFAULT_RETENTION_DAYS } from "@langwatch/data-retention-contract";
 
 const logger = createLogger("langwatch:clickhouse:retention-floor");

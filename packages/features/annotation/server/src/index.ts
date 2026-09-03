@@ -35,3 +35,7 @@ export {
   type AnnotationRestCredentialPort,
   type AnnotationRestPermission,
 } from "./transport/api-rest/annotation.api";
+
+export { PostgresAnnotationBackfillAdapter } from "./adapters/postgres.annotation-backfill.adapter";
+export { AnnotationBackfillSourcePort, TraceAnnotationSyncPort } from "./ports/annotation-backfill.port";
+export { AnnotationClickHouseBackfillTask } from "./tasks/annotation-clickhouse-backfill.task";
