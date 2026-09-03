@@ -64,6 +64,7 @@ export BASE_FILES BRANCH_FILES DOCS_JSON
 python3 - <<'PY_EOF'
 import json
 import os
+import re
 import sys
 from urllib.parse import urlsplit
 
@@ -123,27 +124,70 @@ for entry in redirects:
         by_source.setdefault(source, entry.get("destination"))
 
 
-# Mintlify moves a whole section with a path parameter, `/old/:path*`. Such a
-# source is a prefix rather than one URL, so it covers the prefix itself and
-# everything under it. Longest prefix first, so the most specific one wins.
-wildcard_sources = sorted(
-    ((source, source.split("/:", 1)[0]) for source in by_source if "/:" in source),
-    key=lambda pair: len(pair[1]),
-    reverse=True,
-)
+# Mintlify redirect paths use path-to-regexp syntax: `:name` matches exactly
+# one segment, and `:name*` matches zero or more, which is how a whole section
+# moves (`/old/:path*`). Anything else in a segment is a literal.
+PARAMETER = re.compile(r"^:([A-Za-z_][A-Za-z0-9_]*)(\*?)$")
+
+
+def split_path(path):
+    trimmed = path.strip("/")
+    return trimmed.split("/") if trimmed else []
+
+
+def parameter_names(path):
+    """The names of the path parameters in a redirect source or destination."""
+    names = []
+    for segment in split_path(path):
+        match = PARAMETER.match(segment)
+        if match:
+            names.append(match.group(1))
+    return names
+
+
+def compile_source(source):
+    """A parameterised source -> (regex, literal prefix), or None if it is exact."""
+    pattern = ""
+    prefix = []
+    literal_so_far = True
+    has_parameter = False
+    for segment in split_path(source):
+        match = PARAMETER.match(segment)
+        if not match:
+            if literal_so_far:
+                prefix.append(segment)
+            pattern += "/" + re.escape(segment)
+            continue
+        literal_so_far = False
+        has_parameter = True
+        # `:name*` spans the rest of the path, `:name` is one segment.
+        pattern += "(?:/[^/]+)*" if match.group(2) else "/[^/]+"
+    if not has_parameter:
+        return None
+    return re.compile("^" + pattern + "/?$"), "/" + "/".join(prefix)
+
+
+# Longest literal prefix first, so the most specific section wins.
+wildcard_sources = []
+for source in by_source:
+    compiled = compile_source(source)
+    if compiled is not None:
+        regex, prefix = compiled
+        wildcard_sources.append((source, regex, prefix))
+wildcard_sources.sort(key=lambda item: len(item[2]), reverse=True)
 
 
 def covering_source(url):
     """The `source` in docs.json that routes this page URL, or None."""
     if url in by_source:
         return url
-    for source, prefix in wildcard_sources:
-        if url == prefix or url.startswith(prefix + "/"):
+    for source, regex, _prefix in wildcard_sources:
+        if regex.match(url):
             return source
     return None
 
 
-def destination_problem(destination):
+def destination_problem(destination, source):
     """None when the destination is good, else the reason it is not."""
     if not isinstance(destination, str) or not destination:
         return "destination is missing"
@@ -157,10 +201,20 @@ def destination_problem(destination):
         return f"destination '{destination}' is not https"
     if not destination.startswith("/"):
         return f"destination '{destination}' is not a path"
-    # A section redirect carries the wildcard through to the destination,
-    # `/old/:path*` -> `/new/:path*`. The destination is then a pattern and not
-    # one page, so there is nothing to resolve against the page list.
-    if "/:" in destination:
+    # A section redirect carries the parameter through to the destination,
+    # `/old/:path*` -> `/new/:path*`. The destination is then a pattern rather
+    # than one page, so there is nothing to resolve against the page list. The
+    # source has to capture every parameter the destination substitutes,
+    # otherwise the pattern resolves to nothing.
+    wanted = parameter_names(destination)
+    if wanted:
+        captured = parameter_names(source)
+        missing = [name for name in wanted if name not in captured]
+        if missing:
+            return (
+                f"destination '{destination}' uses ':{missing[0]}', which "
+                f"source '{source}' does not capture"
+            )
         return None
     target = destination.split("?", 1)[0].rstrip("/").lstrip("/")
     if target in branch_pages:
@@ -183,7 +237,7 @@ for path in removed:
         else:
             gaps.append(f"{url}: page removed on {branch}, no redirect in docs.json")
         continue
-    problem = destination_problem(by_source[source])
+    problem = destination_problem(by_source[source], source)
     if problem:
         via = "" if source == url else f" (via '{source}')"
         gaps.append(f"{url}{via}: {problem}")
