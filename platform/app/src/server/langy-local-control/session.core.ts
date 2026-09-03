@@ -332,7 +332,7 @@ export class LocalControlSessionCore {
         heartbeatIntervalMs: PRESENCE_HEARTBEAT_MS,
         conversation: {
           id: conversation.id,
-          title: conversation.title ?? "Langy",
+          title: conversationTitle(conversation.title),
           url: conversationUrl(conversation.id),
         },
         policy: { skipPermissions },
@@ -624,6 +624,34 @@ export function connectMessage(
 ): string {
   const branch = workspace.gitBranch ? `, branch ${workspace.gitBranch}` : "";
   return `Local folder connected: ${workspace.root} on ${hostname}${branch}`;
+}
+
+/**
+ * How long a conversation name may be where the terminal prints it on one
+ * line, next to the folder path and the project name.
+ */
+const MAX_TITLE_LENGTH = 60;
+
+/** The name of a conversation Langy has not named yet. */
+const UNNAMED_CONVERSATION_TITLE = "Langy";
+
+/**
+ * The conversation name the card and the terminal show.
+ *
+ * Langy names a conversation after the first turn, and that name is short. A
+ * conversation that has no name yet carries a placeholder cut from the first
+ * message, which runs to the width of the terminal and often stops mid word.
+ * So a name over the limit is cut back to the last whole word and closed with
+ * an ellipsis.
+ */
+export function conversationTitle(title: string | null | undefined): string {
+  const trimmed = (title ?? "").trim();
+  if (trimmed === "") return UNNAMED_CONVERSATION_TITLE;
+  if (trimmed.length <= MAX_TITLE_LENGTH) return trimmed;
+  const cut = trimmed.slice(0, MAX_TITLE_LENGTH);
+  const lastSpace = cut.lastIndexOf(" ");
+  const words = lastSpace > 0 ? cut.slice(0, lastSpace) : cut;
+  return `${words.replace(/[\s.,;:!?-]+$/, "")}\u2026`;
 }
 
 /**

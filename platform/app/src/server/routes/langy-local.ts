@@ -44,7 +44,10 @@ import {
   workspaceStatusSchema,
 } from "~/server/langy-local-control/http";
 import { getLocalControlRuntime } from "~/server/langy-local-control/runtime";
-import { conversationUrl } from "~/server/langy-local-control/session.core";
+import {
+  conversationTitle,
+  conversationUrl,
+} from "~/server/langy-local-control/session.core";
 import { reconcileSkipPolicy } from "~/server/langy-local-control/skip-policy";
 import { bodyLimit } from "./_lib/body-limit";
 
@@ -202,7 +205,7 @@ secured
         projectName: auth.projectName,
         userId: auth.userId,
         conversationId: conversation.id,
-        conversationTitle: conversation.title ?? "Langy",
+        conversationTitle: conversationTitle(conversation.title),
         conversationUrl: conversationUrl(conversation.id),
       });
       await getApp().commands.langy.requestLocalControl({
