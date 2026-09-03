@@ -161,6 +161,24 @@ describe("shrinking legacy feature fragment inventory", () => {
     );
   });
 
+  it("rejects an empty baseline file as a retained exception surface (R9)", () => {
+    write(
+      "packages/architecture-lint/src/legacy-feature-fragment-baseline.json",
+      JSON.stringify({ version: 0, fragments: [] }),
+    );
+
+    expect(fragmentViolations()).toContainEqual(
+      expect.objectContaining({
+        policy: "legacy-feature-fragment-baseline",
+        message: expect.stringContaining("must be deleted"),
+      }),
+    );
+  });
+
+  it("does not fail when no baseline file exists at all", () => {
+    expect(fragmentViolations()).toEqual([]);
+  });
+
   it("validates canonical ordering and duplicate feature/file entries", () => {
     write(
       "platform/app/src/server/datasets/dataset.service.ts",

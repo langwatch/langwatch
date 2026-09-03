@@ -26,14 +26,9 @@ function isEnterpriseRuntimeDependency(name: string): boolean {
   ].some((pattern) => pattern.test(name));
 }
 
-function compatibleEnterpriseCompositionTarget(
-  pkg: ClassifiedPackage,
-  target: ClassifiedPackage,
-): boolean {
+function compatibleEnterpriseCompositionTarget(target: ClassifiedPackage): boolean {
   if (target.kind === "contract") return true;
-  if (!target.enterprise || !target.feature) return false;
-  if (pkg.enterpriseCompositionRole === "web") return target.kind === "web";
-  return target.kind === "server";
+  return Boolean(target.enterprise && target.feature && target.kind === "server");
 }
 
 function matchingEnterpriseComposition(
@@ -42,16 +37,7 @@ function matchingEnterpriseComposition(
 ): boolean {
   if (target.kind !== "enterprise-composition") return true;
   if (pkg.kind !== "application") return false;
-  if (pkg.applicationRole === "ui") {
-    return target.enterpriseCompositionRole === "web";
-  }
-  if (pkg.applicationRole === "api") {
-    return target.enterpriseCompositionRole === "api";
-  }
-  if (pkg.applicationRole === "worker") {
-    return target.enterpriseCompositionRole === "worker";
-  }
-  return false;
+  return pkg.applicationRole === target.enterpriseCompositionRole;
 }
 
 export function manifestDependencies(manifest: PackageManifest): Record<string, string> {
@@ -155,24 +141,20 @@ export function lintManifests(packages: ClassifiedPackage[]): ArchitectureViolat
           policy: "enterprise-composition",
           file: pkg.manifestPath,
           specifier: dependency,
-          message:
-            "Enterprise API, worker, and web composition packages cannot depend on one another.",
+          message: "Enterprise API and worker composition packages cannot depend on one another.",
         });
       }
       if (
         pkg.kind === "enterprise-composition" &&
         target.feature &&
-        !compatibleEnterpriseCompositionTarget(pkg, target)
+        !compatibleEnterpriseCompositionTarget(target)
       ) {
         violations.push({
           policy: "enterprise-composition",
           file: pkg.manifestPath,
           specifier: dependency,
           message: `The ${pkg.enterpriseCompositionRole} Enterprise composition cannot import ${target.kind} surface ${target.name}.`,
-          allowed:
-            pkg.enterpriseCompositionRole === "web"
-              ? "Depend only on portable contracts and Enterprise web surfaces."
-              : `Depend only on portable contracts and Enterprise ${pkg.enterpriseCompositionRole} or server installers.`,
+          allowed: `Depend only on portable contracts and Enterprise ${pkg.enterpriseCompositionRole} or server installers.`,
         });
       }
       if (pkg.kind === "enterprise-root" && target.kind !== "contract") {

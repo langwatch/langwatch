@@ -35,11 +35,18 @@ export type {
 } from "./types";
 export { readFeatureCatalogue } from "./feature-catalogue";
 export { lintApiTransportBoundaries } from "./api-transport-boundaries";
-export { changedSourceFiles, lintCommentBlocks } from "./comment-blocks";
+export {
+  changedSourceFiles,
+  compareCommentBlockRoots,
+  lintCommentBlocks,
+  lintCommentBlockRoots,
+} from "./comment-blocks";
 export type {
   CommentBlockLintOptions,
   CommentBlockLintResult,
   CommentBlockReview,
+  CommentBlockRootEntry,
+  CommentBlockRootsBaselineCheck,
 } from "./comment-blocks";
 export type {
   LegacyApplicationBoundaryEdge,

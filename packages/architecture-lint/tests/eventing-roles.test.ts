@@ -75,7 +75,7 @@ describe("Eventing role lint", () => {
 
   it("rejects external work from a process definition", () => {
     write(
-      "apps/api/src/order.process.ts",
+      "apps/api/src/processes/order.process.ts",
       "export async function evolve() { await new Promise((resolve) => setTimeout(resolve, 1)); }",
     );
 
@@ -84,7 +84,7 @@ describe("Eventing role lint", () => {
 
   it("applies executable eventing rules in Enterprise API and worker composition", () => {
     write(
-      "packages/enterprise/composition/api/src/governance/unsafe.process.ts",
+      "packages/enterprise/composition/api/src/processes/unsafe.process.ts",
       'import "node:http"; export async function evolve() { await fetch("https://example.com"); }',
     );
     write(
@@ -137,5 +137,32 @@ describe("Eventing role lint", () => {
     );
 
     expect(policies([pkg])).toContain("eventing-subscriber-idempotency");
+  });
+
+  it("does not classify apps/api's OS process entry as a process manager", () => {
+    write(
+      "apps/api/src/api.process.ts",
+      "export async function main() { await new Promise((resolve) => setTimeout(resolve, 1)); }",
+    );
+
+    expect(policies()).toEqual([]);
+  });
+
+  it("does not classify apps/worker's OS process entry as a process manager", () => {
+    write(
+      "apps/worker/src/worker.process.ts",
+      "export async function main() { await new Promise((resolve) => setTimeout(resolve, 1)); }",
+    );
+
+    expect(policies()).toEqual([]);
+  });
+
+  it("still classifies a *-process.service.ts masquerade as a process manager", () => {
+    write(
+      "apps/worker/src/identity-process.service.ts",
+      "export async function evolve() { await new Promise((resolve) => setTimeout(resolve, 1)); }",
+    );
+
+    expect(policies()).toContain("eventing-process-purity");
   });
 });

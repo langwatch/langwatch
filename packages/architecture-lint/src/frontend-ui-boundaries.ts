@@ -96,6 +96,18 @@ type Capability = {
 
 type WebPackage = ClassifiedPackage & { kind: "web"; feature: string };
 
+/**
+ * Screens are allowed the typed client and React Query (lane T puts
+ * `trpcReact` from `@langwatch/platform-api-client` in every web package);
+ * they still may not reach for `@trpc/client` or `@trpc/react-query/*` raw.
+ */
+function isScreenPortableTransport(specifier: string): boolean {
+  return (
+    /^@tanstack\/react-query(?:\/|$)/.test(specifier) ||
+    /^@langwatch\/platform-api-client(?:\/|$)/.test(specifier)
+  );
+}
+
 const BROWSER_CAPABILITY_IMPORTS: ReadonlyArray<readonly [RegExp, string]> = [
   [/^@tanstack\/react-query(?:\/|$)/, "React Query directly"],
   [/^@trpc\/(?:client|react-query)(?:\/|$)/, "tRPC transport directly"],
@@ -458,8 +470,13 @@ function browserCapabilitySourceViolations(source: string): string[] {
  * names it portable in that role.
  *
  * Everything else first-party has to prove it.
+ *
+ * `ui-drawer` and `ui-host` join the Design System here for the same reason:
+ * both are UI platform packages, not features, and neither can prove
+ * portable by scanning its imports (they are React by construction).
  */
-const PORTABLE_BY_ROLE = /^@langwatch\/(?:design-system(?:\/|$)|[^/]+-contract(?:\/|$))/;
+const PORTABLE_BY_ROLE =
+  /^@langwatch\/(?:design-system(?:\/|$)|ui-drawer(?:\/|$)|ui-host(?:\/|$)|[^/]+-contract(?:\/|$))/;
 
 export type PortableModuleOracle = {
   /** Whether a first-party specifier resolves to a provably portable module. */
@@ -561,6 +578,7 @@ function forbiddenWebPresentationImport({
   specifier: string;
   portable: PortableModuleOracle;
 }): string | undefined {
+  if (isScreenPortableTransport(specifier)) return void 0;
   const forbiddenUiSpecifier = isForbiddenUiSpecifier(specifier);
   if (forbiddenUiSpecifier) return forbiddenUiSpecifier;
   const forbiddenCapability = forbiddenBrowserCapabilityImport(specifier);
@@ -609,7 +627,8 @@ function lintUiRootDirectories(root: string): ArchitectureViolation[] {
   if (!existsSync(sourceRoot)) return [];
   return sourceFiles(sourceRoot).flatMap((file) => {
     const segments = relative(sourceRoot, file).split(sep);
-    const isPackageEntry = segments.length === 1 && segments[0] === "index.ts";
+    const isPackageEntry =
+      segments.length === 1 && (segments[0] === "index.ts" || segments[0] === "ui.entrypoint.tsx");
     if (isPackageEntry || (segments.length > 1 && UI_SOURCE_DIRECTORIES.has(segments[0]!))) {
       return [];
     }

@@ -1,11 +1,4 @@
-import {
-  existsSync,
-  mkdirSync,
-  mkdtempSync,
-  readFileSync,
-  rmSync,
-  writeFileSync,
-} from "node:fs";
+import { existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { dirname, join } from "node:path";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
@@ -149,8 +142,7 @@ The ${feature} implementation becomes singular at the cost of explicit compositi
       name,
       type: "module",
       exports,
-      dependencies:
-        role === "contract" ? { zod: "^4.4.3", ...dependencies } : dependencies,
+      dependencies: role === "contract" ? { zod: "^4.4.3", ...dependencies } : dependencies,
     }),
   );
   write(
@@ -168,10 +160,7 @@ The ${feature} implementation becomes singular at the cost of explicit compositi
   write(`${prefix}/src/index.ts`, source);
   const serviceName = `${className(feature)}Service`;
   if (layoutVersion === 0 && role === "contract") {
-    write(
-      `${prefix}/src/${feature}.service.ts`,
-      `export abstract class ${serviceName} {}`,
-    );
+    write(`${prefix}/src/${feature}.service.ts`, `export abstract class ${serviceName} {}`);
   }
   if (layoutVersion === 0 && role === "server") {
     write(
@@ -284,10 +273,7 @@ describe("feature package boundary lint", () => {
     featurePackage({ feature: "agent", role: "contract" });
     featurePackage({ feature: "agent", role: "server" });
     featurePackage({ feature: "agent", role: "web" });
-    write(
-      "packages/features/agent/contract/src/agentCommands.ts",
-      "export const value = true;",
-    );
+    write("packages/features/agent/contract/src/agentCommands.ts", "export const value = true;");
     write(
       "packages/features/agent/server/src/services/agentService.service.ts",
       "export const value = true;",
@@ -500,6 +486,110 @@ describe("feature package boundary lint", () => {
     expect(policies()).toContain("private-runtime-export");
   });
 
+  /** @scenario testing.ts may export a memory repository double */
+  it("allows testing.ts to export a repository under repositories/memory", () => {
+    featurePackage({
+      feature: "agent",
+      role: "server",
+      exports: {
+        ".": "./src/index.ts",
+        "./testing": "./src/testing.ts",
+      },
+    });
+    write(
+      "packages/features/agent/server/src/testing.ts",
+      'export { MemoryAgentRepository } from "./repositories/memory/memory.agent.repository";',
+    );
+    write(
+      "packages/features/agent/server/src/repositories/memory/memory.agent.repository.ts",
+      "export class MemoryAgentRepository {}",
+    );
+
+    expect(policies()).not.toContain("private-runtime-export");
+  });
+
+  /** @scenario testing.ts may export a fake/stub/null-named repository double */
+  it("allows testing.ts to export a fake-named repository double", () => {
+    featurePackage({
+      feature: "agent",
+      role: "server",
+      exports: {
+        ".": "./src/index.ts",
+        "./testing": "./src/testing.ts",
+      },
+    });
+    write(
+      "packages/features/agent/server/src/testing.ts",
+      'export { FakeAgentRepository } from "./repositories/fake.agent.repository";',
+    );
+    write(
+      "packages/features/agent/server/src/repositories/fake.agent.repository.ts",
+      "export class FakeAgentRepository {}",
+    );
+
+    expect(policies()).not.toContain("private-runtime-export");
+  });
+
+  /** @scenario testing.ts may export test fakes from a *.test-fakes.ts module */
+  it("allows testing.ts to export from a *.test-fakes.ts module", () => {
+    featurePackage({
+      feature: "agent",
+      role: "server",
+      exports: {
+        ".": "./src/index.ts",
+        "./testing": "./src/testing.ts",
+      },
+    });
+    write(
+      "packages/features/agent/server/src/testing.ts",
+      'export { agentFixture } from "./stores/agent.test-fakes";',
+    );
+    write(
+      "packages/features/agent/server/src/stores/agent.test-fakes.ts",
+      "export const agentFixture = {};",
+    );
+
+    expect(policies()).not.toContain("private-runtime-export");
+  });
+
+  /** @scenario testing.ts still rejects a real repository, store, or projection */
+  it("still rejects testing.ts exporting a real repository", () => {
+    featurePackage({
+      feature: "agent",
+      role: "server",
+      exports: {
+        ".": "./src/index.ts",
+        "./testing": "./src/testing.ts",
+      },
+    });
+    write(
+      "packages/features/agent/server/src/testing.ts",
+      'export { AgentRepository } from "./repositories/prisma/prisma.agent.repository";',
+    );
+    write(
+      "packages/features/agent/server/src/repositories/prisma/prisma.agent.repository.ts",
+      "export class AgentRepository {}",
+    );
+
+    expect(policies()).toContain("private-runtime-export");
+  });
+
+  /** @scenario A memory repository double still cannot escape through index.ts */
+  it("still rejects index.ts exporting a memory repository double", () => {
+    featurePackage({
+      feature: "agent",
+      role: "server",
+      source:
+        'export { MemoryAgentRepository } from "./repositories/memory/memory.agent.repository";',
+    });
+    write(
+      "packages/features/agent/server/src/repositories/memory/memory.agent.repository.ts",
+      "export class MemoryAgentRepository {}",
+    );
+
+    expect(policies()).toContain("private-runtime-export");
+  });
+
   /** @scenario A type-only export of a repository's database type is allowed */
   it("allows a type-only export of a repository's database type", () => {
     featurePackage({
@@ -677,9 +767,7 @@ describe("strict feature source layout", () => {
       "export class PrismaAgentRepository {}",
     );
 
-    const layoutPolicies = policies().filter(
-      (policy) => policy === "feature-source-layout",
-    );
+    const layoutPolicies = policies().filter((policy) => policy === "feature-source-layout");
     expect(layoutPolicies).toHaveLength(2);
   });
 
@@ -705,9 +793,7 @@ describe("strict feature source layout", () => {
       "export abstract class AgentRepository {}",
     );
 
-    const layoutPolicies = policies().filter(
-      (policy) => policy === "feature-source-layout",
-    );
+    const layoutPolicies = policies().filter((policy) => policy === "feature-source-layout");
     expect(layoutPolicies.length).toBeGreaterThanOrEqual(2);
   });
 
@@ -830,9 +916,7 @@ describe("Prisma client containment", () => {
       'import type { PrismaClient } from "@langwatch/prisma-client/generated"; export class AgentsService { static create(_client: PrismaClient) { return new AgentsService(); } }',
     );
 
-    expect(policies().filter((policy) => policy === "prisma-containment")).toHaveLength(
-      3,
-    );
+    expect(policies().filter((policy) => policy === "prisma-containment")).toHaveLength(3);
   });
 
   it("allows lifecycle construction in an app but rejects it from feature services", () => {
@@ -854,9 +938,7 @@ describe("Prisma client containment", () => {
       'import { PrismaConnectionService } from "@langwatch/prisma-client"; export { PrismaConnectionService };',
     );
 
-    expect(policies().filter((policy) => policy === "prisma-containment")).toHaveLength(
-      1,
-    );
+    expect(policies().filter((policy) => policy === "prisma-containment")).toHaveLength(1);
   });
 
   /** @scenario Prisma cannot leak through public declarations */
@@ -864,8 +946,7 @@ describe("Prisma client containment", () => {
     featurePackage({
       feature: "agent",
       role: "server",
-      source:
-        'export type { PrismaBacked } from "./repositories/prisma/prisma.agents.repository";',
+      source: 'export type { PrismaBacked } from "./repositories/prisma/prisma.agents.repository";',
     });
     write(
       "packages/features/agent/server/src/repositories/prisma/prisma.agents.repository.ts",

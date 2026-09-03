@@ -69,7 +69,27 @@ function generatedImport(specifier: string): boolean {
  * other layer speaks to Prisma only through the port the repository fronts.
  * That is the invariant `service-repository-adapter-port.md` documents.
  */
+/**
+ * Composition roots (applications, enterprise compositions) are the seam
+ * CLAUDE.md names for the typed Prisma client: a composition, mount, or
+ * infrastructure file that wires it into a feature's adapter. Feature
+ * packages get no such allowance — a service, port or transport there stays
+ * a violation (see A6/A7 in the burn-down plan).
+ */
+function isCompositionRoot(pkg: ClassifiedPackage): boolean {
+  return pkg.kind === "application" || pkg.kind === "enterprise-composition";
+}
+
+function isCompositionPrismaSeam(file: string): boolean {
+  if (/\.composition\.ts$/.test(file)) return true;
+  if (/\.mount\.ts$/.test(file)) return true;
+  if (/\.adapter\.ts$/.test(file)) return true;
+  if (file.includes(`${sep}src${sep}platform${sep}infrastructure${sep}`)) return true;
+  return false;
+}
+
 function isStrictPrismaAdapter(pkg: ClassifiedPackage, file: string): boolean {
+  if (isCompositionRoot(pkg)) return isCompositionPrismaSeam(file);
   if (pkg.kind !== "server") return false;
   if (isWithin(join(pkg.root, "src", "repositories", "prisma"), file)) return true;
   return /\/src\/adapters\/postgres\.[^/]+\.adapter\.ts$/.test(file);

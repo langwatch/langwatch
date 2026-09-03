@@ -4,11 +4,7 @@ import ts from "typescript";
 import { z } from "zod";
 import { walkFiles } from "./files";
 import { exportedSubpaths } from "./manifests";
-import type {
-  ArchitectureViolation,
-  ClassifiedPackage,
-  EnterpriseCompositionRole,
-} from "./types";
+import type { ArchitectureViolation, ClassifiedPackage } from "./types";
 
 const SOURCE_FILE = /\.[cm]?[jt]sx?$/;
 const LEGACY_BASELINE_PATH = join(
@@ -224,14 +220,9 @@ function targetPackage(
   );
 }
 
-function compatibleEnterpriseTarget(
-  role: EnterpriseCompositionRole | undefined,
-  target: ClassifiedPackage,
-): boolean {
+function compatibleEnterpriseTarget(target: ClassifiedPackage): boolean {
   if (target.kind === "contract") return true;
-  if (!target.enterprise || !target.feature) return false;
-  if (role === "web") return target.kind === "web";
-  return target.kind === "server";
+  return Boolean(target.enterprise && target.feature && target.kind === "server");
 }
 
 function matchingEnterpriseComposition(
@@ -240,9 +231,6 @@ function matchingEnterpriseComposition(
 ): boolean {
   if (target.kind !== "enterprise-composition") return true;
   if (importer.kind !== "application") return false;
-  if (importer.applicationRole === "ui") {
-    return target.enterpriseCompositionRole === "web";
-  }
   return importer.applicationRole === target.enterpriseCompositionRole;
 }
 
@@ -298,13 +286,12 @@ function lintClassifiedSourceImports(
           file: sourceImport.file,
           line: sourceImport.line,
           specifier: sourceImport.specifier,
-          message:
-            "Enterprise API, worker, and web composition packages cannot import one another.",
+          message: "Enterprise API and worker composition packages cannot import one another.",
         });
       } else if (
         pkg.kind === "enterprise-composition" &&
         target?.feature &&
-        !compatibleEnterpriseTarget(pkg.enterpriseCompositionRole, target)
+        !compatibleEnterpriseTarget(target)
       ) {
         violations.push({
           policy: "enterprise-composition",
@@ -312,10 +299,7 @@ function lintClassifiedSourceImports(
           line: sourceImport.line,
           specifier: sourceImport.specifier,
           message: `The ${pkg.enterpriseCompositionRole} Enterprise composition cannot import ${target.kind} surface ${target.name}.`,
-          allowed:
-            pkg.enterpriseCompositionRole === "web"
-              ? "Depend only on portable contracts and Enterprise web surfaces."
-              : `Depend only on portable contracts and Enterprise ${pkg.enterpriseCompositionRole} or server installers.`,
+          allowed: `Depend only on portable contracts and Enterprise ${pkg.enterpriseCompositionRole} or server installers.`,
         });
       }
 

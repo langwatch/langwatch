@@ -76,7 +76,6 @@ function application(
 const ENTERPRISE_COMPOSITION_NAMES: Record<EnterpriseCompositionRole, string> = {
   api: "@langwatch/enterprise-api",
   worker: "@langwatch/enterprise-worker",
-  web: "@langwatch/enterprise-web",
 };
 
 function enterpriseComposition(
@@ -248,12 +247,6 @@ describe("Enterprise aggregate boundaries", () => {
     });
     enterpriseComposition("worker", {
       "@langwatch/enterprise-billing-server": "workspace:*",
-    });
-    enterpriseComposition("web", {
-      "@langwatch/enterprise-billing-web": "workspace:*",
-    });
-    application("ui", {
-      dependencies: { "@langwatch/enterprise-web": "workspace:*" },
     });
     application("api", {
       dependencies: { "@langwatch/enterprise-api": "workspace:*" },

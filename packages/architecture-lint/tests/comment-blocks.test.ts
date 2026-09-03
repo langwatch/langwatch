@@ -3,7 +3,12 @@ import { mkdirSync, mkdtempSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { dirname, join } from "node:path";
 import { describe, expect, it } from "vitest";
-import { changedSourceFiles, lintCommentBlocks } from "../src";
+import {
+  changedSourceFiles,
+  compareCommentBlockRoots,
+  lintCommentBlockRoots,
+  lintCommentBlocks,
+} from "../src";
 
 function lineComments(lines: number): string {
   return Array.from({ length: lines }, () => "// comment").join("\n");
@@ -104,6 +109,171 @@ describe("oversized comment blocks", () => {
       "src/untracked.ts",
     ]);
     expect(lintCommentBlocks(root, { files }).violations).toHaveLength(3);
+  });
+
+  describe("the whole-repo root allowlist (R1)", () => {
+    it("errors on 6+ lines in a changed file always, even under an allowed root", () => {
+      const root = mkdtempSync(join(tmpdir(), "comment-blocks-changed-always-"));
+      writeFixture(root, "packages/legacy/src/six.ts", blockComment(6));
+
+      const result = lintCommentBlocks(root, {
+        changedFiles: ["packages/legacy/src/six.ts"],
+        allowedRoots: [{ root: "packages/legacy", blocks: 1, expires: "2099-01-01" }],
+      });
+
+      expect(result.violations).toMatchObject([
+        { policy: "comment-block-size", file: join(root, "packages/legacy/src/six.ts") },
+      ]);
+    });
+
+    it("exempts 6+ lines in an unchanged file whose root is allowed and unexpired", () => {
+      const root = mkdtempSync(join(tmpdir(), "comment-blocks-allowed-root-"));
+      writeFixture(root, "packages/legacy/src/six.ts", blockComment(6));
+      writeFixture(root, "packages/other/src/six.ts", blockComment(6));
+
+      const result = lintCommentBlocks(root, {
+        changedFiles: [],
+        allowedRoots: [{ root: "packages/legacy", blocks: 1, expires: "2099-01-01" }],
+        now: new Date("2026-01-01T00:00:00Z"),
+      });
+
+      expect(result.violations).toMatchObject([
+        { policy: "comment-block-size", file: join(root, "packages/other/src/six.ts") },
+      ]);
+    });
+
+    it("stops exempting an unchanged file once its root's allowlist entry has expired", () => {
+      const root = mkdtempSync(join(tmpdir(), "comment-blocks-expired-root-"));
+      writeFixture(root, "packages/legacy/src/six.ts", blockComment(6));
+
+      const result = lintCommentBlocks(root, {
+        changedFiles: [],
+        allowedRoots: [{ root: "packages/legacy", blocks: 1, expires: "2020-01-01" }],
+        now: new Date("2026-01-01T00:00:00Z"),
+      });
+
+      expect(result.violations).toMatchObject([
+        { policy: "comment-block-size", file: join(root, "packages/legacy/src/six.ts") },
+      ]);
+    });
+
+    it("does not scan the 4-5 line warn tier outside changed files", () => {
+      const root = mkdtempSync(join(tmpdir(), "comment-blocks-unchanged-warn-"));
+      writeFixture(root, "packages/other/src/four.ts", lineComments(4));
+
+      const result = lintCommentBlocks(root, { changedFiles: [] });
+
+      expect(result.reviews).toEqual([]);
+      expect(result.violations).toEqual([]);
+    });
+  });
+
+  describe("comment-block-roots.json (R1)", () => {
+    function writeRootsFile(root: string, contents: unknown): void {
+      writeFixture(
+        root,
+        "packages/architecture-lint/src/comment-block-roots.json",
+        JSON.stringify(contents),
+      );
+    }
+
+    it("reports an expired entry", () => {
+      const root = mkdtempSync(join(tmpdir(), "comment-block-roots-expired-"));
+      writeRootsFile(root, {
+        version: 0,
+        roots: [{ root: "packages/legacy", blocks: 10, expires: "2020-01-01" }],
+      });
+
+      const check = lintCommentBlockRoots(root, void 0, new Date("2026-01-01T00:00:00Z"));
+
+      expect(check.violations).toMatchObject([{ policy: "comment-block-root-expired" }]);
+    });
+
+    it("stays quiet for an entry that has not expired", () => {
+      const root = mkdtempSync(join(tmpdir(), "comment-block-roots-fresh-"));
+      writeRootsFile(root, {
+        version: 0,
+        roots: [{ root: "packages/legacy", blocks: 10, expires: "2099-01-01" }],
+      });
+
+      const check = lintCommentBlockRoots(root, void 0, new Date("2026-01-01T00:00:00Z"));
+
+      expect(check.violations).toEqual([]);
+      expect(check.entries).toEqual([
+        { root: "packages/legacy", blocks: 10, expires: "2099-01-01" },
+      ]);
+    });
+
+    it("rejects growth against a merge-base reference: a raised block count, a later expiry, or a new root", () => {
+      const root = mkdtempSync(join(tmpdir(), "comment-block-roots-growth-"));
+      writeRootsFile(root, {
+        version: 0,
+        roots: [
+          { root: "packages/legacy", blocks: 20, expires: "2099-02-01" },
+          { root: "packages/new", blocks: 5, expires: "2099-01-01" },
+        ],
+      });
+      writeFixture(
+        root,
+        "reference/comment-block-roots.json",
+        JSON.stringify({
+          version: 0,
+          roots: [{ root: "packages/legacy", blocks: 10, expires: "2099-01-01" }],
+        }),
+      );
+
+      const check = lintCommentBlockRoots(root, "reference/comment-block-roots.json");
+
+      expect(check.violations).toEqual(
+        expect.arrayContaining([
+          expect.objectContaining({
+            policy: "comment-block-root-baseline-growth",
+            message: expect.stringContaining("increase packages/legacy's block count"),
+          }),
+          expect.objectContaining({
+            policy: "comment-block-root-baseline-growth",
+            message: expect.stringContaining("move packages/legacy's expiry later"),
+          }),
+          expect.objectContaining({
+            policy: "comment-block-root-baseline-growth",
+            message: expect.stringContaining("cannot add packages/new"),
+          }),
+        ]),
+      );
+    });
+
+    it("accepts shrinking the allowlist against a reference: a lower count, an earlier expiry, or a dropped root", () => {
+      const root = mkdtempSync(join(tmpdir(), "comment-block-roots-shrink-"));
+      writeRootsFile(root, {
+        version: 0,
+        roots: [{ root: "packages/legacy", blocks: 5, expires: "2099-01-01" }],
+      });
+      writeFixture(
+        root,
+        "reference/comment-block-roots.json",
+        JSON.stringify({
+          version: 0,
+          roots: [
+            { root: "packages/legacy", blocks: 10, expires: "2099-02-01" },
+            { root: "packages/gone", blocks: 3, expires: "2099-01-01" },
+          ],
+        }),
+      );
+
+      const check = lintCommentBlockRoots(root, "reference/comment-block-roots.json");
+
+      expect(check.violations).toEqual([]);
+    });
+
+    it("compares reference and proposed allowlists directly", () => {
+      const violations = compareCommentBlockRoots(
+        [{ root: "packages/legacy", blocks: 10, expires: "2099-01-01" }],
+        [{ root: "packages/legacy", blocks: 11, expires: "2099-01-01" }],
+        "comment-block-roots.json",
+      );
+
+      expect(violations).toMatchObject([{ policy: "comment-block-root-baseline-growth" }]);
+    });
   });
 
   it("ignores licences, generated headers, generated files, and build output", () => {

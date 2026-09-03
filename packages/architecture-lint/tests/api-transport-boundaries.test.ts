@@ -93,7 +93,7 @@ describe("strict feature API transport boundaries", () => {
     // findings under `packages/architecture-lint/apps/api/...` — a path that
     // does not exist, so the reader could not open the file the rule named.
     write(
-      "apps/api/src/features/thing/thing.mount.ts",
+      "apps/api/src/features/thing/thing.api.ts",
       'import type { PrismaClient } from "@langwatch/prisma-client/generated";\nexport type T = PrismaClient;',
     );
 
@@ -101,6 +101,42 @@ describe("strict feature API transport boundaries", () => {
 
     expect(violation).toBeDefined();
     expect(existsSync(violation!.file)).toBe(true);
+  });
+
+  it("does not scan apps/api's *.mount.ts files — a mount is a composition seam", () => {
+    write(
+      "apps/api/src/features/thing/thing.mount.ts",
+      'import type { PrismaClient } from "@langwatch/prisma-client/generated";\nexport type T = PrismaClient;',
+    );
+
+    expect(violations([apiApplication()])).toEqual([]);
+  });
+
+  it("does not treat apps/api's composition roots or platform/infrastructure as transport", () => {
+    write(
+      "apps/api/src/app/api-usage.composition.ts",
+      'import type { PrismaClient } from "@langwatch/prisma-client/generated";\nexport type T = PrismaClient;',
+    );
+    write(
+      "apps/api/src/platform/infrastructure/api-database.infrastructure.ts",
+      'import type { PrismaClient } from "@langwatch/prisma-client/generated";\nexport type T = PrismaClient;',
+    );
+
+    expect(violations([apiApplication()])).toEqual([]);
+  });
+
+  it("still scans apps/api's app-trpc and app-rest roots", () => {
+    write(
+      "apps/api/src/app-trpc/thing.router.ts",
+      'import type { PrismaClient } from "@langwatch/prisma-client/generated";\nexport type T = PrismaClient;',
+    );
+    write(
+      "apps/api/src/app-rest/thing.api.ts",
+      'import type { PrismaClient } from "@langwatch/prisma-client/generated";\nexport type T = PrismaClient;',
+    );
+
+    const found = violations([apiApplication()]);
+    expect(found).toHaveLength(2);
   });
 
   it("rejects persistence, environment and application implementation imports", () => {
@@ -256,7 +292,7 @@ describe("strict feature API transport boundaries", () => {
 
   it("applies structural import and locator checks to apps/api without banning its Hono root", () => {
     write(
-      "apps/api/src/widget.transport.ts",
+      "apps/api/src/app-rest/widget.transport.ts",
       `
         import { Hono } from "hono";
         import { env } from "./env";

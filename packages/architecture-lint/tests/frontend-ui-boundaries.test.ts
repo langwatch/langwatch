@@ -211,6 +211,13 @@ describe("frontend UI architecture boundaries", () => {
     expect(policies([]).filter((policy) => policy === "ui-root-catch-all")).toHaveLength(4);
   });
 
+  it("exempts apps/ui's Vite entrypoint file from ui-root-catch-all", () => {
+    writeCatalogue([{ id: "prompt-studio" }]);
+    write("apps/ui/src/ui.entrypoint.tsx", "export {};");
+
+    expect(policies([]).filter((policy) => policy === "ui-root-catch-all")).toEqual([]);
+  });
+
   it("enforces global, screen, and frontend feature dependency direction", () => {
     writeCatalogue([{ id: "prompt-studio" }, { id: "trace-explorer" }]);
     write("apps/ui/src/behavior/api/client.ts", 'import "../../features/prompt-studio/route";');
@@ -505,6 +512,27 @@ describe("frontend UI architecture boundaries", () => {
     );
   });
 
+  it("allows an owner-only screen to use the typed client and React Query, but not raw tRPC transport", () => {
+    const promptWeb = webPackage("prompt", {
+      "./screens/prompt-studio": "./src/screens/prompt-studio/index.ts",
+    });
+    writeCatalogue([
+      { id: "prompt-studio", screens: ["@langwatch/prompt-web/screens/prompt-studio"] },
+    ]);
+    write(
+      "packages/features/prompt/web/src/screens/prompt-studio/index.ts",
+      [
+        'import "@langwatch/platform-api-client";',
+        'import "@tanstack/react-query";',
+        'import "@trpc/client";',
+        'import "@trpc/react-query/shared";',
+      ].join("\n"),
+    );
+
+    const found = policies([promptWeb]).filter((policy) => policy === "ui-screen-closure");
+    expect(found).toHaveLength(2);
+  });
+
   it("reads a method named fetch on an object as the method it is", () => {
     const promptWeb = webPackage("prompt", {
       "./screens/prompt-studio": "./src/screens/prompt-studio/index.ts",
@@ -692,6 +720,16 @@ describe("frontend UI architecture boundaries", () => {
 
     expect(policies([]).filter((policy) => policy === "ui-backend-access")).toHaveLength(8);
     expect(policies([]).filter((policy) => policy === "ui-browser-capability")).toHaveLength(3);
+  });
+
+  it("allows frontend features to import the UI platform packages ui-drawer and ui-host", () => {
+    writeCatalogue([{ id: "prompt-studio" }]);
+    write(
+      "apps/ui/src/features/prompt-studio/route.ts",
+      ['import "@langwatch/ui-drawer";', 'import "@langwatch/ui-host";'].join("\n"),
+    );
+
+    expect(policies([]).filter((policy) => policy === "ui-browser-capability")).toEqual([]);
   });
 
   it("reads code, not the comments that explain why the code avoids something", () => {

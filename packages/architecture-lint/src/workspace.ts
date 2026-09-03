@@ -31,7 +31,6 @@ const ENTERPRISE_COMPOSITION_PACKAGES: ReadonlyArray<{
 }> = [
   { role: "api", name: "@langwatch/enterprise-api" },
   { role: "worker", name: "@langwatch/enterprise-worker" },
-  { role: "web", name: "@langwatch/enterprise-web" },
 ];
 
 function readManifest(path: string): PackageManifest {

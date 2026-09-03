@@ -1,5 +1,5 @@
 import { existsSync, readFileSync, statSync } from "node:fs";
-import { dirname, join, relative, resolve, sep } from "node:path";
+import { basename, dirname, join, relative, resolve, sep } from "node:path";
 import ts from "typescript";
 import { walkFiles } from "./files";
 import type { ArchitectureViolation, ClassifiedPackage, FeatureCatalogueEntry } from "./types";
@@ -257,6 +257,12 @@ function lintServer(pkg: ClassifiedPackage): ArchitectureViolation[] {
 }
 
 const PRIVATE_SERVER_EXPORT = /(?:^|\/)(?:projections|repositories|stores)(?:\/|$)/;
+/**
+ * What `src/testing.ts` may still export past `PRIVATE_SERVER_EXPORT`: a
+ * double, not a real repository, store, or projection (R6, burn-down §4).
+ */
+const TESTING_ENTRY_DOUBLE =
+  /(?:^|\/)(?:repositories|stores)\/memory(?:\/|$)|(?:^|\/)(?:memory|null|stub|fake)\.[^/]+\.(?:repository|store)\.ts$|(?:^|\/)[^/]*\.test-fakes\.ts$/;
 const SOURCE_FILE_EXTENSIONS = [".ts", ".tsx"] as const;
 
 /**
@@ -329,7 +335,11 @@ function resolveImportsAlias(specifier: string, pkg: ClassifiedPackage): string 
 }
 
 /** Resolves a relative or `#`-aliased specifier to the file it loads, or `undefined` for anything else (bare package specifiers are out of scope: they cannot name this package's own private directories). */
-function resolveSpecifier(fromFile: string, specifier: string, pkg: ClassifiedPackage): string | undefined {
+function resolveSpecifier(
+  fromFile: string,
+  specifier: string,
+  pkg: ClassifiedPackage,
+): string | undefined {
   let base: string | undefined;
   if (specifier.startsWith(".")) {
     base = resolve(dirname(fromFile), specifier);
@@ -337,14 +347,25 @@ function resolveSpecifier(fromFile: string, specifier: string, pkg: ClassifiedPa
     base = resolveImportsAlias(specifier, pkg);
   }
   if (!base) return void 0;
-  for (const candidate of [base, ...SOURCE_FILE_EXTENSIONS.map((ext) => `${base}${ext}`), join(base, "index.ts")]) {
+  for (const candidate of [
+    base,
+    ...SOURCE_FILE_EXTENSIONS.map((ext) => `${base}${ext}`),
+    join(base, "index.ts"),
+  ]) {
     if (existsSync(candidate) && statSync(candidate).isFile()) return candidate;
   }
   return void 0;
 }
 
-function isPrivateServerPath(pkg: ClassifiedPackage, file: string): boolean {
-  return PRIVATE_SERVER_EXPORT.test(workspacePath(`${pkg.root}/src`, file));
+function isPrivateServerPath(
+  pkg: ClassifiedPackage,
+  file: string,
+  allowTestingDoubles = false,
+): boolean {
+  const relativePath = workspacePath(`${pkg.root}/src`, file);
+  if (!PRIVATE_SERVER_EXPORT.test(relativePath)) return false;
+  if (allowTestingDoubles && TESTING_ENTRY_DOUBLE.test(relativePath)) return false;
+  return true;
 }
 
 function exportName(element: ts.ExportSpecifier): string {
@@ -374,7 +395,9 @@ function isExportedValueDeclaration(statement: ts.Statement): boolean {
   }
   return (
     ts.canHaveModifiers(statement) &&
-    (ts.getModifiers(statement)?.some((modifier) => modifier.kind === ts.SyntaxKind.ExportKeyword) ??
+    (ts
+      .getModifiers(statement)
+      ?.some((modifier) => modifier.kind === ts.SyntaxKind.ExportKeyword) ??
       false)
   );
 }
@@ -401,6 +424,7 @@ function resolveBindingOrigin(
   name: string,
   pkg: ClassifiedPackage,
   visited: Set<string>,
+  allowTestingDoubles = false,
 ): boolean {
   const key = `${file}::${name}`;
   if (visited.has(key)) return false;
@@ -409,7 +433,9 @@ function resolveBindingOrigin(
   const sourceFile = parseModule(file);
 
   for (const statement of sourceFile.statements) {
-    if (declaresValue(statement, name)) return isPrivateServerPath(pkg, file);
+    if (declaresValue(statement, name)) {
+      return isPrivateServerPath(pkg, file, allowTestingDoubles);
+    }
   }
 
   for (const statement of sourceFile.statements) {
@@ -420,14 +446,22 @@ function resolveBindingOrigin(
     if (!clause) continue;
     if (clause.name?.text === name) {
       const target = resolveSpecifier(file, statement.moduleSpecifier.text, pkg);
-      if (target && resolveBindingOrigin(target, "default", pkg, visited)) return true;
+      if (
+        target &&
+        resolveBindingOrigin(target, "default", pkg, visited, allowTestingDoubles)
+      )
+        return true;
     }
     if (clause.namedBindings && !ts.isNamespaceImport(clause.namedBindings)) {
       for (const element of clause.namedBindings.elements) {
         if (element.isTypeOnly || element.name.text !== name) continue;
         const target = resolveSpecifier(file, statement.moduleSpecifier.text, pkg);
         const imported = element.propertyName?.text ?? element.name.text;
-        if (target && resolveBindingOrigin(target, imported, pkg, visited)) return true;
+        if (
+          target &&
+          resolveBindingOrigin(target, imported, pkg, visited, allowTestingDoubles)
+        )
+          return true;
       }
     }
   }
@@ -440,11 +474,20 @@ function resolveBindingOrigin(
     if (statement.exportClause && ts.isNamedExports(statement.exportClause)) {
       for (const element of statement.exportClause.elements) {
         if (element.isTypeOnly || element.name.text !== name) continue;
-        if (resolveBindingOrigin(target, exportName(element), pkg, visited)) return true;
+        if (
+          resolveBindingOrigin(
+            target,
+            exportName(element),
+            pkg,
+            visited,
+            allowTestingDoubles,
+          )
+        )
+          return true;
       }
     } else if (!statement.exportClause) {
       // `export * from "./elsewhere"` may forward the name; best-effort probe.
-      if (resolveBindingOrigin(target, name, pkg, visited)) return true;
+      if (resolveBindingOrigin(target, name, pkg, visited, allowTestingDoubles)) return true;
     }
   }
 
@@ -460,6 +503,7 @@ function fileExposesPrivateValue(
   file: string,
   pkg: ClassifiedPackage,
   visited: Set<string>,
+  allowTestingDoubles = false,
 ): boolean {
   if (visited.has(file)) return false;
   visited.add(file);
@@ -473,20 +517,35 @@ function fileExposesPrivateValue(
         const target = resolveSpecifier(file, statement.moduleSpecifier.text, pkg);
         if (!target) continue;
         if (!statement.exportClause || ts.isNamespaceExport(statement.exportClause)) {
-          if (fileExposesPrivateValue(target, pkg, visited)) return true;
+          if (fileExposesPrivateValue(target, pkg, visited, allowTestingDoubles)) return true;
         } else if (ts.isNamedExports(statement.exportClause)) {
           for (const element of statement.exportClause.elements) {
             if (element.isTypeOnly) continue;
-            if (resolveBindingOrigin(target, exportName(element), pkg, new Set())) return true;
+            if (
+              resolveBindingOrigin(
+                target,
+                exportName(element),
+                pkg,
+                new Set(),
+                allowTestingDoubles,
+              )
+            )
+              return true;
           }
         }
       } else if (statement.exportClause && ts.isNamedExports(statement.exportClause)) {
         for (const element of statement.exportClause.elements) {
           if (element.isTypeOnly) continue;
-          if (resolveBindingOrigin(file, exportName(element), pkg, new Set())) return true;
+          if (
+            resolveBindingOrigin(file, exportName(element), pkg, new Set(), allowTestingDoubles)
+          )
+            return true;
         }
       }
-    } else if (isExportedValueDeclaration(statement) && isPrivateServerPath(pkg, file)) {
+    } else if (
+      isExportedValueDeclaration(statement) &&
+      isPrivateServerPath(pkg, file, allowTestingDoubles)
+    ) {
       return true;
     }
   }
@@ -498,6 +557,11 @@ function lintPrivateServerExportsForEntry(
   file: string,
 ): ArchitectureViolation[] {
   if (!existsSync(file)) return [];
+  // R6: `src/testing.ts` is a test-only entrypoint. It may still export a
+  // double (a memory/null/stub/fake repository or store, or a
+  // `*.test-fakes.ts` module) — never a real repository, store, or
+  // projection, which stays as private from `testing.ts` as from `index.ts`.
+  const allowTestingDoubles = basename(file) === "testing.ts";
   const sourceFile = parseModule(file);
   const violations: ArchitectureViolation[] = [];
   const add = (node: ts.Node, specifier?: string): void => {
@@ -518,18 +582,37 @@ function lintPrivateServerExportsForEntry(
 
     if (statement.moduleSpecifier && ts.isStringLiteral(statement.moduleSpecifier)) {
       const specifierText = statement.moduleSpecifier.text;
-      if (PRIVATE_SERVER_EXPORT.test(specifierText)) {
+      const target = resolveSpecifier(file, specifierText, pkg);
+      // Test against the resolved file (which carries its .ts extension) when
+      // it resolves; a filename-shaped allowance like `fake.<x>.repository.ts`
+      // only matches with the extension present. Fall back to the raw
+      // specifier when resolution fails, so an unresolvable import naming a
+      // private directory is still caught.
+      const originPath = target ? workspacePath(`${pkg.root}/src`, target) : specifierText;
+      if (
+        PRIVATE_SERVER_EXPORT.test(originPath) &&
+        !(allowTestingDoubles && TESTING_ENTRY_DOUBLE.test(originPath))
+      ) {
         add(statement, specifierText);
         continue;
       }
-      const target = resolveSpecifier(file, specifierText, pkg);
       if (!target) continue;
       if (!statement.exportClause || ts.isNamespaceExport(statement.exportClause)) {
-        if (fileExposesPrivateValue(target, pkg, new Set())) add(statement, specifierText);
+        if (fileExposesPrivateValue(target, pkg, new Set(), allowTestingDoubles)) {
+          add(statement, specifierText);
+        }
       } else if (ts.isNamedExports(statement.exportClause)) {
         for (const element of statement.exportClause.elements) {
           if (element.isTypeOnly) continue;
-          if (resolveBindingOrigin(target, exportName(element), pkg, new Set())) {
+          if (
+            resolveBindingOrigin(
+              target,
+              exportName(element),
+              pkg,
+              new Set(),
+              allowTestingDoubles,
+            )
+          ) {
             add(element, specifierText);
           }
         }
@@ -540,7 +623,10 @@ function lintPrivateServerExportsForEntry(
     if (statement.exportClause && ts.isNamedExports(statement.exportClause)) {
       for (const element of statement.exportClause.elements) {
         if (element.isTypeOnly) continue;
-        if (resolveBindingOrigin(file, exportName(element), pkg, new Set())) add(element);
+        if (
+          resolveBindingOrigin(file, exportName(element), pkg, new Set(), allowTestingDoubles)
+        )
+          add(element);
       }
     }
   }

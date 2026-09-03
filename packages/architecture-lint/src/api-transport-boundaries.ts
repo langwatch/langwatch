@@ -64,11 +64,25 @@ function transportSources(packages: readonly ClassifiedPackage[]): TransportSour
     // old one would stop checking them, and dropping the new one stopped
     // checking everything else — which is what happened when the rename landed
     // and this list still said `src/api` alone.
+    // The api application's transport is its request-handling surface —
+    // `app-trpc/`, `app-rest/`, and the feature transports under `features/`.
+    // `*.composition.ts`, `*.mount.ts` and `platform/infrastructure/**` are
+    // the composition seam, not transport, so they are scanned by
+    // prisma-containment and application-boundaries instead (R3).
     const sourceRoots = strictFeatureApi
       ? [join(pkg.root, "src", "transport"), join(pkg.root, "src", "api")]
-      : [join(pkg.root, "src")];
+      : [
+          join(pkg.root, "src", "app-trpc"),
+          join(pkg.root, "src", "app-rest"),
+          join(pkg.root, "src", "features"),
+        ];
+    const isScannedApiApplicationSource = (file: string): boolean =>
+      isProductionSource(file) && !/\.mount\.ts$/.test(file);
     for (const sourceRoot of sourceRoots) {
-      for (const file of walkFiles(sourceRoot, isProductionSource)) {
+      for (const file of walkFiles(
+        sourceRoot,
+        apiApplication ? isScannedApiApplicationSource : isProductionSource,
+      )) {
         sources.set(file, { file, strictFeatureApi });
       }
     }

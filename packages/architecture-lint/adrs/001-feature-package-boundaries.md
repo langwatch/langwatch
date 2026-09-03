@@ -107,7 +107,7 @@ subject is an architectural expansion: the catalogue, feature ADR and
 behavioural spec change together. This preserves coherent subordinate concepts
 without allowing a broad feature name to become a catch-all.
 
-ADR-111 adds four non-feature enterprise packages at fixed paths beneath one
+ADR-111 adds three non-feature enterprise packages at fixed paths beneath one
 legal ownership root:
 
 ```text
@@ -115,17 +115,17 @@ packages/enterprise/LICENSE.md                    # governs the entire tree
 packages/enterprise/package.json                 # @langwatch/enterprise
 packages/enterprise/composition/api/             # @langwatch/enterprise-api
 packages/enterprise/composition/worker/          # @langwatch/enterprise-worker
-packages/enterprise/composition/web/             # @langwatch/enterprise-web
 ```
 
 The root package follows portable contract rules and owns catalogue vocabulary.
 The legal notice must exist before any enterprise package is accepted, and
 package metadata must not claim that a descendant is Apache-only. Each
 composition package may import enterprise implementation packages only for its
-named runtime and must not contain implementation itself. The three composition
+named runtime and must not contain implementation itself. The two composition
 packages cannot depend on one another. No other package manifest is allowed
 directly beneath the enterprise ownership root; product licensing is an
-ordinary strict enterprise feature rather than another aggregate role.
+ordinary strict enterprise feature rather than another aggregate role. Browser
+enterprise screens are mounted directly by `apps/ui`'s own feature folders.
 
 ### Package roles determine allowed dependencies
 

@@ -35,7 +35,7 @@
     },
     {
       "file": "packages/features/authz/server/src/services/authz.service.ts",
-      "moduleLines": 775,
+      "moduleLines": 858,
       "methodLines": 80,
       "statements": 24,
       "complexity": 24,
@@ -67,7 +67,7 @@
     },
     {
       "file": "packages/features/langy/server/src/services/langy-conversation.service.ts",
-      "moduleLines": 1250,
+      "moduleLines": 1272,
       "methodLines": 80,
       "statements": 24,
       "complexity": 24,
@@ -83,7 +83,7 @@
     },
     {
       "file": "packages/features/organization/server/src/services/organization.service.ts",
-      "moduleLines": 1388,
+      "moduleLines": 1433,
       "methodLines": 136,
       "statements": 24,
       "complexity": 24,

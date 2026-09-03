@@ -1,0 +1,850 @@
+{
+  "version": 0,
+  "roots": [
+    {
+      "root": ".github",
+      "blocks": 19,
+      "expires": "2026-10-15"
+    },
+    {
+      "root": "apps/api",
+      "blocks": 1281,
+      "expires": "2026-09-17"
+    },
+    {
+      "root": "apps/server",
+      "blocks": 93,
+      "expires": "2026-09-17"
+    },
+    {
+      "root": "apps/tasks",
+      "blocks": 6,
+      "expires": "2026-09-17"
+    },
+    {
+      "root": "apps/ui",
+      "blocks": 671,
+      "expires": "2026-09-17"
+    },
+    {
+      "root": "apps/worker",
+      "blocks": 499,
+      "expires": "2026-09-17"
+    },
+    {
+      "root": "dev",
+      "blocks": 60,
+      "expires": "2026-10-15"
+    },
+    {
+      "root": "docs",
+      "blocks": 15,
+      "expires": "2026-10-15"
+    },
+    {
+      "root": "mcp",
+      "blocks": 69,
+      "expires": "2026-10-15"
+    },
+    {
+      "root": "packages/actor",
+      "blocks": 2,
+      "expires": "2026-10-15"
+    },
+    {
+      "root": "packages/api",
+      "blocks": 291,
+      "expires": "2026-10-15"
+    },
+    {
+      "root": "packages/architecture-lint",
+      "blocks": 115,
+      "expires": "2026-10-15"
+    },
+    {
+      "root": "packages/aws-client",
+      "blocks": 6,
+      "expires": "2026-10-15"
+    },
+    {
+      "root": "packages/clickhouse-client",
+      "blocks": 101,
+      "expires": "2026-10-15"
+    },
+    {
+      "root": "packages/config",
+      "blocks": 33,
+      "expires": "2026-10-15"
+    },
+    {
+      "root": "packages/design-system",
+      "blocks": 51,
+      "expires": "2026-10-15"
+    },
+    {
+      "root": "packages/egress",
+      "blocks": 51,
+      "expires": "2026-10-15"
+    },
+    {
+      "root": "packages/enterprise",
+      "blocks": 11,
+      "expires": "2026-10-15"
+    },
+    {
+      "root": "packages/enterprise/composition/api",
+      "blocks": 10,
+      "expires": "2026-10-15"
+    },
+    {
+      "root": "packages/enterprise/composition/worker",
+      "blocks": 5,
+      "expires": "2026-10-15"
+    },
+    {
+      "root": "packages/enterprise/features/audit-log/server",
+      "blocks": 1,
+      "expires": "2026-10-01"
+    },
+    {
+      "root": "packages/enterprise/features/billing/contract",
+      "blocks": 24,
+      "expires": "2026-10-01"
+    },
+    {
+      "root": "packages/enterprise/features/billing/server",
+      "blocks": 96,
+      "expires": "2026-10-01"
+    },
+    {
+      "root": "packages/enterprise/features/billing/web",
+      "blocks": 39,
+      "expires": "2026-10-01"
+    },
+    {
+      "root": "packages/enterprise/features/governance/contract",
+      "blocks": 7,
+      "expires": "2026-10-01"
+    },
+    {
+      "root": "packages/enterprise/features/governance/server",
+      "blocks": 86,
+      "expires": "2026-10-01"
+    },
+    {
+      "root": "packages/enterprise/features/governance/web",
+      "blocks": 61,
+      "expires": "2026-10-01"
+    },
+    {
+      "root": "packages/enterprise/features/licensing/contract",
+      "blocks": 23,
+      "expires": "2026-10-01"
+    },
+    {
+      "root": "packages/enterprise/features/licensing/server",
+      "blocks": 34,
+      "expires": "2026-10-01"
+    },
+    {
+      "root": "packages/enterprise/features/licensing/web",
+      "blocks": 27,
+      "expires": "2026-10-01"
+    },
+    {
+      "root": "packages/enterprise/features/scim/server",
+      "blocks": 5,
+      "expires": "2026-10-01"
+    },
+    {
+      "root": "packages/enterprise/features/scim/web",
+      "blocks": 10,
+      "expires": "2026-10-01"
+    },
+    {
+      "root": "packages/enterprise/features/sso/server",
+      "blocks": 9,
+      "expires": "2026-10-01"
+    },
+    {
+      "root": "packages/enterprise/features/webhook/contract",
+      "blocks": 1,
+      "expires": "2026-10-01"
+    },
+    {
+      "root": "packages/enterprise/features/webhook/server",
+      "blocks": 42,
+      "expires": "2026-10-01"
+    },
+    {
+      "root": "packages/eventing",
+      "blocks": 467,
+      "expires": "2026-10-15"
+    },
+    {
+      "root": "packages/features/agent/contract",
+      "blocks": 18,
+      "expires": "2026-10-01"
+    },
+    {
+      "root": "packages/features/agent/server",
+      "blocks": 62,
+      "expires": "2026-10-01"
+    },
+    {
+      "root": "packages/features/agent/web",
+      "blocks": 22,
+      "expires": "2026-10-01"
+    },
+    {
+      "root": "packages/features/analytics/contract",
+      "blocks": 95,
+      "expires": "2026-10-01"
+    },
+    {
+      "root": "packages/features/analytics/server",
+      "blocks": 572,
+      "expires": "2026-10-01"
+    },
+    {
+      "root": "packages/features/analytics/web",
+      "blocks": 273,
+      "expires": "2026-10-01"
+    },
+    {
+      "root": "packages/features/annotation/contract",
+      "blocks": 5,
+      "expires": "2026-10-01"
+    },
+    {
+      "root": "packages/features/annotation/server",
+      "blocks": 42,
+      "expires": "2026-10-01"
+    },
+    {
+      "root": "packages/features/annotation/web",
+      "blocks": 121,
+      "expires": "2026-10-01"
+    },
+    {
+      "root": "packages/features/api-key/contract",
+      "blocks": 13,
+      "expires": "2026-10-01"
+    },
+    {
+      "root": "packages/features/api-key/server",
+      "blocks": 51,
+      "expires": "2026-10-01"
+    },
+    {
+      "root": "packages/features/api-key/web",
+      "blocks": 105,
+      "expires": "2026-10-01"
+    },
+    {
+      "root": "packages/features/auth/contract",
+      "blocks": 2,
+      "expires": "2026-10-01"
+    },
+    {
+      "root": "packages/features/auth/server",
+      "blocks": 140,
+      "expires": "2026-10-01"
+    },
+    {
+      "root": "packages/features/auth/web",
+      "blocks": 195,
+      "expires": "2026-10-01"
+    },
+    {
+      "root": "packages/features/authz/contract",
+      "blocks": 46,
+      "expires": "2026-10-01"
+    },
+    {
+      "root": "packages/features/authz/server",
+      "blocks": 179,
+      "expires": "2026-10-01"
+    },
+    {
+      "root": "packages/features/authz/web",
+      "blocks": 63,
+      "expires": "2026-10-01"
+    },
+    {
+      "root": "packages/features/automation/contract",
+      "blocks": 55,
+      "expires": "2026-10-01"
+    },
+    {
+      "root": "packages/features/automation/server",
+      "blocks": 128,
+      "expires": "2026-10-01"
+    },
+    {
+      "root": "packages/features/automation/web",
+      "blocks": 145,
+      "expires": "2026-10-01"
+    },
+    {
+      "root": "packages/features/coding-agent/contract",
+      "blocks": 71,
+      "expires": "2026-10-01"
+    },
+    {
+      "root": "packages/features/coding-agent/server",
+      "blocks": 177,
+      "expires": "2026-10-01"
+    },
+    {
+      "root": "packages/features/coding-agent/web",
+      "blocks": 151,
+      "expires": "2026-10-01"
+    },
+    {
+      "root": "packages/features/dashboard/contract",
+      "blocks": 2,
+      "expires": "2026-10-01"
+    },
+    {
+      "root": "packages/features/dashboard/server",
+      "blocks": 48,
+      "expires": "2026-10-01"
+    },
+    {
+      "root": "packages/features/data-privacy/contract",
+      "blocks": 9,
+      "expires": "2026-10-01"
+    },
+    {
+      "root": "packages/features/data-privacy/server",
+      "blocks": 55,
+      "expires": "2026-10-01"
+    },
+    {
+      "root": "packages/features/data-privacy/web",
+      "blocks": 22,
+      "expires": "2026-10-01"
+    },
+    {
+      "root": "packages/features/data-retention/contract",
+      "blocks": 4,
+      "expires": "2026-10-01"
+    },
+    {
+      "root": "packages/features/data-retention/server",
+      "blocks": 28,
+      "expires": "2026-10-01"
+    },
+    {
+      "root": "packages/features/data-retention/web",
+      "blocks": 20,
+      "expires": "2026-10-01"
+    },
+    {
+      "root": "packages/features/dataset/contract",
+      "blocks": 11,
+      "expires": "2026-10-01"
+    },
+    {
+      "root": "packages/features/dataset/server",
+      "blocks": 163,
+      "expires": "2026-10-01"
+    },
+    {
+      "root": "packages/features/dataset/web",
+      "blocks": 113,
+      "expires": "2026-10-01"
+    },
+    {
+      "root": "packages/features/entitlement/contract",
+      "blocks": 3,
+      "expires": "2026-10-01"
+    },
+    {
+      "root": "packages/features/entitlement/server",
+      "blocks": 40,
+      "expires": "2026-10-01"
+    },
+    {
+      "root": "packages/features/evaluation/contract",
+      "blocks": 5,
+      "expires": "2026-10-01"
+    },
+    {
+      "root": "packages/features/evaluation/server",
+      "blocks": 96,
+      "expires": "2026-10-01"
+    },
+    {
+      "root": "packages/features/evaluator/contract",
+      "blocks": 5,
+      "expires": "2026-10-01"
+    },
+    {
+      "root": "packages/features/evaluator/server",
+      "blocks": 23,
+      "expires": "2026-10-01"
+    },
+    {
+      "root": "packages/features/evaluator/web",
+      "blocks": 72,
+      "expires": "2026-10-01"
+    },
+    {
+      "root": "packages/features/experiment/contract",
+      "blocks": 69,
+      "expires": "2026-10-01"
+    },
+    {
+      "root": "packages/features/experiment/server",
+      "blocks": 263,
+      "expires": "2026-10-01"
+    },
+    {
+      "root": "packages/features/experiment/web",
+      "blocks": 479,
+      "expires": "2026-10-01"
+    },
+    {
+      "root": "packages/features/feature-flag/contract",
+      "blocks": 55,
+      "expires": "2026-10-01"
+    },
+    {
+      "root": "packages/features/feature-flag/server",
+      "blocks": 21,
+      "expires": "2026-10-01"
+    },
+    {
+      "root": "packages/features/feature-flag/web",
+      "blocks": 8,
+      "expires": "2026-10-01"
+    },
+    {
+      "root": "packages/features/gateway/contract",
+      "blocks": 43,
+      "expires": "2026-10-01"
+    },
+    {
+      "root": "packages/features/gateway/server",
+      "blocks": 458,
+      "expires": "2026-10-01"
+    },
+    {
+      "root": "packages/features/gateway/web",
+      "blocks": 161,
+      "expires": "2026-10-01"
+    },
+    {
+      "root": "packages/features/github/contract",
+      "blocks": 3,
+      "expires": "2026-10-01"
+    },
+    {
+      "root": "packages/features/github/server",
+      "blocks": 74,
+      "expires": "2026-10-01"
+    },
+    {
+      "root": "packages/features/github/web",
+      "blocks": 16,
+      "expires": "2026-10-01"
+    },
+    {
+      "root": "packages/features/hosted-mcp/server",
+      "blocks": 38,
+      "expires": "2026-10-01"
+    },
+    {
+      "root": "packages/features/identity/contract",
+      "blocks": 117,
+      "expires": "2026-10-01"
+    },
+    {
+      "root": "packages/features/identity/server",
+      "blocks": 388,
+      "expires": "2026-10-01"
+    },
+    {
+      "root": "packages/features/langy/contract",
+      "blocks": 192,
+      "expires": "2026-10-01"
+    },
+    {
+      "root": "packages/features/langy/server",
+      "blocks": 309,
+      "expires": "2026-10-01"
+    },
+    {
+      "root": "packages/features/langy/web",
+      "blocks": 694,
+      "expires": "2026-10-01"
+    },
+    {
+      "root": "packages/features/log/server",
+      "blocks": 11,
+      "expires": "2026-10-01"
+    },
+    {
+      "root": "packages/features/metric/contract",
+      "blocks": 9,
+      "expires": "2026-10-01"
+    },
+    {
+      "root": "packages/features/metric/server",
+      "blocks": 39,
+      "expires": "2026-10-01"
+    },
+    {
+      "root": "packages/features/model-provider/contract",
+      "blocks": 72,
+      "expires": "2026-10-01"
+    },
+    {
+      "root": "packages/features/model-provider/server",
+      "blocks": 177,
+      "expires": "2026-10-01"
+    },
+    {
+      "root": "packages/features/model-provider/web",
+      "blocks": 185,
+      "expires": "2026-10-01"
+    },
+    {
+      "root": "packages/features/monitor/contract",
+      "blocks": 4,
+      "expires": "2026-10-01"
+    },
+    {
+      "root": "packages/features/monitor/server",
+      "blocks": 28,
+      "expires": "2026-10-01"
+    },
+    {
+      "root": "packages/features/monitor/web",
+      "blocks": 19,
+      "expires": "2026-10-01"
+    },
+    {
+      "root": "packages/features/navigation/web",
+      "blocks": 196,
+      "expires": "2026-10-01"
+    },
+    {
+      "root": "packages/features/notification/contract",
+      "blocks": 1,
+      "expires": "2026-10-01"
+    },
+    {
+      "root": "packages/features/notification/server",
+      "blocks": 24,
+      "expires": "2026-10-01"
+    },
+    {
+      "root": "packages/features/notification/web",
+      "blocks": 10,
+      "expires": "2026-10-01"
+    },
+    {
+      "root": "packages/features/onboarding/web",
+      "blocks": 59,
+      "expires": "2026-10-01"
+    },
+    {
+      "root": "packages/features/ops/contract",
+      "blocks": 28,
+      "expires": "2026-10-01"
+    },
+    {
+      "root": "packages/features/ops/server",
+      "blocks": 215,
+      "expires": "2026-10-01"
+    },
+    {
+      "root": "packages/features/ops/web",
+      "blocks": 171,
+      "expires": "2026-10-01"
+    },
+    {
+      "root": "packages/features/organization/contract",
+      "blocks": 9,
+      "expires": "2026-10-01"
+    },
+    {
+      "root": "packages/features/organization/server",
+      "blocks": 218,
+      "expires": "2026-10-01"
+    },
+    {
+      "root": "packages/features/organization/web",
+      "blocks": 140,
+      "expires": "2026-10-01"
+    },
+    {
+      "root": "packages/features/presence/server",
+      "blocks": 11,
+      "expires": "2026-10-01"
+    },
+    {
+      "root": "packages/features/presence/web",
+      "blocks": 5,
+      "expires": "2026-10-01"
+    },
+    {
+      "root": "packages/features/project/contract",
+      "blocks": 6,
+      "expires": "2026-10-01"
+    },
+    {
+      "root": "packages/features/project/server",
+      "blocks": 57,
+      "expires": "2026-10-01"
+    },
+    {
+      "root": "packages/features/project/web",
+      "blocks": 105,
+      "expires": "2026-10-01"
+    },
+    {
+      "root": "packages/features/prompt/contract",
+      "blocks": 20,
+      "expires": "2026-10-01"
+    },
+    {
+      "root": "packages/features/prompt/server",
+      "blocks": 72,
+      "expires": "2026-10-01"
+    },
+    {
+      "root": "packages/features/prompt/web",
+      "blocks": 260,
+      "expires": "2026-10-01"
+    },
+    {
+      "root": "packages/features/role/contract",
+      "blocks": 2,
+      "expires": "2026-10-01"
+    },
+    {
+      "root": "packages/features/role/server",
+      "blocks": 15,
+      "expires": "2026-10-01"
+    },
+    {
+      "root": "packages/features/scenario/contract",
+      "blocks": 141,
+      "expires": "2026-10-01"
+    },
+    {
+      "root": "packages/features/scenario/server",
+      "blocks": 309,
+      "expires": "2026-10-01"
+    },
+    {
+      "root": "packages/features/scenario/web",
+      "blocks": 621,
+      "expires": "2026-10-01"
+    },
+    {
+      "root": "packages/features/secret/contract",
+      "blocks": 2,
+      "expires": "2026-10-01"
+    },
+    {
+      "root": "packages/features/secret/server",
+      "blocks": 12,
+      "expires": "2026-10-01"
+    },
+    {
+      "root": "packages/features/secret/web",
+      "blocks": 15,
+      "expires": "2026-10-01"
+    },
+    {
+      "root": "packages/features/share/server",
+      "blocks": 12,
+      "expires": "2026-10-01"
+    },
+    {
+      "root": "packages/features/share/web",
+      "blocks": 1,
+      "expires": "2026-10-01"
+    },
+    {
+      "root": "packages/features/stored-object/contract",
+      "blocks": 2,
+      "expires": "2026-10-01"
+    },
+    {
+      "root": "packages/features/stored-object/server",
+      "blocks": 126,
+      "expires": "2026-10-01"
+    },
+    {
+      "root": "packages/features/suite/contract",
+      "blocks": 33,
+      "expires": "2026-10-01"
+    },
+    {
+      "root": "packages/features/suite/server",
+      "blocks": 47,
+      "expires": "2026-10-01"
+    },
+    {
+      "root": "packages/features/suite/web",
+      "blocks": 59,
+      "expires": "2026-10-01"
+    },
+    {
+      "root": "packages/features/topic/contract",
+      "blocks": 10,
+      "expires": "2026-10-01"
+    },
+    {
+      "root": "packages/features/topic/server",
+      "blocks": 90,
+      "expires": "2026-10-01"
+    },
+    {
+      "root": "packages/features/topic/web",
+      "blocks": 13,
+      "expires": "2026-10-01"
+    },
+    {
+      "root": "packages/features/trace/contract",
+      "blocks": 173,
+      "expires": "2026-10-01"
+    },
+    {
+      "root": "packages/features/trace/server",
+      "blocks": 1042,
+      "expires": "2026-10-01"
+    },
+    {
+      "root": "packages/features/trace/web",
+      "blocks": 1435,
+      "expires": "2026-10-01"
+    },
+    {
+      "root": "packages/features/user/contract",
+      "blocks": 3,
+      "expires": "2026-10-01"
+    },
+    {
+      "root": "packages/features/user/server",
+      "blocks": 67,
+      "expires": "2026-10-01"
+    },
+    {
+      "root": "packages/features/user/web",
+      "blocks": 139,
+      "expires": "2026-10-01"
+    },
+    {
+      "root": "packages/features/workflow/contract",
+      "blocks": 15,
+      "expires": "2026-10-01"
+    },
+    {
+      "root": "packages/features/workflow/server",
+      "blocks": 67,
+      "expires": "2026-10-01"
+    },
+    {
+      "root": "packages/features/workflow/web",
+      "blocks": 206,
+      "expires": "2026-10-01"
+    },
+    {
+      "root": "packages/group-queue",
+      "blocks": 226,
+      "expires": "2026-10-15"
+    },
+    {
+      "root": "packages/handled-error",
+      "blocks": 34,
+      "expires": "2026-10-15"
+    },
+    {
+      "root": "packages/mail",
+      "blocks": 23,
+      "expires": "2026-10-15"
+    },
+    {
+      "root": "packages/observability",
+      "blocks": 72,
+      "expires": "2026-10-15"
+    },
+    {
+      "root": "packages/otlp",
+      "blocks": 30,
+      "expires": "2026-10-15"
+    },
+    {
+      "root": "packages/platform-api-client",
+      "blocks": 10,
+      "expires": "2026-10-15"
+    },
+    {
+      "root": "packages/prisma-client",
+      "blocks": 58,
+      "expires": "2026-10-15"
+    },
+    {
+      "root": "packages/react-rum",
+      "blocks": 16,
+      "expires": "2026-10-15"
+    },
+    {
+      "root": "packages/redaction",
+      "blocks": 83,
+      "expires": "2026-10-15"
+    },
+    {
+      "root": "packages/redis-client",
+      "blocks": 17,
+      "expires": "2026-10-15"
+    },
+    {
+      "root": "packages/system-migrations",
+      "blocks": 23,
+      "expires": "2026-10-15"
+    },
+    {
+      "root": "packages/task",
+      "blocks": 6,
+      "expires": "2026-10-15"
+    },
+    {
+      "root": "packages/test-harness",
+      "blocks": 79,
+      "expires": "2026-10-15"
+    },
+    {
+      "root": "packages/ui-drawer",
+      "blocks": 41,
+      "expires": "2026-10-15"
+    },
+    {
+      "root": "plugins",
+      "blocks": 4,
+      "expires": "2026-10-15"
+    },
+    {
+      "root": "sdks/typescript",
+      "blocks": 1362,
+      "expires": "2026-10-15"
+    },
+    {
+      "root": "services",
+      "blocks": 24,
+      "expires": "2026-10-15"
+    },
+    {
+      "root": "skills",
+      "blocks": 45,
+      "expires": "2026-10-15"
+    }
+  ]
+}

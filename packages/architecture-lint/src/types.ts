@@ -2,7 +2,7 @@ export type FeaturePackageRole = "contract" | "server" | "web";
 
 export type ApplicationPackageRole = "ui" | "api" | "worker" | "server";
 
-export type EnterpriseCompositionRole = "api" | "worker" | "web";
+export type EnterpriseCompositionRole = "api" | "worker";
 
 export type FeatureLayoutVersion = 0;
 

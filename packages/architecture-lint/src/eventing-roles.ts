@@ -6,7 +6,13 @@ import type { ArchitectureViolation, ClassifiedPackage } from "./types";
 
 const PROJECTION_FILE = /\.(?:projection|foldProjection|mapProjection)\.ts$/;
 const SUBSCRIBER_FILE = /\.subscriber\.ts$/;
-const PROCESS_FILE = /(?:\.process\.ts|-process\.service\.ts)$/;
+// A process manager lives at `processes/<subject>.process.ts` (the grammar's
+// kind) or masquerades as `-process.service.ts`. A bare `*.process.ts` file
+// outside `processes/` is an OS process entry (`apps/api/src/api.process.ts`,
+// `apps/worker/src/worker.process.ts`), not a process manager, and is not
+// scanned for eventing purity.
+const PROCESS_MANAGER_FILE = /(?:^|\/)processes\/[^/]+\.process\.ts$/;
+const PROCESS_SERVICE_MASQUERADE = /-process\.service\.ts$/;
 
 const IO_MODULES = new Set([
   "axios",
@@ -50,7 +56,8 @@ function workspacePath(root: string, path: string): string {
 function roleOf(file: string): EventingRole | null {
   if (PROJECTION_FILE.test(file)) return "projection";
   if (SUBSCRIBER_FILE.test(file)) return "subscriber";
-  if (PROCESS_FILE.test(file)) return "process";
+  if (PROCESS_MANAGER_FILE.test(file) || PROCESS_SERVICE_MASQUERADE.test(file))
+    return "process";
   return null;
 }
 
