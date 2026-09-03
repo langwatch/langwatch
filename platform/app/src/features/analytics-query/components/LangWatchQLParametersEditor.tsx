@@ -26,6 +26,9 @@ import {
 import { ChevronDown, ChevronRight, Plus, Trash2 } from "lucide-react";
 import { useCallback, useState } from "react";
 
+import { ReservedParamRow } from "~/components/analytics/ReservedParamRow";
+import { RESERVED_PARAMETERS } from "~/server/analytics/dashboardWidgetDefinition";
+
 import type { LangWatchQLParameterValue } from "../logic/lwqlRequestState";
 
 /** What a row's text means. The four shapes the API accepts. */
@@ -277,6 +280,15 @@ export interface LangWatchQLParametersEditorProps {
    * member is halfway through typing.
    */
   initialParameters?: Readonly<Record<string, LangWatchQLParameterValue>>;
+  /**
+   * Current live values for the reserved parameters, keyed by name — the same
+   * `period_start`/`period_end`/`period_granularity_seconds` the time window
+   * and granularity picker above already show, formatted the way the
+   * statement receives them. Shown as read-only rows above the author's own,
+   * the way the dashboard widget editor already does, so a member can see
+   * what those names resolve to without triggering a refusal first.
+   */
+  builtinValues?: Readonly<Record<string, string>>;
 }
 
 function kindOf(value: LangWatchQLParameterValue): ParameterKind {
@@ -303,6 +315,7 @@ export function LangWatchQLParametersEditor({
   missingParameters,
   reservedParameters,
   initialParameters,
+  builtinValues = {},
 }: LangWatchQLParametersEditorProps) {
   const [rows, setRows] = useState<readonly ParameterRow[]>(() =>
     initialParameters ? rowsOf(initialParameters) : [],
@@ -370,6 +383,15 @@ export function LangWatchQLParametersEditor({
 
       {isOpen && (
         <Stack gap={2}>
+          {RESERVED_PARAMETERS.map((reserved) => (
+            <ReservedParamRow
+              key={reserved.name}
+              reserved={reserved}
+              {...(builtinValues[reserved.name] !== undefined
+                ? { value: builtinValues[reserved.name] }
+                : {})}
+            />
+          ))}
           {rows.map((row) => (
             <ParameterRowFields
               key={row.id}
