@@ -24,21 +24,17 @@ SCIM (System for Cross-domain Identity Management) 2.0 lets your identity provid
 Open **Settings > SCIM Provisioning**. The base URL is shown at the top of the page:
 
 ```
-https://app.langwatch.ai/api/scim/v2
+https://<your-langwatch-domain>/api/scim/v2
 ```
 
-On a self-hosted deployment, replace the domain with your own:
-
-```
-https://your-langwatch-instance.example.com/api/scim/v2
-```
+On LangWatch Cloud the domain is `app.langwatch.ai`. On a self-hosted deployment it is your own domain. The rest of this page writes it as `<your-langwatch-domain>`.
 
 ### Step 2: Create a bearer token
 
 A token belongs to one SSO connection and is shown once. Create it through the [SCIM Tokens API](/api-reference/scim-tokens/overview) with the connection id LangWatch gave you during SSO setup:
 
 ```bash
-curl -X POST https://app.langwatch.ai/api/scim-tokens \
+curl -X POST https://<your-langwatch-domain>/api/scim-tokens \
   -H "Authorization: Bearer sk-lw-..." \
   -H "Content-Type: application/json" \
   -d '{"connectionId": "YOUR_CONNECTION_ID", "description": "Okta SCIM integration"}'
@@ -56,7 +52,7 @@ You can create several tokens, for example one per integration, and revoke each 
 
 | Setting | Value |
 |---------|-------|
-| SCIM Base URL | `https://app.langwatch.ai/api/scim/v2` |
+| SCIM Base URL | `https://<your-langwatch-domain>/api/scim/v2` |
 | Bearer Token | The token from step 2 |
 
 Where to enter them:
