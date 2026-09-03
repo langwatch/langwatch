@@ -57,8 +57,6 @@ import {
 } from "@langwatch/identity";
 import type { IdentityLedger } from "@langwatch/identity-server";
 import { createLogger } from "@langwatch/observability";
-import { tryGetApp } from "~/server/app-layer/app";
-import { createTenantId } from "~/server/event-sourcing";
 import type { Event } from "~/server/event-sourcing/domain/types";
 import { identityEventsFor } from "~/server/event-sourcing/pipelines/identity/envelope";
 import type { IdentityFoldState } from "~/server/event-sourcing/pipelines/identity/projections/identityState.foldProjection";
@@ -70,19 +68,18 @@ import {
   identityCommitDurationSeconds,
   identityProjectionConvergenceTimeoutsTotal,
 } from "./metrics";
+import {
+  awaitedAppPipelineSender,
+  resolveAppEventStore,
+  StagedLedgerWriter,
+  type StagedSender,
+} from "./staged-ledger-writer";
 
 const logger = createLogger("langwatch:identity:ledger");
-
-/** How long a ceremony waits for the App handle before staging gives up. */
-const IDENTITY_APP_HANDLE_WAIT_MS = 5_000;
 
 /** The read-your-writes window, the grants ledger's convergence shape. */
 export const IDENTITY_CONVERGENCE_TIMEOUT_MS = 2_000;
 export const IDENTITY_CONVERGENCE_POLL_MS = 25;
-
-export type IdentityStagedSender = {
-  send(data: unknown): Promise<unknown>;
-};
 
 const SENDER_NAME_BY_COMMAND: Record<IdentityCommandType, string> = {
   [ATTACH_IDENTIFIER_COMMAND_TYPE]: "attachIdentifier",
@@ -120,75 +117,69 @@ export async function resolveIdentityEventStore(): Promise<
 export async function resolveEventStore<TEvent extends Event>(): Promise<
   EventStore<TEvent>
 > {
-  const deadline = Date.now() + IDENTITY_APP_HANDLE_WAIT_MS;
-  let app = tryGetApp();
-  while (!app && Date.now() < deadline) {
-    await new Promise((resolve) => setTimeout(resolve, 50));
-    app = tryGetApp();
-  }
-  const eventStore = app?.eventSourcing?.isEnabled
-    ? app.eventSourcing.getEventStore<TEvent>()
-    : undefined;
-  if (!eventStore) {
-    // A plain Error on purpose (error doctrine): the caller cannot act on an
-    // unavailable event stack, and the ceremony degrades to a retryable
-    // failure with a trace id.
-    throw new Error(
+  return resolveAppEventStore<TEvent>({
+    unavailableMessage:
       "identity ledger cannot append: the event-sourcing stack is unavailable",
-    );
-  }
-  return eventStore;
+  });
 }
 
-/**
- * The pipeline's sender for one command, once the App exists.
- *
- * The wait is why this is async: better-auth builds its adapter at module
- * load, so a ceremony can reach here while the App is still composing, and
- * refusing then would fail a ceremony over a race rather than a defect.
- */
-async function resolveStagedSender(
-  name: string,
-): Promise<IdentityStagedSender | null> {
-  const deadline = Date.now() + IDENTITY_APP_HANDLE_WAIT_MS;
-  let app = tryGetApp();
-  while (!app && Date.now() < deadline) {
-    await new Promise((resolve) => setTimeout(resolve, 50));
-    app = tryGetApp();
-  }
-  if (!app?.eventSourcing?.isEnabled) return null;
-  try {
-    const pipeline = app.eventSourcing.getPipeline(
-      IDENTITY_PIPELINE_NAME as never,
-    ) as unknown as { commands: Record<string, IdentityStagedSender> };
-    return pipeline.commands[name] ?? null;
-  } catch {
-    return null;
-  }
-}
+const resolveStagedSender = awaitedAppPipelineSender({
+  pipelineName: IDENTITY_PIPELINE_NAME,
+});
 
 export interface IdentityLedgerWriterDeps {
   projectionStore: StateProjectionStore<IdentityFoldState>;
   /** Production resolves the pipeline handle lazily; tests hand one in. */
-  stagedSender?: (name: string) => Promise<IdentityStagedSender | null>;
+  stagedSender?: (name: string) => Promise<StagedSender | null>;
   /** The read-your-writes window; production uses the constants above. */
   convergence?: { timeoutMs: number; pollMs: number };
 }
 
-export class IdentityLedgerWriter implements IdentityLedger {
-  private readonly projectionStore: StateProjectionStore<IdentityFoldState>;
-  private readonly stagedSender: (
-    name: string,
-  ) => Promise<IdentityStagedSender | null>;
-  private readonly convergence: { timeoutMs: number; pollMs: number };
-
+export class IdentityLedgerWriter
+  extends StagedLedgerWriter<IdentityCommand, IdentityEvent, IdentityFoldState>
+  implements IdentityLedger
+{
   constructor(deps: IdentityLedgerWriterDeps) {
-    this.projectionStore = deps.projectionStore;
-    this.stagedSender = deps.stagedSender ?? resolveStagedSender;
-    this.convergence = deps.convergence ?? {
+    const convergence = deps.convergence ?? {
       timeoutMs: IDENTITY_CONVERGENCE_TIMEOUT_MS,
       pollMs: IDENTITY_CONVERGENCE_POLL_MS,
     };
+    super({
+      stagedSender: deps.stagedSender ?? resolveStagedSender,
+      // No append of its own: the staged command is the sole appender
+      // (ADR-110), which is what keeps one ceremony to one event row.
+      waitedAppend: null,
+      readYourWrites: {
+        projectionStore: deps.projectionStore,
+        timeoutMs: convergence.timeoutMs,
+        pollMs: convergence.pollMs,
+        onTimeout: ({ aggregateId, eventCount }) => {
+          identityProjectionConvergenceTimeoutsTotal.inc();
+          logger.warn(
+            { userId: aggregateId, commandCount: eventCount },
+            "identity projection did not land a ceremony's events within the read-your-writes window; the command is queued and the fold will converge",
+          );
+        },
+        onUnreadableProjection: ({ aggregateId, error }) => {
+          logger.warn(
+            { userId: aggregateId, error },
+            "could not read the identity projection while waiting for convergence; continuing",
+          );
+        },
+      },
+    });
+  }
+
+  protected senderNameFor(command: IdentityCommand): string {
+    return SENDER_NAME_BY_COMMAND[command.type];
+  }
+
+  protected onMissingSender({ senderName }: { senderName: string }): never {
+    // A wiring defect, not a transient: the pipeline exposed no sender for
+    // a command type it declares. Loud, because nothing downstream folds.
+    throw new Error(
+      `identity ledger cannot stage: the identity pipeline exposes no "${senderName}" sender`,
+    );
   }
 
   async commit({
@@ -238,24 +229,20 @@ export class IdentityLedgerWriter implements IdentityLedger {
    * sign-up returns. The entrance sequences the same two legs these methods
    * implement, rather than a second copy of them.
    */
-  async stage({ command }: { command: IdentityCommand }): Promise<void> {
-    const senderName = SENDER_NAME_BY_COMMAND[command.type];
-    const sender = await this.stagedSender(senderName);
-    if (!sender) {
-      // A wiring defect, not a transient: the pipeline exposed no sender for
-      // a command type it declares. Loud, because nothing downstream folds.
-      throw new Error(
-        `identity ledger cannot stage: the identity pipeline exposes no "${senderName}" sender`,
-      );
-    }
-    await sender.send(command.data);
+  override async stage({
+    command,
+  }: {
+    command: IdentityCommand;
+  }): Promise<void> {
+    await super.stage({ command });
   }
 
   /**
    * Leg two: wait for the projection's cursor to reach the last event the
-   * guard decided. The same comparison the fold uses to decide an event is
-   * already applied, read here instead of written — which is what makes this
-   * an observation of the queue's work rather than a second writer racing it.
+   * guard decided.
+   *
+   * Public for the same reason `stage` is, and keyed by `userId` because the
+   * entrance names the newborn rather than an anonymous aggregate.
    */
   async awaitFold({
     userId,
@@ -266,56 +253,6 @@ export class IdentityLedgerWriter implements IdentityLedger {
     tenantId: string;
     events: IdentityEvent[];
   }): Promise<void> {
-    const last = events[events.length - 1];
-    if (!last) return;
-    const context = { aggregateId: userId, tenantId: createTenantId(tenantId) };
-    // Wall-clock, not injectable business time: a frozen test clock would
-    // otherwise make this loop unable to time out.
-    const deadline = Date.now() + this.convergence.timeoutMs;
-    for (;;) {
-      if (await this.foldReached({ userId, context, last })) return;
-      if (Date.now() >= deadline) {
-        identityProjectionConvergenceTimeoutsTotal.inc();
-        logger.warn(
-          { userId, commandCount: events.length },
-          "identity projection did not land a ceremony's events within the read-your-writes window; the command is queued and the fold will converge",
-        );
-        return;
-      }
-      await new Promise((resolve) =>
-        setTimeout(resolve, this.convergence.pollMs),
-      );
-    }
-  }
-
-  private async foldReached({
-    userId,
-    context,
-    last,
-  }: {
-    userId: string;
-    context: {
-      aggregateId: string;
-      tenantId: ReturnType<typeof createTenantId>;
-    };
-    last: IdentityEvent;
-  }): Promise<boolean> {
-    try {
-      const stored = await this.projectionStore.load(userId, context);
-      const cursor = stored?.cursor;
-      if (!cursor) return false;
-      return (
-        cursor.acceptedAt > last.createdAt ||
-        (cursor.acceptedAt === last.createdAt && cursor.eventId >= last.id)
-      );
-    } catch (error) {
-      // An unreadable projection is not a failed ceremony: the facts are
-      // durable. Stop waiting and let the caller proceed.
-      logger.warn(
-        { userId, error },
-        "could not read the identity projection while waiting for convergence; continuing",
-      );
-      return true;
-    }
+    await this.awaitConvergence({ aggregateId: userId, tenantId, events });
   }
 }

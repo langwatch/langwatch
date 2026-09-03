@@ -25,7 +25,8 @@
  * ledger and is already durable by the time this runs; a sync fact that
  * cannot land is logged and swallowed. The opposite choice — refusing a push
  * whose bookkeeping failed — would turn an event-stack blip into a directory
- * outage.
+ * outage. That is also why a missing sender is a warning here where every
+ * other ledger throws.
  *
  * Like the identity ledger, the pipeline handle is resolved lazily off the
  * App: a bare script that never composes one must still be able to import
@@ -44,14 +45,14 @@ import {
 } from "@langwatch/identity";
 import type { ScimSyncLedger } from "@langwatch/identity-server";
 import { createLogger } from "@langwatch/observability";
-import { tryGetApp } from "~/server/app-layer/app";
 import { SCIM_SYNC_PIPELINE_NAME } from "~/server/event-sourcing/pipelines/scim-sync/schemas/constants";
+import {
+  appPipelineSender,
+  StagedLedgerWriter,
+  type StagedSender,
+} from "./staged-ledger-writer";
 
 const logger = createLogger("langwatch:identity:scim-sync-ledger");
-
-export type ScimSyncStagedSender = {
-  send(data: unknown): Promise<unknown>;
-};
 
 const SENDER_NAME_BY_COMMAND: Record<ScimSyncCommandType, string> = {
   [ISSUE_SCIM_TOKEN_COMMAND_TYPE]: "issueScimToken",
@@ -62,29 +63,47 @@ const SENDER_NAME_BY_COMMAND: Record<ScimSyncCommandType, string> = {
   [REVOKE_SCIM_SYNC_COMMAND_TYPE]: "revokeScimSync",
 };
 
-function resolveStagedSender(name: string): ScimSyncStagedSender | null {
-  const app = tryGetApp();
-  if (!app?.eventSourcing?.isEnabled) return null;
-  try {
-    const pipeline = app.eventSourcing.getPipeline(
-      SCIM_SYNC_PIPELINE_NAME as never,
-    ) as unknown as { commands: Record<string, ScimSyncStagedSender> };
-    return pipeline.commands[name] ?? null;
-  } catch {
-    return null;
-  }
-}
+const resolveStagedSender = appPipelineSender({
+  pipelineName: SCIM_SYNC_PIPELINE_NAME,
+});
 
 export interface ScimSyncLedgerWriterDeps {
   /** Production resolves the App's pipeline lazily; tests hand one in. */
-  stagedSender?: (name: string) => ScimSyncStagedSender | null;
+  stagedSender?: (name: string) => StagedSender | null;
 }
 
-export class ScimSyncLedgerWriter implements ScimSyncLedger {
-  private readonly stagedSender: (name: string) => ScimSyncStagedSender | null;
-
+export class ScimSyncLedgerWriter
+  extends StagedLedgerWriter<ScimSyncCommand>
+  implements ScimSyncLedger
+{
   constructor(deps: ScimSyncLedgerWriterDeps = {}) {
-    this.stagedSender = deps.stagedSender ?? resolveStagedSender;
+    super({
+      stagedSender: deps.stagedSender ?? resolveStagedSender,
+      // No append of its own: the staged command is the sole appender
+      // (ADR-110).
+      waitedAppend: null,
+      // No read-your-writes wait, on purpose — see the header. Nothing on the
+      // SCIM request path reads this projection back, so waiting for it would
+      // hold an identity provider's request open for a row nobody reads.
+      readYourWrites: null,
+    });
+  }
+
+  protected senderNameFor(command: ScimSyncCommand): string {
+    return SENDER_NAME_BY_COMMAND[command.type];
+  }
+
+  protected onMissingSender({
+    command,
+    senderName,
+  }: {
+    command: ScimSyncCommand;
+    senderName: string;
+  }): void {
+    logger.warn(
+      { commandType: command.type, senderName },
+      "directory sync fact appended but not staged: the pipeline exposes no sender for it",
+    );
   }
 
   async commit({
@@ -109,22 +128,5 @@ export class ScimSyncLedgerWriter implements ScimSyncLedger {
         "could not record a directory sync fact; the push itself is unaffected",
       );
     }
-  }
-
-  private async stage({
-    command,
-  }: {
-    command: ScimSyncCommand;
-  }): Promise<void> {
-    const senderName = SENDER_NAME_BY_COMMAND[command.type];
-    const sender = this.stagedSender(senderName);
-    if (!sender) {
-      logger.warn(
-        { commandType: command.type, senderName },
-        "directory sync fact appended but not staged: the pipeline exposes no sender for it",
-      );
-      return;
-    }
-    await sender.send(command.data);
   }
 }
