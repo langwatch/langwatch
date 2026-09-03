@@ -1,6 +1,6 @@
 import { auditLog } from "@ee/audit-log/auditLog";
 import { z } from "zod";
-import { scimOversight } from "~/server/app-layer/identity/scim-reconciliation-runtime";
+import { scimOversight } from "~/server/app-layer/identity/runtime";
 import { adminSurfaceHidden } from "../../../../ee/admin/adminSurfaceHidden";
 import { isAdmin as checkIsAdmin } from "../../../../ee/admin/isAdmin";
 import { createTRPCRouter, protectedProcedure } from "../trpc";

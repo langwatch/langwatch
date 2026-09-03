@@ -113,6 +113,29 @@ export class PrismaSsoConnectionIssuers
     return row?.issuer ?? null;
   }
 
+  /**
+   * The `SsoProvider` row this connection registered, or none.
+   *
+   * Whether the LEGACY engine holds a provider for a connection, which is
+   * half of what makes a connection dialable (D09). Read fresh and outside
+   * the memo above for the reason `findIssuerForConnection` is: an
+   * administrator standing on the setup screen has just written this row, and
+   * a five-second answer of "no provider" reads to them as a broken save.
+   *
+   * The row rather than a boolean, so the caller states what absence means to
+   * it rather than inheriting a question this class invented.
+   */
+  async findRegisteredProvider({
+    connectionId,
+  }: {
+    connectionId: string;
+  }): Promise<{ id: string } | null> {
+    return await this.prisma.ssoProvider.findFirst({
+      where: { providerId: connectionId },
+      select: { id: true },
+    });
+  }
+
   /** Every issuer any connection registered, read fresh and raising. */
   async findAllIssuers(): Promise<readonly string[]> {
     const rows = await this.prisma.ssoProvider.findMany({

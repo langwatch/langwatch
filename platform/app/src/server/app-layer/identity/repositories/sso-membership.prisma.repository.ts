@@ -1,4 +1,8 @@
-import { Prisma, type PrismaClient } from "~/generated/prisma/client";
+import {
+  OrganizationUserRole,
+  Prisma,
+  type PrismaClient,
+} from "~/generated/prisma/client";
 
 /**
  * The `OrganizationUser` rows the two single-sign-on sign-in decisions read
@@ -112,6 +116,31 @@ export class PrismaSsoMembershipRepository {
     return await this.prisma.organization.findUnique({
       where: { id: organizationId },
       select: { id: true, name: true },
+    });
+  }
+
+  /**
+   * Whether this person is a live administrator of this organization, counted.
+   *
+   * The people `breakGlassCandidates` lists, asked on the write path: a
+   * binding that named anybody else would satisfy activation's precondition
+   * and open no door. Disabled members are excluded because a seat somebody
+   * cannot sign into is not a way back in.
+   */
+  async countEligibleAdministrator({
+    organizationId,
+    userId,
+  }: {
+    organizationId: string;
+    userId: string;
+  }): Promise<number> {
+    return await this.prisma.organizationUser.count({
+      where: {
+        organizationId,
+        userId,
+        disabledAt: null,
+        role: OrganizationUserRole.ADMIN,
+      },
     });
   }
 }

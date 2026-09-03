@@ -76,7 +76,7 @@ describe("given the operator lookup and the organization identity surface", () =
       // because there is no import edge to reach it through.
       const reachers = [
         "src/server/api/routers/identityLookup.ts",
-        "src/server/app-layer/identity/identity-lookup-runtime.ts",
+        "src/server/app-layer/identity/runtime.ts",
       ];
       const everyServerFile = readFileSync(
         path.join(APP, "src/server/api/root.ts"),

@@ -1,5 +1,6 @@
 import { auditLog } from "@ee/audit-log/auditLog";
 import { z } from "zod";
+import { PrismaSsoConnectionBackofficeRepository } from "~/server/app-layer/identity/repositories/sso-connection-backoffice.prisma.repository";
 import { ssoConnections } from "~/server/app-layer/identity/runtime";
 import { SsoConnectionBackofficeService } from "~/server/app-layer/identity/sso-connection-backoffice.service";
 import { prisma } from "~/server/db";
@@ -70,7 +71,7 @@ function requireOperator(user: { id: string; email?: string | null }): {
 
 function service(): SsoConnectionBackofficeService {
   return new SsoConnectionBackofficeService({
-    prisma,
+    reads: new PrismaSsoConnectionBackofficeRepository(prisma),
     connections: ssoConnections,
   });
 }

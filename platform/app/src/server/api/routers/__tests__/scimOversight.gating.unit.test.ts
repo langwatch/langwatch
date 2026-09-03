@@ -27,11 +27,6 @@ const { mockService, mockAuditLog } = vi.hoisted(() => ({
   mockAuditLog: vi.fn<(...args: unknown[]) => Promise<void>>(),
 }));
 
-vi.mock("~/server/app-layer/identity/scim-reconciliation-runtime", () => ({
-  scimOversight: () => mockService,
-  scimReconciliation: () => ({}),
-}));
-
 vi.mock("~/server/db", () => ({ prisma: {} }));
 vi.mock("@ee/audit-log/auditLog", () => ({ auditLog: mockAuditLog }));
 
@@ -39,10 +34,10 @@ vi.mock("@ee/audit-log/auditLog", () => ({ auditLog: mockAuditLog }));
  * The identity composition root, kept off this suite's graph.
  *
  * It resolves the whole event stack at module scope and exports a long list
- * of factories, none of which this suite asserts anything about — so it is
- * answered by a proxy that hands back an inert factory for whatever the tRPC
- * boundary happens to reach for. Naming them one by one would make this test
- * fail every time the composition root grows a service.
+ * of factories, only one of which this suite asserts anything about — so the
+ * rest are answered by inert factories, and `scimOversight` by the spy. Naming
+ * them one by one would make this test fail every time the composition root
+ * grows a service.
  */
 vi.mock("~/server/app-layer/identity/runtime", () => {
   const inert = () => ({}) as unknown;
@@ -57,13 +52,16 @@ vi.mock("~/server/app-layer/identity/runtime", () => {
     "identityNewbornReconciliation",
     "identityProjectionStore",
     "identitySecretCarry",
+    "identityLookup",
     "identityService",
     "identityStorageAdapter",
     "joinRequests",
+    "linkProposals",
     "joinRequestsService",
     "mfaCeremonies",
     "mfaEnrollments",
     "organizationMfa",
+    "scimReconciliation",
     "sessionClaims",
     "sessionInventory",
     "signInDomainRoutingPort",
@@ -74,10 +72,13 @@ vi.mock("~/server/app-layer/identity/runtime", () => {
     "ssoConnections",
     "ssoDomainClaimQueue",
     "ssoSelfServe",
+    "twoStepVerification",
     "verificationCeremony",
   ];
   return {
     ...Object.fromEntries(factories.map((name) => [name, inert])),
+    // The one factory this suite asserts about: the surface under test.
+    scimOversight: () => mockService,
     // Not inert, unlike its neighbours: `better-auth/index.ts` is on this
     // router's import graph and calls this at module load to build its
     // adapter. An empty object there fails the initialization, and because

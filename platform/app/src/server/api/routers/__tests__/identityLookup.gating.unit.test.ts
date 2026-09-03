@@ -32,7 +32,13 @@ const { mockService, mockAuditLog, mockRuntime } = vi.hoisted(() => ({
  * these tests can say WHICH verb a procedure reached, and — the point of
  * this file — whether the record was written before the gate.
  */
-vi.mock("~/server/app-layer/identity/identity-lookup-runtime", () => ({
+// Only the lookup factory is replaced: the composition root is the router's
+// one door into identity now that the satellite runtime is gone, and the rest
+// of it still has to answer for whatever else this suite's graph reaches.
+vi.mock("~/server/app-layer/identity/runtime", async (importOriginal) => ({
+  ...(await importOriginal<
+    typeof import("~/server/app-layer/identity/runtime")
+  >()),
   identityLookup: mockRuntime,
 }));
 

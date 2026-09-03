@@ -145,13 +145,7 @@ describe("identity service layering", () => {
       const offenders = offendersOf(files, (file, source) =>
         isRepositoryTier(file) ? [] : linesMatching(source, QUERY),
       );
-      expect(
-        ratchet(offenders, [
-          "server/app-layer/identity/platform-operators.ts",
-          "server/app-layer/identity/runtime.ts",
-          "server/app-layer/identity/sso-connection-backoffice.service.ts",
-        ]),
-      ).toEqual(CLEAN);
+      expect(ratchet(offenders, [])).toEqual(CLEAN);
     });
 
     /** @scenario "Prisma is spelled in the repository tier only" */
@@ -174,14 +168,9 @@ describe("identity service layering", () => {
       const offenders = offendersOf(files, (file, source) =>
         file === RUNTIME ? [] : linesMatching(source, CONSTRUCTION),
       );
-      expect(
-        ratchet(offenders, [
-          "server/app-layer/identity/identity-lookup-runtime.ts",
-          "server/app-layer/identity/scim-reconciliation-runtime.ts",
-          "server/app-layer/identity/two-step-runtime.ts",
-          "server/better-auth/index.ts",
-        ]),
-      ).toEqual(CLEAN);
+      expect(ratchet(offenders, ["server/better-auth/index.ts"])).toEqual(
+        CLEAN,
+      );
     });
 
     /** @scenario "The identity services are composed in one file" */
@@ -190,11 +179,7 @@ describe("identity service layering", () => {
         .filter((file) => /-runtime\.ts$/.test(basename(file)))
         .map(rel)
         .sort();
-      expect(satellites).toEqual([
-        "server/app-layer/identity/identity-lookup-runtime.ts",
-        "server/app-layer/identity/scim-reconciliation-runtime.ts",
-        "server/app-layer/identity/two-step-runtime.ts",
-      ]);
+      expect(satellites).toEqual([]);
     });
   });
 
@@ -211,12 +196,7 @@ describe("identity service layering", () => {
       const offenders = offendersOf(scope, (_file, source) =>
         linesMatching(source, /mode:\s*["']insensitive["']/),
       );
-      expect(
-        ratchet(offenders, [
-          "server/app-layer/identity/runtime.ts",
-          "server/app-layer/identity/sso-connection-backoffice.service.ts",
-        ]),
-      ).toEqual(CLEAN);
+      expect(ratchet(offenders, [])).toEqual(CLEAN);
     });
 
     /** @scenario "A question about the data is asked in one place" */

@@ -1,6 +1,6 @@
 import { z } from "zod";
 import { createTRPCRouter, protectedProcedure } from "~/server/api/trpc";
-import { scimReconciliation } from "~/server/app-layer/identity/scim-reconciliation-runtime";
+import { scimReconciliation } from "~/server/app-layer/identity/runtime";
 import { assertEnterprisePlan, ENTERPRISE_FEATURE_ERRORS } from "../enterprise";
 
 /**

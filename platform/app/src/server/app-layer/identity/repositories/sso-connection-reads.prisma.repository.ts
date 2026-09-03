@@ -125,6 +125,24 @@ export class PrismaSsoConnectionReadRepository
       },
     });
   }
+
+  /**
+   * How many ACTIVE connections this organization has right now.
+   *
+   * The break-glass revoke guard's one outside fact: revoking the last way
+   * back in matters only while a connection is actually deciding this
+   * organization's sign-in. A count rather than the rows, because the guard
+   * asks whether there is any and reads nothing about them.
+   */
+  async countActiveConnections({
+    organizationId,
+  }: {
+    organizationId: string;
+  }): Promise<number> {
+    return await this.prisma.ssoConnection.count({
+      where: { organizationId, state: "ACTIVE" },
+    });
+  }
 }
 
 /**

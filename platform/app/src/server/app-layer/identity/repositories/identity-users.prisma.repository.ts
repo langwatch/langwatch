@@ -129,6 +129,25 @@ export class PrismaIdentityUsersRepository implements IdentityUsersRepository {
     });
   }
 
+  /**
+   * Marks the address confirmed on whoever holds it.
+   *
+   * Case-insensitive for the same reason `findUserIdByEmail` is: rows written
+   * before sign-up lowercased addresses may carry capitals, and an exact
+   * match would quietly confirm nothing.
+   *
+   * `updateMany` rather than `update` because the predicate is not the unique
+   * key: a case-twin pair is exactly what the insensitive match exists to
+   * catch, and confirming both is the honest answer where a `update` would
+   * throw on the second.
+   */
+  async updateAddressConfirmed({ email }: { email: string }): Promise<void> {
+    await this.prisma.user.updateMany({
+      where: { email: { equals: email, mode: "insensitive" } },
+      data: { emailVerified: true },
+    });
+  }
+
   /** The soft-block banner's flag (ADR-027): set when somebody signs in with
    *  a provider their organization's SSO does not name. */
   async updatePendingSsoSetup({

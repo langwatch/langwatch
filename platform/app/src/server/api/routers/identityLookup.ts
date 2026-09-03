@@ -1,7 +1,7 @@
 import { auditLog } from "@ee/audit-log/auditLog";
 import { normalizeIdentifierValue } from "@langwatch/identity";
 import { z } from "zod";
-import { identityLookup } from "~/server/app-layer/identity/identity-lookup-runtime";
+import { identityLookup } from "~/server/app-layer/identity/runtime";
 import { adminSurfaceHidden } from "../../../../ee/admin/adminSurfaceHidden";
 import { isAdmin as checkIsAdmin } from "../../../../ee/admin/isAdmin";
 import { createTRPCRouter, protectedProcedure } from "../trpc";

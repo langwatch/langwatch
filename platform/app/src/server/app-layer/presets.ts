@@ -851,6 +851,9 @@ export function initializeDefaultApp(options?: {
   // The address lock is shared: the guards claim through it and the fold
   // releases through it, so the two must be the same instance (ADR-116 §6).
   const identityReservations = new PrismaIdentityReservationRepository(prisma);
+  // One instance, two roles: the `User` reads identity runs on, and the one
+  // address the platform-operator list asks about an actor.
+  const identityUsers = new PrismaIdentityUsersRepository(prisma);
 
   // Construct repositories at the composition root — ClickHouse-or-Memory decisions live here.
   const repositories: PipelineRepositories = {
@@ -941,7 +944,7 @@ export function initializeDefaultApp(options?: {
       identityReservations,
     ),
     identityHeads: new PrismaIdentityHeadsRepository(prisma),
-    identityUsers: new PrismaIdentityUsersRepository(prisma),
+    identityUsers,
     identityReservations,
     // The proposal log, not a table: reads the identity events back through
     // the App's own event store, resolved lazily for the same reason the
@@ -968,7 +971,7 @@ export function initializeDefaultApp(options?: {
       localDoor: new LocalDoorBreakGlassBinding(),
       bindings: ssoBreakGlass(),
     }),
-    ssoPlatformOperators: new AdminEmailPlatformOperators(prisma),
+    ssoPlatformOperators: new AdminEmailPlatformOperators(identityUsers),
     ssoLicenseAuthority: new LicenseDomainClaimAuthority(),
     ssoConnectionTeardown: new SsoConnectionTeardownDispatcher(),
     // One repository, two roles (D08): the fold's store and the guards' read

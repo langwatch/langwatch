@@ -1,8 +1,10 @@
 import type { IncomingHttpHeaders } from "node:http";
 import { z } from "zod";
 import { createTRPCRouter, protectedProcedure } from "~/server/api/trpc";
-import { organizationMfa } from "~/server/app-layer/identity/runtime";
-import { twoStepVerification } from "~/server/app-layer/identity/two-step-runtime";
+import {
+  organizationMfa,
+  twoStepVerification,
+} from "~/server/app-layer/identity/runtime";
 
 /**
  * Two-step verification (D06): a person's own setup, and an organization's

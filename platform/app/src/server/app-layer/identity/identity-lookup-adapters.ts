@@ -1,8 +1,8 @@
 import type { LinkProposalDirectoryPort } from "@langwatch/identity-server";
 import { createLogger } from "@langwatch/observability";
 import type { PrismaClient } from "~/generated/prisma/client";
-import { auth as betterAuth } from "~/server/better-auth";
 import { InviteService } from "~/server/invites/invite.service";
+import { betterAuthInstance } from "./better-auth-instance.adapter";
 import type {
   OperatorInvitationPort,
   OperatorSessionPort,
@@ -112,6 +112,7 @@ export class BetterAuthLinkProposalDirectory
     normalizedEmail: string;
   }): Promise<void> {
     const issuer = await this.issuerFor({ connectionId, provider });
+    const betterAuth = await betterAuthInstance();
     await betterAuth.$context.then((context) =>
       context.internalAdapter.createAccount({
         userId,

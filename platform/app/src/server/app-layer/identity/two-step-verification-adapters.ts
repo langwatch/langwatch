@@ -1,6 +1,6 @@
 import { IdentityMfaPasswordInvalidError } from "@langwatch/identity";
-import { auth } from "~/server/better-auth";
 import { handledErrorForBetterAuthCode } from "~/server/better-auth/handled-errors";
+import { betterAuthInstance } from "./better-auth-instance.adapter";
 import type { TwoStepProtocolPort } from "./two-step-verification.service";
 
 /**
@@ -30,6 +30,7 @@ export class BetterAuthTwoStepProtocol implements TwoStepProtocolPort {
     code: string;
   }): Promise<void> {
     try {
+      const auth = await betterAuthInstance();
       await auth.api.verifyTOTP({ body: { code }, headers });
     } catch (error) {
       throw translated({
@@ -50,6 +51,7 @@ export class BetterAuthTwoStepProtocol implements TwoStepProtocolPort {
     password?: string;
   }): Promise<void> {
     try {
+      const auth = await betterAuthInstance();
       await auth.api.disableTwoFactor({
         body: password ? { password } : {},
         headers,
