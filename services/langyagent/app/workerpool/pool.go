@@ -125,11 +125,15 @@ type CredentialRevoker interface {
 //
 // It satisfies app.WorkerPool.
 type Pool struct {
-	maxWorkers         int
-	workerIdle         time.Duration
-	readinessTimeout   time.Duration
-	reaperInterval     time.Duration
-	sessionsRoot       string
+	maxWorkers       int
+	workerIdle       time.Duration
+	readinessTimeout time.Duration
+	reaperInterval   time.Duration
+	sessionsRoot     string
+	// sessionsRootLock is this manager's claim on sessionsRoot; it is what
+	// makes the boot wipe safe. Released on Shutdown, and by the kernel when
+	// the process dies.
+	sessionsRootLock   *sessionsRootLock
 	workspaceRoot      string
 	openCodeBinaryPath string
 	piBinaryPath       string
@@ -175,11 +179,13 @@ var _ app.WorkerPool = (*Pool)(nil)
 // ctx becomes the pool-lifetime context (carries the logger; a copy with
 // cancellation is stored so Shutdown propagates to worker subprocesses).
 func New(ctx context.Context, opts Options) (*Pool, error) {
-	if err := os.RemoveAll(opts.SessionsRoot); err != nil && !os.IsNotExist(err) {
-		return nil, fmt.Errorf("wipe sessions root: %w", err)
+	rootLock, err := lockSessionsRoot(opts.SessionsRoot)
+	if err != nil {
+		return nil, err
 	}
-	if err := os.MkdirAll(opts.SessionsRoot, 0o755); err != nil {
-		return nil, fmt.Errorf("mkdir sessions root: %w", err)
+	if err := wipeSessionsRoot(opts.SessionsRoot); err != nil {
+		rootLock.Release()
+		return nil, err
 	}
 	// AGENTS.md + skills are EMBEDDED in the binary (internal/assets), not seeded
 	// into /workspace by the entrypoint. Read the template once (a spawn writes it
@@ -190,9 +196,11 @@ func New(ctx context.Context, opts Options) (*Pool, error) {
 	// accept traffic and silently spawn crippled workers.
 	agentsTemplate, err := assets.AgentsTemplate()
 	if err != nil {
+		rootLock.Release()
 		return nil, fmt.Errorf("load embedded AGENTS.md: %w", err)
 	}
 	if err := assets.MaterializeSkills(filepath.Join(opts.WorkspaceRoot, "skills")); err != nil {
+		rootLock.Release()
 		return nil, fmt.Errorf("materialize embedded skills: %w", err)
 	}
 	tel := opts.Telemetry
@@ -216,6 +224,7 @@ func New(ctx context.Context, opts Options) (*Pool, error) {
 		readinessTimeout:   opts.ReadinessTimeout,
 		reaperInterval:     opts.ReaperInterval,
 		sessionsRoot:       opts.SessionsRoot,
+		sessionsRootLock:   rootLock,
 		workspaceRoot:      opts.WorkspaceRoot,
 		openCodeBinaryPath: opts.OpenCodeBinaryPath,
 		piBinaryPath:       opts.PiBinaryPath,
@@ -280,6 +289,7 @@ func (p *Pool) Shutdown() {
 	for _, id := range ids {
 		p.kill(id, "shutdown")
 	}
+	p.sessionsRootLock.Release()
 	p.baseCancel()
 }
 
