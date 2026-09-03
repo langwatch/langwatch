@@ -102,7 +102,7 @@ def my_llm_call(user_input):
     if not guardrail.passed:
         return "I can't help with that request."
 
-    # Continue with the normal call
+    return call_llm(user_input)
 ```
 
 See [Guardrails](/evaluations/guardrails/overview) for the TypeScript call and the error handling.

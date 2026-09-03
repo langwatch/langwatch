@@ -420,10 +420,10 @@ Each dataset entry contains:
 |-------|-------------|
 | `id` | Unique identifier for the entry |
 | `entry` | The actual data (e.g., `input`, `expected_output`, `contexts`) |
-| `datasetId` | ID of the parent dataset (TypeScript only) |
-| `projectId` | ID of the project (TypeScript only) |
-| `createdAt` | Timestamp of creation (TypeScript only) |
-| `updatedAt` | Timestamp of last update (TypeScript only) |
+| `datasetId` | ID of the parent dataset |
+| `projectId` | ID of the project |
+| `createdAt` | Timestamp of creation |
+| `updatedAt` | Timestamp of last update |
 
 In Python, `get_dataset` returns entries with `id` and `entry` only. The records returned by `list_records` and `create_records` carry all six fields in both SDKs.
 

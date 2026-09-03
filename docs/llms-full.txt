@@ -39694,7 +39694,7 @@ Column names must be unique and cannot be `id` or `selected`. Each column has on
 
 ### Upload files
 
-**Upload datasets** opens a drawer that accepts CSV, JSON and JSONL files, several at a time. Each file becomes one dataset. For each file, edit the dataset name, then check the columns read from the file header: rename a column, change its type, drag it to reorder, or exclude it. Click **Upload all**.
+**Upload datasets** opens a drawer that accepts CSV, JSON and JSONL files, several at a time. Each file becomes one dataset. For each file, edit the dataset name, then check the columns read from the file. A CSV gives its columns from the header row, a JSON or JSONL file from the object keys. Rename a column, change its type, drag it to reorder, or exclude it. Click **Upload all**.
 
 <Frame>
 <img src="/images/datasets/dataset-upload-drawer.png" alt="The Upload datasets drawer with a CSV file added and its columns listed" />
@@ -40201,10 +40201,10 @@ Each dataset entry contains:
 |-------|-------------|
 | `id` | Unique identifier for the entry |
 | `entry` | The actual data (e.g., `input`, `expected_output`, `contexts`) |
-| `datasetId` | ID of the parent dataset (TypeScript only) |
-| `projectId` | ID of the project (TypeScript only) |
-| `createdAt` | Timestamp of creation (TypeScript only) |
-| `updatedAt` | Timestamp of last update (TypeScript only) |
+| `datasetId` | ID of the parent dataset |
+| `projectId` | ID of the project |
+| `createdAt` | Timestamp of creation |
+| `updatedAt` | Timestamp of last update |
 
 In Python, `get_dataset` returns entries with `id` and `entry` only. The records returned by `list_records` and `create_records` carry all six fields in both SDKs.
 
@@ -44976,7 +44976,7 @@ The clip above builds an experiment on a customer support dataset: a prompt colu
   **Let your agent set this up.** [Copy the evaluations prompt](/skills/code-prompts#set-up-evaluations) into your coding agent to get started automatically.
 </Tip>
 
-An experiment is a table. Each row is a dataset entry, each column is a prompt or an agent that runs on that entry, and each evaluator attached to a column scores the output. You build the table in the workbench, run it, and read the pass rate per column.
+An experiment is a table. Each row is a dataset entry, and each column is a prompt, an agent, a comparison or an evaluator that runs on that entry. An evaluator attached to a prompt or an agent column scores the output of that column. You build the table in the workbench, run it, and read the pass rate per column.
 
 <Frame>
 <img src="/images/evaluations/workbench-overview.png" alt="The experiments workbench with a dataset, a prompt column with outputs and an evaluator chip with pass and fail results" />
@@ -46305,7 +46305,7 @@ Choose one of:
 | **Exact Match** | The answer must match the expected output character for character. Case, surrounding whitespace and punctuation are ignored by default; each is a setting. |
 | **LLM Answer Match** | The answer may be worded differently and still be correct. A model compares the answer with the expected output and passes it when the meaning matches. |
 
-Name the evaluator. In **Variables**, map `output` to the prompt column's output, `expected_output` to the dataset's `expected_output` column and `input` to the dataset's `input` column, then click **Apply**.
+Name the evaluator. In **Variables**, map `output` to the prompt column's output, `expected_output` to the dataset's `expected_output` column and `input` to the dataset's `input` column, then click **Create Evaluator**. If a required field stays unmapped, the workbench opens the mapping editor. Map the field there and click **Apply**.
 
 <Frame>
 <img src="/images/evaluations/workbench-evaluator-mapping.png" alt="The LLM Answer Match editor with output mapped to the prompt output and expected_output to the dataset column" />
@@ -46404,7 +46404,7 @@ Fail the output if any criterion is not met, and name the criterion that failed.
 <img src="/images/evaluations/workbench-llm-judge-editor.png" alt="The LLM-as-a-Judge Boolean evaluator editor with the criteria prompt" />
 </Frame>
 
-In **Variables**, map `input` to the dataset's `input` column and `output` to the prompt column's output. Click **Apply**.
+In **Variables**, map `input` to the dataset's `input` column and `output` to the prompt column's output. Click **Create Evaluator**. If a required field stays unmapped, the workbench opens the mapping editor. Map the field there and click **Apply**.
 </Step>
 
 <Step title="Run">
@@ -47154,7 +47154,7 @@ Guardrails can run at two points:
 
 ## Getting Started
 
-**Set up Guardrail** on the [Online Evaluations](https://app.langwatch.ai/@project/online-evaluations) page opens the **New Guardrail** drawer: pick a saved evaluator and copy the **Integration Code** for your language.
+Click **Set up Guardrail** on the [Online Evaluations](https://app.langwatch.ai/@project/online-evaluations) page to open the **New Guardrail** drawer. Pick a saved evaluator and copy the **Integration Code** for your language.
 
 <Frame>
 <img src="/images/evaluations/guardrail-drawer.png" alt="The New Guardrail drawer with an evaluator selected and the Python integration code" />
@@ -47684,7 +47684,7 @@ def my_llm_call(user_input):
     if not guardrail.passed:
         return "I can't help with that request."
 
-    # Continue with the normal call
+    return call_llm(user_input)
 ```
 
 See [Guardrails](/evaluations/guardrails/overview) for the TypeScript call and the error handling.
