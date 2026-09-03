@@ -1,8 +1,8 @@
 import { Text } from "@chakra-ui/react";
 import type { ReactNode } from "react";
 import { Tooltip } from "@langwatch/design-system/tooltip";
-import { formatMoney } from "../../../model/format-money";
-import type { Money } from "../../../model/utils/types";
+import { formatMoney } from "@langwatch/design-system/format-money";
+import type { Money } from "@langwatch/design-system/type-utils";
 
 export const FormatMoney = ({
   amount,

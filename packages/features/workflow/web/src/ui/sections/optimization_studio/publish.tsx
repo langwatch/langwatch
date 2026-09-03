@@ -12,19 +12,12 @@ import {
 } from "@chakra-ui/react";
 import type { Edge } from "@xyflow/react";
 import { useCallback, useState } from "react";
-import {
-  ArrowUp,
-  ArrowUpCircle,
-  ChevronDown,
-  Code,
-  Share2,
-  XCircle,
-} from "react-feather";
+import { ArrowUp, ArrowUpCircle, ChevronDown, Code, Share2, XCircle } from "react-feather";
 import { FormProvider, useForm } from "react-hook-form";
 import { RenderCode } from "../code/render-code";
 import type { Dataset, DatasetRecord } from "@langwatch/dataset-contract";
 import type { Project } from "../../../model/prisma-types";
-import { langwatchEndpoint } from "../../../model/code/langwatch-endpoint-env";
+import { langwatchEndpoint } from "@langwatch/design-system/langwatch-endpoint-env";
 import { SmallLabel } from "@langwatch/design-system/small-label";
 import { Dialog } from "../../elements/dialog";
 import { Link } from "../../elements/studio-host/link";
@@ -75,29 +68,27 @@ export function Publish({ isDisabled }: { isDisabled: boolean }) {
   }));
   const trpc = api.useUtils();
 
-  const toggleSaveAsComponentMutation =
-    api.optimization.toggleSaveAsComponent.useMutation({
-      onSuccess: () => {
-        void trpc.optimization.getComponents.invalidate();
-        toaster.create({
-          title: "Component status updated",
-          type: "success",
-          duration: 5000,
-        });
-      },
-    });
+  const toggleSaveAsComponentMutation = api.optimization.toggleSaveAsComponent.useMutation({
+    onSuccess: () => {
+      void trpc.optimization.getComponents.invalidate();
+      toaster.create({
+        title: "Component status updated",
+        type: "success",
+        duration: 5000,
+      });
+    },
+  });
 
-  const toggleSaveAsEvaluatorMutation =
-    api.optimization.toggleSaveAsEvaluator.useMutation({
-      onSuccess: () => {
-        void trpc.optimization.getComponents.invalidate();
-        toaster.create({
-          title: "Evaluator status updated",
-          type: "success",
-          duration: 5000,
-        });
-      },
-    });
+  const toggleSaveAsEvaluatorMutation = api.optimization.toggleSaveAsEvaluator.useMutation({
+    onSuccess: () => {
+      void trpc.optimization.getComponents.invalidate();
+      toaster.create({
+        title: "Evaluator status updated",
+        type: "success",
+        duration: 5000,
+      });
+    },
+  });
 
   const toggleSaveAsComponent = () => {
     if (!workflowId || !project?.id) return;
@@ -329,8 +320,7 @@ function PublishMenu({
       )}
       <Tooltip content={canPublish} positioning={{ placement: "right" }}>
         <Menu.Item onClick={onTogglePublish} disabled={!!canPublish} value="publish">
-          <ArrowUp size={16} />{" "}
-          <Text textTransform="capitalize">{`Publish ${workflow_type}`}</Text>
+          <ArrowUp size={16} /> <Text textTransform="capitalize">{`Publish ${workflow_type}`}</Text>
         </Menu.Item>
       </Tooltip>
       <Menu.Item
@@ -350,11 +340,7 @@ function PublishMenu({
       </Menu.Item>
 
       <Tooltip content={publishDisabledLabel} positioning={{ placement: "right" }}>
-        <Menu.Item
-          onClick={onToggleApi}
-          disabled={!!publishDisabledLabel}
-          value="api-reference"
-        >
+        <Menu.Item onClick={onToggleApi} disabled={!!publishDisabledLabel} value="api-reference">
           <Code size={16} /> View API Reference
         </Menu.Item>
       </Tooltip>
@@ -406,10 +392,9 @@ function PublishModalContent({
     }),
   );
 
-  const { hasProvidersWithoutCustomKeys, nodeProvidersWithoutCustomKeys } =
-    useModelProviderKeys({
-      workflow: getWorkflow(),
-    });
+  const { hasProvidersWithoutCustomKeys, nodeProvidersWithoutCustomKeys } = useModelProviderKeys({
+    workflow: getWorkflow(),
+  });
 
   const form = useForm<{
     version: string;
@@ -584,8 +569,8 @@ function PublishModalContent({
         <Dialog.Body>
           <VStack align="start" width="full" gap={10}>
             <Text fontSize="15px" color="black">
-              Publish your workflow to make it available via API, as a component to other
-              workflows, or as a custom evaluator.
+              Publish your workflow to make it available via API, as a component to other workflows,
+              or as a custom evaluator.
             </Text>
             <VersionToBeUsed />
           </VStack>
@@ -627,11 +612,7 @@ function PublishModalContent({
                   </Alert.Content>
                 </Alert.Root>
                 <VStack width="full" align="start">
-                  <Button
-                    colorPalette="green"
-                    onClick={() => openApiModal()}
-                    variant="outline"
-                  >
+                  <Button colorPalette="green" onClick={() => openApiModal()} variant="outline">
                     <Code size={16} /> View API Reference
                   </Button>
                 </VStack>
@@ -688,8 +669,8 @@ export const ApiModalContent = () => {
       <Dialog.CloseTrigger />
       <Dialog.Body>
         <Text paddingBottom={8}>
-          Incorporate the following JSON payload within the body of your HTTP POST request
-          to get the workflow result.
+          Incorporate the following JSON payload within the body of your HTTP POST request to get
+          the workflow result.
         </Text>
         <Box padding={4} backgroundColor={"#272822"}>
           <RenderCode
@@ -714,8 +695,8 @@ EOF`}
           .
         </Text>
         <Text marginTop={4}>
-          To access the API details and view more information, please refer to the
-          official documentation{" "}
+          To access the API details and view more information, please refer to the official
+          documentation{" "}
           <Link href="https://docs.langwatch.ai" textDecoration="underline" isExternal>
             here
           </Link>

@@ -19,14 +19,18 @@ import type {
   TargetConfig,
 } from "@langwatch/experiment-web/experiments-v3/types";
 import { isComparisonEvaluatorType } from "@langwatch/experiment-web/experiments-v3/types";
-import { applyHandledErrorToForm, FormServerError, showErrorToast } from "@langwatch/workflow-web/studio-host/errors";
+import {
+  applyHandledErrorToForm,
+  FormServerError,
+  showErrorToast,
+} from "@langwatch/workflow-web/studio-host/errors";
 import {
   getComplexProps,
   getDrawerStack,
   getFlowCallbacks,
   useDrawer,
   useDrawerParams,
-} from "@langwatch/workflow-web/studio-host/use-drawer";
+} from "@langwatch/ui-host/use-drawer";
 import { useOrganizationTeamProject } from "@langwatch/workflow-web/studio-host/use-organization-team-project";
 import { WorkflowCardDisplay } from "@langwatch/workflow-web";
 import { formatTimeAgo } from "@langwatch/workflow-web/utils/formatTimeAgo";
@@ -46,14 +50,9 @@ import {
 } from "@langwatch/evaluator-web";
 import { EvaluatorMappingsSection } from "../../elements/evaluators/evaluator-mappings-section";
 
-// Stable reference for the "no comparison config yet" default (new comparison
-// evaluator, before the user has picked anything). Must be a module-level
-// constant, not an inline literal in JSX — ComparisonConfigForm re-syncs its
-// local draft from this `value` prop whenever the *reference* changes
-// (`useEffect(() => setDraft(value), [value])`), and onChange only writes
-// to a ref (not back into this prop), so a fresh `{...}` literal on every
-// EvaluatorEditorBody re-render silently wiped the variants / Golden field
-// mid-selection any time an unrelated field in the drawer re-rendered it.
+// Stable module-level reference (not an inline JSX literal): ComparisonConfigForm
+// re-syncs its draft whenever this `value` prop's REFERENCE changes, so a fresh
+// `{...}` on every re-render would silently wipe the variants/Golden field.
 const EMPTY_COMPARISON_CONFIG: ComparisonEvaluatorConfig = {
   variants: [],
   hasGoldenAnswer: false,
@@ -140,10 +139,8 @@ export type EvaluatorEditorController = {
       }
     | undefined;
   /**
-   * Whether a `comparisonContext` is expected to arrive for this drawer, i.e.
-   * the workbench opened it. False for openers that have no workbench behind
-   * them (Settings → Evaluators, online-eval, guardrails), which never attach
-   * one — so the form must not sit waiting on it there.
+   * Whether a `comparisonContext` is expected, i.e. the workbench opened it.
+   * False for openers with no workbench behind them, which never attach one.
    */
   expectsComparisonContext: boolean;
   /** The live comparison draft, mirrored from ComparisonConfigForm. */
@@ -319,15 +316,10 @@ export function useEvaluatorEditorController(
 
   const [hasUnsavedChanges, setHasUnsavedChanges] = useState(false);
 
-  // `defaultSettings` depends on the cascade-resolved model/embeddings queries,
-  // which can resolve (new object reference) *after* the user has already
-  // started filling out the form — e.g. Pairwise Compare's Include cost /
-  // duration toggles. `form.formState.isDirty` alone doesn't survive that
-  // race reliably (RHF batches its dirty flag; the effect body may read a
-  // stale value before the toggle-flip flushes), so cost gets a resolved
-  // default that stomps duration back to `[]`. Latch a ref to "already done
-  // the initial reset" for this evaluator so late-resolving defaults never
-  // re-fire the reset once the form is live.
+  // `defaultSettings` can resolve (new reference) after the user has already
+  // started filling the form; `form.formState.isDirty` doesn't survive that
+  // race reliably. Latch a ref so late-resolving defaults never re-fire the
+  // reset once the form is live.
   const didInitializeCreateFormRef = useRef<string | null>(null);
   useEffect(() => {
     if (!evaluatorDef || evaluatorId) return;
@@ -479,15 +471,10 @@ export function useEvaluatorEditorController(
   const isSaving = createMutation.isPending || updateMutation.isPending;
   const name = form.watch("name");
 
-  // A comparison with fewer than two variants judges nothing — the
-  // orchestrator skips it outright ("fewer than 2 variants configured"). Gate
-  // Save and Apply on it rather than letting the user create a column that
-  // silently never runs.
-  //
-  // Filter empty slots, not just array length: a folded legacy pairwise
-  // config (fromPairwise) always returns a 2-element `variants` array even
-  // when one or both slots are unset, so `.length` alone can't tell a fully
-  // configured comparison from an under-filled one.
+  // A comparison with fewer than two variants judges nothing (the
+  // orchestrator skips it), so gate Save/Apply on it. Filter empty slots,
+  // not array length: a folded legacy pairwise config always returns a
+  // 2-element array even with an unset slot.
   const hasEnoughVariants =
     !isComparisonEvaluatorType(evaluatorType) || comparison.variants.filter(Boolean).length >= 2;
   const isValid = !!name && name.trim().length > 0 && hasEnoughVariants;
@@ -685,13 +672,9 @@ export function EvaluatorEditorBody({ controller }: { controller: EvaluatorEdito
     onComparisonChange,
   } = controller;
 
-  // Comparison: if the caller passed comparison context, ignore the generic
-  // mappings UI entirely and render the variants+golden picker. Derive from
-  // evaluatorType alone so the inline UI shows the right fields even when
-  // drawer navigation transitions wipe flowCallbacks/complexProps mid-flight.
-  // Callback presence (`onComparisonChange`) is still checked at the render
-  // site below so persistence works when wiring is present, but it no longer
-  // decides which layout to draw.
+  // Comparison: render the variants+golden picker instead of the generic
+  // mappings UI. Derived from evaluatorType alone so it's correct even when
+  // drawer transitions wipe flowCallbacks/complexProps mid-flight.
   const isComparison = isComparisonEvaluatorType(evaluatorType);
 
   if (evaluatorId && isLoadingEvaluator) {
@@ -702,22 +685,10 @@ export function EvaluatorEditorBody({ controller }: { controller: EvaluatorEdito
     );
   }
 
-  // A comparison editor needs its context (targets/dataset-columns) to render
-  // the variants+golden+input picker. On the Add→Comparison flow that context is
-  // attached synchronously, so this never trips. On a page RELOAD it is
-  // re-attached a beat later (once the workbench store hydrates) — without this
-  // gate the name/model/prompt paint first and the picker pops in afterwards,
-  // which reads as a janky two-stage load. Holding the form until the context
-  // lands makes it appear in one piece.
-  //
-  // Only wait when the context is actually COMING. A comparison evaluator is a
-  // normal saved evaluator, so it is also reachable from places that have no
-  // workbench behind them — Settings → Evaluators lists it, as do the online-
-  // eval and guardrail drawers. Those openers never attach a comparisonContext,
-  // so waiting on one there is waiting forever. The workbench is the only opener
-  // that carries a targetId, which makes it the signal for "context is coming";
-  // everywhere else falls through and renders the name/model/prompt form, with
-  // the variants section omitted by the guard at the render site below.
+  // A comparison editor needs its context to render the picker. On reload it
+  // re-attaches a beat late, so hold the form to avoid a two-stage pop-in —
+  // but only when `expectsComparisonContext` says it's actually coming
+  // (non-workbench openers never attach one, so waiting there is forever).
   if (isComparison && !comparisonContext && expectsComparisonContext) {
     return (
       <HStack justify="center" paddingY={8}>
@@ -754,17 +725,9 @@ export function EvaluatorEditorBody({ controller }: { controller: EvaluatorEdito
             prefix="settings"
             errors={form.formState.errors.settings}
             variant="default"
-            // For the Comparison shortcut, drop the fields the inline
-            // ComparisonConfigForm already owns (has_golden_answer,
-            // include_metrics) plus the ones that would only be noise beside
-            // it (allow_tie, randomize_order), and the legacy pairwise judge's
-            // `swap_and_confirm`, which this evaluator does not have.
-            //
-            // Everything NOT listed still renders here — model, max_tokens,
-            // prompt, temperature and swap_and_reconcile. This comment used to
-            // say the opposite ("keep ONLY the Model picker", naming `prompt`
-            // among the skipped), which is how a reviewer came to conclude
-            // swap_and_reconcile had no off switch. It has one, right here.
+            // Comparison shortcut: skip fields ComparisonConfigForm already
+            // owns plus noise beside it. Everything else (model, max_tokens,
+            // prompt, temperature, swap_and_reconcile) still renders here.
             skipFields={
               isComparison
                 ? [
@@ -844,12 +807,7 @@ export function EvaluatorEditorBody({ controller }: { controller: EvaluatorEdito
 
 export type EvaluatorEditorFooterProps = {
   controller: EvaluatorEditorController;
-  /**
-   * Override the Cancel button behavior. When not provided, defaults to
-   * controller.handleClose (which walks the drawer stack and confirms unsaved
-   * changes). The unified flow passes a direct close so Cancel always shuts
-   * the whole flow.
-   */
+  /** Overrides Cancel; default `controller.handleClose` confirms unsaved changes. */
   onCancel?: () => void;
 };
 

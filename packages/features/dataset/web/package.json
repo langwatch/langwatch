@@ -68,6 +68,7 @@
     "@langwatch/observability": "workspace:*",
     "@langwatch/platform-api-client": "workspace:*",
     "@langwatch/ui-drawer": "workspace:*",
+    "@langwatch/ui-host": "workspace:*",
     "@langwatch/workflow-web": "workspace:*",
     "@tanstack/react-query": "5.101.4",
     "@tanstack/react-table": "^8.21.3",

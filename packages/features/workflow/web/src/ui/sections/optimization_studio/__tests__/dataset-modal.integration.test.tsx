@@ -28,7 +28,7 @@ const { mockOpenDrawer, mockDatasets } = vi.hoisted(() => ({
   },
 }));
 
-vi.mock("../../../../behavior/studio-host/use-drawer", () => ({
+vi.mock("@langwatch/ui-host/use-drawer", () => ({
   useDrawer: () => ({
     openDrawer: mockOpenDrawer,
     closeDrawer: vi.fn(),
@@ -120,8 +120,7 @@ const Wrapper = ({ children }: { children: React.ReactNode }) => (
   <ChakraProvider value={defaultSystem}>{children}</ChakraProvider>
 );
 
-const getEntryNode = () =>
-  _useWorkflowStore.getState().nodes.find((n) => n.id === "entry");
+const getEntryNode = () => _useWorkflowStore.getState().nodes.find((n) => n.id === "entry");
 
 describe("Workflow dataset dialog", () => {
   afterEach(() => cleanup());
@@ -215,10 +214,7 @@ describe("Workflow dataset dialog", () => {
       const entry = getEntryNode();
       const dataset = (entry?.data as Entry).dataset;
       expect(dataset?.name).toBe("Draft Dataset");
-      expect(dataset?.inline?.columnTypes.map((c) => c.name)).toEqual([
-        "input",
-        "expected_output",
-      ]);
+      expect(dataset?.inline?.columnTypes.map((c) => c.name)).toEqual(["input", "expected_output"]);
     });
 
     /** @scenario New dataset button works when a dataset already exists */
@@ -270,12 +266,7 @@ describe("Workflow dataset dialog", () => {
       });
       const user = userEvent.setup();
       render(
-        <DatasetModal
-          open={true}
-          onClose={vi.fn()}
-          node={ENTRY_NODE}
-          editingDataset={draft}
-        />,
+        <DatasetModal open={true} onClose={vi.fn()} node={ENTRY_NODE} editingDataset={draft} />,
         { wrapper: Wrapper },
       );
 
@@ -288,9 +279,7 @@ describe("Workflow dataset dialog", () => {
       // The change landed in the workflow DSL, not in any database
       await waitFor(() => {
         const entry = getEntryNode();
-        expect((entry?.data as Entry).dataset?.inline?.records.input?.[0]).toBe(
-          "bonjour",
-        );
+        expect((entry?.data as Entry).dataset?.inline?.records.input?.[0]).toBe("bonjour");
       });
 
       // Promotion to a real dataset is offered

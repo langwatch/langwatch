@@ -11,15 +11,9 @@ import {
 import { AlertTriangle, Search } from "lucide-react";
 import React, { useEffect, useMemo, useState } from "react";
 import { LuSettings2 } from "react-icons/lu";
-import {
-  modelProviderIcons,
-  ProviderIconGlyph,
-} from "./modelProviders/icons-map";
+import { modelProviderIcons, ProviderIconGlyph } from "./modelProviders/icons-map";
 import { useOrganizationTeamProject } from "@langwatch/workflow-web/studio-host/use-organization-team-project";
-import {
-  isCodexModel,
-  isModelAllowedForFeature,
-} from "@langwatch/model-provider-contract";
+import { isCodexModel, isModelAllowedForFeature } from "@langwatch/model-provider-contract";
 import {
   buildCustomModelDisplayNames,
   modelDisplayLabel,
@@ -29,8 +23,11 @@ import {
   type ModelProviderEditorValue as MaybeStoredModelProvider,
 } from "@langwatch/model-provider-contract";
 import { api } from "@langwatch/workflow-web/studio-host/api";
-import { titleCase } from "@langwatch/workflow-web/utils/stringCasing";
-import { MODEL_ICON_SIZE, MODEL_ICON_SIZE_SM } from "@langwatch/prompt-web/components/llmPromptConfigs/constants";
+import { titleCase } from "@langwatch/design-system/string-casing";
+import {
+  MODEL_ICON_SIZE,
+  MODEL_ICON_SIZE_SM,
+} from "@langwatch/prompt-web/components/llmPromptConfigs/constants";
 import { NoModelsConfiguredCallout } from "./no-models-configured-callout";
 import { InputGroup } from "@langwatch/design-system/input-group";
 import { Link } from "@langwatch/workflow-web/studio-host/link";
@@ -68,10 +65,7 @@ export type GroupedModelOptions = ModelOptionGroup[];
 
 /**
  * Fail-closed gate for restricted-provider models (codex today): a picker
- * only offers them when it declares which feature it serves AND that
- * feature is licensed to run them. Pickers that pass no `featureKey`
- * (playground, workflows, evaluators) therefore never see them.
- * Exported for tests.
+ * only offers them when it declares a licensed `featureKey`. Exported for tests.
  */
 export const filterRestrictedModels = ({
   models,
@@ -91,23 +85,11 @@ const scopeRank = (scopeType?: string): number =>
   SCOPE_RANK[scopeType as keyof typeof SCOPE_RANK] ?? 0;
 
 /**
- * Provider keys whose registry models in `mode` must not be offered,
- * because the row that would actually serve them cannot.
- *
- * Availability follows the row execution picks, not the union of rows.
- * A registry model is listed in no row's custom catalog, so
- * `findRowServingModel` finds nothing and `resolveServingRow` keeps the
- * scope-collapse winner — enabled beats disabled, then narrowest scope
- * (ModelProviderService.isNarrower). An AI Studio row at organization
- * scope therefore does NOT rescue an Agent Platform row at project scope:
- * the project row wins and answers 404 on the embeddings endpoint.
- *
- * Ties inside the winning tier resolve conservatively — if any row that
- * could win cannot serve the mode, the models stay hidden. Offering a
- * model that fails is the defect this exists to remove; hiding one that
- * would have worked costs a configuration change the customer can see.
- *
- * Exported for tests.
+ * Provider keys whose registry models in `mode` must not be offered, because
+ * the row `resolveServingRow` actually picks (its scope-collapse winner, not
+ * the union of rows) cannot serve them. Ties resolve conservatively: if any
+ * row that could win can't serve the mode, the models stay hidden. Exported
+ * for tests.
  */
 export const providersWithoutRegistryModels = (
   rows: Array<{
@@ -143,10 +125,8 @@ export const providersWithoutRegistryModels = (
 };
 
 /**
- * A real union by model id: the first row that declares a model wins, and the
- * same model declared again at a wider scope adds nothing. Concatenating
- * instead put one model in the picker twice, because `getCustomModels` turns
- * every entry into an option without looking for repeats.
+ * A real union by model id: the first row that declares a model wins.
+ * Concatenating instead put one model in the picker twice.
  */
 const unionCustomModels = <T extends { modelId: string }>(
   first: readonly T[] | null | undefined,
@@ -160,11 +140,9 @@ const unionCustomModels = <T extends { modelId: string }>(
 };
 
 /**
- * Adapt the array shape (one row per provider+scope) into the legacy
- * `Record<provider, config>` shape that getCustomModels and the custom-model
- * dedup expect. Multiple rows for the same provider (multi-scope) are merged:
- * the provider counts as enabled if any row is enabled, custom model lists
- * union.
+ * Adapt the array shape into the legacy `Record<provider, config>` shape
+ * `getCustomModels` expects, merging multi-scope rows (enabled if any is,
+ * custom model lists union).
  */
 const mergeProviderRowsByKey = (
   rows: readonly MaybeStoredModelProvider[],
@@ -196,12 +174,9 @@ export const useModelSelectionOptions = (
   opts?: { featureKey?: string | undefined },
 ) => {
   const { project } = useOrganizationTeamProject();
-  // `listAllForProjectForFrontend` returns the providers actually
-  // stored against any scope reachable from this project. The legacy
-  // `getAllForProject` merged env-fed defaults (every registry
-  // provider whose API key is present in the server's process env),
-  // which made unrelated providers like Gemini show up in the picker
-  // for a project that only stored Anthropic/OpenAI.
+  // `listAllForProjectForFrontend` returns only providers actually stored
+  // against a scope reachable from this project, unlike the legacy
+  // env-fed-defaults merge that leaked unrelated providers into the picker.
   const modelProviders = api.modelProvider.listAllForProjectForFrontend.useQuery(
     { projectId: project?.id ?? "" },
     { enabled: !!project?.id },
@@ -220,8 +195,7 @@ export const useModelSelectionOptions = (
     // Build a set of custom model IDs for quick lookup
     const customModelIdSet = new Set<string>();
     for (const [providerKey, config] of Object.entries(providersByKey)) {
-      const customList =
-        mode === "chat" ? config.customModels : config.customEmbeddingsModels;
+      const customList = mode === "chat" ? config.customModels : config.customEmbeddingsModels;
       if (customList) {
         for (const model of customList) {
           customModelIdSet.add(`${providerKey}/${model.modelId}`);
@@ -229,20 +203,16 @@ export const useModelSelectionOptions = (
       }
     }
 
-    // Gemini's Agent Platform door serves chat but not the embeddings
-    // endpoint (verified live: :batchEmbedContents answers 404 on
-    // aiplatform.googleapis.com). Offering registry embedding models a
-    // credential cannot run would recreate the selectable-but-always-fails
-    // class this fold removed. Explicit custom models stay — they are the
-    // customer's own claim about what their endpoint serves.
+    // Gemini's Agent Platform door serves chat but not embeddings (404 on
+    // :batchEmbedContents), so registry embedding models are dropped here.
+    // Explicit custom models stay — the customer's own claim.
     const withoutRegistryModels = providersWithoutRegistryModels(providers ?? [], mode);
 
     const allModels = filterRestrictedModels({
       models: getCustomModels(providersByKey, options, mode),
       featureKey,
     }).filter(
-      (model) =>
-        customModelIdSet.has(model) || !withoutRegistryModels.has(model.split("/")[0]!),
+      (model) => customModelIdSet.has(model) || !withoutRegistryModels.has(model.split("/")[0]!),
     );
 
     const displayNames = buildCustomModelDisplayNames(providers ?? []);
@@ -336,8 +306,11 @@ export const ModelSelector = React.memo(function ModelSelector({
   open?: boolean;
   onOpenChange?: (open: boolean) => void;
 }) {
-  const { selectOptions, groupedByProvider, isEmpty, isLoading } =
-    useModelSelectionOptions(options, model, mode);
+  const { selectOptions, groupedByProvider, isEmpty, isLoading } = useModelSelectionOptions(
+    options,
+    model,
+    mode,
+  );
 
   // ALL hooks must run unconditionally — keep the empty-state early
   // return *after* every hook below so we don't violate React's rules
@@ -374,9 +347,7 @@ export const ModelSelector = React.memo(function ModelSelector({
   // treatment ModelChip renders in the Default Models table.
   const providerKey = model.split("/")[0] ?? "";
   const isProviderMissing =
-    !!model &&
-    !!providerKey &&
-    !groupedByProvider.some((group) => group.provider === providerKey);
+    !!model && !!providerKey && !groupedByProvider.some((group) => group.provider === providerKey);
 
   const selectValueText = (
     <HStack overflow="hidden" gap={2} align="center">
@@ -421,9 +392,7 @@ export const ModelSelector = React.memo(function ModelSelector({
   const [highlightedValue, setHighlightedValue] = useState<string | null>(model);
 
   useEffect(() => {
-    const highlightedItem = allFilteredModels.find(
-      (item) => item.value === highlightedValue,
-    );
+    const highlightedItem = allFilteredModels.find((item) => item.value === highlightedValue);
     if (!highlightedItem) {
       const firstValue = allFilteredModels[0]?.value ?? null;
       if (firstValue !== highlightedValue) {
@@ -486,9 +455,7 @@ export const ModelSelector = React.memo(function ModelSelector({
         onPointerDown={(e) => e.stopPropagation()}
         onClick={(e) => e.stopPropagation()}
       >
-        <Select.ValueText placeholder={selectValueText}>
-          {() => selectValueText}
-        </Select.ValueText>
+        <Select.ValueText placeholder={selectValueText}>{() => selectValueText}</Select.ValueText>
       </Select.Trigger>
       <Select.Content>
         <Field.Root asChild>
@@ -537,20 +504,13 @@ export const ModelSelector = React.memo(function ModelSelector({
                 return (
                   <React.Fragment key={item.value}>
                     {showDivider && (
-                      <Box
-                        borderBottom="1px solid"
-                        borderColor="border"
-                        marginX={2}
-                        marginY={1}
-                      />
+                      <Box borderBottom="1px solid" borderColor="border" marginX={2} marginY={1} />
                     )}
                     <Select.Item item={item}>
                       <HStack gap={2}>
                         {item.icon && (
                           <ProviderIconGlyph
-                            provider={
-                              item.value.split("/")[0] as keyof typeof modelProviderIcons
-                            }
+                            provider={item.value.split("/")[0] as keyof typeof modelProviderIcons}
                             size={MODEL_ICON_SIZE}
                           />
                         )}
@@ -607,18 +567,7 @@ export const ModelSelector = React.memo(function ModelSelector({
   );
 });
 
-/**
- * Builds the list of available models by combining registry models with custom models.
- *
- * Registry models from `options` are always included for enabled providers,
- * filtered by mode (chat or embedding). Custom models are returned first
- * so they appear at the top of the selector.
- *
- * @param modelProviders - Map of provider keys to their configuration
- * @param options - Registry model IDs (e.g., "openai/gpt-4o")
- * @param mode - Whether to include chat or embedding custom models
- * @returns Combined list of model IDs for enabled providers (custom first, then registry)
- */
+/** Combines registry models (`options`, filtered by `mode`) with custom models, custom first. */
 export const getCustomModels = (
   modelProviders: Record<string, MaybeStoredModelProvider>,
   options: string[],
@@ -630,8 +579,7 @@ export const getCustomModels = (
   // Add custom models first so they appear at the top
   for (const [providerKey, config] of Object.entries(modelProviders)) {
     if (!config.enabled) continue;
-    const customList =
-      mode === "chat" ? config.customModels : config.customEmbeddingsModels;
+    const customList = mode === "chat" ? config.customModels : config.customEmbeddingsModels;
     if (customList) {
       for (const model of customList) {
         customModelIds.push(`${providerKey}/${model.modelId}`);

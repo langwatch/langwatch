@@ -1,7 +1,7 @@
 import { Button, HStack, Spacer } from "@chakra-ui/react";
 import { useFormContext } from "react-hook-form";
 
-import { GenerateApiSnippetButton } from "@langwatch/workflow-web/components/GenerateApiSnippetButton";
+import { GenerateApiSnippetButton } from "@langwatch/design-system/generate-api-snippet-button";
 import { useOrganizationTeamProject } from "@langwatch/workflow-web/studio-host/use-organization-team-project";
 import type { PromptConfigFormValues } from "@langwatch/prompt-web/surfaces/prompt-form";
 import { GeneratePromptApiSnippetDialog } from "../../elements/prompts/generate-prompt-api-snippet-dialog";

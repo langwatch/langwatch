@@ -27,8 +27,8 @@ import type { Edge, Node } from "@xyflow/react";
 
 import { workflowApi } from "../../behavior/workflow-api";
 import { useWorkflowHost } from "../../model/workflow-host";
-import { FullLogo } from "../../ui/elements/full-logo";
-import { LoadingScreen } from "../../ui/sections/loading-screen";
+import { FullLogo } from "@langwatch/design-system/full-logo";
+import { LoadingScreen } from "@langwatch/design-system/loading-screen";
 import { WorkflowChatBox } from "../../ui/sections/workflow-chat-box";
 
 export default function WorkflowChatScreen() {

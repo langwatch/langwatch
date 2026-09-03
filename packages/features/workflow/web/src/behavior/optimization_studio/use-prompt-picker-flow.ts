@@ -1,10 +1,7 @@
 import { useMemo } from "react";
 
-import { setFlowCallbacks, useDrawer } from "../studio-host/use-drawer";
-import {
-  useWorkflowPromptPickerFlow,
-  type PromptPickerPort,
-} from "@langwatch/workflow-web";
+import { setFlowCallbacks, useDrawer } from "@langwatch/ui-host/use-drawer";
+import { useWorkflowPromptPickerFlow, type PromptPickerPort } from "@langwatch/workflow-web";
 
 /** App composition adapter for the Workflow prompt-selection state machine. */
 export function usePromptPickerFlow() {

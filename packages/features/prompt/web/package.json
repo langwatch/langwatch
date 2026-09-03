@@ -113,6 +113,7 @@
     "@langwatch/topic-contract": "workspace:*",
     "@langwatch/trace-contract": "workspace:*",
     "@langwatch/ui-drawer": "workspace:*",
+    "@langwatch/ui-host": "workspace:*",
     "@langwatch/workflow-contract": "workspace:*",
     "@langwatch/workflow-web": "workspace:*",
     "@xyflow/react": "^12.11.1",

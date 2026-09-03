@@ -4,8 +4,8 @@ import React, { useEffect, useRef, useState } from "react";
 import { useRouter } from "@langwatch/workflow-web/studio-host/next-router";
 import { useFilterParams } from "../use-filter-params";
 import { api } from "@langwatch/workflow-web/studio-host/api";
-import { Delayed } from "@langwatch/workflow-web/components/Delayed";
-import { OverflownTextWithTooltip } from "@langwatch/workflow-web/components/OverflownText";
+import { Delayed } from "@langwatch/design-system/delayed";
+import { OverflownTextWithTooltip } from "@langwatch/design-system/overflown-text";
 import { Checkbox } from "@langwatch/design-system/checkbox";
 
 export function TopicsSelector({ showTitle = true }: { showTitle?: boolean }) {
@@ -108,9 +108,7 @@ export function TopicsSelector({ showTitle = true }: { showTitle?: boolean }) {
     if (topicSelectorRef.current && topicCountsQuery.data) {
       const currentHeight = topicSelectorRef.current.clientHeight;
 
-      setMinHeight((minHeight) =>
-        currentHeight > (minHeight ?? 0) ? currentHeight : minHeight,
-      );
+      setMinHeight((minHeight) => (currentHeight > (minHeight ?? 0) ? currentHeight : minHeight));
     }
   }, [topicCountsQuery.data]);
 
@@ -188,9 +186,7 @@ export function TopicsSelector({ showTitle = true }: { showTitle?: boolean }) {
                             gap={3}
                             flexGrow={1}
                             checked={selectedSubtopics.includes(subtopic.id)}
-                            onChange={(e) =>
-                              handleSubtopicChange(subtopic.id, e.target.checked)
-                            }
+                            onChange={(e) => handleSubtopicChange(subtopic.id, e.target.checked)}
                           >
                             <OverflownTextWithTooltip
                               lineClamp={1}
@@ -213,8 +209,7 @@ export function TopicsSelector({ showTitle = true }: { showTitle?: boolean }) {
                 <VStack textAlign="center">
                   <EmptyState.Title textStyle="sm">No topics found</EmptyState.Title>
                   <EmptyState.Description textStyle="xs">
-                    Topics are assigned automatically after enough messages are
-                    collected.{" "}
+                    Topics are assigned automatically after enough messages are collected.{" "}
                   </EmptyState.Description>
                 </VStack>
               </EmptyState.Content>

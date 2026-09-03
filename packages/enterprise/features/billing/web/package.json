@@ -32,6 +32,7 @@
     "@langwatch/enterprise-licensing-web": "workspace:*",
     "@langwatch/entitlement-contract": "workspace:*",
     "@langwatch/platform-api-client": "workspace:*",
+    "@langwatch/ui-host": "workspace:*",
     "@langwatch/workflow-web": "workspace:*",
     "lucide-react": "^1.22.0",
     "numeral": "^2.0.6",

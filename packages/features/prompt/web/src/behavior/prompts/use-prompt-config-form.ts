@@ -11,7 +11,7 @@ import {
   type PromptConfigFormValues,
   refinedFormSchemaWithModelLimits,
 } from "@langwatch/prompt-web/surfaces/prompt-form";
-import { salvageValidData } from "@langwatch/workflow-web/utils/zodSalvage";
+import { salvageValidData } from "@langwatch/design-system/zod-salvage";
 
 interface UsePromptConfigFormProps {
   configId?: string;
@@ -72,10 +72,7 @@ export const usePromptConfigForm = ({
   const model = formData.version?.configData?.llm?.model;
   const { limits: modelLimits } = useModelLimits({ model });
 
-  const dynamicSchema = useMemo(
-    () => refinedFormSchemaWithModelLimits(modelLimits),
-    [modelLimits],
-  );
+  const dynamicSchema = useMemo(() => refinedFormSchemaWithModelLimits(modelLimits), [modelLimits]);
 
   // Update schema ref when limits change
   useEffect(() => {
@@ -84,15 +81,10 @@ export const usePromptConfigForm = ({
     // Clamp max_tokens to model limit when limits change (prevents validation error)
     if (modelLimits?.maxOutputTokens) {
       const currentMaxTokens = methods.getValues("version.configData.llm.maxTokens");
-      if (
-        currentMaxTokens !== undefined &&
-        currentMaxTokens > modelLimits.maxOutputTokens
-      ) {
-        methods.setValue(
-          "version.configData.llm.maxTokens",
-          modelLimits.maxOutputTokens,
-          { shouldDirty: false },
-        );
+      if (currentMaxTokens !== undefined && currentMaxTokens > modelLimits.maxOutputTokens) {
+        methods.setValue("version.configData.llm.maxTokens", modelLimits.maxOutputTokens, {
+          shouldDirty: false,
+        });
       }
     }
 
@@ -137,20 +129,12 @@ export const usePromptConfigForm = ({
     const inputs = formData.version?.configData.inputs ?? [];
     const outputs = formData.version?.configData.outputs ?? [];
     const newColumns = inputsAndOutputsToDemostrationColumns(inputs, outputs);
-    const currentColumns =
-      formData.version?.configData.demonstrations?.inline?.columnTypes ?? [];
-    const currentRecords =
-      formData.version?.configData.demonstrations?.inline?.records ?? {};
+    const currentColumns = formData.version?.configData.demonstrations?.inline?.columnTypes ?? [];
+    const currentRecords = formData.version?.configData.demonstrations?.inline?.records ?? {};
 
     if (!isEqual(newColumns, currentColumns)) {
-      methods.setValue(
-        "version.configData.demonstrations.inline.columnTypes",
-        newColumns,
-      );
-      methods.setValue(
-        "version.configData.demonstrations.inline.records",
-        currentRecords,
-      );
+      methods.setValue("version.configData.demonstrations.inline.columnTypes", newColumns);
+      methods.setValue("version.configData.demonstrations.inline.records", currentRecords);
     }
   }, [formData, methods]);
 
@@ -193,9 +177,7 @@ export const usePromptConfigForm = ({
       methods.setValue("version.parameters", nextRuntimeParameters);
     }
     // Use parsed values to ensure defaults are applied
-    for (const [key, value] of Object.entries(
-      parsedInitialValues?.version?.configData ?? {},
-    )) {
+    for (const [key, value] of Object.entries(parsedInitialValues?.version?.configData ?? {})) {
       const currentValue = methods.getValues(`version.configData.${key}` as any);
       if (!isEqual(currentValue, value)) {
         methods.setValue(`version.configData.${key}` as any, value as any);

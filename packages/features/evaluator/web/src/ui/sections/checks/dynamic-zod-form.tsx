@@ -11,30 +11,22 @@ import {
 } from "@chakra-ui/react";
 import React, { useMemo } from "react";
 import { Info, Plus, Trash2, X } from "react-feather";
-import {
-  Controller,
-  type FieldErrors,
-  useFieldArray,
-  useFormContext,
-} from "react-hook-form";
+import { Controller, type FieldErrors, useFieldArray, useFormContext } from "react-hook-form";
 import { type ZodType, z } from "zod";
 import { useOrganizationTeamProject } from "@langwatch/workflow-web/studio-host/use-organization-team-project";
 import { AddModelProviderKey } from "@langwatch/workflow-web/optimization_studio/components/AddModelProviderKey";
-import type {
-  EvaluatorDefinition,
-  EvaluatorTypes,
-} from "@langwatch/evaluator-contract";
+import type { EvaluatorDefinition, EvaluatorTypes } from "@langwatch/evaluator-contract";
 import { getEvaluatorDefinitions } from "@langwatch/evaluator-contract";
 import { api } from "@langwatch/workflow-web/studio-host/api";
-import { camelCaseToTitleCase, titleCase } from "@langwatch/workflow-web/utils/stringCasing";
-import { HorizontalFormControl } from "@langwatch/workflow-web/components/HorizontalFormControl";
+import { camelCaseToTitleCase, titleCase } from "@langwatch/design-system/string-casing";
+import { HorizontalFormControl } from "@langwatch/design-system/horizontal-form-control";
 import {
   allModelOptions,
   ModelSelector,
   useModelSelectionOptions,
 } from "@langwatch/model-provider-web/components/ModelSelector";
 import { SmallLabel } from "@langwatch/design-system/small-label";
-import { PropertySectionTitle } from "@langwatch/workflow-web/components/ui/PropertySectionTitle";
+import { PropertySectionTitle } from "@langwatch/design-system/property-section-title";
 import { Switch } from "@langwatch/design-system/switch";
 import { Tooltip } from "@langwatch/design-system/tooltip";
 import type { CheckConfigFormData } from "./check-config-form";
@@ -79,28 +71,21 @@ const ModelSelectorWithWarning = ({
 
 import { EvaluatorLLMConfigField } from "../../elements/checks/evaluator-llm-config-field";
 
-// Toggle-button field for array-of-literal-union fields (e.g. include_metrics:
-// z.array(z.union([z.literal("cost"), z.literal("duration")]))). Each option
-// is a sticky toggle button with a hover-tooltip explaining what the metric
-// is and why it matters for the judge prompt — replaces the generic dropdown
-// + "Add" array UI for fields where the option set is small and fixed.
-// Some evaluator settings have a long, citation-heavy description that reads
-// as clutter when always shown inline under the field. For those, split the
-// description into a short helper line plus a hover tooltip (little "i" icon)
-// carrying the supporting detail — same pattern as METRIC_META below.
+// Toggle-button field for array-of-literal-union fields (e.g. include_metrics),
+// replacing the generic dropdown + "Add" array UI where the option set is
+// small and fixed. A long, citation-heavy description splits into a short
+// helper line plus a hover tooltip — same pattern as METRIC_META below.
 const FIELD_HELPER_OVERRIDES: Record<string, { helper: string; tooltip: string }> = {
   swap_and_confirm: {
     helper:
       "Run two judge calls with A/B positions swapped; tie on disagreement. Doubles judge cost.",
-    tooltip:
-      "Studies show that swapping can reduce position bias from 68% to 51% (PandaLM paper).",
+    tooltip: "Studies show that swapping can reduce position bias from 68% to 51% (PandaLM paper).",
   },
   // The Comparison evaluator's field. Only its legacy predecessor
   // (`swap_and_confirm`, above) was listed, so this one rendered its whole
   // schema description — citation included — as the line under the toggle.
   swap_and_reconcile: {
-    helper:
-      "Check each row again with the candidates in the opposite order. Doubles judge cost.",
+    helper: "Check each row again with the candidates in the opposite order. Doubles judge cost.",
     tooltip:
       "Judges tend to favour whichever answer they read first, and reversing the order is the most reliable way to catch it — swapping alone flips 10-30% of verdicts on close rows. When the two checks disagree, the row is left without a result rather than called a tie: a tie would say the candidates are equally good, which is not what was found.",
   },
@@ -167,11 +152,7 @@ const MetricToggleField = ({
                   >
                     Include {meta.label.toLowerCase()}
                   </Field.Label>
-                  <Tooltip
-                    content={meta.tooltip}
-                    showArrow
-                    positioning={{ placement: "top" }}
-                  >
+                  <Tooltip content={meta.tooltip} showArrow positioning={{ placement: "top" }}>
                     <Box
                       as="span"
                       display="inline-flex"
@@ -258,9 +239,7 @@ const ArrayField = <T extends EvaluatorTypes>({
       {fields.map((field, index) => (
         <Box
           key={field.id}
-          borderLeft={
-            arraySchema.element instanceof z.ZodObject ? "4px solid" : undefined
-          }
+          borderLeft={arraySchema.element instanceof z.ZodObject ? "4px solid" : undefined}
           borderLeftColor={variant === "studio" ? "border" : "orange.400"}
           width="full"
         >
@@ -340,8 +319,7 @@ const DynamicZodForm = ({
     isTopLevel = false,
   ): React.JSX.Element | null => {
     const fullPath = prefix ? `${prefix}.${fieldName}` : fieldName;
-    let defaultValue =
-      evaluator?.settings?.[fieldName]?.default;
+    let defaultValue = evaluator?.settings?.[fieldName]?.default;
 
     if (fieldName === "model") {
       defaultValue = (resolvedDefaultModel.data?.model ?? "") as any;
@@ -350,8 +328,7 @@ const DynamicZodForm = ({
       defaultValue = (resolvedDefaultEmbeddings.data?.model ?? "") as any;
     }
 
-    const fieldSchema_ =
-      fieldSchema instanceof z.ZodOptional ? fieldSchema.unwrap() : fieldSchema;
+    const fieldSchema_ = fieldSchema instanceof z.ZodOptional ? fieldSchema.unwrap() : fieldSchema;
 
     const fieldKey = [...fieldName.split(".")].reverse()[0] ?? "";
 
@@ -466,10 +443,7 @@ const DynamicZodForm = ({
 
                   if (e.target.value === "") {
                     field.onChange(undefined);
-                  } else if (
-                    !isNaN(+e.target.value) &&
-                    literalValues.includes(+e.target.value)
-                  ) {
+                  } else if (!isNaN(+e.target.value) && literalValues.includes(+e.target.value)) {
                     field.onChange(+e.target.value);
                   } else {
                     field.onChange(e.target.value);
@@ -490,13 +464,9 @@ const DynamicZodForm = ({
       );
     } else if (fieldSchema_ instanceof z.ZodString) {
       if (["topic", "name"].includes(fieldKey) || !isNaN(+fieldKey)) {
-        return (
-          <Input size={variant === "studio" ? "sm" : "md"} {...register(fullPath)} />
-        );
+        return <Input size={variant === "studio" ? "sm" : "md"} {...register(fullPath)} />;
       }
-      return (
-        <Textarea size={variant === "studio" ? "sm" : "md"} {...register(fullPath)} />
-      );
+      return <Textarea size={variant === "studio" ? "sm" : "md"} {...register(fullPath)} />;
     } else if (fieldSchema_ instanceof z.ZodArray) {
       // Special-case: small, fixed sets of literal options render as toggle
       // pills with hover-tooltips (e.g. include_metrics for pairwise_compare).
@@ -508,9 +478,7 @@ const DynamicZodForm = ({
         element.options.every((o: any) => o instanceof z.ZodLiteral);
       if (fieldKey === "include_metrics" && isLiteralUnion) {
         const options = (element.options as z.ZodLiteral<string>[]).map((o) => o.value);
-        return (
-          <MetricToggleField fieldName={fullPath} options={options} variant={variant} />
-        );
+        return <MetricToggleField fieldName={fullPath} options={options} variant={variant} />;
       }
       return (
         <ArrayField
@@ -546,9 +514,7 @@ const DynamicZodForm = ({
 
   const renderSchema = <T extends EvaluatorTypes>(schema: ZodType, basePath = "") => {
     if (schema instanceof z.ZodObject) {
-      const evaluatorDefinition = getEvaluatorDefinitions(
-        evaluatorType,
-      ) as EvaluatorDefinition<T>;
+      const evaluatorDefinition = getEvaluatorDefinitions(evaluatorType) as EvaluatorDefinition<T>;
 
       const keys = Object.keys(schema.shape);
 
@@ -576,10 +542,7 @@ const DynamicZodForm = ({
           </VStack>
         ) : (
           <React.Fragment key="llm-config">
-            <HorizontalFormControl
-              label="Model"
-              tooltip="The model to use for evaluation"
-            >
+            <HorizontalFormControl label="Model" tooltip="The model to use for evaluation">
               <EvaluatorLLMConfigField prefix={prefix} />
             </HorizontalFormControl>
           </React.Fragment>
@@ -593,8 +556,7 @@ const DynamicZodForm = ({
         .map((key) => {
           const field = schema.shape[key];
           const isOptional = field instanceof z.ZodOptional;
-          const helperText =
-            evaluatorDefinition?.settings?.[key]?.description ?? "";
+          const helperText = evaluatorDefinition?.settings?.[key]?.description ?? "";
           const isInvalid = errors && key in errors && !!(errors as any)[key];
           const helperOverride = FIELD_HELPER_OVERRIDES[key];
 

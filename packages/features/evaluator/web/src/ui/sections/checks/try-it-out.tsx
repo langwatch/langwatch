@@ -17,7 +17,7 @@ import { useEffect, useState } from "react";
 import { Pause, Play, RefreshCw, Search } from "react-feather";
 import type { UseFormReturn } from "react-hook-form";
 import { useDebounceValue } from "usehooks-ts";
-import { useDrawer } from "@langwatch/workflow-web/studio-host/use-drawer";
+import { useDrawer } from "@langwatch/ui-host/use-drawer";
 import { useColorRawValue } from "@langwatch/design-system/color-mode";
 import { toaster } from "@langwatch/workflow-web/studio-host/toaster";
 import { useFilterParams } from "@langwatch/analytics-web/hooks/useFilterParams";
@@ -35,12 +35,15 @@ import {
 } from "../../../model/evaluations/preconditions";
 import type { CheckPreconditions } from "../../../model/evaluations/types";
 import { api } from "@langwatch/workflow-web/studio-host/api";
-import { formatMoney } from "@langwatch/workflow-web/utils/formatMoney";
-import type { Money } from "@langwatch/workflow-web/utils/types";
+import { formatMoney } from "@langwatch/design-system/format-money";
+import type { Money } from "@langwatch/design-system/type-utils";
 import { FilterSidebar } from "@langwatch/analytics-web/components/filters/FilterSidebar";
 import { FilterToggle } from "@langwatch/analytics-web/components/filters/FilterToggle";
 import { HoverableBigText } from "@langwatch/workflow-web/components/HoverableBigText";
-import { PeriodSelector, usePeriodSelector } from "@langwatch/analytics-web/components/PeriodSelector";
+import {
+  PeriodSelector,
+  usePeriodSelector,
+} from "@langwatch/analytics-web/components/PeriodSelector";
 import { InputGroup } from "@langwatch/design-system/input-group";
 import { RedactedField } from "@langwatch/workflow-web/components/ui/RedactedField";
 import { Tooltip } from "@langwatch/design-system/tooltip";
@@ -119,9 +122,7 @@ export function TryItOut({
         });
       })(),
     ) ?? [];
-  const firstPassingPrecondition = tracesLivePassesPreconditions.findIndex(
-    (pass: any) => pass,
-  );
+  const firstPassingPrecondition = tracesLivePassesPreconditions.findIndex((pass: any) => pass);
 
   const [runningResults, setRunningResults] = useState<
     Record<string, { status: "loading" } | SingleEvaluationResult>
@@ -146,10 +147,7 @@ export function TryItOut({
     }));
 
     const moveToNext = () => {
-      const processedTraceIds = [
-        ...Object.keys(runningResults),
-        runningState.nextTraceId,
-      ];
+      const processedTraceIds = [...Object.keys(runningResults), runningState.nextTraceId];
       const nextIndex = tracesLivePassesPreconditions.findIndex(
         (passes: any, index: any) =>
           passes &&
@@ -267,8 +265,8 @@ export function TryItOut({
           <Alert.Indicator />
           <Alert.Content>
             <Text>
-              Heads up! Since LangWatch already redacts PII, you won{"'"}t see any bad
-              examples here. You can still try it though.
+              Heads up! Since LangWatch already redacts PII, you won{"'"}t see any bad examples
+              here. You can still try it though.
             </Text>
           </Alert.Content>
         </Alert.Root>
@@ -283,9 +281,7 @@ export function TryItOut({
                   : `Fetched ${
                       (tracesPassingPreconditionsOnLoad.data ?? []).length
                     } random sample messages${
-                      preconditions.length > 0 && allPassing
-                        ? " passing preconditions"
-                        : ""
+                      preconditions.length > 0 && allPassing ? " passing preconditions" : ""
                     }`}
               </Text>
               <Spacer />
@@ -316,8 +312,7 @@ export function TryItOut({
                 onClick={() => {
                   if (runningState.state === "idle") {
                     const firstTraceId =
-                      tracesPassingPreconditionsOnLoad.data?.[firstPassingPrecondition]
-                        ?.trace_id;
+                      tracesPassingPreconditionsOnLoad.data?.[firstPassingPrecondition]?.trace_id;
 
                     if (!firstTraceId) {
                       return;
@@ -372,9 +367,7 @@ export function TryItOut({
                     {evaluatorType?.startsWith("custom/") ? (
                       <Table.ColumnHeader width="120px">Score</Table.ColumnHeader>
                     ) : null}
-                    {hasAnyLabels && (
-                      <Table.ColumnHeader width="120px">Label</Table.ColumnHeader>
-                    )}
+                    {hasAnyLabels && <Table.ColumnHeader width="120px">Label</Table.ColumnHeader>}
                     <Table.ColumnHeader width="250px">Details</Table.ColumnHeader>
                     <Table.ColumnHeader width="120px">Cost</Table.ColumnHeader>
                   </Table.Row>
@@ -418,21 +411,15 @@ export function TryItOut({
                               })
                             }
                           >
-                            {new Date(trace.timestamps.started_at).toLocaleDateString(
-                              undefined,
-                              {
-                                month: "numeric",
-                                day: "numeric",
-                              },
-                            ) +
+                            {new Date(trace.timestamps.started_at).toLocaleDateString(undefined, {
+                              month: "numeric",
+                              day: "numeric",
+                            }) +
                               ", " +
-                              new Date(trace.timestamps.started_at).toLocaleTimeString(
-                                undefined,
-                                {
-                                  hour: "numeric",
-                                  minute: "numeric",
-                                },
-                              )}
+                              new Date(trace.timestamps.started_at).toLocaleTimeString(undefined, {
+                                hour: "numeric",
+                                minute: "numeric",
+                              })}
                           </Table.Cell>
                           <Table.Cell
                             maxWidth="225px"
@@ -444,9 +431,7 @@ export function TryItOut({
                           >
                             <Tooltip
                               content={
-                                livePassesPreconditions
-                                  ? (trace.input?.value ?? "")
-                                  : undefined
+                                livePassesPreconditions ? (trace.input?.value ?? "") : undefined
                               }
                             >
                               <RedactedField field="input">
@@ -465,12 +450,7 @@ export function TryItOut({
                                 })
                               }
                             >
-                              <Text
-                                lineClamp={1}
-                                maxWidth="250px"
-                                display="block"
-                                color="red.400"
-                              >
+                              <Text lineClamp={1} maxWidth="250px" display="block" color="red.400">
                                 Error
                                 {trace.error.message ? ": " : ""}
                                 {trace.error.message}
@@ -486,11 +466,7 @@ export function TryItOut({
                               }
                             >
                               <Tooltip
-                                content={
-                                  livePassesPreconditions
-                                    ? trace.output?.value
-                                    : undefined
-                                }
+                                content={livePassesPreconditions ? trace.output?.value : undefined}
                               >
                                 <RedactedField field="output">
                                   <Text lineClamp={1} display="block" maxWidth="250px">
@@ -566,9 +542,7 @@ export function TryItOut({
                           <Table.Cell color={color} maxWidth="250px">
                             {runningResult &&
                               (resultDetails ? (
-                                <HoverableBigText lineClamp={3}>
-                                  {resultDetails}
-                                </HoverableBigText>
+                                <HoverableBigText lineClamp={3}>{resultDetails}</HoverableBigText>
                               ) : runningResult.status === "loading" ? (
                                 ""
                               ) : (
@@ -616,16 +590,14 @@ export function TryItOut({
                       Total Cost:
                     </Table.Cell>
                     <Table.Cell>
-                      {Object.values(runningResults).filter(
-                        (result) => result.status !== "loading",
-                      ).length > 0
+                      {Object.values(runningResults).filter((result) => result.status !== "loading")
+                        .length > 0
                         ? formatMoney({
                             amount: totalCost,
                             currency:
                               (
                                 Object.values(runningResults).filter(
-                                  (result) =>
-                                    result.status === "processed" && result.cost,
+                                  (result) => result.status === "processed" && result.cost,
                                 )[0] as any
                               )?.cost.currency ?? "USD",
                           })

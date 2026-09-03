@@ -33,10 +33,10 @@ import {
 import { Link } from "../../elements/studio-host/link";
 import { toaster } from "../../../behavior/studio-host/toaster";
 import { Tooltip } from "@langwatch/design-system/tooltip";
-import { useDrawer } from "../../../behavior/studio-host/use-drawer";
+import { useDrawer } from "@langwatch/ui-host/use-drawer";
 import { useOrganizationTeamProject } from "../../../behavior/studio-host/use-organization-team-project";
 import { assertCrispChatHidden } from "../../../behavior/crisp-bubble-policy";
-import { titleCase } from "../../../model/string-casing";
+import { titleCase } from "@langwatch/design-system/string-casing";
 import {
   useAskBeforeLeaving,
   type WorkflowEmojiPickerRenderProps,

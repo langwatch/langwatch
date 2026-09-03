@@ -13,23 +13,14 @@ import {
 import { zodResolver } from "@hookform/resolvers/zod";
 import { useEffect, useMemo, useState } from "react";
 import { ChevronDown, Edit2, HelpCircle } from "react-feather";
-import {
-  Controller,
-  FormProvider,
-  type Resolver,
-  useFieldArray,
-  useForm,
-} from "react-hook-form";
+import { Controller, FormProvider, type Resolver, useFieldArray, useForm } from "react-hook-form";
 import { z } from "zod";
 import { EvaluationExecutionMode } from "@langwatch/workflow-web/model/prisma-types";
 import { useRouter } from "@langwatch/workflow-web/studio-host/next-router";
-import { slugify } from "@langwatch/workflow-web/utils/slugify";
+import { slugify } from "@langwatch/design-system/slugify";
 import { useAvailableEvaluators } from "../../../behavior/use-available-evaluators";
 import { useOrganizationTeamProject } from "@langwatch/workflow-web/studio-host/use-organization-team-project";
-import {
-  DEFAULT_EMBEDDINGS_MODEL,
-  DEFAULT_MODEL,
-} from "@langwatch/workflow-web/utils/constants";
+import { DEFAULT_EMBEDDINGS_MODEL, DEFAULT_MODEL } from "@langwatch/workflow-web/utils/constants";
 import { DEFAULT_MAPPINGS, migrateLegacyMappings } from "@langwatch/evaluator-contract";
 import { evaluatorDisplayName } from "@langwatch/evaluator-contract";
 import {
@@ -49,7 +40,7 @@ import {
 import { type MappingState, mappingStateSchema } from "@langwatch/trace-contract";
 import { api } from "@langwatch/workflow-web/studio-host/api";
 import { EvaluatorTracesMapping } from "../../elements/evaluations/evaluator-traces-mapping";
-import { HorizontalFormControl } from "@langwatch/workflow-web/components/HorizontalFormControl";
+import { HorizontalFormControl } from "@langwatch/design-system/horizontal-form-control";
 import { Tooltip } from "@langwatch/design-system/tooltip";
 import DynamicZodForm from "./dynamic-zod-form";
 import { EvaluationManualIntegration } from "./evaluation-manual-integration";
@@ -339,8 +330,8 @@ export default function CheckConfigForm({
                       />
                       {isNameAlreadyInUse && (
                         <Text color="red.500" fontSize="13px">
-                          An evaluation with the same name already exists, please choose a
-                          different name to have a different slug identifier as well
+                          An evaluation with the same name already exists, please choose a different
+                          name to have a different slug identifier as well
                         </Text>
                       )}
                       <Text fontSize="12px" paddingLeft={4}>
@@ -415,8 +406,8 @@ export default function CheckConfigForm({
                           <VStack align="start" gap={1}>
                             <Field.Label margin={0}>Execution Settings</Field.Label>
                             <Field.HelperText margin={0} fontSize="13px">
-                              Configure how and when this evaluation is executed when a
-                              new message arrives
+                              Configure how and when this evaluation is executed when a new message
+                              arrives
                             </Field.HelperText>
                           </VStack>
                         </Field.Root>

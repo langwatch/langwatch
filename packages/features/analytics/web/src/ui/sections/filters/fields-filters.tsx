@@ -24,7 +24,7 @@ import React, { useCallback, useEffect, useMemo, useState } from "react";
 import { ChevronDown, X } from "react-feather";
 import { LuZap } from "react-icons/lu";
 import { useDebounceValue } from "usehooks-ts";
-import { useDrawer } from "@langwatch/workflow-web/studio-host/use-drawer";
+import { useDrawer } from "@langwatch/ui-host/use-drawer";
 import { useOrganizationTeamProject } from "@langwatch/workflow-web/studio-host/use-organization-team-project";
 import { type FilterParam, useFilterParams } from "../use-filter-params";
 import { filterOutEmptyFilters } from "../analytics/utils";
@@ -32,7 +32,7 @@ import type { AppRouter } from "@langwatch/workflow-web/studio-host/api";
 import { availableFilters } from "../../../model/filters/registry";
 import type { FilterDefinition, FilterField } from "../../../model/filters/types";
 import { api } from "@langwatch/workflow-web/studio-host/api";
-import { OverflownTextWithTooltip } from "@langwatch/workflow-web/components/OverflownText";
+import { OverflownTextWithTooltip } from "@langwatch/design-system/overflown-text";
 import { Checkbox } from "@langwatch/design-system/checkbox";
 import { useColorRawValue } from "@langwatch/design-system/color-mode";
 import { InputGroup } from "@langwatch/design-system/input-group";
@@ -813,12 +813,12 @@ function RangeFilter({
   currentValues: string[];
   onChange: (value: string[]) => void;
 }) {
-  let min = +numeral(+(filterData.data?.options.find((o: any) => o.label === "min")?.field ?? 0)).format(
-    "0.[0]",
-  );
-  let max = +numeral(+(filterData.data?.options.find((o: any) => o.label === "max")?.field ?? 0)).format(
-    "0.[0]",
-  );
+  let min = +numeral(
+    +(filterData.data?.options.find((o: any) => o.label === "min")?.field ?? 0),
+  ).format("0.[0]");
+  let max = +numeral(
+    +(filterData.data?.options.find((o: any) => o.label === "max")?.field ?? 0),
+  ).format("0.[0]");
   if (isNaN(min)) {
     min = 0;
   }

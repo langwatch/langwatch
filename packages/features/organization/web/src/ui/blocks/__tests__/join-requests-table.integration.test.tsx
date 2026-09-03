@@ -11,10 +11,8 @@ import userEvent from "@testing-library/user-event";
 import { afterEach, describe, expect, it, vi } from "vitest";
 
 import { InvitesTable } from "../invites-table";
-import {
-  JoinRequestsTable,
-  type PendingJoinRequest,
-} from "../join-requests-table";
+import { JoinRequestsTable } from "../join-requests-table";
+import type { PendingJoinRequest } from "../../../model/pending-join-request";
 
 const samsRequest: PendingJoinRequest = {
   joinRequestId: "jreq_1",

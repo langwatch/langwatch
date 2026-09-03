@@ -4,7 +4,7 @@ import {
   DatasetPreviewTable as DatasetPreviewTableView,
   type DatasetPreviewTableProps,
 } from "@langwatch/dataset-web";
-import { ExternalImage, getImageUrl } from "@langwatch/workflow-web/components/ExternalImage";
+import { ExternalImage, getImageUrl } from "@langwatch/design-system/external-image";
 
 const renderImage = (value: string): ReactNode | null => {
   const imageUrl = getImageUrl(value);

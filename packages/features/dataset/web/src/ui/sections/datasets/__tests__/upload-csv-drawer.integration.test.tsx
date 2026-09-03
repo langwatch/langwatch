@@ -1,20 +1,9 @@
 /**
  * @vitest-environment jsdom
- *
- * Component tests for the Upload CSV drawer pieces: the redesigned dropzone
- * (empty state, drag highlight, file status row, collapse), the in-drawer
- * processing view, the cancel control, and error routing. Renders the
- * components and mocks the boundaries (upload service, tRPC, project/router
- * hooks). Binds specs/datasets/dataset-upload-dropzone.feature.
+ * Upload CSV drawer pieces. Binds specs/datasets/dataset-upload-dropzone.feature.
  */
 import { ChakraProvider, defaultSystem } from "@chakra-ui/react";
-import {
-  cleanup,
-  fireEvent,
-  render,
-  screen,
-  waitFor,
-} from "@testing-library/react";
+import { cleanup, fireEvent, render, screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import "@testing-library/jest-dom/vitest";
@@ -54,11 +43,9 @@ vi.mock("@langwatch/dataset-web", async (importActual) => {
   const actual = await importActual<typeof import("@langwatch/dataset-web")>();
   return {
     ...actual,
-    retryDatasetNormalize: (...args: unknown[]) =>
-      retryDatasetNormalize(...args),
+    retryDatasetNormalize: (...args: unknown[]) => retryDatasetNormalize(...args),
     requestDirectUpload: (...args: unknown[]) => requestDirectUpload(...args),
-    putFileToPresignedUrl: (...args: unknown[]) =>
-      putFileToPresignedUrl(...args),
+    putFileToPresignedUrl: (...args: unknown[]) => putFileToPresignedUrl(...args),
     finalizeDirectUpload: (...args: unknown[]) => finalizeDirectUpload(...args),
     abortPendingUpload: (...args: unknown[]) => abortPendingUpload(...args),
   };
@@ -70,7 +57,7 @@ vi.mock("@langwatch/workflow-web/studio-host/use-organization-team-project", () 
   }),
 }));
 
-vi.mock("@langwatch/workflow-web/studio-host/use-drawer", () => ({
+vi.mock("@langwatch/ui-host/use-drawer", () => ({
   useDrawer: () => ({ closeDrawer: vi.fn() }),
 }));
 
@@ -82,21 +69,15 @@ vi.mock("@langwatch/workflow-web/studio-host/toaster", () => ({
   toaster: { create: vi.fn() },
 }));
 
-import {
-  CSVReaderComponent,
-  DatasetUploadProcessing,
-  UploadCSVForm,
-} from "../upload-csv-drawer";
+import { CSVReaderComponent, DatasetUploadProcessing, UploadCSVForm } from "../upload-csv-drawer";
 
 /** Error shaped like an aborted fetch. */
-const abortError = () =>
-  Object.assign(new Error("aborted"), { name: "AbortError" });
+const abortError = () => Object.assign(new Error("aborted"), { name: "AbortError" });
 
 const wrap = (ui: React.ReactElement) =>
   render(<ChakraProvider value={defaultSystem}>{ui}</ChakraProvider>);
 
-const fileInput = () =>
-  document.querySelector('input[type="file"]') as HTMLInputElement;
+const fileInput = () => document.querySelector('input[type="file"]') as HTMLInputElement;
 
 afterEach(() => {
   cleanup();
@@ -120,9 +101,7 @@ describe("the upload dropzone", () => {
   describe("when a file is dragged over the zone", () => {
     /** @scenario Dragging a file over the dropzone highlights it */
     it("marks the zone active while the file is over it and clears on leave", () => {
-      const { container } = wrap(
-        <CSVReaderComponent parse={false} onUploadAccepted={vi.fn()} />,
-      );
+      const { container } = wrap(<CSVReaderComponent parse={false} onUploadAccepted={vi.fn()} />);
       const zone = container.querySelector("[data-active]") as HTMLElement;
 
       expect(zone).toHaveAttribute("data-active", "false");
@@ -137,40 +116,20 @@ describe("the upload dropzone", () => {
     /** @scenario A chosen file appears as a status row */
     it("shows a row with the file name and its size", async () => {
       const user = userEvent.setup();
-      wrap(
-        <CSVReaderComponent
-          parse={false}
-          onUploadAccepted={vi.fn()}
-          onRawFile={vi.fn()}
-        />,
-      );
+      wrap(<CSVReaderComponent parse={false} onUploadAccepted={vi.fn()} onRawFile={vi.fn()} />);
 
-      await user.upload(
-        fileInput(),
-        new File(["a,b\n1,2\n"], "chosen.csv", { type: "text/csv" }),
-      );
+      await user.upload(fileInput(), new File(["a,b\n1,2\n"], "chosen.csv", { type: "text/csv" }));
 
       expect(await screen.findByText("chosen.csv")).toBeInTheDocument();
       expect(screen.getByText(/\bB\b|KB|MB/)).toBeInTheDocument(); // size label
-      expect(
-        screen.getByRole("button", { name: /remove file/i }),
-      ).toBeInTheDocument();
+      expect(screen.getByRole("button", { name: /remove file/i })).toBeInTheDocument();
     });
 
     it("resets the native input value so the same file can be re-picked after a remove", async () => {
       const user = userEvent.setup();
-      wrap(
-        <CSVReaderComponent
-          parse={false}
-          onUploadAccepted={vi.fn()}
-          onRawFile={vi.fn()}
-        />,
-      );
+      wrap(<CSVReaderComponent parse={false} onUploadAccepted={vi.fn()} onRawFile={vi.fn()} />);
 
-      await user.upload(
-        fileInput(),
-        new File(["x"], "repick.csv", { type: "text/csv" }),
-      );
+      await user.upload(fileInput(), new File(["x"], "repick.csv", { type: "text/csv" }));
 
       // The captured file lives in React state; the input is cleared so the OS
       // dialog re-firing `change` for the same file isn't suppressed.
@@ -192,10 +151,7 @@ describe("the upload dropzone", () => {
         />,
       );
 
-      await user.upload(
-        fileInput(),
-        new File(["x"], "gone.csv", { type: "text/csv" }),
-      );
+      await user.upload(fileInput(), new File(["x"], "gone.csv", { type: "text/csv" }));
       expect(await screen.findByText("gone.csv")).toBeInTheDocument();
 
       await user.click(screen.getByRole("button", { name: /remove file/i }));
@@ -212,17 +168,10 @@ describe("the upload dropzone", () => {
     it("marks the file row with the error message", async () => {
       const user = userEvent.setup();
       const { rerender } = wrap(
-        <CSVReaderComponent
-          parse={false}
-          onUploadAccepted={vi.fn()}
-          onRawFile={vi.fn()}
-        />,
+        <CSVReaderComponent parse={false} onUploadAccepted={vi.fn()} onRawFile={vi.fn()} />,
       );
 
-      await user.upload(
-        fileInput(),
-        new File(["x"], "big.csv", { type: "text/csv" }),
-      );
+      await user.upload(fileInput(), new File(["x"], "big.csv", { type: "text/csv" }));
       expect(await screen.findByText("big.csv")).toBeInTheDocument();
 
       // The host computes the validation and passes it down.
@@ -237,9 +186,7 @@ describe("the upload dropzone", () => {
         </ChakraProvider>,
       );
 
-      expect(screen.getByTestId("upload-error")).toHaveTextContent(
-        /file is too large/i,
-      );
+      expect(screen.getByTestId("upload-error")).toHaveTextContent(/file is too large/i);
     });
   });
 
@@ -257,10 +204,7 @@ describe("the upload dropzone", () => {
         />,
       );
 
-      await user.upload(
-        fileInput(),
-        new File(["x"], "uploading.csv", { type: "text/csv" }),
-      );
+      await user.upload(fileInput(), new File(["x"], "uploading.csv", { type: "text/csv" }));
 
       rerender(
         <ChakraProvider value={defaultSystem}>
@@ -277,9 +221,7 @@ describe("the upload dropzone", () => {
       const cancel = screen.getByRole("button", { name: /cancel upload/i });
       expect(cancel).toBeInTheDocument();
       // The trash remove control is replaced by cancel while uploading.
-      expect(
-        screen.queryByRole("button", { name: /remove file/i }),
-      ).not.toBeInTheDocument();
+      expect(screen.queryByRole("button", { name: /remove file/i })).not.toBeInTheDocument();
 
       await user.click(cancel);
       expect(onCancel).toHaveBeenCalledTimes(1);
@@ -288,10 +230,7 @@ describe("the upload dropzone", () => {
 });
 
 describe("DatasetUploadProcessing", () => {
-  const renderProcessing = (overrides?: {
-    onReady?: () => void;
-    onViewDataset?: () => void;
-  }) =>
+  const renderProcessing = (overrides?: { onReady?: () => void; onViewDataset?: () => void }) =>
     wrap(
       <DatasetUploadProcessing
         projectId="proj_1"
@@ -332,9 +271,7 @@ describe("DatasetUploadProcessing", () => {
       const { rerender } = renderProcessing({ onReady, onViewDataset });
 
       expect(screen.getByText(/ready/i)).toBeInTheDocument();
-      expect(
-        screen.getByRole("button", { name: /view dataset/i }),
-      ).toBeInTheDocument();
+      expect(screen.getByRole("button", { name: /view dataset/i })).toBeInTheDocument();
       expect(onReady).toHaveBeenCalledTimes(1);
 
       // A re-render with the same ready data must not fire onReady again.
@@ -365,9 +302,7 @@ describe("DatasetUploadProcessing", () => {
       renderProcessing({ onReady });
 
       // Not stuck on a spinner; "ready" is honored once the server says so.
-      expect(
-        screen.queryByText(/preparing your dataset/i),
-      ).not.toBeInTheDocument();
+      expect(screen.queryByText(/preparing your dataset/i)).not.toBeInTheDocument();
       expect(onReady).toHaveBeenCalledTimes(1);
     });
   });
@@ -384,9 +319,7 @@ describe("DatasetUploadProcessing", () => {
       renderProcessing();
 
       expect(screen.getByText("boom")).toBeInTheDocument();
-      expect(
-        screen.getByRole("button", { name: /retry/i }),
-      ).toBeInTheDocument();
+      expect(screen.getByRole("button", { name: /retry/i })).toBeInTheDocument();
     });
   });
 
@@ -398,9 +331,7 @@ describe("DatasetUploadProcessing", () => {
       renderProcessing({ onReady });
 
       expect(screen.getByText(/no longer available/i)).toBeInTheDocument();
-      expect(
-        screen.queryByText(/preparing your dataset/i),
-      ).not.toBeInTheDocument();
+      expect(screen.queryByText(/preparing your dataset/i)).not.toBeInTheDocument();
       expect(onReady).not.toHaveBeenCalled();
     });
   });
@@ -412,11 +343,7 @@ describe("UploadCSVForm cancel", () => {
       const user = userEvent.setup();
       // requestDirectUpload is held open so we can cancel mid-flight, then
       // resolve it AFTER the cancel — the server has minted the row by then.
-      let resolveRequest!: (value: {
-        datasetId: string;
-        uploadUrl: string;
-        slug: string;
-      }) => void;
+      let resolveRequest!: (value: { datasetId: string; uploadUrl: string; slug: string }) => void;
       requestDirectUpload.mockReturnValue(
         new Promise((resolve) => {
           resolveRequest = resolve;
@@ -443,17 +370,12 @@ describe("UploadCSVForm cancel", () => {
         </ChakraProvider>,
       );
 
-      await user.upload(
-        fileInput(),
-        new File(["x"], "racey.csv", { type: "text/csv" }),
-      );
+      await user.upload(fileInput(), new File(["x"], "racey.csv", { type: "text/csv" }));
       await user.click(screen.getByRole("button", { name: /^upload$/i }));
 
       // Mid-flight: the cancel control is shown; click it before the presign
       // resolves (so handleCancelUpload sees no id yet → reaps nothing).
-      await user.click(
-        await screen.findByRole("button", { name: /cancel upload/i }),
-      );
+      await user.click(await screen.findByRole("button", { name: /cancel upload/i }));
       expect(abortPendingUpload).not.toHaveBeenCalled();
 
       // Now the presign resolves: the row exists, the aborted PUT throws, and

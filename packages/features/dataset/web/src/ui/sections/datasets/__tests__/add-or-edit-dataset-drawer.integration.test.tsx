@@ -1,22 +1,7 @@
 /**
  * @vitest-environment jsdom
- *
- * The dataset editor opened from a bare address, with nobody waiting on it.
- *
- * `addOrEditDataset` is a REGISTERED DRAWER as well as a component every
- * workbench mounts itself. The registry opens it from `?drawer.open=` alone,
- * and `CurrentDrawer` spreads the parsed address, so the props that arrive are
- * whatever the URL carried — never a function. `onSuccess` was required and
- * called unconditionally, so the first successful save from such an open threw
- * `props.onSuccess is not a function` INSIDE the mutation's own success
- * callback: the dataset was already written, the toast never fired, and the
- * drawer stayed open over a page whose list had not been invalidated.
- *
- * The regression therefore drives the whole path rather than reading the type:
- * a real submit, a real mutation callback, and the assertion that the drawer
- * closed. `dev/docs/best_practices/drawers.md` is what says closing is the
- * right ending — a caller navigates to this drawer and returns through
- * `onClose`, and an open with no caller has only that leg.
+ * A bare-address open (no caller, `onSuccess` unset) must submit and close
+ * (dev/docs/best_practices/drawers.md), not throw.
  */
 
 import { ChakraProvider, defaultSystem } from "@chakra-ui/react";
@@ -27,7 +12,7 @@ import { describe, expect, it, vi } from "vitest";
 const closeDrawer = vi.fn();
 const created = vi.fn();
 
-vi.mock("@langwatch/workflow-web/studio-host/use-drawer", () => ({
+vi.mock("@langwatch/ui-host/use-drawer", () => ({
   useDrawer: () => ({ closeDrawer }),
 }));
 

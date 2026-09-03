@@ -1,16 +1,7 @@
 /**
- * Standalone spreadsheet editor for a single dataset: the same TanStack
- * table experience as the evaluations workbench (inline cell editing, type
- * validation, virtualized rows, trailing phantom row), reusable anywhere a
- * dataset is viewed or edited.
- *
- * Two modes:
- *  - Saved (`datasetId`): loads records from the database and autosaves cell
- *    edits, new rows, and deletions through useDatasetRecordSync, surfacing
- *    status through the save chip.
- *  - In-memory (`inMemoryDataset` + `onUpdateDataset`): the caller owns the
- *    data (draft datasets in the workflow DSL, prompt demonstrations);
- *    every change is propagated up, nothing touches the network.
+ * Standalone spreadsheet editor for one dataset. Two modes: saved
+ * (`datasetId`, autosaves through `useDatasetRecordSync`) or in-memory
+ * (`inMemoryDataset` + `onUpdateDataset`, caller owns the data).
  */
 
 import {
@@ -39,9 +30,9 @@ import { Check, Download, Edit2, Plus, Trash2, Upload, X } from "react-feather";
 import { useStore } from "zustand";
 
 import { AddOrEditDatasetDrawer } from "../add-or-edit-dataset-drawer";
-import { ExternalImage, getImageUrl } from "@langwatch/workflow-web/components/ExternalImage";
+import { ExternalImage, getImageUrl } from "@langwatch/design-system/external-image";
 import { Pagination } from "@langwatch/design-system/pagination";
-import { SelectionActionBar } from "@langwatch/workflow-web/components/ui/SelectionActionBar";
+import { SelectionActionBar } from "@langwatch/design-system/selection-action-bar";
 import { Tooltip } from "@langwatch/design-system/tooltip";
 import { showErrorToast } from "@langwatch/workflow-web/studio-host/errors";
 import { useOrganizationTeamProject } from "@langwatch/workflow-web/studio-host/use-organization-team-project";
@@ -231,15 +222,9 @@ export function DatasetEditorTable({
     });
   }, [databaseDatasetError]);
 
-  // The PG-authoritative total record count from the last settled read (undefined
-  // until the first response; held across a page switch by keepPreviousData so it
-  // never momentarily resets mid-navigation). Deriving the page count from
-  // `count / pageSize` — rather than reading the server's `totalPages` — keeps it
-  // correct the instant the user changes the rows-per-page, before any refetch.
-  // `pageCount` floors at 1 so an EMPTY dataset still reads as a single page and
-  // never asks for page 0 (which the server's `positive()` guard would reject).
-  // `currentPage` is the page actually shown, clamped so it can never exceed the
-  // count.
+  // Page count is derived from count/pageSize (not the server's totalPages) so
+  // it's correct the instant rows-per-page changes, and floors at 1 so an
+  // empty dataset never asks for page 0. currentPage is clamped to it.
   const serverRecordCount = datasetId ? databaseDataset.data?.count : undefined;
   const pageCount = Math.max(1, Math.ceil((serverRecordCount ?? 0) / pageSize));
   const currentPage = Math.min(page, pageCount);
@@ -278,9 +263,7 @@ export function DatasetEditorTable({
   const holdingPreviousData = databaseDataset.isPlaceholderData;
   useEffect(() => {
     if (datasetId && databaseDataset.data && !holdingPreviousData) {
-      const columns = toEditorColumns(
-        (databaseDataset.data.columnTypes ?? []) as DatasetColumns,
-      );
+      const columns = toEditorColumns((databaseDataset.data.columnTypes ?? []) as DatasetColumns);
       const records = toEditorRecords(
         (databaseDataset.data.datasetRecords ?? []).map(
           (record: { id: string; entry: unknown }) => ({
@@ -296,10 +279,7 @@ export function DatasetEditorTable({
     } else if (!datasetId && inMemoryDataset && !loadedRef.current) {
       store.getState().setData({
         columns: toEditorColumns(inMemoryDataset.columnTypes),
-        records: toEditorRecords(
-          inMemoryDataset.datasetRecords,
-          inMemoryDataset.columnTypes,
-        ),
+        records: toEditorRecords(inMemoryDataset.datasetRecords, inMemoryDataset.columnTypes),
         dbDatasetId: undefined,
       });
       loadedRef.current = true;
@@ -429,9 +409,7 @@ export function DatasetEditorTable({
   const rowData = useMemo((): DatasetTableRowData[] => {
     return Array.from({ length: displayRowCount }, (_, index) => {
       const record = records[index];
-      const dataset = Object.fromEntries(
-        columns.map((col) => [col.id, record?.[col.name] ?? ""]),
-      );
+      const dataset = Object.fromEntries(columns.map((col) => [col.id, record?.[col.name] ?? ""]));
       const isEmpty = Object.values(dataset).every((v) => v === "");
       return { rowIndex: index, dataset, isEmpty };
     });
@@ -601,12 +579,10 @@ export function DatasetEditorTable({
         const fullColumnTypes = (fullDataset?.columnTypes ?? []) as DatasetColumns;
         exportColumns = toEditorColumns(fullColumnTypes);
         exportRecords = toEditorRecords(
-          (fullDataset?.datasetRecords ?? []).map(
-            (record: { id: string; entry: unknown }) => ({
-              id: record.id,
-              ...(record.entry as Record<string, unknown>),
-            }),
-          ),
+          (fullDataset?.datasetRecords ?? []).map((record: { id: string; entry: unknown }) => ({
+            id: record.id,
+            ...(record.entry as Record<string, unknown>),
+          })),
           fullColumnTypes,
         );
       } catch (error) {
@@ -617,17 +593,13 @@ export function DatasetEditorTable({
 
     const csv = Parse.unparse({
       fields: exportColumns.map((col) => col.name),
-      data: exportRecords.map((record) =>
-        exportColumns.map((col) => record[col.name] ?? ""),
-      ),
+      data: exportRecords.map((record) => exportColumns.map((col) => record[col.name] ?? "")),
     });
 
     const url = window.URL.createObjectURL(new Blob([csv]));
     const link = document.createElement("a");
     link.href = url;
-    const fileName = `${
-      datasetName?.toLowerCase().replace(/ /g, "_") ?? "draft_dataset"
-    }.csv`;
+    const fileName = `${datasetName?.toLowerCase().replace(/ /g, "_") ?? "draft_dataset"}.csv`;
     link.setAttribute("download", fileName);
     document.body.appendChild(link);
     link.click();
@@ -660,8 +632,7 @@ export function DatasetEditorTable({
           title
         )}
         <Text fontSize="13px" color="fg.muted" data-testid="dataset-row-count">
-          {formatRecordCount(totalRecordCount)}{" "}
-          {totalRecordCount === 1 ? "record" : "records"}
+          {formatRecordCount(totalRecordCount)} {totalRecordCount === 1 ? "record" : "records"}
         </Text>
         {datasetId && <SaveStatusChip state={autosave.state} error={autosave.error} />}
         <Spacer />
@@ -673,8 +644,7 @@ export function DatasetEditorTable({
             data-testid="delete-selected-rows"
             onClick={() => deleteSelectedRows()}
           >
-            <X size={14} /> Delete {selectedRows.size}{" "}
-            {selectedRows.size === 1 ? "row" : "rows"}
+            <X size={14} /> Delete {selectedRows.size} {selectedRows.size === 1 ? "row" : "rows"}
           </Button>
         )}
         {!hideButtons && (
@@ -900,13 +870,7 @@ function RowCheckbox({
  * on success, and a loud error with the message when a save fails: a
  * blocked save must never look like a successful one.
  */
-export function SaveStatusChip({
-  state,
-  error,
-}: {
-  state: AutosaveState;
-  error?: string;
-}) {
+export function SaveStatusChip({ state, error }: { state: AutosaveState; error?: string }) {
   if (state === "saving") {
     return (
       <HStack gap={1} color="fg.muted" data-testid="save-status-saving">

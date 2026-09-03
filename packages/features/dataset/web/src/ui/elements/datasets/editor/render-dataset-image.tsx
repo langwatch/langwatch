@@ -1,17 +1,10 @@
 import type { ReactNode } from "react";
 
-import { ExternalImage, getImageUrl } from "@langwatch/workflow-web/components/ExternalImage";
+import { ExternalImage, getImageUrl } from "@langwatch/design-system/external-image";
 
 /**
- * How an "image" dataset cell is drawn.
- *
- * `@langwatch/dataset-web` renders the table but cannot reach the app's
- * image proxy, so every host of a dataset table injects this through
- * `DatasetTableContextValue.renderImage`. Keeping the one implementation here
- * is what stops the hosts drifting apart on size or expandability.
- *
- * Answers null when the value is not an image reference, which is what tells
- * the cell to fall back to rendering the raw value.
+ * How an "image" dataset cell is drawn, injected by every table host through
+ * `DatasetTableContextValue.renderImage`. Answers null for a non-image value.
  */
 export const renderDatasetImage = (value: string): ReactNode | null => {
   const imageUrl = getImageUrl(value);

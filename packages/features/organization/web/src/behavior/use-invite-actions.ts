@@ -3,19 +3,15 @@ import { OrganizationUserRole } from "../model/prisma-types";
 import type { MembersForm } from "../model/member-invite-form";
 // The seat-quote modal is `@langwatch/workflow-web`'s singleton store; see
 // `use-license-enforcement.ts` for why the address travels and the modal does not.
-import { useUpgradeModalStore } from "@langwatch/workflow-web/stores/upgradeModalStore";
+import { useUpgradeModalStore } from "@langwatch/ui-host/upgrade-modal-store";
 import { api } from "../behavior/organization-api";
 import { useLicenseEnforcement } from "./use-license-enforcement";
 import { useOrganizationToaster, useShowErrorToast } from "../behavior/organization-feedback";
 
 /**
- * Encapsulates invite mutation handlers: create, resend, and revoke (D11 -
- * the member-approval request flow is retired; D12's join requests carry
- * that motivation). Keeps MembersList focused on rendering.
- *
- * All pricing models go through enforcement first. When `pricingModel` is "SEAT_EVENT"
- * and the user has an active subscription, exceeding the limit opens the proration
- * preview modal. Otherwise, the standard upgrade modal is shown.
+ * Invite mutation handlers: create, resend, revoke. All pricing models go
+ * through enforcement first — SEAT_EVENT with an active subscription opens
+ * the proration preview, otherwise the standard upgrade modal.
  */
 export function useInviteActions({
   organizationId,
@@ -113,8 +109,7 @@ export function useInviteActions({
           refetchInvites();
           invalidateLimits();
         },
-        onError: (error) =>
-          showErrorToast({ error, fallbackTitle: "Couldn't send the invites" }),
+        onError: (error) => showErrorToast({ error, fallbackTitle: "Couldn't send the invites" }),
       },
     );
   };

@@ -22,16 +22,13 @@ import {
 } from "react-papaparse";
 import type { InMemoryDataset } from "./editor/dataset-editor-table";
 import { describeError, showErrorToast } from "@langwatch/workflow-web/studio-host/errors";
-import { useDrawer } from "@langwatch/workflow-web/studio-host/use-drawer";
+import { useDrawer } from "@langwatch/ui-host/use-drawer";
 import { useOrganizationTeamProject } from "@langwatch/workflow-web/studio-host/use-organization-team-project";
 import { api } from "@langwatch/workflow-web/studio-host/api";
 import { useRouter } from "@langwatch/workflow-web/studio-host/next-router";
 import type { DatasetColumns, DatasetRecordEntry } from "@langwatch/dataset-contract";
 import { MAX_FILE_SIZE_BYTES, MAX_ROWS_LIMIT } from "@langwatch/dataset-contract";
-import {
-  type AddDatasetDrawerProps,
-  AddOrEditDatasetDrawer,
-} from "./add-or-edit-dataset-drawer";
+import { type AddDatasetDrawerProps, AddOrEditDatasetDrawer } from "./add-or-edit-dataset-drawer";
 import { Drawer } from "@langwatch/workflow-web/components/ui/drawer";
 import { toaster } from "@langwatch/workflow-web/studio-host/toaster";
 import {
@@ -64,10 +61,9 @@ export function UploadCSVDrawer({
   onSuccess: NonNullable<AddDatasetDrawerProps["onSuccess"]>;
   onCreateFromScratch?: () => void;
   /**
-   * When true (default), a successful upload streams the raw file directly to
-   * object storage and navigates to the dataset page while it is prepared.
-   * Hosts that need the dataset's columns synchronously (e.g. the workflow
-   * dataset picker) pass false to keep the in-browser-parse drawer flow.
+   * When true (default), upload streams the raw file directly to object
+   * storage. Hosts needing columns synchronously (the workflow dataset
+   * picker) pass false for the in-browser-parse drawer flow instead.
    */
   enableDirectUpload?: boolean;
 }) {
@@ -79,9 +75,7 @@ export function UploadCSVDrawer({
 
   const addDatasetDrawer = useDisclosure();
   const [localIsOpen, setLocalIsOpen] = useState(isOpen);
-  const [uploadedDataset, setUploadedDataset] = useState<InMemoryDataset | undefined>(
-    undefined,
-  );
+  const [uploadedDataset, setUploadedDataset] = useState<InMemoryDataset | undefined>(undefined);
   // Confirm-columns step (ADR-032 v19): when the form requests it, hold the
   // parsed columns + the resume callback and render the confirm drawer. Null
   // when no confirm is in progress (so the drawer — and its hooks — only mount
@@ -119,11 +113,7 @@ export function UploadCSVDrawer({
 
   return (
     <>
-      <Drawer.Root
-        open={localIsOpen}
-        onOpenChange={({ open }) => !open && handleClose()}
-        size="xl"
-      >
+      <Drawer.Root open={localIsOpen} onOpenChange={({ open }) => !open && handleClose()} size="xl">
         <Drawer.Content bg="bg">
           <Drawer.CloseTrigger />
           <Drawer.Header>
@@ -204,12 +194,9 @@ export function UploadCSVDrawer({
 }
 
 /**
- * In-drawer view for the async tail of a direct upload (ADR-032 D4): after the
- * raw file is finalized, the dataset normalizes server-side. This polls its
- * status (mirroring the dataset page's processing banner, so the UX is
- * identical) and surfaces processing / ready / failed states without leaving
- * the drawer. On ready it notifies the host (to refresh the list); navigating
- * to the dataset is an explicit user action, never automatic.
+ * In-drawer view for the async tail of a direct upload (ADR-032 D4): polls
+ * processing / ready / failed status without leaving the drawer. On ready it
+ * notifies the host; navigating to the dataset stays an explicit user action.
  */
 export function DatasetUploadProcessing({
   projectId,
@@ -233,8 +220,7 @@ export function DatasetUploadProcessing({
       // finished; we don't second-guess it (a degenerate columnless dataset is
       // still terminally ready, not an endless spinner).
       refetchInterval: (query) =>
-        query.state.data?.status === "processing" ||
-        query.state.data?.status === "uploading"
+        query.state.data?.status === "processing" || query.state.data?.status === "uploading"
           ? 3000
           : false,
     },
@@ -325,9 +311,7 @@ export function InlineUploadCSVForm({
   onSuccess: NonNullable<AddDatasetDrawerProps["onSuccess"]>;
 }) {
   const addDatasetDrawer = useDisclosure();
-  const [uploadedDataset, setUploadedDataset] = useState<InMemoryDataset | undefined>(
-    undefined,
-  );
+  const [uploadedDataset, setUploadedDataset] = useState<InMemoryDataset | undefined>(undefined);
 
   return (
     <>
@@ -452,10 +436,7 @@ export function UploadCSVForm({
     return validName;
   };
 
-  const handleUploadAccepted = async (results: {
-    data: string[][];
-    acceptedFile: File;
-  }) => {
+  const handleUploadAccepted = async (results: { data: string[][]; acceptedFile: File }) => {
     const { data, acceptedFile } = results;
     setRawFile(acceptedFile);
     setUploadError(null);
@@ -465,19 +446,10 @@ export function UploadCSVForm({
   };
 
   /**
-   * Direct-to-storage path (ADR-032 D4): request a presigned PUT, stream the
-   * raw file, finalize, then navigate to the dataset page where the processing
-   * banner takes over. The raw file is captured WITHOUT an in-browser parse
-   * (see `onRawFile` below), so a multi-GB file never OOMs the tab on the happy
-   * path. On no-storage installs `requestDirectUpload` throws
-   * `DirectUploadUnavailableError`; only THEN do we lazily parse the captured
-   * file and fall back to the parse-and-drawer flow, so small/self-hosted
-   * setups are unaffected.
+   * Direct-to-storage path (ADR-032 D4): presigned PUT, finalize, navigate.
+   * `DirectUploadUnavailableError` is the only trigger for the fallback below.
    */
-  const handleUpload = async (confirmed?: {
-    name: string;
-    columnTypes: DatasetColumns;
-  }) => {
+  const handleUpload = async (confirmed?: { name: string; columnTypes: DatasetColumns }) => {
     if (!enableDirectUpload || !rawFile || !projectId || !project) {
       uploadCSVData();
       return;
@@ -494,9 +466,7 @@ export function UploadCSVForm({
     let pendingDatasetId: string | undefined;
     try {
       const name =
-        confirmed?.name ??
-        uploadedDataset?.name ??
-        (await proposeValidName(rawFile.name));
+        confirmed?.name ?? uploadedDataset?.name ?? (await proposeValidName(rawFile.name));
       const { datasetId, uploadUrl } = await requestDirectUpload({
         projectId,
         name,
@@ -531,24 +501,12 @@ export function UploadCSVForm({
         void router.push(`/${project.slug}/datasets/${datasetId}`);
       }
     } catch (error) {
-      // A user-initiated cancel aborts the PUT (AbortError) OR lands while
-      // requestDirectUpload() is still pending. The presign call is deliberately
-      // NOT wired to the abort signal (aborting its fetch could strand a row the
-      // server minted but whose id we never received), so it runs to completion
-      // and may resolve OR reject — e.g. DirectUploadUnavailableError on a
-      // no-storage install — AFTER the cancel. In that window we must NOT run the
-      // fallback parse or surface an error for an upload the user already
-      // cancelled. `controller.signal.aborted` is the precise "cancelled while
-      // this attempt was live" flag (handleCancelUpload only aborts a controller
-      // still held by the ref; once the PUT succeeds the ref is nulled, so a
-      // later cancel can't set it), so treat it like AbortError: reap any row the
-      // presign minted (the ref holds that id exactly when it hasn't been reaped
-      // yet; a cancel during the PUT already reaped and nulled it → no double
-      // reap) and bail before any fallback/error handling.
-      if (
-        (error instanceof Error && error.name === "AbortError") ||
-        controller.signal.aborted
-      ) {
+      // A user cancel aborts the PUT (AbortError) or lands while the presign
+      // call is still pending and un-abortable, so it may reject AFTER the
+      // cancel. Either way (`controller.signal.aborted` covers both) reap any
+      // row the presign minted and bail — never run fallback/error handling
+      // for an upload the user already cancelled.
+      if ((error instanceof Error && error.name === "AbortError") || controller.signal.aborted) {
         const strandedId = pendingDatasetIdRef.current;
         pendingDatasetIdRef.current = null;
         if (strandedId && projectId) {
@@ -561,13 +519,10 @@ export function UploadCSVForm({
         }
         return;
       }
-      // Any failure AFTER requestDirectUpload minted the `uploading` row leaves
-      // it behind and locks the slug — whether we fall back (a fresh dataset is
-      // created) or surface the error (the upload is abandoned). Reap it either
-      // way so a retry isn't blocked. `DirectUploadUnavailableError` throws
-      // BEFORE the row exists (pendingDatasetId undefined → no-op), and a
-      // same-origin local-FS PUT failure (StorageNotWritable, a plain Error)
-      // hits the surface-error branch below — which previously stranded the row.
+      // Any failure after requestDirectUpload minted the `uploading` row
+      // locks the slug, so reap it whether we fall back or surface the
+      // error. `DirectUploadUnavailableError` throws before the row exists
+      // (pendingDatasetId undefined → no-op).
       if (pendingDatasetId) {
         try {
           await abortPendingUpload({ projectId, datasetId: pendingDatasetId });
@@ -585,14 +540,9 @@ export function UploadCSVForm({
         await runFallbackParseAndDrawer(rawFile, "no-storage");
         return;
       }
-      // Storage IS configured but the cross-origin presigned PUT was rejected —
-      // almost always a missing/incorrect bucket CORS rule (an opaque fetch
-      // TypeError carries no status). This silently degrades the headline
-      // direct-upload path to the legacy in-browser one, so log it LOUDLY for
-      // operators — the UI can't (and per copywriting.md shouldn't) explain CORS
-      // to an end user. Then fall back for small files (resilience) but show an
-      // accurate error for large ones — never the false "requires object storage"
-      // when storage is in fact configured.
+      // Storage IS configured but the presigned PUT was rejected (almost
+      // always a missing bucket CORS rule) — log it loudly for operators,
+      // since the UI can't explain CORS to an end user, then fall back.
       if (error instanceof PresignedUploadFailedError) {
         logger.error(
           { error, fileSizeBytes: rawFile.size, projectId },
@@ -623,9 +573,7 @@ export function UploadCSVForm({
 
   /**
    * Cancel an in-flight direct upload: abort the streaming PUT and reap the
-   * pending `uploading` row so its slug isn't locked on retry. The dropzone's
-   * cancel control additionally clears the selected file (re-expanding the drop
-   * zone) — see `RawFileDropzone`'s cancel handler — so the user starts fresh.
+   * pending `uploading` row so its slug isn't locked on retry.
    */
   const handleCancelUpload = () => {
     abortControllerRef.current?.abort();
@@ -641,28 +589,15 @@ export function UploadCSVForm({
   };
 
   /**
-   * 409-fallback only: lazily parse the raw file we captured up front, populate
-   * `uploadedDataset`, and open the parse-and-drawer flow. This is the single
-   * point where the direct path ever parses in-browser.
-   *
-   * Guarded on the legacy 25 MB limit (`MAX_FILE_SIZE_BYTES`): without object
-   * storage this path parses the whole file in the tab, so a multi-GB file would
-   * OOM the browser (the exact failure direct upload avoids). Over the limit we
-   * abort with a clear message instead of parsing.
+   * 409-fallback only. Guarded on `MAX_FILE_SIZE_BYTES`: over the limit,
+   * abort with a message instead of parsing (no object storage to fall back on).
    */
-  const runFallbackParseAndDrawer = async (
-    file: File,
-    reason: "no-storage" | "presign-failed",
-  ) => {
+  const runFallbackParseAndDrawer = async (file: File, reason: "no-storage" | "presign-failed") => {
     if (file.size > MAX_FILE_SIZE_BYTES) {
-      // Exhaustive map (not a ternary): widening the `reason` union surfaces a
-      // compile error here instead of silently defaulting to one message.
-      //  - presign-failed: storage IS configured, the direct upload to it
-      //    failed — do NOT claim the deployment lacks object storage (the
-      //    misleading message a real user hit). Operator-facing CORS/
-      //    connectivity detail is in the log; the UI stays jargon-free
-      //    (copywriting.md).
-      //  - no-storage: the deployment genuinely has no object storage.
+      // Exhaustive map (not a ternary), so widening `reason` is a compile
+      // error here: presign-failed must never claim no object storage (the
+      // misleading message a real user hit) — CORS/connectivity detail
+      // stays in the log, per copywriting.md.
       const oversizeMessage: Record<typeof reason, string> = {
         "presign-failed":
           "We couldn't upload your file to storage. Please try again, or contact your administrator if the problem persists.",
@@ -694,13 +629,9 @@ export function UploadCSVForm({
   };
 
   /**
-   * Upload button handler. On the direct path with a parseable header AND a host
-   * that can show the confirm drawer, hand the parsed columns to the host first
-   * (ADR-032 v19) so the user fixes names + types before the upload starts; the
-   * host calls back `onConfirmed` with the final schema, which resumes
-   * `handleUpload`. Without a host confirm handler (standalone form) or an
-   * unparseable header, upload straight away — normalize then derives
-   * all-`string` columns as before.
+   * With a parseable header and a host confirm drawer, hand the parsed
+   * columns to the host first (ADR-032 v19); its `onConfirmed` resumes
+   * `handleUpload`. Otherwise upload straight away.
    */
   const handleUploadClick = () => {
     if (enableDirectUpload && rawFile && parsedColumns && requestColumnConfirm) {
@@ -724,9 +655,7 @@ export function UploadCSVForm({
   const canUpload = enableDirectUpload
     ? // Wait for the header parse to settle so a fast click can't bypass confirm.
       !!rawFile && !isParsingHeader
-    : !!uploadedDataset &&
-      uploadedDataset.datasetRecords.length > 0 &&
-      !overRowLimitForFallback;
+    : !!uploadedDataset && uploadedDataset.datasetRecords.length > 0 && !overRowLimitForFallback;
 
   // File-level validation, shown inline on the file's row: too-large (fallback)
   // or over the in-browser row limit.
@@ -740,9 +669,7 @@ export function UploadCSVForm({
         <Alert.Root status="error" width="full">
           <Alert.Indicator />
           <Alert.Content>
-            <Alert.Description data-testid="upload-error">
-              {uploadError}
-            </Alert.Description>
+            <Alert.Description data-testid="upload-error">{uploadError}</Alert.Description>
           </Alert.Content>
         </Alert.Root>
       )}
@@ -762,12 +689,10 @@ export function UploadCSVForm({
           // Bump the token so any in-flight parse from a previous file is
           // discarded when it resolves (no stale overwrite).
           const token = ++parseHeaderTokenRef.current;
-          // Read just the header (bounded slice — never the whole file) so the
-          // confirm step can show the file's columns. Best-effort: on an
-          // unreadable header the upload proceeds without confirm. Upload stays
-          // disabled (`isParsingHeader`) until this settles. Only when a confirm
-          // host is wired — without it the parse result is unused, so a standalone
-          // form neither parses nor blocks.
+          // Read just the header (bounded slice) so the confirm step can show
+          // the columns. Best-effort: an unreadable header proceeds without
+          // confirm. Upload stays disabled (`isParsingHeader`) until this
+          // settles, only when a confirm host is wired.
           if (file && enableDirectUpload && requestColumnConfirm) {
             setIsParsingHeader(true);
             void (async () => {
@@ -840,10 +765,7 @@ export function CSVReaderComponent({
   onCancel,
   children,
 }: {
-  onUploadAccepted: (results: {
-    data: string[][];
-    acceptedFile: File;
-  }) => void | Promise<void>;
+  onUploadAccepted: (results: { data: string[][]; acceptedFile: File }) => void | Promise<void>;
   onUploadRemoved?: () => void;
   /**
    * Raw-file callback for the no-parse path: receives the dropped `File` (or
@@ -852,11 +774,9 @@ export function CSVReaderComponent({
    */
   onRawFile?: (file: File | null) => void;
   /**
-   * When false, the dropzone captures only the raw `File` and never runs
-   * PapaParse / `readString` — so a multi-GB file does not OOM the browser
-   * before the direct upload (ADR-032 D4). The default (true) keeps the
-   * parse-and-emit behaviour `AddRowsFromCSVModal` and the no-storage fallback
-   * rely on for synchronous columns/records.
+   * When false, the dropzone captures only the raw `File` (never runs
+   * PapaParse), so a multi-GB file can't OOM the browser (ADR-032 D4). The
+   * default (true) is the parse-and-emit behaviour older callers rely on.
    */
   parse?: boolean;
   /** "uploading" while the no-parse raw file streams to storage. */
@@ -893,11 +813,9 @@ export function CSVReaderComponent({
 }
 
 /**
- * Parse-and-emit dropzone: runs PapaParse (and a JSON/JSONL→CSV pre-parse) on
- * the dropped file so callers get `{ data, acceptedFile }` synchronously. Used
- * by `AddRowsFromCSVModal` and the no-storage fallback, which need columns and
- * records up front. NOT used on the direct-upload happy path (see
- * `RawFileDropzone`) — this parse is what OOMs the browser on big files.
+ * Parse-and-emit dropzone: PapaParse (plus a JSON/JSONL→CSV pre-parse) so
+ * callers get `{ data, acceptedFile }` synchronously. Not used on the
+ * direct-upload path (`RawFileDropzone`) — this is what OOMs on big files.
  */
 function ParsingCSVReader({
   onUploadAccepted,
@@ -905,10 +823,7 @@ function ParsingCSVReader({
   fileError,
   children,
 }: {
-  onUploadAccepted: (results: {
-    data: string[][];
-    acceptedFile: File;
-  }) => void | Promise<void>;
+  onUploadAccepted: (results: { data: string[][]; acceptedFile: File }) => void | Promise<void>;
   onUploadRemoved?: () => void;
   fileError?: string;
   children?: (hasAcceptedFile: boolean) => React.ReactNode;
@@ -1000,10 +915,8 @@ function ParsingCSVReader({
 }
 
 /**
- * Build an in-memory dataset from already-parsed CSV rows (header + body),
- * renaming reserved/colliding columns and toasting the rename. Shared by the
- * immediate-parse path and the no-storage fallback so both produce identical
- * datasets.
+ * Build an in-memory dataset from already-parsed CSV rows, renaming
+ * reserved/colliding columns and toasting the rename.
  */
 function buildDatasetFromRows(data: string[][], name: string): InMemoryDataset {
   const originalColumnNames = data[0] ?? [];
@@ -1030,21 +943,17 @@ function buildDatasetFromRows(data: string[][], name: string): InMemoryDataset {
   });
 
   const now = new Date().getTime();
-  const records: DatasetRecordEntry[] = data
-    .slice(1)
-    .map((row: string[], index: number) => ({
-      id: `${now}-${index}`,
-      ...Object.fromEntries(row.map((col, i) => [columns[i]?.name, col])),
-    }));
+  const records: DatasetRecordEntry[] = data.slice(1).map((row: string[], index: number) => ({
+    id: `${now}-${index}`,
+    ...Object.fromEntries(row.map((col, i) => [columns[i]?.name, col])),
+  }));
 
   return { datasetRecords: records, columnTypes: columns, name };
 }
 
 /**
- * Parse a raw CSV/JSON/JSONL file into header+body rows. Used ONLY by the
- * no-storage fallback: the direct path captures the file unparsed and reaches
- * here just when storage is unavailable. Mirrors the JSON/JSONL handling in
- * `ParsingCSVReader` so both paths read the same file the same way.
+ * Parse a raw CSV/JSON/JSONL file into header+body rows, for the no-storage
+ * fallback only. Mirrors `ParsingCSVReader`'s JSON/JSONL handling.
  */
 async function parseFileToRows(file: File): Promise<string[][]> {
   const isJson = file.name.endsWith(".jsonl") || file.name.endsWith(".json");
@@ -1293,12 +1202,9 @@ function CSVReaderBox({
 }
 
 /**
- * No-parse dropzone for the direct-upload happy path (ADR-032 D4). Captures the
- * raw `File` via a native file input + drag handlers and never runs PapaParse —
- * `react-papaparse`'s `CSVReader` parses the whole file in-browser before its
- * `onUploadAccepted` fires, which OOMs the browser on a multi-GB file. Here the
- * only thing the direct upload needs is the raw `File` (its name seeds the
- * default dataset name; the columns are derived server-side by normalize).
+ * No-parse dropzone for the direct-upload happy path (ADR-032 D4): captures
+ * the raw `File` via a native input + drag handlers, never PapaParse. Its
+ * name seeds the dataset name; columns are derived server-side by normalize.
  */
 function RawFileDropzone({
   onRawFile,
@@ -1332,11 +1238,7 @@ function RawFileDropzone({
   };
 
   const isUploading = uploadStatus === "uploading";
-  const rowStatus: DatasetFileStatus = fileError
-    ? "error"
-    : isUploading
-      ? "uploading"
-      : "selected";
+  const rowStatus: DatasetFileStatus = fileError ? "error" : isUploading ? "uploading" : "selected";
 
   return (
     <VStack width="full" gap={0} align="stretch">

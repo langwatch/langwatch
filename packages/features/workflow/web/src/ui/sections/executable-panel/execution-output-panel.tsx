@@ -13,7 +13,7 @@ import { useDebounceValue } from "usehooks-ts";
 import { RenderInputOutput } from "@langwatch/trace-web/components/traces/RenderInputOutput";
 import { SpanDuration } from "@langwatch/trace-web/components/traces/SpanDetails";
 import { RedactedField } from "../redacted-field";
-import { useDrawer } from "../../../behavior/studio-host/use-drawer";
+import { useDrawer } from "@langwatch/ui-host/use-drawer";
 import type { ExecutionState } from "@langwatch/workflow-contract";
 
 interface OutputPanelProps {
@@ -51,10 +51,7 @@ export const ExecutionOutputPanel = ({
         </Heading>
         <Spacer />
         {executionState?.timestamps && isExecutionComplete && (
-          <ExecutionMetadata
-            executionState={executionState}
-            isTracingEnabled={isTracingEnabled}
-          />
+          <ExecutionMetadata executionState={executionState} isTracingEnabled={isTracingEnabled} />
         )}
       </HStack>
 
@@ -74,8 +71,7 @@ const ExecutionMetadata = ({
   isTracingEnabled: boolean;
 }) => {
   const { openDrawer } = useDrawer();
-  const hasTiming =
-    executionState.timestamps?.started_at && executionState.timestamps?.finished_at;
+  const hasTiming = executionState.timestamps?.started_at && executionState.timestamps?.finished_at;
 
   return (
     <HStack gap={3}>
@@ -88,8 +84,7 @@ const ExecutionMetadata = ({
           {executionState.cost !== undefined && <Text color="fg.subtle">·</Text>}
           <SpanDuration
             span={{
-              error:
-                executionState?.status === "error" ? executionState.error : undefined,
+              error: executionState?.status === "error" ? executionState.error : undefined,
               timestamps: {
                 started_at: executionState.timestamps?.started_at ?? 0,
                 finished_at: executionState.timestamps?.finished_at ?? 0,
@@ -142,10 +137,7 @@ const renderExecutionContent = (
 /**
  * Renders the current execution status messages
  */
-const renderExecutionStatus = (
-  executionState: ExecutionState,
-  isWaitingLong?: boolean,
-) => {
+const renderExecutionStatus = (executionState: ExecutionState, isWaitingLong?: boolean) => {
   if (isWaitingLong && executionState.status === "waiting") {
     return <Text>Waiting for runner</Text>;
   }
@@ -171,10 +163,7 @@ const renderExecutionError = (executionState: ExecutionState) => {
       <Text fontSize="13px" fontWeight="bold" textTransform="uppercase" color="fg.muted">
         Error
       </Text>
-      <OutputBox
-        color="red.700"
-        value={executionState.error ?? "No error message captured"}
-      />
+      <OutputBox color="red.700" value={executionState.error ?? "No error message captured"} />
     </VStack>
   );
 };
@@ -193,16 +182,10 @@ const renderExecutionOutputs = (executionState: ExecutionState, nodeType?: strin
   // handle's boolean, so surface that single value.
   if (nodeType === "if_else") {
     const outputs = executionState.outputs as Record<string, unknown>;
-    const isConditionTrue =
-      "true" in outputs ? outputs.true : !(outputs.false as boolean);
+    const isConditionTrue = "true" in outputs ? outputs.true : !(outputs.false as boolean);
     return (
       <VStack width="full" align="start" gap={3}>
-        <Text
-          fontSize="13px"
-          fontWeight="bold"
-          textTransform="uppercase"
-          color="gray.600"
-        >
+        <Text fontSize="13px" fontWeight="bold" textTransform="uppercase" color="gray.600">
           Condition
         </Text>
         <OutputBox value={isConditionTrue} />
@@ -216,10 +199,8 @@ const renderExecutionOutputs = (executionState: ExecutionState, nodeType?: strin
       const isFail =
         (nodeType === "evaluator" && identifier === "passed" && value === false) ||
         (identifier === "status" && value === "error");
-      const isSkipped =
-        nodeType === "evaluator" && identifier === "status" && value === "skipped";
-      const isSuccess =
-        nodeType === "evaluator" && identifier === "passed" && value === true;
+      const isSkipped = nodeType === "evaluator" && identifier === "status" && value === "skipped";
+      const isSuccess = nodeType === "evaluator" && identifier === "passed" && value === true;
 
       const textColor = isSkipped
         ? "yellow.600"
@@ -236,21 +217,10 @@ const renderExecutionOutputs = (executionState: ExecutionState, nodeType?: strin
           key={identifier}
           gap={3}
           color={
-            isSkipped
-              ? "yellow.600"
-              : isFail
-                ? "red.600"
-                : isSuccess
-                  ? "green.600"
-                  : undefined
+            isSkipped ? "yellow.600" : isFail ? "red.600" : isSuccess ? "green.600" : undefined
           }
         >
-          <Text
-            fontSize="13px"
-            fontWeight="bold"
-            textTransform="uppercase"
-            color={textColor}
-          >
+          <Text fontSize="13px" fontWeight="bold" textTransform="uppercase" color={textColor}>
             {identifier}
           </Text>
           <OutputBox value={value} />

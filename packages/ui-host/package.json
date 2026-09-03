@@ -1,0 +1,55 @@
+{
+  "name": "@langwatch/ui-host",
+  "version": "0.1.0",
+  "private": true,
+  "description": "The framework-shaped adapters a feature-web package asks its composing application for, instead of reaching the router, a toast singleton or session storage directly.",
+  "files": [
+    "src"
+  ],
+  "type": "module",
+  "main": "./src/index.ts",
+  "types": "./src/index.ts",
+  "exports": {
+    ".": {
+      "types": "./src/index.ts",
+      "default": "./src/index.ts"
+    },
+    "./compat/next-dynamic": {
+      "types": "./src/compat/next-dynamic.ts",
+      "default": "./src/compat/next-dynamic.ts"
+    },
+    "./use-drawer": {
+      "types": "./src/use-drawer.ts",
+      "default": "./src/use-drawer.ts"
+    },
+    "./upgrade-modal-store": {
+      "types": "./src/upgrade-modal-store.ts",
+      "default": "./src/upgrade-modal-store.ts"
+    }
+  },
+  "scripts": {
+    "typecheck": "tsc --noEmit",
+    "test": "vitest run",
+    "test:unit": "vitest run"
+  },
+  "dependencies": {
+    "@langwatch/enterprise-licensing-contract": "workspace:*",
+    "@langwatch/ui-drawer": "workspace:*",
+    "zustand": "^4.5.7"
+  },
+  "devDependencies": {
+    "@testing-library/jest-dom": "^7.0.1",
+    "@testing-library/react": "^16.3.2",
+    "@types/react": "^19.2.14",
+    "@types/react-dom": "^19.2.3",
+    "jsdom": "^30.0.1",
+    "react": "^19.2.7",
+    "react-dom": "^19.2.7",
+    "typescript": "^7.0.2",
+    "vitest": "^4.1.9"
+  },
+  "peerDependencies": {
+    "react": "^19.2.7",
+    "react-dom": "^19.2.7"
+  }
+}

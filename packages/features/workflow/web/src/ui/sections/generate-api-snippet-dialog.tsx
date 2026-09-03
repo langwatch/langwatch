@@ -4,7 +4,7 @@ import { CheckIcon, ChevronDownIcon } from "lucide-react";
 import React, { createContext, useContext, useMemo, useState } from "react";
 
 import type { Snippet, Target } from "@langwatch/prompt-web/surfaces/api-snippet";
-import { uppercaseFirstLetter } from "../../model/string-casing";
+import { uppercaseFirstLetter } from "@langwatch/design-system/string-casing";
 import { RenderCode } from "./code/render-code";
 import { Dialog } from "../elements/dialog";
 import { Menu } from "@langwatch/design-system/menu";
@@ -97,9 +97,7 @@ export function GenerateApiSnippetDialog({
   };
   const onOpen = () => setOpen(true);
   const onClose = () => setOpen(false);
-  const [selectedTarget, setSelectedTarget] = useState<Target>(
-    targets[0] ?? "python_python3",
-  );
+  const [selectedTarget, setSelectedTarget] = useState<Target>(targets[0] ?? "python_python3");
   const [selectedTab, setSelectedTab] = useState<string>(tabs?.[0]?.value ?? "python");
 
   // Derived instead of synced via effect: an effect calling setState on every
@@ -127,11 +125,7 @@ export function GenerateApiSnippetDialog({
   return (
     <ApiSnippetDialogContext.Provider value={{ open, onOpen: handleOpen, onClose }}>
       {children}
-      <Dialog.Root
-        open={open}
-        onOpenChange={({ open }) => (open ? onOpen() : onClose())}
-        size="xl"
-      >
+      <Dialog.Root open={open} onOpenChange={({ open }) => (open ? onOpen() : onClose())} size="xl">
         <Dialog.Content bg="bg">
           <Dialog.CloseTrigger />
           <Dialog.Header width="100%" marginTop={4}>
@@ -166,9 +160,7 @@ export function GenerateApiSnippetDialog({
           </Dialog.Header>
           <Dialog.Body>
             <RenderCode
-              code={
-                useTabs ? (activeTab?.content ?? "") : (selectedSnippet?.content ?? "")
-              }
+              code={useTabs ? (activeTab?.content ?? "") : (selectedSnippet?.content ?? "")}
               language={
                 useTabs
                   ? (activeTab?.language ?? "bash")
@@ -229,11 +221,7 @@ const LanguageMenu = React.memo(function LanguageMenu({
       </Menu.Trigger>
       <Menu.Content>
         {targets.map((target) => (
-          <Menu.Item
-            key={target}
-            value={target}
-            onClick={() => setSelectedTarget(target)}
-          >
+          <Menu.Item key={target} value={target} onClick={() => setSelectedTarget(target)}>
             {formatTarget(target)}
             {selectedTarget === target && <CheckIcon />}
           </Menu.Item>

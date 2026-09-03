@@ -1,10 +1,7 @@
 import { useMemo } from "react";
 
-import { setFlowCallbacks, useDrawer } from "../studio-host/use-drawer";
-import {
-  useWorkflowEvaluatorPickerFlow,
-  type EvaluatorPickerPort,
-} from "@langwatch/workflow-web";
+import { setFlowCallbacks, useDrawer } from "@langwatch/ui-host/use-drawer";
+import { useWorkflowEvaluatorPickerFlow, type EvaluatorPickerPort } from "@langwatch/workflow-web";
 
 /** App composition adapter for the Workflow evaluator-selection state machine. */
 export function useEvaluatorPickerFlow() {

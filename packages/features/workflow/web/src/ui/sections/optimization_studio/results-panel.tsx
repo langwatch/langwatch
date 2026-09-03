@@ -7,15 +7,15 @@ import {
   BatchSummaryFooter,
   transformBatchEvaluationData,
 } from "@langwatch/experiment-web";
-import { ExternalImage } from "../external-image";
+import { ExternalImage } from "@langwatch/design-system/external-image";
 import { EvaluatorResultChip } from "@langwatch/evaluator-web/components/shared/EvaluatorResultChip";
 import { describeCellFailure } from "@langwatch/experiment-web/experiments-v3/utils/cellFailure";
 import { TraceIdPeek } from "@langwatch/trace-web/explorer/components/TraceIdPeek";
-import { useDrawer } from "../../../behavior/studio-host/use-drawer";
+import { useDrawer } from "@langwatch/ui-host/use-drawer";
 import { useBatchEvaluationState } from "@langwatch/experiment-web/components/experiments/BatchEvaluationV2";
 import { useOrganizationTeamProject } from "../../../behavior/studio-host/use-organization-team-project";
 import { api } from "../../../behavior/studio-host/api";
-import { slugify } from "../../../model/slugify";
+import { slugify } from "@langwatch/design-system/slugify";
 import { useRunEvalution } from "./use-run-evalution";
 import {
   isExperimentQueryEnabled,

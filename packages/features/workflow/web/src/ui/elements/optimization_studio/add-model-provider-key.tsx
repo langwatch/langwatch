@@ -1,7 +1,7 @@
 import { Alert, Box, Button, HStack, Spacer, Text, VStack } from "@chakra-ui/react";
 import { modelProviderIcons } from "@langwatch/model-provider-web/components/modelProviders/iconsMap";
 import { Link } from "../studio-host/link";
-import { titleCase } from "../../../model/string-casing";
+import { titleCase } from "@langwatch/design-system/string-casing";
 
 export const AddModelProviderKey = ({
   runWhat,
@@ -16,8 +16,8 @@ export const AddModelProviderKey = ({
         <VStack align="start" width="full">
           <HStack paddingBottom={3}>
             <Text>
-              You need to set up your own API keys for the following providers to be able
-              to {runWhat}:
+              You need to set up your own API keys for the following providers to be able to{" "}
+              {runWhat}:
             </Text>
           </HStack>
           <VStack align="start" width="full" gap={3}>

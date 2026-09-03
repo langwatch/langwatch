@@ -2,8 +2,11 @@ import { Box, HStack, type StackProps, Text, VStack } from "@chakra-ui/react";
 import { AlertTriangle } from "lucide-react";
 
 import { modelProviderIcons } from "@langwatch/model-provider-web/components/modelProviders/iconsMap";
-import { allModelOptions, useModelSelectionOptions } from "@langwatch/model-provider-web/components/ModelSelector";
-import { OverflownTextWithTooltip } from "@langwatch/workflow-web/components/OverflownText";
+import {
+  allModelOptions,
+  useModelSelectionOptions,
+} from "@langwatch/model-provider-web/components/ModelSelector";
+import { OverflownTextWithTooltip } from "@langwatch/design-system/overflown-text";
 import { Tooltip } from "@langwatch/design-system/tooltip";
 import { MODEL_ICON_SIZE } from "../../../model/llmPromptConfigs/constants";
 
@@ -67,9 +70,7 @@ export function LLMModelDisplay({
       <VStack gap={0} align="start">
         <OverflownTextWithTooltip
           label={
-            isDisabled
-              ? `${modelOption?.label ?? model} (disabled)`
-              : (modelOption?.label ?? model)
+            isDisabled ? `${modelOption?.label ?? model} (disabled)` : (modelOption?.label ?? model)
           }
           fontSize={fontSize}
           fontFamily="mono"
@@ -89,12 +90,7 @@ export function LLMModelDisplay({
       {isProviderMissing && (
         <HStack gap={1} color="red.600" flexShrink={0}>
           <AlertTriangle size={14} aria-hidden />
-          <Text
-            fontSize="xs"
-            fontWeight="medium"
-            textTransform="uppercase"
-            letterSpacing="wide"
-          >
+          <Text fontSize="xs" fontWeight="medium" textTransform="uppercase" letterSpacing="wide">
             Update needed
           </Text>
         </HStack>

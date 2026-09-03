@@ -12,7 +12,7 @@ import { Trash2, UnplugIcon } from "lucide-react";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { Info } from "react-feather";
 
-import { DeleteConfirmationDialog } from "@langwatch/workflow-web/components/ui/delete-confirmation-dialog";
+import { DeleteConfirmationDialog } from "@langwatch/design-system/delete-confirmation-dialog";
 import { CopyButton } from "@langwatch/workflow-web/components/CopyButton";
 import {
   DialogBody,
@@ -149,16 +149,7 @@ export function DeployPromptDialog({
     } finally {
       setIsSaving(false);
     }
-  }, [
-    tagsQuery.data,
-    tagSelections,
-    allTags,
-    assignTag,
-    projectId,
-    configId,
-    onClose,
-    utils,
-  ]);
+  }, [tagsQuery.data, tagSelections, allTags, assignTag, projectId, configId, onClose, utils]);
 
   const versionItems = useMemo(
     () =>
@@ -238,8 +229,8 @@ export function DeployPromptDialog({
         <DialogBody>
           <VStack align="stretch" gap={4}>
             <Text fontSize="sm" color="fg.muted">
-              Use tags to get specific prompt versions via the SDK and API. Prompt
-              versions with the production tag are returned by default.
+              Use tags to get specific prompt versions via the SDK and API. Prompt versions with the
+              production tag are returned by default.
             </Text>
 
             <HStack gap={2}>
@@ -331,9 +322,7 @@ export function DeployPromptDialog({
                           minWidth={0}
                           maxWidth="280px"
                           value={
-                            tagSelections[tagDef.name]
-                              ? [tagSelections[tagDef.name] ?? ""]
-                              : []
+                            tagSelections[tagDef.name] ? [tagSelections[tagDef.name] ?? ""] : []
                           }
                           onValueChange={(details) => {
                             setTagVersionId(tagDef.name, details.value[0] ?? "");
@@ -343,9 +332,7 @@ export function DeployPromptDialog({
                           <Select.Trigger clearable>
                             <Select.ValueText placeholder="Select version">
                               {(items) => {
-                                const item = items[0] as
-                                  | (typeof versionItems)[number]
-                                  | undefined;
+                                const item = items[0] as (typeof versionItems)[number] | undefined;
                                 if (!item) return "Select version";
                                 return (
                                   <HStack gap={1} maxWidth="100%" overflow="hidden">
@@ -358,12 +345,7 @@ export function DeployPromptDialog({
                                     >
                                       v{item.version}
                                     </Text>
-                                    <Text
-                                      as="span"
-                                      fontSize="sm"
-                                      color="fg.muted"
-                                      truncate
-                                    >
+                                    <Text as="span" fontSize="sm" color="fg.muted" truncate>
                                       {item.commitMessage}
                                     </Text>
                                   </HStack>
@@ -385,12 +367,7 @@ export function DeployPromptDialog({
                                     >
                                       v{v.version}
                                     </Text>
-                                    <Text
-                                      as="span"
-                                      fontSize="sm"
-                                      color="fg.muted"
-                                      truncate
-                                    >
+                                    <Text as="span" fontSize="sm" color="fg.muted" truncate>
                                       {v.commitMessage}
                                     </Text>
                                   </HStack>

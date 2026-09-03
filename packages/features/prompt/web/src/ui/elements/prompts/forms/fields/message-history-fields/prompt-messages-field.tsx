@@ -10,8 +10,8 @@ import {
   AddMessageButton,
   MessageRoleLabel,
   RemoveMessageButton,
-} from "@langwatch/workflow-web/components/ui/messages/index";
-import { VerticalFormControl } from "@langwatch/workflow-web/components/VerticalFormControl";
+} from "@langwatch/design-system/messages";
+import { VerticalFormControl } from "@langwatch/design-system/vertical-form-control";
 import {
   type PromptTextAreaOnAddMention,
   PromptTextAreaWithVariables,
@@ -49,10 +49,7 @@ type MessageRowProps = {
   availableSources?: AvailableSource[];
   messageErrors?: string;
   hasMessagesError: boolean;
-  getMessageError: (
-    index: number,
-    key: "role" | "content",
-  ) => { message?: string } | undefined;
+  getMessageError: (index: number, key: "role" | "content") => { message?: string } | undefined;
   onRemove: () => void;
   onCreateVariable: (variable: Variable) => void;
   /** Callback when a variable mapping should be set */
@@ -214,11 +211,7 @@ export function PromptMessagesField({
   onSetVariableMapping,
   onAddEdge,
 }: {
-  messageFields: UseFieldArrayReturn<
-    PromptConfigFormValues,
-    "version.configData.messages",
-    "id"
-  >;
+  messageFields: UseFieldArrayReturn<PromptConfigFormValues, "version.configData.messages", "id">;
   /** Available variables with their types */
   availableFields: Variable[];
   otherNodesFields: Record<string, string[]>;
@@ -307,9 +300,7 @@ export function PromptMessagesField({
    */
   const messageErrors = useMemo(() => {
     return Array.isArray(errors.version?.configData?.messages)
-      ? errors.version?.configData?.messages
-          .map((message) => message.content?.message)
-          .join(", ")
+      ? errors.version?.configData?.messages.map((message) => message.content?.message).join(", ")
       : typeof errors.version?.configData?.messages === "string"
         ? errors.version?.configData?.messages
         : undefined;

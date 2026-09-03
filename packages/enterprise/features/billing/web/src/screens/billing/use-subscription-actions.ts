@@ -8,13 +8,9 @@ import {
   type PlannedUser,
   resolveGrowthSeatPlanType,
 } from "../../index";
-// THE SEAT-QUOTE MODAL IS ANOTHER PACKAGE'S, and this is the address rather
-// than a copy: the store is a zustand singleton exported by
-// `@langwatch/workflow-web`, so opening it here and mounting it there is one
-// modal. Nothing mounts it above a screen served from `apps/ui` yet — the same
-// overlay gap every family since governance has recorded — so on that half the
-// seat update opens nothing until the chrome layout route carries it.
-import { useUpgradeModalStore } from "@langwatch/workflow-web/stores/upgradeModalStore";
+// The seat-quote modal is a shared zustand singleton: opening it here and
+// mounting it in the chrome layout is one modal, not a copy.
+import { useUpgradeModalStore } from "@langwatch/ui-host/upgrade-modal-store";
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 type TRPCRefetchFn = { refetch: () => any };

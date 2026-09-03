@@ -1,36 +1,8 @@
 /**
- * `llmModelCost`, as the address spells it: the form behind every cost rule.
- *
- * RECOVERED FROM `platform/app/src/components/settings/LLMModelCostDrawer.tsx`,
- * deleted in `cc91631cd8`. Two live surfaces kept writing the address after it
- * went — the Model Costs settings table's Add / Edit / Clone, and the trace
- * drawer's "this model has no cost mapping" suggestion, which deep-links here
- * with the model and an exact-match regex prefilled — so the one place a cost
- * rule can be authored opened nothing.
- *
- * WHAT CHANGED IN THE LIFT, all of it because the platform owned it:
- *
- * - The project, team and organization come from the host port rather than
- *   from `useOrganizationTeamProject`, and their NAMES come from the same
- *   `availableScopes()` the providers table resolves its chips with.
- * - The toast is the host's `failed`, asked after `isReportedGlobally` exactly
- *   as the costs table next door asks it.
- * - Closing goes through `@langwatch/ui-drawer`'s navigator rather than the
- *   application's own hook. That package IS the framework — it owns the address
- *   vocabulary and the navigation stack and names no drawer — so a feature may
- *   depend on it; what a feature may not carry is the REGISTRY, which is
- *   composition.
- * - `applyHandledErrorToForm` and `FormServerError` come from
- *   `@langwatch/workflow-web/studio-host/errors`, the same import
- *   `@langwatch/evaluator-web` takes for the same two names. They are pure —
- *   they decide WHERE a refusal lands, never what it says — so they carry no
- *   host of their own.
- *
- * THE SCOPE IS A SINGLE ORGANIZATION'S (ADR-021). Editing keeps the row's own
- * scope; a new or cloned row defaults to the current project. The organization
- * and team rows are what let an admin push one cost policy down the cascade
- * (PROJECT overrides TEAM overrides ORGANIZATION) instead of every project
- * re-entering it.
+ * `llmModelCost`: the form behind every cost rule, opened from the Model
+ * Costs table (Add/Edit/Clone) and the trace drawer's cost-mapping
+ * suggestion. Scope is a single organization's (ADR-021): editing keeps the
+ * row's own scope, a new/cloned row defaults to the current project.
  */
 
 import { Button, Field, Heading, Input, Text } from "@chakra-ui/react";
@@ -42,7 +14,7 @@ import { Drawer } from "@langwatch/design-system/drawer";
 import { useDrawer } from "@langwatch/ui-drawer";
 import { InputGroup } from "@langwatch/design-system/input-group";
 import { ScopeChipPicker, type ScopeTriadEntry } from "@langwatch/authz-web/surfaces/scope-picker";
-import { HorizontalFormControl } from "@langwatch/workflow-web/components/HorizontalFormControl";
+import { HorizontalFormControl } from "@langwatch/design-system/horizontal-form-control";
 import {
   applyHandledErrorToForm,
   FormServerError,

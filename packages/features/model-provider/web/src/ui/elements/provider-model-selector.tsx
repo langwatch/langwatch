@@ -4,8 +4,11 @@ import React, { useEffect, useMemo, useState } from "react";
 import { modelProviderIcons } from "./modelProviders/icons-map";
 import { modelDisplayLabel } from "@langwatch/model-provider-contract";
 import { isLatestAlias, resolveLatestAlias } from "@langwatch/model-provider-contract";
-import { titleCase } from "@langwatch/workflow-web/utils/stringCasing";
-import { MODEL_ICON_SIZE, MODEL_ICON_SIZE_SM } from "@langwatch/prompt-web/components/llmPromptConfigs/constants";
+import { titleCase } from "@langwatch/design-system/string-casing";
+import {
+  MODEL_ICON_SIZE,
+  MODEL_ICON_SIZE_SM,
+} from "@langwatch/prompt-web/components/llmPromptConfigs/constants";
 import { InputGroup } from "@langwatch/design-system/input-group";
 import { Select } from "@langwatch/design-system/select";
 
@@ -30,18 +33,10 @@ type GroupedModelOptions = {
 export const INHERIT_SENTINEL = "__inherit__";
 
 /**
- * A model selector that supports models from multiple providers.
- * Derives the provider icon from each model's prefix (e.g., "openai/gpt-4" -> openai icon).
- * Groups models by provider for better organization.
- * Used in the model provider settings form to select default models.
- *
- * `inheritOption` (optional) prepends a special "Inherit" entry at the
- * top of the dropdown. When the user picks it, `onChange` is called
- * with `INHERIT_SENTINEL`; the parent translates that to "clear the
- * key from in-progress state". When `model` is empty AND
- * `inheritOption` is set, the trigger renders the inherited model
- * label at 0.55 opacity as a placeholder so the user can see what the
- * cascade would resolve to.
+ * Model selector across providers, grouped by provider icon (from each
+ * model's prefix). `inheritOption`, when set, prepends an "Inherit" entry
+ * that emits `INHERIT_SENTINEL` on pick, and renders as a faint placeholder
+ * when `model` is empty.
  */
 export const ProviderModelSelector = React.memo(function ProviderModelSelector({
   model,
@@ -148,17 +143,12 @@ export const ProviderModelSelector = React.memo(function ProviderModelSelector({
   // opacity so it reads as "this is what you'd get if you don't
   // override" instead of an empty / broken selector.
   const inheritIcon = inheritOption?.model
-    ? modelProviderIcons[
-        inheritOption.model.split("/")[0] as keyof typeof modelProviderIcons
-      ]
+    ? modelProviderIcons[inheritOption.model.split("/")[0] as keyof typeof modelProviderIcons]
     : null;
 
-  // Flatten for collection. When an inherit option is present we MUST
-  // include it as a collection item — Chakra's Select uses the
-  // collection for keyboard nav, click-to-select, and hover highlight.
-  // Rendering a Select.Item whose value isn't in the collection makes
-  // it look interactive but silently un-selectable (hover stays on the
-  // first real item below it).
+  // The inherit option must be in the collection: Chakra's Select uses it
+  // for keyboard nav and hover, so an item outside it looks interactive but
+  // is silently un-selectable.
   const inheritItem: ModelOption | null = inheritOption
     ? {
         value: INHERIT_SENTINEL,
@@ -185,9 +175,7 @@ export const ProviderModelSelector = React.memo(function ProviderModelSelector({
     !model && inheritOption ? (
       <HStack overflow="hidden" gap={2} align="center" opacity={0.55}>
         {inheritIcon && (
-          <Box minWidth={size === "sm" ? MODEL_ICON_SIZE_SM : MODEL_ICON_SIZE}>
-            {inheritIcon}
-          </Box>
+          <Box minWidth={size === "sm" ? MODEL_ICON_SIZE_SM : MODEL_ICON_SIZE}>{inheritIcon}</Box>
         )}
         <Box
           fontSize={size === "sm" ? 12 : 14}
@@ -206,9 +194,7 @@ export const ProviderModelSelector = React.memo(function ProviderModelSelector({
     ) : (
       <HStack overflow="hidden" gap={2} align="center">
         {selectedIcon && (
-          <Box minWidth={size === "sm" ? MODEL_ICON_SIZE_SM : MODEL_ICON_SIZE}>
-            {selectedIcon}
-          </Box>
+          <Box minWidth={size === "sm" ? MODEL_ICON_SIZE_SM : MODEL_ICON_SIZE}>{selectedIcon}</Box>
         )}
         <Box
           fontSize={size === "sm" ? 12 : 14}
@@ -225,9 +211,7 @@ export const ProviderModelSelector = React.memo(function ProviderModelSelector({
   const [highlightedValue, setHighlightedValue] = useState<string | null>(model);
 
   useEffect(() => {
-    const highlightedItem = modelCollection.items.find(
-      (item) => item.value === highlightedValue,
-    );
+    const highlightedItem = modelCollection.items.find((item) => item.value === highlightedValue);
     if (!highlightedItem) {
       setHighlightedValue(modelCollection.items[0]?.value ?? null);
     }
@@ -265,9 +249,7 @@ export const ProviderModelSelector = React.memo(function ProviderModelSelector({
         background="bg.panel"
         padding={0}
       >
-        <Select.ValueText placeholder={selectValueText}>
-          {() => selectValueText}
-        </Select.ValueText>
+        <Select.ValueText placeholder={selectValueText}>{() => selectValueText}</Select.ValueText>
       </Select.Trigger>
       <Select.Content padding={1}>
         <Field.Root asChild>
@@ -281,11 +263,7 @@ export const ProviderModelSelector = React.memo(function ProviderModelSelector({
             borderBottom="1px solid"
             borderColor="border"
           >
-            <InputGroup
-              startElement={<Search size={16} />}
-              startOffset="-4px"
-              width="full"
-            >
+            <InputGroup startElement={<Search size={16} />} startOffset="-4px" width="full">
               <Input
                 size="sm"
                 placeholder="Search models"

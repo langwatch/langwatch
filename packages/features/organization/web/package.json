@@ -36,6 +36,7 @@
     "@langwatch/identity-contract": "workspace:*",
     "@langwatch/organization-contract": "workspace:*",
     "@langwatch/platform-api-client": "workspace:*",
+    "@langwatch/ui-host": "workspace:*",
     "@langwatch/workflow-web": "workspace:*",
     "date-fns": "^4.4.0",
     "lodash-es": "^4.17.21",

@@ -2,7 +2,7 @@ import { Button, Field, Heading, HStack, Textarea, VStack } from "@chakra-ui/rea
 import { useCallback, useEffect, useMemo } from "react";
 import { Play } from "react-feather";
 import { type FieldErrors, useForm } from "react-hook-form";
-import { HorizontalFormControl } from "../horizontal-form-control";
+import { HorizontalFormControl } from "@langwatch/design-system/horizontal-form-control";
 
 // Create a simplified field type that matches what we need
 export type InputField = {
@@ -31,9 +31,7 @@ export const ExecutionInputPanel = ({
     return Object.fromEntries(
       fields.map((field) => [
         field.identifier,
-        typeof field.value === "object"
-          ? JSON.stringify(field.value)
-          : (field.value ?? ""),
+        typeof field.value === "object" ? JSON.stringify(field.value) : (field.value ?? ""),
       ]),
     );
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -115,9 +113,7 @@ export const ExecutionInputPanel = ({
                       : input.type
                 }
               />
-              <Field.ErrorText>
-                {form.formState.errors[input.identifier]?.message}
-              </Field.ErrorText>
+              <Field.ErrorText>{form.formState.errors[input.identifier]?.message}</Field.ErrorText>
             </HorizontalFormControl>
           );
         })}

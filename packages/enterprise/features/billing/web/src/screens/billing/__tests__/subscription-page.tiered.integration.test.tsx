@@ -1,28 +1,11 @@
 /**
  * @vitest-environment jsdom
- *
- * Integration tests for SubscriptionPage — SEAT_EVENT and TIERED pricing
- * models, enterprise TIERED exclusion, and upgrade-from-TIERED flow.
- *
- * Moved from `platform/app/src/components/subscription/__tests__/`. The page
- * now reads its organization, team and notices through `BillingHostPort` and
- * its procedures through `billingApi`, so the application-level mocks
- * (`~/utils/api`, `~/hooks/useOrganizationTeamProject`, the toaster and the
- * settings layout) became one fake host and one mocked api module. The
- * assertions are the originals.
- *
- * @see specs/licensing/subscription-page.feature
+ * SubscriptionPage pricing flows, against a fake `BillingHostPort` and a
+ * mocked `billingApi`. @see specs/licensing/subscription-page.feature
  */
 import "@testing-library/jest-dom/vitest";
 import { ChakraProvider, defaultSystem } from "@chakra-ui/react";
-import {
-  cleanup,
-  fireEvent,
-  render,
-  screen,
-  waitFor,
-  within,
-} from "@testing-library/react";
+import { cleanup, fireEvent, render, screen, waitFor, within } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { ENTERPRISE_PLAN_FEATURES, WEBHOOK_FEATURE_LABEL } from "../../../billing-plans";
 import {
@@ -107,7 +90,7 @@ const renderSubscriptionPage = () => {
 // ---------------------------------------------------------------------------
 // vi.mock declarations (hoisted — must be at module top-level)
 // ---------------------------------------------------------------------------
-vi.mock("@langwatch/workflow-web/stores/upgradeModalStore", async () => {
+vi.mock("@langwatch/ui-host/upgrade-modal-store", async () => {
   const setup = await import("./subscription-test-setup");
   return {
     useUpgradeModalStore: (

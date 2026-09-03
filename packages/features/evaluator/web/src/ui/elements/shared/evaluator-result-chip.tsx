@@ -1,18 +1,13 @@
 /**
- * EvaluatorResultChip - A read-only chip displaying evaluator result status
- *
- * This is a shared component used by both:
- * - Evaluations V3 workbench (via the interactive EvaluatorChip wrapper)
- * - Batch evaluation results page (read-only display)
- *
- * For the interactive version with edit/remove menu, see:
- * experiments-v3/components/TargetSection/evaluator-chip.tsx
+ * Read-only chip displaying evaluator result status. Shared by the
+ * Evaluations V3 workbench and the batch results page; for the interactive
+ * edit/remove version see `experiments-v3/components/TargetSection/evaluator-chip.tsx`.
  */
 import { Box, Circle, HStack, Icon, Spinner, Text, VStack } from "@chakra-ui/react";
 import { LuChevronRight, LuCircleX } from "react-icons/lu";
 
 import { Tooltip } from "@langwatch/design-system/tooltip";
-import { useInteractiveTooltip } from "@langwatch/workflow-web/hooks/useInteractiveTooltip";
+import { useInteractiveTooltip } from "@langwatch/design-system/use-interactive-tooltip";
 import {
   EVALUATION_STATUS_COLORS,
   getStatusLabel,
@@ -58,11 +53,8 @@ const DataTooltipContent = ({ inputs }: { inputs: Record<string, unknown> }) => 
 );
 
 /**
- * Base chip that displays evaluator result - read-only version
- *
- * NOTE: When inputs are provided, we use useInteractiveTooltip to manually
- * manage tooltip state, allowing nested tooltips (for the Data sub-tooltip)
- * to work correctly.
+ * Base read-only result chip. With inputs, `useInteractiveTooltip` drives
+ * tooltip state by hand so the nested Data sub-tooltip works.
  */
 export function EvaluatorResultChip({
   name,
@@ -220,12 +212,8 @@ export function EvaluatorResultChip({
     </HStack>
   );
 
-  // When we have inputs, use controlled tooltip with interactive behavior.
-  // closeOnScroll stays off on both variants: the details box scrolls
-  // internally (long evaluator reasoning) and zag's default scroll
-  // listener would dismiss the popover on the first wheel tick - the
-  // "it disappears when I scroll" customer bug. The positioner keeps
-  // tracking the anchor while the results table scrolls.
+  // closeOnScroll stays off: the details box scrolls internally, and zag's
+  // default listener would dismiss the popover on the first wheel tick.
   if (hasInputs) {
     return (
       <Tooltip

@@ -25,7 +25,7 @@ import {
   LlmConfigOutputTypes,
 } from "@langwatch/workflow-web/types";
 import { DEFAULT_MODEL } from "@langwatch/workflow-web/utils/constants";
-import { kebabCase } from "@langwatch/workflow-web/utils/stringCasing";
+import { kebabCase } from "@langwatch/design-system/string-casing";
 
 import { generateUniqueIdentifier } from "@langwatch/prompt-contract";
 
@@ -463,9 +463,7 @@ export function formValuesToTriggerSaveVersionParams(
   };
 }
 
-export function versionedPromptToOptimizationStudioNodeData(
-  prompt: VersionedPrompt,
-): Required<
+export function versionedPromptToOptimizationStudioNodeData(prompt: VersionedPrompt): Required<
   Omit<
     LlmPromptConfigComponent,
     | "_library_ref"

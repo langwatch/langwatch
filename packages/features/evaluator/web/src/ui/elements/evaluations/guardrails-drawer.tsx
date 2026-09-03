@@ -5,7 +5,7 @@ import { Drawer } from "@langwatch/workflow-web/components/ui/drawer";
 import type { Evaluator } from "@langwatch/evaluator-contract";
 import { setFlowCallbacks, useDrawer } from "@langwatch/ui-drawer";
 import { RenderCode } from "@langwatch/workflow-web/components/code/RenderCode";
-import { HorizontalFormControl } from "@langwatch/workflow-web/components/HorizontalFormControl";
+import { HorizontalFormControl } from "@langwatch/design-system/horizontal-form-control";
 import { EvaluatorSelectionBox } from "./evaluator-selection-box";
 
 export type GuardrailsDrawerProps = {
@@ -220,11 +220,7 @@ EOF
   const apiKeyLink = "/settings/api-keys";
 
   return (
-    <Drawer.Root
-      open={isOpen}
-      onOpenChange={({ open }) => !open && handleClose()}
-      size="lg"
-    >
+    <Drawer.Root open={isOpen} onOpenChange={({ open }) => !open && handleClose()} size="lg">
       <Drawer.Content bg="bg">
         <Drawer.CloseTrigger />
         <Drawer.Header>
@@ -279,8 +275,7 @@ EOF
                   </Box>
 
                   <Text fontSize="sm" color="gray.600">
-                    Set the <code>LANGWATCH_API_KEY</code> environment variable with your
-                    API key.{" "}
+                    Set the <code>LANGWATCH_API_KEY</code> environment variable with your API key.{" "}
                     <Link
                       href={apiKeyLink}
                       color="blue.500"

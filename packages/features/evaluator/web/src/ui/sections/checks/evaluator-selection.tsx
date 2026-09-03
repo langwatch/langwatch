@@ -24,7 +24,7 @@ import {
   type EvaluatorTypes,
 } from "@langwatch/evaluator-contract";
 import { api } from "@langwatch/workflow-web/studio-host/api";
-import { titleCase } from "@langwatch/workflow-web/utils/stringCasing";
+import { titleCase } from "@langwatch/design-system/string-casing";
 import { Link } from "@langwatch/workflow-web/studio-host/link";
 import { Tooltip } from "@langwatch/design-system/tooltip";
 import type { CheckConfigFormData } from "./check-config-form";

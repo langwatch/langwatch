@@ -6,7 +6,10 @@ import {
   type Evaluator,
   type EvaluatorTypes,
 } from "@langwatch/evaluator-contract";
-import { langwatchEndpoint, langwatchEndpointEnv } from "@langwatch/workflow-web/components/code/langwatchEndpointEnv";
+import {
+  langwatchEndpoint,
+  langwatchEndpointEnv,
+} from "@langwatch/design-system/langwatch-endpoint-env";
 import { RenderCode } from "@langwatch/workflow-web/components/code/RenderCode";
 import {
   DialogBody,
@@ -46,9 +49,7 @@ export function EvaluatorApiUsageDialog({
   // Get evaluator definition for field information
   const config = evaluator.config as { evaluatorType?: string } | null;
   const evaluatorType = config?.evaluatorType ?? "";
-  const evaluatorDef = evaluatorType
-    ? AVAILABLE_EVALUATORS[evaluatorType as EvaluatorTypes]
-    : null;
+  const evaluatorDef = evaluatorType ? AVAILABLE_EVALUATORS[evaluatorType as EvaluatorTypes] : null;
 
   // Build data fields for experiment mode (Python)
   const buildPythonExperimentDataFields = (): string => {
@@ -67,12 +68,10 @@ export function EvaluatorApiUsageDialog({
         if (field === "output") return `            "${field}": output,`;
         if (field === "input") return `            "${field}": row["input"],`;
         if (field === "contexts") return `            "${field}": row["contexts"],`;
-        if (field === "expected_output")
-          return `            "${field}": row["expected_output"],`;
+        if (field === "expected_output") return `            "${field}": row["expected_output"],`;
         if (field === "expected_contexts")
           return `            "${field}": row["expected_contexts"],`;
-        if (field === "conversation")
-          return `            "${field}": row["conversation"],`;
+        if (field === "conversation") return `            "${field}": row["conversation"],`;
         return `            "${field}": "",`;
       })
       .join("\n");
@@ -126,9 +125,7 @@ export function EvaluatorApiUsageDialog({
       output: "", // your output value`;
     }
 
-    return allFields
-      .map((field) => `      ${field}: "", // your ${field} value`)
-      .join("\n");
+    return allFields.map((field) => `      ${field}: "", // your ${field} value`).join("\n");
   };
 
   // Build data fields for cURL
@@ -369,8 +366,7 @@ EOF
             {/* Help text */}
             <VStack align="start" gap={2}>
               <Text fontSize="sm" color="fg.muted">
-                Set the <code>LANGWATCH_API_KEY</code> environment variable with your API
-                key.{" "}
+                Set the <code>LANGWATCH_API_KEY</code> environment variable with your API key.{" "}
                 <Link
                   href={apiKeyLink}
                   color="blue.500"
@@ -383,10 +379,7 @@ EOF
               </Text>
               <Text fontSize="sm" color="fg.muted">
                 Learn more about{" "}
-                {usageMode === "experiment"
-                  ? "running experiments"
-                  : "online evaluations"}{" "}
-                in our{" "}
+                {usageMode === "experiment" ? "running experiments" : "online evaluations"} in our{" "}
                 <Link
                   href={docsLink}
                   color="blue.500"

@@ -1,6 +1,6 @@
 import { Box, HStack, RadioCard, Text, VStack } from "@chakra-ui/react";
 import { LuChevronRight } from "react-icons/lu";
-import { OverflownTextWithTooltip } from "@langwatch/workflow-web/components/OverflownText";
+import { OverflownTextWithTooltip } from "@langwatch/design-system/overflown-text";
 import { Tooltip } from "@langwatch/design-system/tooltip";
 
 export function StepButton({
@@ -70,12 +70,7 @@ export function StepRadio({
           <RadioCard.ItemHiddenInput />
           <RadioCard.ItemControl cursor="pointer" width="full">
             <RadioCard.ItemContent width="full">
-              <HStack
-                align="start"
-                gap={3}
-                width="full"
-                _icon={{ width: "22px", height: "22px" }}
-              >
+              <HStack align="start" gap={3} width="full" _icon={{ width: "22px", height: "22px" }}>
                 {icon}
                 <VStack align="start" gap={1} width="full">
                   <OverflownTextWithTooltip>{title}</OverflownTextWithTooltip>

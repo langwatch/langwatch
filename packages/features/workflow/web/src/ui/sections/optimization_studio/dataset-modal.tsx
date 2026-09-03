@@ -28,16 +28,13 @@ import {
   type InMemoryDataset,
 } from "@langwatch/dataset-web/components/datasets/editor/DatasetEditorTable";
 import { UploadCSVDrawer } from "@langwatch/dataset-web/components/datasets/UploadCSVDrawer";
-import { useDrawer } from "../../../behavior/studio-host/use-drawer";
+import { useDrawer } from "@langwatch/ui-host/use-drawer";
 import type { DatasetColumns } from "@langwatch/dataset-contract";
 import { Dialog } from "../../elements/dialog";
 import { useWorkflowStore } from "@langwatch/workflow-web";
 import type { Component, Entry } from "@langwatch/workflow-contract";
 import { transposeColumnsFirstToRowsFirstWithId } from "@langwatch/workflow-contract";
-import {
-  datasetColumnsToFields,
-  inMemoryDatasetToNodeDataset,
-} from "@langwatch/workflow-web";
+import { datasetColumnsToFields, inMemoryDatasetToNodeDataset } from "@langwatch/workflow-web";
 
 const DRAFT_DATASET_COLUMNS: DatasetColumns = [
   { name: "input", type: "string" },
@@ -88,9 +85,7 @@ export function DatasetModal({
     const draft: Entry["dataset"] = {
       name: "Draft Dataset",
       inline: {
-        records: Object.fromEntries(
-          DRAFT_DATASET_COLUMNS.map((col) => [col.name, ["", "", ""]]),
-        ),
+        records: Object.fromEntries(DRAFT_DATASET_COLUMNS.map((col) => [col.name, ["", "", ""]])),
         columnTypes: DRAFT_DATASET_COLUMNS,
       },
     };
@@ -113,15 +108,9 @@ export function DatasetModal({
       datasetToSave: {
         name: editingDataset.name,
         columnTypes: editingDataset.inline.columnTypes,
-        datasetRecords: transposeColumnsFirstToRowsFirstWithId(
-          editingDataset.inline.records,
-        ),
+        datasetRecords: transposeColumnsFirstToRowsFirstWithId(editingDataset.inline.records),
       },
-      onSuccess: (saved: {
-        datasetId: string;
-        name: string;
-        columnTypes: DatasetColumns;
-      }) => {
+      onSuccess: (saved: { datasetId: string; name: string; columnTypes: DatasetColumns }) => {
         attachDataset({ id: saved.datasetId, name: saved.name }, saved.columnTypes);
         onClose();
       },
@@ -213,8 +202,7 @@ export function DatasetModal({
             <Dialog.Body paddingBottom="32px" display="flex" flexDirection="column">
               <HStack paddingBottom={4}>
                 <Text color="fg.muted" fontSize="sm">
-                  Pick an existing dataset for this workflow, upload a CSV, or start a new
-                  draft.
+                  Pick an existing dataset for this workflow, upload a CSV, or start a new draft.
                 </Text>
                 <Spacer />
                 <Button

@@ -29,7 +29,7 @@ import type { MouseEvent } from "react";
 
 import { workflowApi } from "../../behavior/workflow-api";
 import { useWorkflowHost } from "../../model/workflow-host";
-import { NoDataInfoBlock } from "../../ui/elements/no-data-info-block";
+import { NoDataInfoBlock } from "@langwatch/design-system/no-data-info-block";
 import { WorkflowCreateDialogHost } from "../../ui/sections/workflow-create-dialog-host";
 import { WorkflowListCard } from "../../ui/sections/workflow-list-card";
 

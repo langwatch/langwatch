@@ -18,25 +18,9 @@
       "types": "./src/ui/sections/copy-button.tsx",
       "default": "./src/ui/sections/copy-button.tsx"
     },
-    "./components/Delayed": {
-      "types": "./src/ui/elements/delayed.tsx",
-      "default": "./src/ui/elements/delayed.tsx"
-    },
-    "./components/ExternalImage": {
-      "types": "./src/ui/sections/external-image.tsx",
-      "default": "./src/ui/sections/external-image.tsx"
-    },
-    "./components/GenerateApiSnippetButton": {
-      "types": "./src/ui/elements/generate-api-snippet-button.tsx",
-      "default": "./src/ui/elements/generate-api-snippet-button.tsx"
-    },
     "./components/GenerateApiSnippetDialog": {
       "types": "./src/ui/sections/generate-api-snippet-dialog.tsx",
       "default": "./src/ui/sections/generate-api-snippet-dialog.tsx"
-    },
-    "./components/HorizontalFormControl": {
-      "types": "./src/ui/elements/horizontal-form-control.tsx",
-      "default": "./src/ui/elements/horizontal-form-control.tsx"
     },
     "./components/HoverableBigText": {
       "types": "./src/ui/sections/hoverable-big-text.tsx",
@@ -46,14 +30,6 @@
       "types": "./src/ui/sections/markdown.tsx",
       "default": "./src/ui/sections/markdown.tsx"
     },
-    "./components/OverflownText": {
-      "types": "./src/ui/elements/overflown-text.tsx",
-      "default": "./src/ui/elements/overflown-text.tsx"
-    },
-    "./components/VerticalFormControl": {
-      "types": "./src/ui/elements/vertical-form-control.tsx",
-      "default": "./src/ui/elements/vertical-form-control.tsx"
-    },
     "./components/blocks/CodeBlockEditor": {
       "types": "./src/ui/sections/blocks/code-block-editor.tsx",
       "default": "./src/ui/sections/blocks/code-block-editor.tsx"
@@ -61,10 +37,6 @@
     "./components/code/RenderCode": {
       "types": "./src/ui/sections/code/render-code.tsx",
       "default": "./src/ui/sections/code/render-code.tsx"
-    },
-    "./components/code/langwatchEndpointEnv": {
-      "types": "./src/model/code/langwatch-endpoint-env.ts",
-      "default": "./src/model/code/langwatch-endpoint-env.ts"
     },
     "./components/run-via-api/DataSourcePicker": {
       "types": "./src/ui/elements/run-via-api/data-source-picker.tsx",
@@ -82,21 +54,9 @@
       "types": "./src/ui/elements/isolated-error-boundary.tsx",
       "default": "./src/ui/elements/isolated-error-boundary.tsx"
     },
-    "./components/ui/PropertySectionTitle": {
-      "types": "./src/ui/elements/property-section-title.tsx",
-      "default": "./src/ui/elements/property-section-title.tsx"
-    },
     "./components/ui/RedactedField": {
       "types": "./src/ui/sections/redacted-field.tsx",
       "default": "./src/ui/sections/redacted-field.tsx"
-    },
-    "./components/ui/SelectionActionBar": {
-      "types": "./src/ui/elements/selection-action-bar.tsx",
-      "default": "./src/ui/elements/selection-action-bar.tsx"
-    },
-    "./components/ui/delete-confirmation-dialog": {
-      "types": "./src/ui/elements/delete-confirmation-dialog.tsx",
-      "default": "./src/ui/elements/delete-confirmation-dialog.tsx"
     },
     "./components/ui/dialog": {
       "types": "./src/ui/elements/dialog.tsx",
@@ -106,25 +66,13 @@
       "types": "./src/ui/elements/drawer.tsx",
       "default": "./src/ui/elements/drawer.tsx"
     },
-    "./components/ui/messages/index": {
-      "types": "./src/ui/sections/messages/index.ts",
-      "default": "./src/ui/sections/messages/index.ts"
-    },
     "./hooks/useDejaViewLink": {
       "types": "./src/behavior/use-deja-view-link.ts",
       "default": "./src/behavior/use-deja-view-link.ts"
     },
-    "./hooks/useEscapeKey": {
-      "types": "./src/behavior/use-escape-key.ts",
-      "default": "./src/behavior/use-escape-key.ts"
-    },
     "./hooks/useFeatureFlag": {
       "types": "./src/behavior/use-feature-flag.ts",
       "default": "./src/behavior/use-feature-flag.ts"
-    },
-    "./hooks/useInteractiveTooltip": {
-      "types": "./src/behavior/use-interactive-tooltip.ts",
-      "default": "./src/behavior/use-interactive-tooltip.ts"
     },
     "./model/prism-language": {
       "types": "./src/model/prism-language.ts",
@@ -170,10 +118,6 @@
       "types": "./src/screens/workflows/index.ts",
       "default": "./src/screens/workflows/index.ts"
     },
-    "./stores/upgradeModalStore": {
-      "types": "./src/behavior/stores/upgrade-modal-store.ts",
-      "default": "./src/behavior/stores/upgrade-modal-store.ts"
-    },
     "./studio-host/api": {
       "types": "./src/behavior/studio-host/api.ts",
       "default": "./src/behavior/studio-host/api.ts"
@@ -198,10 +142,6 @@
       "types": "./src/behavior/studio-host/toaster.ts",
       "default": "./src/behavior/studio-host/toaster.ts"
     },
-    "./studio-host/use-drawer": {
-      "types": "./src/behavior/studio-host/use-drawer.ts",
-      "default": "./src/behavior/studio-host/use-drawer.ts"
-    },
     "./studio-host/use-organization-team-project": {
       "types": "./src/behavior/studio-host/use-organization-team-project.ts",
       "default": "./src/behavior/studio-host/use-organization-team-project.ts"
@@ -209,18 +149,6 @@
     "./types": {
       "types": "./src/model/types.ts",
       "default": "./src/model/types.ts"
-    },
-    "./ui/elements/loading-screen": {
-      "types": "./src/ui/sections/loading-screen.tsx",
-      "default": "./src/ui/sections/loading-screen.tsx"
-    },
-    "./ui/elements/no-data-info-block": {
-      "types": "./src/ui/elements/no-data-info-block.tsx",
-      "default": "./src/ui/elements/no-data-info-block.tsx"
-    },
-    "./utils/compat/next-dynamic": {
-      "types": "./src/behavior/compat/next-dynamic.ts",
-      "default": "./src/behavior/compat/next-dynamic.ts"
     },
     "./utils/compat/next-link": {
       "types": "./src/ui/elements/compat/next-link.tsx",
@@ -238,45 +166,25 @@
       "types": "./src/behavior/crisp-bubble-policy.ts",
       "default": "./src/behavior/crisp-bubble-policy.ts"
     },
-    "./utils/formatMoney": {
-      "types": "./src/model/format-money.ts",
-      "default": "./src/model/format-money.ts"
-    },
-    "./utils/formatTimeAgo": {
-      "types": "./src/model/utils/format-time-ago.ts",
-      "default": "./src/model/utils/format-time-ago.ts"
-    },
     "./utils/routes": {
       "types": "./src/model/routes.ts",
       "default": "./src/model/routes.ts"
-    },
-    "./utils/slugify": {
-      "types": "./src/model/slugify.ts",
-      "default": "./src/model/slugify.ts"
     },
     "./utils/sse/fetchSSE": {
       "types": "./src/model/sse/fetch-sse.ts",
       "default": "./src/model/sse/fetch-sse.ts"
     },
-    "./utils/stringCasing": {
-      "types": "./src/model/string-casing.ts",
-      "default": "./src/model/string-casing.ts"
-    },
     "./utils/trpcError": {
       "types": "./src/behavior/trpc-error.ts",
       "default": "./src/behavior/trpc-error.ts"
-    },
-    "./utils/types": {
-      "types": "./src/model/utils/types.ts",
-      "default": "./src/model/utils/types.ts"
     },
     "./utils/workflow-api": {
       "types": "./src/behavior/workflow-api.ts",
       "default": "./src/behavior/workflow-api.ts"
     },
-    "./utils/zodSalvage": {
-      "types": "./src/model/zod-salvage.ts",
-      "default": "./src/model/zod-salvage.ts"
+    "./utils/formatTimeAgo": {
+      "types": "./src/model/utils/format-time-ago.ts",
+      "default": "./src/model/utils/format-time-ago.ts"
     }
   },
   "scripts": {
@@ -306,6 +214,7 @@
     "@langwatch/trace-contract": "workspace:*",
     "@langwatch/trace-web": "workspace:*",
     "@langwatch/ui-drawer": "workspace:*",
+    "@langwatch/ui-host": "workspace:*",
     "@langwatch/workflow-contract": "workspace:*",
     "@microsoft/fetch-event-source": "^2.0.1",
     "@monaco-editor/react": "^4.7.0",

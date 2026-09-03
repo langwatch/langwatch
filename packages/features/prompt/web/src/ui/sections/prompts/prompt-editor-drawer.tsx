@@ -17,7 +17,12 @@ import { useEvaluationMappings } from "@langwatch/experiment-web/experiments-v3/
 import type { LocalPromptConfig } from "@langwatch/experiment-web/experiments-v3/types";
 import { getFieldsUsedByPromptTemplate } from "@langwatch/experiment-web/experiments-v3/utils/mappingValidation";
 import { showErrorToast } from "@langwatch/workflow-web/studio-host/errors";
-import { getComplexProps, getFlowCallbacks, useDrawer, useDrawerParams } from "@langwatch/workflow-web/studio-host/use-drawer";
+import {
+  getComplexProps,
+  getFlowCallbacks,
+  useDrawer,
+  useDrawerParams,
+} from "@langwatch/ui-host/use-drawer";
 import { useModelProvidersSettings } from "@langwatch/model-provider-web/hooks/useModelProvidersSettings";
 import { useOrganizationTeamProject } from "@langwatch/workflow-web/studio-host/use-organization-team-project";
 import { useRegisterDrawerFooter } from "@langwatch/workflow-web";
@@ -26,7 +31,10 @@ import { PromptEditorHeader } from "./prompt-editor-header";
 import { VersionBadge } from "@langwatch/prompt-web/surfaces/prompt-version";
 import { ChangeHandleDialog } from "./forms/change-handle-dialog";
 import { PromptMessagesField } from "../../elements/prompts/forms/fields/message-history-fields/prompt-messages-field";
-import { type SaveDialogFormValues, SaveVersionDialog } from "../../elements/prompts/forms/save-version-dialog";
+import {
+  type SaveDialogFormValues,
+  SaveVersionDialog,
+} from "../../elements/prompts/forms/save-version-dialog";
 import { useLatestPromptVersion } from "../../../behavior/prompts/use-latest-prompt-version";
 import { usePromptConfigForm } from "../../../behavior/prompts/use-prompt-config-form";
 import {
@@ -40,7 +48,7 @@ import {
 } from "@langwatch/prompt-web/surfaces/prompt-form";
 import { formValuesToTriggerSaveVersionParams } from "../../../behavior/prompts/llm-prompt-config-utils";
 import type { VersionedPrompt } from "@langwatch/prompt-contract";
-import { useUpgradeModalStore } from "@langwatch/workflow-web/stores/upgradeModalStore";
+import { useUpgradeModalStore } from "@langwatch/ui-host/upgrade-modal-store";
 import type { LlmConfigInputType } from "@langwatch/workflow-web/types";
 import { api } from "@langwatch/workflow-web/studio-host/api";
 import { localConfigToFormValues } from "../../../model/prompts/local-config-to-form-values";

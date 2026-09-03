@@ -6,7 +6,7 @@ import type {
   CheckPreconditionFields,
   CheckPreconditionRule,
 } from "../../../model/evaluations/types";
-import { HorizontalFormControl } from "@langwatch/workflow-web/components/HorizontalFormControl";
+import { HorizontalFormControl } from "@langwatch/design-system/horizontal-form-control";
 import {
   fieldRequiresKey,
   getAllowedRulesForField,
@@ -120,12 +120,7 @@ export const PreconditionsField = ({
           const keyInfo = fieldRequiresKey(currentField);
 
           return (
-            <Box
-              key={field.id}
-              borderLeft="4px solid"
-              borderLeftColor="blue.400"
-              width="full"
-            >
+            <Box key={field.id} borderLeft="4px solid" borderLeftColor="blue.400" width="full">
               <VStack
                 borderLeftColor="reset"
                 padding={3}
@@ -178,9 +173,7 @@ export const PreconditionsField = ({
                   )}
 
                   <NativeSelect.Root minWidth="fit-content">
-                    <NativeSelect.Field
-                      {...control.register(`preconditions.${index}.rule`)}
-                    >
+                    <NativeSelect.Field {...control.register(`preconditions.${index}.rule`)}>
                       {allowedRules.map((rule) => (
                         <option key={rule} value={rule}>
                           {RULE_LABELS[rule]}
@@ -193,9 +186,7 @@ export const PreconditionsField = ({
                 <HStack width="full">
                   {valueType === "boolean" ? (
                     <NativeSelect.Root minWidth="fit-content">
-                      <NativeSelect.Field
-                        {...control.register(`preconditions.${index}.value`)}
-                      >
+                      <NativeSelect.Field {...control.register(`preconditions.${index}.value`)}>
                         <option value="true">true</option>
                         <option value="false">false</option>
                       </NativeSelect.Field>

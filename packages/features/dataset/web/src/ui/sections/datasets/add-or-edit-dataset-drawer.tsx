@@ -14,8 +14,12 @@ import { Eye, EyeOff, Trash2 } from "react-feather";
 import { type FieldErrors, useFieldArray, useForm } from "react-hook-form";
 import type { InMemoryDataset } from "./editor/dataset-editor-table";
 import { convertDatasetRecordsToColumnTypes } from "@langwatch/dataset-web";
-import { describeError, readHandledError, showErrorToast } from "@langwatch/workflow-web/studio-host/errors";
-import { useDrawer } from "@langwatch/workflow-web/studio-host/use-drawer";
+import {
+  describeError,
+  readHandledError,
+  showErrorToast,
+} from "@langwatch/workflow-web/studio-host/errors";
+import { useDrawer } from "@langwatch/ui-host/use-drawer";
 import { Drawer } from "@langwatch/workflow-web/components/ui/drawer";
 import { toaster } from "@langwatch/workflow-web/studio-host/toaster";
 import { useOrganizationTeamProject } from "@langwatch/workflow-web/studio-host/use-organization-team-project";
@@ -28,7 +32,7 @@ import {
 import { api } from "@langwatch/workflow-web/studio-host/api";
 import { DatasetSlugDisplay } from "./dataset-slug-display";
 import { useDatasetSlugValidation } from "../../../behavior/datasets/use-dataset-slug-validation";
-import { HorizontalFormControl } from "@langwatch/workflow-web/components/HorizontalFormControl";
+import { HorizontalFormControl } from "@langwatch/design-system/horizontal-form-control";
 
 export interface AddDatasetDrawerProps {
   datasetToSave?: Omit<InMemoryDataset, "datasetRecords"> & {
@@ -39,20 +43,8 @@ export interface AddDatasetDrawerProps {
   open?: boolean;
   onClose?: () => void;
   /**
-   * What the caller does with the dataset that was just written.
-   *
-   * OPTIONAL, BECAUSE THE DRAWER IS ALSO A REGISTERED ADDRESS. Every in-product
-   * caller — the workbench, the upload confirm step, "Add to Dataset" — mounts
-   * this drawer itself and hands one in. `?drawer.open=addOrEditDataset` has no
-   * caller at all: `CurrentDrawer` spreads the parsed address, and a URL cannot
-   * carry a function. A required callback made that open a crash on the FIRST
-   * successful save, after the dataset had already been written.
-   *
-   * The drawers doc settles what the ending should be instead: a sub-flow
-   * "NAVIGATES to it and returns", and the return leg is `onClose`, which
-   * already falls back to the navigator's `closeDrawer`. So a bare-URL open
-   * creates the dataset and closes, and only a caller that asked to be told is
-   * told.
+   * Optional: a bare-URL open (`?drawer.open=addOrEditDataset`) has no
+   * caller to hand one in, so it must create and close via `onClose` alone.
    */
   onSuccess?: (dataset: { datasetId: string; name: string; columnTypes: DatasetColumns }) => void;
   /**
@@ -70,12 +62,9 @@ export interface AddDatasetDrawerProps {
     onToggleVisibility: (columnName: string) => void;
   };
   /**
-   * When true, the column SET is fixed: the user can rename columns and change
-   * their types but cannot add or remove them. Used by the upload confirm step
-   * (ADR-032 v19), where the columns come from the file's header and must stay
-   * positionally aligned with what the normalize job parses — adding (no row
-   * data to back an invented column) or removing a column is a post-create edit
-   * on the dataset page via this same drawer.
+   * When true, the column set is fixed (rename/retype only, no add/remove).
+   * Used by the upload confirm step (ADR-032 v19), whose columns must stay
+   * positionally aligned with the file header the normalize job parsed.
    */
   isColumnsLocked?: boolean;
 }
@@ -162,11 +151,12 @@ export function AddOrEditDatasetDrawer(props: AddDatasetDrawerProps) {
   const name = watch("name");
 
   // Use custom hook for slug validation against a name + datasetId
-  const { slugInfo, displaySlug, slugWillChange, dbSlug, resetSlugInfo } =
-    useDatasetSlugValidation({
+  const { slugInfo, displaySlug, slugWillChange, dbSlug, resetSlugInfo } = useDatasetSlugValidation(
+    {
       name,
       datasetId: props.datasetToSave?.datasetId,
-    });
+    },
+  );
 
   useEffect(() => {
     let resetTimeout: ReturnType<typeof setTimeout> | undefined;
@@ -320,8 +310,7 @@ export function AddOrEditDatasetDrawer(props: AddDatasetDrawerProps) {
                 <VStack align="start" width="full">
                   {fields.map((field, index) => {
                     const columnName = watch(`columnTypes.${index}.name`);
-                    const isHidden =
-                      props.columnVisibility?.hiddenColumns.has(columnName);
+                    const isHidden = props.columnVisibility?.hiddenColumns.has(columnName);
                     return (
                       <HStack key={field.id} width="full" gap={2}>
                         <Input
@@ -350,9 +339,7 @@ export function AddOrEditDatasetDrawer(props: AddDatasetDrawerProps) {
                           <IconButton
                             size="sm"
                             variant="ghost"
-                            onClick={() =>
-                              props.columnVisibility?.onToggleVisibility(columnName)
-                            }
+                            onClick={() => props.columnVisibility?.onToggleVisibility(columnName)}
                             color={isHidden ? "fg.subtle" : "fg.muted"}
                             aria-label={isHidden ? "Show column" : "Hide column"}
                             title={isHidden ? "Show column" : "Hide column"}
@@ -375,10 +362,7 @@ export function AddOrEditDatasetDrawer(props: AddDatasetDrawerProps) {
                   })}
                   <Field.ErrorText>{errors.columnTypes?.message}</Field.ErrorText>
                   {!props.isColumnsLocked && (
-                    <Button
-                      type="button"
-                      onClick={() => append({ name: "", type: "string" })}
-                    >
+                    <Button type="button" onClick={() => append({ name: "", type: "string" })}>
                       Add Column
                     </Button>
                   )}
@@ -391,11 +375,7 @@ export function AddOrEditDatasetDrawer(props: AddDatasetDrawerProps) {
               minWidth="fit-content"
               loading={upsertDataset.isPending}
             >
-              {props.localOnly
-                ? "Apply"
-                : props.datasetToSave
-                  ? "Save"
-                  : "Create Dataset"}
+              {props.localOnly ? "Apply" : props.datasetToSave ? "Save" : "Create Dataset"}
             </Button>
           </form>
         </Drawer.Body>

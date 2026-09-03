@@ -6,7 +6,7 @@ import remarkGfm from "remark-gfm";
 import { useRouter } from "../../behavior/studio-host/next-router";
 import { stringifyIfObject } from "../../model/stringify-if-object";
 import { RenderCode } from "./code/render-code";
-import { getProxiedImageUrl } from "./external-image";
+import { getProxiedImageUrl } from "@langwatch/design-system/external-image";
 import { ConfirmDialog } from "@langwatch/design-system/confirm-dialog";
 import { Link as UiLink } from "../elements/studio-host/link";
 import { Prose } from "../elements/prose";
@@ -53,16 +53,10 @@ function MarkdownWithPluginsAndProxy({
     );
   }
 
-  const urlTransform = (url: string) =>
-    url.startsWith("data:") ? url : defaultUrlTransform(url);
+  const urlTransform = (url: string) => (url.startsWith("data:") ? url : defaultUrlTransform(url));
 
   return (
-    <Prose
-      className={className}
-      fontSize={fontSize}
-      maxWidth="none"
-      {...(color ? { color } : {})}
-    >
+    <Prose className={className} fontSize={fontSize} maxWidth="none" {...(color ? { color } : {})}>
       <ReactMarkdown
         remarkPlugins={[remarkGfm]}
         urlTransform={urlTransform}
