@@ -102,6 +102,7 @@ describe("resolveShellRoute", () => {
      * "settings-team" as Settings. Project slugs are top-level addresses and
      * neither name is reserved, so the test has to be on the segment boundary.
      */
+    /** @scenario A project whose slug reads like a product keeps the project shell */
     it("reads it as the project it is, not as the product it prefixes", () => {
       expect(resolve("/metadata/traces").activeProductId).toBe("llm-ops");
       expect(resolve("/settings-team").isSettingsRoute).toBe(false);

@@ -25,6 +25,7 @@ beforeEach(() => {
 
 describe("resolveSettingsBackTarget", () => {
   describe("given this tab captured the page Settings was entered from", () => {
+    /** @scenario Leaving Settings goes back to the product I came from */
     it("returns to that exact address, query included", () => {
       captureSettingsReturnPath({
         organizationId: "org_1",
@@ -57,6 +58,7 @@ describe("resolveSettingsBackTarget", () => {
   });
 
   describe("given Settings was opened directly in a fresh tab", () => {
+    /** @scenario Settings is never the remembered product */
     it("captures nothing for an address that is not a product page", () => {
       captureSettingsReturnPath({ organizationId: "org_1", pathname: "/settings/members" });
 
@@ -70,6 +72,7 @@ describe("resolveSettingsBackTarget", () => {
       ).toEqual({ label: "Back", href: "/" });
     });
 
+    /** @scenario The Settings back entry works even in a fresh tab */
     it("falls back to the remembered product's home when it is still reachable", () => {
       expect(
         resolveSettingsBackTarget({

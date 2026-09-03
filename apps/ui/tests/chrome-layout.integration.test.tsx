@@ -179,6 +179,7 @@ describe("given the chrome layout route", () => {
 
 describe("given a project pick in the switcher", () => {
   describe("when the reader is on a project page", () => {
+    /** @scenario Picking a different project preserves the current sub-route */
     it("lands on the same page in the picked project", () => {
       expect(
         projectSwitchHref({
@@ -207,6 +208,7 @@ describe("given a project pick in the switcher", () => {
       ).toBe("/acme-labs");
     });
 
+    /** @scenario Picking a project from a non-project route falls back to project root */
     it("lands on the project home when no project is resolved at all", () => {
       expect(
         projectSwitchHref({ pathname: "/settings", currentSlug: void 0, nextSlug: "acme-labs" }),

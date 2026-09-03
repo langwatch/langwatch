@@ -69,6 +69,7 @@ describe("ProjectSlugService.mint", () => {
   });
 
   describe("given a name that matches a top-level route", () => {
+    /** @scenario A project can never take a reserved top-level address */
     it("mints it, because the id suffix already keeps it off that route", () => {
       expect(mint("settings")).toBe("settings-abcdef");
     });

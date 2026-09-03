@@ -177,6 +177,31 @@ describe("given Genie's own profile", () => {
       expect(attributesOf(request)["langwatch.user.id"]).toBe("entra-object-id");
     });
   });
+
+  describe("when a run's batch mixes its own questions with another source's events", () => {
+    /** @scenario A run routes only the events belonging to its own source */
+    it("routes only the events its own profile recognises", () => {
+      const ownQuestion = conversationEvent("genie_query");
+      const foreignEvent = conversationEvent("copilot_conversation");
+
+      const mixedRequest = GenieTraceMapper.toTraceRequest({
+        events: [foreignEvent, ownQuestion],
+        origin: ORIGIN,
+      });
+      const soloRequest = GenieTraceMapper.toTraceRequest({
+        events: [ownQuestion],
+        origin: ORIGIN,
+      });
+
+      expect(mixedRequest).not.toBeNull();
+      const mixedSpans = (mixedRequest as any).resourceSpans[0].scopeSpans[0].spans;
+      const soloSpans = (soloRequest as any).resourceSpans[0].scopeSpans[0].spans;
+      // The foreign event contributes no spans of its own: the batch's
+      // shape is exactly what routing the Genie question alone produces.
+      expect(mixedSpans.length).toBe(soloSpans.length);
+      expect(attributesOf(mixedRequest)["gen_ai.request.model"]).toBe("databricks/genie");
+    });
+  });
 });
 
 describe("given the set of agents a profile may name", () => {

@@ -162,6 +162,7 @@ describe("VendorClientResilience", () => {
     });
 
     describe("when an insert fails with it", () => {
+      /** @scenario Insert failures are not retried by the client */
       it("does not retry and raises the error untranslated", async () => {
         const metrics = recordingMetrics();
         const translateQueryError = vi.fn();
@@ -418,6 +419,7 @@ describe("VendorClientResilience", () => {
         await expect(client.query({ query: "SELECT 1" })).rejects.toBe(failure);
       });
 
+      /** @scenario Logging crashes do not affect query results */
       it("still returns the rows when the success line throws", async () => {
         const broken: StatementLogSink = {
           debug: boom,
@@ -435,6 +437,53 @@ describe("VendorClientResilience", () => {
         await expect(client.query({ query: "SELECT 1" })).resolves.toEqual({
           ok: true,
         });
+      });
+    });
+  });
+
+  describe("given an insert that fails with a non-transient error", () => {
+    describe("when it is issued", () => {
+      /** @scenario Non-transient insert errors fail immediately */
+      it("is not retried and emits a structured error log", async () => {
+        const outcomes = recordingSink();
+        const failure = new Error("Code: 62. Syntax error");
+        const insert = vi.fn().mockRejectedValue(failure);
+
+        const client = new VendorClientResilience({
+          maxRetries: 2,
+          baseDelayMs: 1,
+          maxDelayMs: 1,
+          outcomeLogger: outcomes,
+        }).wrap({ query: vi.fn(), insert });
+
+        await expect(client.insert({ table: "events", values: [] })).rejects.toBe(failure);
+
+        expect(insert).toHaveBeenCalledTimes(1);
+        expect(outcomes.lines).toHaveLength(1);
+        expect(outcomes.lines[0]).toMatchObject({
+          level: "warn",
+          fields: expect.objectContaining({ operation: "insert" }),
+        });
+      });
+    });
+  });
+
+  describe("given a vendor client with methods beyond query and insert", () => {
+    describe("when a non-query method is called on the wrapped client", () => {
+      /** @scenario Non-query operations pass through to the underlying client */
+      it("delegates directly to the underlying client without interception", async () => {
+        const close = vi.fn().mockResolvedValue(undefined);
+        const command = vi.fn().mockResolvedValue({ ok: true });
+        const raw = { query: vi.fn(), insert: vi.fn(), close, command };
+
+        const wrapped = new VendorClientResilience().wrap(raw);
+
+        expect(wrapped.close).toBe(close);
+        expect(wrapped.command).toBe(command);
+        await wrapped.close();
+        await wrapped.command();
+        expect(close).toHaveBeenCalledTimes(1);
+        expect(command).toHaveBeenCalledTimes(1);
       });
     });
   });

@@ -12,6 +12,7 @@ import { resolveOrgSwitchDestination } from "../resolve-org-switch-destination";
 
 describe("resolveOrgSwitchDestination", () => {
   describe("given the current product is reachable in the new organization", () => {
+    /** @scenario Switching organization stays in the same product when possible */
     it("lands on that product's home there", () => {
       expect(
         resolveOrgSwitchDestination({
@@ -35,6 +36,7 @@ describe("resolveOrgSwitchDestination", () => {
   });
 
   describe("given the current product is not reachable there", () => {
+    /** @scenario Switching organization falls back when the product is not reachable */
     it("lands on that organization's project home", () => {
       expect(
         resolveOrgSwitchDestination({

@@ -43,6 +43,7 @@ describe("runWithRetry", () => {
 describe("retry", () => {
   describe("given a transient failure that then succeeds", () => {
     describe("when the statement is executed", () => {
+      /** @scenario A read rejected for transient overload is retried and succeeds */
       it("returns the eventual result", async () => {
         const { sleep } = fakeSleep();
         const next = vi
@@ -63,6 +64,7 @@ describe("retry", () => {
 
   describe("given a permanent failure", () => {
     describe("when the statement is executed", () => {
+      /** @scenario A read failing with a non-transient error fails fast */
       it("fails on the first attempt instead of spending the budget", async () => {
         // Retrying a syntax error costs the full budget and, when the failure
         // is an overload the retries caused, makes the overload worse.
@@ -81,6 +83,7 @@ describe("retry", () => {
 
   describe("given a failure that never clears", () => {
     describe("when the attempt budget runs out", () => {
+      /** @scenario A read that keeps failing transiently eventually surfaces the error */
       it("stops at the attempt budget", async () => {
         const { sleep } = fakeSleep();
         const next = vi.fn().mockRejectedValue(transient());
