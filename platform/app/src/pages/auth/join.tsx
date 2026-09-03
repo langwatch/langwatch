@@ -8,7 +8,7 @@ import type { JoinableOrganization } from "~/features/auth/logic/joinBeforeCreat
 import { HandledErrorAlert, showErrorToast } from "~/features/errors";
 import { useRequiredSession } from "~/hooks/useRequiredSession";
 import { api } from "~/utils/api";
-import { hardRedirect } from "~/utils/hardRedirect";
+import { hardRedirect, isNavigatingAway } from "~/utils/hardRedirect";
 
 /**
  * Join before create (ADR-117 §6, D12): the step a brand-new account passes
@@ -98,6 +98,14 @@ export default function Join() {
   // made "Ask to join" look inert: the page redirected home before the lookup
   // it exists to render had returned.
   if (lookup.isPending || mine.isPending) return <LoadingScreen />;
+
+  // A read the page's own departure aborted is not a read that failed. Three
+  // of the four ways out of here are `hardRedirect`, and the browser keeps
+  // rendering this screen until the next document commits — so both queries
+  // fail on the way out, and the card below would be the last thing somebody
+  // saw of a sign-up that WORKED. Wait instead: whatever they are being taken
+  // to is already on its way.
+  if (isNavigatingAway()) return <LoadingScreen />;
 
   // A lookup we could not make is not a lookup that found nothing. Say so and
   // leave the explicit choice, rather than quietly carrying on to workspace

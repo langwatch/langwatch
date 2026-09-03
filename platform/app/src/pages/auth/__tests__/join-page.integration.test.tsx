@@ -24,6 +24,7 @@ const {
   admitMock,
   hardRedirectMock,
   invalidateMock,
+  navigatingAwayRef,
 } = vi.hoisted(() => ({
   lookupRef: { current: { data: undefined as unknown } },
   mineRef: { current: { data: undefined as unknown } },
@@ -31,6 +32,7 @@ const {
   admitMock: vi.fn(),
   hardRedirectMock: vi.fn(),
   invalidateMock: vi.fn(),
+  navigatingAwayRef: { current: false },
 }));
 
 vi.mock("~/utils/api", () => ({
@@ -55,6 +57,7 @@ vi.mock("~/hooks/useRequiredSession", () => ({
 
 vi.mock("~/utils/hardRedirect", () => ({
   hardRedirect: (...args: unknown[]) => hardRedirectMock(...args),
+  isNavigatingAway: () => navigatingAwayRef.current,
 }));
 
 // The page stands on the auth screens' ground now rather than in the setup
@@ -87,6 +90,7 @@ const renderPage = () =>
 
 beforeEach(() => {
   vi.clearAllMocks();
+  navigatingAwayRef.current = false;
   lookupRef.current = {
     data: {
       outcome: "ask",
@@ -215,6 +219,30 @@ describe("given a lookup that could not be made", () => {
         }),
       ).toBeInTheDocument();
       expect(hardRedirectMock).not.toHaveBeenCalled();
+    });
+  });
+
+  describe("when the page is already on its way somewhere else", () => {
+    it("waits, rather than reading its own departure as a failure", () => {
+      // Three of the four ways off this page are a full-page navigation, and
+      // the browser keeps rendering here until the next document commits — so
+      // the reads in flight are aborted, and an aborted read is
+      // indistinguishable from a server nobody could reach.
+      navigatingAwayRef.current = true;
+      lookupRef.current = {
+        isError: true,
+        error: new Error("aborted by the navigation"),
+        refetch: vi.fn(),
+      } as unknown as { data: unknown };
+
+      renderPage();
+
+      expect(screen.queryByTestId("lookup-refusal")).toBeNull();
+      expect(
+        screen.queryByRole("button", {
+          name: /Create a new organization instead/,
+        }),
+      ).toBeNull();
     });
   });
 });
