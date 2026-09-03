@@ -25,42 +25,37 @@ type seedPreset struct {
 	// ingest is the ordered list of live-stack pnpm scripts to run after the
 	// base seed — they go through the running stack's real collector and
 	// event-sourcing commands, so the stack must be up.
+	//
+	// EVERY SHIPPED PRESET'S LIST IS EMPTY. The five scripts that filled it
+	// (seed:retention, seed:sample-traces, seed:realistic-platform, seed:mass,
+	// seed:langy-prompts) lived in the platform application's scripts/ and were
+	// deleted with it; nothing that survives loads data through the collector,
+	// and there is no script left to repoint at. The field, runSeedIngest and
+	// ingestPlaySeed are the seam those seeds come back through, so they stay
+	// and stay tested — an empty list is a no-op, not a silent failure.
 	ingest  []string
 	summary string
 }
 
-// seedRetentionStep pins the local-dev org's data retention to two years,
-// partition-aligned, before any data lands. A dev stack keeps only 7 days by
-// default (DefaultRetentionDays in the overlay), so a preset that loads data —
-// especially the backdated mass history — has to raise retention first or its
-// rows would be written pre-expired. Runs first in every data-loading preset;
-// unseeded presets (onboarding/bare) keep the tiny default.
-const seedRetentionStep = "seed:retention"
-
-// defaultMassSeedMonths is the mass preset's backdated window, mirroring
-// seed-mass.ts's own fallback. Kept as a string because it travels as an
-// environment value to both seed:retention and seed:mass, which must agree on
-// the window or the retention pin will not cover the oldest rows.
-const defaultMassSeedMonths = "3"
-
 // seedPresets is the registry of variants, shared by `db seed` and `db reset`.
+// Every entry is env switches that prisma/seed.ts reads for itself — see
+// packages/prisma-client/prisma/seed.ts, which is the whole seed now.
 var seedPresets = map[string]seedPreset{
-	"demo":            {env: []string{"HAVEN_SEED_PRESET=demo"}, ingest: []string{seedRetentionStep, "seed:sample-traces", "seed:realistic-platform"}, summary: "past onboarding + sample traces + realistic platform data"},
-	"traces":          {ingest: []string{seedRetentionStep, "seed:sample-traces"}, summary: "the deterministic sample traces on top of the stable identity"},
+	"demo":            {env: []string{"HAVEN_SEED_PRESET=demo"}, summary: "past onboarding, with the demo prompt, HTTP agent and dataset"},
 	"onboarding":      {env: []string{"HAVEN_SEED_FIRST_MESSAGE=0"}, summary: "a fresh onboarding journey (first-trace flag cleared)"},
 	"post-onboarding": {env: []string{"HAVEN_SEED_FIRST_MESSAGE=1"}, summary: "past onboarding, no demo content"},
 	"bare":            {env: []string{"HAVEN_SEED_MODEL_PROVIDERS=0", "HAVEN_SEED_FEATURE_FLAGS=0"}, summary: "identity only — no env-derived providers, stock feature flags"},
-	// mass: a superset of demo — months of coherent, backdated activity.
-	// Event-sourced products are seeded through their event logs (replayed by
-	// the projection workers); traces backdate through the collector inside
-	// its 31-day window and, older than that, through recordSpan commands.
-	// HAVEN_SEED_MONTHS tunes the window (default 3). It is set explicitly rather
-	// than left to seed:mass's own default because seed:retention reads the same
-	// variable to decide whether to wait out the retention-policy cache before
-	// backdated rows are written: unset, it computed a zero-day window, skipped
-	// the wait, and a worker holding the cached 7-day default could stamp months
-	// of history pre-expired.
-	"mass": {env: []string{"HAVEN_SEED_PRESET=demo", "HAVEN_SEED_MONTHS=" + defaultMassSeedMonths}, ingest: []string{seedRetentionStep, "seed:sample-traces", "seed:realistic-platform", "seed:mass"}, summary: "demo plus months of backdated traces, runs, and metric series (HAVEN_SEED_MONTHS, default 3)"},
+}
+
+// retiredSeedPresets are preset names whose ENTIRE content was ingest steps
+// that no longer exist, mapped to what happened to them. Refused by name
+// rather than simply dropped, for the reason `±workers` is refused by name in
+// domain/selection.go: "unknown preset" reads as a typo, and a developer who
+// has been typing `haven db seed mass` for months would go looking for their
+// own mistake. Delete an entry once its data has a home again.
+var retiredSeedPresets = map[string]string{
+	"traces": "its only content was the seed:sample-traces ingest step",
+	"mass":   "its content was the seed:retention, seed:sample-traces, seed:realistic-platform and seed:mass ingest steps",
 }
 
 // SeedPresetNames lists the registry for errors and help, sorted.
@@ -86,6 +81,11 @@ func ValidateSeedPreset(name string) error {
 func resolveSeedPreset(name string) (seedPreset, error) {
 	if name == "" {
 		return seedPreset{}, nil
+	}
+	if why, retired := retiredSeedPresets[name]; retired {
+		return seedPreset{}, fmt.Errorf(
+			"the %q seed preset is retired: %s, and those scripts were deleted with the platform application — no seed loads data through the collector today. Available: %s",
+			name, why, strings.Join(SeedPresetNames(), ", "))
 	}
 	pre, ok := seedPresets[name]
 	if !ok {

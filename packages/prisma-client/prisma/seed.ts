@@ -163,9 +163,9 @@ async function main() {
   });
 
   // Prompt tags are org-defined, and `production` is the one
-  // `resolveLangyPrompt` reads by default — so without it `seed:langy-prompts`
-  // fails on a fresh stack with "Invalid tag", and every prompt seeded into a
-  // new database needs the tag created by hand first.
+  // `resolveLangyPrompt` reads by default — so without it every prompt seeded
+  // into a new database needs the tag created by hand first, and anything that
+  // resolves a prompt fails with "Invalid tag".
   await prisma.promptTag.upsert({
     where: {
       organizationId_name: {

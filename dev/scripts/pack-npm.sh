@@ -156,18 +156,14 @@ EXCLUDES=(
   --exclude=Dockerfile.*
   --exclude=.dockerignore
   --exclude=.github
-  # The server bundles' source maps, re-included ahead of the blanket *.map
-  # exclude below (rsync takes the FIRST matching rule). The published
-  # applications run node with --enable-source-maps, so without these every
-  # production stack trace an end user reports is a bundle offset instead of a
-  # real file and line. They are safe to publish: the bundles are built with
-  # sourcesContent:false, so a map carries path and position data only, never
-  # source text. ~15 MB total, against a 300 MB tarball ceiling.
-  # A new dist/server bundle needs its map listed here too.
-  --include=server.cjs.map
-  --include=workers.cjs.map
-  --include=task.cjs.map
-  --include=scenario-child-process.cjs.map
+  # No source maps. Four were re-included ahead of this exclude for the
+  # monolith's dist/server bundles (server, workers, task, scenario child);
+  # none of those bundles exists any more. apps/api and apps/worker ship as
+  # SOURCE and run through tsx, so a production stack trace already names a
+  # real file and line, and the one bundle left — apps/server/dist/cli.cjs —
+  # is built with `sourcemap: false` and emits no map to re-include.
+  # A future bundle that does emit one needs an --include line here, ahead of
+  # this rule: rsync takes the FIRST matching filter.
   --exclude=*.map
   --exclude=*.tsbuildinfo
   --exclude=.DS_Store
@@ -373,9 +369,8 @@ if git -C "$ROOT" rev-parse --git-dir >/dev/null 2>&1; then
   not_application_source="$not_application_source"'|__pycache__|\.pytest_cache|\.venv'
   not_application_source="$not_application_source"'|\.github|\.vscode|\.idea'
   not_application_source="$not_application_source"'|\.next|\.turbo|\.vercel|\.pnpm-store)/'
-  # The bundle source maps the filters re-include are build output, so no
-  # tracked path can reach this rule and the re-include stays asserted by the
-  # staged-versus-tarball guard after the pack.
+  # Source maps, build logs and compiler caches are build output, so no tracked
+  # path can reach this rule.
   not_application_source="$not_application_source"'|\.(log|map|tsbuildinfo|orig|swp)$'
   not_application_source="$not_application_source"'|(^|/)(\.DS_Store|\._[^/]*)$'
 

@@ -25,7 +25,9 @@ const DefaultLangyInternalSecret = "langy-local-development-secret"
 // which the control plane reads ONLY outside production — it fails loud if that
 // var is ever set in prod, where the default is fixed. A seeded DB overrides
 // this with a two-year, partition-aligned RetentionPolicy so the seeded history
-// survives (see the seed:retention step).
+// survives. NOTHING DOES THAT TODAY: the step that pinned it (seed:retention)
+// went with the platform application, and no shipped preset loads backdated
+// data that would need it. Restore both together — see db.go's seedPreset.
 const DefaultRetentionDays = 7
 
 // svc looks a service up by name; a zero value is fine for the string formatting
@@ -84,8 +86,9 @@ func (s Stack) OverlayEnv() []string {
 		// A tiny default retention for the dev stack: an unseeded worktree keeps a
 		// week of data so ClickHouse stays small and whole weekly partitions drop
 		// cleanly. Haven-dev only — the control plane fails loud if this var is set
-		// in prod, where the platform default is fixed. Seeding overrides it with a
-		// two-year, partition-aligned RetentionPolicy (the seed:retention step).
+		// in prod, where the platform default is fixed. Nothing raises it: the
+		// seed:retention step that did went with the platform application, and no
+		// shipped preset loads data old enough to need it (see db.go).
 		fmt.Sprintf("LANGWATCH_DEFAULT_RETENTION_DAYS=%d", DefaultRetentionDays),
 	}
 	// The IdP simulator is an opt-in lane; only a worktree actually running (or

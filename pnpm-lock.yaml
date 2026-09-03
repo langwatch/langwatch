@@ -98,6 +98,9 @@ importers:
       '@typescript/native-preview':
         specifier: 7.0.0-dev.20260506.1
         version: 7.0.0-dev.20260506.1
+      concurrently:
+        specifier: ^9.1.2
+        version: 9.2.4
       oxfmt:
         specifier: 0.63.0
         version: 0.63.0

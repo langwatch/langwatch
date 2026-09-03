@@ -89,8 +89,8 @@ haven status     one-shot report: selection, per-service health, shared servers,
                  RAM footprints (--json for machines)
 haven db         this stack's data: `db seed [preset]` (reseed in place, drops
                  nothing) · `db reset [preset]` (fresh database, confirmed;
-                 --yes for scripts) · `db url [engine]`. Presets: demo, traces,
-                 onboarding, post-onboarding, bare, mass
+                 --yes for scripts) · `db url [engine]`. Presets: demo,
+                 onboarding, post-onboarding, bare
 haven clean      one cleanup: interactive worktree picker + safe reclaim
                  (build artifacts, orphaned processes); --yes applies only the
                  safe categories
@@ -101,10 +101,10 @@ haven play [pr]  run a PR in a throwaway sandbox: own checkout, own
                  Quitting the view DESTROYS everything it created, every time.
                  No argument opens a picker of open PRs (terminal only).
                  --seed <preset> seeds it from the same registry `db seed`
-                 reads, so it can open on data rather than the onboarding
-                 screen: demo, traces and mass load data, onboarding and
-                 post-onboarding move the onboarding flag, bare is the
-                 identity alone
+                 reads, so it can open past onboarding rather than on it:
+                 demo adds the demo prompt, HTTP agent and dataset,
+                 onboarding and post-onboarding move the onboarding flag,
+                 bare is the identity alone
                  Trust-gated: every commit author must have write access, or a
                  two-step confirmation — y/N, then the PR number typed back
                  after it discloses that the code runs as you, from this
@@ -181,15 +181,20 @@ worktrees, and the reaping feed.
 **Seeding.** `haven db seed` reseeds in place — an idempotent upsert that can
 only add or refresh, never discard — and `haven db reset` is the destructive
 sibling that starts from a fresh, migrated database. Both take a preset:
-`demo` marks the project past onboarding and ingests deterministic sample
-traces + realistic platform lifecycles through the running stack's real
-collector (the stack must be up; re-running is idempotent), `traces` ingests
-just the sample traces, `onboarding` / `post-onboarding` flip the first-trace
-flag, and `bare` seeds the identity alone. `mass` is demo plus months of
-backdated activity (`HAVEN_SEED_MONTHS`, default 3): event-sourced products
-are seeded through their event logs with backdated `occurredAt` and replayed
-by the projection workers — read models are never written directly — while
-traces ingest through the collector inside its 31-day window.
+`demo` marks the project past onboarding and adds the demo prompt, HTTP agent
+and dataset, `onboarding` / `post-onboarding` flip the first-trace flag, and
+`bare` seeds the identity alone. Every preset is switches that
+`packages/prisma-client/prisma/seed.ts` reads for itself, so none of them
+needs a running stack.
+
+`traces` and `mass` are RETIRED and refused by name. Both existed only to run
+ingest scripts through the live stack's collector — `seed:sample-traces`,
+`seed:realistic-platform`, `seed:mass` and the `seed:retention` pin that had to
+precede them — and all four lived in the platform application, which is
+deleted. Nothing that survives loads data through the collector. The ingest
+machinery itself is intact and tested (`seedPreset.ingest`, `runSeedIngest`,
+`ingestPlaySeed`); it is the seam those seeds return through, and every
+shipped preset's list is empty until they do.
 
 **Resource caps.** Everything haven manages is bounded: the ClickHouse
 container and the observability stack are memory-capped (and their colima VM is
@@ -220,7 +225,9 @@ preset's switches go to the sandbox's own seed, and any data that has to travel
 through the collector is ingested once the sandbox's app answers, in a lane
 beside the services. A failed ingest never takes the sandbox down — it names
 the step and the command that retries it, since a PR that broke the collector
-is exactly the PR you want to keep watching.
+is exactly the PR you want to keep watching. No shipped preset ingests
+anything today (see Seeding), so a sandbox waits for nothing and every preset
+is a plain seed.
 
 **Git across worktrees.** `haven git` opens [moron](https://github.com/0xdeafcafe/moron)
 in-process (a Go module dependency — nothing extra to install) for the current

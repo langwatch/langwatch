@@ -856,9 +856,11 @@ func hasEnvKey(env []string, key string) bool {
 	return false
 }
 
-// runIngestScript runs one live-stack seed script (seed:sample-traces,
-// seed:realistic-platform, seed:mass) through the running stack's collector —
-// the real pipeline, not a ClickHouse side door — so the stack must be up. It
+// runIngestScript runs one live-stack seed script through the running stack's
+// collector — the real pipeline, not a ClickHouse side door — so the stack must
+// be up. No shipped preset names a script today (db.go's seedPreset says why);
+// this is the seam they come back through, and it stays tested against a
+// preset the tests own. It
 // talks to the app's loopback port over plain HTTP (portless terminates TLS in
 // front of it; Node does not trust the proxy's CA). The scripts deliberately
 // use the collector + event-sourcing commands rather than inserting read

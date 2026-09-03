@@ -10,7 +10,7 @@
   },
   "type": "module",
   "scripts": {
-    "dev": "pnpm --parallel --filter @langwatch/ui --filter @langwatch/platform-api --filter @langwatch/worker dev",
+    "dev": "bash dev/scripts/dev-stack.sh",
     "dev:app": "pnpm --parallel --filter @langwatch/ui --filter @langwatch/platform-api dev",
     "dev:ui": "pnpm --filter @langwatch/ui dev",
     "dev:api": "pnpm --filter @langwatch/platform-api dev",
@@ -38,8 +38,9 @@
     "lint:fix": "oxlint --fix --quiet --config .oxlintrc.architecture.json apps packages/features packages/enterprise packages/config packages/design-system packages/prisma-client/src packages/runtime-composition/src",
     "format": "oxfmt --write --disable-nested-config .",
     "format:check": "oxfmt --check --disable-nested-config .",
+    "ensure:ai-gateway-secrets": "bash dev/scripts/ensure-ai-gateway-secrets.sh",
     "prepare:files": "pnpm run start:prepare:files",
-    "start:prepare:files": "cp services/langevals/ts-integration/evaluators.generated.ts packages/features/evaluator/contract/src/evaluators.generated.ts && pnpm --filter @langwatch/prisma-client prisma:generate && pnpm --filter langwatch build && pnpm --filter @langwatch/mcp-server build && pnpm --filter @langwatch/langy-web generate:langy-skills && pnpm --filter @langwatch/langy-server generate:setup-skill-bodies",
+    "start:prepare:files": "pnpm run ensure:ai-gateway-secrets && cp services/langevals/ts-integration/evaluators.generated.ts packages/features/evaluator/contract/src/evaluators.generated.ts && pnpm --filter @langwatch/prisma-client prisma:generate && pnpm --filter langwatch build && pnpm --filter @langwatch/mcp-server build && pnpm --filter @langwatch/langy-web generate:langy-skills && pnpm --filter @langwatch/langy-server generate:setup-skill-bodies",
     "prisma:migrate": "pnpm --filter @langwatch/platform-api task:prisma-migrate",
     "clickhouse:migrate": "pnpm --filter @langwatch/platform-api task:clickhouse-migrate",
     "prisma:seed": "pnpm --filter @langwatch/prisma-client db:seed",
@@ -50,6 +51,7 @@
   "devDependencies": {
     "@0xdeafcafe/tslsp-cli": "0.6.0",
     "@typescript/native-preview": "7.0.0-dev.20260506.1",
+    "concurrently": "^9.1.2",
     "oxfmt": "0.63.0",
     "oxlint": "^1.78.0",
     "typescript": "^7.0.2"

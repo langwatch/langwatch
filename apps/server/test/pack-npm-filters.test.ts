@@ -20,8 +20,8 @@ import { afterEach, describe, expect, it } from "vitest";
  * EVERY path component. A working-tree artifact named there by its bare name
  * therefore also removes any source file or directory that happens to share
  * the name, anywhere in any shipped tree. That has reached npm twice: once as
- * `--exclude=reports`, which took src/server/app-layer/reports with it and
- * killed the published server at first boot inside the ClickHouse migration.
+ * `--exclude=reports`, which took the ClickHouse migration's own reports
+ * directory with it and killed the published server at first boot.
  *
  * The script is run for real against a small fixture repository rather than
  * having its patterns re-read here, so the assertions are about rsync's own
@@ -105,8 +105,10 @@ function buildFixture(trackedPaths: string[]): string {
     content: `${JSON.stringify(
       [
         ".env.example",
-        "platform/app/",
-        "packages/api/",
+        "apps/api/",
+        "apps/ui/",
+        "apps/worker/",
+        "packages/",
         "dev/scripts/",
         "apps/server/dist/",
         "apps/server/src/",
@@ -184,15 +186,21 @@ function staged({ stageDir, relPath }: { stageDir: string; relPath: string }): b
 
 describe("npm pack staging filters", () => {
   it("keeps source whose name collides with a working-tree artifact", () => {
-    // Each of these shares a name with something the script strips from the
-    // app root. A bare-name pattern removes all of them; an anchored one
-    // reaches only the app root copy.
+    // Each of these shares a name with something the script strips from ONE
+    // known path. A bare-name pattern removes all of them; an anchored one
+    // reaches only the copy it names.
     const collisions = [
-      "platform/app/src/server/licenses.json",
-      "platform/app/src/server/quickwit/index.ts",
-      "packages/api/src/licenses.json",
-      "packages/api/src/quickwit-client.ts",
-      "platform/app/src/server/reports/report-chart.service.ts",
+      // `apps/ui/e2e/auth.json` is a saved signed-in Playwright session and is
+      // anchored there. An auth.json anywhere else is ordinary source.
+      "apps/api/src/features/auth/auth.json",
+      "packages/features/auth/server/src/auth.json",
+      // `packages/prisma-client/prisma/db.sqlite*` is a local scratch database
+      // beside the schema. The name means nothing anywhere else.
+      "apps/worker/src/fixtures/db.sqlite.ts",
+      // The `reports` failure that reached npm and killed the published server
+      // at first boot. No bare `reports` exclude may come back.
+      "apps/api/src/tasks/reports/report-chart.service.ts",
+      "packages/analytics/src/reports/index.ts",
     ];
     const root = buildFixture(collisions);
     const stageDir = join(root, "_stage");
@@ -212,10 +220,10 @@ describe("npm pack staging filters", () => {
     // added under dev/scripts turned every branch that merged main red.
     const root = buildFixture([
       "dev/scripts/dogfood/multimodal/.gitignore",
-      "platform/app/.gitignore",
+      "apps/ui/.gitignore",
       "packages/api/.npmignore",
-      "platform/app/Dockerfile",
-      "platform/app/.dockerignore",
+      "apps/api/Dockerfile",
+      "apps/api/.dockerignore",
       "packages/api/src/__tests__/unit.test.ts",
       "packages/api/tests/integration.test.ts",
     ]);
@@ -233,7 +241,7 @@ describe("npm pack staging filters", () => {
     const root = buildFixture([
       ".env.example",
       ".env.staging",
-      "platform/app/src/server/config.ts",
+      "apps/api/src/config.ts",
     ]);
     const stageDir = join(root, "_stage");
 
@@ -244,17 +252,15 @@ describe("npm pack staging filters", () => {
     expect(staged({ stageDir, relPath: ".env.staging" })).toBe(false);
   });
 
-  it("still strips the artifacts the app root writes", () => {
+  it("still strips the artifacts a working tree accumulates", () => {
     // The inverse probe. These paths are never tracked in the real repository
     // (they are what a working tree accumulates), so tracking them here is
-    // what puts them in front of the filters at all.
+    // what puts them in front of the filters at all. The first two are the
+    // whole of ANCHORED_EXCLUDES; the log is caught by a bare-name rule.
     const artifacts = [
-      "platform/app/licenses.json",
-      "platform/app/quickwit",
-      "platform/app/.sentryclirc",
-      "platform/app/prisma/db.sqlite3",
-      "platform/app/e2e/auth.json",
-      "platform/app/src/server/stray.log",
+      "apps/ui/e2e/auth.json",
+      "packages/prisma-client/prisma/db.sqlite3",
+      "apps/api/src/stray.log",
     ];
     const root = buildFixture(artifacts);
     const stageDir = join(root, "_stage");
@@ -280,7 +286,7 @@ describe("npm pack staging filters", () => {
   describe("the published manifest", () => {
     /** @scenario Every entry point the published package advertises resolves inside it */
     it("relocates every advertised entry point onto the staged layout", () => {
-      const root = buildFixture(["platform/app/src/server/config.ts"]);
+      const root = buildFixture(["apps/api/src/config.ts"]);
       const stageDir = join(root, "_stage");
 
       const { code } = runCheck({ root, extraArgs: ["--stage-to", stageDir] });
@@ -321,7 +327,7 @@ describe("npm pack staging filters", () => {
     it.each([["--stage-to", ""], ["--stage-to="]])(
       "refuses %s with no directory",
       (...extraArgs: string[]) => {
-        const root = buildFixture(["platform/app/src/server/config.ts"]);
+        const root = buildFixture(["apps/api/src/config.ts"]);
 
         const { code, output } = runCheck({ root, extraArgs });
 
@@ -333,7 +339,7 @@ describe("npm pack staging filters", () => {
     it("refuses a directory that already holds something", () => {
       // rsync adds and overwrites but never deletes, so a stale file left in
       // the directory would read as staged and, on a full pack, ship.
-      const root = buildFixture(["platform/app/src/server/config.ts"]);
+      const root = buildFixture(["apps/api/src/config.ts"]);
       const stageDir = join(root, "_stage");
       write({ root: stageDir, relPath: "leftover.txt" });
 
