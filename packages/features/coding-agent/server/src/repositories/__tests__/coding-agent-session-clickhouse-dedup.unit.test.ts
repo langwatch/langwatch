@@ -155,6 +155,21 @@ const read = (client: CodingAgentClickHouseClient) =>
 
 describe("CodingAgentSessionClickHouseRepository point-read tiebreak", () => {
   describe("given two versions of one session tied on UpdatedAt", () => {
+    describe("given one applied a later event than the other", () => {
+      describe("when the session is point-read", () => {
+        it("returns the version with the higher progress watermark", async () => {
+          const result = await read(
+            tiedVersions(
+              { LastEventOccurredAt: "2026-07-24 11:00:00.000", Commits: 1 },
+              { LastEventOccurredAt: "2026-07-24 11:45:00.000", Commits: 9 },
+            ),
+          );
+
+          expect(result?.row.commits).toBe(9);
+        });
+      });
+    });
+
     describe("given they share a watermark but folded different amounts of span and log work", () => {
       describe("when the session is point-read", () => {
         /** @scenario "the most complete version of a session is the one that is read" */

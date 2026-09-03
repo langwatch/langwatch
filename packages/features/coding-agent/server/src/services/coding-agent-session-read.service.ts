@@ -76,12 +76,7 @@ export class CodingAgentSessionReadService {
       limit,
     });
     const derivedWindow = parsed.occurredAt === undefined ? window : undefined;
-    if (
-      page.events.length > 0 ||
-      parsed.cursor !== undefined ||
-      parsed.kinds !== undefined ||
-      !derivedWindow
-    ) {
+    if (page.events.length > 0 || parsed.cursor !== undefined || !derivedWindow) {
       return page;
     }
     return this.dependencies.sessionEvents.findBySessionId({

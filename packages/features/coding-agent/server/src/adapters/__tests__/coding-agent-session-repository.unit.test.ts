@@ -114,4 +114,113 @@ describe("Coding Agent session ClickHouse repository", () => {
     expect(dedup).not.toContain("StartedAt BETWEEN");
     expect(dedup).not.toContain("UserId =");
   });
+
+  describe("given two versions of one session inside the same millisecond", () => {
+    describe("when both are written through the repository", () => {
+      it("stamps strictly increasing versions so the latest always wins", async () => {
+        const { endpoint, repository } = await createRepository();
+        const row = session({ sessionId: "versioned", updatedAt: 0 });
+
+        await repository.upsert(row, 14, []);
+        await repository.upsert(row, 14, []);
+
+        const first = endpoint.requests[0];
+        const second = endpoint.requests[1];
+        const firstUpdated = /"UpdatedAt":"([^"]+)"/.exec(first?.body ?? "")?.[1];
+        const secondUpdated = /"UpdatedAt":"([^"]+)"/.exec(second?.body ?? "")?.[1];
+        expect(Date.parse(secondUpdated ?? "")).toBeGreaterThan(Date.parse(firstUpdated ?? ""));
+      });
+    });
+  });
+
+  describe("given a row threading its superseded version's timestamp", () => {
+    describe("when it is written while this writer's clock lags that prior", () => {
+      it("stamps past the prior version", async () => {
+        const { endpoint, repository } = await createRepository();
+        const priorMs = Date.now() + 60_000;
+        const row = session({ sessionId: "versioned", updatedAt: priorMs });
+
+        await repository.upsert(row, 14, []);
+
+        const stamped = /"UpdatedAt":"([^"]+)"/.exec(endpoint.requests[0]?.body ?? "")?.[1];
+        expect(Date.parse(stamped ?? "")).toBeGreaterThan(priorMs);
+      });
+    });
+  });
+
+  describe("given a batch of versions for one session", () => {
+    describe("when the batch is written in one insert", () => {
+      it("stamps each entry past the one before it", async () => {
+        const { endpoint, repository } = await createRepository();
+
+        await repository.upsertBatch([
+          { row: session({ sessionId: "batched", updatedAt: 0 }), retentionDays: 14, appliedEventIds: [] },
+          { row: session({ sessionId: "batched", updatedAt: 0 }), retentionDays: 14, appliedEventIds: [] },
+          { row: session({ sessionId: "batched", updatedAt: 0 }), retentionDays: 14, appliedEventIds: [] },
+        ]);
+
+        const stamps = (endpoint.requests[0]?.body ?? "")
+          .split("\n")
+          .filter((line) => line.trim().length > 0)
+          .map((line) => Date.parse(/"UpdatedAt":"([^"]+)"/.exec(line)?.[1] ?? ""));
+        expect(stamps).toHaveLength(3);
+        expect(stamps[1]).toBeGreaterThan(stamps[0]!);
+        expect(stamps[2]).toBeGreaterThan(stamps[1]!);
+      });
+    });
+  });
+
+  describe("given a row whose columns carry no timezone suffix", () => {
+    describe("when it is read back on a host that is not on UTC", () => {
+      it("decodes them as UTC rather than the host's local time", async () => {
+        const { endpoint, repository } = await createRepository();
+        endpoint.queryRows.push([
+          {
+            TenantId: "tenant-1",
+            SessionId: "sess-1",
+            Version: "2026-07-21",
+            StartedAt: "2026-07-24 12:00:00.000",
+            CreatedAt: "2026-07-24 12:00:00.000",
+            UpdatedAt: "2026-07-24 12:00:02.500",
+            LastEventOccurredAt: "2026-07-24 12:00:01.250",
+          },
+        ]);
+
+        const found = await repository.tryFindBySessionIdWithApplied({
+          tenantId: "tenant-1",
+          sessionId: "sess-1",
+        });
+
+        expect(found?.row.startedAtMs).toBe(Date.parse("2026-07-24T12:00:00Z"));
+        expect(found?.row.updatedAt).toBe(Date.parse("2026-07-24T12:00:02.500Z"));
+        expect(found?.row.lastEventOccurredAt).toBe(Date.parse("2026-07-24T12:00:01.250Z"));
+      });
+    });
+  });
+
+  describe("given a pre-00053 row whose checkpoint is the column default", () => {
+    describe("when it is read back off UTC in either direction", () => {
+      it("decodes the checkpoint as 0 so the store's gate still rejects it", async () => {
+        const { endpoint, repository } = await createRepository();
+        endpoint.queryRows.push([
+          {
+            TenantId: "tenant-1",
+            SessionId: "sess-1",
+            Version: "2026-07-21",
+            StartedAt: "2026-07-24 12:00:00.000",
+            CreatedAt: "2026-07-24 12:00:00.000",
+            UpdatedAt: "2026-07-24 12:00:02.500",
+            LastEventOccurredAt: "1970-01-01 00:00:00.000",
+          },
+        ]);
+
+        const found = await repository.tryFindBySessionIdWithApplied({
+          tenantId: "tenant-1",
+          sessionId: "sess-1",
+        });
+
+        expect(found?.row.lastEventOccurredAt).toBe(0);
+      });
+    });
+  });
 });
