@@ -171,7 +171,7 @@ Feature: Langy is tested with LangWatch's own scenario and evaluation tooling
     When the scenario runs against Langy
     Then Langy explains it can only work inside the shared folder and does not retry
     And the denied removal is not run again
-    And a pattern the user allowed is not asked a second time
+    And a pattern the user allowed is not asked again in a later turn
 
   @e2e
   Scenario: A scenario checks that Langy recovers when the folder disconnects mid-task
