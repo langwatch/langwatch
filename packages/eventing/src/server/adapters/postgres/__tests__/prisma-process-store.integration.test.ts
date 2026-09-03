@@ -1,6 +1,6 @@
 import { createHash } from "node:crypto";
 import { nanoid } from "nanoid";
-import { afterEach, beforeEach, describe, expect, it } from "vitest";
+import { afterEach, beforeAll, beforeEach, describe, expect, it } from "vitest";
 import {
   PrismaConfigService,
   PrismaConnectionService,
@@ -38,8 +38,10 @@ function database(): PrismaClient {
   return connection.client;
 }
 
-const prisma = database();
-const store = new PrismaProcessStore(prisma);
+// Assigned in beforeAll, only for a suite that isn't skipped — see
+// describe.skipIf(!databaseUrl) below.
+let prisma: PrismaClient;
+let store: PrismaProcessStore;
 let processName: string;
 
 function ref(
@@ -115,7 +117,12 @@ async function clean(): Promise<void> {
   ]);
 }
 
-describe("PrismaProcessStore", () => {
+describe.skipIf(!databaseUrl)("PrismaProcessStore", () => {
+  beforeAll(() => {
+    prisma = database();
+    store = new PrismaProcessStore(prisma);
+  });
+
   beforeEach(() => {
     processName = `process-store-${nanoid(10)}`;
   });

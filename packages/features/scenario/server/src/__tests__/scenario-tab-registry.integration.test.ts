@@ -46,37 +46,37 @@ class SystemClock extends ScenarioClockPort {
   }
 }
 
-beforeAll(async () => {
-  connection = new RedisConnectionService().connect({
-    url: process.env.REDIS_URL,
-    clusterEndpoints: process.env.REDIS_CLUSTER_ENDPOINTS,
-    dbIndex: process.env.REDIS_DB_INDEX,
-  });
-  if (!connection) {
-    throw new Error(
-      "These tests need a real Redis; run them through the integration suite",
-    );
-  }
-  scenarioTabRegistry = ScenarioTabRegistryService.create({
-    store: RedisScenarioTabStoreAdapter.create(connection),
-    clock: new SystemClock(),
-  });
-});
-
-afterAll(async () => {
-  const keys = [...writtenKeys, ...pendingKeys];
-  if (connection) {
-    // Per-key DEL: a multi-key DEL spanning different hash slots is rejected
-    // with CROSSSLOT when this runs against a cluster, which would throw out
-    // of `afterAll` and leave every test key behind.
-    for (const key of keys) {
-      await connection.del(key);
+describe.skipIf(!process.env.REDIS_URL)("scenarioTabRegistry", () => {
+  beforeAll(async () => {
+    connection = new RedisConnectionService().connect({
+      url: process.env.REDIS_URL,
+      clusterEndpoints: process.env.REDIS_CLUSTER_ENDPOINTS,
+      dbIndex: process.env.REDIS_DB_INDEX,
+    });
+    if (!connection) {
+      throw new Error(
+        "These tests need a real Redis; run them through the integration suite",
+      );
     }
-  }
-  connection?.disconnect();
-});
+    scenarioTabRegistry = ScenarioTabRegistryService.create({
+      store: RedisScenarioTabStoreAdapter.create(connection),
+      clock: new SystemClock(),
+    });
+  });
 
-describe("scenarioTabRegistry", () => {
+  afterAll(async () => {
+    const keys = [...writtenKeys, ...pendingKeys];
+    if (connection) {
+      // Per-key DEL: a multi-key DEL spanning different hash slots is rejected
+      // with CROSSSLOT when this runs against a cluster, which would throw out
+      // of `afterAll` and leave every test key behind.
+      for (const key of keys) {
+        await connection.del(key);
+      }
+    }
+    connection?.disconnect();
+  });
+
   it("keeps the disconnect grace inside the presence TTL", () => {
     // `unregister` retires a tab by ageing its score by the difference between
     // these two, so a grace at or above the TTL would extend a tab's life

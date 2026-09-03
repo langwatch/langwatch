@@ -9,22 +9,6 @@ import {
 
 let connection: RedisConnection;
 
-beforeAll(() => {
-  const connected = new RedisConnectionService().connect({
-    url: process.env.REDIS_URL,
-    clusterEndpoints: process.env.REDIS_CLUSTER_ENDPOINTS,
-    dbIndex: process.env.REDIS_DB_INDEX,
-  });
-  if (!connected) {
-    throw new Error("Scenario cancellation integration tests require Redis");
-  }
-  connection = connected;
-});
-
-afterAll(() => {
-  connection?.disconnect();
-});
-
 async function waitFor(condition: () => boolean, timeoutMs = 2_000): Promise<void> {
   const startedAt = Date.now();
   while (!condition()) {
@@ -41,7 +25,23 @@ function subscriber(messages: CancellationMessage[]) {
   );
 }
 
-describe("Redis Scenario cancellation", () => {
+describe.skipIf(!process.env.REDIS_URL)("Redis Scenario cancellation", () => {
+  beforeAll(() => {
+    const connected = new RedisConnectionService().connect({
+      url: process.env.REDIS_URL,
+      clusterEndpoints: process.env.REDIS_CLUSTER_ENDPOINTS,
+      dbIndex: process.env.REDIS_DB_INDEX,
+    });
+    if (!connected) {
+      throw new Error("Scenario cancellation integration tests require Redis");
+    }
+    connection = connected;
+  });
+
+  afterAll(() => {
+    connection?.disconnect();
+  });
+
   it("delivers the complete targeted cancellation payload", async () => {
     const received: CancellationMessage[] = [];
     const unsubscribe = await subscriber(received);

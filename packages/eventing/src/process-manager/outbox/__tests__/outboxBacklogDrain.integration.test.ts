@@ -1,5 +1,5 @@
 import { nanoid } from "nanoid";
-import { afterEach, beforeEach, describe, expect, it } from "vitest";
+import { afterEach, beforeAll, beforeEach, describe, expect, it } from "vitest";
 import {
   PrismaConfigService,
   PrismaConnectionService,
@@ -43,8 +43,10 @@ function database(): PrismaClient {
  * behavior: tails are released un-attempted, nothing is delivered twice, a
  * lapse-looping message retires, and a fenced acknowledgement is reported.
  */
-const prisma = database();
-const store = new PrismaProcessStore(prisma);
+// Assigned in beforeAll, only for a suite that isn't skipped — see
+// describe.skipIf(!databaseUrl) below.
+let prisma: PrismaClient;
+let store: PrismaProcessStore;
 let processName: string;
 
 const sleep = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms));
@@ -71,7 +73,12 @@ function commit(batch: NewOutboxMessage[]): ProcessCommit<{ seeded: true }> {
   };
 }
 
-describe("outbox backlog drain under slow deliveries", () => {
+describe.skipIf(!databaseUrl)("outbox backlog drain under slow deliveries", () => {
+  beforeAll(() => {
+    prisma = database();
+    store = new PrismaProcessStore(prisma);
+  });
+
   beforeEach(() => {
     processName = `backlog-drain-${nanoid(10)}`;
   });

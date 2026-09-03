@@ -61,9 +61,11 @@ export function errorText(error: unknown): string {
   return error instanceof Error ? error.message : String(error);
 }
 
+/**
+ * A parse-failure error's own message quotes the offending input (V8 echoes
+ * it into `SyntaxError`), so it is never safe to surface. Name only the error
+ * class — the diagnosis a caller needs without the payload it parsed.
+ */
 export function safeParseErrorText(error: unknown): string {
-  return errorText(error).replaceAll(
-    /(?:s3|azure-blob|gs|file):\/\/[^\s'"]+/gi,
-    "<redacted-uri>",
-  );
+  return error instanceof Error ? error.constructor.name : "unknown error";
 }
