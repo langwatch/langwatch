@@ -160,14 +160,25 @@ Feature: Langy's worker-side delete gate
       # the segment — that over-block is what gets the whole gate flag-disabled.
 
     @unit
-    Scenario: Routine brace expansion in a non-langwatch command is not over-blocked
-      Given a command whose brace group is a path or range list in an ordinary,
-        non-langwatch command (`cp foo.{js,ts} bar/`, `mkdir -p src/{a,b,c}`,
-        `echo {1..3}`, `rm -rf build/{dist,tmp}`, `git add src/{a,b}.ts`)
+    Scenario: Quoted globs and braces stay literal and are allowed
+      Given a command whose only glob (`*`, `?`, `[`) or brace (`{`, `}`) is
+        quoted or backslash-escaped (`find . -name '*.py'`, `grep -E '(a|b)' f`,
+        `echo "{hi}"`, `git log --format='%h (%an)'`, `echo \*`)
       When the gated bash command runs
       Then the gate returns allow:true
-      # The argument brace-expansion pass is scoped to langwatch invocations, so
-      # routine path/range braces never reach it and are not over-blocked.
+      # A quoted or escaped metacharacter is literal text to bash, not an
+      # expansion, so it must not hold the segment.
+
+    @unit
+    Scenario: The test builtin and group braces as standalone words are not treated as expansion
+      Given a command with a standalone `[`/`]` test builtin or `{`/`}` shell
+        group brace as its own word (`[ -f file ]`, `{ echo hi; }`)
+      When the gated bash command runs
+      Then the gate returns allow:true
+      # A word whose whole value is `[`, `]`, `{`, or `}` is the POSIX test
+      # builtin or a group-command brace, not a glob/brace-expansion. The
+      # exception does not weaken the executor scan: a bare `bash` inside
+      # `{ bash; }` is still held on its own word.
 
     @unit
     Scenario: An escaped double-quote inside a double-quoted word is parsed as one argument, not held
@@ -362,95 +373,29 @@ Feature: Langy's worker-side delete gate
       # obfuscated command name is held with a targeted re-issue reason.
 
     @unit
-    Scenario: A brace-expansion splice that reassembles a destructive verb or resource is held
-      Given a langwatch command whose argument carries a comma or empty-alternative
-        brace group that bash would expand into a destructive verb or a resource
-        type (`dele{,}te`, `{,delete,}`, `data{set,}`, `d{el,}ete`)
-      When the spliced command is run as a gated bash command
-      Then the gate returns allow:false
-      # The lexer copies braces literally into the word value, so the verb match
-      # misses them; a dedicated argument brace-expansion pass unmasks the
-      # reassembled verb/resource and holds fail-closed, even with a valid
-      # confirmation. Quoted braces are suppressed and non-langwatch path braces
-      # (`cp foo.{js,ts}`) never reach the pass.
-
-    @unit
-    Scenario: A single-element or enumerated range brace that reassembles a destructive verb is held
-      Given a langwatch command whose argument carries a `..` range brace that
-        bash expands into a destructive verb — a single-element range
-        (`del{e..e}te` -> `delete`, `pur{g..g}e` -> `purge`) or several in one
-        word (`d{e..e}l{e..e}te` -> `delete`)
-      When the spliced command is run as a gated bash command
-      Then the gate returns allow:false
-      # bash collapses `{e..e}` to `e`, so the range unmasks a verb the old
-      # brace-strip (`dele..ete`, not a verb) missed. The pass enumerates ranges
-      # bash-faithfully and holds fail-closed, even with a valid confirmation.
-
-    @unit
-    Scenario: A brace expansion exceeding the enumeration budget is held quickly
-      Given a langwatch command whose argument would brace-expand to more results
-        or more groups than the enumeration budget (an adversarial `{a,...,j}`
-        glued eight times), or names an unenumerable or mismatched range (`{a..3}`)
+    Scenario: Unquoted globs or braces anywhere in a command are held as unresolvable
+      Given a segment carrying an unquoted glob (`*`, `?`, `[`) or brace
+        (`{`, `}`) metacharacter anywhere and in any command head (`ls *.ts`,
+        `rm -rf node_modules/*`, `/bin/{ba,}*sh -c x`, `/bin/[!c]ash`,
+        `[[:alpha:]]ash`, `nice {bash,} -c x`, `langwatch dataset dele{,}te d1`,
+        `echo {a..z}`, `b?sh x`)
       When the command is run as a gated bash command
       Then the gate returns allow:false
-      And it returns quickly, without materialising the full cartesian product
-      # The budget (result count and group count) is checked before the product
-      # is built, so 10^8 combos cannot exhaust the worker; over budget or
-      # unenumerable is held, never brace-stripped.
+      # Structural decision: stop modelling bash expansion. Any unquoted glob or
+      # brace metacharacter is held as unresolvable, fail-closed, regardless of
+      # position or command head — bash would expand it into text the gate never
+      # sees, and modelling each expansion form piecemeal left sibling holes open.
+      # No confirmation releases it.
 
     @unit
-    Scenario: A long run of unmatched braces on a langwatch argument is held quickly
-      Given a langwatch command argument padded with a long run of unmatched `{`
-        (no closing `}` anywhere in the word)
+    Scenario: A long run of braces is held quickly on any command
+      Given a bash tool call carrying a 50,000-char run of `{` under either a
+        `langwatch` or an `echo` head
       When the command is run as a gated bash command
       Then the gate returns allow:false
-      And it returns quickly, without a rescan proportional to the run's length
-      # findExpandableBrace previously rescanned to the end of the word for
-      # every unmatched `{`, an O(n^2) blow-up neither the result nor the group
-      # budget ever engages against, since no expandable group is ever found.
-      # A word-length budget (MAX_BRACE_WORD_LENGTH) holds it directly, and the
-      # scan itself is now a single linear pass regardless of unmatched braces.
-      # A non-langwatch head carrying the same run is unaffected.
-
-    @unit
-    Scenario: A long run of unmatched braces is held quickly on any command
-      Given a bash tool call whose head is `echo` carrying a 50,000-char run of `{`
-      When the command is run as a gated bash command
-      Then the gate returns allow:false
-      And it returns quickly
-      # A word carrying an unquoted `{` longer than MAX_BRACE_WORD_LENGTH is held
-      # fail-closed in EVERY position, not only under a langwatch head: an
-      # executor or verb could hide behind padding inside the group
-      # (`{bash,<pad>}`). The scan is a single linear pass, so the hold is fast.
-
-    @unit
-    Scenario: A long brace-free langwatch argument is not over-blocked
-      Given `langwatch dataset list --tag` with a 2,000-char brace-free argument
-        (no unquoted `{` in the word)
-      When the command is run as a gated bash command
-      Then the gate returns allow:true
-      # The budget triggers on length ONLY when an unquoted `{` is present — a
-      # long brace-free argument (a big JSON blob, a long tag) must stay allowed.
-
-    @unit
-    Scenario: An escaped or quoted brace that bash leaves literal is not over-blocked
-      Given a langwatch or ordinary command whose brace group is suppressed by a
-        backslash-escaped comma (`dele{\,}te`, `a{\,}b`) or by quoting, which
-        bash leaves literal with no expansion
-      When the command is run as a gated bash command
-      Then the gate returns allow:true
-      # An escaped or quoted comma is not a brace-expansion separator, so the
-      # group never reassembles a verb; over-holding it is an over-block on
-      # routine use. Benign langwatch ranges (`--limit {1..3}`) likewise pass.
-
-    @unit
-    Scenario: The brace expander matches real bash for every handled brace form
-      Given each brace form the expander handles (comma list, empty alternative,
-        nested, integer range, letter range, reverse range, degenerate range,
-        escaped brace or comma, quoted brace)
-      When the word is expanded by the gate and by real "bash -c 'printf %s'"
-      Then the two produce the same set of words, except where the gate holds
-        fail-closed by design (budget, unenumerable range), which is documented
+      And it returns quickly, without expansion or a rescan proportional to the run
+      # The hold fires on the FIRST unquoted metacharacter, so detection is O(1)
+      # and a pathological brace run cannot hang the worker.
 
     @unit
     Scenario: An awk program that concatenates a destructive command through system() is held
@@ -459,19 +404,6 @@ Feature: Langy's worker-side delete gate
       When the program is run as a gated bash command
       Then the gate returns allow:false
       # awk is in CODE_INTERPRETERS: system() plus native concat is the awk twin of the Python concat bypass.
-
-    @unit
-    Scenario: A brace-spliced shell or interpreter name anywhere in a segment is held
-      Given a segment where an unquoted brace group bash would expand into a shell
-        or interpreter name — at the head or behind a wrapper (`nice {bash,} -c …`,
-        `{ba,}sh script.sh`, `b{a..a}sh script.sh`, `nice {,bash}`)
-      When the command is run as a gated bash command
-      Then the gate returns allow:false
-      # The lexer copies braces literally, so the executor name is never
-      # contiguous in the word value. The any-token executor scan expands every
-      # unquoted-brace word bash-faithfully and holds if any expansion names an
-      # executor — over-budget or unenumerable expansions fail closed. Routine
-      # non-executor braces (`cp foo.{js,ts}`, `echo {1..3}`) are not over-blocked.
 
     @unit
     Scenario: Versioned interpreters and alternative shells are held
@@ -496,17 +428,6 @@ Feature: Langy's worker-side delete gate
       # lexer now splits them off and the grouped executor is seen. An ordinary
       # command grouped in a subshell (`(echo hi)`) is not over-blocked, and
       # `$(`/`<(` are still held earlier by the unresolvable-substitution rule.
-
-    @unit
-    Scenario: A globbed executor name is held while ordinary globs are allowed
-      Given an unquoted word whose glob pattern could name a shell or interpreter
-        (`/bin/ba*sh`, `ba?h`, `/bin/[b]ash`, `pyth*n3`)
-      When the command is run as a gated bash command
-      Then the gate returns allow:false
-      # `*` matches zero-or-more and `?` exactly one, so the pattern is tested as
-      # a regex against every executor name; a `[..]` class is reduced to its
-      # first char. Ordinary globs that name no executor stay allowed (`ls *.ts`,
-      # `rm -f *.tmp`, `grep foo src/**/*.ts`), and a quoted glob is literal.
 
   Rule: The HTTP matcher catches destructive intent beyond the literal DELETE verb, without over-blocking reads
 
@@ -674,10 +595,10 @@ Feature: Langy's worker-side delete gate
 # AC 7: "Mismatch: confirm A, delete B -> blocked" -> Scenario Outline: A confirmed delete does not authorize a mismatched target
 # AC 8: "Single-use: consumed on first gated allow" -> Scenario: A confirmation is consumed on its first authorized delete
 # AC 9: "Multi-target in one command, partial confirm -> blocked" -> Scenario: A multi-target command with only one target confirmed is blocked entirely
-# AC 10: "Read-only langwatch calls pass" -> Scenario Outline: Read-only langwatch CLI calls pass without confirmation; Scenario: A quoted or escaped argument is not over-blocked, even with word-internal splices; Scenario: Routine brace expansion in a non-langwatch command is not over-blocked; Scenario: An escaped double-quote inside a double-quoted word is parsed as one argument, not held; Scenario: An unquoted shell comment does not make a command unparseable
+# AC 10: "Read-only langwatch calls pass" -> Scenario Outline: Read-only langwatch CLI calls pass without confirmation; Scenario: A quoted or escaped argument is not over-blocked, even with word-internal splices; Scenario: Quoted globs and braces stay literal and are allowed; Scenario: The test builtin and group braces as standalone words are not treated as expansion; Scenario: An escaped double-quote inside a double-quoted word is parsed as one argument, not held; Scenario: An unquoted shell comment does not make a command unparseable
 # AC 11: "Non-langwatch bash passes" -> Scenario Outline: Non-langwatch bash commands pass without confirmation; Scenario Outline: An innocent pipeline into a non-shell tool is not over-blocked
 # AC 12: "Block reason is actionable" -> Scenario: A block reason for an unconfirmed delete tells the agent to ask first; Scenario: A block reason for an unresolvable command tells the agent how to re-issue it; Scenario: An obfuscated command-name block names the obfuscation and says to re-issue the name plainly; Scenario: A destructive HTTP block tells the agent to re-issue through the CLI, not to confirm
-# AC 13: "Write-then-execute is held unconditionally" -> Scenario: A write or edit whose content contains a destructive command is held; Scenario Outline: Executing an agent-written file is held even with a valid confirmation; Scenario: A bash native quote-splice that reassembles the CLI name is held; Scenario: A backslash- or brace-spliced command name that reassembles the CLI name is held; Scenario: A brace-expansion splice that reassembles a destructive verb or resource is held; Scenario: A single-element or enumerated range brace that reassembles a destructive verb is held; Scenario: A brace expansion exceeding the enumeration budget is held quickly; Scenario: A long run of unmatched braces on a langwatch argument is held quickly; Scenario: A long run of unmatched braces is held quickly on any command; Scenario: A long brace-free langwatch argument is not over-blocked; Scenario: An escaped or quoted brace that bash leaves literal is not over-blocked; Scenario: The brace expander matches real bash for every handled brace form; Scenario: An awk program that concatenates a destructive command through system() is held; Scenario Outline: A bare shell fed its script on stdin is held; Scenario Outline: An argument-runner that hands its argv to a shell or interpreter is held; Scenario Outline: A shell or interpreter anywhere in a segment is held regardless of the wrapper in front of it; Scenario Outline: Filenames that merely resemble an interpreter name are not held; Scenario Outline: A command using shell expansion is held even when it does not mention LangWatch; Scenario: A brace-spliced shell or interpreter name anywhere in a segment is held; Scenario: Versioned interpreters and alternative shells are held; Scenario: A shell inside tight subshell parentheses is held; Scenario: A globbed executor name is held while ordinary globs are allowed
+# AC 13: "Write-then-execute is held unconditionally" -> Scenario: A write or edit whose content contains a destructive command is held; Scenario Outline: Executing an agent-written file is held even with a valid confirmation; Scenario: A bash native quote-splice that reassembles the CLI name is held; Scenario: A backslash- or brace-spliced command name that reassembles the CLI name is held; Scenario: Unquoted globs or braces anywhere in a command are held as unresolvable; Scenario: A long run of braces is held quickly on any command; Scenario: An awk program that concatenates a destructive command through system() is held; Scenario Outline: A bare shell fed its script on stdin is held; Scenario Outline: An argument-runner that hands its argv to a shell or interpreter is held; Scenario Outline: A shell or interpreter anywhere in a segment is held regardless of the wrapper in front of it; Scenario Outline: Filenames that merely resemble an interpreter name are not held; Scenario Outline: A command using shell expansion is held even when it does not mention LangWatch; Scenario: Versioned interpreters and alternative shells are held; Scenario: A shell inside tight subshell parentheses is held
 # AC 14: "Destructive HTTP beyond literal DELETE is held" -> Scenario: A POST GraphQL delete or archive mutation...; Scenario: A PUT or PATCH soft-delete...; Scenario: A POST to a destructive action endpoint...; Scenario: A destructive HTTP block tells the agent to re-issue through the CLI, not to confirm; Scenario Outline: Each unconfirmed bypass class is blocked at the real tool_call seam (HTTP-shape delete case)
 # AC 15: "Benign HTTP to a langwatch host is NOT over-blocked" -> Scenario: A GET request to a langwatch host is not blocked; Scenario: A read or non-destructive GraphQL POST to a langwatch host is not blocked
 # AC 16: "Equals-form flag values are evaluated" -> Scenario: An equals-form flag value carrying a destructive verb is matched; Scenario Outline: Each unconfirmed bypass class is blocked at the real tool_call seam (equals-form case)

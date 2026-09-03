@@ -44,16 +44,14 @@ export type DestructiveMatch =
       /**
        * The specific reason the segment could not be resolved, when known.
        * `obfuscated-command-name` means the head/command-name token was spliced
-       * by quotes, a backslash, or a brace group so its literal is never
-       * contiguous — the confirmation layer surfaces a targeted "write the
-       * command name plainly" reason for it instead of the generic four-cause
-       * list. `brace-expansion-budget` means a `langwatch` argument's brace
-       * expansion exceeded the enumeration budget (too many results or groups)
-       * or named an unenumerable/mismatched range — held fail-closed rather than
-       * brace-stripped. Both fall back to the generic re-issue reason today.
-       * Absent for genuinely unknown causes (substitution, wrapper, etc.).
+       * by quotes or a backslash so its literal is never contiguous — the
+       * confirmation layer surfaces a targeted "write the command name plainly"
+       * reason for it instead of the generic re-issue list. Absent for every
+       * other unresolvable cause (substitution, an unquoted glob or brace, an
+       * unrecognised wrapper, unbalanced quotes), which fall back to the generic
+       * re-issue reason.
        */
-      cause?: "obfuscated-command-name" | "brace-expansion-budget";
+      cause?: "obfuscated-command-name";
     };
 
 /** Tool names whose input can reach a destructive command. */
@@ -267,6 +265,22 @@ const FILE_EXECUTORS = new Set([
  * assembles the CLI name at runtime past every substring check — the awk-shaped
  * twin of the Python concat bypass.
  *
+ * Runtime EXPANSION is no longer modelled: `classifySegment` holds any unquoted
+ * glob metacharacter (`*`, `?`, `[`) or brace (`{`, `}`) anywhere in the segment,
+ * in any command head, as unresolvable — so an executor or verb reassembled by a
+ * glob (`/bin/ba*sh`, `/bin/[!c]ash`, `/bin/[[:alpha:]]ash`) or a brace group
+ * (`{ba,}sh`, `dele{,}te`) is held on that structural rule before this scan runs,
+ * rather than by ten separate models of bash expansion. Quoted/escaped forms
+ * stay literal and allowed.
+ *
+ * Residuals still NOT caught, by design (out of scope for a static gate):
+ *  - a name inside a SINGLE quoted string handed to a non-executor wrapper
+ *    (`env -S "python3 -c …"`, one argument): the interpreter is not its own word.
+ *  - `bash5` / `bash.exe`-style aliases: a shell name carrying a suffix neither
+ *    `FILE_EXECUTORS` membership nor the interpreter-version regex covers.
+ *  - GNU `sed`'s `e` flag/command, which executes shell from a sed script.
+ *  - heredoc bodies (see the `splitSegments`/heredoc note below).
+ *
  * Deliberately NOT added, each judged already-covered or an accepted residual
  * (a head-based hold would over-block their overwhelmingly benign everyday use):
  *  - `sed`/`gsed`: GNU sed's `e` command/flag can exec, but a LITERAL `langwatch`
@@ -342,9 +356,14 @@ const SEGMENT_EXECUTORS = new Set<string>([...FILE_EXECUTORS, ...CODE_INTERPRETE
  * empty or a run of `.<digits>`). Shells are NOT in here — they are matched by
  * exact `FILE_EXECUTORS` membership — so `bash5`/`sh5` remain documented
  * residuals rather than false hits on a real basename ending in a digit.
+ *
+ * The second alternative covers CPython's debug builds (`python3-dbg`,
+ * `python3d`, and their point-release forms `python3.11-dbg` / `python3.11d`),
+ * which the digit-suffix rule alone would miss because their tail is `-dbg`/`d`,
+ * not `.<digits>`. `python3-config`/`python3-doc` still do NOT match.
  */
 const VERSIONED_INTERPRETER =
-  /^(?:python|pypy|python3|pypy3|node|nodejs|ruby|perl|php|lua|luajit)\d*(?:\.\d+)*$/;
+  /^(?:(?:python|pypy|python3|pypy3|node|nodejs|ruby|perl|php|lua|luajit)\d*(?:\.\d+)*|python3(?:\.\d+)*(?:-dbg|d))$/;
 
 /**
  * True when a basename is a shell or code interpreter the gate holds: an exact
@@ -377,10 +396,12 @@ const UNRESOLVABLE = /[$`]|<\(/;
  * splices in argument position, which are not CLI-name obfuscations and must not
  * hold the segment. A quote- or backslash-splice that reassembles a destructive
  * verb in argument position is still caught: the lexer de-splices each such token
- * to its bash word value before the verb match runs. A BRACE splice is the
- * exception the lexer does not collapse (`dele{,}te` stays literal in `value`),
- * so brace groups in a `langwatch` argument get a dedicated expansion pass
- * (`bashBraceExpand`) in `classifySegment` before the verb/resource match.
+ * to its bash word value before the verb match runs. A BRACE splice in an
+ * ARGUMENT (`dele{,}te`) is not resolved here at all — the structural expansion
+ * pass in `classifySegment` holds any unquoted brace or glob unconditionally, so
+ * it never reaches the verb/resource match. This head regex still matches a
+ * brace group spliced into the command NAME (`lang{,}watch`) so that obfuscation
+ * gets the targeted `obfuscated-command-name` reason rather than the generic one.
  *
  * Each alternative requires word text adjacent to the splice, so a fully-quoted
  * token (`"langwatch"`, which the lexer already resolves cleanly) never matches.
@@ -430,17 +451,52 @@ const DESTRUCTIVE_PATH = new RegExp(
 );
 
 /**
- * Split a command line on the operators that start a new command. Deliberately
- * crude: it does not understand quoting, so a `;` inside a quoted string
- * over-splits. Over-splitting only ever produces MORE segments to inspect,
- * which is the safe direction. Newlines split too, so `write`/`edit` file
- * content is inspected line by line.
+ * Split a command line on the operators that start a new command (`;`, newline,
+ * `|`, `||`, `&`, `&&`), honouring quoting the way bash does: an operator inside
+ * single or double quotes, or backslash-escaped, is literal text and does NOT
+ * start a new segment (`grep -E '(a|b)' f` is one command, not two). Splitting
+ * elsewhere still errs toward MORE segments, the safe direction; newlines split
+ * too, so `write`/`edit` file content is inspected line by line.
  */
 export function splitSegments(command: string): string[] {
-  return command
-    .split(/\|\||&&|[;\n|&]/)
-    .map((segment) => segment.trim())
-    .filter((segment) => segment.length > 0);
+  const segments: string[] = [];
+  let current = "";
+  let inSingle = false;
+  let inDouble = false;
+  for (let i = 0; i < command.length; i += 1) {
+    const c = command[i] ?? "";
+    if (c === "\\" && !inSingle) {
+      current += c;
+      if (i + 1 < command.length) {
+        current += command[i + 1];
+        i += 1;
+      }
+      continue;
+    }
+    if (c === "'" && !inDouble) {
+      inSingle = !inSingle;
+      current += c;
+      continue;
+    }
+    if (c === '"' && !inSingle) {
+      inDouble = !inDouble;
+      current += c;
+      continue;
+    }
+    if (!inSingle && !inDouble && (c === ";" || c === "\n" || c === "|" || c === "&")) {
+      segments.push(current);
+      current = "";
+      // `||` and `&&` consume their second char so it does not open an empty
+      // segment; a lone `|`/`&`/`;`/newline separates just the same.
+      if ((c === "|" && command[i + 1] === "|") || (c === "&" && command[i + 1] === "&")) {
+        i += 1;
+      }
+      continue;
+    }
+    current += c;
+  }
+  segments.push(current);
+  return segments.map((segment) => segment.trim()).filter((segment) => segment.length > 0);
 }
 
 /**
@@ -459,11 +515,11 @@ export type Word = { raw: string; value: string };
  * `"de""lete"` → one word `delete`). Inside double quotes a backslash escapes
  * only `$`, backtick, `"`, `\`, and newline (bash), so `"she said \"hi\""` is
  * one word `she said "hi"`; single quotes take no escapes. An unquoted `#` at a
- * word boundary starts a comment that ends the segment. Brace expansion is NOT
- * performed here — braces are copied literally into both `raw` and `value`; a
- * word-internal brace group in the HEAD is caught by `HEAD_SPLICE` on `raw`, and
- * a comma/empty-alternative brace group in an ARGUMENT of a `langwatch`
- * invocation is expanded by `bashBraceExpand` in `classifySegment`.
+ * word boundary starts a comment that ends the segment. Neither brace nor glob
+ * expansion is performed here — the metacharacters are copied literally into both
+ * `raw` and `value`; a word-internal brace group in the HEAD is caught by
+ * `HEAD_SPLICE` on `raw`, and any other unquoted brace or glob metacharacter is
+ * held by the structural expansion pass in `classifySegment`.
  * `unterminated` is true when a quote is opened and never closed, which means
  * the parse does not describe the command and the segment must be held.
  */
@@ -599,260 +655,19 @@ function verbOfToken(token: string): string | null {
 }
 
 /**
- * Global expansion budget, checked BEFORE the cartesian product materialises so
- * an adversarial word (`{a..j}` glued eight times = 10^8 combos, measured at
- * 6.3s / 710MB unbudgeted) cannot exhaust the worker. A word whose expansion
- * would exceed either cap is held fail-closed (`brace-expansion-budget`), never
- * brace-stripped. `256` results covers every real reassembled verb/resource
- * (`d{el,}ete`, `data{set,}`) with wide margin; `8` groups bounds the recursion
- * depth even when each group is tiny (`{,}` × 8 = 256).
- *
- * These two caps bound the COMBINATORIAL and HUGE-RANGE shapes. A third shape —
- * a long run of `{` with no matching `}` — bypasses both, because no
- * expandable group is ever found (`findExpandableBrace` returns null and
- * neither cap engages): a `langwatch dataset list --tag ` argument padded with
- * 50,000 literal `{` took ~5s synchronously in the tool_call hook, even though
- * `findExpandableBrace` itself is now a single linear pass (previously an O(n²)
- * rescan-from-each-`{` that was the actual cost). `MAX_BRACE_WORD_LENGTH`
- * closes this third shape directly: a `langwatch`-argument word carrying an
- * unquoted `{` longer than the cap is held before expansion is attempted at
- * all, regardless of whether it would ever resolve to a real group.
+ * True when a word's verbatim source carries an unquoted, unescaped shell
+ * EXPANSION metacharacter — a glob char (`*`, `?`, `[`) or a brace (`{`, `}`).
+ * These are exactly the characters bash expands at runtime into words the gate
+ * never sees, so any word containing one (outside single quotes, double quotes,
+ * and not backslash-escaped) is unresolvable and held on the same fail-closed
+ * footing as `$`/backtick/`<(`. We deliberately do NOT model what the expansion
+ * would produce — ten rounds of modelling brace/glob expansion piecemeal each
+ * left a sibling hole open, so the whole class is held instead. Quoted or
+ * escaped forms (`'*.ts'`, `"{a,b}"`, `\*`) are literal text to bash and are not
+ * flagged. The caller separately exempts the standalone `[`/`]` test builtin and
+ * `{`/`}` group-command braces, whose whole word is one of those characters.
  */
-const MAX_BRACE_RESULTS = 256;
-const MAX_BRACE_GROUPS = 8;
-const MAX_BRACE_WORD_LENGTH = 1024;
-
-/**
- * Split a brace body on its top-level commas, honouring nested braces and — the
- * bash rule the old splitter missed — quotes and backslash escapes: an escaped
- * comma (`\,`) or a quoted comma is NOT a separator, so `{\,}` and `{"a,b"}` are
- * single-element groups bash leaves literal. Quotes/escapes are copied through
- * verbatim; the final `shellWords` collapse in `bashBraceExpand` strips them.
- */
-function splitTopLevelCommas(body: string): string[] {
-  const parts: string[] = [];
-  let depth = 0;
-  let current = "";
-  let inSingle = false;
-  let inDouble = false;
-  for (let i = 0; i < body.length; i += 1) {
-    const ch = body[i] ?? "";
-    if (ch === "\\" && !inSingle) {
-      current += ch;
-      if (i + 1 < body.length) {
-        current += body[i + 1];
-        i += 1;
-      }
-      continue;
-    }
-    if (ch === "'" && !inDouble) {
-      inSingle = !inSingle;
-      current += ch;
-    } else if (ch === '"' && !inSingle) {
-      inDouble = !inDouble;
-      current += ch;
-    } else if (!inSingle && !inDouble && ch === "{") {
-      depth += 1;
-      current += ch;
-    } else if (!inSingle && !inDouble && ch === "}") {
-      depth -= 1;
-      current += ch;
-    } else if (!inSingle && !inDouble && ch === "," && depth === 0) {
-      parts.push(current);
-      current = "";
-    } else {
-      current += ch;
-    }
-  }
-  parts.push(current);
-  return parts;
-}
-
-/**
- * The first brace group in `text` that bash would actually expand: one with a
- * top-level comma (`{a,b}`, `{,delete,}`) or a `..` range (`{1..3}`, `{e..e}`).
- * A literal `{foo}` (no comma, no range) is left alone, so the scan skips it and
- * looks for the next `{`. Quotes and backslash escapes suppress a brace, comma,
- * or `..` the way bash does (`"{a,b}"`, `\{`, `\,` do not expand), so an
- * argument-position quoted/escaped brace is never mistaken for an expansion.
- *
- * Single linear pass over `text` (a stack of open-brace frames, matched as
- * `}` closes each), not a rescan-from-every-`{`: the previous version restarted
- * a full inner scan at every unmatched or nested `{`, which is O(n²) on a long
- * run of unmatched braces (`{{{{{{…`, no closing `}` anywhere) — 50,000 glued
- * `{` measured at ~5s in the synchronous tool_call hook. "First qualifying
- * group" reduces to "leftmost brace-open position whose own matched group has
- * a direct-level comma/range", which is exactly the leftmost-starting frame
- * flagged `hasComma`/`hasRange` when it closes — nesting always gives an outer
- * frame a smaller `start` than any frame it contains, so taking the minimum
- * `start` over every closed, qualifying frame reproduces the old leftmost-scan
- * result in one pass.
- */
-function findExpandableBrace(
-  text: string,
-): { start: number; end: number; isRange: boolean } | null {
-  type Frame = { start: number; hasComma: boolean; hasRange: boolean };
-  const stack: Frame[] = [];
-  let best: { start: number; end: number; isRange: boolean } | null = null;
-  let inSingle = false;
-  let inDouble = false;
-  for (let i = 0; i < text.length; i += 1) {
-    const c = text[i] ?? "";
-    if (c === "\\" && !inSingle) {
-      i += 1; // the escaped character is literal
-      continue;
-    }
-    if (c === "'" && !inDouble) {
-      inSingle = !inSingle;
-      continue;
-    }
-    if (c === '"' && !inSingle) {
-      inDouble = !inDouble;
-      continue;
-    }
-    if (inSingle || inDouble) continue;
-    if (c === "{") {
-      stack.push({ start: i, hasComma: false, hasRange: false });
-    } else if (c === "}") {
-      const frame = stack.pop();
-      if (!frame) continue; // unmatched `}`: nothing to close.
-      if ((frame.hasComma || frame.hasRange) && (best === null || frame.start < best.start)) {
-        best = { start: frame.start, end: i, isRange: !frame.hasComma && frame.hasRange };
-      }
-    } else if (stack.length > 0) {
-      // Only the innermost currently-open frame owns this character — the
-      // direct-level (`depth === 1` in the old scan) content of its group.
-      const top = stack[stack.length - 1];
-      if (!top) continue;
-      if (c === ",") {
-        top.hasComma = true;
-      } else if (c === "." && text[i + 1] === ".") {
-        top.hasRange = true;
-      }
-    }
-  }
-  return best; // frames left open (unmatched `{`) never close, so never qualify.
-}
-
-/** Zero-pad a signed integer to `width` the way bash does for `{01..05}`. */
-function padInt(value: number, width: number): string {
-  const negative = value < 0;
-  const digits = Math.abs(value).toString();
-  return (negative ? "-" : "") + digits.padStart(negative ? Math.max(0, width - 1) : width, "0");
-}
-
-/**
- * Enumerate a `{start..end[..step]}` range bash-faithfully, or return null when
- * it cannot be enumerated so the caller HOLDS (never brace-strips). Handles
- * integer ranges (`{1..5}`, reverse `{5..1}`, step `{1..9..2}`, zero-padded
- * `{01..05}`), single-letter ranges (`{a..e}`, reverse `{e..a}`), and the
- * degenerate single-element range (`{e..e}` → `[e]`) — the case whose old
- * brace-strip (`del{e..e}te` → `dele..ete`, not a verb) was the CRITICAL
- * bypass, since bash collapses it to `delete`. A mismatched range bash leaves
- * literal (`{a..3}`, `{1..a}`), a non-integer step, or a count over the budget
- * returns null: the gate holds fail-closed rather than reproduce bash's
- * literal-passthrough, an over-block only reachable on a `langwatch` argument.
- */
-function enumerateRange(body: string): string[] | null {
-  const parts = body.split("..");
-  if (parts.length < 2 || parts.length > 3) return null;
-  const [startRaw, endRaw, stepRaw] = parts;
-  const intRe = /^-?\d+$/;
-  if (intRe.test(startRaw ?? "") && intRe.test(endRaw ?? "")) {
-    const start = Number(startRaw);
-    const end = Number(endRaw);
-    let step = 1;
-    if (stepRaw !== undefined) {
-      if (!intRe.test(stepRaw)) return null;
-      step = Math.abs(Number(stepRaw));
-      if (step === 0) return null;
-    }
-    const count = Math.floor(Math.abs(end - start) / step) + 1;
-    if (count > MAX_BRACE_RESULTS) return null;
-    const padded = /^-?0\d/.test(startRaw ?? "") || /^-?0\d/.test(endRaw ?? "");
-    const width = padded
-      ? Math.max((startRaw ?? "").replace("-", "").length, (endRaw ?? "").replace("-", "").length)
-      : 0;
-    const dir = end >= start ? 1 : -1;
-    const out: string[] = [];
-    for (let v = start; dir > 0 ? v <= end : v >= end; v += dir * step) {
-      out.push(width > 0 ? padInt(v, width) : String(v));
-    }
-    return out;
-  }
-  const letterRe = /^[A-Za-z]$/;
-  if (stepRaw === undefined && letterRe.test(startRaw ?? "") && letterRe.test(endRaw ?? "")) {
-    const start = (startRaw ?? "").charCodeAt(0);
-    const end = (endRaw ?? "").charCodeAt(0);
-    const count = Math.abs(end - start) + 1;
-    if (count > MAX_BRACE_RESULTS) return null;
-    const dir = end >= start ? 1 : -1;
-    const out: string[] = [];
-    for (let c = start; dir > 0 ? c <= end : c >= end; c += dir) {
-      out.push(String.fromCharCode(c));
-    }
-    return out;
-  }
-  return null; // mismatched or otherwise unenumerable → hold, fail-closed.
-}
-
-/**
- * Recursive brace expansion over a word's verbatim source, tracking a shared
- * `groups` budget. Returns null the instant either budget cap would be crossed
- * or a range is unenumerable — the count is accumulated as results are built and
- * checked BEFORE the array grows past the cap, so an adversarial word never
- * materialises its full cartesian product. Results are still raw (quotes/escapes
- * intact); `bashBraceExpand` collapses them to bash word values.
- */
-function expandBraces(text: string, budget: { groups: number }): string[] | null {
-  const brace = findExpandableBrace(text);
-  if (!brace) return [text];
-  budget.groups += 1;
-  if (budget.groups > MAX_BRACE_GROUPS) return null;
-  const pre = text.slice(0, brace.start);
-  const body = text.slice(brace.start + 1, brace.end);
-  const post = text.slice(brace.end + 1);
-  const alternatives = brace.isRange ? enumerateRange(body) : splitTopLevelCommas(body);
-  if (alternatives === null) return null;
-  const postExpansions = expandBraces(post, budget);
-  if (postExpansions === null) return null;
-  const results: string[] = [];
-  for (const alternative of alternatives) {
-    const altExpansions = expandBraces(alternative, budget);
-    if (altExpansions === null) return null;
-    for (const expandedAlt of altExpansions) {
-      for (const expandedPost of postExpansions) {
-        results.push(pre + expandedAlt + expandedPost);
-        if (results.length > MAX_BRACE_RESULTS) return null;
-      }
-    }
-  }
-  return results;
-}
-
-/**
- * Bash-faithful brace expansion of a single word to the list of bash word values
- * it produces, enough to unmask a destructive verb or resource type spliced apart
- * by braces (`dele{,}te` → `[delete, delete]`, `del{e..e}te` → `[delete]`,
- * `data{set,}` → `[dataset, data]`). Returns null when the expansion is held
- * fail-closed (budget exceeded or an unenumerable range) — the caller must HOLD,
- * never brace-strip. Empty alternatives (`{,delete,}`) yield empty strings here;
- * bash drops them by word splitting, but the caller only tests each result
- * against the verb/resource sets, which no empty string joins.
- */
-export function bashBraceExpand(word: string): string[] | null {
-  const expanded = expandBraces(word, { groups: 0 });
-  if (expanded === null) return null;
-  return expanded.map((piece) => shellWords(piece).words[0]?.value ?? piece);
-}
-
-/**
- * True when `raw` contains a `{` that bash would subject to brace expansion —
- * i.e. one outside any quotes and not backslash-escaped. Quoting suppresses
- * brace expansion (`"dele{,}te"` stays literal), so a quoted brace must NOT
- * trigger the argument expansion pass.
- */
-function hasUnquotedBrace(raw: string): boolean {
+function hasUnquotedExpansionChar(raw: string): boolean {
   let inSingle = false;
   let inDouble = false;
   for (let i = 0; i < raw.length; i += 1) {
@@ -865,72 +680,15 @@ function hasUnquotedBrace(raw: string): boolean {
       inSingle = !inSingle;
     } else if (c === '"' && !inSingle) {
       inDouble = !inDouble;
-    } else if (c === "{" && !inSingle && !inDouble) {
+    } else if (
+      !inSingle &&
+      !inDouble &&
+      (c === "*" || c === "?" || c === "[" || c === "{" || c === "}")
+    ) {
       return true;
     }
   }
   return false;
-}
-
-/**
- * True when `raw` contains an unquoted, unescaped glob metacharacter (`*`, `?`,
- * or `[`) — the ones bash would subject to pathname expansion. A quoted or
- * escaped glob (`ls "*.ts"`, `grep -r '*' .`) is left literal by bash and must
- * NOT be read as a glob, so it is not detected here.
- */
-function hasUnquotedGlobChar(raw: string): boolean {
-  let inSingle = false;
-  let inDouble = false;
-  for (let i = 0; i < raw.length; i += 1) {
-    const c = raw[i];
-    if (c === "\\" && !inSingle) {
-      i += 1; // skip the escaped character
-      continue;
-    }
-    if (c === "'" && !inDouble) {
-      inSingle = !inSingle;
-    } else if (c === '"' && !inSingle) {
-      inDouble = !inDouble;
-    } else if (!inSingle && !inDouble && (c === "*" || c === "?" || c === "[")) {
-      return true;
-    }
-  }
-  return false;
-}
-
-/**
- * True when a globbed basename could expand to a shell or code interpreter, so
- * the segment must be held (`/bin/ba*sh`, `ba?h`, `[b]ash`, `pyth*n3`). Not
- * every glob is held — only one whose pattern could name an executor — so
- * ordinary globbing stays allowed (`ls *.ts`, `rm -f *.tmp`, `grep foo
- * src/**` + `/*.ts`).
- *
- * `[...]` bracket expressions are reduced to a representative first inner char
- * (`[b]ash` → `bash`, bash-simplest, an accepted residual for multi-char
- * classes). `*` and `?` become a `.*`/`.` regex tested against every executor
- * name: `*` matches zero-or-more, `?` exactly one, so `ba*sh`/`ba?h` both reach
- * `bash` and `pyth*n3` reaches `python3` — a naive "strip the glob chars" would
- * miss all three (it yields `bah`/`pythn3`). Only the finite `SEGMENT_EXECUTORS`
- * universe is scanned; a glob crafted to hit ONLY a versioned interpreter form
- * (`python3.1*`) is a documented residual.
- */
-function globCouldBeExecutor(base: string): boolean {
-  if (!/[*?[]/.test(base)) return false;
-  // Reduce each `[..]` to its first inner char, then drop any stray unmatched
-  // `[` so it is not carried into the regex as a metacharacter.
-  let candidate = base.replace(/\[(.)[^\]]*\]/g, "$1").replace(/\[/g, "");
-  if (candidate.includes("*") || candidate.includes("?")) {
-    const pattern = `^${candidate
-      .split(/([*?])/)
-      .map((part) => (part === "*" ? ".*" : part === "?" ? "." : escapeForRegExp(part)))
-      .join("")}$`;
-    const re = new RegExp(pattern);
-    for (const name of SEGMENT_EXECUTORS) {
-      if (re.test(name)) return true;
-    }
-    return false;
-  }
-  return matchesExecutor(candidate);
 }
 
 /**
@@ -1028,6 +786,31 @@ function classifySegment(segment: string): DestructiveMatch | null {
     return { kind: "unparseable", segment, cause: "obfuscated-command-name" };
   }
 
+  // Structural expansion hold: any word carrying an UNQUOTED glob metacharacter
+  // (`*`, `?`, `[`) or brace (`{`, `}`), anywhere in the segment and in any
+  // command head, is held UNCONDITIONALLY as unresolvable — the same fail-closed
+  // bucket as `$`/backtick/`<(` above. bash would expand these at runtime into
+  // words the gate never sees (a glob resolving to `/bin/bash`, a brace group
+  // reassembling a destructive verb or an executor name), and modelling that
+  // expansion piecemeal repeatedly left a sibling hole open, so the whole class
+  // is held instead. Two standalone-word exceptions stay allowed: `[`/`]` are
+  // the POSIX `test` builtin, and `{`/`}` are shell group-command braces (a bare
+  // `bash` inside `{ bash; }` is still caught by the executor scan below on its
+  // own word). Quoted/escaped forms (`'*.ts'`, `"{a,b}"`, `\*`) are literal.
+  for (const word of stripped) {
+    if (
+      word.value === "[" ||
+      word.value === "]" ||
+      word.value === "{" ||
+      word.value === "}"
+    ) {
+      continue;
+    }
+    if (hasUnquotedExpansionChar(word.raw)) {
+      return { kind: "unparseable", segment };
+    }
+  }
+
   // From here on, resolve against the bash-word VALUES (quotes/backslashes
   // already collapsed), so a spliced destructive verb in argument position
   // (`langwatch dataset "de""lete" d1` → `delete`) is matched at its real value.
@@ -1059,29 +842,19 @@ function classifySegment(segment: string): DestructiveMatch | null {
   // off-head, `.` is find's current-directory argument and neither can be exec'd
   // as an external program by a wrapper.
   //
-  // Each word is inspected three ways, because bash reaches the same executor by
-  // more than a bare name:
-  //  1. an unquoted BRACE splice (`{bash,}`, `{ba,}sh`, `b{a..a}sh`, `nice
-  //     {,bash}`) — the lexer copies braces literally, so the executor name is
-  //     never contiguous in `.value`; expand it bash-faithfully and test each
-  //     result. Over-budget/unenumerable expansions fail closed exactly as the
-  //     langwatch argument pass does, and a word with an unquoted `{` over
-  //     `MAX_BRACE_WORD_LENGTH` is HELD before expansion in every position (an
-  //     executor could hide behind arbitrary padding inside the group,
-  //     `{bash,<1100 chars>}`, and the unmatched-brace-run DoS is closed the
-  //     same way) — not only under a langwatch head.
-  //  2. an unquoted GLOB (`/bin/ba*sh`, `ba?h`, `[b]ash`, `pyth*n3`) whose
-  //     pattern could name an executor — ordinary globs (`ls *.ts`) are untouched.
-  //  3. the plain basename, by exact membership OR a versioned interpreter form
-  //     (`python3.12`, `php8.3`).
+  // Each word's plain basename is tested by exact membership OR a versioned
+  // interpreter form (`python3.12`, `php8.3`). A splice of the name reaches this
+  // scan already resolved: quote/backslash splices are collapsed to their word
+  // VALUE by the lexer, and any unquoted glob or brace splice was already held by
+  // the structural expansion pass above (before this scan runs), so no
+  // brace/glob-specific branch is needed here.
   //
-  // What this scan covers, stated precisely: quote/backslash/brace splices of the
-  // name (via the lexer + the brace pass), an arbitrary chain of wrappers and
-  // path prefixes in front of it, globbed names, and version suffixes. What
-  // remains residual: a name assembled at RUNTIME from a `$VAR` (already held by
-  // UNRESOLVABLE), a name embedded inside a single quoted string that is not its
-  // own word (`env -S "python3 -c …"`), and a shell name carrying a suffix the
-  // interpreter regex does not cover (`bash5`, `bash.exe`).
+  // What this scan covers: quote/backslash splices of the name and an arbitrary
+  // chain of wrappers and path prefixes in front of it. What remains residual: a
+  // name assembled at RUNTIME from a `$VAR` (already held by UNRESOLVABLE), a name
+  // embedded inside a single quoted string that is not its own word (`env -S
+  // "python3 -c …"`), and a shell name carrying a suffix the interpreter regex
+  // does not cover (`bash5`, `bash.exe`).
   //
   // Accepted over-block, fail-closed by design: a plain word that merely EQUALS an
   // interpreter name is held too — `echo bash`, `grep python3 file`, `which sh`,
@@ -1093,38 +866,6 @@ function classifySegment(segment: string): DestructiveMatch | null {
     const word = stripped[i];
     if (!word) continue;
     const base = (word.value.split("/").pop() ?? word.value).toLowerCase();
-
-    // 1. Brace-spliced executor name anywhere in the segment.
-    if (hasUnquotedBrace(word.raw)) {
-      // A word carrying an unquoted `{` longer than the cap is held before
-      // expansion is attempted — fail-closed in EVERY position, since an
-      // executor name can hide behind arbitrary padding inside the group
-      // (`{bash,<pad>}`) and the unmatched-brace-run DoS shape is closed the
-      // same way. See `MAX_BRACE_WORD_LENGTH`.
-      if (word.raw.length > MAX_BRACE_WORD_LENGTH) {
-        return { kind: "unparseable", segment, cause: "brace-expansion-budget" };
-      }
-      const expansions = bashBraceExpand(word.raw);
-      if (expansions === null) {
-        // Over-budget or unenumerable: cannot prove no executor hides in it.
-        return { kind: "unparseable", segment, cause: "brace-expansion-budget" };
-      }
-      for (const expansion of expansions) {
-        const eb = (expansion.split("/").pop() ?? expansion).toLowerCase();
-        if (!eb) continue;
-        if ((eb === "." || eb === "source") && i !== 0) continue;
-        if (matchesExecutor(eb)) {
-          return { kind: "exec-file", segment };
-        }
-      }
-    }
-
-    // 2. Globbed executor name (only a glob that could name an executor).
-    if (hasUnquotedGlobChar(word.raw) && globCouldBeExecutor(base)) {
-      return { kind: "exec-file", segment };
-    }
-
-    // 3. Plain basename: exact member or a versioned interpreter form.
     if (!base) continue; // e.g. a trailing-slash path (`python3/`) — not an executable.
     if ((base === "." || base === "source") && i !== 0) continue;
     if (matchesExecutor(base)) {
@@ -1146,42 +887,10 @@ function classifySegment(segment: string): DestructiveMatch | null {
         return { kind: "cli-verb", verb, segment, target: commandTarget(values, i, verb) };
       }
     }
-    // Brace-expansion splice in argument position: the lexer copies braces
-    // literally, so a comma, empty-alternative, or range group that bash would
-    // expand into a destructive verb or a resource type (`dele{,}te` → `delete`,
-    // `data{set,}` → `dataset`, `del{e..e}te` → `delete`) slips past the verb
-    // match above. Fully brace-expand every unquoted-brace argument bash-faithful
-    // (`bashBraceExpand`, ranges enumerated) and hold if any expansion is a
-    // destructive verb or a resource type — a reconstructed command shape we
-    // cannot bind, held unconditionally (fail-closed). A null expansion (budget
-    // exceeded or an unenumerable range) is itself a hold. Quoted braces are
-    // suppressed by `hasUnquotedBrace`, and routine path braces (`cp foo.{js,ts}`,
-    // `mkdir src/{a,b}`) never reach here — this branch is `langwatch`-only.
-    for (let i = 1; i < stripped.length; i += 1) {
-      const word = stripped[i];
-      if (!word || !hasUnquotedBrace(word.raw)) continue;
-      // A word this long carrying an unquoted `{` is held before expansion is
-      // even attempted — closes the unmatched-brace-run DoS shape directly,
-      // independent of whether `findExpandableBrace`/`bashBraceExpand` would
-      // ever find a real group in it. See `MAX_BRACE_WORD_LENGTH`.
-      if (word.raw.length > MAX_BRACE_WORD_LENGTH) {
-        return { kind: "unparseable", segment, cause: "brace-expansion-budget" };
-      }
-      const expansions = bashBraceExpand(word.raw);
-      if (expansions === null) {
-        // Budget overflow or an unenumerable/mismatched range: fail closed,
-        // never brace-strip. bash leaves a mismatched range (`{a..3}`) literal;
-        // we hold instead — an over-block reachable only on a `langwatch`
-        // argument, the safe direction.
-        return { kind: "unparseable", segment, cause: "brace-expansion-budget" };
-      }
-      for (const expansion of expansions) {
-        const lower = expansion.toLowerCase();
-        if (DESTRUCTIVE_VERB_SET.has(lower) || RESOURCE_TYPES.has(lower)) {
-          return { kind: "unparseable", segment };
-        }
-      }
-    }
+    // A brace/glob splice in an argument (`dele{,}te`, `del{e..e}te`) never
+    // reaches here: the structural expansion pass above already held any unquoted
+    // brace or glob as unresolvable, so a `langwatch` invocation that survives to
+    // this point carries only literal, resolvable argument tokens.
     return null;
   }
 

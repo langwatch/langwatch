@@ -61,8 +61,10 @@ const BLOCK_REASON =
 
 const UNRESOLVABLE_REASON =
   "Blocked: this command could not be checked for a destructive LangWatch operation (shell substitution, " +
-  "an unrecognised wrapper, unbalanced quotes, or executing a file this gate cannot read). Re-issue it as a " +
-  "single plain `langwatch` command with no substitutions and no wrapper script so it can be checked.";
+  "shell expansion such as an unquoted glob (`*`, `?`, `[`) or brace (`{`, `}`), an unrecognised wrapper, " +
+  "unbalanced quotes, or executing a file this gate cannot read). Re-issue it as a single plain `langwatch` " +
+  "command with no substitutions and no wrapper script, and quote or write out any literal `*`, `?`, `[`, or " +
+  "`{` instead of relying on shell expansion, so it can be checked.";
 
 const OBFUSCATED_NAME_REASON =
   "Blocked: the command name is obfuscated by quote, backslash, or brace splicing (for example " +
