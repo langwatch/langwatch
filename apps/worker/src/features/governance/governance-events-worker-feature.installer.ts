@@ -1,5 +1,8 @@
 import { Deferred, type CommandDispatcher } from "@langwatch/eventing";
-import { WorkerFeatureHandlePort, WorkerFeatureInstallerPort } from "../worker-feature.installer";
+import type {
+  WorkerFeatureCloser,
+  WorkerFeatureInstallerPort,
+} from "../worker-feature.installer";
 import type { WorkerEventingRuntime } from "../../platform/eventing/worker-eventing.runtime";
 
 /** A registrable Eventing definition, as the worker's one runtime accepts it. */
@@ -40,7 +43,7 @@ export interface GovernanceEventsWorkerCapability {
  * leaves its debits with nowhere to land. Keeping them a pair is what
  * preserves that.
  */
-export class GovernanceEventsWorkerFeatureInstaller extends WorkerFeatureInstallerPort {
+export class GovernanceEventsWorkerFeatureInstaller implements WorkerFeatureInstallerPort {
   static create(options: {
     installer: GovernanceEventsWorkerCapability;
     eventing: WorkerEventingRuntime;
@@ -85,11 +88,9 @@ export class GovernanceEventsWorkerFeatureInstaller extends WorkerFeatureInstall
     private readonly installer: GovernanceEventsWorkerCapability,
     private readonly eventing: WorkerEventingRuntime,
     private readonly anomalySchedule: GovernanceAnomalySchedule | undefined,
-  ) {
-    super();
-  }
+  ) {}
 
-  async install(): Promise<WorkerFeatureHandlePort> {
+  async install(): Promise<WorkerFeatureCloser | undefined> {
     if (!this.installed) {
       const pipeline = this.eventing.eventSourcing.register(this.installer.buildProcessing());
       const commands = pipeline.commands as Record<string, { send(data: unknown): Promise<void> }>;
@@ -105,7 +106,8 @@ export class GovernanceEventsWorkerFeatureInstaller extends WorkerFeatureInstall
       this.anomalySchedule?.start();
       this.installed = true;
     }
-    return GovernanceEventsWorkerFeatureHandle.create(this.anomalySchedule);
+    const anomalySchedule = this.anomalySchedule;
+    return anomalySchedule ? () => anomalySchedule.stop() : undefined;
   }
 }
 
@@ -113,20 +115,4 @@ export class GovernanceEventsWorkerFeatureInstaller extends WorkerFeatureInstall
 export interface GovernanceAnomalySchedule {
   start(): void;
   stop(): Promise<void>;
-}
-
-class GovernanceEventsWorkerFeatureHandle extends WorkerFeatureHandlePort {
-  static create(
-    anomalySchedule: GovernanceAnomalySchedule | undefined,
-  ): GovernanceEventsWorkerFeatureHandle {
-    return new GovernanceEventsWorkerFeatureHandle(anomalySchedule);
-  }
-
-  private constructor(private readonly anomalySchedule: GovernanceAnomalySchedule | undefined) {
-    super();
-  }
-
-  async close(): Promise<void> {
-    await this.anomalySchedule?.stop();
-  }
 }

@@ -1,5 +1,8 @@
 import { EventingLangyMaintenanceAdapter } from "@langwatch/langy-server";
-import { WorkerFeatureHandlePort, WorkerFeatureInstallerPort } from "../worker-feature.installer";
+import type {
+  WorkerFeatureCloser,
+  WorkerFeatureInstallerPort,
+} from "../worker-feature.installer";
 import type { WorkerEventingRuntime } from "../../platform/eventing/worker-eventing.runtime";
 
 /** The revoke half of the sweep, so a caller can supply one without a database. */
@@ -22,7 +25,7 @@ export abstract class WorkerLangySessionKeyReapPort {
  * graph's own process store prunes, and a definition built against another
  * store prunes another process's rows.
  */
-export class LangyMaintenanceWorkerFeatureInstaller extends WorkerFeatureInstallerPort {
+export class LangyMaintenanceWorkerFeatureInstaller implements WorkerFeatureInstallerPort {
   static create(options: {
     eventing: WorkerEventingRuntime;
     sessionKeyReap: WorkerLangySessionKeyReapPort;
@@ -36,11 +39,9 @@ export class LangyMaintenanceWorkerFeatureInstaller extends WorkerFeatureInstall
   private constructor(
     private readonly eventing: WorkerEventingRuntime,
     private readonly sessionKeyReap: WorkerLangySessionKeyReapPort,
-  ) {
-    super();
-  }
+  ) {}
 
-  async install(): Promise<WorkerFeatureHandlePort> {
+  async install(): Promise<WorkerFeatureCloser | undefined> {
     if (!this.installed) {
       const processStore = this.eventing.processStore;
       this.eventing.eventSourcing.register(
@@ -53,18 +54,6 @@ export class LangyMaintenanceWorkerFeatureInstaller extends WorkerFeatureInstall
       );
       this.installed = true;
     }
-    return LangyMaintenanceWorkerFeatureHandle.create();
+    return undefined;
   }
-}
-
-class LangyMaintenanceWorkerFeatureHandle extends WorkerFeatureHandlePort {
-  static create(): LangyMaintenanceWorkerFeatureHandle {
-    return new LangyMaintenanceWorkerFeatureHandle();
-  }
-
-  private constructor() {
-    super();
-  }
-
-  async close(): Promise<void> {}
 }

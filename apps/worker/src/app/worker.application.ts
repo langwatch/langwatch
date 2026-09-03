@@ -1,5 +1,5 @@
-import {
-  WorkerFeatureHandlePort,
+import type {
+  WorkerFeatureCloser,
   WorkerFeatureInstallerPort,
 } from "../features/worker-feature.installer";
 import { WorkerEventingRuntime } from "../platform/eventing/worker-eventing.runtime";
@@ -14,7 +14,7 @@ export class WorkerApplication {
     return new WorkerApplication(options.runtime, options.featureInstallers, options.eventing);
   }
 
-  private readonly featureHandles: WorkerFeatureHandlePort[] = [];
+  private readonly featureClosers: WorkerFeatureCloser[] = [];
   private started = false;
   private closed = false;
   private starting: Promise<void> | undefined;
@@ -69,7 +69,8 @@ export class WorkerApplication {
   private async startApplication(): Promise<void> {
     try {
       for (const installer of this.featureInstallers) {
-        this.featureHandles.push(await installer.install());
+        const closer = await installer.install();
+        if (closer) this.featureClosers.push(closer);
       }
       this.eventing?.completeRegistrations();
       await this.eventing?.start();
@@ -136,14 +137,14 @@ export class WorkerApplication {
 
   private async closeFeatureHandlesBestEffort(): Promise<unknown> {
     let firstError: unknown;
-    for (const handle of this.featureHandles.reverse()) {
+    for (const closer of this.featureClosers.reverse()) {
       try {
-        await handle.close();
+        await closer();
       } catch (error) {
         firstError ??= error;
       }
     }
-    this.featureHandles.length = 0;
+    this.featureClosers.length = 0;
     return firstError;
   }
 }

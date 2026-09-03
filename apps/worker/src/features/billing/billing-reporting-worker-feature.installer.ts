@@ -1,5 +1,8 @@
 import { Deferred, type CommandDispatcher } from "@langwatch/eventing";
-import { WorkerFeatureHandlePort, WorkerFeatureInstallerPort } from "../worker-feature.installer";
+import type {
+  WorkerFeatureCloser,
+  WorkerFeatureInstallerPort,
+} from "../worker-feature.installer";
 import type { WorkerEventingRuntime } from "../../platform/eventing/worker-eventing.runtime";
 
 /** A registrable Eventing definition, as the worker's one runtime accepts it. */
@@ -29,7 +32,7 @@ export interface BillingReportingWorkerCapability<TReportUsage = unknown> {
  * is configured before any pipeline exists — which is exactly why the sender
  * it closes over is the proxy published here and not a direct handle.
  */
-export class BillingReportingWorkerFeatureInstaller extends WorkerFeatureInstallerPort {
+export class BillingReportingWorkerFeatureInstaller implements WorkerFeatureInstallerPort {
   static create(options: {
     installer: BillingReportingWorkerCapability;
     eventing: WorkerEventingRuntime;
@@ -53,11 +56,9 @@ export class BillingReportingWorkerFeatureInstaller extends WorkerFeatureInstall
   private constructor(
     private readonly installer: BillingReportingWorkerCapability,
     private readonly eventing: WorkerEventingRuntime,
-  ) {
-    super();
-  }
+  ) {}
 
-  async install(): Promise<WorkerFeatureHandlePort> {
+  async install(): Promise<WorkerFeatureCloser | undefined> {
     if (!this.installed) {
       const pipeline = this.eventing.eventSourcing.register(this.installer.buildProcessing());
       const commands = pipeline.commands as Record<string, { send(data: unknown): Promise<void> }>;
@@ -70,18 +71,6 @@ export class BillingReportingWorkerFeatureInstaller extends WorkerFeatureInstall
       this.installer.connectSelfDispatch((data) => dispatch(data));
       this.installed = true;
     }
-    return BillingReportingWorkerFeatureHandle.create();
+    return undefined;
   }
-}
-
-class BillingReportingWorkerFeatureHandle extends WorkerFeatureHandlePort {
-  static create(): BillingReportingWorkerFeatureHandle {
-    return new BillingReportingWorkerFeatureHandle();
-  }
-
-  private constructor() {
-    super();
-  }
-
-  async close(): Promise<void> {}
 }

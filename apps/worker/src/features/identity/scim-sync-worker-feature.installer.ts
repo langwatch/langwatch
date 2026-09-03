@@ -1,5 +1,8 @@
 import type { ScimSyncPipeline } from "@langwatch/identity-server";
-import { WorkerFeatureHandlePort, WorkerFeatureInstallerPort } from "../worker-feature.installer";
+import type {
+  WorkerFeatureCloser,
+  WorkerFeatureInstallerPort,
+} from "../worker-feature.installer";
 import type { WorkerEventingRuntime } from "../../platform/eventing/worker-eventing.runtime";
 
 /** Directory sync's worker-facing capability: the built pipeline definition. */
@@ -31,7 +34,7 @@ export interface ScimSyncWorkerCapability {
  * unchanged. Whoever makes the worker composition the live one drops the
  * legacy registration in the same change.
  */
-export class ScimSyncWorkerFeatureInstaller extends WorkerFeatureInstallerPort {
+export class ScimSyncWorkerFeatureInstaller implements WorkerFeatureInstallerPort {
   static create(options: {
     installer: ScimSyncWorkerCapability;
     eventing: WorkerEventingRuntime;
@@ -45,27 +48,13 @@ export class ScimSyncWorkerFeatureInstaller extends WorkerFeatureInstallerPort {
   private constructor(
     private readonly installer: ScimSyncWorkerCapability,
     private readonly eventing: WorkerEventingRuntime,
-  ) {
-    super();
-  }
+  ) {}
 
-  async install(): Promise<WorkerFeatureHandlePort> {
+  async install(): Promise<WorkerFeatureCloser | undefined> {
     if (!this.installed) {
       this.eventing.eventSourcing.register(this.installer.pipeline);
       this.installed = true;
     }
-    return ScimSyncWorkerFeatureHandle.create();
+    return undefined;
   }
-}
-
-class ScimSyncWorkerFeatureHandle extends WorkerFeatureHandlePort {
-  static create(): ScimSyncWorkerFeatureHandle {
-    return new ScimSyncWorkerFeatureHandle();
-  }
-
-  private constructor() {
-    super();
-  }
-
-  async close(): Promise<void> {}
 }

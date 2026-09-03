@@ -1,10 +1,9 @@
-export abstract class WorkerFeatureHandlePort {
-  abstract close(): Promise<void>;
-}
+/** Releases what a feature's `install()` acquired; runs in reverse install order. */
+export type WorkerFeatureCloser = () => Promise<void>;
 
 /** A feature-owned consumer/process-manager contribution to the worker graph. */
-export abstract class WorkerFeatureInstallerPort {
-  abstract readonly name: string;
+export interface WorkerFeatureInstallerPort {
+  readonly name: string;
 
-  abstract install(): Promise<WorkerFeatureHandlePort>;
+  install(): Promise<WorkerFeatureCloser | undefined>;
 }

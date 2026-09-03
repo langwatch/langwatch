@@ -1,5 +1,8 @@
 import type { JoinRequestPipeline } from "@langwatch/identity-server";
-import { WorkerFeatureHandlePort, WorkerFeatureInstallerPort } from "../worker-feature.installer";
+import type {
+  WorkerFeatureCloser,
+  WorkerFeatureInstallerPort,
+} from "../worker-feature.installer";
 import type { WorkerEventingRuntime } from "../../platform/eventing/worker-eventing.runtime";
 
 /** Join requests' worker-facing capability: the built pipeline definition. */
@@ -33,7 +36,7 @@ export interface JoinRequestWorkerCapability {
  * interstitial renders, and no panel appears. Whoever makes the worker
  * composition the live one drops the legacy registration in the same change.
  */
-export class JoinRequestWorkerFeatureInstaller extends WorkerFeatureInstallerPort {
+export class JoinRequestWorkerFeatureInstaller implements WorkerFeatureInstallerPort {
   static create(options: {
     installer: JoinRequestWorkerCapability;
     eventing: WorkerEventingRuntime;
@@ -47,27 +50,13 @@ export class JoinRequestWorkerFeatureInstaller extends WorkerFeatureInstallerPor
   private constructor(
     private readonly installer: JoinRequestWorkerCapability,
     private readonly eventing: WorkerEventingRuntime,
-  ) {
-    super();
-  }
+  ) {}
 
-  async install(): Promise<WorkerFeatureHandlePort> {
+  async install(): Promise<WorkerFeatureCloser | undefined> {
     if (!this.installed) {
       this.eventing.eventSourcing.register(this.installer.pipeline);
       this.installed = true;
     }
-    return JoinRequestWorkerFeatureHandle.create();
+    return undefined;
   }
-}
-
-class JoinRequestWorkerFeatureHandle extends WorkerFeatureHandlePort {
-  static create(): JoinRequestWorkerFeatureHandle {
-    return new JoinRequestWorkerFeatureHandle();
-  }
-
-  private constructor() {
-    super();
-  }
-
-  async close(): Promise<void> {}
 }

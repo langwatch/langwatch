@@ -1,4 +1,7 @@
-import { WorkerFeatureHandlePort, WorkerFeatureInstallerPort } from "../worker-feature.installer";
+import type {
+  WorkerFeatureCloser,
+  WorkerFeatureInstallerPort,
+} from "../worker-feature.installer";
 import type { WorkerEventingRuntime } from "../../platform/eventing/worker-eventing.runtime";
 
 /**
@@ -40,7 +43,7 @@ export interface GovernanceIngestionWorkerCapability {
  * deliberately not awaited: a Governance installation whose reconcile pass
  * fails logs and retries next boot rather than refusing to start the worker.
  */
-export class GovernanceIngestionWorkerFeatureInstaller extends WorkerFeatureInstallerPort {
+export class GovernanceIngestionWorkerFeatureInstaller implements WorkerFeatureInstallerPort {
   static create(options: {
     installer: GovernanceIngestionWorkerCapability;
     eventing: WorkerEventingRuntime;
@@ -55,9 +58,7 @@ export class GovernanceIngestionWorkerFeatureInstaller extends WorkerFeatureInst
   private constructor(
     private readonly installer: GovernanceIngestionWorkerCapability,
     private readonly eventing: WorkerEventingRuntime,
-  ) {
-    super();
-  }
+  ) {}
 
   /**
    * The installed command surfaces and lifecycle service.
@@ -73,20 +74,8 @@ export class GovernanceIngestionWorkerFeatureInstaller extends WorkerFeatureInst
     return this.installation;
   }
 
-  async install(): Promise<WorkerFeatureHandlePort> {
+  async install(): Promise<WorkerFeatureCloser | undefined> {
     this.installation ??= this.installer.register(this.eventing.eventSourcing);
-    return GovernanceIngestionWorkerFeatureHandle.create();
+    return undefined;
   }
-}
-
-class GovernanceIngestionWorkerFeatureHandle extends WorkerFeatureHandlePort {
-  static create(): GovernanceIngestionWorkerFeatureHandle {
-    return new GovernanceIngestionWorkerFeatureHandle();
-  }
-
-  private constructor() {
-    super();
-  }
-
-  async close(): Promise<void> {}
 }

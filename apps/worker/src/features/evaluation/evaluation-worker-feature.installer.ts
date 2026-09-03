@@ -6,7 +6,10 @@ import {
   type RegisteredCommand,
   type StaticPipelineDefinition,
 } from "@langwatch/eventing";
-import { WorkerFeatureHandlePort, WorkerFeatureInstallerPort } from "../worker-feature.installer";
+import type {
+  WorkerFeatureCloser,
+  WorkerFeatureInstallerPort,
+} from "../worker-feature.installer";
 import type { WorkerEventingRuntime } from "../../platform/eventing/worker-eventing.runtime";
 
 /**
@@ -60,7 +63,7 @@ export interface EvaluationWorkerCapability<TEvent extends Event = Event> {
  * actually been registered, so a mis-ordered graph fails loudly at boot
  * instead of dispatching into a pipeline that does not exist yet.
  */
-export class EvaluationWorkerFeatureInstaller extends WorkerFeatureInstallerPort {
+export class EvaluationWorkerFeatureInstaller implements WorkerFeatureInstallerPort {
   static create<TEvent extends Event>(options: {
     installer: EvaluationWorkerCapability<TEvent>;
     eventing: WorkerEventingRuntime;
@@ -90,11 +93,9 @@ export class EvaluationWorkerFeatureInstaller extends WorkerFeatureInstallerPort
 
   private installed = false;
 
-  private constructor(private readonly registerPipeline: () => unknown) {
-    super();
-  }
+  private constructor(private readonly registerPipeline: () => unknown) {}
 
-  async install(): Promise<WorkerFeatureHandlePort> {
+  async install(): Promise<WorkerFeatureCloser | undefined> {
     if (!this.installed) {
       const commands = this.registerPipeline() as Record<
         string,
@@ -111,18 +112,6 @@ export class EvaluationWorkerFeatureInstaller extends WorkerFeatureInstallerPort
       this.reportEvaluation.resolve((data) => reportEvaluation.send(data));
       this.installed = true;
     }
-    return EvaluationWorkerFeatureHandle.create();
+    return undefined;
   }
-}
-
-class EvaluationWorkerFeatureHandle extends WorkerFeatureHandlePort {
-  static create(): EvaluationWorkerFeatureHandle {
-    return new EvaluationWorkerFeatureHandle();
-  }
-
-  private constructor() {
-    super();
-  }
-
-  async close(): Promise<void> {}
 }

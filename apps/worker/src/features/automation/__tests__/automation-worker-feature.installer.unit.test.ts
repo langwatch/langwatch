@@ -48,11 +48,12 @@ describe("AutomationWorkerFeatureInstaller", () => {
       const stop = vi.fn(async () => {});
       const installer = createInstaller({ start, stop });
 
-      const handle = await installer.install();
+      const closer = await installer.install();
       expect(start).toHaveBeenCalledTimes(1);
       expect(stop).not.toHaveBeenCalled();
 
-      await handle.close();
+      expect(closer).toBeDefined();
+      await closer!();
       expect(stop).toHaveBeenCalledTimes(1);
     });
 
@@ -70,12 +71,12 @@ describe("AutomationWorkerFeatureInstaller", () => {
   });
 
   describe("given a process that composed no report calendar", () => {
-    it("installs and closes without one", async () => {
+    it("installs with nothing to close", async () => {
       const installer = createInstaller();
 
-      const handle = await installer.install();
+      const closer = await installer.install();
 
-      await expect(handle.close()).resolves.toBeUndefined();
+      expect(closer).toBeUndefined();
     });
   });
 });

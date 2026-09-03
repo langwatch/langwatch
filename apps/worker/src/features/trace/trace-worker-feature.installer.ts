@@ -5,7 +5,10 @@ import {
   type RecordSpanCommandData,
   TraceTopicAssignmentPort,
 } from "@langwatch/trace-contract";
-import { WorkerFeatureHandlePort, WorkerFeatureInstallerPort } from "../worker-feature.installer";
+import type {
+  WorkerFeatureCloser,
+  WorkerFeatureInstallerPort,
+} from "../worker-feature.installer";
 import type { WorkerEventingRuntime } from "../../platform/eventing/worker-eventing.runtime";
 
 class WorkerTraceTopicAssignments extends TraceTopicAssignmentPort {
@@ -24,7 +27,7 @@ class WorkerTraceTopicAssignments extends TraceTopicAssignmentPort {
 }
 
 /** Worker-owned mounting point for Trace's complete processing registration. */
-export class TraceWorkerFeatureInstaller extends WorkerFeatureInstallerPort {
+export class TraceWorkerFeatureInstaller implements WorkerFeatureInstallerPort {
   static create(options: {
     installer: TraceProcessingInstallerPort;
     eventing: WorkerEventingRuntime;
@@ -57,29 +60,15 @@ export class TraceWorkerFeatureInstaller extends WorkerFeatureInstallerPort {
   private constructor(
     private readonly installer: TraceProcessingInstallerPort,
     private readonly eventing: WorkerEventingRuntime,
-  ) {
-    super();
-  }
+  ) {}
 
-  async install(): Promise<WorkerFeatureHandlePort> {
+  async install(): Promise<WorkerFeatureCloser | undefined> {
     if (!this.installed) {
       const installed = this.installer.install(this.eventing.eventSourcing);
       this.traceAssignments.connect(installed.traceAssignments);
       this.recordSpan.resolve(installed.commands.recordSpan);
       this.installed = true;
     }
-    return TraceWorkerFeatureHandle.create();
+    return undefined;
   }
-}
-
-class TraceWorkerFeatureHandle extends WorkerFeatureHandlePort {
-  static create(): TraceWorkerFeatureHandle {
-    return new TraceWorkerFeatureHandle();
-  }
-
-  private constructor() {
-    super();
-  }
-
-  async close(): Promise<void> {}
 }

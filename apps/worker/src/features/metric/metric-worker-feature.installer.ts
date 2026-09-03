@@ -1,7 +1,10 @@
 import type { EventSubscriberDefinition } from "@langwatch/eventing";
 import type { MetricProcessingPipeline } from "@langwatch/metric-server";
 import type { MetricProcessingEvent } from "@langwatch/metric-contract";
-import { WorkerFeatureHandlePort, WorkerFeatureInstallerPort } from "../worker-feature.installer";
+import type {
+  WorkerFeatureCloser,
+  WorkerFeatureInstallerPort,
+} from "../worker-feature.installer";
 import type { WorkerEventingRuntime } from "../../platform/eventing/worker-eventing.runtime";
 
 /** Metric's worker-facing capability after its server graph is composed. */
@@ -21,7 +24,7 @@ export interface MetricWorkerCapability {
  * only guarantees that whatever it was given is mounted before queue
  * readiness.
  */
-export class MetricWorkerFeatureInstaller extends WorkerFeatureInstallerPort {
+export class MetricWorkerFeatureInstaller implements WorkerFeatureInstallerPort {
   static create(options: {
     installer: MetricWorkerCapability;
     eventing: WorkerEventingRuntime;
@@ -41,29 +44,15 @@ export class MetricWorkerFeatureInstaller extends WorkerFeatureInstallerPort {
     private readonly installer: MetricWorkerCapability,
     private readonly eventing: WorkerEventingRuntime,
     private readonly subscribers: EventSubscriberDefinition<MetricProcessingEvent>[] | undefined,
-  ) {
-    super();
-  }
+  ) {}
 
-  async install(): Promise<WorkerFeatureHandlePort> {
+  async install(): Promise<WorkerFeatureCloser | undefined> {
     if (!this.installed) {
       this.eventing.eventSourcing.register(
         this.installer.buildProcessing({ subscribers: this.subscribers }),
       );
       this.installed = true;
     }
-    return MetricWorkerFeatureHandle.create();
+    return undefined;
   }
-}
-
-class MetricWorkerFeatureHandle extends WorkerFeatureHandlePort {
-  static create(): MetricWorkerFeatureHandle {
-    return new MetricWorkerFeatureHandle();
-  }
-
-  private constructor() {
-    super();
-  }
-
-  async close(): Promise<void> {}
 }

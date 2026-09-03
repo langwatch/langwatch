@@ -74,8 +74,8 @@ export {
   type SuiteWorkerCommands,
 } from "./features/suite/suite-worker-feature.installer";
 export {
-  WorkerFeatureHandlePort,
-  WorkerFeatureInstallerPort,
+  type WorkerFeatureCloser,
+  type WorkerFeatureInstallerPort,
 } from "./features/worker-feature.installer";
 export {
   resolveWorkerConfig,

@@ -1,5 +1,8 @@
 import { EventingAgentSandboxMaintenanceAdapter } from "@langwatch/api-key-server";
-import { WorkerFeatureHandlePort, WorkerFeatureInstallerPort } from "../worker-feature.installer";
+import type {
+  WorkerFeatureCloser,
+  WorkerFeatureInstallerPort,
+} from "../worker-feature.installer";
 import type { WorkerEventingRuntime } from "../../platform/eventing/worker-eventing.runtime";
 
 /** The revoke half of the sweep, so a caller can supply one without a database. */
@@ -23,7 +26,7 @@ export abstract class WorkerAgentSandboxKeyReapPort {
  * the ones this graph's own process store prunes, and a definition built against
  * another store prunes another process's rows.
  */
-export class ApiKeyWorkerFeatureInstaller extends WorkerFeatureInstallerPort {
+export class ApiKeyWorkerFeatureInstaller implements WorkerFeatureInstallerPort {
   static create(options: {
     eventing: WorkerEventingRuntime;
     sandboxKeyReap: WorkerAgentSandboxKeyReapPort;
@@ -37,11 +40,9 @@ export class ApiKeyWorkerFeatureInstaller extends WorkerFeatureInstallerPort {
   private constructor(
     private readonly eventing: WorkerEventingRuntime,
     private readonly sandboxKeyReap: WorkerAgentSandboxKeyReapPort,
-  ) {
-    super();
-  }
+  ) {}
 
-  async install(): Promise<WorkerFeatureHandlePort> {
+  async install(): Promise<WorkerFeatureCloser | undefined> {
     if (!this.installed) {
       const processStore = this.eventing.processStore;
       this.eventing.eventSourcing.register(
@@ -54,18 +55,6 @@ export class ApiKeyWorkerFeatureInstaller extends WorkerFeatureInstallerPort {
       );
       this.installed = true;
     }
-    return ApiKeyWorkerFeatureHandle.create();
+    return undefined;
   }
-}
-
-class ApiKeyWorkerFeatureHandle extends WorkerFeatureHandlePort {
-  static create(): ApiKeyWorkerFeatureHandle {
-    return new ApiKeyWorkerFeatureHandle();
-  }
-
-  private constructor() {
-    super();
-  }
-
-  async close(): Promise<void> {}
 }

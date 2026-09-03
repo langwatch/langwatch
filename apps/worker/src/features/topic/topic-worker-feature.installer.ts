@@ -1,7 +1,10 @@
 import { Deferred } from "@langwatch/eventing";
 import type { TopicClusteringCommandsPort } from "@langwatch/topic-server";
 import type { TraceTopicAssignmentPort } from "@langwatch/trace-contract";
-import { WorkerFeatureHandlePort, WorkerFeatureInstallerPort } from "../worker-feature.installer";
+import type {
+  WorkerFeatureCloser,
+  WorkerFeatureInstallerPort,
+} from "../worker-feature.installer";
 import type { WorkerEventingRuntime } from "../../platform/eventing/worker-eventing.runtime";
 
 /** Topic's worker-facing capability after its server graph is composed. */
@@ -15,7 +18,7 @@ export interface TopicWorkerCapability {
 }
 
 /** Worker consumer, boot-seed, and manual-task wiring for the Topic installer. */
-export class TopicWorkerFeatureInstaller extends WorkerFeatureInstallerPort {
+export class TopicWorkerFeatureInstaller implements WorkerFeatureInstallerPort {
   static create(options: {
     installer: TopicWorkerCapability;
     eventing: WorkerEventingRuntime;
@@ -58,11 +61,9 @@ export class TopicWorkerFeatureInstaller extends WorkerFeatureInstallerPort {
     private readonly installer: TopicWorkerCapability,
     private readonly eventing: WorkerEventingRuntime,
     private readonly traceAssignments: TraceTopicAssignmentPort,
-  ) {
-    super();
-  }
+  ) {}
 
-  async install(): Promise<WorkerFeatureHandlePort> {
+  async install(): Promise<WorkerFeatureCloser | undefined> {
     if (!this.installed) {
       const installed = this.installer.install({
         eventSourcing: this.eventing.eventSourcing,
@@ -72,7 +73,7 @@ export class TopicWorkerFeatureInstaller extends WorkerFeatureInstallerPort {
       this.installer.startBootSeeds();
       this.installed = true;
     }
-    return TopicWorkerFeatureHandle.create();
+    return undefined;
   }
 
   async requestManualRun(projectId: string, occurredAt = Date.now()): Promise<void> {
@@ -82,16 +83,4 @@ export class TopicWorkerFeatureInstaller extends WorkerFeatureInstallerPort {
       trigger: "manual",
     });
   }
-}
-
-class TopicWorkerFeatureHandle extends WorkerFeatureHandlePort {
-  static create(): TopicWorkerFeatureHandle {
-    return new TopicWorkerFeatureHandle();
-  }
-
-  private constructor() {
-    super();
-  }
-
-  async close(): Promise<void> {}
 }

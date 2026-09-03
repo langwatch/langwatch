@@ -1,4 +1,7 @@
-import { WorkerFeatureHandlePort, WorkerFeatureInstallerPort } from "../worker-feature.installer";
+import type {
+  WorkerFeatureCloser,
+  WorkerFeatureInstallerPort,
+} from "../worker-feature.installer";
 import type { WorkerEventingRuntime } from "../../platform/eventing/worker-eventing.runtime";
 
 /** A registrable Eventing definition, as the worker's one runtime accepts it. */
@@ -32,7 +35,7 @@ export interface GatewaySpendWorkerCapability<TSettleSpend = unknown> {
  * Postgres fallback, and always immediately after Governance events, whose
  * commands its debit adapter delivers into.
  */
-export class GatewaySpendWorkerFeatureInstaller extends WorkerFeatureInstallerPort {
+export class GatewaySpendWorkerFeatureInstaller implements WorkerFeatureInstallerPort {
   static create(options: {
     installer: GatewaySpendWorkerCapability;
     eventing: WorkerEventingRuntime;
@@ -46,11 +49,9 @@ export class GatewaySpendWorkerFeatureInstaller extends WorkerFeatureInstallerPo
   private constructor(
     private readonly installer: GatewaySpendWorkerCapability,
     private readonly eventing: WorkerEventingRuntime,
-  ) {
-    super();
-  }
+  ) {}
 
-  async install(): Promise<WorkerFeatureHandlePort> {
+  async install(): Promise<WorkerFeatureCloser | undefined> {
     if (!this.installed) {
       const pipeline = this.eventing.eventSourcing.register(this.installer.buildProcessing());
       const commands = pipeline.commands as Record<string, { send(data: unknown): Promise<void> }>;
@@ -61,18 +62,6 @@ export class GatewaySpendWorkerFeatureInstaller extends WorkerFeatureInstallerPo
       this.installer.connectSettlement((data) => settleSpend.send(data));
       this.installed = true;
     }
-    return GatewaySpendWorkerFeatureHandle.create();
+    return undefined;
   }
-}
-
-class GatewaySpendWorkerFeatureHandle extends WorkerFeatureHandlePort {
-  static create(): GatewaySpendWorkerFeatureHandle {
-    return new GatewaySpendWorkerFeatureHandle();
-  }
-
-  private constructor() {
-    super();
-  }
-
-  async close(): Promise<void> {}
 }

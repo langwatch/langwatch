@@ -1,6 +1,9 @@
 import { Deferred, type CommandDispatcher } from "@langwatch/eventing";
 import type { ExperimentRunProcessingPipeline } from "@langwatch/experiment-server";
-import { WorkerFeatureHandlePort, WorkerFeatureInstallerPort } from "../worker-feature.installer";
+import type {
+  WorkerFeatureCloser,
+  WorkerFeatureInstallerPort,
+} from "../worker-feature.installer";
 import type { WorkerEventingRuntime } from "../../platform/eventing/worker-eventing.runtime";
 
 /** Experiment's worker-facing capability after its server graph is composed. */
@@ -28,7 +31,7 @@ export interface ExperimentWorkerCapability {
  * that owns the ClickHouse resolver; it is deliberately not part of this
  * feature's worker surface.
  */
-export class ExperimentWorkerFeatureInstaller extends WorkerFeatureInstallerPort {
+export class ExperimentWorkerFeatureInstaller implements WorkerFeatureInstallerPort {
   static create(options: {
     installer: ExperimentWorkerCapability;
     eventing: WorkerEventingRuntime;
@@ -52,11 +55,9 @@ export class ExperimentWorkerFeatureInstaller extends WorkerFeatureInstallerPort
   private constructor(
     private readonly installer: ExperimentWorkerCapability,
     private readonly eventing: WorkerEventingRuntime,
-  ) {
-    super();
-  }
+  ) {}
 
-  async install(): Promise<WorkerFeatureHandlePort> {
+  async install(): Promise<WorkerFeatureCloser | undefined> {
     if (!this.installed) {
       const pipeline = this.eventing.eventSourcing.register(this.installer.buildProcessing());
       const commands = pipeline.commands as Record<string, { send(data: unknown): Promise<void> }>;
@@ -69,18 +70,6 @@ export class ExperimentWorkerFeatureInstaller extends WorkerFeatureInstallerPort
       this.computeExperimentRunMetrics.resolve((data) => computeMetrics.send(data));
       this.installed = true;
     }
-    return ExperimentWorkerFeatureHandle.create();
+    return undefined;
   }
-}
-
-class ExperimentWorkerFeatureHandle extends WorkerFeatureHandlePort {
-  static create(): ExperimentWorkerFeatureHandle {
-    return new ExperimentWorkerFeatureHandle();
-  }
-
-  private constructor() {
-    super();
-  }
-
-  async close(): Promise<void> {}
 }

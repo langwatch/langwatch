@@ -4,7 +4,10 @@ import type {
   RegisteredCommand,
   StaticPipelineDefinition,
 } from "@langwatch/eventing";
-import { WorkerFeatureHandlePort, WorkerFeatureInstallerPort } from "../worker-feature.installer";
+import type {
+  WorkerFeatureCloser,
+  WorkerFeatureInstallerPort,
+} from "../worker-feature.installer";
 import type { WorkerEventingRuntime } from "../../platform/eventing/worker-eventing.runtime";
 
 /**
@@ -47,7 +50,7 @@ export interface SsoConnectionWorkerCapability<TEvent extends Event = Event> {
  * the worker composition the live one drops the legacy registration in the
  * same change.
  */
-export class SsoConnectionWorkerFeatureInstaller extends WorkerFeatureInstallerPort {
+export class SsoConnectionWorkerFeatureInstaller implements WorkerFeatureInstallerPort {
   static create<TEvent extends Event>(options: {
     installer: SsoConnectionWorkerCapability<TEvent>;
     eventing: WorkerEventingRuntime;
@@ -60,27 +63,13 @@ export class SsoConnectionWorkerFeatureInstaller extends WorkerFeatureInstallerP
   readonly name = "sso-connection";
   private installed = false;
 
-  private constructor(private readonly registerPipeline: () => unknown) {
-    super();
-  }
+  private constructor(private readonly registerPipeline: () => unknown) {}
 
-  async install(): Promise<WorkerFeatureHandlePort> {
+  async install(): Promise<WorkerFeatureCloser | undefined> {
     if (!this.installed) {
       this.registerPipeline();
       this.installed = true;
     }
-    return SsoConnectionWorkerFeatureHandle.create();
+    return undefined;
   }
-}
-
-class SsoConnectionWorkerFeatureHandle extends WorkerFeatureHandlePort {
-  static create(): SsoConnectionWorkerFeatureHandle {
-    return new SsoConnectionWorkerFeatureHandle();
-  }
-
-  private constructor() {
-    super();
-  }
-
-  async close(): Promise<void> {}
 }

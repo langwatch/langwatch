@@ -7,7 +7,10 @@ import type {
   RegisteredCommand,
   StaticPipelineDefinition,
 } from "@langwatch/eventing";
-import { WorkerFeatureHandlePort, WorkerFeatureInstallerPort } from "../worker-feature.installer";
+import type {
+  WorkerFeatureCloser,
+  WorkerFeatureInstallerPort,
+} from "../worker-feature.installer";
 import type { WorkerEventingRuntime } from "../../platform/eventing/worker-eventing.runtime";
 
 /**
@@ -92,7 +95,7 @@ export interface AutomationWorkerCapability<TEvent extends Event = Event> {
  * governance graphs produce, and its settlement process manager is what turns
  * those matches into one notification per window.
  */
-export class AutomationWorkerFeatureInstaller extends WorkerFeatureInstallerPort {
+export class AutomationWorkerFeatureInstaller implements WorkerFeatureInstallerPort {
   /**
    * The registration is captured as a closure, and that is what erases the
    * event union.
@@ -138,11 +141,9 @@ export class AutomationWorkerFeatureInstaller extends WorkerFeatureInstallerPort
   private constructor(
     private readonly registerPipeline: () => unknown,
     private readonly reportSchedule: AutomationReportSchedule | undefined,
-  ) {
-    super();
-  }
+  ) {}
 
-  async install(): Promise<WorkerFeatureHandlePort> {
+  async install(): Promise<WorkerFeatureCloser | undefined> {
     if (!this.installed) {
       const commands = this.registerPipeline() as Record<string, unknown>;
       const recordTriggerMatch = commands.recordTriggerMatch;
@@ -159,7 +160,8 @@ export class AutomationWorkerFeatureInstaller extends WorkerFeatureInstallerPort
       this.reportSchedule?.start();
       this.installed = true;
     }
-    return AutomationWorkerFeatureHandle.create(this.reportSchedule);
+    const reportSchedule = this.reportSchedule;
+    return reportSchedule ? () => reportSchedule.stop() : undefined;
   }
 }
 
@@ -167,20 +169,4 @@ export class AutomationWorkerFeatureInstaller extends WorkerFeatureInstallerPort
 export interface AutomationReportSchedule {
   start(): void;
   stop(): Promise<void>;
-}
-
-class AutomationWorkerFeatureHandle extends WorkerFeatureHandlePort {
-  static create(
-    reportSchedule: AutomationReportSchedule | undefined,
-  ): AutomationWorkerFeatureHandle {
-    return new AutomationWorkerFeatureHandle(reportSchedule);
-  }
-
-  private constructor(private readonly reportSchedule: AutomationReportSchedule | undefined) {
-    super();
-  }
-
-  async close(): Promise<void> {
-    await this.reportSchedule?.stop();
-  }
 }

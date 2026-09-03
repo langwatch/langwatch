@@ -1,5 +1,8 @@
 import { EventingGithubMaintenanceAdapter } from "@langwatch/github-server";
-import { WorkerFeatureHandlePort, WorkerFeatureInstallerPort } from "../worker-feature.installer";
+import type {
+  WorkerFeatureCloser,
+  WorkerFeatureInstallerPort,
+} from "../worker-feature.installer";
 import type { WorkerEventingRuntime } from "../../platform/eventing/worker-eventing.runtime";
 
 /** The sweep, so a caller can supply one without a GitHub App or a database. */
@@ -26,7 +29,7 @@ export abstract class WorkerGithubBranchMaintenancePort {
  * the definition's dependency — the whole `GithubService`, an organization
  * service and a project service behind it — for two methods that read neither.
  */
-export class GithubWorkerFeatureInstaller extends WorkerFeatureInstallerPort {
+export class GithubWorkerFeatureInstaller implements WorkerFeatureInstallerPort {
   static create(options: {
     eventing: WorkerEventingRuntime;
     branchMaintenance: WorkerGithubBranchMaintenancePort;
@@ -40,11 +43,9 @@ export class GithubWorkerFeatureInstaller extends WorkerFeatureInstallerPort {
   private constructor(
     private readonly eventing: WorkerEventingRuntime,
     private readonly branchMaintenance: WorkerGithubBranchMaintenancePort,
-  ) {
-    super();
-  }
+  ) {}
 
-  async install(): Promise<WorkerFeatureHandlePort> {
+  async install(): Promise<WorkerFeatureCloser | undefined> {
     if (!this.installed) {
       this.eventing.eventSourcing.register(
         EventingGithubMaintenanceAdapter.create({
@@ -57,18 +58,6 @@ export class GithubWorkerFeatureInstaller extends WorkerFeatureInstallerPort {
       );
       this.installed = true;
     }
-    return GithubWorkerFeatureHandle.create();
+    return undefined;
   }
-}
-
-class GithubWorkerFeatureHandle extends WorkerFeatureHandlePort {
-  static create(): GithubWorkerFeatureHandle {
-    return new GithubWorkerFeatureHandle();
-  }
-
-  private constructor() {
-    super();
-  }
-
-  async close(): Promise<void> {}
 }

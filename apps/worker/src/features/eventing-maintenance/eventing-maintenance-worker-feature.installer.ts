@@ -4,7 +4,10 @@ import {
   createProcessManagerMaintenancePipeline,
   type ProcessRetentionMetricsPort,
 } from "@langwatch/eventing/server";
-import { WorkerFeatureHandlePort, WorkerFeatureInstallerPort } from "../worker-feature.installer";
+import type {
+  WorkerFeatureCloser,
+  WorkerFeatureInstallerPort,
+} from "../worker-feature.installer";
 import type { WorkerEventingRuntime } from "../../platform/eventing/worker-eventing.runtime";
 
 /** The queue-owned blob keyspace pass, injected because the sweeper holds Redis. */
@@ -23,7 +26,7 @@ export abstract class WorkerBlobSweepPort {
  * mounts them in, and because both are unconditional: the substrate exists in
  * every worker whether or not any feature pipeline is registered.
  */
-export class EventingMaintenanceWorkerFeatureInstaller extends WorkerFeatureInstallerPort {
+export class EventingMaintenanceWorkerFeatureInstaller implements WorkerFeatureInstallerPort {
   static create(options: {
     eventing: WorkerEventingRuntime;
     blobSweep: WorkerBlobSweepPort;
@@ -43,11 +46,9 @@ export class EventingMaintenanceWorkerFeatureInstaller extends WorkerFeatureInst
     private readonly eventing: WorkerEventingRuntime,
     private readonly blobSweep: WorkerBlobSweepPort,
     private readonly retentionMetrics: ProcessRetentionMetricsPort,
-  ) {
-    super();
-  }
+  ) {}
 
-  async install(): Promise<WorkerFeatureHandlePort> {
+  async install(): Promise<WorkerFeatureCloser | undefined> {
     if (!this.installed) {
       const processStore = this.eventing.processStore;
       this.eventing.eventSourcing.register(
@@ -73,18 +74,6 @@ export class EventingMaintenanceWorkerFeatureInstaller extends WorkerFeatureInst
       );
       this.installed = true;
     }
-    return EventingMaintenanceWorkerFeatureHandle.create();
+    return undefined;
   }
-}
-
-class EventingMaintenanceWorkerFeatureHandle extends WorkerFeatureHandlePort {
-  static create(): EventingMaintenanceWorkerFeatureHandle {
-    return new EventingMaintenanceWorkerFeatureHandle();
-  }
-
-  private constructor() {
-    super();
-  }
-
-  async close(): Promise<void> {}
 }

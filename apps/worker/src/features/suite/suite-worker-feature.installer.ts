@@ -1,6 +1,9 @@
 import { Deferred, type CommandDispatcher } from "@langwatch/eventing";
 import type { SuiteRunProcessingPipeline } from "@langwatch/suite-server";
-import { WorkerFeatureHandlePort, WorkerFeatureInstallerPort } from "../worker-feature.installer";
+import type {
+  WorkerFeatureCloser,
+  WorkerFeatureInstallerPort,
+} from "../worker-feature.installer";
 import type { WorkerEventingRuntime } from "../../platform/eventing/worker-eventing.runtime";
 
 /**
@@ -39,7 +42,7 @@ export interface SuiteWorkerCapability {
  * simulation side — so this installer has no ordering requirement of its own
  * beyond preceding the pipeline that dispatches to it.
  */
-export class SuiteWorkerFeatureInstaller extends WorkerFeatureInstallerPort {
+export class SuiteWorkerFeatureInstaller implements WorkerFeatureInstallerPort {
   static create(options: {
     installer: SuiteWorkerCapability;
     eventing: WorkerEventingRuntime;
@@ -67,11 +70,9 @@ export class SuiteWorkerFeatureInstaller extends WorkerFeatureInstallerPort {
   private constructor(
     private readonly installer: SuiteWorkerCapability,
     private readonly eventing: WorkerEventingRuntime,
-  ) {
-    super();
-  }
+  ) {}
 
-  async install(): Promise<WorkerFeatureHandlePort> {
+  async install(): Promise<WorkerFeatureCloser | undefined> {
     if (!this.installed) {
       const pipeline = this.eventing.eventSourcing.register(this.installer.buildProcessing());
       const commands = pipeline.commands as Record<string, { send(data: unknown): Promise<void> }>;
@@ -86,18 +87,6 @@ export class SuiteWorkerFeatureInstaller extends WorkerFeatureInstallerPort {
       this.completeSuiteRunItem.resolve((data) => completeItem.send(data));
       this.installed = true;
     }
-    return SuiteWorkerFeatureHandle.create();
+    return undefined;
   }
-}
-
-class SuiteWorkerFeatureHandle extends WorkerFeatureHandlePort {
-  static create(): SuiteWorkerFeatureHandle {
-    return new SuiteWorkerFeatureHandle();
-  }
-
-  private constructor() {
-    super();
-  }
-
-  async close(): Promise<void> {}
 }

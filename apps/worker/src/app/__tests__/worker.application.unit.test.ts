@@ -1,7 +1,7 @@
 import { describe, expect, it, vi } from "vitest";
 import { WorkerApplication } from "../worker.application";
-import {
-  WorkerFeatureHandlePort,
+import type {
+  WorkerFeatureCloser,
   WorkerFeatureInstallerPort,
 } from "../../features/worker-feature.installer";
 import { WorkerRuntime } from "../../platform/lifecycle/worker.runtime";
@@ -27,14 +27,10 @@ class Transport extends WorkerTransportPort {
   readonly start = vi.fn(async () => this.handle);
 }
 
-class FeatureHandle extends WorkerFeatureHandlePort {
-  readonly close = vi.fn(async (): Promise<void> => void 0);
-}
-
-class FeatureInstaller extends WorkerFeatureInstallerPort {
+class FeatureInstaller implements WorkerFeatureInstallerPort {
   readonly name = "topic";
-  readonly handle = new FeatureHandle();
-  readonly install = vi.fn(async () => this.handle);
+  readonly close = vi.fn(async (): Promise<void> => void 0);
+  readonly install = vi.fn(async (): Promise<WorkerFeatureCloser | undefined> => this.close);
 }
 
 class EventingQueue implements EventSourcedQueueProcessor<Record<string, unknown>> {
@@ -77,7 +73,7 @@ describe("WorkerApplication", () => {
 
     expect(first.install).toHaveBeenCalledBefore(transport.start);
     expect(second.install).toHaveBeenCalledBefore(transport.start);
-    expect(second.handle.close).toHaveBeenCalledBefore(first.handle.close);
+    expect(second.close).toHaveBeenCalledBefore(first.close);
   });
 
   it("shares concurrent starts without registering a feature twice", async () => {
@@ -101,12 +97,12 @@ describe("WorkerApplication", () => {
     const first = new FeatureInstaller();
     first.install.mockImplementation(async () => {
       phases.push("first");
-      return first.handle;
+      return first.close;
     });
     const second = new FeatureInstaller();
     second.install.mockImplementation(async () => {
       phases.push("second");
-      return second.handle;
+      return second.close;
     });
     const eventing = WorkerEventingRuntime.create({
       eventStore: EventStoreMemory.createForTesting(),
@@ -150,7 +146,7 @@ describe("WorkerApplication", () => {
 
     await expect(application.start()).rejects.toThrow("topic registration failed");
 
-    expect(first.handle.close).toHaveBeenCalledOnce();
+    expect(first.close).toHaveBeenCalledOnce();
   });
 
   it("drains Eventing before deferring infrastructure teardown after a transport-start failure", async () => {
@@ -163,7 +159,7 @@ describe("WorkerApplication", () => {
       phases.push("lifecycle");
     });
     const feature = new FeatureInstaller();
-    feature.handle.close.mockImplementation(async () => {
+    feature.close.mockImplementation(async () => {
       phases.push("feature");
     });
     const application = WorkerApplication.create({
@@ -196,7 +192,7 @@ describe("WorkerApplication", () => {
       consumers: { enabled: false },
     });
     const feature = new FeatureInstaller();
-    feature.handle.close.mockImplementation(async () => {
+    feature.close.mockImplementation(async () => {
       phases.push("feature");
     });
     const lifecycle = new Lifecycle();
@@ -221,7 +217,7 @@ describe("WorkerApplication", () => {
   it("closes every feature even when one feature cleanup fails", async () => {
     const first = new FeatureInstaller();
     const second = new FeatureInstaller();
-    second.handle.close.mockRejectedValueOnce(new Error("second cleanup failed"));
+    second.close.mockRejectedValueOnce(new Error("second cleanup failed"));
     const application = WorkerApplication.create({
       runtime: WorkerRuntime.create({ lifecycle: new Lifecycle(), transport: new Transport() }),
       featureInstallers: [first, second],
@@ -230,13 +226,13 @@ describe("WorkerApplication", () => {
     await application.start();
     await expect(application.close()).rejects.toThrow("second cleanup failed");
 
-    expect(first.handle.close).toHaveBeenCalledOnce();
+    expect(first.close).toHaveBeenCalledOnce();
   });
 
   it("drains Eventing before releasing feature and runtime infrastructure", async () => {
     const phases: string[] = [];
     const feature = new FeatureInstaller();
-    feature.handle.close.mockImplementation(async () => {
+    feature.close.mockImplementation(async () => {
       phases.push("feature");
     });
     const lifecycle = new Lifecycle();
@@ -263,7 +259,7 @@ describe("WorkerApplication", () => {
     const eventingError = new Error("eventing drain failed");
     const phases: string[] = [];
     const feature = new FeatureInstaller();
-    feature.handle.close.mockImplementation(async () => {
+    feature.close.mockImplementation(async () => {
       phases.push("feature");
       throw new Error("feature close failed");
     });

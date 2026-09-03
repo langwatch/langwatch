@@ -7,7 +7,10 @@ import {
   type StaticPipelineDefinition,
 } from "@langwatch/eventing";
 import { scenarioDeferredComputeRunMetricsJob } from "@langwatch/scenario-server";
-import { WorkerFeatureHandlePort, WorkerFeatureInstallerPort } from "../worker-feature.installer";
+import type {
+  WorkerFeatureCloser,
+  WorkerFeatureInstallerPort,
+} from "../worker-feature.installer";
 import type { WorkerEventingRuntime } from "../../platform/eventing/worker-eventing.runtime";
 
 /**
@@ -87,7 +90,7 @@ export interface ScenarioWorkerCapability<
  * job from the legacy registry cannot disagree with this one about the routing
  * key both consumers stage.
  */
-export class ScenarioWorkerFeatureInstaller extends WorkerFeatureInstallerPort {
+export class ScenarioWorkerFeatureInstaller implements WorkerFeatureInstallerPort {
   static create<TComputeRunMetrics extends Record<string, unknown>, TEvent extends Event>(options: {
     installer: ScenarioWorkerCapability<TComputeRunMetrics, TEvent>;
     eventing: WorkerEventingRuntime;
@@ -117,11 +120,9 @@ export class ScenarioWorkerFeatureInstaller extends WorkerFeatureInstallerPort {
   private constructor(
     private readonly installer: ScenarioWorkerCapability,
     private readonly eventing: WorkerEventingRuntime,
-  ) {
-    super();
-  }
+  ) {}
 
-  async install(): Promise<WorkerFeatureHandlePort> {
+  async install(): Promise<WorkerFeatureCloser | undefined> {
     if (!this.installed) {
       const pipeline = this.eventing.eventSourcing.register(this.installer.buildProcessing());
       const commands = pipeline.commands as Record<
@@ -169,18 +170,6 @@ export class ScenarioWorkerFeatureInstaller extends WorkerFeatureInstallerPort {
       });
       this.installed = true;
     }
-    return ScenarioWorkerFeatureHandle.create();
+    return undefined;
   }
-}
-
-class ScenarioWorkerFeatureHandle extends WorkerFeatureHandlePort {
-  static create(): ScenarioWorkerFeatureHandle {
-    return new ScenarioWorkerFeatureHandle();
-  }
-
-  private constructor() {
-    super();
-  }
-
-  async close(): Promise<void> {}
 }

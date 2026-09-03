@@ -1,7 +1,10 @@
 import type { EventSubscriberDefinition } from "@langwatch/eventing";
 import type { LogProcessingPipeline } from "@langwatch/log-server";
 import type { LogProcessingEvent } from "@langwatch/log-contract";
-import { WorkerFeatureHandlePort, WorkerFeatureInstallerPort } from "../worker-feature.installer";
+import type {
+  WorkerFeatureCloser,
+  WorkerFeatureInstallerPort,
+} from "../worker-feature.installer";
 import type { WorkerEventingRuntime } from "../../platform/eventing/worker-eventing.runtime";
 
 /** Log's worker-facing capability after its server graph is composed. */
@@ -21,7 +24,7 @@ export interface LogWorkerCapability {
  * only guarantees that whatever it was given is mounted before queue
  * readiness.
  */
-export class LogWorkerFeatureInstaller extends WorkerFeatureInstallerPort {
+export class LogWorkerFeatureInstaller implements WorkerFeatureInstallerPort {
   static create(options: {
     installer: LogWorkerCapability;
     eventing: WorkerEventingRuntime;
@@ -37,29 +40,15 @@ export class LogWorkerFeatureInstaller extends WorkerFeatureInstallerPort {
     private readonly installer: LogWorkerCapability,
     private readonly eventing: WorkerEventingRuntime,
     private readonly subscribers: EventSubscriberDefinition<LogProcessingEvent>[] | undefined,
-  ) {
-    super();
-  }
+  ) {}
 
-  async install(): Promise<WorkerFeatureHandlePort> {
+  async install(): Promise<WorkerFeatureCloser | undefined> {
     if (!this.installed) {
       this.eventing.eventSourcing.register(
         this.installer.buildProcessing({ subscribers: this.subscribers }),
       );
       this.installed = true;
     }
-    return LogWorkerFeatureHandle.create();
+    return undefined;
   }
-}
-
-class LogWorkerFeatureHandle extends WorkerFeatureHandlePort {
-  static create(): LogWorkerFeatureHandle {
-    return new LogWorkerFeatureHandle();
-  }
-
-  private constructor() {
-    super();
-  }
-
-  async close(): Promise<void> {}
 }

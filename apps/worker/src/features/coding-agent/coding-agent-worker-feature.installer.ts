@@ -1,6 +1,9 @@
 import { Deferred, type CommandDispatcher } from "@langwatch/eventing";
 import type { CodingAgentProcessingPipeline } from "@langwatch/coding-agent-server";
-import { WorkerFeatureHandlePort, WorkerFeatureInstallerPort } from "../worker-feature.installer";
+import type {
+  WorkerFeatureCloser,
+  WorkerFeatureInstallerPort,
+} from "../worker-feature.installer";
 import type { WorkerEventingRuntime } from "../../platform/eventing/worker-eventing.runtime";
 
 /**
@@ -35,7 +38,7 @@ export interface CodingAgentWorkerCapability {
  * make that ordering checkable — a subscriber built too early still cannot
  * dispatch, and says so.
  */
-export class CodingAgentWorkerFeatureInstaller extends WorkerFeatureInstallerPort {
+export class CodingAgentWorkerFeatureInstaller implements WorkerFeatureInstallerPort {
   static create(options: {
     installer: CodingAgentWorkerCapability;
     eventing: WorkerEventingRuntime;
@@ -67,11 +70,9 @@ export class CodingAgentWorkerFeatureInstaller extends WorkerFeatureInstallerPor
   private constructor(
     private readonly installer: CodingAgentWorkerCapability,
     private readonly eventing: WorkerEventingRuntime,
-  ) {
-    super();
-  }
+  ) {}
 
-  async install(): Promise<WorkerFeatureHandlePort> {
+  async install(): Promise<WorkerFeatureCloser | undefined> {
     if (!this.installed) {
       const pipeline = this.eventing.eventSourcing.register(this.installer.buildProcessing());
       const commands = pipeline.commands as Record<string, { send(data: unknown): Promise<void> }>;
@@ -88,18 +89,6 @@ export class CodingAgentWorkerFeatureInstaller extends WorkerFeatureInstallerPor
       this.logFacts.resolve((data) => logFacts.send(data));
       this.installed = true;
     }
-    return CodingAgentWorkerFeatureHandle.create();
+    return undefined;
   }
-}
-
-class CodingAgentWorkerFeatureHandle extends WorkerFeatureHandlePort {
-  static create(): CodingAgentWorkerFeatureHandle {
-    return new CodingAgentWorkerFeatureHandle();
-  }
-
-  private constructor() {
-    super();
-  }
-
-  async close(): Promise<void> {}
 }

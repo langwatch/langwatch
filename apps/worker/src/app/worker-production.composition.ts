@@ -1971,61 +1971,35 @@ export class WorkerProductionComposition {
  * A group landing later slots into its documented position; nothing here
  * reorders to accommodate it.
  */
-function orderedFeatureInstallers(installers: {
-  automation?: AutomationWorkerFeatureInstaller;
-  eventingMaintenance?: EventingMaintenanceWorkerFeatureInstaller;
-  langyConversation?: LangyConversationWorkerFeatureInstaller;
-  langyMaintenance?: LangyMaintenanceWorkerFeatureInstaller;
-  apiKey?: ApiKeyWorkerFeatureInstaller;
-  github?: GithubWorkerFeatureInstaller;
-  evaluation?: EvaluationWorkerFeatureInstaller;
-  codingAgent?: CodingAgentWorkerFeatureInstaller;
-  governanceEvents?: GovernanceEventsWorkerFeatureInstaller;
-  gatewaySpend?: GatewaySpendWorkerFeatureInstaller;
-  metric?: MetricWorkerFeatureInstaller;
-  log?: LogWorkerFeatureInstaller;
-  trace: TraceWorkerFeatureInstaller;
-  suite?: SuiteWorkerFeatureInstaller;
-  scenario?: ScenarioWorkerFeatureInstaller;
-  experiment?: ExperimentWorkerFeatureInstaller;
-  topic: TopicWorkerFeatureInstaller;
-  governanceIngestion?: GovernanceIngestionWorkerFeatureInstaller;
-  billingReporting?: BillingReportingWorkerFeatureInstaller;
-  authz?: AuthzWorkerFeatureInstaller;
-  identity?: IdentityWorkerFeatureInstaller;
-  ssoConnection?: SsoConnectionWorkerFeatureInstaller;
-  scimSync?: ScimSyncWorkerFeatureInstaller;
-  joinRequest?: JoinRequestWorkerFeatureInstaller;
-}): readonly WorkerFeatureInstallerPort[] {
-  const ordered: (WorkerFeatureInstallerPort | undefined)[] = [
-    installers.automation,
-    installers.eventingMaintenance,
-    installers.langyMaintenance,
-    installers.apiKey,
-    installers.github,
-    installers.evaluation,
-    installers.codingAgent,
-    installers.governanceEvents,
-    installers.gatewaySpend,
-    installers.metric,
-    installers.log,
-    installers.trace,
-    installers.suite,
-    installers.scenario,
-    installers.experiment,
-    installers.langyConversation,
-    installers.topic,
-    installers.governanceIngestion,
-    installers.billingReporting,
-    installers.authz,
-    installers.identity,
-    installers.ssoConnection,
-    installers.scimSync,
-    installers.joinRequest,
-  ];
-  return ordered.filter(
-    (installer): installer is WorkerFeatureInstallerPort => installer !== undefined,
-  );
+function orderedFeatureInstallers(
+  options: Parameters<typeof WorkerProductionComposition.createFromPorts>[0],
+): readonly WorkerFeatureInstallerPort[] {
+  return [
+    options.automation,
+    options.eventingMaintenance,
+    options.langyMaintenance,
+    options.apiKey,
+    options.github,
+    options.evaluation,
+    options.codingAgent,
+    options.governanceEvents,
+    options.gatewaySpend,
+    options.metric,
+    options.log,
+    options.trace,
+    options.suite,
+    options.scenario,
+    options.experiment,
+    options.langyConversation,
+    options.topic,
+    options.governanceIngestion,
+    options.billingReporting,
+    options.authz,
+    options.identity,
+    options.ssoConnection,
+    options.scimSync,
+    options.joinRequest,
+  ].filter((installer) => installer !== undefined);
 }
 
 class WorkerProductionLifecycle extends WorkerLifecyclePort {

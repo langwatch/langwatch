@@ -291,7 +291,7 @@ describe("WorkerProductionComposition", () => {
         (candidate) => candidate.name === "governance-events",
       );
       expect(installer, "the composition mounted no governance-events feature").toBeDefined();
-      const handle = await installer!.install();
+      const closer = await installer!.install();
       await runOneTick();
 
       // Asserted before the dispatch is awaited: a root that composed no
@@ -300,7 +300,8 @@ describe("WorkerProductionComposition", () => {
       expect(database.models.anomalyRule.findMany).toHaveBeenCalledTimes(1);
 
       const detail = await database.recordedDispatch;
-      await handle.close();
+      expect(closer, "the anomaly schedule's install() returned nothing to stop it").toBeDefined();
+      await closer!();
 
       expect(database.create).toHaveBeenCalledTimes(1);
       expect(detail).toMatchObject({ dispatch: "failed_webhook_1" });

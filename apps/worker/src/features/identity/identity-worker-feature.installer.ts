@@ -1,5 +1,8 @@
 import type { IdentityPipeline } from "@langwatch/identity-server";
-import { WorkerFeatureHandlePort, WorkerFeatureInstallerPort } from "../worker-feature.installer";
+import type {
+  WorkerFeatureCloser,
+  WorkerFeatureInstallerPort,
+} from "../worker-feature.installer";
 import type { WorkerEventingRuntime } from "../../platform/eventing/worker-eventing.runtime";
 
 /** Identity's worker-facing capability: the built pipeline definition. */
@@ -33,7 +36,7 @@ export interface IdentityWorkerCapability {
  * opens only for a user whose backfill is finalized. Whoever makes the worker
  * composition the live one drops the legacy registration in the same change.
  */
-export class IdentityWorkerFeatureInstaller extends WorkerFeatureInstallerPort {
+export class IdentityWorkerFeatureInstaller implements WorkerFeatureInstallerPort {
   static create(options: {
     installer: IdentityWorkerCapability;
     eventing: WorkerEventingRuntime;
@@ -47,27 +50,13 @@ export class IdentityWorkerFeatureInstaller extends WorkerFeatureInstallerPort {
   private constructor(
     private readonly installer: IdentityWorkerCapability,
     private readonly eventing: WorkerEventingRuntime,
-  ) {
-    super();
-  }
+  ) {}
 
-  async install(): Promise<WorkerFeatureHandlePort> {
+  async install(): Promise<WorkerFeatureCloser | undefined> {
     if (!this.installed) {
       this.eventing.eventSourcing.register(this.installer.pipeline);
       this.installed = true;
     }
-    return IdentityWorkerFeatureHandle.create();
+    return undefined;
   }
-}
-
-class IdentityWorkerFeatureHandle extends WorkerFeatureHandlePort {
-  static create(): IdentityWorkerFeatureHandle {
-    return new IdentityWorkerFeatureHandle();
-  }
-
-  private constructor() {
-    super();
-  }
-
-  async close(): Promise<void> {}
 }

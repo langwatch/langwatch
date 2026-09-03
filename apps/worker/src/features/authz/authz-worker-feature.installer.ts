@@ -1,5 +1,8 @@
 import type { AuthzPipeline } from "@langwatch/authz-server";
-import { WorkerFeatureHandlePort, WorkerFeatureInstallerPort } from "../worker-feature.installer";
+import type {
+  WorkerFeatureCloser,
+  WorkerFeatureInstallerPort,
+} from "../worker-feature.installer";
 import type { WorkerEventingRuntime } from "../../platform/eventing/worker-eventing.runtime";
 
 /** AuthZ's worker-facing capability: the built grants-ledger definition. */
@@ -33,7 +36,7 @@ export interface AuthzWorkerCapability {
  * and this graph is the consumer. Whoever makes the worker composition the
  * live one drops the legacy registration in the same change.
  */
-export class AuthzWorkerFeatureInstaller extends WorkerFeatureInstallerPort {
+export class AuthzWorkerFeatureInstaller implements WorkerFeatureInstallerPort {
   static create(options: {
     installer: AuthzWorkerCapability;
     eventing: WorkerEventingRuntime;
@@ -47,27 +50,13 @@ export class AuthzWorkerFeatureInstaller extends WorkerFeatureInstallerPort {
   private constructor(
     private readonly installer: AuthzWorkerCapability,
     private readonly eventing: WorkerEventingRuntime,
-  ) {
-    super();
-  }
+  ) {}
 
-  async install(): Promise<WorkerFeatureHandlePort> {
+  async install(): Promise<WorkerFeatureCloser | undefined> {
     if (!this.installed) {
       this.eventing.eventSourcing.register(this.installer.pipeline);
       this.installed = true;
     }
-    return AuthzWorkerFeatureHandle.create();
+    return undefined;
   }
-}
-
-class AuthzWorkerFeatureHandle extends WorkerFeatureHandlePort {
-  static create(): AuthzWorkerFeatureHandle {
-    return new AuthzWorkerFeatureHandle();
-  }
-
-  private constructor() {
-    super();
-  }
-
-  async close(): Promise<void> {}
 }

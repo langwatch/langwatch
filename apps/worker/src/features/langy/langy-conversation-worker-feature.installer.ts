@@ -4,7 +4,10 @@ import type {
   RegisteredCommand,
   StaticPipelineDefinition,
 } from "@langwatch/eventing";
-import { WorkerFeatureHandlePort, WorkerFeatureInstallerPort } from "../worker-feature.installer";
+import type {
+  WorkerFeatureCloser,
+  WorkerFeatureInstallerPort,
+} from "../worker-feature.installer";
 import type { WorkerEventingRuntime } from "../../platform/eventing/worker-eventing.runtime";
 
 /**
@@ -58,7 +61,7 @@ export interface LangyConversationWorkerCapability<
  * so unlike the ClickHouse-gated pipelines there is no configuration under
  * which the graph is meaningless.
  */
-export class LangyConversationWorkerFeatureInstaller extends WorkerFeatureInstallerPort {
+export class LangyConversationWorkerFeatureInstaller implements WorkerFeatureInstallerPort {
   /**
    * The registration is captured as a closure, and that is what erases the
    * event union.
@@ -90,11 +93,9 @@ export class LangyConversationWorkerFeatureInstaller extends WorkerFeatureInstal
       failAgentResponse: (data: never) => Promise<void>;
       generateConversationTitle: (data: never) => Promise<void>;
     }) => void,
-  ) {
-    super();
-  }
+  ) {}
 
-  async install(): Promise<WorkerFeatureHandlePort> {
+  async install(): Promise<WorkerFeatureCloser | undefined> {
     if (!this.installed) {
       const commands = this.registerPipeline() as Record<string, WorkerCommandSender>;
       const failAgentResponse = commands.failAgentResponse;
@@ -110,18 +111,6 @@ export class LangyConversationWorkerFeatureInstaller extends WorkerFeatureInstal
       });
       this.installed = true;
     }
-    return LangyConversationWorkerFeatureHandle.create();
+    return undefined;
   }
-}
-
-class LangyConversationWorkerFeatureHandle extends WorkerFeatureHandlePort {
-  static create(): LangyConversationWorkerFeatureHandle {
-    return new LangyConversationWorkerFeatureHandle();
-  }
-
-  private constructor() {
-    super();
-  }
-
-  async close(): Promise<void> {}
 }
