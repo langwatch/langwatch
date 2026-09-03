@@ -118,6 +118,7 @@ describe.skipIf(!databaseUrl)("annotations for a page of traces", () => {
       ]);
     });
 
+    /** @scenario "trace projections receive anchored annotations" */
     it("carries the part of the trace each comment is about", async () => {
       const rows = await service.listForProjection({
         projectId,

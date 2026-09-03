@@ -176,6 +176,7 @@ describe("EvaluatorService", () => {
       traceback: ["Traceback: ..."],
     });
   });
+  /** @scenario "Missing evaluators have explicit result semantics" */
   it("keeps nullable lookup and throwing lookup distinct", async () => {
     const missing = repository({
       tryFindById: vi.fn().mockResolvedValue(null),

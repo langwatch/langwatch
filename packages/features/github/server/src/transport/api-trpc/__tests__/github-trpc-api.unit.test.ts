@@ -62,6 +62,7 @@ function harness({
 
 describe("GithubTrpcApi", () => {
   describe("given the mounted router", () => {
+    /** @scenario "compatibility transports keep their public paths" */
     it("exposes exactly the procedure names the clients call", () => {
       const trpc = initTRPC.context<TestContext>().create();
       const router = GithubTrpcApi.create(
@@ -150,6 +151,7 @@ describe("GithubTrpcApi", () => {
   });
 
   describe("when a member disconnects an installation", () => {
+    /** @scenario "compatibility transports keep their public paths" */
     it("records the disconnect against the organization and hands back the link", async () => {
       const { caller, recordAudit } = harness({
         github: {

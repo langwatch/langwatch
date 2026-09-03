@@ -449,6 +449,7 @@ describe("evaluateGraphTrigger", () => {
   });
 
   describe("given a breach with no open TriggerSent", () => {
+    /** @scenario "Graph threshold evaluation uses the singular AutomationService" */
     it("fires the dispatch notifier and inserts a TriggerSent", async () => {
       const result = await evaluateGraphTrigger({
         deps: harness.deps,
@@ -672,6 +673,7 @@ describe("evaluateGraphTrigger", () => {
   });
 
   describe("given a breach with an existing open TriggerSent", () => {
+    /** @scenario "Graph threshold evaluation uses the singular AutomationService" */
     it("reports already_firing and does not re-notify", async () => {
       harness.triggerSent.openRows.push({
         id: "sent-prior",
@@ -694,6 +696,7 @@ describe("evaluateGraphTrigger", () => {
       expect(harness.updateLastRunAt).toHaveBeenCalledTimes(1);
     });
 
+    /** @scenario "Graph threshold evaluation uses the singular AutomationService" */
     it("is idempotent across repeated invocations", async () => {
       // First call inserts the TriggerSent.
       await evaluateGraphTrigger({
@@ -1117,6 +1120,7 @@ describe("evaluateGraphTrigger", () => {
   });
 
   describe("given a no-data trigger with an absent metric", () => {
+    /** @scenario "Graph threshold evaluation uses the singular AutomationService" */
     it("fires when the heartbeat invokes the evaluator", async () => {
       harness = makeHarness({
         trigger: makeTrigger({

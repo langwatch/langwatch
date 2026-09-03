@@ -46,6 +46,7 @@ function required<T>(value: T | undefined): T {
 }
 
 describe("ClickHouseRetroactiveRetentionRepository", () => {
+  /** @scenario "Apply retention to existing project data" */
   it("updates every traces table, including event_log, with parameterized values", async () => {
     const { commands, repository } = createRepository([]);
 
@@ -91,6 +92,7 @@ describe("ClickHouseRetroactiveRetentionRepository", () => {
     expect(commands.some((command) => command.query.includes("'project-1'"))).toBe(false);
   });
 
+  /** @scenario "Apply retention to existing project data" */
   it("updates the scenario and experiment tables for their categories", async () => {
     const scenarios = createRepository([]);
     await scenarios.repository.triggerUpdate({

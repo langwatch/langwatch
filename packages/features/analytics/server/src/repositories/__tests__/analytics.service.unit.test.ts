@@ -86,6 +86,7 @@ function createService(repository: AnalyticsRepository): AnalyticsService {
 }
 
 describe("AnalyticsService", () => {
+  /** @scenario "Additive trace metrics use the trace rollup" */
   it("routes safe additive trace reads to the trace rollup and keeps the tenant", async () => {
     const repository = new RecordingRepository();
     const service = createService(repository);
@@ -97,6 +98,7 @@ describe("AnalyticsService", () => {
     expect(repository.lastQuery?.input.timeZone).toBe("Europe/Amsterdam");
   });
 
+  /** @scenario "Unsafe query shapes use the legacy trace table" */
   it("falls back to the legacy table for a trace-id scoped query", async () => {
     const repository = new RecordingRepository();
     const service = createService(repository);
@@ -106,6 +108,7 @@ describe("AnalyticsService", () => {
     expect(repository.lastQuery?.table).toBe("trace_summaries");
   });
 
+  /** @scenario "Oversized requests are bounded" */
   it("normalizes an oversized bucket request to the daily safety cap", async () => {
     const repository = new RecordingRepository();
     const service = createService(repository);
@@ -189,6 +192,8 @@ describe("AnalyticsService", () => {
     });
   });
 
+  /** @scenario "Feedback reads preserve their existing result shape" */
+  /** @scenario "Top-document reads preserve their existing result shape" */
   it("keeps feedback and document reads on the canonical service boundary", async () => {
     const repository = new RecordingRepository();
     const service = createService(repository);
@@ -224,6 +229,8 @@ describe("AnalyticsService", () => {
     });
   });
 
+  /** @scenario "Feedback reads preserve their existing result shape" */
+  /** @scenario "Top-document reads preserve their existing result shape" */
   it("preserves legacy feedback decoding and document ordering", async () => {
     const calls: Array<Record<string, unknown>> = [];
     const service = AnalyticsAdapter.create({
@@ -306,6 +313,7 @@ describe("AnalyticsService", () => {
     }
   });
 
+  /** @scenario "ClickHouse-disabled processes preserve evaluation projection no-ops" */
   it("keeps evaluation analytics writes and read-backs as no-ops when ClickHouse is disabled", async () => {
     const resolveClient = vi.fn(async () => {
       throw new Error("ClickHouse must not be resolved when disabled");

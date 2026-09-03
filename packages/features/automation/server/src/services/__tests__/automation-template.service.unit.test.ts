@@ -213,6 +213,7 @@ describe("testFireTrigger", () => {
   });
 
   describe("given a Slack bot destination", () => {
+    /** @scenario "Test fire uses the automation service" */
     it("posts via the Web API with gated blocks kept, not the webhook", async () => {
       const { notifier, sentSlack, sentSlackBot } = makeNotifier();
       const service = makeService(notifier);
@@ -499,6 +500,7 @@ describe("testFireTrigger", () => {
     });
 
     describe("when the draft has slackTemplate but no slackTemplateType", () => {
+      /** @scenario "Test fire uses the automation service" */
       it("rejects with a validation error and sends nothing", async () => {
         const { notifier, sentSlack } = makeNotifier();
         const service = makeService(notifier);

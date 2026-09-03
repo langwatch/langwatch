@@ -36,6 +36,7 @@ function serviceWith(input: {
 }
 
 describe("Coding Agent installation backfill", () => {
+  /** @scenario "a completed GitHub installation backfills recent session branches" */
   it("reads each organization project in its bounded recent window and asks GitHub once per canonical branch", async () => {
     const sessions = new TestSessions();
     sessions.recentRowsByTenant.set("project-a", [
@@ -109,6 +110,7 @@ describe("Coding Agent installation backfill", () => {
     expect(PULL_REQUEST_MAPPING_BACKFILL_BRANCH_CAP).toBe(500);
   });
 
+  /** @scenario "a completed GitHub installation backfills recent session branches" */
   it("contains a mapping failure so GitHub installation remains non-blocking", async () => {
     const sessions = new TestSessions();
     sessions.rows = [

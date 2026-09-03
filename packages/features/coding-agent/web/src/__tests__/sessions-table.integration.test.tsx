@@ -216,6 +216,7 @@ afterEach(() => {
 describe("the personal Sessions table", () => {
   describe("given a personal workspace with coding-agent sessions", () => {
     /** @scenario "The page lists my recent sessions with their context economics" */
+    /** @scenario "the application renders a coding-agent session list" */
     it("gives each session a row carrying its context, compactions, rebuilds and waiting time", () => {
       pinSessions([sessionRow()]);
 
@@ -492,6 +493,7 @@ describe("the personal Sessions table", () => {
     });
 
     /** @scenario "Every column sorts, and sorting has a way back" */
+    /** @scenario "the application renders a coding-agent session list" */
     it("sorts from a heading, reverses on the second choice, and returns to the opening order on the third", async () => {
       const user = userEvent.setup();
       renderTable();

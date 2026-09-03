@@ -247,6 +247,7 @@ describe("ClickHouseEvaluationRepository", () => {
     expect(client.queries[1]).toContain("max(UpdatedAt)");
   });
 
+  /** @scenario "Per-trace evaluation reads use the same capability" */
   it("degrades a per-trace read to its light projection when inputs exceed memory", async () => {
     const { client, repository } = harness();
     const lightRow = fixtureRow();

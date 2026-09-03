@@ -253,6 +253,7 @@ describe("deriveStatus", () => {
 describe("GithubPullRequestStatusService", () => {
   describe("given GitHub rate limits the live status read", () => {
     /** @scenario "A rate limited live read falls back to the stored snapshot" */
+    /** @scenario "private repository access stays behind the service" */
     it("returns the stored snapshot label, marked as a snapshot", async () => {
       const { service } = serviceWith({
         stored: storedRow({ state: "closed", prMergedAt: MAPPED_AT }),

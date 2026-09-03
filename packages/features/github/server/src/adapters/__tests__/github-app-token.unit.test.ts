@@ -87,6 +87,7 @@ describe("computeRepoScopeKey", () => {
 });
 
 describe("signAppJwt", () => {
+  /** @scenario "installation tokens are ephemeral" */
   it("signs an RS256 JWT issued by the app id, backdated, ≤10 minutes", () => {
     const svc = GithubAppTokenAdapter.create("app-123", privateKey, null);
     const now = 1_000_000;

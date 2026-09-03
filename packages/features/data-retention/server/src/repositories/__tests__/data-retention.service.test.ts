@@ -135,6 +135,7 @@ describe("DataRetentionService", () => {
     ).resolves.toBeUndefined();
   });
 
+  /** @scenario "Resolve retention through the scope cascade" */
   it("resolves policy through the project/team/organization cascade", async () => {
     const repository = new Repository();
     repository.rows = [
@@ -155,6 +156,7 @@ describe("DataRetentionService", () => {
     ).resolves.toBe(63);
   });
 
+  /** @scenario "Reject invalid retention values" */
   it("rejects unaligned retention values at the service boundary", async () => {
     const service = createService();
     await expect(
@@ -166,6 +168,7 @@ describe("DataRetentionService", () => {
     ).rejects.toThrow();
   });
 
+  /** @scenario "Default a missing read target" */
   it("keeps the platform default when a project has no resolvable scope", async () => {
     const repository = new Repository();
     const missingProjects = {
@@ -197,6 +200,7 @@ describe("DataRetentionService", () => {
     });
   });
 
+  /** @scenario "Resolve scope ownership through canonical services" */
   it("defaults a genuinely missing team but does not hide service failures", async () => {
     const missingOrganizations = {
       getTeamById: async () => {

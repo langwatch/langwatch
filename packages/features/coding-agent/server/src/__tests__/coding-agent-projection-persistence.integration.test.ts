@@ -28,6 +28,7 @@ async function createPersistence() {
 }
 
 describe("Coding Agent projection persistence runtime adapter", () => {
+  /** @scenario "projection writes use Coding Agent persistence" */
   it("persists the complete session row, retention, and durable watermark through the package runtime adapter", async () => {
     const { endpoint, persistence } = await createPersistence();
 
@@ -80,6 +81,7 @@ describe("Coding Agent projection persistence runtime adapter", () => {
     expect(Date.parse(stamps[1] ?? "")).toBeGreaterThan(Date.parse(stamps[0] ?? ""));
   });
 
+  /** @scenario "projection writes use Coding Agent persistence" */
   it("routes each append projection to its concrete table with the supplied trace retention", async () => {
     const { endpoint, persistence } = await createPersistence();
 

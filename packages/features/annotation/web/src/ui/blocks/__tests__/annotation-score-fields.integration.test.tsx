@@ -150,6 +150,7 @@ describe("given a score key the reviewer opened", () => {
 
   describe("when they type a reason and confirm", () => {
     /** @scenario "Confirming keeps the rating and the reason given with it" */
+    /** @scenario "reusable annotation browser surfaces stay in the feature web package" */
     it("closes the editor and keeps the rating with its reason", async () => {
       renderScores();
       await userEvent.click(chip("Helpfulness"));

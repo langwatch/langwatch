@@ -6,6 +6,7 @@ Feature: Evaluator service boundary
     Then both handlers use the same contract service instance
     And neither handler constructs a repository or database client
 
+  @unit
   Scenario: Missing evaluators have explicit result semantics
     Given an evaluator is not present in the requested project
     When a caller uses the nullable lookup
@@ -19,12 +20,14 @@ Feature: Evaluator service boundary
     Then the returned value conforms to the contract schema
     And no generated Prisma type crosses the package boundary
 
+  @unit
   Scenario: Evaluator vocabulary has one portable source
     Given a host renders or validates a built-in or code evaluator
     When it needs the catalogue, code defaults, or a display name
     Then it imports that vocabulary from the evaluator contract
     And it does not duplicate that vocabulary in an application module
 
+  @integration
   Scenario: Reusable evaluator UI remains browser-safe
     Given a browser host supplies evaluator availability and navigation callbacks
     When it renders an evaluator picker, card, or editor chrome

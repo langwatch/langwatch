@@ -259,6 +259,7 @@ describe("AutomationDrawer", () => {
 
   describe("given an existing automation in edit mode", () => {
     describe("when the saved row first resolves", () => {
+      /** @scenario "Provider authoring uses one browser surface" */
       it("hydrates the form from the saved row", async () => {
         mockTriggerRow = savedRow();
         renderDrawer({ automationId: "trigger-1" });

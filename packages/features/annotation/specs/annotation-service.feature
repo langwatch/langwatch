@@ -1,5 +1,6 @@
 Feature: Annotation service boundary
 
+  @integration
   Scenario: reusable annotation browser surfaces stay in the feature web package
     Given a trace surface renders an annotation card or editor
     When the application composes its queries, mutations and trace navigation
@@ -12,11 +13,13 @@ Feature: Annotation service boundary
     Then it uses the same contract AnnotationService instance
     And it does not construct a repository for the request
 
+  @unit
   Scenario: annotation input is validated by the contract
     Given an annotation command has an incomplete anchor
     When the service receives the command
     Then validation fails before persistence is called
 
+  @unit
   Scenario: a required annotation lookup throws
     Given the requested annotation does not exist in the project
     When the service performs the ordinary lookup
@@ -28,6 +31,7 @@ Feature: Annotation service boundary
     Then the result conforms to the contract schema
     And generated Prisma types do not cross the package boundary
 
+  @unit
   Scenario: queue references use their owning services
     Given a queue command names project members and score definitions
     When the annotation service validates the command
@@ -41,6 +45,7 @@ Feature: Annotation service boundary
     Then all upserts use one database transaction
     And requeueing keeps the existing unique-key and done-state behaviour
 
+  @integration
   Scenario: trace projections receive anchored annotations
     Given a project has comments about a trace and about fields within it
     When the service reads annotations for a trace projection

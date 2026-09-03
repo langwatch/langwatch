@@ -63,6 +63,7 @@ describe("evaluator contract", () => {
     });
   });
 
+  /** @scenario "Evaluator vocabulary has one portable source" */
   it("keeps code evaluator defaults and display names in the portable vocabulary", () => {
     expect(codeEvaluatorConfigSchema.parse(defaultCodeEvaluatorConfig)).toEqual(
       defaultCodeEvaluatorConfig,
@@ -73,6 +74,7 @@ describe("evaluator contract", () => {
     expect(codeEvaluatorIdFromCheckType("workflow")).toBeUndefined();
   });
 
+  /** @scenario "Evaluator vocabulary has one portable source" */
   it("merges native and generated evaluators into one catalogue", () => {
     const native = AVAILABLE_EVALUATORS[API_KEYS_AND_SECRETS_DETECTION];
 

@@ -3,6 +3,7 @@ import type { OrganizationService } from "@langwatch/organization-contract";
 import type { ProjectService } from "@langwatch/project-contract";
 import type { DataRetentionRepository } from "../data-retention.repository";
 import { PinnedTraceRepository } from "../pinned-trace.repository";
+import { RetroactiveRetentionRepository } from "../retroactive-retention.repository";
 import { DataRetentionService } from "../../services/data-retention.service";
 
 class Pins extends PinnedTraceRepository {
@@ -45,16 +46,51 @@ const organizations = {
   getTeamById: async () => ({ id: "team", organizationId: "org" }),
 } as unknown as OrganizationService;
 
-const create = (pinRepository: Pins) =>
+/**
+ * The ClickHouse seam. Pinning is an annotation, so nothing on this port may be
+ * reached by a pin — which is what the test below asserts rather than assumes.
+ */
+class RecordingRetroactive extends RetroactiveRetentionRepository {
+  readonly calls: string[] = [];
+  async triggerUpdate(): Promise<{ tables: string[] }> {
+    this.calls.push("triggerUpdate");
+    return { tables: [] };
+  }
+  async getMutationProgress(): Promise<never[]> {
+    this.calls.push("getMutationProgress");
+    return [];
+  }
+  async killMutation(): Promise<void> {
+    this.calls.push("killMutation");
+  }
+}
+
+const create = (pinRepository: Pins, retroactiveRepository?: RecordingRetroactive) =>
   DataRetentionService.create({
     repository,
     projects,
     organizations,
     defaultRetentionDays: 49,
     pinRepository,
+    retroactiveRepository,
   });
 
 describe("DataRetentionService pin lifecycle", () => {
+  /** @scenario "Pinning a trace does not change retention" */
+  it("records the pin and issues no ClickHouse retention command", async () => {
+    const pins = new Pins();
+    const retroactive = new RecordingRetroactive();
+    const service = create(pins, retroactive);
+
+    await service.pin({ projectId: "project", traceId: "trace" });
+
+    await expect(
+      service.isPinned({ projectId: "project", traceId: "trace" }),
+    ).resolves.toBe(true);
+    expect(retroactive.calls).toEqual([]);
+  });
+
+  /** @scenario "Manual pins survive share removal" */
   it("keeps a manual pin when auto-unpin runs", async () => {
     const service = create(new Pins());
     await service.autoPin({ projectId: "project", traceId: "trace" });

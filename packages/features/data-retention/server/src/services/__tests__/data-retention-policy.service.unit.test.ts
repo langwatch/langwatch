@@ -137,6 +137,7 @@ describe("given a caller writing a retention override", () => {
 
 describe("given a plan-gated write", () => {
   describe("when the scope does not resolve to an organization", () => {
+    /** @scenario "Reject a missing write target" */
     it("refuses the write rather than gating on the caller's project", async () => {
       await expect(
         policy({ organizationId: null }).assertWriteAllowed({

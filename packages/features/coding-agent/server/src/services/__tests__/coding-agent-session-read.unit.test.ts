@@ -38,6 +38,7 @@ function serviceWith(input: {
 }
 
 describe("Coding Agent session reads", () => {
+  /** @scenario "an event page is larger than the service permits" */
   it("clamps event pages at the package contract ceiling, including legacy limits", async () => {
     const events = new TestEvents();
     const service = serviceWith({ events });
@@ -57,6 +58,7 @@ describe("Coding Agent session reads", () => {
     ]);
   });
 
+  /** @scenario "a session event read has no explicit time window" */
   it("bounds inferred event reads around the session and widens only the upper edge after an empty page", async () => {
     const sessions = new TestSessions();
     const row = session({
@@ -162,6 +164,7 @@ describe("Coding Agent session reads", () => {
     expect(sessions.findInputs[1]?.window).toBeUndefined();
   });
 
+  /** @scenario "a trace with no coding-agent mapping is optional discovery" */
   it("does not query sessions when a trace has no Coding Agent mapping", async () => {
     const sessions = new TestSessions();
     const service = serviceWith({ sessions });
@@ -173,6 +176,7 @@ describe("Coding Agent session reads", () => {
     expect(sessions.findInputs).toEqual([]);
   });
 
+  /** @scenario "metric-only sessions retain their usage totals" */
   it("overlays metric-only sessions without replacing span and log totals", async () => {
     const sessions = new TestSessions();
     sessions.rows = [

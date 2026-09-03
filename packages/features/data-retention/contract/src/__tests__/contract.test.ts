@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 import { retentionDaysInputSchema, resolveRetention } from "../index";
 
 describe("data-retention contract", () => {
+  /** @scenario "Reject invalid retention values" */
   it("accepts only the indefinite sentinel or aligned retention values", () => {
     // Acceptance stated as acceptance. `parse(0)).toBe(0)` passed for any
     // schema that lets 0 through, which is every schema that does not reject it.
@@ -10,6 +11,7 @@ describe("data-retention contract", () => {
     expect(retentionDaysInputSchema.safeParse(42).success).toBe(false);
   });
 
+  /** @scenario "Resolve retention through the scope cascade" */
   it("resolves each category from the nearest scope", () => {
     expect(
       resolveRetention({

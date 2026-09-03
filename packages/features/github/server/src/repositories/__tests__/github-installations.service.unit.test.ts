@@ -384,6 +384,7 @@ describe("mintTurnToken", () => {
 
   describe("when no explicit repo is given", () => {
     /** @scenario "Langy still mints a turn token through the connection" */
+    /** @scenario "installation tokens are ephemeral" */
     it("mints a full-installation-scoped token", async () => {
       const repo = makeRepo([row()]);
       const mint = vi.fn(async () => ({ token: "ghs_all", expiresAt: "" }));
@@ -393,6 +394,10 @@ describe("mintTurnToken", () => {
       expect(result?.repoScopeKey).toBe(GithubAppTokenAdapter.computeRepoScopeKey({}));
       // No repository_ids ⇒ full installation scope.
       expect(mint).toHaveBeenCalledWith({ installationId: "inst-1" });
+      // The minted token is ephemeral: nothing about it reaches persistence.
+      expect(repo.upsert).not.toHaveBeenCalled();
+      expect(repo.insertOrGetExisting).not.toHaveBeenCalled();
+      expect(repo.setRepositories).not.toHaveBeenCalled();
     });
   });
 

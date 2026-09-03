@@ -152,6 +152,7 @@ describe("GraphAlertDispatchService.dispatch", () => {
   });
 
   describe("given the fire is retried after a partial delivery", () => {
+    /** @scenario "Graph threshold evaluation uses the singular AutomationService" */
     it("skips the recipient already reached and sends the one that was not", async () => {
       // The claim is per recipient, so a retry is not all-or-nothing.
       const first = dispatcherWith();

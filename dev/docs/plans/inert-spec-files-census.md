@@ -506,3 +506,106 @@ behaviour the test does prove. Named here so nobody mistakes the binding for cov
 class has no such method), `model-provider` 1 ("the provider repository remains private" — the
 server package index never exports it), and `metric-processing` 2 (the partial-success clause is
 proven at the service result; the OTLP route body that serialises it has no test).
+
+---
+
+## Lane 4 ledger — 2026-09-03
+
+All eight service specs landed. Every scenario tagged in this lane is bound; nothing was tagged
+over a gap. Where a scenario named a clause no test asserted, either the smallest honest
+assertion was added or the scenario was left untagged with the reason recorded below.
+
+| Feature file | Scenarios bound | Untagged, and why |
+| --- | --- | --- |
+| `packages/features/analytics/specs/analytics-timeseries.feature` | 7 of 8 | **Analytics does not own product lifecycles** — the claim is that Analytics owns no Dashboard or Topic repository. Nothing exercises it, and no boundary lint names those two features. |
+| `packages/features/annotation/specs/annotation-service.feature` | 5 of 10 | **a process composes one annotation capability** — "the same contract AnnotationService instance" is only observable at the composition root in `apps/api`, held by another lane. **annotation persistence stays private** — no test parses a mapped row through the contract schema; the Prisma-containment half is the repo-wide `public-declarations` policy, not a package test. **queue-item writes are atomic** — the `$transaction` at `prisma.annotation.repository.ts:345` is reached by no test. **queue transport orchestration remains one annotation seam** — an architectural claim about where orchestration lives; nothing exercises it. **transport user projections preserve their legacy shape** — `transport/api-trpc/annotation.api.ts` has no test at all, in this package or anywhere. |
+| `packages/features/automation/specs/automation.feature` | 12 of 12 | — |
+| `packages/features/coding-agent/specs/coding-agent-session-read.feature` | 7 of 7 | — |
+| `packages/features/data-retention/specs/data-retention-service.feature` | 8 of 9 | **Boot supplies the platform default** — the explicit injection happens in `apps/api`'s composition, which another lane holds, and the "importing the contract does not read environment state" half is asserted by nothing. `data-retention.schema.unit.test.ts` already carries a comment saying the environment refusal has no owner; this is that same hole. |
+| `packages/features/evaluation/specs/evaluation-service.feature` | 6 of 7 (5 new; the `@unit` scenario from `691eceb652` kept) | **API and workers share the same service** — "both use the same service capability" is a composition-root claim, in `apps/api` and `apps/worker`. |
+| `packages/features/evaluator/specs/evaluator-service.feature` | 3 of 5 | **A process composes one evaluator capability** — the REST and tRPC suites each build their own `EvaluatorApp` double, so neither proves one shared instance; that lives in `apps/api`'s composition. **Evaluator persistence stays behind the server boundary** — `PrismaEvaluatorRepository` appears in zero test files, so the row mapping is untested. |
+| `packages/features/github/specs/github-service.feature` | 4 of 5 | **one process composes one GitHub capability** — the capability is memoized at `apps/api/src/app/api-production.composition.ts:3137`, in another lane's file. |
+
+51 scenarios newly bound across the eight files (7 + 5 + 12 + 7 + 8 + 5 + 3 + 4). Every one of
+those files reports `✓ all bound`. A 52nd scenario, in a root spec, is bound as a side effect —
+see "One cross-bind" below.
+
+### Gate, before and after
+
+```
+before  Enforced: 1376 file(s) · Legacy: 15 file(s) · Inert: 393 file(s)
+        FAIL: 4629 unbound scenario(s) in enforced files, 352 unknown annotation(s),
+              30 file(s) enforce no scenario at all
+
+after   Enforced: 1376 file(s) · Legacy: 15 file(s) · Inert: 380 file(s)
+        FAIL: 4628 unbound scenario(s) in enforced files, 352 unknown annotation(s),
+              17 file(s) enforce no scenario at all
+```
+
+Seven fatal-inert files cleared here (`evaluation-service` was already enforcing one scenario, so
+it was never on the fatal list). The fatal count fell by thirteen rather than seven because other
+lanes were landing in the same working tree while this one ran — two consecutive runs minutes
+apart, with no edit of mine between them, read 19 and then 17, so treat the totals as a moving
+floor and the per-file rows above as the part this lane owns. The unknown-annotation count did not
+move, which is the check that every `@scenario` title written here names a real scenario.
+
+### Where a test was tightened rather than trusted
+
+Eight scenarios named a clause the matching test did not assert. Each was closed with the
+smallest honest assertion:
+
+- **analytics** — "when it writes the row **or its rollup**" had no rollup test at all. The
+  repository suite now appends a derived bucket, pins `evaluation_analytics_rollup` as the table,
+  and proves a malformed bucket is refused before any insert.
+- **annotation** — "validation fails before persistence is called" was only proven at the schema.
+  The service test now calls `create` with a half anchor and asserts the repository saw nothing.
+  Writing it surfaced that `AnnotationService.create` throws **synchronously**, so the assertion
+  is `expect(() => …).toThrow()` rather than `rejects` — worth knowing before anyone treats that
+  method as returning a rejected promise.
+- **annotation** — "members are read in one OrganizationService batch" was unasserted. A new test
+  pins one `getOrganizationMembers` call carrying the deduplicated user ids.
+- **automation** — "it claims the containment check before evaluating project traffic" and "it
+  sends at most one limit notification for the UTC day" were both unasserted. The runaway port now
+  records its calls in order; the containment claim is proven to come first, a condition-less
+  trigger is proven never to read project traffic, and a second breach after the check claim is
+  released still mails once. The filtered-automation scenario got the same once-a-day assertion.
+- **automation** — "an automation is read by id and project returns only the automation belonging
+  to that project" had no test. The trigger fake now serves rows by `projectId:triggerId`, and the
+  new test proves a read from another project fails and that both keys reach the repository.
+- **data-retention** — "no ClickHouse retention command is issued" was true only because the pin
+  suite composed no ClickHouse at all. It now composes a recording `RetroactiveRetentionRepository`
+  and asserts the pin leaves it untouched.
+- **evaluation** — "it validates the Zod 4 run contract" was unasserted. `upsertRun` with a
+  malformed run now has to reject, and the read-back has to still throw `EvaluationNotFoundError`,
+  proving nothing reached the repository.
+- **github** — "no token is written to GitHub persistence" was unasserted. The turn-token test now
+  proves `upsert`, `insertOrGetExisting` and `setRepositories` are all untouched by a mint.
+
+### Riders bound without their own assertion
+
+Five scenarios carry an architectural clause no test can express, and were bound on the behaviour
+the test does prove:
+
+- `annotation` 1 — "the card, editor body, diff and score controls come from annotation-web". The
+  card and the score controls are rendered by tests; `AnnotateBody`, `SuggestBody` and `DiffPanel`
+  are exported from the web root and rendered by nothing.
+- `coding-agent` 6 — "application composition cannot inject Coding Agent repositories".
+- `coding-agent` 7 — "application routing and query composition remain outside the feature".
+- `data-retention` 5 — "its repository reads only retention policy rows".
+- `github` 2 — "repository implementations are not exported from the server root". This one *is*
+  enforced, repo-wide, by the `private-runtime-export` policy and
+  `architecture-lint/tests/feature-package-boundaries.test.ts` `it("rejects private persistence
+  exported through a server root barrel")` — deliberately left unannotated because the sibling
+  `@unimplemented` architecture-spec lane holds that file.
+- `evaluator` 4 — "it does not duplicate that vocabulary in an application module". True today
+  (`AVAILABLE_EVALUATORS` appears nowhere under `apps/ui/src`), asserted by nothing.
+- `automation` 11 — "application code retains only drawer and transport composition".
+
+### One cross-bind, on purpose
+
+`Pinning a trace does not change retention` is the only title in this lane that appears in two
+feature files: the package spec and `specs/data-retention/pr-4147-regressions.feature:21`, which
+was already `@regression @unit` and unbound. The new pin test satisfies the regression file's
+sentence too ("no retention mutation is issued"), so it binds both — that is the single scenario
+the unbound count fell by. Its second clause there, "trace follows the 49-day retention policy",
+remains a rider.

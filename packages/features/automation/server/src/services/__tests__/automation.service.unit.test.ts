@@ -187,8 +187,13 @@ class Triggers extends TriggerRepository {
   updateLastRunAt() {
     return Promise.resolve();
   }
-  findByIdOrThrow(): Promise<Trigger> {
-    return Promise.reject(new Error("unused"));
+  findByIdInputs: Array<{ triggerId: string; projectId: string }> = [];
+  rowsById = new Map<string, Trigger>();
+  findByIdOrThrow(input: { triggerId: string; projectId: string }): Promise<Trigger> {
+    this.findByIdInputs.push(input);
+    const row = this.rowsById.get(`${input.projectId}:${input.triggerId}`);
+    if (!row) return Promise.reject(new Error("automation not found in this project"));
+    return Promise.resolve(row);
   }
   tryFindById() {
     return Promise.resolve(null);
@@ -305,6 +310,24 @@ const makeService = (
   })();
 
 describe("AutomationService trigger and fire-history lifecycle", () => {
+  /** @scenario "Automations are scoped to a project" */
+  it("reads an automation by id only within the project that owns it", async () => {
+    const triggers = new Triggers();
+    triggers.rowsById.set("p:t", { id: "t", projectId: "p" } as Trigger);
+    const service = makeService(triggers);
+
+    await expect(service.getById({ triggerId: "t", projectId: "p" })).resolves.toMatchObject({
+      id: "t",
+      projectId: "p",
+    });
+    await expect(service.getById({ triggerId: "t", projectId: "other" })).rejects.toThrow();
+    expect(triggers.findByIdInputs).toEqual([
+      { triggerId: "t", projectId: "p" },
+      { triggerId: "t", projectId: "other" },
+    ]);
+  });
+
+  /** @scenario "Reports are not dispatched as trace or graph triggers" */
   it("keeps reports out of trace and graph dispatch projections", async () => {
     const triggers = new Triggers();
     triggers.rowsByProject.set("p", [
@@ -336,6 +359,7 @@ describe("AutomationService trigger and fire-history lifecycle", () => {
     expect(triggers.findActiveCalls).toBe(2);
   });
 
+  /** @scenario "One automation capability owns subordinate lifecycles" */
   it("forwards send claims through the automation-owned trigger repository", async () => {
     const triggers = new Triggers();
     const service = makeService(triggers);
@@ -345,6 +369,7 @@ describe("AutomationService trigger and fire-history lifecycle", () => {
     expect(triggers.claimSendCalls).toEqual([input]);
   });
 
+  /** @scenario "One automation capability owns subordinate lifecycles" */
   it("records scheduled fires through the automation-owned history repository", async () => {
     const history = new Fires();
     const service = makeService(new Triggers(), history);
@@ -411,6 +436,7 @@ describe("AutomationService trigger and fire-history lifecycle", () => {
     });
   });
 
+  /** @scenario "One automation capability owns subordinate lifecycles" */
   it("owns webhook delivery recording, reads, and pruning", async () => {
     const webhookDeliveries = new EmptyWebhookDeliveries();
     webhookDeliveries.findAllRecentByTriggerId.mockResolvedValue([
@@ -456,6 +482,7 @@ describe("AutomationService trigger and fire-history lifecycle", () => {
 });
 
 describe("AutomationService email suppression", () => {
+  /** @scenario "Project-wide email suppression applies to a trigger" */
   it("normalizes addresses and applies project-wide rows", async () => {
     const repo = new Suppressions();
     const service = makeService(
@@ -484,6 +511,7 @@ describe("AutomationService email suppression", () => {
     ).toEqual(["bob@example.com"]);
   });
 
+  /** @scenario "Missing report schedules are repaired without resuming paused reports" */
   it("repairs missing report schedules without reactivating paused rows", async () => {
     const triggers = new Triggers();
     triggers.reportTargets = [

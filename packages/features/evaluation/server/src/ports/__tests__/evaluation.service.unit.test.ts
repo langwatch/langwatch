@@ -227,6 +227,7 @@ describe("EvaluationService", () => {
       workflows: new TestWorkflowService(),
     });
 
+  /** @scenario "Evaluation runs use private ClickHouse persistence" */
   it("validates and persists runs through the private repository", async () => {
     const value = new FakeRepository();
     await service(value).upsertRun({ tenantId: "project_1", data: run });
@@ -236,14 +237,29 @@ describe("EvaluationService", () => {
         evaluationId: run.evaluationId,
       }),
     ).resolves.toEqual(run);
+
+    // The run contract is parsed at the boundary, so a malformed run never
+    // reaches the repository at all.
+    const rejected = new FakeRepository();
+    await expect(
+      service(rejected).upsertRun({ tenantId: "project_1", data: {} as never }),
+    ).rejects.toThrow();
+    await expect(
+      service(rejected).getRunByEvaluationId({
+        tenantId: "project_1",
+        evaluationId: run.evaluationId,
+      }),
+    ).rejects.toBeInstanceOf(EvaluationNotFoundError);
   });
 
+  /** @scenario "Missing evaluation runs throw a domain error" */
   it("throws when a run is absent", async () => {
     await expect(
       service().getRunByEvaluationId({ tenantId: "project_1", evaluationId: "missing" }),
     ).rejects.toBeInstanceOf(EvaluationNotFoundError);
   });
 
+  /** @scenario "Evaluation execution is delegated through one capability" */
   it("validates workflow scope before dispatch", async () => {
     const workflows = new TestWorkflowService();
     const execution = new FakeExecution();
@@ -270,6 +286,7 @@ describe("EvaluationService", () => {
     expect(execution.execute).toHaveBeenCalled();
   });
 
+  /** @scenario "Per-trace evaluation reads use the same capability" */
   it("owns the per-trace evaluation read vocabulary", async () => {
     const repository = new FakeRepository();
     await expect(
@@ -286,6 +303,7 @@ describe("EvaluationService", () => {
     ).resolves.toBeNull();
   });
 
+  /** @scenario "Per-trace evaluation reads use the same capability" */
   it("resolves durable input markers inside the canonical service", async () => {
     const repository = new FakeRepository();
     repository.tryFindInputs = vi.fn(async () => ({ marker: "object_1" }));
@@ -311,6 +329,7 @@ describe("EvaluationService", () => {
     });
   });
 
+  /** @scenario "Monitor performance uses the same capability" */
   it("summarizes score and guardrail performance through its private read model", async () => {
     const performance = await service(
       new FakeRepository(),

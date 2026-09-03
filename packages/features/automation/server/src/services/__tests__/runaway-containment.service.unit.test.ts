@@ -15,9 +15,12 @@ class TestRunawayPort extends AutomationRunawayPort {
     async () => undefined,
   );
   private readonly claimed = new Set<string>();
+  /** Every port call in the order the policy made it. */
+  readonly calls: string[] = [];
   count = 1_000;
   failEmail = false;
   async countProjectTraces24h(): Promise<number> {
+    this.calls.push("count-project-traces");
     return this.count;
   }
   async notificationRecipients(): Promise<string[]> {
@@ -36,6 +39,7 @@ class TestRunawayPort extends AutomationRunawayPort {
     await this.emailed(input);
   }
   async tryClaimOnce(key: string): Promise<{ key: string; token: string } | null> {
+    this.calls.push(`claim:${key}`);
     if (this.claimed.has(key)) return null;
     this.claimed.add(key);
     return { key, token: key };
@@ -90,6 +94,7 @@ function runtime(port = new TestRunawayPort()): {
 }
 
 describe("runaway containment policy", () => {
+  /** @scenario "Persist-cap containment pauses a condition-less automation once" */
   it("pauses a condition-less automation and sends a paused notification", async () => {
     const { port, service } = runtime();
     await service.handle(breach());
@@ -105,17 +110,43 @@ describe("runaway containment policy", () => {
     );
   });
 
+  /** @scenario "Persist-cap containment pauses a condition-less automation once" */
+  it("claims the containment check first and mails once for the UTC day", async () => {
+    const { port, service } = runtime();
+    const check = { key: "automation-containment-check:trigger-1", token: "automation-containment-check:trigger-1" };
+    const pause = { key: "automation-pause:trigger-1", token: "automation-pause:trigger-1" };
+
+    await service.handle(breach());
+    await port.releaseClaim(check);
+    await port.releaseClaim(pause);
+    await service.handle(breach());
+
+    // The check is claimed before anything else, and a condition-less trigger
+    // is contained without reading the project's traffic at all.
+    expect(port.calls[0]).toBe(`claim:${check.key}`);
+    expect(port.calls).not.toContain("count-project-traces");
+    expect(port.paused).toHaveBeenCalledTimes(2);
+    expect(port.emailed).toHaveBeenCalledTimes(1);
+  });
+
+  /** @scenario "Persist-cap containment leaves a busy filtered automation active" */
   it("leaves a filtered automation active below the traffic-share threshold", async () => {
     const { port, service } = runtime();
-    await service.handle(
+    const filtered = () =>
       breach({
         trigger: trigger({ filters: { status: ["error"] } }),
         count: 899,
         skipped: 799,
-      }),
-    );
+      });
+    const check = { key: "automation-containment-check:trigger-1", token: "automation-containment-check:trigger-1" };
+
+    await service.handle(filtered());
+    await port.releaseClaim(check);
+    await service.handle(filtered());
+
     expect(port.paused).not.toHaveBeenCalled();
     expect(port.emailed).toHaveBeenCalledWith(expect.objectContaining({ kind: "ceiling_reached" }));
+    expect(port.emailed).toHaveBeenCalledTimes(1);
   });
 
   it("contains notifier failures and releases the day claim for retry", async () => {

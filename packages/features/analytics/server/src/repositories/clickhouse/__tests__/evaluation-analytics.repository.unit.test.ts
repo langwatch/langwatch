@@ -61,6 +61,7 @@ function repository(
 }
 
 describe("AnalyticsEvaluationRepository", () => {
+  /** @scenario "Evaluation projections use the canonical Analytics persistence capability" */
   it("writes the complete evaluation row with strict insert settings", async () => {
     const client = clientReturning([]);
     const analytics = repository(client);
@@ -91,6 +92,42 @@ describe("AnalyticsEvaluationRepository", () => {
         }),
       }),
     );
+  });
+
+  /** @scenario "Evaluation projections use the canonical Analytics persistence capability" */
+  it("appends a derived bucket to the rollup table and refuses a malformed one", async () => {
+    const client = clientReturning([]);
+    const analytics = repository(client);
+    const bucket = {
+      tenantId: row.tenantId,
+      bucketStart: new Date(row.occurredAtMs),
+      evaluatorType: row.evaluatorType,
+      status: row.status,
+      evalCount: 1,
+      passCount: 1,
+      failCount: 0,
+      errorCount: 0,
+      skippedCount: 0,
+      scoreSum: 0.9,
+      scoreCount: 1,
+      durationSum: 120,
+      costSum: 0,
+      nonBilledCostSum: 0,
+    };
+
+    await analytics.appendRollup({ row: bucket, retentionDays: 14 });
+
+    expect(client.insert).toHaveBeenCalledWith(
+      expect.objectContaining({
+        table: "evaluation_analytics_rollup",
+        format: "JSONEachRow",
+      }),
+    );
+
+    await expect(
+      analytics.appendRollup({ row: { ...bucket, evalCount: Number.NaN } }),
+    ).rejects.toThrow();
+    expect(client.insert).toHaveBeenCalledTimes(1);
   });
 
   it("reads the newest row and records bounded-read outcomes", async () => {

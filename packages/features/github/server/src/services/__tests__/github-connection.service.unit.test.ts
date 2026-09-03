@@ -167,6 +167,7 @@ describe("GithubConnectionService", () => {
   });
 
   describe("when no installation carries the id", () => {
+    /** @scenario "optional GitHub discovery is explicit" */
     it("reports a missing connection", async () => {
       const { connection } = service({ byId: null });
 

@@ -72,6 +72,7 @@ function renderCard({
 afterEach(cleanup);
 
 describe("annotation card presentation", () => {
+  /** @scenario "reusable annotation browser surfaces stay in the feature web package" */
   it("shows the author, timestamp, comment, and rating", () => {
     renderCard({ item: annotation({ isThumbsUp: true }) });
 
@@ -195,6 +196,7 @@ describe("annotation card anchors", () => {
 });
 
 describe("annotation card editing", () => {
+  /** @scenario "reusable annotation browser surfaces stay in the feature web package" */
   it("only lets its author edit with click or keyboard", () => {
     const onEdit = vi.fn();
     renderCard({ isOwn: true, onEdit });

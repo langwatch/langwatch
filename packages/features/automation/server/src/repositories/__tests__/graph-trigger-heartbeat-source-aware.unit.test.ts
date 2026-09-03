@@ -134,6 +134,7 @@ describe("decideGraphTriggerHeartbeat source-awareness (ADR-034 Phase 6)", () =>
   });
 
   describe("given a project with one trace-source and one eval-source graph trigger", () => {
+    /** @scenario "Graph heartbeat isolates projects and metric sources" */
     it("issues one query against trace_analytics and one against evaluation_analytics", async () => {
       // Both triggers are no-data shapes (operator: lt, threshold: 1) so
       // both qualify as candidates.

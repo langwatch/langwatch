@@ -48,6 +48,7 @@ describe("provider registry parity", () => {
         }
       });
 
+      /** @scenario "Provider authoring uses one browser surface" */
       it("exposes a config form, an icon, and the slice helpers on every provider", () => {
         for (const action of Object.values(TriggerAction)) {
           const p = CLIENT_PROVIDERS[action];

@@ -218,6 +218,7 @@ describe("consumeEmailCapSlot in-memory fallback", () => {
 
   describe("given a fresh hour bucket", () => {
     describe("when the SAME dispatch is consumed twice (outbox retry)", () => {
+      /** @scenario "Email delivery caps are idempotent across retries" */
       it("does not double-count: the second call re-reads the same slot", async () => {
         const now = new Date("2026-06-11T10:15:00Z");
         const args = {
@@ -406,6 +407,7 @@ describe("consumeTenantEmailCapSlot in-memory fallback", () => {
     });
 
     describe("when the SAME dispatch is consumed twice (outbox retry)", () => {
+      /** @scenario "Email delivery caps are idempotent across retries" */
       it("does not double-count: the retry re-reads the same total without INCRBY", async () => {
         const now = new Date("2026-06-11T10:15:00Z");
         const args = {
@@ -472,6 +474,7 @@ describe("consumeTenantEmailCapSlot in-memory fallback", () => {
     });
 
     describe("when a dispatch wins its claim", () => {
+      /** @scenario "Email delivery caps are idempotent across retries" */
       it("advances the counter via INCRBY recipientCount, not a plain INCR", async () => {
         const incrby = vi.fn().mockResolvedValue(8);
         redisMock.connection = makeStore({

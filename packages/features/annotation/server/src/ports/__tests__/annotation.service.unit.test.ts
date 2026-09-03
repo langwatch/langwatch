@@ -74,6 +74,7 @@ function createService(repository: FakeRepository) {
 }
 
 describe("AnnotationService", () => {
+  /** @scenario "a required annotation lookup throws" */
   it("throws at the service boundary when an annotation is absent", async () => {
     const repository = new FakeRepository();
     repository.getById.mockRejectedValue(new AnnotationNotFoundError("missing"));
@@ -82,6 +83,46 @@ describe("AnnotationService", () => {
     await expect(
       service.getById({ id: "missing", projectId: "project-1" }),
     ).rejects.toBeInstanceOf(AnnotationNotFoundError);
+  });
+
+  /** @scenario "annotation input is validated by the contract" */
+  it("refuses an incomplete anchor before the repository is reached", () => {
+    const repository = new FakeRepository();
+    const { service } = createService(repository);
+
+    expect(() =>
+      service.create({
+        id: "annotation-2",
+        projectId: "project-1",
+        traceId: "trace-1",
+        userId: "user-1",
+        comment: "comment",
+        isThumbsUp: null,
+        expectedOutput: null,
+        anchorKind: "field",
+      } as never),
+    ).toThrow();
+
+    expect(repository.create).not.toHaveBeenCalled();
+  });
+
+  /** @scenario "queue references use their owning services" */
+  it("reads every queue member in one organization batch", async () => {
+    const repository = new FakeRepository();
+    const { service, projects, organizations } = createService(repository);
+
+    await service.assertQueueConfigurationReferences({
+      projectId: "project-1",
+      userIds: ["user-1", "user-2", "user-1"],
+      scoreTypeIds: ["score-1"],
+    });
+
+    expect(projects.getOrganizationId).toHaveBeenCalledWith("project-1");
+    expect(organizations.getOrganizationMembers).toHaveBeenCalledTimes(1);
+    expect(organizations.getOrganizationMembers).toHaveBeenCalledWith({
+      organizationId: "organization-1",
+      userIds: ["user-1", "user-2"],
+    });
   });
 
   it("delegates projection reads through the private repository", async () => {
@@ -101,6 +142,7 @@ describe("AnnotationService", () => {
     });
   });
 
+  /** @scenario "queue references use their owning services" */
   it("rejects queue members and scores outside the project boundary", async () => {
     const repository = new FakeRepository();
     const { service, organizations } = createService(repository);

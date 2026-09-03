@@ -93,6 +93,7 @@ describe("decideGraphTriggerHeartbeat per-project isolation", () => {
   });
 
   describe("given one project's candidate load throws", () => {
+    /** @scenario "Graph heartbeat isolates projects and metric sources" */
     it("still enqueues the healthy project's absence evaluation", async () => {
       const service = GraphTriggerHeartbeatService.create(
         makeDeps({
@@ -108,6 +109,7 @@ describe("decideGraphTriggerHeartbeat per-project isolation", () => {
       expect(requests[0]).toMatchObject({ projectId: HEALTHY });
     });
 
+    /** @scenario "Graph heartbeat isolates projects and metric sources" */
     it("does not enqueue anything for the failing project", async () => {
       const service = GraphTriggerHeartbeatService.create(
         makeDeps({

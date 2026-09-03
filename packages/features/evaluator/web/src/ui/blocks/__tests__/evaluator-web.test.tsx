@@ -32,6 +32,7 @@ describe("Evaluator web primitives", () => {
     ).toBeNull();
   });
 
+  /** @scenario "Reusable evaluator UI remains browser-safe" */
   it("renders category choices and delegates their host-owned actions", async () => {
     const user = userEvent.setup();
     const onSelectCategory = vi.fn();
@@ -51,6 +52,7 @@ describe("Evaluator web primitives", () => {
     expect(onSelectCode).toHaveBeenCalledOnce();
   });
 
+  /** @scenario "Reusable evaluator UI remains browser-safe" */
   it("groups contract definitions and exposes unavailable evaluator state", async () => {
     const user = userEvent.setup();
     const onSelect = vi.fn();
