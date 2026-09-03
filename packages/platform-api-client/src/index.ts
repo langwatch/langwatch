@@ -1,3 +1,4 @@
+export { trpcReact } from "./app-router-client";
 export {
   asFeatureApiClient,
   createFeatureApi,

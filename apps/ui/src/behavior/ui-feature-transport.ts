@@ -167,15 +167,26 @@ export type UiFeatureApiBinding = {
  * own procedure map, so mounting a list of them in one loop needs the props
  * erased — and this is the one place that erases them, rather than a cast at
  * every mount site.
+ *
+ * `TClient` is deliberately unconstrained rather than bounded to
+ * `FeatureApiClient<TMap extends FeatureApiMap>`: a package still on a
+ * hand-written `*ApiMap` hands a `Provider` typed by `RouterFromMap<TMap>`,
+ * and a package built on the one shared `createTRPCReact<AppRouter>()` client
+ * (`@langwatch/platform-api-client`'s `trpcReact`) hands one typed by the real
+ * router — a different shape this function does not need to name, and every
+ * feature web package but this file is forbidden from naming it at all. Both
+ * shapes are the same `TRPCUntypedClient` at runtime, and this is the one
+ * place that erases either back to the untyped prop the shell actually mounts
+ * every feature with.
  */
-export function uiFeatureApi<TMap extends FeatureApiMap>({
+export function uiFeatureApi<TClient>({
   name,
   api,
 }: {
   name: string;
   api: {
     Provider: ComponentType<{
-      client: FeatureApiClient<TMap>;
+      client: TClient;
       queryClient: QueryClient;
       children: ReactNode;
     }>;
