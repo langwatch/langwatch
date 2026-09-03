@@ -89,6 +89,7 @@ describe("API process configuration", () => {
         clickhouse: {
           url: undefined,
           langwatchQl: undefined,
+          opsUrl: undefined,
           privateRoutes: [],
           poolSizing: {
             override: undefined,
@@ -175,6 +176,7 @@ describe("API process configuration", () => {
           compression: "gzip",
           payloadCodec: "json",
         },
+        licensing: { publicKey: undefined },
       },
     });
   });
@@ -452,6 +454,7 @@ describe("API process configuration", () => {
       clickhouse: {
         url: undefined,
         langwatchQl: undefined,
+        opsUrl: undefined,
         privateRoutes: [],
         poolSizing: {
           override: undefined,
@@ -533,6 +536,7 @@ describe("API process configuration", () => {
         compression: "zstd",
         payloadCodec: "msgpack",
       },
+      licensing: { publicKey: undefined },
     });
   });
 
