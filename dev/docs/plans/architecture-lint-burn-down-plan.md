@@ -35,12 +35,68 @@ identity ADR-129 refactor.
   repository or store or a `*.test-fakes.ts` module, and nothing else.
 - **R9, first item** (same commit): `legacy-feature-fragment-baseline.json`
   deleted.
+- **R9, second item (decision 15b as approved):** `global-app-access-baseline.json`
+  and `legacy-application-boundary-baseline.json` both deleted outright — both
+  were drained to zero, and each rule already treats a missing baseline file
+  as an empty one (`readBaseline`/`readLegacyBaseline` both short-circuit on
+  `!existsSync`), so deleting them is behaviour-preserving zero-tolerance, not
+  a rule change. The baseline machinery itself (the two rule files, and every
+  other baseline in the package) is untouched.
 - **A4** (`f723164a16`, "Delete the private runtime exports nothing outside
   their package reads"): 43 `private-runtime-export` rows with zero consumers
   deleted outright, plus 5 rows whose only consumers were the owning package's
   own `__tests__` (repointed to relative imports). `private-runtime-export`
   went 99 → 56. `packages/enterprise/features/webhook` was NOT touched — it is
   consumed.
+- **R7 — the `rules/<subject>.rules.ts` layout kind** (decision 1a, approved):
+  implemented in `src/feature-layout.ts`. A file at `rules/<subject>.rules.ts`
+  is recognised alongside the existing `SERVER_PATTERNS`; it must declare no
+  class and no `new` expression anywhere in the file (mechanical stand-in for
+  "exports functions and constants only"), and each of its own value imports
+  must resolve to `node:*`, another `rules/` file in the same package, a
+  `*-contract` package, or a workspace package whose own value-import closure
+  never reaches Prisma, ClickHouse, or another package's
+  services/ports/adapters/repositories/stores/projections/subscribers/processes/intents/transport
+  (checked with `module-graph.ts`'s `walkValueImportGraph`, the same walker
+  `frontend-ui-boundaries.ts`'s portable-module oracle uses, kept as a
+  separate implementation here since that file is another lane's). A rules/
+  import that fails either check reports the offending specifier by name.
+  Zero files in the current tree use the new shape yet — the ~100-file move
+  is L2, scheduled separately — so this slice cleared 0 of the 303
+  `feature-source-layout` findings on its own; it only unblocks L2 to start.
+  Tests: `strict feature source layout` in
+  `tests/feature-package-boundaries.test.ts` (5 new cases: accepts the
+  canonical shape; rejects a class, a `new`, a relative service import, and a
+  `@prisma/client` import).
+- **R8 — the expiring boundary-edge baseline** (decision 2a, approved):
+  `src/boundary-edge-baseline.ts` + `src/boundary-edge-baseline.json`, shaped
+  like `comment-block-roots.json` — `{version, edges: [{kind, from, to,
+  expires}]}`, `kind` one of `cross-feature` | `private-runtime-export`. An
+  unlisted edge fails as today; a listed, unexpired edge is silenced by
+  `filterBaselinedBoundaryEdges` (wired into `cli.ts`'s main path over
+  `lintWorkspace`'s own output, the same way `commentBlockRoots.entries` gates
+  `lintCommentBlocks`); an expired entry fails as `boundary-edge-expired`; an
+  entry whose edge no longer appears in the current run fails as
+  `boundary-edge-baseline-stale`, mirroring the existing
+  `legacy-application-boundary-baseline` staleness check. Growth against a
+  merge-base reference (`compareBoundaryEdgeBaseline`, wired through
+  `--boundary-edge-baseline-reference` / `--baseline-reference-dir` in
+  `cli.ts`'s `--shrinking-baseline-only` path) allows only removing an edge or
+  moving its expiry earlier, never adding one. CI's merge-base copy loop in
+  `.github/workflows/langwatch-app-ci.yml` now includes
+  `boundary-edge-baseline.json` alongside the other three debt inventories.
+  Bootstrapped, ahead of W1–W3 per the explicit go-ahead in decision 2, from
+  the 159 `cross-feature` (101) and `private-runtime-export` (58) edges
+  currently unsuppressed, all under `packages/features/*` or
+  `packages/enterprise/features/*`, so every entry got the `packages/features/*`
+  tier's 2026-10-01 expiry from the `comment-block-roots.json` scheme (no
+  `apps/*` or "everything else" edges exist in this corpus). Bootstrapping
+  before the workflow-web drain means some of these ~159 are the grab-bag the
+  decision warned about; W1–W3 should re-derive and shrink this baseline when
+  they land, the same way any other slice does. Tests:
+  `tests/boundary-edge-baseline.test.ts` (9 cases covering silence, an
+  unlisted edge, suppression composed with unrelated policies, expiry,
+  staleness, reference growth/shrink, and the edge-extraction helper).
 
 ## In progress (a live lane owns these — do not start them)
 
@@ -51,16 +107,8 @@ identity ADR-129 refactor.
 
 ## Open — decisions first
 
-- **R7 — a `rules/<subject>.rules.ts` layout kind.** Not implemented; no
-  `rules/` pattern exists in `src/feature-layout.ts`. ~100 of the layout
-  violations are pure functions with no home. Alex's ruling requested; see
-  decision 1 in `open-decisions-2026-09-03.md`. If refused, L2 folds each
-  `.rules.ts` into the service that calls it — the same 100 files, a different
-  destination; the slice list does not change.
-- **R8 — the boundary edge baseline.** Not implemented; no
-  `src/boundary-edge-baseline.json` exists. It must be bootstrapped *after*
-  W1–W3 so the `workflow-web` grab-bag never enters it. See decision 2 in
-  `open-decisions-2026-09-03.md`.
+Both rule slices that were waiting on a ruling landed (R7 under "Landed"
+above; R8 likewise). Nothing is open here any more.
 
 ## Ground rules (unchanged, still in force)
 
@@ -297,13 +345,13 @@ imports it by relative path.
                               A8  (folded)
  A1 api enterprise door ─┐
  A2 worker + compositions ┴─▶ A3 leftovers, plan-gate
- R7 rules/ (DECISION) ─▶ L1 classes A,B,C,G ──▶ L2a L2b L2c rules/ ──▶ L3 identity (with ID)
-                                                                    ──▶ L4 analytics
-                                                                    ──▶ L5 rest, L6 singles
+ R7 rules/ (LANDED) ──▶ L1 classes A,B,C,G ──▶ L2a L2b L2c rules/ ──▶ L3 identity (with ID)
+                                                                   ──▶ L4 analytics
+                                                                   ──▶ L5 rest, L6 singles
  A9a A9b A9c try* renames   (independent of R7; after L1 so paths are final)
  Q1 line length ──▶ Q2 methods ──▶ Q3 ratchet + split lanes
  W1 design-system ──▶ W2 ui-host (IN PROGRESS) ──▶ W3 prisma-types
-                                                └──▶ R8 edge baseline (bootstrap)
+                                                └──▶ R8 edge baseline (LANDED; re-derive on W1–W3 landing)
                                                 └──▶ A15 cycles
  A12 web layout, A13 layers  (independent of W)
  A16 screen capabilities, A17 apps/ui features
@@ -387,5 +435,6 @@ already behave locally.
 
 ## Slice count
 
-Rule slices: 2 left (R7, R8), both waiting on a ruling. Code slices: ~37 open.
+Rule slices: 0 left — R7 and R8 both landed 2026-09-04. Code slices: ~37 open,
+L2 (class D) now unblocked.
 Comment slices: ~110. Held for other owners: 4.

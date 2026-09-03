@@ -2,16 +2,22 @@
 import { relative, resolve } from "node:path";
 import {
   formatViolation,
+  boundaryEdgesFromViolations,
   changedSourceFiles,
   discoverClassifiedPackages,
+  filterBaselinedBoundaryEdges,
+  lintBoundaryEdgeBaseline,
   lintCommentBlocks,
   lintCommentBlockRoots,
+  lintFeatureLayouts,
+  lintManifests,
   lintServiceQuality,
   lintServiceQualityBaseline,
   lintStrictPortModules,
   lintStrictPortBaseline,
   lintTestQuality,
   lintWorkspace,
+  type ArchitectureViolation,
 } from "./index";
 
 function valueAfter(flag: string): string | undefined {
@@ -37,10 +43,27 @@ const resolvedServiceQualityBaselineReference =
 const commentBlockRootsBaselineReference =
   valueAfter("--comment-block-roots-reference") ??
   (baselineReferenceDirectory ? `${baselineReferenceDirectory}/comment-block-roots.json` : void 0);
+const boundaryEdgeBaselineReference =
+  valueAfter("--boundary-edge-baseline-reference") ??
+  (baselineReferenceDirectory
+    ? `${baselineReferenceDirectory}/boundary-edge-baseline.json`
+    : void 0);
 const commentBlockRoots = lintCommentBlockRoots(root, commentBlockRootsBaselineReference);
 const baselineOnly =
   process.argv.includes("--shrinking-baseline-only") ||
   process.argv.includes("--service-quality-baseline-only");
+const baselineDiscovery = baselineOnly ? discoverClassifiedPackages(root) : void 0;
+// `lintManifests`/`lintFeatureLayouts` run outside `lintWorkspace` here, so
+// their violations still carry absolute file paths — relativize before
+// deriving edges, which are keyed by the workspace-relative `from`.
+const baselineBoundaryEdges = baselineDiscovery
+  ? boundaryEdgesFromViolations(
+      [
+        ...lintManifests(baselineDiscovery.packages),
+        ...lintFeatureLayouts(root, baselineDiscovery.packages, baselineDiscovery.catalogue),
+      ].map((violation) => ({ ...violation, file: relative(root, violation.file) })),
+    )
+  : [];
 const baselineCheck = baselineOnly
   ? {
       serviceQuality: lintServiceQualityBaseline(
@@ -48,15 +71,20 @@ const baselineCheck = baselineOnly
         resolvedServiceQualityBaselineReference,
       ),
       strictPorts: lintStrictPortBaseline(root, portModuleBaselineReference),
+      boundaryEdges: lintBoundaryEdgeBaseline(
+        root,
+        baselineBoundaryEdges,
+        boundaryEdgeBaselineReference,
+      ),
       commentBlockRoots,
     }
   : void 0;
-const baselineDiscovery = baselineOnly ? discoverClassifiedPackages(root) : void 0;
 const baselinePolicyViolations =
   baselineCheck && baselineDiscovery
     ? [
         ...baselineCheck.serviceQuality.violations,
         ...baselineCheck.strictPorts.violations,
+        ...baselineCheck.boundaryEdges.violations,
         ...baselineCheck.commentBlockRoots.violations,
         ...lintServiceQuality(root, baselineDiscovery.packages),
         ...lintStrictPortModules(root, baselineDiscovery.packages),
@@ -69,30 +97,40 @@ const allCommentBlocks = process.argv.includes("--all-comment-blocks");
 const commentBlocks = allCommentBlocks
   ? lintCommentBlocks(root, { files: void 0 })
   : lintCommentBlocks(root, { changedFiles, allowedRoots: commentBlockRoots.entries });
+
+function fullWorkspaceViolations(): ArchitectureViolation[] {
+  const workspaceViolations = lintWorkspace(
+    {
+      root,
+      changedFiles,
+      declarations: !process.argv.includes("--no-declarations"),
+      legacyApplicationMigration: !process.argv.includes("--no-legacy-application-migration"),
+      legacyFeatureFragments: !process.argv.includes("--no-legacy-feature-fragments"),
+      serviceQualityBaselineReference: resolvedServiceQualityBaselineReference,
+    },
+    commentBlocks,
+  );
+  // `lintWorkspace` already relativized `file`, so its cross-feature/private-runtime-export
+  // violations are the current edges as-is.
+  const boundaryEdges = lintBoundaryEdgeBaseline(
+    root,
+    boundaryEdgesFromViolations(workspaceViolations),
+    boundaryEdgeBaselineReference,
+  );
+  return [
+    ...filterBaselinedBoundaryEdges(workspaceViolations, boundaryEdges.entries),
+    ...commentBlockRoots.violations,
+    ...boundaryEdges.violations,
+  ];
+}
+
 const violations = reviewCommentBlocks
   ? commentBlocks.violations
   : reviewTestQuality
     ? lintTestQuality(root, { files: changedFiles })
     : baselinePolicyViolations
       ? baselinePolicyViolations
-      : [
-          ...lintWorkspace(
-            {
-              root,
-              changedFiles,
-              declarations: !process.argv.includes("--no-declarations"),
-              legacyApplicationMigration: !process.argv.includes(
-                "--no-legacy-application-migration",
-              ),
-              legacyFeatureFragments: !process.argv.includes(
-                "--no-legacy-feature-fragments",
-              ),
-              serviceQualityBaselineReference: resolvedServiceQualityBaselineReference,
-            },
-            commentBlocks,
-          ),
-          ...commentBlockRoots.violations,
-        ];
+      : fullWorkspaceViolations();
 
 if (reviewCommentBlocks && commentBlocks.reviews.length > 0) {
   process.stdout.write(
@@ -132,6 +170,11 @@ if (violations.length === 0) {
     if (baselineCheck?.strictPorts.bootstrapped) {
       process.stdout.write(
         "architecture-lint: accepting the one-time strict port baseline bootstrap; future merge-base checks can only shrink it\n",
+      );
+    }
+    if (baselineCheck?.boundaryEdges.bootstrapped) {
+      process.stdout.write(
+        "architecture-lint: accepting the one-time boundary edge baseline bootstrap; future merge-base checks can only shrink it\n",
       );
     }
     process.stdout.write("architecture-lint: package boundaries are sealed\n");

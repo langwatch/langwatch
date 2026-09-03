@@ -947,7 +947,7 @@ jobs:
           merge_base="$(git merge-base "$base_sha" HEAD)"
           reference_directory="$RUNNER_TEMP/architecture-lint-baselines"
           mkdir -p "$reference_directory"
-          for baseline in service-quality-baseline.json port-module-baseline.json comment-block-roots.json; do
+          for baseline in service-quality-baseline.json port-module-baseline.json comment-block-roots.json boundary-edge-baseline.json; do
             source_path="packages/architecture-lint/src/$baseline"
             reference="$reference_directory/$baseline"
             if git cat-file -e "$merge_base:$source_path"; then

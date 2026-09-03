@@ -9,6 +9,10 @@ document each belongs to is named so the context is one hop away.
 
 ## 1. Architecture-lint R7: add a `rules/<subject>.rules.ts` layout kind
 
+**Resolved 2026-09-04: (a), as recommended.** Implemented in
+`packages/architecture-lint/src/feature-layout.ts`; see the R7 entry under
+"Landed" in `architecture-lint-burn-down-plan.md`.
+
 About 100 of the 303 `feature-source-layout` violations are pure functions with
 no home — 55 `*.rules.ts`, 16 `canonicalisation/*.canonicaliser.ts`, identity's
 `*-guards.ts` and `*-id.ts`, analytics' `query-builders/*` and
@@ -31,6 +35,15 @@ manufacturing 100 single-method classes whose only reason to exist is a
 filename rule. Lane: `architecture-lint-burn-down-plan.md`.
 
 ## 2. Architecture-lint R8: an expiring boundary-edge baseline
+
+**Resolved 2026-09-04: (a), as recommended, bootstrapped now rather than after
+W1–W3.** `packages/architecture-lint/src/boundary-edge-baseline.{ts,json}`;
+see the R8 entry under "Landed" in `architecture-lint-burn-down-plan.md`. The
+bootstrap seeded from the corpus as it stood today (159 edges, all under
+`packages/features/*`/`packages/enterprise/features/*`), which does include
+some `workflow-web` grab-bag residue the decision below warned about — W1–W3
+should re-derive and shrink the baseline when they land rather than treat the
+159 as settled.
 
 After W1–W3 drain the `workflow-web` grab-bag there will still be roughly 60
 web→web edges and 14 core-feature→enterprise edges that are product structure
@@ -73,6 +86,15 @@ process's mount; (b) reintroduces exactly the gap by hand. Lane:
 
 ## 4. Suite default plan naming, and the by-name REST route it waits on
 
+**Resolved 2026-09-04 as option (a).** `suiteRunPlanInputSchema.name` is
+`.optional()`; the tRPC door kept its own `min(1)`. `SuiteService.runPlan`
+derives a name via `defaultPlanName` (scope label + target labels) built on
+the contract's `derivePlanName`/`targetLabels`, only when the caller sends
+none. Landed in the same change that mounted `/api/v1/run-plans/run` (decision
+5). One deviation from main: derived target labels carry no connected-agent
+environment/owner suffix, since `AgentService.getNamesByIds` on this branch
+returns only `{id, name}`. See `suite-restore-review.md`, "Landed 2026-09-04". Original framing follows.
+
 `suiteRunPlanInputSchema` requires `name`
 (`packages/features/suite/contract/src/suite.ts:186`), and nothing derives one.
 Main derived it. The callers that omit the name are not the web — they are
@@ -92,6 +114,16 @@ field. **Recommended: (a).** Lane: `suite-restore-review.md` fix 4.
 
 ## 5. `/api/v1/run-plans*` and `/api/v1/test-suites*`: ship or retire?
 
+**Resolved 2026-09-04: (a), as recommended — both families built.** Alex's
+standing rule is that nothing main shipped is retired on this branch, which
+settles it independent of the size argument below. Both families are lifted
+onto `SuiteApp`/`SuiteService` in the branch's Hono style and mounted in
+`apps/api/src/app-rest/app-rest.packaged-families.ts` beside the deprecated
+`/api/suites` alias, reusing the same `services.suites` accessor — no change
+was needed to the tRPC-flatten lane's files. See `suite-restore-review.md`,
+"Landed 2026-09-04" for the file list and the one field-level deviation
+(target-name enrichment). Original framing follows.
+
 Eleven documented REST operations across these two families are unmounted and
 **unowned** — no plan claims them, no server file exists, and `suite.api.ts`
 mounts `/api/suites` and never `/api/v1/test-suites`. They are in the frozen
@@ -108,6 +140,19 @@ genuinely has no callers — someone should check the SDK and MCP surfaces befor
 that is assumed. Lane: `restructure-bug-hunt-2026-09-03.md`.
 
 ## 6. A producer-only Eventing pipeline factory for the trace and topic pipelines
+
+**Resolved 2026-09-04: (a), as recommended, plus the topic producer factory
+from (b).** `annotation-clickhouse-backfill` and `dataset-content-backfill`
+are registered (the trace pipeline already had a producer factory,
+`createTraceProcessingProducerPipeline` — built earlier for `apps/api`'s
+annotation path — so only the two tasks needed wiring).
+`createTopicClusteringProcessingProducerPipeline`
+(`packages/features/topic/server/src/adapters/topic-clustering-processing-producer.adapter.ts`)
+was also built, covering both producer registrations `topic-clustering-run`
+needs; it stays unregistered because its runner (model-provider gateway,
+langevals, Prisma repository) is still absent — the smaller, honestly-named
+remainder of (b), not the full option. See "Open — one unregistered task" in
+`tasks-lane-review.md`.
 
 Three tasks are moved into their features, registered nowhere, and blocked on
 the same shape. `stalled-runs-backfill` showed the shape works:
@@ -150,6 +195,24 @@ one predicate over one config leaf and (b) buys a port for a boolean; what is
 worth fixing is that two composition sites now answer "is this the demo
 project" independently. Lane: `restructure-bug-hunt-2026-09-03.md`.
 
+**RESOLVED 2026-09-04 (frontend half — the backend `refuseDemoProject`/MCP
+call sites live under `apps/api/src/app/**`, out of scope here).** The two
+apps/ui composition sites that gated Langy visibility (`home-host.tsx`'s
+`langyVisibility()`/`canAskLangy()`, `navigation-host.tsx`'s `canAskLangy`)
+independently read `config.demoProjectSlug` and neither compared it against
+the active project — a demo-project reader got the full Langy home/command-bar
+experience and every send 403'd. Added one shared predicate,
+`apps/ui/src/behavior/langy-demo-project.ts#isLangyDemoProject`, and folded
+both sites onto it (a). Extended `LangyHostPort` (`@langwatch/langy-web`) with
+`isDemoProject()`, implemented in `apps/ui/src/features/langy/ui/sections/host.tsx`
+using the same predicate, and wired it into the panel's own gate
+(`use-show-langy.ts`) — closing the gap its docblock had flagged as
+"recorded rather than hidden". Bound `specs/security/api-endpoint-authorization.feature`'s
+"The demo project refuses Langy on every surface" in
+`apps/ui/src/features/langy/__tests__/langy-host-demo-refusal.integration.test.tsx`;
+added a supporting (unbound) case to langy-web's own
+`project-langy-layout.integration.test.tsx` proving the panel hides.
+
 ## 8. `worker: null` in the API's Langy composition
 
 `api-trpc-collaborators.agent-group.composition.ts:806` sets the Langy turn
@@ -170,28 +233,14 @@ which process the browser's "start a turn" button actually calls. That needs
 one probe against a running stack before it is ruled either way. Lane:
 `core-application-feature-extraction-plan.md`.
 
-## 9. langwatch-saas: keep the plugin fallback, or move the eight tasks in?
+## 9. langwatch-saas: keep the plugin fallback, or move the eight tasks in? — **DECIDED: (c), landed**
 
-The fallback is implemented — `@langwatch/task` is a leaf package saas can
-depend on as a git subdirectory dependency, `apps/tasks` loads
-`LANGWATCH_TASK_MODULES`, and a broken or unknown plugin module fails boot
-rather than silently shrinking the catalogue. Nothing in this repository blocks
-either path, and **nothing has happened on the saas side**: its runner and all
-eight tasks still import `langwatch/platform/app/...`, so that repo does not
-build against this branch at all. **(a) Fallback (already decided, already
-built):** saas rewrites its eight tasks as `Task` classes over `TaskHostPort`,
-drops the submodule for a dependency on `@langwatch/task`, and builds `FROM`
-the public image. Cost: a second build, and a narrower surface for the private
-tasks. **(b) Move the eight in** under `packages/enterprise/features/*/server/src/tasks/`,
-delete the second runner, and turn the saas repo's coupling from a submodule
-SHA into an image tag. Cost: the tasks become public source — billing and
-Stripe code already is, and the model-registry sync and GDPR erase are ordinary
-operations. **(c) Both:** move the six that are ordinary, keep any genuinely
-private one as a plugin. **Recommended: (c).** The mechanism for (a) is built
-and costs nothing to keep for the exceptions, and (b) is what makes the
-enterprise grouping true for everything else. Whichever is chosen, the saas
-repo needs a PR before this branch can deploy. Lane:
-`tasks-launch-interface-and-saas.md`.
+Option (c) taken: five of the six ordinary tasks moved into this repository's
+feature packages as `Task` classes, registered on `apps/tasks`' catalogue;
+`backfillInviteUsersToCio` stays a saas-only plugin (genuinely private — a
+one-off historical-bug backfill of user PII into Customer.io, not a repeatable
+operation). Full mapping, what still needs a rewrite (`onboarding-completion-rate`
+is blocked, not moved), and the saas-side follow-up: `tasks-launch-interface-and-saas.md`.
 
 ## 10. Which composition-simplification options to schedule, and in what order
 
@@ -283,6 +332,17 @@ moving deliberately rather than discovering it as a red build. Lane:
 
 ## 15. The two drained lint baselines
 
+**Resolved 2026-09-04: (c), overriding the recommendation.** Alex chose to
+delete both files rather than keep `global-app-access-baseline.json` as (b)
+recommended. Both rules already treat a missing baseline file the same as an
+empty one (`readBaseline`/`readLegacyBaseline` both return `{entries: []}`
+when `!existsSync`), so this is behaviour-preserving: `global-app-access`
+still forbids `getApp`/`tryGetApp` by name via the `ACCESSOR_FILE`/`ACCESSOR_ALIAS`
+constants in `global-app-access.ts` (unchanged), and the legacy application
+boundary still fails on any new edge. Only the two JSON files are gone; the
+baseline machinery in both rule files, and every other baseline in the
+package, is untouched.
+
 `global-app-access-baseline.json` and `legacy-application-boundary-baseline.json`
 are both drained to zero and still present. **(a) Keep both** as documented
 tripwires. **(b) Keep `global-app-access` and replace
@@ -337,6 +397,31 @@ them from the picker** — the ADR is the authority on where home may point.
 Lane: `core-application-feature-extraction-plan.md` (`F-GATEWAY-CAT-01`,
 `F-HOME-01`).
 
+**RESOLVED 2026-09-04.** `toLegacyCompatibleCustomModels` now returns
+`{ entries, rejected }` (`ParsedCustomModels`); a rejected entry carries only
+`{ name }` (its `modelId`, never its full content). Its one production caller,
+`gateway-provider-model-catalog.adapter.ts#declaredModelsForProvider`, logs
+`rejected` at `warn` by name and keeps declaring the entries that parsed.
+Saving already refuses a malformed entry outright — `customModelUpdateInputSchema`
+is the tRPC mutation's own `.strict()` input schema — so no separate save-path
+change was needed; the defect was read-side only. Bound
+"A stored custom model entry that fails the strict parse is dropped loudly" in
+`specs/model-providers/custom-models-management.feature`, test in
+`custom-model.schema.unit.test.ts`; added a second unit test on the adapter
+(`gateway-provider-model-catalog.unit.test.ts`) for the warn-log half.
+
+For the picker: `home-page-picker.tsx` read `firstProjectSlug` off
+`homePagePickerState` (unfiltered) instead of `governance.resolveHome`
+(filtered). Rather than touch the excluded `apps/api/src/app/**` port
+implementations, `PersonaResolution` (governance contract) now echoes the
+caller's own (already-filtered) `firstProjectSlug`, and the picker reads that
+instead — one source of truth, no new backend port. Bound "The picker's
+'Project home' option never names a personal workspace" in
+`specs/ai-gateway/governance/persona-home-content.feature`; test in
+`home-page-picker.unroutable-project-option.integration.test.tsx`
+(`@langwatch/user-web`); resolver pass-through covered in
+`persona-home-resolver.unit.test.ts`.
+
 ## 19. Two decisions carried over from the exit plan
 
 **Secret compatibility retirement:** whether legacy project-key write actor
@@ -362,7 +447,7 @@ work as specified — not for rediscovering the shape.
 | Item | Where | Size |
 | --- | --- | --- |
 | `apps/api/src/index.ts:40,53` re-export `withApiTraceGroupCollaborators` and `withApiGatewayGroupCollaborators`, which step B deleted and nothing defines. `@langwatch/platform-api` does not compile. | `trpc-flatten-review.md` | 10 minutes |
-| `normalizePlanScope` (suite contract) and `CLI_EPHEMERAL_LABEL` (suite contract) are restored with **no consumer** — a fix landed half-way in each case, and three spec scenarios stay unbound. | `suite-restore-review.md` fixes 3, 9 | half a day |
+| ~~`normalizePlanScope` (suite contract) and `CLI_EPHEMERAL_LABEL` (suite contract) are restored with **no consumer**~~ — landed 2026-09-04, both wired and the three spec scenarios bound. | `suite-restore-review.md` fixes 3, 9 | done |
 | `useRegisterLangyActions` is exported from a module langy-web's entry point does not publish, and nothing calls it. | decision 13 | see below |
 
 ## tRPC flatten and the api-map retirement
@@ -437,7 +522,7 @@ Counts predate R1–R6; re-derive before starting any slice.
 | The trace producer-only pipeline factory; register `annotation-clickhouse-backfill` and `dataset-content-backfill` (**needs decision 6**) | 2 days |
 | Move `WorkerDatasetStorageResolver` into `dataset/server/adapters` and fill `TasksHost.objectStorage` | half a day |
 | `topic-clustering-run` — the runner's collaborator graph plus two producer registrations | 3 days |
-| langwatch-saas PR — its runner and all 8 tasks still import `platform/app` and do not build (**needs decision 9**) | 2 days, other repo |
+| langwatch-saas PR — delete the 5 moved tasks, keep `backfillInviteUsersToCio` as a `@langwatch/task` plugin, drop the submodule, build `FROM` the public image (decision 9 **DECIDED**) | 1 day, other repo |
 
 ## Unserved surfaces and restored features
 

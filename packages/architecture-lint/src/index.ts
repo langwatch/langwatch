@@ -34,6 +34,18 @@ export type {
   PackageKind,
 } from "./types";
 export { readFeatureCatalogue } from "./feature-catalogue";
+export {
+  boundaryEdgesFromViolations,
+  compareBoundaryEdgeBaseline,
+  filterBaselinedBoundaryEdges,
+  lintBoundaryEdgeBaseline,
+} from "./boundary-edge-baseline";
+export type {
+  BoundaryEdge,
+  BoundaryEdgeBaselineCheck,
+  BoundaryEdgeEntry,
+  BoundaryEdgeKind,
+} from "./boundary-edge-baseline";
 export { lintApiTransportBoundaries } from "./api-transport-boundaries";
 export {
   changedSourceFiles,
@@ -62,6 +74,8 @@ export {
   formatLegacyFeatureFragmentBaseline,
 } from "./legacy-feature-fragments";
 export { discoverClassifiedPackages } from "./workspace";
+export { lintFeatureLayouts } from "./feature-layout";
+export { lintManifests } from "./manifests";
 export { formatServiceQualityBaseline } from "./service-quality";
 export { collectServiceQualityCeilings } from "./service-quality";
 export { compareServiceQualityBaselines } from "./service-quality";
@@ -125,7 +139,7 @@ export function lintWorkspace(
   const discovery = discoverClassifiedPackages(root);
   const violations = [
     ...discovery.violations,
-    ...lintFeatureLayouts(discovery.packages, discovery.catalogue),
+    ...lintFeatureLayouts(root, discovery.packages, discovery.catalogue),
     ...lintFrontendUiBoundaries(root, discovery.packages),
     ...lintGlobalAppAccess(root),
     ...(options.legacyFeatureFragments === false

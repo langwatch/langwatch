@@ -885,6 +885,125 @@ describe("strict feature source layout", () => {
       ),
     ).toBe(true);
   });
+
+  /** @scenario "A rules/ module is a pure package of functions" */
+  it("accepts a rules module exporting pure functions and constants", () => {
+    featurePackage({ feature: "agent", role: "contract" });
+    featurePackage({ feature: "agent", role: "server" });
+    write(
+      "packages/features/agent/server/src/rules/agent-support.rules.ts",
+      "export function isSiblingRule(value: number): boolean {\n  return value % 2 === 0;\n}\n",
+    );
+    write(
+      "packages/features/agent/server/src/rules/agent-eligibility.rules.ts",
+      [
+        'import { createHash } from "node:crypto";',
+        'import { value } from "@langwatch/agent-contract";',
+        'import { isSiblingRule } from "./agent-support.rules";',
+        "",
+        "export function isEligible(input: string): boolean {",
+        "  return Boolean(value) && isSiblingRule(input.length) && createHash(\"sha256\").update(input).digest(\"hex\").length > 0;",
+        "}",
+        "",
+        "export const ELIGIBILITY_THRESHOLD = 1;",
+        "",
+      ].join("\n"),
+    );
+
+    expect(policies()).not.toContain("feature-source-layout");
+  });
+
+  it("rejects a rules module that declares a class", () => {
+    featurePackage({ feature: "agent", role: "server" });
+    write(
+      "packages/features/agent/server/src/rules/agent-eligibility.rules.ts",
+      "export class AgentEligibilityRules {}\n",
+    );
+
+    const violations = lintWorkspace({ root, declarations: false }).filter(
+      (violation) => violation.policy === "feature-source-layout",
+    );
+    expect(
+      violations.some(
+        (violation) =>
+          violation.file.includes("agent-eligibility.rules.ts") &&
+          violation.message.includes("a class"),
+      ),
+    ).toBe(true);
+  });
+
+  it("rejects a rules module that instantiates with new", () => {
+    featurePackage({ feature: "agent", role: "server" });
+    write(
+      "packages/features/agent/server/src/rules/agent-eligibility.rules.ts",
+      "export function build(): Date {\n  return new Date();\n}\n",
+    );
+
+    const violations = lintWorkspace({ root, declarations: false }).filter(
+      (violation) => violation.policy === "feature-source-layout",
+    );
+    expect(
+      violations.some(
+        (violation) =>
+          violation.file.includes("agent-eligibility.rules.ts") &&
+          violation.message.includes("`new` expression"),
+      ),
+    ).toBe(true);
+  });
+
+  it("rejects a rules module importing a service", () => {
+    featurePackage({ feature: "agent", role: "server" });
+    write(
+      "packages/features/agent/server/src/rules/agent-eligibility.rules.ts",
+      [
+        'import { AgentService } from "../services/agent.service";',
+        "",
+        "export function noop(): boolean {",
+        "  return Boolean(AgentService);",
+        "}",
+        "",
+      ].join("\n"),
+    );
+
+    const violations = lintWorkspace({ root, declarations: false }).filter(
+      (violation) => violation.policy === "feature-source-layout",
+    );
+    expect(
+      violations.some(
+        (violation) =>
+          violation.file.includes("agent-eligibility.rules.ts") &&
+          violation.message.includes("../services/agent.service") &&
+          violation.message.includes("a service"),
+      ),
+    ).toBe(true);
+  });
+
+  it("rejects a rules module importing Prisma", () => {
+    featurePackage({ feature: "agent", role: "server" });
+    write(
+      "packages/features/agent/server/src/rules/agent-eligibility.rules.ts",
+      [
+        'import { Prisma } from "@prisma/client";',
+        "",
+        "export function noop(): boolean {",
+        "  return Boolean(Prisma);",
+        "}",
+        "",
+      ].join("\n"),
+    );
+
+    const violations = lintWorkspace({ root, declarations: false }).filter(
+      (violation) => violation.policy === "feature-source-layout",
+    );
+    expect(
+      violations.some(
+        (violation) =>
+          violation.file.includes("agent-eligibility.rules.ts") &&
+          violation.message.includes("@prisma/client") &&
+          violation.message.includes("Prisma"),
+      ),
+    ).toBe(true);
+  });
 });
 
 describe("Prisma client containment", () => {

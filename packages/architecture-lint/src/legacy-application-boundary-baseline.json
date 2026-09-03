@@ -1,9 +1,0 @@
-{
-  "version": 1,
-  "edges": {
-    "backend-to-browser": {},
-    "browser-to-backend": {},
-    "ee-alias": {},
-    "enterprise-to-application": {}
-  }
-}

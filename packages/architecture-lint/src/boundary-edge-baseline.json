@@ -1,0 +1,959 @@
+{
+  "version": 0,
+  "edges": [
+    {
+      "kind": "cross-feature",
+      "from": "packages/enterprise/features/billing/web/package.json",
+      "to": "@langwatch/enterprise-licensing-web",
+      "expires": "2026-10-01"
+    },
+    {
+      "kind": "cross-feature",
+      "from": "packages/enterprise/features/billing/web/package.json",
+      "to": "@langwatch/workflow-web",
+      "expires": "2026-10-01"
+    },
+    {
+      "kind": "cross-feature",
+      "from": "packages/enterprise/features/governance/server/package.json",
+      "to": "@langwatch/project-server",
+      "expires": "2026-10-01"
+    },
+    {
+      "kind": "cross-feature",
+      "from": "packages/enterprise/features/governance/server/package.json",
+      "to": "@langwatch/trace-server",
+      "expires": "2026-10-01"
+    },
+    {
+      "kind": "cross-feature",
+      "from": "packages/enterprise/features/governance/web/package.json",
+      "to": "@langwatch/authz-web",
+      "expires": "2026-10-01"
+    },
+    {
+      "kind": "cross-feature",
+      "from": "packages/enterprise/features/governance/web/package.json",
+      "to": "@langwatch/coding-agent-web",
+      "expires": "2026-10-01"
+    },
+    {
+      "kind": "cross-feature",
+      "from": "packages/enterprise/features/scim/server/package.json",
+      "to": "@langwatch/identity-server",
+      "expires": "2026-10-01"
+    },
+    {
+      "kind": "cross-feature",
+      "from": "packages/features/analytics/server/package.json",
+      "to": "@langwatch/feature-flag-server",
+      "expires": "2026-10-01"
+    },
+    {
+      "kind": "cross-feature",
+      "from": "packages/features/analytics/server/package.json",
+      "to": "@langwatch/trace-server",
+      "expires": "2026-10-01"
+    },
+    {
+      "kind": "cross-feature",
+      "from": "packages/features/analytics/web/package.json",
+      "to": "@langwatch/evaluator-web",
+      "expires": "2026-10-01"
+    },
+    {
+      "kind": "cross-feature",
+      "from": "packages/features/analytics/web/package.json",
+      "to": "@langwatch/workflow-web",
+      "expires": "2026-10-01"
+    },
+    {
+      "kind": "cross-feature",
+      "from": "packages/features/annotation/web/package.json",
+      "to": "@langwatch/trace-web",
+      "expires": "2026-10-01"
+    },
+    {
+      "kind": "cross-feature",
+      "from": "packages/features/api-key/web/package.json",
+      "to": "@langwatch/authz-web",
+      "expires": "2026-10-01"
+    },
+    {
+      "kind": "cross-feature",
+      "from": "packages/features/auth/server/package.json",
+      "to": "@langwatch/identity-server",
+      "expires": "2026-10-01"
+    },
+    {
+      "kind": "cross-feature",
+      "from": "packages/features/authz/web/package.json",
+      "to": "@langwatch/enterprise-billing-web",
+      "expires": "2026-10-01"
+    },
+    {
+      "kind": "cross-feature",
+      "from": "packages/features/coding-agent/web/package.json",
+      "to": "@langwatch/trace-web",
+      "expires": "2026-10-01"
+    },
+    {
+      "kind": "cross-feature",
+      "from": "packages/features/dashboard/server/package.json",
+      "to": "@langwatch/analytics-server",
+      "expires": "2026-10-01"
+    },
+    {
+      "kind": "cross-feature",
+      "from": "packages/features/dashboard/server/package.json",
+      "to": "@langwatch/feature-flag-server",
+      "expires": "2026-10-01"
+    },
+    {
+      "kind": "cross-feature",
+      "from": "packages/features/data-privacy/web/package.json",
+      "to": "@langwatch/authz-web",
+      "expires": "2026-10-01"
+    },
+    {
+      "kind": "cross-feature",
+      "from": "packages/features/data-retention/web/package.json",
+      "to": "@langwatch/authz-web",
+      "expires": "2026-10-01"
+    },
+    {
+      "kind": "cross-feature",
+      "from": "packages/features/dataset/web/package.json",
+      "to": "@langwatch/workflow-web",
+      "expires": "2026-10-01"
+    },
+    {
+      "kind": "cross-feature",
+      "from": "packages/features/evaluator/web/package.json",
+      "to": "@langwatch/analytics-web",
+      "expires": "2026-10-01"
+    },
+    {
+      "kind": "cross-feature",
+      "from": "packages/features/evaluator/web/package.json",
+      "to": "@langwatch/experiment-web",
+      "expires": "2026-10-01"
+    },
+    {
+      "kind": "cross-feature",
+      "from": "packages/features/evaluator/web/package.json",
+      "to": "@langwatch/model-provider-web",
+      "expires": "2026-10-01"
+    },
+    {
+      "kind": "cross-feature",
+      "from": "packages/features/evaluator/web/package.json",
+      "to": "@langwatch/prompt-web",
+      "expires": "2026-10-01"
+    },
+    {
+      "kind": "cross-feature",
+      "from": "packages/features/evaluator/web/package.json",
+      "to": "@langwatch/trace-web",
+      "expires": "2026-10-01"
+    },
+    {
+      "kind": "cross-feature",
+      "from": "packages/features/evaluator/web/package.json",
+      "to": "@langwatch/workflow-web",
+      "expires": "2026-10-01"
+    },
+    {
+      "kind": "cross-feature",
+      "from": "packages/features/experiment/server/package.json",
+      "to": "@langwatch/agent-server",
+      "expires": "2026-10-01"
+    },
+    {
+      "kind": "cross-feature",
+      "from": "packages/features/experiment/server/package.json",
+      "to": "@langwatch/prompt-server",
+      "expires": "2026-10-01"
+    },
+    {
+      "kind": "cross-feature",
+      "from": "packages/features/experiment/server/package.json",
+      "to": "@langwatch/suite-server",
+      "expires": "2026-10-01"
+    },
+    {
+      "kind": "cross-feature",
+      "from": "packages/features/experiment/web/package.json",
+      "to": "@langwatch/dataset-web",
+      "expires": "2026-10-01"
+    },
+    {
+      "kind": "cross-feature",
+      "from": "packages/features/experiment/web/package.json",
+      "to": "@langwatch/evaluator-web",
+      "expires": "2026-10-01"
+    },
+    {
+      "kind": "cross-feature",
+      "from": "packages/features/experiment/web/package.json",
+      "to": "@langwatch/langy-web",
+      "expires": "2026-10-01"
+    },
+    {
+      "kind": "cross-feature",
+      "from": "packages/features/experiment/web/package.json",
+      "to": "@langwatch/model-provider-web",
+      "expires": "2026-10-01"
+    },
+    {
+      "kind": "cross-feature",
+      "from": "packages/features/experiment/web/package.json",
+      "to": "@langwatch/prompt-web",
+      "expires": "2026-10-01"
+    },
+    {
+      "kind": "cross-feature",
+      "from": "packages/features/experiment/web/package.json",
+      "to": "@langwatch/trace-web",
+      "expires": "2026-10-01"
+    },
+    {
+      "kind": "cross-feature",
+      "from": "packages/features/experiment/web/package.json",
+      "to": "@langwatch/workflow-web",
+      "expires": "2026-10-01"
+    },
+    {
+      "kind": "cross-feature",
+      "from": "packages/features/gateway/web/package.json",
+      "to": "@langwatch/authz-web",
+      "expires": "2026-10-01"
+    },
+    {
+      "kind": "cross-feature",
+      "from": "packages/features/gateway/web/package.json",
+      "to": "@langwatch/enterprise-billing-web",
+      "expires": "2026-10-01"
+    },
+    {
+      "kind": "cross-feature",
+      "from": "packages/features/identity/server/package.json",
+      "to": "@langwatch/ops-server",
+      "expires": "2026-10-01"
+    },
+    {
+      "kind": "cross-feature",
+      "from": "packages/features/langy/web/package.json",
+      "to": "@langwatch/github-web",
+      "expires": "2026-10-01"
+    },
+    {
+      "kind": "cross-feature",
+      "from": "packages/features/langy/web/package.json",
+      "to": "@langwatch/model-provider-web",
+      "expires": "2026-10-01"
+    },
+    {
+      "kind": "cross-feature",
+      "from": "packages/features/langy/web/package.json",
+      "to": "@langwatch/ops-web",
+      "expires": "2026-10-01"
+    },
+    {
+      "kind": "cross-feature",
+      "from": "packages/features/langy/web/package.json",
+      "to": "@langwatch/trace-web",
+      "expires": "2026-10-01"
+    },
+    {
+      "kind": "cross-feature",
+      "from": "packages/features/langy/web/package.json",
+      "to": "@langwatch/workflow-web",
+      "expires": "2026-10-01"
+    },
+    {
+      "kind": "cross-feature",
+      "from": "packages/features/log/server/package.json",
+      "to": "@langwatch/data-privacy-server",
+      "expires": "2026-10-01"
+    },
+    {
+      "kind": "cross-feature",
+      "from": "packages/features/log/server/package.json",
+      "to": "@langwatch/trace-server",
+      "expires": "2026-10-01"
+    },
+    {
+      "kind": "cross-feature",
+      "from": "packages/features/metric/server/package.json",
+      "to": "@langwatch/data-privacy-server",
+      "expires": "2026-10-01"
+    },
+    {
+      "kind": "cross-feature",
+      "from": "packages/features/metric/server/package.json",
+      "to": "@langwatch/trace-server",
+      "expires": "2026-10-01"
+    },
+    {
+      "kind": "cross-feature",
+      "from": "packages/features/model-provider/server/package.json",
+      "to": "@langwatch/secret-server",
+      "expires": "2026-10-01"
+    },
+    {
+      "kind": "cross-feature",
+      "from": "packages/features/model-provider/web/package.json",
+      "to": "@langwatch/authz-web",
+      "expires": "2026-10-01"
+    },
+    {
+      "kind": "cross-feature",
+      "from": "packages/features/model-provider/web/package.json",
+      "to": "@langwatch/enterprise-managed-provider-web",
+      "expires": "2026-10-01"
+    },
+    {
+      "kind": "cross-feature",
+      "from": "packages/features/model-provider/web/package.json",
+      "to": "@langwatch/prompt-web",
+      "expires": "2026-10-01"
+    },
+    {
+      "kind": "cross-feature",
+      "from": "packages/features/model-provider/web/package.json",
+      "to": "@langwatch/workflow-web",
+      "expires": "2026-10-01"
+    },
+    {
+      "kind": "cross-feature",
+      "from": "packages/features/onboarding/web/package.json",
+      "to": "@langwatch/project-web",
+      "expires": "2026-10-01"
+    },
+    {
+      "kind": "cross-feature",
+      "from": "packages/features/ops/web/package.json",
+      "to": "@langwatch/feature-flag-web",
+      "expires": "2026-10-01"
+    },
+    {
+      "kind": "cross-feature",
+      "from": "packages/features/organization/web/package.json",
+      "to": "@langwatch/enterprise-billing-web",
+      "expires": "2026-10-01"
+    },
+    {
+      "kind": "cross-feature",
+      "from": "packages/features/organization/web/package.json",
+      "to": "@langwatch/enterprise-licensing-web",
+      "expires": "2026-10-01"
+    },
+    {
+      "kind": "cross-feature",
+      "from": "packages/features/organization/web/package.json",
+      "to": "@langwatch/workflow-web",
+      "expires": "2026-10-01"
+    },
+    {
+      "kind": "cross-feature",
+      "from": "packages/features/project/web/package.json",
+      "to": "@langwatch/analytics-web",
+      "expires": "2026-10-01"
+    },
+    {
+      "kind": "cross-feature",
+      "from": "packages/features/project/web/package.json",
+      "to": "@langwatch/langy-web",
+      "expires": "2026-10-01"
+    },
+    {
+      "kind": "cross-feature",
+      "from": "packages/features/project/web/package.json",
+      "to": "@langwatch/navigation-web",
+      "expires": "2026-10-01"
+    },
+    {
+      "kind": "cross-feature",
+      "from": "packages/features/project/web/package.json",
+      "to": "@langwatch/organization-web",
+      "expires": "2026-10-01"
+    },
+    {
+      "kind": "cross-feature",
+      "from": "packages/features/project/web/package.json",
+      "to": "@langwatch/trace-web",
+      "expires": "2026-10-01"
+    },
+    {
+      "kind": "cross-feature",
+      "from": "packages/features/prompt/web/package.json",
+      "to": "@langwatch/dataset-web",
+      "expires": "2026-10-01"
+    },
+    {
+      "kind": "cross-feature",
+      "from": "packages/features/prompt/web/package.json",
+      "to": "@langwatch/experiment-web",
+      "expires": "2026-10-01"
+    },
+    {
+      "kind": "cross-feature",
+      "from": "packages/features/prompt/web/package.json",
+      "to": "@langwatch/model-provider-web",
+      "expires": "2026-10-01"
+    },
+    {
+      "kind": "cross-feature",
+      "from": "packages/features/prompt/web/package.json",
+      "to": "@langwatch/workflow-web",
+      "expires": "2026-10-01"
+    },
+    {
+      "kind": "cross-feature",
+      "from": "packages/features/scenario/web/package.json",
+      "to": "@langwatch/agent-web",
+      "expires": "2026-10-01"
+    },
+    {
+      "kind": "cross-feature",
+      "from": "packages/features/scenario/web/package.json",
+      "to": "@langwatch/analytics-web",
+      "expires": "2026-10-01"
+    },
+    {
+      "kind": "cross-feature",
+      "from": "packages/features/scenario/web/package.json",
+      "to": "@langwatch/langy-web",
+      "expires": "2026-10-01"
+    },
+    {
+      "kind": "cross-feature",
+      "from": "packages/features/scenario/web/package.json",
+      "to": "@langwatch/model-provider-web",
+      "expires": "2026-10-01"
+    },
+    {
+      "kind": "cross-feature",
+      "from": "packages/features/scenario/web/package.json",
+      "to": "@langwatch/prompt-web",
+      "expires": "2026-10-01"
+    },
+    {
+      "kind": "cross-feature",
+      "from": "packages/features/scenario/web/package.json",
+      "to": "@langwatch/suite-web",
+      "expires": "2026-10-01"
+    },
+    {
+      "kind": "cross-feature",
+      "from": "packages/features/scenario/web/package.json",
+      "to": "@langwatch/trace-web",
+      "expires": "2026-10-01"
+    },
+    {
+      "kind": "cross-feature",
+      "from": "packages/features/scenario/web/package.json",
+      "to": "@langwatch/workflow-web",
+      "expires": "2026-10-01"
+    },
+    {
+      "kind": "cross-feature",
+      "from": "packages/features/trace/server/package.json",
+      "to": "@langwatch/data-retention-server",
+      "expires": "2026-10-01"
+    },
+    {
+      "kind": "cross-feature",
+      "from": "packages/features/trace/web/package.json",
+      "to": "@langwatch/annotation-web",
+      "expires": "2026-10-01"
+    },
+    {
+      "kind": "cross-feature",
+      "from": "packages/features/trace/web/package.json",
+      "to": "@langwatch/coding-agent-web",
+      "expires": "2026-10-01"
+    },
+    {
+      "kind": "cross-feature",
+      "from": "packages/features/trace/web/package.json",
+      "to": "@langwatch/dataset-web",
+      "expires": "2026-10-01"
+    },
+    {
+      "kind": "cross-feature",
+      "from": "packages/features/trace/web/package.json",
+      "to": "@langwatch/evaluator-web",
+      "expires": "2026-10-01"
+    },
+    {
+      "kind": "cross-feature",
+      "from": "packages/features/trace/web/package.json",
+      "to": "@langwatch/langy-web",
+      "expires": "2026-10-01"
+    },
+    {
+      "kind": "cross-feature",
+      "from": "packages/features/trace/web/package.json",
+      "to": "@langwatch/model-provider-web",
+      "expires": "2026-10-01"
+    },
+    {
+      "kind": "cross-feature",
+      "from": "packages/features/trace/web/package.json",
+      "to": "@langwatch/onboarding-web",
+      "expires": "2026-10-01"
+    },
+    {
+      "kind": "cross-feature",
+      "from": "packages/features/trace/web/package.json",
+      "to": "@langwatch/ops-web",
+      "expires": "2026-10-01"
+    },
+    {
+      "kind": "cross-feature",
+      "from": "packages/features/trace/web/package.json",
+      "to": "@langwatch/presence-web",
+      "expires": "2026-10-01"
+    },
+    {
+      "kind": "cross-feature",
+      "from": "packages/features/trace/web/package.json",
+      "to": "@langwatch/prompt-web",
+      "expires": "2026-10-01"
+    },
+    {
+      "kind": "cross-feature",
+      "from": "packages/features/trace/web/package.json",
+      "to": "@langwatch/scenario-web",
+      "expires": "2026-10-01"
+    },
+    {
+      "kind": "cross-feature",
+      "from": "packages/features/trace/web/package.json",
+      "to": "@langwatch/share-web",
+      "expires": "2026-10-01"
+    },
+    {
+      "kind": "cross-feature",
+      "from": "packages/features/trace/web/package.json",
+      "to": "@langwatch/suite-web",
+      "expires": "2026-10-01"
+    },
+    {
+      "kind": "cross-feature",
+      "from": "packages/features/trace/web/package.json",
+      "to": "@langwatch/workflow-web",
+      "expires": "2026-10-01"
+    },
+    {
+      "kind": "cross-feature",
+      "from": "packages/features/user/web/package.json",
+      "to": "@langwatch/coding-agent-web",
+      "expires": "2026-10-01"
+    },
+    {
+      "kind": "cross-feature",
+      "from": "packages/features/user/web/package.json",
+      "to": "@langwatch/gateway-web",
+      "expires": "2026-10-01"
+    },
+    {
+      "kind": "cross-feature",
+      "from": "packages/features/workflow/web/package.json",
+      "to": "@langwatch/agent-web",
+      "expires": "2026-10-01"
+    },
+    {
+      "kind": "cross-feature",
+      "from": "packages/features/workflow/web/package.json",
+      "to": "@langwatch/dataset-web",
+      "expires": "2026-10-01"
+    },
+    {
+      "kind": "cross-feature",
+      "from": "packages/features/workflow/web/package.json",
+      "to": "@langwatch/evaluator-web",
+      "expires": "2026-10-01"
+    },
+    {
+      "kind": "cross-feature",
+      "from": "packages/features/workflow/web/package.json",
+      "to": "@langwatch/experiment-web",
+      "expires": "2026-10-01"
+    },
+    {
+      "kind": "cross-feature",
+      "from": "packages/features/workflow/web/package.json",
+      "to": "@langwatch/langy-web",
+      "expires": "2026-10-01"
+    },
+    {
+      "kind": "cross-feature",
+      "from": "packages/features/workflow/web/package.json",
+      "to": "@langwatch/model-provider-web",
+      "expires": "2026-10-01"
+    },
+    {
+      "kind": "cross-feature",
+      "from": "packages/features/workflow/web/package.json",
+      "to": "@langwatch/prompt-web",
+      "expires": "2026-10-01"
+    },
+    {
+      "kind": "cross-feature",
+      "from": "packages/features/workflow/web/package.json",
+      "to": "@langwatch/trace-web",
+      "expires": "2026-10-01"
+    },
+    {
+      "kind": "private-runtime-export",
+      "from": "packages/enterprise/features/webhook/server/src/index.ts",
+      "to": "./repositories/prisma/prisma.webhook-retention.repository",
+      "expires": "2026-10-01"
+    },
+    {
+      "kind": "private-runtime-export",
+      "from": "packages/features/auth/server/src/index.ts",
+      "to": "./repositories/prisma/prisma.signup-verification.repository",
+      "expires": "2026-10-01"
+    },
+    {
+      "kind": "private-runtime-export",
+      "from": "packages/features/automation/server/src/index.ts",
+      "to": "./repositories/prisma/prisma.custom-graph.repository",
+      "expires": "2026-10-01"
+    },
+    {
+      "kind": "private-runtime-export",
+      "from": "packages/features/automation/server/src/index.ts",
+      "to": "./repositories/prisma/prisma.graph-trigger-sent.repository",
+      "expires": "2026-10-01"
+    },
+    {
+      "kind": "private-runtime-export",
+      "from": "packages/features/automation/server/src/index.ts",
+      "to": "./repositories/prisma/prisma.trigger-fire-history.repository",
+      "expires": "2026-10-01"
+    },
+    {
+      "kind": "private-runtime-export",
+      "from": "packages/features/automation/server/src/index.ts",
+      "to": "./repositories/prisma/prisma.trigger.repository",
+      "expires": "2026-10-01"
+    },
+    {
+      "kind": "private-runtime-export",
+      "from": "packages/features/automation/server/src/index.ts",
+      "to": "./repositories/prisma/prisma.webhook-delivery.repository",
+      "expires": "2026-10-01"
+    },
+    {
+      "kind": "private-runtime-export",
+      "from": "packages/features/data-privacy/server/src/index.ts",
+      "to": "./repositories/prisma/prisma.data-privacy-directory.repository",
+      "expires": "2026-10-01"
+    },
+    {
+      "kind": "private-runtime-export",
+      "from": "packages/features/data-retention/server/src/index.ts",
+      "to": "./repositories/prisma/prisma.data-retention-directory.repository",
+      "expires": "2026-10-01"
+    },
+    {
+      "kind": "private-runtime-export",
+      "from": "packages/features/dataset/server/src/index.ts",
+      "to": "./repositories/prisma/dataset-content.repository",
+      "expires": "2026-10-01"
+    },
+    {
+      "kind": "private-runtime-export",
+      "from": "packages/features/entitlement/server/src/index.ts",
+      "to": "./repositories/prisma/prisma.usage-membership.repository",
+      "expires": "2026-10-01"
+    },
+    {
+      "kind": "private-runtime-export",
+      "from": "packages/features/evaluation/server/src/index.ts",
+      "to": "./repositories/clickhouse/evaluation.repository",
+      "expires": "2026-10-01"
+    },
+    {
+      "kind": "private-runtime-export",
+      "from": "packages/features/gateway/server/src/index.ts",
+      "to": "./adapters/clickhouse.gateway-open-admissions.adapter",
+      "expires": "2026-10-01"
+    },
+    {
+      "kind": "private-runtime-export",
+      "from": "packages/features/gateway/server/src/index.ts",
+      "to": "./adapters/gateway-spend-fold.adapter",
+      "expires": "2026-10-01"
+    },
+    {
+      "kind": "private-runtime-export",
+      "from": "packages/features/identity/server/src/index.ts",
+      "to": "./repositories/prisma/prisma.identity-heads.repository",
+      "expires": "2026-10-01"
+    },
+    {
+      "kind": "private-runtime-export",
+      "from": "packages/features/identity/server/src/index.ts",
+      "to": "./repositories/prisma/prisma.identity-projection.repository",
+      "expires": "2026-10-01"
+    },
+    {
+      "kind": "private-runtime-export",
+      "from": "packages/features/identity/server/src/index.ts",
+      "to": "./repositories/prisma/prisma.identity-verification.repository",
+      "expires": "2026-10-01"
+    },
+    {
+      "kind": "private-runtime-export",
+      "from": "packages/features/identity/server/src/index.ts",
+      "to": "./repositories/prisma/prisma.join-request-projection.repository",
+      "expires": "2026-10-01"
+    },
+    {
+      "kind": "private-runtime-export",
+      "from": "packages/features/identity/server/src/index.ts",
+      "to": "./repositories/prisma/prisma.join-request.repository",
+      "expires": "2026-10-01"
+    },
+    {
+      "kind": "private-runtime-export",
+      "from": "packages/features/identity/server/src/index.ts",
+      "to": "./repositories/prisma/prisma.legacy-sso-domain-routing.repository",
+      "expires": "2026-10-01"
+    },
+    {
+      "kind": "private-runtime-export",
+      "from": "packages/features/identity/server/src/index.ts",
+      "to": "./repositories/prisma/prisma.scim-sync-projection.repository",
+      "expires": "2026-10-01"
+    },
+    {
+      "kind": "private-runtime-export",
+      "from": "packages/features/identity/server/src/index.ts",
+      "to": "./repositories/prisma/prisma.sso-connection-routing.repository",
+      "expires": "2026-10-01"
+    },
+    {
+      "kind": "private-runtime-export",
+      "from": "packages/features/langy/server/src/adapters/eventing.langy-conversation-index.adapter.ts",
+      "to": "./eventing.langy-projections-index.adapter",
+      "expires": "2026-10-01"
+    },
+    {
+      "kind": "private-runtime-export",
+      "from": "packages/features/langy/server/src/index.ts",
+      "to": "./repositories/langy-session-key-reap.repository",
+      "expires": "2026-10-01"
+    },
+    {
+      "kind": "private-runtime-export",
+      "from": "packages/features/langy/server/src/testing.ts",
+      "to": "./repositories/prisma/prisma.langy-conversation-projection.repository",
+      "expires": "2026-10-01"
+    },
+    {
+      "kind": "private-runtime-export",
+      "from": "packages/features/langy/server/src/testing.ts",
+      "to": "./repositories/prisma/prisma.langy-conversation-turn-projection.repository",
+      "expires": "2026-10-01"
+    },
+    {
+      "kind": "private-runtime-export",
+      "from": "packages/features/langy/server/src/testing.ts",
+      "to": "./repositories/prisma/prisma.langy-conversation.repository",
+      "expires": "2026-10-01"
+    },
+    {
+      "kind": "private-runtime-export",
+      "from": "packages/features/langy/server/src/testing.ts",
+      "to": "./repositories/prisma/prisma.langy-message-projection.repository",
+      "expires": "2026-10-01"
+    },
+    {
+      "kind": "private-runtime-export",
+      "from": "packages/features/langy/server/src/testing.ts",
+      "to": "./repositories/prisma/prisma.langy-message.repository",
+      "expires": "2026-10-01"
+    },
+    {
+      "kind": "private-runtime-export",
+      "from": "packages/features/langy/server/src/testing.ts",
+      "to": "./repositories/prisma/prisma.langy-turn-admission.repository",
+      "expires": "2026-10-01"
+    },
+    {
+      "kind": "private-runtime-export",
+      "from": "packages/features/ops/server/src/index.ts",
+      "to": "./repositories/clickhouse/clickhouse.event-explorer.repository",
+      "expires": "2026-10-01"
+    },
+    {
+      "kind": "private-runtime-export",
+      "from": "packages/features/ops/server/src/index.ts",
+      "to": "./repositories/clickhouse/clickhouse.ops-explain.repository",
+      "expires": "2026-10-01"
+    },
+    {
+      "kind": "private-runtime-export",
+      "from": "packages/features/ops/server/src/index.ts",
+      "to": "./repositories/prisma/prisma.bug-report.repository",
+      "expires": "2026-10-01"
+    },
+    {
+      "kind": "private-runtime-export",
+      "from": "packages/features/ops/server/src/index.ts",
+      "to": "./repositories/prisma/prisma.process-ops.repository",
+      "expires": "2026-10-01"
+    },
+    {
+      "kind": "private-runtime-export",
+      "from": "packages/features/scenario/server/src/index.ts",
+      "to": "./adapters/simulation-eventing.adapter",
+      "expires": "2026-10-01"
+    },
+    {
+      "kind": "private-runtime-export",
+      "from": "packages/features/scenario/server/src/index.ts",
+      "to": "./repositories/clickhouse/clickhouse.result-atoms.repository",
+      "expires": "2026-10-01"
+    },
+    {
+      "kind": "private-runtime-export",
+      "from": "packages/features/scenario/server/src/index.ts",
+      "to": "./repositories/clickhouse/clickhouse.run-configurations.repository",
+      "expires": "2026-10-01"
+    },
+    {
+      "kind": "private-runtime-export",
+      "from": "packages/features/stored-object/server/src/index.ts",
+      "to": "./repositories/clickhouse/stored-objects.repository",
+      "expires": "2026-10-01"
+    },
+    {
+      "kind": "private-runtime-export",
+      "from": "packages/features/stored-object/server/src/index.ts",
+      "to": "./repositories/clickhouse/stored-objects.row",
+      "expires": "2026-10-01"
+    },
+    {
+      "kind": "private-runtime-export",
+      "from": "packages/features/topic/server/src/index.ts",
+      "to": "./adapters/eventing.topic-clustering.adapter",
+      "expires": "2026-10-01"
+    },
+    {
+      "kind": "private-runtime-export",
+      "from": "packages/features/trace/server/src/index.ts",
+      "to": "./projections/trace-derived.projection",
+      "expires": "2026-10-01"
+    },
+    {
+      "kind": "private-runtime-export",
+      "from": "packages/features/trace/server/src/index.ts",
+      "to": "./projections/trace-summary.projection",
+      "expires": "2026-10-01"
+    },
+    {
+      "kind": "private-runtime-export",
+      "from": "packages/features/trace/server/src/index.ts",
+      "to": "./repositories/clickhouse/log-record-storage.repository",
+      "expires": "2026-10-01"
+    },
+    {
+      "kind": "private-runtime-export",
+      "from": "packages/features/trace/server/src/index.ts",
+      "to": "./repositories/clickhouse/session-groups.repository",
+      "expires": "2026-10-01"
+    },
+    {
+      "kind": "private-runtime-export",
+      "from": "packages/features/trace/server/src/index.ts",
+      "to": "./repositories/clickhouse/span-storage.repository",
+      "expires": "2026-10-01"
+    },
+    {
+      "kind": "private-runtime-export",
+      "from": "packages/features/trace/server/src/index.ts",
+      "to": "./repositories/clickhouse/stored-span-row.codec",
+      "expires": "2026-10-01"
+    },
+    {
+      "kind": "private-runtime-export",
+      "from": "packages/features/trace/server/src/index.ts",
+      "to": "./repositories/clickhouse/trace-existence.repository",
+      "expires": "2026-10-01"
+    },
+    {
+      "kind": "private-runtime-export",
+      "from": "packages/features/trace/server/src/index.ts",
+      "to": "./repositories/clickhouse/trace-legacy-read.repository",
+      "expires": "2026-10-01"
+    },
+    {
+      "kind": "private-runtime-export",
+      "from": "packages/features/trace/server/src/index.ts",
+      "to": "./repositories/clickhouse/trace-list.repository",
+      "expires": "2026-10-01"
+    },
+    {
+      "kind": "private-runtime-export",
+      "from": "packages/features/trace/server/src/index.ts",
+      "to": "./repositories/clickhouse/trace-summary.repository",
+      "expires": "2026-10-01"
+    },
+    {
+      "kind": "private-runtime-export",
+      "from": "packages/features/trace/server/src/index.ts",
+      "to": "./repositories/log-record-storage.repository",
+      "expires": "2026-10-01"
+    },
+    {
+      "kind": "private-runtime-export",
+      "from": "packages/features/trace/server/src/index.ts",
+      "to": "./repositories/session-groups.repository",
+      "expires": "2026-10-01"
+    },
+    {
+      "kind": "private-runtime-export",
+      "from": "packages/features/trace/server/src/index.ts",
+      "to": "./repositories/span-storage.repository",
+      "expires": "2026-10-01"
+    },
+    {
+      "kind": "private-runtime-export",
+      "from": "packages/features/trace/server/src/index.ts",
+      "to": "./repositories/trace-summary.repository",
+      "expires": "2026-10-01"
+    },
+    {
+      "kind": "private-runtime-export",
+      "from": "packages/features/trace/server/src/index.ts",
+      "to": "./stores/eventing/eventing.span-storage.store",
+      "expires": "2026-10-01"
+    },
+    {
+      "kind": "private-runtime-export",
+      "from": "packages/features/trace/server/src/index.ts",
+      "to": "./stores/eventing/eventing.trace-derived.store",
+      "expires": "2026-10-01"
+    },
+    {
+      "kind": "private-runtime-export",
+      "from": "packages/features/trace/server/src/index.ts",
+      "to": "./stores/eventing/eventing.trace-rollup.store",
+      "expires": "2026-10-01"
+    },
+    {
+      "kind": "private-runtime-export",
+      "from": "packages/features/trace/server/src/index.ts",
+      "to": "./stores/eventing/eventing.trace-summary.store",
+      "expires": "2026-10-01"
+    }
+  ]
+}

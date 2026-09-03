@@ -2,6 +2,13 @@ import { existsSync, readFileSync, statSync } from "node:fs";
 import { basename, dirname, join, relative, resolve, sep } from "node:path";
 import ts from "typescript";
 import { walkFiles } from "./files";
+import {
+  createWorkspaceModuleResolver,
+  resolveRelativeModule,
+  valueImports,
+  walkValueImportGraph,
+  type WorkspaceModuleResolver,
+} from "./module-graph";
 import type { ArchitectureViolation, ClassifiedPackage, FeatureCatalogueEntry } from "./types";
 
 const NAME = "[a-z0-9]+(?:-[a-z0-9]+)*";
@@ -19,6 +26,7 @@ const CANONICAL_ARTIFACTS = new Set([
   "projection",
   "queries",
   "repository",
+  "rules",
   "service",
   "store",
   "subscriber",
@@ -87,6 +95,29 @@ const SERVER_PATTERNS = [
   new RegExp(`^transport/${NAME}/${NAME}\\.api\\.ts$`),
   new RegExp(`^migrations/${NAME}-import\\.${NAME}\\.migration\\.ts$`),
 ] as const;
+// A pure function/constant module (R7, burn-down plan class D): a package of
+// functions in the Go sense, not a single-method class. Checked separately
+// from SERVER_PATTERNS because it carries its own purity and import rules.
+const RULES_PATTERN = new RegExp(`^rules/${NAME}\\.rules\\.ts$`);
+const RULES_IMPLEMENTATION_PATH =
+  /(?:^|\/)(?:services|ports|adapters|repositories|stores|projections|subscribers|processes|intents|transport)(?:\/|$)/;
+const RULES_IMPLEMENTATION_KIND: Record<string, string> = {
+  services: "service",
+  ports: "port",
+  adapters: "adapter",
+  repositories: "repository",
+  stores: "store",
+  projections: "projection",
+  subscribers: "subscriber",
+  processes: "process",
+  intents: "intent",
+  transport: "transport",
+};
+const RULES_FORBIDDEN_SPECIFIER: readonly (readonly [RegExp, string])[] = [
+  [/^@prisma\//, "Prisma"],
+  [/^@langwatch\/prisma-client(?:\/|$)/, "Prisma"],
+  [/^@langwatch\/clickhouse-client(?:\/|$)/, "ClickHouse"],
+];
 
 function workspacePath(root: string, path: string): string {
   return relative(root, path).split(sep).join("/");
@@ -213,7 +244,133 @@ function lintContract(pkg: ClassifiedPackage): ArchitectureViolation[] {
   return violations;
 }
 
-function lintServer(pkg: ClassifiedPackage): ArchitectureViolation[] {
+/** The implementation directory a resolved file lives under, package-relative. */
+function rulesImplementationKind(relativePath: string): string | undefined {
+  const match = relativePath.match(RULES_IMPLEMENTATION_PATH)?.[0]?.replace(/\//g, "");
+  return match ? RULES_IMPLEMENTATION_KIND[match] : void 0;
+}
+
+function namedForbiddenSpecifier(specifier: string): string | undefined {
+  return RULES_FORBIDDEN_SPECIFIER.find(([pattern]) => pattern.test(specifier))?.[1];
+}
+
+function withArticle(noun: string): string {
+  return `${/^[aeiou]/.test(noun) ? "an" : "a"} ${noun}`;
+}
+
+/** Whether `node`, anywhere in its subtree, declares a class or instantiates one. */
+function findClassOrNew(node: ts.Node): ts.Node | undefined {
+  if (ts.isClassDeclaration(node) || ts.isClassExpression(node) || ts.isNewExpression(node)) {
+    return node;
+  }
+  let found: ts.Node | undefined;
+  ts.forEachChild(node, (child) => {
+    found ??= findClassOrNew(child);
+  });
+  return found;
+}
+
+/**
+ * Whether `entry`'s own value-import closure stays clear of Prisma,
+ * ClickHouse, and any package's services/ports/adapters/repositories —
+ * the "framework-free workspace package" a rules/ import may still name.
+ */
+function isRulesFrameworkFree({
+  entry,
+  resolver,
+}: {
+  entry: string;
+  resolver: WorkspaceModuleResolver;
+}): boolean {
+  return (
+    walkValueImportGraph({
+      roots: [entry],
+      resolve: (options) => resolver.resolve(options),
+      forbidden: ({ specifier, target }) => {
+        const named = namedForbiddenSpecifier(specifier);
+        if (named) return named;
+        if (!target) return void 0;
+        const owner = resolver.owningPackage({ file: target });
+        if (!owner) return void 0;
+        const kind = rulesImplementationKind(relative(owner.directory, target).split(sep).join("/"));
+        return kind ? withArticle(kind) : void 0;
+      },
+    }).seeds.size === 0
+  );
+}
+
+function lintRulesImports(
+  pkg: ClassifiedPackage,
+  file: string,
+  resolver: WorkspaceModuleResolver,
+): ArchitectureViolation[] {
+  const violations: ArchitectureViolation[] = [];
+  const allowed =
+    "A rules/ file may import only node:*, other rules/ modules in the same package, *-contract packages, and framework-free workspace packages.";
+
+  for (const { specifier } of valueImports({ file })) {
+    if (specifier.startsWith("node:")) continue;
+
+    if (specifier.startsWith(".")) {
+      const target = resolveRelativeModule({ file, specifier });
+      const relativeTarget = target ? workspacePath(`${pkg.root}/src`, target) : void 0;
+      if (relativeTarget?.startsWith("rules/")) continue;
+      const kind = relativeTarget ? rulesImplementationKind(relativeTarget) : void 0;
+      violations.push(
+        violation(
+          file,
+          `Rules module cannot import ${JSON.stringify(specifier)}${kind ? `, ${withArticle(kind)}` : ""}.`,
+          allowed,
+        ),
+      );
+      continue;
+    }
+
+    const named = namedForbiddenSpecifier(specifier);
+    if (named) {
+      violations.push(
+        violation(file, `Rules module cannot import ${JSON.stringify(specifier)} (${named}).`, allowed),
+      );
+      continue;
+    }
+
+    const target = resolver.resolve({ specifier, file });
+    if (!target) continue;
+    const owner = resolver.owningPackage({ file: target });
+    if (owner?.name.endsWith("-contract")) continue;
+    if (isRulesFrameworkFree({ entry: target, resolver })) continue;
+    violations.push(
+      violation(file, `Rules module cannot import ${JSON.stringify(specifier)}.`, allowed),
+    );
+  }
+  return violations;
+}
+
+function lintRulesModule(
+  pkg: ClassifiedPackage,
+  file: string,
+  path: string,
+  resolver: WorkspaceModuleResolver,
+): ArchitectureViolation[] {
+  const violations: ArchitectureViolation[] = [];
+  const impure = findClassOrNew(parseModule(file));
+  if (impure) {
+    violations.push(
+      violation(
+        file,
+        `Rules module ${JSON.stringify(path)} may only export functions and constants (found ${ts.isNewExpression(impure) ? "a `new` expression" : "a class"}).`,
+        "Move stateful construction to the service that calls this rules module.",
+      ),
+    );
+  }
+  violations.push(...lintRulesImports(pkg, file, resolver));
+  return violations;
+}
+
+function lintServer(
+  pkg: ClassifiedPackage,
+  getResolver: () => WorkspaceModuleResolver,
+): ArchitectureViolation[] {
   const violations: ArchitectureViolation[] = [];
   const files = walkFiles(`${pkg.root}/src`, (path) => /\.[cm]?[jt]sx?$/.test(path));
   let serviceCount = 0;
@@ -229,6 +386,10 @@ function lintServer(pkg: ClassifiedPackage): ArchitectureViolation[] {
           "Move pure evolution to processes/<subject>.process.ts and retry-safe external work to intents/<subject>.intent.ts.",
         ),
       );
+      continue;
+    }
+    if (RULES_PATTERN.test(path)) {
+      violations.push(...lintRulesModule(pkg, file, path, getResolver()));
       continue;
     }
     if (SERVER_PATTERNS.some((pattern) => pattern.test(path))) {
@@ -729,17 +890,23 @@ function lintOwnedSubjects(
 }
 
 export function lintFeatureLayouts(
+  root: string,
   packages: ClassifiedPackage[],
   catalogue: readonly FeatureCatalogueEntry[],
 ): ArchitectureViolation[] {
   const violations: ArchitectureViolation[] = [];
+  // Built at most once, and only when a rules/ file is actually found — most
+  // lint runs never need the workspace-wide resolver this walk requires.
+  let resolver: WorkspaceModuleResolver | undefined;
+  const getResolver = (): WorkspaceModuleResolver =>
+    (resolver ??= createWorkspaceModuleResolver({ root }));
   for (const pkg of packages) {
     if (pkg.layoutVersion !== 0) continue;
     violations.push(...lintSourceFilenames(pkg));
     violations.push(...lintOwnedSubjects(pkg, catalogue, packages));
     if (pkg.kind === "contract") violations.push(...lintContract(pkg));
     if (pkg.kind === "server") {
-      violations.push(...lintServer(pkg));
+      violations.push(...lintServer(pkg, getResolver));
       violations.push(...lintPrivateServerExports(pkg));
     }
   }
