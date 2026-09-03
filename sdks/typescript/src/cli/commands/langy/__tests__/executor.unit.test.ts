@@ -89,6 +89,59 @@ describe("given a shared folder", () => {
     });
   });
 
+  describe("when the developer's login profile has a broken line", () => {
+    it("keeps that text off the command's stderr, and leaves real stderr alone", async () => {
+      const home = fs.mkdtempSync(path.join(os.tmpdir(), "langy-home-"));
+      const noise = "profile: line 3: /nowhere/env: No such file or directory";
+      for (const file of [".profile", ".bash_profile", ".bashrc"]) {
+        fs.writeFileSync(path.join(home, file), `echo "${noise}" >&2\n`);
+      }
+      const realHome = process.env.HOME;
+      process.env.HOME = home;
+      try {
+        const clean = await startCommand({
+          command: "echo hello",
+          root,
+          callId: "call_profile",
+        }).result;
+        expect(clean.stderr).toBe("");
+        expect(clean.stdout).toBe("hello\n");
+
+        const loud = await startCommand({
+          command: "echo mine >&2",
+          root,
+          callId: "call_profile_stderr",
+        }).result;
+        expect(loud.stderr).toBe("mine\n");
+      } finally {
+        if (realHome === undefined) delete process.env.HOME;
+        else process.env.HOME = realHome;
+        fs.rmSync(home, { recursive: true, force: true });
+      }
+    });
+
+    it("gives the command the PATH the CLI itself was started with", async () => {
+      const binDir = fs.mkdtempSync(path.join(os.tmpdir(), "langy-bin-"));
+      const tool = path.join(binDir, "langy-only-here");
+      fs.writeFileSync(tool, "#!/bin/sh\necho found\n");
+      fs.chmodSync(tool, 0o755);
+      const realPath = process.env.PATH;
+      process.env.PATH = `${binDir}:${realPath ?? ""}`;
+      try {
+        const output = await startCommand({
+          command: "langy-only-here",
+          root,
+          callId: "call_path",
+        }).result;
+        expect(output.stdout).toBe("found\n");
+        expect(output.exitCode).toBe(0);
+      } finally {
+        process.env.PATH = realPath;
+        fs.rmSync(binDir, { recursive: true, force: true });
+      }
+    });
+  });
+
   describe("when a command writes more than the cap", () => {
     it("cuts the text, says so, and keeps the whole log in the folder", async () => {
       const command = startCommand({

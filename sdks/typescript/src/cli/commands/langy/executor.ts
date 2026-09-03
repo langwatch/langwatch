@@ -1,10 +1,10 @@
 /**
  * Runs one command in the shared folder.
  *
- * Every command runs under `bash -lc` with the folder as its working
- * directory and its own process group, so a cancel, a timeout or a Ctrl-C
- * reaches the children too. The output the model reads is capped; the whole
- * log stays in the folder, in a directory the CLI keeps out of git.
+ * Every command runs under a non-login `bash -c` with the folder as its
+ * working directory and its own process group, so a cancel, a timeout or a
+ * Ctrl-C reaches the children too. The output the model reads is capped; the
+ * whole log stays in the folder, in a directory the CLI keeps out of git.
  *
  * A background command is different in one way that matters: its output goes
  * straight to the log file descriptor rather than through a pipe, so the
@@ -25,6 +25,21 @@ import { LocalCallFailure } from "./errors";
 
 /** How long a killed process group has to end before it is killed outright. */
 const KILL_GRACE_MS = 2_000;
+
+/**
+ * The shell one command runs in.
+ *
+ * A login shell reads the developer's profile files, and a broken line in one
+ * of them writes to stderr of every command. That text reaches the model as
+ * part of each tool result and reads as a failure of the command it did not
+ * come from. A non-login shell reads no profile, and the PATH the developer
+ * expects arrives anyway: the CLI was started from their own terminal, so the
+ * environment it hands the command already carries it.
+ */
+export const SHELL_ARGS = (command: string): [string, string[]] => [
+  "bash",
+  ["-c", command],
+];
 
 export interface RunningCommand {
   /** The process group leader, undefined when the spawn failed. */
@@ -190,8 +205,9 @@ function startBackground({
   const fd = fs.openSync(logPath, "a");
   let child;
   try {
-    child = spawn("bash", ["-lc", command], {
+    child = spawn(...SHELL_ARGS(command), {
       cwd: root,
+      env: process.env,
       detached: true,
       stdio: ["ignore", fd, fd],
     });
@@ -234,8 +250,9 @@ function startForeground({
   // or removed while a command runs, and an unhandled stream error would take
   // the whole session down. Drop the log and keep the command's own output.
   log.on("error", () => undefined);
-  const child = spawn("bash", ["-lc", command], {
+  const child = spawn(...SHELL_ARGS(command), {
     cwd: root,
+    env: process.env,
     detached: true,
     stdio: ["ignore", "pipe", "pipe"],
   });
