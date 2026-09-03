@@ -323,9 +323,6 @@ function AutomationsPage() {
             title: `Delete ${noun}`,
             type: "success",
             description: `${noun.charAt(0).toUpperCase()}${noun.slice(1)} deleted`,
-            meta: {
-              closable: true,
-            },
           });
           void triggers.refetch();
           // The view/edit drawers read this row by id — without invalidating

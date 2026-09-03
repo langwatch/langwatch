@@ -752,7 +752,7 @@ export function initializeDefaultApp(options?: {
     notifier: liveTriggerNotifier,
   };
   const triggerTemplates = {
-    testFire: (input: Parameters<typeof testFireTrigger>[1]) =>
+    testFire: (input: Parameters<typeof testFireTrigger>[0]["input"]) =>
       testFireTrigger({ deps: triggerTemplateDeps, input }),
   };
   const tokenizer = new TokenizerService(
@@ -2195,7 +2195,7 @@ export function createTestApp(overrides?: TestAppOverrides): App {
         },
       };
       return {
-        testFire: (input: Parameters<typeof testFireTrigger>[1]) =>
+        testFire: (input: Parameters<typeof testFireTrigger>[0]["input"]) =>
           testFireTrigger({ deps: testDeps, input }),
       };
     })(),

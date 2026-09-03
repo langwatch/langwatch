@@ -1032,7 +1032,6 @@ export function AutomationDrawer({
           toaster.create({
             title: automationId ? labels.updatedToast : labels.createdToast,
             type: "success",
-            meta: { closable: true },
             // Saving closes the drawer and leaves the author wherever they
             // started, which is usually not the automations list. This is the
             // one moment the app knows exactly which row was written, so it
