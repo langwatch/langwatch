@@ -1279,20 +1279,22 @@ describe("AutomationDrawer", () => {
             opts?: { onSuccess?: (saved: { id: string }) => void },
           ) => opts?.onSuccess?.({ id: "trigger-created" }),
         );
-        useAutomationStore.getState().hydrate({
-          ...INITIAL_DRAFT,
-          name: "Flag failing traces",
-          action: TriggerAction.SEND_EMAIL,
-          filterQuery: "status:error",
-          slices: {
-            ...INITIAL_DRAFT.slices,
-            [TriggerAction.SEND_EMAIL]: {
-              ...INITIAL_DRAFT.slices[TriggerAction.SEND_EMAIL],
-              members: ["ops@acme.com"],
-            },
-          },
-        });
         renderDrawer();
+        act(() => {
+          useAutomationStore.getState().hydrate({
+            ...INITIAL_DRAFT,
+            name: "Flag failing traces",
+            action: TriggerAction.SEND_EMAIL,
+            filterQuery: "status:error",
+            slices: {
+              ...INITIAL_DRAFT.slices,
+              [TriggerAction.SEND_EMAIL]: {
+                ...INITIAL_DRAFT.slices[TriggerAction.SEND_EMAIL],
+                members: ["ops@acme.com"],
+              },
+            },
+          });
+        });
         await continueToReview(user);
 
         const createButton = await screen.findByRole("button", {
