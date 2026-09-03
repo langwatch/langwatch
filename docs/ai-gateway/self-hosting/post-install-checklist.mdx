@@ -31,7 +31,7 @@ Expected:
 
 `version` carries the `ENVIRONMENT` value, `local` unless you set it.
 
-This probe reaches the gateway because `networkPolicy.enabled` is `false` by default. With the network policy on, the gateway admits only the selectors in `networkPolicy.ingressFrom`, and this pod is not one of them. Add a selector for the probe pod to `ingressFrom` to run it. The ingress is no way around this: it publishes `/v1` and `/health`, never `/healthz`. To check the process from outside the cluster, use `/health` and read step 3, which covers what its `control_plane` field means.
+This probe reaches the gateway because `networkPolicy.enabled` is `false` by default. With the network policy on, the gateway admits only the selectors in `networkPolicy.ingressFrom`, and this pod is not one of them. Add a selector for the probe pod to `ingressFrom` to run it. The default ingress is no way around this: it publishes `/v1` and `/health` only, so `/healthz` does not answer through it. To check the process from outside the cluster, use `/health` and read step 3, which covers what its `control_plane` field means. A deployment that sets `ingress.path: /` publishes every route, the probes included, and can reach `/healthz` that way.
 
 ## 3. The gateway reaches the control plane
 

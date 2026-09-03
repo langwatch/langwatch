@@ -5679,19 +5679,22 @@ A page that returns `limit` records may be followed by more. Pull again at once 
 Write the cookie into a curl config file that only the job user can read, and pass the file rather than the value. A `-H` argument puts the cookie in the process argument list, where every other user on the host can read it out of `ps`.
 
 ```bash
-umask 077
-printf 'header = "Cookie: %s"\n' "$SESSION_COOKIE" > /run/ocsf-export/curl.conf
+conf="$(mktemp)"
+trap 'rm -f "$conf"' EXIT
+printf 'header = "Cookie: %s"\n' "$SESSION_COOKIE" > "$conf"
 ```
+
+`mktemp` makes a new file each run, owned by the job user and readable only by them. Writing to a fixed path instead would reuse whatever file or symlink is already there, and keep its permissions.
 
 ```bash
 INPUT='{"json":{"organizationId":"YOUR_ORGANIZATION_ID","sinceMs":0,"limit":500}}'
 
 curl -G "https://app.langwatch.ai/api/trpc/governance.ocsfExport" \
   --data-urlencode "input=$INPUT" \
-  --config /run/ocsf-export/curl.conf
+  --config "$conf"
 ```
 
-`$SESSION_COOKIE` is the cookie of a browser session signed in as a user who holds `complianceExport:view`. Read it from your secrets store into the job environment, and delete the config file when the run finishes. Forward `events[]` to your SIEM's ingest API, then store `nextCursorCompound` for the next run.
+`$SESSION_COOKIE` is the cookie of a browser session signed in as a user who holds `complianceExport:view`. Read it from your secrets store into the job environment. The `trap` deletes the config file when the shell exits, on a failed run as well as a clean one. Forward `events[]` to your SIEM's ingest API, then store `nextCursorCompound` for the next run.
 
 <Warning>The session cookie is a full browser credential for that user, and this endpoint takes no other credential. It is not scoped to `complianceExport:view`, and it expires on the session's own schedule rather than the job's. Keep it out of shell history, out of the process argument list, and out of any script committed to a repository, and rotate the session when the job host changes.</Warning>
 
@@ -9327,7 +9330,7 @@ Expected:
 
 `version` carries the `ENVIRONMENT` value, `local` unless you set it.
 
-This probe reaches the gateway because `networkPolicy.enabled` is `false` by default. With the network policy on, the gateway admits only the selectors in `networkPolicy.ingressFrom`, and this pod is not one of them. Add a selector for the probe pod to `ingressFrom` to run it. The ingress is no way around this: it publishes `/v1` and `/health`, never `/healthz`. To check the process from outside the cluster, use `/health` and read step 3, which covers what its `control_plane` field means.
+This probe reaches the gateway because `networkPolicy.enabled` is `false` by default. With the network policy on, the gateway admits only the selectors in `networkPolicy.ingressFrom`, and this pod is not one of them. Add a selector for the probe pod to `ingressFrom` to run it. The default ingress is no way around this: it publishes `/v1` and `/health` only, so `/healthz` does not answer through it. To check the process from outside the cluster, use `/health` and read step 3, which covers what its `control_plane` field means. A deployment that sets `ingress.path: /` publishes every route, the probes included, and can reach `/healthz` that way.
 
 ## 3. The gateway reaches the control plane
 
