@@ -11,6 +11,14 @@ auditability and PII redaction. Going beyond that, multi-source
 ingestion, extended retention, anomaly detection, OCSF/SIEM export,
 tamper-evidence, requires an **Enterprise** license.
 
+<Note>
+  The 49-day window in the tables below is the retention LangWatch applies by
+  default. It is not a period any of these frameworks prescribe. Set the window
+  your own obligations require: paid plans, and self-hosted deployments with a
+  license, configure it per organization, team or project. See
+  [Data Retention](/platform/data-retention).
+</Note>
+
 The right tier for your organization depends on which mechanisms you
 need on day one, so read the map below before you commit to a
 deployment plan.
@@ -91,9 +99,11 @@ require Enterprise.
 
 If your processor agreement requires retention longer than 49 days OR a
 named breach-notification mechanism (Art. 33's "without undue delay,
-where feasible, not later than 72 hours"), Enterprise is the right tier
-even for non-EU customers because GDPR's extra-territorial scope
-applies.
+where feasible, not later than 72 hours"), Enterprise is the right tier.
+This reaches customers outside the EU as well, but only where Art. 3
+puts them in scope: an establishment in the EU, an offer of goods or
+services to people in the EU, or monitoring of their behavior in the
+EU.
 
 One retention clause to state explicitly in DPAs: **billing spend
 records** (the per-request metering ledger under
@@ -111,14 +121,15 @@ technical safeguards map cleanly onto the open-core split:
 
 - **§164.312(a)(1) Access control**: Apache 2.0 RBAC catalog + per-project tenancy
 - **§164.312(b) Audit controls**: Apache 2.0 event_log @ 49d retention
-- **§164.312(b) ≥6yr retention**: Enterprise extended retention policies (multi-year windows)
+- **§164.316(b)(2)(i) 6-year documentation retention**: Enterprise extended retention policies (multi-year windows)
 - **§164.312(c)(1) Integrity**: Enterprise tamper-evidence (post-GA follow-up)
 - **§164.312(d) Authentication**: Apache 2.0 SSO (env-configured) + Personal IDE keys
 - **§164.312(e) Transmission security**: Apache 2.0 (TLS at gateway + dataplane)
 
 **HIPAA-most-uses**: covered entities with PHI in LLM traces should
-treat Apache 2.0 as the floor for technical safeguards; the §164.312(b)
-6-year audit-log requirement and §164.312(c)(1) integrity (when you
+treat Apache 2.0 as the floor for technical safeguards; the
+§164.316(b)(2)(i) 6-year retention requirement and §164.312(c)(1)
+integrity (when you
 need cryptographic tamper-evidence) push toward Enterprise. For BAAs
 with explicit retention clauses, Enterprise is required.
 
