@@ -94,6 +94,10 @@ function summaryRow({
     RequestCount: 1,
     RevisionCount: 0,
     PreviousAmountNanoUsd: null,
+    // The §15 markers are `DateTime` columns, so SECONDS. The comparator is
+    // blind to them — it re-derives money — but the row type is the table's.
+    RevisedAt: null,
+    LastObservedAt: Math.floor(OCCURRED_AT / 1000),
     PulledItemsJson: "{}",
     Version: "v1",
     AppliedEventIds: [],

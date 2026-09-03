@@ -196,9 +196,21 @@ async function plainSumOfDay(): Promise<number> {
   return Number(rows[0]?.Total ?? 0);
 }
 
+/**
+ * Compacts on demand, around the merge freeze `beforeAll` installs.
+ *
+ * `OPTIMIZE` is itself a merge, so it is refused while merges are stopped —
+ * the freeze has to lift for exactly as long as the compaction takes.
+ */
 async function compact(): Promise<void> {
   await ch.command({
+    query: `SYSTEM START MERGES ${GOVERNANCE_COST_ROLLUP_TABLE}`,
+  });
+  await ch.command({
     query: `OPTIMIZE TABLE ${GOVERNANCE_COST_ROLLUP_TABLE} FINAL`,
+  });
+  await ch.command({
+    query: `SYSTEM STOP MERGES ${GOVERNANCE_COST_ROLLUP_TABLE}`,
   });
 }
 
@@ -265,6 +277,10 @@ function pricedCell({
     RequestCount: 1,
     RevisionCount: 0,
     PreviousAmountNanoUsd: null,
+    // Never restated, and never touched by a pull. Both `DateTime` columns, so
+    // both are in SECONDS here, unlike the millisecond fields above.
+    RevisedAt: null,
+    LastObservedAt: Math.floor(at / 1000),
     PulledItemsJson: "{}",
     Version: GOVERNANCE_COST_ROLLUP_PROJECTION_VERSION_LATEST,
     AppliedEventIds: [],
@@ -275,21 +291,40 @@ function pricedCell({
 }
 
 describe("governance cost rollup", () => {
-  beforeAll(() => {
+  beforeAll(async () => {
     const client = getTestClickHouseClient();
     if (!client) throw new Error("Test ClickHouse is not available");
     ch = client;
     repo = new GovernanceCostRollupClickHouseRepository(async () => ch);
     store = new GovernanceCostRollupStore(repo);
+
+    // Half these tests assert on what is still on disk BEFORE a compaction —
+    // that a superseded version survives, and that the read steps over it
+    // rather than waiting for a merge. A ReplacingMergeTree merges on its own
+    // schedule, so left running it can collapse those rows between the write
+    // and the assertion, and the test then fails for a reason that has nothing
+    // to do with the code. Merges are stopped for the whole file and lifted
+    // only inside `compact()`, where a compaction is the point.
+    await ch.command({
+      query: `SYSTEM STOP MERGES ${GOVERNANCE_COST_ROLLUP_TABLE}`,
+    });
   });
 
   beforeEach(() => {
-    // A fresh tenant per test: the table is shared and OPTIMIZE ... FINAL is
-    // table-wide, so tests that compact must not be able to see each other.
+    // A fresh tenant per test: the table is shared, so tests must not be able
+    // to see each other's rows. Note this does NOT isolate them from each
+    // other's merges, which are table-wide — the freeze above is what does.
     tenantId = `proj-costrollup-${nanoid(8)}`;
   });
 
   afterAll(async () => {
+    // Leaving a shared table frozen would strand every later test that needs a
+    // merge, so the freeze is lifted even though the container is torn down.
+    await ch
+      ?.command({
+        query: `SYSTEM START MERGES ${GOVERNANCE_COST_ROLLUP_TABLE}`,
+      })
+      .catch(() => undefined);
     await ch?.close();
   });
 
@@ -415,6 +450,181 @@ describe("governance cost rollup", () => {
       expect(cells[0]!.RevisionCount).toBe(1);
       expect(cells[0]!.PreviousAmountNanoUsd).toBe(12_340_000_000);
       expect(cells[0]!.ExactOrEstimate).toBe("exact");
+    });
+
+    /** @scenario "The markers survive a read taken before storage compacts" */
+    it("returns the newest revision marker and last-observed time, not an older one", async () => {
+      const first = Date.parse("2026-08-02T04:00:00.000Z");
+      const second = Date.parse("2026-08-03T04:00:00.000Z");
+      await foldThroughExecutor(
+        observed({ costNanoMinor: 12_340_000_000, observedAtMs: first }),
+      );
+      await foldThroughExecutor(
+        observed({
+          costNanoMinor: 9_000_000_000,
+          observedAtMs: second,
+          costStatus: "exact",
+        }),
+      );
+
+      // Deliberately NOT compacted. A read that is not replacement-aware picks
+      // whichever version the scan reached, and annotates a current figure
+      // with a superseded revision — or with no revision at all.
+      expect(await rawRowCount()).toBe(2);
+
+      const [cell] = await repo.findCellsForDay({ tenantId, day: DAY });
+      // Both columns are DateTime, so both come back in SECONDS.
+      expect(cell?.RevisedAt).toBe(Math.floor(second / 1000));
+      expect(cell?.LastObservedAt).toBe(Math.floor(second / 1000));
+
+      const [lane] = await repo.sumDaysByLane({
+        tenantId,
+        fromDay: DAY,
+        toDay: DAY,
+      });
+      expect(lane?.revisedAt).toBe(Math.floor(second / 1000));
+      expect(lane?.lastObservedAt).toBe(Math.floor(second / 1000));
+      // What the day totalled before the restatement, reconstructed from the
+      // cells that changed plus the ones that did not.
+      expect(lane?.previousAmountNanoUsd).toBe(12_340_000_000);
+      expect(lane?.cellsWithoutPreviousAmount).toBe(0);
+    });
+  });
+
+  describe("given two spenders' cells restated on different dates", () => {
+    /** @scenario "A day restated twice reports only the latest move" */
+    it("reports what the day held just before the LATEST revision", async () => {
+      // The counterexample for the day-level "was $X". Two cells of one day,
+      // restated a fortnight apart. Summing every revised cell's prior figure
+      // regardless of date reports $300 — a $70 move — under the later date,
+      // whose actual move was $50. §15: the marker holds only the latest
+      // revision.
+      const early = Date.parse("2026-08-05T04:00:00.000Z");
+      const late = Date.parse("2026-08-20T04:00:00.000Z");
+      const base = pricedCell({ amountNanoUsd: null, at: 0 });
+
+      for (const cell of [
+        // ada: 100 -> 120, restated on the 5th.
+        {
+          RawActorId: "ada",
+          AmountNanoUsd: 120_000_000_000,
+          PreviousAmountNanoUsd: 100_000_000_000,
+          RevisedAt: Math.floor(early / 1000),
+          LastObservedAt: Math.floor(early / 1000),
+        },
+        // bob: 200 -> 250, restated on the 20th — the day's latest.
+        {
+          RawActorId: "bob",
+          AmountNanoUsd: 250_000_000_000,
+          PreviousAmountNanoUsd: 200_000_000_000,
+          RevisedAt: Math.floor(late / 1000),
+          LastObservedAt: Math.floor(late / 1000),
+        },
+      ]) {
+        await repo.upsert({ ...base, ...cell, EventTimestamp: 1_000 });
+      }
+
+      const [lane] = await repo.sumDaysByLane({
+        tenantId,
+        fromDay: DAY,
+        toDay: DAY,
+      });
+
+      expect(lane?.amountNanoUsd).toBe(370_000_000_000);
+      expect(lane?.revisedAt).toBe(Math.floor(late / 1000));
+      // 120 + 200: ada was already at its restated figure by the 20th, so it
+      // contributes what it holds now, not what it held on the 5th.
+      expect(lane?.previousAmountNanoUsd).toBe(320_000_000_000);
+      expect(lane?.cellsWithoutPreviousAmount).toBe(0);
+    });
+
+    it("sums every prior when the whole day was restated at one moment", async () => {
+      const at = Date.parse("2026-08-20T04:00:00.000Z");
+      const base = pricedCell({ amountNanoUsd: null, at: 0 });
+
+      for (const actor of ["ada", "bob"]) {
+        await repo.upsert({
+          ...base,
+          RawActorId: actor,
+          AmountNanoUsd: 250_000_000_000,
+          PreviousAmountNanoUsd: 200_000_000_000,
+          RevisedAt: Math.floor(at / 1000),
+          LastObservedAt: Math.floor(at / 1000),
+          EventTimestamp: 1_000,
+        });
+      }
+
+      const [lane] = await repo.sumDaysByLane({
+        tenantId,
+        fromDay: DAY,
+        toDay: DAY,
+      });
+
+      // Both cells ARE the latest revision, so both swap in their priors. The
+      // pinning rule must not cost the common case its answer.
+      expect(lane?.amountNanoUsd).toBe(500_000_000_000);
+      expect(lane?.previousAmountNanoUsd).toBe(400_000_000_000);
+    });
+
+    it("carries an unrevised cell's current figure into the earlier total", async () => {
+      const at = Date.parse("2026-08-20T04:00:00.000Z");
+      const base = pricedCell({ amountNanoUsd: null, at: 0 });
+
+      await repo.upsert({
+        ...base,
+        RawActorId: "ada",
+        AmountNanoUsd: 250_000_000_000,
+        PreviousAmountNanoUsd: 200_000_000_000,
+        RevisedAt: Math.floor(at / 1000),
+        LastObservedAt: Math.floor(at / 1000),
+        EventTimestamp: 1_000,
+      });
+      await repo.upsert({
+        ...base,
+        RawActorId: "bob",
+        AmountNanoUsd: 70_000_000_000,
+        EventTimestamp: 1_000,
+      });
+
+      const [lane] = await repo.sumDaysByLane({
+        tenantId,
+        fromDay: DAY,
+        toDay: DAY,
+      });
+
+      // bob was never revised, so it compares NULL against the day's latest
+      // revision. It has to land in the current-amount arm — dropping out of
+      // the sum would understate the earlier total by its whole figure.
+      expect(lane?.amountNanoUsd).toBe(320_000_000_000);
+      expect(lane?.previousAmountNanoUsd).toBe(270_000_000_000);
+      expect(lane?.cellsWithoutPreviousAmount).toBe(0);
+    });
+  });
+
+  describe("given a cell summarized before the markers were added", () => {
+    /** @scenario "A day summarized before the markers existed reads as settled" */
+    it("reads as never revised and never observed", async () => {
+      // What the ALTER's defaults leave on every pre-existing row. The pullers
+      // look thirty days back, so a day genuinely still settling is re-stamped
+      // by the next daily pull; a day this calls settled was one no pull was
+      // ever going to touch again.
+      await repo.upsert({
+        ...pricedCell({ amountNanoUsd: 12_340_000_000, at: 1_000 }),
+        RevisedAt: null,
+        LastObservedAt: 0,
+      });
+
+      const cell = await repo.findCellWithApplied(withdrawnCellDimensions());
+      expect(cell?.RevisedAt).toBeNull();
+      expect(cell?.LastObservedAt).toBe(0);
+
+      const [lane] = await repo.sumDaysByLane({
+        tenantId,
+        fromDay: DAY,
+        toDay: DAY,
+      });
+      expect(lane?.revisedAt).toBeNull();
+      expect(lane?.lastObservedAt).toBe(0);
     });
   });
 
