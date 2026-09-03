@@ -428,6 +428,45 @@ describe("SubjectSection", () => {
     });
   });
 
+  describe("given a trace draft with no condition yet", () => {
+    const seedEmptyConditionDraft = (annotators: string[]) =>
+      useAutomationStore.getState().hydrate({
+        ...INITIAL_DRAFT,
+        source: "trace",
+        action: TriggerAction.ADD_TO_ANNOTATION_QUEUE,
+        filterQuery: "",
+        slices: {
+          ...INITIAL_DRAFT.slices,
+          [TriggerAction.ADD_TO_ANNOTATION_QUEUE]: { annotators },
+        },
+      });
+
+    describe("when the delivery is not set up yet", () => {
+      /** @scenario "The missing condition is only flagged once the delivery is set up" */
+      it("offers the empty condition as guidance, not as an error", () => {
+        seedEmptyConditionDraft([]);
+        render(<SubjectSection />, { wrapper: Wrapper });
+
+        expect(
+          screen.getByText("Add a condition to see which traces would match."),
+        ).toBeInTheDocument();
+        expect(screen.queryByText("Add at least one condition.")).toBeNull();
+      });
+    });
+
+    describe("when the delivery is set up", () => {
+      /** @scenario "The missing condition is only flagged once the delivery is set up" */
+      it("flags the missing condition", () => {
+        seedEmptyConditionDraft(["user-1"]);
+        render(<SubjectSection />, { wrapper: Wrapper });
+
+        expect(
+          screen.getByText("Add at least one condition."),
+        ).toBeInTheDocument();
+      });
+    });
+  });
+
   describe("given the condition preview failed", () => {
     /** @scenario "A failed preview shows nothing and never blocks saving" */
     it("says nothing and leaves the draft alone", () => {

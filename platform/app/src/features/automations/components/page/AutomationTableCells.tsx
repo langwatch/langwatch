@@ -226,7 +226,6 @@ export function SectionHeader({
   accent,
   title,
   count,
-  summary,
   details,
   addLabel,
   onAdd,
@@ -235,7 +234,6 @@ export function SectionHeader({
   accent: string;
   title: string;
   count: number;
-  summary: string;
   details: string;
   addLabel: string;
   onAdd: () => void;
@@ -253,22 +251,17 @@ export function SectionHeader({
       >
         {icon}
       </Box>
-      <VStack align="start" gap={0.5} flex={1} minWidth={0}>
-        <HStack gap={2} align="center">
-          <Heading size="md">{title}</Heading>
-          <Badge colorPalette={accent} variant="subtle" borderRadius="full">
-            {count}
-          </Badge>
-          <Tooltip content={details}>
-            <Box color="fg.muted" display="inline-flex" cursor="help">
-              <HelpCircle size={13} />
-            </Box>
-          </Tooltip>
-        </HStack>
-        <Text textStyle="sm" color="fg.muted">
-          {summary}
-        </Text>
-      </VStack>
+      <HStack gap={2} align="center" flex={1} minWidth={0}>
+        <Heading size="md">{title}</Heading>
+        <Badge colorPalette={accent} variant="subtle" borderRadius="full">
+          {count}
+        </Badge>
+        <Tooltip content={details}>
+          <Box color="fg.muted" display="inline-flex" cursor="help">
+            <HelpCircle size={13} />
+          </Box>
+        </Tooltip>
+      </HStack>
       <Button
         size="sm"
         variant="outline"

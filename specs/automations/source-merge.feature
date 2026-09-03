@@ -48,6 +48,15 @@ Feature: One automation flow with a subject choice
       And sets a delivery channel and a name
       Then saving creates one automation that fires when the metric crosses the threshold
 
+    # The name lives on the review step, but a check on the last step reads as
+    # "ready to save", so a name alone must not tick it while what to watch or
+    # where to deliver is still open.
+    @unit
+    Scenario: The review step is only marked answered once the earlier steps are
+      Given the user has named the automation
+      When what it watches or where it delivers is still unanswered
+      Then the review step is not marked as answered
+
     # Absorbs the untagged authoring-drawer.feature scenario "A completed
     # section collapses to a one-line summary" (reopen-any-section), which
     # is deleted when R0 lands.
@@ -247,6 +256,17 @@ Feature: One automation flow with a subject choice
       When the user chooses to disconnect Slack in settings
       Then a confirmation says the three automations stop delivering until Slack is reconnected
       And the connection is still there until the user confirms
+
+    # Whether the user may change the connection is answered by the same read
+    # as the connection itself, so until it answers the card says it is
+    # checking and nothing else — an administrator must not be told to ask an
+    # administrator while it loads.
+    @integration
+    Scenario: The Slack card waits for the connection check before offering or withholding actions
+      Given the project's Slack connection is still being checked
+      When the user opens the integrations settings
+      Then the card says it is checking the connection
+      And it neither offers actions nor tells the user to ask an administrator
 
   Rule: An automation's own stored token outranks the project integration
 

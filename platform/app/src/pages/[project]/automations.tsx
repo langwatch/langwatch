@@ -742,7 +742,6 @@ function AutomationsPage() {
                     accent="purple"
                     title="Reports"
                     count={reports.length}
-                    summary="Send a dashboard, a graph, or a table of traces on a recurring schedule."
                     details="A report bundles a dashboard, a single graph, or a top-N trace table into a Slack or email digest on the schedule you set."
                     addLabel="New report"
                     onAdd={() =>
@@ -880,7 +879,6 @@ function AutomationsPage() {
                     accent="blue"
                     title="Automations"
                     count={automations.length}
-                    summary="Watch a trace filter or a graph, and act when something matches."
                     details="An automation watches either the traces matching your conditions or one series on an analytics graph. When it fires it posts to Slack or email, adds rows to a dataset, or queues traces for annotation."
                     addLabel="New automation"
                     onAdd={() => openDrawer("automation", {})}

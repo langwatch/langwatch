@@ -383,9 +383,12 @@ describe("AutomationDrawer", () => {
 
         // Review: what it watches, the rule, the delivery and the name, all on
         // one screen.
-        fireEvent.change(screen.getByPlaceholderText("Flag failing traces"), {
-          target: { value: "Flag failures" },
-        });
+        fireEvent.change(
+          screen.getByPlaceholderText("e.g., Flag failing traces"),
+          {
+            target: { value: "Flag failures" },
+          },
+        );
         expect(screen.getByText("Watches")).toBeInTheDocument();
         expect(
           screen.getAllByText("Trace filter · status:error").length,
@@ -655,7 +658,7 @@ describe("AutomationDrawer", () => {
         // clean however much of it the author fills in, and closing throws it
         // away without a word.
         fireEvent.change(
-          await screen.findByPlaceholderText("Flag failing traces"),
+          await screen.findByPlaceholderText("e.g., Flag failing traces"),
           { target: { value: "A new automation" } },
         );
         await user.click(await screen.findByRole("button", { name: /close/i }));
@@ -1204,7 +1207,9 @@ describe("AutomationDrawer", () => {
         ).toBeInTheDocument();
 
         await user.click(screen.getByRole("button", { name: "Continue" }));
-        const nameInput = screen.getByPlaceholderText("Flag failing traces");
+        const nameInput = screen.getByPlaceholderText(
+          "e.g., Flag failing traces",
+        );
         fireEvent.change(nameInput, { target: { value: "Flag failures" } });
 
         // The rail carries each reached step, so an earlier one is one click

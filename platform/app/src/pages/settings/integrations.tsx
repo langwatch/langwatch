@@ -443,21 +443,28 @@ function SlackProjectConnection({
   return (
     <VStack align="stretch" gap={3} data-testid="slack-project-connection">
       <SlackConnectionStatusLine status={status} />
-      <SlackLegacyTokenCensus
-        projectId={projectId}
-        count={census.data?.count ?? 0}
-        canSwitch={connected && canManage}
-        workspaceName={status.data?.slackTeamName ?? null}
-        onSwitched={refresh}
-      />
-      <SlackTokenForm
-        projectId={projectId}
-        projectName={projectName}
-        connected={connected}
-        canManage={canManage}
-        dependentAutomations={status.data?.dependentAutomations ?? 0}
-        onChanged={refresh}
-      />
+      {/* The write controls and the read-only hint both depend on the status
+          read, so neither is shown until it has answered — otherwise an
+          administrator is told to ask an administrator while it loads. */}
+      {status.data ? (
+        <>
+          <SlackLegacyTokenCensus
+            projectId={projectId}
+            count={census.data?.count ?? 0}
+            canSwitch={connected && canManage}
+            workspaceName={status.data.slackTeamName ?? null}
+            onSwitched={refresh}
+          />
+          <SlackTokenForm
+            projectId={projectId}
+            projectName={projectName}
+            connected={connected}
+            canManage={canManage}
+            dependentAutomations={status.data.dependentAutomations ?? 0}
+            onChanged={refresh}
+          />
+        </>
+      ) : null}
     </VStack>
   );
 }

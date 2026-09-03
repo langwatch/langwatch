@@ -64,6 +64,16 @@ Feature: Staged automation authoring drawer
       Then one empty, editable condition row is already there
       And the automation still cannot be saved until it is filled in
 
+    # The requirement is pointed at the way the Name field does it: only once
+    # the rest of the setup is done. Before that the empty row is guidance,
+    # so a fresh drawer reads as empty, not broken.
+    @integration
+    Scenario: The missing condition is only flagged once the delivery is set up
+      Given the user opened the drawer from automation settings
+      When the When section is shown before any delivery is set up
+      Then the empty condition reads as guidance, not as an error
+      And once the delivery is set up the missing condition is flagged
+
   Rule: The condition builder can target a custom attribute
 
     A trace's custom attributes (`trace.attribute.<key>`, `span.attribute.<key>`,

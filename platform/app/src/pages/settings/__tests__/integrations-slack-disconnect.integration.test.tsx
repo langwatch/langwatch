@@ -27,6 +27,8 @@ const slackStatus = vi.hoisted(() => ({
     dependentAutomations: 3,
     canManage: true,
   },
+  /** The status read is still in flight — nothing is known yet. */
+  loading: false,
 }));
 /** Every disconnect the card actually sent — the point of the confirmation is
  *  that this stays empty until the operator confirms. */
@@ -67,11 +69,10 @@ vi.mock("~/utils/api", () => ({
     },
     slackIntegration: {
       getStatus: {
-        useQuery: () => ({
-          data: slackStatus.current,
-          isLoading: false,
-          error: null,
-        }),
+        useQuery: () =>
+          slackStatus.loading
+            ? { data: undefined, isLoading: true, error: null }
+            : { data: slackStatus.current, isLoading: false, error: null },
       },
       getLegacyTokenCensus: {
         useQuery: () => ({ data: { count: 0, automations: [] } }),
@@ -137,6 +138,28 @@ const clickDisconnect = async () => {
   await user.click(await screen.findByRole("button", { name: "Disconnect" }));
   return user;
 };
+
+describe("given the project's Slack connection is still being checked", () => {
+  beforeEach(() => {
+    slackStatus.loading = true;
+  });
+
+  afterEach(() => {
+    slackStatus.loading = false;
+    cleanup();
+  });
+
+  /** @scenario "The Slack card waits for the connection check before offering or withholding actions" */
+  it("says it is checking and neither offers actions nor tells the user to ask an administrator", () => {
+    renderPage();
+
+    expect(
+      screen.getByText(/Checking this project.s Slack connection/),
+    ).toBeInTheDocument();
+    expect(screen.queryByText(/Ask a project administrator/)).toBeNull();
+    expect(screen.queryByRole("button", { name: "Disconnect" })).toBeNull();
+  });
+});
 
 describe("given a project whose Slack connection several automations post through", () => {
   beforeEach(() => {

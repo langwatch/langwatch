@@ -50,7 +50,7 @@ import {
   PREVIEW_WINDOW_MS,
 } from "../logic/useDailyCapAdvice";
 import { useAutomationStore } from "../state/automationStore";
-import { useDraft } from "../state/selectors";
+import { useConfigComplete, useDraft } from "../state/selectors";
 import { ConditionBuilder } from "./ConditionBuilder";
 import { DailyCapAdviceAlert } from "./DailyCapAdviceAlert";
 import { type FacetAccordionProps, FacetSection } from "./FacetSection";
@@ -624,6 +624,7 @@ function TraceQuerySubject({
   const { project } = useOrganizationTeamProject();
   const projectId = project?.id ?? "";
   const draft = useDraft();
+  const configComplete = useConfigComplete();
 
   // Debounce before hitting the preview endpoint so fluent typing stays local;
   // the window re-anchors to "now" each time the debounced query settles.
@@ -742,6 +743,7 @@ function TraceQuerySubject({
         canBatch={canBatch}
         showFiringRate={purpose === "automation"}
         requireQuery={purpose === "automation"}
+        setupComplete={configComplete}
         capAdvice={capAdvice}
       />
     </VStack>
@@ -827,6 +829,7 @@ function TracePreview({
   canBatch,
   showFiringRate,
   requireQuery,
+  setupComplete,
   capAdvice,
 }: {
   trimmed: string;
@@ -842,15 +845,23 @@ function TracePreview({
   /** An automation must be scoped — an empty query would act on every trace,
    *  so we say so rather than silently leaving Save disabled. */
   requireQuery: boolean;
+  /** Whether the delivery is set up. The missing condition is only flagged
+   *  once it is — the same rule the Name field follows — so a fresh drawer
+   *  reads as empty rather than broken, and a draft that can't save has the
+   *  reason pointed at. */
+  setupComplete: boolean;
   /** Set when the estimate outruns the plan's daily ceiling, null otherwise. */
   capAdvice: DailyCapAdvice | null;
 }) {
   if (trimmed.length === 0) {
+    const flagged = requireQuery && setupComplete;
     return (
-      <Text textStyle="xs" color={requireQuery ? "orange.fg" : "fg.muted"}>
-        {requireQuery
+      <Text textStyle="xs" color={flagged ? "orange.fg" : "fg.muted"}>
+        {flagged
           ? "Add at least one condition."
-          : "Add a query above to preview which traces would match."}
+          : requireQuery
+            ? "Add a condition to see which traces would match."
+            : "Add a query above to preview which traces would match."}
       </Text>
     );
   }

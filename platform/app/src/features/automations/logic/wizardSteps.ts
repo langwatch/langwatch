@@ -78,7 +78,14 @@ export function stepIsComplete({
     case "delivery":
       return configIsComplete(draft);
     case "review":
-      return draft.name.trim().length > 0;
+      // Review is the whole automation, so its check means "ready to save":
+      // a name alone must not tick the last step while the first two are
+      // still open.
+      return (
+        draft.name.trim().length > 0 &&
+        stepIsComplete({ step: "watch", draft }) &&
+        stepIsComplete({ step: "delivery", draft })
+      );
   }
 }
 

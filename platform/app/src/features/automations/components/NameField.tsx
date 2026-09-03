@@ -7,11 +7,12 @@ import {
   usePresetLabels,
 } from "../state/selectors";
 
-/** Per-preset placeholder — a concrete example beats an empty field. */
+/** Per-preset placeholder — a concrete example beats an empty field, and the
+ *  "e.g.," keeps it reading as an example rather than a value already set. */
 const NAME_PLACEHOLDER = {
-  trace: "Flag failing traces",
-  customGraph: "High latency",
-  report: "Weekly quality digest",
+  trace: "e.g., Flag failing traces",
+  customGraph: "e.g., High latency",
+  report: "e.g., Weekly quality digest",
 } as const;
 
 /**

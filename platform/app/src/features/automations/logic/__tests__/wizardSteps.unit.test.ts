@@ -148,6 +148,34 @@ describe("stepIsComplete", () => {
       ).toBe(false);
     });
   });
+
+  describe("when the automation is named but an earlier step is unanswered", () => {
+    /** @scenario "The review step is only marked answered once the earlier steps are" */
+    it("leaves the review step incomplete until the watch step is answered", () => {
+      expect(
+        stepIsComplete({
+          step: "review",
+          draft: { ...filterDraft, filterQuery: "" },
+        }),
+      ).toBe(false);
+    });
+
+    /** @scenario "The review step is only marked answered once the earlier steps are" */
+    it("leaves the review step incomplete until the delivery is set up", () => {
+      expect(
+        stepIsComplete({
+          step: "review",
+          draft: {
+            ...filterDraft,
+            slices: {
+              ...filterDraft.slices,
+              [TriggerAction.SEND_EMAIL]: emailWith([]),
+            },
+          },
+        }),
+      ).toBe(false);
+    });
+  });
 });
 
 describe("stepSummary", () => {
