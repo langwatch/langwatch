@@ -12,7 +12,7 @@
 #   bumps. The dispatched run reads the version from apps/server/package.json — it does
 #   NOT require a release tag.
 #
-# Version lock: apps/server/package.json and platform/app/package.json must match.
+# Version lock: apps/server/package.json and apps/api/package.json must match.
 # Both are auto-bumped in lockstep by release-please-config.json. The
 # pre-publish step verifies it.
 #
@@ -75,10 +75,10 @@ jobs:
         run: |
           set -e
           pkg_version="$(node -p "require('./apps/server/package.json').version")"
-          app_version="$(node -p "require('./platform/app/package.json').version")"
+          app_version="$(node -p "require('./apps/api/package.json').version")"
           tag="${GITHUB_REF_NAME:-}"
           echo "apps/server/package.json version: $pkg_version"
-          echo "platform/app/package.json version: $app_version"
+          echo "apps/api/package.json version:    $app_version"
           echo "release tag (if any):           $tag"
 
           if [ "$pkg_version" != "$app_version" ]; then
@@ -186,8 +186,16 @@ jobs:
       # it), so end users still run `pnpm install` once on first start, which
       # is what generates the platform-specific Prisma client via prisma's
       # postinstall hook — see apps/server/src/services/node-deps.ts.
-      - name: Build langwatch app (vite + scenario + mcp + generated types)
-        run: pnpm --filter "@langwatch/web..." run build
+      # The browser bundle plus every workspace build the two Node processes
+      # need (the SDK dist and mcp/typescript's). apps/api and apps/worker
+      # declare no build of their own — they run from source through tsx, and
+      # the tarball ships that source.
+      - name: Build langwatch app (vite + sdk + mcp + generated types)
+        run: >
+          pnpm --filter "@langwatch/ui..."
+          --filter "@langwatch/platform-api..."
+          --filter "@langwatch/worker..."
+          run build
         env:
           NODE_ENV: production
 
@@ -220,20 +228,26 @@ jobs:
             "package/app/pnpm-lock.yaml"
             "package/app/pnpm-workspace.yaml"
             "package/app/package.json"
-            "package/app/platform/app/package.json"
-            "package/app/platform/app/dist/client/index.html"
-            # The server bundles. `start:app` and `start:workers` execute these
-            # directly on plain node, and the published tree has no tsx to fall
-            # back to, so a tarball missing any of them is a server that cannot
-            # boot. `task.cjs` runs the migrations, and the scenario bundle is
-            # what keeps simulation cold-starts to seconds.
-            "package/app/platform/app/dist/server/server.cjs"
-            "package/app/platform/app/dist/server/workers.cjs"
-            "package/app/platform/app/dist/server/task.cjs"
-            "package/app/platform/app/dist/server/scenario-child-process.cjs"
-            # goose reads the ClickHouse migrations from ${__dirname}/migrations,
-            # which in the bundle is dist/server/migrations.
-            "package/app/platform/app/dist/server/migrations"
+            # The browser bundle. apps/ui is a build, not a process: the API
+            # process serves this directory.
+            "package/app/apps/ui/dist/client/index.html"
+            # The two Node processes, as SOURCE. Neither is bundled any more —
+            # each declares `tsx` as a production dependency and its `start`
+            # script runs the entry point through it, so what the tarball has
+            # to carry is the entry point and the tree it imports.
+            "package/app/apps/api/src/api.entrypoint.ts"
+            "package/app/apps/worker/src/worker.entrypoint.ts"
+            # The migration tasks the first boot runs, in the order the image
+            # runs them: Prisma, then ClickHouse, then LangWatchQL.
+            "package/app/apps/api/prisma.config.ts"
+            "package/app/apps/api/src/tasks/clickhouse-migrate/clickhouse-migrate.entrypoint.ts"
+            "package/app/apps/api/src/tasks/lwql-provision/lwql-provision.entrypoint.ts"
+            # goose reads the ClickHouse migrations from a directory beside the
+            # runner; from source that is the task's own migrations/ folder.
+            "package/app/apps/api/src/tasks/clickhouse-migrate/migrations"
+            # The canonical Prisma schema and history the migrate task applies.
+            "package/app/packages/prisma-client/prisma/schema.prisma"
+            "package/app/packages/prisma-client/prisma/migrations"
             "package/app/services/langevals/pyproject.toml"
             # langevals resolves the python SDK as a local path dependency,
             # so the tarball must ship sdks/python/pyproject.toml + src/.
@@ -244,9 +258,9 @@ jobs:
             # "@langwatch/mcp-server/create-mcp-server".
             "package/app/mcp/typescript/package.json"
             "package/app/mcp/typescript/dist/create-mcp-server.js"
-            # Langy reads the platform feature map at runtime
-            # (platform/app/src/shared/langy/featureMap.ts imports it from the
-            # repo root).
+            # Langy reads the feature map at runtime
+            # (packages/features/langy/contract/src/cards/registry.ts imports it
+            # from the repo root).
             "package/app/feature-map.json"
             # The app's prepare step imports the skills front-matter helper
             # (scripts/generate-langy-skills.ts) when a tree rebuilds. The
@@ -276,8 +290,9 @@ jobs:
             required+=("package/app/$member/package.json")
           done
           forbidden=(
-            "package/app/platform/app/node_modules"
-            "package/app/platform/app/.next/cache"
+            "package/app/apps/api/node_modules"
+            "package/app/apps/worker/node_modules"
+            "package/app/apps/ui/node_modules"
             "package/app/.env"
             # The lockfile must be under app/, never at the package root —
             # npm would delete it there and the guard above would still pass

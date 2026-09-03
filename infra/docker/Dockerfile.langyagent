@@ -98,8 +98,8 @@ FROM oven/bun:1.3.13-debian AS cli-builder
 
 WORKDIR /src
 
-# pnpm resolves the CLI's lockfile + the `../../packages/langy` workspace link;
-# the bun image ships no Node, and pnpm needs one.
+# pnpm resolves the CLI's lockfile + its workspace links; the bun image ships
+# no Node, and pnpm needs one.
 RUN apt-get update && apt-get install -y --no-install-recommends curl ca-certificates \
     && curl -fsSL https://deb.nodesource.com/setup_22.x | bash - \
     && apt-get install -y --no-install-recommends nodejs \
@@ -107,11 +107,13 @@ RUN apt-get update && apt-get install -y --no-install-recommends curl ca-certifi
     && rm -rf /var/lib/apt/lists/*
 
 # Since ADR-076 the repo is a SINGLE pnpm workspace, so the lockfile and
-# workspace definition live at the root and the install runs from there. langy
-# is still a `workspace:*` dependency of the CLI; it is source-only (its `main`
-# points at src/index.ts) and is bundled into the binary.
+# workspace definition live at the root and the install runs from there.
+# `@langwatch/langy-contract` is the CLI's one workspace dependency; it is
+# source-only (its `main` points at src/index.ts) and is bundled into the
+# binary. `packages/langy` used to be copied here and no longer exists — the
+# canonical langy packages live under packages/features/langy.
 COPY pnpm-workspace.yaml pnpm-lock.yaml package.json .npmrc ./
-COPY packages/langy ./packages/langy
+COPY packages/features/langy/contract ./packages/features/langy/contract
 COPY sdks/typescript ./sdks/typescript
 # Full source for the langy-worker wrapper: its Bun compile below bundles
 # src/ + the pi SDK from node_modules, so manifests alone are not enough.
@@ -122,7 +124,6 @@ COPY services/langyworker/src ./services/langyworker/src
 COPY services/langyworker/scripts ./services/langyworker/scripts
 # Manifests only. `--frozen-lockfile` checks the lockfile against every
 # workspace member it can see, so each member needs at least its package.json.
-COPY platform/app/package.json ./platform/app/
 COPY packages/api/package.json ./packages/api/
 COPY packages/features/authz/contract/package.json ./packages/features/authz/contract/
 COPY packages/features/authz/server/package.json ./packages/features/authz/server/
@@ -143,27 +144,25 @@ WORKDIR /src
 RUN pnpm install --frozen-lockfile --ignore-scripts --filter "langwatch..." --filter "@langwatch/langyworker..."
 
 # Back to the SDK for the generator + compile steps below, which resolve their
-# inputs (../../platform/app, ../../services/langevals, ../../feature-map.json)
-# relative to it.
+# inputs (../../packages, ../../apps/api, ../../services/langevals,
+# ../../feature-map.json) relative to it.
 WORKDIR /src/sdks/typescript
 
-# The CLI imports types GENERATED from the platform source: copy-types.sh copies
-# the Zod-first modules out of platform/app/ + services/langevals/ and derives
-# default-prompt-model.generated.ts from llmModels.json, and the OpenAPI client is
-# generated from the app's OpenAPI json. Those sources live OUTSIDE sdks/typescript/
-# and the install ran with --ignore-scripts, so the generated tree is absent and
-# the Bun compile fails to resolve `internal/generated/*`. Bring in exactly the
-# files the generators read (at the ../../platform/app, ../../services/langevals paths copy-types.sh
-# expects relative to /src/sdks/typescript), then run the generators. These are
-# written INTO the image, so .dockerignore's `*.generated.*` filter (a host→context
-# rule) does not strip them.
-COPY platform/app/src/server/tracer/types.ts             /src/platform/app/src/server/tracer/types.ts
-COPY platform/app/src/server/filters/types.ts            /src/platform/app/src/server/filters/types.ts
-COPY platform/app/src/server/evaluations/types.ts        /src/platform/app/src/server/evaluations/types.ts
+# The CLI imports types GENERATED from first-party source: copy-types.sh copies
+# the Zod-first contract modules out of packages/ + services/langevals/ and
+# derives default-prompt-model.generated.ts from the model catalogue, and the
+# OpenAPI client is generated from the API's OpenAPI document. Those sources live
+# OUTSIDE sdks/typescript/ and the install ran with --ignore-scripts, so the
+# generated tree is absent and the Bun compile fails to resolve
+# `internal/generated/*`. Bring in exactly the files the generators read (at the
+# ../../ paths copy-types.sh expects relative to /src/sdks/typescript), then run
+# the generators. These are written INTO the image, so .dockerignore's
+# `*.generated.*` filter (a host→context rule) does not strip them.
+COPY packages/features/trace/contract/src/trace-format.schemas.ts /src/packages/features/trace/contract/src/trace-format.schemas.ts
 COPY packages/features/evaluator/contract/src/evaluators.native.ts /src/packages/features/evaluator/contract/src/evaluators.native.ts
 COPY packages/features/model-provider/contract/src/catalog/model-catalog.json /src/packages/features/model-provider/contract/src/catalog/model-catalog.json
 COPY packages/redaction/src                           /src/packages/redaction/src
-COPY platform/app/src/app/api/openapiLangWatch.json      /src/platform/app/src/app/api/openapiLangWatch.json
+COPY apps/api/src/features/discovery/openapi-document.json /src/apps/api/src/features/discovery/openapi-document.json
 COPY services/langevals/ts-integration/evaluators.generated.ts /src/services/langevals/ts-integration/evaluators.generated.ts
 # copy-types.sh also embeds the repo-root feature-map.json (feature-map.generated.ts),
 # and generate-skills-bundle.mjs walks the whole skills/ tree (feature-skills.ts,

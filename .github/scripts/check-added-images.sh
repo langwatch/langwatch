@@ -25,7 +25,7 @@ BASE_REF="${1:?usage: check-added-images.sh <base-ref>}"
 ALLOWED_PREFIXES=(
   "docs/images/"
   "docs/media/"
-  "platform/app/public/"
+  "apps/ui/public/"
   "assets/"
   "specs/"
   "sdks/python/examples/"

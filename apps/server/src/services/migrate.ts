@@ -1,34 +1,27 @@
 import type { RuntimeContext } from "../shared/runtime-contract.ts";
 import type { EventBus } from "./event-bus.ts";
-import { locateApiDir, locateLangwatchDir, resolvePnpm } from "./node-deps.ts";
+import { locateApiDir, resolvePnpm } from "./node-deps.ts";
 import { execAndPipe } from "./_pipe-to-bus.ts";
 
 /**
  * Run Prisma migrations against the embedded postgres + ClickHouse goose
- * migrations against the embedded clickhouse. Both binaries are bundled
- * with the langwatch app already (via platform/app/node_modules and goose in
- * scripts/), so this is a thin shell-out.
+ * migrations against the embedded clickhouse. Both run from apps/api, which
+ * owns both tasks and declares the prisma CLI as a runtime dependency, so this
+ * is a thin shell-out.
  *
  * Idempotent — Prisma reports "Already in sync" and goose reports "no
  * migrations to run" when the schema is current.
  *
- * envFromFile is the `.env` we scaffold into LANGWATCH_HOME — the langwatch
- * app's pnpm scripts go through `@t3-oss/env-core`, which validates the
- * full env schema (BASE_HOST, NEXTAUTH_SECRET, etc.) at module-load time
- * even for migrate-only invocations. Without this overlay, the script
- * exits 1 before goose ever runs.
+ * envFromFile is the `.env` we scaffold into LANGWATCH_HOME — each task
+ * parses the process configuration it needs at boot and refuses by name on a
+ * missing leaf, even for a migrate-only invocation. Without this overlay the
+ * task exits 1 before goose ever runs.
  */
 export async function runMigrations(
   ctx: RuntimeContext,
   bus: EventBus,
   envFromFile: Record<string, string>,
 ): Promise<void> {
-  const langwatchDir = locateLangwatchDir();
-  if (!langwatchDir) {
-    throw new Error(
-      "could not locate langwatch app directory — expected next to apps/server (monorepo) or under @langwatch/server install root",
-    );
-  }
   const apiDir = locateApiDir();
   if (!apiDir) {
     throw new Error(
@@ -55,8 +48,8 @@ export async function runMigrations(
   };
 
   // resolvePnpm(paths) prefers the bundled <bin>/pnpm (installed by the
-  // pnpm predep), so both the OUTER `pnpm run prisma:migrate` AND the
-  // INNER `pnpm prisma migrate deploy` (inside the package.json's `sh -c`)
+  // pnpm predep), so both the OUTER `pnpm run task:prisma-migrate` AND the
+  // INNER `pnpm exec prisma migrate deploy` (inside the package.json's `sh -c`)
   // resolve to the same binary — the inner one finds it via PATH, which
   // the env block above already prepends with ctx.paths.bin.
   const pnpm = await resolvePnpm(ctx.paths);
@@ -64,8 +57,8 @@ export async function runMigrations(
     bus,
     "migrate:prisma",
     pnpm.command,
-    [...pnpm.args, "run", "prisma:migrate"],
-    { cwd: langwatchDir, env },
+    [...pnpm.args, "run", "task:prisma-migrate"],
+    { cwd: apiDir, env },
   );
   await execAndPipe(
     bus,

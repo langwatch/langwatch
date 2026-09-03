@@ -5,7 +5,7 @@ import { downloadWithProgress } from "./_download.ts";
 import type { Predep } from "./types.ts";
 
 // Goose runs the langwatch app's ClickHouse schema migrations
-// (platform/app/src/server/clickhouse/goose.ts shells out to `goose` via
+// (apps/api's clickhouse-migrate task shells out to `goose` via
 // `which`). Pinned to the same version compose.dev.yml uses so dev / prod /
 // npx all run the same migration engine.
 const GOOSE_VERSION = "v3.26.0";

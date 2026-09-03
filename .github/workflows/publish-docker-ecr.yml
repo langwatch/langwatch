@@ -180,7 +180,7 @@ jobs:
             langwatch-app:
               - 'infra/docker/Dockerfile'
               - 'infra/docker/Dockerfile.langyagent'
-              - 'platform/app/**'
+              - 'apps/**'
               - 'packages/**'
               - 'mcp/typescript/**'
               - 'sdks/typescript/**'

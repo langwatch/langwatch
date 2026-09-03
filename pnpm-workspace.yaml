@@ -12,7 +12,6 @@
 # One install from the repo root now covers all of it.
 packages:
   - "apps/*"
-  - "platform/app"
   - "packages/*"
   - "packages/features/*/*"
   - "packages/enterprise"
@@ -27,12 +26,13 @@ packages:
   - "dev/tests/agentic-e2e"
 
 # pnpm 10 already defaults this to false. It is stated explicitly because the
-# merge is what made it load-bearing: sdks/typescript/ is the package `langwatch`
-# and platform/app/ (now @langwatch/web) depends on `langwatch@1.0.0`, meaning the
-# PUBLISHED SDK. With the two in one workspace, flipping this to true silently
-# switches the app — and everything built from it, including the production
+# six-root merge is what made it load-bearing: sdks/typescript/ is the package
+# `langwatch`, and a member depending on `langwatch@<range>` means the PUBLISHED
+# SDK. With both in one workspace, flipping this to true would silently switch
+# every such member — and everything built from them, including the production
 # image — onto the SDK working copy. Linking the working copy is a deliberate
-# change (`"langwatch": "workspace:*"`), not something to acquire by accident.
+# change (`"langwatch": "workspace:*"`, which is what the packages that need the
+# working copy declare today), not something to acquire by accident.
 linkWorkspacePackages: false
 
 # Supply-chain age gate. Previously set only on platform/app/'s root, so five of

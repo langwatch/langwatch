@@ -23,9 +23,9 @@ require_dir() {
   [ -d "$1" ] || missing+=("$1/")
 }
 
-require_file "platform/app/src/server/evaluations/evaluators.generated.ts"
-require_file "platform/app/src/tasks.generated.ts"
-require_file "platform/app/src/shared/langy/langySkills.generated.json"
+require_file "packages/features/evaluator/contract/src/evaluators.generated.ts"
+require_file "packages/features/langy/web/src/model/shared/langy/langySkills.generated.json"
+require_file "packages/features/langy/server/src/services/setup-skill-bodies.generated.ts"
 
 # Name the ENTRYPOINTS, not just the directories that hold them. A directory
 # check passes for an empty or half-written one, so a partially restored cache

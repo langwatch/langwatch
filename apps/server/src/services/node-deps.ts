@@ -18,12 +18,16 @@ import type { EventBus } from "./event-bus.ts";
 
 /**
  * The workspace name of the langwatch app, as declared in
- * platform/app/package.json. Used to filter the install down to the app and its
+ * apps/api/package.json. Used to filter the install down to the apps and their
  * dependencies. It was plain `langwatch` until ADR-076 — the same name the
  * published TypeScript SDK uses, which is exactly why it had to change before
  * the two could live in one workspace.
  */
-export const APP_PACKAGE_NAME = "@langwatch/web";
+export const APP_PACKAGE_NAMES = [
+  "@langwatch/platform-api",
+  "@langwatch/worker",
+  "@langwatch/ui",
+] as const;
 
 /**
  * The argv for the workspace install both boot passes run — dev-deps-included
@@ -44,55 +48,51 @@ export function workspaceInstallArgs(
     "install",
     prod ? "--prod" : "--prod=false",
     "--frozen-lockfile",
-    "--filter",
-    `${APP_PACKAGE_NAME}...`,
+    // One filter per deployable, each with the trailing `...` that pulls in
+    // its workspace dependencies. Three, because the three dependency subtrees
+    // are not subsets of one another: the browser bundle's build tooling is not
+    // in the API's closure, and the worker's queue stack is not in the UI's.
+    ...APP_PACKAGE_NAMES.flatMap((name) => ["--filter", `${name}...`]),
   ];
 }
 
 /**
- * Ensure platform/app/node_modules exists + start:prepare:files has run, both of
- * which are prerequisites for `pnpm run prisma:migrate` and `pnpm run start:app`.
+ * Ensure the applications' node_modules exist and `start:prepare:files` has
+ * run, both of which are prerequisites for the migration tasks and for
+ * `pnpm run start` in apps/api and apps/worker.
  *
- * Runs INSIDE the relocated app tree (LANGWATCH_HOME/app/platform/app/) — see
+ * Runs INSIDE the relocated tree (LANGWATCH_HOME/app/) — see
  * services/app-dir.ts for why we relocate out of node_modules.
  */
 export async function ensureLangwatchDeps(
   ctx: { paths: LangwatchPaths },
   bus: EventBus,
 ): Promise<void> {
-  const langwatchDir = locateLangwatchDir();
-  if (!langwatchDir) throw new Error("langwatch app dir not found");
+  const apiDir = locateApiDir();
+  if (!apiDir) throw new Error("langwatch api dir not found");
+  const uiDir = locateUiDir();
+  if (!uiDir) throw new Error("langwatch ui dir not found");
 
-  // The install now runs from the tarball ROOT, not from platform/app/. Since
-  // ADR-076 the repo is a single pnpm workspace, so the lockfile and the
-  // workspace definition live at the root and langwatch/ is one member of it.
-  // The tree pnpm produces is unchanged — platform/app/node_modules is still
-  // where the app resolves from — only the directory we invoke pnpm in moved.
+  // The install runs from the tarball ROOT. Since ADR-076 the repo is a single
+  // pnpm workspace, so the lockfile and the workspace definition live at the
+  // root and each application is one member of it.
   const rootDir = appRoot();
-  const nodeModulesPath = join(langwatchDir, "node_modules");
+  const nodeModulesPath = join(apiDir, "node_modules");
   // Where pnpm's virtual store actually lives since ADR-076.
   const rootNodeModules = join(rootDir, "node_modules");
-  const distPath = join(langwatchDir, "dist");
+  const distPath = join(uiDir, "dist");
   const lockfilePath = join(rootDir, "pnpm-lock.yaml");
   const workspacePath = join(rootDir, "pnpm-workspace.yaml");
   const hashFile = join(nodeModulesPath, ".install-hash");
 
-  // Both halves have to be there. dist/client is the served UI; dist/server
-  // holds every artifact executed directly at runtime — the four bundles
-  // (`start:app`, `start:workers`, run-task.sh, the scenario spawn) plus the
-  // migrations goose reads from dist/server/migrations. Gate the skip on all
-  // of them: a partial tree (interrupted build, or one made before a bundle
-  // existed) would otherwise pass and die at boot on the missing piece.
-  const serverArtifacts = [
-    "server.cjs",
-    "workers.cjs",
-    "task.cjs",
-    "scenario-child-process.cjs",
-    "migrations",
-  ];
-  const distAlreadyBuilt =
-    existsSync(join(distPath, "client")) &&
-    serverArtifacts.every((artifact) => existsSync(join(distPath, "server", artifact)));
+  // One artifact, not five. The two Node processes are no longer bundled —
+  // apps/api and apps/worker each declare `tsx` as a production dependency and
+  // run their entry point from source, and the ClickHouse migrations are read
+  // from the task's own directory rather than a copy under dist/server. What a
+  // build still has to produce is the browser bundle the API process serves,
+  // and index.html is the file that proves it landed whole: an interrupted
+  // vite build leaves assets without a shell.
+  const distAlreadyBuilt = existsSync(join(distPath, "client", "index.html"));
   // Hash key combines the lockfile + workspace definition + package.json —
   // any of them changing means we need to re-run install. Use sha256 (not
   // just mtime) because rsync during ensureAppDir resets mtimes. The sequence
@@ -106,7 +106,10 @@ export async function ensureLangwatchDeps(
   // trees have no root-level workspace at all, so the filtered install below
   // would otherwise be skipped as fresh and leave the app on a layout the
   // rest of this function no longer expects.
-  const installKey = `${computeInstallKey(lockfilePath, workspacePath, join(langwatchDir, "package.json"))}|seq4-single-workspace`;
+  // seq5: re-run on installs whose tree predates the split into apps/api,
+  // apps/worker and apps/ui. Those trees are keyed on the monolith's manifest
+  // and hold its bundles, neither of which exists now.
+  const installKey = `${computeInstallKey(lockfilePath, workspacePath, join(apiDir, "package.json"))}|seq5-three-applications`;
 
   // Top-level symlinks are the strongest "install completed" signal:
   // pnpm creates `.bin/` and direct package entries LAST after populating
@@ -130,7 +133,7 @@ export async function ensureLangwatchDeps(
   bus.emit({ type: "starting", service: "prepare:langwatch" as never });
   const start = Date.now();
 
-  // We use `pnpm -C <dir>` instead of `cwd: langwatchDir` because pnpm's
+  // We use `pnpm -C <dir>` instead of a cwd because pnpm's
   // workspace-aware mode resolves the workspace ROOT package.json when
   // invoked through corepack (or sometimes plain pnpm too) — leading to
   // "Missing script: build. Did you mean pnpm run build:cli?" because
@@ -151,7 +154,7 @@ export async function ensureLangwatchDeps(
   // ESM loader shims land deep in the virtual store and its instrumentation
   // cannot patch them.
   //
-  // At the ROOT, not in langwatch/: hoisting is a property of the install
+  // At the ROOT, not in an application directory: hoisting is a property of the install
   // root, and since ADR-076 that is the tarball root. A copy written into
   // langwatch/ would be read for nothing.
   const npmrcPath = join(rootDir, ".npmrc");
@@ -189,25 +192,32 @@ export async function ensureLangwatchDeps(
     ]);
   }
 
-  // Skip the build step entirely when dist/client/ is already present.
+  // Skip the build step entirely when apps/ui/dist/client/ is already present.
   // Published npm tarballs ship dist/ pre-built (see
   // .github/workflows/npx-server-publish.yml), so end users hit `pnpm install`
   // + `prisma generate` and nothing else. The build only runs for
   // `pnpm pack`-driven local dogfood and dev checkouts where dist/
   // doesn't exist yet.
   if (!distAlreadyBuilt) {
-    // Full prod build: start:prepare:files → vite build → build:server.
-    // start:prepare:files generates Prisma client, Zod types, SDK versions,
-    // langevals types (from the source committed in services/langevals/ts-integration/),
-    // the mcp-server bundle and the task registry. vite build emits dist/client/
-    // for static serving; without it every UI route returns 404 and only /api/*
-    // works. build:server emits dist/server/*.cjs — the entry points start:app
-    // and start:workers run on plain node.
+    // Full prod build, in the two steps the image runs: the root's
+    // start:prepare:files (Prisma client, langevals evaluator types, the
+    // TypeScript SDK's dist, the mcp-server bundle, the langy skill
+    // catalogue), then the browser bundle. `--filter "@langwatch/ui..."`
+    // builds the UI's workspace dependencies first, in topological order.
+    // Without dist/client every browser route 404s and only /api/* answers.
+    // Neither Node process is built: both run their entry point through tsx.
+    await execAndPipe(bus, "prepare:langwatch", pnpm.command, [
+      ...pnpm.args,
+      "-C",
+      rootDir,
+      "run",
+      "start:prepare:files",
+    ]);
     await execAndPipe(
       bus,
       "prepare:langwatch",
       pnpm.command,
-      [...pnpm.args, "-C", langwatchDir, "run", "build"],
+      [...pnpm.args, "-C", rootDir, "--filter", "@langwatch/ui...", "run", "build"],
       {
         env: {
           ...process.env,
@@ -222,9 +232,9 @@ export async function ensureLangwatchDeps(
   // This is what drops vite, vitest, playwright and the rest of the
   // build tooling from the tree the server actually runs — on the order of a
   // gigabyte — while prisma stays, because migrations run through the prisma
-  // CLI and it is declared as a runtime dependency. tsx goes out with the
-  // rest: the app and the workers boot from the prebuilt dist/server bundles
-  // on plain node, so the running tree never needs it.
+  // CLI and apps/api declares it as a runtime dependency. tsx stays for the
+  // same reason: apps/api and apps/worker boot their entry point through it,
+  // so it is a production dependency of both rather than build tooling.
   //
   // A re-install with `--prod` rather than `pnpm prune --prod`: prune has no
   // `--filter`, so in a workspace it reasons about every project rather than
@@ -234,7 +244,7 @@ export async function ensureLangwatchDeps(
   // ONLY on the relocated copy under LANGWATCH_HOME. A dev checkout runs the
   // CLI against its own working tree, and pruning that would strip the
   // developer's test and build tooling out from under them.
-  if (shouldPruneToProd(langwatchDir, ctx.paths)) {
+  if (shouldPruneToProd(apiDir, ctx.paths)) {
     await execAndPipe(
       bus,
       "prepare:langwatch",
@@ -252,21 +262,23 @@ export async function ensureLangwatchDeps(
     await execAndPipe(bus, "prepare:langwatch", pnpm.command, [
       ...pnpm.args,
       "-C",
-      langwatchDir,
+      apiDir,
       "exec",
       "prisma",
       "generate",
+      "--config",
+      "./prisma.config.ts",
     ]);
   }
 
   // Workspace members living OUTSIDE langwatch/ (mcp-server, packages/*)
-  // cannot reach platform/app/node_modules by walking up, so their declared
+  // cannot reach apps/api/node_modules by walking up, so their declared
   // peerDependencies resolve nowhere in the relocated tree. Materialize
   // each peer as a member-local link to the app's resolved instance —
   // the "consumer provides the peer" contract made explicit on disk.
   // Only on the relocated copy: a dev checkout resolves these through its
   // own root-workspace install.
-  if (shouldPruneToProd(langwatchDir, ctx.paths)) {
+  if (shouldPruneToProd(apiDir, ctx.paths)) {
     linkExternalMemberPeers(appRoot());
   }
 
@@ -302,7 +314,7 @@ export async function ensureLangwatchDeps(
  * doesn't carry. Exported for tests.
  */
 export function linkExternalMemberPeers(appRootDir: string): string[] {
-  const appNodeModules = join(appRootDir, "platform", "app", "node_modules");
+  const appNodeModules = join(appRootDir, "apps", "api", "node_modules");
   const memberDirs = [
     join(appRootDir, "mcp", "typescript"),
     ...listDirs(join(appRootDir, "packages")),
@@ -395,9 +407,9 @@ export function assertWorkspaceLinksResolve(nodeModulesPath: string): void {
  *
  * Takes several roots because ADR-076 moved the store. The install root is now
  * the workspace root, so the store is at <root>/node_modules/.pnpm and
- * platform/app/node_modules holds only symlinks — checking platform/app/node_modules
- * alone reintroduced exactly the bug described above, silently, for every npx
- * user. Both are checked: the root for current trees, langwatch/ for ones
+ * an application's node_modules holds only symlinks — checking that alone
+ * reintroduced exactly the bug described above, silently, for every npx user.
+ * Both are checked: the root for current trees, the application's for ones
  * installed before the merge. Exported for tests.
  */
 export function prismaClientGenerated(...nodeModulesPaths: string[]): boolean {
@@ -480,21 +492,28 @@ export async function resolvePnpm(
   throw new Error("pnpm not found in <bin>/pnpm, on PATH, or via corepack");
 }
 
-export function locateLangwatchDir(): string | null {
-  // appRoot() returns the relocated tree (LANGWATCH_HOME/app) once
-  // ensureAppDir has run, or the dev workspace fallback otherwise.
-  const dir = join(appRoot(), "platform", "app");
+/**
+ * The three deployables, in the relocated tree.
+ *
+ * `appRoot()` returns LANGWATCH_HOME/app once ensureAppDir has run, or the dev
+ * workspace fallback otherwise. Each is located separately because each is a
+ * separate process with its own work: apps/api runs both schema migrations and
+ * serves everything (including the browser bundle apps/ui builds), and
+ * apps/worker runs the background stack.
+ */
+function locateAppDir(name: "api" | "worker" | "ui"): string | null {
+  const dir = join(appRoot(), "apps", name);
   return existsSync(join(dir, "package.json")) ? dir : null;
 }
 
-/**
- * The interactive API process, in the same relocated tree.
- *
- * It is located separately because it owns work the app used to run: the
- * ClickHouse schema migration is its task now, so the migration step runs
- * from here while the Prisma one still runs from the app directory above.
- */
 export function locateApiDir(): string | null {
-  const dir = join(appRoot(), "apps", "api");
-  return existsSync(join(dir, "package.json")) ? dir : null;
+  return locateAppDir("api");
+}
+
+export function locateWorkerDir(): string | null {
+  return locateAppDir("worker");
+}
+
+export function locateUiDir(): string | null {
+  return locateAppDir("ui");
 }

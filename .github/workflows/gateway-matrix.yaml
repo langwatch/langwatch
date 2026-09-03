@@ -17,8 +17,8 @@ name: gateway-matrix
 # Touches needing this matrix:
 #   - services/aigateway/**          (gateway data plane)
 #   - pkg/**                         (shared HTTP/health helpers)
-#   - platform/app/src/server/gateway/  (control plane)
-#   - platform/app/ee/governance/process-manager/gatewayDebits.process.ts
+#   - packages/features/gateway/  (control plane)
+#   - packages/enterprise/features/governance/server/src/processes/gateway-debit.process.ts
 #     (the sole writer of gateway budget debits)
 # Triggers:
 #   - PR push (path-filtered to gateway-relevant files only — doc-only
@@ -53,9 +53,9 @@ on:
       - "cmd/**"
       - "go.mod"
       - "go.sum"
-      - "platform/app/src/server/gateway/**"
-      - "platform/app/ee/governance/process-manager/gatewayDebits.process.ts"
-      - "platform/app/src/server/routes/gateway-internal.ts"
+      - "packages/features/gateway/**"
+      - "packages/enterprise/features/governance/server/src/processes/gateway-debit.process.ts"
+      - "apps/api/src/app/api-gateway*.composition.ts"
       - "charts/gateway/**"
       - ".github/workflows/gateway-matrix.yaml"
   schedule:
@@ -210,22 +210,22 @@ jobs:
         # action that puts node-gyp on PATH.
         run: |
           npm install -g node-gyp@12.3.0
-          pnpm install --frozen-lockfile --filter "@langwatch/web..."
+          pnpm install --frozen-lockfile --filter "@langwatch/platform-api..."
 
       - name: Apply DB migrations
-        working-directory: platform/app
+        working-directory: apps/api
         env:
           DATABASE_URL: postgresql://postgres:postgres@localhost:5432/langwatch
-        run: pnpm prisma migrate deploy
+        run: pnpm run task:prisma-migrate
 
       - name: Start control plane (background)
-        working-directory: platform/app
+        working-directory: apps/api
         env:
           DATABASE_URL: postgresql://postgres:postgres@localhost:5432/langwatch
           REDIS_URL: redis://localhost:6379
           CLICKHOUSE_HOST: http://localhost:8123
         run: |
-          pnpm dev > /tmp/langwatch-dev.log 2>&1 &
+          pnpm start > /tmp/langwatch-dev.log 2>&1 &
           echo $! > /tmp/langwatch.pid
           # Wait up to 90s for /api/health
           for i in {1..45}; do

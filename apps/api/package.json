@@ -36,7 +36,9 @@
     "task:model-provider-migrate": "tsx --env-file-if-exists=../../.env src/tasks/model-provider-migrate/model-provider-migrate.entrypoint.ts",
     "typecheck": "tsc --noEmit && tsc --noEmit -p tsconfig.test.json",
     "test": "vitest run",
-    "test:unit": "vitest run"
+    "test:unit": "vitest run",
+    "test:stress": "vitest run --exclude '**/node_modules/**' src/__tests__/collector.stress.test.ts",
+    "check:gateway-control-plane": "tsx scripts/check-gateway-control-plane.ts"
   },
   "dependencies": {
     "@aws-sdk/client-s3": "^3.1080.0",
@@ -167,6 +169,7 @@
     "@opentelemetry/sdk-trace-web": "2.10.0",
     "@types/bcrypt": "^6.0.0",
     "@types/node": "^26.0.1",
+    "simple-statistics": "^7.9.2",
     "typescript": "^7.0.2",
     "vitest": "^4.1.9"
   }

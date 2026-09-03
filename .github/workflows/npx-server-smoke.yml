@@ -40,9 +40,9 @@ on:
       - "services/langevals/uv.lock"
       - "services/aigateway/**"
       - "cmd/service/**"
-      - "platform/app/package.json"
-      - "platform/app/scripts/start.sh"
-      - "platform/app/scripts/check-ports.sh"
+      - "apps/api/package.json"
+      - "apps/worker/package.json"
+      - "apps/ui/package.json"
       - ".github/workflows/npx-server-smoke.yml"
       # The script that assembles the tarball. It decides what every npm user
       # receives, so a change to it is precisely what this job exists to
@@ -185,7 +185,7 @@ jobs:
           pnpm --filter @langwatch/server run test:invariants
 
       # Same prebuild as npx-server-publish.yml: every published artifact
-      # ships platform/app/dist + mcp/typescript/dist (the publish sanity check
+      # ships apps/ui/dist + mcp/typescript/dist (the publish sanity check
       # asserts both), so the artifact THIS job boots must carry them too —
       # otherwise the smoke exercises a tree shape no npm user ever receives
       # and pays a full on-runner vite build for it inside the health budget.
@@ -194,7 +194,7 @@ jobs:
       # above already covers it. Same redundancy that was removed from
       # npx-server-publish.yml.
       - name: Build langwatch app (vite + scenario + mcp + generated types)
-        run: pnpm --filter "@langwatch/web..." run build
+        run: pnpm --filter "@langwatch/ui..." --filter "@langwatch/platform-api..." run build
         env:
           NODE_ENV: production
 

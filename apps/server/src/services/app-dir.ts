@@ -33,7 +33,7 @@ function locatePackageSource(): string | null {
   // already been downloaded.
   let dir = __dirname;
   for (let i = 0; i < 6; i++) {
-    if (existsSync(join(dir, "platform", "app", "package.json"))) return dir;
+    if (existsSync(join(dir, "apps", "api", "package.json"))) return dir;
     const parent = dirname(dir);
     if (parent === dir) break;
     dir = parent;
@@ -56,7 +56,7 @@ function isUnderNodeModules(p: string): boolean {
  * dies on the first `pnpm clickhouse:migrate` boot. Moving the tree to
  * ~/.langwatch/app/ takes the source out of any node_modules ancestry.
  *
- * Copies platform/app/, services/langevals/, sdks/python/, etc. as siblings —
+ * Copies apps/, packages/, services/langevals/, sdks/python/, etc. as siblings —
  * preserves the relative `editable+../../sdks/python` references that
  * services/langevals/ts-integration's generators rely on.
  *

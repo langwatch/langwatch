@@ -1,7 +1,7 @@
 import chalk from "chalk";
 
 // The same ASCII art the langwatch app prints when it boots — see
-// platform/app/src/start.ts. Keeping these in lockstep means `npx @langwatch/server`
+// apps/api's boot banner. Keeping these in lockstep means `npx @langwatch/server`
 // shows the same identity as `pnpm dev`.
 const ASCII_ART = [
   "",

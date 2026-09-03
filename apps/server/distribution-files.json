@@ -6,7 +6,6 @@
   "apps/ui/",
   "apps/worker/",
   "packages/",
-  "platform/app/",
   "services/langevals/",
   "sdks/python/",
   "sdks/typescript/",

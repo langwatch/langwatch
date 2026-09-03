@@ -19,7 +19,9 @@
 # can tell a justified exclusion from a capitulation, so the reason column is
 # what a reviewer reads.
 
-@langwatch/web  # this workflow's own test-unit, test-component and test-integration jobs are its suite
+@langwatch/platform-api  # this workflow runs the three applications' suites in their own jobs
+@langwatch/worker
+@langwatch/ui
 langwatch  # sdk-javascript-ci.yml runs the TypeScript SDK's suite
 @langwatch/mcp-server  # mcp-javascript-ci.yml runs it
 @langwatch/agent-plugin  # agent-plugin-ci.yml runs it

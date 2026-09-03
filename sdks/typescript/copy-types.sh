@@ -11,27 +11,15 @@ set -euo pipefail
 # there is no schema-generation (ts-to-zod) step anymore.
 cp ../../packages/features/trace/contract/src/trace-format.schemas.ts src/internal/generated/types/tracer.ts
 
-# Copy filter types (only filterFieldsEnum is needed by the SDK)
-mkdir -p src/internal/generated/filters
-node -e "
-const fs = require('fs');
-const src = fs.readFileSync('../../platform/app/src/server/filters/types.ts', 'utf8');
-// Extract only the zod import and filterFieldsEnum definition
-const lines = src.split('\n');
-const out = [];
-let inEnum = false;
-for (const line of lines) {
-  if (line.match(/^import.*from ['\"]zod['\"]/)) { out.push(line); continue; }
-  if (line.match(/export const filterFieldsEnum/)) { inEnum = true; }
-  if (inEnum) { out.push(line); }
-  if (inEnum && line.includes(']);')) { inEnum = false; }
-  if (line.match(/export type FilterField/)) { out.push(line); }
-}
-fs.writeFileSync('src/internal/generated/filters/types.ts', out.join('\n') + '\n');
-"
-
-# Evaluations types are already Zod-first (schemas defined with z.*); copy verbatim.
-cp ../../platform/app/src/server/evaluations/types.ts src/internal/generated/types/evaluations.ts
+# The filter-field enum and the evaluations schemas used to be generated here
+# from the monolith's server types. Both outputs —
+# `src/internal/generated/filters/types.ts` and
+# `src/internal/generated/types/evaluations.ts` — were imported by NOTHING in
+# this SDK, and both sources are gone. They are not repointed at their new
+# package homes (`@langwatch/analytics-contract`'s `analytics.filter-field.ts`
+# and `@langwatch/evaluator-web`'s `model/evaluations/types.ts`); a generator
+# whose output no consumer reads is a build step that can only break. Restore
+# from those two files if the CLI ever needs them.
 
 # Evaluator catalog + settings schemas are Zod-first (generated from langevals);
 # copy verbatim — no ts-to-zod step.

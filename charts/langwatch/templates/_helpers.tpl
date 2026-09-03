@@ -1526,12 +1526,14 @@ here, once, by name, so both consuming templates agree.
 {{/* Renders terminationGracePeriodSeconds for a Node component, refusing the
      render when it cannot cover that component's shutdown drain.
 
-     The Node processes run four nested shutdown clocks — the GroupQueue
-     drain, App.close's backstop, the entrypoint watchdog, and this one. They
-     are derived from a single number in
-     platform/app/src/server/shutdown/budget.ts:
+     The Node processes run four nested shutdown clocks — the drain
+     (SHUTDOWN_DRAIN_TIMEOUT_MS on the worker, API_HTTP_DRAIN_GRACE_MS on the
+     API), the close backstop, the entrypoint watchdog, and this one. They are
+     derived from a single number; the two processes state the derivation in
+     apps/worker/src/platform/config/worker.config.ts and
+     apps/api/src/platform/config/api.config.ts:
 
-       processDeadlineMs = drain + 5s (App.close) + 15s (process teardown)
+       processDeadlineMs = drain + 5s (close) + 15s (process teardown)
        required grace    = processDeadlineMs + 10s of kubelet slack
 
      So a drain of D seconds needs a grace period of at least D + 30. The
@@ -1584,17 +1586,26 @@ here, once, by name, so both consuming templates agree.
 
 {{- define "langwatch.shutdownEnv" -}}
 {{- $drain := include "langwatch.positiveSeconds" (dict "name" (printf "%s.shutdownDrainSeconds" .name) "value" .component.shutdownDrainSeconds "fallback" 25) -}}
+{{/* The two processes read the drain budget under DIFFERENT names, because
+     they drain different things: apps/worker's SHUTDOWN_DRAIN_TIMEOUT_MS is the
+     GroupQueue drain, and apps/api's API_HTTP_DRAIN_GRACE_MS is how long live
+     HTTP requests get after the listener stops accepting. Emitting one name for
+     both would leave whichever process does not read it on its code default —
+     5 seconds for the API — while its pod was sized for twenty-five, so a
+     rollout would cut requests short and the grace period would still look
+     right. */}}
+{{- $var := ternary "API_HTTP_DRAIN_GRACE_MS" "SHUTDOWN_DRAIN_TIMEOUT_MS" (eq .name "app") -}}
 {{/* extraEnvs renders after this block, and the kubelet takes the LAST
-     duplicate — so setting SHUTDOWN_DRAIN_TIMEOUT_MS there silently wins over
-     the value the pod was sized for, which is the exact drift the pair exists
-     to prevent, and invisible because the grace period still looks right. Set
+     duplicate — so setting the variable there silently wins over the value the
+     pod was sized for, which is the exact drift the pair exists to prevent, and
+     invisible because the grace period still looks right. Set
      shutdownDrainSeconds instead; it moves both. */}}
 {{- range (default (list) .component.extraEnvs) -}}
-{{- if eq .name "SHUTDOWN_DRAIN_TIMEOUT_MS" -}}
-{{- fail (printf "SHUTDOWN_DRAIN_TIMEOUT_MS must not be set through extraEnvs — it would override the drain budget the pod's terminationGracePeriodSeconds was sized for, and the kubelet would SIGKILL a drain the process still thinks it has time for. Set shutdownDrainSeconds instead, which moves both.") -}}
+{{- if or (eq .name "SHUTDOWN_DRAIN_TIMEOUT_MS") (eq .name "API_HTTP_DRAIN_GRACE_MS") -}}
+{{- fail (printf "%s must not be set through extraEnvs — it would override the drain budget the pod's terminationGracePeriodSeconds was sized for, and the kubelet would SIGKILL a drain the process still thinks it has time for. Set shutdownDrainSeconds instead, which moves both." .name) -}}
 {{- end -}}
 {{- end -}}
-- name: SHUTDOWN_DRAIN_TIMEOUT_MS
+- name: {{ $var }}
   value: {{ mul (int $drain) 1000 | quote }}
 {{- end -}}
 

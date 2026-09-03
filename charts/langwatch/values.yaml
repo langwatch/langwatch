@@ -180,9 +180,11 @@ app:
   replicaCount: 1
 
   # Shutdown budget — same shape and the same rule as workers.* below. The app
-  # shares the workers' entrypoint watchdog and can host the worker stack
-  # itself (the `all` process role), so it is sized the same way. A web-only
-  # pod drains in well under this; the grace period is a ceiling, not a wait.
+  # runs its own process now (apps/api; the workers are apps/worker in their own
+  # Deployment) and is sized the same way, because the clock has the same shape:
+  # the value below becomes API_HTTP_DRAIN_GRACE_MS, and the process deadline
+  # sits above it. The API drains in well under this; the grace period is a
+  # ceiling, not a wait.
   ## @param app.shutdownDrainSeconds [default: 25] Seconds the queue may spend draining in-flight jobs on shutdown.
   shutdownDrainSeconds: 25
   ## @param app.terminationGracePeriodSeconds [default: 55] Seconds before SIGKILL. Must be at least shutdownDrainSeconds + 30.
@@ -261,7 +263,8 @@ app:
   # commit-prefixed CDN base — e.g. "https://cdn.langwatch.ai/git-<short-sha>/" — so
   # a rolling deploy never strands a browser on a 404: every past build's assets
   # remain under their own immutable prefix. The deploy pipeline both uploads
-  # dist/client/assets to that prefix and sets this value for the same SHA. See
+  # apps/ui's dist/client/assets to that prefix and sets this value for the same
+  # SHA. See
   # ADR-086. Rendered into the LANGWATCH_ASSET_BASE env var when non-empty.
   ## @param app.assetBase [string, default: ""] CDN base URL for content-hashed assets; empty = serve same-origin from the pod.
   assetBase: ""
@@ -609,7 +612,7 @@ app:
     # it exists for installs that LangWatch issues licenses to from a separate
     # signing chain. Replacing this key does not grant an Enterprise License,
     # and a key that verifies only against a replaced value is not one; see
-    # platform/app/ee/LICENSE.md.
+    # packages/enterprise/LICENSE.md.
     publicKey:
       value: ""
       secretKeyRef: { name: "", key: "" }

@@ -365,7 +365,7 @@
         },
         {
           "type": "json",
-          "path": "platform/app/package.json",
+          "path": "apps/api/package.json",
           "jsonpath": "$.version"
         },
         {

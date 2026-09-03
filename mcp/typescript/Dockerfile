@@ -17,7 +17,6 @@ COPY mcp/typescript/package.json ./mcp/typescript/
 COPY packages/handled-error ./packages/handled-error
 # Manifests only. `--frozen-lockfile` checks the lockfile against every
 # workspace member it can see, so each member needs at least its package.json.
-COPY platform/app/package.json ./platform/app/
 COPY packages/redaction/package.json ./packages/redaction/
 COPY packages/ssrf/package.json ./packages/ssrf/
 COPY packages/api/package.json ./packages/api/
@@ -28,7 +27,6 @@ COPY packages/features/automation/server/package.json ./packages/features/automa
 COPY packages/system-migrations/package.json ./packages/system-migrations/
 COPY packages/observability/package.json ./packages/observability/
 COPY packages/react-rum/package.json ./packages/react-rum/
-COPY packages/langy/package.json ./packages/langy/
 COPY apps/server/package.json ./apps/server/
 COPY sdks/typescript/package.json ./sdks/typescript/
 COPY skills/package.json ./skills/

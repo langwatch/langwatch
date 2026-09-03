@@ -34,8 +34,9 @@ set -euo pipefail
 cd "$(dirname "$0")/.."
 
 # The default drain budget (workers.shutdownDrainSeconds) and the fixed margin
-# above it: 5s for App.close, 15s for process teardown, 10s of kubelet slack.
-# Mirrors platform/app/src/server/shutdown/budget.ts.
+# above it: 5s for the close backstop, 15s for process teardown, 10s of kubelet
+# slack. Mirrors apps/worker/src/platform/config/worker.config.ts and
+# apps/api/src/platform/config/api.config.ts, which derive the same numbers.
 readonly DRAIN_SECONDS=25
 readonly REQUIRED_MARGIN_SECONDS=30
 
@@ -121,11 +122,22 @@ test_app_grace_period_covers_the_drain() {
   expect_covers_drain "app grace period" "app"
 }
 
+# The two processes read the drain budget under different names: the worker
+# drains its queue (SHUTDOWN_DRAIN_TIMEOUT_MS), the API drains live HTTP
+# requests (API_HTTP_DRAIN_GRACE_MS). Asserting one name against both pods would
+# pass on whichever pod happened to carry it and prove nothing about the other.
 drain_env_of() {
-  printf '%s' "$1" | awk '
-    /name: SHUTDOWN_DRAIN_TIMEOUT_MS/ { want=1; next }
+  printf '%s' "$1" | awk -v var="$2" '
+    $0 ~ ("name: " var "$") { want=1; next }
     want && /value:/ { gsub(/"/,"",$2); print $2; want=0 }
   ' | head -n 1
+}
+
+drain_var_of() {
+  case "$1" in
+    app) echo "API_HTTP_DRAIN_GRACE_MS" ;;
+    *) echo "SHUTDOWN_DRAIN_TIMEOUT_MS" ;;
+  esac
 }
 
 # The pod is sized for a drain the process must be told about. A process
@@ -134,14 +146,15 @@ drain_env_of() {
 # for — so assert they came from the same value rather than merely both being
 # present.
 expect_drain_env_matches() {
-  local label="$1" component="$2" flags="$3" want="$4" block got
+  local label="$1" component="$2" flags="$3" want="$4" block got var
+  var=$(drain_var_of "$component")
   block=$(render_component "$component" "$BASE $flags")
-  got=$(drain_env_of "$block")
+  got=$(drain_env_of "$block" "$var")
   if [ "$got" != "$want" ]; then
-    fail "$label" "SHUTDOWN_DRAIN_TIMEOUT_MS is '${got:-<absent>}', expected $want"
+    fail "$label" "$var is '${got:-<absent>}', expected $want"
     return
   fi
-  echo "ok   [$label] SHUTDOWN_DRAIN_TIMEOUT_MS=$got"
+  echo "ok   [$label] $var=$got"
 }
 
 # @scenario "The process is told the same drain budget the pod is sized for"

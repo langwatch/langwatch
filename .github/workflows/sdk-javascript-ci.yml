@@ -78,21 +78,23 @@ jobs:
             # which only a live request can exercise.
             ingest:
               # The Hono route modules the SDK posts to, and the shared
-              # middleware under `_lib/` that the capped ones mount:
+              # middleware the capped ones mount:
               # /api/otel/v1/{traces,logs,metrics} and /api/collector.
-              - 'platform/app/src/server/routes/**'
+              - 'packages/features/trace/server/src/transport/api-rest/**'
+              - 'packages/api/src/rest/**'
               # Mounts those modules and fixes their order. A route that
               # resolves in the router but not on the wire is a mount bug,
               # and mount order has silently swallowed API surfaces before.
-              - 'platform/app/src/server/api-router.ts'
+              - 'apps/api/src/app-rest/**'
               # Reads the OTLP request body for those routes and decodes it,
               # including the byte ceiling they enforce on it.
-              - 'platform/app/src/server/otel/**'
+              - 'packages/otlp/**'
               # Wires the Node bridge into Hono and decides whether the
               # process keeps its own global Request/Response. Behaviour that
               # depends on that seam is invisible to every test that does not
               # go over a real socket.
-              - 'platform/app/src/start.ts'
+              - 'apps/api/src/api-http.listener.ts'
+              - 'apps/api/src/api.entrypoint.ts'
 
   ci:
     needs: changes
@@ -269,22 +271,24 @@ jobs:
       - name: Install dependencies
         run: >
           CI=true pnpm install --frozen-lockfile
-          --filter "@langwatch/web..."
+          --filter "@langwatch/platform-api..."
+          --filter "@langwatch/worker..."
+          --filter "@langwatch/ui..."
           --filter "langwatch..."
 
       - name: Build mcp-server
         run: pnpm --filter @langwatch/mcp-server run build
 
       - name: Prepare LangWatch files
-        working-directory: platform/app
+        working-directory: .
         run: pnpm start:prepare:files
 
       - name: Setup database
-        working-directory: platform/app
+        working-directory: .
         run: pnpm prisma:migrate
 
       - name: Seed test project
-        working-directory: platform/app
+        working-directory: .
         env:
           # Seed the credential the SDK test process receives without putting
           # LANGWATCH_API_KEY on the platform process itself.
@@ -301,26 +305,25 @@ jobs:
         working-directory: apps/api
         run: pnpm task:clickhouse-migrate
 
-      # Build the app so we can run a production server (dev mode is
-      # unreliable in CI — turbopack JIT compilation can hang under
-      # memory pressure, causing the server to become unresponsive).
-      - name: Build LangWatch app
-        working-directory: platform/app
-        run: NODE_ENV=test pnpm build
+      # Build the browser bundle so the API process serves a real SPA rather
+      # than 404ing every non-API route; the readiness probe below reads it.
+      - name: Build LangWatch browser bundle
+        working-directory: .
+        run: NODE_ENV=test pnpm --filter "@langwatch/ui..." run build
 
       - name: Start LangWatch server and worker
-        working-directory: platform/app
+        working-directory: .
         env:
           # The workflow-global LANGWATCH_API_KEY is for the SDK under test.
-          # Platform processes refuse to boot with it set (the self-referencing
-          # ingest guard in langwatchPlatformGuard.ts), so blank it here.
+          # Pointing a LangWatch process at its own ingest is a feedback loop,
+          # so blank it here.
           LANGWATCH_API_KEY: ""
         run: |
           # Capture both processes' output: background-process stdout is lost
           # once this step ends, which has already hidden one real regression
           # (a server-side 500 on the visibility poll shows up only as SDK
           # test timeouts). The failure step below tails these files.
-          NODE_ENV=production pnpm run start > /tmp/langwatch-server.log 2>&1 &
+          NODE_ENV=production pnpm --filter @langwatch/platform-api start > /tmp/langwatch-server.log 2>&1 &
           # Start the worker process so the event-sourcing pipeline
           # consumes traces from Redis and writes them to ClickHouse
           pnpm --filter @langwatch/worker start > /tmp/langwatch-workers.log 2>&1 &

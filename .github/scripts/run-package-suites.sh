@@ -3,7 +3,7 @@
 #
 # WHY THIS EXISTS
 #
-# The package suites under packages/ are unreachable from platform/app's vitest
+# The package suites under packages/ are unreachable from the applications' vitest
 # root, so a suite there does not merely go unsharded — it runs nowhere at all.
 # For a long time the answer was a hand-written step per package in
 # langwatch-app-ci.yml. That list reached seventeen packages while the workspace
@@ -11,7 +11,7 @@
 # invisible by DEFAULT rather than by decision. The core-application feature
 # extraction (dev/docs/plans/core-application-feature-extraction-plan.md, F-CI-02)
 # turns that from a slow leak into an active one: every wave moves behaviour out
-# of platform/app, which CI runs, into packages/features/*, which it did not.
+# of the monolith, which CI ran, into packages/features/*, which it did not.
 #
 # So this script DISCOVERS the packages instead of being told about them. It
 # asks pnpm for the workspace membership, which is the same list the installer

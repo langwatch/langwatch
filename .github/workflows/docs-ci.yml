@@ -54,7 +54,7 @@ jobs:
               # The docs site ships a copy of the canonical OpenAPI document and
               # generates its api-reference pages from it, so a spec change has
               # to re-run this job or the copy silently falls behind.
-              - 'platform/app/src/app/api/openapiLangWatch.json'
+              - 'apps/api/src/features/discovery/openapi-document.json'
               # The structure checker and the rules it applies.
               - 'pkg/docsscan/**'
               - 'tools/docscheck/**'
@@ -208,7 +208,7 @@ jobs:
       - name: Install dependencies
         run: >
           pnpm install --frozen-lockfile
-          --filter "@langwatch/web..."
+          --filter "@langwatch/platform-api..."
           --filter "@langwatch/skills..."
 
       - name: Regenerate docs/skills pages

@@ -2,7 +2,7 @@ import { execFileSync } from "node:child_process";
 import { existsSync, readFileSync } from "node:fs";
 import { join } from "node:path";
 import { describe, expect, it } from "vitest";
-import { APP_PACKAGE_NAME, workspaceInstallArgs } from "../src/services/node-deps";
+import { APP_PACKAGE_NAMES, workspaceInstallArgs } from "../src/services/node-deps";
 
 /**
  * The invariants ADR-076 established, asserted against the repo itself.
@@ -133,7 +133,7 @@ describe("the repo is a single pnpm workspace", () => {
       const members = workspaceMembers();
 
       for (const project of [
-        "platform/app",
+        "apps/*",
         "sdks/typescript",
         "mcp/typescript",
         "skills",
@@ -151,30 +151,43 @@ describe("the repo is a single pnpm workspace", () => {
 
   describe("when the package names are compared", () => {
     /** @scenario The application and the SDK no longer share a package name */
-    it("gives the app the name the npx installer filters by, and the SDK its own", () => {
-      const app = readJson("platform/app/package.json").name;
+    it("gives each deployable the name the npx installer filters by, and the SDK its own", () => {
+      const deployables = ["apps/api", "apps/worker", "apps/ui"].map(
+        (dir) => readJson(`${dir}/package.json`).name,
+      );
       const sdk = readJson("sdks/typescript/package.json").name;
 
-      // Cross-checked against the constant the end-user install filters
-      // by, not against a literal: pnpm exits 0 on a filter that matches
+      // Cross-checked against the constants the end-user install filters
+      // by, not against literals: pnpm exits 0 on a filter that matches
       // nothing, so a rename that misses node-deps.ts turns every npx
       // first boot into a silent no-op that fails minutes later inside a
       // migration. This is the only assertion tying the two together.
-      expect(app).toBe(APP_PACKAGE_NAME);
+      expect(deployables).toEqual([...APP_PACKAGE_NAMES]);
       expect(sdk).toBe("langwatch");
-      expect(app).not.toBe(sdk);
+      expect(deployables).not.toContain(sdk);
     });
 
     /** @scenario The application links the SDK working copy */
     it("links the SDK working copy rather than a published release", () => {
-      const app = readJson("platform/app/package.json") as {
-        dependencies?: Record<string, string>;
-      };
+      // The deployables reach the SDK through the feature packages rather than
+      // declaring it themselves, so the invariant is asserted where the
+      // specifier lives: every `langwatch` dependency in the workspace names
+      // the working copy. So an SDK edit reaches the applications — and the
+      // production image built from them — without a publish.
+      // `linkWorkspacePackages` stays false, so this only happens for the
+      // specifiers that ask for it.
+      const specifiers = execFileSync(
+        "git",
+        ["grep", "-h", "--", '"langwatch": "', "--", "packages", "apps"],
+        { cwd: repoRoot, encoding: "utf8" },
+      )
+        .split("\n")
+        .filter((line) => line.trim().startsWith('"langwatch":'));
 
-      // So an SDK edit reaches the app — and the production image built
-      // from it — without a publish. `linkWorkspacePackages` stays false,
-      // so this only happens for the specifier that asks for it.
-      expect(app.dependencies?.langwatch).toMatch(/^workspace:/);
+      expect(specifiers.length).toBeGreaterThan(0);
+      for (const line of specifiers) {
+        expect(line).toMatch(/"langwatch":\s*"workspace:/);
+      }
     });
 
     /** @scenario The SDK carries its own copy of a pinned dependency */
@@ -392,7 +405,9 @@ describe("the repo is a single pnpm workspace", () => {
       for (const prod of [true, false]) {
         const args = workspaceInstallArgs("/some/root", { prod });
         expect(args).toContain("--frozen-lockfile");
-        expect(args).toContain(`${APP_PACKAGE_NAME}...`);
+        for (const name of APP_PACKAGE_NAMES) {
+          expect(args).toContain(`${name}...`);
+        }
         expect(args).toContain(prod ? "--prod" : "--prod=false");
       }
     });

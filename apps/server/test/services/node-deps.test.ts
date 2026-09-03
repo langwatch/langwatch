@@ -89,14 +89,14 @@ describe("workspace link integrity", () => {
 describe("external member peer links", () => {
   async function makeAppTree(): Promise<string> {
     const appRoot = await mkdtemp(join(tmpdir(), "langwatch-peers-"));
-    // The app sits at platform/app in the shipped tree, not at the repo
+    // The apps sit under apps/ in the shipped tree, not at the repo
     // root: a fixture carrying the pre-restructure layout is what let the
     // packed artifact look for node_modules where nothing ships.
-    mkdirSync(join(appRoot, "platform", "app", "node_modules", "zod"), {
+    mkdirSync(join(appRoot, "apps", "api", "node_modules", "zod"), {
       recursive: true,
     });
     writeFileSync(
-      join(appRoot, "platform", "app", "node_modules", "zod", "package.json"),
+      join(appRoot, "apps", "api", "node_modules", "zod", "package.json"),
       "{}",
     );
     mkdirSync(join(appRoot, "packages", "langy-contract"), {
