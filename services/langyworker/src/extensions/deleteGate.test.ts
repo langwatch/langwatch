@@ -1,12 +1,13 @@
 import { describe, expect, it } from "vitest";
-import { evaluateToolCall, type BranchEntryLike } from "./deleteGate.js";
+import { evaluateToolCall } from "./deleteGate.js";
 import {
-  findDestructiveIntent,
+  CODE_INTERPRETERS,
   findDestructiveMatches,
 } from "./deleteGateMatcher.js";
 import {
   isUserConfirmation,
   resolveConfirmedTargets,
+  type BranchEntryLike,
 } from "./deleteGateConfirmation.js";
 
 const user = (text: string): BranchEntryLike => ({
@@ -116,7 +117,7 @@ describe("Confirmation authenticity (the #7562 self-authored bypass)", () => {
 describe("Confirmation binding", () => {
   /** @scenario A bound confirmation authorizes the single delete it followed */
   it("allows the single delete the confirmation followed", () => {
-    expect(resolveConfirmedTargets(confirmedForD1).has("dashboard d1")).toBe(true);
+    expect(resolveConfirmedTargets(confirmedForD1).has("delete dashboard d1")).toBe(true);
     expect(bash("langwatch dashboard delete d1", confirmedForD1).allow).toBe(true);
   });
 
@@ -126,6 +127,14 @@ describe("Confirmation binding", () => {
     expect(bash("langwatch dashboard delete d2", confirmedForD1).allow).toBe(false);
     // Same identifier, different resource type.
     expect(bash("langwatch dataset delete d1", confirmedForD1).allow).toBe(false);
+  });
+
+  /** @scenario A confirmed delete does not authorize a different destructive verb on the same target */
+  it("blocks a different destructive verb on the confirmed resource and identifier", () => {
+    // The confirmation named "delete dashboard d1"; archiving the SAME d1 is a
+    // different destructive verb and is not authorized by that "yes".
+    expect(bash("langwatch dashboard archive d1", confirmedForD1).allow).toBe(false);
+    expect(resolveConfirmedTargets(confirmedForD1).has("archive dashboard d1")).toBe(false);
   });
 
   /** @scenario A confirmation is consumed on its first authorized delete */
@@ -219,6 +228,58 @@ describe("Unresolvable commands held unconditionally", () => {
   });
 });
 
+describe("Interpreter-executed code is held unconditionally", () => {
+  /** @scenario An interpreter running code that builds a destructive command at runtime is held */
+  it("holds the concat-bypass payload and a no-semicolon variant, even with a valid confirmation", () => {
+    // The exact adversarial payload: os.system on a runtime-concatenated
+    // "langwatch" string, which defeats every substring check. No semicolon.
+    const concatPayload =
+      "python3 -c \"__import__('os').system(('lang'+'watch dataset delete d1'))\"";
+    expect(bash(concatPayload).allow).toBe(false);
+    expect(bash(concatPayload, confirmedForD1).allow).toBe(false);
+    // A semicolon variant, likewise held.
+    const semicolonPayload =
+      "python3 -c \"import os; os.system('langwatch dataset delete d1')\"";
+    expect(bash(semicolonPayload).allow).toBe(false);
+    // Classified as exec-file (the fail-closed bucket), not waved through.
+    expect(findDestructiveMatches(concatPayload)).toContainEqual(
+      expect.objectContaining({ kind: "exec-file" }),
+    );
+  });
+
+  /** @scenario Every enumerated code interpreter is held whether it runs inline code, a script file, or bare stdin */
+  it("holds every interpreter in CODE_INTERPRETERS across inline, script, and bare forms", () => {
+    for (const interpreter of CODE_INTERPRETERS) {
+      // Inline code, a script file, and a bare (stdin-reading) invocation must
+      // all be held — a new interpreter missing from the set is the only way to
+      // pass, which this table makes a conscious choice.
+      expect(bash(`${interpreter} -c "langwatch dataset delete d1"`).allow).toBe(false);
+      expect(bash(`${interpreter} cleanup.script`, confirmedForD1).allow).toBe(false);
+      expect(bash(`echo hi | ${interpreter}`).allow).toBe(false);
+    }
+  });
+
+  /** @scenario An interpreter behind a runner or env preamble is still held */
+  it("holds an interpreter reached through a runner wrapper or env preamble", () => {
+    expect(bash('sudo python3 -c "print(1)"').allow).toBe(false);
+    expect(bash('env FOO=bar node -e "1"').allow).toBe(false);
+    expect(bash("LANGWATCH_API_KEY=x ruby evil.rb").allow).toBe(false);
+  });
+
+  /** @scenario A write or edit whose content embeds an interpreter invocation is held */
+  it("holds a write whose content runs a destructive command through an interpreter", () => {
+    const write = evaluateToolCall({
+      toolName: "write",
+      input: {
+        path: "cleanup.sh",
+        content: "python3 -c \"__import__('os').system('langwatch dataset delete d1')\"\n",
+      },
+      entries: confirmedForD1,
+    });
+    expect(write.allow).toBe(false);
+  });
+});
+
 describe("Destructive HTTP beyond the literal DELETE verb", () => {
   /** @scenario A POST GraphQL delete or archive mutation to a langwatch host is held */
   it("holds a POST GraphQL delete/archive mutation to a langwatch host", () => {
@@ -250,6 +311,16 @@ describe("Destructive HTTP beyond the literal DELETE verb", () => {
     expect(bash("curl -X POST https://app.langwatch.ai/api/dashboard/d1/purge").allow).toBe(
       false,
     );
+    // Real routes whose path segment is not a plain delete verb, derived from
+    // the same source as the CLI verbs: roll-secret (a DESTRUCTIVE_VERB) and the
+    // route-only regenerate-api-key.
+    expect(
+      bash("curl -X POST https://app.langwatch.ai/api/webhooks/v1/endpoints/wh_1/roll-secret")
+        .allow,
+    ).toBe(false);
+    expect(
+      bash("curl -X POST https://app.langwatch.ai/api/projects/p1/regenerate-api-key").allow,
+    ).toBe(false);
   });
 
   /** @scenario A GET request to a langwatch host is not blocked */
@@ -293,10 +364,14 @@ describe("Verb matcher completeness across flag forms and case", () => {
 // cannot drift silently.
 describe("matcher regressions", () => {
   it("matches a plain CLI delete", () => {
-    expect(findDestructiveIntent("langwatch dashboard delete dash_123")).toMatchObject({
-      kind: "cli-verb",
-      verb: "delete",
-    });
+    const matches = findDestructiveMatches("langwatch dashboard delete dash_123");
+    expect(matches).toContainEqual(
+      expect.objectContaining({
+        kind: "cli-verb",
+        verb: "delete",
+        target: { verb: "delete", resourceType: "dashboard", identifier: "dash_123" },
+      }),
+    );
   });
 
   it("blocks package-runner, env-prefix, and quoted-verb evasions", () => {

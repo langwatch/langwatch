@@ -165,5 +165,21 @@ export async function createLangySession({
     tools: [...ENABLED_TOOLS],
   });
 
+  // Serialize tool execution so the delete gate cannot be raced. The default is
+  // "parallel", which prepares EVERY tool call in an assistant turn (running
+  // each `tool_call` gate check) before any result lands — so two destructive
+  // calls in one turn both see the same unconsumed confirmation
+  // (pi-agent-core agent-loop.js:332-370, `executeToolCallsParallel`). The
+  // "sequential" path interleaves prepare→execute→persist per call: it runs
+  // `prepareToolCall` (the gate), executes, then `emitToolResultMessage` —
+  // which persists the tool result to the session via
+  // `sessionManager.appendMessage` on `message_end`
+  // (pi-coding-agent core/agent-session.js:376-378) — all BEFORE the next
+  // call's prepare (agent-loop.js:295-331, `executeToolCallsSequential`). So
+  // the first delete's tool result is in `getBranch()` when the second call's
+  // gate runs, and branch history marks the confirmation consumed. The gate's
+  // own in-flight signature guard (`deleteGate.ts`) is the second layer.
+  session.agent.toolExecution = "sequential";
+
   return { session, resumed };
 }

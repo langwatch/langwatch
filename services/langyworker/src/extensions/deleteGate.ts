@@ -34,13 +34,22 @@ import {
   targetKey,
 } from "./deleteGateMatcher.js";
 import {
+  confirmationSignature,
   resolveConfirmedTargets,
   type BranchEntryLike,
 } from "./deleteGateConfirmation.js";
 
-export type { BranchEntryLike } from "./deleteGateConfirmation.js";
-
-export type GateDecision = { allow: true } | { allow: false; reason: string };
+/**
+ * `allow: true` may carry a `confirmationSignature` when the release was
+ * authorized by a user confirmation. The extension uses it as a transient,
+ * in-flight single-use guard: two destructive calls in one parallel prepare
+ * wave (before either tool result lands) resolve the SAME unconsumed
+ * confirmation, so both would otherwise be released. Branch history remains the
+ * source of truth for single-use across turns; this only dedups within a wave.
+ */
+export type GateDecision =
+  | { allow: true; confirmationSignature?: string }
+  | { allow: false; reason: string };
 
 /** Tool inputs whose written content is scanned for a destructive command. */
 const WRITE_TOOL_NAMES = new Set(["write", "edit"]);
@@ -105,8 +114,13 @@ export function evaluateToolCall({
   // never sees, so no confirmation can release it.
   if (WRITE_TOOL_NAMES.has(toolName)) {
     const written = extractWrittenText(record);
+    // `exec-file` covers an interpreter invocation embedded in the content
+    // (`python3 -c "...langwatch delete..."`), whose destructive intent is
+    // lexically unresolvable — so written content carrying one is held just as
+    // a plain `cli-verb`/`http` command would be.
     const embedded = findDestructiveMatches(written).some(
-      (match) => match.kind === "cli-verb" || match.kind === "http",
+      (match) =>
+        match.kind === "cli-verb" || match.kind === "http" || match.kind === "exec-file",
     );
     return embedded ? { allow: false, reason: WRITE_THEN_EXEC_REASON } : { allow: true };
   }
@@ -141,7 +155,9 @@ export function evaluateToolCall({
       return { allow: false, reason: BLOCK_REASON };
     }
   }
-  return { allow: true };
+  // Confirmation-backed release: tag it with the confirmation's signature so the
+  // extension can enforce single-use within one parallel prepare wave.
+  return { allow: true, confirmationSignature: confirmationSignature(entries) };
 }
 
 /**
@@ -154,6 +170,19 @@ export function createDeleteGateExtension(): InlineExtension {
   return {
     name: "langy-delete-gate",
     factory: (pi: ExtensionAPI) => {
+      // Transient in-flight guard against the parallel-dispatch race: pi's
+      // `executeToolCallsParallel` (pi-agent-core agent-loop.js:332-370) runs
+      // every `beforeToolCall`/tool_call preparation before any tool result
+      // lands, so two destructive calls in one assistant turn both see the same
+      // unconsumed confirmation. `session.ts` also pins `toolExecution:
+      // "sequential"` (belt), which interleaves prepare→execute→persist so a
+      // tool result lands first; this Set is the braces. It records each
+      // confirmation the gate has already released within the process. Once a
+      // tool result lands, branch history marks the confirmation consumed and a
+      // fresh confirmation yields a different signature, so the Set never
+      // false-blocks a legitimately new confirmation. Branch history stays the
+      // source of truth for single-use across turns.
+      const releasedConfirmationSignatures = new Set<string>();
       pi.on("tool_call", async (event, ctx): Promise<ToolCallEventResult> => {
         let entries: BranchEntryLike[] = [];
         try {
@@ -167,8 +196,16 @@ export function createDeleteGateExtension(): InlineExtension {
           input: event.input,
           entries,
         });
-        if (decision.allow) return {};
-        return { block: true, reason: decision.reason };
+        if (!decision.allow) return { block: true, reason: decision.reason };
+        if (decision.confirmationSignature !== undefined) {
+          if (releasedConfirmationSignatures.has(decision.confirmationSignature)) {
+            // A second destructive call authorized by the SAME still-unconsumed
+            // confirmation in one prepare wave: single-use forbids it.
+            return { block: true, reason: BLOCK_REASON };
+          }
+          releasedConfirmationSignatures.add(decision.confirmationSignature);
+        }
+        return {};
       });
     },
   };

@@ -59,7 +59,7 @@ Feature: Langy's worker-side delete gate
       When a gated bash command deletes a LangWatch resource
       Then the gate returns allow:false
 
-  Rule: A confirmation authorizes exactly the (resource-type, identifier) it followed
+  Rule: A confirmation authorizes exactly the (verb, resource-type, identifier) it followed
 
     @unit
     Scenario: A bound confirmation authorizes the single delete it followed
@@ -82,6 +82,14 @@ Feature: Langy's worker-side delete gate
       Examples: Same identifier, different resource type
         | mismatched-target  |
         | dataset "d1"       |
+
+    @unit
+    Scenario: A confirmed delete does not authorize a different destructive verb on the same target
+      Given the assistant's prior turn named deleting dashboard "d1"
+      And the user's immediately following turn is an affirmative
+      When a gated bash command archives dashboard "d1"
+      Then the gate returns allow:false
+      # The confirmation binds the verb: a "yes" to delete authorizes only delete.
 
     @unit
     Scenario: A confirmation is consumed on its first authorized delete
@@ -155,6 +163,31 @@ Feature: Langy's worker-side delete gate
         | source f.sh   |
         | . f.sh        |
         | ./f.sh        |
+
+    @unit
+    Scenario: An interpreter running code that builds a destructive command at runtime is held
+      Given a bound, valid confirmation is present for the same target
+      When a gated bash command runs a code interpreter with inline code that concatenates a destructive langwatch command at runtime
+      Then the gate returns allow:false
+      # Interpreter-executed code is lexically unresolvable — held like write-then-exec.
+
+    @unit
+    Scenario: Every enumerated code interpreter is held whether it runs inline code, a script file, or bare stdin
+      Given the CODE_INTERPRETERS set
+      When each interpreter heads a gated bash command as inline code, a script file, or a bare stdin-reading invocation
+      Then the gate returns allow:false for every one
+      # A new interpreter missing from the set is the only way to pass — a conscious omission the canary surfaces.
+
+    @unit
+    Scenario: An interpreter behind a runner or env preamble is still held
+      When a gated bash command runs a code interpreter behind a runner wrapper or an env-assignment preamble
+      Then the gate returns allow:false
+
+    @unit
+    Scenario: A write or edit whose content embeds an interpreter invocation is held
+      Given a bound, valid confirmation is present for the same target
+      When a "write" or "edit" tool call's content runs a destructive langwatch command through a code interpreter
+      Then the gate returns allow:false
 
   Rule: The HTTP matcher catches destructive intent beyond the literal DELETE verb, without over-blocking reads
 
@@ -236,6 +269,14 @@ Feature: Langy's worker-side delete gate
       And a gated delete is then driven through the real "tool_call" event
       Then the event result blocks the call and the tool does not execute
       And reading the injected turn back from getBranch() shows role is not "user"
+
+    @integration
+    Scenario: A parallel-dispatch race cannot reuse one confirmation for two deletes
+      Given the delete gate is registered on a real pi AgentSession
+      And a bound confirmation for the target is on record
+      When two destructive tool_call events are driven back-to-back with no tool result between them
+      Then the first is allowed and the second is blocked
+      # Single-use holds even when both calls prepare before either result lands.
 
     @integration
     Scenario: A correctly confirmed delete executes exactly once at the real seam

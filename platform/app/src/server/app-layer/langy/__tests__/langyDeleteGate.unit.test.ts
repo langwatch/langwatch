@@ -12,7 +12,7 @@ const ids = {
 };
 
 describe("resolveLangyDeleteGate", () => {
-  describe("given the flag is not explicitly configured", () => {
+  describe("when the flag is not explicitly configured", () => {
     /** @scenario The flag resolves ON by default and falls back safely on a flag-store error */
     it("resolves ON by default and falls back to ON on a flag-store error", async () => {
       // Default ON is a property of the registry entry, mirroring
@@ -42,7 +42,7 @@ describe("resolveLangyDeleteGate", () => {
     });
   });
 
-  describe("given the flag is turned off for the project", () => {
+  describe("when the flag is turned off for the project", () => {
     it("resolves OFF", async () => {
       const isEnabled = vi.fn().mockResolvedValue(false);
       await expect(

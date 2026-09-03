@@ -98,19 +98,24 @@ const TYPE_ALT = [...RESOURCE_TYPES].join("|");
  * keeps confirm-A-delete-B falsifiable on both axes.
  */
 const ASK_TARGET = new RegExp(
-  // The identifier must END alphanumeric, so a trailing sentence period
-  // ("delete dashboard d1.") is not absorbed into the id — otherwise the ask's
-  // "d1." would never match the command's "d1".
-  `\\b(?:${VERB_ALT})\\b[^.?!\\n]{0,40}?\\b(${TYPE_ALT})\\b\\s+["']?([A-Za-z0-9](?:[\\w.-]*[A-Za-z0-9])?)["']?`,
+  // The verb is captured (group 1) so the confirmation binds to it: a "yes" to
+  // "archive dataset d1" must not authorize a "delete dataset d1". The
+  // identifier must END alphanumeric, so a trailing sentence period ("delete
+  // dashboard d1.") is not absorbed into the id — otherwise the ask's "d1."
+  // would never match the command's "d1".
+  `\\b(${VERB_ALT})\\b[^.?!\\n]{0,40}?\\b(${TYPE_ALT})\\b\\s+["']?([A-Za-z0-9](?:[\\w.-]*[A-Za-z0-9])?)["']?`,
   "gi",
 );
 
 export function parseAskTargets(text: string): GateTarget[] {
   const targets: GateTarget[] = [];
   for (const match of text.matchAll(ASK_TARGET)) {
-    const resourceType = (match[1] ?? "").toLowerCase();
-    const identifier = match[2] ?? "";
-    if (resourceType && identifier) targets.push({ resourceType, identifier });
+    const verb = (match[1] ?? "").toLowerCase();
+    const resourceType = (match[2] ?? "").toLowerCase();
+    const identifier = match[3] ?? "";
+    if (verb && resourceType && identifier) {
+      targets.push({ verb, resourceType, identifier });
+    }
   }
   return targets;
 }
@@ -180,4 +185,20 @@ export function resolveConfirmedTargets(entries: readonly BranchEntryLike[]): Se
     confirmed.add(targetKey(target));
   }
   return confirmed;
+}
+
+/**
+ * A stable fingerprint of the CURRENT unconsumed confirmation, for the
+ * extension's in-flight single-use guard. It combines the branch length with
+ * the confirmed target set: two prepare-wave calls that see the same branch
+ * (no tool result between them) produce the SAME signature — so the second is
+ * blocked — while any appended entry (a tool result, a fresh confirmation)
+ * lengthens the append-only branch and yields a different signature. Empty
+ * string when nothing is confirmed (never used to gate a non-confirmed allow).
+ */
+export function confirmationSignature(entries: readonly BranchEntryLike[]): string {
+  const confirmed = resolveConfirmedTargets(entries);
+  if (confirmed.size === 0) return "";
+  const length = Array.isArray(entries) ? entries.length : 0;
+  return `${length}|${[...confirmed].sort().join(",")}`;
 }

@@ -143,6 +143,25 @@ describe("delete gate at the real pi tool_call seam", () => {
     expect(last.message?.role).not.toBe("user");
   });
 
+  /** @scenario A parallel-dispatch race cannot reuse one confirmation for two deletes */
+  it("blocks a second destructive call racing the same confirmation before any tool result lands", async () => {
+    const session = await bootSession();
+    session.sessionManager.appendMessage(userMessage("clean up the old dashboards"));
+    session.sessionManager.appendMessage(
+      assistantMessage("I can delete dashboard d1. Confirm?"),
+    );
+    session.sessionManager.appendMessage(userMessage("yes, go ahead"));
+
+    // Two destructive tool_call events back-to-back with NO intervening tool
+    // result — the parallel-dispatch race. The first is authorized; the second,
+    // resolving the same still-unconsumed confirmation, is blocked by the gate's
+    // in-flight single-use guard.
+    const first = await driveToolCall(session, "bash", deleteD1);
+    expect(first?.block).toBeFalsy();
+    const second = await driveToolCall(session, "bash", deleteD1);
+    expect(second?.block).toBe(true);
+  });
+
   /** @scenario A correctly confirmed delete executes exactly once at the real seam */
   it("allows a correctly confirmed delete", async () => {
     const session = await bootSession();

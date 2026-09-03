@@ -12,6 +12,12 @@
 
 /** A single destructive operation, identified for confirmation binding. */
 export type GateTarget = {
+  /**
+   * The destructive verb, e.g. `delete`, `archive`. Bound into the confirmation
+   * key so a "yes" to `delete dataset d1` authorizes ONLY that verb — not
+   * `purge`/`archive` of the same resource.
+   */
+  verb: string;
   /** The LangWatch resource kind, e.g. `dashboard`, `dataset`. */
   resourceType: string;
   /** The resource identifier the command names, e.g. `d1`. */
@@ -187,8 +193,14 @@ export const RESOURCE_TYPES = new Set([
 /** Binaries that front the CLI without being it. Stripped before matching. */
 const RUNNER_WRAPPERS = new Set(["npx", "pnpx", "bunx", "sudo", "env", "command", "exec", "time", "nohup"]);
 
-/** `pnpm|yarn|npm|bun <sub> langwatch ...` — the sub-word is dropped too. */
-const PACKAGE_MANAGERS = new Set(["pnpm", "npm", "yarn", "bun"]);
+/**
+ * `pnpm|yarn|npm <sub> langwatch ...` — the sub-word is dropped too. `bun` is
+ * deliberately absent: it is BOTH a package runner and a code interpreter
+ * (`bun -e`, `bun run x.ts`), so stripping it as a preamble would let
+ * interpreter-executed code slip past. It is held as an interpreter instead;
+ * `bunx` (a `RUNNER_WRAPPER`) remains the transparent way to reach the CLI.
+ */
+const PACKAGE_MANAGERS = new Set(["pnpm", "npm", "yarn"]);
 const PACKAGE_MANAGER_SUBCOMMANDS = new Set(["exec", "run", "dlx", "x", "--"]);
 
 /** Names the CLI answers to on a PATH. */
@@ -196,10 +208,38 @@ const CLI_NAMES = new Set(["langwatch", "lw"]);
 
 /**
  * Shell interpreters that run a file the gate never sees. Executing an
- * agent-written file through any of these is unresolvable and held
- * unconditionally.
+ * agent-written file through any of these (with a script argument) is
+ * unresolvable and held unconditionally.
  */
 const FILE_EXECUTORS = new Set(["bash", "sh", "zsh", "dash", "ksh", "source", "."]);
+
+/**
+ * Language interpreters whose executed code is lexically unresolvable to this
+ * gate: inline code (`-c`/`-e`/`-r`/`--eval`), a script file, or code fed on
+ * stdin can spell any destructive LangWatch call — and runtime string-building
+ * (`'lang'+'watch ...'`) defeats every substring check. So an interpreter at a
+ * segment head is held UNCONDITIONALLY, like write-then-exec: no confirmation
+ * releases it. Enumerated so a newly-relevant interpreter missing from this set
+ * is a conscious omission the canary (`deleteGate.canary.test.ts`) surfaces.
+ */
+export const CODE_INTERPRETERS = new Set([
+  "python",
+  "python2",
+  "python3",
+  "node",
+  "nodejs",
+  "deno",
+  "bun",
+  "ruby",
+  "perl",
+  "php",
+  "rscript",
+  "osascript",
+  "groovy",
+  "lua",
+  "tclsh",
+  "elixir",
+]);
 
 /** HTTP clients whose invocations reach the REST/GraphQL delete surface. */
 const HTTP_CLIENTS = new Set(["curl", "http", "https", "wget", "fetch", "xh"]);
@@ -216,8 +256,37 @@ const DESTRUCTIVE_VERB_SET = new Set<string>(DESTRUCTIVE_VERBS);
  */
 const GRAPHQL_DESTRUCTIVE = /\bmutation\b[\s\S]*\b(delete|archive|remove|purge|destroy|revoke)/i;
 
-/** REST paths whose method-agnostic intent is destructive (`POST /purge`). */
-const DESTRUCTIVE_PATH = /\/(purge|delete|archive|destroy|remove|revoke|reset)\b/i;
+/**
+ * Route-only destructive actions: real REST endpoints whose intent is
+ * destructive but whose path segment is NOT one of the CLI's `DESTRUCTIVE_VERBS`
+ * (so deriving the path set from the verbs alone would miss them). Kept as the
+ * single place a route-only action is added.
+ *  - `regenerate-api-key` — POST /api/projects/:id/regenerate-api-key
+ *    (`platform/app/src/app/api/projects/[[...route]]/app.ts`) invalidates the
+ *    old key.
+ * `roll-secret` (POST /endpoints/:id/roll-secret) is already a `DESTRUCTIVE_VERB`.
+ *
+ * NOTE: a full REST-route inventory canary (walking every registered route the
+ * way the verb canary walks the CLI catalogue) is a follow-up, not built here.
+ */
+const ROUTE_ONLY_DESTRUCTIVE_ACTIONS = ["regenerate-api-key"] as const;
+
+function escapeForRegExp(literal: string): string {
+  return literal.replace(/[.*+?^${}()|[\]\\-]/g, "\\$&");
+}
+
+/**
+ * REST paths whose method-agnostic intent is destructive (`POST /purge`,
+ * `POST /roll-secret`). Derived from the SAME `DESTRUCTIVE_VERBS` the CLI matcher
+ * uses, plus the route-only actions above, so the HTTP and CLI surfaces cannot
+ * drift apart.
+ */
+const DESTRUCTIVE_PATH = new RegExp(
+  `/(?:${[...DESTRUCTIVE_VERBS, ...ROUTE_ONLY_DESTRUCTIVE_ACTIONS]
+    .map(escapeForRegExp)
+    .join("|")})\\b`,
+  "i",
+);
 
 /**
  * Split a command line on the operators that start a new command. Deliberately
@@ -287,7 +356,11 @@ function verbOfToken(token: string): string | null {
  * the destructive verb. Null when either cannot be read (e.g. the verb hid in a
  * `--flag=` value), which the confirmation layer treats as un-bindable → held.
  */
-function commandTarget(stripped: string[], verbIndex: number): GateTarget | null {
+function commandTarget(
+  stripped: string[],
+  verbIndex: number,
+  verb: string,
+): GateTarget | null {
   let resourceType: string | null = null;
   for (let i = 1; i < stripped.length; i += 1) {
     const token = stripped[i] ?? "";
@@ -309,7 +382,7 @@ function commandTarget(stripped: string[], verbIndex: number): GateTarget | null
     break;
   }
   if (!resourceType || !identifier) return null;
-  return { resourceType, identifier };
+  return { verb, resourceType, identifier };
 }
 
 /** Classify an HTTP-client segment; null when it is a benign call. */
@@ -359,7 +432,20 @@ function classifySegment(segment: string): DestructiveMatch | null {
 
   const stripped = stripPreamble(tokens);
   const head = stripped[0] ?? "";
-  const headBase = head.split("/").pop() ?? head;
+  // Lower-cased so an upper-cased head (`PYTHON3 -c`, `BASH f.sh`, `CURL -X`)
+  // cannot dodge a membership check whose sets are all lower-case.
+  const headBase = (head.split("/").pop() ?? head).toLowerCase();
+
+  // A language interpreter runs code the gate never resolves — inline (`-c`),
+  // from a script file, or on stdin — and runtime string-building defeats every
+  // substring check. Held UNCONDITIONALLY the moment one heads a segment, even
+  // bare (a bare interpreter in a pipeline reads stdin). This sits before the
+  // CLI/HTTP checks so `python3 -c "...langwatch..."` can never fall through to
+  // the substring fallback below. Interpreters behind a runner/env preamble
+  // (`sudo python3 -c`, `FOO=1 node x.js`) are already stripped to this head.
+  if (CODE_INTERPRETERS.has(headBase)) {
+    return { kind: "exec-file", segment };
+  }
 
   // Executing an agent-written file: the shell resolves file contents the gate
   // never sees, so it is unresolvable and held unconditionally.
@@ -375,7 +461,7 @@ function classifySegment(segment: string): DestructiveMatch | null {
       const token = stripped[i] ?? "";
       const verb = verbOfToken(token);
       if (verb) {
-        return { kind: "cli-verb", verb, segment, target: commandTarget(stripped, i) };
+        return { kind: "cli-verb", verb, segment, target: commandTarget(stripped, i, verb) };
       }
     }
     return null;
@@ -406,16 +492,11 @@ export function findDestructiveMatches(command: string): DestructiveMatch[] {
 }
 
 /**
- * The first destructive intent in a raw bash command, or null when the command
- * is provably benign. Retained for callers that want a single verdict.
- *
- * @param command - the `command` field of a bash tool call.
+ * A stable key for a target, for set membership. The verb is folded in so a
+ * confirmation binds to one destructive verb only: a "yes" to `delete dataset
+ * d1` yields `delete dataset d1`, which never matches an `archive`/`purge` of
+ * the same resource.
  */
-export function findDestructiveIntent(command: string): DestructiveMatch | null {
-  return findDestructiveMatches(command)[0] ?? null;
-}
-
-/** A stable key for a target, for set membership. */
 export function targetKey(target: GateTarget): string {
-  return `${target.resourceType} ${target.identifier}`;
+  return `${target.verb} ${target.resourceType} ${target.identifier}`;
 }
