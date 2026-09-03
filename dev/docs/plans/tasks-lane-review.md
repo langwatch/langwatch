@@ -46,11 +46,13 @@ wire are still unregistered, each for a reason named below.
   values, so a missing `REDIS_URL` fails only that task at run time instead of
   every task at catalogue construction.
 
-Nine tasks are registered in `apps/tasks/src/tasks.catalogue.ts`:
+Eleven tasks are registered in `apps/tasks/src/tasks.catalogue.ts`:
 `prisma-migrate`, `webhook-signature-vectors`, `clickhouse-migrate`,
 `lwql-provision`, `model-provider-migrate-custom-models`,
 `model-provider-migrate-credentials`, `slack-alert`,
-`object-storage-migrate`, `stalled-runs-backfill`.
+`object-storage-migrate`, `stalled-runs-backfill`,
+`annotation-clickhouse-backfill`, `dataset-content-backfill` (plus the
+enterprise-billing and user-data tasks another lane added since).
 
 **Two retirements confirmed.** `cleanupOldLambdas` stays retired — nothing on
 this branch invokes Lambda, no `@aws-sdk/client-lambda` dependency exists, and
@@ -67,38 +69,59 @@ remains: `langwatch.yml:159` adds
 `packages/clickhouse-client/migrations/**/*.sql` under a rule whose `exclude`
 is `**/migrations/**` — same as before the move.
 
-## Open — three unregistered tasks
+## Open — one unregistered task (was three)
 
-Each is a real `Task` subclass exported from its feature and constructed by
-nothing. `apps/tasks/src/tasks.catalogue.ts` names all three in its own
-comment.
+Decision 6 in `open-decisions-2026-09-03.md` chose option (a): build the
+trace-processing pipeline's producer factory and register the two cheap
+tasks; leave `topic-clustering-run` named and unregistered. Both parts are
+now done.
 
-- **`annotation-clickhouse-backfill`** (annotation) — needs a queue write for
-  `bulkSyncAnnotations` on the trace pipeline. Wiring it needs a **producer
-  registration of the trace-processing pipeline definition**, which
-  `apps/tasks` does not build (only `simulation_processing` is registered).
-  Same shape `stalled-runs-backfill` used, applied to a factory that does not
-  exist yet.
-- **`dataset-content-backfill`** (dataset) — needs `DatasetStorageResolver`,
-  built from the worker's stored-object runtime. `TasksHost.objectStorage` is
-  `never`. The fix is to move `WorkerDatasetStorageResolver`
-  (`apps/worker/src/app/worker-dataset-normalization.composition.ts`) into
-  `dataset/server/src/adapters/` and give `TasksHost.objectStorage` the same
-  `createWorkerObjectStorage` runtime. This is the one genuine absence the
-  `objectStorage` handle was reserved for.
-- **`topic-clustering-run`** (topic) — needs far more: the full
-  `TopicClusteringRunner` (ClickHouse reads, a model-provider gateway
-  `apps/tasks` composes none of, langevals, a Prisma repository, the
-  legacy-import seed guard) **plus two** producer registrations —
-  `topic_clustering_processing` for `TopicClusteringCommandsPort` (which needs
-  stand-ins for three Postgres `StateProjectionStore`s and its process
-  manager's metrics and run ports) and the trace pipeline for
-  `TraceTopicAssignmentPort`. Neither has a ready-made producer factory the
-  way `simulation_processing` does.
-
-The first two share one root cause with each other and it is the trace
-pipeline's producer registration; building it unblocks both. See decision 6 in
-`open-decisions-2026-09-03.md`.
+- **`annotation-clickhouse-backfill`** (annotation) — **wired.**
+  `createTraceProcessingProducerPipeline` (`@langwatch/trace-server`) already
+  existed (built for `apps/api`'s annotation tRPC path) and is reused
+  unchanged. `apps/tasks/src/platform/annotation-clickhouse-backfill.composition.ts`
+  registers it on this process's own producer-only Eventing host and wraps
+  `registered.commands.bulkSyncAnnotations` as a `TraceAnnotationSyncPort`.
+  `AnnotationClickHouseBackfillTask.create` now takes deferred factories
+  (`source`/`sync` as `() => Port`, not values), matching
+  `stalled-runs-backfill`'s reason: a missing `REDIS_URL` fails only this task
+  at run time, not every task at catalogue construction.
+- **`dataset-content-backfill`** (dataset) — **wired.**
+  `TasksHost.objectStorage` is no longer `never`: it is
+  `TasksObjectStorage` (`apps/tasks/src/platform/infrastructure/tasks-stored-object-storage.adapter.ts`),
+  built from the SHARED `objectStorageConfigDefinition`
+  (`@langwatch/config`) — the same `S3_BUCKET_NAME`, `STORED_OBJECTS_BACKEND`
+  etc. `apps/api` and `apps/worker` read — plus the shared
+  `parseDataplaneS3RoutingTable` helper for BYOC routing, reusing
+  `StoredObjectDestinationPolicy` from `@langwatch/stored-object-server/storage`
+  rather than the worker's own app-local driver classes (which stayed
+  untouched; `apps/worker` was read-only for this change). Rather than
+  literally moving `WorkerDatasetStorageResolver`, a new
+  `DatasetObjectStorageResolver` + `DatasetObjectStorageS3ClientResolver`
+  landed in `dataset/server/src/adapters/dataset-object-storage-resolver.adapter.ts`,
+  decoupled from any one app's storage runtime via a small
+  `DatasetStorageDestinationPort` seam (`apps/tasks` implements it by wrapping
+  its own `StoredObjectDestinationPolicy`). **Azure is a named absence**: this
+  composition builds no Azure driver, so a deployment whose real
+  `STORED_OBJECTS_BACKEND=azure` gets a clear refusal (thrown by
+  `StoredObjectDestinationPolicy` itself) the moment a project resolves to it,
+  never a silent local-filesystem fallback. `DatasetContentBackfillTask.create`
+  now takes deferred factories too, for the same reason as annotation's.
+- **`topic-clustering-run`** (topic) — **still unregistered, now for a
+  smaller reason.** The producer side is done:
+  `createTopicClusteringProcessingProducerPipeline`
+  (`packages/features/topic/server/src/adapters/topic-clustering-processing-producer.adapter.ts`)
+  registers `topic_clustering_processing` for `TopicClusteringCommandsPort`
+  (`recordTopics`, `requestClustering`), with stand-ins for the three Postgres
+  `StateProjectionStore`s and the process manager's run port, outcome commands
+  and metrics port — all plain interfaces, no abstract-class ceremony needed.
+  Combined with the pre-existing `createTraceProcessingProducerPipeline` for
+  `TraceTopicAssignmentPort`, **both** producer registrations
+  `topic-clustering-run` needs now exist. What remains is the runner itself:
+  a real `TopicClusteringRunPort` needs a model-provider gateway, langevals
+  and a Prisma repository, none of which `apps/tasks` composes. This factory
+  is built but **not yet consumed by any apps/tasks task** — it is groundwork
+  for whoever builds that runner next.
 
 ## Open — fix 18, index surfaces (partial)
 
@@ -138,7 +161,7 @@ Three things move at once, not one:
 3. **`close()` must track what was OPENED, not what was CONFIGURED.** Today's
    `this.clickhouse ? … : Promise.resolve()` is sound only because the two are
    the same fact. Once opening is deferred, reading the getter to check
-   presence would *open* it — turning shutdown into the last thing that creates
+   presence would _open_ it — turning shutdown into the last thing that creates
    a connection. `close()` needs its own record of what was actually
    constructed, checked directly and never through the public getter.
 
@@ -214,7 +237,7 @@ tests for the established mocking seam rather than inventing one.
 - **`close()` on an untouched host closes nothing** — the `prisma-migrate`
   case, and the regression test for what fix 16 names.
 - **`close()` closes only what was opened** — after only `requireRedis()`,
-  the other two connect *and* shutdown spies stay at zero.
+  the other two connect _and_ shutdown spies stay at zero.
 - **`close()` with nothing configured is a no-op**, unchanged.
 - **Concurrent first access does not double-open.** Today's connect factories
   are synchronous, so this may collapse into the memoization case; note which

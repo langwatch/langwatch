@@ -9,6 +9,7 @@ export {
   type TopicClusteringRunStatusData,
   type TopicModelData,
 } from "./adapters/eventing.topic-clustering.adapter";
+export { createTopicClusteringProcessingProducerPipeline } from "./adapters/topic-clustering-processing-producer.adapter";
 export {
   PostgresTopicAdapter,
   type TopicClusteringPersistence,

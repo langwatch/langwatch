@@ -78,20 +78,26 @@ type DatasetBackfillOutcome = Awaited<
 
 /**
  * The task-launcher entry — `pnpm --filter @langwatch/tasks task
- * dataset-content-backfill`. Not yet registered in `apps/tasks`' catalogue:
- * `DatasetStorageResolver` is built inside
- * `apps/worker/src/app/worker-dataset-normalization.composition.ts` from the
- * worker's stored-object runtime, its AWS runtime and its per-project S3
- * sources, none of which `apps/tasks` composes yet. `SKIP_DATASET_S3_MIGRATE`
- * and `DATASET_S3_MIGRATE_DRY_RUN` are read here, at the process boundary —
- * `DatasetContentBackfillSweep.execute` above takes them as parsed values so
- * it stays testable without an environment.
+ * dataset-content-backfill`. Registered in `apps/tasks`' catalogue via
+ * `dataset-content-backfill.composition.ts`, which builds a
+ * `DatasetStorageResolver` from `TasksHost.objectStorage`.
+ * `SKIP_DATASET_S3_MIGRATE` and `DATASET_S3_MIGRATE_DRY_RUN` are read here, at
+ * the process boundary — `DatasetContentBackfillSweep.execute` above takes
+ * them as parsed values so it stays testable without an environment.
+ *
+ * `database` and `storage` are FACTORIES, not values: resolving the real
+ * `storage` needs `TasksHost.objectStorage`, and a missing/misconfigured
+ * environment should fail only THIS task at run time, not every task at
+ * catalogue construction.
  */
 export class DatasetContentBackfillTask extends Task {
   readonly name = "dataset-content-backfill";
   readonly description = "Moves dataset content out of Postgres and into object storage.";
 
-  private constructor(private readonly sweep: DatasetContentBackfillSweep) {
+  private constructor(
+    private readonly database: () => PrismaClient,
+    private readonly storage: () => DatasetStorageResolver,
+  ) {
     super();
   }
 
@@ -99,16 +105,18 @@ export class DatasetContentBackfillTask extends Task {
     database,
     storage,
   }: {
-    database: PrismaClient;
-    storage: DatasetStorageResolver;
+    database: () => PrismaClient;
+    storage: () => DatasetStorageResolver;
   }): DatasetContentBackfillTask {
-    return new DatasetContentBackfillTask(
-      DatasetContentBackfillSweep.create({ database, storage }),
-    );
+    return new DatasetContentBackfillTask(database, storage);
   }
 
   async run(_input: { args: readonly string[]; signal: AbortSignal }): Promise<void> {
-    await this.sweep.execute({
+    const sweep = DatasetContentBackfillSweep.create({
+      database: this.database(),
+      storage: this.storage(),
+    });
+    await sweep.execute({
       skipped: process.env.SKIP_DATASET_S3_MIGRATE === "true",
       dryRun: process.env.DATASET_S3_MIGRATE_DRY_RUN === "true",
     });

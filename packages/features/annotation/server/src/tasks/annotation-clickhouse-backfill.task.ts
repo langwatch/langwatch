@@ -134,20 +134,25 @@ function groupAnnotationIdsByTrace(
 
 /**
  * The task-launcher entry — `pnpm --filter @langwatch/tasks task
- * annotation-clickhouse-backfill`. Not yet registered in `apps/tasks`'
- * catalogue: `TraceAnnotationSyncPort.bulkSyncAnnotations` sends a command on
- * the trace event-sourcing pipeline, and `apps/tasks` composes no queue write
- * for it today — the pipeline's command queue is only reachable from
- * `apps/worker/src/app/worker-trace-processing-pipeline.composition.ts`. This
- * class is the whole contract a runner needs the day `apps/tasks` gets an
- * adapter that enqueues `bulkSyncAnnotations` over `host.requireRedis()`.
+ * annotation-clickhouse-backfill`. Registered in `apps/tasks`' catalogue via
+ * `annotation-clickhouse-backfill.composition.ts`, which registers the trace
+ * feature's producer-only pipeline (`createTraceProcessingProducerPipeline`)
+ * to obtain a real `bulkSyncAnnotations` dispatcher.
+ *
+ * `source` and `sync` are FACTORIES, not values: constructing the real `sync`
+ * registers an Eventing pipeline, which needs Redis, and a missing
+ * `REDIS_URL` must fail only this task at run time — not every task at
+ * catalogue construction, the same reason `stalled-runs-backfill` defers.
  */
 export class AnnotationClickHouseBackfillTask extends Task {
   readonly name = "annotation-clickhouse-backfill";
   readonly description =
     "Syncs every annotation from Postgres to ClickHouse through bulkSyncAnnotations.";
 
-  private constructor(private readonly sweep: AnnotationBackfillSweep) {
+  private constructor(
+    private readonly source: () => AnnotationBackfillSourcePort,
+    private readonly sync: () => TraceAnnotationSyncPort,
+  ) {
     super();
   }
 
@@ -155,13 +160,14 @@ export class AnnotationClickHouseBackfillTask extends Task {
     source,
     sync,
   }: {
-    source: AnnotationBackfillSourcePort;
-    sync: TraceAnnotationSyncPort;
+    source: () => AnnotationBackfillSourcePort;
+    sync: () => TraceAnnotationSyncPort;
   }): AnnotationClickHouseBackfillTask {
-    return new AnnotationClickHouseBackfillTask(AnnotationBackfillSweep.create({ source, sync }));
+    return new AnnotationClickHouseBackfillTask(source, sync);
   }
 
   async run(_input: { args: readonly string[]; signal: AbortSignal }): Promise<void> {
-    await this.sweep.execute();
+    const sweep = AnnotationBackfillSweep.create({ source: this.source(), sync: this.sync() });
+    await sweep.execute();
   }
 }

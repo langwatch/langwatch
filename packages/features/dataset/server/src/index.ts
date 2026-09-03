@@ -51,6 +51,13 @@ export {
   LocalDatasetStorage,
   LocalDatasetStorageAdapter,
 } from "./adapters/local.dataset-storage.adapter";
+export {
+  DatasetObjectStorageResolver,
+  DatasetObjectStorageS3ClientResolver,
+  DatasetStorageDestinationPort,
+  type DatasetStorageDestination,
+  type DatasetS3Target,
+} from "./adapters/dataset-object-storage-resolver.adapter";
 export { DatasetUploadAdapter } from "./adapters/dataset-upload.adapter";
 export { DatasetContentAdapter } from "./adapters/dataset-content.adapter";
 export {

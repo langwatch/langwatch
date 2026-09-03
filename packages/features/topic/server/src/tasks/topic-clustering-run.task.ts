@@ -17,10 +17,13 @@ const logger = createLogger("langwatch:tasks:topic-clustering-run");
  * of appending a fresh `topics_recorded` chain on every re-run.
  *
  * The composed entrypoint is still absent: a real {@link TopicClusteringRunPort}
- * needs a model-provider gateway, langevals, a Prisma repository, AND two
- * separate producer-only Eventing registrations (`topic_clustering_processing`
- * and the trace pipeline), neither with a ready-made producer factory the way
- * `simulation_processing` has. Full collaborator list and blocker:
+ * needs a model-provider gateway, langevals and a Prisma repository —
+ * `apps/tasks` composes none of them. The two producer-only Eventing
+ * registrations this task would ALSO need now both have factories
+ * (`createTopicClusteringProcessingProducerPipeline` here,
+ * `createTraceProcessingProducerPipeline` in `@langwatch/trace-server`, for
+ * `TraceTopicAssignmentPort`); the model-provider/langevals/Prisma runner
+ * collaborator graph is the remaining blocker. Full collaborator list:
  * `apps/tasks/src/tasks.catalogue.ts` and the launch-interface plan doc.
  */
 export class TopicClusteringRunTask extends Task {

@@ -28,6 +28,7 @@
     "@aws-sdk/s3-request-presigner": "^3.826.0",
     "@langwatch/api": "workspace:*",
     "@langwatch/authz-contract": "workspace:*",
+    "@langwatch/aws-client": "workspace:*",
     "@langwatch/dataset-contract": "workspace:*",
     "@langwatch/handled-error": "workspace:*",
     "@langwatch/observability": "workspace:*",
