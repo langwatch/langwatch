@@ -39,22 +39,24 @@ describe("given an organization admin", () => {
           organizationId: ORG,
           bindings: [{ scopeType: "ORGANIZATION", scopeId: ORG, role: "ADMIN" }],
           sharedTeamIds: ["team-1", "team-2"],
-          personalProjectId: "proj-personal",
+          personalProject: { id: "proj-personal", teamId: "team-personal" },
         }),
       ).toEqual([{ scopeType: "ORGANIZATION", scopeId: ORG }]);
     });
 
     /** @scenario org admin defaults to organization scope */
-    it("does the same for a member or viewer binding at the organization", () => {
-      // An org-wide binding of any role is org-wide access; narrowing it to the
-      // personal project would hand the key less than the reader holds.
+    it("falls back to the organization chip for a member or viewer with nothing else to offer", () => {
+      // A MEMBER or VIEWER org binding grants the org-member bag only, so it does
+      // not collapse to the organization the way ADMIN does. With no team
+      // binding held (the personal team included) there is nothing else, and a
+      // view-only key beats a dead-ended login.
       for (const role of ["MEMBER", "VIEWER"]) {
         expect(
           defaultCliKeyScopes({
             organizationId: ORG,
             bindings: [{ scopeType: "ORGANIZATION", scopeId: ORG, role }],
             sharedTeamIds: ["team-1"],
-            personalProjectId: "proj-personal",
+            personalProject: { id: "proj-personal", teamId: "team-personal" },
           }),
         ).toEqual([{ scopeType: "ORGANIZATION", scopeId: ORG }]);
       }
@@ -72,9 +74,10 @@ describe("given a member of two shared teams", () => {
           bindings: [
             { scopeType: "TEAM", scopeId: "team-2", role: "MEMBER" },
             { scopeType: "TEAM", scopeId: "team-1", role: "MEMBER" },
+            { scopeType: "TEAM", scopeId: "team-personal", role: "ADMIN" },
           ],
           sharedTeamIds: ["team-1", "team-2", "team-3"],
-          personalProjectId: "proj-personal",
+          personalProject: { id: "proj-personal", teamId: "team-personal" },
         }),
       ).toEqual([
         { scopeType: "TEAM", scopeId: "team-1" },
@@ -90,7 +93,7 @@ describe("given a member of two shared teams", () => {
           organizationId: ORG,
           bindings: [],
           sharedTeamIds: ["team-1"],
-          personalProjectId: null,
+          personalProject: null,
         }),
       ).toEqual([]);
     });

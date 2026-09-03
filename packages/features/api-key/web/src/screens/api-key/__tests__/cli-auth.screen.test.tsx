@@ -244,6 +244,7 @@ describe("given a member of two shared teams", () => {
     state.bindings = [
       { scopeType: "TEAM", scopeId: "team-1", role: "MEMBER" },
       { scopeType: "TEAM", scopeId: "team-2", role: "MEMBER" },
+      { scopeType: "TEAM", scopeId: "team-personal", role: "ADMIN" },
     ];
     renderWithApiKeyHost(<CliAuthScreen />, hostFor());
     await confirmCode(user);

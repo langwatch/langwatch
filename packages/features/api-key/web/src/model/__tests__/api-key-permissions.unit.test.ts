@@ -9,6 +9,7 @@
  *
  * Spec: specs/api-keys/scope-based-permissions.feature
  */
+import { builtinRolePermissions } from "@langwatch/authz-contract";
 import { describe, expect, it } from "vitest";
 import {
   categorizablePermissions,
@@ -651,8 +652,8 @@ describe("getUserPermissionsAtScope()", () => {
     });
   });
 
-  describe("when an org-level non-ADMIN binding covers a project scope", () => {
-    it("returns the team-role bag", () => {
+  describe("when an org-level MEMBER binding covers a project scope", () => {
+    it("returns nothing: the whole org-member bag is org-exclusive", () => {
       const result = getUserPermissionsAtScope({
         myBindings: [{ scopeType: "ORGANIZATION", scopeId: "org-1", role: "MEMBER" }],
         scopeType: "PROJECT",
@@ -662,7 +663,81 @@ describe("getUserPermissionsAtScope()", () => {
         isServiceKey: false,
         getTeamRolePermissions: mockGetPerms,
       });
-      expect(result).toEqual(["project:view", "project:update"]);
+      // The org-member bag (organization:view, aiTools:view) targets
+      // org-tier-only resources, and the mint strips org-exclusive
+      // permissions from any selection with no ORGANIZATION binding
+      // (`filterToGrantable`). Offering them on a PROJECT chip made the
+      // approve request carry only permissions the server then dropped,
+      // failing with "Select at least one permission".
+      expect(result).toEqual([]);
+    });
+  });
+
+  describe("when an org-level MEMBER binding covers a team scope", () => {
+    it("returns nothing: no org-exclusive permission is grantable there", () => {
+      const result = getUserPermissionsAtScope({
+        myBindings: [
+          { scopeType: "ORGANIZATION", scopeId: "org-1", role: "MEMBER" },
+        ],
+        scopeType: "TEAM",
+        scopeId: "team-1",
+        organizationId: "org-1",
+        orgProjects,
+        isServiceKey: false,
+        getTeamRolePermissions: mockGetPerms,
+      });
+      expect(result).toEqual([]);
+    });
+  });
+
+  describe("when an org-level MEMBER binding is checked at org scope", () => {
+    it("returns the org-member bag", () => {
+      const result = getUserPermissionsAtScope({
+        myBindings: [
+          { scopeType: "ORGANIZATION", scopeId: "org-1", role: "MEMBER" },
+        ],
+        scopeType: "ORGANIZATION",
+        scopeId: "org-1",
+        organizationId: "org-1",
+        orgProjects,
+        isServiceKey: false,
+        getTeamRolePermissions: mockGetPerms,
+      });
+      expect(result).toEqual([...builtinRolePermissions("org-member")]);
+    });
+  });
+
+  describe("when an org-level VIEWER binding is checked at org scope", () => {
+    it("returns the org-member bag, mirroring the resolver's non-ADMIN branch", () => {
+      const result = getUserPermissionsAtScope({
+        myBindings: [
+          { scopeType: "ORGANIZATION", scopeId: "org-1", role: "VIEWER" },
+        ],
+        scopeType: "ORGANIZATION",
+        scopeId: "org-1",
+        organizationId: "org-1",
+        orgProjects,
+        isServiceKey: false,
+        getTeamRolePermissions: mockGetPerms,
+      });
+      expect(result).toEqual([...builtinRolePermissions("org-member")]);
+    });
+  });
+
+  describe("when an org-level CUSTOM binding is checked at org scope", () => {
+    it("keeps the injected role bag (custom roles resolve their own permissions)", () => {
+      const result = getUserPermissionsAtScope({
+        myBindings: [
+          { scopeType: "ORGANIZATION", scopeId: "org-1", role: "CUSTOM" },
+        ],
+        scopeType: "ORGANIZATION",
+        scopeId: "org-1",
+        organizationId: "org-1",
+        orgProjects,
+        isServiceKey: false,
+        getTeamRolePermissions: mockGetPerms,
+      });
+      expect(result).toEqual(["project:view"]);
     });
   });
 });
