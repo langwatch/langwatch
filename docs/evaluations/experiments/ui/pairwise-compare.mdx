@@ -8,13 +8,6 @@ description: Use the Comparison evaluator to judge two or more candidate outputs
 
 When you choose between two prompts, two models, or several agent configurations, absolute evaluator scores are hard to calibrate. A score of `0.78` does not tell you whether one variant is better than the others for your users. A relative question, "which of these outputs is best for this input?", is easier for a judge to answer and gives a more stable verdict.
 
-<Frame>
-  <img
-    src="/images/pairwise-compare/results-column-final.png"
-    alt="Comparison results with a win-rate chart and per-row winner, output, and reasoning."
-  />
-</Frame>
-
 ## When to use it
 
 Use Comparison when the decision is between two or more alternatives:
@@ -36,18 +29,21 @@ Use a different evaluator when:
 1. Open the [Experiments Workbench](https://app.langwatch.ai/@project/experiments).
 2. Add the two or more prompts, agents or models you want to compare, one column each.
 3. Click **Add to Evaluation** and pick **Comparison**. If you already have a saved Comparison evaluator, pick it from the list, or select **New Comparison** to start blank.
-4. Select the targets you want as candidates.
-5. If a target produces a structured output (for example `{answer, confidence}`), pick the field the judge reads for that candidate. Each candidate picks its field on its own.
-6. If your dataset has a reference answer, turn **Has Golden Answer** on and select the golden field. Without a reference answer, leave it off (the default) and describe the preference criteria in the judge instructions.
-7. Save. Saving is disabled until at least two candidates are selected.
-8. Run the experiment. Comparison runs once every candidate has produced an output for a row. A row where one candidate produced no output is skipped.
+4. Name the evaluator and pick the judge **Model**. The **Prompt** holds the judge instructions and **Temperature** the judge's sampling temperature.
+5. Under **Variants (pick 2 or more)**, select the candidates. **Add another** adds one more.
+6. If your dataset has a reference answer, select its column in **Golden field**. Leave it on **None, judge on merits** (the default) to compare the candidates on their own, and describe the preference criteria in the prompt instead. **Input field** names the column with the task the candidates answered; the default auto-detects it.
+7. Keep **Shuffle candidate order** on, and **Swap And Reconcile** on unless you want one judge call per row. Under **Include metrics during judgment**, switch on **Include cost** or **Include duration** to show those per candidate to the judge.
+8. Click **Apply**, or **Save** to keep the evaluator for other experiments. Saving is disabled until at least two candidates are selected.
+9. Run the experiment. Comparison runs once every candidate has produced an output for a row. A row where one candidate produced no output is skipped.
 
 <Frame>
   <img
     src="/images/evaluations/comparison-evaluator-setup.png"
-    alt="The Comparison evaluator editor with three candidate targets mapped and no reference answer, judging three candidates against each other."
+    alt="The Comparison evaluator editor for Best support answer: gpt-5-mini as the judge, the prompt, Temperature 0, Swap And Reconcile switched off for this run, the three variants, Golden field empty so the judge compares on merits, Shuffle candidate order on and both Include metrics switches off. The workbench behind it shows a trophy verdict per row."
   />
 </Frame>
+
+In this example, **Swap And Reconcile** is switched off so that every row gets a verdict. With it on, the default, a row whose two passes disagree stays at **No verdict yet**.
 
 You can compare candidates that share a display name. LangWatch numbers them, for example `bot (1)` and `bot (2)`, so the scoreboard and the row verdicts stay readable.
 
@@ -55,17 +51,17 @@ You can compare candidates that share a display name. LangWatch numbers them, fo
 
 By default Comparison shuffles the candidate order per row and asks the judge to pick the best candidate in one comparison across every candidate:
 
-1. The judge sees the candidates in a shuffled order that is seeded by the row index, so a re-evaluation of the same row presents the same order and gives a comparable verdict. `randomize_order` controls the shuffle. Turn it off and the judge sees the candidates in the order their targets were registered.
+1. The judge sees the candidates in a shuffled order that is seeded by the row index, so a re-evaluation of the same row presents the same order and gives a comparable verdict. **Shuffle candidate order** (`randomize_order`) controls the shuffle. Turn it off and the judge sees the candidates in the order their targets were registered.
 2. The judge picks the single best candidate, or a tie when no candidate is clearly better and ties are allowed.
 3. LangWatch maps the verdict back to the winning candidate's own identifier (for a prompt, its prompt handle) before it shows it to you.
 
-One comparison covers every candidate at once, however many there are. With `swap_and_reconcile` on (the default), the judge is asked twice per row, the second time with the candidate order reversed. When the two answers disagree, the row is recorded with no winner, because a verdict that changes with the order has not separated the candidates.
+One comparison covers every candidate at once, however many there are. With **Swap And Reconcile** (`swap_and_reconcile`) on, the default, the judge is asked twice per row, the second time with the candidate order reversed, which doubles the judge cost. When the two answers disagree, the row is recorded with no winner and the cell reads **No verdict yet**, because a verdict that changes with the order has not separated the candidates.
 
 The verdict details include the judge's reasoning, so you can read why a row went the way it did.
 
-## Golden answer or direct preference
+## Golden field or direct preference
 
-**Has Golden Answer** is off by default. When it is on, the judge grades every candidate against the reference answer you select. When it is off, the judge compares the candidates on their own merits and the judge prompt has no reference answer section.
+**Golden field** is empty by default. When you select a column, the judge grades every candidate against that reference answer. When it is empty, the judge compares the candidates on their own merits and the judge prompt has no reference answer section.
 
 Use a golden answer when correctness is the main question. Use direct preference when the task is open-ended and you care about tone, completeness, helpfulness, structure or policy adherence.
 
@@ -73,14 +69,16 @@ Use a golden answer when correctness is the main question. Use direct preference
 
 The Comparison column holds what you need to review each judgment:
 
-- **Who won:** each row shows the winning candidate's name, a tie when no candidate is clearly better, or no winner when the two passes disagreed. A tie means the candidates are equally good. No winner means this row did not separate them.
+- **Who won:** each row shows the winning candidate's name with a trophy, a tie when no candidate is clearly better, or **No verdict yet** when the two passes disagreed. A tie means the candidates are equally good. No verdict means this row did not separate them.
 - **What won:** the cell shows the winning candidate's output, so you can read the answer the judge preferred.
 - **Why it won:** the judge's reasoning is below the output.
+
+On the results page, click a verdict cell that is cut off to expand it: the panel shows **Winner** with the candidate's name, the winning output and the judge's full reason. Press Escape or click outside to close it.
 
 <Frame>
   <img
     src="/images/evaluations/comparison-results-column.png"
-    alt="The results table with the winner column and the verdict popover open on one row, showing the verdict per row and the judge's reason."
+    alt="The results table with the short-answer and follow-up-question columns and the Best support answer column, the verdict panel expanded on the first row: Winner: follow-up-question, the winning output and the judge's reason."
   />
 </Frame>
 
@@ -90,12 +88,12 @@ To find the source output behind a verdict, click the candidate's name in the ve
 
 ### The win-rate chart
 
-Click **Results** in the header to open the results page. It shows a win-rate chart next to the cost and latency charts, with one bar per candidate plus a bar for ties. Every candidate is counted, including the ones that never won a row. A row with no winner is on none of the bars.
+Click **Results** in the header to open the results page. It shows a win-rate card named after the evaluator next to the cost and latency charts, with one bar per candidate plus a **Tie** bar. Every candidate is counted, including the ones that never won a row. A row with no verdict is on none of the bars. Long candidate names are shortened on the axis; hover a bar for the full name.
 
 <Frame>
   <img
     src="/images/evaluations/comparison-win-rate-chart.png"
-    alt="The win-rate chart on the results page, one bar per candidate and one for ties, showing the win rate per candidate."
+    alt="The Best support answer win rate card: 2, 2 and 6 wins for the three candidates and a Tie bar at 0."
   />
 </Frame>
 
@@ -112,10 +110,12 @@ With three or more candidates, a win tally is not enough to rank them. A can bea
 
 The leaderboard appears on the results page, as a card next to the win-rate chart, when the comparison has three or more candidates. With two candidates the win-rate chart already tells the whole story, and there is no leaderboard. The Metrics selector on the results page lists it as **(Leaderboard)** next to the evaluator's name.
 
+The leaderboard is a ranking with a stated confidence. It names a winner only when the run separates that candidate from every other one, and it reports every check that limits what the run can support. On a small run, for example 10 rows over three candidates, expect it to report the ranking as not settled.
+
 <Frame>
   <img
     src="/images/evaluations/comparison-leaderboard.png"
-    alt="The Bradley-Terry leaderboard expanded: the ranking table, the win-matrix heatmap and the cost and duration scatter, showing the ranking across the set."
+    alt="The leaderboard drawer for Best support answer over 10 rows: the headline Ship short-answer, not separated on quality, 20% cheaper, the three score bars with their confidence bands all tied for first, the trust checks with three warnings (12 of 30 matchups, no pair separated, the judge shares a model family with the candidates), the quality against average cost scatter, the ranking table and the win matrix."
   />
 </Frame>
 
@@ -154,7 +154,7 @@ This section reports every check either way, so you can tell a check that passed
 |-------|-----------------|
 | Enough comparisons | Every candidate needs at least 30 matchups for a stable score. Below that, run more rows. |
 | Every candidate both won and lost | A candidate that swept or was swept has no score that fits and is excluded from the ranking. |
-| Everything is on one scale | Whether every candidate is linked to the rest through wins and losses. When the run splits into groups it never connected, only the order across groups is meaningful, and the size of the gap is not. |
+| Everything is on one scale | Whether every candidate is linked to the rest through wins and losses, directly or through a chain of shared opponents. The leaderboard only orders candidates that share comparisons. When the run splits into groups it never connected, scores compare only inside a group. Across groups the run keeps only the direction, and only where one group beat the other and was never beaten back; candidates in groups that never met cannot be ranked against each other, and the size of any gap across groups is not measured. |
 | Rows the judge would not call | How many rows produced no verdict because the two passes disagreed. Above 25% of the rows, change the judge model or the prompt; more rows will not settle it. |
 | Ranking settled | Whether the fit converged on a stable answer. |
 | How much this run settled | How many candidate pairs the run separated, out of all pairs, and how many comparisons that is based on. |
@@ -171,7 +171,7 @@ The ranking table lists **Rank**, **Variant**, **Score (± 95% confidence)**, **
 
 The win matrix has one row and one column per candidate. Each cell counts how often the row candidate beat the column candidate, tinted by that pair's win rate: green when the row candidate won more than half, red when it won less. Click a cell to read the judge's reasoning for every row where that pair met and the row candidate won.
 
-When every verdict in the run judged all candidates together, each row of the matrix repeats the same number: the candidate's total wins. The counts then do not tell you who it beat, but the shading still does, because it is computed per pair.
+With an N-way judge, every verdict covers all candidates together, so each row of the matrix repeats the same number: the candidate's total wins. The counts then do not tell you who it beat, but the shading still does, because it is computed per pair. The product says so under the matrix.
 
 ## Settings
 
@@ -180,11 +180,11 @@ When every verdict in the run judged all candidates together, each row of the ma
 | `model` | `openai/gpt-5-mini` | The judge model. |
 | `temperature` | `0.0` | The judge model's temperature. |
 | `max_tokens` | `128000` | The token limit for the judge call. |
-| `has_golden_answer` | `false` | Compare each candidate against a reference answer. Enable it when the dataset has one. |
-| `randomize_order` | `true` | Shuffle the candidate order per row (deterministically, seeded by the row index) before the judge sees them, to reduce position bias. |
+| `has_golden_answer` | `false` | Compare each candidate against a reference answer. Set by selecting a **Golden field**. |
+| `randomize_order` | `true` | **Shuffle candidate order**: shuffle the candidate order per row (deterministically, seeded by the row index) before the judge sees them, to reduce position bias. |
 | `allow_tie` | `true` | Allow the judge to return a tie when the candidates are equivalent. |
-| `swap_and_reconcile` | `true` | Ask the judge a second time with the candidate order reversed, and record no winner when the two answers disagree. Doubles the judge cost per row. |
-| `include_metrics` | `[]` | Include per-candidate metrics such as cost or duration in the judge context. |
+| `swap_and_reconcile` | `true` | **Swap And Reconcile**: ask the judge a second time with the candidate order reversed, and record no winner when the two answers disagree. Doubles the judge cost per row. |
+| `include_metrics` | `[]` | **Include cost** and **Include duration**: show those per candidate to the judge. |
 | `prompt` | The built-in judge prompt | Custom judge instructions. |
 
 ## Using it from the SDK
