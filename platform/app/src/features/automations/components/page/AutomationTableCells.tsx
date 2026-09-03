@@ -239,7 +239,7 @@ export function SectionHeader({
   onAdd: () => void;
 }) {
   return (
-    <HStack width="full" align="center" gap={3}>
+    <HStack width="full" align="center" gap={3} flexWrap="wrap">
       <Box
         colorPalette={accent}
         bg="colorPalette.subtle"
@@ -251,7 +251,7 @@ export function SectionHeader({
       >
         {icon}
       </Box>
-      <HStack gap={2} align="center" flex={1} minWidth={0}>
+      <HStack gap={2} align="center" flex="1 0 auto">
         <Heading size="md">{title}</Heading>
         <Badge colorPalette={accent} variant="subtle" borderRadius="full">
           {count}
@@ -361,8 +361,11 @@ export function TableShell({ children }: { children: React.ReactNode }) {
           // only mean anything above a floor: without one, `width="full"`
           // shrinks the table to the shell at any cost, and the cost is the
           // Name column collapsing to its longest single word. Below this the
-          // shell scrolls instead.
-          "& table": { tableLayout: "fixed", minWidth: "1000px" },
+          // shell scrolls instead. The floor is what a 1440px laptop leaves
+          // beside the sidebar, so the toggle and the row menu stay on screen
+          // there; a two-word header wraps rather than spilling into its
+          // neighbour, which is why the headers are not kept on one line.
+          "& table": { tableLayout: "fixed", minWidth: "880px" },
           "& thead th": {
             backgroundColor: "var(--chakra-colors-bg-subtle)",
             fontSize: "11px",
@@ -370,7 +373,7 @@ export function TableShell({ children }: { children: React.ReactNode }) {
             textTransform: "uppercase",
             letterSpacing: "0.04em",
             color: "var(--chakra-colors-fg-muted)",
-            whiteSpace: "nowrap",
+            verticalAlign: "bottom",
             paddingTop: "0.6rem",
             paddingBottom: "0.6rem",
             borderBottomColor: "var(--chakra-colors-border)",
@@ -623,7 +626,7 @@ export function AutomationRow({
             ) : null}
           </VStack>
         </Table.Cell>
-        <Table.Cell whiteSpace="nowrap">
+        <Table.Cell>
           <LastFiredCell trigger={trigger} stats={stats} />
         </Table.Cell>
         <Table.Cell>

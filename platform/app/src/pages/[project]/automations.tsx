@@ -761,19 +761,19 @@ function AutomationsPage() {
                             <Table.ColumnHeader width="20%">
                               Name
                             </Table.ColumnHeader>
-                            <Table.ColumnHeader width="18%">
+                            <Table.ColumnHeader width="17%">
                               Sends
                             </Table.ColumnHeader>
-                            <Table.ColumnHeader width="18%" whiteSpace="nowrap">
+                            <Table.ColumnHeader width="16%">
                               Schedule
                             </Table.ColumnHeader>
-                            <Table.ColumnHeader width="12%" whiteSpace="nowrap">
+                            <Table.ColumnHeader width="12%">
                               <MetricHeader
                                 label="Next run"
                                 help="When this next goes out, straight from the scheduler. A paused report has no next run."
                               />
                             </Table.ColumnHeader>
-                            <Table.ColumnHeader width="12%" whiteSpace="nowrap">
+                            <Table.ColumnHeader width="12%">
                               <MetricHeader
                                 label="Last run"
                                 help="The last time this was sent."
@@ -782,10 +782,10 @@ function AutomationsPage() {
                             <Table.ColumnHeader width="9%">
                               Delivery
                             </Table.ColumnHeader>
-                            <Table.ColumnHeader width="6%">
+                            <Table.ColumnHeader width="7%">
                               Active
                             </Table.ColumnHeader>
-                            <Table.ColumnHeader width="5%" />
+                            <Table.ColumnHeader width="7%" />
                           </Table.Row>
                         </Table.Header>
                         <Table.Body>
@@ -900,37 +900,37 @@ function AutomationsPage() {
                       <Table.Root variant="line" width="full">
                         <Table.Header>
                           <Table.Row>
-                            <Table.ColumnHeader width="20%">
+                            <Table.ColumnHeader width="19%">
                               Name
                             </Table.ColumnHeader>
-                            <Table.ColumnHeader width="22%">
+                            <Table.ColumnHeader width="20%">
                               Watches
                             </Table.ColumnHeader>
-                            <Table.ColumnHeader width="16%">
+                            <Table.ColumnHeader width="14%">
                               Delivery
                             </Table.ColumnHeader>
-                            <Table.ColumnHeader width="12%" whiteSpace="nowrap">
+                            <Table.ColumnHeader width="12%">
                               <MetricHeader
                                 label="Last fired"
                                 help="When this automation last fired and ran its delivery. Automations on a digest schedule also show when the next bundled send is due."
                               />
                             </Table.ColumnHeader>
-                            <Table.ColumnHeader width="10%" whiteSpace="nowrap">
+                            <Table.ColumnHeader width="11%">
                               <MetricHeader
                                 label="Fires (30 days)"
                                 help="Times this automation fired in the last 30 days."
                               />
                             </Table.ColumnHeader>
-                            <Table.ColumnHeader width="9%" whiteSpace="nowrap">
+                            <Table.ColumnHeader width="10%">
                               <MetricHeader
                                 label="Status"
                                 help="A graph-watching automation is firing while its metric is past the threshold, and back to OK when it recovers."
                               />
                             </Table.ColumnHeader>
-                            <Table.ColumnHeader width="6%">
+                            <Table.ColumnHeader width="7%">
                               Active
                             </Table.ColumnHeader>
-                            <Table.ColumnHeader width="5%" />
+                            <Table.ColumnHeader width="7%" />
                           </Table.Row>
                         </Table.Header>
                         <Table.Body>
