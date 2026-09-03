@@ -183,3 +183,125 @@ Feature: A test suite groups scenarios
     Then the change is refused with "suite_scope_not_allowed"
     When the suite editor tries to name the scenarios directly
     Then the change is refused with "validation_error"
+
+  # --- Fields on a test suite ---
+
+  # A test suite declares typed fields beyond situation and criteria, and every
+  # scenario filed in it carries one value per field. The identifier grammar
+  # and the value rules are in specs/scenarios/scenario-fields.feature.
+
+  @integration
+  Scenario: A test suite declares fields and reads them back
+    Given a test suite "Case lookups"
+    When the suite editor saves the fields golden_sql (text) and table_schema (text)
+    Then the test suite reads back with both fields in that order
+    And the public API returns the same fields on the test suite
+
+  @integration
+  Scenario: A field an evaluator reads cannot be removed
+    Given a test suite declaring the field golden_sql
+    And an evaluator attached to it with expected_output mapped to that field
+    When the suite editor saves the fields without golden_sql
+    Then the change is refused with "suite_field_in_use"
+    And the test suite keeps its fields and its evaluators
+
+  @unit
+  Scenario: A run plan takes evaluators but no fields
+    Given a run plan "Nightly"
+    When fields are written on it
+    Then the change is refused with "validation_error"
+
+  # --- Evaluators on a test suite ---
+
+  # An evaluator attached to a suite runs after every scenario run of that
+  # suite. Each of its inputs maps to a source: the conversation, the scenario
+  # (situation, criteria or a field) or the trace (retrieved contexts, or a
+  # tool call's input or output). A required evaluator that fails fails the
+  # scenario; a score-only evaluator reports and never gates.
+
+  @integration
+  Scenario: An evaluator is attached to a test suite with its mappings
+    Given a test suite declaring the field golden_sql
+    And a saved evaluator "SQL Query Equivalence" with inputs output, expected_output and expected_contexts
+    When the suite editor attaches it, required, with output from the last agent message and expected_output from golden_sql
+    Then the test suite reads back with the attachment and its mappings
+    And the public API returns the same evaluators on the test suite
+
+  @integration
+  Scenario: An attachment naming an evaluator the project does not have is refused
+    Given a test suite
+    When the suite editor attaches an evaluator id that names nothing in the project
+    Then the change is refused with "suite_evaluator_not_found"
+
+  @unit
+  Scenario: A mapping to a field the suite does not declare is refused
+    Given a test suite declaring the field golden_sql
+    When an attachment maps expected_output to the scenario field table_schema
+    Then the change is refused with "suite_evaluator_mapping_invalid"
+
+  @unit
+  Scenario: A mapping to a path no source has is refused
+    Given a test suite
+    When an attachment maps output to conversation.final_answer
+    Then the change is refused with "suite_evaluator_mapping_invalid"
+
+  @unit
+  Scenario: A run plan evaluator cannot read a scenario field
+    Given a run plan "Nightly"
+    When an evaluator attached to it maps expected_output to a scenario field
+    Then the change is refused with "suite_evaluator_mapping_invalid"
+
+  @unit
+  Scenario: Mappings are inferred when an evaluator is attached
+    Given a test suite declaring the fields golden_sql and table_schema
+    When an evaluator with inputs input, output, expected_output and expected_contexts is attached
+    Then input maps to the first user message
+    And output maps to the last agent message
+    And expected_output maps to the scenario field golden_sql
+    And expected_contexts maps to the scenario field table_schema
+
+  @unit
+  Scenario: A tool call is never inferred
+    Given a target whose traces show a run_sql tool call
+    When an evaluator with the input output is attached
+    Then output maps to the last agent message and not to the tool call
+
+  @unit
+  Scenario: A plan level attachment never maps to a scenario field
+    Given a run plan and a suite declaring the field golden_sql
+    When an evaluator with the input expected_output is attached to the run plan
+    Then expected_output has no mapping
+
+  @unit
+  Scenario: An attachment with an unmapped required input opens its drawer on attach
+    Given an evaluator whose required input expected_sql matches no field
+    When it is attached
+    Then the attachment lists expected_sql as missing
+    And the evaluator drawer opens right after the attach
+
+  @unit
+  Scenario: An attachment with every required input mapped and no expected-like input closes on attach
+    Given an evaluator with the required inputs input and output only
+    When it is attached
+    Then the attachment lists no missing input
+    And the evaluator drawer does not open
+
+  # --- Evaluators on a run plan ---
+
+  @integration
+  Scenario: A run plan carries its own evaluators beside the suites' ones
+    Given a test suite with one attached evaluator
+    And a run plan covering that suite with one evaluator of its own
+    When the attachments of a run of that plan are read
+    Then the suite's attachment comes first and the plan's after it
+    And an evaluator attached on both sides is listed once
+
+  # --- Missing mappings refuse a run ---
+
+  @integration
+  Scenario: A run is refused while a suite evaluator has a missing required mapping
+    Given a test suite with an evaluator whose required input expected_output is unmapped
+    When a run of that suite is started
+    Then the run is refused with "suite_evaluator_mappings_missing"
+    And the refusal names the evaluator, the suite and the input
+    And nothing is queued
