@@ -171,7 +171,9 @@ Feature: Langy asks a real question with selectable options
       Then the card renders superseded
       And the tool wait ends
 
-    @e2e
+    # No scenario run forces the fork, so a test that reads it would pass on a
+    # run where Langy had nothing to ask.
+    @e2e @unimplemented
     Scenario: Langy asks a real fork while changing code and continues after the answer
       Given my local folder is connected and Langy is instrumenting tracing
       When Langy reaches a choice between two files that could own the setup

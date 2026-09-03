@@ -58,6 +58,7 @@ describe("Langy reaches the code through the shared folder", () => {
 
   describe("when the user asks for tracing and shares the folder", () => {
     /** @scenario A scenario checks that Langy instruments tracing through a shared folder */
+    /** @scenario Instrumenting traces offers the two ways to reach the code */
     it(
       "offers both ways, works on a branch, and commits the SDK calls",
       async () => {

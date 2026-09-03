@@ -37,6 +37,7 @@ describe("Langy asks for the code only when the code has to change", () => {
 
   describe("when the work is platform work", () => {
     /** @scenario A scenario checks that platform work never asks for the code */
+    /** @scenario Creating a scenario on the platform needs no code */
     it(
       "creates the scenario and never asks how to reach the code",
       async () => {

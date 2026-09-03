@@ -259,6 +259,7 @@ describe("given a folder connected to a Langy conversation", () => {
       expect((result!.error as { code: string }).code).toBe("permission_denied");
     });
 
+    /** @scenario "A session grant silences the next matching command" */
     it("runs the call when the answer allows it, and a pattern grant silences the next one", async () => {
       start();
       await settle();
@@ -294,6 +295,38 @@ describe("given a folder connected to a Langy conversation", () => {
         what: "the granted command to answer with no second card",
       });
       expect(socket.sentOf("permission_required")).toHaveLength(1);
+    });
+
+    /** @scenario "A grant lives with the session, not with the conversation" */
+    it("forgets the grant when the command line is started again", async () => {
+      start();
+      await settle();
+      register();
+      socket.deliver(
+        callFrame({ tool: "local_bash", params: { command: "true" } }),
+      );
+      await settle();
+      socket.deliver({
+        type: "permission",
+        callId: "call-1",
+        decision: "allow_pattern",
+      });
+      await waitUntil(() => socket.sentOf("result").length === 1, {
+        what: "the allowed command to answer",
+      });
+      await session.client.stop();
+
+      // The same conversation, the same command, a new run of the command
+      // line: the grant belonged to the session, so it is gone with it.
+      start();
+      await settle();
+      register();
+      socket.deliver(
+        callFrame({ tool: "local_bash", params: { command: "true" } }),
+      );
+      await waitUntil(() => socket.sentOf("permission_required").length === 1, {
+        what: "the second session to ask again",
+      });
     });
   });
 
