@@ -16,6 +16,10 @@ import { useColorMode } from "~/components/ui/color-mode";
 import { RESERVED_PARAMETERS } from "~/server/analytics/dashboardWidgetDefinition";
 import dynamic from "~/utils/compat/next-dynamic";
 
+import { LW_GLOBAL_DTS } from "./bridge/lwGlobalTypes";
+
+const LW_GLOBAL_DTS_URI = "file:///lw-global.d.ts";
+
 const MonacoEditor = dynamic(() => import("@monaco-editor/react"), {
   ssr: false,
   loading: () => (
@@ -57,6 +61,19 @@ const configureTypeScriptDefaults: BeforeMount = (monaco) => {
     noSemanticValidation: true,
     noSyntaxValidation: false,
   });
+
+  // Guard against re-registering on every mount (both the in-card Code view
+  // and the edit drawer call this) — addExtraLib would otherwise stack
+  // duplicate libs under the same content each time a pane mounts.
+  const alreadyRegistered =
+    monaco.languages.typescript.typescriptDefaults
+      .getExtraLibs()[LW_GLOBAL_DTS_URI] !== undefined;
+  if (!alreadyRegistered) {
+    monaco.languages.typescript.typescriptDefaults.addExtraLib(
+      LW_GLOBAL_DTS,
+      LW_GLOBAL_DTS_URI,
+    );
+  }
 };
 
 /** Matches ClickHouse bound-param tokens like `{period_start:DateTime}`. */
