@@ -18,6 +18,24 @@ import type {
   ScenarioVersionSummary,
 } from "@langwatch/scenario-contract";
 
+/**
+ * One run plan row, read for the results tab and the run-configuration
+ * history — a `SimulationSuite` row of any kind, not only `test_suite`.
+ *
+ * `scope` and `targets` stay `unknown`: they are Prisma `Json` columns and
+ * each reader parses them with its own schema (`SuiteScope`/`SuiteTarget`
+ * from `@langwatch/suite-contract`).
+ */
+export interface ScenarioPlanRecord {
+  id: string;
+  name: string;
+  slug: string;
+  kind: string;
+  scope: unknown;
+  scenarioIds: string[];
+  targets: unknown;
+}
+
 export abstract class ScenarioRepository {
   abstract create(
     input: ScenarioCreateInput & { id: string; actor: ScenarioActor },
@@ -59,11 +77,31 @@ export abstract class ScenarioRepository {
     ids: string[];
     projectId: string;
   }): Promise<{ id: string; name: string }[]>;
+  abstract findModelChoices(input: {
+    ids: string[];
+    projectId: string;
+  }): Promise<{ id: string; simulatorModel: string | null; judgeModel: string | null }[]>;
+  /** Scenario ids carrying any of these labels, or filed in any of these test suites. */
+  abstract findIdsByLabelsOrTestSuites(input: {
+    projectId: string;
+    labels?: string[];
+    testSuiteIds?: string[];
+  }): Promise<string[]>;
+  /** A scenario's title and labels, for the results tab's scenario grouping. */
+  abstract findTitlesByIds(input: {
+    ids: string[];
+    projectId: string;
+  }): Promise<{ id: string; name: string; labels: string[] }[]>;
+  /** Every non-archived run plan of the project, every kind. */
+  abstract findPlans(input: { projectId: string }): Promise<ScenarioPlanRecord[]>;
   abstract createTestSuite(
     input: ScenarioTestSuiteCreateInput & { id: string },
   ): Promise<ScenarioTestSuite>;
   abstract tryFindTestSuite(input: ScenarioTestSuiteIdInput): Promise<ScenarioTestSuite | null>;
-  abstract findTestSuites(input: { projectId: string }): Promise<ScenarioTestSuite[]>;
+  abstract findTestSuites(input: {
+    projectId: string;
+    includeArchived?: boolean;
+  }): Promise<ScenarioTestSuite[]>;
   abstract renameTestSuite(input: ScenarioTestSuiteRenameInput): Promise<ScenarioTestSuite>;
   abstract updateTestSuite(input: ScenarioTestSuiteUpdateInput): Promise<ScenarioTestSuite>;
   abstract getTestSuiteRunDefinition(

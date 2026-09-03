@@ -20,7 +20,6 @@ import { LiteMemberRestrictedError, type AuthzService } from "@langwatch/authz-c
 import { HandledError } from "@langwatch/handled-error";
 import { createLogger, type Logger } from "@langwatch/observability";
 import type { PrismaConnection } from "@langwatch/prisma-client";
-import type { TRPCRouterRecord } from "@trpc/server";
 import type { ZodTypeAny } from "zod";
 import type { ApiAuditPort } from "../api-request.policy";
 import { ApiTrpcFeaturesPort, type ApiTrpcFeatureMount } from "../api.application";
@@ -29,7 +28,7 @@ import {
   type ApiTrpcCollaborators,
 } from "../app-trpc/app-trpc.collaborators";
 import type { ApiTrpcFeatureApplication } from "../app-trpc/app-trpc.context";
-import { createAppTrpcFeatures } from "../app-trpc/app-trpc.features";
+import { createAppTrpcFeatures, type AppTrpcFeatureRecord } from "../app-trpc/app-trpc.features";
 import { createApiTrpcPorts } from "./api-trpc-ports.composition";
 import type { ApiAgentGroupCollaborators } from "./api-trpc-collaborators.agent-group.composition";
 import type { ApiAnalyticsCollaborators } from "./api-trpc-collaborators.analytics.composition";
@@ -201,12 +200,7 @@ export class ApiTrpcFeaturesComposition<
       options.report?.absent("no-collaborators");
       return undefined;
     }
-    return new ApiTrpcFeaturesComposition(
-      database.client,
-      authz,
-      options.audit,
-      collaborators,
-    );
+    return new ApiTrpcFeaturesComposition(database.client, authz, options.audit, collaborators);
   }
 
   readonly application: ApiTrpcFeatureApplication;
@@ -266,7 +260,7 @@ export class ApiTrpcFeaturesComposition<
       failure instanceof Error ? failure : new Error(String(failure)),
   };
 
-  build(mount: ApiTrpcFeatureMount): TRPCRouterRecord {
+  build(mount: ApiTrpcFeatureMount): AppTrpcFeatureRecord {
     const ports = createApiTrpcPorts({
       prisma: this.prisma,
       authz: this.authorization,
@@ -274,7 +268,7 @@ export class ApiTrpcFeaturesComposition<
       mount,
       collaborators: this.collaborators,
     });
-    return createAppTrpcFeatures({ mount, ports }) as unknown as TRPCRouterRecord;
+    return createAppTrpcFeatures({ mount, ports });
   }
 
   private readonly logger: Pick<Logger, "error"> = createLogger("langwatch:api:trpc");
@@ -308,6 +302,17 @@ export class LoggedApiTrpcFeaturesAbsence extends ApiTrpcCollaboratorsAbsence {
  * process composed nothing for it — see that half's own composing function
  * for why it can be missing.
  */
+/**
+ * The same ten once every one of them is present.
+ *
+ * `Required<>` is not this: it strips the `?` a member does not have and leaves
+ * the `| undefined` a member does, so the whole record read below stayed
+ * nullable and every `half.field` became "possibly undefined".
+ */
+type ComposedApiTrpcCollaboratorHalves = {
+  readonly [K in keyof ApiTrpcCollaboratorHalves]-?: NonNullable<ApiTrpcCollaboratorHalves[K]>;
+};
+
 export type ApiTrpcCollaboratorHalves = Readonly<{
   product: ApiProductCollaborators | undefined;
   analytics: ApiAnalyticsCollaborators | undefined;
@@ -361,7 +366,7 @@ export function composeApiTrpcCollaborators(
     orgGroup,
     productInfra,
     gatewayGroup,
-  } = halves as Required<ApiTrpcCollaboratorHalves>;
+  } = halves as ComposedApiTrpcCollaboratorHalves;
 
   return {
     application: {
@@ -377,7 +382,8 @@ export function composeApiTrpcCollaborators(
       evaluatorApp: productGroup.evaluatorApp,
       featureFlags: productGroup.featureFlagService,
       permissions: productGroup.permissions,
-      projects: productGroup.projectReads,
+      // `projects` is the ORG group's: `...orgGroup.application` below carries
+      // it and overwrote the product group's reader in this slot, silently.
       prompts: productGroup.promptApp,
       roles: productGroup.roleApp,
       traces: traceGroup.traces,

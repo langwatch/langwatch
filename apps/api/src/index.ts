@@ -255,7 +255,11 @@ export {
   createScenariosRestApp,
   createSimulationRunsRestApp,
 } from "@langwatch/scenario-server";
-export { createSuiteRestApp } from "@langwatch/suite-server";
+export {
+  createRunPlansV1RestApp,
+  createSuiteRestApp,
+  createTestSuitesV1RestApp,
+} from "@langwatch/suite-server";
 export {
   createWorkflowsRestApp,
   type WorkflowEvaluationOutcome,

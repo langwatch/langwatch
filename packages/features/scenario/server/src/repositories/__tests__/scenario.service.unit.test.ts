@@ -21,7 +21,7 @@ import {
 } from "@langwatch/scenario-contract";
 import { SimulationService } from "@langwatch/scenario-contract";
 import { describe, expect, it } from "vitest";
-import { ScenarioRepository } from "../scenario.repository";
+import { ScenarioRepository, type ScenarioPlanRecord } from "../scenario.repository";
 import { ScenarioService } from "../../services/scenario.service";
 import { ScenarioClockPort } from "../../ports/scenario-clock.port";
 import { ScenarioTestSuiteIdPort, ScenarioIdPort } from "../../ports/scenario-id.port";
@@ -240,6 +240,45 @@ class MemoryScenarioRepository extends ScenarioRepository {
     return [...this.rows.values()]
       .filter((row) => input.ids.includes(row.id) && row.projectId === input.projectId)
       .map(({ id, name }) => ({ id, name }));
+  }
+
+  async findModelChoices(input: {
+    ids: string[];
+    projectId: string;
+  }): Promise<{ id: string; simulatorModel: string | null; judgeModel: string | null }[]> {
+    return [...this.rows.values()]
+      .filter((row) => input.ids.includes(row.id) && row.projectId === input.projectId)
+      .map(({ id, simulatorModel, judgeModel }) => ({ id, simulatorModel, judgeModel }));
+  }
+
+  async findIdsByLabelsOrTestSuites(input: {
+    projectId: string;
+    labels?: string[];
+    testSuiteIds?: string[];
+  }): Promise<string[]> {
+    const labels = input.labels ?? [];
+    const testSuiteIds = input.testSuiteIds ?? [];
+    return [...this.rows.values()]
+      .filter(
+        (row) =>
+          row.projectId === input.projectId &&
+          (row.labels.some((label) => labels.includes(label)) ||
+            (row.testSuiteId !== null && testSuiteIds.includes(row.testSuiteId))),
+      )
+      .map((row) => row.id);
+  }
+
+  async findTitlesByIds(input: {
+    ids: string[];
+    projectId: string;
+  }): Promise<{ id: string; name: string; labels: string[] }[]> {
+    return [...this.rows.values()]
+      .filter((row) => input.ids.includes(row.id) && row.projectId === input.projectId)
+      .map(({ id, name, labels }) => ({ id, name, labels }));
+  }
+
+  async findPlans(): Promise<ScenarioPlanRecord[]> {
+    return [];
   }
 
   async createTestSuite(

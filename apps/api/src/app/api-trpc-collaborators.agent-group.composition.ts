@@ -126,9 +126,7 @@ import {
   AgentTestService,
   PrismaScenarioAdapter,
   ResultAtomsClickHouseAdapter,
-  ResultAtomsReadPort,
   RunConfigurationsClickHouseAdapter,
-  RunConfigurationsReadPort,
   ScenarioApp,
   ScenarioClockPort,
   ScenarioExecutionPrefetcherService,
@@ -528,6 +526,8 @@ export function composeApiAgentGroupCollaborators(
     scenarioTabs,
     users: options.users,
     broadcast: options.broadcast,
+    resultAtoms: composeResultAtoms(options),
+    runConfigurations: composeRunConfigurations(options),
   });
 
   // "Test agent": the same target prefetch and adapter registry a real run
@@ -600,58 +600,17 @@ function composeSimulations(
 }
 
 /**
- * The Results tab reads, refused by name rather than answered empty.
+ * The Results tab reads, and the run dialog's configuration history.
  *
- * Unlike `composeSimulations`, an empty answer here would be misleading: the
+ * `createUnavailable` rather than `createNull` when there is no ClickHouse:
+ * unlike `composeSimulations`, an empty answer here would be misleading — the
  * stat strip and the group rows are what tells an operator whether a
- * deployment with no ClickHouse endpoint is failing or merely quiet, so this
- * refuses instead of quietly reporting zero runs.
+ * deployment with no ClickHouse endpoint is failing or merely quiet, so both
+ * refuse by name instead of quietly reporting zero runs.
  */
-class UnavailableApiResultAtomsRepository extends ResultAtomsReadPort {
-  private refuse<T>(): Promise<T> {
-    return Promise.reject(new ApiAgentGroupUnavailableError("Reading the Results tab"));
-  }
-  findAtoms(): ReturnType<ResultAtomsReadPort["findAtoms"]> {
-    return this.refuse();
-  }
-  findRunOrdinals(): ReturnType<ResultAtomsReadPort["findRunOrdinals"]> {
-    return this.refuse();
-  }
-  aggregateTotals(): ReturnType<ResultAtomsReadPort["aggregateTotals"]> {
-    return this.refuse();
-  }
-  aggregateGroups(): ReturnType<ResultAtomsReadPort["aggregateGroups"]> {
-    return this.refuse();
-  }
-  findCodeScenarios(): ReturnType<ResultAtomsReadPort["findCodeScenarios"]> {
-    return this.refuse();
-  }
-  findRunTargets(): ReturnType<ResultAtomsReadPort["findRunTargets"]> {
-    return this.refuse();
-  }
-  aggregateTrend(): ReturnType<ResultAtomsReadPort["aggregateTrend"]> {
-    return this.refuse();
-  }
-  aggregateSeries(): ReturnType<ResultAtomsReadPort["aggregateSeries"]> {
-    return this.refuse();
-  }
-}
-
-/** The run dialog's configuration history, refused by name for the same reason. */
-class UnavailableApiRunConfigurationsRepository extends RunConfigurationsReadPort {
-  findConfigurations(): ReturnType<RunConfigurationsReadPort["findConfigurations"]> {
-    return Promise.reject(
-      new ApiAgentGroupUnavailableError("Reading the run configuration history"),
-    );
-  }
-}
-
 function composeResultAtoms(options: ApiAgentGroupCollaboratorsOptions): ResultAtomsService {
   if (!options.resolveClickHouseClient) {
-    return ResultAtomsService.create(
-      new UnavailableApiResultAtomsRepository(),
-      PrismaScenarioRepository.create(options.prisma),
-    );
+    return ResultAtomsClickHouseAdapter.createUnavailable({ prisma: options.prisma });
   }
   return ResultAtomsClickHouseAdapter.create({
     resolveClient: options.resolveClickHouseClient,
@@ -663,10 +622,7 @@ function composeRunConfigurations(
   options: ApiAgentGroupCollaboratorsOptions,
 ): RunConfigurationsService {
   if (!options.resolveClickHouseClient) {
-    return RunConfigurationsService.create(
-      new UnavailableApiRunConfigurationsRepository(),
-      PrismaScenarioRepository.create(options.prisma),
-    );
+    return RunConfigurationsClickHouseAdapter.createUnavailable({ prisma: options.prisma });
   }
   return RunConfigurationsClickHouseAdapter.create({
     resolveClient: options.resolveClickHouseClient,

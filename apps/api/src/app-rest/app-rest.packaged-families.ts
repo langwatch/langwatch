@@ -104,7 +104,11 @@ import type {
 } from "@langwatch/stored-object-server";
 import { createFilesRestApp } from "@langwatch/stored-object-server";
 import type { SuiteApp } from "@langwatch/suite-server";
-import { createSuiteRestApp } from "@langwatch/suite-server";
+import {
+  createRunPlansV1RestApp,
+  createSuiteRestApp,
+  createTestSuitesV1RestApp,
+} from "@langwatch/suite-server";
 import { createEventsRestApp, type TrackedEventPorts } from "@langwatch/trace-server";
 import {
   createMeRestApp,
@@ -356,6 +360,7 @@ export type ApiPackagedRestFamilyName =
   | "projects"
   | "role-bindings"
   | "roles"
+  | "run-plans"
   | "scenario-events"
   | "scenarios"
   | "scim-tokens"
@@ -363,6 +368,7 @@ export type ApiPackagedRestFamilyName =
   | "simulation-runs"
   | "suites"
   | "teams"
+  | "test-suites"
   | "triggers"
   | "user-avatar"
   | "tracked-events"
@@ -724,6 +730,22 @@ export function mountApiPackagedRestFamilies(options: {
     "suites",
     suites
       ? () => createSuiteRestApp({ security, suites, platformUrl: ports.platformUrl }).hono
+      : null,
+  );
+  // The published families a run plan and a test suite each own — `suites`
+  // above is the deprecated `/api/suites` alias that predates the split, and
+  // all three read the SAME SuiteApp so the fallback order and the resolved
+  // organization never disagree between doors.
+  mount(
+    "run-plans",
+    suites
+      ? () => createRunPlansV1RestApp({ security, suites, platformUrl: ports.platformUrl }).hono
+      : null,
+  );
+  mount(
+    "test-suites",
+    suites
+      ? () => createTestSuitesV1RestApp({ security, suites, platformUrl: ports.platformUrl }).hono
       : null,
   );
 

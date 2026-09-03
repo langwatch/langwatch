@@ -1,4 +1,5 @@
 import { AgentService } from "@langwatch/agent-contract";
+import { closeConnectedAgentRuntime } from "@langwatch/agent-server";
 import {
   ApiKeyService,
   type OrganizationApiKeyResolution,
@@ -12,7 +13,7 @@ import { AesGcmSecretEncryptionAdapter } from "@langwatch/secret-server";
 import { OrganizationService } from "@langwatch/organization-contract";
 import type { UserService } from "@langwatch/user-contract";
 import { Hono } from "hono";
-import { beforeEach, describe, expect, it, vi } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 const processMocks = vi.hoisted(() => {
   const process = { start: vi.fn(async () => undefined), close: vi.fn(async () => undefined) };
@@ -210,6 +211,16 @@ const secret: Secret = {
 };
 
 describe("ApiProductionComposition", () => {
+  // `installConnectedAgentRedis` composes a process-wide singleton
+  // (`@langwatch/agent-server`'s `getConnectedAgentRuntime`) that refuses a
+  // second install once built — correct for one live process, but this file
+  // composes many `ApiProductionComposition`s in one test process. Closing
+  // after each test is what makes every composition resolve its own runtime
+  // once, rather than colliding with the previous test's.
+  afterEach(async () => {
+    await closeConnectedAgentRuntime();
+  });
+
   it("constructs one API-key REST adapter in process composition and propagates its actor and ceiling", async () => {
     const apiKeys = apiKeyService(resolvedKey);
     const authz = authzService(true);

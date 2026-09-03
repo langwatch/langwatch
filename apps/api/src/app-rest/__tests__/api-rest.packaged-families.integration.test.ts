@@ -43,6 +43,7 @@ const project = { id: "project-1", slug: "acme", teamId: "team-1", name: "Acme" 
 const FAMILY_PATHS: ReadonlyArray<readonly [ApiPackagedRestFamilyName, string]> = [
   ["agent-cache", "/api/agent-cache"],
   ["agents", "/api/agents"],
+  ["agents-v1", "/api/v1/agents"],
   ["coding-agent", "/api/coding-agent"],
   ["coding-agent-v1", "/api/v1/coding-agent"],
   ["dashboards", "/api/dashboards"],
@@ -61,6 +62,7 @@ const FAMILY_PATHS: ReadonlyArray<readonly [ApiPackagedRestFamilyName, string]> 
   ["projects", "/api/projects"],
   ["roles", "/api/roles"],
   ["role-bindings", "/api/role-bindings"],
+  ["run-plans", "/api/v1/run-plans"],
   ["scenarios", "/api/scenarios"],
   ["scenario-events", "/api/scenario-events"],
   ["scim-tokens", "/api/scim-tokens"],
@@ -68,6 +70,7 @@ const FAMILY_PATHS: ReadonlyArray<readonly [ApiPackagedRestFamilyName, string]> 
   ["simulation-runs", "/api/simulation-runs"],
   ["suites", "/api/suites"],
   ["teams", "/api/teams"],
+  ["test-suites", "/api/v1/test-suites"],
   ["tracked-events", "/api/events/track"],
   ["tracked-events", "/api/track_event"],
   ["triggers", "/api/triggers"],

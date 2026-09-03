@@ -4,12 +4,14 @@ import {
   type ProcessObservabilityOptions,
 } from "@langwatch/observability/node";
 import type { AgentService } from "@langwatch/agent-contract";
-import type { AgentTestPort } from "@langwatch/agent-server";
+import type { AgentAppDependencies, AgentTestPort } from "@langwatch/agent-server";
 import type { SecretService } from "@langwatch/secret-contract";
+import type { TRPCCreateRouterOptions } from "@trpc/server";
 import {
   ApiApplication,
   MissingAgentService,
   MissingSecretService,
+  NoApiTrpcFeatures,
   type ApiHttpOptions,
   type ApiSubscriptionMount,
   type ApiTrpcFeaturesPort,
@@ -48,6 +50,8 @@ export class ApiProcess {
     agents?: AgentService;
     /** Absent for a process that composed no Scenario application; see ApiApplication. */
     agentTesting?: AgentTestPort;
+    /** Absent for a process that composed no connected-agent transport; see ApiApplication. */
+    connectedAgents?: AgentAppDependencies["connected"];
     /** Absent for a process that composed no secret service; ApiApplication gets the null object. */
     secrets?: SecretService;
     http?: Omit<ApiHttpOptions, "logger">;
@@ -67,9 +71,11 @@ export class ApiProcess {
     metrics?: ApiMetricsPort;
     /**
      * The packaged tRPC namespaces, when this process composed them. Absent
-     * leaves the root serving exactly the two routers it served before.
+     * leaves the root serving exactly the two routers it served before —
+     * forwarded as {@link NoApiTrpcFeatures}, since the application requires
+     * the port rather than defaulting to one internally.
      */
-    features?: ApiTrpcFeaturesPort;
+    features?: ApiTrpcFeaturesPort<TRPCCreateRouterOptions>;
   }): ApiProcess {
     if (options.http && options.requestPolicy) {
       throw new Error("API process composition accepts HTTP options or request policy, not both.");
@@ -86,8 +92,9 @@ export class ApiProcess {
       // name instead of leaving the router off the wire.
       agents: options.agents ?? new MissingAgentService(),
       agentTesting: options.agentTesting,
+      ...(options.connectedAgents ? { connectedAgents: options.connectedAgents } : {}),
       secrets: options.secrets ?? new MissingSecretService(),
-      ...(options.features ? { features: options.features } : {}),
+      features: options.features ?? new NoApiTrpcFeatures(),
       http: {
         ...http,
         ...(options.subscriptions ? { subscriptions: options.subscriptions } : {}),
@@ -122,7 +129,14 @@ export class ApiProcess {
   private closing: Promise<void> | undefined;
 
   private constructor(
-    readonly application: ApiApplication,
+    /**
+     * Widened to the record BOUND rather than this process's own instantiation:
+     * a deployment that composed no packaged surfaces holds an application over
+     * an empty record, and a process type that named only the full one could not
+     * hold it. Nothing reads a namespace off this — `AppRouter` is read from the
+     * class, not from a process instance.
+     */
+    readonly application: ApiApplication<TRPCCreateRouterOptions>,
     private readonly observability: ProcessObservability,
     private readonly listener: ApiHttpListener | undefined,
     private readonly graph: ApiProcessGraphPort | undefined,

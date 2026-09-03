@@ -9,6 +9,26 @@ export * from "./ports/scenario-execution-pool.port";
 export * from "./ports/scenario-processor-metrics.port";
 export * from "./ports/scenario-secret-cipher.port";
 export * from "./ports/scenario-tab-store.port";
+export {
+  ResultAtomsReadPort,
+  MAX_ATOM_PAGE,
+  MAX_TREND_POINTS,
+  MAX_CODE_SCENARIOS,
+  MAX_RUN_TARGETS,
+  type RawAtomRow,
+  type RunOrdinalRow,
+  type RawGroupRow,
+  type RawTrendRow,
+  type RawCodeScenarioRow,
+  type RawRunTargetRow,
+  type RawSeriesRow,
+  type RawTotalsRow,
+} from "./ports/result-atoms-read.port";
+export {
+  RunConfigurationsReadPort,
+  MAX_RUN_CONFIGURATIONS,
+  type RawRunConfigurationRow,
+} from "./ports/run-configurations-read.port";
 export * from "./services/scenario-execution-pool.service";
 export * from "./services/scenario-execution.service";
 export * from "./services/scenario-execution-prefetcher.service";
@@ -30,12 +50,15 @@ export {
 export * from "./services/scenario-failure-handler.service";
 export * from "./services/scenario-processor.service";
 export * from "./services/scenario-tab-registry.service";
+export * from "./adapters/child-egress-policy.adapter";
 export * from "./adapters/child-logger.adapter";
 export * from "./adapters/child-process-spawn.adapter";
 export * from "./adapters/child-tls-env.adapter";
 export * from "./adapters/http-auth.adapter";
 export * from "./adapters/litellm-model.adapter";
+export { closeNlpFetchDispatchers } from "./adapters/nlp-fetch.adapter";
 export * from "./adapters/node-scenario-child-process.adapter";
+export { OtelScenarioProcessorMetricsAdapter } from "./adapters/otel.scenario-processor-metrics.adapter";
 export * from "./adapters/prompt-template.adapter";
 export * from "./adapters/remote-trace-run.adapter";
 export * from "./adapters/redis.cancellation-channel.adapter";
@@ -101,6 +124,18 @@ export {
   type ScenarioBroadcast,
   type ScenarioCaller,
 } from "./app/scenario.app";
+export { ResultAtomsService } from "./services/result-atoms.service";
+export {
+  RunConfigurationsService,
+  type RunConfiguration,
+  type RunConfigurationEntry,
+  type RunConfigurationScope,
+} from "./services/run-configurations.service";
+export {
+  ResultAtomsClickHouseAdapter,
+  type ResultAtomsClickHouseClient,
+} from "./adapters/result-atoms.clickhouse.adapter";
+export { RunConfigurationsClickHouseAdapter } from "./adapters/run-configurations.clickhouse.adapter";
 export { ScenarioTrpcApi } from "./transport/api-trpc/scenario.api";
 export { filterRunsByTimestamp } from "./transport/api-trpc/scenario-events.api";
 export {

@@ -2,6 +2,7 @@ import { AgentService } from "@langwatch/agent-contract";
 import {
   AgentApp,
   AgentTrpcApi,
+  type AgentAppDependencies,
   type AgentTestPort,
   type AgentTrpcContext,
 } from "@langwatch/agent-server";
@@ -11,7 +12,12 @@ import { createLogger, type Logger } from "@langwatch/observability";
 import { runWithContext } from "@langwatch/observability/context";
 import { SecretService } from "@langwatch/secret-contract";
 import { SecretApp, SecretTrpcApi, type SecretTrpcContext } from "@langwatch/secret-server";
-import { TRPCError, type TRPCDefaultErrorShape, type TRPCRouterRecord } from "@trpc/server";
+import {
+  TRPCError,
+  type AnyTRPCRouter,
+  type TRPCCreateRouterOptions,
+  type TRPCDefaultErrorShape,
+} from "@trpc/server";
 import {
   TrpcRootDefinition,
   type AppTrpcPolicyMiddlewares,
@@ -25,6 +31,7 @@ import { fetchRequestHandler } from "@trpc/server/adapters/fetch";
 import { trace } from "@opentelemetry/api";
 import { Hono } from "hono";
 import superjson from "superjson";
+import type { AppTrpcFeatureRecord } from "./app-trpc/app-trpc.features";
 import type { TopicApiFeature } from "./features/topic/topic-api.feature";
 import type { ApiRequestFailureCapturePort } from "./api-process.lifecycle";
 import type { SseSubscriptionPorts } from "./app-trpc/app-trpc.sse";
@@ -73,7 +80,7 @@ export type ApiAuditEvent = Readonly<{
   error: unknown;
 }>;
 
-type ApiErrorFormatter = (options: {
+export type ApiErrorFormatter = (options: {
   shape: TRPCDefaultErrorShape;
   error: { cause?: unknown; message?: string; code?: string };
 }) => TRPCDefaultErrorShape;
@@ -189,7 +196,9 @@ export type ApiTrpcFeatureMount = Readonly<{
  * exactly what it served before, and every `ctx.app` slice a packaged surface
  * would have read is absent rather than faked.
  */
-export abstract class ApiTrpcFeaturesPort {
+export abstract class ApiTrpcFeaturesPort<
+  TRecord extends TRPCCreateRouterOptions = AppTrpcFeatureRecord,
+> {
   /** The AuthZ decisions every declared check and the lineage guard run on. */
   abstract readonly authorization: TrpcAuthorizationDecisions;
   /** The two refusals whose concrete error class is this process's to choose. */
@@ -201,7 +210,7 @@ export abstract class ApiTrpcFeaturesPort {
   /** The application slices the mounted surfaces read off `ctx.app`. */
   abstract readonly application: ApiTrpcFeatureApplication;
   /** Builds the namespace record on this process's mount. */
-  abstract build(mount: ApiTrpcFeatureMount): TRPCRouterRecord;
+  abstract build(mount: ApiTrpcFeatureMount): TRecord;
 }
 
 export class MissingAgentService extends AgentService {
@@ -349,7 +358,7 @@ function handledErrorCode(error: HandledError): TRPCError["code"] {
  * failure, and a formatter that omits them turns a named model-provider
  * refusal into an unrenderable generic on the surface that serves it.
  */
-const defaultErrorFormatter: ApiErrorFormatter = appTrpcErrorFormatter;
+export const defaultErrorFormatter: ApiErrorFormatter = appTrpcErrorFormatter;
 
 /**
  * What stands in for the packaged application on a process that composed no
@@ -372,7 +381,57 @@ const unavailableFeatureApplication = new Proxy({} as ApiTrpcFeatureApplication,
   },
 });
 
-function createTrpcRoot(errorFormatter: ApiErrorFormatter) {
+/**
+ * What a process that composed no packaged surfaces mounts instead.
+ *
+ * The same bargain {@link MissingAgentService} and {@link MissingSecretService}
+ * make: the port is REQUIRED, so a deployment with no collaborators names this
+ * rather than the application quietly defaulting to one. Its record is empty
+ * and honestly so — nothing is mounted, so no policy chain built from the four
+ * refusals below is ever reached, and `agents.*` and `secrets.*` are the whole
+ * wire surface exactly as they were.
+ */
+export class NoApiTrpcFeatures extends ApiTrpcFeaturesPort<Record<string, never>> {
+  private unavailable(): never {
+    throw new Error(
+      "No packaged tRPC surfaces were composed for this API application, so its policy chain has nothing to decide.",
+    );
+  }
+
+  readonly authorization: TrpcAuthorizationDecisions = {
+    getDecision: () => this.unavailable(),
+    getProjectAnyDecision: () => this.unavailable(),
+    checkScopeLineage: () => this.unavailable(),
+  };
+
+  readonly denials: TrpcAuthorizationDenialPort = {
+    membershipDisabled: () => this.unavailable(),
+    liteMemberRestricted: () => this.unavailable(),
+  };
+
+  readonly causes: TrpcCauseTranslationPort = { translate: () => undefined };
+
+  readonly errorReporting: TrpcErrorReportingPort = {
+    capture: () => this.unavailable(),
+    asError: () => this.unavailable(),
+  };
+
+  readonly application = unavailableFeatureApplication;
+
+  build(): Record<string, never> {
+    return {};
+  }
+}
+
+/**
+ * This process's one tRPC root.
+ *
+ * Exported so a test can build the SAME root the application does — the
+ * packaged record is typed against `ApiTrpcFeatureMount`, so a second root
+ * shaped by hand would not satisfy it and the test would be proving something
+ * else.
+ */
+export function createTrpcRoot(errorFormatter: ApiErrorFormatter = defaultErrorFormatter) {
   return TrpcRootDefinition.forContext<ApiTrpcContext>().create({
     transformer: superjson,
     errorFormatter,
@@ -384,8 +443,10 @@ function createTrpcRoot(errorFormatter: ApiErrorFormatter) {
  * policy is injected at boot so platform-specific session and audit adapters
  * do not leak into feature packages.
  */
-export class ApiApplication {
-  static create(options: {
+export class ApiApplication<
+  TRecord extends TRPCCreateRouterOptions = AppTrpcFeatureRecord,
+> {
+  static create<TRecord extends TRPCCreateRouterOptions>(options: {
     /**
      * Required — a process that composes no real agent service passes
      * {@link MissingAgentService}, which mounts the router and refuses every
@@ -400,6 +461,13 @@ export class ApiApplication {
      */
     agentTesting?: AgentTestPort;
     /**
+     * Reads presence off the connected-agent runtime (ADR-128). Absent on a
+     * process that composed no connected-agent transport: every agent then
+     * reads as offline with no instances and no owner, the same degrade a
+     * process with no `connected` dependency at all gives `AgentApp`.
+     */
+    connectedAgents?: AgentAppDependencies["connected"];
+    /**
      * Required — a process that composes no real secret service passes
      * {@link MissingSecretService}, which mounts the router and refuses every
      * call by name instead of leaving `secrets.*` off the wire.
@@ -409,16 +477,20 @@ export class ApiApplication {
     http?: ApiHttpOptions;
     rest?: Hono;
     /**
-     * The packaged namespace record, when this process composed one. Absent
-     * leaves the root exactly as it was: two routers, and no policy chain
-     * built for surfaces that are not there.
+     * Required — a process that composed no packaged surfaces passes
+     * {@link NoApiTrpcFeatures}, whose record is empty, so the root is exactly
+     * what it was: two routers and nothing else.
      */
-    features?: ApiTrpcFeaturesPort;
-  }): ApiApplication {
+    features: ApiTrpcFeaturesPort<TRecord>;
+  }): ApiApplication<TRecord> {
     options.topic?.install();
-    return new ApiApplication(
+    return new ApiApplication<TRecord>(
       {
-        agents: AgentApp.create({ agents: options.agents, testing: options.agentTesting }),
+        agents: AgentApp.create({
+          agents: options.agents,
+          testing: options.agentTesting,
+          ...(options.connectedAgents ? { connected: options.connectedAgents } : {}),
+        }),
         secrets: SecretApp.create({ secrets: options.secrets }),
       },
       options.http,
@@ -438,7 +510,7 @@ export class ApiApplication {
     private readonly http: ApiHttpOptions | undefined,
     rest: Hono | undefined,
     readonly topic: TopicApiFeature | undefined,
-    private readonly features: ApiTrpcFeaturesPort | undefined,
+    private readonly features: ApiTrpcFeaturesPort<TRecord>,
   ) {
     this.root = createTrpcRoot(http?.errorFormatter ?? defaultErrorFormatter);
     const protectedProcedure = this.createProtectedProcedure();
@@ -462,9 +534,8 @@ export class ApiApplication {
    * the same reason the record is: every middleware belongs to the root that
    * produced it, and only the application holds that root.
    */
-  private buildFeatureRouters(): TRPCRouterRecord {
+  private buildFeatureRouters(): TRecord {
     const features = this.features;
-    if (!features) return {};
 
     const policy = createApiTrpcPolicy<ApiTrpcContext, ApiTrpcContext>(this.root, {
       authz: features.authorization,
@@ -614,11 +685,19 @@ export class ApiApplication {
 
   private createHono(http: ApiHttpOptions, rest: Hono | undefined): Hono {
     const endpoint = http.endpoint ?? "/api/trpc";
+    /**
+     * The request lane routes by procedure PATH and answers JSON either way, so
+     * it needs a router, not this application's record type. Named at the
+     * adapter's own bound rather than passed straight in: `trpc`'s record is
+     * generic here, which leaves `inferRouterContext` unresolved and the whole
+     * options object deferred.
+     */
+    const router: AnyTRPCRouter = this.trpc;
     const handler = async (request: Request): Promise<Response> =>
       fetchRequestHandler({
         endpoint,
         req: request,
-        router: this.trpc,
+        router,
         createContext: async () => this.withServices(await http.createContext(request), request),
       });
     const hono = new Hono();

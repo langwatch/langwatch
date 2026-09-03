@@ -20,9 +20,26 @@ import {
 const logger = createLogger("langwatch:api:auth");
 
 export type BetterAuthSessionLookup = Readonly<{
+  /** The fetch-compatible boundary the `/api/auth/*` catch-all hands off to. */
+  handler(request: Request): Promise<Response>;
   api: Readonly<{
     getSession(input: { headers: Headers }): Promise<VerifiedBrowserSession | null>;
   }>;
+}>;
+
+/**
+ * The Better Auth instance this process composed, and the origin it verifies
+ * against.
+ *
+ * Published so the `/api/auth` REST family can be mounted over the SAME
+ * instance the session transport already reads. Absent where a host supplied
+ * its own transport: this process then holds no instance and knows none of the
+ * options — including the base URL its origin gate would have to check — and a
+ * second one built here would verify nothing.
+ */
+export type ApiComposedBetterAuth = Readonly<{
+  transport: BetterAuthSessionLookup;
+  baseUrl: string;
 }>;
 
 /** The Better Auth request boundary required by the API process. */
@@ -291,13 +308,20 @@ export class ApiAuthComposition extends ApiAuthSessionCompositionPort {
       users,
     }).build();
 
-    return new ApiAuthComposition({
-      auth,
-      sessions:
-        options.browserSessions ??
-        ApiAuthComposition.composeBrowserSessions({ options, database, auth, users }),
-      users,
-    });
+    const supplied = options.browserSessions;
+    if (supplied) {
+      return new ApiAuthComposition({ auth, sessions: supplied, users }, undefined);
+    }
+
+    const betterAuth = ApiAuthComposition.composeBetterAuth({ options, database, auth, users });
+    return new ApiAuthComposition(
+      {
+        auth,
+        sessions: BetterAuthBrowserSessionTransportAdapter.create(betterAuth.transport),
+        users,
+      },
+      betterAuth,
+    );
   }
 
   /**
@@ -310,7 +334,7 @@ export class ApiAuthComposition extends ApiAuthSessionCompositionPort {
    * cannot authenticate anybody, and the refusal says so rather than composing
    * an instance over a guessed secret.
    */
-  private static composeBrowserSessions({
+  private static composeBetterAuth({
     options,
     database,
     auth,
@@ -320,7 +344,7 @@ export class ApiAuthComposition extends ApiAuthSessionCompositionPort {
     database: PrismaConnection["client"];
     auth: AuthService;
     users: UserService;
-  }): ApiBrowserSessionTransportPort {
+  }): ApiComposedBetterAuth {
     const configuration = options.browserSession;
     if (!configuration) {
       throw new Error(
@@ -330,8 +354,8 @@ export class ApiAuthComposition extends ApiAuthSessionCompositionPort {
 
     announceApiBetterAuthAbsences(logger);
 
-    return BetterAuthBrowserSessionTransportAdapter.create(
-      composeApiBetterAuth({
+    return {
+      transport: composeApiBetterAuth({
         configuration,
         database,
         auth,
@@ -344,10 +368,15 @@ export class ApiAuthComposition extends ApiAuthSessionCompositionPort {
         signUpVerification: options.signUpVerification,
         logger,
       }) as unknown as BetterAuthSessionLookup,
-    );
+      baseUrl: configuration.baseUrl,
+    };
   }
 
-  private constructor(private readonly dependencies: ApiAuthSessionDependencies) {
+  private constructor(
+    private readonly dependencies: ApiAuthSessionDependencies,
+    /** The instance this process composed, or nothing where a host supplied one. */
+    readonly betterAuth: ApiComposedBetterAuth | undefined,
+  ) {
     super();
   }
 

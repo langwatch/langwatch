@@ -14,147 +14,67 @@
  * once per feature. That is the difference this file makes: a restated copy of
  * the same chain per feature could drift, and one cannot.
  */
+import type { ApiTrpcFeatureMount } from "../api.application";
 import type { AnalyticsReadInput, AnalyticsTimeseriesInput } from "@langwatch/analytics-contract";
+import type { AnalyticsTrpcPorts, LangWatchQLTrpcPorts } from "@langwatch/analytics-server";
+import type { AnnotationTrpcPorts } from "@langwatch/annotation-server";
+import type { TrpcApiMount } from "@langwatch/api/trpc";
+
+import type { EmailSuppressionTrpcPorts } from "@langwatch/automation-server";
+
+import type { CodingAgentTrpcPorts } from "@langwatch/coding-agent-server";
+
+import type { BatchRecordTrpcPorts, DatasetTrpcPorts } from "@langwatch/dataset-server";
+import type { DataRetentionTrpcPolicy } from "@langwatch/data-retention-server";
+import type { MonitorTrpcPorts } from "@langwatch/monitor-server";
+
+import type { AuthApp } from "@langwatch/auth-server";
+import type { DataPrivacyTrpcPorts } from "@langwatch/data-privacy-server";
 import type {
-  AnalyticsTrpcContext,
-  AnalyticsTrpcPorts,
-  LangWatchQLTrpcContext,
-  LangWatchQLTrpcPorts,
-} from "@langwatch/analytics-server";
-import type {
-  AnnotationScoreTrpcContext,
-  AnnotationTrpcContext,
-  AnnotationTrpcPorts,
-} from "@langwatch/annotation-server";
-import type { TrpcApiMount, TrpcApiPublicMount } from "@langwatch/api/trpc";
-import type { ApiKeyTrpcContext } from "@langwatch/api-key-server";
-import type {
-  AutomationTrpcContext,
-  EmailSuppressionTrpcContext,
-  EmailSuppressionTrpcPorts,
-} from "@langwatch/automation-server";
-import type { AuthzTrpcContext } from "@langwatch/authz-server";
-import type {
-  CodingAgentTrpcContext,
-  CodingAgentTrpcPorts,
-} from "@langwatch/coding-agent-server";
-import type { EnterpriseTrpcContext } from "@langwatch/enterprise-api";
-import type {
-  BatchRecordTrpcContext,
-  BatchRecordTrpcPorts,
-  DatasetRecordTrpcContext,
-  DatasetTrpcContext,
-  DatasetTrpcPorts,
-} from "@langwatch/dataset-server";
-import type {
-  DataRetentionTrpcContext,
-  DataRetentionTrpcPolicy,
-} from "@langwatch/data-retention-server";
-import type { MonitorTrpcContext, MonitorTrpcPorts } from "@langwatch/monitor-server";
-import type { StoredObjectTrpcContext } from "@langwatch/stored-object-server";
-import type { FeatureFlagTrpcContext } from "@langwatch/feature-flag-server";
-import type { AuthApp, FrontDoorTrpcContext, PublicEnvTrpcContext } from "@langwatch/auth-server";
-import type { DataPrivacyTrpcContext, DataPrivacyTrpcPorts } from "@langwatch/data-privacy-server";
-import type {
-  DashboardTrpcContext,
-  GraphTrpcContext,
   GraphTrpcPorts,
-  SavedViewTrpcContext,
   SavedViewTrpcPorts,
-  SavedWorkbenchChartTrpcContext,
   SavedWorkbenchChartTrpcPorts,
 } from "@langwatch/dashboard-server";
-import type { HttpProxyTrpcContext, HttpProxyTrpcPorts } from "@langwatch/agent-server";
+import type { HttpProxyTrpcPorts } from "@langwatch/agent-server";
+import type { CostTrpcPorts, LimitsTrpcPorts } from "@langwatch/entitlement-server";
 import type {
-  CostTrpcContext,
-  CostTrpcPorts,
-  LimitsTrpcContext,
-  LimitsTrpcPorts,
-  PlanTrpcContext,
-} from "@langwatch/entitlement-server";
-import type {
-  LlmModelCostTrpcContext,
   LlmModelCostTrpcPorts,
-  ModelProviderTrpcContext,
   ModelProviderTrpcPorts,
-  TranslateTrpcContext,
   TranslateTrpcPorts,
 } from "@langwatch/model-provider-server";
-import type { PinnedTraceTrpcContext, ShareTrpcContext } from "@langwatch/share-server";
-import type { TopicTrpcContext } from "@langwatch/topic-server";
+
 import type { TraceLegacyFilterInput, TraceLegacyListInput } from "@langwatch/trace-contract";
 import type {
-  SharedTraceTrpcContext,
   SharedTraceTrpcPorts,
-  SpansTrpcContext,
   SpansTrpcPorts,
-  TraceEditOverlayTrpcContext,
   TraceEditOverlayTrpcPorts,
   TraceEditOverlayVisibilityWindow,
-  TracesTrpcContext,
   TracesTrpcPorts,
-  TracesV2TrpcContext,
   TracesV2TrpcPorts,
 } from "@langwatch/trace-server";
-import type { EvaluationTrpcContext } from "@langwatch/evaluation-server";
-import type {
-  EvaluatorTrpcContext,
-  EvaluatorTrpcPorts,
-} from "@langwatch/evaluator-server";
-import type { ExperimentTrpcContext, ExperimentTrpcPorts } from "@langwatch/experiment-server";
-import type {
-  BugReportTrpcContext,
-  BugReportTrpcPorts,
-  OpsTrpcContext,
-  OpsTrpcPorts,
-} from "@langwatch/ops-server";
+
+import type { EvaluatorTrpcPorts } from "@langwatch/evaluator-server";
+import type { ExperimentTrpcPorts } from "@langwatch/experiment-server";
+import type { BugReportTrpcPorts, OpsTrpcPorts } from "@langwatch/ops-server";
 import type { AuthzDeclaration, AuthzPermission } from "@langwatch/authz-contract";
+import type { LangyEgressTrpcPorts, LangyTrpcPorts } from "@langwatch/langy-server";
+import type { ScenarioTrpcPorts } from "@langwatch/scenario-server";
+
 import type {
-  LangyEgressTrpcContext,
-  LangyEgressTrpcPorts,
-  LangyTrpcContext,
-  LangyTrpcPorts,
-  SetupSkillsTrpcContext,
-} from "@langwatch/langy-server";
-import type { ScenarioTrpcContext, ScenarioTrpcPorts } from "@langwatch/scenario-server";
-import type { SuiteTrpcContext } from "@langwatch/suite-server";
-import type {
-  GroupTrpcContext,
   GroupTrpcPorts,
-  JoinRequestTrpcContext,
   JoinRequestTrpcPorts,
-  OnboardingTrpcContext,
   OnboardingTrpcPorts,
-  OrganizationTrpcContext,
   OrganizationTrpcPorts,
-  PersonalWorkspaceFeaturesTrpcContext,
-  TeamTrpcContext,
   TeamTrpcPorts,
 } from "@langwatch/organization-server";
-import type { PresenceTrpcContext } from "@langwatch/presence-server";
+
 import type { PrismaClient } from "@langwatch/prisma-client/generated";
-import type {
-  HomeTrpcContext,
-  HomeTrpcPorts,
-  IntegrationsChecksTrpcContext,
-  IntegrationsChecksTrpcPorts,
-  ProjectTrpcContext,
-} from "@langwatch/project-server";
-import type { PromptTrpcContext, PromptTrpcPorts } from "@langwatch/prompt-server";
-import type { RoleBindingTrpcContext, RoleTrpcContext } from "@langwatch/role-server";
-import type {
-  IdentityTrpcContext,
-  IdentityTrpcPorts,
-  UserTrpcContext,
-  UserTrpcPorts,
-} from "@langwatch/user-server";
-import type {
-  WorkflowOptimizationTrpcContext,
-  WorkflowOptimizationTrpcPorts,
-  WorkflowTrpcContext,
-  WorkflowTrpcPorts,
-} from "@langwatch/workflow-server";
-import type { AnyTRPCRootTypes, TRPCRuntimeConfigOptions } from "@trpc/server";
+import type { HomeTrpcPorts, IntegrationsChecksTrpcPorts } from "@langwatch/project-server";
+import type { PromptTrpcPorts } from "@langwatch/prompt-server";
+
+import type { IdentityTrpcPorts, UserTrpcPorts } from "@langwatch/user-server";
+import type { WorkflowOptimizationTrpcPorts, WorkflowTrpcPorts } from "@langwatch/workflow-server";
+
 import type { ZodTypeAny } from "zod";
 import type { AppTrpcDeclaredCheck, AppTrpcPolicyKit } from "./app-trpc.policy-kit";
 
@@ -190,19 +110,20 @@ import {
   createDataPrivacyTrpcRouter,
   type DataPrivacyTrpcChecks,
 } from "../features/data-privacy/data-privacy-trpc.mount";
-import { createDataRetentionTrpcRouter } from "../features/data-retention/data-retention-trpc.mount";
+import {
+  createDataRetentionTrpcRouter,
+} from "../features/data-retention/data-retention-trpc.mount";
 import { createMonitorTrpcRouter } from "../features/monitor/monitor-trpc.mount";
-import { createStoredObjectTrpcRouter } from "../features/stored-object/stored-object-trpc.mount";
+import {
+  createStoredObjectTrpcRouter,
+} from "../features/stored-object/stored-object-trpc.mount";
 import {
   createEvaluationTrpcRouter,
   type EvaluationMountPorts,
 } from "../features/evaluation/evaluation-trpc.mount";
 import { createEvaluatorTrpcRouter } from "../features/evaluator/evaluator-trpc.mount";
 import { createExperimentTrpcRouter } from "../features/experiment/experiment-trpc.mount";
-import {
-  createExportTrpcRouter,
-  type ExportTrpcContext,
-} from "../features/export/export-trpc.mount";
+import { createExportTrpcRouter } from "../features/export/export-trpc.mount";
 import { createBugReportTrpcRouter, createOpsTrpcRouter } from "../features/ops/ops-trpc.mount";
 import { createPresenceTrpcRouter } from "../features/presence/presence-trpc.mount";
 import {
@@ -237,17 +158,18 @@ import {
 } from "../features/role/role-trpc.mount";
 import {
   createGithubTrpcRouter,
-  type GithubTrpcContext,
   type GithubTrpcMountPorts,
 } from "../features/github/github-trpc.mount";
-import { createIdentityTrpcRouter, createUserTrpcRouter } from "../features/user/user-trpc.mount";
+import {
+  createIdentityTrpcRouter,
+  createUserTrpcRouter,
+} from "../features/user/user-trpc.mount";
 import {
   createWorkflowOptimizationTrpcRouter,
   createWorkflowTrpcRouter,
 } from "../features/workflow/workflow-trpc.mount";
 import {
   createEnterpriseBillingTrpcRouters,
-  type EnterpriseBillingTrpcContext,
 } from "../features/enterprise/enterprise-billing-trpc.mount";
 import {
   createEnterpriseTrpcRouters,
@@ -255,16 +177,13 @@ import {
 } from "../features/enterprise/enterprise-trpc.mount";
 import {
   createEnterpriseGovernanceTrpcRouters,
-  type EnterpriseGovernanceMountContext,
 } from "../features/enterprise/enterprise-governance-trpc.mount";
 import {
   createGovernanceHomeTrpcRouter,
-  type GovernanceHomeTrpcContext,
   type GovernanceHomeTrpcPorts,
 } from "../features/enterprise/governance-home.mount";
 import {
   createGatewayTrpcRouters,
-  type GatewayTrpcContext,
   type GatewayTrpcPorts,
 } from "../features/gateway/gateway-trpc.mount";
 import {
@@ -627,86 +546,17 @@ export interface AppTrpcFeaturePorts<
 /**
  * Builds every tRPC surface this package owns against one process's mount.
  *
+ * The mount is this process's own {@link ApiTrpcFeatureMount}, not three type
+ * parameters constrained to the intersection of every feature's context. The
+ * root carries the context, so naming the root names the context once — and it
+ * is what lets {@link AppTrpcFeatureRecord} be read off this function at all.
+ *
  * The result is keyed by the namespace each surface answers on, so the caller
  * spreads it into its router record and adds nothing per feature. A surface
  * that is not in here is not mounted — which is the property the audits rely
  * on.
  */
 export function createAppTrpcFeatures<
-  TContext extends AnalyticsTrpcContext &
-    AnnotationTrpcContext &
-    AnnotationScoreTrpcContext &
-    ApiKeyTrpcContext &
-    AuthzTrpcContext &
-    BatchRecordTrpcContext &
-    BugReportTrpcContext &
-    DashboardTrpcContext &
-    DataPrivacyTrpcContext &
-    DatasetRecordTrpcContext &
-    DatasetTrpcContext &
-    EvaluationTrpcContext &
-    EvaluatorTrpcContext &
-    ExperimentTrpcContext &
-    ExportTrpcContext &
-    FeatureFlagTrpcContext &
-    FrontDoorTrpcContext &
-    GraphTrpcContext &
-    GroupTrpcContext &
-    HomeTrpcContext &
-    IdentityTrpcContext &
-    IntegrationsChecksTrpcContext &
-    JoinRequestTrpcContext &
-    LangWatchQLTrpcContext &
-    OnboardingTrpcContext &
-    PersonalWorkspaceFeaturesTrpcContext &
-    PresenceTrpcContext &
-    PromptTrpcContext &
-    RoleBindingTrpcContext &
-    RoleTrpcContext &
-    PublicEnvTrpcContext &
-    SavedWorkbenchChartTrpcContext &
-    TeamTrpcContext &
-    UserTrpcContext &
-    WorkflowOptimizationTrpcContext &
-    WorkflowTrpcContext &
-    LangyEgressTrpcContext &
-    LangyTrpcContext &
-    OpsTrpcContext &
-    ScenarioTrpcContext &
-    SetupSkillsTrpcContext &
-    SuiteTrpcContext &
-    EnterpriseBillingTrpcContext &
-    EnterpriseGovernanceMountContext &
-    GatewayTrpcContext &
-    GovernanceHomeTrpcContext &
-    GithubTrpcContext &
-    AutomationTrpcContext &
-    CodingAgentTrpcContext &
-    EmailSuppressionTrpcContext &
-    EnterpriseTrpcContext &
-    OrganizationTrpcContext &
-    ProjectTrpcContext &
-    DataRetentionTrpcContext &
-    MonitorTrpcContext &
-    StoredObjectTrpcContext &
-    CostTrpcContext &
-    HttpProxyTrpcContext &
-    LimitsTrpcContext &
-    LlmModelCostTrpcContext &
-    ModelProviderTrpcContext &
-    PinnedTraceTrpcContext &
-    PlanTrpcContext &
-    SavedViewTrpcContext &
-    ShareTrpcContext &
-    SharedTraceTrpcContext &
-    SpansTrpcContext &
-    TopicTrpcContext &
-    TraceEditOverlayTrpcContext &
-    TracesTrpcContext &
-    TracesV2TrpcContext &
-    TranslateTrpcContext,
-  TOptions extends TRPCRuntimeConfigOptions<TContext, object>,
-  TRoot extends AnyTRPCRootTypes,
   TAnnotationPorts extends AnnotationTrpcPorts,
   TBugReport,
   TBugReportPage,
@@ -739,7 +589,7 @@ export function createAppTrpcFeatures<
   TRetentionSnapshot = unknown,
   TStorageScopeUsage = unknown,
 >(options: {
-  mount: TrpcApiMount<TContext, TOptions, TRoot> & TrpcApiPublicMount<TContext, TOptions, TRoot>;
+  mount: ApiTrpcFeatureMount;
   ports: AppTrpcFeaturePorts<
     TAnnotationPorts,
     TBugReport,
@@ -1041,6 +891,19 @@ export function createAppTrpcFeatures<
 }
 
 /**
+ * The record {@link createAppTrpcFeatures} returns, at THIS process's mount.
+ *
+ * Inferred from the function rather than restated, so a namespace added to the
+ * return literal above is a namespace a client can call without a second edit.
+ * This reads cleanly only because the mount is CONCRETE: the function takes
+ * `ApiTrpcFeatureMount` rather than three type parameters, so the root every
+ * router type carries is this process's own. The remaining parameters are the
+ * ports', and they erase to their constraints — the one part a client reads
+ * back as `unknown`.
+ */
+export type AppTrpcFeatureRecord = ReturnType<typeof createAppTrpcFeatures>;
+
+/**
  * The operator chain, assembled from the process's own middlewares plus the
  * one gate a declaration cannot describe.
  *
@@ -1052,10 +915,7 @@ export function createAppTrpcFeatures<
  */
 function opsPolicyKit(
   middlewares: TrpcApiMount<never, never, never>["middlewares"],
-  opsCheck: (input: {
-    permission: AuthzPermission;
-    throwOnDeny?: boolean;
-  }) => AppTrpcDeclaredCheck,
+  opsCheck: (input: { permission: AuthzPermission; throwOnDeny?: boolean }) => AppTrpcDeclaredCheck,
 ): AppTrpcPolicyKit {
   return {
     tracerMiddleware: middlewares.tracer,

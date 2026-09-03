@@ -41,7 +41,9 @@ import {
 import { createGithubRestApp, type GithubRestPorts } from "@langwatch/github-server";
 import {
   createAuthCliDeviceFlowRestApp,
+  createAuthRestApp,
   type AuthCliDeviceFlowRestPorts,
+  type AuthRestPorts,
 } from "@langwatch/auth-server";
 import {
   createGovernanceCliRestApp,
@@ -401,6 +403,15 @@ export type ApiProcessRestPorts = Readonly<{
    */
   authCliDeviceFlow?: AuthCliDeviceFlowRestPorts | undefined;
   /**
+   * The `/api/auth` family's collaborators, or none.
+   *
+   * None where this process composed no Better Auth instance of its own: the
+   * catch-all IS that instance's door, and a second instance built over a
+   * different option set verifies nothing and answers "signed out" to
+   * everybody rather than failing.
+   */
+  auth?: AuthRestPorts | undefined;
+  /**
    * The CLI governance plane's collaborators, or none.
    *
    * None where this process composed no Enterprise governance application:
@@ -698,9 +709,9 @@ export function createApiProcessRestFeatures(options: {
 
   // The two halves of `/api/auth/cli`, whose path sets are disjoint: the
   // device grant owns the RFC 8628 lifecycle, the governance plane owns the
-  // reads and mints a device session authorizes. Both must be registered
-  // BEFORE any `/api/auth/*` catch-all, which swallows every `/auth/*` sibling
-  // after it — this process mounts none, and that is what keeps them reachable.
+  // reads and mints a device session authorizes. Both are registered BEFORE
+  // the `/api/auth` family below, whose `/auth/*` catch-all swallows every
+  // sibling after it — that order is what keeps these two reachable.
   const authCliDeviceFlow = ports.authCliDeviceFlow;
   if (authCliDeviceFlow) {
     features.push(createAuthCliDeviceFlowRestApp({ security, ports: authCliDeviceFlow }));
@@ -709,6 +720,14 @@ export function createApiProcessRestFeatures(options: {
   const governanceCli = ports.governanceCli;
   if (governanceCli) {
     features.push(createGovernanceCliRestApp({ security, ports: governanceCli }));
+  }
+
+  // The Better Auth door, and everything a browser reaches to sign in, read
+  // its own session or sign out. Registered after the two CLI halves and
+  // before every family that reads a session, for the ordering above.
+  const auth = ports.auth;
+  if (auth) {
+    features.push(createAuthRestApp({ security, ports: auth }));
   }
 
   // `/api/ingest` is a literal first segment nothing else claims, so it is

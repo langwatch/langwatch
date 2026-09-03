@@ -181,9 +181,7 @@ function testAuthz(): AuthzService {
       teams: new Map(
         teams.map(({ teamId }) => [teamId, permission === "team:manage" && teamId === TEAM_ID]),
       ),
-      projects: new Map(
-        projects.map(({ projectId }) => [projectId, projectId === PROJECT_ID]),
-      ),
+      projects: new Map(projects.map(({ projectId }) => [projectId, projectId === PROJECT_ID])),
     }),
     tryResolveScope: async (input: { projectId?: string; organizationId?: string }) =>
       input.projectId
@@ -601,9 +599,8 @@ describe("given an API process composed with the product-infrastructure half", (
       });
 
       expect(status).toBe(200);
-      const snapshot = (
-        body as { result: { data: { json: Record<string, unknown> } } }
-      ).result.data.json;
+      const snapshot = (body as { result: { data: { json: Record<string, unknown> } } }).result.data
+        .json;
 
       // The caller manages one team and one project, and no organization.
       expect(snapshot.available).toEqual({
@@ -629,14 +626,10 @@ describe("given an API process composed with the product-infrastructure half", (
     it("sums only the projects the caller may view", async () => {
       const { application } = composeApplication();
 
-      const { status, body } = await callTrpc(
-        application,
-        "dataRetention.getScopeStorageUsage",
-        {
-          projectId: PROJECT_ID,
-          scope: { scopeType: "ORGANIZATION", scopeId: ORGANIZATION_ID },
-        },
-      );
+      const { status, body } = await callTrpc(application, "dataRetention.getScopeStorageUsage", {
+        projectId: PROJECT_ID,
+        scope: { scopeType: "ORGANIZATION", scopeId: ORGANIZATION_ID },
+      });
 
       expect(status).toBe(200);
       // Two projects are in the organization; one is readable, so the rollup

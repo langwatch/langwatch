@@ -12,7 +12,7 @@
  * feature package defines. A wrapper that quietly built its own router would
  * pass a "the key is present" assertion and fail this one.
  *
- * Nothing in this suite serves a request. The mount is a bare tRPC root and
+ * Nothing in this suite serves a request. The mount is the process's own root and
  * every port refuses, because building a surface is what registers its access
  * decisions — the part the audits read.
  */
@@ -22,183 +22,28 @@ import {
   type AnalyticsReadInput,
   type AnalyticsTimeseriesInput,
 } from "@langwatch/analytics-contract";
-import type { AnalyticsTrpcContext, LangWatchQLTrpcContext } from "@langwatch/analytics-server";
-import type {
-  AnnotationScoreTrpcContext,
-  AnnotationTrpcContext,
-  AnnotationTrpcPorts,
-} from "@langwatch/annotation-server";
+
+import type { AnnotationTrpcPorts } from "@langwatch/annotation-server";
 import type { AppTrpcPolicyMiddlewares } from "@langwatch/api/trpc";
-import type { ApiKeyTrpcContext } from "@langwatch/api-key-server";
-import type { FrontDoorTrpcContext, PublicEnvTrpcContext } from "@langwatch/auth-server";
+
 import { declareAuthzMiddleware } from "@langwatch/authz-contract";
-import type {
-  AutomationTrpcContext,
-  EmailSuppressionTrpcContext,
-} from "@langwatch/automation-server";
-import type { AuthzTrpcContext } from "@langwatch/authz-server";
-import type { CodingAgentTrpcContext } from "@langwatch/coding-agent-server";
-import type { EnterpriseTrpcContext } from "@langwatch/enterprise-api";
-import type {
-  DashboardTrpcContext,
-  GraphTrpcContext,
-  SavedViewTrpcContext,
-  SavedWorkbenchChartTrpcContext,
-} from "@langwatch/dashboard-server";
-import type { DataPrivacyTrpcContext } from "@langwatch/data-privacy-server";
-import type {
-  BatchRecordTrpcContext,
-  DatasetRecordTrpcContext,
-  DatasetTrpcContext,
-} from "@langwatch/dataset-server";
-import type { EvaluationTrpcContext } from "@langwatch/evaluation-server";
-import type { EvaluatorTrpcContext } from "@langwatch/evaluator-server";
-import type { ExperimentTrpcContext } from "@langwatch/experiment-server";
-import type { ExportTrpcContext } from "../../features/export/export-trpc.mount";
-import type { GithubTrpcContext } from "../../features/github/github-trpc.mount";
-import type { BugReportTrpcContext, OpsTrpcContext } from "@langwatch/ops-server";
-import type {
-  LangyEgressTrpcContext,
-  LangyTrpcContext,
-  SetupSkillsTrpcContext,
-} from "@langwatch/langy-server";
-import type { ScenarioTrpcContext } from "@langwatch/scenario-server";
-import type { SuiteTrpcContext } from "@langwatch/suite-server";
-import type {
-  GroupTrpcContext,
-  JoinRequestTrpcContext,
-  OnboardingTrpcContext,
-  OrganizationTrpcContext,
-  OrganizationTrpcPorts,
-  PersonalWorkspaceFeaturesTrpcContext,
-  TeamTrpcContext,
-} from "@langwatch/organization-server";
-import type { RoleBindingTrpcContext, RoleTrpcContext } from "@langwatch/role-server";
-import type { PresenceTrpcContext } from "@langwatch/presence-server";
-import type { FeatureFlagTrpcContext } from "@langwatch/feature-flag-server";
-import type {
-  HomeTrpcContext,
-  IntegrationsChecksTrpcContext,
-  ProjectTrpcContext,
-} from "@langwatch/project-server";
+
+import type { OrganizationTrpcPorts } from "@langwatch/organization-server";
+
 import type { AutomationMountPorts } from "../../features/automation/automation-trpc.mount";
-import type { PromptTrpcContext } from "@langwatch/prompt-server";
-import type { IdentityTrpcContext, UserTrpcContext } from "@langwatch/user-server";
+
 import type {
-  WorkflowOptimizationTrpcContext,
-  WorkflowTrpcContext,
-} from "@langwatch/workflow-server";
-import { initTRPC } from "@trpc/server";
+  TraceLegacyFilterInput,
+  TraceLegacyListInput,
+} from "@langwatch/trace-contract";
 import { describe, expect, it } from "vitest";
 import { z } from "zod";
-import type { EnterpriseBillingTrpcContext } from "../../features/enterprise/enterprise-billing-trpc.mount";
-import type { EnterpriseGovernanceMountContext } from "../../features/enterprise/enterprise-governance-trpc.mount";
-import type { GovernanceHomeTrpcContext } from "../../features/enterprise/governance-home.mount";
-import type { GatewayTrpcContext } from "../../features/gateway/gateway-trpc.mount";
-import { createAppTrpcFeatures, type AppTrpcFeaturePorts } from "../app-trpc.features";
-import type { DataRetentionTrpcContext } from "@langwatch/data-retention-server";
-import type { MonitorTrpcContext } from "@langwatch/monitor-server";
-import type { StoredObjectTrpcContext } from "@langwatch/stored-object-server";
-import type { HttpProxyTrpcContext } from "@langwatch/agent-server";
-import type {
-  CostTrpcContext,
-  LimitsTrpcContext,
-  PlanTrpcContext,
-} from "@langwatch/entitlement-server";
-import type {
-  LlmModelCostTrpcContext,
-  ModelProviderTrpcContext,
-  TranslateTrpcContext,
-} from "@langwatch/model-provider-server";
-import type { PinnedTraceTrpcContext, ShareTrpcContext } from "@langwatch/share-server";
-import type { TopicTrpcContext } from "@langwatch/topic-server";
-import type {
-  SharedTraceTrpcContext,
-  SpansTrpcContext,
-  TraceEditOverlayTrpcContext,
-  TracesTrpcContext,
-  TracesTrpcPorts,
-  TracesV2TrpcContext,
-} from "@langwatch/trace-server";
 
-/**
- * The intersection every mounted surface constrains the process's context to.
- * Stating it here is what makes a feature whose context grows a compile error
- * in this suite rather than a surprise in the app.
- */
-type TestContext = AnalyticsTrpcContext &
-  EnterpriseBillingTrpcContext &
-  EnterpriseGovernanceMountContext &
-  GatewayTrpcContext &
-  GovernanceHomeTrpcContext &
-  AuthzTrpcContext &
-  AnnotationTrpcContext &
-  AnnotationScoreTrpcContext &
-  ApiKeyTrpcContext &
-  BugReportTrpcContext &
-  DashboardTrpcContext &
-  BatchRecordTrpcContext &
-  DataPrivacyTrpcContext &
-  DatasetRecordTrpcContext &
-  DatasetTrpcContext &
-  EvaluationTrpcContext &
-  EvaluatorTrpcContext &
-  ExperimentTrpcContext &
-  ExportTrpcContext &
-  FrontDoorTrpcContext &
-  GithubTrpcContext &
-  GraphTrpcContext &
-  GroupTrpcContext &
-  HomeTrpcContext &
-  IdentityTrpcContext &
-  IntegrationsChecksTrpcContext &
-  JoinRequestTrpcContext &
-  LangWatchQLTrpcContext &
-  OnboardingTrpcContext &
-  PersonalWorkspaceFeaturesTrpcContext &
-  PresenceTrpcContext &
-  RoleBindingTrpcContext &
-  RoleTrpcContext &
-  TeamTrpcContext &
-  PublicEnvTrpcContext &
-  SavedWorkbenchChartTrpcContext &
-  UserTrpcContext &
-  FeatureFlagTrpcContext &
-  PromptTrpcContext &
-  WorkflowOptimizationTrpcContext &
-  WorkflowTrpcContext &
-  CostTrpcContext &
-  HttpProxyTrpcContext &
-  LimitsTrpcContext &
-  LlmModelCostTrpcContext &
-  ModelProviderTrpcContext &
-  PinnedTraceTrpcContext &
-  PlanTrpcContext &
-  SavedViewTrpcContext &
-  ShareTrpcContext &
-  SharedTraceTrpcContext &
-  SpansTrpcContext &
-  TopicTrpcContext &
-  TraceEditOverlayTrpcContext &
-  TracesTrpcContext &
-  TracesV2TrpcContext &
-  TranslateTrpcContext &
-  // The three product-infrastructure surfaces, for the same reason.
-  DataRetentionTrpcContext &
-  MonitorTrpcContext &
-  StoredObjectTrpcContext &
-  AutomationTrpcContext &
-  CodingAgentTrpcContext &
-  EmailSuppressionTrpcContext &
-  EnterpriseTrpcContext &
-  OrganizationTrpcContext &
-  ProjectTrpcContext &
-  LangyEgressTrpcContext &
-  LangyTrpcContext &
-  OpsTrpcContext &
-  ScenarioTrpcContext &
-  SetupSkillsTrpcContext &
-  SuiteTrpcContext;
+import { createTrpcRoot } from "../../api.application";
+import { createAppTrpcFeatures, type AppTrpcFeaturePorts } from "../app-trpc.features";
+
+import type { TracesTrpcPorts } from "@langwatch/trace-server";
+
 
 /** A pass-through stand-in for one of the process's policy middlewares. */
 const passThrough =
@@ -411,16 +256,25 @@ function refusingPorts(): AppTrpcFeaturePorts<
       filterInputSchema: z.object({ projectId: z.string() }),
       evaluatorTypeSchema: z.string(),
       preconditionSchema: z.object({ field: z.string() }),
-    } as unknown as TracesTrpcPorts,
+    } as unknown as TracesTrpcPorts<
+      TraceLegacyListInput,
+      unknown,
+      TraceLegacyFilterInput,
+      unknown,
+      unknown
+    >,
     tracesV2: refuseEvery("tracesV2"),
     spans: refuseEvery("spans"),
     traceEditOverlay: refuseEvery("traceEditOverlay"),
     sharedTrace: refuseEvery("sharedTrace"),
     savedViews: { savedViews: refuseEvery("savedViews") },
     costs: refuseEvery("costs"),
+    // Named member by member rather than spread from `refuseEvery`: the spread
+    // carries no types, so a port growing a member would go unnoticed here.
     llmModelCost: {
-      ...(refuseEvery("llmModelCost") as object),
       isSafeRegex: () => true,
+      getModelLimits: refuse("llmModelCost.getModelLimits"),
+      previewMatchingSpans: refuse("llmModelCost.previewMatchingSpans"),
     },
     modelProvider: refuseEvery("modelProvider"),
     modelProviderChecks: {
@@ -459,7 +313,10 @@ function refusingPorts(): AppTrpcFeaturePorts<
 }
 
 function buildFeatures() {
-  const trpc = initTRPC.context<TestContext>().create();
+  // The application's OWN root, not a second one shaped by hand: the record is
+  // typed against `ApiTrpcFeatureMount`, so a hand-rolled root would prove
+  // something other than what the process mounts.
+  const trpc = createTrpcRoot();
 
   return createAppTrpcFeatures({
     mount: {

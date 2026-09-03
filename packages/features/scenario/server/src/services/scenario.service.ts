@@ -257,10 +257,15 @@ export class ScenarioService extends ScenarioServiceContract {
     return this.options.repository.tryFindTestSuite(scenarioTestSuiteIdInputSchema.parse(input));
   }
 
-  listTestSuites(input: { projectId: string }): Promise<ScenarioTestSuite[]> {
-    return this.options.repository.findTestSuites(
-      scenarioIdInputSchema.pick({ projectId: true }).parse(input),
-    );
+  listTestSuites(input: {
+    projectId: string;
+    includeArchived?: boolean;
+  }): Promise<ScenarioTestSuite[]> {
+    const { projectId } = scenarioIdInputSchema.pick({ projectId: true }).parse(input);
+    return this.options.repository.findTestSuites({
+      projectId,
+      includeArchived: input.includeArchived,
+    });
   }
 
   async renameTestSuite(input: ScenarioTestSuiteRenameInput): Promise<ScenarioTestSuite> {
@@ -306,6 +311,13 @@ export class ScenarioService extends ScenarioServiceContract {
     projectId: string;
   }): Promise<{ id: string; name: string }[]> {
     return this.options.repository.findNamesByIds(input);
+  }
+
+  getModelChoices(input: {
+    ids: string[];
+    projectId: string;
+  }): Promise<{ id: string; simulatorModel: string | null; judgeModel: string | null }[]> {
+    return this.options.repository.findModelChoices(input);
   }
 
   async resolveRunParameters(

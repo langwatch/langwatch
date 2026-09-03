@@ -9,7 +9,12 @@
  * that walk only follows VALUE imports, so this subpath never appears in it.
  *
  * `ApiApplication["trpc"]` is read off the class rather than restated, so this
- * type can never drift from what the process actually mounts.
+ * type can never drift from what the process actually mounts. Read
+ * unparameterized, which resolves the class's own default: `AppTrpcFeatureRecord`,
+ * the record `createAppTrpcFeatures` returns at this process's mount. A
+ * deployment that composed no packaged surfaces instantiates the class at an
+ * empty record instead, and its own router type is that instantiation — not
+ * this one.
  */
 import type { ApiApplication } from "../api.application";
 

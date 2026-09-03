@@ -163,9 +163,7 @@ function testAuthApp(): AuthApp {
   });
 }
 
-function composeApplication(
-  options: { clickhouse?: boolean; workbenchEnabled?: boolean } = {},
-) {
+function composeApplication(options: { clickhouse?: boolean; workbenchEnabled?: boolean } = {}) {
   const prisma = testPrisma();
   const clickhouse = testClickHouse();
   const analytics = composeApiAnalyticsCollaborators({
@@ -176,8 +174,7 @@ function composeApplication(
       overrides: new Map(),
       forceEnabled: new Set(options.workbenchEnabled === true ? [LWQL_FLAG] : []),
     },
-    resolveClickHouseClient:
-      options.clickhouse === false ? null : clickhouse.resolveClient,
+    resolveClickHouseClient: options.clickhouse === false ? null : clickhouse.resolveClient,
     langWatchQL: undefined,
     resources: testResources(),
   });

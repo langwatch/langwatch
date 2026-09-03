@@ -25,6 +25,7 @@ import {
   AuthSessionApiAuthenticationAdapter,
   BetterAuthBrowserSessionTransportAdapter,
   type ApiAuthSessionDependencies,
+  type BetterAuthSessionLookup,
 } from "../api-auth.composition";
 import { ApiUserAvatarStorageAdapter } from "../../features/user/user-avatar-storage.adapter";
 import { ApiAuthorizationPort, ApiRequestPolicy } from "../../api-request.policy";
@@ -39,6 +40,23 @@ const browserSession: BrowserSession = {
   expires: "2026-08-28T12:00:00.000Z",
   sessionId: "session-1",
 };
+
+/**
+ * A Better Auth double for the session lookup alone.
+ *
+ * `handler` is part of the boundary because the `/api/auth/*` catch-all hands
+ * requests to it, and nothing here routes one — so it refuses by name rather
+ * than answering a Response no test asked for.
+ */
+function transportLookingUp(
+  getSession: (input: { headers: Headers }) => Promise<VerifiedBrowserSession | null>,
+): BetterAuthSessionLookup {
+  return {
+    handler: () =>
+      Promise.reject(new Error("These tests resolve sessions; they route no auth request.")),
+    api: { getSession },
+  };
+}
 
 class TestAuthService extends AuthService {
   readonly tryResolveBrowserSession = vi.fn(
@@ -101,9 +119,9 @@ describe("API Auth/session composition", () => {
   it("uses one injected Auth service after Better Auth verifies the request", async () => {
     const getSession = vi.fn(async (_input: { headers: Headers }) => verified);
     const auth = new TestAuthService();
-    const sessions = BetterAuthBrowserSessionTransportAdapter.create({
-      api: { getSession },
-    });
+    const sessions = BetterAuthBrowserSessionTransportAdapter.create(
+      transportLookingUp(getSession),
+    );
     const composition = new TestAuthComposition({ auth, sessions, users: testUserService() });
     const authentication = AuthSessionApiAuthenticationAdapter.create(composition.compose());
     const request = new Request("https://api.example.test/api/trpc", {
@@ -130,7 +148,7 @@ describe("API Auth/session composition", () => {
     const auth = new TestAuthService();
     const authentication = AuthSessionApiAuthenticationAdapter.create({
       auth,
-      sessions: BetterAuthBrowserSessionTransportAdapter.create({ api: { getSession } }),
+      sessions: BetterAuthBrowserSessionTransportAdapter.create(transportLookingUp(getSession)),
     });
 
     await expect(
@@ -145,9 +163,9 @@ describe("API Auth/session composition", () => {
     auth.tryResolveBrowserSession.mockResolvedValueOnce(null);
     const authentication = AuthSessionApiAuthenticationAdapter.create({
       auth,
-      sessions: BetterAuthBrowserSessionTransportAdapter.create({
-        api: { getSession: async (_input) => verified },
-      }),
+      sessions: BetterAuthBrowserSessionTransportAdapter.create(
+        transportLookingUp(async (_input) => verified),
+      ),
     });
     const policy = ApiRequestPolicy.create({
       authentication,
@@ -166,9 +184,9 @@ describe("API Auth/session composition", () => {
     auth.tryResolveBrowserSession.mockRejectedValueOnce(new Error("database unavailable"));
     const authentication = AuthSessionApiAuthenticationAdapter.create({
       auth,
-      sessions: BetterAuthBrowserSessionTransportAdapter.create({
-        api: { getSession: async (_input) => verified },
-      }),
+      sessions: BetterAuthBrowserSessionTransportAdapter.create(
+        transportLookingUp(async (_input) => verified),
+      ),
     });
 
     await expect(
@@ -183,9 +201,9 @@ describe("when a request presents a Better Auth session token", () => {
     // The factory hands back one logger per name for the life of the process,
     // so this is the instance the composition module already holds.
     const warn = vi.spyOn(createLogger("langwatch:api:auth"), "warn");
-    const sessions = BetterAuthBrowserSessionTransportAdapter.create({
-      api: { getSession: async () => null },
-    });
+    const sessions = BetterAuthBrowserSessionTransportAdapter.create(
+      transportLookingUp(async () => null),
+    );
 
     const resolved = await sessions.tryResolveVerifiedSession(
       new Request("https://api.example.test/api/trpc", {
@@ -211,9 +229,9 @@ describe("when a request presents a Better Auth session token", () => {
   /** @scenario "An anonymous request is not logged as a refusal" */
   it("records nothing for a request carrying no session cookie", async () => {
     const warn = vi.spyOn(createLogger("langwatch:api:auth"), "warn");
-    const sessions = BetterAuthBrowserSessionTransportAdapter.create({
-      api: { getSession: async () => null },
-    });
+    const sessions = BetterAuthBrowserSessionTransportAdapter.create(
+      transportLookingUp(async () => null),
+    );
 
     await sessions.tryResolveVerifiedSession(
       new Request("https://api.example.test/api/trpc", {
@@ -233,9 +251,9 @@ describe("when a request presents a Better Auth session token", () => {
     auth.tryResolveBrowserSession.mockResolvedValueOnce(null);
     const authentication = AuthSessionApiAuthenticationAdapter.create({
       auth,
-      sessions: BetterAuthBrowserSessionTransportAdapter.create({
-        api: { getSession: async () => verified },
-      }),
+      sessions: BetterAuthBrowserSessionTransportAdapter.create(
+        transportLookingUp(async () => verified),
+      ),
     });
 
     await authentication.authenticate(new Request("https://api.example.test/api/trpc"));

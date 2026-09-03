@@ -1,6 +1,6 @@
 import { SecretService, type Secret } from "@langwatch/secret-contract";
 import { describe, expect, it, vi } from "vitest";
-import { ApiApplication, MissingAgentService } from "../api.application";
+import { ApiApplication, MissingAgentService, NoApiTrpcFeatures } from "../api.application";
 import { ApiHttpListener } from "../api-http.listener";
 
 const secret: Secret = {
@@ -26,6 +26,7 @@ describe("ApiApplication HTTP transport", () => {
   it("serves a mixed tRPC batch through the standalone listener and one composed service", async () => {
     const secrets = new TestSecretService();
     const application = ApiApplication.create({
+      features: new NoApiTrpcFeatures(),
       agents: new MissingAgentService(),
       secrets,
       http: {

@@ -46,11 +46,11 @@ pnpm --filter @langwatch/platform-api test:unit run \
   src/tasks/openapi-document/__tests__/openapi-document.unit.test.ts
 ```
 
-| Family | Ops | Owner |
-| --- | ---: | --- |
-| `/api/v1/agents` (get, post), `/{id}` (get, patch, put, delete), `/{id}/test`, `/{id}/call`, `/connect/{register,poll,frames}` | 11 | `connected-agents-restore-plan.md` Slice 7, `apps/api` half. `createAgentV1RestApp` is built and exported; nothing calls it and there is no `"agents-v1"` family name. See verification item 9. |
-| `/api/v1/run-plans` (get), `/run` (post), `/{id}` (get, delete), `/{id}/run` (post) | 5 | **Unowned.** No run-plans family, no server file. `POST /run` is also the route `suite-restore-review.md` fix 4 waits on — the CLI omits the plan name only there. |
-| `/api/v1/test-suites` (get, post), `/{id}` (get, patch, delete), `/{id}/run` (post) | 6 | **Unowned.** `suite.api.ts` mounts `/api/suites` and never `/api/v1/test-suites`. |
+| Family                                                                                                                         | Ops | Owner                                                                                                                                                                                                                                             |
+| ------------------------------------------------------------------------------------------------------------------------------ | --: | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `/api/v1/agents` (get, post), `/{id}` (get, patch, put, delete), `/{id}/test`, `/{id}/call`, `/connect/{register,poll,frames}` |  11 | **Fixed.** `connected-agents-restore-plan.md` Slice 7, `apps/api` half, landed (`585bc7b6f6`): `"agents-v1"` family in `app-rest.packaged-families.ts` calls `createAgentV1RestApp`, mounted whenever `AgentApp` exists. See verification item 9. |
+| `/api/v1/run-plans` (get), `/run` (post), `/{id}` (get, delete), `/{id}/run` (post)                                            |   5 | **Unowned.** No run-plans family, no server file. `POST /run` is also the route `suite-restore-review.md` fix 4 waits on — the CLI omits the plan name only there.                                                                                |
+| `/api/v1/test-suites` (get, post), `/{id}` (get, patch, delete), `/{id}/run` (post)                                            |   6 | **Unowned.** `suite.api.ts` mounts `/api/suites` and never `/api/v1/test-suites`.                                                                                                                                                                 |
 
 The legacy `/api/agents` alias is mounted (`agent-legacy.api.ts`, family
 `"agents"`) and works; it is a distinct path from v1.
@@ -62,13 +62,13 @@ one root cause: the **result-atoms query layer is absent repo-wide**
 (`grep -rln "ResultsFilter\|result-atoms" packages/features/scenario/server apps/api apps/worker`
 returns nothing). Porting it unblocks all five.
 
-| Procedure | Web call site |
-| --- | --- |
-| `scenarios.getResultsOverview` | `scenario/web/src/ui/sections/agent-testing/results/use-result-groups.ts:221` |
-| `scenarios.getResultAtoms` | `…/use-result-groups.ts:234` |
-| `scenarios.getCodeScenarios` | `…/use-result-groups.ts:563` |
-| `scenarios.getRunTargets` | `…/use-result-groups.ts:569` |
-| `scenarios.getRunConfigurations` | `…/run/use-run-configuration-history.ts:54` |
+| Procedure                        | Web call site                                                                 |
+| -------------------------------- | ----------------------------------------------------------------------------- |
+| `scenarios.getResultsOverview`   | `scenario/web/src/ui/sections/agent-testing/results/use-result-groups.ts:221` |
+| `scenarios.getResultAtoms`       | `…/use-result-groups.ts:234`                                                  |
+| `scenarios.getCodeScenarios`     | `…/use-result-groups.ts:563`                                                  |
+| `scenarios.getRunTargets`        | `…/use-result-groups.ts:569`                                                  |
+| `scenarios.getRunConfigurations` | `…/run/use-run-configuration-history.ts:54`                                   |
 
 Verification item 2 below carries the full hand-off for
 `getRunConfigurations`, including the composition call site
@@ -84,20 +84,20 @@ code moved.
 
 ### Main's module map (`origin/main`)
 
-| Concern | Main's file | Lines | Lands as |
-| --- | --- | --- | --- |
-| Contract types (`ResultAtom`, `ResultsFilter`, `ResultsOverview`, `CodeScenario`, `RunTarget`, …) | `platform/app/src/server/app-layer/simulations/result-atoms/atom.types.ts` | 231 | **Already ported** verbatim to `packages/features/scenario/contract/src/result-atoms.ts` (245 lines, exported from `index.ts`) ahead of this task — found in place, unmodified. |
-| ClickHouse SQL expression builders (`TARGET_KEY_EXPR`, `buildAtomFilters`, `atomScopeSql`, …) | `.../result-atoms/atom-sql.ts` | 427 | Folded into `packages/features/scenario/server/src/repositories/clickhouse/clickhouse.result-atoms.repository.ts` (see "Grammar adaptations" below — no `rules/` layout kind exists yet, decision 1 is undecided). |
-| ClickHouse repository (`ResultAtomsClickHouseRepository`) | `.../result-atoms/result-atoms.clickhouse.repository.ts` | 592 | Same file as above. |
-| Service (`ResultAtomsService`, folds atoms into overview/groups/trend/series) | `.../result-atoms/result-atoms.service.ts` | 630 | `packages/features/scenario/server/src/services/result-atoms.service.ts` |
-| Run-configuration types (`RunConfigurationScope`, `RunConfiguration`, `RunConfigurationEntry`) | `platform/app/src/server/app-layer/simulations/run-configurations/run-configuration.types.ts` | 64 | Colocated inside `services/run-configurations.service.ts` (see "Where the run-configuration types live" below — NOT contract). |
-| Run-configuration SQL (`TARGET_PAIR_EXPR`, `HAS_NOTE_EXPR`, …) | `.../run-configurations/run-configuration-sql.ts` | 71 | Folded into `repositories/clickhouse/clickhouse.run-configurations.repository.ts`. |
-| Run-configuration ClickHouse repository | `.../run-configurations/run-configurations.clickhouse.repository.ts` | 192 | Same file as above. |
-| Run-configuration service | `.../run-configurations/run-configurations.service.ts` | 342 | `packages/features/scenario/server/src/services/run-configurations.service.ts` |
-| tRPC routers | `platform/app/src/server/api/routers/scenarios/{result-atoms,run-configurations}.router.ts` | 124 + 33 | `transport/api-trpc/{result-atoms,run-configurations}.api.ts`, merged into `scenario.api.ts` |
-| Router merge | `.../routers/scenarios/index.ts` | 25 | `ScenarioTrpcApi.create` in `scenario.api.ts` |
-| Composition wiring | `platform/app/src/server/app-layer/presets.ts:1982-1992` (`new ResultAtomsService(new ResultAtomsClickHouseRepository(...), globalPrisma)`) | — | `ScenarioApp.create(...)`'s dependencies, wired at the **restricted** `apps/api/src/app/api-trpc-collaborators.agent-group.composition.ts` call site — hand-off below. |
-| Tests | `result-atoms/__tests__/{atom-sql,result-atoms.clickhouse.repository,result-atoms.service}.*.test.ts`, `run-configurations/__tests__/{run-configurations,run-configurations.service}.*.test.ts` | — | Lifted verbatim with `@scenario` titles, see "Tests landed" below. No ClickHouse migration needed — both repositories read the existing `simulation_runs` table (`TABLE_NAME` from `repositories/clickhouse/simulation-clickhouse.repository.ts`), which this branch already projects into. **No projection to port**: result-atoms has always been a read model over the run projection that already exists on this branch, not its own fold. |
+| Concern                                                                                           | Main's file                                                                                                                                                                                     | Lines    | Lands as                                                                                                                                                                                                                                                                                                                                                                                                                                       |
+| ------------------------------------------------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | -------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Contract types (`ResultAtom`, `ResultsFilter`, `ResultsOverview`, `CodeScenario`, `RunTarget`, …) | `platform/app/src/server/app-layer/simulations/result-atoms/atom.types.ts`                                                                                                                      | 231      | **Already ported** verbatim to `packages/features/scenario/contract/src/result-atoms.ts` (245 lines, exported from `index.ts`) ahead of this task — found in place, unmodified.                                                                                                                                                                                                                                                                |
+| ClickHouse SQL expression builders (`TARGET_KEY_EXPR`, `buildAtomFilters`, `atomScopeSql`, …)     | `.../result-atoms/atom-sql.ts`                                                                                                                                                                  | 427      | Folded into `packages/features/scenario/server/src/repositories/clickhouse/clickhouse.result-atoms.repository.ts` (see "Grammar adaptations" below — no `rules/` layout kind exists yet, decision 1 is undecided).                                                                                                                                                                                                                             |
+| ClickHouse repository (`ResultAtomsClickHouseRepository`)                                         | `.../result-atoms/result-atoms.clickhouse.repository.ts`                                                                                                                                        | 592      | Same file as above.                                                                                                                                                                                                                                                                                                                                                                                                                            |
+| Service (`ResultAtomsService`, folds atoms into overview/groups/trend/series)                     | `.../result-atoms/result-atoms.service.ts`                                                                                                                                                      | 630      | `packages/features/scenario/server/src/services/result-atoms.service.ts`                                                                                                                                                                                                                                                                                                                                                                       |
+| Run-configuration types (`RunConfigurationScope`, `RunConfiguration`, `RunConfigurationEntry`)    | `platform/app/src/server/app-layer/simulations/run-configurations/run-configuration.types.ts`                                                                                                   | 64       | Colocated inside `services/run-configurations.service.ts` (see "Where the run-configuration types live" below — NOT contract).                                                                                                                                                                                                                                                                                                                 |
+| Run-configuration SQL (`TARGET_PAIR_EXPR`, `HAS_NOTE_EXPR`, …)                                    | `.../run-configurations/run-configuration-sql.ts`                                                                                                                                               | 71       | Folded into `repositories/clickhouse/clickhouse.run-configurations.repository.ts`.                                                                                                                                                                                                                                                                                                                                                             |
+| Run-configuration ClickHouse repository                                                           | `.../run-configurations/run-configurations.clickhouse.repository.ts`                                                                                                                            | 192      | Same file as above.                                                                                                                                                                                                                                                                                                                                                                                                                            |
+| Run-configuration service                                                                         | `.../run-configurations/run-configurations.service.ts`                                                                                                                                          | 342      | `packages/features/scenario/server/src/services/run-configurations.service.ts`                                                                                                                                                                                                                                                                                                                                                                 |
+| tRPC routers                                                                                      | `platform/app/src/server/api/routers/scenarios/{result-atoms,run-configurations}.router.ts`                                                                                                     | 124 + 33 | `transport/api-trpc/{result-atoms,run-configurations}.api.ts`, merged into `scenario.api.ts`                                                                                                                                                                                                                                                                                                                                                   |
+| Router merge                                                                                      | `.../routers/scenarios/index.ts`                                                                                                                                                                | 25       | `ScenarioTrpcApi.create` in `scenario.api.ts`                                                                                                                                                                                                                                                                                                                                                                                                  |
+| Composition wiring                                                                                | `platform/app/src/server/app-layer/presets.ts:1982-1992` (`new ResultAtomsService(new ResultAtomsClickHouseRepository(...), globalPrisma)`)                                                     | —        | `ScenarioApp.create(...)`'s dependencies, wired at the **restricted** `apps/api/src/app/api-trpc-collaborators.agent-group.composition.ts` call site — hand-off below.                                                                                                                                                                                                                                                                         |
+| Tests                                                                                             | `result-atoms/__tests__/{atom-sql,result-atoms.clickhouse.repository,result-atoms.service}.*.test.ts`, `run-configurations/__tests__/{run-configurations,run-configurations.service}.*.test.ts` | —        | Lifted verbatim with `@scenario` titles, see "Tests landed" below. No ClickHouse migration needed — both repositories read the existing `simulation_runs` table (`TABLE_NAME` from `repositories/clickhouse/simulation-clickhouse.repository.ts`), which this branch already projects into. **No projection to port**: result-atoms has always been a read model over the run projection that already exists on this branch, not its own fold. |
 
 ### Two adaptations forced by this branch's seams (not in main, not a redesign of behaviour)
 
@@ -162,63 +162,161 @@ already imports `isSuiteSetId` from it), so the service and repository import
 `getSuiteSetId`, and the `target-key.ts` helpers straight from
 `@langwatch/suite-contract` with no new dependency edge and no cycle.
 
-### Composition hand-off (restricted: `apps/api/src/app/**` — not edited by this task)
+### Composition hand-off — landed (2026-09-04)
+
+The restriction on `apps/api/src/app/**` was lifted for one file, and the
+wiring described below is now done, not just planned.
 
 `ScenarioAppDependencies` (`packages/features/scenario/server/src/app/scenario.app.ts`)
-now declares two new required fields, `resultAtoms: ResultAtomsService` and
+declares two required fields, `resultAtoms: ResultAtomsService` and
 `runConfigurations: RunConfigurationsService`, and `ScenarioApp` exposes five
-new passthrough methods (`getResultsOverview`, `getResultAtoms`,
+passthrough methods (`getResultsOverview`, `getResultAtoms`,
 `getCodeScenarios`, `getRunTargets`, `getRunConfigurations`). The
-`ScenarioApp.create({...})` call site at
-`apps/api/src/app/api-trpc-collaborators.agent-group.composition.ts:511-521`
-needs two new entries, built the same way `composeSimulations` (same file,
-~line 585) builds `SimulationClickHouseAdapter` from
-`options.resolveClickHouseClient`:
+`ScenarioApp.create({...})` call site in
+`apps/api/src/app/api-trpc-collaborators.agent-group.composition.ts` now
+passes `resultAtoms: composeResultAtoms(options)` and
+`runConfigurations: composeRunConfigurations(options)`, two new functions
+next to `composeSimulations` that branch on `options.resolveClickHouseClient`
+the same way it does:
 
 ```ts
-const scenarioApp = ScenarioApp.create({
-  scenarios,
-  simulations,
-  scenarioExecution: composeScenarioExecution(options, { ... }),
-  scenarioTabs,
-  users: options.users,
-  broadcast: options.broadcast,
-  resultAtoms: new ResultAtomsService(
-    new ResultAtomsClickHouseRepository(resolveResultAtomsClient),
-    scenarios,
-  ),
-  runConfigurations: new RunConfigurationsService(
-    new RunConfigurationsClickHouseRepository(resolveResultAtomsClient),
-    scenarios,
-  ),
-});
+function composeResultAtoms(options: ApiAgentGroupCollaboratorsOptions): ResultAtomsService {
+  if (!options.resolveClickHouseClient) {
+    return ResultAtomsClickHouseAdapter.createUnavailable({ prisma: options.prisma });
+  }
+  return ResultAtomsClickHouseAdapter.create({
+    resolveClient: options.resolveClickHouseClient,
+    prisma: options.prisma,
+  });
+}
 ```
 
-where `resolveResultAtomsClient` needs the same null-safe treatment
-`composeSimulations` gives `options.resolveClickHouseClient`
-(`(projectId: string) => Promise<SimulationReadClient & SuiteClickHouseClient>) | null`)
-— neither `ResultAtomsClickHouseRepository` nor
-`RunConfigurationsClickHouseRepository` has a main-side "null ClickHouse"
-variant (main always had a live client at its one composition site), so the
-composer needs to decide the no-ClickHouse story here: a resolver that throws
-a plain `Error` (never a `HandledError` — an absent deployment ClickHouse is
-an infra fact, not a customer-actionable one) is the minimal option, or a
-small null-object repository following `NullSimulationRepository`'s pattern
-in `repositories/simulation.repository.ts` if the "empty answer" shape reads
-better for these five reads. `ResultAtomsClickHouseRepository`'s and
-`RunConfigurationsClickHouseRepository`'s constructors take
-`(tenantId: string) => Promise<ClickHouseClient>` (from `@clickhouse/client`,
-matching `clickhouse.simulation-run-metrics.repository.ts` /
-`clickhouse.simulation-run-state.repository.ts`'s existing resolver shape, not
-`simulation-clickhouse.repository.ts`'s narrower duck-typed one) — `scenarios`
-above is the already-composed `PrismaScenarioAdapter` instance (implements
-`ScenarioRepository`), reused rather than re-resolved.
+(`composeRunConfigurations` mirrors it for `RunConfigurationsClickHouseAdapter`.)
+
+Two adapters carry the composition, one per service
+(`adapters/result-atoms.clickhouse.adapter.ts`,
+`adapters/run-configurations.clickhouse.adapter.ts`), matching
+`SimulationClickHouseAdapter`'s shape: `.create({ resolveClient, prisma })`
+builds the concrete ClickHouse repository plus a private
+`PrismaScenarioRepository.create(prisma)` and returns only the service —
+repositories stay private, `apps/api` never sees one. `prisma` is typed as
+`Parameters<typeof PrismaScenarioRepository.create>[0]`, the same
+name-nothing trick `PrismaScenarioAdapter.create` already uses, so
+`prisma-containment` never sees `PrismaClient` imported outside
+`repositories/prisma/**`.
+
+No-ClickHouse resolved as **refuse, not answer empty** — unlike
+`composeSimulations`'s `createNull` (an empty run list is the true answer for
+a deployment that stores none), an empty stat strip here would read as "no
+data" rather than "no ClickHouse endpoint", which is the wrong message to an
+operator. Each adapter gets a `.createUnavailable({ prisma })` that pairs a
+private `Unavailable*Repository extends *ReadPort` (every method rejects a
+plain `Error`, no `HandledError` — an absent deployment ClickHouse is an
+infra fact, not a customer-actionable one) with the same
+`PrismaScenarioRepository`. This mirrors two precedents at once: the
+in-package `UnavailableCancellationPublisherAdapter`
+(`adapters/redis.cancellation-channel.adapter.ts`) for the refuse-by-name
+class shape, and `composeSimulations`/`composeEventExplorer` in the apps/api
+file for the branch-on-`resolveClickHouseClient` structure.
+
+The two abstract ports these repositories extend
+(`ResultAtomsReadPort`, `RunConfigurationsReadPort`) moved from
+`repositories/` to `ports/` mid-implementation — see "Two adaptations"
+below for why a `repositories/` location could not be exported at all.
 
 Registration line for the merged router (already done, not restricted):
 `scenario.api.ts`'s `ScenarioTrpcApi.create` spreads
 `createResultAtomsRouter(trpc, procedures)._def.procedures` and
 `createRunConfigurationsRouter(trpc, procedures)._def.procedures` alongside
 the other five sub-routers.
+
+### Status: landed (2026-09-04)
+
+All five procedures are implemented, wired into `ScenarioApp`, merged into
+`scenario.api.ts`, and — as of 2026-09-04, with the restriction lifted for
+one file — composed into `apps/api`'s `ScenarioApp.create` call. Nothing is
+left pending on this subsystem.
+
+**A third adaptation surfaced while landing this**, beyond the two above:
+`packages/architecture-lint`'s `feature-module-classes` and
+`service-dependencies` oxlint rules (not yet in force when the module map was
+first written) refuse a `.repository.ts` under `repositories/clickhouse/`
+that exports a standalone function or a constructor that isn't `private` behind
+`static create`, and refuse a `services/*.service.ts` file that imports
+anything with `/clickhouse` in its path (path-substring match, not semantic —
+`packages/architecture-lint/oxlint-plugin.mjs`'s `importsDatabaseClient`).
+Fallout:
+
+- Two new abstract ports were added: `ports/result-atoms-read.port.ts`
+  (`ResultAtomsReadPort`, plus the `Raw*Row` types and `MAX_*` constants —
+  these are the abstract port's contract now, not the concrete repository's)
+  and `ports/run-configurations-read.port.ts` (`RunConfigurationsReadPort`,
+  `RawRunConfigurationRow`, `MAX_RUN_CONFIGURATIONS`). Both services depend
+  on the abstract type, never the concrete `*ClickHouseRepository`. They
+  started under `repositories/` and moved to `ports/` once the composition
+  hand-off needed them exported from `index.ts`: `PRIVATE_SERVER_EXPORT`
+  (`packages/architecture-lint/src/feature-layout.ts`) forbids re-exporting
+  anything whose resolved origin sits under `repositories/`, `projections/`
+  or `stores/` — `ports/` is the one directory in this shape the grammar lets
+  a feature server publish, matching `ScenarioTabStorePort`'s existing
+  precedent.
+- The four SQL-builder _functions_ (`groupKeyExpr`, `trendKeyExpr`,
+  `buildAtomFilters`, `atomScopeSql`) became `static` methods of
+  `ResultAtomsClickHouseRepository` instead of module-level exports;
+  `RunConfigurationsClickHouseRepository` calls them as
+  `ResultAtomsClickHouseRepository.buildAtomFilters(...)` etc. The SQL
+  expression _constants_ (`ATOM_SORT_KEY`, `TARGET_KEY_EXPR`, …) stayed
+  plain `export const` — only functions are matched by the rule.
+- `mapStatus` (raw ClickHouse `Status` → `ScenarioRunStatus`) moved from the
+  service into `ResultAtomsClickHouseRepository.findAtoms`: the abstract
+  port's `RawAtomRow.Status` is typed `ScenarioRunStatus` (already mapped),
+  so the service never imports `simulation-run.mapper.ts` at all.
+- `ScenarioRepository` (`repositories/scenario.repository.ts`) gained three
+  read methods used only by these two services: `findIdsByLabelsOrTestSuites`
+  (main's `resolveScenarioScope` Prisma query, moved behind the port),
+  `findTitlesByIds` (main's scenario-grouping title read), and `findPlans`
+  (a new `ScenarioPlanRecord` — id/name/slug/kind/scope/scenarioIds/targets —
+  covering both services' two differently-shaped `readPlans` reads on main).
+  `PrismaScenarioRepository` implements all three against the same
+  `SimulationSuite` table it already reads for test suites. This is the
+  `typed-prisma-seam` adaptation the module map's "Two adaptations" section
+  anticipated, made concrete.
+
+**Tests landed** (all `@scenario` titles carried over verbatim from main):
+`repositories/clickhouse/__tests__/clickhouse.result-atoms-sql.unit.test.ts`
+(19 tests, was `atom-sql.unit.test.ts`),
+`services/__tests__/result-atoms.service.unit.test.ts` (24 tests),
+`services/__tests__/run-configurations.service.unit.test.ts` (9 tests) —
+52 tests total across the three, all passing.
+
+**Not landed**: the two ClickHouse-backed integration tests
+(`result-atoms.clickhouse.repository.integration.test.ts`, 1424 lines;
+`run-configurations.integration.test.ts`, 577 lines, both under
+`origin/main:platform/app/src/server/app-layer/simulations/{result-atoms,run-configurations}/__tests__/`)
+— 2000 lines of ClickHouse-query assertions that would skip locally with no
+ClickHouse to verify against, and translating them faithfully by hand without
+a way to run them was judged higher-risk than valuable this pass. Resume
+point: port them to
+`repositories/clickhouse/__tests__/clickhouse.result-atoms.repository.integration.test.ts`
+and `clickhouse.run-configurations.repository.integration.test.ts` under this
+package's integration lane, adapting the same import paths this section
+documents (`@langwatch/scenario-contract`, `@langwatch/suite-contract`, the
+two abstract ports for types, `ResultAtomsClickHouseRepository`/
+`RunConfigurationsClickHouseRepository` for the classes under test) —
+straightforward mechanical work, just long.
+
+Web side: already built ahead of this pass and unmodified —
+`packages/features/scenario/web/src/ui/sections/agent-testing/results/use-result-groups.ts`
+and `.../run/use-run-configuration-history.ts` already call all five
+procedures and already import `ResultAtom`/`ResultsOverview`/`CodeScenario`/
+`RunTarget`/`ResultsFilter`/`ResultsGroupBy` from `@langwatch/scenario-contract`
+(these were pre-ported, found in place). `RunConfigurationEntry` on the web
+side is its own local mirror
+(`packages/features/scenario/web/src/ui/sections/agent-testing/run/run-configuration.ts`)
+rather than a contract-shared type, which is why the server-side
+`RunConfigurationEntry` in `services/run-configurations.service.ts` has no
+contract-package counterpart either — see "Where the run-configuration types
+live" above.
 
 ## Open — the workbench Langy handoff
 
@@ -281,12 +379,13 @@ and `packages/features/scenario/server/src/adapters/simulation-eventing.adapter.
 `createFoldStore()` wrapped `RepositoryFoldStore` directly with no gate — a
 cost-only metrics event (a redacted/misattributed `scenario.run_id`) would
 mint a `simulation_runs` row with no name, scenario or end. The handler's own
-comment in `simulation-run-state.projection.ts` already *referenced*
+comment in `simulation-run-state.projection.ts` already _referenced_
 `hasRunDefiningEvent` as if it existed ("Copying it here would let a cost
 figure alone create a run") — a stale comment describing behaviour the code
 did not implement.
 
 Fixed:
+
 - `packages/features/scenario/server/src/projections/simulation-run-state.projection.ts` —
   exported `hasRunDefiningEvent(state)`, ported verbatim from
   `origin/main:platform/app/src/server/event-sourcing/pipelines/simulation-processing/projections/simulationRunState.foldProjection.ts`.
@@ -314,24 +413,25 @@ still calls `api.scenarios.getRunConfigurations.useQuery(...)`; no
 
 Not a small lift. Main's implementation
 (`platform/app/src/server/app-layer/simulations/run-configurations/{run-configuration.types.ts,run-configurations.service.ts (342 lines),run-configurations.clickhouse.repository.ts (192 lines)}`
-+ `platform/app/src/server/api/routers/scenarios/run-configurations.router.ts`)
-depends entirely on the **result-atoms subsystem** (`ResultsFilter`, the
-ClickHouse row-folding query it drives) — and that subsystem is itself
-absent from the branch: `grep -rln "ResultsFilter\|result-atoms" packages/features/scenario/server apps/api apps/worker`
-returns nothing. This is the same root cause the original Part A tRPC table
-above already named for `getResultsOverview` / `getResultAtoms` /
-`getCodeScenarios` / `getRunTargets` — none of which are in this task's
-finding list, but `getRunConfigurations` cannot be built without the same
-infrastructure those four also need. Building it properly means porting the
-whole result-atoms query layer first, then `run-configurations.service.ts` /
-`.clickhouse.repository.ts` on top of it, then a new `run-configurations.api.ts`
-sub-router merged into `packages/features/scenario/server/src/transport/api-trpc/scenario.api.ts`
-(not restricted) — and then wiring the concrete ClickHouse-backed service into
-the live process, which happens in `ScenarioApp.create(...)`'s call site,
-`apps/api/src/app/api-trpc-collaborators.agent-group.composition.ts:514-526`
-(**restricted**: `apps/api/src/app/**`). That composition file is also where
-`SimulationClickHouseAdapter`/`SimulationRunStateStoreAdapter` already get
-built for the `simulations` service this new service would sit beside.
+
+- `platform/app/src/server/api/routers/scenarios/run-configurations.router.ts`)
+  depends entirely on the **result-atoms subsystem** (`ResultsFilter`, the
+  ClickHouse row-folding query it drives) — and that subsystem is itself
+  absent from the branch: `grep -rln "ResultsFilter\|result-atoms" packages/features/scenario/server apps/api apps/worker`
+  returns nothing. This is the same root cause the original Part A tRPC table
+  above already named for `getResultsOverview` / `getResultAtoms` /
+  `getCodeScenarios` / `getRunTargets` — none of which are in this task's
+  finding list, but `getRunConfigurations` cannot be built without the same
+  infrastructure those four also need. Building it properly means porting the
+  whole result-atoms query layer first, then `run-configurations.service.ts` /
+  `.clickhouse.repository.ts` on top of it, then a new `run-configurations.api.ts`
+  sub-router merged into `packages/features/scenario/server/src/transport/api-trpc/scenario.api.ts`
+  (not restricted) — and then wiring the concrete ClickHouse-backed service into
+  the live process, which happens in `ScenarioApp.create(...)`'s call site,
+  `apps/api/src/app/api-trpc-collaborators.agent-group.composition.ts:514-526`
+  (**restricted**: `apps/api/src/app/**`). That composition file is also where
+  `SimulationClickHouseAdapter`/`SimulationRunStateStoreAdapter` already get
+  built for the `simulations` service this new service would sit beside.
 
 **Hand-off**: this is a multi-day feature restoration (result-atoms query
 layer + run-configurations service/repository/router + composition wiring),
@@ -367,7 +467,7 @@ built from `~/experiments-v3/actions/{manifest,narration,runScope}.ts`,
 `~/experiments-v3/utils/revealTargetColumn.ts` and
 `~/features/langy/uiActions/{errors,types}.ts` — none of which have a
 branch equivalent checked. The workbench's own comment additionally notes
-four *other* pages (me, automations, analytics, evaluations) hit the same
+four _other_ pages (me, automations, analytics, evaluations) hit the same
 published-export wall and were left with the same gap.
 
 **Hand-off**: (1) publish `useRegisterLangyActions` and
@@ -397,34 +497,34 @@ wiring gap the note also named.
 
 **Module map — main path → branch path, and status found:**
 
-| Main module | Branch module | Status before this pass |
-| --- | --- | --- |
-| `~/features/langy/LangyContext.tsx` (`useRegisterLangyActions`, `useRegisterLangyHandlers`) | `packages/features/langy/web/src/features/langy/ui/sections/langy-context.tsx` | Ported verbatim, functions present, **not exported from package index** |
-| `~/features/langy/components/MessageContent.tsx` (`ProposalHandlers` type) | `packages/features/langy/web/src/features/langy/ui/sections/message-content.tsx` | Ported, **not exported from package index** |
-| `~/features/langy/uiActions/types.ts` | `packages/features/langy/web/src/model/ui-actions/langy-ui-action-types.ts` | Ported verbatim, published (`LangyUiActionHandlers`) |
-| `~/features/langy/uiActions/errors.ts` | `packages/features/langy/web/src/model/ui-actions/langy-ui-action-errors.ts` | Ported verbatim, published |
-| `~/features/langy/uiActions/executeUiAction.ts` | `packages/features/langy/web/src/model/ui-actions/execute-ui-action.ts` | Ported and **widened** (carries `error`, not just `message`, into `onHandlerError` — see finding 8) |
-| `~/experiments-v3/actions/manifest.ts` | `packages/features/experiment/web/src/model/experiments-v3/actions/manifest.ts` | Ported verbatim (`WORKBENCH_ACTIONS`, `WORKBENCH_ACTION_KINDS`) |
-| `~/experiments-v3/actions/narration.ts` | `.../model/experiments-v3/actions/narration.ts` | Ported verbatim (`narrateWorkbenchAction`, `narrateWorkbenchRun`) |
-| `~/experiments-v3/actions/runScope.ts` | `.../model/experiments-v3/actions/run-scope.ts` | Ported verbatim (`scopeFromRunPayload`) |
-| `~/experiments-v3/actions/liveWorkbenchRead.ts` | `.../model/experiments-v3/actions/live-workbench-read.ts` | Ported verbatim (`readLiveWorkbench`) |
-| `~/experiments-v3/execution/runIdentification.ts` | `.../model/experiments-v3/execution/run-identification.ts` | Ported verbatim (`startAndIdentifyRun`) |
-| `~/experiments-v3/hooks/useTargetName.ts` | `.../behavior/experiments-v3/use-target-name.ts` | Ported verbatim (`useTargetNames`) |
-| `~/experiments-v3/utils/revealTargetColumn.ts` | `.../model/experiments-v3/reveal-target-column.ts` | Ported verbatim (`revealTargetColumn`, `targetColumnLabel`) |
-| `~/experiments-v3/hooks/useOptimizeWithLangy.ts` | `.../behavior/experiments-v3/use-optimize-with-langy.ts` | Ported, already wired into `workbench.screen.tsx` |
-| `~/experiments-v3/hooks/useReportPageActivityToLangy.ts` | `.../behavior/experiments-v3/use-report-page-activity-to-langy.ts` | Ported, already wired |
-| `~/experiments-v3/hooks/useWorkbenchUpdateListener.ts` | `.../behavior/experiments-v3/use-workbench-update-listener.ts` | Ported, already wired |
-| `~/pages/.../workbench/[slug].tsx` (proposal handlers + `uiActionHandlers` memo + both register calls) | `packages/features/experiment/web/src/screens/experiments/workbench.screen.tsx` | **The actual gap** — memo blocks and both `useRegisterLangy*` calls were never added, and the two langy-web exports they need did not exist |
+| Main module                                                                                            | Branch module                                                                    | Status before this pass                                                                                                                     |
+| ------------------------------------------------------------------------------------------------------ | -------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------- |
+| `~/features/langy/LangyContext.tsx` (`useRegisterLangyActions`, `useRegisterLangyHandlers`)            | `packages/features/langy/web/src/features/langy/ui/sections/langy-context.tsx`   | Ported verbatim, functions present, **not exported from package index**                                                                     |
+| `~/features/langy/components/MessageContent.tsx` (`ProposalHandlers` type)                             | `packages/features/langy/web/src/features/langy/ui/sections/message-content.tsx` | Ported, **not exported from package index**                                                                                                 |
+| `~/features/langy/uiActions/types.ts`                                                                  | `packages/features/langy/web/src/model/ui-actions/langy-ui-action-types.ts`      | Ported verbatim, published (`LangyUiActionHandlers`)                                                                                        |
+| `~/features/langy/uiActions/errors.ts`                                                                 | `packages/features/langy/web/src/model/ui-actions/langy-ui-action-errors.ts`     | Ported verbatim, published                                                                                                                  |
+| `~/features/langy/uiActions/executeUiAction.ts`                                                        | `packages/features/langy/web/src/model/ui-actions/execute-ui-action.ts`          | Ported and **widened** (carries `error`, not just `message`, into `onHandlerError` — see finding 8)                                         |
+| `~/experiments-v3/actions/manifest.ts`                                                                 | `packages/features/experiment/web/src/model/experiments-v3/actions/manifest.ts`  | Ported verbatim (`WORKBENCH_ACTIONS`, `WORKBENCH_ACTION_KINDS`)                                                                             |
+| `~/experiments-v3/actions/narration.ts`                                                                | `.../model/experiments-v3/actions/narration.ts`                                  | Ported verbatim (`narrateWorkbenchAction`, `narrateWorkbenchRun`)                                                                           |
+| `~/experiments-v3/actions/runScope.ts`                                                                 | `.../model/experiments-v3/actions/run-scope.ts`                                  | Ported verbatim (`scopeFromRunPayload`)                                                                                                     |
+| `~/experiments-v3/actions/liveWorkbenchRead.ts`                                                        | `.../model/experiments-v3/actions/live-workbench-read.ts`                        | Ported verbatim (`readLiveWorkbench`)                                                                                                       |
+| `~/experiments-v3/execution/runIdentification.ts`                                                      | `.../model/experiments-v3/execution/run-identification.ts`                       | Ported verbatim (`startAndIdentifyRun`)                                                                                                     |
+| `~/experiments-v3/hooks/useTargetName.ts`                                                              | `.../behavior/experiments-v3/use-target-name.ts`                                 | Ported verbatim (`useTargetNames`)                                                                                                          |
+| `~/experiments-v3/utils/revealTargetColumn.ts`                                                         | `.../model/experiments-v3/reveal-target-column.ts`                               | Ported verbatim (`revealTargetColumn`, `targetColumnLabel`)                                                                                 |
+| `~/experiments-v3/hooks/useOptimizeWithLangy.ts`                                                       | `.../behavior/experiments-v3/use-optimize-with-langy.ts`                         | Ported, already wired into `workbench.screen.tsx`                                                                                           |
+| `~/experiments-v3/hooks/useReportPageActivityToLangy.ts`                                               | `.../behavior/experiments-v3/use-report-page-activity-to-langy.ts`               | Ported, already wired                                                                                                                       |
+| `~/experiments-v3/hooks/useWorkbenchUpdateListener.ts`                                                 | `.../behavior/experiments-v3/use-workbench-update-listener.ts`                   | Ported, already wired                                                                                                                       |
+| `~/pages/.../workbench/[slug].tsx` (proposal handlers + `uiActionHandlers` memo + both register calls) | `packages/features/experiment/web/src/screens/experiments/workbench.screen.tsx`  | **The actual gap** — memo blocks and both `useRegisterLangy*` calls were never added, and the two langy-web exports they need did not exist |
 
 **Test map:**
 
-| Main test | Branch test | Status before this pass |
-| --- | --- | --- |
-| `RunFlushesPendingSave.integration.test.tsx` | *(none)* | Not ported |
-| `StalePageRefusesAgentActions.integration.test.tsx` | *(none)* | Not ported |
-| `WorkbenchReportsActivityToLangy.integration.test.tsx` | `screens/experiments/__tests__/workbench.report-activity-to-langy.integration.test.tsx` | Already ported, all `@scenario`s bound |
-| `WorkbenchUpdateListener.integration.test.tsx` | `behavior/experiments-v3/__tests__/use-workbench-update-listener.integration.test.tsx` | Already ported, all `@scenario`s bound |
-| `WorkbenchUsesFullMenu.integration.test.tsx` | *(none)* | **Out of scope for this pass** — tests `DashboardLayout`'s compact-overlay-rail behavior, which this branch's workbench no longer wraps in `DashboardLayout` at all (`Box` instead, see workbench.screen.tsx). Not a Langy-handoff scenario; a separate nav-layout question left for whoever owns that regression |
+| Main test                                              | Branch test                                                                             | Status before this pass                                                                                                                                                                                                                                                                                           |
+| ------------------------------------------------------ | --------------------------------------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `RunFlushesPendingSave.integration.test.tsx`           | _(none)_                                                                                | Not ported                                                                                                                                                                                                                                                                                                        |
+| `StalePageRefusesAgentActions.integration.test.tsx`    | _(none)_                                                                                | Not ported                                                                                                                                                                                                                                                                                                        |
+| `WorkbenchReportsActivityToLangy.integration.test.tsx` | `screens/experiments/__tests__/workbench.report-activity-to-langy.integration.test.tsx` | Already ported, all `@scenario`s bound                                                                                                                                                                                                                                                                            |
+| `WorkbenchUpdateListener.integration.test.tsx`         | `behavior/experiments-v3/__tests__/use-workbench-update-listener.integration.test.tsx`  | Already ported, all `@scenario`s bound                                                                                                                                                                                                                                                                            |
+| `WorkbenchUsesFullMenu.integration.test.tsx`           | _(none)_                                                                                | **Out of scope for this pass** — tests `DashboardLayout`'s compact-overlay-rail behavior, which this branch's workbench no longer wraps in `DashboardLayout` at all (`Box` instead, see workbench.screen.tsx). Not a Langy-handoff scenario; a separate nav-layout question left for whoever owns that regression |
 
 **Restoration done this pass:**
 
@@ -568,6 +668,7 @@ Fixed, reusing the exact `AzureBlobStoredObjectDriver` /
 `resolveAzureCredentials` pattern `apps/api/src/app/api-trpc-collaborators.product-infra.composition.ts:310-315`
 (read-only reference, not edited) already uses for the API's own Azure
 object-storage path:
+
 - `apps/worker/src/platform/config/worker.config.ts` — added the
   `AZURE_BLOB_*` + `AZURE_TENANT_ID`/`AZURE_CLIENT_ID`/`AZURE_FEDERATED_TOKEN_FILE`
   config block under `infrastructure.storage.azure`, mirroring
@@ -647,26 +748,25 @@ text. `pnpm --filter @langwatch/langy-contract test:unit src/__tests__/langy-ui-
 → 4/4 pass; full package `pnpm --filter @langwatch/langy-contract test:unit`
 → 490/490 pass.
 
-### 9. Connected agents (ADR-128) mounting — correction to "verified-fixed"
+### 9. Connected agents (ADR-128) mounting — fixed
 
-The package-level restoration is real (commits `a28ba0c995`, `c7384b57c8`,
-`f725772083`, `e705f9c950`: `/api/v1/agents*` REST handlers, `ConnectGateway`,
-`agents.testRun`/`testTurn` tRPC, connected-target resolution by name). But
-`grep -rln "createAgentV1RestApp\|ConnectGateway\|agent-v1.api\|AgentsV1Deps" apps/api/src`
-returns **nothing** — the REST family and the WebSocket/long-poll gateway are
-fully implemented in `packages/features/agent/server` and mounted nowhere in
-the live API process. `apps/api/src/app-rest/app-rest.packaged-families.ts`
-mounts only `createAgentLegacyRestApp` (the `/api/agents` alias).
-
-This is not a gap I'm fixing or handing off fresh: `dev/docs/plans/connected-agents-restore-plan.md`
-(80KB, actively updated today through a "fourth pass," §12) already names
-this exact gap precisely — "Not started — Slice 7 (apps/api half)...
-mounting `createAgentV1RestApp`... blocked on `a8c54399437b5abf2` finishing
-`api-production.composition.ts`" — and is coordinating with another
-in-session agent by name to land it, in `apps/api/src/app/**` (restricted for
-this pass). No action taken here; flagging only because the original doc's
-"restore plan: see connected-agents-restore-plan.md" line could be misread
-as already resolved.
+Was open as of this document's "fourth pass" audit (Slice 7's `apps/api` half
+not yet mounted: `grep -rln "createAgentV1RestApp\|ConnectGateway\|agent-v1.api\|AgentsV1Deps"
+apps/api/src` returned nothing). **Now landed** — `585bc7b6f6` and this
+session's follow-on work: `apps/api/src/app/api-connected-agents.composition.ts`
+builds `ApiConnectedAgentsComposition` (Redis-backed `ConnectGateway` +
+`LongPollTransport`, `ApiConnectCredentialAdapter`, `assertConnectedAgentsRunnable`);
+`"agents-v1"` family in `app-rest.packaged-families.ts` mounts
+`createAgentV1RestApp` whenever `AgentApp` exists, layering the connect/call
+routes in when the composition also exists; the WebSocket upgrade routes
+through `ApiUpgradeRouter` on the API's own HTTP listener;
+`AgentApp.connected.presence` reads `readAgentPresence` over the composed
+runtime. Slice 8 (the agents-page UI slot: `connectedSection` on
+`AgentManagementHostPort`, wired to scenario-web's `ConnectedAgentsSection`)
+also landed. Full detail, including the four apps/api integration suites
+still not lifted against the mounted family and 6 unbound `@unit` scenarios
+belonging to subsystems outside this plan's scope, is in
+`dev/docs/plans/connected-agents-restore-plan.md` §9.
 
 ### 10. `agents.testRun` / `agents.testTurn` — verified-fixed
 

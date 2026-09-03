@@ -47,11 +47,12 @@ export {
   type SseSubscriptionCaller,
   type SseSubscriptionPorts,
 } from "./app-trpc.sse";
-export { createAppTrpcFeatures, type AppTrpcFeaturePorts } from "./app-trpc.features";
 export {
-  ApiTrpcCollaboratorsAbsence,
-  type ApiTrpcCollaborators,
-} from "./app-trpc.collaborators";
+  createAppTrpcFeatures,
+  type AppTrpcFeaturePorts,
+  type AppTrpcFeatureRecord,
+} from "./app-trpc.features";
+export { ApiTrpcCollaboratorsAbsence, type ApiTrpcCollaborators } from "./app-trpc.collaborators";
 export type {
   ApiTrpcFeatureApplication,
   ApiTrpcPortsContext,

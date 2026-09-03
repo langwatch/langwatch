@@ -250,13 +250,45 @@ export type ApiExecutionCollaborators = Readonly<{
   experiments: ExperimentApp;
   /** For `ctx.app.evaluations`. */
   evaluations: Readonly<{ reportEvaluation(data: never): Promise<unknown> }>;
-  /** The `workflows` entry of {@link ApiTrpcCollaborators}. */
+  /**
+   * The `workflows` entry of {@link ApiTrpcCollaborators}, as the exact set this
+   * half composes — every member below is composed unconditionally.
+   *
+   * The rest of both port types are row reads, AuthZ probes and one flag write
+   * the PROCESS answers, so the collaborators record omits them here. `Partial`
+   * over the whole type would say the opposite: that the five this half does
+   * guarantee might be missing.
+   */
   workflowPorts: Readonly<{
-    lifecycle: Partial<WorkflowTrpcPorts>;
-    optimization: Partial<WorkflowOptimizationTrpcPorts<never, never>>;
+    lifecycle: Pick<
+      WorkflowTrpcPorts,
+      | "captureException"
+      | "generateCommitMessage"
+      | "prepareDsl"
+      | "saveWorkflowVersion"
+      | "workflowCreated"
+    >;
+    optimization: Pick<WorkflowOptimizationTrpcPorts<never, never>, "runPublishedWorkflow">;
   }>;
   /** The `experiments` entry. */
-  experimentPorts: Partial<ExperimentTrpcPorts<unknown>>;
+  /**
+   * The six `experiments.*` capabilities this half composes, all of them
+   * unconditionally. Not `Partial`: that made every one of them `undefined`
+   * while the collaborators record requires all six, which is what the
+   * assignment failed on one member at a time. The four that are missing —
+   * `probeProjectPermission`, `createWorkflow`, `tryFindWorkflow` and
+   * `resolveAuthorNames` — are row reads and an AuthZ probe the PROCESS owns,
+   * and the record omits them here for exactly that reason.
+   */
+  experimentPorts: Pick<
+    ExperimentTrpcPorts<unknown>,
+    | "coerceMonitorMappings"
+    | "copyWorkflowWithDatasets"
+    | "saveWorkflowVersion"
+    | "slugify"
+    | "upsertExperimentMonitor"
+    | "workbenchStateSchema"
+  >;
   /** The `evaluations` entry. */
   evaluationPorts: EvaluationMountPorts<unknown, unknown>;
   /** The evaluator service the workflow application publishes evaluators through. */

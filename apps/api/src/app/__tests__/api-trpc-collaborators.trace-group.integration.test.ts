@@ -389,7 +389,8 @@ describe("given an API process composed with the observability collaborators", (
       [
         "traces.getById",
         { projectId: "project-1", traceId: "trace-1" },
-        (body) => expect(body).toMatchObject({ result: { data: { json: { trace_id: "trace-1" } } } }),
+        (body) =>
+          expect(body).toMatchObject({ result: { data: { json: { trace_id: "trace-1" } } } }),
       ],
       [
         "tracesV2.newCount",
@@ -409,7 +410,8 @@ describe("given an API process composed with the observability collaborators", (
       [
         "traceEditOverlay.getByTraceId",
         { projectId: "project-1", traceId: "trace-1" },
-        (body) => expect(body).toMatchObject({ result: { data: { json: { traceId: "trace-1" } } } }),
+        (body) =>
+          expect(body).toMatchObject({ result: { data: { json: { traceId: "trace-1" } } } }),
       ],
       [
         "share.listForResource",
@@ -419,7 +421,8 @@ describe("given an API process composed with the observability collaborators", (
       [
         "pinnedTrace.listByProject",
         { projectId: "project-1" },
-        (body) => expect(body).toMatchObject({ result: { data: { json: [{ traceId: "trace-1" }] } } }),
+        (body) =>
+          expect(body).toMatchObject({ result: { data: { json: [{ traceId: "trace-1" }] } } }),
       ],
       [
         "savedViews.getAll",

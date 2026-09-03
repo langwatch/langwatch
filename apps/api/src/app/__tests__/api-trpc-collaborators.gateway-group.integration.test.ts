@@ -158,9 +158,7 @@ function testEnterprise(setupState: Record<string, boolean>) {
   } as never;
 }
 
-function composeApplication(
-  overrides: { saasBilling?: boolean; enterprise?: unknown } = {},
-) {
+function composeApplication(overrides: { saasBilling?: boolean; enterprise?: unknown } = {}) {
   const prisma = testPrisma();
   const authz = testAuthz();
   const github = testGithub();
@@ -255,32 +253,34 @@ describe("given an API process composed with the gateway-group half of the recor
       );
 
       expect(
-        mounted.filter((namespace) =>
-          [
-            "activityMonitor",
-            "aiTools",
-            "anomalyRules",
-            "currency",
-            "departments",
-            "gatewayBudgets",
-            "gatewayCacheRules",
-            "gatewayGuardrails",
-            "gatewaySpendEvents",
-            "gatewayUsage",
-            "github",
-            "governance",
-            "ingestionKey",
-            "ingestionSources",
-            "ingestionTemplates",
-            "personalSessions",
-            "personalVirtualKeys",
-            "routingPolicy",
-            "sessionPolicy",
-            "subscription",
-            "virtualKeys",
-            "webhookEndpoints",
-          ].includes(namespace),
-        ).sort(),
+        mounted
+          .filter((namespace) =>
+            [
+              "activityMonitor",
+              "aiTools",
+              "anomalyRules",
+              "currency",
+              "departments",
+              "gatewayBudgets",
+              "gatewayCacheRules",
+              "gatewayGuardrails",
+              "gatewaySpendEvents",
+              "gatewayUsage",
+              "github",
+              "governance",
+              "ingestionKey",
+              "ingestionSources",
+              "ingestionTemplates",
+              "personalSessions",
+              "personalVirtualKeys",
+              "routingPolicy",
+              "sessionPolicy",
+              "subscription",
+              "virtualKeys",
+              "webhookEndpoints",
+            ].includes(namespace),
+          )
+          .sort(),
       ).toEqual([
         "activityMonitor",
         "aiTools",

@@ -77,7 +77,10 @@ export abstract class ScenarioService {
   }): Promise<{ archived: string[]; failed: { id: string; error: string }[] }>;
   abstract createTestSuite(input: ScenarioTestSuiteCreateInput): Promise<ScenarioTestSuite>;
   abstract tryGetTestSuite(input: ScenarioTestSuiteIdInput): Promise<ScenarioTestSuite | null>;
-  abstract listTestSuites(input: { projectId: string }): Promise<ScenarioTestSuite[]>;
+  abstract listTestSuites(input: {
+    projectId: string;
+    includeArchived?: boolean;
+  }): Promise<ScenarioTestSuite[]>;
   abstract renameTestSuite(input: ScenarioTestSuiteRenameInput): Promise<ScenarioTestSuite>;
   abstract updateTestSuite(input: ScenarioTestSuiteUpdateInput): Promise<ScenarioTestSuite>;
   abstract getTestSuiteRunDefinition(
@@ -93,6 +96,11 @@ export abstract class ScenarioService {
     ids: string[];
     projectId: string;
   }): Promise<{ id: string; name: string }[]>;
+  /** Each scenario's own model choice, one read for the whole batch. */
+  abstract getModelChoices(input: {
+    ids: string[];
+    projectId: string;
+  }): Promise<{ id: string; simulatorModel: string | null; judgeModel: string | null }[]>;
   abstract resolveRunParameters(
     input: ResolveScenarioRunParametersInput,
   ): Promise<ResolvedScenarioRunParameters>;

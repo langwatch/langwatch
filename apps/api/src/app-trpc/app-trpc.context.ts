@@ -2,12 +2,14 @@
  * The request context every packaged tRPC surface on this process is resolved
  * against.
  *
- * `createAppTrpcFeatures` constrains its context to the INTERSECTION of every
- * mounted feature's own context type, and each of those names one slice of the
- * host application plus, for a few, the authenticated session. This module is
- * that intersection written down once, so the process has a single answer to
- * "what must a request carry for the whole record to be mountable" instead of
- * discovering it one compile error at a time.
+ * Every mounted feature names its own context type, and each of those names one
+ * slice of the host application plus, for a few, the authenticated session.
+ * This module is that intersection written down once, so the process has a
+ * single answer to "what must a request carry for the whole record to be
+ * mountable" instead of discovering it one compile error at a time. It is the
+ * context `createAppTrpcFeatures`'s mount is built on — the function used to
+ * restate the same intersection as a type-parameter constraint, which made the
+ * record's real type unreadable from outside.
  *
  * Two things are deliberately NOT here:
  *

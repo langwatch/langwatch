@@ -39,7 +39,7 @@ import {
   type ScenarioVersionRestoreInput,
   type ScenarioVersionSummary,
 } from "@langwatch/scenario-contract";
-import { ScenarioRepository } from "../scenario.repository";
+import { ScenarioRepository, type ScenarioPlanRecord } from "../scenario.repository";
 
 type ScenarioWriteInput = ScenarioUpdateInput & { actor: ScenarioActor };
 
@@ -349,6 +349,66 @@ export class PrismaScenarioRepository extends ScenarioRepository {
     return rows.map((row) => scenarioSchema.pick({ id: true, name: true }).parse(row));
   }
 
+  async findModelChoices(input: {
+    ids: string[];
+    projectId: string;
+  }): Promise<{ id: string; simulatorModel: string | null; judgeModel: string | null }[]> {
+    const rows = await this.database.scenario.findMany({
+      where: { id: { in: input.ids }, projectId: input.projectId },
+      select: { id: true, simulatorModel: true, judgeModel: true },
+    });
+    return rows.map((row) =>
+      scenarioSchema.pick({ id: true, simulatorModel: true, judgeModel: true }).parse(row),
+    );
+  }
+
+  async findIdsByLabelsOrTestSuites(input: {
+    projectId: string;
+    labels?: string[];
+    testSuiteIds?: string[];
+  }): Promise<string[]> {
+    const hasLabels = (input.labels?.length ?? 0) > 0;
+    const hasTestSuites = (input.testSuiteIds?.length ?? 0) > 0;
+    const rows = await this.database.scenario.findMany({
+      where: {
+        projectId: input.projectId,
+        archivedAt: null,
+        ...(hasLabels ? { labels: { hasSome: input.labels } } : {}),
+        ...(hasTestSuites ? { testSuiteId: { in: input.testSuiteIds } } : {}),
+      },
+      select: { id: true },
+    });
+    return rows.map((row) => row.id);
+  }
+
+  async findTitlesByIds(input: {
+    ids: string[];
+    projectId: string;
+  }): Promise<{ id: string; name: string; labels: string[] }[]> {
+    const rows = await this.database.scenario.findMany({
+      where: { id: { in: input.ids }, projectId: input.projectId },
+      select: { id: true, name: true, labels: true },
+    });
+    return rows.map((row) =>
+      scenarioSchema.pick({ id: true, name: true, labels: true }).parse(row),
+    );
+  }
+
+  async findPlans(input: { projectId: string }): Promise<ScenarioPlanRecord[]> {
+    return this.database.simulationSuite.findMany({
+      where: { projectId: input.projectId, archivedAt: null },
+      select: {
+        id: true,
+        name: true,
+        slug: true,
+        kind: true,
+        scope: true,
+        scenarioIds: true,
+        targets: true,
+      },
+    });
+  }
+
   async createTestSuite(
     input: ScenarioTestSuiteCreateInput & { id: string },
   ): Promise<ScenarioTestSuite> {
@@ -377,9 +437,16 @@ export class PrismaScenarioRepository extends ScenarioRepository {
     throw new ScenarioTestSuiteSlugUnavailableError(input.name);
   }
 
-  async findTestSuites(input: { projectId: string }): Promise<ScenarioTestSuite[]> {
+  async findTestSuites(input: {
+    projectId: string;
+    includeArchived?: boolean;
+  }): Promise<ScenarioTestSuite[]> {
     const rows = await this.database.simulationSuite.findMany({
-      where: { projectId: input.projectId, kind: "test_suite", archivedAt: null },
+      where: {
+        projectId: input.projectId,
+        kind: "test_suite",
+        ...(input.includeArchived ? {} : { archivedAt: null }),
+      },
       orderBy: { updatedAt: "desc" },
     });
     return rows.map(mapTestSuite);

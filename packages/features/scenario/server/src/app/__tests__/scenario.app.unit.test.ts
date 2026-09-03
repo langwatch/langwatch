@@ -27,6 +27,8 @@ import type {
 import type { UserService } from "@langwatch/user-contract";
 import { describe, expect, it } from "vitest";
 
+import type { RunConfigurationsService } from "../../services/run-configurations.service";
+import type { ResultAtomsService } from "../../services/result-atoms.service";
 import { ScenarioApp, type QueueSimulationRunInput } from "../scenario.app";
 
 function harness() {
@@ -48,6 +50,8 @@ function harness() {
     scenarioExecution: {} as ScenarioExecutionService,
     scenarioTabs: {} as ScenarioTabRegistry,
     users: {} as UserService,
+    resultAtoms: {} as ResultAtomsService,
+    runConfigurations: {} as RunConfigurationsService,
     broadcast: {
       getTenantEmitter: () => {
         throw new Error("the queue path subscribes to nothing");

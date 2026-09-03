@@ -8,11 +8,7 @@ import {
   type ProcessObservability,
 } from "@langwatch/observability/node";
 import type { ApiKeyService } from "@langwatch/api-key-contract";
-import type {
-  AuthzGrantsService,
-  AuthzPermission,
-  AuthzService,
-} from "@langwatch/authz-contract";
+import type { AuthzGrantsService, AuthzPermission, AuthzService } from "@langwatch/authz-contract";
 import type { ModelProviderService } from "@langwatch/model-provider-contract";
 import type { OrganizationService } from "@langwatch/organization-contract";
 import type { SecretService } from "@langwatch/secret-contract";
@@ -68,6 +64,7 @@ import {
   ApiConnectedAgentsAbsenceReportPort,
   ApiConnectedAgentsComposition,
 } from "./api-connected-agents.composition";
+import { readAgentPresence } from "@langwatch/agent-server";
 import { ApiUpgradeRouter } from "../api-upgrade-router";
 import {
   composeApiAnalyticsCollaborators,
@@ -259,10 +256,7 @@ import {
 import { ApiHandlerManagedCredentials } from "./api-handler-managed-credential";
 import { apiClientAddress } from "./api-client-address";
 import { extractApiKeyRequestCredentials } from "./api-key-request-credentials";
-import {
-  composeApiTraceIngest,
-  LoggedApiTraceIngestAbsence,
-} from "./api-trace-ingest.composition";
+import { composeApiTraceIngest, LoggedApiTraceIngestAbsence } from "./api-trace-ingest.composition";
 import {
   AdminAccessService,
   PrismaBugReportRepository,
@@ -277,6 +271,7 @@ import {
 } from "../features/langy/langy-rest.mount";
 import { composeApiGithubRest } from "../features/github/github-rest.mount";
 import { composeApiAuthCliDeviceFlow } from "../features/auth/auth-cli-device-flow-rest.mount";
+import { composeApiAuthRest } from "../features/auth/auth-rest.mount";
 import { composeApiGovernanceCliRest } from "../features/enterprise/governance-cli-rest.mount";
 import { composeApiGovernanceIngestRest } from "../features/enterprise/governance-ingest-rest.mount";
 import {
@@ -284,7 +279,7 @@ import {
   LoggedApiScimAbsence,
   type ApiScimRestPorts,
 } from "./api-scim.composition";
-import type { AuthCliDeviceFlowRestPorts } from "@langwatch/auth-server";
+import type { AuthCliDeviceFlowRestPorts, AuthRestPorts } from "@langwatch/auth-server";
 import type {
   GovernanceCliRestPorts,
   GovernanceIngestRestPorts,
@@ -889,7 +884,12 @@ export class ApiProductionComposition extends ApiRuntimeCompositionPort {
     // other half opened — this process's ClickHouse, the queue's Redis, the
     // broadcast fabric presence publishes on, and the agent, user and project
     // directories the tenancy and identity halves built.
-    this.composedAgentGroup = this.composeAgentGroup(options, authz, queueInfrastructure, encryption);
+    this.composedAgentGroup = this.composeAgentGroup(
+      options,
+      authz,
+      queueInfrastructure,
+      encryption,
+    );
     // The org-group half: the nine surfaces a TENANT is administered through —
     // its members and their bindings, its projects' own lifecycle, the coding
     // agents inside them, the automations they fire, and the four Enterprise
@@ -954,8 +954,7 @@ export class ApiProductionComposition extends ApiRuntimeCompositionPort {
       prisma: this.composedDatabase?.connection.client,
       encryption,
       redis: queueInfrastructure?.redis ?? null,
-      baseHost:
-        options.config.infrastructure.execution.publicBaseUrl ?? "https://app.langwatch.ai",
+      baseHost: options.config.infrastructure.execution.publicBaseUrl ?? "https://app.langwatch.ai",
     });
     // The built browser bundle, served by this process off the same listener.
     // `apps/ui` is a build, not a deployable: the image ships its `dist/client`
@@ -963,8 +962,7 @@ export class ApiProductionComposition extends ApiRuntimeCompositionPort {
     // that answers `/api/*` is the pod a browser asks for `/`. Asked LAST, after
     // every claimed surface, because it is the fallback.
     const staticSurface = tryCreateApiStaticSurface({
-      report: (message, context) =>
-        createLogger(options.config.serviceName).info(context, message),
+      report: (message, context) => createLogger(options.config.serviceName).info(context, message),
     });
     const rawSurface = CompositeApiRawSurface.of([hostedMcp, staticSurface]);
     // The WebSocket upgrade path (ADR-128): one router shared with a second
@@ -988,6 +986,14 @@ export class ApiProductionComposition extends ApiRuntimeCompositionPort {
     const process = ApiProcess.create({
       agents,
       agentTesting,
+      ...(this.composedConnectedAgents
+        ? {
+            connectedAgents: {
+              presence: (input: { projectId: string; agents: { id: string; type: string }[] }) =>
+                readAgentPresence({ ...input, runtime: this.composedConnectedAgents!.runtime }),
+            },
+          }
+        : {}),
       ...(features ? { features } : {}),
       secrets: this.secrets,
       requestPolicy: this.requestPolicy,
@@ -1285,9 +1291,7 @@ export class ApiProductionComposition extends ApiRuntimeCompositionPort {
       credentials: handlerManagedCredentials,
       // The one allowance both doors refuse an over-plan export with. Absent
       // where this process opened no ClickHouse, and the receiver says so.
-      ...(this.composedUsageEnforcement
-        ? { allowance: this.composedUsageEnforcement }
-        : {}),
+      ...(this.composedUsageEnforcement ? { allowance: this.composedUsageEnforcement } : {}),
       processName: serviceName,
       report: LoggedApiTraceIngestAbsence.create(createLogger(serviceName)),
     });
@@ -1353,11 +1357,11 @@ export class ApiProductionComposition extends ApiRuntimeCompositionPort {
     // writer and the reader of the CLI token keyspace can never be two
     // spellings of it.
     const authCliDeviceFlow = this.composeAuthCliDeviceFlow(authz, tenancy, publicBaseUrl);
-    const governanceCli = this.composeGovernanceCliRest(
-      authz,
-      authCliDeviceFlow,
-      publicBaseUrl,
-    );
+    const governanceCli = this.composeGovernanceCliRest(authz, authCliDeviceFlow, publicBaseUrl);
+    // The `/api/auth` family itself, over the SAME Better Auth instance this
+    // process's session transport already reads. Registered after the two CLI
+    // halves above, whose paths its catch-all would otherwise swallow.
+    const authRest = this.composeAuthRest(tenancy);
     // The Activity Monitor's receivers, over the trace collection the OTLP
     // composition above already built — the same `trace_processing` producer
     // registration, never a second one.
@@ -1612,8 +1616,7 @@ export class ApiProductionComposition extends ApiRuntimeCompositionPort {
             // The SAME service the workbench's own cells write a run through,
             // so an SDK's batch and a workbench run produce one history.
             experiments: () => execution.experiments.experimentService,
-            reportEvaluation: (input: Record<string, unknown>) =>
-              reportEvaluation(input as never),
+            reportEvaluation: (input: Record<string, unknown>) => reportEvaluation(input as never),
           }
         : undefined;
     // The four evaluate doors' collaborators. They stand on the evaluator
@@ -1634,8 +1637,7 @@ export class ApiProductionComposition extends ApiRuntimeCompositionPort {
             evaluators: execution.evaluators,
             experiments: execution.experiments.experimentService,
             modelProviders,
-            reportEvaluation: (input: Record<string, unknown>) =>
-              reportEvaluation(input as never),
+            reportEvaluation: (input: Record<string, unknown>) => reportEvaluation(input as never),
             deriveEvaluatorId: (name: string) => this.evaluatorIdSlug.derive(name),
           }
         : undefined;
@@ -1672,10 +1674,8 @@ export class ApiProductionComposition extends ApiRuntimeCompositionPort {
     const dspySteps =
       execution && experimentFindOrCreate && modelProviders
         ? {
-            authenticateCredential: (input: {
-              request: Request;
-              permission: AuthzPermission;
-            }) => handlerManagedCredentials.authenticate(input),
+            authenticateCredential: (input: { request: Request; permission: AuthzPermission }) =>
+              handlerManagedCredentials.authenticate(input),
             findOrCreate: () => experimentFindOrCreate,
             experiments: () => execution.experiments.experimentService,
             listModelCosts: async (input: { projectId: string }) =>
@@ -1815,13 +1815,12 @@ export class ApiProductionComposition extends ApiRuntimeCompositionPort {
         ...(githubRest ? { github: githubRest } : {}),
         ...(authCliDeviceFlow ? { authCliDeviceFlow } : {}),
         ...(governanceCli ? { governanceCli } : {}),
+        ...(authRest ? { auth: authRest } : {}),
         ...(governanceIngest ? { governanceIngest } : {}),
         ...(scim ? { scim } : {}),
         ...(publicBaseUrl ? { publicBaseUrl } : {}),
         ...(healthProbes ? { healthProbes } : {}),
-        ...(this.composedOpsExplain
-          ? { opsClickHouseExplain: this.composedOpsExplain.ports }
-          : {}),
+        ...(this.composedOpsExplain ? { opsClickHouseExplain: this.composedOpsExplain.ports } : {}),
         ...(dspySteps ? { dspySteps } : {}),
         ...(mcpAuthorize ? { mcpAuthorize } : {}),
         imageProxy: {
@@ -2137,9 +2136,7 @@ export class ApiProductionComposition extends ApiRuntimeCompositionPort {
       encryption: this.composedEncryption,
       // The process's ONE producer registration, so the drained batch and the
       // voice settlement write onto one stream with one set of dispatchers.
-      ...(spend
-        ? { spendCommands: spend.commands, spendConfirmation: spend.confirmation }
-        : {}),
+      ...(spend ? { spendCommands: spend.commands, spendConfirmation: spend.confirmation } : {}),
       ...(monitors ? { monitors } : {}),
       ...(evaluatorExecution
         ? { runEvaluator: (input) => evaluatorExecution.runEvaluation(input) }
@@ -2289,14 +2286,34 @@ export class ApiProductionComposition extends ApiRuntimeCompositionPort {
       redis: this.composedQueueRedis,
       prisma: this.composedDatabase?.connection.client,
       session: auth
-        ? (request) =>
-            AuthSessionApiAuthenticationAdapter.create(auth).authenticate(request)
+        ? (request) => AuthSessionApiAuthenticationAdapter.create(auth).authenticate(request)
         : undefined,
       apiKeys: tenancy.apiKeys,
       organizations: this.composedIdentity?.application.organizations,
       authz,
       featureFlags: this.composedProductGroup?.featureFlagService,
       publicBaseUrl,
+    });
+  }
+
+  /**
+   * The `/api/auth` family's collaborators, or none.
+   *
+   * The composed Better Auth instance is the gate, and it is the one thing
+   * here this process cannot take from somewhere else: where a host supplied
+   * its own transport there is no instance and no option set to mount a door
+   * over, so the family is left off rather than served by a second instance
+   * that would answer "signed out" to every caller.
+   */
+  private composeAuthRest(tenancy: ApiResolvedTenancy): AuthRestPorts | undefined {
+    const auth = this.composedAuth?.compose();
+    return composeApiAuthRest({
+      betterAuth: this.composedAuth?.betterAuth,
+      sessions: auth?.sessions,
+      auth: auth?.auth,
+      apiKeys: tenancy.apiKeys,
+      prisma: this.composedDatabase?.connection.client,
+      featureFlags: this.composedProductGroup?.featureFlagService,
     });
   }
 
@@ -2407,8 +2424,7 @@ export class ApiProductionComposition extends ApiRuntimeCompositionPort {
     return composeApiGithubRest({
       github: this.composedGatewayGroup?.application.github,
       session: auth
-        ? (request) =>
-            AuthSessionApiAuthenticationAdapter.create(auth).authenticate(request)
+        ? (request) => AuthSessionApiAuthenticationAdapter.create(auth).authenticate(request)
         : undefined,
       authz,
       audit: this.options.audit,
@@ -2976,8 +2992,7 @@ export class ApiProductionComposition extends ApiRuntimeCompositionPort {
           ...(this.composedProduct
             ? {
                 traceIngest: {
-                  recordSpan: (data) =>
-                    this.composedProduct!.traceCommands.recordSpan(data),
+                  recordSpan: (data) => this.composedProduct!.traceCommands.recordSpan(data),
                 },
               }
             : {}),
@@ -3330,9 +3345,7 @@ export class ApiProductionComposition extends ApiRuntimeCompositionPort {
   }
 
   /** One report for every entitlement absence, named once per process. */
-  private entitlementAbsence(
-    options: ApiRuntimeCompositionOptions,
-  ): LoggedApiEntitlementAbsence {
+  private entitlementAbsence(options: ApiRuntimeCompositionOptions): LoggedApiEntitlementAbsence {
     this.composedEntitlementAbsence ??= apiEntitlementAbsenceReport(options.config.serviceName);
     return this.composedEntitlementAbsence;
   }
@@ -3369,9 +3382,7 @@ export class ApiProductionComposition extends ApiRuntimeCompositionPort {
     // a second decryption of the same stored credentials.
     if (this.composedModelProviders) return this.composedModelProviders;
 
-    const absence = LoggedApiModelProviderAbsence.create(
-      createLogger(options.config.serviceName),
-    );
+    const absence = LoggedApiModelProviderAbsence.create(createLogger(options.config.serviceName));
     const database = this.composedDatabase?.connection;
     if (!database) {
       absence.absent("no-database");
@@ -3534,9 +3545,7 @@ export class ApiProductionComposition extends ApiRuntimeCompositionPort {
       modelProviders,
       langevalsEndpoint: this.evaluatorLangevalsEndpoint,
       processName: this.evaluatorProcessName,
-      report: LoggedApiEvaluatorExecutionAbsence.create(
-        createLogger(this.evaluatorProcessName),
-      ),
+      report: LoggedApiEvaluatorExecutionAbsence.create(createLogger(this.evaluatorProcessName)),
     });
     return this.composedEvaluatorExecution;
   }
@@ -4073,7 +4082,6 @@ export class LoggedApiCollaboratorGap extends ApiTrpcCollaboratorGapReport {
     );
   }
 }
-
 
 /**
  * The reserved-metadata amendment's span write, over the process's own

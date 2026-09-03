@@ -58,7 +58,8 @@ import type { GovernanceHomeTrpcPorts } from "../features/enterprise/governance-
 import type { DataRetentionTrpcPolicy } from "@langwatch/data-retention-server";
 import type { MonitorTrpcPorts } from "@langwatch/monitor-server";
 import type { CodingAgentTrpcPorts } from "@langwatch/coding-agent-server";
-import type { LangyEgressTrpcPorts, LangyTrpcGates, LangyTrpcPorts } from "@langwatch/langy-server";
+import type { LangyEgressTrpcPorts, LangyTrpcPorts } from "@langwatch/langy-server";
+import type { LangyTrpcGates } from "../features/langy/langy-trpc.mount";
 import type { OpsTrpcPorts } from "@langwatch/ops-server";
 import type { ScenarioTrpcPorts } from "@langwatch/scenario-server";
 import type { AuthzPermission } from "@langwatch/authz-contract";
@@ -77,9 +78,9 @@ import type {
   ModelProviderTrpcPorts,
   TranslateTrpcPorts,
 } from "@langwatch/model-provider-server";
-import type { SharedTraceTrpcPorts } from "@langwatch/share-server";
 import type { TraceLegacyFilterInput, TraceLegacyListInput } from "@langwatch/trace-contract";
 import type {
+  SharedTraceTrpcPorts,
   SpansTrpcPorts,
   TraceEditOverlayTrpcPorts,
   TraceEditOverlayVisibilityWindow,

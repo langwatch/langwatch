@@ -41,7 +41,10 @@ import {
   type EventSourcedQueueProcessor,
   EventStoreProducerOnly,
 } from "@langwatch/eventing";
-import { IdentityEventingPort, JOIN_REQUEST_LIFECYCLE_PROCESS_NAME } from "@langwatch/identity-server";
+import {
+  IdentityEventingPort,
+  JOIN_REQUEST_LIFECYCLE_PROCESS_NAME,
+} from "@langwatch/identity-server";
 import type { OrganizationService } from "@langwatch/organization-contract";
 import type { PrismaClient } from "@langwatch/prisma-client/generated";
 import type { PrismaConnection } from "@langwatch/prisma-client";
@@ -110,7 +113,11 @@ function testPrisma() {
     organizationUser: { findFirst: vi.fn(async () => null) },
   } as unknown as PrismaClient;
 
-  return { client, writes, transaction: (client as unknown as { $transaction: unknown }).$transaction };
+  return {
+    client,
+    writes,
+    transaction: (client as unknown as { $transaction: unknown }).$transaction,
+  };
 }
 
 /** Permits everything: the refusal path is the declared check's own suite. */
@@ -133,8 +140,10 @@ function testAuthz(): AuthzService {
 function testGrants() {
   const attachBindings = vi.fn(async (_input: { bindings: unknown[] }) => undefined);
   return {
-    grants: { attachBindings, invalidateOrganization: async () => undefined } as unknown as
-      AuthzGrantsService,
+    grants: {
+      attachBindings,
+      invalidateOrganization: async () => undefined,
+    } as unknown as AuthzGrantsService,
     attachBindings,
   };
 }
@@ -564,12 +573,8 @@ function joinRequestPrisma() {
       findFirst: vi.fn(async () => null),
     },
     organizationUser: {
-      findMany: vi.fn(async () => [
-        { organizationId: JOIN_ORGANIZATION_ID, userId: "member-1" },
-      ]),
-      groupBy: vi.fn(async () => [
-        { organizationId: JOIN_ORGANIZATION_ID, _count: { userId: 4 } },
-      ]),
+      findMany: vi.fn(async () => [{ organizationId: JOIN_ORGANIZATION_ID, userId: "member-1" }]),
+      groupBy: vi.fn(async () => [{ organizationId: JOIN_ORGANIZATION_ID, _count: { userId: 4 } }]),
       findFirst: vi.fn(async () => null),
     },
     organization: {
@@ -684,9 +689,8 @@ describe("given an API process that registered the identity pipelines producer-o
       // It is also the leg that answered `null` before the registration
       // existed, which the ledger turns into "the pipeline exposes no
       // \"requestJoin\" sender" — a write that arrived and could not leave.
-      const requestId = (
-        body as { result: { data: { json: { joinRequestId: string } } } }
-      ).result.data.json.joinRequestId;
+      const requestId = (body as { result: { data: { json: { joinRequestId: string } } } }).result
+        .data.json.joinRequestId;
       expect(queue.staged).toHaveLength(1);
       expect(queue.staged[0]?.payload).toMatchObject({
         joinRequestId: requestId,
@@ -700,7 +704,11 @@ describe("given an API process that registered the identity pipelines producer-o
       // rejected and failed the whole ceremony — which is exactly what this
       // tier did before the ledger was corrected.
       await expect(
-        queue.eventStore.storeEvents([], { tenantId: JOIN_ORGANIZATION_ID } as never, "JoinRequest" as never),
+        queue.eventStore.storeEvents(
+          [],
+          { tenantId: JOIN_ORGANIZATION_ID } as never,
+          "JoinRequest" as never,
+        ),
       ).rejects.toMatchObject({ name: "ConfigurationError" });
 
       await queue.eventSourcing.close();

@@ -2,7 +2,7 @@ import { AgentService, type AgentWithFields } from "@langwatch/agent-contract";
 import { getCurrentContext } from "@langwatch/observability/context";
 import { SecretService } from "@langwatch/secret-contract";
 import { describe, expect, it, vi } from "vitest";
-import { ApiApplication, MissingAgentService } from "../api.application";
+import { ApiApplication, MissingAgentService, NoApiTrpcFeatures } from "../api.application";
 
 const agent: AgentWithFields = {
   id: "agent-1",
@@ -134,7 +134,11 @@ describe("ApiApplication Agent tRPC composition", () => {
   it("mounts every legacy agents.* procedure with its legacy presenter shape", async () => {
     const agents = new TestAgentService();
     const authorize = vi.fn(async () => undefined);
-    const application = ApiApplication.create({ agents, secrets: new TestSecretService() });
+    const application = ApiApplication.create({
+      agents,
+      features: new NoApiTrpcFeatures(),
+      secrets: new TestSecretService(),
+    });
     const caller = application.createCaller({
       actor: () => ({ id: "user-1" }),
       authorize,
@@ -186,6 +190,7 @@ describe("ApiApplication Agent tRPC composition", () => {
   /** @scenario "A process with no database composes no agent service" */
   it("mounts the agents surface backed by the null object, refusing every call by name", async () => {
     const application = ApiApplication.create({
+      features: new NoApiTrpcFeatures(),
       agents: new MissingAgentService(),
       secrets: new TestSecretService(),
     });
@@ -214,7 +219,11 @@ describe("ApiApplication Agent tRPC composition", () => {
     const authorizeScopeLineage = vi.fn(async () => {
       throw new Error("scope lineage mismatch");
     });
-    const application = ApiApplication.create({ agents, secrets: new TestSecretService() });
+    const application = ApiApplication.create({
+      agents,
+      features: new NoApiTrpcFeatures(),
+      secrets: new TestSecretService(),
+    });
     const caller = application.createCaller({
       actor: () => ({ id: "user-1" }),
       authorize: async () => undefined,

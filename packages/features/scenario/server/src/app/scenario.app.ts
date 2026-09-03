@@ -34,10 +34,16 @@ import {
   startScenarioTabPresence,
   type CancelScenarioBatchInput,
   type CancelScenarioRunInput,
+  type CodeScenario,
   type ResolveScenarioRunParametersInput,
   type ResolvedScenarioRunParameters,
+  type ResultAtom,
+  type ResultsFilter,
+  type ResultsGroupBy,
+  type ResultsOverview,
   type RunParameterValues,
   type RunSecretCiphertext,
+  type RunTarget,
   type Scenario,
   type ScenarioCreateInput,
   type ScenarioDuplicateInput,
@@ -82,6 +88,11 @@ import {
 } from "@langwatch/scenario-contract";
 import type { UserFullProfile, UserProfilesInput, UserService } from "@langwatch/user-contract";
 import type { EventEmitter } from "node:events";
+import type {
+  RunConfigurationEntry,
+  RunConfigurationsService,
+} from "../services/run-configurations.service";
+import type { ResultAtomsService } from "../services/result-atoms.service";
 
 /**
  * The process's per-tenant fan-out, as this feature uses it: one emitter per
@@ -106,6 +117,10 @@ export interface ScenarioAppDependencies {
   scenarioTabs: ScenarioTabRegistry;
   users: UserService;
   broadcast: ScenarioBroadcast;
+  /** Reads results as atoms and folds them into the Results tab's views. */
+  resultAtoms: ResultAtomsService;
+  /** The run dialog's configuration history. */
+  runConfigurations: RunConfigurationsService;
 }
 
 /** What one queued run needs to know about itself. */
@@ -483,5 +498,52 @@ export class ScenarioApp {
       registration,
       registry: this.dependencies.scenarioTabs,
     });
+  }
+
+  // -- the results tab --------------------------------------------------------
+
+  /** The stat strip and the group rows for one grouping, aggregated in the database. */
+  getResultsOverview(input: {
+    filter: ResultsFilter;
+    groupBy: ResultsGroupBy;
+  }): Promise<ResultsOverview> {
+    return this.dependencies.resultAtoms.getOverview(input);
+  }
+
+  /** One page of atoms, newest first. A drill-down, never a total. */
+  getResultAtoms(input: {
+    filter: ResultsFilter;
+    limit: number;
+    cursor?: string;
+  }): Promise<{ atoms: ResultAtom[]; nextCursor?: string; hasMore: boolean }> {
+    return this.dependencies.resultAtoms.getAtoms(input);
+  }
+
+  /** The scenarios that ran from code inside the window, for the scenario filter. */
+  getCodeScenarios(input: {
+    projectId: string;
+    startDate: number;
+    endDate?: number;
+  }): Promise<CodeScenario[]> {
+    return this.dependencies.resultAtoms.getCodeScenarios(input);
+  }
+
+  /** The targets the window names that the stored agent and prompt lists cannot. */
+  getRunTargets(input: {
+    projectId: string;
+    startDate: number;
+    endDate?: number;
+  }): Promise<RunTarget[]> {
+    return this.dependencies.resultAtoms.getRunTargets(input);
+  }
+
+  /** Every configuration this project's run plans already ran with, newest first. */
+  getRunConfigurations(input: {
+    projectId: string;
+    startDate?: number;
+    endDate?: number;
+    limit?: number;
+  }): Promise<RunConfigurationEntry[]> {
+    return this.dependencies.runConfigurations.getEntries(input);
   }
 }

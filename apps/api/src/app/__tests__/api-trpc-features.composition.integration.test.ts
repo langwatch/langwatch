@@ -26,7 +26,12 @@ import type { PrismaClient } from "@langwatch/prisma-client/generated";
 import type { PrismaConnection } from "@langwatch/prisma-client";
 import { describe, expect, it, vi } from "vitest";
 import { z } from "zod";
-import { ApiApplication, MissingAgentService, MissingSecretService } from "../../api.application";
+import {
+  ApiApplication,
+  MissingAgentService,
+  MissingSecretService,
+  NoApiTrpcFeatures,
+} from "../../api.application";
 import { ApiAuditPort } from "../../api-request.policy";
 import type { ApiTrpcFeatureApplication } from "../../app-trpc/app-trpc.context";
 import {
@@ -479,9 +484,15 @@ describe("given an API process with no collaborators for the record", () => {
 
   it("serves its own two routers unchanged", () => {
     const application = ApiApplication.create({
+      features: new NoApiTrpcFeatures(),
       agents: new MissingAgentService(),
       secrets: new MissingSecretService(),
-      http: { createContext: async () => ({ actor: () => ({ id: "user-1" }), authorize: async () => undefined }) },
+      http: {
+        createContext: async () => ({
+          actor: () => ({ id: "user-1" }),
+          authorize: async () => undefined,
+        }),
+      },
     });
 
     const mounted = Object.keys(

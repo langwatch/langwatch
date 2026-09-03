@@ -367,15 +367,11 @@ describe("given an API process composed with the org-group half of the record", 
     it("carries an acceptance link on this deployment's own origin", async () => {
       const { application } = composeApplication({ withInvitations: true });
 
-      const { body } = await callTrpc(
-        application,
-        "organization.getOrganizationPendingInvites",
-        { organizationId: ORGANIZATION_ID },
-      );
+      const { body } = await callTrpc(application, "organization.getOrganizationPendingInvites", {
+        organizationId: ORGANIZATION_ID,
+      });
 
-      expect(refusal(body)).toContain(
-        "https://app.langwatch.test/invite/accept?inviteCode=code-1",
-      );
+      expect(refusal(body)).toContain("https://app.langwatch.test/invite/accept?inviteCode=code-1");
     });
   });
 

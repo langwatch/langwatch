@@ -402,7 +402,10 @@ function composeApplication() {
   const providers = testProviderEvidence();
 
   const collaborators = composeApiTrpcCollaborators(
-    testHalves({ product: composeProductHalf(prisma.client, clickHouse, providers.port) }, broadcast),
+    testHalves(
+      { product: composeProductHalf(prisma.client, clickHouse, providers.port) },
+      broadcast,
+    ),
   );
   if (!collaborators) throw new Error("the collaborator set was incomplete");
 
