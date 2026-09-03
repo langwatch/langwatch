@@ -1,12 +1,7 @@
 import { describe, expect, it, vi } from "vitest";
 
-// The composition root, which the module's thin export reaches for and these
-// cases do not: the guard under test is constructed here, over the real
-// service and an in-memory stand-in for its two reads.
-vi.mock("~/server/app-layer/identity/runtime", () => ({
-  lastWayInGuard: vi.fn(),
-}));
-
+// The guard under test is constructed here, over the real service and an
+// in-memory stand-in for its two reads.
 import { LastWayInService } from "~/server/app-layer/identity/last-way-in.service";
 import { isLastWayInPath, LastWayInGuard } from "../last-way-in";
 

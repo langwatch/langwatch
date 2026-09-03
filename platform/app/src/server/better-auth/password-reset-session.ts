@@ -1,7 +1,6 @@
 import { AsyncLocalStorage } from "node:async_hooks";
 import { createLogger } from "@langwatch/observability";
 import { APIError } from "better-auth/api";
-import { passwordResetSessionBridge } from "~/server/app-layer/identity/runtime";
 import type {
   BetterAuthSessionMinter,
   SessionMintingAdapter,
@@ -107,23 +106,4 @@ export class PasswordResetSessionBridge {
       );
     }
   }
-}
-
-/** Open the scope for one request. */
-export function runWithPasswordResetScope<T>(
-  run: () => Promise<T>,
-): Promise<T> {
-  return passwordResetSessionBridge().runWithScope(run);
-}
-
-/** The endpoint's callback says who reset; remembered for the hook. */
-export function recordPasswordReset({ userId }: { userId: string }): void {
-  passwordResetSessionBridge().recordPasswordReset({ userId });
-}
-
-/** Bound to `hooks.after`: opens the session a completed reset earned. */
-export function signInAfterPasswordReset(
-  ctx: ResetEndpointContext,
-): Promise<void> {
-  return passwordResetSessionBridge().signInAfterPasswordReset(ctx);
 }

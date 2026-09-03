@@ -1,7 +1,7 @@
 import type { MfaEnrollmentState } from "@langwatch/identity";
 import { MfaCeremonies } from "@langwatch/identity-server/better-auth";
 import { APIError } from "better-auth/api";
-import { beforeEach, describe, expect, it, vi } from "vitest";
+import { describe, expect, it, vi } from "vitest";
 
 /**
  * The two-factor endpoints, as identity facts (D06 follow-up 1).
@@ -13,11 +13,6 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
  * is what it states, what it declines to state, and — the invariant that
  * outranks the rest — that nothing it states can carry a secret or a code.
  */
-
-const mfaCeremoniesMock = vi.fn();
-vi.mock("~/server/app-layer/identity/runtime", () => ({
-  mfaCeremonies: () => mfaCeremoniesMock(),
-}));
 
 import {
   ceremonyVerbFor,
@@ -43,6 +38,9 @@ const enrollment = (
   ...overrides,
 });
 
+/** The ceremonies the case under test built, which `call` hands the hook. */
+let ceremonies: MfaCeremonies;
+
 const ceremoniesOver = (state: MfaEnrollmentState) => {
   // Each takes its command, declared rather than inferred: `async () => []`
   // types the arguments as an EMPTY tuple, so the scenarios below that read
@@ -56,7 +54,7 @@ const ceremoniesOver = (state: MfaEnrollmentState) => {
     expireMfaEnrollment: vi.fn(async (_command: unknown) => []),
     recordVerificationFailure: vi.fn(async (_command: unknown) => []),
   };
-  const ceremonies = new MfaCeremonies({
+  ceremonies = new MfaCeremonies({
     mfa: mfa as never,
     enrollments: {
       findEnrollment: async () => state,
@@ -65,7 +63,6 @@ const ceremoniesOver = (state: MfaEnrollmentState) => {
     backupCodeCount: 10,
     now: () => 1_700_000_000_000,
   });
-  mfaCeremoniesMock.mockReturnValue(ceremonies);
   return mfa;
 };
 
@@ -78,19 +75,18 @@ const call = ({
   userId?: string | null;
   returned?: unknown;
 }) => ({
-  path,
-  context: {
-    returned,
-    newSession: userId ? { user: { id: userId } } : null,
-    session: null,
+  ctx: {
+    path,
+    context: {
+      returned,
+      newSession: userId ? { user: { id: userId } } : null,
+      session: null,
+    },
   },
+  ceremonies,
 });
 
 describe("the two-factor endpoints as identity facts", () => {
-  beforeEach(() => {
-    mfaCeremoniesMock.mockReset();
-  });
-
   describe("given a setup that has just been started", () => {
     describe("when the enable endpoint answers", () => {
       it("states an enrollment naming the method and nothing else", async () => {

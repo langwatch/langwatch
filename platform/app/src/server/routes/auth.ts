@@ -14,13 +14,15 @@ import { createLogger } from "@langwatch/observability";
 import type { Context } from "hono";
 import { env } from "~/env.mjs";
 import { createServiceApp, publicEndpoint } from "~/server/api/security";
-import { sessionRevocation } from "~/server/app-layer/identity/runtime";
+import {
+  bornFinalizedOptIn,
+  passwordResetSessionBridge,
+  sessionRevocation,
+} from "~/server/app-layer/identity/runtime";
 import { getServerAuthSession } from "~/server/auth";
 import { auth } from "~/server/better-auth";
-import { isBornFinalizedSignUp } from "~/server/better-auth/bornFinalizedOptIn";
 import { translateBetterAuthError } from "~/server/better-auth/handled-errors";
 import { isAllowedAuthOrigin } from "~/server/better-auth/originGate";
-import { runWithPasswordResetScope } from "~/server/better-auth/password-reset-session";
 import { prisma } from "~/server/db";
 
 const secured = createServiceApp({ basePath: "/api" });
@@ -181,7 +183,9 @@ const betterAuthCatchAll = async (c: Context) => {
   // passed. Nothing below re-decides it, and outside a marked request the
   // entrance is never reached — which is what makes deploying it a no-op
   // until an operator targets an organization.
-  const isBorn = await isBornFinalizedSignUp({ request: c.req.raw });
+  const isBorn = await bornFinalizedOptIn().isBornFinalizedSignUp({
+    request: c.req.raw,
+  });
   // BetterAuth's auth.handler is fetch-compatible (Request => Response). The
   // marker only changes which BRANCH the writes inside it take; the answer
   // that comes back is the same shape either way, and is translated the same
@@ -194,7 +198,7 @@ const betterAuthCatchAll = async (c: Context) => {
   // The reset scope is opened around EVERY request rather than only the
   // reset path: it is a per-request slot that costs nothing empty, and the
   // path check belongs to the hook that reads it, not to the route.
-  const response = await runWithPasswordResetScope(() =>
+  const response = await passwordResetSessionBridge().runWithScope(() =>
     isBorn ? runWithIdentityBirth(handle) : handle(),
   );
   // better-auth's refusals speak its own vocabulary, which is neither a

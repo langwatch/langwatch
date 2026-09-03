@@ -1,5 +1,4 @@
 import { APIError } from "better-auth/api";
-import { lastWayInGuard } from "~/server/app-layer/identity/runtime";
 
 /**
  * ADR-119, on the two doors that were not behind it.
@@ -147,25 +146,4 @@ export class LastWayInGuard {
         "This is the only way you can sign in. Add another sign-in method first, then remove this one.",
     });
   }
-}
-
-/**
- * Refuse a removal that would close the last door, before better-auth runs it.
- *
- * `prisma` is accepted and unused: the guard now reads through its own
- * repository, and the parameter is kept only so the one call site — the
- * `before` hook in `index.ts` — is untouched while ADR-129 lands in slices.
- */
-export function refuseIfItClosesTheLastDoor({
-  pathname,
-  userId,
-  body,
-  requiringOrganizations,
-}: LastWayInRequest & { prisma?: unknown }): Promise<void> {
-  return lastWayInGuard().refuseIfItClosesTheLastDoor({
-    pathname,
-    userId,
-    body,
-    requiringOrganizations,
-  });
 }

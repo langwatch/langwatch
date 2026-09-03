@@ -1,12 +1,7 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
-// The composition root, which the module's thin exports reach for and these
-// cases do not: the allowlist under test is constructed here, over an
-// in-memory stand-in for the two reads it makes.
-vi.mock("~/server/app-layer/identity/runtime", () => ({
-  ssoRegisteredIssuers: vi.fn(),
-}));
-
+// The allowlist under test is constructed here, over an in-memory stand-in
+// for the two reads it makes.
 import { RegisteredIssuers } from "../registeredIssuers";
 
 /**

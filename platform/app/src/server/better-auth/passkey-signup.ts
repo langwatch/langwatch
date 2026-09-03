@@ -4,7 +4,6 @@ import { createLogger } from "@langwatch/observability";
 import type { GenericEndpointContext } from "better-auth";
 import { APIError, getSessionFromCtx } from "better-auth/api";
 import { env } from "~/env.mjs";
-import { passkeySignUp } from "~/server/app-layer/identity/runtime";
 import {
   belongsToSomebody,
   PasskeySignUpAddressTakenError,
@@ -338,15 +337,25 @@ export class PasskeySignUpRegistration {
 /**
  * The plugin's `registration` block. Exported whole so the flag that mounts
  * the plugin is the only thing deciding whether any of it exists.
+ *
+ * The registration is resolved per ceremony rather than captured, because the
+ * plugin's options are built at module load and the composition root builds
+ * this one over a write surface that resolves its pipeline handle lazily.
  */
-export const passkeySignUpRegistration = {
-  requireSession: false,
-  resolveUser: (args: {
-    ctx: GenericEndpointContext;
-    context?: string | null | undefined;
-  }) => passkeySignUp().resolveUser(args),
-  afterVerification: (args: {
-    ctx: GenericEndpointContext;
-    context?: string | null | undefined;
-  }) => passkeySignUp().afterVerification(args),
-};
+export function passkeySignUpRegistration({
+  signUp,
+}: {
+  signUp: () => PasskeySignUpRegistration;
+}) {
+  return {
+    requireSession: false,
+    resolveUser: (args: {
+      ctx: GenericEndpointContext;
+      context?: string | null | undefined;
+    }) => signUp().resolveUser(args),
+    afterVerification: (args: {
+      ctx: GenericEndpointContext;
+      context?: string | null | undefined;
+    }) => signUp().afterVerification(args),
+  };
+}

@@ -1,5 +1,4 @@
 import { APIError } from "better-auth/api";
-import { mfaCeremonies } from "~/server/app-layer/identity/runtime";
 
 /**
  * Turning a completed two-factor endpoint call into the identity fact it
@@ -42,6 +41,15 @@ export interface TwoStepEndpointContext {
   };
 }
 
+/** The lifecycle fact each completed two-factor call implies (D06). */
+export interface TwoStepCeremoniesPort {
+  afterEnable(args: { userId: string }): Promise<void>;
+  afterVerifyTotp(args: { userId: string }): Promise<void>;
+  afterVerifyBackupCode(args: { userId: string }): Promise<void>;
+  afterGenerateBackupCodes(args: { userId: string }): Promise<void>;
+  afterDisable(args: { userId: string }): Promise<void>;
+}
+
 /**
  * State the fact a finished two-factor call implies, if it implies one.
  *
@@ -51,9 +59,13 @@ export interface TwoStepEndpointContext {
  * endpoint has already answered, and turning a successful sign-in into an
  * error over a record-keeping problem would be the wrong trade every time.
  */
-export async function runTwoStepCeremony(
-  ctx: TwoStepEndpointContext,
-): Promise<void> {
+export async function runTwoStepCeremony({
+  ctx,
+  ceremonies,
+}: {
+  ctx: TwoStepEndpointContext;
+  ceremonies: TwoStepCeremoniesPort;
+}): Promise<void> {
   const verb = ceremonyVerbFor({ path: ctx.path });
   if (!verb) return;
   // After-hooks run for refusals too — better-auth puts the `APIError` in
@@ -64,7 +76,6 @@ export async function runTwoStepCeremony(
   const userId = userIdIn(ctx);
   if (!userId) return;
 
-  const ceremonies = mfaCeremonies();
   switch (verb) {
     case "enable":
       return ceremonies.afterEnable({ userId });

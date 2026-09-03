@@ -47,6 +47,15 @@ vi.mock("~/server/app-layer/identity/runtime", () => ({
   identityCeremonies: () => ({}),
   identityStorageAdapter: () => () => ({}),
   resolveSignInMethodPolicy: async () => ({}),
+  // ADR-129 slice 21a: index.ts now composes better-auth's secondary storage
+  // from this factory, and reads it EAGERLY at module load.
+  secondaryStorage: () => ({ configured: false, connection: () => null }),
+  PASSWORD_HASH_ROUNDS: 10,
+  passkeySignUp: () => ({}),
+  ssoAssertion: () => ({}),
+  databaseHooks: () => ({}),
+  sessionClaims: () => ({}),
+  mfaCeremonies: () => ({}),
   identityEmail: () => ({ verifiedEmailsOf: async () => null }),
   joinRequestsService: () => ({ setJoining: setJoiningMock }),
   // The second-factor gate runs after every permitted decision (D06). Nothing

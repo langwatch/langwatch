@@ -115,6 +115,23 @@ vi.mock(
     ssoDomainReproof: () => ({}),
     ssoEngineProviderDerivation: () => ({}),
     ssoSelfServe: () => ({}),
+    // ADR-129 slice 21a: better-auth's own composition-root reads, now
+    // exhaustive on this Record too. Nothing in this suite reaches either.
+    secondaryStorage: () => ({ configured: false, connection: () => null }),
+    PASSWORD_HASH_ROUNDS: 10,
+    sessionRevocation: () => ({}),
+    ssoRegisteredIssuers: () => ({}),
+    signUpConfirmationEndpoint: () => ({}),
+    passwordResetSessionBridge: () => ({}),
+    passkeySignUp: () => ({}),
+    bornFinalizedOptIn: () => ({}),
+    lastWayIn: () => ({}),
+    lastWayInGuard: () => ({}),
+    credentialAccounts: () => ({}),
+    ssoAssertion: () => ({}),
+    ssoArrival: () => ({}),
+    databaseHooks: () => ({}),
+    sessionMinter: () => ({}),
   }),
 );
 

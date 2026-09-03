@@ -1,7 +1,14 @@
 import { createLogger } from "@langwatch/observability";
-import { sessionClaims } from "~/server/app-layer/identity/runtime";
 
 const logger = createLogger("langwatch:better-auth:session-claims");
+
+/** What a sign-in on this path proved, and which identifier it was. */
+export interface SessionClaimsPort {
+  claimsForMint(args: { userId: string; path: string }): Promise<{
+    identifierId: string | null;
+    amr: readonly string[];
+  }>;
+}
 
 /**
  * What better-auth writes onto a session row it is about to create (D06).
@@ -27,15 +34,17 @@ const logger = createLogger("langwatch:better-auth:session-claims");
 export async function sessionClaimsData({
   userId,
   path,
+  claims: source,
 }: {
   userId: string | undefined;
   path: string | undefined;
+  claims: SessionClaimsPort;
 }): Promise<
   { data: { identifierId: string | null; amr: string[] } } | undefined
 > {
   if (!userId || !path) return undefined;
   try {
-    const claims = await sessionClaims().claimsForMint({ userId, path });
+    const claims = await source.claimsForMint({ userId, path });
     if (claims.identifierId === null && claims.amr.length === 0) {
       // Nothing to say. Returning no data leaves the row's own defaults,
       // which are exactly the "recorded nothing" values.

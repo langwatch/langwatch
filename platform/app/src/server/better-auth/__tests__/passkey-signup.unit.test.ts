@@ -1,12 +1,8 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
-// The composition root, which the module's thin exports reach for and these
-// cases do not: the registration under test is constructed here, over
-// in-memory stand-ins for its three collaborators.
-vi.mock("~/server/app-layer/identity/runtime", () => ({
-  passkeySignUp: vi.fn(),
-}));
-
+// The registration under test is constructed here, over in-memory stand-ins
+// for its three collaborators.
+//
 // The session read that tells "somebody is adding a passkey to the account
 // they are signed into" apart from "somebody is creating one". `APIError` is
 // kept REAL: every refusal below is asserted by the code it carries, and a

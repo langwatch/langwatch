@@ -6,13 +6,8 @@ vi.mock("better-auth/cookies", () => ({
   setSessionCookie: (...args: unknown[]) => setSessionCookie(...args),
 }));
 
-// The composition root, which the module's thin exports reach for and these
-// cases do not: the bridge under test is constructed here, over the real
-// minter, so the request scope and the mint are asserted against each other.
-vi.mock("~/server/app-layer/identity/runtime", () => ({
-  passwordResetSessionBridge: vi.fn(),
-}));
-
+// The bridge under test is constructed here, over the real minter, so the
+// request scope and the mint are asserted against each other.
 import { PasswordResetSessionBridge } from "../password-reset-session";
 import { BetterAuthSessionMinter } from "../session-minter";
 

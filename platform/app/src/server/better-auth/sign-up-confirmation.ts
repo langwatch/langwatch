@@ -4,7 +4,6 @@ import type { BetterAuthPlugin } from "better-auth";
 import { createAuthEndpoint } from "better-auth/api";
 import { z } from "zod";
 import { handledErrorResponseBody } from "~/app/api/middleware/error-handler";
-import { signUpConfirmationEndpoint } from "~/server/app-layer/identity/runtime";
 import type {
   BetterAuthSessionMinter,
   SessionMintingContext,
@@ -162,15 +161,18 @@ export class SignUpConfirmationEndpoint {
   }
 }
 
-/** The endpoint's whole job; exported so it can be exercised directly. */
-export function confirmSignUpAddress(
-  ctx: ConfirmSignUpAddressContext,
-): Promise<unknown> {
-  return signUpConfirmationEndpoint().confirmSignUpAddress(ctx);
-}
-
-/** The plugin that mounts the endpoint on the path the screen posts to. */
-export const signUpConfirmation = () =>
+/**
+ * The plugin that mounts the endpoint on the path the screen posts to.
+ *
+ * The handler is handed in rather than reached for, and it is resolved per
+ * request: the plugin's options are built at module load, and the endpoint the
+ * composition root builds reaches a mailer a test routinely replaces.
+ */
+export const signUpConfirmation = ({
+  confirmSignUpAddress,
+}: {
+  confirmSignUpAddress: (ctx: ConfirmSignUpAddressContext) => Promise<unknown>;
+}) =>
   ({
     id: "langwatch-sign-up-confirmation",
     endpoints: {

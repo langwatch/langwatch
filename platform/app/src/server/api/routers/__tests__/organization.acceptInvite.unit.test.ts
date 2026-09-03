@@ -67,6 +67,26 @@ vi.mock("~/server/app-layer/identity/runtime", () => ({
   // store is exactly that, and holds nothing this suite could assert
   // against by accident.
   identityStorageAdapter: () => memoryAdapter({}),
+  // ADR-129 slice 21a: index.ts now composes better-auth's secondary storage
+  // from this factory, and reads it EAGERLY at module load.
+  secondaryStorage: () => ({ configured: false, connection: () => null }),
+  PASSWORD_HASH_ROUNDS: 10,
+  BACKUP_CODE_COUNT: 10,
+  passkeySignUp: () => ({}),
+  signUpConfirmationEndpoint: () => ({}),
+  ssoAssertion: () => ({}),
+  databaseHooks: () => ({}),
+  ssoRegisteredIssuers: () => ({}),
+  lastWayInGuard: () => ({}),
+  twoStepAccount: () => ({}),
+  sessionRevocation: () => ({}),
+  passwordResetSessionBridge: () => ({}),
+  identityCeremonies: () => ({}),
+  identityBridgeCeremonies: () => ({}),
+  sessionClaims: () => ({}),
+  deploymentIsFederationCapable: () => false,
+  resolveSignInMethodPolicy: async () => ({}),
+  mfaCeremonies: () => ({}),
 }));
 
 // The invite's grants are ledger commands (ADR-092 delivery-plan PR 2).

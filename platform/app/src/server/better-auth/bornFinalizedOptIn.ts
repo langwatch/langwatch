@@ -1,7 +1,6 @@
 import { extractEmailDomain } from "@ee/sso/matching";
 import { normalizedRequestPathname } from "@ee/sso/ssoPathGate";
 import { createLogger } from "@langwatch/observability";
-import { bornFinalizedOptIn } from "~/server/app-layer/identity/runtime";
 
 const logger = createLogger("langwatch:identity:born-finalized-opt-in");
 
@@ -142,11 +141,4 @@ async function signUpEmailOf(request: Request): Promise<string | null> {
     // A body that is not JSON is not better-auth's sign-up shape.
     return null;
   }
-}
-
-/** Whether THIS request may create its user on the identity branch. */
-export function isBornFinalizedSignUp(args: {
-  request: Request;
-}): Promise<boolean> {
-  return bornFinalizedOptIn().isBornFinalizedSignUp(args);
 }

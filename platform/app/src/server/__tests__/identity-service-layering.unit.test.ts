@@ -130,9 +130,26 @@ describe("identity service layering", () => {
             /prisma\/client/.test(specifier),
         ),
       );
-      expect(ratchet(offenders, ["server/better-auth/index.ts"])).toEqual(
-        CLEAN,
+      expect(ratchet(offenders, [])).toEqual(CLEAN);
+    });
+
+    /** @scenario "better-auth never opens the database itself" */
+    it("import the composition root only from index.ts and config/", () => {
+      // The assembly, and nothing else: `index.ts` reads the composition root
+      // and hands what it finds to the modules under `config/`. A plugin, a
+      // guard or a hook that reached for the root itself would be the cycle
+      // ADR-129 removed, and the lazy construction that held it together.
+      const assembles = (file: string) =>
+        rel(file) === "server/better-auth/index.ts" ||
+        rel(file).startsWith("server/better-auth/config/");
+      const offenders = offendersOf(
+        sourceFiles(BETTER_AUTH).filter((file) => !assembles(file)),
+        (file) =>
+          valueImportSpecifiers(file).filter((specifier) =>
+            specifier.includes("app-layer/identity/runtime"),
+          ),
       );
+      expect(ratchet(offenders, [])).toEqual(CLEAN);
     });
   });
 
@@ -168,9 +185,7 @@ describe("identity service layering", () => {
       const offenders = offendersOf(files, (file, source) =>
         file === RUNTIME ? [] : linesMatching(source, CONSTRUCTION),
       );
-      expect(ratchet(offenders, ["server/better-auth/index.ts"])).toEqual(
-        CLEAN,
-      );
+      expect(ratchet(offenders, [])).toEqual(CLEAN);
     });
 
     /** @scenario "The identity services are composed in one file" */
@@ -222,9 +237,7 @@ describe("identity service layering", () => {
       const offenders = offendersOf(sourceFiles(BETTER_AUTH), (_file, source) =>
         linesMatching(source, /^let\s/),
       );
-      expect(ratchet(offenders, ["server/better-auth/index.ts"])).toEqual(
-        CLEAN,
-      );
+      expect(ratchet(offenders, [])).toEqual(CLEAN);
     });
   });
 });

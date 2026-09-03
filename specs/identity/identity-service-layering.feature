@@ -25,6 +25,7 @@ Feature: The auth boundary is classes over identity services
     When they are scanned for imports
     Then none of them import the app's database client or a Prisma client for its value
     And a hook or plugin that needs a row is handed a service that finds it
+    And only the assembly — index.ts and its config modules — imports the composition root
 
   @unit
   Scenario: Prisma is spelled in the repository tier only

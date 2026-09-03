@@ -74,6 +74,14 @@ vi.mock("~/server/app-layer/identity/runtime", () => {
     "ssoSelfServe",
     "twoStepVerification",
     "verificationCeremony",
+    // ADR-129 slice 21a: index.ts now composes better-auth's secondary
+    // storage from this factory, and reads it EAGERLY at module load.
+    "secondaryStorage",
+    "passkeySignUp",
+    "ssoAssertion",
+    "databaseHooks",
+    "deploymentIsFederationCapable",
+    "resolveSignInMethodPolicy",
   ];
   return {
     ...Object.fromEntries(factories.map((name) => [name, inert])),
@@ -100,6 +108,7 @@ vi.mock("~/server/app-layer/identity/runtime", () => {
     isLatched: async () => false,
     routesToIdentityBranch: () => false,
     BACKUP_CODE_COUNT: 10,
+    PASSWORD_HASH_ROUNDS: 10,
   };
 });
 

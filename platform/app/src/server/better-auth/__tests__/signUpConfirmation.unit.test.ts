@@ -6,23 +6,15 @@ vi.mock("better-auth/cookies", () => ({
   setSessionCookie: (...args: unknown[]) => setSessionCookie(...args),
 }));
 
-// The composition root, which the module's thin export reaches for and these
-// cases do not: the endpoint under test is constructed here, over the real
-// minter and in-memory stand-ins for the service that spends the link and the
-// directory that finds the account it confirmed.
-vi.mock("~/server/app-layer/identity/runtime", () => ({
-  signUpConfirmationEndpoint: vi.fn(),
-}));
-
+// The endpoint under test is constructed here, over the real minter and
+// in-memory stand-ins for the service that spends the link and the directory
+// that finds the account it confirmed.
 import { BetterAuthSessionMinter } from "../session-minter";
 import {
   SIGN_UP_CONFIRM_ADDRESS_PATH,
   SignUpConfirmationEndpoint,
   signUpConfirmation,
 } from "../sign-up-confirmation";
-
-/** The endpoint the plugin mounts. */
-const mounted = signUpConfirmation().endpoints.confirmSignUpAddress;
 
 const completeVerification = vi.fn();
 const findUserIdByEmail = vi.fn();
@@ -33,6 +25,11 @@ const endpoint = () =>
     users: { findUserIdByEmail },
     minter: new BetterAuthSessionMinter(),
   });
+
+/** The endpoint the plugin mounts. */
+const mounted = signUpConfirmation({
+  confirmSignUpAddress: (ctx) => endpoint().confirmSignUpAddress(ctx),
+}).endpoints.confirmSignUpAddress;
 
 /** A plugin context with just the pieces the handler touches. */
 const fakeContext = ({ token }: { token: string }) => {

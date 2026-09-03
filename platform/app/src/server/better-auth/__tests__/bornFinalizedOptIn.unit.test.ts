@@ -1,12 +1,7 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
-// The composition root, which the module's thin export reaches for and these
-// cases do not: the gate under test is constructed here, over in-memory
-// stand-ins for the organization lookup and the allowlist itself.
-vi.mock("~/server/app-layer/identity/runtime", () => ({
-  bornFinalizedOptIn: vi.fn(),
-}));
-
+// The gate under test is constructed here, over in-memory stand-ins for the
+// organization lookup and the allowlist itself.
 import { BornFinalizedOptIn } from "../bornFinalizedOptIn";
 
 /**

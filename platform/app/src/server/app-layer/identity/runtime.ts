@@ -57,6 +57,7 @@ import {
   IdentityCeremonies,
   MfaCeremonies,
 } from "@langwatch/identity-server/better-auth";
+import { RedisConfigService } from "@langwatch/redis-client";
 import { compare, hash } from "bcrypt";
 import type { BetterAuthOptions } from "better-auth";
 import type { AdapterFactory } from "better-auth/adapters";
@@ -69,6 +70,7 @@ import {
   BORN_FINALIZED_SIGNUP_FLAG,
   BornFinalizedOptIn,
 } from "../../better-auth/bornFinalizedOptIn";
+import type { SecondaryStorageDeps } from "../../better-auth/config/secondary-storage";
 import { BetterAuthDatabaseHooks } from "../../better-auth/hooks";
 import { LastWayInGuard } from "../../better-auth/last-way-in";
 import { PasskeySignUpRegistration } from "../../better-auth/passkey-signup";
@@ -83,7 +85,7 @@ import { InviteService } from "../../invites/invite.service";
 import { sendAddressConfirmationEmail } from "../../mailer/addressConfirmationEmail";
 import { sendSignUpVerificationEmail } from "../../mailer/signUpVerificationEmail";
 import { trackServerEvent } from "../../posthog";
-import { getApp } from "../app";
+import { getApp, tryGetApp } from "../app";
 import { grantsLedgerWriter } from "../authz/ledger";
 import { grantsService } from "../authz/runtime";
 import { PrismaSystemMigrationStateRepository } from "../system-migrations/repositories/system-migration-state.prisma.repository";
@@ -1146,10 +1148,11 @@ export function lastWayInGuard(): LastWayInGuard {
  * setting a first password and changing one, all of them in the user router —
  * so raising it meant finding all three, and a site that was missed would go
  * on writing weaker hashes than the ones beside it with nothing to show for
- * it. better-auth's own legacy-hash bridge still carries a copy; that module
- * composes nothing through this root yet.
+ * it. better-auth's own legacy-hash bridge is the fourth door a password
+ * arrives through, and it is HANDED this number (ADR-129) rather than
+ * spelling one of its own, so the whole platform hashes at one cost.
  */
-const PASSWORD_HASH_ROUNDS = 10;
+export const PASSWORD_HASH_ROUNDS = 10;
 
 /**
  * An account's own credentials (ADR-129): opening one with a password or a
@@ -1402,4 +1405,29 @@ export function twoStepVerification(): TwoStepVerificationService {
     protocol: new BetterAuthTwoStepProtocol(),
     offered: deploymentOffersTwoStepVerification,
   });
+}
+
+/**
+ * What better-auth's secondary storage is composed from: whether this
+ * deployment has one at all, and the connection a callback finds when it runs
+ * (`better-auth/config/secondary-storage.ts` is the storage itself).
+ *
+ * WHETHER to configure it is a pure question about *configuration*, so it is
+ * answered from env rather than from a live client (ADR-093), and it is
+ * answered here rather than in the config module because the answer costs a
+ * `RedisConfigService` — a construction that belongs to the composition root
+ * like every other (ADR-129 rule 3).
+ *
+ * `BUILD_TIME` joins `SKIP_REDIS` in the skip signal: a build or a test run has
+ * env pointing at a Redis it must not adopt as a session store.
+ */
+export function secondaryStorage(): SecondaryStorageDeps {
+  return {
+    configured: new RedisConfigService().isConfigured({
+      url: env.REDIS_URL,
+      clusterEndpoints: env.REDIS_CLUSTER_ENDPOINTS,
+      skip: env.SKIP_REDIS || !!process.env.BUILD_TIME,
+    }),
+    connection: () => tryGetApp()?.redis ?? null,
+  };
 }

@@ -1,5 +1,4 @@
 import { createLogger } from "@langwatch/observability";
-import { ssoRegisteredIssuers } from "~/server/app-layer/identity/runtime";
 
 /**
  * The issuers this installation's customers have registered.
@@ -198,16 +197,4 @@ export class RegisteredIssuers {
       return null;
     }
   }
-}
-
-/** The issuers to trust for this request. */
-export function issuersForRequest(
-  request: Request | undefined,
-): Promise<string[]> {
-  return ssoRegisteredIssuers().issuersForRequest(request);
-}
-
-/** Every registered issuer, or an empty list if we cannot read them. */
-export function registeredIssuers(): Promise<string[]> {
-  return ssoRegisteredIssuers().registeredIssuers();
 }

@@ -86,6 +86,17 @@ vi.mock("~/server/app-layer/identity/runtime", () => ({
   identityCeremonies: () => ({}),
   identityStorageAdapter: () => () => stubBetterAuthAdapter,
   organizationMfa: () => ({}),
+  // ADR-129 slice 21a: index.ts now composes better-auth's secondary storage
+  // from this factory, and reads it EAGERLY at module load.
+  secondaryStorage: () => ({ configured: false, connection: () => null }),
+  PASSWORD_HASH_ROUNDS: 10,
+  passkeySignUp: () => ({}),
+  ssoAssertion: () => ({}),
+  databaseHooks: () => ({}),
+  sessionClaims: () => ({}),
+  deploymentIsFederationCapable: () => false,
+  resolveSignInMethodPolicy: async () => ({}),
+  mfaCeremonies: () => ({}),
 }));
 
 vi.mock("~/server/db", () => ({ prisma: {} }));
