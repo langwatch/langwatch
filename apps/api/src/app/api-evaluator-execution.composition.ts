@@ -45,10 +45,15 @@
  * three doors are addressed by evaluator id and a door that serves a third of
  * the catalogue is a door that fails unpredictably.
  *
- * **No execution telemetry.** `evaluation_duration_milliseconds` and
- * `evaluation_status_counter` are not reported from this process: the port
- * takes a registry and this composition is handed none. A missing series
- * rather than a wrong one, which is what the port itself documents.
+ * ## What it also composes, and what that took
+ *
+ * **The two evaluator process series.** `evaluation_duration_milliseconds` and
+ * `evaluation_status_counter` are reported from this process, through
+ * `OtelEvaluationExecutionMetricsAdapter`. It is threaded to BOTH holders of
+ * the port — the engine, which times a native evaluator itself, and the
+ * langevals transport, which is the only place a remote call's duration and
+ * its four failure outcomes are known — because a run reported by one of them
+ * and not the other is a dashboard that undercounts without saying so.
  */
 import {
   AZURE_SAFETY_PROVIDER_KEY,
@@ -63,6 +68,7 @@ import {
   EvaluationTraceReadPort,
   EvaluationWorkflowExecutorPort,
   HttpLangevalsEvaluatorAdapter,
+  OtelEvaluationExecutionMetricsAdapter,
   type EvaluationRunOutcome,
 } from "@langwatch/evaluation-server";
 import { WorkflowEvaluationAdapter } from "@langwatch/evaluation-server/workflow-evaluation";
@@ -130,16 +136,6 @@ export type ApiEvaluatorExecution = Readonly<{
 export abstract class ApiEvaluatorExecutionAbsenceReportPort {
   /** No `LANGEVALS_ENDPOINT`: no evaluator runs on this process at all. */
   abstract withoutEvaluatorService(): void;
-
-  /**
-   * No telemetry adapter: the two evaluator process series are not reported.
-   *
-   * NOT a missing registry — `EvaluationExecutionTelemetryPort` takes none, only
-   * a `record({ evaluatorType, status, durationMs })`. What does not exist is
-   * any implementation of it, in this process or any other. The sibling that
-   * writes its series the same way is `OtelPiiAnalysisMetricsAdapter`.
-   */
-  abstract withoutExecutionTelemetry(): void;
 }
 
 export type ApiEvaluatorExecutionOptions = Readonly<{
@@ -190,10 +186,15 @@ export function composeApiEvaluatorExecution(
     return undefined;
   }
 
-  options.report?.withoutExecutionTelemetry();
-
   const environment = options.environment ?? process.env;
+  // ONE adapter, handed to both holders of the port. The two instruments are
+  // process-wide — `histogram()` and `counter()` resolve the same meter
+  // whatever declares them — so a second instance would write the same two
+  // series; one is passed rather than two so a reader can see there is a
+  // single answer to "who reports an evaluation".
+  const telemetry = OtelEvaluationExecutionMetricsAdapter.create();
   const engine = EvaluationExecutionService.create({
+    telemetry,
     traceService: ApiEvaluationTraceReads.create(options.traceReads, options.processName),
     spanDigest: ApiEvaluationSpanDigest.create(),
     modelEnvResolver: ApiEvaluationModelEnv.create({
@@ -207,6 +208,7 @@ export function composeApiEvaluatorExecution(
         maxRetries: LANGEVALS_MAX_RETRIES,
         timeoutMs: LANGEVALS_TIMEOUT_MS,
       },
+      telemetry,
     }),
     // Declared by the engine and read by nothing in it: the workflow branch
     // dispatches through `workflowExecutor` below, which is what actually
@@ -627,12 +629,6 @@ export class LoggedApiEvaluatorExecutionAbsence extends ApiEvaluatorExecutionAbs
   withoutEvaluatorService(): void {
     this.logger.info(
       "API composed no evaluator runtime: LANGEVALS_ENDPOINT names no evaluator service, so the gateway's guardrail check, the four legacy evaluate doors and a trace re-score each refuse by name rather than answering a verdict nothing produced.",
-    );
-  }
-
-  withoutExecutionTelemetry(): void {
-    this.logger.info(
-      "API composed the evaluator runtime without an execution-telemetry adapter: nothing in the tree implements EvaluationExecutionTelemetryPort, so evaluation_duration_milliseconds and evaluation_status_counter are reported by no process.",
     );
   }
 }

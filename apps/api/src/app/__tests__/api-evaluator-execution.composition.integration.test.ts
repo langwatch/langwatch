@@ -31,6 +31,7 @@ import type { MonitorService } from "@langwatch/monitor-contract";
 import type { OrganizationService } from "@langwatch/organization-contract";
 import type { PrismaClient } from "@langwatch/prisma-client/generated";
 import type { ProjectService } from "@langwatch/project-contract";
+import { createRecordingMeterProvider } from "@langwatch/observability/metrics/testing";
 import { AesGcmSecretEncryptionAdapter } from "@langwatch/secret-server";
 import { Hono, type ErrorHandler, type MiddlewareHandler } from "hono";
 import { afterEach, describe, expect, it, vi } from "vitest";
@@ -126,6 +127,47 @@ describe("given a process that composed an evaluator runtime", () => {
       });
     });
   });
+
+  describe("when an evaluation finishes", () => {
+    /**
+     * The composition wires the telemetry adapter; the two series are the only
+     * evidence that it did. Read through the DOOR rather than off the adapter,
+     * because the adapter has its own unit test and what could regress here is
+     * the wiring — `HttpLangevalsEvaluatorAdapter.create` takes `telemetry` as
+     * an optional field, so dropping it compiles and reports nothing.
+     */
+    it("reports its duration and outcome on this process's own series", async () => {
+      const metrics = createRecordingMeterProvider();
+      metrics.install();
+      try {
+        recordingLangevals({ passed: true, score: 0.42 });
+        const api = mountProcessRest();
+
+        const response = await api.fetch("/api/evaluations/ragas/bleu_score/evaluate", {
+          method: "POST",
+          headers: { "content-type": "application/json", "x-auth-token": "token" },
+          body: JSON.stringify({
+            data: { output: "the cat sat", expected_output: "the cat sat down" },
+          }),
+        });
+
+        expect(response.status).toBe(200);
+        expect(
+          metrics.valuesOf("evaluation_duration_milliseconds", {
+            evaluator_type: "ragas/bleu_score",
+          }),
+        ).toHaveLength(1);
+        expect(
+          metrics.valueOf("evaluation_status_counter", {
+            evaluator_type: "ragas/bleu_score",
+            status: "processed",
+          }),
+        ).toBe(1);
+      } finally {
+        metrics.uninstall();
+      }
+    });
+  });
 });
 
 describe("given a process that configured no evaluator service", () => {
@@ -142,7 +184,6 @@ describe("given a process that configured no evaluator service", () => {
         processName: "langwatch-api",
         report: {
           withoutEvaluatorService: () => reported.push("evaluator-service"),
-          withoutExecutionTelemetry: () => reported.push("telemetry"),
         } as never,
       });
 

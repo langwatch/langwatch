@@ -225,6 +225,9 @@ importers:
       '@langwatch/enterprise-licensing-contract':
         specifier: workspace:*
         version: link:../../packages/enterprise/features/licensing/contract
+      '@langwatch/enterprise-licensing-server':
+        specifier: workspace:*
+        version: link:../../packages/enterprise/features/licensing/server
       '@langwatch/enterprise-managed-provider-contract':
         specifier: workspace:*
         version: link:../../packages/enterprise/features/managed-provider/contract
@@ -891,6 +894,9 @@ importers:
       '@langwatch/enterprise-licensing-contract':
         specifier: workspace:*
         version: link:../../packages/enterprise/features/licensing/contract
+      '@langwatch/enterprise-licensing-server':
+        specifier: workspace:*
+        version: link:../../packages/enterprise/features/licensing/server
       '@langwatch/enterprise-managed-provider-contract':
         specifier: workspace:*
         version: link:../../packages/enterprise/features/managed-provider/contract
@@ -2043,6 +2049,9 @@ importers:
       '@langwatch/handled-error':
         specifier: workspace:*
         version: link:../../../../handled-error
+      '@langwatch/prisma-client':
+        specifier: workspace:*
+        version: link:../../../../prisma-client
       '@trpc/server':
         specifier: ^11.18.0
         version: 11.18.0(typescript@7.0.2)

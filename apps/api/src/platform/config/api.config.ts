@@ -601,6 +601,25 @@ export const apiConfigDefinition = RuntimeConfig.define({
       host: Config.value(optionalEnvironmentString, { env: "GITHUB_LANGY_HOST" }),
     },
     /**
+     * The key an activated Enterprise licence's signature is checked against.
+     *
+     * Optional, and absent is the normal case: the licensing contract embeds
+     * the production public key, so a deployment verifies every licence
+     * LangWatch issues without configuring anything. The variable exists for
+     * ROTATION, and it is read here rather than at the verifier because this
+     * module is the process's only environment reader.
+     *
+     * The background process reads the SAME variable (ADR-027), because plan
+     * resolution runs there too and two processes checking a signature against
+     * different keys is one deployment with two answers to whether it is
+     * licensed at all.
+     */
+    licensing: {
+      publicKey: Config.value(optionalEnvironmentString, {
+        env: "LANGWATCH_LICENSE_PUBLIC_KEY",
+      }),
+    },
+    /**
      * Where this deployment keeps the bytes it externalized out of traces,
      * datasets, scenarios and evaluation payloads.
      *
@@ -869,11 +888,25 @@ export type ApiStoredObjectsConfigResolution = Readonly<{
   routes: ReadonlyMap<string, ApiDataplaneS3Route>;
 }>;
 
+/** How an Enterprise licence is verified on this deployment. */
+export type ApiLicensingConfigResolution = Readonly<{
+  /**
+   * The rotated public key, or nothing.
+   *
+   * Nothing means the key embedded in the licensing contract. Blank is not a
+   * key: an operator who exported the variable empty has not rotated anything,
+   * and an empty string reaching the verifier refuses every licence the
+   * deployment holds.
+   */
+  publicKey: string | undefined;
+}>;
+
 export type ApiInfrastructureConfig = Readonly<{
   database: ApiDatabaseConfigResolution;
   clickhouse: ApiClickHouseConfigResolution;
   execution: ApiExecutionConfigResolution;
   github: ApiGithubConfigResolution;
+  licensing: ApiLicensingConfigResolution;
   modelProvider: ApiModelProviderConfigResolution;
   storedObjects: ApiStoredObjectsConfigResolution;
   redis: RedisConfigResolution;
@@ -1032,6 +1065,9 @@ export function resolveApiConfig(source: Readonly<Record<string, unknown>>): Api
         appSlug: value.infrastructure.github.appSlug?.trim() ?? "",
         webhookSecret: value.infrastructure.github.webhookSecret?.trim() ?? "",
         host: value.infrastructure.github.host?.trim() || undefined,
+      },
+      licensing: {
+        publicKey: value.infrastructure.licensing.publicKey?.trim() || undefined,
       },
       storedObjects: {
         backend: value.infrastructure.storedObjects.backend,

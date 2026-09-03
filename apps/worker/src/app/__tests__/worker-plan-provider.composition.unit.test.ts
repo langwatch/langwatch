@@ -1,5 +1,10 @@
 import { PlanTypes } from "@langwatch/enterprise-billing-contract";
 import type { BillingSubscriptionRepository } from "@langwatch/enterprise-billing-server";
+import { OrganizationLicensePort } from "@langwatch/enterprise-licensing-server";
+import {
+  ENTERPRISE_LICENSE_KEY,
+  TEST_PUBLIC_KEY,
+} from "@langwatch/enterprise-licensing-server/testing";
 import { describe, expect, it } from "vitest";
 import {
   createWorkerPlanProvider,
@@ -53,6 +58,17 @@ function subscriptions(active: SubscriptionRecord | null): BillingSubscriptionRe
   return {
     tryFindActive: async () => active,
   } as unknown as BillingSubscriptionRepository;
+}
+
+/**
+ * The licence row, as the composition reads it.
+ *
+ * The KEY is a genuinely signed fixture and the verifier below it is the real
+ * one, so what these tests exercise is the whole licence leg: the read, the
+ * signature check, the deployment-mode reading and the plan it answers.
+ */
+function licenses(licenseKey: string | null): OrganizationLicensePort {
+  return { tryReadLicense: async () => licenseKey } as OrganizationLicensePort;
 }
 
 /** Records which plan sources the composition said it did not hold. */
@@ -166,11 +182,12 @@ describe("given the plan provider this process composes for itself", () => {
 
   describe("when the webhook delivery gate reads the plan", () => {
     /**
-     * The one field the gate reads, end to end. It comes off the ENTERPRISE
-     * plan's own limits, which is why no tier enricher is threaded through
-     * either root — so what this pins is the SUBSCRIPTION path: an enterprise
-     * organization whose row this process could not read resolves the free
-     * baseline and has its endpoints refused.
+     * The one field the gate reads, end to end, on the SUBSCRIPTION path. It
+     * comes off the ENTERPRISE plan's own limits there, so the tier enricher
+     * has nothing to fill — which is why the shared policy threads it with the
+     * licence and only with it. What this pins is what the subscription leg
+     * answers: an enterprise organization whose row this process could not read
+     * resolves the free baseline and has its endpoints refused.
      */
     /** @scenario "An enterprise organization's webhook entitlement is answered here" */
     it("answers the entitlement for an organization whose subscription carries the tier", async () => {
@@ -203,6 +220,79 @@ describe("given the plan provider this process composes for itself", () => {
       const plan = await plans.getActivePlan({ organizationId: "org-1" });
 
       expect(plan.webhookEndpointsEnabled ?? false).toBe(false);
+    });
+  });
+
+  describe("when the deployment is self-hosted and holds the licence row", () => {
+    /**
+     * The answer this process was missing entirely. A licensed self-hosted
+     * customer resolved the same unlimited baseline an unlicensed one does, so
+     * the Enterprise tier they bought reached none of the three decisions this
+     * process makes with a plan.
+     */
+    /** @scenario "A licensed self-hosted deployment resolves the plan its licence names here too" */
+    it("resolves an activated Enterprise licence onto the plan the licence names", async () => {
+      const plans = createWorkerPlanProvider({
+        isSaas: false,
+        licenses: licenses(ENTERPRISE_LICENSE_KEY),
+        licensePublicKey: TEST_PUBLIC_KEY,
+      });
+
+      const plan = await plans.getActivePlan({ organizationId: "org-1" });
+
+      expect(plan.type).toBe(PlanTypes.ENTERPRISE);
+      expect(plan.planSource).toBe("license");
+      // The seats the customer bought bind, and the licence's message ceiling
+      // does not: self-hosted volume is never metered.
+      expect(plan.maxMembers).toBe(100);
+      expect(plan.maxMessagesPerMonth).toBe(Number.MAX_SAFE_INTEGER);
+    });
+
+    /**
+     * The webhook gate reads exactly this field, and the fixture licence was
+     * signed before it existed. Without the tier enricher on the licence leg,
+     * a licensed customer's batches would be dropped by this process while the
+     * endpoint page still said they were enabled.
+     */
+    /** @scenario "A licence predating a tier entitlement still carries it here" */
+    it("fills the webhook entitlement a licence signed before the flag left unanswered", async () => {
+      const plans = createWorkerPlanProvider({
+        isSaas: false,
+        licenses: licenses(ENTERPRISE_LICENSE_KEY),
+        licensePublicKey: TEST_PUBLIC_KEY,
+      });
+
+      const plan = await plans.getActivePlan({ organizationId: "org-1" });
+
+      expect(plan.webhookEndpointsEnabled).toBe(true);
+    });
+
+    /** @scenario "A licensed self-hosted deployment resolves the plan its licence names here too" */
+    it("names no absent licence source, because it composed one", () => {
+      const report = new RecordingEntitlementAbsence();
+
+      createWorkerPlanProvider({
+        isSaas: false,
+        licenses: licenses(ENTERPRISE_LICENSE_KEY),
+        licensePublicKey: TEST_PUBLIC_KEY,
+        report,
+      });
+
+      expect(report.sources).toEqual([]);
+    });
+
+    /** @scenario "A self-hosted deployment resolves the unlimited baseline here too" */
+    it("still resolves the unlimited baseline for an organization that activated nothing", async () => {
+      const plans = createWorkerPlanProvider({
+        isSaas: false,
+        licenses: licenses(null),
+        licensePublicKey: TEST_PUBLIC_KEY,
+      });
+
+      const plan = await plans.getActivePlan({ organizationId: "org-1" });
+
+      expect(plan.type).toBe("OPEN_SOURCE");
+      expect(plan.maxMembers).toBe(Number.MAX_SAFE_INTEGER);
     });
   });
 });

@@ -35,3 +35,10 @@ Feature: Evaluation service boundary
     When an API handler or worker reads a run
     Then both use the same service capability
     And neither constructs ClickHouse or execution dependencies per request
+
+  @unit
+  Scenario: An evaluator run reports its duration and its outcome
+    Given a process composed the evaluator runtime's telemetry
+    When an evaluation finishes
+    Then its duration is recorded against the evaluator that produced it
+    And its outcome is counted apart from the other outcomes

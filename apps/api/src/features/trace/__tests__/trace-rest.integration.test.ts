@@ -23,6 +23,7 @@
  *     the payload names no trace at all.
  */
 import { createAppRestSecurity, type AppRestSecurity } from "@langwatch/api/rest";
+import type { UsageLimitResult } from "@langwatch/entitlement-server";
 import type { ShareService } from "@langwatch/share-contract";
 import type { RecordSpanCommandData, Trace } from "@langwatch/trace-contract";
 import type { TraceApp } from "@langwatch/trace-server";
@@ -31,7 +32,10 @@ import { describe, expect, it, vi } from "vitest";
 
 import { createApiProcessRestFeatures } from "../../../app-rest/app-rest.process-features";
 import type { ApiHandlerManagedCredentials } from "../../../app/api-handler-managed-credential";
-import { composeApiTraceIngest } from "../../../app/api-trace-ingest.composition";
+import {
+  composeApiTraceIngest,
+  type ApiTraceIngestAllowance,
+} from "../../../app/api-trace-ingest.composition";
 import type { ApiTraceReadStackPort } from "../../../app/api-trpc-collaborators.trace-group.composition";
 
 const PROJECT = {
@@ -248,6 +252,32 @@ describe("given the SDK collector over this process's own producer", () => {
     });
   });
 
+  describe("when the project is over its monthly allowance", () => {
+    /** @scenario "An export over the plan's allowance is refused terminally" */
+    it("refuses this door too, so the limit is not routed around by changing a URL", async () => {
+      const { api, commands } = mount({
+        allowance: allowanceAnswering({
+          exceeded: true,
+          message: "Free limit of 50000 events reached. To increase your limits, upgrade",
+          count: 60_000,
+          maxMessagesPerMonth: 50_000,
+          planName: "free",
+          usageUnit: "events",
+        }),
+      });
+
+      const response = await api.fetch("/api/collector", {
+        method: "POST",
+        headers: { "content-type": "application/json", "x-auth-token": "token" },
+        body: JSON.stringify(collectorPayload()),
+      });
+
+      expect(response.status).toBe(402);
+      await expect(response.json()).resolves.toMatchObject({ error: "ERR_PLAN_LIMIT" });
+      expect(commands).toHaveLength(0);
+    });
+  });
+
   describe("when the request carries no usable credential", () => {
     it("answers the collector's own sentence, which every SDK's copy quotes", async () => {
       const { api, commands } = mount({
@@ -278,7 +308,13 @@ type MountOverrides = {
   app?: Partial<Record<string, unknown>>;
   share?: Partial<Record<string, unknown>>;
   credential?: ApiHandlerManagedCredentials["authenticate"];
+  allowance?: ApiTraceIngestAllowance;
 };
+
+/** The allowance, as the process's own `UsageService` would have answered it. */
+function allowanceAnswering(result: UsageLimitResult): ApiTraceIngestAllowance {
+  return { checkLimit: () => Promise.resolve(result) };
+}
 
 /** The process's REST door, over a producer that records rather than enqueues. */
 function mount(overrides: MountOverrides) {
@@ -289,6 +325,7 @@ function mount(overrides: MountOverrides) {
     }),
     redis: null,
     credentials: credentialsStub(overrides.credential),
+    ...(overrides.allowance ? { allowance: overrides.allowance } : {}),
     processName: "langwatch-api-test",
   });
   if (!ingest) throw new Error("the ingest ports must compose over a command queue");
@@ -331,6 +368,9 @@ function mount(overrides: MountOverrides) {
       collector: {
         credential: ingest.collectorCredential,
         ingestSpan: ingest.ingestSpan,
+        // The SAME gate the OTLP receiver holds, wired the way the root wires
+        // it. Two doors, one allowance.
+        usageLimit: ingest.usageLimit,
         deriveEvaluatorId: (name) => `customeval_${name}`,
       },
     },

@@ -2858,12 +2858,14 @@ gateway and leftovers lanes account for the rest in the same working tree.
   guessed `nonBillable` instead would silently price a bundled coding session as
   real spend, which is worse than refusing.
 
-- **The OTLP receiver enforces no plan allowance.** `apps/api` composes no usage
-  meter, so `usageLimit` returns rather than refuses. That is the SAME degradation
-  the receiver has always had when the allowance LOOKUP failed — the batch is
-  accepted and the failure logged — because telemetry a customer already paid to
-  produce must not be dropped by a meter this process cannot read. Reported once
-  at boot by `LoggedApiTraceIngestAbsence`, not per request.
+- ~~**The OTLP receiver enforces no plan allowance.**~~ **CLOSED** by "The last
+  two API absences" at the end of this document. `composeApiUsageEnforcement`
+  builds the packaged `UsageService` over this process's own client, ClickHouse
+  and plan provider, and both ingest doors refuse an over-plan export with
+  `ERR_PLAN_LIMIT` at 402 — never 429, which an OTel SDK retries. The
+  degradation described here survives as the two cases that deserve it: a
+  process with no ClickHouse (reported once at boot) and a lookup that failed
+  (logged per call), both of which accept the batch.
 
 - **The coding-agent span filter runs over a stand-in.** `TraceIngestionService`
   takes a whole `CodingAgentService` to reach one dependency-free rule on its base
@@ -6411,11 +6413,10 @@ already been serving the same wire since `0fc9e4120d`.
   through `/api/experiment/init` and another way here would silently write its
   rows against a second experiment. The port group is declared; supplying it is
   the whole of what is left.
-- **The collector enforces no plan allowance.** `apps/api` composes no usage
-  meter, so `usageLimit` is absent and no monthly allowance is checked. That is
-  the SAME degradation this path has always had when the allowance LOOKUP
-  failed — the batch is accepted and the failure logged — and it is the
-  decision the OTLP receiver on the same process already records.
+- ~~**The collector enforces no plan allowance.**~~ **CLOSED** by "The last two
+  API absences" at the end of this document, in the same pass and with the SAME
+  gate object the OTLP receiver holds: a limit enforced on one of these two
+  doors and not the other is a limit a customer routes around by changing a URL.
 - **The collector no longer stamps the customer trace id onto the
   error-reporting scope.** The platform route called
   `getCurrentScope()?.setPropagationContext?.({ traceId, … })` so a failure
@@ -7766,11 +7767,13 @@ vendor sends).
 
 ### Named absences remaining
 
-- **No execution telemetry.** `evaluation_duration_milliseconds` and
-  `evaluation_status_counter` are not reported from this process: the port
-  takes a registry and this composition is handed none. A missing series rather
-  than a wrong one, which is what the port itself documents. Reported at boot
-  by `LoggedApiEvaluatorExecutionAbsence.withoutExecutionTelemetry`.
+- ~~**No execution telemetry.**~~ **CLOSED** by "The last two API absences" at
+  the end of this document. The reason recorded here was wrong twice over: the
+  port takes no registry, only a `record(...)`, and nothing implemented it in
+  any process. `OtelEvaluationExecutionMetricsAdapter` now does, and this
+  composition threads one instance to BOTH holders — the engine, which times a
+  native evaluator, and the langevals transport, which is where a remote call's
+  duration and its four outcomes are known. The absence is deleted.
 - **No `LANGEVALS_ENDPOINT`, no runtime at all.** Native, code and workflow
   evaluators do not need the endpoint, and refusing those too is the deliberate
   side of the trade: the three doors are addressed by evaluator id, and a door
@@ -12934,8 +12937,8 @@ surface's. Six absences that read as stale are that, and they stay.
 | `UnavailableApiScenarioExecution` | **STALE (4 of 5)** | The package ships the concrete `ScenarioExecutionService`; all ten prefetcher collaborators are composed on this process already, and `ScenarioApp` reaches only `prefetch` | **CLOSED** by the follow-up below: both config values are read now, and the class is deleted. `submit` is refused by `UnavailableScenarioExecutionPoolService`, which is the honest leg |
 | `UnavailableApiOrganizationSeatLicense` | **STALE** | This root makes both halves of the same decision under other names (`ApiInviteSeatCensus`; `assertCustomRolesAllowed`) | **CLOSED** by the follow-up below: `plans` is on the identity options, `ApiOrganizationSeatLicense` decides both halves against the organization's own plan, and the class is deleted |
 | `absent("no-encryption")` | **STALE, kept** | `resolveTenancy` composes nothing without the same `encryption` local, so a composed tenancy is proof the cipher exists | **KEPT**: the branch is the NARROWING for a non-optional input; removing it fails `tsc`, and a silent `return undefined` would drop the gateway with no line saying why. Doc corrected |
-| `absent("plan-allowance")` | **REAL GAP** | "composes no usage meter" is half stale — the plan provider IS held, by eight readers | **MESSAGE CORRECTED**: `UsageOrganizationPort` and `UsageVolumeCounterPort` have no implementation in any tier, so `UsageService` is composed by nobody |
-| `withoutExecutionTelemetry` | **REAL GAP** | "no metrics registry" is wrong: `EvaluationExecutionTelemetryPort` takes no registry, only `record(...)` | **MESSAGE CORRECTED**: nothing in the tree implements the port. Template: `OtelPiiAnalysisMetricsAdapter` |
+| `absent("plan-allowance")` | **REAL GAP** | "composes no usage meter" is half stale — the plan provider IS held, by eight readers | **MESSAGE CORRECTED**, then **CLOSED** by "The last two API absences" at the end of this document: the two ports are the composition root's to write, exactly as `ApiUsageWarningDirectory` is, and everything they stand on was already open. Both ingest doors now enforce; the absence fires only with no ClickHouse |
+| `withoutExecutionTelemetry` | **REAL GAP** | "no metrics registry" is wrong: `EvaluationExecutionTelemetryPort` takes no registry, only `record(...)` | **MESSAGE CORRECTED**, then **CLOSED** by "The last two API absences" at the end of this document: `OtelEvaluationExecutionMetricsAdapter` was written from the template the correction named, and threaded to both holders of the port. The absence is deleted |
 | `absent("usage-mail")` | **REAL GAP** | "needs a Notification vertical" is stale — it exists, as do `UsageLimitService` and `UsageWarningService` | **CLOSED** by "The two mail absences" below: `ApiUsageLimitEmailAdapter` is a real `UsageLimitEmailAdapter`, this process parses a mailer config, and `checkAndSendWarning` sends. The absence now fires only on a deployment that named no `BASE_HOST` |
 | `UnavailableApiPasswordResetMail` | **REAL GAP** | The React-boundary reason is false: `@langwatch/mail` is the ONE allowed terminal in `frontend-boundary.unit.test.ts`, and `apps/api` already declares the dependency | **CLOSED** by "The two mail absences" below: `ApiComposedPasswordResetMail` sends through `api-mail.composition.ts`. The class survives as `UnconfiguredApiPasswordResetMail`, a degenerate-configuration guard, because `sendResetPassword` is not optional on the transport |
 | `absent("events-meter")` | **REAL GAP** | "reads one tenant's rows on another's endpoint" is false — the directory answers a project id, so an organization id raises `UnknownTenantError` rather than mis-routing | **MESSAGE CORRECTED**: `ClickHouseConnection.resolveOrganization` exists; missing is an organization-keyed accessor on `ApiClickHouseInfrastructure` |
@@ -12993,8 +12996,8 @@ surface's. Six absences that read as stale are that, and they stay.
 | `apps/api/src/app/api-trpc-collaborators.product-infra.composition.ts` | The `evaluation-runs` claim rewritten: the stack has moved, the repository is unexported. |
 | `apps/api/src/app/api-trpc-collaborators.identity.composition.ts` | The seat-licence comment now names the missing wiring (`plans` on the identity options) rather than implying no collaborator exists. |
 | `apps/api/src/app/api-model-provider.composition.ts` | `LoggedApiModelProviderAbsence`'s header says which of its three reasons no root reaches, and why it stays. |
-| `apps/api/src/app/api-evaluator-execution.composition.ts` | `withoutExecutionTelemetry` no longer claims a missing registry. |
-| `apps/api/src/app/api-trace-ingest.composition.ts` | `plan-allowance` names the two enforcement ports instead of "no usage meter". |
+| `apps/api/src/app/api-evaluator-execution.composition.ts` | `withoutExecutionTelemetry` no longer claims a missing registry. *Superseded: the absence is deleted and the adapter composed.* |
+| `apps/api/src/app/api-trace-ingest.composition.ts` | `plan-allowance` names the two enforcement ports instead of "no usage meter". *Superseded: both ports are composed here and the absence names the no-ClickHouse case.* |
 | `apps/api/src/app/api-better-auth.composition.ts` | The password-reset port's stated reason replaced: `@langwatch/mail` is the sanctioned terminal; the gap is config and an `EmailDeliveryPort`. |
 | `apps/api/src/features/agent/__tests__/agent-workflow-copy.unit.test.ts` | NEW. 3 tests: the copy and its command shape, the late-resolved thunk, the named refusal. |
 | `apps/api/src/app/__tests__/api-usage.composition.unit.test.ts` | NEW. 5 tests over a real `EntitlementService`: a paying organization resolves its plan, the absence is not reported when composed, free still resolves free, and both no-source cases. |
@@ -13824,7 +13827,9 @@ not be able to fail a seat decision.
   `plan-allowance`, `withoutExecutionTelemetry`, `usage-mail`,
   `UnavailableApiPasswordResetMail`, `events-meter`, `withoutDurableAppend` and
   `withoutRateLimit` each wait on an implementation or a config block that does
-  not exist, and the boundary refusals stay.
+  not exist, and the boundary refusals stay. *Five of those seven were closed
+  later the same day. `withoutDurableAppend` and `withoutRateLimit` are the two
+  left — see "The last two API absences" at the end of this document.*
 
 ## The `any` placeholders swept, and the one that is a Prisma row, 2026-09-03
 
@@ -15453,3 +15458,469 @@ pattern that annotates the resolver — `.query(({ ctx }): OpsApiGetBadgeCountsO
 on `ops.api.ts:301`, replacing the inline structural type — is not done here.
 The published type and the transport's answer match structurally, so the badge
 is correct today; the annotation is what would keep them matching.
+
+## The last two API absences: `plan-allowance` and `withoutExecutionTelemetry`, 2026-09-03
+
+Both were the only rows still classed **REAL GAP** in "The 43" after its
+follow-ups, and both were re-read against the tree today. Neither is a gap any
+more. Each had been audited once and corrected once — the first message said a
+held plan provider blocked it, the second said the port takes a registry — and
+both corrections were right about what was WRONG and wrong about what was left.
+
+The audit's own rule for "stale" is *the root holds the collaborator and fails
+to pass it*. Applied to these two it says: they were stale when the correction
+was written.
+
+### `plan-allowance`: the ports were the root's to write, and it had already written their siblings
+
+The corrected message said `UsageOrganizationPort` and `UsageVolumeCounterPort`
+"have no implementation in any tier, so `UsageService` is composed by nobody".
+True as stated, and it was the wrong test. Neither port CAN have an
+implementation in a feature package: `UsageOrganizationPort` is a join across
+the team, project and organization aggregates, which no one feature may name at
+once, and which store a deployment counts from is a composition decision. They
+are the same shape as `ApiUsageWarningDirectory` and `ApiUsageBreakdownAdapter`
+— the three reads "no package ships an implementation of" that the usage-mail
+pass wrote into this very file for exactly that reason, one section apart.
+
+Everything they stand on was already open on this process, and by the line the
+doors are composed:
+
+```
+compose()
+  743  composedDatabase          ← the guarded client
+  811  composeAnalytics()        ← composedClickHouse  (tenant + organization accessors)
+  843  composeTraceGroup()       ← resolvePlanProvider(options)   [memoised]
+  843+ composedUsageEnforcement  ← NEW. the three lines below
+  967  composeDoors()
+ 1209    composeApiTraceIngest({ …, allowance })
+```
+
+```
+BEFORE                                AFTER
+
+otlp.usageLimit                       otlp.usageLimit ─┐
+  () => Promise.resolve()                              ├→ composeApiTraceIngestUsageLimit
+collector.usageLimit                  collector.usageLimit ─┘        │
+  (absent)                                                           │
+                                        UsageService.checkLimit ─────┘
+report.absent("plan-allowance")           ├ organizations  ApiUsageOrganizationDirectory
+  UNCONDITIONALLY, every boot             ├ traceCounter   ApiTraceVolumeCounter
+                                          ├ eventCounter   ApiEventVolumeCounter
+                                          ├ planResolver   the ONE PlanProvider
+                                          └ deployment     { isSaas, baseHost }
+
+                                      report.absent("plan-allowance")
+                                        only with NO ClickHouse
+```
+
+**Three outcomes, one of which refuses.** Over the allowance throws
+`PlanLimitExceededError` — which already existed, unthrown, in
+`@langwatch/entitlement-contract` — and the family's legacy renderer turns it
+into `{"error":"ERR_PLAN_LIMIT","message":…}` at **402**. The body is
+byte-for-byte the platform application's; the status is not, and deliberately.
+The platform answered **429**, which OTel SDKs and most retrying HTTP clients
+treat as transient, so a terminal rejection came back until the exporter's
+elapsed-time budget ran out. Both ports in `@langwatch/trace-server` already
+documented the 402 rule; nothing composed them, so nothing obeyed it.
+
+Within the allowance returns. **A lookup that FAILED also returns**, and that
+asymmetry is the behaviour this path has always had: a directory or a rollup
+that is down must not stop a customer's telemetry, and a team that resolves to
+no organization is that same case — `UsageService` raises
+`OrganizationNotFoundForTeamError` there, and the gate logs it at warn and lets
+the batch through.
+
+**Both doors, one gate object.** `/api/otel/v1/traces` and `/api/collector` are
+the same write to the same tenant. A limit enforced on one is a limit a
+customer routes around by changing a URL, so the composition publishes the
+single gate and the root hands the same object to both.
+
+**The absence stays, and now means something.** A process that opened no
+ClickHouse has nothing to count the month's volume in, and a meter whose every
+reading is `USAGE_UNKNOWN` is not enforcement — it is a warn line per ingested
+batch and an allowance nobody is held to. `composeApiUsageEnforcement` answers
+`undefined` there, the receiver reports the absence once at boot, and the
+export is accepted. That is the same degradation this path has always had when
+the allowance lookup failed.
+
+### `withoutExecutionTelemetry`: one adapter, and the template was named in the message
+
+The corrected message already said what was missing and where to copy it from:
+"nothing in the tree implements the port. Template: `OtelPiiAnalysisMetricsAdapter`."
+`EvaluationExecutionTelemetryPort` takes a `record({ evaluatorType, status,
+durationMs })` and nothing else, `@langwatch/observability/metrics` resolves the
+process meter at declaration, `HISTOGRAM_BOUNDARIES` already carries
+`evaluation_duration_milliseconds` at the platform's exact buckets, and
+`@langwatch/observability` was already a dependency of the evaluation package.
+Writing it took the one file the message described.
+
+The adapter goes to **both** holders of the port, which is the part a
+composition gets wrong: `EvaluationExecutionService` times a NATIVE evaluator
+itself, and `HttpLangevalsEvaluatorAdapter` is the only place a remote call's
+duration and its four outcomes (`skipped` on a payload too large, `error` on a
+5xx, on an unparseable body and on an empty result set, and the evaluator's own
+status otherwise) are known. Threading one and not the other is a dashboard
+that undercounts without saying so, and both take it as an OPTIONAL field, so
+dropping either compiles.
+
+`docs/langwatch-dashboard.json` reads both series by name, and the PII path
+writes the same two under `evaluator_type: "presidio/pii_detection"`. That
+sharing is deliberate and predates the split — one dashboard row covers every
+evaluator — so the names are pinned as literals on both sides.
+
+### File → change
+
+| File | Change |
+| --- | --- |
+| `packages/features/evaluation/server/src/adapters/otel.evaluation-execution-metrics.adapter.ts` | NEW. `OtelEvaluationExecutionMetricsAdapter` — the first implementation of `EvaluationExecutionTelemetryPort`, over `histogram()` + `counter()`. Names pinned as exported literals |
+| `packages/features/evaluation/server/src/index.ts` | Exports the adapter and its two metric names |
+| `apps/api/src/app/api-evaluator-execution.composition.ts` | Composes ONE adapter and threads it to the engine AND the langevals transport; `withoutExecutionTelemetry` deleted from the report port and from `LoggedApiEvaluatorExecutionAbsence`; the header's "No execution telemetry" paragraph replaced with what it now composes |
+| `apps/api/src/app/api-usage.composition.ts` | `composeApiUsageEnforcement` + `ApiUsageEnforcementOptions`; `ApiUsageOrganizationDirectory`, `ApiTraceVolumeCounter`, `ApiEventVolumeCounter`. The module header now names three things this process composes rather than two |
+| `apps/api/src/app/api-trace-ingest.composition.ts` | `ApiTraceIngestAllowance` (narrowed to `checkLimit`); `allowance` option; `composeApiTraceIngestUsageLimit`; `usageLimit` published on the composition for the collector; the `plan-allowance` reason rewritten to the no-ClickHouse case; the header's absence paragraph moved to "what it composes" |
+| `apps/api/src/app/api-production.composition.ts` | `composedUsageEnforcement` composed after the trace group and threaded into `composeApiTraceIngest`; `usageLimit` added to the collector ports |
+| `specs/server/api-process-plan-allowance.feature` | NEW. 9 scenarios, all tagged and all bound |
+| `packages/features/evaluation/specs/evaluation-service.feature` | One tagged scenario for the two series. The file enforced NOTHING before this — 0 of 6 scenarios tagged — and now reports 1/1 bound instead of being counted among the 50 inert files |
+| `packages/features/evaluation/server/src/adapters/__tests__/otel.evaluation-execution-metrics.adapter.unit.test.ts` | NEW. 3 tests: the two names, the duration observed per evaluator type, each outcome counted apart |
+| `apps/api/src/app/__tests__/api-usage.composition.unit.test.ts` | 6 tests over a REAL `UsageService`: a free organization over its 50,000 events is refused with the unit and the limit in the sentence; the events breakdown lands on the organization accessor and never the tenant one; an organization inside its allowance is not refused; a paying trace-metered organization is counted once per project on that project's own endpoint against the paid cap; a team no organization owns raises rather than metering against nobody's plan; no ClickHouse composes no enforcement |
+| `apps/api/src/app/__tests__/api-trace-ingest.otlp.integration.test.ts` | 5 tests through the real Hono app: over-plan is 402 `ERR_PLAN_LIMIT` with nothing enqueued, within-plan ingests, a failed lookup ingests, the absence is named with no allowance and not named with one |
+| `apps/api/src/features/trace/__tests__/trace-rest.integration.test.ts` | 1 test: `/api/collector` refuses the same organization at 402, wired the way the root wires it |
+| `apps/api/src/app/__tests__/api-evaluator-execution.composition.integration.test.ts` | 1 test through the legacy evaluate door: the run's duration and its `processed` outcome land on the two series. The absence stub loses its `withoutExecutionTelemetry` member |
+
+### Gates
+
+- `apps/api`: `tsc --noEmit` **0 errors**; `vitest run src/app src/features/trace`
+  — **47 files, 527 tests passed**, from a 45 / 508 baseline.
+- `apps/api`: `tsc --noEmit -p tsconfig.test.json` reports **2 errors, neither
+  in this lane** — a `prisma.scenario.findFirst` mock shape in
+  `api-trpc-collaborators.agent-group.integration.test.ts` and a `tryActor()`
+  return type in `api-trpc-collaborators.trace-group.integration.test.ts`. Both
+  files are untouched here and both errors come from other lanes' in-flight
+  edits to the contracts they type against.
+- `packages/features/evaluation/server`: `pnpm test` — **27 files, 217 tests
+  passed** (from 26 / 214); `pnpm typecheck` 0 errors.
+- `task:openapi-check`: `served: 303`, `removed: 3 (0 outside the baseline)`,
+  `undescribed: 11`, `added: 0`, `changed: 0`. No REST family changed.
+- Feature parity: `specs/server/api-process-plan-allowance.feature` **9/9
+  bound**; `packages/features/evaluation/specs/evaluation-service.feature`
+  0-of-6-enforced → **1/1 bound**.
+- `oxlint` clean on every file this pass wrote or edited. `oxfmt --check` clean
+  on them too, EXCEPT three that fail identically at `HEAD` on lines this diff
+  does not touch — `api-production.composition.ts`,
+  `api-evaluator-execution.composition.integration.test.ts` and
+  `trace-rest.integration.test.ts`. They were formatted, the result inspected,
+  and reverted: the reformat rewrote other lanes' lines, which is a
+  provenance-blind sweep, not a fix.
+- **Sabotage, four ways**, each failing exactly the tests that name it:
+  - `otlp.usageLimit` returned to `() => Promise.resolve()` → the 402 test fails
+  - the two `UsageVolumeCounterPort`s swapped in the composition → 3 fail (the
+    refusal, the accessor routing, and the trace fan-out)
+  - `planResolver` rebuilt as a SECOND `composeApiPlanProvider` instead of the
+    composed one → 1 fails, the paying organization, which is the failure that
+    would meter a customer against the free baseline
+  - `telemetry` dropped from `HttpLangevalsEvaluatorAdapter.create` → the door
+    test fails; `status.inc` dropped from the adapter → its unit test fails
+- Nothing under `platform/` was created, edited or read.
+
+### Absences that remain, and what each waits on
+
+- **`absent("plan-allowance")` stays, as a degenerate-configuration guard.** It
+  now fires only on a process that opened no ClickHouse, which is the same
+  class as `withoutQueue` and `withoutPublicBaseUrl`, and the tests pin both
+  polarities.
+- **The root's two one-line threads carry no behavioural test.** The reason is
+  the one already recorded for the product-infra `plans` wiring: the production
+  composition suite mocks the database and queue modules and cannot reach
+  `composeDoors` without a false-pass risk larger than the guard is worth.
+  `tsc`, the option's shape and the two door suites carry it.
+- **Nothing warns a customer that they are AT the cap through this path.** The
+  approaching-limit mail is `UsageWarningService`'s and fires from the tRPC
+  surface; an OTLP exporter crossing the threshold gets the refusal with no
+  message before it. Wiring `checkAndSendWarning` into the ingest gate would
+  send one mail per batch, so it wants the notification store's own once-a-month
+  guard on the ingest path, which is a decision rather than a wiring gap.
+- **`ERR_PLAN_LIMIT` has no client presentation entry**, and does not need one
+  today: it is answered to an SDK over REST, where the handled error's
+  `message` IS the customer-facing sentence, and it never reaches the browser
+  registry. `apps/ui/src/model/errors/__tests__/codes.unit.test.ts` does not see
+  it either — every one of its patterns matches `[a-z][a-z0-9_]*` and the code
+  is upper-case. If a browser surface ever raises it, that is the moment it
+  needs copy, and the guard will not be what tells you.
+- **The worker composes no execution telemetry.** `apps/worker` builds
+  `EvaluationExecutionService` only from a host-supplied `execution` bundle, and
+  nothing in that process supplies one — `AbsentEvaluatorExecution` refuses by
+  name for the four reasons `worker-evaluation-processing.composition.ts`
+  lists. When that bundle is composed, the adapter is one field on it.
+
+## Architecture-lint sweep: the mechanically-fixable classes, 2026-09-03
+
+`packages/architecture-lint`'s CLI reported **2,124** violations at
+`fd0110685d`. This lane worked the classes that a rename, a file move or a
+narrowed export closes without a design decision, one rule class per batch, with
+the affected packages' `typecheck` and `test` green after each. It ended at
+**2,056**.
+
+| rule | before | after | fix shape |
+| --- | ---: | ---: | --- |
+| `fallible-result-naming` | 139 | 100 | `try` prefix on private repository capabilities that return `null`; explicit result types where a capability declared none |
+| `ui-web-layer-direction` | 39 | 26 | move the module to the layer that may hold it: a shared stylesheet down to `ui/elements`, three `model/` modules that used `behavior/` into `behavior/`, two UI-declared types into `model/` |
+| `feature-source-filename` | 9 | 0 | kebab-case the nine camelCase modules under `analytics/server/src/langwatch-ql`, with the reference sweep |
+| `ui-web-private-layout` | 36 | 32 | ambient declarations and a theme stylesheet into a governed layer |
+| `feature-catalogue` | 2 | 0 | register `navigation` and `onboarding` in `packages/features/catalogue.json` |
+| `feature-source-layout` | 302 | 300 | `feature.json` with `layoutVersion` for the two roots that had none |
+| `strict-port-module` | 3 | 2 | `FilterOptionsRepository` -> `FilterOptionsPort`; the port module's abstract class now ends in `Port` |
+| `ui-screen-closure` | 749 | 748 | fell out of the theme-stylesheet move |
+| **total** | **2,124** | **2,056** | |
+
+Three counts moved the wrong way and none of them is this lane's:
+`comment-block-size` 9 -> 10 and `enterprise-direction` 31 -> 33 are the api,
+worker and licensing lanes editing `apps/api/src/app/*.composition.ts` and the
+two application manifests while this ran. The sweep's own net is **-71**.
+
+One thing about `comment-block-size` is worth carrying forward: it only reads
+files that are CHANGED against the branch base, so a file move makes an
+already-over-ceiling comment block visible for the first time. Renaming the
+`langwatch-ql` modules surfaced two blocks of 74 and 66 lines that had been
+sitting there unread. They were split where the code they describe lives — the
+catalog's grain narrative moved to the `@see ./types.ts` that already carries
+the contract, and the PostgreSQL predicate's `LIMIT 1` argument moved into the
+function body beside the `LIMIT 1` it argues for.
+
+### Classes left, and what each one needs decided
+
+- **`ui-screen-closure` (748), `ui-web-public-entry` (215), `cross-feature`
+  (97), `ui-browser-capability` (33), `ui-feature-implementation-import` (14),
+  `ui-screen-owner` (27), `public-exports` (1)** — one class, not seven: the UI
+  feature pilot. 573 of the screen-closure findings are a screen importing
+  another feature-web's public entry, and 193 of the public-entry findings are a
+  feature-web package publishing a subpath that is neither `screens/<owner>` nor
+  `surfaces/<id>`. `workflow-web` alone publishes 65 of them, and
+  `evaluator-web`, `prompt-web` and `experiment-web` reach it through 20 or more
+  distinct subpaths each. Narrowing one export at a time moves the violation
+  rather than closing it; the sequence is a decision about which capabilities
+  become named surfaces first.
+- **`feature-source-layout` (300)** — every file states which of `services`,
+  `repositories`, `stores`, `projections`, `subscribers`, `processes`,
+  `intents`, `ports`, `adapters`, `transport/<surface>` or `migrations` it
+  belongs in. `auth`'s `transport/better-auth/*`, `ops`'s
+  `workers/*.contribution.ts` and the analytics `langwatch-ql/` tree are each a
+  layering call, not a rename.
+- **`private-runtime-export` (76)** — a feature server root re-exporting a
+  repository, store or projection. Every one of them is imported BY NAME from an
+  `apps/api` or `apps/worker` composition, so closing the export means the
+  composition adapter the remedy names, feature by feature.
+- **`fallible-result-naming` (100 left)** — 43 sit on services and 24 on ports,
+  where the name is part of what a transport calls; six of
+  `organization-membership.service.ts`'s are also STRINGS in
+  `apps/api/src/app/api-trpc-collaborators.identity.composition.ts`'s
+  `MEMBERSHIP_OPERATIONS` proxy list, which is a `Set<string>` and would not
+  fail a typecheck if it drifted. Renaming any of them is an api-lane change.
+  Of the 33 left on repositories and stores, 13 are reached from
+  `packages/identity-eventing` or `apps/worker` and the rest from an `apps/api`
+  or `apps/worker` composition, so every one of them is a rename across a lane
+  boundary. The 27 that were reachable from inside their own feature package
+  only are the ones this sweep took.
+- **`service-quality` (51)** — a service over its line, method or complexity
+  ceiling. Splitting collaborators is design.
+- **`ui-web-layer-direction` (26 left)** — mostly `organization-web`'s
+  `ui/blocks` and `ui/elements` calling `behavior/organization-api` directly.
+  The fix is to lift the read to the section and pass props, which changes 16
+  component signatures.
+- **`package-cycle` (26)** — `analytics-web -> evaluator-web -> analytics-web`
+  and nine longer rings through `workflow-web`. Same pilot as above.
+- **`architecture-record` (6)** — `hosted-mcp`, `navigation` and `onboarding`
+  need a boundary ADR with all ten required sections plus a Gherkin spec each.
+  Writing them is authoring, not a sweep, and registering the two new catalogue
+  roots (done here) is what makes the requirement bite.
+- **`strict-port-module` (2 left)** — `webhook-destination.port.ts` and
+  `billing-webhook-subscription.port.ts` declare interfaces that factory
+  functions satisfy with object literals. An abstract `Port` class means those
+  factories return class instances, across the webhook package and
+  `apps/worker`.
+- **`overload-by-literal` (1)** — `usePublicEnv`'s two overloads differ only by
+  `includeCapabilities`. Two names or one signature is a naming call.
+
+## `absent("licence")` was STALE: both processes now read the licence they were told to, 2026-09-03
+
+Both roots reported `absent("licence")` unconditionally, and the record read as
+though a licence source were something neither process could have. Classified
+by walking the platform tree, the ADR and the customer docs: **STALE**. The
+collaborators existed, the platform composed the source on BOTH deployment
+modes, and ADR-027 requires it in both processes by name.
+
+### The evidence, in the order it settles the question
+
+1. **The platform composed it on both modes.**
+   `git show db03af79cd^:platform/app/src/server/app-layer/presets.ts:1374-1399`
+   builds `EntitlementService` twice, and each branch carries
+   `license: LicensingEntitlementSource.create({ licensing: getLicenseHandler(), mode })`
+   — `"cloud"` on the hosted deployment, `"self-hosted"` otherwise. The licence
+   is not a self-hosted-only leg: on Cloud it is the negotiated contract and
+   outranks the subscription.
+2. **ADR-027 names the second process explicitly.** Line 161: the Helm chart
+   plumbs `LANGWATCH_LICENSE_KEY` and `LANGWATCH_LICENSE_PUBLIC_KEY` through
+   `sharedEnv` rather than the app Deployment, "*plan resolution runs in the
+   workers too, and a worker reading a different entitlement than the app would
+   enforce different limits on the same organization*". That is this exact
+   absence, written down before it happened.
+3. **The documented policy has a licensed state.**
+   `docs/self-hosting/licensing.mdx`: unlicensed is uncapped, and a licence adds
+   the Enterprise surface and binds the SEATS it sold. With no licence source
+   the two states resolved the same plan — every allowance intact, the tier
+   withheld, and a per-seat contract unenforceable by the product.
+4. **What was actually missing was one collaborator, not the vertical.**
+   `LicenseStoragePort` had no implementation anywhere in the tree; the
+   platform's `PrismaLicenseRepository` went with
+   `platform/app/src/runtime/app/licensing.ts` in `db03af79cd`. Everything else
+   was already here: the verifier (`NodeLicenseCryptographyAdapter`), the
+   embedded production key (`DEFAULT_LICENSE_PUBLIC_KEY`), the entitlement
+   source (`LicensingEntitlementSource`) and the tier enricher.
+
+### What it cost while it was absent
+
+| Deployment | Resolved before | Resolves now |
+| --- | --- | --- |
+| Self-hosted, licensed ENTERPRISE | `OPEN_SOURCE`, free, `planSource: "free"` | the licence's plan, `planSource: "license"`, seats bound |
+| Self-hosted, unlicensed | `OPEN_SOURCE` | unchanged — the licence leg answers `UNLIMITED_PLAN`, which is free, and a free plan never lifts a baseline |
+| Hosted, licensed | the subscription's plan, or free | the licence, which outranks the subscription |
+
+The self-hosted licensed row is the one that reached customers. Three
+consequences, all silent: the seat count a per-seat contract sold did not bind
+(`maxMembers` stayed `MAX_SAFE_INTEGER`); `planSource` never read `"license"`,
+so `resolveUsageMeter`'s licence override never fired; and
+`webhookEndpointsEnabled` was never set, so the background process dropped the
+gateway-webhook batches of a customer whose endpoint page said they were on.
+
+### The seat counts are why this needed a design change, not a lift
+
+`LicenseStoragePort` conflates two aggregates: the licence ROW, and how many
+seats an organization has filled. Only the row is on the plan path, and the
+counts are the licence-ENFORCEMENT vertical's — full-versus-lite classification
+over pending invitations and custom roles, which now lives in
+`@langwatch/entitlement-server` and which `cross-feature` forbids Licensing from
+importing. Lifting `getLicenseHandler` verbatim would have made both roots
+compose a seat counter neither path calls.
+
+So the collaborator was narrowed instead:
+
+```
+                       OrganizationLicensePort            <- tryReadLicense, and nothing else
+                              ▲            ▲
+        PrismaOrganizationLicenseRepository │
+                    (repositories/prisma)   │
+                                     LicenseStoragePort   <- extends it; adds the row writes
+                                                             and the two seat counts
+   LicensePlanSourceService(licenses, cryptography)
+        getActivePlan  ── hosted: signature AND term
+        getSelfHostedPlan ── signature only (ADR-027)
+                     ▲                        ▲
+                     │                        └── LicenseService delegates, so the status
+                     │                            screen and the plan provider cannot differ
+   LicensingEntitlementSource.forDeployment({ licenses, cryptography, isSaas })
+                     │   mode = isSaas ? "cloud" : "self-hosted", derived ONCE
+                     ▼
+        deploymentPlanSources({ isSaas, license, subscriptions?, adminEmails? })
+                     │
+        ┌────────────┴────────────┐
+        ▼                         ▼
+composeApiPlanProvider    createWorkerPlanProvider
+```
+
+`LicensingEntitlementSource.create` now takes
+`Pick<LicensingService, "getActivePlan" | "getSelfHostedPlan">` rather than the
+whole service. `LicenseService` still satisfies it, so nothing that already
+passed one stops.
+
+### The tier enricher came back, and only on the leg that needs it
+
+The previous entry deleted `enrichers` from both roots and recorded that
+emptying it failed no test — correct at the time, because the enricher's one
+live leg is the licence, and neither process composed one. It is live now:
+`resolvePlanDefaults` deliberately does not default `webhookEndpointsEnabled`,
+so a contract minted before the flag existed resolves `ENTERPRISE` with it
+`undefined`. `deploymentPlanSources` therefore returns
+`enrichers: [{ enrich: applyPlanTypeEntitlements }]` **with the licence and only
+with it** — the baselines are `FREE`/`OPEN_SOURCE`, which the tier map does not
+name, and a subscription answers out of `PLAN_LIMITS`, where `ENTERPRISE`
+carries the field itself. The fixture licence in
+`@langwatch/enterprise-licensing-server/testing` is exactly such a contract,
+which is what the two enricher tests resolve.
+
+### Judgment calls
+
+1. **Both roots depend on `@langwatch/enterprise-licensing-server` directly**,
+   which adds two `enterprise-direction` lines to a class that already has
+   eight (both apps already name `enterprise-billing-server`,
+   `enterprise-governance-server` and `enterprise-managed-provider-server`, and
+   `PostgresBillingAdapter` is built two lines from the new
+   `PostgresOrganizationLicenseAdapter` in both roots). The sanctioned route is
+   through `@langwatch/enterprise-api` / `@langwatch/enterprise-worker`;
+   routing one adapter that way while its sibling goes direct is inconsistent,
+   not cleaner, and the composition packages already violate
+   `enterprise-composition` between themselves. Recorded rather than hidden.
+2. **`LANGWATCH_LICENSE_KEY` is NOT read here.** It is the INSTANCE licence, and
+   its only consumer is `inspectPlatformAccess` behind the SSO gate — a
+   different question from what one organization's plan is. Only
+   `LANGWATCH_LICENSE_PUBLIC_KEY` is wired, at the platform's spelling, in both
+   processes.
+3. **The seat counts stay on `LicenseStoragePort` and stay unimplemented.**
+   Composing them needs `@langwatch/entitlement-server`'s membership repository
+   passed in from a root, and no path in either process reaches
+   `getLicenseStatus` — the whole Enterprise application is still a named
+   absence in `apps/api`. Wiring it now would be a collaborator nothing calls.
+
+### File → change
+
+| File | Change |
+| --- | --- |
+| `packages/enterprise/features/licensing/server/src/ports/organization-license.port.ts` | **New.** `OrganizationLicensePort` — `tryReadLicense`, and nothing else |
+| `.../ports/license-storage.port.ts` | Extends it; the duplicate `tryReadLicense` declaration removed |
+| `.../services/license-plan-source.service.ts` | **New.** The two plan readings, with why the hosted and self-hosted ones deliberately disagree |
+| `.../services/license.service.ts` | `getActivePlan` / `getSelfHostedPlan` delegate; behaviour byte-identical |
+| `.../adapters/licensing.entitlement-source.adapter.ts` | Collaborator narrowed to `LicensePlanReader`; `forDeployment` added, which is where the mode is derived |
+| `.../repositories/prisma/prisma.organization-license.repository.ts` | **New.** The licence key off the organization row |
+| `.../adapters/postgres.organization-license.adapter.ts` | **New.** The typed-`PrismaClient` seam |
+| `.../server/src/index.ts`, `package.json` | Exports; one dependency, `@langwatch/prisma-client` |
+| `packages/enterprise/features/billing/server/.../deployment-plan-sources.service.ts` | `license?` in and out, and `enrichers` returned with it |
+| `apps/api/src/app/api-usage.composition.ts` | `licenses` / `licensePublicKey` options; the source built and the absence reported only when none was |
+| `apps/api/src/app/api-production.composition.ts` | Passes the licence store off the same guarded client as the subscription rows |
+| `apps/api/src/platform/config/api.config.ts` | `infrastructure.licensing.publicKey` from `LANGWATCH_LICENSE_PUBLIC_KEY` |
+| `apps/worker/src/app/worker-plan-provider.composition.ts` | The same, for `createWorkerPlanProvider` |
+| `apps/worker/src/app/worker-production.composition.ts` | The same wiring |
+| `apps/worker/src/platform/config/worker.config.ts` | `deployment.licensePublicKey`, same variable |
+| both roots' `ENTITLEMENT_CONSEQUENCE.licence` | Now names the DEGENERATE case it is left for — a process that opened no database — and what that costs a licensed deployment |
+| `apps/worker/.../worker-production.composition.unit.test.ts` | One test pinning the root's own wiring through the absence it would otherwise report |
+| 4 spec files | `deployment-plan-sources.feature` +2, `worker-plan-resolution.feature` +3, `specs/server/api-process-plan-resolution.feature` **new** +2, `licensing.feature` two existing scenarios tagged `@unit` |
+
+### Gates
+
+- `apps/api`: `vitest run src/app/__tests__/api-usage src/app/__tests__/api-production.composition.unit.test.ts` — **3 files / 67 tests, all passing** (was 55). `tsc --noEmit` — **0 errors**. `tsc --noEmit -p tsconfig.test.json` — **2 errors**, both pre-existing in other lanes' files (`api-trpc-collaborators.agent-group`, `.trace-group`).
+- `apps/worker`: `vitest run src/app` — **34 files / 303 tests, all passing** (was 302 → +6 new, and the suite count is unchanged). `tsc --noEmit` and `tsc --noEmit -p tsconfig.test.json` — **0 errors each**.
+- `@langwatch/enterprise-licensing-server`: **11 files / 187 tests** (was 10 / 180), typecheck clean. `@langwatch/enterprise-billing-server`: **25 files / 280 passed, 25 skipped** (was 276), typecheck clean.
+- Feature parity: `deployment-plan-sources.feature` **6/6**, `worker-plan-resolution.feature` **7/7**, `api-process-plan-resolution.feature` **2/2**, `packages/enterprise/features/licensing/specs/licensing.feature` **2/2** — all bound. That last file was INERT before this pass (nothing in it tagged), which is a hard failure the checker reports rather than tolerates.
+- `oxlint` over the touched files: clean. The warnings that remain are pre-existing and in untouched regions — seven unused imports in `worker-production.composition.ts`, one unused variable at line 256 of its test, three in `plan-provider.service.wiring.unit.test.ts`. `oxfmt --check` over all 18: clean. `api-production.composition.ts` was **already** not `oxfmt`-clean at HEAD, so it was left alone and the inserted region was written to the formatter's shape by hand.
+- `architecture-lint` CLI over the real tree: **no** `package-cycle`, `cross-feature`, `package-role`, `feature-source-layout`, `feature-source-filename`, `strict-port-module`, `typed-prisma-seam` or `prisma-containment` violation names any new module. The two new lines are the `enterprise-direction` manifest pair in judgment call 1.
+
+### Four sabotages, three landed and one did not
+
+| Sabotage | Result |
+| --- | --- |
+| Drop `enrichers` from the licence branch of `deploymentPlanSources` | fails `deployment-plan-sources.unit.test.ts` (1/12) **and** the worker's `fills the webhook entitlement a licence signed before the flag left unanswered` |
+| Swap `forDeployment`'s mode (`isSaas ? "self-hosted" : "cloud"`) | fails 2 of 7 in `license-plan-source.service.unit.test.ts` — the hosted lapse and the self-hosted floor |
+| `worker-production.composition.ts` stops passing `licenses` | fails `says nothing about a missing licence source, because it composed one` |
+| `api-production.composition.ts` stops passing `licenses` | **failed nothing**, which is the finding below |
+
+### What this pass did NOT do
+
+- **The API root's own wiring is not pinned.** `resolvePlanProvider` is lazy and
+  reached only through the invitation, identity and org-group halves, which
+  `api-production.composition.unit.test.ts` does not compose with a client — so
+  a root that stopped passing `licenses` (or `subscriptions`, which has always
+  been in the same position) still passes every test in that file. The guard was
+  written, shown not to land, and deleted rather than kept as coverage that is
+  not there. The worker's equivalent IS pinned, and both roots' plan providers
+  are pinned at the function level.
+- **The seat counts on `LicenseStoragePort` are still unimplemented**, and
+  `getLicenseStatus` is still unreachable in both processes. See judgment call 3.
+- **`LANGWATCH_LICENSE_KEY` and the SSO gate were not touched.**
+- **Nothing under `platform/` was created, edited or read.**

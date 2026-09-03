@@ -10,11 +10,13 @@ Feature: Enterprise licensing lifecycle
     When the licensing service validates it for activation
     Then validation fails and no license state is written
 
+  @unit
   Scenario: Preserve a lapsed self-hosted purchase
     Given a genuine signed license has reached its end date
     When the self-hosted plan source resolves the organization
     Then the signed seat limits and enterprise capabilities remain in its plan
 
+  @unit
   Scenario: Let a lapsed Cloud override step aside
     Given a genuine signed license has reached its end date
     When the active Cloud license source resolves the organization

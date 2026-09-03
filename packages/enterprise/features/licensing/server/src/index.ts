@@ -13,9 +13,12 @@ export {
 } from "./transport/api-trpc/license-enforcement.api";
 export {
   LicensingEntitlementSource,
+  type LicensePlanReader,
   type LicensingEntitlementSourceMode,
 } from "./adapters/licensing.entitlement-source.adapter";
+export { PostgresOrganizationLicenseAdapter } from "./adapters/postgres.organization-license.adapter";
 export { LicenseCryptographyPort } from "./ports/license-cryptography.port";
+export { OrganizationLicensePort } from "./ports/organization-license.port";
 export { LicenseLoggerPort } from "./ports/license-logger.port";
 export { LicenseRetentionPort, type LicenseRetentionRule } from "./ports/license-retention.port";
 export { LicenseUsagePort, type LicenseUsageCount } from "./ports/license-usage.port";
@@ -25,6 +28,10 @@ export {
   type StoredLicense,
 } from "./ports/license-storage.port";
 export { LicenseGenerationService } from "./services/license-generation.service";
+export {
+  LicensePlanSourceService,
+  type LicensePlanSourceOptions,
+} from "./services/license-plan-source.service";
 export {
   LicenseService,
   LicenseServiceConfiguration,

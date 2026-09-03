@@ -119,6 +119,21 @@ export const workerConfigDefinition = RuntimeConfig.define({
      * one surface that the other refuses.
      */
     adminEmails: Config.value(optionalEnvironmentString, { env: "ADMIN_EMAILS" }),
+    /**
+     * The key an activated Enterprise licence's signature is checked against.
+     *
+     * Optional, and absent is the normal case: the licensing contract embeds
+     * the production public key, so a deployment verifies every licence
+     * LangWatch issues without configuring anything. The variable exists for
+     * ROTATION, and it is the App's own spelling because plan resolution runs
+     * in BOTH processes (ADR-027) — a worker checking a signature against a
+     * different key than the App is one deployment with two answers to whether
+     * it is licensed at all. Blank is not a key, so it resolves to nothing
+     * rather than to an empty string that would refuse every licence.
+     */
+    licensePublicKey: Config.value(optionalEnvironmentString, {
+      env: "LANGWATCH_LICENSE_PUBLIC_KEY",
+    }),
   },
   /**
    * The Stripe secret the monthly usage report is sent with.
@@ -749,6 +764,11 @@ export type WorkerDeploymentConfig = Readonly<{
   saas: boolean;
   /** `ADMIN_EMAILS`; unset means nobody is a platform operator. */
   adminEmails: string | undefined;
+  /**
+   * `LANGWATCH_LICENSE_PUBLIC_KEY`; unset means the key embedded in the
+   * licensing contract, which verifies every licence LangWatch issues.
+   */
+  licensePublicKey: string | undefined;
 }>;
 
 /** The Stripe credentials the SaaS monthly usage report is sent with. */
@@ -1006,7 +1026,13 @@ export function resolveWorkerConfig(source: Readonly<Record<string, unknown>>): 
       environment: value.environment,
       queueDrainTimeoutMs: value.shutdown.queueDrainTimeoutMs,
     }),
-    deployment: value.deployment,
+    deployment: {
+      ...value.deployment,
+      // Blank is not a key: an operator who exported the variable empty has
+      // rotated nothing, and an empty string reaching the verifier refuses
+      // every licence the deployment holds.
+      licensePublicKey: value.deployment.licensePublicKey?.trim() || undefined,
+    },
     ...(mail ? { mail } : {}),
     automation: resolveWorkerAutomationConfig(value.automation, value.nextauthSecret),
     authz: {

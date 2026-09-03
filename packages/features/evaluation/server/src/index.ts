@@ -132,6 +132,11 @@ export {
   NullLangevalsEvaluatorClient,
   type LangevalsRuntimeConfig,
 } from "./adapters/http.langevals-evaluator.adapter";
+export {
+  EVALUATION_DURATION_METRIC_NAME,
+  EVALUATION_STATUS_METRIC_NAME,
+  OtelEvaluationExecutionMetricsAdapter,
+} from "./adapters/otel.evaluation-execution-metrics.adapter";
 export { DirectEvaluationExecutionReceipt } from "./adapters/direct.evaluation-execution-receipt.adapter";
 
 // ---------------------------------------------------------------------------

@@ -1,9 +1,16 @@
 import { PlanTypes } from "@langwatch/enterprise-billing-contract";
 import type { BillingSubscriptionRepository } from "@langwatch/enterprise-billing-server";
+import { OrganizationLicensePort } from "@langwatch/enterprise-licensing-server";
+import {
+  ENTERPRISE_LICENSE_KEY,
+  TEST_PUBLIC_KEY,
+} from "@langwatch/enterprise-licensing-server/testing";
 import { describe, expect, it } from "vitest";
+import { OrganizationNotFoundForTeamError } from "@langwatch/entitlement-server";
 import {
   ApiEntitlementAbsenceReport,
   composeApiPlanProvider,
+  composeApiUsageEnforcement,
   composeApiUsageStats,
 } from "../api-usage.composition";
 
@@ -61,6 +68,17 @@ function subscriptions(active: BillingSubscriptionRecord | null): BillingSubscri
   return {
     tryFindActive: async () => active,
   } as unknown as BillingSubscriptionRepository;
+}
+
+/**
+ * The licence row, as the composition reads it.
+ *
+ * The KEY is a genuinely signed fixture and the verifier below it is the real
+ * one, so what these tests exercise is the whole licence leg: the read, the
+ * signature check, the deployment-mode reading and the plan it answers.
+ */
+function licenses(licenseKey: string | null): OrganizationLicensePort {
+  return { tryReadLicense: async () => licenseKey } as OrganizationLicensePort;
 }
 
 describe("composeApiPlanProvider", () => {
@@ -121,6 +139,120 @@ describe("composeApiPlanProvider", () => {
       composeApiPlanProvider({ isSaas: false, report });
 
       expect(report.sources).toEqual(["licence"]);
+    });
+  });
+
+  describe("given a self-hosted deployment holding the licence row", () => {
+    /**
+     * The answer a licensed customer's screens are drawn from. Unlicensed and
+     * licensed used to be the same plan here, because no licence source was
+     * composed at all: every allowance intact, and the Enterprise tier the
+     * contract names withheld.
+     */
+    /** @scenario "A licensed self-hosted deployment resolves the plan its licence names" */
+    it("resolves an activated Enterprise licence onto the plan the licence names", async () => {
+      const plans = composeApiPlanProvider({
+        isSaas: false,
+        licenses: licenses(ENTERPRISE_LICENSE_KEY),
+        licensePublicKey: TEST_PUBLIC_KEY,
+      });
+
+      const plan = await plans.getActivePlan({ organizationId: "org-1" });
+
+      expect(plan.type).toBe(PlanTypes.ENTERPRISE);
+      expect(plan.planSource).toBe("license");
+      expect(plan.free).toBe(false);
+      // The seats the customer bought bind, and the licence's message ceiling
+      // does not: self-hosted volume is never metered.
+      expect(plan.maxMembers).toBe(100);
+      expect(plan.maxMessagesPerMonth).toBe(Number.MAX_SAFE_INTEGER);
+    });
+
+    /**
+     * The tier enricher's whole reason to exist, on the only leg that needs
+     * it: the fixture licence was signed before `webhookEndpointsEnabled`
+     * existed, so the plan it maps to leaves the field unset and the customer
+     * who bought Enterprise is refused the feature Enterprise sells.
+     */
+    /** @scenario "A licence predating a tier entitlement still carries it" */
+    it("fills the webhook entitlement a licence signed before the flag left unanswered", async () => {
+      const plans = composeApiPlanProvider({
+        isSaas: false,
+        licenses: licenses(ENTERPRISE_LICENSE_KEY),
+        licensePublicKey: TEST_PUBLIC_KEY,
+      });
+
+      const plan = await plans.getActivePlan({ organizationId: "org-1" });
+
+      expect(plan.webhookEndpointsEnabled).toBe(true);
+    });
+
+    /** @scenario "A licensed self-hosted deployment resolves the plan its licence names" */
+    it("names no absent licence source, because it composed one", () => {
+      const report = new RecordingEntitlementAbsence();
+
+      composeApiPlanProvider({
+        isSaas: false,
+        licenses: licenses(ENTERPRISE_LICENSE_KEY),
+        licensePublicKey: TEST_PUBLIC_KEY,
+        report,
+      });
+
+      expect(report.sources).toEqual([]);
+    });
+
+    /** @scenario "An unlicensed self-hosted deployment stays unlimited" */
+    it("still resolves the unlimited baseline for an organization that activated nothing", async () => {
+      const plans = composeApiPlanProvider({
+        isSaas: false,
+        licenses: licenses(null),
+        licensePublicKey: TEST_PUBLIC_KEY,
+      });
+
+      const plan = await plans.getActivePlan({ organizationId: "org-1" });
+
+      expect(plan.type).toBe("OPEN_SOURCE");
+      expect(plan.free).toBe(true);
+      expect(plan.maxMembers).toBe(Number.MAX_SAFE_INTEGER);
+    });
+
+    /**
+     * A deployment that rotated the verification key and did not name it would
+     * refuse its own valid licence, which reads exactly like an unlicensed
+     * install. The key is configuration for that reason.
+     */
+    /** @scenario "An unlicensed self-hosted deployment stays unlimited" */
+    it("falls back to the unlimited baseline when the signature does not check out", async () => {
+      const plans = composeApiPlanProvider({
+        isSaas: false,
+        licenses: licenses(ENTERPRISE_LICENSE_KEY),
+      });
+
+      const plan = await plans.getActivePlan({ organizationId: "org-1" });
+
+      expect(plan.type).toBe("OPEN_SOURCE");
+    });
+  });
+
+  describe("given a hosted deployment holding both a licence and a subscription", () => {
+    /**
+     * A licence on Cloud is the negotiated contract, so it wins over whatever
+     * the subscription says. Both processes must agree on that ordering; it is
+     * decided once, in `deploymentPlanSources`.
+     */
+    /** @scenario "A licensed self-hosted deployment resolves the plan its licence names" */
+    it("resolves the licence rather than the subscription's plan", async () => {
+      const plans = composeApiPlanProvider({
+        isSaas: true,
+        licenses: licenses(ENTERPRISE_LICENSE_KEY),
+        licensePublicKey: TEST_PUBLIC_KEY,
+        subscriptions: subscriptions(subscription()),
+      });
+
+      const plan = await plans.getActivePlan({ organizationId: "org-1" });
+
+      expect(plan.type).toBe(PlanTypes.ENTERPRISE);
+      expect(plan.planSource).toBe("license");
     });
   });
 });
@@ -275,6 +407,199 @@ describe("composeApiUsageStats", () => {
       // are different facts, and the panel says so.
       expect(stats.usageUnit).toBe("events");
       expect(stats.currentMonthMessagesCount).toBeNull();
+    });
+  });
+});
+
+/**
+ * Enforcement, taken through the REAL composed stack.
+ *
+ * `composeApiUsageEnforcement` builds the packaged `UsageService` over three
+ * things this root writes: the organization directory (team → organization →
+ * projects → pricing model), the trace counter and the event counter. Nothing
+ * below the ports is a stub, so what these pin is the WIRING — and the wiring
+ * has two ways to go silently wrong. The counters can be swapped, which sends
+ * an organization id at the tenant-keyed resolver and raises `UnknownTenantError`
+ * instead of a count; and the plan resolver can be a second provider, which
+ * would meter a paying organization against the free baseline.
+ */
+function enforcementPrisma(options: {
+  organizationId: string | null;
+  projectIds: string[];
+  pricingModel?: string | null;
+}) {
+  return {
+    team: {
+      findUnique: async () =>
+        options.organizationId ? { organizationId: options.organizationId } : null,
+    },
+    project: { findMany: async () => options.projectIds.map((id) => ({ id })) },
+    organization: {
+      findUnique: async () => ({ pricingModel: options.pricingModel ?? null }),
+    },
+  } as unknown as Parameters<typeof composeApiUsageEnforcement>[0]["prisma"];
+}
+
+/** Answers one `{ projectId, total }` row per project, and records the routing key. */
+function breakdownClient(rows: Array<{ projectId: string; total: number }>) {
+  return {
+    query: async () => ({
+      json: async () => rows.map((row) => ({ projectId: row.projectId, total: String(row.total) })),
+    }),
+  };
+}
+
+describe("composeApiUsageEnforcement", () => {
+  describe("given a free organization past its monthly event allowance", () => {
+    /** @scenario "An organization over its plan's allowance is refused by name" */
+    it("refuses, and says which unit and which limit it reached", async () => {
+      const enforcement = composeApiUsageEnforcement({
+        prisma: enforcementPrisma({ organizationId: "org-1", projectIds: ["project-1"] }),
+        plans: composeApiPlanProvider({ isSaas: true }),
+        clickhouse: {
+          resolveClient: async () => countingClient(0, []) as never,
+          // The free tier meters in EVENTS, so the breakdown lands here.
+          resolveOrganizationClient: async () =>
+            breakdownClient([{ projectId: "project-1", total: 60_000 }]) as never,
+        },
+        isSaas: true,
+      });
+      if (!enforcement) throw new Error("a composed ClickHouse must compose enforcement");
+
+      const result = await enforcement.checkLimit({ teamId: "team-1" });
+
+      expect(result).toMatchObject({
+        exceeded: true,
+        count: 60_000,
+        maxMessagesPerMonth: 50_000,
+        usageUnit: "events",
+      });
+      // The sentence the SDK is handed. "Free" rather than "Monthly" is the
+      // plan provider's answer reaching the message, which is the whole point
+      // of composing ONE provider for the panel, the banner and this refusal.
+      expect(result.exceeded && result.message).toContain("Free limit of 50000 events reached");
+    });
+
+    /** @scenario "The organization id never reaches the tenant resolver" */
+    it("reads the events breakdown off the organization accessor, never the tenant one", async () => {
+      const organizationsAsked: string[] = [];
+      const tenantsAsked: string[] = [];
+
+      const enforcement = composeApiUsageEnforcement({
+        prisma: enforcementPrisma({ organizationId: "org-1", projectIds: ["project-1"] }),
+        plans: composeApiPlanProvider({ isSaas: true }),
+        clickhouse: {
+          resolveClient: async (tenantId) => {
+            tenantsAsked.push(tenantId);
+            return countingClient(0, []) as never;
+          },
+          resolveOrganizationClient: async (organizationId) => {
+            organizationsAsked.push(organizationId);
+            return breakdownClient([{ projectId: "project-1", total: 60_000 }]) as never;
+          },
+        },
+        isSaas: true,
+      });
+
+      await enforcement?.checkLimit({ teamId: "team-1" });
+
+      expect(organizationsAsked).toEqual(["org-1"]);
+      expect(tenantsAsked).toEqual([]);
+    });
+  });
+
+  describe("given a free organization inside its allowance", () => {
+    /** @scenario "An organization inside its allowance is not refused" */
+    it("does not refuse, so its telemetry is ingested", async () => {
+      const enforcement = composeApiUsageEnforcement({
+        prisma: enforcementPrisma({ organizationId: "org-1", projectIds: ["project-1"] }),
+        plans: composeApiPlanProvider({ isSaas: true }),
+        clickhouse: {
+          resolveClient: async () => countingClient(0, []) as never,
+          resolveOrganizationClient: async () =>
+            breakdownClient([{ projectId: "project-1", total: 12 }]) as never,
+        },
+        isSaas: true,
+      });
+
+      await expect(enforcement?.checkLimit({ teamId: "team-1" })).resolves.toEqual({
+        exceeded: false,
+      });
+    });
+  });
+
+  describe("given a paying organization metered in traces", () => {
+    /** @scenario "A trace-metered organization is counted on each project's own endpoint" */
+    it("asks each project's OWN endpoint, and holds the plan's higher allowance", async () => {
+      const tenantsAsked: string[] = [];
+
+      const enforcement = composeApiUsageEnforcement({
+        prisma: enforcementPrisma({
+          organizationId: "org-1",
+          projectIds: ["project-1", "project-2"],
+        }),
+        // A paid plan: 20,000 traces a month, and NOT the free tier's events.
+        plans: composeApiPlanProvider({
+          isSaas: true,
+          subscriptions: subscriptions(subscription()),
+        }),
+        clickhouse: {
+          resolveClient: async (tenantId) => {
+            tenantsAsked.push(tenantId);
+            return countingClient(15_000, []) as never;
+          },
+          resolveOrganizationClient: async () => {
+            throw new Error("a trace-metered organization must not reach the events rollup");
+          },
+        },
+        isSaas: true,
+      });
+
+      const result = await enforcement?.checkLimit({ teamId: "team-1" });
+
+      // One read per project, each routed on that project's own id: the trace
+      // rollup answers a total over a set of tenants, so a fan-out is what
+      // per-tenant routing costs.
+      expect(tenantsAsked).toEqual(["project-1", "project-2"]);
+      expect(result).toMatchObject({
+        exceeded: true,
+        count: 30_000,
+        maxMessagesPerMonth: 20_000,
+        usageUnit: "traces",
+      });
+    });
+  });
+
+  describe("given a team no organization owns", () => {
+    /** @scenario "A team that resolves to no organization is not metered against nobody's plan" */
+    it("refuses to answer rather than metering traffic against nobody's plan", async () => {
+      const enforcement = composeApiUsageEnforcement({
+        prisma: enforcementPrisma({ organizationId: null, projectIds: [] }),
+        plans: composeApiPlanProvider({ isSaas: true }),
+        clickhouse: {
+          resolveClient: async () => countingClient(0, []) as never,
+          resolveOrganizationClient: async () => countingClient(0, []) as never,
+        },
+        isSaas: true,
+      });
+
+      await expect(enforcement?.checkLimit({ teamId: "team-nobody" })).rejects.toBeInstanceOf(
+        OrganizationNotFoundForTeamError,
+      );
+    });
+  });
+
+  describe("given a process that opened no ClickHouse", () => {
+    /** @scenario "A deployment with no rollup enforces no allowance" */
+    it("composes no enforcement at all, rather than one whose every reading is unknown", () => {
+      expect(
+        composeApiUsageEnforcement({
+          prisma: enforcementPrisma({ organizationId: "org-1", projectIds: ["project-1"] }),
+          plans: composeApiPlanProvider({ isSaas: true }),
+          clickhouse: null,
+          isSaas: true,
+        }),
+      ).toBeUndefined();
     });
   });
 });

@@ -1,6 +1,14 @@
 import { getFreePlanLimits } from "@langwatch/enterprise-billing-contract";
-import { UNLIMITED_PLAN } from "@langwatch/enterprise-licensing-contract";
-import type { EntitlementSource, Plan, ResolvePlanInput } from "@langwatch/entitlement-contract";
+import {
+  applyPlanTypeEntitlements,
+  UNLIMITED_PLAN,
+} from "@langwatch/enterprise-licensing-contract";
+import type {
+  EntitlementSource,
+  Plan,
+  PlanEnricher,
+  ResolvePlanInput,
+} from "@langwatch/entitlement-contract";
 import type { BillingSubscriptionRepository } from "../ports/subscription.port";
 import { SaaSPlanProviderService } from "./plan-provider.service";
 
@@ -17,6 +25,22 @@ export type DeploymentPlanSourcesOptions = Readonly<{
    * ceiling the screen does not show and gate a feature the screen offers.
    */
   isSaas: boolean;
+  /**
+   * The signed licence this deployment resolves through, where one is composed.
+   *
+   * It arrives BUILT rather than as the licence store, because verification
+   * lives in `@langwatch/enterprise-licensing-server` and a feature package may
+   * not import another feature's implementation — the same boundary that keeps
+   * `EntitlementService` itself at each root. `LicensingEntitlementSource.forDeployment`
+   * is the one call that builds it, so the deployment mode it reads is derived
+   * once rather than at each process.
+   *
+   * Absent exactly when the calling process opened no typed Prisma client.
+   * Absent, a licensed self-hosted deployment resolves the same unlimited
+   * baseline an unlicensed one does — it keeps every allowance, and loses the
+   * Enterprise tier the licence names — which is why the caller reports it.
+   */
+  license?: EntitlementSource;
   /**
    * The Stripe subscription rows a hosted paid plan is read from.
    *
@@ -40,8 +64,29 @@ export type DeploymentPlanSourcesOptions = Readonly<{
 export type DeploymentPlanSources = Readonly<{
   /** The plan an organization is on before any paid source lifts it. */
   baseline: Plan;
+  /**
+   * The signed licence, consulted FIRST, where one could be read.
+   *
+   * First because a licence is the negotiated contract: on the hosted
+   * deployment it is meant to override whatever the subscription says, and on
+   * a self-hosted one it is the only paid source there is.
+   */
+  license?: EntitlementSource;
   /** The paid source consulted before the baseline, where one could be read. */
   subscription?: EntitlementSource;
+  /**
+   * The tier entitlements applied over whichever leg answered, where a licence
+   * leg exists to need them.
+   *
+   * On the baseline and subscription legs this changes nothing — the baselines
+   * are `FREE` and `OPEN_SOURCE`, which the tier map does not name, and a
+   * subscription answers a plan out of `PLAN_LIMITS`, where `ENTERPRISE`
+   * already carries the one field the map fills. The LICENCE leg is the one
+   * that needs it: a licence signed before a flag existed resolves `ENTERPRISE`
+   * with that field `undefined`, and without this the deployment that bought
+   * the tier is refused the feature the tier sells.
+   */
+  enrichers?: readonly PlanEnricher[];
 }>;
 
 /**
@@ -61,21 +106,21 @@ export type DeploymentPlanSources = Readonly<{
  * constructs the service stays at each root. What the roots no longer decide
  * is which baseline, which paid source, and what the source is built from.
  *
- * **The tier enricher is deliberately not here.** `applyPlanTypeEntitlements`
- * fills a tier's entitlement only where the resolved plan left it undefined,
- * and every plan these two sources can answer already carries the one
- * entitlement the tier map names: the baselines are `FREE` and `OPEN_SOURCE`,
- * which the map does not mention, and the subscription source answers a plan
- * out of `PLAN_LIMITS`, where `ENTERPRISE` sets `webhookEndpointsEnabled`
- * itself. Threading the enricher through these two processes changed no
- * answer. Where it does change one is the LICENCE leg — a contract signed
- * before a flag existed — and that leg applies it in
- * `PlanProviderService` (`@langwatch/enterprise-licensing-server`), which is
- * the provider a licensed deployment resolves through. The unit test beside
- * this module walks the tier map against what these sources actually answer,
- * so a NEW tier entitlement that the plan table does not carry fails here
- * rather than reaching a customer as a feature one process offers and the
- * other refuses.
+ * **The tier enricher travels with the licence, and only with it.**
+ * `applyPlanTypeEntitlements` fills a tier's entitlement only where the
+ * resolved plan left it undefined, and every plan the OTHER two legs can answer
+ * already carries the one entitlement the tier map names: the baselines are
+ * `FREE` and `OPEN_SOURCE`, which the map does not mention, and the
+ * subscription source answers a plan out of `PLAN_LIMITS`, where `ENTERPRISE`
+ * sets `webhookEndpointsEnabled` itself. A signed licence is the leg that can
+ * leave it unanswered — `resolvePlanDefaults` deliberately does not default the
+ * field, so a contract minted before the flag existed resolves `ENTERPRISE`
+ * with it `undefined` — which is why a deployment that composed a licence
+ * source gets the enricher and one that did not is left unchanged. The unit
+ * test beside this module walks the tier map against what these sources
+ * actually answer, so a NEW tier entitlement that the plan table does not carry
+ * fails here rather than reaching a customer as a feature one process offers
+ * and the other refuses.
  *
  * Prisma is nowhere in this module: the subscription rows arrive as the
  * repository port the calling process already composed.
@@ -84,10 +129,16 @@ export function deploymentPlanSources(
   options: DeploymentPlanSourcesOptions,
 ): DeploymentPlanSources {
   const baseline = options.isSaas ? getFreePlanLimits() : UNLIMITED_PLAN;
-  if (!options.subscriptions) return { baseline };
+  // The enricher travels WITH the licence and only with it, because that is
+  // the one leg whose plan can leave a tier entitlement unanswered.
+  const license = options.license
+    ? { license: options.license, enrichers: [{ enrich: applyPlanTypeEntitlements }] }
+    : {};
+  if (!options.subscriptions) return { baseline, ...license };
 
   return {
     baseline,
+    ...license,
     subscription: SubscriptionEntitlementSource.create({
       subscriptions: options.subscriptions,
       isSaas: options.isSaas,

@@ -70,6 +70,7 @@ import {
   type BillingReportingDatabase,
   type BillingTenantOrganizationDatabase,
 } from "@langwatch/enterprise-billing-server";
+import { PostgresOrganizationLicenseAdapter } from "@langwatch/enterprise-licensing-server";
 import { ClickHouseExperimentRunProcessingAdapter } from "@langwatch/experiment-server";
 import {
   type CodingAgentActivityDatabase,
@@ -668,6 +669,13 @@ export class WorkerProductionComposition {
           isSaas: options.config.deployment.saas,
           subscriptions: PostgresBillingAdapter.create(options.connection.client).build()
             .subscriptions,
+          // The licence row a self-hosted deployment's Enterprise tier lives
+          // in, on the same guarded client. Without it this process refuses
+          // the webhook batch a licensed customer's screen says is enabled.
+          licenses: PostgresOrganizationLicenseAdapter.create(options.connection.client).build(),
+          ...(options.config.deployment.licensePublicKey
+            ? { licensePublicKey: options.config.deployment.licensePublicKey }
+            : {}),
           ...(options.observability
             ? { report: LoggedWorkerEntitlementAbsence.create(options.observability.logger) }
             : {}),

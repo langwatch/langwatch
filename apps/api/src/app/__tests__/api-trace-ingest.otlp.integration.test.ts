@@ -31,6 +31,8 @@
  *     problem to see; a 500 from one that pretends to is ours.
  */
 import { createAppRestSecurity, type AppRestSecurity } from "@langwatch/api/rest";
+import type { UsageLimitResult } from "@langwatch/entitlement-server";
+import { HandledError } from "@langwatch/handled-error";
 import { decodeBase64OpenTelemetryId } from "@langwatch/otlp";
 import type { RecordSpanCommandData } from "@langwatch/trace-contract";
 import * as root from "@opentelemetry/otlp-transformer/build/src/generated/root";
@@ -39,7 +41,11 @@ import { describe, expect, it, vi } from "vitest";
 
 import { createApiProcessRestFeatures } from "../../app-rest/app-rest.process-features";
 import type { ApiHandlerManagedCredentials } from "../api-handler-managed-credential";
-import { composeApiTraceIngest } from "../api-trace-ingest.composition";
+import { ApiRestObservabilityComposition } from "../api-rest-observability.composition";
+import {
+  composeApiTraceIngest,
+  type ApiTraceIngestAllowance,
+} from "../api-trace-ingest.composition";
 
 const traceRequestType = (root as any).opentelemetry.proto.collector.trace.v1
   .ExportTraceServiceRequest;
@@ -193,6 +199,114 @@ describe("given the API process composed a command queue", () => {
   });
 });
 
+describe("given the API process composed a plan allowance", () => {
+  describe("when the project is over its monthly allowance", () => {
+    /** @scenario "An export over the plan's allowance is refused terminally" */
+    it("refuses the export terminally, and enqueues nothing", async () => {
+      const { api, commands } = mount({
+        allowance: allowanceAnswering({
+          exceeded: true,
+          message:
+            "Free limit of 1000 traces reached. To increase your limits, upgrade your plan at https://app.langwatch.ai/settings/subscription",
+          count: 1200,
+          maxMessagesPerMonth: 1000,
+          planName: "free",
+          usageUnit: "traces",
+        }),
+      });
+
+      const response = await api.fetch("/api/otel/v1/traces", {
+        method: "POST",
+        headers: { "content-type": "application/json", "x-auth-token": "token" },
+        body: JSON.stringify(jsonExport()),
+      });
+
+      // 402, never 429: an OTel SDK retries a 429 until its elapsed-time budget
+      // runs out, and this rejection is terminal for that payload.
+      expect(response.status).toBe(402);
+      expect(await response.json()).toMatchObject({
+        error: "ERR_PLAN_LIMIT",
+        message: expect.stringContaining("Free limit of 1000 traces reached"),
+        maxMessagesPerMonth: 1000,
+        activePlanName: "free",
+      });
+      expect(commands).toHaveLength(0);
+    });
+  });
+
+  describe("when the project is within its monthly allowance", () => {
+    /** @scenario "An export within the plan's allowance is ingested" */
+    it("ingests the export exactly as an unmetered process would", async () => {
+      const { api, commands } = mount({
+        allowance: allowanceAnswering({ exceeded: false }),
+      });
+
+      const response = await api.fetch("/api/otel/v1/traces", {
+        method: "POST",
+        headers: { "content-type": "application/json", "x-auth-token": "token" },
+        body: JSON.stringify(jsonExport()),
+      });
+
+      expect(response.status).toBe(200);
+      expect(commands).toHaveLength(1);
+    });
+  });
+
+  describe("when the allowance itself could not be read", () => {
+    /** @scenario "An allowance the process could not read accepts the export" */
+    it("accepts the export rather than dropping telemetry over our own outage", async () => {
+      const { api, commands } = mount({
+        allowance: {
+          checkLimit: () => Promise.reject(new Error("No organization found for team team-1")),
+        },
+      });
+
+      const response = await api.fetch("/api/otel/v1/traces", {
+        method: "POST",
+        headers: { "content-type": "application/json", "x-auth-token": "token" },
+        body: JSON.stringify(jsonExport()),
+      });
+
+      expect(response.status).toBe(200);
+      expect(commands).toHaveLength(1);
+    });
+  });
+});
+
+describe("given the API process composed no plan allowance", () => {
+  describe("when the receiver is composed", () => {
+    /** @scenario "A deployment with no rollup enforces no allowance" */
+    it("names the absence, and accepts the export rather than refusing it", async () => {
+      const reported: string[] = [];
+      const { api, commands } = mount({ report: (capability) => reported.push(capability) });
+
+      const response = await api.fetch("/api/otel/v1/traces", {
+        method: "POST",
+        headers: { "content-type": "application/json", "x-auth-token": "token" },
+        body: JSON.stringify(jsonExport()),
+      });
+
+      expect(reported).toContain("plan-allowance");
+      expect(response.status).toBe(200);
+      expect(commands).toHaveLength(1);
+    });
+  });
+
+  describe("when the receiver is composed WITH one", () => {
+    /** @scenario "A deployment holding the rollup enforces the allowance" */
+    it("names no absence, because the allowance is enforced", () => {
+      const reported: string[] = [];
+
+      mount({
+        allowance: allowanceAnswering({ exceeded: false }),
+        report: (capability) => reported.push(capability),
+      });
+
+      expect(reported).not.toContain("plan-allowance");
+    });
+  });
+});
+
 describe("given the API process composed no command queue", () => {
   describe("when the REST features are built", () => {
     it("mounts no OTLP receiver at all", async () => {
@@ -229,6 +343,8 @@ describe("given the API process composed no command queue", () => {
 
 type MountOverrides = {
   credential?: ApiHandlerManagedCredentials["authenticate"];
+  allowance?: ApiTraceIngestAllowance;
+  report?: (capability: "command-queue" | "dedup" | "plan-allowance") => void;
 };
 
 /**
@@ -248,6 +364,8 @@ function mount(overrides: MountOverrides = {}) {
     eventing: recordingEventing(send),
     redis: null,
     credentials: credentialsStub(overrides.credential),
+    ...(overrides.allowance ? { allowance: overrides.allowance } : {}),
+    ...(overrides.report ? { report: { absent: overrides.report } as never } : {}),
     processName: "langwatch-api-test",
   });
   if (!ingest) throw new Error("the OTLP ports must compose over a command queue");
@@ -274,6 +392,11 @@ function mount(overrides: MountOverrides = {}) {
         hono.fetch(new Request(`http://api.test${path}`, init)),
     },
   };
+}
+
+/** The allowance, as the process's own `UsageService` would have answered it. */
+function allowanceAnswering(result: UsageLimitResult): ApiTraceIngestAllowance {
+  return { checkLimit: () => Promise.resolve(result) };
 }
 
 /** A runtime holding one pipeline whose `recordSpan` records what it is sent. */
@@ -400,8 +523,18 @@ function protobufExport(): ArrayBuffer {
   return Uint8Array.from(encoded).buffer as ArrayBuffer;
 }
 
-/** A failure here must be legible rather than swallowed into a generic 500. */
-const renderUnexpected: ErrorHandler = (error, c) => c.json({ error: String(error) }, 500);
+/**
+ * A failure here must be legible rather than swallowed into a generic 500 —
+ * EXCEPT a handled one, which is rendered by the process's own legacy renderer.
+ *
+ * The plan-limit refusal is only a refusal because that renderer turns it into
+ * `{"error":"ERR_PLAN_LIMIT",…}` and a 402; asserting that against a body this
+ * file invented would be asserting the test's own arithmetic.
+ */
+const renderUnexpected: ErrorHandler = (error, c) =>
+  HandledError.isHandled(error)
+    ? ApiRestObservabilityComposition.create().legacyErrorHandler(error, c)
+    : c.json({ error: String(error) }, 500);
 
 function passThroughSecurity(): AppRestSecurity {
   const noop = async (_c: unknown, next: () => Promise<void>) => {

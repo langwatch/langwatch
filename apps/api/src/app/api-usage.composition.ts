@@ -1,25 +1,25 @@
 /**
  * What an organization is allowed, and what it has used.
  *
- * Two things this process composes for itself, both read off its own graph:
+ * Three things this process composes for itself, all read off its own graph:
  *
- *   - the PLAN PROVIDER every surface resolves an allowance through, and
- *   - the USAGE READING the subscription screen's panel renders.
+ *   - the PLAN PROVIDER every surface resolves an allowance through,
+ *   - the USAGE READING the subscription screen's panel renders, and
+ *   - the ENFORCEMENT the ingest doors refuse an over-plan export with.
  *
- * They are one module because the reading is taken AGAINST the plan: the
+ * They are one module because all three are taken AGAINST the plan: the
  * allowance, the unit it is measured in and whether the organization is on a
  * free tier all come from the plan, and a second plan provider composed for
- * the reading would let the panel and the banner disagree about which plan an
- * organization is on.
+ * any of them would let the panel, the banner and the refusal disagree about
+ * which plan an organization is on.
  *
  * ## What this deployment cannot resolve, and why it says so
  *
- *   - **No licence source.** A signed licence is read by the Enterprise
- *     licensing service, which this process composes none of, so a licensed
- *     self-hosted install resolves the same unlimited BASELINE an unlicensed
- *     one does. The two agree on every allowance; they differ only in the tier
- *     entitlements a licence carries, and applying those is the licensing
- *     provider's own step, not something this process can stand in for.
+ *   - **No licence source, on a process that opened no database.** The licence
+ *     leg is composed now, off the organization row it was activated on, which
+ *     is how a licensed self-hosted deployment gets the Enterprise tier it
+ *     bought. What is left is the DEGENERATE case: no database, no licence row,
+ *     and the absence reported rather than a licensed install reading as one.
  *   - **No subscription source.** On the hosted deployment a paid plan comes
  *     from a Stripe subscription row, which is the Enterprise billing store.
  *     Absent, every organization resolves to the free baseline — reported at
@@ -73,6 +73,11 @@ import type {
   BillingUsageLimitOrganization,
 } from "@langwatch/enterprise-billing-contract";
 import type { ClickHouseClient } from "@clickhouse/client";
+import {
+  LicensingEntitlementSource,
+  NodeLicenseCryptographyAdapter,
+  type OrganizationLicensePort,
+} from "@langwatch/enterprise-licensing-server";
 import type { PlanProvider, UsageUnit } from "@langwatch/entitlement-contract";
 import {
   EntitlementService,
@@ -80,8 +85,12 @@ import {
   resolveUsageMeter,
   USAGE_UNKNOWN,
   UsageCounterPort,
+  UsageOrganizationPort,
+  UsageService,
   UsageStatsService,
+  UsageVolumeCounterPort,
   type LimitsTrpcPorts,
+  type ProjectUsageCounts,
   type UsageCount,
 } from "@langwatch/entitlement-server";
 import { HandledError } from "@langwatch/handled-error";
@@ -104,6 +113,26 @@ export type ApiPlanProviderOptions = Readonly<{
    * so it is configuration rather than a guess.
    */
   isSaas: boolean;
+  /**
+   * Where an organization's activated licence key is read from.
+   *
+   * Absent exactly when this process opened no Postgres connection, and the
+   * absence is reported: on a self-hosted deployment the licence is the ONLY
+   * paid source there is, so a process that cannot read it resolves the
+   * unlimited baseline for a customer whose contract names an Enterprise tier
+   * — every allowance intact, and the tier's own entitlements withheld.
+   */
+  licenses?: OrganizationLicensePort;
+  /**
+   * The public key a licence signature is checked against, where the operator
+   * rotated it.
+   *
+   * Absent means the key embedded in the licensing contract, which is what
+   * verifies every licence LangWatch issues. A deployment that rotated the key
+   * and did not name it here would refuse its own valid licence and fall
+   * silently back to the baseline.
+   */
+  licensePublicKey?: string;
   /**
    * The Stripe subscription rows a hosted paid plan is read from.
    *
@@ -146,7 +175,7 @@ export class LoggedApiEntitlementAbsence extends ApiEntitlementAbsenceReport {
 
 const ENTITLEMENT_CONSEQUENCE = {
   licence:
-    "API process composed no licence source: a signed licence is not read here, so every organization resolves the deployment's baseline plan or the plan its subscription names, and an entitlement carried only by a licence is never applied.",
+    "API process composed no licence source because it opened no database: an activated licence is not read here, so a licensed deployment resolves the same baseline an unlicensed one does and the Enterprise tier its contract names is withheld.",
   subscription:
     "API process composed no subscription source on a HOSTED deployment: every organization resolves the free baseline, including ones that are paying.",
   "usage-mail":
@@ -166,20 +195,33 @@ const ENTITLEMENT_CONSEQUENCE = {
  * constructs around the answer — the service belongs to the core Entitlements
  * feature, which a feature package may not import.
  *
- * No tier enricher is threaded, in either process. `applyPlanTypeEntitlements`
- * fills a tier entitlement only where the resolved plan left it undefined, and
- * every plan these two sources answer already carries the one the tier map
- * names, so it changed no answer here. The leg where it does change one is a
- * signed licence predating a flag, and that leg applies it inside
- * `PlanProviderService` (`@langwatch/enterprise-licensing-server`), which this
- * process composes none of. A tier entitlement the plan table does not carry
- * fails `deployment-plan-sources.unit.test.ts` rather than reaching a customer.
+ * The tier enricher travels with the licence leg and is threaded by the shared
+ * policy, not here. It fills a tier entitlement only where the resolved plan
+ * left it undefined, and a signed licence is the one leg that can: a contract
+ * minted before a flag existed resolves `ENTERPRISE` with that field unset. A
+ * tier entitlement the plan table does not carry fails
+ * `deployment-plan-sources.unit.test.ts` rather than reaching a customer.
  */
 export function composeApiPlanProvider(options: ApiPlanProviderOptions): PlanProvider {
-  options.report?.absent("licence");
+  // Built here rather than inside the shared policy: verification lives in the
+  // Licensing feature, and a feature package may not import another feature's
+  // implementation — the same boundary that keeps `EntitlementService.create`
+  // at this root. `forDeployment` is one call, so the mode it derives from
+  // `isSaas` is decided once for both processes rather than twice.
+  const license = options.licenses
+    ? LicensingEntitlementSource.forDeployment({
+        licenses: options.licenses,
+        cryptography: NodeLicenseCryptographyAdapter.create(
+          options.licensePublicKey ? { publicKey: options.licensePublicKey } : {},
+        ),
+        isSaas: options.isSaas,
+      })
+    : undefined;
+  if (!license) options.report?.absent("licence");
 
   const sources = deploymentPlanSources({
     isSaas: options.isSaas,
+    ...(license ? { license } : {}),
     ...(options.subscriptions ? { subscriptions: options.subscriptions } : {}),
     ...(options.adminEmails ? { adminEmails: options.adminEmails } : {}),
   });
@@ -204,6 +246,69 @@ export type ApiUsageClickHouse = Readonly<{
   /** Organization-keyed, for the billable-events rollup. */
   resolveOrganizationClient: (organizationId: string) => Promise<ClickHouseClient>;
 }>;
+
+/** What the monthly allowance is enforced from. */
+export type ApiUsageEnforcementOptions = Readonly<{
+  /** The one guarded connection the organization graph is read on. */
+  prisma: PrismaClient;
+  /** The SAME plan provider the panel and every allowance banner read. */
+  plans: PlanProvider;
+  /**
+   * The two routings the rollups take, or none at all.
+   *
+   * None is the ONE case enforcement declines to run: a process that opened no
+   * ClickHouse cannot count what an organization has used, and a meter whose
+   * every reading is UNKNOWN is not enforcement — it is a warn line per
+   * ingested batch and an allowance nobody is held to. Saying so once at boot
+   * is the honest shape.
+   */
+  clickhouse: ApiUsageClickHouse | null;
+  /** Picks the upgrade sentence the refusal ends with. */
+  isSaas: boolean;
+  /** The self-hosted install's own origin, for the licence link. */
+  baseHost?: string | undefined;
+}>;
+
+/**
+ * The plan's monthly allowance, measured against the month's real volume.
+ *
+ * Composed here rather than shipped by a package because all three of its
+ * collaborators are this root's own: `UsageOrganizationPort` is a join across
+ * the team, project and organization aggregates that no ONE feature package
+ * may name at once — the same reason {@link ApiUsageWarningDirectory} is
+ * here — and the two counters are the deployment's decision about which store
+ * it meters from. The package owns the POLICY (`UsageService`), which is why
+ * none of it is re-implemented below.
+ *
+ * The two counters are unit-specific on purpose. `UsageService` resolves the
+ * meter itself and then asks the counter for that unit, so a single counter
+ * that re-resolved the unit would decide it twice, and the two decisions would
+ * be taken against two reads of the same plan.
+ */
+export function composeApiUsageEnforcement(
+  options: ApiUsageEnforcementOptions,
+): UsageService | undefined {
+  if (!options.clickhouse) return undefined;
+
+  // A query FACADE, not a connection: `ClickHouseBillingAdapter` holds the two
+  // resolvers this process already published and opens nothing of its own, so
+  // this is a second reader over one ClickHouse rather than a second
+  // ClickHouse. The usage panel builds its own for the same reason.
+  const billing = BillableEventsQueryService.create(
+    ClickHouseBillingAdapter.create(options.clickhouse).build(),
+  );
+
+  return new UsageService({
+    organizations: ApiUsageOrganizationDirectory.create(options.prisma),
+    traceCounter: ApiTraceVolumeCounter.create(billing),
+    eventCounter: ApiEventVolumeCounter.create(billing),
+    planResolver: (organizationId) => options.plans.getActivePlan({ organizationId }),
+    deployment: {
+      isSaas: options.isSaas,
+      ...(options.baseHost ? { baseHost: options.baseHost } : {}),
+    },
+  });
+}
 
 /** What the usage reading is composed from. */
 export type ApiUsageStatsOptions = Readonly<{
@@ -569,6 +674,126 @@ class ApiUsageCounterAdapter extends UsageCounterPort {
       select: { id: true },
     });
     return projects.map((project) => project.id);
+  }
+}
+
+/**
+ * The organization graph, as enforcement needs it: three reads, one client.
+ *
+ * Written here rather than in a feature package because each of the three
+ * crosses an aggregate boundary a package may not: a team's organization, an
+ * organization's projects, and the organization row's pricing model. They are
+ * the platform application's own queries, unchanged.
+ *
+ * `tryGetOrganizationIdByTeamId` answers null rather than throwing on a team
+ * nobody owns. `UsageService` turns that into `OrganizationNotFoundForTeamError`,
+ * which the ingest door treats as a failed lookup and lets the batch through —
+ * refusing a customer's telemetry because our own directory could not place
+ * their team is the worse of the two errors.
+ */
+class ApiUsageOrganizationDirectory extends UsageOrganizationPort {
+  static create(prisma: PrismaClient): ApiUsageOrganizationDirectory {
+    return new ApiUsageOrganizationDirectory(prisma);
+  }
+
+  private constructor(private readonly prisma: PrismaClient) {
+    super();
+  }
+
+  async tryGetOrganizationIdByTeamId(input: { teamId: string }): Promise<string | null> {
+    const team = await this.prisma.team.findUnique({
+      where: { id: input.teamId },
+      select: { organizationId: true },
+    });
+    return team?.organizationId ?? null;
+  }
+
+  async getProjectIds(organizationId: string): Promise<string[]> {
+    const projects = await this.prisma.project.findMany({
+      where: { team: { organizationId } },
+      select: { id: true },
+    });
+    return projects.map((project) => project.id);
+  }
+
+  async tryGetPricingModel(organizationId: string): Promise<PricingModel | null> {
+    const organization = await this.prisma.organization.findUnique({
+      where: { id: organizationId },
+      select: { pricingModel: true },
+    });
+    return (organization?.pricingModel ?? null) as PricingModel | null;
+  }
+}
+
+/**
+ * The month's TRACE volume, one project at a time.
+ *
+ * The rollup has no per-project read of its own — it answers a total over a
+ * set of tenant ids — so each project is asked for separately, which is what
+ * tenant routing costs and what it buys: every read lands on that project's
+ * own endpoint. An organization holds a handful of projects.
+ *
+ * A single null anywhere makes the whole reading UNKNOWN rather than a total
+ * with one project silently counted as zero: enforcement reads UNKNOWN as "we
+ * cannot say" and lets traffic through, and it reads a short total as "well
+ * inside the plan", which is the same permissive answer for the wrong reason
+ * and stops being permissive the moment the real total crosses the cap.
+ */
+class ApiTraceVolumeCounter extends UsageVolumeCounterPort {
+  static create(billing: BillableEventsQueryService): ApiTraceVolumeCounter {
+    return new ApiTraceVolumeCounter(billing);
+  }
+
+  private constructor(private readonly billing: BillableEventsQueryService) {
+    super();
+  }
+
+  async getCountByProjects(input: {
+    organizationId: string;
+    projectIds: string[];
+  }): Promise<ProjectUsageCounts> {
+    const billingMonth = BillableEventsQueryService.getBillingMonth();
+    const counts = await Promise.all(
+      input.projectIds.map(async (projectId) => ({
+        projectId,
+        count: await this.billing.tryQueryTraceSummariesTotalUniq({
+          projectIds: [projectId],
+          billingMonth,
+        }),
+      })),
+    );
+    if (counts.some((entry) => entry.count === null)) return USAGE_UNKNOWN;
+
+    return counts.map((entry) => ({ projectId: entry.projectId, count: entry.count ?? 0 }));
+  }
+}
+
+/**
+ * The month's EVENT volume, in one organization-keyed read.
+ *
+ * The events rollup is a `GROUP BY TenantId` on rows already keyed by the
+ * organization that is billed for them, so there is nothing to fan out and
+ * `projectIds` is not consulted. An empty answer is a real measurement here —
+ * this composition only builds the counter where a ClickHouse was opened, so
+ * "no rows" means the organization sent nothing rather than "nobody asked".
+ */
+class ApiEventVolumeCounter extends UsageVolumeCounterPort {
+  static create(billing: BillableEventsQueryService): ApiEventVolumeCounter {
+    return new ApiEventVolumeCounter(billing);
+  }
+
+  private constructor(private readonly billing: BillableEventsQueryService) {
+    super();
+  }
+
+  async getCountByProjects(input: {
+    organizationId: string;
+    projectIds: string[];
+  }): Promise<ProjectUsageCounts> {
+    return await this.billing.queryBillableEventsByProjectApprox({
+      organizationId: input.organizationId,
+      billingMonth: BillableEventsQueryService.getBillingMonth(),
+    });
   }
 }
 

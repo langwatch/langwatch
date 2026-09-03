@@ -1,8 +1,6 @@
 import {
   LicensingService as LicensingServiceContract,
   OrganizationNotFoundError,
-  UNLIMITED_PLAN,
-  mapToPlanInfo,
   resolvePlanDefaults,
   type LicensePlanLimits,
   type LicenseStatus,
@@ -17,6 +15,7 @@ import type { LicenseLoggerPort } from "../ports/license-logger.port";
 import type { LicenseRetentionPort } from "../ports/license-retention.port";
 import type { LicenseUsagePort } from "../ports/license-usage.port";
 import type { LicenseStoragePort } from "../ports/license-storage.port";
+import { LicensePlanSourceService } from "./license-plan-source.service";
 
 export type LicenseRetentionConfiguration = {
   categories: readonly string[];
@@ -70,11 +69,24 @@ export class LicenseService extends LicensingServiceContract {
   private readonly retention: LicenseRetentionPort | undefined;
   private readonly logger: LicenseLoggerPort;
   private readonly configuration: LicenseServiceConfiguration;
+  /**
+   * The plan half, composed rather than restated.
+   *
+   * `getActivePlan` and `getSelfHostedPlan` are the two questions the
+   * entitlement source asks, and a process that resolves plans composes the
+   * same service directly over the licence read alone. Delegating here is what
+   * keeps the status screen and the plan provider on one answer.
+   */
+  private readonly plans: LicensePlanSourceService;
 
   private constructor(options: LicenseServiceOptions) {
     super();
     this.repository = options.repository;
     this.cryptography = options.cryptography;
+    this.plans = LicensePlanSourceService.create({
+      licenses: options.repository,
+      cryptography: options.cryptography,
+    });
     this.usage = options.usage;
     this.retention = options.retention;
     this.logger = options.logger ?? new SilentLicenseLogger();
@@ -110,22 +122,11 @@ export class LicenseService extends LicensingServiceContract {
   }
 
   async getActivePlan(organizationId: string): Promise<PlanInfo> {
-    const licenseKey = await this.repository.tryReadLicense(organizationId);
-    if (!licenseKey) return UNLIMITED_PLAN;
-
-    const result = this.cryptography.validateLicense({ licenseKey });
-    return result.valid ? result.planInfo : UNLIMITED_PLAN;
+    return await this.plans.getActivePlan(organizationId);
   }
 
   async getSelfHostedPlan(organizationId: string): Promise<PlanInfo> {
-    const licenseKey = await this.repository.tryReadLicense(organizationId);
-    if (!licenseKey) return UNLIMITED_PLAN;
-
-    const signedLicense = this.cryptography.tryParseLicenseKey(licenseKey);
-    if (!signedLicense || !this.cryptography.verifySignature(signedLicense)) {
-      return UNLIMITED_PLAN;
-    }
-    return mapToPlanInfo(signedLicense.data);
+    return await this.plans.getSelfHostedPlan(organizationId);
   }
 
   async validateAndStoreLicense({

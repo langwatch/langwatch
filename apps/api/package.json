@@ -81,6 +81,7 @@
     "@langwatch/enterprise-governance-contract": "workspace:*",
     "@langwatch/enterprise-governance-server": "workspace:*",
     "@langwatch/enterprise-licensing-contract": "workspace:*",
+    "@langwatch/enterprise-licensing-server": "workspace:*",
     "@langwatch/enterprise-managed-provider-contract": "workspace:*",
     "@langwatch/enterprise-managed-provider-server": "workspace:*",
     "@langwatch/enterprise-plan-gate": "workspace:*",

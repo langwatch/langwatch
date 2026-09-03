@@ -1,5 +1,9 @@
 import { PlanTypes } from "@langwatch/enterprise-billing-contract";
-import { ENTITLEMENTS_BY_PLAN_TYPE } from "@langwatch/enterprise-licensing-contract";
+import {
+  ENTITLEMENTS_BY_PLAN_TYPE,
+  UNLIMITED_PLAN,
+} from "@langwatch/enterprise-licensing-contract";
+import type { EntitlementSource, Plan } from "@langwatch/entitlement-contract";
 import { describe, expect, it } from "vitest";
 import type {
   BillingSubscriptionRecord,
@@ -155,5 +159,85 @@ describe("given the plan sources a deployment resolves through", () => {
       expect(ENTITLEMENTS_BY_PLAN_TYPE[hosted.type]).toBeUndefined();
       expect(ENTITLEMENTS_BY_PLAN_TYPE[selfHosted.type]).toBeUndefined();
     });
+  });
+});
+
+/**
+ * The licence leg arrives built, because verification lives in the Licensing
+ * feature and a feature package may not import another feature's
+ * implementation. What is decided HERE is whether the deployment resolves
+ * through one at all, and what travels with it.
+ */
+const licensedEnterprise: Plan = {
+  ...UNLIMITED_PLAN,
+  planSource: "license",
+  type: PlanTypes.ENTERPRISE,
+  name: "Enterprise",
+  free: false,
+  // Unset on purpose: this is a contract minted before the flag existed, which
+  // is the only leg that can leave a tier entitlement unanswered.
+  webhookEndpointsEnabled: undefined,
+};
+
+function licence(plan: Plan): EntitlementSource {
+  return { resolve: async () => plan };
+}
+
+describe("given a deployment that composed a licence source", () => {
+  /** @scenario "A licensed deployment resolves through its licence" */
+  it("returns it, so the entitlement service consults it before any other paid source", async () => {
+    const sources = deploymentPlanSources({
+      isSaas: false,
+      license: licence(licensedEnterprise),
+    });
+
+    await expect(sources.license?.resolve({ organizationId: "org-1" })).resolves.toMatchObject({
+      type: PlanTypes.ENTERPRISE,
+      free: false,
+    });
+  });
+
+  /**
+   * The enricher travels with the licence and nothing else does. A contract
+   * signed before `webhookEndpointsEnabled` existed resolves ENTERPRISE with
+   * the field unset, and without this step the deployment that bought the tier
+   * is refused the feature the tier sells.
+   */
+  /** @scenario "A licence predating a tier entitlement still carries it" */
+  it("threads the tier enricher, which fills what the licence left unanswered", async () => {
+    const sources = deploymentPlanSources({
+      isSaas: false,
+      license: licence(licensedEnterprise),
+    });
+
+    expect(sources.enrichers).toHaveLength(1);
+    const enriched = await sources.enrichers?.[0]?.enrich(licensedEnterprise, {
+      organizationId: "org-1",
+    });
+
+    expect(enriched).toMatchObject({ webhookEndpointsEnabled: true });
+  });
+
+  /** @scenario "A licence predating a tier entitlement still carries it" */
+  it("threads no enricher where no licence source was composed, because no other leg needs one", () => {
+    expect(deploymentPlanSources({ isSaas: false }).enrichers).toBeUndefined();
+    expect(
+      deploymentPlanSources({ isSaas: true, subscriptions: subscriptions(subscription()) })
+        .enrichers,
+    ).toBeUndefined();
+  });
+
+  /** @scenario "A licensed deployment resolves through its licence" */
+  it("keeps the subscription source beside it on a hosted deployment", async () => {
+    const sources = deploymentPlanSources({
+      isSaas: true,
+      license: licence(licensedEnterprise),
+      subscriptions: subscriptions(subscription()),
+    });
+
+    expect(sources.license).toBeDefined();
+    await expect(sources.subscription?.resolve({ organizationId: "org-1" })).resolves.toMatchObject(
+      { type: PlanTypes.LAUNCH },
+    );
   });
 });

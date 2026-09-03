@@ -2324,6 +2324,26 @@ describe("the model gateway on the production graph", () => {
         expect.stringContaining("composed no model gateway"),
       );
     });
+
+    /**
+     * The licence row lives on the same connection every other read runs on,
+     * so a root holding one has no reason to leave the licence leg out. This
+     * is the wiring the composition unit cannot see: `createWorkerPlanProvider`
+     * takes the store as an option, and a root that stops passing it still
+     * composes, still resolves plans, and quietly resolves every licensed
+     * customer as unlicensed. The absence it reports is what says so.
+     */
+    /** @scenario "A worker holding its connection composes the licence source" */
+    it("says nothing about a missing licence source, because it composed one", () => {
+      const warn = vi.fn();
+
+      compositionWithConnection({
+        connection: createWorkerProcessDatabase(),
+        observability: { logger: { info: vi.fn(), warn } },
+      });
+
+      expect(warn).not.toHaveBeenCalledWith({ source: "licence" }, expect.any(String));
+    });
   });
 
   describe("when the root was given no typed connection", () => {

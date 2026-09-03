@@ -380,9 +380,14 @@ and its webhook intake, whose shared secret is compared in-handler
 (`scim-webhook-intake.api.ts:47-50`) with no cap, so it is brute-forceable; the
 Stripe and ElevenLabs webhooks; four GitHub setup/webhook routes; and the
 SSRF-guarded image proxy (`apps/api/src/features/image-proxy/image-proxy-rest.ts:51`).
-For the two ingest paths the compounding matters: the ledger's
-`absent("plan-allowance")` row records that `UsageService` is composed by
-nobody, so span ingest has neither a rate limiter nor a usage meter.
+For the two ingest paths the compounding mattered: the ledger's
+`absent("plan-allowance")` row recorded that `UsageService` was composed by
+nobody, so span ingest had neither a rate limiter nor a usage meter. Half of
+that is now false — "The last two API absences" in
+`core-application-feature-extraction-plan.md` composes `UsageService` and both
+doors enforce the plan's monthly allowance. The RATE limiter is still absent,
+and it is the one this document is about: a plan allowance is a MONTHLY cap and
+does nothing against a burst inside the month.
 
 **No tRPC middleware-level limiting exists** — every tRPC limit in the product
 is a per-procedure domain throttle. And **there is no rate-limit config leaf**:

@@ -2,6 +2,11 @@ import {
   deploymentPlanSources,
   type BillingSubscriptionRepository,
 } from "@langwatch/enterprise-billing-server";
+import {
+  LicensingEntitlementSource,
+  NodeLicenseCryptographyAdapter,
+  type OrganizationLicensePort,
+} from "@langwatch/enterprise-licensing-server";
 import type { PlanProvider } from "@langwatch/entitlement-contract";
 import { EntitlementService } from "@langwatch/entitlement-server";
 import type { Logger } from "@langwatch/observability";
@@ -19,6 +24,25 @@ export type WorkerPlanProviderOptions = Readonly<{
    * a ceiling the screen does not show and gate a feature the screen offers.
    */
   isSaas: boolean;
+  /**
+   * Where an organization's activated licence key is read from.
+   *
+   * Absent exactly when this graph opened no typed Prisma client. On a
+   * self-hosted deployment the licence is the ONLY paid source there is, so a
+   * background process that cannot read it withholds the Enterprise tier the
+   * screen grants — the webhook batch the customer bought stops leaving while
+   * the endpoint page still says it is enabled.
+   */
+  licenses?: OrganizationLicensePort;
+  /**
+   * The public key a licence signature is checked against, where the operator
+   * rotated it.
+   *
+   * The SAME variable the interactive process reads. Two processes checking a
+   * signature against different keys is one deployment with two answers to
+   * whether it is licensed at all.
+   */
+  licensePublicKey?: string;
   /**
    * The Stripe subscription rows a hosted paid plan is read from.
    *
@@ -60,7 +84,7 @@ export class LoggedWorkerEntitlementAbsence extends WorkerEntitlementAbsenceRepo
 
 const ENTITLEMENT_CONSEQUENCE = {
   licence:
-    "worker composed no licence source: a signed licence is not read here, so every organization resolves the deployment's baseline plan or the plan its subscription names, and an entitlement carried only by a licence is never applied.",
+    "worker composed no licence source because it opened no database: an activated licence is not read here, so a licensed deployment resolves the same baseline an unlicensed one does and the Enterprise tier its contract names is withheld.",
   subscription:
     "worker composed no subscription source on a HOSTED deployment: every organization resolves the free baseline, including ones that are paying, so their webhooks stop being delivered and their automations settle against the free daily ceiling.",
 } as const;
@@ -86,13 +110,12 @@ const ENTITLEMENT_CONSEQUENCE = {
  * constructs around the answer — the service belongs to the core Entitlements
  * feature, which a feature package may not import.
  *
- * No tier enricher is threaded, in either process. `applyPlanTypeEntitlements`
- * fills a tier entitlement only where the resolved plan left it undefined, and
- * every plan these two sources answer already carries the one the tier map
- * names, so it changed no answer here. The leg where it does change one is a
- * signed licence predating a flag, and that leg applies it inside
- * `PlanProviderService` (`@langwatch/enterprise-licensing-server`), which this
- * process composes none of. A tier entitlement the plan table does not carry
+ * The tier enricher travels with the licence leg and is threaded by the shared
+ * policy, not here. It fills a tier entitlement only where the resolved plan
+ * left it undefined, and a signed licence is the one leg that can: a contract
+ * minted before a flag existed resolves `ENTERPRISE` with that field unset,
+ * which on this process is the difference between delivering a customer's
+ * webhooks and dropping them. A tier entitlement the plan table does not carry
  * fails `deployment-plan-sources.unit.test.ts` rather than reaching a customer.
  *
  * `adminEmails` is deliberately NOT passed. It feeds exactly one field —
@@ -101,10 +124,25 @@ const ENTITLEMENT_CONSEQUENCE = {
  * would be a collaborator nothing can reach.
  */
 export function createWorkerPlanProvider(options: WorkerPlanProviderOptions): PlanProvider {
-  options.report?.absent("licence");
+  // Built here rather than inside the shared policy: verification lives in the
+  // Licensing feature, and a feature package may not import another feature's
+  // implementation — the same boundary that keeps `EntitlementService.create`
+  // at this root. `forDeployment` is one call, so the mode it derives from
+  // `isSaas` is decided once for both processes rather than twice.
+  const license = options.licenses
+    ? LicensingEntitlementSource.forDeployment({
+        licenses: options.licenses,
+        cryptography: NodeLicenseCryptographyAdapter.create(
+          options.licensePublicKey ? { publicKey: options.licensePublicKey } : {},
+        ),
+        isSaas: options.isSaas,
+      })
+    : undefined;
+  if (!license) options.report?.absent("licence");
 
   const sources = deploymentPlanSources({
     isSaas: options.isSaas,
+    ...(license ? { license } : {}),
     ...(options.subscriptions ? { subscriptions: options.subscriptions } : {}),
   });
   if (options.isSaas && !sources.subscription) options.report?.absent("subscription");

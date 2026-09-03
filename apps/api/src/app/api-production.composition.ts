@@ -60,6 +60,7 @@ import {
   ApiClickHouseInfrastructure,
 } from "../platform/infrastructure/api-clickhouse.infrastructure";
 import { PostgresBillingAdapter } from "@langwatch/enterprise-billing-server";
+import { PostgresOrganizationLicenseAdapter } from "@langwatch/enterprise-licensing-server";
 import { ApiAgentWorkflowCopyAdapter } from "../features/agent/agent-workflow-copy.adapter";
 import { ApiAgentsAbsenceReportPort, ApiAgentsComposition } from "./api-agents.composition";
 import {
@@ -101,6 +102,7 @@ import {
   type ApiUsageStatsPort,
 } from "./api-trpc-collaborators.trace-group.composition";
 import type { PlanProvider } from "@langwatch/entitlement-contract";
+import type { UsageService } from "@langwatch/entitlement-server";
 
 /**
  * The retention floor a project with no policy of its own is bounded by.
@@ -211,6 +213,7 @@ import { composeApiTraceReadStack } from "./api-trace-read-stack.composition";
 import {
   apiEntitlementAbsenceReport,
   composeApiPlanProvider,
+  composeApiUsageEnforcement,
   composeApiUsageStats,
   type LoggedApiEntitlementAbsence,
 } from "./api-usage.composition";
@@ -558,6 +561,17 @@ export class ApiProductionComposition extends ApiRuntimeCompositionPort {
    */
   private composedMail: ApiMailComposition | undefined;
   private composedClickHouse: ApiClickHouseInfrastructure | undefined;
+  /**
+   * The plan allowance both ingest doors refuse an over-plan export with, or
+   * none on a process that opened no ClickHouse.
+   *
+   * Held rather than resolved at the door because BOTH doors take it and they
+   * must take the SAME one: a second `UsageService` would answer the same
+   * question against a second read of the plan, and two answers to "is this
+   * organization over its allowance" is a limit a customer routes around by
+   * changing one URL.
+   */
+  private composedUsageEnforcement: UsageService | undefined;
   private composedAnalytics: ApiAnalyticsCollaborators | undefined;
   private composedIdentity: ApiIdentityCollaborators | undefined;
   /**
@@ -845,6 +859,28 @@ export class ApiProductionComposition extends ApiRuntimeCompositionPort {
       queueInfrastructure,
       encryption,
     );
+    // The monthly allowance the two ingest doors enforce, composed HERE
+    // because this is the first line at which everything it stands on is
+    // open: the guarded client, the ClickHouse the analytics half opened, and
+    // the one plan provider the trace group just resolved. Absent on a process
+    // with no database or no ClickHouse — an allowance nothing can count
+    // against is not enforcement — and the doors name that absence themselves.
+    this.composedUsageEnforcement = this.composedDatabase
+      ? composeApiUsageEnforcement({
+          prisma: this.composedDatabase.connection.client,
+          plans: this.resolvePlanProvider(options),
+          clickhouse: this.composedClickHouse
+            ? {
+                resolveClient: this.composedClickHouse.resolveClient,
+                resolveOrganizationClient: this.composedClickHouse.resolveOrganizationClient,
+              }
+            : null,
+          isSaas: options.config.infrastructure.modelProvider.isSaas,
+          ...(options.config.infrastructure.execution.publicBaseUrl
+            ? { baseHost: options.config.infrastructure.execution.publicBaseUrl }
+            : {}),
+        })
+      : undefined;
     // The product-group half: the surfaces a member reaches to RUN the product
     // rather than to look at what it recorded. It folds on rather than seeding,
     // because it needs the tenancy graph that the seed above does not.
@@ -1210,6 +1246,11 @@ export class ApiProductionComposition extends ApiRuntimeCompositionPort {
       eventing: this.composedEventing?.eventSourcing,
       redis: this.composedQueueRedis,
       credentials: handlerManagedCredentials,
+      // The one allowance both doors refuse an over-plan export with. Absent
+      // where this process opened no ClickHouse, and the receiver says so.
+      ...(this.composedUsageEnforcement
+        ? { allowance: this.composedUsageEnforcement }
+        : {}),
       processName: serviceName,
       report: LoggedApiTraceIngestAbsence.create(createLogger(serviceName)),
     });
@@ -1565,8 +1606,11 @@ export class ApiProductionComposition extends ApiRuntimeCompositionPort {
       ? {
           credential: otlpIngest.collectorCredential,
           ingestSpan: otlpIngest.ingestSpan,
-          // The plan allowance this process cannot read; the same degradation
-          // the OTLP receiver records, for the same reason.
+          // The SAME allowance object the OTLP receiver holds. Two gates over
+          // one service would still be one answer, but two SERVICES would not
+          // — and a limit enforced on one door and not the other is a limit a
+          // customer routes around by changing a URL.
+          usageLimit: otlpIngest.usageLimit,
           ...(reportEvaluation
             ? {
                 // The command's own data shape is the evaluation package's, and
@@ -3211,12 +3255,23 @@ export class ApiProductionComposition extends ApiRuntimeCompositionPort {
     const database = this.composedDatabase?.connection;
     this.composedPlanProvider = composeApiPlanProvider({
       isSaas: options.config.infrastructure.modelProvider.isSaas,
-      // The subscription rows the hosted deployment's paid plans live in, on
-      // the SAME guarded client every other read runs on. Without them a
-      // paying organization resolves the free baseline, which is a wrong
-      // answer rather than a missing one.
+      // The subscription rows the hosted deployment's paid plans live in, and
+      // the licence row a self-hosted deployment's Enterprise tier lives in,
+      // on the SAME guarded client every other read runs on. Without them a
+      // paying organization resolves the free baseline and a licensed one
+      // resolves as unlicensed, which are wrong answers rather than missing
+      // ones.
       ...(database
-        ? { subscriptions: PostgresBillingAdapter.create(database.client).build().subscriptions }
+        ? {
+            subscriptions: PostgresBillingAdapter.create(database.client).build().subscriptions,
+            licenses: PostgresOrganizationLicenseAdapter.create(database.client).build(),
+          }
+        : {}),
+      // The rotated verification key, where the operator named one. The
+      // background process reads the same variable, so the two cannot
+      // disagree about whether this deployment is licensed.
+      ...(options.config.infrastructure.licensing.publicKey
+        ? { licensePublicKey: options.config.infrastructure.licensing.publicKey }
         : {}),
       adminEmails: this.options.identity?.adminEmails
         ? AdminAccessService.parseEmails(this.options.identity.adminEmails)
