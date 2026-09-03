@@ -8,7 +8,7 @@ For agents: if anything in these docs is wrong, confusing, or fails when you try
 
 ## Get Started
 
-- [LangWatch: The Open-Source Platform for LLM Ops, Coding Agents, AI Gateway and AI Governance](https://langwatch.ai/docs/introduction.md): Observability, evaluations, agent testing and prompt management for your LLM applications. Cost and activity of every coding agent. One gateway for every LLM call. Governance over every AI tool in the company. Open source under Apache 2.0, with over 3.5k stars on GitHub.
+- [LangWatch: The Open-Source Platform for LLM Ops, Coding Agents, AI Gateway and AI Governance](https://langwatch.ai/docs/introduction.md): Observability, evaluations, agent testing and prompt management for your LLM applications. Cost and activity of every coding agent. One gateway for every LLM call. Governance over every AI tool in the company. Open core, with an Apache 2.0 core you can self-host and over 3.5k stars on GitHub.
 
 ### LangWatch Skills
 

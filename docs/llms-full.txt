@@ -5,7 +5,7 @@ For agents: if anything in these docs is wrong, confusing, or fails when you try
 
 ---
 title: "LangWatch: The Open-Source Platform for LLM Ops, Coding Agents, AI Gateway and AI Governance"
-description: "Observability, evaluations, agent testing and prompt management for your LLM applications. Cost and activity of every coding agent. One gateway for every LLM call. Governance over every AI tool in the company. Open source under Apache 2.0, with over 3.5k stars on GitHub."
+description: "Observability, evaluations, agent testing and prompt management for your LLM applications. Cost and activity of every coding agent. One gateway for every LLM call. Governance over every AI tool in the company. Open core, with an Apache 2.0 core you can self-host and over 3.5k stars on GitHub."
 sidebarTitle: Introduction
 keywords: langwatch, llm, ai, observability, evaluation, agent testing, prompt management, coding agents, ai gateway, ai governance, llmops, open-source, github
 ---
@@ -113,7 +113,9 @@ Start with the area that matches what you are working on today. You can add the 
 
 ## Open Source
 
-LangWatch is open source under the Apache 2.0 license. The self-hosted edition runs the same software as LangWatch Cloud, with no separate community build.
+LangWatch is open core. You can self-host the Apache 2.0 core, and LangWatch Cloud runs the same codebase, with no separate community build.
+
+Enterprise features, such as multi-source governance ingestion and anomaly detection, need a paid plan and have their own license under [`platform/app/ee/`](https://github.com/langwatch/langwatch/tree/main/platform/app/ee). See [Open-core licensing](/ai-governance/open-core-licensing) for the full split.
 
 <CardGroup cols={2}>
   <Card

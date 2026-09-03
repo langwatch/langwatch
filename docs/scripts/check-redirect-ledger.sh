@@ -15,12 +15,15 @@
 # `git fetch origin <branch>`.
 #
 # A page path has no `docs/` prefix and no `.mdx` suffix. An `index` page maps
-# to its directory, the way Mintlify serves it.
+# to its directory, the way Mintlify serves it, and the root `index` page maps
+# to `/`.
 #
 # For each page that exists at the base and no longer exists on the branch, the
 # script asks docs/docs.json on the branch for a `redirects` entry with:
-#   - `source` equal to `/<path>`
-#   - `destination` that is a page on the branch, or an external https:// URL
+#   - `source` equal to `/<path>`, or a section wildcard `/<prefix>/:path*`
+#     that covers it
+#   - `destination` that is a page on the branch, an external https:// URL with
+#     a host, or a wildcard pattern carried through from the source
 #   - no `#anchor` in the destination
 #
 # Exit code is 1 when there is at least one gap, 0 otherwise.
@@ -62,6 +65,20 @@ python3 - <<'PY_EOF'
 import json
 import os
 import sys
+from urllib.parse import urlsplit
+
+
+def canonical(path):
+    """The path form used to report a removed page.
+
+    An index page maps to its directory, and the root index page maps to the
+    site root, which is the empty page path.
+    """
+    if path == "index":
+        return ""
+    if path.endswith("/index"):
+        return path[: -len("/index")]
+    return path
 
 
 def page_paths(listing):
@@ -73,16 +90,8 @@ def page_paths(listing):
             continue
         path = line[len("docs/"):-len(".mdx")]
         pages.add(path)
-        if path.endswith("/index"):
-            pages.add(path[: -len("/index")])
+        pages.add(canonical(path))
     return pages
-
-
-def canonical(path):
-    """The path form used to report a removed page."""
-    if path.endswith("/index"):
-        return path[: -len("/index")]
-    return path
 
 
 branch = os.environ["BRANCH_NAME"]
@@ -114,18 +123,45 @@ for entry in redirects:
         by_source.setdefault(source, entry.get("destination"))
 
 
+# Mintlify moves a whole section with a path parameter, `/old/:path*`. Such a
+# source is a prefix rather than one URL, so it covers the prefix itself and
+# everything under it. Longest prefix first, so the most specific one wins.
+wildcard_sources = sorted(
+    ((source, source.split("/:", 1)[0]) for source in by_source if "/:" in source),
+    key=lambda pair: len(pair[1]),
+    reverse=True,
+)
+
+
+def covering_source(url):
+    """The `source` in docs.json that routes this page URL, or None."""
+    if url in by_source:
+        return url
+    for source, prefix in wildcard_sources:
+        if url == prefix or url.startswith(prefix + "/"):
+            return source
+    return None
+
+
 def destination_problem(destination):
     """None when the destination is good, else the reason it is not."""
     if not isinstance(destination, str) or not destination:
         return "destination is missing"
+    if "#" in destination:
+        return f"destination '{destination}' carries an #anchor"
     if destination.startswith("https://"):
+        if not urlsplit(destination).netloc:
+            return f"destination '{destination}' has no host"
         return None
     if destination.startswith("http://"):
         return f"destination '{destination}' is not https"
-    if "#" in destination:
-        return f"destination '{destination}' carries an #anchor"
     if not destination.startswith("/"):
         return f"destination '{destination}' is not a path"
+    # A section redirect carries the wildcard through to the destination,
+    # `/old/:path*` -> `/new/:path*`. The destination is then a pattern and not
+    # one page, so there is nothing to resolve against the page list.
+    if "/:" in destination:
+        return None
     target = destination.split("?", 1)[0].rstrip("/").lstrip("/")
     if target in branch_pages:
         return None
@@ -134,21 +170,23 @@ def destination_problem(destination):
 
 gaps = []
 for path in removed:
-    source = f"/{path}"
-    if source not in by_source:
+    url = f"/{path}"
+    source = covering_source(url)
+    if source is None:
         # A near miss is worth naming: the ledger may hold the /index form.
-        alt = f"/{path}/index"
+        alt = f"{url.rstrip('/')}/index"
         if alt in by_source:
             gaps.append(
-                f"{source}: no redirect (docs.json has '{alt}' instead, "
+                f"{url}: no redirect (docs.json has '{alt}' instead, "
                 f"which is not the page URL)"
             )
         else:
-            gaps.append(f"{source}: page removed on {branch}, no redirect in docs.json")
+            gaps.append(f"{url}: page removed on {branch}, no redirect in docs.json")
         continue
     problem = destination_problem(by_source[source])
     if problem:
-        gaps.append(f"{source}: {problem}")
+        via = "" if source == url else f" (via '{source}')"
+        gaps.append(f"{url}{via}: {problem}")
 
 print(f"branch:  {branch}")
 print(f"base:    {base}")
