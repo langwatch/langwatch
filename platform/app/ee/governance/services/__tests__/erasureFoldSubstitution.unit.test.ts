@@ -32,6 +32,7 @@ import {
   ErasedIdentifierSuppressionRepository,
   GovernanceTenantHistoryRepository,
   IdentityMatchRepository,
+  IdentityMatchSuggestionRepository,
 } from "../../repositories/governanceIdentity.repository";
 import { installGovernanceSuppressionSnapshot } from "../erasureSuppression.service";
 import { IdentityErasureService } from "../identityErasure.service";
@@ -72,6 +73,11 @@ function inMemoryPrisma() {
   const tenants = [{ organizationId: ORG, tenantId: TENANT }];
 
   return {
+    // Nothing in this file seeds one; the erasure sweeps them anyway, so the
+    // table has to answer rather than be absent.
+    identityMatchSuggestion: {
+      deleteMany: async () => ({ count: 0 }),
+    },
     erasedIdentifierSuppression: {
       findMany: async ({
         where,
@@ -161,6 +167,7 @@ function buildErasure(prisma: PrismaClient) {
     suppression: new ErasedIdentifierSuppressionRepository(),
     discoveredPeople: new DiscoveredPersonRepository(),
     identityMatches: new IdentityMatchRepository(),
+    matchSuggestions: new IdentityMatchSuggestionRepository(),
     rollupErasure: {
       findDaysCarryingActor: async () => [
         { tenantId: TENANT, day: "2026-08-20" },
