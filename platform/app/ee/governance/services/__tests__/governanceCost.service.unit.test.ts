@@ -272,7 +272,7 @@ describe("GovernanceCostService.summary", () => {
     describe("when requesting the summary", () => {
       /** @scenario "A lane with usage we cannot state in US dollars holds no total" */
       it("withholds the total rather than offering the dollar part of it", async () => {
-        const service = GovernanceCostService.create({
+        const service = createService({
           prisma: prismaWithGovProject("gov-1"),
           costRollup: rollupReturning({
             rows: [
@@ -308,7 +308,7 @@ describe("GovernanceCostService.summary", () => {
 
       /** @scenario "A day mixing stated and unstated amounts holds no figure for that lane" */
       it("gaps the mixed day for that lane and leaves the other lane alone", async () => {
-        const service = GovernanceCostService.create({
+        const service = createService({
           prisma: prismaWithGovProject("gov-1"),
           costRollup: rollupReturning({
             rows: [
