@@ -75,6 +75,209 @@ describe("ModelProviderKeysService", () => {
 });
 
 /**
+ * The customKeys counterpart of the header merge above — same
+ * placeholder-restoration contract, applied to the provider's credential
+ * record rather than its extra headers.
+ *
+ * PORTED FROM
+ * `platform/app/src/server/modelProviders/__tests__/modelProvider.service.unit.test.ts`,
+ * whose subject (a standalone `mergeStoredCustomKeys` function) is now this
+ * class's `merge` method.
+ */
+describe("ModelProviderKeysService merge", () => {
+  describe("given a row with nothing worth keeping", () => {
+    it("drops visible configuration when the write carries no credentials", () => {
+      // A base URL is shown back, so a write that omits it is stating the
+      // configuration in full and the stored value goes.
+      expect(
+        policy.merge({
+          incoming: null,
+          stored: { OPENAI_BASE_URL: "https://old-url.com" },
+        }),
+      ).toEqual({});
+    });
+
+    it("keeps a stored secret the write never names", () => {
+      // The other half of the same rule. A secret is masked on read, so no
+      // caller can resend one it did not type, and omitting it cannot mean
+      // "delete it".
+      expect(
+        policy.merge({
+          incoming: null,
+          stored: { CODEX_ACCESS_TOKEN: "stored-token" },
+        }),
+      ).toEqual({ CODEX_ACCESS_TOKEN: "stored-token" });
+    });
+
+    it("returns the write untouched when the row is empty", () => {
+      expect(
+        policy.merge({
+          incoming: { OPENAI_API_KEY: "new-key" },
+          stored: null,
+        }),
+      ).toEqual({ OPENAI_API_KEY: "new-key" });
+    });
+
+    it("drops a masked field with nothing behind it", () => {
+      expect(
+        policy.merge({
+          incoming: {
+            OPENAI_API_KEY: MASKED_KEY_PLACEHOLDER,
+            OPENAI_BASE_URL: "https://new-url.com",
+          },
+          stored: null,
+        }),
+      ).toEqual({ OPENAI_BASE_URL: "https://new-url.com" });
+    });
+
+    it("drops a masked field the stored row does not have", () => {
+      expect(
+        policy.merge({
+          incoming: { OPENAI_API_KEY: MASKED_KEY_PLACEHOLDER },
+          stored: { OPENAI_BASE_URL: "https://old-url.com" },
+        }),
+      ).toEqual({});
+    });
+  });
+
+  describe("when a field comes back masked", () => {
+    it("restores the stored value and takes the edited one", () => {
+      const result = policy.merge({
+        incoming: {
+          OPENAI_API_KEY: MASKED_KEY_PLACEHOLDER,
+          OPENAI_BASE_URL: "https://new-url.com",
+        },
+        stored: {
+          OPENAI_API_KEY: "sk-actual-secret",
+          OPENAI_BASE_URL: "https://old-url.com",
+        },
+      });
+
+      expect(result.OPENAI_API_KEY).toBe("sk-actual-secret");
+      expect(result.OPENAI_BASE_URL).toBe("https://new-url.com");
+    });
+
+    /** @scenario Preserve original subscription key when saving with masked placeholder */
+    it("restores every masked field at once", () => {
+      const result = policy.merge({
+        incoming: {
+          AWS_ACCESS_KEY_ID: MASKED_KEY_PLACEHOLDER,
+          AWS_SECRET_ACCESS_KEY: MASKED_KEY_PLACEHOLDER,
+          AWS_REGION_NAME: "eu-west-1",
+        },
+        stored: {
+          AWS_ACCESS_KEY_ID: "AKIAEXAMPLE",
+          AWS_SECRET_ACCESS_KEY: "secretkey123",
+          AWS_REGION_NAME: "us-east-1",
+        },
+      });
+
+      expect(result.AWS_ACCESS_KEY_ID).toBe("AKIAEXAMPLE");
+      expect(result.AWS_SECRET_ACCESS_KEY).toBe("secretkey123");
+      expect(result.AWS_REGION_NAME).toBe("eu-west-1");
+    });
+
+    it("carries along a field the row never held", () => {
+      const result = policy.merge({
+        incoming: {
+          OPENAI_API_KEY: MASKED_KEY_PLACEHOLDER,
+          NEW_KEY: "new-value",
+        },
+        stored: { OPENAI_API_KEY: "sk-stored" },
+      });
+
+      expect(result.OPENAI_API_KEY).toBe("sk-stored");
+      expect(result.NEW_KEY).toBe("new-value");
+    });
+  });
+
+  describe("when a field is named with a value", () => {
+    it("takes the new value over the stored one", () => {
+      expect(
+        policy.merge({
+          incoming: { OPENAI_API_KEY: "sk-new-key" },
+          stored: { OPENAI_API_KEY: "sk-old-key" },
+        }).OPENAI_API_KEY,
+      ).toBe("sk-new-key");
+    });
+
+    it("clears the stored secret when the value is empty", () => {
+      expect(
+        policy.merge({
+          incoming: { OPENAI_API_KEY: "" },
+          stored: { OPENAI_API_KEY: "sk-old-key" },
+        }).OPENAI_API_KEY,
+      ).toBe("");
+    });
+  });
+
+  // Secrets are masked on read, so no caller can resend one it did not type,
+  // and leaving one out cannot mean "delete it". Everything else is visible,
+  // so a write states it in full.
+  describe("when a field is left out of the write", () => {
+    /** @scenario A save that names one credential keeps the ones it leaves out */
+    it("keeps a stored secret", () => {
+      const result = policy.merge({
+        incoming: { AZURE_OPENAI_ENDPOINT: "https://acme2.openai.azure.com" },
+        stored: {
+          AZURE_OPENAI_API_KEY: "sk-stored",
+          AZURE_OPENAI_ENDPOINT: "https://acme.openai.azure.com",
+        },
+      });
+
+      expect(result).toEqual({
+        AZURE_OPENAI_API_KEY: "sk-stored",
+        AZURE_OPENAI_ENDPOINT: "https://acme2.openai.azure.com",
+      });
+    });
+
+    it("does not resurrect a secret the customer had already cleared", () => {
+      const result = policy.merge({
+        incoming: { AZURE_OPENAI_ENDPOINT: "https://acme.openai.azure.com" },
+        stored: { AZURE_OPENAI_API_KEY: "" },
+      });
+
+      expect(result).toEqual({
+        AZURE_OPENAI_ENDPOINT: "https://acme.openai.azure.com",
+      });
+    });
+
+    /** @scenario Switching Azure to its API gateway keeps the key and drops the direct endpoint */
+    it("drops a stored field that is not a secret", () => {
+      const result = policy.merge({
+        incoming: {
+          AZURE_API_GATEWAY_BASE_URL: "https://apim.acme.com",
+          AZURE_API_GATEWAY_VERSION: "2024-05-01-preview",
+        },
+        stored: {
+          AZURE_OPENAI_API_KEY: "sk-stored",
+          AZURE_OPENAI_ENDPOINT: "https://acme.openai.azure.com",
+        },
+      });
+
+      expect(result).toEqual({
+        AZURE_API_GATEWAY_BASE_URL: "https://apim.acme.com",
+        AZURE_API_GATEWAY_VERSION: "2024-05-01-preview",
+        AZURE_OPENAI_API_KEY: "sk-stored",
+      });
+    });
+  });
+});
+
+/** @scenario API key masking when editing existing provider */
+describe("ModelProviderKeysService maskApiKeys", () => {
+  it("masks the API key and leaves the base URL visible", () => {
+    const result = policy.tryMask({
+      OPENAI_API_KEY: "sk-actual-key",
+      OPENAI_BASE_URL: "https://api.openai.com",
+    });
+
+    expect(result?.OPENAI_API_KEY).toBe(MASKED_KEY_PLACEHOLDER);
+    expect(result?.OPENAI_BASE_URL).toBe("https://api.openai.com");
+  });
+});
+
+/**
  * The read side of the same policy. Every tRPC and REST response carrying a
  * provider row goes through `tryMask` and `maskHeaders` first, so this is the
  * guarantee that a stored credential never reaches a browser. Moved here with

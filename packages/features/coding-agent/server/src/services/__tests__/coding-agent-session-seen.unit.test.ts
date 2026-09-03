@@ -23,6 +23,10 @@ function createFixture(at = 1_000_000) {
 describe("CodingAgentSessionSeenService", () => {
   describe("given one project folding sessions", () => {
     describe("when its sessions commit repeatedly inside the window", () => {
+      /**
+       * @scenario "A folded coding-agent session records the project's activity"
+       * @scenario "A busy project is written to at most once an hour"
+       */
       it("touches the project once and holds the rest back", async () => {
         const { clock, projects, service } = createFixture();
 

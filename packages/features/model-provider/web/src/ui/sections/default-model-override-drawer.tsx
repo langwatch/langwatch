@@ -374,7 +374,16 @@ export function DefaultModelOverrideDrawer({ editingId }: Props) {
       // created against the same procedures — including the Langy pill's
       // `getResolvedDefault`. What it cannot reach is Langy's own store, which
       // is why the docblock above records the pill's follow as absent.
-      await utils.modelProvider.invalidate();
+      //
+      // Isolated in its own try: the write already committed by the time
+      // this runs, so a refresh that fails here must not turn a successful
+      // save into a reported failure — the row is correct on the next
+      // navigation even if this tab's cache stays stale.
+      try {
+        await utils.modelProvider.invalidate();
+      } catch {
+        // Best-effort refresh; the save itself already succeeded.
+      }
       host.succeeded({ title: copy.successTitle });
       onSaved();
       onClose();

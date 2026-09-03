@@ -62,6 +62,8 @@ describe("Model Provider wire values", () => {
     ).toEqual({ ok: true, mp: openaiShared, model: "gpt-5" });
   });
 
+  /** @scenario Legacy "provider/model" wire value resolves when exactly one MP matches */
+  /** @scenario Legacy wire value errors when multiple MPs match */
   it("retains legacy single-provider routing and reports ambiguity", () => {
     expect(resolveModelProviderWireValue("openai/gpt-5", [openaiShared, anthropic])).toEqual({
       ok: true,
@@ -76,6 +78,7 @@ describe("Model Provider wire values", () => {
     });
   });
 
+  /** @scenario Legacy wire value errors when no MPs match */
   it("reports missing selected and legacy providers", () => {
     expect(resolveModelProviderWireValue("mp_missing/gpt-5", [openaiShared])).toEqual({
       ok: false,

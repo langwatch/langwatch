@@ -38,6 +38,7 @@
     "@langwatch/design-system": "workspace:*",
     "@langwatch/feature-flag-contract": "workspace:*",
     "@langwatch/github-web": "workspace:*",
+    "@langwatch/handled-error": "workspace:*",
     "@langwatch/langy-contract": "workspace:*",
     "@langwatch/model-provider-contract": "workspace:*",
     "@langwatch/model-provider-web": "workspace:*",

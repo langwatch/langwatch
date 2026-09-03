@@ -39,6 +39,12 @@ function serviceWith(input: {
 }
 
 describe("Coding Agent sessions list", () => {
+  /**
+   * @scenario "The list answers with the sessions of the last ninety days"
+   * @scenario "A row carries what a session cost in context, not only in tokens"
+   * @scenario "A row is named by the title the session generated"
+   * @scenario "The session's own name is the title the list shows"
+   */
   it("reads one trailing ninety-day page and carries all public session facts", async () => {
     const sessions = new TestSessions();
     sessions.rows = [
@@ -118,6 +124,11 @@ describe("Coding Agent sessions list", () => {
     expect(rows[1]).toMatchObject({ title: null, gitBranches: [], pullRequests: [] });
   });
 
+  /**
+   * @scenario "A session that worked on two branches lists both of their pull requests"
+   * @scenario "The pull requests of a whole page are looked up in one call"
+   * @scenario "A session recorded before branches were remembered falls back to its last branch"
+   */
   it("looks up each distinct branch once, links every driven branch in number order, and falls back to the last branch", async () => {
     const sessions = new TestSessions();
     sessions.rows = [
@@ -224,6 +235,7 @@ describe("Coding Agent sessions list", () => {
     expect(row?.pullRequests.map((pullRequest) => pullRequest.number)).toEqual([9]);
   });
 
+  /** @scenario "A workspace whose organization has no GitHub connection still lists its sessions" */
   it("keeps session rows when the project has no organization", async () => {
     const sessions = new TestSessions();
     sessions.rows = [session({ repositoryOwner: "acme", repositoryName: "widgets" })];

@@ -253,21 +253,6 @@ function MessageContentImpl({
         text: reasoningFold.text,
         hasActivity: hasActivityRecord,
       });
-  // The block channel (ADR-060): a settled assistant message whose parts
-  // carry stamped `langy-card` / `langy-card-failed` parts renders as an
-  // ORDERED sequence — prose, card where the block sat, prose — instead of
-  // one joined markdown body. Fence-less messages keep the joined path
-  // untouched, and the live streaming turn never has stamped parts (the
-  // preview is Phase 4's seam), so `isStreaming` rendering is unaffected.
-  // Memoized: parts are replaced wholesale on settle/rehydrate, so identity
-  // is a faithful cache key and history messages never re-split per render.
-  const blockSegments = useMemo(
-    () =>
-      !isUser && !isStreaming && hasLangyBlockParts(message.parts)
-        ? langyAnswerSegments(message.parts)
-        : null,
-    [isUser, isStreaming, message.parts],
-  );
   // A turn whose only output is a stamped card block has no prose at all, and
   // reading "No content" under a card the reader can see is worse than saying
   // nothing.
@@ -408,50 +393,6 @@ function MessageContentImpl({
             />
           </LangyCardBoundary>
         ))}
-        {/* Work precedes its conclusion. Rendering prose first made settled
-            turns appear to run backwards: answer, then the commands that found
-            it. The prompt suppresses process narration, so this is the useful
-            interpretation that follows the evidence/cards above. */}
-        {/* The answer wears the theme's answer tokens (langyTheme.ts): half a
-            step smaller than the user's `sm` bubble and a step dimmer than
-            `fg`, so a glance separates "what I said" from "what it said". */}
-        {blockSegments ? (
-          <AnswerWithCards
-            segments={blockSegments}
-            hasActivity={showsActivity || Boolean(plan)}
-            projectSlug={project?.slug ?? null}
-            choicesTimeline={choicesTimeline}
-            onChoiceSelect={onChoiceSelect}
-            onVerifyDerivedCard={onVerifyDerivedCard}
-          />
-        ) : (
-          displayText &&
-          (isStreaming ? (
-            // The live turn: prose streams as ever, and any forming
-            // ```langy-card fence previews through the SAME validation the
-            // relay stamps with at settle (ADR-060 §7). Fence-less streams
-            // take the plain path inside, unchanged.
-            <Box paddingX="2px">
-              <StreamingAnswerWithCards text={displayText} projectSlug={project?.slug ?? null} />
-            </Box>
-          ) : (
-            <Box
-              // The cards above have a border plus their own inner padding, so
-              // a flush-left paragraph sat a hair OUTSIDE their text edge. Two
-              // pixels tucks the prose onto the same optical column.
-              paddingX="2px"
-              css={{
-                "& > div > :first-child": { marginTop: 0 },
-                "& > div > :last-child": { marginBottom: 0 },
-                "& table": { display: "block", overflowX: "auto" },
-              }}
-            >
-              <Markdown fontSize="langyAnswer" linkVariant="langy" color="langy.answerFg">
-                {displayText}
-              </Markdown>
-            </Box>
-          ))
-        )}
         {/* The question the agent is waiting on — the interactive choices
             card, after the prose so the ask reads as the turn's closing line.
             Lock state derives from the same recorded timeline as a stamped

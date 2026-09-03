@@ -94,6 +94,7 @@
     "typecheck": "tsc --noEmit",
     "test": "vitest run",
     "test:unit": "vitest run",
+    "test:integration": "vitest run --config vitest.integration.config.ts",
     "generate:setup-skill-bodies": "node --experimental-strip-types scripts/generate-setup-skill-bodies.ts"
   },
   "dependencies": {
@@ -119,7 +120,9 @@
     "@langwatch/feature-flag-server": "workspace:*",
     "@opentelemetry/sdk-trace-base": "2.10.0",
     "@opentelemetry/sdk-trace-node": "2.10.0",
+    "@testcontainers/redis": "^12.0.4",
     "@types/node": "^26.0.1",
+    "ioredis": "^5.9.3",
     "typescript": "^7.0.2",
     "vitest": "^4.1.9"
   }

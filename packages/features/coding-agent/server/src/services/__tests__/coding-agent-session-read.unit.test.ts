@@ -58,7 +58,10 @@ describe("Coding Agent session reads", () => {
     ]);
   });
 
-  /** @scenario "a session event read has no explicit time window" */
+  /**
+   * @scenario "reading a session's events prunes to the session's own weeks"
+   * @scenario "a session longer than the guessed window still answers in full"
+   */
   it("bounds inferred event reads around the session and widens only the upper edge after an empty page", async () => {
     const sessions = new TestSessions();
     const row = session({
@@ -85,6 +88,7 @@ describe("Coding Agent session reads", () => {
     expect(events.inputs[1]?.occurredAt?.toMs).toBe(TEST_NOW_MS);
   });
 
+  /** @scenario "a caller's own window is never widened behind its back" */
   it("does not widen an explicit event window", async () => {
     const events = new TestEvents();
     const service = serviceWith({ events });
@@ -120,6 +124,7 @@ describe("Coding Agent session reads", () => {
     expect(events.inputs[0]?.kinds).toEqual(["compaction"]);
   });
 
+  /** @scenario "the trace view shows its session" */
   it("resolves a trace through its tenant-scoped mapping and retries a stale session window unbounded", async () => {
     const sessions = new TestSessions();
     sessions.rows = [session({ modelCalls: 3 })];
@@ -146,6 +151,7 @@ describe("Coding Agent session reads", () => {
     ]);
   });
 
+  /** @scenario "a stale hint degrades to a slower read, not a missing session" */
   it("retries a stale session hint without hiding the durable session", async () => {
     const sessions = new TestSessions();
     sessions.rows = [session({ modelCalls: 5 })];
@@ -164,7 +170,10 @@ describe("Coding Agent session reads", () => {
     expect(sessions.findInputs[1]?.window).toBeUndefined();
   });
 
-  /** @scenario "a trace with no coding-agent mapping is optional discovery" */
+  /**
+   * @scenario "a trace with no coding-agent mapping is optional discovery"
+   * @scenario "traces from other sources are untouched"
+   */
   it("does not query sessions when a trace has no Coding Agent mapping", async () => {
     const sessions = new TestSessions();
     const service = serviceWith({ sessions });

@@ -166,7 +166,8 @@ describe("PrismaModelProviderRepository", () => {
     );
   });
 
-  /** @scenario "a provider may be visible at project, team, or organization scope" */
+  /** @scenario Model Providers page lists all accessible rows across scopes */
+  /** @scenario Rows outside my permission are hidden */
   it("lists every row visible through the project, team, or organization scope", async () => {
     const findMany = vi.fn().mockResolvedValue([row]);
     const repository = PrismaModelProviderRepository.create(

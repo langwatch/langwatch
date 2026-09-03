@@ -24,6 +24,7 @@ import { Box, VStack } from "@chakra-ui/react";
 import {
   feedLangyDerivedCardPreview,
   type LangyDerivedCardPreview,
+  mightContainLangyCardFence,
   splitLangyCardFences,
 } from "@langwatch/langy-contract";
 import { Fragment, useMemo, useRef, type ReactNode } from "react";
@@ -32,9 +33,6 @@ import {
   LangyDerivedCardView,
   type LangyDerivedCardViewProps,
 } from "./langy-derived-card-view";
-
-/** Cheap heuristic gate: fence-less streams never pay for the line scan. */
-const FENCE_MARKER = "```langy-card";
 
 type StreamSegment =
   | { type: "text"; text: string }
@@ -57,7 +55,7 @@ export function LangyStreamingAnswerWithCards({
   const previewsRef = useRef<Map<number, LangyDerivedCardPreview>>(new Map());
 
   const segments = useMemo<StreamSegment[]>(() => {
-    if (!text.includes(FENCE_MARKER)) {
+    if (!mightContainLangyCardFence(text)) {
       return [{ type: "text", text }];
     }
     const previews = previewsRef.current;

@@ -146,6 +146,77 @@ describe("LangySessionKeyService", () => {
     expect(granted.filter((p) => p.startsWith("langy:") || p.startsWith("ops:"))).toEqual([]);
   });
 
+  // Ported from platform/app/src/server/app-layer/langy/__tests__/langySessionKey.integration.test.ts
+  // (origin/main)'s "reaches the destructive grains the caller's role grants" /
+  // "is refused the delete its owner does not hold", adapted from a real-DB
+  // caller-role fixture to this file's fake-authz `mint` harness: the
+  // permission a minted key carries is exactly the intersection of what the
+  // caller holds and the candidate ceiling — no DB round trip is needed to
+  // prove that intersection either includes or excludes a destructive grain.
+  // See specs/langy/langy-session-key.feature.
+  /** @scenario Langy can delete my work, because I can */
+  it("mints a key carrying a destructive grain the caller holds", async () => {
+    const repository = new SessionKeyRepository();
+    const apiKeyCreate: ApiKeyService["create"] = vi.fn(async () => {
+      const apiKey = Object.assign(Object.create(null), { id: "key-1" });
+      return { token: "session-token", apiKey };
+    });
+    const apiKeys: ApiKeyService = Object.create(ApiKeyService.prototype);
+    apiKeys.create = apiKeyCreate;
+    const authz: AuthzService = Object.create(AuthzService.prototype);
+    authz.effectivePermissions = vi.fn(async () => [
+      "project:view",
+      "experiments:delete",
+    ]);
+
+    await createService({
+      repository,
+      apiKeys,
+      authz,
+      metrics: new SessionKeyMetrics(),
+    }).mint({
+      session: { user: { id: "user-1" } },
+      projectId: "project-1",
+      organizationId: "organization-1",
+    });
+
+    const granted = (apiKeyCreate as ReturnType<typeof vi.fn>).mock.calls[0]![0]
+      .permissions as string[];
+    expect(granted).toContain("experiments:delete");
+  });
+
+  /** @scenario Langy cannot delete my work when I cannot */
+  it("withholds a destructive grain the caller does not hold, even though Langy could ask for it", async () => {
+    const repository = new SessionKeyRepository();
+    const apiKeyCreate: ApiKeyService["create"] = vi.fn(async () => {
+      const apiKey = Object.assign(Object.create(null), { id: "key-1" });
+      return { token: "session-token", apiKey };
+    });
+    const apiKeys: ApiKeyService = Object.create(ApiKeyService.prototype);
+    apiKeys.create = apiKeyCreate;
+    const authz: AuthzService = Object.create(AuthzService.prototype);
+    // Holds enough to mint a key at all (view), but not the destructive grain.
+    authz.effectivePermissions = vi.fn(async () => ["project:view", "experiments:view"]);
+
+    await createService({
+      repository,
+      apiKeys,
+      authz,
+      metrics: new SessionKeyMetrics(),
+    }).mint({
+      session: { user: { id: "user-1" } },
+      projectId: "project-1",
+      organizationId: "organization-1",
+    });
+
+    const granted = (apiKeyCreate as ReturnType<typeof vi.fn>).mock.calls[0]![0]
+      .permissions as string[];
+    // The ceiling names this grain (proven above), but the caller's own role
+    // does not hold it, so the intersection Langy mints must not either.
+    expect(LANGY_CANDIDATE_PERMISSIONS).toContain("experiments:delete");
+    expect(granted).not.toContain("experiments:delete");
+  });
+
   it("refuses a non-Langy key and reaps only expired session keys", async () => {
     const repository = new SessionKeyRepository();
     repository.key = {

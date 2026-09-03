@@ -279,6 +279,7 @@ describe("ModelProviderTrpcApi", () => {
   });
 
   describe("when any browser-facing read runs", () => {
+    /** @scenario Plaintext API keys never reach the browser through any provider query */
     it("uses the masking service methods, never the decrypted execution ones", async () => {
       const getForProject = vi.fn(async () => ({}));
       const listForProject = vi.fn(async () => []);

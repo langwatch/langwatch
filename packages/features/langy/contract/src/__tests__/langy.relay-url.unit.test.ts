@@ -12,6 +12,7 @@ describe("toRelativeSameOriginHref", () => {
     ).toBe("/demo/messages/t1?tab=spans#span-2");
   });
 
+  /** @scenario A link pointing outside this LangWatch instance is not adopted */
   it("rejects foreign, malformed, relative and opaque-origin URLs", () => {
     expect(
       toRelativeSameOriginHref({

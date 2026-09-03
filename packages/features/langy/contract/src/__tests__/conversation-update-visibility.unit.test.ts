@@ -40,6 +40,7 @@ describe("langy conversation update visibility gate", () => {
     });
 
     describe("when the subscribing user is NOT the owner", () => {
+      /** @scenario A private conversation's updates stay with its owner */
       it("refuses the signal", () => {
         const payload = makePayload({
           ownerUserId: "user-owner",
@@ -57,6 +58,7 @@ describe("langy conversation update visibility gate", () => {
 
   describe("given a shared conversation", () => {
     describe("when the subscribing user is a non-owner project member", () => {
+      /** @scenario A shared conversation updates every member watching it */
       it("allows the signal through (shared with the project)", () => {
         const payload = makePayload({
           ownerUserId: "user-owner",

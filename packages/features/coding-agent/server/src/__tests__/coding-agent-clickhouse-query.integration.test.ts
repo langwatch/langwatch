@@ -42,6 +42,10 @@ async function runtime() {
 }
 
 describe("Coding Agent ClickHouse query contract", () => {
+  /**
+   * @scenario re-delivery does not duplicate a row
+   * @scenario a session's events list in time order with stable pagination
+   */
   it("keeps event reads ordered, deduplicated, keyset-paginated, and bounded by the caller window", async () => {
     const { endpoint, service } = await runtime();
 

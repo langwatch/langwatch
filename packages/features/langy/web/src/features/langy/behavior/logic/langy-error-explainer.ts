@@ -1,9 +1,8 @@
+import { explainHandledError, UNKNOWN_ERROR_PRESENTATION } from "@langwatch/handled-error/presentation";
 import {
-  explainHandledError,
   type HandledErrorShape,
   readHandledError,
-  UNKNOWN_ERROR_PRESENTATION,
-} from "../../../../behavior/errors";
+} from "@langwatch/handled-error/read-handled-error";
 
 /**
  * Langy error explainer (ADR-045).
@@ -58,7 +57,6 @@ export interface LangyErrorAction {
 /** One serialized reason from the HandledError chain (recursive). */
 export interface LangySerializedReason {
   kind: string;
-  retryable: boolean;
   meta?: Record<string, unknown>;
   reasons?: LangySerializedReason[];
 }
@@ -329,13 +327,11 @@ function parseReasons(value: unknown): LangySerializedReason[] | undefined {
     .map((r) => {
       const rec = r as {
         kind: string;
-        retryable?: unknown;
         meta?: unknown;
         reasons?: unknown;
       };
       return {
         kind: rec.kind,
-        retryable: rec.retryable === true,
         meta:
           rec.meta && typeof rec.meta === "object"
             ? (rec.meta as Record<string, unknown>)
@@ -370,7 +366,6 @@ export function readLangyStreamError(
     meta?: unknown;
     httpStatus?: unknown;
     traceId?: unknown;
-    retryable?: unknown;
     reasons?: unknown;
   };
   const code =
@@ -387,7 +382,6 @@ export function readLangyStreamError(
       value.meta && typeof value.meta === "object"
         ? (value.meta as Record<string, unknown>)
         : {},
-    retryable: value.retryable === true,
     traceId: typeof value.traceId === "string" ? value.traceId : undefined,
     reasons: parseReasons(value.reasons),
   };
@@ -425,7 +419,6 @@ export function resolveLiveTurnError({
       code: "unknown",
       meta: {},
       httpStatus: 500,
-      retryable: false,
     }
   );
 }
@@ -481,7 +474,6 @@ function toRegistryReasons(
   return (reasons ?? []).map((reason) => ({
     code: reason.kind,
     kind: reason.kind,
-    retryable: reason.retryable,
     reasons: toRegistryReasons(reason.reasons),
   }));
 }
@@ -492,7 +484,6 @@ function registryCopy(domain: LangyDomainError) {
     meta: domain.meta,
     httpStatus: domain.httpStatus,
     fault: domain.fault ?? "customer",
-    retryable: domain.retryable,
     tips: domain.tips ?? [],
     docsUrl: domain.docsUrl,
     traceId: domain.traceId,
@@ -558,8 +549,15 @@ export function isStaleLangyHistoryRead({
   );
 }
 
-export function explainLangyError(received: LangyDomainError): LangyErrorPresentation {
-  const domain = promoteCodexAgentError(received);
+export function explainLangyError(
+  received: LangyDomainError,
+): LangyErrorPresentation {
+  // Order matters: the narrower promotions run first, so a codex session that
+  // also carries an upstream status keeps its own card. "Not reachable at all"
+  // is checked before "reached and refused" for the same reason.
+  const domain = promoteUpstreamProviderError(
+    promoteModelUnavailableError(promoteCodexAgentError(received)),
+  );
   // Always carried through for debugging, regardless of the matched case.
   const debug = {
     meta: Object.keys(domain.meta).length > 0 ? domain.meta : undefined,

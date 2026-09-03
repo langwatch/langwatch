@@ -696,6 +696,11 @@ class DeprecatedCatalog extends Catalog {
     return providerName === "google_agent_platform" ? { replacement: "gemini" } : null;
   }
 }
+class UncheckableCatalog extends Catalog {
+  override testConnection(): Promise<ModelProviderCredentialVerdict> {
+    return Promise.resolve({ outcome: "unchecked", valid: true, reason: "no_endpoint" });
+  }
+}
 class RoutingCatalog extends Catalog {
   tryNormalizeRoutingHandle(input: string | null): string | null {
     return input?.trim().toLowerCase() || null;
@@ -871,6 +876,7 @@ function serviceWithDefaults(defaults: Defaults): ModelProviderService {
 }
 
 describe("ModelProviderService", () => {
+  /** @scenario An org-scoped config sets the DEFAULT for every project in that org */
   it("resolves the newest feature default through the project scope chain", async () => {
     const defaults = new Defaults();
     defaults.configs = [
@@ -903,6 +909,8 @@ describe("ModelProviderService", () => {
     });
   });
 
+  /** @scenario A project-scoped config wins over an org-scoped one for the same key */
+  /** @scenario A feature override beats a role default at the same scope */
   it("prefers the narrowest scope and a feature override within that scope", async () => {
     const defaults = new Defaults();
     defaults.configs = [
@@ -937,6 +945,7 @@ describe("ModelProviderService", () => {
     });
   });
 
+  /** @scenario Legacy duplicate configs at the same scope resolve by created-at DESC */
   it("uses the newest config when duplicate rows exist at one scope", async () => {
     const defaults = new Defaults();
     defaults.configs = [
@@ -964,6 +973,90 @@ describe("ModelProviderService", () => {
     ).resolves.toMatchObject({ model: "openai/gpt-5.5", scope: "project" });
   });
 
+  /** @scenario Missing keys cascade up to the next scope tier */
+  it("cascades an absent key up to the next scope tier", async () => {
+    const defaults = new Defaults();
+    defaults.configs = [
+      {
+        id: "cfg-org",
+        config: { DEFAULT: "openai/gpt-5.5", FAST: "openai/gpt-5.4-mini" },
+        scopes: [{ scopeType: "ORGANIZATION", scopeId: "org_1" }],
+        authorId: null,
+        createdAt: new Date(1),
+      },
+      {
+        id: "cfg-proj",
+        // Only sets DEFAULT — FAST should cascade up to org.
+        config: { DEFAULT: "anthropic/claude-sonnet-4-6" },
+        scopes: [{ scopeType: "PROJECT", scopeId: "project_1" }],
+        authorId: null,
+        createdAt: new Date(2),
+      },
+    ];
+
+    await expect(
+      serviceWithDefaults(defaults).resolveModelForFeature({
+        projectId: "project_1",
+        featureKey: "traces.ai_search",
+      }),
+    ).resolves.toMatchObject({ model: "openai/gpt-5.4-mini", scope: "organization" });
+  });
+
+  /** @scenario A lower-tier config beats a newer higher-tier config */
+  it("always prefers the lower tier regardless of createdAt", async () => {
+    const defaults = new Defaults();
+    defaults.configs = [
+      {
+        id: "cfg-org-new",
+        config: { DEFAULT: "openai/gpt-5.5" },
+        scopes: [{ scopeType: "ORGANIZATION", scopeId: "org_1" }],
+        authorId: null,
+        createdAt: new Date(2),
+      },
+      {
+        id: "cfg-proj-old",
+        config: { DEFAULT: "openai/gpt-5.4-mini" },
+        scopes: [{ scopeType: "PROJECT", scopeId: "project_1" }],
+        authorId: null,
+        createdAt: new Date(1),
+      },
+    ];
+
+    await expect(
+      serviceWithDefaults(defaults).resolveModelForFeature({
+        projectId: "project_1",
+        featureKey: "prompt.create_default",
+      }),
+    ).resolves.toMatchObject({ model: "openai/gpt-5.4-mini", scope: "project" });
+  });
+
+  /** @scenario A config can attach to many scopes at once */
+  it("resolves a multi-scope config at the most-specific tier in the chain", async () => {
+    const defaults = new Defaults();
+    defaults.configs = [
+      {
+        id: "cfg-shared",
+        config: { DEFAULT: "openai/gpt-5.5" },
+        scopes: [
+          { scopeType: "ORGANIZATION", scopeId: "other-org" },
+          { scopeType: "TEAM", scopeId: "team_1" },
+          { scopeType: "PROJECT", scopeId: "project_1" },
+        ],
+        authorId: null,
+        createdAt: new Date(1),
+      },
+    ];
+
+    await expect(
+      serviceWithDefaults(defaults).resolveModelForFeature({
+        projectId: "project_1",
+        featureKey: "prompt.create_default",
+      }),
+    ).resolves.toMatchObject({ model: "openai/gpt-5.5", scope: "project" });
+  });
+
+  /** @scenario "A restricted DEFAULT-role value at project tier is skipped in favor of a wider tier" */
+  /** @scenario 'Exhaustion caused entirely by a restricted model reports the refusal, not "nothing configured"' */
   it("skips restricted defaults and reports restricted-only exhaustion", async () => {
     const defaults = new Defaults();
     const restricted = {
@@ -1003,6 +1096,8 @@ describe("ModelProviderService", () => {
     });
   });
 
+  /** @scenario Looking up an unknown feature key throws */
+  /** @scenario An empty database throws ModelNotConfiguredError */
   it("distinguishes unknown features from an empty configured cascade", async () => {
     const modelProviders = service();
 
@@ -1134,6 +1229,8 @@ describe("ModelProviderService", () => {
     expect(providers.created).toHaveLength(0);
     expect(providers.updates).toHaveLength(0);
   });
+  /** @scenario The retired provider accepts no new credentials, from anywhere */
+  /** @scenario An already-stored credential under the retired provider can still be changed */
   it("refuses a new row for a deprecated provider but keeps stored rows editable", async () => {
     const providers = new Providers();
     providers.rows = [];
@@ -1161,6 +1258,7 @@ describe("ModelProviderService", () => {
       }),
     ).resolves.toMatchObject({ id: "mp_1", enabled: false });
   });
+  /** @scenario The retired provider accepts no new credentials, from anywhere */
   it("allows a new row for the provider that replaces a deprecated provider", async () => {
     const providers = new Providers();
     providers.rows = [];
@@ -1201,6 +1299,7 @@ describe("ModelProviderService", () => {
       meta: { handle: "openai", problem: "reserved" },
     });
   });
+  /** @scenario "Repeated tests are limited per organization" */
   it("tests only a stored, authorized provider and applies the connection-test budget", async () => {
     const providers = new Providers();
     const authorization = new Authorization();
@@ -1614,6 +1713,7 @@ describe("ModelProviderService", () => {
       plan: "plus",
     });
   });
+  /** @scenario Model served by several rows uses the narrowest scope */
   it("selects the narrowest enabled custom-model provider row", async () => {
     const providers = new Providers();
     providers.rows = [
@@ -1637,6 +1737,7 @@ describe("ModelProviderService", () => {
       }),
     ).resolves.toMatchObject({ id: "project-row" });
   });
+  /** @scenario Disabled rows never serve a model even when their catalog lists it */
   it("does not let a disabled project row mask an enabled organization row", async () => {
     const providers = new Providers();
     providers.rows = [
@@ -1887,6 +1988,7 @@ describe("ModelProviderService", () => {
     expect(providers.updates).toHaveLength(0);
   });
 
+  /** @scenario Assigning a provider to an org without manage permission is denied */
   it("rejects an organization-scoped create before persisting when the actor lacks that scope", async () => {
     const providers = new Providers();
     providers.rows = [];
@@ -1905,6 +2007,7 @@ describe("ModelProviderService", () => {
     expect(providers.created).toEqual([]);
   });
 
+  /** @scenario Adding an unauthorized team scope to an existing provider is rejected */
   it("authorizes every old and new scope before replacing a provider scope set", async () => {
     const providers = new Providers();
     providers.rows = [
@@ -1930,6 +2033,7 @@ describe("ModelProviderService", () => {
     expect(providers.rows[0]?.scopes).toEqual([{ scopeType: "PROJECT", scopeId: "project_1" }]);
   });
 
+  /** @scenario Update of a vanished id surfaces NOT_FOUND instead of silently creating */
   it("does not turn a missing id into a new provider row", async () => {
     const providers = new Providers();
     providers.rows = [];
@@ -1945,6 +2049,7 @@ describe("ModelProviderService", () => {
     expect(providers.created).toEqual([]);
   });
 
+  /** @scenario Deletion requires manage permission on EVERY current scope of the MP */
   it("refuses a denied delete without mutating the stored provider", async () => {
     const providers = new Providers();
     const authorization = new Authorization();
@@ -1962,6 +2067,7 @@ describe("ModelProviderService", () => {
     expect(providers.deleted).toEqual([]);
   });
 
+  /** @scenario A provider with unusable credentials refuses a save that brings no replacement */
   it("refuses unreadable stored credentials until a usable replacement is supplied", async () => {
     const providers = new Providers();
     providers.rows = [provider({ customKeys: null })];
@@ -2015,6 +2121,9 @@ describe("ModelProviderService", () => {
     });
   });
 
+  /** @scenario "Testing a saved provider uses the credential already stored" */
+  /** @scenario "A test never accepts an endpoint from the caller" */
+  /** @scenario "Testing an organization-scoped provider reaches its credential" */
   it("uses stored credentials for a connection check and never request-supplied values", async () => {
     const providers = new Providers();
     providers.rows = [provider({ customKeys: { apiKey: "stored-secret" } })];
@@ -2032,6 +2141,21 @@ describe("ModelProviderService", () => {
     ]);
   });
 
+  /** @scenario "A provider we cannot check says so instead of reporting success" */
+  it("passes an unchecked verdict through rather than reporting a pass", async () => {
+    const providers = new Providers();
+    providers.rows = [provider()];
+
+    await expect(
+      service(providers, new UncheckableCatalog(), new CodexRefresher()).testConnection({
+        modelProviderId: "mp_1",
+        organizationId: "org_1",
+        actorId: "user_1",
+      }),
+    ).resolves.toEqual({ outcome: "unchecked", valid: true, reason: "no_endpoint" });
+  });
+
+  /** @scenario "Testing a provider I cannot manage is refused" */
   it("does not rate-limit a connection check that authorization rejects", async () => {
     const authorization = new Authorization();
     authorization.canWriteResult = false;
@@ -2053,6 +2177,7 @@ describe("ModelProviderService", () => {
     expect(limiter.calls).toBe(0);
   });
 
+  /** @scenario "A provider row carrying no scopes is not testable" */
   it("does not test a provider row with no granted scope", async () => {
     const providers = new Providers();
     providers.rows = [provider({ scopes: [] })];
@@ -2129,6 +2254,7 @@ describe("ModelProviderService", () => {
     ).resolves.toMatchObject({ id: "embedding-row" });
   });
 
+  /** @scenario Preserve original extra header values when saving with masked placeholders */
   it("restores each masked header by name through the canonical save path", async () => {
     const providers = new Providers();
     providers.rows = [
@@ -2199,6 +2325,7 @@ describe("ModelProviderService", () => {
     ]);
   });
 
+  /** @scenario Preserve original extra header values when saving with masked placeholders */
   it("does not assign a claimed header secret to an unrelated masked header", async () => {
     const providers = new Providers();
     providers.rows = [
