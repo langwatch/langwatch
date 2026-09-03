@@ -103,6 +103,21 @@ Feature: Passkeys - the fastest way in, and the one phishing cannot take
     Then nothing is offered, about either of them
     But once the interval has passed the offer comes back
 
+  # ADR-120's rule is that a passkey is offered where it REPLACES a password.
+  # Somebody who just signed in through their employer's identity provider did
+  # not type one and cannot stop typing one, and somebody who signed in with a
+  # passkey already has the thing being offered — so the offer would be a
+  # dialog in the way of the product with nothing behind it. What the session
+  # recorded it proved (D06) is the answer, and a session that recorded nothing
+  # is not read as a password.
+  @integration
+  Scenario: The passkey offer follows a password, not a federated sign-in
+    Given "sam" holds no passkey and the offer is theirs to see
+    When "sam" reaches the product having signed in with a password
+    Then the offer is on screen
+    But it is not shown at all when the sign-in was a passkey or an identity provider
+    And it is not shown for a session that recorded no method
+
   @unit @unimplemented
   Scenario: A registered passkey becomes an identifier like every other method
     When "sam" completes a passkey registration ceremony

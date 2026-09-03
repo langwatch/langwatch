@@ -6,6 +6,10 @@ import {
 } from "~/server/app-layer/authz/principal";
 import { resolveSessionPrincipal } from "~/server/app-layer/identity/impersonation-claims";
 import { identityEmail } from "~/server/app-layer/identity/runtime";
+import {
+  type SignedInWith,
+  signedInWithFor,
+} from "~/server/app-layer/identity/session-claims";
 import { auth } from "~/server/better-auth";
 import { prisma } from "~/server/db";
 import type {
@@ -75,6 +79,17 @@ export interface Session {
    * Production runtime always populates it via `getServerAuthSession`.
    */
   sessionId?: string;
+  /**
+   * Which of this person's ways in minted this session (D06), read off the
+   * factors it recorded rather than re-derived by whoever asks.
+   *
+   * ADR-120's offer is the caller: a passkey is offered where it replaces a
+   * password, so a screen has to be able to tell a password sign-in from a
+   * federated one. Optional for the same reason `sessionId` is — hand-built
+   * test fixtures carry no session row — and absent reads as `"unknown"`,
+   * which is never treated as a password.
+   */
+  signedInWith?: SignedInWith;
 }
 
 const toHeaders = (
@@ -124,29 +139,14 @@ export const getServerAuthSession = async (ctx: {
       userId: result.user.id,
     });
 
-    const baseSession: Session = {
-      user: {
-        id: result.user.id,
-        name: result.user.name ?? null,
-        email: identityResolvedEmail ?? result.user.email ?? null,
-        image: result.user.image ?? null,
-        pendingSsoSetup:
-          ((result.user as Record<string, unknown>).pendingSsoSetup as
-            | boolean
-            | undefined) ?? false,
-      },
-      expires:
-        result.session.expiresAt instanceof Date
-          ? result.session.expiresAt.toISOString()
-          : new Date(result.session.expiresAt).toISOString(),
-      sessionId: result.session.id,
-      principal: ownPrincipal({ userId: result.user.id }),
-    };
-
     // The session's own impersonation claims (D06). `{actor, subject}` on the
     // row, which is the shape the authz principal speaks — it replaced a JSON
     // payload that carried a stale copy of the impersonated user's name and
     // e-mail and named the operator nowhere at all.
+    //
+    // `amr` rides along on the same read rather than costing a second one: it
+    // is what the sign-in proved, and the only thing that can tell a password
+    // sign-in from a federated one once the sign-in itself is over.
     const dbSession = await prisma.session.findUnique({
       where: { id: result.session.id },
       select: {
@@ -155,6 +155,7 @@ export const getServerAuthSession = async (ctx: {
         subjectUserId: true,
         impersonationReason: true,
         impersonationExpiresAt: true,
+        amr: true,
       },
     });
 
@@ -172,6 +173,26 @@ export const getServerAuthSession = async (ctx: {
       );
       return null;
     }
+
+    const baseSession: Session = {
+      user: {
+        id: result.user.id,
+        name: result.user.name ?? null,
+        email: identityResolvedEmail ?? result.user.email ?? null,
+        image: result.user.image ?? null,
+        pendingSsoSetup:
+          ((result.user as Record<string, unknown>).pendingSsoSetup as
+            | boolean
+            | undefined) ?? false,
+      },
+      expires:
+        result.session.expiresAt instanceof Date
+          ? result.session.expiresAt.toISOString()
+          : new Date(result.session.expiresAt).toISOString(),
+      sessionId: result.session.id,
+      principal: ownPrincipal({ userId: result.user.id }),
+      signedInWith: signedInWithFor({ amr: dbSession.amr }),
+    };
 
     const principal = resolveSessionPrincipal({
       claims: {

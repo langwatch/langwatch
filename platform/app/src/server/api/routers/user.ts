@@ -447,6 +447,13 @@ export const userRouter = createTRPCRouter({
    * new device does not restart the count and the 30 days actually mean 30
    * days. One dismissal governs the WHOLE nudge, which is what makes it one
    * question rather than two.
+   *
+   * `signedInWith` rides along because the offer is about THIS sign-in rather
+   * than about the account: ADR-120 offers a passkey where it replaces a
+   * password, and both halves of what the account still lacks are the same
+   * whether somebody typed a password today or came through their employer's
+   * identity provider. It is read off the session (D06) and never re-derived,
+   * so a screen cannot reach a different answer than the sign-in did.
    */
   secureAccountNudge: protectedProcedure
     .input(z.object({}))
@@ -455,6 +462,7 @@ export const userRouter = createTRPCRouter({
     })
     .query(async ({ ctx }) => {
       const twoStepOffered = deploymentOffersTwoStepVerification();
+      const signedInWith = ctx.session.signedInWith ?? "unknown";
 
       const [passkeys, user] = await Promise.all([
         ctx.prisma.passkey.count({ where: { userId: ctx.session.user.id } }),
@@ -467,7 +475,7 @@ export const userRouter = createTRPCRouter({
       const passkey = passkeys === 0;
       const twoStep = twoStepOffered && !(user?.twoFactorEnabled ?? false);
       if (!passkey && !twoStep) {
-        return { offer: false, passkey: false, twoStep: false };
+        return { offer: false, passkey: false, twoStep: false, signedInWith };
       }
 
       // The column keeps its name. It has always dated one dismissal of one
@@ -478,7 +486,12 @@ export const userRouter = createTRPCRouter({
       const askAgainAfter = dismissedAt
         ? dismissedAt.getTime() + SECURE_ACCOUNT_NUDGE_INTERVAL_DAYS * DAY_MS
         : 0;
-      return { offer: Date.now() >= askAgainAfter, passkey, twoStep };
+      return {
+        offer: Date.now() >= askAgainAfter,
+        passkey,
+        twoStep,
+        signedInWith,
+      };
     }),
   /**
    * "Not now". Dated rather than flagged, because the offer comes back — a

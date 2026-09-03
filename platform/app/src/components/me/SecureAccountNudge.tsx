@@ -32,11 +32,24 @@ import { authClient } from "~/utils/auth-client";
  * Which halves to show is the server's decision (`user.secureAccountNudge`),
  * so this component never has to know about deployment flags, held
  * credentials or intervals — it renders an answer.
+ *
+ * The one thing it decides is WHETHER TO ASK AT ALL, and it decides it on the
+ * sign-in the server reports rather than on anything it holds itself. ADR-120
+ * offers a passkey where a passkey REPLACES a password: somebody who came
+ * through their employer's identity provider never typed one and cannot stop
+ * typing one, and somebody who signed in with a passkey already has the thing
+ * being offered. Both used to get the dialog anyway, because what the account
+ * lacks is the same either way and nothing was reading how they got in.
+ *
+ * A session that recorded no method at all — every session minted before D06 —
+ * is not read as a password. The offer comes back on their next sign-in, which
+ * costs one deferral and never guesses.
  */
 export function SecureAccountNudge() {
   const nudge = api.user.secureAccountNudge.useQuery({});
 
   if (nudge.data?.offer !== true) return null;
+  if (nudge.data.signedInWith !== "password") return null;
 
   return (
     <SecureAccountNudgeOffer

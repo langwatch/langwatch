@@ -44,12 +44,13 @@ describe("userRouter.secureAccountNudge", () => {
     });
   });
 
-  const call = () => {
+  const call = (signedInWith?: "password" | "passkey" | "federated") => {
     const ctx = createInnerTRPCContext({
       session: {
         user: { id: "user-1", email: "sam@acme.com" },
         sessionId: "sess-1",
         expires: "2099-01-01",
+        ...(signedInWith ? { signedInWith } : {}),
       },
     });
     (ctx as any).prisma = {
@@ -61,10 +62,11 @@ describe("userRouter.secureAccountNudge", () => {
 
   describe("given somebody who signs in with a password alone", () => {
     it("offers a passkey to somebody holding none who was never asked", async () => {
-      await expect(call()).resolves.toEqual({
+      await expect(call("password")).resolves.toEqual({
         offer: true,
         passkey: true,
         twoStep: false,
+        signedInWith: "password",
       });
     });
 
@@ -88,10 +90,11 @@ describe("userRouter.secureAccountNudge", () => {
 
     /** @scenario "Only what the deployment offers is offered" */
     it("offers it to somebody who has not set one up", async () => {
-      await expect(call()).resolves.toEqual({
+      await expect(call("password")).resolves.toEqual({
         offer: true,
         passkey: false,
         twoStep: true,
+        signedInWith: "password",
       });
     });
 
@@ -102,10 +105,11 @@ describe("userRouter.secureAccountNudge", () => {
         twoFactorEnabled: true,
       });
 
-      await expect(call()).resolves.toEqual({
+      await expect(call("password")).resolves.toEqual({
         offer: false,
         passkey: false,
         twoStep: false,
+        signedInWith: "password",
       });
     });
 
@@ -113,10 +117,11 @@ describe("userRouter.secureAccountNudge", () => {
     it("offers both halves at once to somebody who has neither", async () => {
       passkeyCount.mockResolvedValue(0);
 
-      await expect(call()).resolves.toEqual({
+      await expect(call("password")).resolves.toEqual({
         offer: true,
         passkey: true,
         twoStep: true,
+        signedInWith: "password",
       });
     });
   });
@@ -145,6 +150,23 @@ describe("userRouter.secureAccountNudge", () => {
       });
 
       await expect(call()).resolves.toMatchObject({ offer: true });
+    });
+  });
+
+  describe("given the offer is about to be drawn", () => {
+    /** @scenario "The passkey offer follows a password, not a federated sign-in" */
+    it("reports how the session was signed in, so the offer can follow a password", async () => {
+      await expect(call("federated")).resolves.toMatchObject({
+        signedInWith: "federated",
+      });
+      await expect(call("passkey")).resolves.toMatchObject({
+        signedInWith: "passkey",
+      });
+    });
+
+    /** @scenario "The passkey offer follows a password, not a federated sign-in" */
+    it("reports a session that recorded no method as unknown rather than as a password", async () => {
+      await expect(call()).resolves.toMatchObject({ signedInWith: "unknown" });
     });
   });
 });

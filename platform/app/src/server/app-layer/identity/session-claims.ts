@@ -140,23 +140,61 @@ export function deriveSessionAmr({
 }
 
 /**
+ * Which of somebody's ways in minted this session, as a value something can
+ * decide on.
+ *
+ * ADR-120 needs this, and needs it as a value rather than a sentence: a
+ * passkey is offered where it REPLACES a password, so the offer has to know
+ * whether a password is what got somebody in. Reading `amr` at each place that
+ * asks would put RFC 8176's vocabulary in a dialog component and let two
+ * readings of the same session drift apart.
+ *
+ * `oidc` and `saml` give ONE answer on purpose. A federated callback records
+ * the protocol it went through and nothing about which mounted provider it
+ * was, so telling a customer's identity provider apart from a brokered social
+ * sign-in here would be inventing a distinction the session does not carry.
+ *
+ * `unknown` is an ordinary answer rather than a missing one: every session
+ * minted before D06 recorded no factors at all, and nothing may read that as a
+ * password.
+ */
+export type SignedInWith = "password" | "passkey" | "federated" | "unknown";
+
+export function signedInWithFor({
+  amr,
+}: {
+  amr: readonly string[] | null | undefined;
+}): SignedInWith {
+  if (!amr || amr.length === 0) return "unknown";
+  if (amr.includes(PHISHING_RESISTANT_AMR)) return "passkey";
+  if (amr.includes("oidc") || amr.includes("saml")) return "federated";
+  if (amr.includes(PASSWORD_AMR)) return "password";
+  return "unknown";
+}
+
+/**
  * How a session reads on somebody's own list of signed-in devices.
  *
  * Words rather than the wire values: `pwd` and `phw` are RFC 8176's
  * vocabulary and nobody outside this file should have to learn it. A session
  * that recorded nothing reads as an ordinary sign-in, because that is what it
  * is - every session minted before this shipped is one.
+ *
+ * The words are a rendering of the answer above rather than a second reading
+ * of `amr`. A screen that ACTS on which method minted a session and a screen
+ * that PRINTS it cannot then disagree about what the session proved.
  */
+const SIGN_IN_METHOD_LABELS: Record<SignedInWith, string> = {
+  passkey: "Passkey",
+  federated: "Identity provider",
+  password: "Email and password",
+  unknown: "Signed in",
+};
+
 export function signInMethodLabelFor({
   amr,
 }: {
   amr: readonly string[] | null | undefined;
 }): string {
-  if (!amr || amr.length === 0) return "Signed in";
-  if (amr.includes(PHISHING_RESISTANT_AMR)) return "Passkey";
-  if (amr.includes("oidc") || amr.includes("saml")) {
-    return "Identity provider";
-  }
-  if (amr.includes(PASSWORD_AMR)) return "Email and password";
-  return "Signed in";
+  return SIGN_IN_METHOD_LABELS[signedInWithFor({ amr })];
 }
