@@ -469,6 +469,10 @@ describe("strict feature source layout", () => {
       "packages/features/agent/server/src/subscribers/agent.subscriber.ts",
       "export class AgentSubscriber { static create() { return new AgentSubscriber(); } }",
     );
+    write(
+      "packages/features/agent/server/src/tasks/agent-backfill.task.ts",
+      "export class AgentBackfillTask { static create() { return new AgentBackfillTask(); } }",
+    );
 
     expect(policies()).not.toContain("feature-source-layout");
   });

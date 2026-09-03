@@ -33,6 +33,7 @@
     "@langwatch/automation-contract": "workspace:*",
     "@langwatch/eventing": "workspace:*",
     "@langwatch/observability": "workspace:*",
+    "@langwatch/task": "workspace:*",
     "undici": "^8.5.0"
   },
   "devDependencies": {

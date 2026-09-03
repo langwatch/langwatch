@@ -35,6 +35,7 @@ intents/<name>.intent.ts
 adapters/<name>[.<name>].adapter.ts
 transport/<surface>/<name>.api.ts              surfaces: api-rest, api-trpc, api-mcp, better-auth
 migrations/<name>-import.<name>.migration.ts
+tasks/<name>.task.ts                           a one-shot program run by @langwatch/task's launcher
 ```
 
 There is no `composition/`, `registration/`, `lifecycle/`, `eventing/`, `utils/`,

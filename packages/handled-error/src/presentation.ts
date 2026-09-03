@@ -764,6 +764,17 @@ const presentations = {
     describe: () => "This prompt has both a system prompt and a prompt. Remove one.",
   },
 
+  // ---- Tasks ----
+  task_not_found: {
+    title: "Unknown task",
+    describe: (error) => `No task named "${str(error, "task", "that")}" is registered.`,
+  },
+  task_infrastructure_unavailable: {
+    title: "This task can't run here",
+    describe: (error) =>
+      `${str(error, "handle", "A required")} connection isn't configured for this environment.`,
+  },
+
   // ---- API keys ----
   api_key_not_found: { title: "API key not found" },
   api_key_not_owned: {

@@ -2,11 +2,7 @@ import { existsSync, readFileSync } from "node:fs";
 import { relative, sep } from "node:path";
 import ts from "typescript";
 import { walkFiles } from "./files";
-import type {
-  ArchitectureViolation,
-  ClassifiedPackage,
-  FeatureCatalogueEntry,
-} from "./types";
+import type { ArchitectureViolation, ClassifiedPackage, FeatureCatalogueEntry } from "./types";
 
 const NAME = "[a-z0-9]+(?:-[a-z0-9]+)*";
 const NAME_RE = new RegExp(`^${NAME}$`);
@@ -26,6 +22,7 @@ const CANONICAL_ARTIFACTS = new Set([
   "service",
   "store",
   "subscriber",
+  "task",
 ]);
 const TEST_LEVELS = new Set(["unit", "integration", "e2e"]);
 /**
@@ -56,9 +53,7 @@ const SERVER_ARCHITECTURAL_QUALIFIERS = new Set([
   "redis",
   "routed",
 ]);
-const CONTRACT_ARTIFACT = new RegExp(
-  `^${NAME}\\.(?:commands|errors|events|queries|service)\\.ts$`,
-);
+const CONTRACT_ARTIFACT = new RegExp(`^${NAME}\\.(?:commands|errors|events|queries|service)\\.ts$`);
 const SERVER_ONLY_CONTRACT_ARTIFACT =
   /\.(?:adapter|api|mapper|migration|port|projection|repository|store)\.ts$/;
 const CONTRACT_ARTIFACT_SUFFIX = /\.(?:commands|errors|events|queries|service)\.ts$/;
@@ -74,9 +69,7 @@ const SERVER_PATTERNS = [
   new RegExp(`^services/${NAME}\\.service\\.ts$`),
   new RegExp(`^ports/${NAME}\\.port\\.ts$`),
   new RegExp(`^repositories/${NAME}(?:\\.${NAME})?\\.repository\\.ts$`),
-  new RegExp(
-    `^repositories/(${NAME})/(?:${NAME}|\\1\\.${NAME})\\.(?:mapper|repository)\\.ts$`,
-  ),
+  new RegExp(`^repositories/(${NAME})/(?:${NAME}|\\1\\.${NAME})\\.(?:mapper|repository)\\.ts$`),
   new RegExp(`^stores/${NAME}(?:\\.${NAME})?\\.store\\.ts$`),
   new RegExp(`^stores/(${NAME})/(?:${NAME}|\\1\\.${NAME})\\.store\\.ts$`),
   new RegExp(`^projections/${NAME}\\.projection\\.ts$`),
@@ -84,6 +77,10 @@ const SERVER_PATTERNS = [
   new RegExp(`^processes/${NAME}\\.process\\.ts$`),
   new RegExp(`^intents/${NAME}\\.intent\\.ts$`),
   new RegExp(`^adapters/${NAME}(?:\\.${NAME})?\\.adapter\\.ts$`),
+  // One-shot programs run from the task launcher (`@langwatch/task`),
+  // composed by apps/tasks. Lives beside the feature's other artifacts so
+  // the task calls services and adapters rather than a repository directly.
+  new RegExp(`^tasks/${NAME}\\.task\\.ts$`),
   // A transport lives under `transport/<surface>/`, where the surface names
   // the door: `api-rest`, `api-trpc`. The old `api/app-<kind>/` said "app"
   // twice and put the noun before the adjective.
@@ -95,11 +92,7 @@ function workspacePath(root: string, path: string): string {
   return relative(root, path).split(sep).join("/");
 }
 
-function violation(
-  file: string,
-  message: string,
-  allowed: string,
-): ArchitectureViolation {
+function violation(file: string, message: string, allowed: string): ArchitectureViolation {
   return { policy: "feature-source-layout", file, message, allowed };
 }
 
@@ -156,8 +149,7 @@ function lintSourceFilenames(pkg: ClassifiedPackage): ArchitectureViolation[] {
   for (const file of files) {
     if (TEST_DIRECTORY.test(workspacePath(`${pkg.root}/src`, file))) continue;
     const name = file.slice(file.lastIndexOf("/") + 1);
-    const valid =
-      pkg.kind === "server" ? isStrictServerFilename(name) : isLowerKebabFilename(name);
+    const valid = pkg.kind === "server" ? isStrictServerFilename(name) : isLowerKebabFilename(name);
     if (!valid) violations.push(filenameViolation(file, name));
   }
   return violations;
@@ -349,19 +341,11 @@ const ARTIFACT_PARTS = new Set([
   "subscriber",
   "intent",
 ]);
-const QUALIFIED_ARTIFACTS = new Set([
-  "adapter",
-  "mapper",
-  "migration",
-  "repository",
-  "store",
-]);
+const QUALIFIED_ARTIFACTS = new Set(["adapter", "mapper", "migration", "repository", "store"]);
 
 function claimsSubject(candidate: string, feature: string, subject: string): boolean {
   if (candidate === subject) return true;
-  return (
-    candidate.startsWith(`${feature}-`) && candidate.slice(feature.length + 1) === subject
-  );
+  return candidate.startsWith(`${feature}-`) && candidate.slice(feature.length + 1) === subject;
 }
 
 function claimedSubjects(path: string): string[] {

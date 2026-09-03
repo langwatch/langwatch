@@ -433,6 +433,8 @@ export const APP_ERROR_CODES = [
   "suite_targets_required",
   "system_prompt_conflict",
   "system_prompt_required",
+  "task_infrastructure_unavailable",
+  "task_not_found",
   "team_last_admin_required",
   "team_member_already_added",
   "team_membership_not_found",

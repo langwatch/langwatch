@@ -59,6 +59,8 @@ export {
 export { WebhookEgressService } from "./services/webhook-egress.service";
 export type { WebhookSendInput } from "./services/webhook-egress.service";
 
+export { WebhookSignatureVectorsTask } from "./tasks/webhook-signature-vectors.task";
+
 /**
  * The corporate proxy a self-hosted deployment's outbound vendor calls leave
  * through.
