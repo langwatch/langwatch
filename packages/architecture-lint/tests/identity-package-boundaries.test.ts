@@ -112,7 +112,6 @@ describe("identity package boundaries", () => {
    * never add to it.
    */
   const EVENTING_IMPORT_BASELINE = [
-    "packages/features/identity/server/src/adapters/eventing.scim-sync-ledger.adapter.ts -> @langwatch/eventing",
     "packages/features/identity/server/src/adapters/identity-ledger.adapter.ts -> @langwatch/eventing",
     "packages/features/identity/server/src/adapters/join-request-ledger.adapter.ts -> @langwatch/eventing",
     "packages/features/identity/server/src/repositories/prisma/prisma.identity-projection.repository.ts -> @langwatch/eventing",

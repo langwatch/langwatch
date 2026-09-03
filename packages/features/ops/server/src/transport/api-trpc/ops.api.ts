@@ -67,6 +67,7 @@ import {
   type OpsMigrationCohortResult,
   type OpsMigrationEnrollmentListing,
   type OpsMigrationOrganizationMatch,
+  type OpsApiGetBadgeCountsOutput,
   type OpsMigrationOverview,
   type OpsMigrationTargetedRunResult,
   opsSearchMigrationOrganizationsInputSchema,
@@ -298,14 +299,8 @@ export class OpsTrpcApi {
        * always-on polling; reach for `getDashboardSnapshot` only on the
        * ops route itself.
        */
-      getBadgeCounts: view(procedure).query(
-        ({
-          ctx,
-        }): {
-          blockedCount: number;
-          dlqCount: number;
-          computedAt: Date | null;
-        } => ctx.app.ops.badgeCounts(),
+      getBadgeCounts: view(procedure).query(({ ctx }): OpsApiGetBadgeCountsOutput =>
+        ctx.app.ops.badgeCounts(),
       ),
 
       dashboardStream: view(procedure).subscription(async function* ({ signal, ctx }) {
