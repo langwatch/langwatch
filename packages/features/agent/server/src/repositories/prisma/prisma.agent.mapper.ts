@@ -17,6 +17,12 @@ export type AgentRow = {
   createdAt: Date;
   updatedAt: Date;
   _count?: { copiedAgents: number };
+  /** Connected agents only (ADR-128); absent on every other row. */
+  environment?: string | null;
+  ownerUserId?: string | null;
+  hostLabel?: string | null;
+  identityKey?: string | null;
+  lastSeenAt?: Date | null;
 };
 
 export function mapAgentRow(row: AgentRow): Agent {
@@ -32,6 +38,11 @@ export function mapAgentRow(row: AgentRow): Agent {
     archivedAt: row.archivedAt ?? null,
     createdAt: row.createdAt,
     updatedAt: row.updatedAt,
+    environment: row.environment ?? null,
+    ownerUserId: row.ownerUserId ?? null,
+    hostLabel: row.hostLabel ?? null,
+    identityKey: row.identityKey ?? null,
+    lastSeenAt: row.lastSeenAt ?? null,
   } as Record<string, unknown>;
   if (row._count) {
     agent.copyCount = row._count.copiedAgents;

@@ -3,18 +3,21 @@ import { getSuiteSetId } from "@langwatch/suite-contract";
 import { createLogger } from "@langwatch/observability";
 import {
   generateBatchRunId,
+  type ResolvedRunModels,
   type RunActor,
   type RunSecretCiphertext,
   type ScenarioRunConfig,
   type ScenarioService,
   withActor,
   withNote,
+  withResolvedModels,
 } from "@langwatch/scenario-contract";
 import {
   SuiteExecutionPort,
   SuiteRunCommandsPort,
   SuiteRunIdPort,
 } from "../ports/suite-execution.port";
+import type { SuiteRunModelsResolver } from "./suite-run-models.service";
 
 const logger = createLogger("langwatch:suite-run:service");
 
@@ -36,6 +39,14 @@ export type SuiteExecutionRequest = {
   note?: string;
   /** Who started the run; every run of the batch records it. */
   actor?: RunActor;
+  /**
+   * The simulation models the plan was configured with. Stamped onto every
+   * run so the run dialog can read a configuration back off the runs and not
+   * only off the plan row. Also the "plan" half of the model-resolution
+   * chain: what the run really ran on is stamped beside it.
+   */
+  simulatorModel?: string | null;
+  judgeModel?: string | null;
 };
 
 /** One scenario, against one target, on one repeat. */
@@ -51,14 +62,22 @@ export class SuiteExecutionService extends SuiteExecutionPort {
     commands: SuiteRunCommandsPort;
     ids: SuiteRunIdPort;
     scenarios: ScenarioService;
+    /**
+     * Reads, once per batch, the models each queued run really runs on.
+     * Absent in a context with no model-default resolution behind it; the
+     * runs then record no resolved model, the same as a run recorded before
+     * the field existed.
+     */
+    resolveRunModels?: SuiteRunModelsResolver;
   }): SuiteExecutionService {
-    return new SuiteExecutionService(input.commands, input.ids, input.scenarios);
+    return new SuiteExecutionService(input.commands, input.ids, input.scenarios, input.resolveRunModels);
   }
 
   private constructor(
     private readonly commands: SuiteRunCommandsPort,
     private readonly ids: SuiteRunIdPort,
     private readonly scenarios: ScenarioService,
+    private readonly resolveRunModels?: SuiteRunModelsResolver,
   ) {
     super();
   }
@@ -167,6 +186,18 @@ export class SuiteExecutionService extends SuiteExecutionPort {
     secrets: Map<string, Record<string, string>>;
   }): Promise<void> {
     const now = Date.now();
+    const simulationModels = SuiteExecutionService.withSimulationModels(input);
+    // Read before the first run is queued: every run of the batch says which
+    // models it ran on, and the answer must not change part way through it.
+    const resolvedModelsByScenarioId: Map<string, ResolvedRunModels> =
+      (await this.resolveRunModels?.({
+        projectId: input.projectId,
+        scenarioIds: input.activeScenarioIds,
+        plan: {
+          simulatorModel: input.simulatorModel,
+          judgeModel: input.judgeModel,
+        },
+      })) ?? new Map();
 
     await Promise.allSettled(
       items.map((item) => {
@@ -185,6 +216,8 @@ export class SuiteExecutionService extends SuiteExecutionPort {
               targetType: item.target.type,
               scenarioVersion: input.scenarioVersions.get(item.scenarioId),
               ...withActor(input.actor),
+              ...simulationModels,
+              ...withResolvedModels(resolvedModelsByScenarioId.get(item.scenarioId)),
             },
             ...withNote(input.note),
             ...SuiteExecutionService.withParameters(parameters.get(item.scenarioId)),
@@ -200,6 +233,26 @@ export class SuiteExecutionService extends SuiteExecutionPort {
 
   private static withParameters(parameters: Record<string, string | number | boolean> | undefined) {
     return parameters && Object.keys(parameters).length > 0 ? { parameters } : {};
+  }
+
+  /**
+   * The simulation models the plan was configured with, or nothing at all.
+   *
+   * A plan that names no model runs on the project default, and records no
+   * model rather than the default's name: a configuration is what a person
+   * chose, so the same choice has to key the same way after a project
+   * default changes.
+   *
+   * @see specs/scenarios/run-configuration-on-runs.feature
+   */
+  private static withSimulationModels(models: {
+    simulatorModel?: string | null;
+    judgeModel?: string | null;
+  }): { simulatorModel?: string; judgeModel?: string } {
+    return {
+      ...(models.simulatorModel ? { simulatorModel: models.simulatorModel } : {}),
+      ...(models.judgeModel ? { judgeModel: models.judgeModel } : {}),
+    };
   }
 
   private static withSecretParameterNames(secretParameters: RunSecretCiphertext | undefined) {

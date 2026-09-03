@@ -5,6 +5,8 @@ import type {
   CreateAgentCommand,
   UpdateAgentCommand,
 } from "./agent.commands";
+import type { ConnectedAgentConfig } from "./config/connected";
+import type { ConnectedAgentIdentity } from "./connected-agent.identity";
 import type {
   AgentCopy,
   AgentHistoryEntry,
@@ -65,4 +67,26 @@ export abstract class AgentService {
     agentId: string;
     projectId: string;
   }): Promise<AgentHistoryEntry[]>;
+  /**
+   * Creates or re-registers a connected agent (ADR-128) on the row its
+   * identity key names. A connected agent is never created through
+   * {@link create}: the SDK registers it from the process that runs it.
+   */
+  abstract registerConnected(input: {
+    id: string;
+    projectId: string;
+    name: string;
+    config: ConnectedAgentConfig;
+    identity: ConnectedAgentIdentity;
+  }): Promise<Agent>;
+  /** The owner of every personal development agent given, by user id. */
+  abstract ownersOf(
+    agents: readonly { ownerUserId: string | null }[],
+  ): Promise<Map<string, { userId: string; name: string | null }>>;
+  /** Connected agents addressed by `<name>@<environment>` rather than id. */
+  abstract getConnectedByNameAndEnvironment(input: {
+    projectId: string;
+    name: string;
+    environment: string;
+  }): Promise<Agent[]>;
 }

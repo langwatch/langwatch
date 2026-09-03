@@ -39,4 +39,7 @@ export type AgentsDatabase = {
     create(args: unknown): Promise<unknown>;
     update(args: unknown): Promise<unknown>;
   };
+  user: {
+    findMany(args: unknown): Promise<unknown[]>;
+  };
 };

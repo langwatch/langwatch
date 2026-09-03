@@ -7,10 +7,19 @@ import {
   runParameterValuesSchema,
 } from "@langwatch/scenario-contract";
 import { suiteKindSchema } from "./suite.kind";
+import { MAX_PLAN_NAME_LENGTH } from "./plan-name";
 import { suiteScopeSchema } from "./suite.scope";
 
 export const RUN_ALL_SUITE_LABEL = "managed:run-all";
 export const RUN_ALL_SUITE_NAME = "All test cases";
+
+/**
+ * Label the CLI puts on the throwaway plan it makes for `langwatch scenario
+ * run`, archived as soon as the run is queued. A plan resolved by name skips
+ * these rows: joining one would attach a person's run to a plan about to
+ * disappear from every list.
+ */
+export const CLI_EPHEMERAL_LABEL = "cli-ephemeral";
 
 export const suiteTargetTypeSchema = z.enum([
   "prompt",
@@ -144,6 +153,47 @@ export const suiteRunAllInputSchema = suiteRunInputSchema
   .extend({ targets: z.array(suiteTargetSchema).optional() })
   .strict();
 export type SuiteRunAllInput = z.infer<typeof suiteRunAllInputSchema>;
+
+/**
+ * A run plan's config, as a run request carries it: the scope, the targets,
+ * the two simulation model overrides, and — for a hand-picked scope only —
+ * the scenarios it names.
+ */
+export const runPlanConfigSchema = z
+  .object({
+    scope: suiteScopeSchema,
+    targets: z.array(suiteTargetSchema),
+    repeatCount: z.number().int().min(1).max(MAX_REPEAT_COUNT).optional(),
+    simulatorModel: z.string().nullish(),
+    judgeModel: z.string().nullish(),
+    /** The scenarios a hand-picked scope covers; ignored by every other. */
+    scenarioIds: z.array(z.string()).optional(),
+  })
+  .strict();
+export type RunPlanConfigInput = z.infer<typeof runPlanConfigSchema>;
+
+/**
+ * Starts a run under a NAME: the run either joins the plan of that name and
+ * replaces its config, or creates one. A caller that sends none gets a name
+ * derived from what the run covers and what it runs against; a name of only
+ * spaces is refused rather than silently treated as absent.
+ *
+ * @see specs/suites/run-plan-identity-by-name.feature
+ */
+export const suiteRunPlanInputSchema = suiteRunInputSchema
+  .omit({ id: true })
+  .extend({
+    name: z.string().trim().min(1).max(MAX_PLAN_NAME_LENGTH),
+    config: runPlanConfigSchema,
+  })
+  .strict();
+export type SuiteRunPlanInput = z.infer<typeof suiteRunPlanInputSchema>;
+
+export type SuiteRunPlanResult = SuiteRunResult & {
+  suiteId: string;
+  planName: string;
+  created: boolean;
+};
 
 export const suiteArchivedNamesInputSchema = z
   .object({

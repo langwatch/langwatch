@@ -31,6 +31,12 @@ export const agentApiAgentReferenceInputSchema = z.object({
   agentId: z.string(),
 });
 
+/** One turn to an agent: the Test panel of the agent drawers. */
+export const agentApiTestTurnInputSchema = agentApiAgentInputSchema.extend({
+  message: z.string().min(1),
+  params: z.record(z.string(), z.union([z.string(), z.number(), z.boolean()])).optional(),
+});
+
 export const agentApiPushToCopiesInputSchema = z.object({
   projectId: z.string(),
   agentId: z.string(),
@@ -58,6 +64,7 @@ export function agentApiCopyInputSchema(generateAgentId: () => string) {
 export type AgentApiProjectInput = z.infer<typeof agentApiProjectInputSchema>;
 export type AgentApiAgentInput = z.infer<typeof agentApiAgentInputSchema>;
 export type AgentApiAgentReferenceInput = z.infer<typeof agentApiAgentReferenceInputSchema>;
+export type AgentApiTestTurnInput = z.infer<typeof agentApiTestTurnInputSchema>;
 export type AgentApiPushToCopiesInput = z.infer<typeof agentApiPushToCopiesInputSchema>;
 
 /**

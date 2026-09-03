@@ -1,5 +1,5 @@
 /**
- * App-process transport mounts for the thirteen Enterprise governance and
+ * App-process transport mounts for the fourteen Enterprise governance and
  * gateway-governance tRPC surfaces this process serves.
  *
  *   governance.*           the console's own reads: the setup rollup, the SIEM
@@ -12,6 +12,8 @@
  *   aiTools.*              the catalogue an organization sanctions
  *   activityMonitor.*      what its people did, as an administrator reads it
  *   anomalyRules.*         the alerts that watch the same stream
+ *   personalDashboard.*    the /me dashboard's governance reads — merged into
+ *                          `user.*` by the caller, not mounted under its own name
  *   personalSessions.*     a member's own CLI and agent sessions
  *   sessionPolicy.*        the rules those sessions are bounded by
  *   personalVirtualKeys.*  the keys a member mints for themselves
@@ -21,19 +23,14 @@
  * Behaviour is package-owned and reached through TWO seams, both in
  * `@langwatch/enterprise-api`: `EnterpriseGovernanceTrpcComposition` and
  * `EnterpriseGatewayTrpcComposition`. A core process may not depend on an
- * Enterprise feature package, so the thirteen arrive together or not at all —
+ * Enterprise feature package, so the fourteen arrive together or not at all —
  * which is also why one mount builds both compositions rather than two mounts
  * building one each.
  *
- * ## Why `personalDashboard` is not returned
- *
- * The governance composition builds fourteen and this mount forwards thirteen.
- * `personalDashboard` answers on the `user` namespace rather than a governance
- * one — `user.personalUsage`, `user.budgetOverview` and `user.cliBootstrap` are
- * the names the /me page and the CLI call — and `user.*` is composed by the
- * identity half of this record. Merging a second owner into that namespace from
- * here would put two mounts on one wire name; the surface stays unmounted and
- * that is recorded rather than hidden.
+ * `personalDashboard` answers on `user.*` (`user.personalUsage`,
+ * `user.budgetOverview`, `user.cliBootstrap` — the /me page and CLI names),
+ * not its own namespace, so this mount returns the router unmounted and
+ * `app-trpc.features.ts` merges it into `user.*` with `mergeRouters`.
  */
 import {
   EnterpriseGatewayTrpcComposition,
@@ -48,11 +45,11 @@ import {
 } from "@langwatch/api/trpc";
 import type { AnyTRPCRootTypes, TRPCRuntimeConfigOptions } from "@trpc/server";
 
-/** Every context requirement the thirteen surfaces place on the process. */
+/** Every context requirement the fourteen surfaces place on the process. */
 export type EnterpriseGovernanceMountContext = EnterpriseGatewayTrpcContext &
   EnterpriseGovernanceTrpcContext;
 
-/** The thirteen Enterprise governance namespaces this process mounts. */
+/** The fourteen Enterprise governance namespaces this process mounts. */
 export function createEnterpriseGovernanceTrpcRouters<
   TContext extends EnterpriseGovernanceMountContext,
   TOptions extends TRPCRuntimeConfigOptions<TContext, object>,
@@ -82,6 +79,7 @@ export function createEnterpriseGovernanceTrpcRouters<
     ingestionKey: governance.ingestionKey,
     ingestionSources: governance.ingestionSources,
     ingestionTemplates: governance.ingestionTemplates,
+    personalDashboard: governance.personalDashboard,
     personalSessions: governance.personalSessions,
     personalVirtualKeys: gateway.personalVirtualKeys,
     routingPolicy: gateway.routingPolicy,

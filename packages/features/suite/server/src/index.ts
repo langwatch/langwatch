@@ -22,6 +22,10 @@ export {
 } from "./ports/suite-execution.port";
 export { SuiteExecutionService } from "./services/suite-execution.service";
 export {
+  SuiteRunModelsService,
+  type SuiteRunModelsResolver,
+} from "./services/suite-run-models.service";
+export {
   assertConnectedAgentsRunnable,
   type AgentOwnerNameReader,
   type ConnectedTargetAgent,

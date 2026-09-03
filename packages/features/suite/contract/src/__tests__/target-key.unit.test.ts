@@ -363,6 +363,34 @@ describe("targetLabels", () => {
       ).toEqual(["agent-a", "agent-a · plan=pro", "agent-b"]);
     });
   });
+
+  describe("given a shared and a personal connected agent of one name", () => {
+    /** @scenario "A target label carries the environment and the owner" */
+    it("reads the environment, and the owner after it", () => {
+      const facts = {
+        agent_prod: { environment: "production", ownerName: null },
+        agent_dev: { environment: "development", ownerName: "Rogerio" },
+      } as const;
+      const targets = [
+        { referenceId: "agent_prod" },
+        { referenceId: "agent_dev" },
+      ];
+
+      const labels = targetLabels({
+        targets,
+        nameOf: () => "support-agent",
+        environmentOf: (target) =>
+          facts[target.referenceId as keyof typeof facts].environment,
+        ownerNameOf: (target) =>
+          facts[target.referenceId as keyof typeof facts].ownerName,
+      });
+
+      expect(labels).toEqual([
+        "support-agent · production",
+        "support-agent · development (Rogerio)",
+      ]);
+    });
+  });
 });
 
 describe("declaredDefaults", () => {

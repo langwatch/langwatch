@@ -12,6 +12,21 @@ export * from "./ports/scenario-tab-store.port";
 export * from "./services/scenario-execution-pool.service";
 export * from "./services/scenario-execution.service";
 export * from "./services/scenario-execution-prefetcher.service";
+export {
+  AgentTestService,
+  type AgentTestRunResult,
+  type AgentTestServiceOptions,
+  type AgentTestTurnResult,
+} from "./services/agent-test.service";
+export {
+  AgentTestOwnershipPort,
+  type AgentTestOwnershipSubject,
+} from "./ports/agent-test-ownership.port";
+export {
+  AgentTestConnectedDispatchPort,
+  type AgentTestConnectedDispatchResult,
+  type AgentTestConnectedInstance,
+} from "./ports/agent-test-connected-dispatch.port";
 export * from "./services/scenario-failure-handler.service";
 export * from "./services/scenario-processor.service";
 export * from "./services/scenario-tab-registry.service";

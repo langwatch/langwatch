@@ -172,6 +172,7 @@ describe("SuiteService", () => {
   });
 
   /** @scenario "Resolve a run through owning feature services" */
+  /** @scenario "Suite run succeeds when all scenarios exist" */
   it("resolves references before handing a run to the execution port", async () => {
     const execute = vi.fn().mockResolvedValue({
       batchRunId: "batch_1",
@@ -246,6 +247,7 @@ describe("SuiteService", () => {
     );
   });
 
+  /** @scenario "Suite run fails when all scenarios are archived" */
   it("refuses a run before execution when every scenario is archived", async () => {
     const execute = vi.fn();
     class ExecutionPort extends SuiteExecutionPort {
@@ -434,6 +436,15 @@ describe("SuiteService", () => {
     expect(execution.execute).not.toHaveBeenCalled();
   });
 
+  /** @scenario "Suite run respects repeat count" */
+  /** @scenario "Suite run succeeds when HTTP target agent exists" */
+  /** @scenario "Suite run excludes archived scenarios from job scheduling" */
+  /** @scenario "Filters out archived scenarios from a reference list" */
+  /** @scenario "Suite run excludes archived targets from job scheduling" */
+  /** @scenario "Filters out archived targets from a reference list" */
+  /** @scenario "Suite run reports skipped archived scenarios" */
+  /** @scenario "Suite run reports skipped archived targets" */
+  /** @scenario "Job count reflects only active scenarios and targets" */
   it("batches target checks, filters archived references, and preserves the run idempotency key", async () => {
     const execution = new CapturingExecutionPort();
     const agents = mockAgentService({
@@ -520,6 +531,8 @@ describe("SuiteService", () => {
     );
   });
 
+  /** @scenario "Suite run fails when a scenario does not exist" */
+  /** @scenario "Suite run fails when HTTP target agent does not exist" */
   it("rejects missing scenario and target references before execution", async () => {
     const execution = new CapturingExecutionPort();
     const scenarios = mockScenarioService({
@@ -580,6 +593,7 @@ describe("SuiteService", () => {
     expect(targetExecution.execute).not.toHaveBeenCalled();
   });
 
+  /** @scenario "Suite run fails when all targets are archived" */
   it("rejects when every target is archived", async () => {
     const execution = new CapturingExecutionPort();
     const service = SuiteService.create({

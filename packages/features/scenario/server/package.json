@@ -7,11 +7,11 @@
     "src"
   ],
   "type": "module",
+  "main": "./src/index.ts",
+  "types": "./src/index.ts",
   "imports": {
     "#*": "./src/*.ts"
   },
-  "main": "./src/index.ts",
-  "types": "./src/index.ts",
   "exports": {
     ".": {
       "types": "./src/index.ts",
@@ -44,6 +44,7 @@
     "@langwatch/scenario-contract": "workspace:*",
     "@langwatch/secret-contract": "workspace:*",
     "@langwatch/suite-contract": "workspace:*",
+    "@langwatch/task": "workspace:*",
     "@langwatch/trace-contract": "workspace:*",
     "@langwatch/user-contract": "workspace:*",
     "@langwatch/workflow-contract": "workspace:*",

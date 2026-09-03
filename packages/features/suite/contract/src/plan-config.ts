@@ -11,9 +11,9 @@
  * So: two plans may hold the SAME config and differ only by name. Nothing may
  * derive a plan's id or slug from a config key.
  *
- * `normalizePlanScope` is NOT here: it reads the project's test suites out of
- * the database, and a contract package holds no data access. It lives with the
- * suite service, which already has the repository.
+ * `normalizePlanScope` takes the project's active test suite ids as a plain
+ * argument rather than reading them itself, so it stays framework-free: the
+ * caller reads them from `ScenarioService.listTestSuites` first.
  *
  * @see specs/suites/run-plan-identity-by-name.feature
  */
@@ -143,4 +143,32 @@ function sortedList(values: string[]): string {
 export function planScopeOrNull(raw: unknown): SuiteScope | null {
   const parsed = suiteScopeSchema.safeParse(raw);
   return parsed.success ? parsed.data : null;
+}
+
+/**
+ * Reduces a scope to the one form the project agrees on.
+ *
+ * A `test suites` scope naming every active test suite of the project IS
+ * every scenario of the project, so it normalises to `all` — without this,
+ * hand-picking every suite and pressing Run all land on two different plans
+ * that always run the same thing. A scope naming no suite is left alone: an
+ * empty pick is not everything.
+ */
+export function normalizePlanScope({
+  scope,
+  activeTestSuiteIds,
+}: {
+  scope: SuiteScope;
+  activeTestSuiteIds: string[];
+}): SuiteScope {
+  if (scope.mode !== "test_suites") return scope;
+
+  const named = new Set(scope.testSuiteIds);
+  if (named.size === 0) return { mode: "test_suites", testSuiteIds: [] };
+
+  const coversEvery =
+    activeTestSuiteIds.length > 0 && activeTestSuiteIds.every((id) => named.has(id));
+  return coversEvery
+    ? { mode: "all" }
+    : { mode: "test_suites", testSuiteIds: [...named].sort() };
 }

@@ -4,6 +4,7 @@ import type {
   AgentName,
   AgentReferenceState,
   AgentType,
+  ConnectedAgentIdentity,
   UpdateAgentCommand,
 } from "@langwatch/agent-contract";
 
@@ -22,11 +23,17 @@ export type PersistAgentInput = {
   config: AgentConfig;
   workflowId?: string;
   copiedFromAgentId?: string;
+  /** The identity of a connected agent (ADR-128); unset for every other type. */
+  identity?: ConnectedAgentIdentity;
 };
 
 export abstract class AgentRepository {
   abstract tryFindById(input: { id: string; projectId: string }): Promise<Agent | null>;
   abstract tryFindByIdOnly(id: string): Promise<Agent | null>;
+  abstract tryFindByIdIncludingArchived(input: {
+    id: string;
+    projectId: string;
+  }): Promise<Agent | null>;
   abstract findAll(input: { projectId: string }): Promise<Agent[]>;
   abstract findReferenceStates(input: {
     ids: string[];
@@ -54,4 +61,42 @@ export abstract class AgentRepository {
     name: string;
     config: AgentConfig;
   }): Promise<void>;
+  /**
+   * Finds a connected agent by its identity key, whatever its state, so a
+   * process that registers the same identity writes the row it already has.
+   */
+  abstract findByIdentityKey(input: {
+    projectId: string;
+    identityKey: string;
+  }): Promise<Agent | null>;
+  /**
+   * Finds connected agents by name and environment, archived ones and ones
+   * unseen for too long excluded. Several rows can answer: one per scope in
+   * a development environment.
+   */
+  abstract findConnectedByNameAndEnvironment(input: {
+    projectId: string;
+    name: string;
+    environment: string;
+  }): Promise<Agent[]>;
+  /**
+   * Re-registers a connected agent on its existing row: the name and config
+   * the SDK sent now, and the presence projection fresh.
+   */
+  abstract reregisterConnected(input: {
+    id: string;
+    projectId: string;
+    name: string;
+    config: AgentConfig;
+  }): Promise<Agent>;
+  /** Writes the presence projection of one agent. */
+  abstract touchLastSeenAt(input: {
+    id: string;
+    projectId: string;
+    at: Date;
+  }): Promise<void>;
+  /** The display names of a set of users, for a connected agent's owner. */
+  abstract findUserNamesByIds(
+    ids: readonly string[],
+  ): Promise<Map<string, string | null>>;
 }

@@ -4,6 +4,7 @@ import {
   type ProcessObservabilityOptions,
 } from "@langwatch/observability/node";
 import type { AgentService } from "@langwatch/agent-contract";
+import type { AgentTestPort } from "@langwatch/agent-server";
 import type { SecretService } from "@langwatch/secret-contract";
 import {
   ApiApplication,
@@ -43,6 +44,8 @@ export class ApiProcess {
   static create(options: {
     /** Absent for a process that composed no agent service; see ApiApplication. */
     agents?: AgentService;
+    /** Absent for a process that composed no Scenario application; see ApiApplication. */
+    agentTesting?: AgentTestPort;
     /** Absent for a process that composed no secret service; see ApiApplication. */
     secrets?: SecretService;
     http?: Omit<ApiHttpOptions, "logger">;
@@ -77,6 +80,7 @@ export class ApiProcess {
     const observability = createProcessObservability(options.observability);
     const application = ApiApplication.create({
       agents: options.agents,
+      agentTesting: options.agentTesting,
       secrets: options.secrets,
       ...(options.features ? { features: options.features } : {}),
       http: {

@@ -18,10 +18,18 @@
  */
 import type { AgentService } from "@langwatch/agent-contract";
 import { nanoid } from "nanoid";
+import type { AgentTestPort, AgentTestRunResult, AgentTestTurnResult } from "../ports/agent-test.port";
 
 /** What the process composes this feature's application from. */
 export interface AgentAppDependencies {
   agents: AgentService;
+  /**
+   * Runs "Test agent" through the Scenario feature's execution pipeline.
+   * Absent on a process that composes no Scenario application: `testTurn` and
+   * `testRun` then throw a plain `Error`, the same way an agent copy refuses
+   * when this process holds no Workflow application.
+   */
+  testing?: AgentTestPort;
 }
 
 export class AgentApp {
@@ -113,5 +121,55 @@ export class AgentApp {
   /** One agent's edit history. */
   getHistory(input: Parameters<AgentService["getHistory"]>[0]) {
     return this.dependencies.agents.getHistory(input);
+  }
+
+  /**
+   * Sends one turn to an agent, through the same adapter a simulation turn
+   * uses, and answers what it returned.
+   */
+  async testTurn(input: {
+    id: string;
+    projectId: string;
+    message: string;
+    params?: Record<string, string | number | boolean>;
+    actorId: string;
+  }): Promise<AgentTestTurnResult> {
+    const agent = await this.dependencies.agents.getById({
+      id: input.id,
+      projectId: input.projectId,
+    });
+    if (!this.dependencies.testing) {
+      throw new Error("This process composed no agent test runner, so no turn can be sent.");
+    }
+    return this.dependencies.testing.sendTurn({
+      projectId: input.projectId,
+      agent,
+      message: input.message,
+      params: input.params,
+      actor: { id: input.actorId, label: "user" },
+    });
+  }
+
+  /**
+   * Schedules one scripted "Test agent" run, saving nothing, and answers with
+   * the run's ids so the caller can open the run drawer on it.
+   */
+  async testRun(input: {
+    agentId: string;
+    projectId: string;
+    actorId: string;
+  }): Promise<AgentTestRunResult> {
+    const agent = await this.dependencies.agents.getById({
+      id: input.agentId,
+      projectId: input.projectId,
+    });
+    if (!this.dependencies.testing) {
+      throw new Error("This process composed no agent test runner, so no run can be scheduled.");
+    }
+    return this.dependencies.testing.scheduleRun({
+      projectId: input.projectId,
+      agent,
+      actor: { id: input.actorId, label: "user" },
+    });
   }
 }

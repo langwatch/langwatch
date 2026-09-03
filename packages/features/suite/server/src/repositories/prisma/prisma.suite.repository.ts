@@ -1,11 +1,14 @@
 import { type Prisma, type PrismaClient } from "@langwatch/prisma-client/generated";
+import { isUniqueConstraintError } from "@langwatch/prisma-client";
 import {
   parseSuiteScope,
   suiteSchema,
   SuiteNotFoundError,
   type CreateSuiteCommand,
+  type RunPlanConfigInput,
   type Suite,
   type SuiteIdInput,
+  type SuiteScope,
   type UpdateSuiteCommand,
 } from "@langwatch/suite-contract";
 import { SuiteRepository } from "../suite.repository";
@@ -23,6 +26,16 @@ function nextAvailableSlug(baseSlug: string, existingSlugs: string[]): string {
     const candidate = `${baseSlug}-${suffix}`;
     if (!existing.has(candidate)) return candidate;
   }
+}
+
+function slugify(value: string): string {
+  return (
+    value
+      .toLowerCase()
+      .trim()
+      .replace(/[^a-z0-9]+/g, "-")
+      .replace(/^-|-$/g, "") || "run-plan"
+  );
 }
 
 /**
@@ -120,6 +133,116 @@ export class PrismaSuiteRepository extends SuiteRepository {
       });
       return scenarioIds;
     });
+  }
+
+  async resolveScopeMembership(input: {
+    projectId: string;
+    scope: SuiteScope;
+  }): Promise<string[]> {
+    if (input.scope.mode === "scenarios") return [];
+    if (input.scope.mode === "all") {
+      const scenarios = await this.database.scenario.findMany({
+        where: { projectId: input.projectId, archivedAt: null },
+        select: { id: true },
+        orderBy: { createdAt: "asc" },
+      });
+      return scenarios.map((scenario) => scenario.id);
+    }
+
+    const scenarios = await this.database.scenario.findMany({
+      where: {
+        projectId: input.projectId,
+        archivedAt: null,
+        ...(input.scope.mode === "test_suites"
+          ? { testSuiteId: { in: input.scope.testSuiteIds } }
+          : {}),
+        ...(input.scope.mode === "labels" ? { labels: { hasSome: input.scope.labels } } : {}),
+      },
+      select: { id: true },
+      orderBy: { createdAt: "asc" },
+    });
+    return scenarios.map((scenario) => scenario.id);
+  }
+
+  async findOrCreatePlanByName(input: {
+    id: string;
+    projectId: string;
+    name: string;
+    scope: SuiteScope;
+    targets: Suite["targets"];
+    scenarioIds: string[];
+    config: RunPlanConfigInput;
+  }): Promise<{ suite: Suite; created: boolean }> {
+    const storedConfig = {
+      scope: input.scope as unknown as Prisma.InputJsonValue,
+      targets: input.targets as Prisma.InputJsonValue,
+      repeatCount: input.config.repeatCount ?? 1,
+      simulatorModel: input.config.simulatorModel ?? null,
+      judgeModel: input.config.judgeModel ?? null,
+      scenarioIds: input.scenarioIds,
+    };
+    const baseSlug = slugify(input.name) || "run-plan";
+
+    const resolveUnderLock = () =>
+      this.database.$transaction(async (transaction) => {
+        const lockKey = `suite-plan-name:${input.projectId}:${input.name.trim().toLowerCase()}`;
+        await transaction.$executeRaw`SELECT pg_advisory_xact_lock(hashtext(${lockKey}))`;
+
+        const existing = await transaction.simulationSuite.findFirst({
+          where: {
+            projectId: input.projectId,
+            kind: "run_plan",
+            archivedAt: null,
+            name: { equals: input.name.trim(), mode: "insensitive" },
+          },
+          orderBy: [{ updatedAt: "desc" }, { createdAt: "desc" }, { id: "desc" }],
+        });
+        if (existing) {
+          const row = await transaction.simulationSuite.update({
+            where: { id: existing.id, projectId: input.projectId },
+            data: storedConfig,
+          });
+          return { suite: mapSuite(row), created: false };
+        }
+
+        const slugRows = await transaction.simulationSuite.findMany({
+          where: {
+            projectId: input.projectId,
+            slug: { startsWith: baseSlug },
+            archivedAt: null,
+          },
+          select: { slug: true },
+        });
+        const slug = nextAvailableSlug(
+          baseSlug,
+          slugRows.map((candidate) => candidate.slug),
+        );
+        const row = await transaction.simulationSuite.create({
+          data: {
+            id: input.id,
+            projectId: input.projectId,
+            name: input.name.trim(),
+            slug,
+            kind: "run_plan",
+            labels: [],
+            ...storedConfig,
+          },
+        });
+        return { suite: mapSuite(row), created: true };
+      });
+
+    try {
+      return await resolveUnderLock();
+    } catch (error) {
+      // The name lock holds two runs of ONE name apart, so a slug taken here
+      // was taken by a plan of another name that slugifies the same way. A
+      // failed statement aborts its transaction, so the retry is the whole
+      // locked block, which picks a free slug on its second read.
+      if (isUniqueConstraintError(error)) {
+        return await resolveUnderLock();
+      }
+      throw error;
+    }
   }
 
   async tryFindById(input: SuiteIdInput): Promise<Suite | null> {

@@ -303,3 +303,16 @@ No dev-stack process from this investigation is still running:
 - Whether the haven `migrations failed: context canceled` result is a real
   migration defect or purely an artifact of the investigation's own timeout
   wrapper — needs a re-run with a longer budget to disambiguate.
+
+## Added 2026-09-03 evening, from the spec lift
+
+- **Connected agents (ADR-128) have no transport on this branch.** `platform/app/src/server/connected-agents/` on main (connect gateway, long-poll transport and process, parameter spec, call envelope, presence projection) and the agents UI section were never carried over; only the runtime service and four adapters moved. Restore plan: `dev/docs/plans/connected-agents-restore-plan.md`.
+- **`agents.testRun` / `agents.testTurn`** are called by scenario/web and defined nowhere. Their dependencies (agent-test prefetcher, serialized-agent registry) exist in scenario/server; lift in progress.
+- **Azure dataset storage refuses in the worker.** Main's `getDatasetStorage(projectId)` picked S3, Azure or local by destination; the branch inlines the choice per composition root and `WorkerDatasetStorageResolver` in `apps/worker/src/app/worker-dataset-normalization.composition.ts` throws for Azure. Self-hosted Azure deployments lose dataset normalisation.
+- **Dataset tRPC conflict errors were raw `TRPCError`s** instead of the `DatasetNameTakenError` / `DatasetStaleColumnsError` handled errors; fixed in `packages/features/dataset/server/src/transport/api-trpc/dataset.api.ts` during the lift.
+- **Langy `langy_ui_handler_failed` remediation** exists only in packages/handled-error's registry, not in langy/contract's own tips map.
+- **Simulation run cost attribution lost its write-suppression guard.** Main's `hasRunDefiningEvent` check went with the old store class and was not reimplemented; two of the three scenarios in `simulation-run-cost-attribution.feature` cannot bind until it returns.
+- **`scenarios.getRunConfigurations` has no service.** The ClickHouse run-configurations service and repository from main are absent repo-wide, and the web still calls the procedure.
+- **Workbench Langy handoff is gone.** `useRegisterLangyActions` and the workbench's Langy UI-action registration existed on main; the branch's `workbench.screen.tsx` has neither, and the `UiActionBackendRunner` type in langy has no implementation wired. A spec-lift lane retired the tests; treat as a feature to restore.
+- **`SuiteExecutionService.resolveParameters` does not merge target-level parameters** (found porting prompt/server tests).
+- **`resolveDynamicRunMembership` locks `kind = 'custom'` then reads `kind: "run_plan"`**, so its `FOR UPDATE` matches nothing (suite/server, pre-existing).

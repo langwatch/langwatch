@@ -13,6 +13,12 @@ export { AgentTrpcApi, type AgentTrpcContext } from "./transport/api-trpc/agent.
 export type { AgentsAuditLogPort, AgentsDatabase, AgentsWorkflowPort } from "./ports/agent.port";
 export { LinkedWorkflowCopyPort } from "./ports/linked-workflow-copy.port";
 export {
+  AgentTestPort,
+  type AgentTestActor,
+  type AgentTestRunResult,
+  type AgentTestTurnResult,
+} from "./ports/agent-test.port";
+export {
   HttpProxyTrpcApi,
   type HttpProxyResult,
   type HttpProxyTrpcContext,
@@ -79,3 +85,16 @@ export {
   type StoredResult,
   type StoredResultError,
 } from "./adapters/connected-agent-envelope.adapter";
+export {
+  normalizeParameterSchema,
+  type NormalizedParameters,
+} from "./services/connected-agent-parameter-spec.service";
+export {
+  agentPresenceView,
+  NO_PRESENCE,
+  readAgentPresence,
+  type AgentInstanceView,
+  type AgentOwnerView,
+  type AgentPresence,
+  type AgentPresenceStatus,
+} from "./services/connected-agent-presence.service";

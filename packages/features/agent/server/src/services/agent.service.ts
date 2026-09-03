@@ -3,12 +3,15 @@ import {
   AgentCopySelectionError,
   AgentIsNotCopyError,
   AgentNotFoundError,
+  AgentRegisterOnlyError,
   AgentSourceNotFoundError,
   InvalidAgentConfigError,
   type Agent,
   type AgentFields,
   AgentService as AgentServiceContract,
   type AgentWithFields,
+  type ConnectedAgentConfig,
+  type ConnectedAgentIdentity,
   createAgentCommandSchema,
   copyAgentCommandSchema,
   linkedWorkflowId,
@@ -18,6 +21,18 @@ import {
 import { nanoid } from "nanoid";
 import type { AgentsAuditLogPort, AgentsWorkflowPort } from "../ports/agent.port";
 import type { AgentRepository } from "../repositories/agent.repository";
+
+/**
+ * Whether Prisma refused a write because a unique index already holds the
+ * value. The row the caller wanted exists, written by somebody else.
+ */
+function isUniqueConstraintViolation(error: unknown): boolean {
+  return (
+    typeof error === "object" &&
+    error !== null &&
+    (error as { code?: unknown }).code === "P2002"
+  );
+}
 
 type AgentServiceOptions = {
   repository: AgentRepository;
@@ -97,6 +112,7 @@ export class AgentService extends AgentServiceContract {
   async create(
     input: Parameters<AgentServiceContract["create"]>[0],
   ): ReturnType<AgentServiceContract["create"]> {
+    if (input.type === "connected") throw new AgentRegisterOnlyError();
     const result = createAgentCommandSchema.safeParse(input);
     if (!result.success) {
       throw new InvalidAgentConfigError(input.type, result.error.issues);
@@ -112,6 +128,7 @@ export class AgentService extends AgentServiceContract {
   async update(
     input: Parameters<AgentServiceContract["update"]>[0],
   ): ReturnType<AgentServiceContract["update"]> {
+    await this.refuseConnectedUpdate(input);
     const commandResult = updateAgentCommandSchema.safeParse(input);
     if (!commandResult.success) {
       const existingType = input.type ?? "signature";
@@ -312,6 +329,114 @@ export class AgentService extends AgentServiceContract {
   }): ReturnType<AgentServiceContract["getHistory"]> {
     await this.getById({ id: input.agentId, projectId: input.projectId });
     return this.auditLog.history({ ...input, limit: 100 });
+  }
+
+  /**
+   * Creates or re-registers a connected agent on the row its identity key
+   * names. The re-register writes `lastSeenAt`, so a row unseen for too long
+   * is listed again, and it clears `archivedAt`, so a row deleted by hand
+   * comes back when the process connects again.
+   *
+   * Several instances of one agent normally start together, so two of them
+   * can read no row and both go on to create one. `(projectId, identityKey)`
+   * is unique, so the loser of that race is answered with the row the winner
+   * wrote rather than with a constraint violation.
+   */
+  async registerConnected(input: {
+    id: string;
+    projectId: string;
+    name: string;
+    config: ConnectedAgentConfig;
+    identity: ConnectedAgentIdentity;
+  }): Promise<Agent> {
+    const existing = await this.repository.findByIdentityKey({
+      projectId: input.projectId,
+      identityKey: input.identity.identityKey,
+    });
+    if (existing) return this.reregister(existing.id, input);
+    try {
+      return await this.repository.create({
+        id: input.id,
+        projectId: input.projectId,
+        name: input.name,
+        type: "connected",
+        config: input.config,
+        identity: input.identity,
+      });
+    } catch (error) {
+      if (!isUniqueConstraintViolation(error)) throw error;
+      const raced = await this.repository.findByIdentityKey({
+        projectId: input.projectId,
+        identityKey: input.identity.identityKey,
+      });
+      if (!raced) throw error;
+      return this.reregister(raced.id, input);
+    }
+  }
+
+  private reregister(
+    existingId: string,
+    input: { projectId: string; name: string; config: ConnectedAgentConfig },
+  ): Promise<Agent> {
+    return this.repository.reregisterConnected({
+      id: existingId,
+      projectId: input.projectId,
+      name: input.name,
+      config: input.config,
+    });
+  }
+
+  /**
+   * Refuses an edit of a connected agent. Its type, name, environment and
+   * parameters are what the process that runs it declared, so the only way
+   * to change them is to change the code and register again.
+   */
+  private async refuseConnectedUpdate(input: {
+    id: string;
+    projectId: string;
+    type?: string;
+  }): Promise<void> {
+    if (input.type === "connected") throw new AgentRegisterOnlyError();
+    // Archived rows included: an archived connected agent is still the
+    // SDK's to change, and it comes back on the next register.
+    const existing = await this.repository.tryFindByIdIncludingArchived({
+      id: input.id,
+      projectId: input.projectId,
+    });
+    if (existing?.type === "connected") throw new AgentRegisterOnlyError();
+  }
+
+  ownersOf(
+    agents: readonly { ownerUserId: string | null }[],
+  ): ReturnType<AgentServiceContract["ownersOf"]> {
+    return this.doOwnersOf(agents);
+  }
+
+  private async doOwnersOf(
+    agents: readonly { ownerUserId: string | null }[],
+  ): Promise<Map<string, { userId: string; name: string | null }>> {
+    const userIds = [
+      ...new Set(
+        agents
+          .map((agent) => agent.ownerUserId)
+          .filter((id): id is string => !!id),
+      ),
+    ];
+    const names = await this.repository.findUserNamesByIds(userIds);
+    return new Map(
+      userIds.map((userId) => [
+        userId,
+        { userId, name: names.get(userId) ?? null },
+      ]),
+    );
+  }
+
+  getConnectedByNameAndEnvironment(input: {
+    projectId: string;
+    name: string;
+    environment: string;
+  }): ReturnType<AgentServiceContract["getConnectedByNameAndEnvironment"]> {
+    return this.repository.findConnectedByNameAndEnvironment(input);
   }
 
   private async getAgent(input: { id: string; projectId: string }): Promise<Agent> {

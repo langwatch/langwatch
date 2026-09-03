@@ -48,6 +48,8 @@ import {
   type SuiteRunAllResult,
   type SuiteRunInput,
   type SuiteRunResult,
+  type SuiteRunPlanInput,
+  type SuiteRunPlanResult,
   type SuiteService,
   type UpdateSuiteCommand,
 } from "@langwatch/suite-contract";
@@ -247,6 +249,16 @@ export class SuiteApp {
   async runAll(input: Omit<SuiteRunAllInput, "organizationId">): Promise<SuiteRunAllResult> {
     const organizationId = await this.requireOrganizationId(input.projectId);
     return this.dependencies.suites.runAll({ ...input, organizationId });
+  }
+
+  /**
+   * Schedules a run under a NAME, resolving the project's organization first.
+   *
+   * @see specs/suites/run-plan-identity-by-name.feature
+   */
+  async runPlan(input: Omit<SuiteRunPlanInput, "organizationId">): Promise<SuiteRunPlanResult> {
+    const organizationId = await this.requireOrganizationId(input.projectId);
+    return this.dependencies.suites.runPlan({ ...input, organizationId });
   }
 
   // -- the project a suite belongs to ---------------------------------------

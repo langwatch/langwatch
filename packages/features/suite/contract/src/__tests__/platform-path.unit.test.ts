@@ -91,7 +91,12 @@ describe("the addresses the platform hands out", () => {
       ).toBe("/simulations/checkout%20flow/batch%231");
     });
 
+    /** @scenario A simulation run's address opens the run's own detail drawer */
+    /** @scenario Every run gets a precise address, even when its set is unknown */
     it("opens a run in the run detail drawer over the run history", () => {
+      // The call needs only ui + scenarioRunId — no scenarioSetId parameter
+      // exists to resolve, so every run gets a precise drawer address whether
+      // or not its set is known.
       expect(scenarioRunPath({ ui, scenarioRunId: "run_1" })).toBe(
         "/simulations?drawer.open=scenarioRunDetail&drawer.scenarioRunId=run_1",
       );

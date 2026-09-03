@@ -73,6 +73,7 @@
  * {@link unavailableOperatorRuntime}.
  */
 import type { ClickHouseClient } from "@clickhouse/client";
+import { MAX_CALL_TIMEOUT_MS } from "@langwatch/agent-contract";
 import type { AgentService } from "@langwatch/agent-contract";
 import type { AuthService } from "@langwatch/auth-contract";
 import {
@@ -121,6 +122,7 @@ import type { ProjectService } from "@langwatch/project-contract";
 import { PostgresPromptAdapter } from "@langwatch/prompt-server";
 import type { RedisConnection } from "@langwatch/redis-client";
 import {
+  AgentTestService,
   PrismaScenarioAdapter,
   ScenarioApp,
   ScenarioClockPort,
@@ -156,6 +158,7 @@ import {
   SuiteApp,
   SuiteExecutionService,
   SuiteRunIdPort,
+  SuiteRunModelsService,
 } from "@langwatch/suite-server";
 import type {
   ScenarioService,
@@ -173,6 +176,8 @@ import type { AnyApiTrpcCollaborators } from "../app-trpc/app-trpc.collaborators
 import type { ApiTrpcFeatureApplication, ApiTrpcPortsContext } from "../app-trpc/app-trpc.context";
 import type { AppAgentGroupTrpcPorts } from "../app-trpc/app-trpc.agent-group";
 import type { ApiAuditPort } from "../api-request.policy";
+import { ApiAgentTestConnectedDispatchAdapter } from "../features/agent/agent-test-connected-dispatch.adapter";
+import { ApiAgentTestOwnershipAdapter } from "../features/agent/agent-test-ownership.adapter";
 
 /**
  * The rollout flag the authoritative Langy gate is read from.
@@ -392,6 +397,11 @@ export type ApiAgentGroupCollaborators = Readonly<{
    * is a service and not a query.
    */
   simulations: SimulationService;
+  /**
+   * Runs "Test agent", for the `AgentTestPort` this root wires into the
+   * Agent package's own application (`ApiAgentTestAdapter`).
+   */
+  agentTestService: AgentTestService;
   /** For `ctx.app.suites`. */
   suites: SuiteApp;
   /** For `ctx.app.langy` — the same application both Langy doors read. */
@@ -463,6 +473,10 @@ export function composeApiAgentGroupCollaborators(
       commands: pipelines.suiteRuns,
       ids: new KsuidSuiteRunId(),
       scenarios,
+      resolveRunModels: SuiteRunModelsService.create({
+        scenarios,
+        modelProviders: options.scenarioExecution.modelProviders,
+      }).resolve,
     }),
     generateId: () => `suite_${nanoid()}`,
   });
@@ -491,6 +505,25 @@ export function composeApiAgentGroupCollaborators(
     broadcast: options.broadcast,
   });
 
+  // "Test agent": the same target prefetch and adapter registry a real run
+  // uses, over this process's own graph. Composed here rather than beside
+  // `ScenarioApp` because it is `agents.testTurn`/`agents.testRun` that call
+  // it — the Agent package's own tRPC surface, over a port it declares and
+  // this root implements (`ApiAgentTestAdapter`).
+  const agentTestService = AgentTestService.create({
+    agents: options.agents,
+    projects: options.projects,
+    workflows: options.scenarioExecution.workflows,
+    prompts,
+    secrets: options.scenarioExecution.secrets,
+    modelProviders: options.scenarioExecution.modelProviders,
+    simulations,
+    config: options.scenarioExecution.config,
+    ownership: ApiAgentTestOwnershipAdapter.create(),
+    connectedDispatch: ApiAgentTestConnectedDispatchAdapter.create(),
+    maxCallTimeoutMs: MAX_CALL_TIMEOUT_MS,
+  });
+
   const langyApp = composeLangy(options, pipelines);
   const opsApp = composeOps(options, logger);
 
@@ -499,6 +532,7 @@ export function composeApiAgentGroupCollaborators(
     scenarioService: scenarios,
     scenarioTabs,
     simulations,
+    agentTestService,
     suites: suiteApp,
     langy: langyApp,
     ops: opsApp,

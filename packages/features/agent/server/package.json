@@ -38,6 +38,7 @@
     "@langwatch/observability": "workspace:*",
     "@langwatch/prisma-client": "workspace:*",
     "@langwatch/redis-client": "workspace:*",
+    "@langwatch/scenario-contract": "workspace:*",
     "@langwatch/trace-contract": "workspace:*",
     "@langwatch/workflow-contract": "workspace:*",
     "@trpc/server": "^11.18.0",

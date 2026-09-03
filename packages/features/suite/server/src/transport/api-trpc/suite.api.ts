@@ -22,6 +22,7 @@ import { createTestSuiteRouter } from "./test-suite.api";
 import {
   createSuiteSchema,
   projectSchema,
+  runPlanSchema,
   suiteTargetSchema,
   updateSuiteSchema,
 } from "./suite.schemas";
@@ -154,6 +155,35 @@ export class SuiteTrpcApi {
           ...result,
         };
       }),
+
+      /**
+       * Starts a run under a name, which is what identifies a run plan: the
+       * name either joins an existing plan and replaces its config, or
+       * creates one.
+       *
+       * Separate from `run` on purpose. `run` takes a plan id; this one is
+       * the run dialog's single entry point for all of its scenarios — hand
+       * a scope, some targets and a name, and get a plan back either way.
+       *
+       * @see specs/suites/run-plan-identity-by-name.feature
+       */
+      runPlan: policy("scenarios:manage")(procedure.input(runPlanSchema)).mutation(
+        async ({ ctx, input }) => {
+          // No catch: a Suite execution error is a HandledError, so the tRPC
+          // handled-error middleware maps its code and status.
+          const result = await ctx.app.suites.runPlan({
+            projectId: input.projectId,
+            name: input.name,
+            config: input.config,
+            idempotencyKey: input.idempotencyKey,
+            batchRunId: input.batchRunId,
+            parameters: input.parameters,
+            note: input.note,
+            actor: { id: ctx.actor().id, label: "user" },
+          });
+          return { scheduled: true, ...result };
+        },
+      ),
 
       /**
        * Runs every non-archived test case of the project through the managed

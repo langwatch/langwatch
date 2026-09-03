@@ -188,10 +188,10 @@ Lift, never rewrite. For every row below: `git show origin/main:<main test file>
 | platform/app/src/server/event-sourcing/queues/groupQueue/__tests__/groupQueue.failureLogging.integration.test.ts | 2 | packages/eventing | 3 | 1 | specs/observability/retryable-failure-log-level.feature |
 | platform/app/src/server/event-sourcing/pipelines/trace-processing/projections/__tests__/traceAnalyticsRefoldPolicy.unit.test.ts | 2 | packages/eventing | 6 | 1 | specs/trace-processing/hot-trace-fold-amplification.feature |
 | platform/app/src/server/app-layer/ops/__tests__/integration/replay-full-rebuild.integration.test.ts | 1 | packages/eventing | 8 | 5 | packages/eventing/specs/projection-replay.feature |
-| platform/app/src/server/connected-agents/__tests__/connect.gateway.integration.test.ts | 15 | packages/features/agent/contract | 5 | 10 | specs/agents/connected-agents.feature |
-| platform/app/src/app/api/agents/__tests__/long-poll-route.integration.test.ts | 11 | packages/features/agent/contract | 5 | 7 | specs/agents/connected-agents.feature |
-| platform/app/src/server/connected-agents/__tests__/protocol-and-identity.unit.test.ts | 7 | packages/features/agent/contract | 2 | 1 | specs/agents/connected-agents.feature |
-| platform/app/src/server/agents/__tests__/agent-test-turn.unit.test.ts | 1 | packages/features/agent/contract | 1 | 7 | specs/agents/agent-test-run.feature |
+| platform/app/src/server/connected-agents/__tests__/connect.gateway.integration.test.ts | 15 | apps/api (src/features/agent/__tests__/connected-agent-gateway.integration.test.ts) | 5 | 10 | specs/agents/connected-agents.feature |
+| platform/app/src/app/api/agents/__tests__/long-poll-route.integration.test.ts | 11 | apps/api (src/features/agent/__tests__/connected-agent-long-poll-route.integration.test.ts) | 5 | 7 | specs/agents/connected-agents.feature |
+| platform/app/src/server/connected-agents/__tests__/protocol-and-identity.unit.test.ts | 7 | packages/features/agent/contract (split: connected-agent-protocol.unit.test.ts + connected-agent-identity.unit.test.ts) | 2 | 1 | specs/agents/connected-agents.feature |
+| platform/app/src/server/agents/__tests__/agent-test-turn.unit.test.ts | 1 | packages/features/scenario/server (agent-test.service) | 1 | 7 | specs/agents/agent-test-run.feature |
 | platform/app/src/server/connected-agents/__tests__/long-poll.unit.test.ts | 3 | packages/features/agent/server | 4 | 5 | specs/agents/connected-agents.feature |
 | platform/app/src/server/connected-agents/__tests__/gateway-guards.unit.test.ts | 3 | packages/features/agent/server | 3 | 3 | specs/agents/connected-agents.feature |
 | platform/app/src/components/agents/__tests__/AgentTypeSelectorDrawer.integration.test.tsx | 5 | packages/features/agent/web | 2 | 1 | specs/agents/agent-management.feature<br>specs/features/agents/connected-agents-ui.feature |
@@ -871,7 +871,7 @@ Lift, never rewrite. For every row below: `git show origin/main:<main test file>
 | platform/app/src/server/scenarios/execution/__tests__/ingest-lag.service.unit.test.ts | 6 | UNRESOLVED | 0 | 2 | specs/scenarios/remote-trace-judging.feature |
 | platform/app/src/server/routes/__tests__/gateway-internal.spend-ingest.integration.test.ts | 6 | UNRESOLVED | 0 | 4 | specs/ai-gateway/billing-spend-events.feature |
 | platform/app/src/server/evaluations/native/__tests__/registry.unit.test.ts | 6 | UNRESOLVED | 0 | 2 | specs/evaluators/secrets-and-redaction-aware-detection.feature |
-| platform/app/src/server/connected-agents/__tests__/parameter-spec.unit.test.ts | 6 | UNRESOLVED | 0 | 1 | specs/agents/connected-agents.feature |
+| platform/app/src/server/connected-agents/__tests__/parameter-spec.unit.test.ts | 6 | packages/features/agent/server (services/__tests__/connected-agent-parameter-spec.service.unit.test.ts) | 0 | 1 | specs/agents/connected-agents.feature |
 | platform/app/src/server/clickhouse/__tests__/schemaLock.unit.test.ts | 6 | UNRESOLVED | 0 | 1 | specs/ci/clickhouse-schema-lock.feature |
 | platform/app/src/server/api/routers/__tests__/savedViews.integration.test.ts | 6 | UNRESOLVED | 0 | 6 | specs/traces/saved-views.feature |
 | platform/app/src/server/api/routers/__tests__/personalVirtualKeys.scopeRbac.integration.test.ts | 6 | UNRESOLVED | 0 | 6 | specs/ai-gateway/governance/vk-scope-rbac.feature |

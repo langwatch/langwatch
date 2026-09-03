@@ -10,7 +10,7 @@ import {
   scopeKey,
   sortSuiteTargets,
 } from "../plan-config";
-import { targetSortKey } from "../target-key";
+import { declaredDefaults, targetSortKey, withCanonicalOverrides } from "../target-key";
 import type { SuiteTarget } from "../suite";
 
 describe("sortSuiteTargets", () => {
@@ -58,6 +58,21 @@ describe("duplicateSuiteTargets", () => {
       };
 
       expect(duplicateSuiteTargets([twice, { ...twice }])).toEqual([twice]);
+    });
+  });
+
+  describe("when two targets differ only by a typed default", () => {
+    /** @scenario "Two targets that differ only by a typed default are refused" */
+    it("names the repeated one once its overrides are canonicalized", () => {
+      const defaults = declaredDefaults([{ name: "model", defaultValue: "gpt-5" }]);
+      const targets: SuiteTarget[] = [
+        { type: "http", referenceId: "prod-agent" },
+        { type: "http", referenceId: "prod-agent", runParameters: { model: "gpt-5" } },
+      ];
+
+      expect(duplicateSuiteTargets(withCanonicalOverrides({ targets, defaults }))).toEqual([
+        { type: "http", referenceId: "prod-agent" },
+      ]);
     });
   });
 

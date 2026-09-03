@@ -6,10 +6,37 @@ import type {
   AgentType,
   UpdateAgentCommand,
 } from "@langwatch/agent-contract";
+import { connectedAgentSeenCutoff } from "@langwatch/agent-contract";
 import type { AgentsDatabase } from "../../ports/agent.port";
 import type { AgentCopyRecord, PersistAgentInput } from "../agent.repository";
 import { AgentRepository } from "../agent.repository";
 import { mapAgentRow, type AgentRow } from "./prisma.agent.mapper";
+
+/**
+ * The `where` fragment that keeps a stale connected agent out of a read.
+ *
+ * Spread into a `where`; the alternatives travel under `AND` so a call site
+ * that declares an `OR` of its own does not drop them. Every other agent
+ * type has no presence, so only connected rows are filtered.
+ *
+ * Only this repository may name the Prisma `where` shape (the predicate
+ * itself, `isConnectedAgentStale`'s inverse, is the contract's).
+ */
+function connectedAgentVisibleWhere(now: Date = new Date()): {
+  AND: Array<Record<string, unknown>>;
+} {
+  return {
+    AND: [
+      {
+        OR: [
+          { type: { not: "connected" } },
+          { lastSeenAt: null },
+          { lastSeenAt: { gte: connectedAgentSeenCutoff(now) } },
+        ],
+      },
+    ],
+  };
+}
 
 type AgentCopyRow = {
   id: string;
@@ -44,9 +71,23 @@ export class PrismaAgentRepository extends AgentRepository {
     return this.tryMapOptionalRow(row);
   }
 
+  async tryFindByIdIncludingArchived(input: {
+    id: string;
+    projectId: string;
+  }): Promise<Agent | null> {
+    const row = await this.database.agent.findFirst({
+      where: { id: input.id, projectId: input.projectId },
+    });
+    return this.tryMapOptionalRow(row);
+  }
+
   async findAll(input: { projectId: string }): Promise<Agent[]> {
     const rows = await this.database.agent.findMany({
-      where: { projectId: input.projectId, archivedAt: null },
+      where: {
+        projectId: input.projectId,
+        archivedAt: null,
+        ...connectedAgentVisibleWhere(),
+      },
       orderBy: { updatedAt: "desc" },
       include: { _count: { select: { copiedAgents: true } } },
     });
@@ -86,7 +127,11 @@ export class PrismaAgentRepository extends AgentRepository {
     page: number;
     limit: number;
   }): Promise<{ data: Agent[]; total: number }> {
-    const where = { projectId: input.projectId, archivedAt: null };
+    const where = {
+      projectId: input.projectId,
+      archivedAt: null,
+      ...connectedAgentVisibleWhere(),
+    };
     const [rows, total] = await Promise.all([
       this.database.agent.findMany({
         where,
@@ -113,6 +158,13 @@ export class PrismaAgentRepository extends AgentRepository {
     if (input.workflowId !== undefined) data.workflowId = input.workflowId;
     if (input.copiedFromAgentId !== undefined) {
       data.copiedFromAgentId = input.copiedFromAgentId;
+    }
+    if (input.identity) {
+      data.environment = input.identity.environment;
+      data.ownerUserId = input.identity.ownerUserId;
+      data.hostLabel = input.identity.hostLabel;
+      data.identityKey = input.identity.identityKey;
+      data.lastSeenAt = new Date();
     }
     const row = await this.database.agent.create({ data });
     return mapAgentRow(row as AgentRow);
@@ -179,6 +231,74 @@ export class PrismaAgentRepository extends AgentRepository {
       where: { id: input.id, projectId: input.projectId },
       data: { name: input.name, config: input.config },
     });
+  }
+
+  async findByIdentityKey(input: {
+    projectId: string;
+    identityKey: string;
+  }): Promise<Agent | null> {
+    const row = await this.database.agent.findFirst({
+      where: { projectId: input.projectId, identityKey: input.identityKey },
+    });
+    return this.tryMapOptionalRow(row);
+  }
+
+  async findConnectedByNameAndEnvironment(input: {
+    projectId: string;
+    name: string;
+    environment: string;
+  }): Promise<Agent[]> {
+    const rows = await this.database.agent.findMany({
+      where: {
+        projectId: input.projectId,
+        type: "connected",
+        name: input.name,
+        environment: input.environment,
+        archivedAt: null,
+        ...connectedAgentVisibleWhere(),
+      },
+    });
+    return rows.map((row) => mapAgentRow(row as AgentRow));
+  }
+
+  async reregisterConnected(input: {
+    id: string;
+    projectId: string;
+    name: string;
+    config: AgentConfig;
+  }): Promise<Agent> {
+    const row = await this.database.agent.update({
+      where: { id: input.id, projectId: input.projectId },
+      data: {
+        name: input.name,
+        config: input.config,
+        archivedAt: null,
+        lastSeenAt: new Date(),
+      },
+    });
+    return mapAgentRow(row as AgentRow);
+  }
+
+  async touchLastSeenAt(input: {
+    id: string;
+    projectId: string;
+    at: Date;
+  }): Promise<void> {
+    await this.database.agent.update({
+      where: { id: input.id, projectId: input.projectId },
+      data: { lastSeenAt: input.at },
+    });
+  }
+
+  async findUserNamesByIds(
+    ids: readonly string[],
+  ): Promise<Map<string, string | null>> {
+    if (ids.length === 0) return new Map();
+    const users = (await this.database.user.findMany({
+      where: { id: { in: [...ids] } },
+      select: { id: true, name: true },
+    })) as Array<{ id: string; name: string | null }>;
+    return new Map(users.map((user) => [user.id, user.name]));
   }
 
   private tryMapOptionalRow(row: unknown): Agent | null {

@@ -320,17 +320,12 @@ function baseCollaborators(): AnyApiTrpcCollaborators {
      * build time because a tRPC input parser is, and the billing switch, which
      * decides which router the two billing namespaces ARE.
      */
-    gatewayGroup: {
-      gateway: { virtualKeys: { virtualKeyBudgetInput: anySchema } },
-      governanceHome: stub("gatewayGroup.governanceHome"),
-      saasBilling: false,
-    },
+    gateway: { virtualKeys: { virtualKeyBudgetInput: anySchema } },
+    governanceHome: stub("governanceHome"),
+    saasBilling: false,
     github: stub("github"),
-    productInfra: {
-      storedObjects: stub("productInfra.storedObjects"),
-      dataRetention: stub("productInfra.dataRetention"),
-      monitors: stub("productInfra.monitors", { preconditionsSchema: anySchema }),
-    },
+    dataRetention: stub("dataRetention"),
+    monitors: stub("monitors", { preconditionsSchema: anySchema }),
     user: stub("user"),
     workflows: {
       lifecycle: stub("workflows.lifecycle"),

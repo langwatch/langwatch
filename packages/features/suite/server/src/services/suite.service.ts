@@ -13,8 +13,10 @@ import {
   suiteIdInputSchema,
   suiteRunAllInputSchema,
   suiteRunInputSchema,
+  suiteRunPlanInputSchema,
   suiteRunStateInputSchema,
   suiteSchema,
+  sortSuiteTargets,
   SuiteTestSuiteMembershipManagedError,
   SuiteNameTakenError,
   SuiteNotFoundError,
@@ -32,6 +34,8 @@ import {
   type SuiteRunAllResult,
   type SuiteRunInput,
   type SuiteRunResult,
+  type SuiteRunPlanInput,
+  type SuiteRunPlanResult,
   type SuiteRunStateData,
   type SuiteRunStateInput,
   type SuiteTarget,
@@ -242,7 +246,113 @@ export class SuiteService extends SuiteServiceContract {
       parameters: parsed.parameters,
       note: parsed.note,
       actor: parsed.actor,
+      simulatorModel: suite.simulatorModel,
+      judgeModel: suite.judgeModel,
     });
+  }
+
+  /**
+   * Starts a run under a NAME, which is what identifies a run plan: the name
+   * either joins an existing plan and replaces its config, or creates one.
+   *
+   * The plan is written only once the run holds up — everything is resolved
+   * and validated first, exactly as `run` does it for an existing plan id —
+   * so a refused run touches no row under a name it will not use.
+   *
+   * @see specs/suites/run-plan-identity-by-name.feature
+   */
+  async runPlan(input: SuiteRunPlanInput): Promise<SuiteRunPlanResult> {
+    const parsed = suiteRunPlanInputSchema.parse(input);
+    const { scenarios, agents, prompts, execution, repository } = this.options;
+
+    const targets = sortSuiteTargets(parsed.config.targets);
+    if (targets.length === 0) {
+      throw new SuiteTargetsRequiredError();
+    }
+
+    const scope = parsed.config.scope;
+    const scenarioIds = isDynamicScope(scope)
+      ? await repository.resolveScopeMembership({ projectId: parsed.projectId, scope })
+      : (parsed.config.scenarioIds ?? []);
+    if (isDynamicScope(scope) && scenarioIds.length === 0) {
+      throw new SuiteScopeEmptyError();
+    }
+
+    const scenarioResolution = await this.resolveScenarioReferences({
+      scenarioIds,
+      projectId: parsed.projectId,
+      scenarios,
+    });
+    if (scenarioResolution.missing.length > 0) {
+      throw new InvalidScenarioReferencesError({
+        invalidIds: scenarioResolution.missing,
+      });
+    }
+    if (scenarioResolution.active.length === 0) {
+      throw new AllScenariosArchivedError();
+    }
+
+    const targetResolution = await this.resolveTargetReferences({
+      targets,
+      projectId: parsed.projectId,
+      organizationId: parsed.organizationId,
+      agents,
+      prompts,
+    });
+    if (targetResolution.missing.length > 0) {
+      throw new InvalidTargetReferencesError({
+        invalidIds: targetResolution.missing.map((target) => target.referenceId),
+      });
+    }
+    if (targetResolution.active.length === 0) {
+      throw new AllTargetsArchivedError();
+    }
+
+    const scenarioConfigs = await scenarios.getRunConfigs({
+      ids: scenarioResolution.active,
+      projectId: parsed.projectId,
+    });
+    // A refusal here (e.g. a missing secret) must throw before the plan row
+    // is touched, matching `prepareRun` on main: nothing is written for a run
+    // that will not hold up.
+    await scenarios.resolveRunParametersForScenarios({
+      scenarios: scenarioConfigs,
+      values: parsed.parameters,
+    });
+
+    const { suite, created } = await repository.findOrCreatePlanByName({
+      id: (this.options.generateId ?? SuiteService.defaultGenerateId)(),
+      projectId: parsed.projectId,
+      name: parsed.name,
+      scope,
+      targets,
+      scenarioIds,
+      config: parsed.config,
+    });
+
+    const result = await execution.execute({
+      suiteId: suite.id,
+      projectId: parsed.projectId,
+      activeScenarioIds: scenarioResolution.active,
+      scenarioNames: new Map(scenarioConfigs.map((scenario) => [scenario.id, scenario.name])),
+      scenarioVersions: new Map(scenarioConfigs.map((scenario) => [scenario.id, scenario.version])),
+      scenarioConfigs,
+      activeTargets: targetResolution.active,
+      repeatCount: suite.repeatCount,
+      skippedArchived: {
+        scenarios: scenarioResolution.archived,
+        targets: targetResolution.archived.map((target) => target.referenceId),
+      },
+      idempotencyKey: parsed.idempotencyKey,
+      batchRunId: parsed.batchRunId,
+      parameters: parsed.parameters,
+      note: parsed.note,
+      actor: parsed.actor,
+      simulatorModel: suite.simulatorModel,
+      judgeModel: suite.judgeModel,
+    });
+
+    return { ...result, suiteId: suite.id, planName: suite.name, created };
   }
 
   async runAll(input: SuiteRunAllInput): Promise<SuiteRunAllResult> {

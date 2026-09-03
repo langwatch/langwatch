@@ -121,5 +121,8 @@ export async function prefetchAgentTestData({
       script: { kind: "agent_test", userMessage: AGENT_TEST_USER_MESSAGE },
     },
     telemetry,
+    // An agent test run resolves no model: no simulator plays the person and
+    // no judge decides, so there is nothing here for the run to record.
+    resolvedModels: null,
   };
 }

@@ -48,3 +48,10 @@ export function derivePlanName({
 export function planNameKey(name: string): string {
   return name.trim().toLowerCase();
 }
+
+/**
+ * Prefix for the advisory-lock key `findOrCreatePlanByName` takes, combined
+ * with the project id and `planNameKey(name)`. One definition so the lock and
+ * the match agree on what "the same name" means during a rolling deploy.
+ */
+export const PLAN_NAME_LOCK_PREFIX = "run-plan-name:";

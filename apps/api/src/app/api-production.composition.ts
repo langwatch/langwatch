@@ -61,6 +61,7 @@ import {
 } from "../platform/infrastructure/api-clickhouse.infrastructure";
 import { PostgresBillingAdapter } from "@langwatch/enterprise-billing-server";
 import { PostgresOrganizationLicenseAdapter } from "@langwatch/enterprise-licensing-server";
+import { ApiAgentTestAdapter } from "../features/agent/agent-test.adapter";
 import { ApiAgentWorkflowCopyAdapter } from "../features/agent/agent-workflow-copy.adapter";
 import { ApiAgentsAbsenceReportPort, ApiAgentsComposition } from "./api-agents.composition";
 import {
@@ -819,6 +820,14 @@ export class ApiProductionComposition extends ApiRuntimeCompositionPort {
       audit: this.options.audit,
     });
     const agents = this.resolveAgents(options);
+    // "Test agent", over the agent-group half's Scenario application — a
+    // thunk for the same reason `workflowCopies` above is one: the agent
+    // group composes AFTER this point, so a service read here rather than at
+    // the call would always be absent.
+    const agentTesting = ApiAgentTestAdapter.create({
+      service: () => this.composedAgentGroup?.agentTestService,
+      processName: options.config.serviceName,
+    });
     // The charted reads, the workbench and the dashboards, composed over this
     // process's OWN ClickHouse and the second, restricted identity a member's
     // submitted SQL runs as. Both are this composition's to open, so the record
@@ -998,6 +1007,7 @@ export class ApiProductionComposition extends ApiRuntimeCompositionPort {
     const rawSurface = CompositeApiRawSurface.of([hostedMcp, staticSurface]);
     const process = ApiProcess.create({
       agents,
+      agentTesting,
       ...(features ? { features } : {}),
       secrets: this.secrets,
       requestPolicy: this.requestPolicy,

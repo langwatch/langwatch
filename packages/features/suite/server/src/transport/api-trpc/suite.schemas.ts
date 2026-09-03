@@ -2,7 +2,8 @@
  * Shared input schemas for the suite tRPC surface.
  */
 import { modelOverrideSchema } from "@langwatch/model-provider-contract";
-import { suiteScopeSchema, suiteTargetSchema } from "@langwatch/suite-contract";
+import { runNoteSchema, runParameterValuesSchema } from "@langwatch/scenario-contract";
+import { MAX_PLAN_NAME_LENGTH, suiteScopeSchema, suiteTargetSchema } from "@langwatch/suite-contract";
 import { z } from "zod";
 
 export type { SuiteTarget } from "@langwatch/suite-contract";
@@ -59,4 +60,43 @@ export const updateSuiteSchema = projectSchema.extend({
   labels: z.array(z.string()).optional(),
   simulatorModel: modelOverrideSchema.nullish(),
   judgeModel: modelOverrideSchema.nullish(),
+});
+
+/**
+ * A run plan's config, as the `runPlan` mutation takes it: the rule the run
+ * covers, the targets it goes against, and the two simulation model
+ * overrides — everything the plan row is created or replaced with.
+ */
+export const runPlanConfigSchema = z.object({
+  scope: suiteScopeSchema,
+  targets: z.array(suiteTargetSchema),
+  repeatCount: z.number().int().min(1).max(100).optional(),
+  simulatorModel: modelOverrideSchema.nullish(),
+  judgeModel: modelOverrideSchema.nullish(),
+  /** The scenarios a hand-picked scope covers; ignored by every other. */
+  scenarioIds: z.array(z.string()).optional(),
+});
+
+/**
+ * Starts a run under a name: the run either joins the plan of that name and
+ * replaces its config, or creates one.
+ *
+ * @see specs/suites/run-plan-identity-by-name.feature
+ */
+export const runPlanSchema = projectSchema.extend({
+  name: z.string().trim().min(1).max(MAX_PLAN_NAME_LENGTH),
+  config: runPlanConfigSchema,
+  idempotencyKey: z.string(),
+  /** Optional client-generated batch run ID for immediate placeholder feedback */
+  batchRunId: z.string().optional(),
+  /**
+   * Constant values applied to every scenario in the run. A value supplied
+   * here overrides the scenario's own default for that name.
+   */
+  parameters: runParameterValuesSchema.optional(),
+  /**
+   * One short line describing why this batch was run, stamped onto every
+   * run of the batch.
+   */
+  note: runNoteSchema,
 });

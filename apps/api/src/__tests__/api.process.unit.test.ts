@@ -50,6 +50,15 @@ class TestAgentService extends AgentService {
   getNamesByIds() {
     return this.unavailable();
   }
+  registerConnected() {
+    return this.unavailable();
+  }
+  ownersOf() {
+    return this.unavailable();
+  }
+  getConnectedByNameAndEnvironment() {
+    return this.unavailable();
+  }
 
   exists() {
     return this.unavailable();

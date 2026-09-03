@@ -39,6 +39,12 @@ export abstract class SuiteExecutionPort {
     parameters?: SuiteRunParameters;
     note?: string;
     actor?: RunActor;
+    /**
+     * The simulation models the plan was configured with, stamped on every
+     * run of the batch beside the models they resolved to.
+     */
+    simulatorModel?: string | null;
+    judgeModel?: string | null;
   }): Promise<SuiteRunResult>;
 }
 

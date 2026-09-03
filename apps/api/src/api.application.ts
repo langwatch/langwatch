@@ -1,5 +1,10 @@
 import { AgentService } from "@langwatch/agent-contract";
-import { AgentApp, AgentTrpcApi, type AgentTrpcContext } from "@langwatch/agent-server";
+import {
+  AgentApp,
+  AgentTrpcApi,
+  type AgentTestPort,
+  type AgentTrpcContext,
+} from "@langwatch/agent-server";
 import type { AuthzPermission } from "@langwatch/authz-contract";
 import { HandledError, isZodLikeError, ValidationError } from "@langwatch/handled-error";
 import { createLogger, type Logger } from "@langwatch/observability";
@@ -271,6 +276,18 @@ class MissingAgentService extends AgentService {
   getHistory() {
     return this.unavailable();
   }
+
+  registerConnected() {
+    return this.unavailable();
+  }
+
+  ownersOf() {
+    return this.unavailable();
+  }
+
+  getConnectedByNameAndEnvironment() {
+    return this.unavailable();
+  }
 }
 
 /**
@@ -382,6 +399,13 @@ export class ApiApplication {
   static create(options: {
     agents?: AgentService;
     /**
+     * Runs "Test agent" over the Scenario application. Absent leaves
+     * `agents.testTurn`/`agents.testRun` composed but refusing by name — the
+     * agent router itself still mounts, since every other `agents.*`
+     * procedure needs nothing from Scenario.
+     */
+    agentTesting?: AgentTestPort;
+    /**
      * Absent for a process that composed no secret service: its tRPC router is
      * left off the root, the same way the agent router is.
      */
@@ -399,7 +423,9 @@ export class ApiApplication {
     options.topic?.install();
     return new ApiApplication(
       {
-        agents: options.agents ? AgentApp.create({ agents: options.agents }) : undefined,
+        agents: options.agents
+          ? AgentApp.create({ agents: options.agents, testing: options.agentTesting })
+          : undefined,
         secrets: options.secrets ? SecretApp.create({ secrets: options.secrets }) : undefined,
       },
       options.http,
