@@ -252,13 +252,20 @@ const FILE_EXECUTORS = new Set(["bash", "sh", "zsh", "dash", "ksh", "source", ".
  *    is a narrow accepted residual (head-scoped splice detection does not reach
  *    argument interiors); holding every `sed 's/…/…/'` would be ruinous
  *    over-block for near-zero marginal gain.
- *  - `xargs`, `find -exec`: pass arguments to a command, they do not concatenate
- *    strings — a `langwatch` they invoke is a literal token caught by
- *    `mentionsCli`. Holding all `find`/`xargs` would over-block routine use.
- *  - `env -S`, `busybox` (applet dispatch): head-based detection sees `env`
- *    (stripped as a runner wrapper) or `busybox`, not the interpreter behind it,
- *    so a concat payload wrapped in either is a known residual — narrow, and
- *    unlikely in the worker image. Recorded in the threat model, not closed here.
+ *  - `xargs`, `find -exec`, `parallel`: pass arguments to a command, they do not
+ *    concatenate strings — a `langwatch` they invoke is a literal token caught by
+ *    `mentionsCli`. A hand-off to a shell or code interpreter (`xargs sh -c`,
+ *    `find … -exec python3 {} \;`) IS closed: the executor is a bare argv token,
+ *    so the any-token executor scan in `classifySegment` holds it regardless of
+ *    which runner fronts it. Holding all `find`/`xargs` outright would over-block
+ *    routine use.
+ *  - `env -S bash`, `busybox sh` (applet dispatch): CLOSED by the same any-token
+ *    scan — the interpreter (`bash`/`sh`/`python3`) is itself a bare word in the
+ *    segment, so a wrapper in front of it (`busybox`, or `env` stripped as a runner
+ *    wrapper leaving `-S bash`) no longer hides it. The narrow residual that remains
+ *    is a SINGLE-QUOTED-STRING form where the interpreter name is not its own word
+ *    (`env -S "python3 -c …"`, one argument), or a concat payload assembling the
+ *    interpreter name at runtime — recorded in the threat model, not closed here.
  *  - heredoc bodies: `splitSegments` splits on every newline regardless of
  *    heredoc context, so a heredoc body line carrying an unmatched literal quote
  *    is read as an unterminated segment and held. This fails CLOSED (an
@@ -289,25 +296,15 @@ export const CODE_INTERPRETERS = new Set([
 ]);
 
 /**
- * Argument-runner commands that hand their argv on to another command to run
- * (`xargs cmd`, `find … -exec cmd`, `parallel cmd`). They build no strings, but
- * they DO execute whatever executable their argv names — so one that hands off to
- * a shell or a code interpreter (`xargs sh -c`, `find … -exec bash {} \;`)
- * re-opens the stdin/script-fed shell-out those heads are already held for. A
- * hand-off to a non-executor (`find … | xargs wc -l`) stays allowed.
+ * The shells and code interpreters whose presence ANYWHERE in a segment holds it:
+ * either executor family runs content the gate never resolves (a script file,
+ * stdin, or inline/runtime-built code). Scanned as any bare argv token, not just
+ * the head — see the executor scan in `classifySegment` for why. `.` / `source`
+ * are excluded off-head (handled specially there): off-head `.` is find's
+ * current-directory argument, and neither builtin can be exec'd as an external
+ * program by a wrapper's argv.
  */
-const ARGV_RUNNERS = new Set(["xargs", "find", "parallel"]);
-
-/**
- * The executor tokens whose presence in an argument-runner's argv triggers a
- * hold. The `.` / `source` shell builtins are excluded: they cannot be exec'd as
- * external programs by `xargs`/`find`, and `.` is overwhelmingly the
- * current-directory argument to `find`, not the source builtin.
- */
-const HANDOFF_EXECUTORS = new Set<string>([
-  ...[...FILE_EXECUTORS].filter((name) => name !== "." && name !== "source"),
-  ...CODE_INTERPRETERS,
-]);
+const SEGMENT_EXECUTORS = new Set<string>([...FILE_EXECUTORS, ...CODE_INTERPRETERS]);
 
 /** HTTP clients whose invocations reach the REST/GraphQL delete surface. */
 const HTTP_CLIENTS = new Set(["curl", "http", "https", "wget", "fetch", "xh"]);
@@ -927,41 +924,43 @@ function classifySegment(segment: string): DestructiveMatch | null {
   // cannot dodge a membership check whose sets are all lower-case.
   const headBase = (head.split("/").pop() ?? head).toLowerCase();
 
-  // A language interpreter runs code the gate never resolves — inline (`-c`),
-  // from a script file, or on stdin — and runtime string-building defeats every
-  // substring check. Held UNCONDITIONALLY the moment one heads a segment, even
-  // bare (a bare interpreter in a pipeline reads stdin). This sits before the
-  // CLI/HTTP checks so `python3 -c "...langwatch..."` can never fall through to
-  // the substring fallback below. Interpreters behind a runner/env preamble
-  // (`sudo python3 -c`, `FOO=1 node x.js`) are already stripped to this head.
-  if (CODE_INTERPRETERS.has(headBase)) {
-    return { kind: "exec-file", segment };
+  // A shell or code interpreter ANYWHERE in the segment runs content the gate
+  // never resolves — a script file (`bash f.sh`), stdin when run bare (`… | bash`,
+  // `cat f.sh | bash`), or inline/runtime-built code (`python3 -c …`) — so the
+  // moment one appears as a bare argv token the segment is held UNCONDITIONALLY,
+  // before the CLI/HTTP checks below.
+  //
+  // The scan is any-token, NOT head-only, because a wrapper in front of the
+  // executor becomes the head and a head-only hold never fires. Adding wrappers to
+  // a strip-list is not the fix — flag-taking wrappers (`nice -n 10 bash`,
+  // `timeout 5 sh`) and unknown ones (`foo bar bash`) still bypass it. Scanning
+  // every de-spliced word closes the whole family at once and folds in what the
+  // old ARGV_RUNNERS/HANDOFF_EXECUTORS special case did for `xargs sh -c` and
+  // `find … -exec python3 {} \;` — those are just the same executor sitting in a
+  // runner's argv. `.` / `source` (the source builtin) count only at the head;
+  // off-head, `.` is find's current-directory argument and neither can be exec'd
+  // as an external program by a wrapper.
+  //
+  // Accepted over-block, fail-closed by design: a plain word that merely EQUALS an
+  // interpreter name is held too — `echo bash`, `grep python3 file`, `which sh`,
+  // and even a `langwatch` delete whose identifier is literally `bash`. A filename
+  // that only RESEMBLES one is NOT held, because its basename differs (`cat bash.md`,
+  // `ls ./sh.txt`, `ls python3/` whose trailing-slash basename is empty), and a
+  // quoted multi-word value never equals a bare name (`git commit -m "run bash later"`).
+  for (let i = 0; i < stripped.length; i += 1) {
+    const value = stripped[i]?.value ?? "";
+    const base = (value.split("/").pop() ?? value).toLowerCase();
+    if (!base) continue; // e.g. a trailing-slash path (`python3/`) — not an executable.
+    if ((base === "." || base === "source") && i !== 0) continue;
+    if (SEGMENT_EXECUTORS.has(base)) {
+      return { kind: "exec-file", segment };
+    }
   }
-
-  // A shell resolves content the gate never sees — a script file (`bash f.sh`)
-  // OR its stdin when run bare (`… | bash`, `cat f.sh | bash`). Held
-  // UNCONDITIONALLY, even bare, mirroring CODE_INTERPRETERS above: a bare shell
-  // in a pipeline reads its script from stdin just as a bare interpreter does.
-  if (FILE_EXECUTORS.has(headBase)) {
-    return { kind: "exec-file", segment };
-  }
+  // A relative-path executable at the head (`./f.sh`, `../f.sh`) runs an
+  // agent-written file the gate never sees. Its basename is not an executor name,
+  // so the scan above does not catch it; hold it here.
   if (/^\.{1,2}\//.test(head)) {
     return { kind: "exec-file", segment };
-  }
-
-  // An argument-runner (`xargs`/`find`/`parallel`) that hands its argv to a shell
-  // or a code interpreter (`xargs -I{} sh -c {}`, `find … -exec bash {} \;`) runs
-  // code the gate never resolves, so it is held. The hand-off target is matched
-  // as a bare token or the basename of a path token; a hand-off to a non-executor
-  // (`find … | xargs wc -l`) is untouched.
-  if (ARGV_RUNNERS.has(headBase)) {
-    for (let i = 1; i < values.length; i += 1) {
-      const token = values[i] ?? "";
-      const base = (token.split("/").pop() ?? token).toLowerCase();
-      if (HANDOFF_EXECUTORS.has(base)) {
-        return { kind: "exec-file", segment };
-      }
-    }
   }
 
   if (CLI_NAMES.has(headBase)) {

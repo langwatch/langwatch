@@ -297,6 +297,65 @@ describe("Unresolvable commands held unconditionally", () => {
   });
 });
 
+describe("An executor anywhere in a segment is held regardless of the wrapper (Finding C)", () => {
+  /** @scenario A shell or interpreter anywhere in a segment is held regardless of the wrapper in front of it */
+  it("holds a shell or interpreter behind any wrapper, flag-taking or unknown", () => {
+    // The old hold fired only on the segment HEAD after stripping the enumerated
+    // RUNNER_WRAPPERS, so any OTHER wrapper became the head and the hold never
+    // fired: `echo d | nice bash` decoded and ran the shell with no langwatch
+    // literal for the gate to catch. Adding wrappers to the strip-set is not the
+    // fix — a flag-taking wrapper (`nice -n 10 bash`) still bypasses it. The
+    // any-token scan holds the executor wherever it sits.
+    const held = [
+      // The six reproductions from the finding.
+      "echo d | nice bash",
+      "echo d | nice sh",
+      "echo d | ionice bash",
+      "echo d | stdbuf -o0 bash",
+      "echo d | timeout 5 bash",
+      "echo d | nice python3 -c 'pass'",
+      // Flag-taking and unknown wrappers, which no strip-set could enumerate.
+      "nice -n 10 bash",
+      "timeout 5 sh -s",
+      "setsid bash",
+      "chrt 0 python3",
+      "foo bar bash",
+      // Closed residuals: the interpreter is a bare word behind an applet
+      // dispatcher (`busybox sh`) or behind `env -S` (env is stripped as a runner
+      // wrapper, leaving `-S bash` whose `bash` is its own token).
+      "env -S bash",
+      "busybox sh",
+    ];
+    for (const command of held) {
+      expect(bash(command, confirmedForD1).allow, command).toBe(false);
+      expect(findDestructiveMatches(command), command).toContainEqual(
+        expect.objectContaining({ kind: "exec-file" }),
+      );
+    }
+  });
+
+  /** @scenario Filenames that merely resemble an interpreter name are not held */
+  it("does not over-block filenames or quoted words that only resemble an interpreter name", () => {
+    // The accepted over-block is scoped to a bare word that EQUALS an executor
+    // name. A path whose basename merely differs, a trailing-slash directory, and
+    // a quoted multi-word argument must all stay allowed — over-blocking these is
+    // the over-block that gets the whole gate flag-disabled.
+    const allowed = [
+      "echo hi | grep hi",
+      "cat file | wc -l",
+      "find . -name '*.ts' | xargs wc -l",
+      "git log | head",
+      "ls python3/", // trailing-slash basename is empty, not the `python3` binary
+      'git commit -m "run bash later"', // quoted → one word value, not `bash`
+      "cat bash.md", // basename `bash.md`, not `bash`
+      "ls ./sh.txt", // basename `sh.txt`, not `sh`
+    ];
+    for (const command of allowed) {
+      expect(bash(command).allow, command).toBe(true);
+    }
+  });
+});
+
 describe("Interpreter-executed code is held unconditionally", () => {
   /** @scenario An interpreter running code that builds a destructive command at runtime is held */
   it("holds the concat-bypass payload and a no-semicolon variant, even with a valid confirmation", () => {

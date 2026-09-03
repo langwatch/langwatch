@@ -263,6 +263,45 @@ Feature: Langy's worker-side delete gate
         | find . -name '*.py' -exec python3 {} \; |
 
     @unit
+    Scenario Outline: A shell or interpreter anywhere in a segment is held regardless of the wrapper in front of it
+      Given a bound, valid confirmation is present for the same target
+      When a gated bash command runs "<command>"
+      Then the gate returns allow:false
+      # The hold scans every de-spliced word, not just the segment head, so a
+      # wrapper in front of the executor (flag-taking or unknown) cannot hide it —
+      # `env -S bash` and `busybox sh` are held for the same reason.
+
+      Examples:
+        | command                          |
+        | echo d \| nice bash              |
+        | echo d \| ionice bash            |
+        | echo d \| stdbuf -o0 bash        |
+        | echo d \| timeout 5 bash         |
+        | echo d \| nice python3 -c 'pass' |
+        | nice -n 10 bash                  |
+        | timeout 5 sh -s                  |
+        | setsid bash                      |
+        | chrt 0 python3                   |
+        | foo bar bash                     |
+        | env -S bash                      |
+        | busybox sh                       |
+
+    @unit
+    Scenario Outline: Filenames that merely resemble an interpreter name are not held
+      When a gated bash command runs "<command>"
+      Then the gate returns allow:true
+      # The accepted over-block is scoped to a bare word that EQUALS an executor
+      # name. A path whose basename differs, a trailing-slash directory, and a
+      # quoted multi-word argument all stay allowed.
+
+      Examples:
+        | command                          |
+        | git log \| head                  |
+        | ls python3/                      |
+        | cat bash.md                      |
+        | ls ./sh.txt                      |
+
+    @unit
     Scenario Outline: A command using shell expansion is held even when it does not mention LangWatch
       When a gated bash command runs "<command>"
       Then the gate returns allow:false
@@ -588,7 +627,7 @@ Feature: Langy's worker-side delete gate
 # AC 10: "Read-only langwatch calls pass" -> Scenario Outline: Read-only langwatch CLI calls pass without confirmation; Scenario: A quoted or escaped argument is not over-blocked, even with word-internal splices; Scenario: Routine brace expansion in a non-langwatch command is not over-blocked; Scenario: An escaped double-quote inside a double-quoted word is parsed as one argument, not held; Scenario: An unquoted shell comment does not make a command unparseable
 # AC 11: "Non-langwatch bash passes" -> Scenario Outline: Non-langwatch bash commands pass without confirmation; Scenario Outline: An innocent pipeline into a non-shell tool is not over-blocked
 # AC 12: "Block reason is actionable" -> Scenario: A block reason for an unconfirmed delete tells the agent to ask first; Scenario: A block reason for an unresolvable command tells the agent how to re-issue it; Scenario: An obfuscated command-name block names the obfuscation and says to re-issue the name plainly; Scenario: A destructive HTTP block tells the agent to re-issue through the CLI, not to confirm
-# AC 13: "Write-then-execute is held unconditionally" -> Scenario: A write or edit whose content contains a destructive command is held; Scenario Outline: Executing an agent-written file is held even with a valid confirmation; Scenario: A bash native quote-splice that reassembles the CLI name is held; Scenario: A backslash- or brace-spliced command name that reassembles the CLI name is held; Scenario: A brace-expansion splice that reassembles a destructive verb or resource is held; Scenario: A single-element or enumerated range brace that reassembles a destructive verb is held; Scenario: A brace expansion exceeding the enumeration budget is held quickly; Scenario: A long run of unmatched braces on a langwatch argument is held quickly; Scenario: A non-langwatch command with the same unmatched-brace run is unaffected; Scenario: A long brace-free langwatch argument is not over-blocked; Scenario: An escaped or quoted brace that bash leaves literal is not over-blocked; Scenario: The brace expander matches real bash for every handled brace form; Scenario: An awk program that concatenates a destructive command through system() is held; Scenario Outline: A bare shell fed its script on stdin is held; Scenario Outline: An argument-runner that hands its argv to a shell or interpreter is held; Scenario Outline: A command using shell expansion is held even when it does not mention LangWatch
+# AC 13: "Write-then-execute is held unconditionally" -> Scenario: A write or edit whose content contains a destructive command is held; Scenario Outline: Executing an agent-written file is held even with a valid confirmation; Scenario: A bash native quote-splice that reassembles the CLI name is held; Scenario: A backslash- or brace-spliced command name that reassembles the CLI name is held; Scenario: A brace-expansion splice that reassembles a destructive verb or resource is held; Scenario: A single-element or enumerated range brace that reassembles a destructive verb is held; Scenario: A brace expansion exceeding the enumeration budget is held quickly; Scenario: A long run of unmatched braces on a langwatch argument is held quickly; Scenario: A non-langwatch command with the same unmatched-brace run is unaffected; Scenario: A long brace-free langwatch argument is not over-blocked; Scenario: An escaped or quoted brace that bash leaves literal is not over-blocked; Scenario: The brace expander matches real bash for every handled brace form; Scenario: An awk program that concatenates a destructive command through system() is held; Scenario Outline: A bare shell fed its script on stdin is held; Scenario Outline: An argument-runner that hands its argv to a shell or interpreter is held; Scenario Outline: A shell or interpreter anywhere in a segment is held regardless of the wrapper in front of it; Scenario Outline: Filenames that merely resemble an interpreter name are not held; Scenario Outline: A command using shell expansion is held even when it does not mention LangWatch
 # AC 14: "Destructive HTTP beyond literal DELETE is held" -> Scenario: A POST GraphQL delete or archive mutation...; Scenario: A PUT or PATCH soft-delete...; Scenario: A POST to a destructive action endpoint...; Scenario: A destructive HTTP block tells the agent to re-issue through the CLI, not to confirm; Scenario Outline: Each unconfirmed bypass class is blocked at the real tool_call seam (HTTP-shape delete case)
 # AC 15: "Benign HTTP to a langwatch host is NOT over-blocked" -> Scenario: A GET request to a langwatch host is not blocked; Scenario: A read or non-destructive GraphQL POST to a langwatch host is not blocked
 # AC 16: "Equals-form flag values are evaluated" -> Scenario: An equals-form flag value carrying a destructive verb is matched; Scenario Outline: Each unconfirmed bypass class is blocked at the real tool_call seam (equals-form case)
