@@ -45,5 +45,7 @@ Feature: The background worker resolves a plan the way the interactive one does
   Scenario: An enterprise organization's webhook entitlement is answered here
     Given an organization on a plan whose tier carries the webhook entitlement
     When their plan is resolved
-    Then the entitlement is applied from the tier rather than from the contract
+    Then the entitlement comes back set, carried by the plan their subscription
+      names rather than added afterwards
     And a plan whose tier does not carry it leaves it unset
+    And so does the same organization when the subscription rows cannot be read

@@ -14336,3 +14336,360 @@ A deployment that set `TRIGGER_PERSIST_DAILY_CAP_*` keeps its own values.
 - **`adminEmails` is read and not used.** See above — the field it feeds is
   unreachable without a user, and no consumer here supplies one.
 - **Nothing under `platform/` was created, edited or read.**
+
+## The two `fromEntries` outputs, and the 22 borrowed entries filled, 2026-09-03
+
+The two follow-ups the placeholder sweep left behind. One of the two `any`
+bugs it named is real and is fixed; the other does not reproduce, and that is
+the first thing to record.
+
+### `Object.fromEntries` erases one of the two, not both
+
+The sweep read both call sites as landing on `Object.fromEntries`'s
+`Iterable<readonly any[]>: any` overload. Probed rather than assumed — a
+`const __probe: never = <the expression>` in each function, read off the
+compiler's complaint:
+
+| Site | Inferred before any change |
+| --- | --- |
+| `model-provider/server/.../model-provider.api.ts:266` (`toLegacyProviderMap`) | `{ [k: string]: ModelProviderListEntry }` — **not** `any` |
+| `trace/server/.../traces.api.ts:404` (`getFormattedSpansDigest`) | `any` — **erased**, as reported |
+
+The difference is the `await Promise.all` between the `.map` and the
+`fromEntries`. TypeScript infers the entry as a two-tuple from the CONTEXTUAL
+type flowing back out of `fromEntries`'s typed overload into the `map`
+callback; the digest's `await` breaks that flow, and the provider map's direct
+call keeps it. So the model-provider annotation the sweep called worthless was
+in fact holding, and the trace one was answering `any` to every caller.
+
+Both now carry `as const` on the entry, which makes the tuple explicit instead
+of inference-dependent, and each has a type-level test. `getAllForProject`'s
+was PROVED to bite by sabotage: hoisting the entries into a `const entries` is
+enough to lose the contextual tuple, and with that in place the suite reports
+four errors (`TS2349` on `not.toBeAny()`, `TS2344` on `toEqualTypeOf`) across
+the two cases. The digest's test failed against the unfixed code with the same
+two, and passes with `as const` in.
+
+The tests assert on the CALLER's return type
+(`Awaited<ReturnType<Caller["x"]>>`) rather than `inferRouterOutputs`. Without
+a transformer `inferRouterOutputs` applies tRPC's `Serialize`, which turns
+`Date` into `string` and `Record<string, T>` into `Record<string | number, T>`
+— a mismatch that reads exactly like an erasure and is not one.
+
+### The 22 borrowed entries
+
+Every one of the 22 the sweep named is filled. Each needed the same three
+things: an output type in the owning contract, a return annotation on the
+resolver, and the map entry. None of the outputs is a Prisma row — every one is
+the contract's own zod-inferred DTO, or a transport reshape over one.
+
+| Map entry | Kind | Input type | Output type (new) | Derived from |
+| --- | --- | --- | --- | --- |
+| `prompts.getAllPromptsForProject` | query | `PromptProjectTrpcInput` | `PromptGetAllForProjectTrpcOutput` | `PromptApp.listForProject` → `VersionedPrompt[]` |
+| `prompts.getByIdOrHandle` | query | `PromptGetByIdOrHandleTrpcInput` | `PromptGetByIdOrHandleTrpcOutput` | `tryGetByIdOrHandle` → `VersionedPrompt \| null` |
+| `prompts.getAllVersionsForPrompt` | query | `PromptIdOrHandleTrpcInput` | `PromptGetAllVersionsTrpcOutput` | `listVersions` → `VersionedPrompt[]` |
+| `prompts.checkHandleUniqueness` | query | `PromptHandleUniquenessTrpcInput` | `PromptHandleUniquenessTrpcOutput` | `checkHandleUniqueness` → `boolean` |
+| `prompts.getTagsForConfig` | query | `PromptConfigTagsTrpcInput` | `PromptConfigTagsTrpcOutput` | `getTagsForConfig` → `PromptTagAssignment[]` |
+| `prompts.create` | mutation | `PromptCreateTrpcInput` | `PromptCreateTrpcOutput` | `create` → `VersionedPrompt` |
+| `prompts.update` | mutation | `PromptUpdateTrpcInput` | `PromptUpdateTrpcOutput` | `update` → `VersionedPrompt` |
+| `prompts.updateHandle` | mutation | `PromptUpdateHandleTrpcInput` | `PromptUpdateHandleTrpcOutput` | `updateHandle` → `VersionedPrompt` |
+| `prompts.assignTag` | mutation | `PromptAssignTagTrpcInput` | `PromptAssignTagTrpcOutput` | `assignTag` → `PromptTagAssignment` |
+| `evaluators.getAll` | query | `EvaluatorApiProjectInput` | `EvaluatorApiGetAllOutput` | `getAllWithFields` → `EvaluatorWithFields[]` |
+| `evaluators.getById` | query | `EvaluatorApiEvaluatorIdInput` | `EvaluatorApiGetByIdOutput` | `tryGetByIdWithFields` → `EvaluatorWithFields \| null` |
+| `evaluators.create` | mutation | `EvaluatorApiCreateInput` (new) | `EvaluatorApiCreateOutput` | `create` → `Evaluator` |
+| `evaluators.update` | mutation | `EvaluatorApiUpdateInput` | `EvaluatorApiUpdateOutput` | `update` → `Evaluator` |
+| `evaluators.delete` | mutation | `EvaluatorApiEvaluatorIdInput` | `EvaluatorApiDeleteOutput` | `archive` → `Evaluator` |
+| `dataset.getAll` | query | `DatasetApiProjectInput` | `DatasetApiGetAllOutput` | `listDatasets().data` → `DatasetSummary[]` |
+| `dataset.getById` | query | `DatasetApiDatasetInput` | `DatasetApiGetByIdOutput` | `getBySlugOrId` → `Dataset`, `null` on the transport's catch |
+| `dataset.upsert` | mutation | `DatasetApiUpsertInput` (new) | `DatasetApiUpsertOutput` | `upsertDataset` → `Dataset` |
+| `dataset.validateDatasetName` | query | `DatasetApiValidateNameInput` | `DatasetApiValidateNameOutput` | `validateDatasetName` → `DatasetNameResult` |
+| `dataset.findNextName` | query | `DatasetApiFindNextNameInput` | `DatasetApiFindNextNameOutput` | `findNextAvailableName` → `string` |
+| `modelProvider.listAllForProjectForFrontend` | query | inline `{ projectId }` | `ModelProviderListAllForProjectTrpcOutput` | `listForProject` mapped through `toLegacyProvider` → `ModelProviderListEntry[]` |
+| `modelProvider.getResolvedDefault` | query | inline `{ projectId, featureKey }` | `ModelDefaultResolvedTrpcOutput` | `tryGetResolvedDefault` → `ModelDefaultEffective \| null` |
+| `agents.update` | mutation | `UpdateAgentCommand` | `AgentApiUpdateOutput` | `AgentApp.update` → `AgentWithFields` |
+
+### Three things the fill turned up
+
+- **`z.infer` is the wrong alias for a wire INPUT with a default.**
+  `EvaluatorApiCreateInput` started as `z.infer<...>` and broke
+  `evaluator-editor-shared.tsx:542`: `id` carries
+  `.default(generateEvaluatorId)`, so the PARSED shape has it and what the
+  browser sends does not. `z.input` is the correct alias, and
+  `@langwatch/agent-contract`'s `UpdateAgentCommand` had already reached the
+  same conclusion for its own defaulted keys. Worth checking on every future
+  fill: a defaulted or transformed key makes `z.infer` a requirement the client
+  cannot meet.
+- **Two of the 22 answer a shape the TRANSPORT builds, not the service's.**
+  `dataset.getAll` returns `listDatasets`'s `data` page without the pagination
+  block, and `modelProvider.listAllForProjectForFrontend` maps every row through
+  the same `toLegacyProvider` the two `getAllForProject*` reads use. Both are
+  still contract DTOs (`DatasetSummary`, `ModelProviderListEntry`), which is why
+  they qualified; the type is named after the PROCEDURE for that reason.
+- **`dataset.findNextName` answers a bare `string`.** Published as a named
+  alias anyway, so the map entry reads like its neighbours rather than as a
+  primitive somebody guessed.
+
+### The resolvers now annotate, in files where nothing did
+
+None of the five transports carried a single return annotation. The sweep's
+rule was "annotate where its siblings do", and taken literally that would have
+left every one of the 22 outputs derived-but-unbound: the published type would
+assert a shape nothing checks. They are annotated, which turns the derivation
+into a compile error the day an app method's return moves. The annotation is in
+every case the exact type the app method already declares, so no wire shape
+changed — `apps/ui`, `apps/api` and all nine consumer web packages typecheck
+unchanged.
+
+### File → change
+
+| File | Change |
+| --- | --- |
+| `packages/features/trace/server/src/transport/api-trpc/traces.api.ts` | `as const` on the digest entry; the erasure this fixes is the one that reproduced. |
+| `packages/features/trace/server/src/app/__tests__/traces-trpc-api.unit.test.ts` | Type-level test that `getFormattedSpansDigest` answers `Record<string, string>` and not `any`. |
+| `packages/features/model-provider/server/src/transport/api-trpc/model-provider.api.ts` | `as const` on the provider entry, with the comment saying what it defends against; return annotations on `listAllForProjectForFrontend` and `getResolvedDefault`. |
+| `packages/features/model-provider/server/src/app/__tests__/model-provider-trpc-api.unit.test.ts` | Type-level tests for both provider reads. |
+| `packages/features/model-provider/contract/src/model-provider.trpc-schemas.ts` | Its first two `export type`s — the file had none. |
+| `packages/features/prompt/contract/src/prompt.trpc-schemas.ts` | Seven input aliases over schemas it already published, nine outputs. |
+| `packages/features/prompt/server/src/transport/api-trpc/prompt.api.ts` | Nine return annotations. |
+| `packages/features/evaluator/contract/src/evaluator.schemas.ts` | `EvaluatorApiCreateInput` (`z.input` over the factory's return), five outputs. |
+| `packages/features/evaluator/server/src/transport/api-trpc/evaluator.api.ts` | Five return annotations. |
+| `packages/features/dataset/contract/src/dataset.schemas.ts` | `DatasetApiUpsertInput` (the two chained parsers as one type), five outputs. |
+| `packages/features/dataset/server/src/transport/api-trpc/dataset.api.ts` | Five return annotations. |
+| `packages/features/agent/contract/src/agent.schemas.ts` | `AgentApiUpdateOutput`. |
+| `packages/features/agent/server/src/transport/api-trpc/agent.api.ts` | One return annotation. |
+| `packages/features/workflow/web/src/behavior/workflow-api.ts` | All 22 placeholders replaced; the file's `Unpublished` lines drop from 95 to 75. |
+| `packages/features/scenario/web/src/behavior/scenario-api.ts` | The three it borrows: `agents.update`, `modelProvider.getResolvedDefault`, `listAllForProjectForFrontend`. |
+| `packages/features/langy/web/src/behavior/langy-api.ts` | The one it borrows: `modelProvider.getResolvedDefault`. |
+
+### Left as placeholders in the other two maps, and why
+
+`langy-api.ts` still says `Q`/`QL` for `prompts.getAllPromptsForProject`,
+`prompts.getByIdOrHandle`, `dataset.getAll` and `dataset.getById`, and
+`scenario-api.ts` for `prompts.getAllPromptsForProject` — the types they want
+now exist, but neither package DEPENDS on `@langwatch/prompt-contract` or
+`@langwatch/dataset-contract`. Filling them means adding a workspace dependency
+and an install, which is a different change from naming a type that is already
+reachable, and this lane did not run an install while other lanes were live.
+Five one-line entries, blocked on two `package.json` lines each.
+
+### Gates
+
+Per package, `typecheck` then `test`, one at a time:
+
+| Package | typecheck | test |
+| --- | --- | --- |
+| `@langwatch/prompt-contract` | clean | 9 files, 131 tests passed |
+| `@langwatch/prompt-server` | clean | 22 passed + 2 skipped files, 197 passed + 45 todo |
+| `@langwatch/dataset-contract` | clean | 3 files, 9 tests passed |
+| `@langwatch/dataset-server` | clean | 16 files, 117 tests passed |
+| `@langwatch/evaluator-contract` | clean | 4 files, 19 tests passed |
+| `@langwatch/evaluator-server` | clean | 6 files, 78 tests passed |
+| `@langwatch/agent-contract` | clean | 2 files, 6 tests passed |
+| `@langwatch/agent-server` | clean | 3 files, 51 tests passed |
+| `@langwatch/model-provider-contract` | clean | 26 files, 343 tests passed |
+| `@langwatch/model-provider-server` | clean | 19 files, 191 tests passed |
+| `@langwatch/trace-server` | clean | 142 files, 2397 tests passed |
+| `@langwatch/workflow-web` | clean | 52 files, 323 tests passed |
+| `@langwatch/langy-web` | clean | 75 files, 739 tests passed |
+| `@langwatch/scenario-web` | clean | 52 files, 421 passed + 1 skipped |
+| `apps/ui` | clean | — |
+
+Also typechecked clean, as the consumers a widened output could have broken:
+`prompt-web`, `dataset-web`, `evaluator-web`, `agent-web`,
+`model-provider-web`, `trace-web`, `navigation-web`, `experiment-web`,
+`ops-web`.
+
+`oxlint --config .oxlintrc.architecture.json` over all sixteen touched files:
+clean.
+
+`apps/api` reports three errors, all in test files this lane did not touch and
+none naming a type it published:
+`api-trpc-collaborators.agent-group.integration.test.ts:852` (a local Prisma
+mock declared with only `findMany`),
+`api-trpc-collaborators.trace-group.integration.test.ts:1222` (a `tryActor`
+returning `undefined` where the context wants `| null` — and that file is dirty
+from another lane), and `api-usage.composition.unit.test.ts:3`
+(`BillingSubscriptionRecord` no longer exported by
+`@langwatch/enterprise-billing-server`).
+
+## One deployment, one plan policy — and the home the record named could not hold it, 2026-09-03
+
+The follow-up the "worker learns which plan a customer is on" entry recorded:
+`baseline: isSaas ? getFreePlanLimits() : UNLIMITED_PLAN`, the subscription
+source over it and the tier enricher were written out in **both** composition
+roots, held together only by two suites asserting the same fixtures. They are
+now one function, both roots call it, and both copies are gone.
+
+### The recorded home is a package cycle, and the lint says so
+
+The record proposed `deploymentBaselinePlan({ isSaas })` in
+`@langwatch/enterprise-licensing-contract`, "which already owns one of the two
+baselines and is a contract package both roots may depend on". Both halves of
+that sentence are true and the conclusion still does not hold:
+
+```
+  @langwatch/enterprise-billing-contract
+        │  package.json dependency (FREE_VISIBILITY_DAYS, PlanInfo)
+        ▼
+  @langwatch/enterprise-licensing-contract      ← the proposed home
+        │
+        └── would need getFreePlanLimits() ─────┐
+                                                │
+                                    ...back to billing-contract
+                                    = package-cycle
+```
+
+`lintCycles` (`packages/architecture-lint/src/cycles.ts`) is manifest-level, so
+the edge is a cycle whether the import is a type or a value. The hosted
+baseline is **not** licensing's own `FREE_PLAN` either: licensing's is
+1 member / 1,000 messages / `canPublish: false`, and `PLAN_LIMITS[FREE]` — what
+both roots actually resolved — is 2 / 50,000 / `canPublish: true`. Substituting
+one for the other would have been a silent customer-visible change.
+
+Three more rules narrow what is left, all in
+`packages/architecture-lint/src/manifests.ts`:
+
+| Candidate home | Refused by | Because |
+| --- | --- | --- |
+| `enterprise-licensing-contract` | `package-cycle` | needs `getFreePlanLimits` |
+| `entitlement-server` / `entitlement-contract` (core) | `enterprise-direction` | a core package cannot depend on an enterprise one |
+| `enterprise-licensing-server` | `cross-feature` | needs `SaaSPlanProviderService`, a foreign feature's **implementation** |
+| `enterprise-billing-contract` | `package-role` | a contract package cannot depend on its own server |
+
+That leaves exactly one package that may name `getFreePlanLimits`,
+`UNLIMITED_PLAN` and `SaaSPlanProviderService` at once:
+**`@langwatch/enterprise-billing-server`**, which already depends on the billing
+and licensing contracts and which both applications already depend on.
+
+### What it returns, and why not the provider
+
+`packages/enterprise/features/billing/server/src/services/deployment-plan-sources.service.ts`
+exports `deploymentPlanSources({ isSaas, subscriptions?, adminEmails? })`,
+returning `{ baseline, subscription? }` — the fully composed provider **inputs**.
+
+It does not return the `PlanProvider` itself because `EntitlementService` is
+`@langwatch/entitlement-server`'s, and `cross-feature` refuses a feature package
+importing another feature's implementation. So the one line that constructs the
+service stays at each root, and every line that *decides* anything left them.
+Prisma is nowhere in the module: the rows arrive as
+`BillingSubscriptionRepository`, the port each process already composed.
+
+```
+   IS_SAAS ──┐                     ┌── PostgresBillingAdapter(...).subscriptions
+             ▼                     ▼
+        deploymentPlanSources({ isSaas, subscriptions?, adminEmails? })
+             │  baseline = isSaas ? getFreePlanLimits() : UNLIMITED_PLAN
+             │  subscription = SaaSPlanProviderService, as EntitlementSource
+             ▼
+   ┌─────────┴──────────┐
+   ▼                    ▼
+composeApiPlanProvider   createWorkerPlanProvider
+ report absent(...)       report absent(...)
+ EntitlementService       EntitlementService
+   .create(sources)         .create(sources)
+```
+
+Each root keeps what is genuinely its own: the absence report and its wording
+(the API names four sources, the worker two), and `adminEmails`, which the API
+passes and the worker still deliberately does not — no call site in the
+background process supplies a user, so the field it feeds
+(`overrideAddingLimitations`) is unreachable there.
+
+### The inert enricher: deleted from both roots, kept where it fires
+
+`enrichers: [{ enrich: applyPlanTypeEntitlements }]` is gone from
+`composeApiPlanProvider` and `createWorkerPlanProvider`. The reasoning, checked
+rather than asserted:
+
+- `ENTITLEMENTS_BY_PLAN_TYPE` names exactly one tier and one field —
+  `ENTERPRISE → webhookEndpointsEnabled: true`.
+- The two baselines these roots can resolve are `FREE` and `OPEN_SOURCE`. The
+  map mentions neither, so on the baseline leg the enricher is a no-op by
+  construction.
+- The only other leg is the subscription source, and
+  `SaaSPlanProviderService.getActivePlan` answers either `getFreePlanLimits()`
+  or `{ ...PLAN_LIMITS[plan], ...customLimits }`, where `customLimits` carries
+  only `maxMembers`, `maxMembersLite` and `maxMessagesPerMonth`.
+  `PLAN_LIMITS[ENTERPRISE]` sets `webhookEndpointsEnabled: true` itself
+  (`plan-limits.ts:152`), so nothing is ever left undefined for the enricher to
+  fill.
+
+**Where it is NOT inert, and is untouched:** the LICENCE leg. A licence signed
+before the flag existed resolves `ENTERPRISE` with the field undefined, and
+`PlanProviderService`
+(`packages/enterprise/features/licensing/server/src/services/plan-provider.service.ts:32`)
+applies the enricher over whatever provider a licensed deployment resolves
+through. Neither of these two processes composes a licence source, which is
+exactly why the enricher never fired in them. `applyPlanTypeEntitlements` and
+its six tests stay in the licensing contract.
+
+The seam the previous record wanted to preserve is preserved as a **test**
+rather than as dead wiring: `deployment-plan-sources.unit.test.ts` walks
+`ENTITLEMENTS_BY_PLAN_TYPE` and resolves a real subscription on each tier it
+names, asserting the answered plan already carries every mapped field, plus that
+neither baseline's `type` appears in the map. A new tier entitlement the plan
+table does not carry fails there — with the tier and field named — instead of
+reaching a customer as a feature one process offers and the other refuses.
+
+**Sabotage, shown to land:** deleting `webhookEndpointsEnabled: true` from
+`PLAN_LIMITS[ENTERPRISE]` fails
+`deployment-plan-sources.unit.test.ts:145` with `ENTERPRISE.webhookEndpointsEnabled`
+`expected true, received undefined` (1 failed / 7 passed). Restored byte-identical.
+
+### File → change
+
+| File | Change |
+| --- | --- |
+| `packages/enterprise/features/billing/server/src/services/deployment-plan-sources.service.ts` | **New.** `deploymentPlanSources`, its two option/result types, and the subscription source as Entitlements' neutral port |
+| `packages/enterprise/features/billing/server/src/services/__tests__/deployment-plan-sources.unit.test.ts` | **New.** 8 tests, including the two that make the enricher's absence a checked fact |
+| `packages/enterprise/features/billing/server/src/index.ts` | Exports the function and its two types |
+| `packages/enterprise/features/billing/server/package.json` | One dependency: `@langwatch/entitlement-contract` (core contract; `enterprise-direction` allows enterprise → core, `cross-feature` allows a contract target, no cycle) |
+| `packages/enterprise/features/billing/specs/deployment-plan-sources.feature` | **New.** 4 `@unit` scenarios, all bound |
+| `apps/api/src/app/api-usage.composition.ts` | `composeApiPlanProvider` calls the shared policy; `ApiSubscriptionEntitlementSource`, the baseline expression and the enricher deleted, with four now-unused imports |
+| `apps/worker/src/app/worker-plan-provider.composition.ts` | The same, for `createWorkerPlanProvider` |
+| both roots' `ENTITLEMENT_CONSEQUENCE.licence` | Said "only the tier entitlements carried by the plan's own type are applied", which described the enricher. Now: the baseline or the subscription's plan answers, and an entitlement carried only by a licence is never applied |
+| `apps/api/src/app/__tests__/api-usage.composition.unit.test.ts` | Docblock says what the file now pins; `BillingSubscriptionRecord` derived off `tryFindActive` instead of imported — which closes the third `apps/api` test error the previous entry recorded as open |
+| `apps/worker/src/app/__tests__/worker-plan-provider.composition.unit.test.ts` | Two docblocks corrected: the suite is no longer the only thing holding the two roots together |
+| `specs/automations/worker-plan-resolution.feature` | The webhook scenario said the entitlement "is applied from the tier rather than from the contract", which was never what its test asserted. It now says the plan the subscription names carries it |
+
+### Gates
+
+- `apps/api`: `vitest run src/app/__tests__/api-usage.composition.unit.test.ts
+  src/app` — **43 files, 467 passed, 2 failed**; both failures are 10s
+  `testTimeout` expiries under whole-suite load
+  (`api-trpc-collaborators.org-group` and `.execution`, whose import cost alone
+  is 84s and 31s), and both pass when run alone. `tsc --noEmit` — **0 errors**.
+  `tsc --noEmit -p tsconfig.test.json` — **2 errors**, the two the previous
+  entry recorded in other lanes' files; the third, `api-usage.composition.unit.test.ts:3`,
+  is fixed here.
+- `apps/worker`: `vitest run src/app` — **34 files / 290 tests, all passing**.
+  `tsc --noEmit` and `tsc --noEmit -p tsconfig.test.json` — **0 errors each**.
+- `@langwatch/enterprise-billing-server`: `vitest run` — **25 files passed /
+  2 skipped, 276 passed / 25 skipped**. `tsc --noEmit` — **0 errors**.
+- `@langwatch/enterprise-licensing-contract`: 6 files / 67 tests, typecheck
+  clean. `@langwatch/entitlement-contract` and `@langwatch/entitlement-server`:
+  2 and 4 tests, typecheck clean.
+- `packages/architecture-lint`: `feature-package-boundaries` and
+  `application-workspace-boundaries` — 46 tests passing. The CLI over the real
+  tree reports **no** `package-cycle`, `enterprise-direction`, `cross-feature`,
+  `package-role`, `feature-source-layout` or `feature-source-filename`
+  violation naming the new module, its package manifest or either root; the
+  three lines it prints against `api-usage.composition.ts` are the pre-existing
+  `api-transport-import-boundary` / `prisma-containment` pair at shifted line
+  numbers.
+- Feature parity: `packages/enterprise/features/billing/specs/deployment-plan-sources.feature`
+  **4/4 bound**, `specs/automations/worker-plan-resolution.feature` **4/4 bound**.
+- `oxlint` over the seven touched TypeScript files: clean. `oxfmt` reformatted
+  three; note that `api-usage.composition.ts` was **already** not `oxfmt`-clean
+  at HEAD (verified against `git show HEAD:` output), so two unrelated
+  one-liners in it reflow as a side effect of leaving the file clean.
+
+### What this pass did NOT do
+
+- **Nothing under `platform/` was created, edited or read.**
+- **The enricher was not deleted from the licensing contract.** It is live on
+  the licence leg, which is a leg neither of these processes composes.
+- **No absence was closed.** Both roots still report `absent("licence")`, and a
+  hosted deployment with no subscription rows still reports
+  `absent("subscription")` — the shared policy returns no source, and each root
+  still names what that costs in its own words.

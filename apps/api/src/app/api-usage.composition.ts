@@ -17,9 +17,9 @@
  *   - **No licence source.** A signed licence is read by the Enterprise
  *     licensing service, which this process composes none of, so a licensed
  *     self-hosted install resolves the same unlimited BASELINE an unlicensed
- *     one does. The two agree on every allowance; they differ only in the
- *     tier entitlements a licence carries, and the enricher below applies
- *     those from the plan's own type.
+ *     one does. The two agree on every allowance; they differ only in the tier
+ *     entitlements a licence carries, and applying those is the licensing
+ *     provider's own step, not something this process can stand in for.
  *   - **No subscription source.** On the hosted deployment a paid plan comes
  *     from a Stripe subscription row, which is the Enterprise billing store.
  *     Absent, every organization resolves to the free baseline — reported at
@@ -46,22 +46,11 @@
 import {
   BillableEventsQueryService,
   ClickHouseBillingAdapter,
-  SaaSPlanProviderService,
+  deploymentPlanSources,
   type BillingSubscriptionRepository,
 } from "@langwatch/enterprise-billing-server";
-import { getFreePlanLimits } from "@langwatch/enterprise-billing-contract";
-import {
-  applyPlanTypeEntitlements,
-  UNLIMITED_PLAN,
-} from "@langwatch/enterprise-licensing-contract";
 import type { ClickHouseClient } from "@clickhouse/client";
-import type {
-  EntitlementSource,
-  Plan,
-  PlanProvider,
-  ResolvePlanInput,
-  UsageUnit,
-} from "@langwatch/entitlement-contract";
+import type { PlanProvider, UsageUnit } from "@langwatch/entitlement-contract";
 import {
   EntitlementService,
   PrismaUsageMembershipRepository,
@@ -131,7 +120,7 @@ export class LoggedApiEntitlementAbsence extends ApiEntitlementAbsenceReport {
 
 const ENTITLEMENT_CONSEQUENCE = {
   licence:
-    "API process composed no licence source: a signed licence is not read here, so every organization resolves the deployment's baseline plan and only the tier entitlements carried by the plan's own type are applied.",
+    "API process composed no licence source: a signed licence is not read here, so every organization resolves the deployment's baseline plan or the plan its subscription names, and an entitlement carried only by a licence is never applied.",
   subscription:
     "API process composed no subscription source on a HOSTED deployment: every organization resolves the free baseline, including ones that are paying.",
   "usage-mail":
@@ -143,63 +132,36 @@ const ENTITLEMENT_CONSEQUENCE = {
 /**
  * Composes the plan provider this process resolves every allowance through.
  *
- * The enricher is the same one the platform application applies, and it is
- * applied here for the same reason: a tier's entitlements belong to the tier
- * rather than to each contract that predates it, so they are applied once, at
- * the single point every resolved plan passes through.
+ * **The policy itself is not written here.** Which baseline this deployment
+ * starts from, which paid source is consulted over it and what that source is
+ * built from come from `deploymentPlanSources`
+ * (`@langwatch/enterprise-billing-server`), which the background process reads
+ * too. It used to be written out in both roots and held together only by two
+ * suites asserting the same fixtures. What is this process's own is the rest of
+ * this function: the absences it names, and the entitlement service it
+ * constructs around the answer — the service belongs to the core Entitlements
+ * feature, which a feature package may not import.
+ *
+ * No tier enricher is threaded, in either process. `applyPlanTypeEntitlements`
+ * fills a tier entitlement only where the resolved plan left it undefined, and
+ * every plan these two sources answer already carries the one the tier map
+ * names, so it changed no answer here. The leg where it does change one is a
+ * signed licence predating a flag, and that leg applies it inside
+ * `PlanProviderService` (`@langwatch/enterprise-licensing-server`), which this
+ * process composes none of. A tier entitlement the plan table does not carry
+ * fails `deployment-plan-sources.unit.test.ts` rather than reaching a customer.
  */
 export function composeApiPlanProvider(options: ApiPlanProviderOptions): PlanProvider {
   options.report?.absent("licence");
 
-  const subscription = options.subscriptions
-    ? ApiSubscriptionEntitlementSource.create({
-        subscriptions: options.subscriptions,
-        isSaas: options.isSaas,
-        adminEmails: options.adminEmails ?? [],
-      })
-    : undefined;
-  if (options.isSaas && !subscription) options.report?.absent("subscription");
-
-  return EntitlementService.create({
-    baseline: options.isSaas ? getFreePlanLimits() : UNLIMITED_PLAN,
-    ...(subscription ? { subscription } : {}),
-    enrichers: [{ enrich: applyPlanTypeEntitlements }],
+  const sources = deploymentPlanSources({
+    isSaas: options.isSaas,
+    ...(options.subscriptions ? { subscriptions: options.subscriptions } : {}),
+    ...(options.adminEmails ? { adminEmails: options.adminEmails } : {}),
   });
-}
+  if (options.isSaas && !sources.subscription) options.report?.absent("subscription");
 
-/**
- * The hosted deployment's paid plan, as Entitlements' neutral source port.
- *
- * `SaaSPlanProviderService` answers the FREE baseline rather than null when an
- * organization has no subscription row, and `EntitlementService` already
- * discards a free plan before falling through to its own baseline. So the
- * translation is the identity one and the two baselines cannot disagree.
- *
- * It is the twin of `LicensingEntitlementSource` on the licence side, and it
- * lives here rather than in the billing package for the same reason the
- * licensing one lives in its own: which source a deployment consults is a
- * composition decision, not the store's.
- */
-class ApiSubscriptionEntitlementSource implements EntitlementSource {
-  static create(options: {
-    subscriptions: BillingSubscriptionRepository;
-    isSaas: boolean;
-    adminEmails: readonly string[];
-  }): ApiSubscriptionEntitlementSource {
-    return new ApiSubscriptionEntitlementSource(
-      SaaSPlanProviderService.create({
-        subscriptions: options.subscriptions,
-        isSaas: options.isSaas,
-        adminEmails: options.adminEmails,
-      }),
-    );
-  }
-
-  private constructor(private readonly plans: SaaSPlanProviderService) {}
-
-  async resolve(input: ResolvePlanInput): Promise<Plan> {
-    return this.plans.getActivePlan(input.organizationId, input.user);
-  }
+  return EntitlementService.create(sources);
 }
 
 /** What the usage reading is composed from. */
@@ -243,8 +205,7 @@ class ApiComposedUsageStats extends ApiUsageStatsPort {
 
   ports(): LimitsTrpcPorts {
     return {
-      getUsageStats: (_ctx, input) =>
-        this.stats.getUsageStats(input.organizationId, input.user),
+      getUsageStats: (_ctx, input) => this.stats.getUsageStats(input.organizationId, input.user),
       checkAndSendWarning: () =>
         Promise.reject(new ApiUsageNotifierUnavailableError(this.processName)),
     };
@@ -274,9 +235,7 @@ class ApiUsageCounterAdapter extends UsageCounterPort {
               // tenant-keyed connection would resolve one tenant's endpoint
               // for another's rows, so it refuses instead of guessing.
               resolveOrganizationClient: () =>
-                Promise.reject(
-                  new ApiOrganizationRoutedReadUnavailableError(options.processName),
-                ),
+                Promise.reject(new ApiOrganizationRoutedReadUnavailableError(options.processName)),
             }).build()
           : null,
       ),
@@ -293,9 +252,7 @@ class ApiUsageCounterAdapter extends UsageCounterPort {
     super();
   }
 
-  async getCurrentMonthCountForDisplay(input: {
-    organizationId: string;
-  }): Promise<UsageCount> {
+  async getCurrentMonthCountForDisplay(input: { organizationId: string }): Promise<UsageCount> {
     const unit = await this.getResolvedUsageUnit(input);
     if (unit === "events") {
       this.report?.absent("events-meter");

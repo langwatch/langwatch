@@ -1,18 +1,8 @@
-import { getFreePlanLimits } from "@langwatch/enterprise-billing-contract";
 import {
-  SaaSPlanProviderService,
+  deploymentPlanSources,
   type BillingSubscriptionRepository,
 } from "@langwatch/enterprise-billing-server";
-import {
-  applyPlanTypeEntitlements,
-  UNLIMITED_PLAN,
-} from "@langwatch/enterprise-licensing-contract";
-import type {
-  EntitlementSource,
-  Plan,
-  PlanProvider,
-  ResolvePlanInput,
-} from "@langwatch/entitlement-contract";
+import type { PlanProvider } from "@langwatch/entitlement-contract";
 import { EntitlementService } from "@langwatch/entitlement-server";
 import type { Logger } from "@langwatch/observability";
 
@@ -70,7 +60,7 @@ export class LoggedWorkerEntitlementAbsence extends WorkerEntitlementAbsenceRepo
 
 const ENTITLEMENT_CONSEQUENCE = {
   licence:
-    "worker composed no licence source: a signed licence is not read here, so every organization resolves the deployment's baseline plan and only the tier entitlements carried by the plan's own type are applied.",
+    "worker composed no licence source: a signed licence is not read here, so every organization resolves the deployment's baseline plan or the plan its subscription names, and an entitlement carried only by a licence is never applied.",
   subscription:
     "worker composed no subscription source on a HOSTED deployment: every organization resolves the free baseline, including ones that are paying, so their webhooks stop being delivered and their automations settle against the free daily ceiling.",
 } as const;
@@ -86,26 +76,24 @@ const ENTITLEMENT_CONSEQUENCE = {
  * window. So this is not a convenience default — it resolves from the
  * subscription rows, or it says which source it could not read.
  *
- * **The policy line is written twice in the tree.** `baseline: isSaas ?
- * getFreePlanLimits() : UNLIMITED_PLAN`, the subscription source over it and
- * the one tier enricher are also `composeApiPlanProvider`'s
- * (`apps/api/src/app/api-usage.composition.ts`), and the two cannot be one
- * function today: it lives inside the interactive application, which a
- * background process must not import, and hoisting it into a package would put
- * the enterprise billing and licensing tiers on a feature package that does not
- * carry them. What holds the two together meanwhile is a test, not a type —
- * `worker-plan-provider.composition.unit.test.ts` asserts the same resolutions
- * `api-usage.composition.unit.test.ts` asserts, on the same fixtures. The
- * follow-up that removes the copy is a `deploymentBaselinePlan({ isSaas })` in
- * `@langwatch/enterprise-licensing-contract`, which already owns one of the two
- * baselines and is a contract package both roots may depend on.
+ * **The policy itself is not written here.** Which baseline a deployment starts
+ * from, which paid source is consulted over it and what that source is built
+ * from come from `deploymentPlanSources`
+ * (`@langwatch/enterprise-billing-server`), which the interactive process reads
+ * too. It used to be written out in both roots and held together only by two
+ * suites asserting the same fixtures. What is this process's own is the rest of
+ * this function: the absences it names, and the entitlement service it
+ * constructs around the answer — the service belongs to the core Entitlements
+ * feature, which a feature package may not import.
  *
- * The tier enricher is carried because the interactive process carries it, not
- * because it fires: `applyPlanTypeEntitlements` fills a tier's entitlement only
- * where the resolved plan left it undefined, and the one field it maps —
- * `webhookEndpointsEnabled` on `ENTERPRISE` — is already set by that plan's own
- * limits. It is the seam a NEW tier entitlement lands on, and it must land on
- * both roots at once or one process starts refusing what the other offers.
+ * No tier enricher is threaded, in either process. `applyPlanTypeEntitlements`
+ * fills a tier entitlement only where the resolved plan left it undefined, and
+ * every plan these two sources answer already carries the one the tier map
+ * names, so it changed no answer here. The leg where it does change one is a
+ * signed licence predating a flag, and that leg applies it inside
+ * `PlanProviderService` (`@langwatch/enterprise-licensing-server`), which this
+ * process composes none of. A tier entitlement the plan table does not carry
+ * fails `deployment-plan-sources.unit.test.ts` rather than reaching a customer.
  *
  * `adminEmails` is deliberately NOT passed. It feeds exactly one field —
  * `overrideAddingLimitations`, for an operator impersonating a member — and no
@@ -115,45 +103,11 @@ const ENTITLEMENT_CONSEQUENCE = {
 export function createWorkerPlanProvider(options: WorkerPlanProviderOptions): PlanProvider {
   options.report?.absent("licence");
 
-  const subscription = options.subscriptions
-    ? WorkerSubscriptionEntitlementSource.create({
-        subscriptions: options.subscriptions,
-        isSaas: options.isSaas,
-      })
-    : undefined;
-  if (options.isSaas && !subscription) options.report?.absent("subscription");
-
-  return EntitlementService.create({
-    baseline: options.isSaas ? getFreePlanLimits() : UNLIMITED_PLAN,
-    ...(subscription ? { subscription } : {}),
-    enrichers: [{ enrich: applyPlanTypeEntitlements }],
+  const sources = deploymentPlanSources({
+    isSaas: options.isSaas,
+    ...(options.subscriptions ? { subscriptions: options.subscriptions } : {}),
   });
-}
+  if (options.isSaas && !sources.subscription) options.report?.absent("subscription");
 
-/**
- * The hosted deployment's paid plan, as Entitlements' neutral source port.
- *
- * `SaaSPlanProviderService` answers the FREE baseline rather than null when an
- * organization has no subscription row, and `EntitlementService` already
- * discards a free plan before falling through to its own baseline. So the
- * translation is the identity one and the two baselines cannot disagree.
- */
-class WorkerSubscriptionEntitlementSource implements EntitlementSource {
-  static create(options: {
-    subscriptions: BillingSubscriptionRepository;
-    isSaas: boolean;
-  }): WorkerSubscriptionEntitlementSource {
-    return new WorkerSubscriptionEntitlementSource(
-      SaaSPlanProviderService.create({
-        subscriptions: options.subscriptions,
-        isSaas: options.isSaas,
-      }),
-    );
-  }
-
-  private constructor(private readonly plans: SaaSPlanProviderService) {}
-
-  async resolve(input: ResolvePlanInput): Promise<Plan> {
-    return this.plans.getActivePlan(input.organizationId, input.user);
-  }
+  return EntitlementService.create(sources);
 }

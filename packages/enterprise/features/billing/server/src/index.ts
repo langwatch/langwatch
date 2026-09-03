@@ -116,6 +116,11 @@ export {
 export { NotificationService, type UsageLimitEmailData } from "./services/notification.service";
 export { NurturingService, type NurturingServiceOptions } from "./services/nurturing.service";
 export { NUMERIC_OVERRIDE_FIELDS, SaaSPlanProviderService } from "./services/plan-provider.service";
+export {
+  deploymentPlanSources,
+  type DeploymentPlanSources,
+  type DeploymentPlanSourcesOptions,
+} from "./services/deployment-plan-sources.service";
 export { SeatEventSubscriptionService } from "./services/seat-event-subscription.service";
 export { SeatSyncService } from "./services/seat-sync.service";
 export {

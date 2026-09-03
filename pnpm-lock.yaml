@@ -1686,6 +1686,9 @@ importers:
       '@langwatch/enterprise-licensing-contract':
         specifier: workspace:*
         version: link:../../licensing/contract
+      '@langwatch/entitlement-contract':
+        specifier: workspace:*
+        version: link:../../../../features/entitlement/contract
       '@langwatch/evaluation-contract':
         specifier: workspace:*
         version: link:../../../../features/evaluation/contract

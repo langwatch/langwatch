@@ -9,15 +9,17 @@ import {
 /**
  * Spec: specs/automations/worker-plan-resolution.feature
  *
- * THE SAME ANSWER AS THE OTHER PROCESS, asserted on the same fixtures.
+ * THE SAME ANSWER AS THE OTHER PROCESS, and now for a better reason than two
+ * suites agreeing.
  *
- * These cases are `apps/api/src/app/__tests__/api-usage.composition.unit.test.ts`'s,
- * deliberately: the two roots each compose the deployment's plan provider and
- * the policy line — which baseline for which deployment kind, the subscription
- * source over it, the one tier enricher — is written in both. A type cannot
- * hold them together while the API's copy lives inside the interactive
- * application, so this file does. If either root's policy moves, the pair of
- * suites disagrees rather than production disagreeing with itself.
+ * Which baseline a deployment starts from, which paid source is consulted over
+ * it and what that source is built from are `deploymentPlanSources`'s
+ * (`@langwatch/enterprise-billing-server`), which both roots read and
+ * `deployment-plan-sources.unit.test.ts` asserts. What this file pins is this
+ * root's own half: the absences it names, and resolutions that prove it
+ * actually reached the shared policy rather than composing a provider of its
+ * own — the answers a background process reading a different plan from the
+ * screen would get wrong.
  */
 
 /**
@@ -165,9 +167,8 @@ describe("given the plan provider this process composes for itself", () => {
   describe("when the webhook delivery gate reads the plan", () => {
     /**
      * The one field the gate reads, end to end. It comes off the ENTERPRISE
-     * plan's own limits rather than off the tier enricher — the enricher fills
-     * a tier entitlement only where the plan left it undefined, and this plan
-     * does not — so what this pins is the SUBSCRIPTION path: an enterprise
+     * plan's own limits, which is why no tier enricher is threaded through
+     * either root — so what this pins is the SUBSCRIPTION path: an enterprise
      * organization whose row this process could not read resolves the free
      * baseline and has its endpoints refused.
      */

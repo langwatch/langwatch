@@ -1,10 +1,29 @@
 import { PlanTypes } from "@langwatch/enterprise-billing-contract";
-import type {
-  BillingSubscriptionRecord,
-  BillingSubscriptionRepository,
-} from "@langwatch/enterprise-billing-server";
+import type { BillingSubscriptionRepository } from "@langwatch/enterprise-billing-server";
 import { describe, expect, it } from "vitest";
 import { ApiEntitlementAbsenceReport, composeApiPlanProvider } from "../api-usage.composition";
+
+/**
+ * What this file pins is this root's WIRING, not the plan policy.
+ *
+ * Which baseline a deployment starts from and which paid source is consulted
+ * over it are `deploymentPlanSources`'s
+ * (`@langwatch/enterprise-billing-server`), asserted where they are written, by
+ * `deployment-plan-sources.unit.test.ts`. Both processes read that one
+ * function; what remains different here is what this root names when a source
+ * is missing, and the resolutions below are what prove it actually reached the
+ * policy rather than composing a provider of its own.
+ */
+
+/**
+ * The row shape, taken off the one read the source makes rather than imported:
+ * `BillingSubscriptionRecord` is the billing package's own and is not on its
+ * public surface, and restating twelve fields here is how a fixture starts
+ * disagreeing with the table it stands for.
+ */
+type BillingSubscriptionRecord = NonNullable<
+  Awaited<ReturnType<BillingSubscriptionRepository["tryFindActive"]>>
+>;
 
 /** Records which plan sources the composition said it did not hold. */
 class RecordingEntitlementAbsence extends ApiEntitlementAbsenceReport {
