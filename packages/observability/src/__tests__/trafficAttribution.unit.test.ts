@@ -156,6 +156,58 @@ describe("classifyClient", () => {
       ).toEqual({ clientSource: "http-client" });
     });
   });
+
+  describe("when the request comes from the coding-agent tracking client", () => {
+    /** @scenario A request from the coding-agent tracking client is attributed to the SDK */
+    it("attributes a TypeScript agent-tracking request to the SDK", () => {
+      expect(
+        classifyClient(
+          headersOf({ "user-agent": "langwatch-typescript/1.2.3" }),
+        ),
+      ).toEqual({
+        clientSource: "sdk",
+        clientSdkName: "langwatch-typescript",
+        clientSdkLanguage: "typescript",
+        clientSdkVersion: "1.2.3",
+      });
+    });
+
+    /** @scenario A request from the coding-agent tracking client is attributed to the SDK */
+    it("attributes a Python agent-tracking request to the SDK", () => {
+      expect(
+        classifyClient(headersOf({ "user-agent": "langwatch-python/0.9.1" })),
+      ).toEqual({
+        clientSource: "sdk",
+        clientSdkName: "langwatch-python",
+        clientSdkLanguage: "python",
+        clientSdkVersion: "0.9.1",
+      });
+    });
+  });
+
+  describe("when an internal LangWatch service calls the API", () => {
+    /** @scenario A request from an internal LangWatch service is attributed as internal */
+    it("attributes the AI gateway to the internal client source", () => {
+      expect(
+        classifyClient(
+          headersOf({ "user-agent": "langwatch-aigateway/2.0.1" }),
+        ),
+      ).toEqual({
+        clientSource: "internal",
+        clientSdkName: "langwatch-aigateway",
+        clientSdkVersion: "2.0.1",
+      });
+    });
+  });
+
+  describe("when the user agent only looks like a known name", () => {
+    /** @scenario A user agent that only looks like a known name does not match */
+    it("classifies a prototype-property-shaped user agent as unknown", () => {
+      expect(
+        classifyClient(headersOf({ "user-agent": "constructor/1.0" })),
+      ).toEqual({ clientSource: "unknown" });
+    });
+  });
 });
 
 describe("endpointClassOf", () => {

@@ -8,7 +8,12 @@ import {
   LANGWATCH_SDK_VERSION,
 } from "../constants";
 import { resolveEndpoint } from "@/internal/endpoint";
-import { scopedApiKey, scopedProjectId } from "@/internal/credentialContext";
+import {
+  scopedApiKey,
+  scopedProjectId,
+  scopedSurface,
+} from "@/internal/credentialContext";
+import { CLI_SURFACE_HEADER, CLI_SURFACE_VALUE } from "@/internal/surface";
 import { buildAuthHeaders } from "./auth";
 import { handledErrorFrom } from "./errors";
 
@@ -97,6 +102,13 @@ export const createLangWatchApiClient = (
       "x-langwatch-sdk-language": LANGWATCH_SDK_LANGUAGE,
       "x-langwatch-sdk-version": LANGWATCH_SDK_VERSION,
       "x-langwatch-sdk-platform": LANGWATCH_SDK_RUNTIME(),
+      // The request-scoped surface (set at the CLI's request boundaries,
+      // internal/credentialContext.ts) lets the platform's traffic
+      // attribution tell CLI traffic apart from a plain SDK embed, which
+      // scopes nothing and sends none of this.
+      ...(scopedSurface() === "cli"
+        ? { [CLI_SURFACE_HEADER]: CLI_SURFACE_VALUE }
+        : {}),
     },
   });
 

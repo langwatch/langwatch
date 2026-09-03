@@ -11,7 +11,7 @@
  * exactly the code that ran before daemon mode existed.
  */
 
-import { runWithCredentialHolder } from "@/internal/credentialContext";
+import { runWithCliCredentialHolder } from "@/internal/credentialContext";
 import { execViaDaemon, requestStop } from "./client";
 import {
   collectForwardedEnv,
@@ -150,5 +150,8 @@ async function runInProcess(argv: string[]): Promise<void> {
   // (internal/credentialContext.ts). For a cold CLI this is the one command
   // in the process, but keeping the wrapper here means both paths behave
   // identically and the resolver never has to touch process.env for the key.
-  await runWithCredentialHolder(() => buildProgram().parseAsync(argv));
+  // The "Cli" variant also marks the holder's surface, so every request this
+  // command makes through createLangWatchApiClient carries the CLI surface
+  // header, matching the daemon-served path.
+  await runWithCliCredentialHolder(() => buildProgram().parseAsync(argv));
 }
