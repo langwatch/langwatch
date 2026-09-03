@@ -3,6 +3,7 @@ import { describe, expect, it } from "vitest";
 import { getSuiteSetId, isSuiteSetId, tryExtractSuiteId } from "../suite-set-id";
 
 describe("suite set IDs", () => {
+  /** @scenario "Suite run uses suite ID as setId" */
   it("builds the existing internal suite namespace", () => {
     expect(getSuiteSetId("suite_abc123")).toBe("__internal__suite_abc123__suite");
   });

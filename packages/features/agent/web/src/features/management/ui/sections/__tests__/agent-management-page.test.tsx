@@ -289,4 +289,43 @@ describe("AgentManagementPage", () => {
 
     await waitFor(() => expect(lifecycle.agentArchivedCalls).toBe(1));
   });
+
+  describe("given the project has no agent of any kind", () => {
+    /** @scenario "An empty agents page still opens the new agent flow" */
+    it("draws an empty state whose control opens the new agent flow", async () => {
+      const browser = new TestAgentBrowser();
+      const openTypeSelectorCalls: unknown[] = [];
+      class EmptyNavigation extends AgentManagementNavigationPort {
+        openEditor(): void {}
+        openTypeSelector(): void {
+          openTypeSelectorCalls.push(true);
+        }
+        openHistory(): void {}
+        openWorkflow(): void {}
+      }
+
+      render(
+        <ChakraProvider value={defaultSystem}>
+          <AgentManagementPage
+            data={{
+              projectId: "project_1",
+              agents: browser,
+              items: [],
+              isLoading: false,
+              copyProjects: [],
+            }}
+            navigation={new EmptyNavigation()}
+            feedback={new TestFeedback()}
+            lifecycle={new TestLifecycle()}
+            composition={new TestAgentPageComposition()}
+            card={new TestCard()}
+          />
+        </ChakraProvider>,
+      );
+
+      fireEvent.click(await screen.findByText("Create your first agent"));
+
+      expect(openTypeSelectorCalls).toEqual([true]);
+    });
+  });
 });

@@ -49,4 +49,41 @@ describe("AgentTypeSelectorDrawer", () => {
 
     expect(onSelect).toHaveBeenCalledWith("workflow");
   });
+
+  describe("given the connect-from-code choice leads the list", () => {
+    /** @scenario "Connect from code is the first choice of the new agent flow" */
+    it("draws Connect from Code first, with the green dot before the words", () => {
+      render(
+        <AgentTypeSelectorDrawer open={true} onClose={vi.fn()} onConnectFromCode={vi.fn()} />,
+        { wrapper: Wrapper },
+      );
+
+      const cards = screen.getAllByTestId(/^agent-type-/);
+      expect(cards[0]).toHaveAttribute("data-testid", "agent-type-connected");
+      expect(screen.getByTestId("agent-type-connected-dot")).toBeTruthy();
+      expect(screen.getByText("Connect from Code")).toBeTruthy();
+    });
+
+    /** @scenario "Connect from code opens the connect drawer" */
+    it("calls onConnectFromCode when clicked, without selecting a stored type", () => {
+      const onConnectFromCode = vi.fn();
+      const { onSelect } = {
+        onSelect: vi.fn(),
+      };
+      render(
+        <AgentTypeSelectorDrawer
+          open={true}
+          onClose={vi.fn()}
+          onSelect={onSelect}
+          onConnectFromCode={onConnectFromCode}
+        />,
+        { wrapper: Wrapper },
+      );
+
+      fireEvent.click(screen.getByTestId("agent-type-connected"));
+
+      expect(onConnectFromCode).toHaveBeenCalledTimes(1);
+      expect(onSelect).not.toHaveBeenCalled();
+    });
+  });
 });

@@ -176,6 +176,12 @@ describe.skipIf(!databaseUrl)("Scenario version persistence", () => {
     }
   });
 
+  /** @scenario "A new scenario starts at version 1" */
+  /** @scenario "Each save raises the version by one" */
+  /** @scenario "A save that changes nothing still records a version" */
+  /** @scenario "A history entry names the number, the author, the date and the changed fields" */
+  /** @scenario "A save over the public API is recorded with the API as its author" */
+  /** @scenario "A save from the command line is recorded with the command line as its author" */
   it("records complete snapshots, deliberate no-op saves, changed fields and attribution", async () => {
     const scenario = await createScenario();
     await scenarios.update({
@@ -255,6 +261,7 @@ describe.skipIf(!databaseUrl)("Scenario version persistence", () => {
     ).resolves.toMatchObject({ versions: [{ version: 1 }], nextCursor: null });
   });
 
+  /** @scenario "Two saves at the same time produce two different versions" */
   it("keeps concurrent saves uniquely and contiguously numbered", async () => {
     const scenario = await createScenario();
     for (const situation of ["second", "third", "fourth"]) {
@@ -271,6 +278,7 @@ describe.skipIf(!databaseUrl)("Scenario version persistence", () => {
     expect(history.versions.map((version) => version.version)).toEqual([6, 5, 4, 3, 2, 1]);
   });
 
+  /** @scenario "Saving over a version somebody else already replaced is refused with scenario_stale_version" */
   it("refuses a stale expected version without changing the row or history", async () => {
     const scenario = await createScenario();
     await scenarios.update({ id: scenario.id, projectId, situation: "current" });
@@ -295,6 +303,8 @@ describe.skipIf(!databaseUrl)("Scenario version persistence", () => {
     ).resolves.toMatchObject({ versions: [{ version: 2 }, { version: 1 }] });
   });
 
+  /** @scenario "A scenario created before versions existed shows a made-up first entry" */
+  /** @scenario "The first save of a pre-existing scenario starts real history" */
   it("pages newest first and synthesizes v1 only on the final legacy page", async () => {
     const row = await database().scenario.create({
       data: {
@@ -380,6 +390,9 @@ describe.skipIf(!databaseUrl)("Scenario version persistence", () => {
     expect(version.fields.situation).toBe("edited before copy");
   });
 
+  /** @scenario "Restoring an older version writes a new version at the top" */
+  /** @scenario "The restore entry says which version it came from" */
+  /** @scenario "A restore can be undone by restoring the version before it" */
   it("restores content forward, preserves its test suite and can restore the prior content again", async () => {
     const testSuite = await scenarios.createTestSuite({ projectId, name: "Refunds" });
     const scenario = await scenarios.create({
@@ -439,6 +452,7 @@ describe.skipIf(!databaseUrl)("Scenario version persistence", () => {
     ]);
   });
 
+  /** @scenario "Restoring the newest version still writes an entry" */
   it("records restoring the newest version even when its content is unchanged", async () => {
     const scenario = await createScenarioAtVersionFive();
     const restored = await scenarios.restoreVersion({
@@ -457,6 +471,8 @@ describe.skipIf(!databaseUrl)("Scenario version persistence", () => {
     });
   });
 
+  /** @scenario "Version history of a scenario in another project is not readable" */
+  /** @scenario "Restoring a version of a scenario in another project is refused with not_found" */
   it("keeps version reads and restores tenant scoped", async () => {
     const scenario = await createScenario();
 
@@ -484,6 +500,8 @@ describe.skipIf(!databaseUrl)("Scenario version persistence", () => {
     });
   });
 
+  /** @scenario "Restoring a version that does not exist is refused with scenario_version_not_found" */
+  /** @scenario "Restoring an archived scenario is refused" */
   it("refuses missing-version and archived restores without mutating the scenario", async () => {
     const missingVersionScenario = await createScenarioAtVersionFive();
     await expect(

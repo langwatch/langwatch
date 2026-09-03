@@ -9,6 +9,8 @@
  * @see specs/scenarios/remote-trace-judging.feature
  */
 
+import fs from "fs";
+import path from "path";
 import { describe, expect, it } from "vitest";
 import { buildRemoteTraceRunConfig, TRACE_WAIT_CAP_MS } from "../index";
 
@@ -85,6 +87,27 @@ describe("buildRemoteTraceRunConfig", () => {
           }),
         ).toEqual({});
       }
+    });
+  });
+});
+
+describe("scenario child process wiring", () => {
+  const source = fs.readFileSync(
+    path.resolve(__dirname, "../adapters/scenario-child-execution.adapter.ts"),
+    "utf8",
+  );
+
+  describe("when it constructs the agents for a run", () => {
+    /** @scenario "The judge for an http target is the SDK judge with remote fetching enabled" */
+    it("builds one SDK judge for every target type and spreads the remote-trace config into the run", () => {
+      // One judge path: the SDK judge, no per-target judge wrapper.
+      expect(source.match(/judgeAgent\(\{/g)).toHaveLength(1);
+      expect(source).toContain("ScenarioRunner.judgeAgent({");
+      // Remote fetching arrives through the run configuration alone.
+      expect(source).toContain("...buildRemoteTraceRunConfig({");
+      expect(source).toContain(
+        "traceWaitTimeoutMs: jobData.traceWaitTimeoutMs",
+      );
     });
   });
 });

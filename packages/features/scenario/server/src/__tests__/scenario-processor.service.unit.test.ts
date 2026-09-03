@@ -175,6 +175,7 @@ describe("ScenarioProcessorService", () => {
       fixture.pool.connect(fixture.processor);
     });
 
+    /** @scenario "In-flight runs are failed when the worker restarts" */
     it("finishes running and pending jobs before clearing the pool", async () => {
       await fixture.processor.drain();
 
@@ -186,6 +187,7 @@ describe("ScenarioProcessorService", () => {
       expect(killSignals).toContain("SIGTERM");
     });
 
+    /** @scenario "A cancelled in-flight run is preserved as cancelled, not failed" */
     it("preserves cancellation for an in-flight run", async () => {
       fixture.pool.markCancelled("running");
 

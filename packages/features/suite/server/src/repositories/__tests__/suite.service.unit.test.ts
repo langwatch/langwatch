@@ -893,6 +893,64 @@ describe("SuiteService", () => {
     });
   });
 
+  describe("archive()", () => {
+    describe("given an existing suite", () => {
+      /** @scenario "Archiving frees up the suite name for reuse" */
+      it("computes an archived slug suffixed with the suite id and hands it to the repository", async () => {
+        const existing = suite({ id: "suite_abc123", slug: "critical-path", archivedAt: null });
+        const repo = repository({
+          tryFindById: vi.fn().mockResolvedValue(existing),
+          archive: vi.fn().mockResolvedValue(
+            suite({
+              id: "suite_abc123",
+              slug: "critical-path--archived-abc123",
+              archivedAt: new Date("2026-02-01T00:00:00.000Z"),
+            }),
+          ),
+        });
+        const service = SuiteService.create(
+          serviceOptions(repo, { now: () => new Date("2026-02-01T00:00:00.000Z") }),
+        );
+
+        const result = await service.archive({ id: "suite_abc123", projectId: "project_1" });
+
+        expect(result.slug).toBe("critical-path--archived-abc123");
+        expect(repo.archive).toHaveBeenCalledWith(
+          expect.objectContaining({
+            id: "suite_abc123",
+            projectId: "project_1",
+            archivedAt: new Date("2026-02-01T00:00:00.000Z"),
+            archivedSlug: "critical-path--archived-abc123",
+          }),
+        );
+      });
+    });
+
+    describe("given an already-archived suite", () => {
+      /** @scenario "Archiving an already-archived suite succeeds without error" */
+      it("does not stack --archived suffixes", async () => {
+        const existing = suite({
+          id: "suite_abc123",
+          slug: "critical-path--archived",
+          archivedAt: new Date("2026-01-15T00:00:00.000Z"),
+        });
+        const repo = repository({
+          tryFindById: vi.fn().mockResolvedValue(existing),
+          archive: vi.fn().mockResolvedValue(existing),
+        });
+        const service = SuiteService.create(
+          serviceOptions(repo, { now: () => new Date("2026-02-01T00:00:00.000Z") }),
+        );
+
+        await service.archive({ id: "suite_abc123", projectId: "project_1" });
+
+        expect(repo.archive).toHaveBeenCalledWith(
+          expect.objectContaining({ archivedSlug: "critical-path--archived" }),
+        );
+      });
+    });
+  });
+
   it("duplicates and archives through only the Suite repository", async () => {
     const original = suite({ id: "suite_1", name: "Critical path", labels: ["smoke"] });
     const repo = repository({

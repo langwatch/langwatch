@@ -8,7 +8,11 @@ import { ChakraProvider, defaultSystem } from "@chakra-ui/react";
 import { cleanup, render, screen } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { afterEach, describe, expect, it, vi } from "vitest";
-import { ScenarioPicker, type ScenarioPickerProps } from "../scenario-picker";
+import {
+  PICKER_UNFILED_GROUP_NAME,
+  ScenarioPicker,
+  type ScenarioPickerProps,
+} from "../scenario-picker";
 
 const Wrapper = ({ children }: { children: React.ReactNode }) => (
   <ChakraProvider value={defaultSystem}>{children}</ChakraProvider>
@@ -143,6 +147,55 @@ describe("<ScenarioPicker />", () => {
         await user.click(screen.getByRole("button", { name: "Add Scenario" }));
 
         expect(onCreateNew).toHaveBeenCalledTimes(1);
+      });
+    });
+  });
+
+  describe("given scenarios grouped by test suite", () => {
+    const groupedProps: Partial<ScenarioPickerProps> = {
+      scenarios: [
+        { id: "case_1", name: "Double charge", labels: [], testSuiteId: "f_1" },
+        { id: "case_2", name: "Late refund", labels: [], testSuiteId: "f_1" },
+        { id: "case_3", name: "Card declined", labels: [], testSuiteId: "f_2" },
+        { id: "case_4", name: "Login flow", labels: [], testSuiteId: "f_2" },
+      ],
+      selectedIds: [],
+      totalCount: 4,
+    };
+
+    describe("when the picker renders with test suites", () => {
+      /** @scenario "A run plan can select single scenarios grouped by their test suite" */
+      it("lists the scenarios under their suite names and saves the ones picked", async () => {
+        const user = userEvent.setup();
+        const onToggle = vi.fn();
+        renderPicker({
+          ...groupedProps,
+          onToggle,
+          testSuites: [
+            { id: "f_1", name: "Refunds" },
+            { id: "f_2", name: "Checkout" },
+          ],
+        });
+
+        expect(screen.getByText("Refunds")).toBeInTheDocument();
+        expect(screen.getByText("Checkout")).toBeInTheDocument();
+
+        await user.click(screen.getByText("Double charge"));
+        await user.click(screen.getByText("Card declined"));
+
+        expect(onToggle).toHaveBeenNthCalledWith(1, "case_1");
+        expect(onToggle).toHaveBeenNthCalledWith(2, "case_3");
+      });
+    });
+
+    describe("when the project uses no test suite", () => {
+      it("keeps the flat list", () => {
+        renderPicker({ ...groupedProps, testSuites: [] });
+
+        expect(
+          screen.queryByText(PICKER_UNFILED_GROUP_NAME),
+        ).not.toBeInTheDocument();
+        expect(screen.getByText("Double charge")).toBeInTheDocument();
       });
     });
   });
