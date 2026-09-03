@@ -1,5 +1,5 @@
 # The SSRF address-classification rule set exists twice: pkg/ssrf (Go) and
-# @langwatch/ssrf (TypeScript). Both are held to one corpus,
+# packages/egress/src/ssrf/address.ts (TypeScript). Both are held to one corpus,
 # pkg/ssrf/testdata/address_vectors.json.
 #
 # Those two suites otherwise run in two unrelated workflows (go-ci and
@@ -9,7 +9,7 @@
 # job so divergence is one unambiguous failure on any change to either
 # implementation or to the vectors themselves.
 #
-# If you add a range to pkg/ssrf/address.go or packages/ssrf/src/index.ts, add a
+# If you add a range to pkg/ssrf/address.go or packages/egress/src/ssrf/address.ts, add a
 # vector here too; this is the gate that makes that non-optional.
 name: ssrf-conformance
 
@@ -29,7 +29,7 @@ on:
   pull_request:
     paths:
       - "pkg/ssrf/**"
-      - "packages/ssrf/**"
+      - "packages/egress/src/ssrf/**"
       - ".github/workflows/ssrf-conformance.yaml"
   # No paths here on purpose: a manual dispatch is an explicit request to run.
   workflow_dispatch:
@@ -62,10 +62,10 @@ jobs:
 
       - uses: ./.github/actions/setup-pnpm-node
         with:
-          install: "@langwatch/ssrf..."
+          install: "@langwatch/egress..."
 
       # Runs even when the Go half already failed, so a divergence report names
       # both sides in one log instead of making you re-run to see the second.
       - name: TypeScript half of the corpus
         if: ${{ !cancelled() }}
-        run: pnpm --filter @langwatch/ssrf test:unit
+        run: pnpm --filter @langwatch/egress test:unit -- src/ssrf

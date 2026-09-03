@@ -3,7 +3,7 @@ import { request as httpRequest, type RequestOptions } from "node:http";
 import { request as httpsRequest } from "node:https";
 import { isIP } from "node:net";
 
-import { classify } from "@langwatch/ssrf";
+import { classify } from "@langwatch/egress/ssrf";
 
 const MAX_REDIRECTS = 5;
 const MAX_RESPONSE_BYTES = 5 * 1024 * 1024;

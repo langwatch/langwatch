@@ -2,7 +2,7 @@ import { existsSync, readFileSync } from "node:fs";
 import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
 import { describe, expect, it } from "vitest";
-import { blocked, type Category, classify, isPublicAddress } from "./index";
+import { blocked, type Category, classify, isPublicAddress } from "../address";
 
 /**
  * The corpus is the single source of truth shared with the Go pkg/ssrf tests.
@@ -29,7 +29,7 @@ const vectors = (
   JSON.parse(readFileSync(corpusPath, "utf8")) as { vectors: AddressVector[] }
 ).vectors;
 
-describe("@langwatch/ssrf shared conformance corpus", () => {
+describe("the shared SSRF conformance corpus", () => {
   it("loads a non-empty corpus", () => {
     expect(vectors.length).toBeGreaterThan(0);
   });

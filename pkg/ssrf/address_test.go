@@ -9,7 +9,7 @@ import (
 )
 
 // addressVector mirrors one entry of testdata/address_vectors.json — the corpus
-// shared with the @langwatch/ssrf TypeScript package. Keeping the two languages
+// shared with the TypeScript half in packages/egress/src/ssrf/address.ts. Keeping the two languages
 // bound to the same file is the whole point: a rule added to one implementation
 // but not the other fails here or in the TS suite.
 type addressVector struct {

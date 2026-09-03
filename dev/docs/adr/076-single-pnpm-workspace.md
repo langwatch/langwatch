@@ -209,7 +209,7 @@ one command and a security pin that reaches every project.
 - `mcp-server` is installed and built once per CI run instead of twice.
 - `--ignore-workspace` disappears from `docs-ci.yml` and `e2e-ci.yml`.
 - `@langwatch/handled-error`, `@langwatch/langy`, `@langwatch/redaction` and
-  `@langwatch/ssrf` are declarable from any project in the repo, including the
+  `@langwatch/egress` are declarable from any project in the repo, including the
   SDK and the skills compiler.
 - The application's package name changes. Anything filtering it by name needs
   `@langwatch/web`; path-based invocation (`pnpm -C platform/app`) is unaffected.

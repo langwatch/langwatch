@@ -18,6 +18,10 @@
     ".": {
       "types": "./src/index.ts",
       "default": "./src/index.ts"
+    },
+    "./ssrf": {
+      "types": "./src/ssrf/address.ts",
+      "default": "./src/ssrf/address.ts"
     }
   },
   "scripts": {
@@ -29,7 +33,6 @@
     "@langwatch/automation-contract": "workspace:*",
     "@langwatch/eventing": "workspace:*",
     "@langwatch/observability": "workspace:*",
-    "@langwatch/ssrf": "workspace:*",
     "undici": "^8.5.0"
   },
   "devDependencies": {

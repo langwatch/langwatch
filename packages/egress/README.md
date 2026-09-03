@@ -8,7 +8,7 @@ Three layers, bottom up:
    all, and at which resolved IP. Cloud metadata endpoints and cloud-internal
    domains are refused unconditionally; private, loopback, link-local and every
    other non-globally-routable range is refused when the policy says so, using
-   the `@langwatch/ssrf` classification table the Go services share. The name is
+   the `src/ssrf/address.ts` classification table the Go services share. The name is
    resolved once and the connection is pinned to that address, so a rebind
    cannot move the destination between the decision and the socket.
 2. **The fenced fetch** (`src/ssrf/fenced-fetch.ts`) — the only way a validated

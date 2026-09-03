@@ -1,7 +1,7 @@
 import dns from "node:dns/promises";
 import { isIP } from "node:net";
 import { createLogger } from "@langwatch/observability";
-import { classify as classifyEgressAddress } from "@langwatch/ssrf";
+import { classify as classifyEgressAddress } from "./address";
 import { BLOCKED_CLOUD_DOMAINS, BLOCKED_METADATA_HOSTS } from "./blocked-hosts";
 
 /**
@@ -20,7 +20,7 @@ import { BLOCKED_CLOUD_DOMAINS, BLOCKED_METADATA_HOSTS } from "./blocked-hosts";
  * - Cloud provider internal domains (`BLOCKED_CLOUD_DOMAINS`, suffix match)
  *
  * ## What is refused when `blockLocal` is set
- * Every non-globally-routable address, as classified by `@langwatch/ssrf` — one
+ * Every non-globally-routable address, as classified by `./address` — one
  * table shared byte-for-byte with the Go services and held to one conformance
  * corpus. That is the whole IANA special-purpose registry, not just the classic
  * private ranges: loopback, RFC 1918, link-local, CGNAT, TEST-NET,
@@ -124,7 +124,7 @@ export function isBlockedCloudDomain(hostname: string): boolean {
 /**
  * Whether an IP literal is non-globally-routable.
  *
- * Delegates to `@langwatch/ssrf` so this package, the application, the Go AI
+ * Delegates to `./address` so this package, the application, the Go AI
  * gateway, the Go Langy egress proxy and the NLP service all agree on exactly
  * which addresses are unsafe to reach. A metadata address is non-global too, so
  * it is reported here as well as refused unconditionally above.

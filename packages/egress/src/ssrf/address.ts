@@ -1,5 +1,5 @@
 /**
- * @langwatch/ssrf — canonical SSRF address-classification rules.
+  * Canonical SSRF address-classification rules (`@langwatch/egress`, `src/ssrf/address.ts`).
  *
  * This is the TypeScript half of a two-language contract. The Go half lives in
  * `pkg/ssrf` (package ssrf); both are held to the identical behavior by the
@@ -18,7 +18,6 @@
  *     metadata service" (block egress to 169.254.0.0/16; IMDSv2 hop limit 1):
  *     https://docs.aws.amazon.com/whitepapers/latest/security-practices-multi-tenant-saas-applications-eks/restrict-the-use-of-host-networking-and-block-access-to-instance-metadata-service.html
  *
- * @module @langwatch/ssrf
  */
 
 /**
@@ -154,7 +153,7 @@ interface Prefix {
 function parsePrefix({ cidr, rfc }: { cidr: string; rfc: string }): Prefix {
   const slash = cidr.lastIndexOf("/");
   const bytes = ipToBytes(cidr.slice(0, slash));
-  if (!bytes) throw new Error(`@langwatch/ssrf: bad prefix ${cidr}`);
+  if (!bytes) throw new Error(`ssrf: bad prefix ${cidr}`);
   return { bytes, bits: Number(cidr.slice(slash + 1)), rfc };
 }
 
