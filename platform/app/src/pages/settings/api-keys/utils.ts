@@ -1,4 +1,5 @@
 import { createListCollection } from "@chakra-ui/react";
+import { builtinRolePermissions } from "@langwatch/authz";
 import { hasPermissionWithHierarchy } from "../../../server/api/rbac";
 import {
   type AccessLevel,
@@ -411,6 +412,16 @@ export function getUserPermissionsAtScope({
   if (!binding) return [];
   if (binding.scopeType === "ORGANIZATION" && binding.role === "ADMIN") {
     return categorizablePermissions();
+  }
+  // A non-ADMIN ORGANIZATION-scoped builtin binding grants the org-member bag
+  // only (organization:view, aiTools:view) — the resolver's non-ADMIN branch
+  // never consults the team-role bags for it. Offering the team bag here made
+  // the ceiling overstate what the approve/save endpoints would accept, so a
+  // selection built from it was refused wholesale with "exceeds your own
+  // access". CUSTOM org bindings resolve their own permission list and keep
+  // the injected bag.
+  if (binding.scopeType === "ORGANIZATION" && binding.role !== "CUSTOM") {
+    return [...builtinRolePermissions("org-member")];
   }
   return getRolePerms(binding.role);
 }
