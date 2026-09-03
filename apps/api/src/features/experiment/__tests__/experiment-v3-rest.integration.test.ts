@@ -115,6 +115,7 @@ describe("given a process that composed no run loop", () => {
 
 describe("given the workbench's run doors", () => {
   describe("when a browser aborts a run owned by another project", () => {
+    /** @scenario "A resource id from the body is verified against the authenticated tenant" */
     it("answers not-found rather than confirming the run exists elsewhere", async () => {
       const requestAbort = vi.fn(async () => {});
       const api = mount({
@@ -133,6 +134,7 @@ describe("given the workbench's run doors", () => {
   });
 
   describe("when a browser aborts a run its own project owns", () => {
+    /** @scenario "Project members can stop their own running workbench execution" */
     it("signals the stop through the composed abort port", async () => {
       const requestAbort = vi.fn(async () => {});
       const api = mount({

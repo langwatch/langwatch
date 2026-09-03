@@ -26,6 +26,7 @@ const state = (
 });
 
 describe("Experiment workbench contract", () => {
+  /** @scenario "A state that does not match the schema is refused" */
   it("reports invalid persisted state as the established handled error", () => {
     try {
       parseWorkbenchState({ ...state(), activeDatasetId: 42 });
@@ -123,6 +124,7 @@ describe("Experiment workbench contract", () => {
     });
   });
 
+  /** @scenario "Run results are not stored in the version snapshot" */
   it("strips results only from a version snapshot", () => {
     const snapshot = stripWorkbenchResults(
       state({

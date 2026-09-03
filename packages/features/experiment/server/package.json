@@ -41,6 +41,7 @@
     "@langwatch/observability": "workspace:*",
     "@langwatch/prisma-client": "workspace:*",
     "@langwatch/prompt-contract": "workspace:*",
+    "@langwatch/prompt-server": "workspace:*",
     "@langwatch/scenario-contract": "workspace:*",
     "@langwatch/suite-server": "workspace:*",
     "@langwatch/trace-contract": "workspace:*",

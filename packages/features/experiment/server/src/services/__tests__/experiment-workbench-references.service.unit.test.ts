@@ -126,6 +126,7 @@ describe("ExperimentWorkbenchReferencesService.assertAllExist", () => {
       await expect(assertAllExist(service, withPrompt)).resolves.toBeUndefined();
     });
 
+    /** @scenario "A state pointing at a row that no longer exists is refused" */
     it("refuses when the prompt is gone, naming what is missing", async () => {
       const service = servicesAnswering({ prompts: [] });
 
@@ -240,6 +241,48 @@ describe("ExperimentWorkbenchReferencesService.assertAllExist", () => {
       await expect(
         assertAllExist(servicesAnswering({ workflow: "down" }), withWorkflow),
       ).rejects.toThrow("workflow service unreachable");
+    });
+  });
+
+  describe("given a target switched to another type that kept its old id in a field it no longer reads", () => {
+    /** @scenario "A reference the run would not read is not checked" */
+    it("passes without asking about the stale field, because collection reads the active type only", async () => {
+      const service = servicesAnswering({ agentExists: true });
+      const switchedTarget = state({
+        targets: [
+          target({
+            type: "agent",
+            dbAgentId: "agent_1",
+            // A field a prompt target would read; an agent target never does.
+            promptId: "prompt_deleted",
+          }),
+        ],
+      });
+
+      await expect(assertAllExist(service, switchedTarget)).resolves.toBeUndefined();
+    });
+  });
+
+  describe("given a target whose own type names a row that is gone", () => {
+    /** @scenario "A reference the run would read is still checked" */
+    it("refuses the write and names that reference", async () => {
+      const service = servicesAnswering({ prompts: [{ id: "prompt_1" }], agentExists: false });
+      const switchedTarget = state({
+        targets: [
+          target({
+            type: "agent",
+            dbAgentId: "agent_deleted",
+            promptId: "prompt_1",
+          }),
+        ],
+      });
+
+      const error = await assertAllExist(service, switchedTarget).catch(
+        (caught: unknown) => caught,
+      );
+
+      expect(error).toBeInstanceOf(WorkbenchMissingReferenceError);
+      expect(error).toMatchObject({ meta: { refType: "agent", refId: "agent_deleted" } });
     });
   });
 

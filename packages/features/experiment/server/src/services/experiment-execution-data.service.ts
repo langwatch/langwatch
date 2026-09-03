@@ -6,7 +6,7 @@
  */
 
 import { createLogger } from "@langwatch/observability";
-import type { Agent, AgentService } from "@langwatch/agent-contract";
+import { AgentNotFoundError, type Agent, type AgentService } from "@langwatch/agent-contract";
 import type { DatasetService } from "@langwatch/dataset-contract";
 import type { Evaluator, EvaluatorService } from "@langwatch/evaluator-contract";
 import {
@@ -447,16 +447,23 @@ export const loadExecutionData = async (
 
   for (const target of targets) {
     if (target.type === "agent" && target.dbAgentId) {
-      const agent = await agentService.getById({
-        id: target.dbAgentId,
-        projectId,
-      });
       // A missing agent used to leave the map short and the run continued
       // against nothing, reporting an empty column rather than the deletion
       // that caused it. Same answer as a missing prompt or workflow: say what
-      // is gone and stop.
-      if (!agent) {
-        return { error: `Agent "${target.dbAgentId}" not found`, status: 404 };
+      // is gone and stop. `getById` throws `AgentNotFoundError` rather than
+      // returning a nullable — translate it to the same sentinel shape every
+      // other missing-target path in this loader returns.
+      let agent: Agent;
+      try {
+        agent = await agentService.getById({
+          id: target.dbAgentId,
+          projectId,
+        });
+      } catch (error) {
+        if (error instanceof AgentNotFoundError) {
+          return { error: `Agent "${target.dbAgentId}" not found`, status: 404 };
+        }
+        throw error;
       }
       loadedAgents.set(target.dbAgentId, agent);
     }
@@ -575,7 +582,13 @@ export const loadExecutionData = async (
       id: evaluatorId,
       projectId,
     });
-    if (dbEvaluator) loadedEvaluators.set(evaluatorId, dbEvaluator);
+    // Same answer as a missing prompt, agent, or workflow: say what is gone
+    // and stop, rather than silently running with fewer evaluators than
+    // configured.
+    if (!dbEvaluator) {
+      return { error: `Evaluator "${evaluatorId}" not found`, status: 404 };
+    }
+    loadedEvaluators.set(evaluatorId, dbEvaluator);
   }
 
   return {
