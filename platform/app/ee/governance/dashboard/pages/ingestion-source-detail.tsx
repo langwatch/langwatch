@@ -14,10 +14,11 @@ import {
   VStack,
 } from "@chakra-ui/react";
 import {
+  noDataSinceNotice,
+  sourceBadge,
+} from "@ee/governance/dashboard/logic/sourceHealthDisplay";
+import {
   ArrowLeft,
-  CircleCheck,
-  CircleDashed,
-  CircleX,
   Copy,
   KeyRound,
   Pencil,
@@ -79,19 +80,6 @@ type EventRow = RouterOutputs["activityMonitor"]["eventsForSource"][number];
 type SourceHealthMetrics =
   RouterOutputs["activityMonitor"]["sourceHealthMetrics"];
 
-const STATUS_META: Record<
-  string,
-  { icon: typeof CircleCheck; label: string; color: string }
-> = {
-  active: { icon: CircleCheck, label: "Active", color: "green.500" },
-  awaiting_first_event: {
-    icon: CircleDashed,
-    label: "Awaiting first event",
-    color: "amber.500",
-  },
-  disabled: { icon: CircleX, label: "Disabled", color: "fg.muted" },
-};
-
 /**
  * Whether a failed load actually means "no such source".
  *
@@ -128,8 +116,10 @@ function SourceDetailHeader({
   onArchive: () => void;
   onEdit: () => void;
 }) {
-  const status =
-    STATUS_META[source.status] ?? STATUS_META.awaiting_first_event!;
+  const status = sourceBadge({
+    status: source.status,
+    errorCount: source.errorCount,
+  });
   const StatusIcon = status.icon;
   return (
     <HStack alignItems="end">
@@ -216,6 +206,37 @@ function SourceDetailHeader({
 }
 
 /**
+ * Where the numbers below stop being trustworthy.
+ *
+ * A source that has failed three runs in a row has not been asked about
+ * anything since its last successful pull, so every day after that is
+ * unknown -- not a day it spent nothing. Saying so here is what stops a
+ * reader taking an empty chart for a cheap week (ADR-128).
+ */
+function NoDataSinceCallout({ source }: { source: Source }) {
+  const notice = noDataSinceNotice({
+    status: source.status,
+    errorCount: source.errorCount,
+    lastSuccessAt: source.lastSuccessAt,
+  });
+  if (!notice) return null;
+  return (
+    <Box
+      borderWidth="1px"
+      borderColor="red.200"
+      borderRadius="sm"
+      background="red.50"
+      padding={3}
+    >
+      <Text fontSize="sm" color="red.700">
+        No data since {fmtRelative(notice.lastSuccessIso)}. This source is
+        failing to pull, so spend after that point is unknown rather than zero.
+      </Text>
+    </Box>
+  );
+}
+
+/**
  * The four event-count cards. They read `health?.events24h ?? 0`, so a failed
  * health query would render "0 events", indistinguishable from a silent
  * source, and the first thing an admin does about a silent source is go
@@ -296,6 +317,7 @@ function SourceActivityPanels({
   const health = healthQuery.data;
   return (
     <>
+      <NoDataSinceCallout source={source} />
       <SourceHealthCards
         health={health}
         error={healthQuery.error}

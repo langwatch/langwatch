@@ -15,6 +15,7 @@ import { PrismaClientKnownRequestError } from "@prisma/client/runtime/client";
 import type { PrismaClient } from "~/generated/prisma/client";
 
 import { DepartmentRepository } from "../../repositories/department.repository";
+import { PROJECT_KIND } from "../governanceProject.service";
 
 export class DepartmentNotFoundError extends Error {
   readonly code = "department_not_found" as const;
@@ -112,7 +113,10 @@ export class DepartmentService {
         orderBy: { name: "asc" },
       }),
       this.prisma.project.findMany({
-        where: { team: { organizationId } },
+        where: {
+          team: { organizationId },
+          kind: { not: PROJECT_KIND.INTERNAL_GOVERNANCE },
+        },
         select: { id: true, name: true, departmentId: true },
         orderBy: { name: "asc" },
       }),

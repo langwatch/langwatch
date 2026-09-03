@@ -14,6 +14,7 @@ import { KSUID_RESOURCES } from "~/utils/constants";
 import type {
   CreateTeamInput,
   PaginatedResult,
+  TeamProjectListing,
   TeamRepository,
   UpdateTeamInput,
 } from "./team.repository";
@@ -29,6 +30,28 @@ export class PrismaTeamRepository implements TeamRepository {
 
   async findById(id: string): Promise<Team | null> {
     return this.prisma.team.findUnique({ where: { id } });
+  }
+
+  async findProjectsInTeam({
+    teamId,
+  }: {
+    teamId: string;
+  }): Promise<TeamProjectListing[]> {
+    return this.prisma.project.findMany({
+      where: {
+        teamId,
+        archivedAt: null,
+        kind: { not: "internal_governance" },
+      },
+      select: {
+        id: true,
+        name: true,
+        slug: true,
+        createdAt: true,
+        updatedAt: true,
+      },
+      orderBy: { createdAt: "desc" },
+    });
   }
 
   async findAllByOrganization({

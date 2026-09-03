@@ -29,14 +29,23 @@ Feature: Governance home — route, nav promotion, persona detection
   # Route — top-level + back-compat alias
   # ---------------------------------------------------------------------------
 
-  @bdd @ui @governance-home @route
+  # Bound to delegatedViewer.integration.test.tsx, which renders the
+  # overview page and asserts the heading and every panel. The bound test
+  # renders the page component; the address staying put on a cold load
+  # rides on the route registration the alias scenarios below exercise.
+  @bdd @ui @governance-home @route @integration
   Scenario: Top-level /governance renders the dashboard
     When the admin navigates to "/governance"
-    Then the page renders with the heading "Governance"
+    Then the page renders with the heading "AI Governance"
     And the URL stays at "/governance"
     And the setup-checklist OR live-metrics view is rendered
 
-  @bdd @ui @governance-home @route @alias
+  # Declared gap: specs/navigation/gateway-url-move.feature asserts the
+  # DEEP-LINK form (/settings/governance/tool-catalog?... keeps its path
+  # and query) and the retargeted cost-centers hop — but no test cold-loads
+  # the bare legacy address and asserts where it lands. The prefix redirect
+  # in legacyRedirects.tsx should cover it; nothing pins that.
+  @bdd @ui @governance-home @route @alias @integration @unimplemented
   Scenario: Legacy /settings/governance keeps working as a redirect
     When the admin navigates to "/settings/governance"
     Then the browser lands on "/governance" with the same dashboard
@@ -44,7 +53,12 @@ Feature: Governance home — route, nav promotion, persona detection
     And admins who bookmarked the legacy URL keep landing on the
       dashboard through the permanent redirect
 
-  @bdd @ui @governance-home @route @sub-routes
+  # Declared gap: /governance/inventory and its tabs are asserted below,
+  # but the per-source detail page and /governance/anomaly-rules as the
+  # rule-authoring surface are declared nowhere else — the rail scenario
+  # at the bottom names anomaly-rules only as a link target, and no test
+  # renders either address.
+  @bdd @ui @governance-home @route @sub-routes @integration @unimplemented
   Scenario: Admin-authoring sub-routes live under /governance
     Then "/governance/inventory" is the tabbed inventory surface
       (Catalog + Sources)
@@ -175,52 +189,44 @@ Feature: Governance home — route, nav promotion, persona detection
     # bypassOnboardingRedirect as a third layer; the catalog page keeps it.
 
   # ---------------------------------------------------------------------------
-  # Persona / nav promotion via api.governance.setupState
+  # Nav promotion — the Governance product entry
+  #
+  # The four scenarios that used to sit here described the #7597-era UI: a
+  # "Govern · Preview" sidebar section header with an Eye icon, gated on
+  # flag + org-admin permission + setup state. Two of those gates are gone:
+  # the header string no longer exists anywhere in the app, and setup state
+  # no longer feeds the nav decision at all — the entry today is a product
+  # in features/navigation/products.ts, gated on the flag AND the
+  # "governance:view" permission (note the drift: the old scenarios said
+  # "organization:manage"). The two scenarios below re-declare the gating
+  # that IS live. The generic product-gating machinery has lane-tagged
+  # coverage in specs/navigation/*, but nothing asserts governance's own
+  # two gates specifically, so both stay declared gaps.
   # ---------------------------------------------------------------------------
 
-  @bdd @ui @governance-home @nav-promotion
-  Scenario: Org admin with governance state sees the Governance nav entry
-    Given the org has at least one of: personal VK, RoutingPolicy,
-      IngestionSource, AnomalyRule, recent gateway event activity
-    When the admin loads any project page
-    Then the MainMenu sidebar shows a "Govern · Preview" section header
-    And below it a "Governance" entry with an Eye icon
-    And the entry links to "/governance"
-    And the entry highlights as active when the URL is "/governance"
-      OR any "/governance/*" sub-route
-
-  @bdd @ui @governance-home @nav-promotion @no-state
-  Scenario: Org admin with NO governance state sees no nav change
-    Given the org has zero personal VKs, RoutingPolicies,
-      IngestionSources, AnomalyRules, AND no recent gateway activity
-    When the admin loads any project page
-    Then NO "Govern" section header appears in the sidebar
-    And NO "Governance" entry is rendered
-    And the existing project-scoped LLMOps menu is unchanged
-    # This protects the "don't lose LLMOps" invariant: admins who
-    # haven't configured governance see exactly main's nav.
-
-  @bdd @ui @governance-home @nav-promotion @rbac
-  Scenario: Non-admins never see the Governance entry
-    Given the org has IngestionSources configured (governanceActive=true)
-    But the current user does NOT have "organization:manage" permission
-    When the user loads any project page
-    Then NO "Govern" section header or "Governance" entry appears
-    # Setup-state being true is necessary but not sufficient — the
-    # nav entry is org-admin-only.
-
-  @bdd @ui @governance-home @nav-promotion @flag
-  Scenario: Without the governance preview flag, no nav entry appears
+  @bdd @ui @governance-home @nav-promotion @flag @integration @unimplemented
+  Scenario: Without the governance flag there is no Governance product entry
     Given "release_ui_ai_governance_enabled" is disabled for the org
-    Even though the org has IngestionSources + the user is org admin
-    Then NO "Govern" section header or "Governance" entry appears
-    # All three conditions (flag + permission + state) are required.
+    And the user holds "governance:view"
+    When the user opens the product navigation
+    Then no "Governance" product entry is listed
+
+  @bdd @ui @governance-home @nav-promotion @rbac @integration @unimplemented
+  Scenario: The Governance product entry requires governance:view
+    Given "release_ui_ai_governance_enabled" is enabled for the org
+    But the user does NOT hold "governance:view"
+    When the user opens the product navigation
+    Then no "Governance" product entry is listed
+    But a user holding "governance:view" sees the entry
+    And the entry's home is "/governance"
 
   # ---------------------------------------------------------------------------
   # No auto-redirect (master_orchestrator's invariant)
   # ---------------------------------------------------------------------------
 
-  @bdd @ui @governance-home @no-auto-redirect
+  # Declared gap: no test navigates "/" with governance state present and
+  # asserts the absence of a redirect.
+  @bdd @ui @governance-home @no-auto-redirect @integration @unimplemented
   Scenario: Hitting "/" never auto-redirects to /governance
     Given the admin has governanceActive=true
     When they navigate to "/"
@@ -234,7 +240,10 @@ Feature: Governance home — route, nav promotion, persona detection
   # api.governance.setupState contract
   # ---------------------------------------------------------------------------
 
-  @bdd @api @governance-home @setup-state
+  # Bound: auth-cli-governance.integration.test.ts asserts the REST shape
+  # (all five hasFoo flags plus the OR), and governance.rbac /
+  # license-gate-governance pin the tRPC procedure's shape and its gate.
+  @bdd @api @governance-home @setup-state @integration
   Scenario: setupState returns boolean OR for nav-promotion signal
     When the admin's session resolves and the MainMenu calls
       `api.governance.setupState({organizationId})`
@@ -246,9 +255,9 @@ Feature: Governance home — route, nav promotion, persona detection
       | hasAnomalyRules      | boolean | any non-archived AnomalyRule in org       |
       | hasRecentActivity    | boolean | any gateway_activity_event in last 30d    |
       | governanceActive     | boolean | OR of the five hasFoo flags above         |
-    And the procedure is org:view (any org member can call it; the
-      org-admin permission gate applies to the nav-promotion decision
-      in the UI, not to the read itself)
+    And the procedure is gated on "governance:view" — an org member
+      without it is refused (governance.rbac.integration.test.ts pins
+      the FORBIDDEN), not the any-member read this scenario once claimed
     And the query is cheap (small index lookups + a single
       gateway_activity_events count); MainMenu reads it on every
       page load with `refetchOnWindowFocus: false`
@@ -257,7 +266,12 @@ Feature: Governance home — route, nav promotion, persona detection
   # Layout — current + future
   # ---------------------------------------------------------------------------
 
-  @bdd @ui @governance-home @layout
+  # Declared gap, narrower than it looks: the rail entries ARE asserted —
+  # sectionNavParity.integration.test.tsx renders GovernanceLayout and pins
+  # exactly the four entries in the table below (bound to the billed-cost
+  # scenario at the bottom). What no test asserts is the header chrome:
+  # the org-name chip and the org-scoped indicator.
+  @bdd @ui @governance-home @layout @integration @unimplemented
   Scenario: /governance renders with the GovernanceLayout (top-level chrome)
     Given "release_ui_governance_billed_cost_enabled" is disabled
       for the organization
@@ -278,15 +292,14 @@ Feature: Governance home — route, nav promotion, persona detection
     # release_ui_governance_billed_cost_enabled is on (see the
     # billed-cost flag section below).
 
-  @bdd @ui @governance-home @layout @sub-routes
-  Scenario: Admin-authoring sub-routes share the GovernanceLayout chrome
-    When the admin clicks "Inventory" in the GovernanceLayout
-      left rail and lands on "/governance/inventory"
-    Then the page renders inside GovernanceLayout, the same chrome as
-      the daily-use home
-    And the same applies to "/governance/anomaly-rules"
+  # The former "Admin-authoring sub-routes share the GovernanceLayout chrome"
+  # scenario restated the rail listing the scenario above already declares,
+  # with no assertion of its own beyond "same chrome"; one behaviour, one
+  # scenario.
 
-  @bdd @ui @governance-home @layout @bypass-project-redirect
+  # Declared gap: no test loads /governance for a zero-project org and
+  # asserts the layout renders instead of the project-onboarding bounce.
+  @bdd @ui @governance-home @layout @bypass-project-redirect @integration @unimplemented
   Scenario: /governance bypasses the no-project onboarding redirect
     Given an admin whose org has no projects yet
     When they navigate to "/governance"
@@ -324,6 +337,10 @@ Feature: Governance home — route, nav promotion, persona detection
     When the admin looks at the GOVERNANCE rail
     Then "Costs" (/governance/costs) and "Billed" (/governance/billed)
       are listed between Overview and Inventory
-    And each page renders its heading and an empty-state placeholder —
-      no data, no queries; the pages exist so the rail shape ships
-      ahead of the spend views
+    And each page renders its heading
+    # Costs has since grown its real content — the billed/gateway/seat
+    # lanes of specs/governance/governance-cost-screen.feature (ADR-128
+    # wave 1). Billed is still the placeholder shell this scenario was
+    # written for. The scenario TITLE is left verbatim because it is the
+    # parity binding key for sectionNavParity.integration.test.tsx, which
+    # asserts the rail listing and not either page's body.

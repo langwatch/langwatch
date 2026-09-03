@@ -31,6 +31,11 @@
  *   - specs/ai-gateway/governance/architecture-invariants.feature
  *     (single trace store, reserved namespaces)
  */
+import {
+  deriveSourceHealth,
+  isDayCoveredByPull,
+  type SourceHealth,
+} from "@ee/governance/services/pullers/sourceHealth";
 import { z } from "zod";
 import type { PrismaClient } from "~/generated/prisma/client";
 
@@ -42,7 +47,7 @@ import {
   resolveTraceDepartmentId,
   UNASSIGNED_DEPARTMENT,
 } from "../department/departmentAttribution";
-import { PROJECT_KIND } from "../governanceProject.service";
+import { resolveGovProjectId } from "../govProject";
 import type { ActivityMonitorClickHouseRepository } from "./activityMonitor.clickhouse.repository";
 import type {
   PulledEventChRow,
@@ -204,6 +209,25 @@ export interface SourceHealthMetrics {
   events7d: number;
   events30d: number;
   lastSuccessIso: string | null;
+}
+
+/** One UTC day, and whether a successful pull ever reached into it. */
+export interface SourceCoverageDay {
+  dayStartIso: string;
+  /**
+   * False means unknown, and unknown carries no number on purpose: the whole
+   * defect this shape exists to prevent is an unpulled day being rendered as
+   * zero dollars.
+   */
+  covered: boolean;
+}
+
+export interface SourceDataCoverage {
+  health: SourceHealth;
+  consecutiveFailures: number;
+  lastSuccessfulPullIso: string | null;
+  /** Oldest first, one entry per UTC day in the requested window. */
+  days: SourceCoverageDay[];
 }
 
 // ---------------------------------------------------------------------------
@@ -423,15 +447,7 @@ export class ActivityMonitorService {
   private async resolveGovProjectId(
     organizationId: string,
   ): Promise<string | null> {
-    const project = await this.prisma.project.findFirst({
-      where: {
-        kind: PROJECT_KIND.INTERNAL_GOVERNANCE,
-        team: { organizationId },
-        archivedAt: null,
-      },
-      select: { id: true },
-    });
-    return project?.id ?? null;
+    return await resolveGovProjectId({ prisma: this.prisma, organizationId });
   }
 
   // -----------------------------------------------------------------------
@@ -997,6 +1013,46 @@ export class ActivityMonitorService {
       events7d: total((r) => r.c7),
       events30d: total((r) => r.c30),
       lastSuccessIso: lastMs > 0 ? new Date(lastMs).toISOString() : null,
+    };
+  }
+
+  /**
+   * Puller health, and which days of the window a successful pull reached.
+   *
+   * Prisma only: both inputs live on the source row, mirrored there by the
+   * ingestionPullRunStatus projection. That matters beyond speed -- a
+   * deployment without ClickHouse still has to be able to say a puller is
+   * broken, and the health question is not a spend question.
+   *
+   * Spec: specs/governance/ingestion-source-health.feature
+   */
+  async sourceDataCoverage(input: {
+    organizationId: string;
+    sourceId: string;
+    windowDays: number;
+  }): Promise<SourceDataCoverage> {
+    const windowDays = Math.max(1, Math.floor(input.windowDays));
+    const dayMs = 24 * 60 * 60 * 1000;
+    const windowStart = startOfUtcDay(Date.now()) - (windowDays - 1) * dayMs;
+
+    const source = await this.prisma.ingestionSource.findFirst({
+      where: { id: input.sourceId, organizationId: input.organizationId },
+      select: { errorCount: true, lastSuccessAt: true },
+    });
+    const consecutiveFailures = source?.errorCount ?? 0;
+    const lastSuccessfulPullMs = source?.lastSuccessAt?.getTime() ?? null;
+
+    return {
+      health: deriveSourceHealth({ consecutiveFailures }),
+      consecutiveFailures,
+      lastSuccessfulPullIso: source?.lastSuccessAt?.toISOString() ?? null,
+      days: Array.from({ length: windowDays }, (_, i) => {
+        const dayStartMs = windowStart + i * dayMs;
+        return {
+          dayStartIso: new Date(dayStartMs).toISOString(),
+          covered: isDayCoveredByPull({ dayStartMs, lastSuccessfulPullMs }),
+        };
+      }),
     };
   }
 

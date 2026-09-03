@@ -105,7 +105,8 @@ Feature: IngestionSource — admin configuration of cross-platform feeds
         cron text box
       And the picker arrives prefilled with that source's recommended
         schedule (for example "every 15 minutes")
-      And a sentence below states the chosen schedule in plain words
+      And nothing under the picker restates the schedule it is already
+        showing; the explanation sits behind the (i) beside the heading
 
     @unit
     Scenario: The picker speaks every recommended schedule
@@ -123,7 +124,8 @@ Feature: IngestionSource — admin configuration of cross-platform feeds
       When the admin changes the cadence to hourly
       Then the create request carries the matching schedule everywhere
         the schedule travels, including inside the source's pull settings
-      And the summary sentence updates to say so
+      And the picker itself is the feedback, so there is no second
+        sentence to keep in step with it
 
     @integration
     Scenario: Cron editing is still there for schedules the picker cannot say
@@ -132,6 +134,25 @@ Feature: IngestionSource — admin configuration of cross-platform feeds
       Then the value is kept as typed, not clobbered by picker defaults
       And a cron that can never run shows a plain-language message next
         to the input, and the create button refuses until it is fixed
+      And the typed cron is read back in plain words, because five cron
+        fields say nothing on their own the way the picker does
+
+    @integration
+    Scenario: Cadence and destination both sit behind Advanced
+      Given the admin composes a pull-mode source that carries
+        conversations
+      Then neither the cadence nor the destination picker is visible
+        until the admin expands "Advanced", leaving the form asking only
+        for what creating a source actually requires
+      And both are in that one group rather than one each, so there is
+        no guessing which "Advanced" holds the thing they came for
+      And a source type that declares no advanced settings of its own
+        still offers the group, so what it does have stays reachable
+      And a source type with neither a schedule nor conversations to
+        route offers no group at all, rather than one opening on nothing
+      And closing and reopening the group gives both back unchanged,
+        because the drawer holds them rather than the group
+      And the edit drawer places them the same way
 
   Rule: A conversation source names the project its conversations land in
 
@@ -141,12 +162,24 @@ Feature: IngestionSource — admin configuration of cross-platform feeds
     routes nothing until then.
 
     The choice carries three consequences the admin cannot discover any
-    other way, so the drawer states all three where the choice is made:
-    the destination project's own redaction policy governs what is
-    stored; only conversations from the last 31 days arrive, so a thread
-    that started earlier shows only its recent turns; and a destination
-    that is later archived or deleted stops receiving conversations
-    instead of failing the source or landing them elsewhere.
+    other way, so the drawer states all three where the choice is made —
+    behind the (i) beside the label, one click from the picker rather
+    than as a stack of paragraphs under it, which is a wall of grey text
+    an admin scrolls past. The three: the destination project's own
+    redaction policy governs what is stored; only conversations from the
+    last 31 days arrive, so a thread that started earlier shows only its
+    recent turns; and a destination that is later archived or deleted
+    stops receiving conversations instead of failing the source or
+    landing them elsewhere.
+
+    The picker itself sits behind "Advanced" with the cadence, because a
+    source with no destination ingests perfectly well — it simply routes
+    no conversations onward until someone says where. Which means the
+    two notices that describe the state of the choice, that none is set
+    yet and that the one stored has since been archived, sit behind the
+    group with it: they are what the admin needs the moment they go
+    looking, not a reason to put the control in front of someone who
+    came to add a source.
 
     Sources that pull counts rather than conversations are offered no
     destination at all — a control that changed nothing would be worse
@@ -155,36 +188,55 @@ Feature: IngestionSource — admin configuration of cross-platform feeds
     @integration
     Scenario: The composer of a conversation source offers a destination
       When the admin picks "Databricks AI/BI Genie" from the Add source menu
+      And expands "Advanced"
       Then the composer offers a picker for the project its conversations
         land in, listing only projects of this organization
       And the picker starts empty, because where another team's
         conversations become readable is never a default
 
     @integration
-    Scenario: The destination states its three consequences where it is picked
+    Scenario: The destination states its three consequences behind its (i)
       Given the admin is composing a "Databricks AI/BI Genie" source
-      When they pick a destination project
-      Then the drawer says the destination project's data-privacy policy
-        governs what is stored
+      When they open the (i) beside the destination label
+      Then it says the destination project's data-privacy policy governs
+        what is stored
       And it says conversations from the last 31 days arrive, and that a
         conversation that started earlier shows only its recent turns
       And it says a destination that is archived or deleted stops
         receiving conversations
+      And none of the three is also stacked as a paragraph under the
+        picker
 
     @integration
     Scenario: A source created without a destination routes nothing
       When the admin creates a "Databricks AI/BI Genie" source without
         picking a destination
       Then the source is created
-      And the drawer said, before saving, that its conversations would
+      And the picker said, where it sits, that its conversations would
         not be readable in the explorer until a destination is set
+
+    @integration
+    Scenario: The drawer names the destination once one is picked
+      The field tooltips already say what the silent default means, so
+      the drawer stays quiet until there is a choice to confirm — a
+      standing warning above the fold was noise beside them.
+
+      Given the admin is composing a "Databricks AI/BI Genie" source and
+        has not expanded "Advanced"
+      Then the drawer shows no destination line yet
+      When they expand "Advanced" and pick a destination
+      Then a line names the project the conversations will land in
+      And a source type that pulls counts rather than conversations shows
+        no such line, because it routes none
 
     @integration
     Scenario: The edit drawer changes a destination and says history stays
       Given a "Databricks AI/BI Genie" source already lands in "Analytics"
-      When the admin opens the source for editing
+      When the admin opens the source for editing and expands "Advanced"
       Then the destination picker shows "Analytics"
-      And the drawer says conversations already routed stay where they are
+      And the (i) says conversations already routed stay where they are,
+        which it does not say while composing a source that has routed
+        none
       When they change it to "Support" and save
       Then the update carries "Support" as the destination
 
@@ -199,7 +251,7 @@ Feature: IngestionSource — admin configuration of cross-platform feeds
     Scenario: An archived destination is named as archived, not as absent
       Given a "Databricks AI/BI Genie" source lands in a project that has
         since been archived
-      When the admin opens the source for editing
+      When the admin opens the source for editing and expands "Advanced"
       Then the drawer says that destination is archived and that
         conversations are no longer being routed there
       And it still offers the picker, so the admin can repoint the source

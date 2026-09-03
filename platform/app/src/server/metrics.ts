@@ -3,6 +3,7 @@ import { performance } from "node:perf_hooks";
 import {
   Counter,
   collectDefaultMetrics,
+  Gauge,
   Histogram,
   register,
 } from "prom-client";
@@ -1540,6 +1541,78 @@ export const observeCodingAgentSessionListReadDuration = ({
   durationMs: number;
 }) =>
   codingAgentSessionListReadDuration.labels(table, outcome).observe(durationMs);
+
+// ============================================================================
+// ADR-128: the governance cost rollup's watchdogs
+// ============================================================================
+
+/**
+ * Times the daily cost rollup disagreed with the events it was built from.
+ *
+ * The comparator re-derives a sampled day straight from the event log and
+ * compares it against the summarized figure. An increment means the number a
+ * customer is being shown is not the number their events add up to — it does
+ * NOT mean the rollup was repaired: wave 1 surfaces the signal and heals
+ * nothing, deliberately, because a self-healing rewrite would erase the
+ * evidence of why the two ever diverged. The organization and the two figures
+ * are on the log line beside it.
+ *
+ * A healthy fleet emits this at exactly zero.
+ */
+register.removeSingleMetric("langwatch_governance_cost_rollup_mismatch_total");
+const governanceCostRollupMismatchCounter = new Counter({
+  name: "langwatch_governance_cost_rollup_mismatch_total",
+  help: "Days on which the governance cost rollup disagreed with the events it was derived from",
+  labelNames: ["cost_source"] as const,
+});
+
+export const incrementGovernanceCostRollupMismatch = (
+  costSource: string,
+): void => {
+  governanceCostRollupMismatchCounter.labels(costSource).inc();
+};
+
+/**
+ * How far behind the event log the rollup is, in seconds, per tenant and lane.
+ *
+ * A gauge and not an alert: ADR-128 wave 1 measures and sends nothing. The
+ * value is the distance between the newest event's BUSINESS time and the
+ * newest business time any summary row covers, so a lane that stopped folding
+ * climbs steadily while a lane that is merely idle sits flat at zero.
+ *
+ * `tenant_id` is load-bearing, not detail. The comparator fires once per
+ * tenant, and a gauge keyed only by lane would have each tenant overwrite the
+ * last: the fleet's worst lag would sit invisible behind whichever tenant
+ * happened to report most recently, which is the one reading this metric
+ * exists to surface. Pinned by governanceCostRollupMetrics.unit.test.ts.
+ *
+ * The series are therefore per tenant, and prom-client keeps a label set for
+ * the life of the process — a deleted tenant's last reading lingers until the
+ * worker restarts. Acceptable for a lag gauge nobody alerts on; it would not
+ * be if this ever became a paging signal.
+ */
+register.removeSingleMetric("langwatch_governance_cost_rollup_lag_seconds");
+const governanceCostRollupLagGauge = new Gauge({
+  name: "langwatch_governance_cost_rollup_lag_seconds",
+  help: "Seconds between the newest cost event and the newest moment the rollup covers",
+  labelNames: ["tenant_id", "cost_source"] as const,
+});
+
+export const setGovernanceCostRollupLagSeconds = ({
+  tenantId,
+  costSource,
+  seconds,
+}: {
+  tenantId: string;
+  costSource: string;
+  seconds: number;
+}): void => {
+  // Named labels rather than positional: two same-typed labels next to each
+  // other are silently swappable, and a swap here mislabels every series.
+  governanceCostRollupLagGauge
+    .labels({ tenant_id: tenantId, cost_source: costSource })
+    .set(seconds);
+};
 
 // ============================================================================
 // withMetrics utility

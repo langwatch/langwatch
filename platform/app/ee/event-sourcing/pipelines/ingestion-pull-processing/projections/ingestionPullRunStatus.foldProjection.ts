@@ -30,6 +30,16 @@ export interface IngestionPullRunStatusData {
   LastRunErrorCode: string | null;
   ConsecutiveErrors: number;
   /**
+   * When a run last reached the provider and came back without an error.
+   *
+   * Distinct from `LastRunAt`, which moves on failures too, and from
+   * `IngestionSource.lastEventAt`, which moves only when data arrives. Health
+   * needs the third question -- when did the pull itself last work -- and
+   * neither of the other two answers it, so a source whose provider had gone
+   * dark looked identical to one that was merely quiet (ADR-128).
+   */
+  LastSuccessAt: number | null;
+  /**
    * Which run this row's outcome fields describe, as the run's `scheduledFor`.
    *
    * The process manager fences late outcomes by comparing `runId` against the
@@ -92,6 +102,7 @@ export class IngestionPullRunStatusFoldProjection
       LastRunErrorCode: null,
       ConsecutiveErrors: 0,
       LastRunScheduledFor: null,
+      LastSuccessAt: null,
     };
   }
 
@@ -153,6 +164,10 @@ export class IngestionPullRunStatusFoldProjection
   ): IngestionPullRunStatusData {
     if (this.isSuperseded({ state, scheduledFor: event.data.scheduledFor }))
       return state;
+    // Absent on every completion written before runs reported an error count,
+    // and reading that as a clean run is correct: those producers failed the
+    // whole run rather than returning partial progress.
+    const partlySucceeded = (event.data.errorCount ?? 0) > 0;
     return {
       ...state,
       SourceId: event.data.sourceId,
@@ -162,8 +177,18 @@ export class IngestionPullRunStatusFoldProjection
       LastRunEventCount: event.data.eventCount,
       LastRunError: null,
       LastRunErrorCode: null,
-      ConsecutiveErrors: 0,
+      // A run that delivered something but also stepped over rows it could not
+      // read, or refused a next-page link, is not the clean run that proves the
+      // source works -- so it neither clears the failure count nor adds to it,
+      // and it stamps no success. Counting it as one wrote a fresh success over
+      // exactly the signals that were meant to be loud, and a source could
+      // launder itself healthy forever while never reading a whole page.
+      ConsecutiveErrors: partlySucceeded ? state.ConsecutiveErrors : 0,
       LastRunScheduledFor: event.data.scheduledFor,
+      // Stamped on every clean completion, including one that found nothing
+      // new: reaching the provider and being told "no usage" is a working
+      // puller.
+      LastSuccessAt: partlySucceeded ? state.LastSuccessAt : event.occurredAt,
     };
   }
 

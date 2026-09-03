@@ -76,6 +76,25 @@ describe("ingestion pull outbox effect", () => {
     });
   });
 
+  it("reports the errors a partly-succeeded run stepped over", async () => {
+    const recordRunCompleted = vi.fn();
+    const handler = createIngestionPullRunHandler({
+      runPort: {
+        run: vi.fn().mockResolvedValue({
+          nextCursor: "cursor-2",
+          eventCount: 3,
+          errorCount: 2,
+        }),
+      },
+      commands: () => commandsStub({ recordRunCompleted }),
+      clock: () => 200,
+    });
+    await handler(intent, context(1));
+    expect(recordRunCompleted).toHaveBeenCalledWith(
+      expect.objectContaining({ eventCount: 3, errorCount: 2 }),
+    );
+  });
+
   it("rethrows before the final attempt so the outbox retries", async () => {
     const handler = createIngestionPullRunHandler({
       runPort: { run: vi.fn().mockRejectedValue(new Error("provider down")) },

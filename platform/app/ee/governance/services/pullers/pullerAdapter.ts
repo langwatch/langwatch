@@ -54,10 +54,15 @@ const costUsdSchema = z
     const s = String(v).trim();
     if (s === "" || s === "0" || s === "0.0") return "0";
     if (!COST_USD_PATTERN.test(s)) return "0";
-    // Reject negative costs — adapters currently only produce non-negative.
-    // If credits/refunds are needed, this guard should be removed explicitly.
+    // Finite, and nothing more. A negative figure is REAL money: a provider
+    // that refunds a day serves the credit in the same field a charge arrives
+    // in, and clamping it to zero would leave the charge it reverses standing
+    // on its own — the customer reads as having spent money they got back.
+    // The pattern above already permits the sign; this only rejects values
+    // that are not numbers at all, including the lone "-" and anything that
+    // overflows.
     const n = Number(s);
-    if (!Number.isFinite(n) || n < 0) return "0";
+    if (!Number.isFinite(n)) return "0";
     return s;
   })
   .default("0");
@@ -80,9 +85,15 @@ export const normalizedPullEventSchema = z.object({
   action: z.string(),
   /** Target of the action (e.g. model name, tool name, document id). */
   target: z.string(),
-  /** USD cost as a decimal string ("0" if the source doesn't expose it).
+  /** Cost as a decimal string ("0" if the source doesn't expose it).
    *  Kept as a string so sub-cent amounts survive without float rounding.
-   *  Validated against DECIMAL_PATTERN and nonnegative at the parse boundary. */
+   *  SIGNED: a provider that credits a period reports it here as a negative
+   *  figure, and it is carried rather than clamped. Validated against
+   *  DECIMAL_PATTERN and checked finite at the parse boundary.
+   *
+   *  Named `_usd` for the sources that predate currencies and is still the
+   *  provider's own currency; which currency that is travels on the
+   *  `pulled_usage` hint (`pulledUsageRecord.ts`), never here. */
   cost_usd: costUsdSchema,
   /** Input tokens (0 if unknown). */
   tokens_input: z.number().nonnegative().int().default(0),

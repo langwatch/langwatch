@@ -1,0 +1,229 @@
+// SPDX-License-Identifier: LicenseRef-LangWatch-Enterprise
+
+/**
+ * Who is allowed to read an Azure subscription's bill.
+ *
+ * Azure Cost Management reports spend for a whole subscription, not for the one
+ * environment a source happens to watch. Everything below the read stores that
+ * figure against the source that fetched it: the ledger keys on the source, and
+ * the daily rollup carries the source id in its row identity. So two sources
+ * naming one subscription file the same bill twice, and the organisation's
+ * total reports double what Azure charged. Both entries are individually
+ * correct, which is what makes it dangerous — the mismatch check guarding the
+ * rollup compares a figure against itself and never fires, and nothing else
+ * surfaces the difference.
+ *
+ * The remedy here is the narrow one: at most one source may name a given
+ * subscription, refused on the write rather than at pull time, because by pull
+ * time the admin is long gone and the only signal left is a wrong number on a
+ * dashboard. It costs an organisation running two environments on one
+ * subscription the ability to name it twice; they choose which source carries
+ * the bill and the other reads conversations only.
+ *
+ * The wider fix is the bill as its own connection, owned per subscription
+ * rather than per environment, which also lets it run on the daily schedule the
+ * data is actually published on. That is tracked separately; this guard is what
+ * stops the numbers lying in the meantime.
+ */
+
+import { ValidationError } from "@langwatch/handled-error";
+
+/** The config key naming the Azure subscription a source reads the bill of. */
+export const AZURE_SUBSCRIPTION_FIELD = "azureSubscriptionId";
+
+/** A source that already reads some subscription's bill. */
+export interface AzureBillReader {
+  id: string;
+  name: string;
+  subscriptionId: string;
+}
+
+/**
+ * The subscription a config claims the bill of, or null when it claims none.
+ *
+ * Blank reads as "none" rather than as a subscription named the empty string,
+ * which would have every source without a subscription collide with every other
+ * one. The composer already drops an empty field before it builds the config
+ * (`inventory.tsx`), so this is not fixing a live escape — it holds because
+ * anything reaching the service directly, without going through that form, is
+ * under no such obligation.
+ */
+export function readClaimedSubscription(
+  parserConfig: Record<string, unknown> | null | undefined,
+): string | null {
+  if (!parserConfig || typeof parserConfig !== "object") return null;
+  const claimed = parserConfig[AZURE_SUBSCRIPTION_FIELD];
+  if (typeof claimed !== "string") return null;
+  const trimmed = claimed.trim();
+  return trimmed === "" ? null : trimmed;
+}
+
+/**
+ * The customer's own prepaid declaration, read off the stored config.
+ *
+ * A reader beside `readClaimedSubscription` for the same reason it exists:
+ * the config is untyped JSON, and every caller hand-reading the key is a
+ * caller that can quietly disagree with the others about what counts as
+ * declared. Only a stored `true` does — the declaration is a checkbox an
+ * admin ticked, never an inference (ADR-128 §21.4).
+ */
+export function readPrepaidDeclared(
+  parserConfig: Record<string, unknown> | null | undefined,
+): boolean {
+  return parserConfig?.azureBillingIsPrepaid === true;
+}
+
+/**
+ * Refuse a save that names a subscription without the bill's own credential.
+ *
+ * The bill is read with its own registered app — one that holds Cost
+ * Management Reader and cannot read a conversation — and never with the
+ * conversation credential (ADR-128 §21.1). Enforcing that at save time is
+ * what keeps the state "subscription named, bill unreadable forever" from
+ * existing at all: refused here, it never needs explaining on a spend panel
+ * months later to someone who was not in the room when the source was made.
+ *
+ * Only a save that carries readable credentials can be judged on its pair.
+ * An edit does not resend secrets — the service carries the stored,
+ * already-validated envelope across, so by the time this guard runs the
+ * credentials are absent or an encrypted string. Which of two saves that is
+ * decides everything:
+ *
+ * - The stored config ALREADY claimed a subscription: the envelope was
+ *   proven to hold the billing pair when the claim was first saved, and
+ *   refusing now would lock an admin out of renaming their own source.
+ * - The stored config claimed none: the envelope was never checked for a
+ *   billing pair, and waving the claim through would store exactly the
+ *   state this guard exists to refuse — one API edit away, invisible to
+ *   the form, explained to nobody. Refused; claiming a bill means
+ *   re-entering the credentials with the pair inside.
+ *
+ * A CREATE naming a subscription is refused unless this very save carries the
+ * pair. Nothing downstream of this guard requires credentials — `createSource`
+ * validates the schedule, the plan cap, the source type and the destinations,
+ * then writes — so a create that omits the subscribe-time secrets is stored,
+ * not "caught by a louder failure". That path is the only way the state this
+ * guard exists to refuse could still be reached, which is precisely why it
+ * cannot be the one path left open.
+ *
+ * An edit SWAPPING one subscription for another behind a sealed envelope is
+ * allowed HERE, and the distinction is worth stating because it looks like a
+ * hole. What is checked here is that a claim never lands without a pair
+ * PRESENT, never that the pair can read the subscription named — §21.6
+ * proposed verifying the grant at save time and v3.4 withdrew it. The
+ * swapped-in claim still rides the envelope validated for the previous one,
+ * so the pair is there; if it turns out not to cover the new subscription the
+ * read fails and the window is held, which the panel says out loud as
+ * `billing_read_failed`. Refusing the swap outright would force an admin to
+ * retype both secrets whenever one registered app holds Cost Management
+ * Reader across several subscriptions — the ordinary Azure setup — and prove
+ * nothing about the new one.
+ *
+ * That honest-path promise only holds while no bill has been read: once one
+ * has, the cursor and the recorded rows keep answering for the old bill
+ * under the new claim, and the failed-read note is masked instead of said.
+ * `assertClaimedSubscriptionUnchangedOncePulled` (in the service, beside the
+ * report guard it mirrors) is what closes that half — this guard stays about
+ * the pair being present, never about which bill the source has history with.
+ */
+export function assertAzureBillHasItsOwnCredential(params: {
+  parserConfig: Record<string, unknown> | null | undefined;
+  /** The config as stored before this edit. Omitted on create. */
+  storedParserConfig?: Record<string, unknown> | null;
+}): void {
+  const { parserConfig, storedParserConfig } = params;
+  if (readClaimedSubscription(parserConfig) === null) return;
+
+  const complaint =
+    "Reading this subscription's bill needs its own app registration — a billing client ID and secret holding the Cost Management Reader role. The conversation credential is never used for the bill, so without the billing pair the spend would stay unreadable. Add both billing fields, or leave the subscription empty.";
+
+  const credentials = parserConfig?.credentials;
+  if (
+    typeof credentials !== "object" ||
+    credentials === null ||
+    Array.isArray(credentials)
+  ) {
+    // Nothing readable to judge. The one save that may pass is an edit
+    // carrying the sealed envelope across for a claim that was already
+    // judged when it was made; a create, or an edit that ADDS the claim,
+    // has never had its pair checked by anyone.
+    if (
+      storedParserConfig !== undefined &&
+      readClaimedSubscription(storedParserConfig) !== null
+    ) {
+      return;
+    }
+    const editComplaint =
+      "This change claims an Azure subscription, but the credentials on file were never checked for the bill's own app registration. Re-enter the credentials — including the billing client ID and secret — to claim the bill.";
+    const message =
+      storedParserConfig === undefined ? complaint : editComplaint;
+    throw new ValidationError(message, {
+      meta: { formErrors: [message] },
+    });
+  }
+
+  const readBillingKey = (key: string): string => {
+    const value = (credentials as Record<string, unknown>)[key];
+    return typeof value === "string" ? value.trim() : "";
+  };
+  if (
+    readBillingKey("billingClientId") &&
+    readBillingKey("billingClientSecret")
+  ) {
+    return;
+  }
+
+  throw new ValidationError(complaint, {
+    meta: { formErrors: [complaint] },
+  });
+}
+
+/**
+ * Refuse a config claiming a subscription another live source already reads.
+ *
+ * A no-op for a config claiming no subscription — silence here means "nothing
+ * claimed", never "checked and fine".
+ *
+ * `sourceId` is the source being written. It is excluded from its own check so
+ * that renaming a source, or any other edit that resends the subscription it
+ * already holds, does not make it collide with itself.
+ *
+ * Identifiers are compared without regard to case or surrounding space. Azure
+ * prints them lower case and accepts either spelling, so a pasted capitalised
+ * identifier names the same subscription and the same bill; comparing them
+ * literally would let the second reader straight through.
+ *
+ * `claimedBy` is passed in rather than read here so that the whole decision is
+ * one pure function. The alternative — a database filter on a JSON field —
+ * would put the matching rules somewhere that silently returns nothing when
+ * they are wrong, which is the one failure this guard cannot afford.
+ */
+export function assertAzureBillNotAlreadyClaimed(params: {
+  parserConfig: Record<string, unknown> | null | undefined;
+  claimedBy: AzureBillReader[];
+  sourceId?: string;
+}): void {
+  const { parserConfig, claimedBy, sourceId } = params;
+
+  const claimed = readClaimedSubscription(parserConfig);
+  if (claimed === null) return;
+
+  const wanted = claimed.toLowerCase();
+  const owner = claimedBy.find(
+    (reader) =>
+      reader.id !== sourceId &&
+      reader.subscriptionId.trim().toLowerCase() === wanted,
+  );
+  if (!owner) return;
+
+  // The complaint travels in `meta.formErrors` because that is the half of the
+  // `validation_error` contract the presentation layer reads for a field it has
+  // no on-screen name for. Without it the admin gets the generic "Check your
+  // input" copy and never learns which source already holds the subscription —
+  // which is the entire point of naming the owner here (see
+  // `unsupportedValue.ts` for the same trap spelled out).
+  const complaint = `The source "${owner.name}" already reads this Azure subscription's bill. A subscription's bill covers everything running under it, so reading it from two sources would report double the spend. Leave the subscription empty here, or name a different one.`;
+  throw new ValidationError(complaint, {
+    meta: { formErrors: [complaint] },
+  });
+}

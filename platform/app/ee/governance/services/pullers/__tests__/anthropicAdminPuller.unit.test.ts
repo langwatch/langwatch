@@ -30,6 +30,9 @@ const SOURCE = {
   organizationId: "org_acme",
   teamId: "team_platform",
 };
+/** The org's hidden governance project — where the row is stored (ADR-128). */
+const GOV_PROJECT_ID = "proj_governance_acme";
+
 const OBSERVED_AT = new Date("2026-08-06T09:00:00.000Z");
 
 function jsonResponse(body: unknown) {
@@ -117,11 +120,12 @@ describe("the Anthropic Admin puller", () => {
       const record = buildPulledUsageRecord({
         event: result.events[0]!,
         source: SOURCE,
+        governanceProjectId: GOV_PROJECT_ID,
         observedAt: OBSERVED_AT,
       });
       expect(record?.costBasis).toBe("computed");
       expect(record?.costStatus).toBe("estimate");
-      expect(record?.costNanoUsd).toBeGreaterThan(0);
+      expect(record?.costNanoMinor).toBeGreaterThan(0);
       expect(record?.tokensInput).toBe(120_000);
       expect(record?.tokensCacheRead).toBe(4_000);
       // Both TTL variants of the nested `cache_creation` object count as
@@ -237,6 +241,7 @@ describe("the Anthropic Admin puller", () => {
       const record = buildPulledUsageRecord({
         event: result.events[0]!,
         source: SOURCE,
+        governanceProjectId: GOV_PROJECT_ID,
         observedAt: OBSERVED_AT,
       });
       expect(record?.tokensCacheWrite).toBe(2_345);
@@ -257,6 +262,7 @@ describe("the Anthropic Admin puller", () => {
       const record = buildPulledUsageRecord({
         event: result.events[0]!,
         source: SOURCE,
+        governanceProjectId: GOV_PROJECT_ID,
         observedAt: OBSERVED_AT,
       });
       expect(record?.costBasis).toBe("provider_reported");
@@ -266,7 +272,40 @@ describe("the Anthropic Admin puller", () => {
       expect(record?.rateVersion).toBeNull();
       // The documented worked example: `amount` is denominated in cents, so
       // "41280.000000" is $412.80 — not $41,280. Stored verbatim it was 100x.
-      expect(record?.costNanoUsd).toBe(412_800_000_000);
+      expect(record?.costNanoMinor).toBe(412_800_000_000);
+    });
+
+    /** @scenario "A provider amount in minor units becomes the correct dollar amount" */
+    it("reads 1234 minor units as twelve dollars and thirty-four cents", async () => {
+      fetchMock.mockResolvedValue(
+        jsonResponse({
+          ...COST_PAGE,
+          data: [
+            {
+              starting_at: "2026-08-01T00:00:00Z",
+              results: [{ ...COST_PAGE.data[0]!.results[0], amount: "1234" }],
+            },
+          ],
+        }),
+      );
+
+      const result = await new AnthropicAdminPuller().runOnce(RUN_OPTIONS, {
+        adapter: "anthropic_admin",
+        report: "cost",
+        bucketWidth: "1d",
+        schedule: "0 * * * *",
+      });
+
+      const record = buildPulledUsageRecord({
+        event: result.events[0]!,
+        source: SOURCE,
+        governanceProjectId: GOV_PROJECT_ID,
+        observedAt: OBSERVED_AT,
+      });
+
+      // $12.34, not $1,234. The 100x bug class (#6977) is a provider's minor
+      // units stored as if they were the major ones.
+      expect(record?.costNanoMinor).toBe(12_340_000_000);
     });
 
     it("shifts the decimal point without passing through a float", async () => {
@@ -294,11 +333,12 @@ describe("the Anthropic Admin puller", () => {
       const record = buildPulledUsageRecord({
         event: result.events[0]!,
         source: SOURCE,
+        governanceProjectId: GOV_PROJECT_ID,
         observedAt: OBSERVED_AT,
       });
       // 1234.567890123 cents = $12.34567890123; every digit nano-USD can hold
       // survives, the sub-nano tail rounds half away from zero.
-      expect(record?.costNanoUsd).toBe(12_345_678_901);
+      expect(record?.costNanoMinor).toBe(12_345_678_901);
     });
 
     it("survives an exponent-form amount from the schema's number branch", async () => {
@@ -328,10 +368,11 @@ describe("the Anthropic Admin puller", () => {
       const record = buildPulledUsageRecord({
         event: result.events[0]!,
         source: SOURCE,
+        governanceProjectId: GOV_PROJECT_ID,
         observedAt: OBSERVED_AT,
       });
       // 1e-7 cents = 1e-9 USD = exactly one nano-USD.
-      expect(record?.costNanoUsd).toBe(1);
+      expect(record?.costNanoMinor).toBe(1);
     });
 
     it("drops a non-USD row rather than inventing a rate, and keeps the rest", async () => {
@@ -365,9 +406,10 @@ describe("the Anthropic Admin puller", () => {
       const record = buildPulledUsageRecord({
         event: result.events[0]!,
         source: SOURCE,
+        governanceProjectId: GOV_PROJECT_ID,
         observedAt: OBSERVED_AT,
       });
-      expect(record?.costNanoUsd).toBe(412_800_000_000);
+      expect(record?.costNanoMinor).toBe(412_800_000_000);
     });
 
     it("drops a malformed amount row rather than aborting the pull", async () => {
@@ -407,9 +449,10 @@ describe("the Anthropic Admin puller", () => {
       const record = buildPulledUsageRecord({
         event: result.events[0]!,
         source: SOURCE,
+        governanceProjectId: GOV_PROJECT_ID,
         observedAt: OBSERVED_AT,
       });
-      expect(record?.costNanoUsd).toBe(412_800_000_000);
+      expect(record?.costNanoMinor).toBe(412_800_000_000);
     });
 
     it("asks for the daily bucket the cost report actually supports", async () => {
@@ -451,6 +494,7 @@ describe("the Anthropic Admin puller", () => {
         buildPulledUsageRecord({
           event,
           source: SOURCE,
+          governanceProjectId: GOV_PROJECT_ID,
           observedAt: OBSERVED_AT,
         })?.restatementKey;
       expect(keyFor(daily.events[0]!)).toBe(keyFor(hourly.events[0]!));
@@ -486,17 +530,19 @@ describe("the Anthropic Admin puller", () => {
       const before = buildPulledUsageRecord({
         event: first.events[0]!,
         source: SOURCE,
+        governanceProjectId: GOV_PROJECT_ID,
         observedAt: OBSERVED_AT,
       });
       const after = buildPulledUsageRecord({
         event: corrected.events[0]!,
         source: SOURCE,
+        governanceProjectId: GOV_PROJECT_ID,
         observedAt: new Date("2026-08-07T09:00:00.000Z"),
       });
 
       // 999.5 cents = $9.995.
       expect(after?.restatementKey).toBe(before?.restatementKey);
-      expect(after?.costNanoUsd).toBe(9_995_000_000);
+      expect(after?.costNanoMinor).toBe(9_995_000_000);
     });
   });
 
@@ -719,9 +765,10 @@ describe("the Anthropic Admin puller", () => {
       const record = buildPulledUsageRecord({
         event: result.events[0]!,
         source: SOURCE,
+        governanceProjectId: GOV_PROJECT_ID,
         observedAt: OBSERVED_AT,
       });
-      expect(record?.costNanoUsd).toBe(412_800_000_000);
+      expect(record?.costNanoMinor).toBe(412_800_000_000);
       // And the rewind runs once: the freshly minted cursor carries the
       // current query identity.
       expect(JSON.parse(result.cursor ?? "{}").query).toContain("cost:");

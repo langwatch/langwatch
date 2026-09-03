@@ -1,0 +1,69 @@
+// SPDX-License-Identifier: LicenseRef-LangWatch-Enterprise
+
+import { deriveSourceHealth } from "@ee/governance/services/pullers/sourceHealth";
+import { CircleAlert, CircleCheck, CircleDashed, CircleX } from "lucide-react";
+
+/**
+ * What the source badge says, on the inventory list and the detail header.
+ *
+ * Two different questions share one badge. Status is what an admin
+ * configured: active, disabled, waiting for its first event. Health is
+ * whether the puller still works, derived at read time from the consecutive
+ * failure count (ADR-128) -- never stored as a fourth status, because a
+ * provider outage must not be able to rewrite configuration.
+ *
+ * Health wins when the two disagree, with one exception. A source configured
+ * "active" whose last three runs all failed is not active in the sense any
+ * reader means, and showing the green check there is how a broken integration
+ * goes unnoticed for a week.
+ *
+ * The exception is "disabled". A disabled source is not expected to be
+ * pulling, so "Not pulling" is not news about it — it is the state an admin
+ * chose, restated in red. Worse, it is unactionable: the reader clicks
+ * through to fix an outage and finds nothing wrong. Configuration wins here
+ * because health is only interesting about a source we are asking to run.
+ */
+export interface SourceBadge {
+  icon: typeof CircleCheck;
+  label: string;
+  color: string;
+}
+
+export const SOURCE_STATUS_META: Record<string, SourceBadge> = {
+  active: { icon: CircleCheck, label: "Active", color: "green.500" },
+  awaiting_first_event: {
+    icon: CircleDashed,
+    label: "Awaiting first event",
+    color: "amber.500",
+  },
+  disabled: { icon: CircleX, label: "Disabled", color: "fg.muted" },
+};
+
+export const SOURCE_UNHEALTHY_META: SourceBadge = {
+  icon: CircleAlert,
+  label: "Not pulling",
+  color: "red.500",
+};
+
+export function sourceBadge({
+  status,
+  errorCount,
+}: {
+  status: string;
+  errorCount: number;
+}): SourceBadge {
+  // Checked before health: a source nobody asked to run cannot be failing to
+  // run, so its configured state is the honest badge.
+  if (status === "disabled") return SOURCE_STATUS_META.disabled!;
+  if (deriveSourceHealth({ consecutiveFailures: errorCount }) === "unhealthy") {
+    return SOURCE_UNHEALTHY_META;
+  }
+  return SOURCE_STATUS_META[status] ?? SOURCE_STATUS_META.awaiting_first_event!;
+}
+
+/**
+ * Re-exported from the health rule it belongs with. The badge and the cost
+ * screen ask the same question, and the cost service cannot import this
+ * module — it brings icons with it.
+ */
+export { noDataSinceNotice } from "@ee/governance/services/pullers/sourceHealth";

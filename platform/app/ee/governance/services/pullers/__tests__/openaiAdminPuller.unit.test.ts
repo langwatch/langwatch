@@ -41,6 +41,9 @@ const SOURCE = {
   organizationId: "org_acme",
   teamId: "team_platform",
 };
+/** The org's hidden governance project — where the row is stored (ADR-128). */
+const GOV_PROJECT_ID = "proj_governance_acme";
+
 const OBSERVED_AT = new Date("2026-08-26T09:00:00.000Z");
 
 /** 2026-08-01T00:00:00Z, the shape the API reports a bucket start in. */
@@ -166,11 +169,12 @@ describe("given an OpenAI Admin cost source", () => {
       const record = buildPulledUsageRecord({
         event: result.events[0]!,
         source: SOURCE,
+        governanceProjectId: GOV_PROJECT_ID,
         observedAt: OBSERVED_AT,
       });
 
       // 0.0000001234 USD × 1e9 = 123.4 → 123 nanoUsd (truncated).
-      expect(record?.costNanoUsd).toBe(123);
+      expect(record?.costNanoMinor).toBe(123);
     });
 
     /** @scenario "Spend is called an estimate, not the invoice" */
@@ -181,6 +185,7 @@ describe("given an OpenAI Admin cost source", () => {
       const record = buildPulledUsageRecord({
         event: result.events[0]!,
         source: SOURCE,
+        governanceProjectId: GOV_PROJECT_ID,
         observedAt: OBSERVED_AT,
       });
 
@@ -298,16 +303,18 @@ describe("given an OpenAI Admin cost source", () => {
       const before = buildPulledUsageRecord({
         event: first.events[0]!,
         source: SOURCE,
+        governanceProjectId: GOV_PROJECT_ID,
         observedAt: OBSERVED_AT,
       });
       const after = buildPulledUsageRecord({
         event: second.events[0]!,
         source: SOURCE,
+        governanceProjectId: GOV_PROJECT_ID,
         observedAt: new Date(OBSERVED_AT.getTime() + 60_000),
       });
 
       expect(after?.restatementKey).toBe(before?.restatementKey);
-      expect(after?.costNanoUsd).not.toBe(before?.costNanoUsd);
+      expect(after?.costNanoMinor).not.toBe(before?.costNanoMinor);
     });
 
     /** @scenario "Re-reading an unchanged day records nothing new" */

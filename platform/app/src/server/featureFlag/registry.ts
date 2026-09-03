@@ -265,7 +265,7 @@ export const FEATURE_FLAGS = [
     scope: "PRODUCT",
     defaultValue: false,
     description:
-      "Reveals the Costs and Billed governance placeholder pages and their sidebar items (spec: specs/ai-gateway/governance/governance-home-routing.feature). Composed ON TOP of release_ui_ai_governance_enabled, never instead of it: the section flag off still hides everything. Default off — the pages are empty shells shipped ahead of the spend views. Enable per organization via the operator store; for local dev use FEATURE_FLAG_FORCE_ENABLE=release_ui_governance_billed_cost_enabled.",
+      "Reveals the Costs and Billed governance pages and their sidebar items (specs: specs/ai-gateway/governance/governance-home-routing.feature, specs/governance/governance-cost-screen.feature). Composed ON TOP of release_ui_ai_governance_enabled, never instead of it: the section flag off still hides everything. Default off. Costs now renders the real billed/gateway/seat lanes (ADR-128 wave 1); Billed is still a placeholder shell. Enable per organization via the operator store; for local dev use FEATURE_FLAG_FORCE_ENABLE=release_ui_governance_billed_cost_enabled.",
     family: "Governance",
   },
   // ADR-034 Phase 3 — routes analytics getTimeseries reads to the slim

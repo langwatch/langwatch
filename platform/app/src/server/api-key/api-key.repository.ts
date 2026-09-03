@@ -553,7 +553,11 @@ export class ApiKeyRepository {
 
   async findProjectsInOrg({ organizationId }: { organizationId: string }) {
     return this.prisma.project.findMany({
-      where: { team: { organizationId }, archivedAt: null },
+      where: {
+        team: { organizationId },
+        archivedAt: null,
+        kind: { not: "internal_governance" },
+      },
       select: { id: true, name: true, teamId: true },
       orderBy: { name: "asc" },
     });

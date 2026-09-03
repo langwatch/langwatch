@@ -64,6 +64,26 @@ const pulledUsageHintSchema = z
      * us a string should have every one of them survive to the ledger.
      */
     costUsd: z.string().optional(),
+    /**
+     * Which currency `costUsd` is in, ISO 4217. Absent means dollars, which is
+     * what every adapter written before this reported.
+     *
+     * Deliberately NOT a dimension. `dimensions` is the restatement identity,
+     * and a provider that re-denominated a period would mint a fresh key and
+     * add its correction on top of the figure it corrects rather than
+     * replacing it. Currency belongs with the money, not with the coordinates.
+     */
+    currency: z.string().length(3).optional(),
+    /**
+     * The BILLER's own conversion of `costUsd` into dollars, as the exact
+     * decimal string it published. Azure returns this beside the native
+     * amount at its own invoice-grade rate.
+     *
+     * Only ever the biller's number. Absent stays absent — nothing downstream
+     * fills it from a rate of our own. Also not a dimension, for the same
+     * reason as `currency`.
+     */
+    costUsdBiller: z.string().optional(),
     /** Falls back to the event's `target`, which is where models already sit. */
     model: z.string().optional(),
     tokensCacheRead: z.number().int().nonnegative().default(0),
@@ -141,10 +161,17 @@ function restatementKeyFor({
 export function buildPulledUsageRecord({
   event,
   source,
+  governanceProjectId,
   observedAt,
 }: {
   event: NormalizedPullEvent;
   source: PulledUsageSourceAttribution;
+  /**
+   * The org's hidden governance project — where the row is STORED, not who
+   * the money belongs to. Separate from `source` because attribution is what
+   * the source knows and the home is what the org has.
+   */
+  governanceProjectId: string;
   observedAt: Date;
 }): PulledUsageObservedEventData | null {
   const raw = event.extra?.[PULLED_USAGE_HINT_KEY];
@@ -174,6 +201,8 @@ export function buildPulledUsageRecord({
           // The string when the adapter kept one, so no digit is lost to the
           // float `cost_usd` had to be to fit the canonical event shape.
           costUsd: hint.costUsd ?? event.cost_usd,
+          currencyCode: hint.currency,
+          costUsdBiller: hint.costUsdBiller,
           // Present by the schema's own refinement on this branch.
           costStatus: hint.costStatus!,
         })
@@ -195,13 +224,18 @@ export function buildPulledUsageRecord({
     ingestionSourceId: source.ingestionSourceId,
     organizationId: source.organizationId,
     teamId: source.teamId,
-    // Deferred: `IngestionSource` carries no project yet (ADR-088 Decision 4).
-    // Null says unattributed. The hidden governance project every other pull
-    // writer uses is not an option here — it is invisible to the customer, so
-    // filing their money there would be worse than saying we do not know.
-    projectId: null,
+    // The row's home: the org's hidden governance project, the same partition
+    // the OCSF audit rows and the ledger's TenantId already use. Nothing
+    // pulled arrives homeless. This says where the row is STORED and not who
+    // owns the money — that stays on organizationId/teamId above, which
+    // `pulledUsageScopeId` reads to pick the ledger's Scope. Members never see
+    // the home: every listing surface excludes kind="internal_governance".
+    // Decision: ADR-128.
+    projectId: governanceProjectId,
     model,
     ...quantities,
+    costNanoMinor: priced.costNanoMinor,
+    currencyCode: priced.currencyCode,
     costNanoUsd: priced.costNanoUsd,
     rateVersion: priced.rateVersion,
     costBasis: priced.costBasis,

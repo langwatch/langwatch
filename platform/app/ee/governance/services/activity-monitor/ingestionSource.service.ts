@@ -23,6 +23,7 @@
 
 import { pullScheduleSchema } from "@ee/event-sourcing/pipelines/ingestion-pull-processing/schemas/events";
 import { ensureHiddenGovernanceProject } from "@ee/governance/services/governanceProject.service";
+import { readStoredCostCursor } from "@ee/governance/services/pullers/copilotStudioDataverse.puller";
 import { syncIngestionPullSource } from "@ee/governance/services/pullers/ingestionPullLifecycle";
 import { hasPollerCursor } from "@ee/governance/services/pullers/pollerCursor";
 import {
@@ -40,6 +41,12 @@ import {
 } from "~/generated/prisma/client";
 import { isEnterpriseTier } from "~/server/api/enterprise";
 import { getApp } from "~/server/app-layer/app";
+import {
+  type AzureBillReader,
+  assertAzureBillHasItsOwnCredential,
+  assertAzureBillNotAlreadyClaimed,
+  readClaimedSubscription,
+} from "./azureBillOwnership";
 import {
   encryptParserConfigCredentials,
   isEncryptedCredentials,
@@ -349,6 +356,64 @@ export function assertReportUnchangedOncePulled({
   });
 }
 
+/**
+ * Refuse pointing a source at a different subscription's bill once one has
+ * been read.
+ *
+ * Everything the cost read records is filed under the source, not under the
+ * subscription: the cursor says how far THIS source's bill was priced, and
+ * the rollup rows carry the source id in their identity. Swap the claim and
+ * both keep answering for the old bill — the new one starts at the old
+ * trailing window instead of a first read, and the panel's "was this bill
+ * read" question finds the old bill's rows and says yes, showing one
+ * subscription's spend under another's name while suppressing the
+ * failed-read note that would have told the truth.
+ *
+ * So the same rule the report gets (`assertReportUnchangedOncePulled`), for
+ * the same recorded-spend-continuity reason: the claim is changeable until
+ * the bill has actually been read or attempted, and fixed after. Held state
+ * counts — a held window carried across would say "read failed" about a bill
+ * never tried. A claim can still be DROPPED at any time (stopping mixes
+ * nothing), but once cost memory exists no new claim may land on this source,
+ * not even the one that was dropped: nothing stored says which subscription
+ * the memory belongs to, so the guard cannot tell resuming from mixing.
+ */
+export function assertClaimedSubscriptionUnchangedOncePulled({
+  existing,
+  incoming,
+}: {
+  existing: Pick<IngestionSource, "parserConfig" | "pollerCursor">;
+  incoming: Record<string, unknown>;
+}): void {
+  const incomingClaim = readClaimedSubscription(incoming);
+  if (incomingClaim === null) return;
+
+  const storedClaim = readClaimedSubscription(
+    existing.parserConfig as Record<string, unknown> | null,
+  );
+  if (
+    storedClaim !== null &&
+    storedClaim.toLowerCase() === incomingClaim.toLowerCase()
+  ) {
+    return;
+  }
+
+  const cursor = readStoredCostCursor(existing.pollerCursor);
+  if (cursor.costPricedThroughDay === null && cursor.costHeldSinceMs === null) {
+    return;
+  }
+
+  const complaint =
+    "This source has already read the bill of the subscription it claimed, " +
+    "and the spend it recorded is filed under this source. Claiming a " +
+    "different subscription here would show one bill's spend under " +
+    "another's name. Archive this source and create a new one to read a " +
+    "different subscription's bill.";
+  throw new ValidationError(complaint, {
+    meta: { formErrors: [complaint] },
+  });
+}
+
 async function syncPullProcessBestEffort({
   prisma,
   source,
@@ -543,6 +608,101 @@ export class IngestionSourceService {
     return null;
   }
 
+  /**
+   * The config guards that run on an edit, in one place.
+   *
+   * The adapter comes from the stored row, not from `incoming`. The edit form
+   * sends back only the fields it renders and `adapter` is not one of them, so
+   * dispatching on the incoming value would make the destination check do
+   * nothing on precisely the request that repoints the host — leaving the
+   * destination pinned at create and free afterwards.
+   *
+   * `sourceId` is the row being edited, excluded from the bill check so that a
+   * source resending the subscription it already holds does not collide with
+   * itself.
+   */
+  private async assertEditedConfigAllowed(params: {
+    organizationId: string;
+    incoming: Record<string, unknown>;
+    existing: Pick<IngestionSource, "id" | "parserConfig" | "pollerCursor">;
+  }): Promise<void> {
+    const stored =
+      (params.existing.parserConfig as Record<string, unknown>) ?? {};
+    assertPullDestinationAllowed({
+      parserConfig: params.incoming,
+      adapterId: stored.adapter as string,
+    });
+    // Before the bill-ownership check: this one costs no query.
+    assertClaimedSubscriptionUnchangedOncePulled({
+      existing: params.existing,
+      incoming: params.incoming,
+    });
+    await this.assertAzureBillIsFree({
+      organizationId: params.organizationId,
+      parserConfig: params.incoming,
+      sourceId: params.existing.id,
+      storedParserConfig: stored,
+    });
+  }
+
+  /**
+   * Refuse a write whose config claims an Azure bill another source reads.
+   *
+   * The claim is read before anything is fetched. A config naming no
+   * subscription is the common case by a wide margin, and it cannot collide
+   * with anything, so it must not cost a query on every source write.
+   */
+  private async assertAzureBillIsFree(params: {
+    organizationId: string;
+    parserConfig: Record<string, unknown>;
+    sourceId?: string;
+    /** The stored config on an edit; absent on create. The credential guard
+     * needs it to tell a claim carried across from a claim newly made. */
+    storedParserConfig?: Record<string, unknown>;
+  }): Promise<void> {
+    if (readClaimedSubscription(params.parserConfig) === null) return;
+    // The bill's own credential first: it is a property of this save alone,
+    // so it must not wait on the cross-source read below.
+    assertAzureBillHasItsOwnCredential({
+      parserConfig: params.parserConfig,
+      storedParserConfig: params.storedParserConfig,
+    });
+    assertAzureBillNotAlreadyClaimed({
+      parserConfig: params.parserConfig,
+      claimedBy: await this.azureBillReaders(params.organizationId),
+      sourceId: params.sourceId,
+    });
+  }
+
+  /**
+   * Every live source in the org that already reads an Azure bill.
+   *
+   * Archived sources are left out: they do not pull, so they read nothing, and
+   * holding a subscription against one would strand that bill behind a source
+   * nobody can see.
+   *
+   * The org's sources are read whole rather than filtered in the database. The
+   * comparison is case- and space-insensitive and a JSON-path filter is neither,
+   * so filtering there would quietly match nothing on exactly the input that
+   * needs catching. Admin writes are rare and an org's source count is small.
+   */
+  private async azureBillReaders(
+    organizationId: string,
+  ): Promise<AzureBillReader[]> {
+    const rows = await this.prisma.ingestionSource.findMany({
+      where: { organizationId, archivedAt: null },
+      select: { id: true, name: true, parserConfig: true },
+    });
+    return rows.flatMap((row) => {
+      const subscriptionId = readClaimedSubscription(
+        row.parserConfig as Record<string, unknown> | null,
+      );
+      return subscriptionId
+        ? [{ id: row.id, name: row.name, subscriptionId }]
+        : [];
+    });
+  }
+
   // ---------------------------------------------------------------------
   // Writes
   // ---------------------------------------------------------------------
@@ -611,6 +771,10 @@ export class IngestionSourceService {
       ...(input.parserConfig ?? {}),
     };
     assertPullDestinationAllowed({ parserConfig: requestedParserConfig });
+    await this.assertAzureBillIsFree({
+      organizationId: input.organizationId,
+      parserConfig: requestedParserConfig,
+    });
     await assertTraceDestinationIsOwnLiveProject({
       prisma: this.prisma,
       organizationId: input.organizationId,
@@ -713,14 +877,10 @@ export class IngestionSourceService {
         existing,
         incoming,
       }));
-      // The adapter comes from the stored row, not from `incoming`. The edit
-      // form sends back only the fields it renders and `adapter` is not one of
-      // them, so dispatching on the incoming value would make this check do
-      // nothing on precisely the request that repoints the host — leaving the
-      // destination pinned at create and free afterwards.
-      assertPullDestinationAllowed({
-        parserConfig: incoming,
-        adapterId: stored.adapter as string,
+      await this.assertEditedConfigAllowed({
+        organizationId: input.organizationId,
+        incoming,
+        existing,
       });
       data.parserConfig = encryptParserConfigCredentials(
         incoming,
