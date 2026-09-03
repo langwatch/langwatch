@@ -166,12 +166,22 @@ export interface IdentityErasureDeps {
   rollupErasure: GovernanceRollupErasureClickHouseRepository;
   replay: RollupReplayPort;
   /**
-   * How far back the event log still holds events. Days older than this cannot
-   * be replayed, so they are reported as not rebuilt instead of being retried
-   * forever. Null means the caller cannot state a horizon, in which case every
-   * day is attempted and none is pre-emptively declared unreachable.
+   * How far back the event log still holds events, for each area asked about.
+   * Days older than an area's horizon cannot be replayed, so they are reported
+   * as not rebuilt instead of being retried forever.
+   *
+   * Per area rather than one number for the organization, because retention is
+   * resolved per project and an organization that has been re-tenanted can hold
+   * two logs reaching back to two different days.
+   *
+   * An area missing from the result is one whose horizon could not be stated,
+   * and the safe reading of that is to attempt every one of its days: a day
+   * that genuinely cannot be replayed then surfaces as a rebuild that changed
+   * nothing, which is a far better failure than a day written off unasked.
    */
-  replayHorizon: () => Date | null;
+  replayHorizon: (params: {
+    tenantIds: string[];
+  }) => Promise<Map<string, Date>>;
   now?: () => Date;
 }
 
@@ -479,7 +489,7 @@ export class IdentityErasureService {
       rawActorId,
     });
 
-    const daysNotRebuilt = this.daysBeyondReplayHorizon(affectedDays);
+    const daysNotRebuilt = await this.daysBeyondReplayHorizon(affectedDays);
     const replayable = affectedDays.filter(
       (candidate) =>
         !daysNotRebuilt.some(
@@ -627,13 +637,27 @@ export class IdentityErasureService {
    * ADR-022 makes the event log's retention the durability ceiling: for a day
    * older than it there is nothing left to replay from, so the delete is the
    * whole operation.
+   *
+   * Each day is judged against its own area's horizon. An area with no horizon
+   * loses no days — see the dep's own note on why silence means "attempt".
    */
-  private daysBeyondReplayHorizon(
+  private async daysBeyondReplayHorizon(
     days: { tenantId: string; day: string }[],
-  ): { tenantId: string; day: string }[] {
-    const horizon = this.deps.replayHorizon();
-    if (!horizon) return [];
-    const horizonDay = horizon.toISOString().slice(0, 10);
-    return days.filter((entry) => entry.day < horizonDay);
+  ): Promise<{ tenantId: string; day: string }[]> {
+    const tenantIds = [...new Set(days.map((entry) => entry.tenantId))];
+    if (tenantIds.length === 0) return [];
+
+    const horizons = await this.deps.replayHorizon({ tenantIds });
+    const horizonDays = new Map(
+      [...horizons].map(([tenantId, oldest]) => [
+        tenantId,
+        oldest.toISOString().slice(0, 10),
+      ]),
+    );
+
+    return days.filter((entry) => {
+      const horizonDay = horizonDays.get(entry.tenantId);
+      return horizonDay !== undefined && entry.day < horizonDay;
+    });
   }
 }

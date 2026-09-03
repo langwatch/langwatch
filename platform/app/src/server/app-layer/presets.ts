@@ -21,6 +21,7 @@ import {
 } from "@ee/governance/services/costRollupComparatorSchedule";
 import { installGovernanceSuppressionSnapshot } from "@ee/governance/services/erasureSuppression.service";
 import { GovernanceCostRollupClickHouseRepository } from "@ee/governance/services/governanceCostRollup.clickhouse.repository";
+import { GovernanceEventLogHorizonClickHouseRepository } from "@ee/governance/services/governanceEventLogHorizon.clickhouse.repository";
 import { GovernanceKpisClickHouseRepository } from "@ee/governance/services/governanceKpis.clickhouse.repository";
 import { GovernanceOcsfEventsClickHouseRepository } from "@ee/governance/services/governanceOcsfEvents.clickhouse.repository";
 import { GovernanceRollupErasureClickHouseRepository } from "@ee/governance/services/governanceRollupErasure.clickhouse.repository";
@@ -1081,6 +1082,13 @@ export function initializeDefaultApp(options?: {
   const governanceRollupErasureRepository = clickhouseEnabled
     ? new GovernanceRollupErasureClickHouseRepository(resolveClickHouseClient)
     : undefined;
+  // ADR-022 makes the event log's retention the ceiling on what an erasure can
+  // rebuild, and this is what reads that ceiling off the log itself rather than
+  // predicting it from the retention policy — see the repository for why the
+  // policy is the wrong source.
+  const governanceEventLogHorizonRepository = clickhouseEnabled
+    ? new GovernanceEventLogHorizonClickHouseRepository(resolveClickHouseClient)
+    : undefined;
   const governanceIdentityErasure = governanceRollupErasureRepository
     ? new IdentityErasureService({
         prisma,
@@ -1103,12 +1111,13 @@ export function initializeDefaultApp(options?: {
           }
           return ops.replay;
         }),
-        // ADR-022 makes the event log's retention the ceiling on what can be
-        // rebuilt. Stated as null until PR-D wires the configured retention
-        // through: every affected day is then attempted rather than being
-        // pre-emptively written off, and a day that genuinely cannot be
-        // replayed surfaces as a rebuild that changed nothing.
-        replayHorizon: () => null,
+        // Asked per erasure, never cached: a horizon read at boot would be
+        // months stale by the time an erasure uses it, and stale in the one
+        // direction that writes days off unasked.
+        replayHorizon: async ({ tenantIds }) =>
+          (await governanceEventLogHorizonRepository?.oldestEventByTenant({
+            tenantIds,
+          })) ?? new Map(),
       })
     : undefined;
 

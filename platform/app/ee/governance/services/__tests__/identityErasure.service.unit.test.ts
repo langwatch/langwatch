@@ -41,7 +41,8 @@ function buildService(
     person?: FakePerson | null;
     days?: { tenantId: string; day: string }[];
     tenants?: string[];
-    replayHorizon?: Date | null;
+    /** The oldest event the log still holds, per tenant. Absent = unknown. */
+    replayHorizon?: Record<string, Date>;
     /** How many times the ClickHouse delete throws before it starts working. */
     failDeleteTimes?: number;
     /** How many times the rebuild request throws before it starts working. */
@@ -80,6 +81,7 @@ function buildService(
     replayedSince?: string;
     replayedTenants?: string[];
     markedRebuildSince?: string | null;
+    horizonTenants?: string[];
   } = { suppressionHashes: [] };
 
   // Installed rather than injected: the service reaches the process's one
@@ -191,7 +193,16 @@ function buildService(
         }
       }),
     },
-    replayHorizon: () => overrides.replayHorizon ?? null,
+    replayHorizon: vi.fn(async ({ tenantIds }: { tenantIds: string[] }) => {
+      recorded.horizonTenants = tenantIds;
+      const horizons = new Map<string, Date>();
+      for (const [tenantId, oldest] of Object.entries(
+        overrides.replayHorizon ?? {},
+      )) {
+        if (tenantIds.includes(tenantId)) horizons.set(tenantId, oldest);
+      }
+      return horizons;
+    }),
     now: () => new Date("2026-09-02T00:00:00.000Z"),
   };
 
@@ -393,7 +404,9 @@ describe("given a provider-named person an organization has asked us to erase", 
           { tenantId: "project_gov_new", day: "2025-01-05" },
           { tenantId: "project_gov_new", day: "2026-08-20" },
         ],
-        replayHorizon: new Date("2026-06-01T00:00:00.000Z"),
+        replayHorizon: {
+          project_gov_new: new Date("2026-06-01T00:00:00.000Z"),
+        },
       });
 
       const outcome = await service.erase({
@@ -416,7 +429,9 @@ describe("given a provider-named person an organization has asked us to erase", 
     it("deletes the rows and does not ask for a replay that has nothing to read", async () => {
       const { service, deps } = buildService({
         days: [{ tenantId: "project_gov_new", day: "2025-01-05" }],
-        replayHorizon: new Date("2026-06-01T00:00:00.000Z"),
+        replayHorizon: {
+          project_gov_new: new Date("2026-06-01T00:00:00.000Z"),
+        },
       });
 
       const outcome = await service.erase({
@@ -427,6 +442,61 @@ describe("given a provider-named person an organization has asked us to erase", 
       expect(outcome.daysNotRebuilt).toHaveLength(1);
       expect(deps.replay.replaySince).not.toHaveBeenCalled();
       expect(deps.rollupErasure.deleteRowsCarryingActor).toHaveBeenCalled();
+    });
+  });
+
+  describe("when two areas' logs reach back to different days", () => {
+    /** @scenario "Each area is judged against how far its own log reaches" */
+    it("judges each area against its own log", async () => {
+      const { service, recorded } = buildService({
+        tenants: ["project_gov_new", "project_gov_old"],
+        days: [
+          { tenantId: "project_gov_new", day: "2026-03-10" },
+          { tenantId: "project_gov_old", day: "2026-03-10" },
+        ],
+        replayHorizon: {
+          // The same day is inside one area's log and gone from the other's.
+          project_gov_new: new Date("2026-01-01T00:00:00.000Z"),
+          project_gov_old: new Date("2026-06-01T00:00:00.000Z"),
+        },
+      });
+
+      const outcome = await service.erase({
+        organizationId: ORG,
+        discoveredPersonId: PERSON,
+      });
+
+      expect(outcome.daysNotRebuilt).toEqual([
+        { tenantId: "project_gov_old", day: "2026-03-10" },
+      ]);
+      // Asked about every area the organization has ever written under, not
+      // only the current one.
+      expect(recorded.horizonTenants).toEqual([
+        "project_gov_new",
+        "project_gov_old",
+      ]);
+    });
+  });
+
+  describe("when an area's log says nothing about how far back it reaches", () => {
+    /** @scenario "An area whose log cannot be read is retried, not written off" */
+    it("attempts every day rather than writing any off", async () => {
+      const { service, recorded } = buildService({
+        days: [
+          { tenantId: "project_gov_new", day: "2019-01-05" },
+          { tenantId: "project_gov_new", day: "2026-08-20" },
+        ],
+        // No entry for the tenant: the log holds nothing, or could not say.
+        replayHorizon: {},
+      });
+
+      const outcome = await service.erase({
+        organizationId: ORG,
+        discoveredPersonId: PERSON,
+      });
+
+      expect(outcome.daysNotRebuilt).toEqual([]);
+      expect(recorded.replayedSince).toBe("2019-01-05");
     });
   });
 

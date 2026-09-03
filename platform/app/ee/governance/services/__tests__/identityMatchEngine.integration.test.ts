@@ -88,7 +88,7 @@ const eraser = () =>
       deleteRowsCarryingActor: async () => {},
     } as never,
     replay: { replaySince: async () => {} },
-    replayHorizon: () => null,
+    replayHorizon: async () => new Map(),
     now: () => at,
   });
 
@@ -581,7 +581,7 @@ describe("Feature: the match engine, against the database that holds its rules",
           },
         } as never,
         replay: { replaySince: async () => {} },
-        replayHorizon: () => null,
+        replayHorizon: async () => new Map(),
         now: () => at,
       });
 
