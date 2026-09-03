@@ -2,7 +2,7 @@ import type { LinkProposalDirectoryPort } from "@langwatch/identity-server";
 import { createLogger } from "@langwatch/observability";
 import type { PrismaClient } from "~/generated/prisma/client";
 import { InviteService } from "~/server/invites/invite.service";
-import { betterAuthInstance } from "./better-auth-instance.adapter";
+import type { BetterAuthInstanceHandle } from "./better-auth-instance.adapter";
 import type {
   OperatorInvitationPort,
   OperatorSessionPort,
@@ -97,7 +97,12 @@ export class InviteServiceOperatorInvitations
 export class BetterAuthLinkProposalDirectory
   implements LinkProposalDirectoryPort
 {
-  constructor(private readonly prisma: PrismaClient) {}
+  constructor(
+    private readonly deps: {
+      prisma: PrismaClient;
+      auth: BetterAuthInstanceHandle;
+    },
+  ) {}
 
   async linkProviderAccount({
     userId,
@@ -112,8 +117,7 @@ export class BetterAuthLinkProposalDirectory
     normalizedEmail: string;
   }): Promise<void> {
     const issuer = await this.issuerFor({ connectionId, provider });
-    const betterAuth = await betterAuthInstance();
-    await betterAuth.$context.then((context) =>
+    await this.deps.auth.resolve().$context.then((context) =>
       context.internalAdapter.createAccount({
         userId,
         providerId: provider,
@@ -142,7 +146,7 @@ export class BetterAuthLinkProposalDirectory
     provider: string;
   }): Promise<string> {
     if (connectionId !== null) {
-      const connection = await this.prisma.ssoConnection.findUnique({
+      const connection = await this.deps.prisma.ssoConnection.findUnique({
         where: { id: connectionId },
         select: { idpMetadata: true },
       });

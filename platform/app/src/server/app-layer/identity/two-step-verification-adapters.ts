@@ -1,6 +1,6 @@
 import { IdentityMfaPasswordInvalidError } from "@langwatch/identity";
 import { handledErrorForBetterAuthCode } from "~/server/better-auth/handled-errors";
-import { betterAuthInstance } from "./better-auth-instance.adapter";
+import type { BetterAuthInstanceHandle } from "./better-auth-instance.adapter";
 import type { TwoStepProtocolPort } from "./two-step-verification.service";
 
 /**
@@ -22,6 +22,8 @@ import type { TwoStepProtocolPort } from "./two-step-verification.service";
  * generic unknown with a trace id, which is the doctrine and not a gap.
  */
 export class BetterAuthTwoStepProtocol implements TwoStepProtocolPort {
+  constructor(private readonly auth: BetterAuthInstanceHandle) {}
+
   async verifyCode({
     headers,
     code,
@@ -30,8 +32,7 @@ export class BetterAuthTwoStepProtocol implements TwoStepProtocolPort {
     code: string;
   }): Promise<void> {
     try {
-      const auth = await betterAuthInstance();
-      await auth.api.verifyTOTP({ body: { code }, headers });
+      await this.auth.resolve().api.verifyTOTP({ body: { code }, headers });
     } catch (error) {
       throw translated({
         error,
@@ -51,8 +52,7 @@ export class BetterAuthTwoStepProtocol implements TwoStepProtocolPort {
     password?: string;
   }): Promise<void> {
     try {
-      const auth = await betterAuthInstance();
-      await auth.api.disableTwoFactor({
+      await this.auth.resolve().api.disableTwoFactor({
         body: password ? { password } : {},
         headers,
       });

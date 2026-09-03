@@ -1,13 +1,7 @@
-import { describe, expect, it, vi } from "vitest";
-
+import { describe, expect, it } from "vitest";
+import type { PrismaClient } from "~/generated/prisma/client";
 import type { GuardParams } from "~/utils/dbGuardMiddleware";
 import { guardOrganizationId } from "~/utils/dbOrganizationIdProtection";
-
-// The adapter reaches the two-factor plugin for its protocol half, which has
-// no place in a test about a database read.
-vi.mock("~/server/better-auth", () => ({ auth: {} }));
-
-import type { PrismaClient } from "~/generated/prisma/client";
 import { PrismaTwoStepAccount } from "../two-step-account.adapter";
 
 /**

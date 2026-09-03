@@ -118,6 +118,13 @@ vi.mock(
     // ADR-129 slice 21a: better-auth's own composition-root reads, now
     // exhaustive on this Record too. Nothing in this suite reaches either.
     secondaryStorage: () => ({ configured: false, connection: () => null }),
+    betterAuthInstance: () => ({ provide: () => undefined }),
+    // ADR-129 slice 21b: the three satellite roots folded into the runtime.
+    identityLookup: () => ({}),
+    linkProposals: () => ({}),
+    scimOversight: () => ({}),
+    scimReconciliation: () => ({}),
+    twoStepVerification: () => ({}),
     PASSWORD_HASH_ROUNDS: 10,
     sessionRevocation: () => ({}),
     ssoRegisteredIssuers: () => ({}),

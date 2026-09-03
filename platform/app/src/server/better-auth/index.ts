@@ -4,6 +4,7 @@ import { betterAuth } from "better-auth";
 import { env } from "~/env.mjs";
 import {
   BACKUP_CODE_COUNT,
+  betterAuthInstance,
   databaseHooks as composeDatabaseHooks,
   secondaryStorage as composeSecondaryStorage,
   deploymentIsFederationCapable,
@@ -176,5 +177,10 @@ export const auth = betterAuth({
       passwordResetSessionBridge().signInAfterPasswordReset(ctx),
   }),
 });
+
+// The two identity adapters that call better-auth's own endpoints are handed
+// the instance from here, rather than importing this module: the boundary
+// depends on the composition root, never the reverse (ADR-129).
+betterAuthInstance().provide(auth);
 
 export type Auth = typeof auth;

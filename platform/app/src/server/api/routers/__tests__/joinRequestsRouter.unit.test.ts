@@ -50,6 +50,7 @@ vi.mock("~/server/app-layer/identity/runtime", () => ({
   // ADR-129 slice 21a: index.ts now composes better-auth's secondary storage
   // from this factory, and reads it EAGERLY at module load.
   secondaryStorage: () => ({ configured: false, connection: () => null }),
+  betterAuthInstance: () => ({ provide: () => undefined }),
   PASSWORD_HASH_ROUNDS: 10,
   passkeySignUp: () => ({}),
   ssoAssertion: () => ({}),

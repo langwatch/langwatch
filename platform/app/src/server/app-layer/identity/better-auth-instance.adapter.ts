@@ -1,26 +1,42 @@
 import type { Auth } from "~/server/better-auth";
 
 /**
- * The better-auth instance, resolved on the CALL rather than on the import.
+ * The better-auth instance, handed IN by the boundary rather than imported by
+ * the services.
  *
- * THIS DEFERRAL IS WHAT LETS THE COMPOSITION ROOT STAY ONE FILE. The two
- * adapters below it — the link-proposal directory and the two-step protocol —
- * reach better-auth's own endpoints, and `server/better-auth/index.ts` builds
- * its plugin list and its storage adapter AT MODULE LOAD out of `runtime.ts`'s
- * exports. A static edge from `runtime.ts` to those adapters would therefore
- * close a cycle that crashes whichever side is entered second: entering
- * `runtime.ts` first evaluates better-auth against a half-initialized module
- * and dies on `Cannot access 'identityStorage' before initialization`. That is
- * the cycle the three satellite `*-runtime.ts` files used to sidestep by
- * living outside `runtime.ts`; deferring the module edge to the first call
- * removes the cycle instead of routing around it, and by then both modules are
- * fully evaluated.
+ * Two adapters below the composition root — the link-proposal directory and
+ * the two-step protocol — call better-auth's own endpoints, and
+ * `server/better-auth/index.ts` builds its plugin list and its storage
+ * adapter out of `runtime.ts`'s exports at module load. A value import from
+ * the identity tree back to that module would therefore be a cycle that
+ * crashes whichever side is entered second (`Cannot access 'identityStorage'
+ * before initialization`). That cycle is what the three satellite
+ * `*-runtime.ts` files used to route around.
  *
- * It is the one deferred module edge in the identity tree, and it is
- * deliberate rather than convenient: nothing here is optional or expensive,
- * and the only thing being bought is evaluation ORDER.
+ * The dependency runs one way instead (ADR-129): the boundary depends on the
+ * services, never the reverse. The composition root constructs this handle
+ * and gives it to the two adapters; `better-auth/index.ts`, which already
+ * imports the composition root, fills it in the moment the instance exists.
+ * Nothing in the identity tree names the better-auth module as a value, so
+ * there is no cycle to hold together, and the composition root can be one
+ * file.
+ *
+ * Resolving before the boundary has loaded is a wiring fault, not a state to
+ * wait out, so it throws rather than returning a promise that never settles.
  */
-export const betterAuthInstance = async (): Promise<Auth> => {
-  const { auth } = await import("~/server/better-auth");
-  return auth;
-};
+export class BetterAuthInstanceHandle {
+  private instance: Auth | null = null;
+
+  provide(auth: Auth): void {
+    this.instance = auth;
+  }
+
+  resolve(): Auth {
+    if (this.instance === null) {
+      throw new Error(
+        "better-auth instance requested before server/better-auth/index.ts was loaded",
+      );
+    }
+    return this.instance;
+  }
+}

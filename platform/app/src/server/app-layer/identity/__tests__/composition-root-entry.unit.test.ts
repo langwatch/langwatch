@@ -12,10 +12,12 @@
  *
  * That asymmetry is why the operator lookup and two-step verification used to
  * be composed in satellite `*-runtime.ts` files. They are in `runtime.ts` now,
- * and what makes that safe is `better-auth-instance.adapter.ts` resolving the
- * instance on the CALL. This file is the proof, and it works by being the
- * import: the composition root is the first module this suite loads, which is
- * exactly the order that used to crash.
+ * and what makes that safe is the edge running the other way: the adapters
+ * hold a `BetterAuthInstanceHandle` that `better-auth/index.ts` fills, so the
+ * identity tree never names the better-auth module as a value. This file is
+ * the proof, and it works by being the import: the composition root is the
+ * first module this suite loads, which is exactly the order that used to
+ * crash.
  */
 import { describe, expect, it } from "vitest";
 import { identityStorageAdapter } from "../runtime";

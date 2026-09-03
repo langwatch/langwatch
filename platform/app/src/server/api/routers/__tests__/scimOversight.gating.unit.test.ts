@@ -87,6 +87,8 @@ vi.mock("~/server/app-layer/identity/runtime", () => {
     ...Object.fromEntries(factories.map((name) => [name, inert])),
     // The one factory this suite asserts about: the surface under test.
     scimOversight: () => mockService,
+    // index.ts hands the built instance to this holder at module load.
+    betterAuthInstance: () => ({ provide: () => undefined }),
     // Not inert, unlike its neighbours: `better-auth/index.ts` is on this
     // router's import graph and calls this at module load to build its
     // adapter. An empty object there fails the initialization, and because

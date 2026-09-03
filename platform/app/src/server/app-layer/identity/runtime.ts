@@ -91,6 +91,7 @@ import { grantsService } from "../authz/runtime";
 import { PrismaSystemMigrationStateRepository } from "../system-migrations/repositories/system-migration-state.prisma.repository";
 import { AccountIdentifiersService } from "./account-identifiers.service";
 import { buildAddressConfirmationUrl } from "./address-confirmation-link";
+import { BetterAuthInstanceHandle } from "./better-auth-instance.adapter";
 import { IdentityBirthService } from "./birth";
 import {
   LocalDoorBreakGlassBinding,
@@ -1298,15 +1299,26 @@ export function databaseHooks(): BetterAuthDatabaseHooks {
  * `~/server/better-auth`, and `~/server/better-auth` builds its plugin list
  * and its storage adapter out of THIS file at module load. A static edge from
  * here to those adapters closed that loop, and a loop between two modules that
- * both work at load time crashes whichever side is entered second. The edge is
- * deferred to the first call instead, in `better-auth-instance.adapter.ts`, so
- * the adapters carry no load-time dependency on better-auth and the
- * composition root can be one file again.
+ * both work at load time crashes whichever side is entered second. The edge
+ * now runs the other way: the boundary is HANDED the instance holder below and
+ * fills it once `betterAuth()` has returned, so nothing in this tree names the
+ * better-auth module as a value and the composition root can be one file.
  *
  * Everything here is composed PER CALL, like the write surfaces above: the
  * ledger writers resolve the pipeline handle lazily, so a service built before
  * the App exists still appends once one does.
  */
+
+/**
+ * The one better-auth instance, as the two adapters below reach it. Filled by
+ * `server/better-auth/index.ts` the moment the instance exists; resolving it
+ * earlier is a wiring fault and throws (`better-auth-instance.adapter.ts`).
+ */
+const betterAuthHandle = new BetterAuthInstanceHandle();
+
+export function betterAuthInstance(): BetterAuthInstanceHandle {
+  return betterAuthHandle;
+}
 
 /**
  * The proposal log, read. One instance: it holds no request state, and its
@@ -1329,7 +1341,10 @@ export function linkProposals(): LinkProposalService {
       projectionStore: identityProjectionStore(),
     }),
     proposals: identityLinkProposalLog,
-    directory: new BetterAuthLinkProposalDirectory(prisma),
+    directory: new BetterAuthLinkProposalDirectory({
+      prisma,
+      auth: betterAuthHandle,
+    }),
   });
 }
 
@@ -1396,13 +1411,13 @@ export function scimOversight(): ScimOversightService {
  * The account side of two-step verification, composed (D06).
  *
  * It reaches the two-factor plugin's endpoints, which live on the better-auth
- * instance — the second of the two compositions the deferred handle above
+ * instance — the second of the two compositions the instance holder above
  * exists for.
  */
 export function twoStepVerification(): TwoStepVerificationService {
   return new TwoStepVerificationService({
     account: new PrismaTwoStepAccount(prisma),
-    protocol: new BetterAuthTwoStepProtocol(),
+    protocol: new BetterAuthTwoStepProtocol(betterAuthHandle),
     offered: deploymentOffersTwoStepVerification,
   });
 }
