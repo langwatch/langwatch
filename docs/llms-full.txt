@@ -39756,7 +39756,7 @@ The Python and TypeScript SDKs, the CLI, the MCP server and the REST API list, c
 # FILE: ./datasets/programmatic-access.mdx
 
 ---
-title: "Datasets: programmatic access from the SDKs, the CLI and the MCP server"
+title: "Datasets: programmatic access from the SDKs, CLI and MCP server"
 sidebarTitle: Programmatic Access
 description: Manage datasets from the Python and TypeScript SDKs, the CLI and the MCP server for offline evaluations and automated workflows.
 ---
@@ -46244,7 +46244,7 @@ See [CI/CD Integration](/evaluations/experiments/ci-cd) for complete examples wi
 # FILE: ./evaluations/experiments/ui/answer-correctness.mdx
 
 ---
-title: "Answer Correctness: check that your LLM answers match the expected output"
+title: "Answer Correctness: check LLM answers against the expected output"
 sidebarTitle: Answer Correctness
 description: Score every answer against the expected output in your dataset with the Exact Match or the LLM Answer Match evaluator, and compare runs as you change the prompt.
 ---
@@ -46350,7 +46350,7 @@ Each saved prompt version is what your application loads through the [prompt lib
 # FILE: ./evaluations/experiments/ui/llm-as-a-judge.mdx
 
 ---
-title: "LLM-as-a-Judge: score outputs against written criteria when there are no expected answers"
+title: "LLM-as-a-Judge: score outputs on criteria without expected answers"
 sidebarTitle: LLM-as-a-Judge
 description: Score outputs against written criteria with an LLM-as-a-Judge evaluator when your dataset has inputs but no expected answers, and read the reason behind each verdict.
 ---
@@ -46439,9 +46439,9 @@ Change the prompt, click **Run** again, then open **Results** and tick both runs
 # FILE: ./evaluations/experiments/ui/pairwise-compare.mdx
 
 ---
-title: "Pairwise Comparison: judge prompts, models or agents head-to-head and rank them on a Bradley-Terry leaderboard"
+title: "Pairwise Comparison: judge prompts, models or agents head-to-head"
 sidebarTitle: Comparison
-description: Use the Comparison evaluator to judge two or more candidate outputs against each other, with built-in position-bias mitigation, and read the leaderboard when you compare three or more.
+description: Use the Comparison evaluator to judge two or more candidate outputs against each other, with built-in position-bias mitigation, and rank three or more candidates on a Bradley-Terry leaderboard.
 ---
 
 **Comparison** is an evaluator that shows an LLM judge every candidate output for the same dataset row and asks which one is best, or whether it is a tie. The result is a per-row verdict naming the winning candidate, a win-rate chart across the run, and, from three candidates upward, a Bradley-Terry leaderboard that ranks the candidates and states whether the run separates them.
