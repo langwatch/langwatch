@@ -273,6 +273,50 @@ Feature: Langy's worker-side delete gate
       # (`cp foo.{js,ts}`) never reach the pass.
 
     @unit
+    Scenario: A single-element or enumerated range brace that reassembles a destructive verb is held
+      Given a langwatch command whose argument carries a `..` range brace that
+        bash expands into a destructive verb — a single-element range
+        (`del{e..e}te` -> `delete`, `pur{g..g}e` -> `purge`) or several in one
+        word (`d{e..e}l{e..e}te` -> `delete`)
+      When the spliced command is run as a gated bash command
+      Then the gate returns allow:false
+      # bash collapses `{e..e}` to `e`, so the range unmasks a verb the old
+      # brace-strip (`dele..ete`, not a verb) missed. The pass enumerates ranges
+      # bash-faithfully and holds fail-closed, even with a valid confirmation.
+
+    @unit
+    Scenario: A brace expansion exceeding the enumeration budget is held quickly
+      Given a langwatch command whose argument would brace-expand to more results
+        or more groups than the enumeration budget (an adversarial `{a,...,j}`
+        glued eight times), or names an unenumerable or mismatched range (`{a..3}`)
+      When the command is run as a gated bash command
+      Then the gate returns allow:false
+      And it returns quickly, without materialising the full cartesian product
+      # The budget (result count and group count) is checked before the product
+      # is built, so 10^8 combos cannot exhaust the worker; over budget or
+      # unenumerable is held, never brace-stripped.
+
+    @unit
+    Scenario: An escaped or quoted brace that bash leaves literal is not over-blocked
+      Given a langwatch or ordinary command whose brace group is suppressed by a
+        backslash-escaped comma (`dele{\,}te`, `a{\,}b`) or by quoting, which
+        bash leaves literal with no expansion
+      When the command is run as a gated bash command
+      Then the gate returns allow:true
+      # An escaped or quoted comma is not a brace-expansion separator, so the
+      # group never reassembles a verb; over-holding it is an over-block on
+      # routine use. Benign langwatch ranges (`--limit {1..3}`) likewise pass.
+
+    @unit
+    Scenario: The brace expander matches real bash for every handled brace form
+      Given each brace form the expander handles (comma list, empty alternative,
+        nested, integer range, letter range, reverse range, degenerate range,
+        escaped brace or comma, quoted brace)
+      When the word is expanded by the gate and by real "bash -c 'printf %s'"
+      Then the two produce the same set of words, except where the gate holds
+        fail-closed by design (budget, unenumerable range), which is documented
+
+    @unit
     Scenario: An awk program that concatenates a destructive command through system() is held
       Given an awk, gawk, or mawk program that builds "langwatch" at runtime by
         string concatenation inside system()
@@ -449,7 +493,7 @@ Feature: Langy's worker-side delete gate
 # AC 10: "Read-only langwatch calls pass" -> Scenario Outline: Read-only langwatch CLI calls pass without confirmation; Scenario: A quoted or escaped argument is not over-blocked, even with word-internal splices; Scenario: Routine brace expansion in a non-langwatch command is not over-blocked; Scenario: An escaped double-quote inside a double-quoted word is parsed as one argument, not held; Scenario: An unquoted shell comment does not make a command unparseable
 # AC 11: "Non-langwatch bash passes" -> Scenario Outline: Non-langwatch bash commands pass without confirmation
 # AC 12: "Block reason is actionable" -> Scenario: A block reason for an unconfirmed delete tells the agent to ask first; Scenario: A block reason for an unresolvable command tells the agent how to re-issue it; Scenario: An obfuscated command-name block names the obfuscation and says to re-issue the name plainly; Scenario: A destructive HTTP block tells the agent to re-issue through the CLI, not to confirm
-# AC 13: "Write-then-execute is held unconditionally" -> Scenario: A write or edit whose content contains a destructive command is held; Scenario Outline: Executing an agent-written file is held even with a valid confirmation; Scenario: A bash native quote-splice that reassembles the CLI name is held; Scenario: A backslash- or brace-spliced command name that reassembles the CLI name is held; Scenario: A brace-expansion splice that reassembles a destructive verb or resource is held; Scenario: An awk program that concatenates a destructive command through system() is held
+# AC 13: "Write-then-execute is held unconditionally" -> Scenario: A write or edit whose content contains a destructive command is held; Scenario Outline: Executing an agent-written file is held even with a valid confirmation; Scenario: A bash native quote-splice that reassembles the CLI name is held; Scenario: A backslash- or brace-spliced command name that reassembles the CLI name is held; Scenario: A brace-expansion splice that reassembles a destructive verb or resource is held; Scenario: A single-element or enumerated range brace that reassembles a destructive verb is held; Scenario: A brace expansion exceeding the enumeration budget is held quickly; Scenario: An escaped or quoted brace that bash leaves literal is not over-blocked; Scenario: The brace expander matches real bash for every handled brace form; Scenario: An awk program that concatenates a destructive command through system() is held
 # AC 14: "Destructive HTTP beyond literal DELETE is held" -> Scenario: A POST GraphQL delete or archive mutation...; Scenario: A PUT or PATCH soft-delete...; Scenario: A POST to a destructive action endpoint...; Scenario: A destructive HTTP block tells the agent to re-issue through the CLI, not to confirm; Scenario Outline: Each unconfirmed bypass class is blocked at the real tool_call seam (HTTP-shape delete case)
 # AC 15: "Benign HTTP to a langwatch host is NOT over-blocked" -> Scenario: A GET request to a langwatch host is not blocked; Scenario: A read or non-destructive GraphQL POST to a langwatch host is not blocked
 # AC 16: "Equals-form flag values are evaluated" -> Scenario: An equals-form flag value carrying a destructive verb is matched; Scenario Outline: Each unconfirmed bypass class is blocked at the real tool_call seam (equals-form case)

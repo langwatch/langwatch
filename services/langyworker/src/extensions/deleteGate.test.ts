@@ -1,6 +1,8 @@
+import { execFileSync } from "node:child_process";
 import { describe, expect, it } from "vitest";
 import { evaluateToolCall } from "./deleteGate.js";
 import {
+  bashBraceExpand,
   CODE_INTERPRETERS,
   findDestructiveMatches,
 } from "./deleteGateMatcher.js";
@@ -418,6 +420,158 @@ describe("Brace-expansion splice in argument position (Item 1)", () => {
     ]) {
       expect(bash(command).allow, command).toBe(true);
     }
+  });
+});
+
+describe("Brace range collapse in argument position (Finding 1)", () => {
+  /** @scenario A single-element or enumerated range brace that reassembles a destructive verb is held */
+  it("holds a langwatch argument whose range brace bash expands into a destructive verb", () => {
+    // bash collapses a single-element range: `del{e..e}te` -> `delete`,
+    // `pur{g..g}e` -> `purge`, `d{e..e}l{e..e}te` -> `delete`. The old pass
+    // brace-stripped ranges (`dele..ete`, not a verb) and waved these through —
+    // the CRITICAL bypass. The range is now enumerated bash-faithfully and held.
+    for (const command of [
+      "langwatch dataset del{e..e}te d1",
+      "langwatch dataset pur{g..g}e d1",
+      "langwatch dataset d{e..e}l{e..e}te d1",
+    ]) {
+      expect(bash(command).allow, command).toBe(false);
+      expect(bash(command, confirmedForD1).allow, command).toBe(false);
+      expect(findDestructiveMatches(command), command).toContainEqual(
+        expect.objectContaining({ kind: "unparseable" }),
+      );
+    }
+  });
+
+  /** @scenario An escaped or quoted brace that bash leaves literal is not over-blocked */
+  it("does not over-block a benign langwatch range whose expansions are not verbs or resources", () => {
+    // A range that enumerates within budget but reassembles nothing destructive
+    // must pass — over-holding it is the over-block that gets the gate disabled.
+    for (const command of [
+      "langwatch dataset list --limit {1..3}",
+      "langwatch dataset list --tag item{a..c}",
+    ]) {
+      expect(bash(command).allow, command).toBe(true);
+    }
+  });
+});
+
+describe("Brace-expansion budget (Finding 2)", () => {
+  /** @scenario A brace expansion exceeding the enumeration budget is held quickly */
+  it("holds an over-budget brace expansion in well under the unbudgeted blow-up time", () => {
+    // Eight ten-alternative groups glued into one word is 10^8 combos, measured
+    // at 6.3s / 710MB unbudgeted. The budget is counted before the product is
+    // built, so this must resolve to a hold near-instantly.
+    const glued = "{a,b,c,d,e,f,g,h,i,j}".repeat(8);
+    const command = `langwatch dataset ${glued}`;
+    const start = performance.now();
+    const decision = bash(command);
+    const elapsedMs = performance.now() - start;
+    expect(decision.allow).toBe(false);
+    expect(elapsedMs).toBeLessThan(500);
+    // The classifier attributes it to the budget cause (falls back to the
+    // generic re-issue reason, which is fine).
+    expect(findDestructiveMatches(command)).toContainEqual(
+      expect.objectContaining({ kind: "unparseable", cause: "brace-expansion-budget" }),
+    );
+  });
+
+  /** @scenario A brace expansion exceeding the enumeration budget is held quickly */
+  it("holds an unenumerable or mismatched range instead of brace-stripping it", () => {
+    // bash leaves a mismatched range literal (`{a..3}`); the gate holds it —
+    // an over-block reachable only on a langwatch argument, the safe direction.
+    for (const command of [
+      "langwatch dataset item{a..3} d1",
+      "langwatch dataset item{1..a} d1",
+    ]) {
+      expect(bash(command).allow, command).toBe(false);
+      expect(findDestructiveMatches(command), command).toContainEqual(
+        expect.objectContaining({ kind: "unparseable", cause: "brace-expansion-budget" }),
+      );
+    }
+  });
+});
+
+describe("Escaped-comma brace suppression (cleanup)", () => {
+  /** @scenario An escaped or quoted brace that bash leaves literal is not over-blocked */
+  it("does not over-hold a brace whose comma is backslash-escaped or quoted", () => {
+    // bash: `dele{\,}te` -> `dele{,}te` (the escaped comma is not a separator,
+    // so no expansion); the old lexer dropped the backslash before brace
+    // detection and over-held. Escaped/quoted braces must now pass.
+    for (const command of [
+      "echo dele{\\,}te",
+      "langwatch dataset list dele{\\,}te",
+      "langwatch dataset list --tag 'a{\\,}b'",
+    ]) {
+      expect(bash(command).allow, command).toBe(true);
+    }
+    // The unescaped comma form still expands to a verb and is still held.
+    expect(bash("langwatch dataset dele{,}te d1").allow).toBe(false);
+  });
+});
+
+describe("Brace expander parity with real bash (meta-requirement)", () => {
+  /** Run real bash and collect the words it produces from one brace token.
+   * printf emits one arg per line; the trailing newline yields a final empty
+   * element we drop. bash also drops empty expansions by word splitting, so the
+   * result is the set of non-empty words. */
+  function bashExpand(word: string): string[] {
+    const out = execFileSync("bash", ["-c", `printf '%s\\n' ${word}`], { encoding: "utf8" });
+    const lines = out.split("\n");
+    if (lines.length > 0 && lines[lines.length - 1] === "") lines.pop();
+    return lines;
+  }
+
+  const nonEmpty = (words: string[]) => words.filter((w) => w.length > 0);
+
+  /** @scenario The brace expander matches real bash for every handled brace form */
+  it("produces the same word set as bash for every enumerating brace form", () => {
+    // Table-driven: each row is one brace form. bash is the oracle; the gate's
+    // expander must produce the same SET of non-empty words. Empty alternatives
+    // (`{,delete,}`) yield empty strings in the expander that bash drops by word
+    // splitting, so both sides compare on the non-empty set.
+    const cases: { word: string; form: string }[] = [
+      { word: "dele{,}te", form: "empty alternative" },
+      { word: "{,delete,}", form: "empty alternatives (leading/trailing)" },
+      { word: "data{set,}", form: "comma list with empty" },
+      { word: "d{el,}ete", form: "comma list" },
+      { word: "x{a,b}{c,d}y", form: "adjacent comma groups" },
+      { word: "{a,b,{c,d}}", form: "nested comma group" },
+      { word: "del{e..e}te", form: "degenerate range" },
+      { word: "pur{g..g}e", form: "degenerate range" },
+      { word: "del{a..e}te", form: "letter range" },
+      { word: "{1..3}", form: "integer range" },
+      { word: "{3..1}", form: "reverse integer range" },
+      { word: "{2..2}", form: "degenerate integer range" },
+      { word: "{01..03}", form: "zero-padded integer range" },
+      { word: "{a..e}", form: "letter range" },
+      { word: "{e..a}", form: "reverse letter range" },
+      // Escaped/quoted braces bash leaves literal; the expander must match that
+      // literal exactly (not hold, not expand).
+      { word: "dele{\\,}te", form: "escaped comma (bash leaves literal)" },
+      { word: "a{\\,}b", form: "escaped comma (bash leaves literal)" },
+    ];
+    for (const { word, form } of cases) {
+      const expander = bashBraceExpand(word);
+      expect(expander, `${form}: ${word} expected enumeration, got hold`).not.toBeNull();
+      expect(new Set(nonEmpty(expander ?? [])), `${form}: ${word}`).toEqual(
+        new Set(nonEmpty(bashExpand(word))),
+      );
+    }
+  });
+
+  /** @scenario The brace expander matches real bash for every handled brace form */
+  it("holds fail-closed where it deliberately diverges from bash (budget, unenumerable range)", () => {
+    // Documented divergences from bash, all fail-closed (never brace-strip):
+    //  - a mismatched range bash leaves literal, the gate holds (returns null);
+    //  - an over-budget expansion bash would enumerate (10^8), the gate holds.
+    // Verify bash's literal-passthrough on the mismatched cases, then the hold.
+    for (const word of ["{a..3}", "{1..a}"]) {
+      expect(bashExpand(word)).toEqual([word]); // bash: literal, no expansion
+      expect(bashBraceExpand(word), word).toBeNull(); // gate: fail-closed hold
+    }
+    // Over budget: do NOT run bash (10^8 combos would hang). Gate holds.
+    expect(bashBraceExpand("{a,b,c,d,e,f,g,h,i,j}".repeat(8))).toBeNull();
   });
 });
 
