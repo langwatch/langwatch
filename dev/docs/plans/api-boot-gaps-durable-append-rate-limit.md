@@ -662,18 +662,19 @@ BEFORE                                    AFTER
 | new: `.../adapters/__tests__/join-request-ledger.adapter.unit.test.ts` | Six tests; the writer had none at all |
 | `specs/server/api-process-eventing.feature` | The join-request scenario said "the request's facts are appended before the call returns". It now says staged, and that this process appends nothing |
 
-### 3. SCIM directory-sync history: the writer is corrected, one registration is not
+### 3. SCIM directory-sync history: the writer is corrected, and so is the registration
 
 `ScimSyncLedgerWriter` had the same append-then-stage shape and the same
 guaranteed failure, swallowed at `error` as "could not record a directory sync
 fact". It now stages only.
 
-That does **not** restore the history on its own, and the reason is now the only
-one left: `apps/api` registers `identity`, `join-requests` and `sso-connections`
-producer-only and **not** `scim-sync`, so there is no sender to stage through.
-The writer therefore says exactly that, at `error`, naming the pipeline and the
-command, and lets the push through — the package's rule that a push must never
-fail for its bookkeeping is unchanged.
+That did **not** restore the history on its own. `apps/api` registered
+`identity`, `join-requests` and `sso-connections` producer-only and **not**
+`scim-sync`, so there was no sender to stage through: the writer said exactly
+that, at `error`, naming the pipeline and the command, and let the push
+through — the package's rule that a push must never fail for its bookkeeping is
+unchanged. That fourth registration has since landed; the closure is recorded
+below, together with the one thing it turned out not to reach.
 
 | File | What changed |
 | --- | --- |
@@ -681,29 +682,53 @@ fail for its bookkeeping is unchanged.
 | `apps/api/src/app/api-scim.composition.ts` | Its docblock explained the loss as a missing durable append. It now names the missing registration, and says the worker's consumer side is already there |
 | new: `.../adapters/__tests__/eventing.scim-sync-ledger.adapter.unit.test.ts` | Five tests: it stages on the registered sender, it resolves the sender by the verb, it lets the push through when there is none, and it logs the loss at `error` with the pipeline and sender named |
 
-**The exact remaining piece, and it is one registration:**
+**The remaining registration landed — 2026-09-03.** All four steps, exactly as
+scoped above:
 
-1. `packages/identity-eventing/src/adapters/producer.identity-pipelines.adapter.ts`
-   — add `createScimSyncProducerPipeline({ processName })`, the fourth sibling of
-   the three already there: `createScimSyncPipeline` with a
-   `ProducerOnlyStateProjectionStore<ScimSyncFoldState>` and
-   `new ScimSyncGuards({ syncs: producerOnlyReads<ScimSyncReadRepository>(…) })`.
-   No process manager to decline — `scim-sync` declares none.
-2. Export it from `packages/identity-eventing/src/index.ts`, beside the other
-   three.
-3. `apps/api/src/app/api-identity-pipelines.composition.ts` — a fourth
-   `senders.set(SCIM_SYNC_PIPELINE_NAME, resolveSenders({…}))` with the five
-   command names (`issueScimToken`, `recordScimUserPush`,
-   `recordScimGroupMapping`, `recordScimApplyFailure`, `revokeScimSync`).
-4. `packages/identity-eventing/src/adapters/__tests__/producer.identity-pipelines.adapter.unit.test.ts`
-   — the fourth case.
+| File | What changed |
+| --- | --- |
+| `packages/identity-eventing/src/adapters/producer.identity-pipelines.adapter.ts` | `createScimSyncProducerPipeline({ processName })`, the fourth sibling: `createScimSyncPipeline` over a `ProducerOnlyStateProjectionStore<ScimSyncFoldState>` and `ScimSyncGuards` over `producerOnlyReads<ScimSyncReadRepository>`. No process manager to decline — `scim-sync` declares none, because a push is the DIRECTORY's to retry |
+| `packages/identity-eventing/src/index.ts` | exported beside the other three |
+| `apps/api/src/app/api-identity-pipelines.composition.ts` | the fourth `senders.set(SCIM_SYNC_PIPELINE_NAME, …)` over the five verbs, listed as `SCIM_SYNC_COMMAND_NAMES` so a definition that dropped one fails this process's boot rather than one provider's nightly run |
+| `packages/identity-eventing/src/adapters/__tests__/producer.identity-pipelines.adapter.unit.test.ts` | the fourth case, twice over: the five command names equal the Postgres composition's, and the directory-sync head refuses by name |
+| `apps/api/src/features/enterprise/__tests__/scim-rest.integration.test.ts` | four new tests over the REAL composed graph — `EventStoreProducerOnly` + `composeApiIdentityPipelines` + `ApiEventingIdentityAdapter` + `composeApiScimRest` — driven with the mounted Hono app beside them |
+| `specs/server/api-process-eventing.feature` | two `@integration` scenarios, both bound (`8/8 · ✓ all bound`) |
 
-The consumer side needs nothing: `ScimSyncWorkerFeatureInstaller` is registered
-**unconditionally** at `apps/worker/src/app/worker-production.composition.ts:1382`
-and `scim-sync` is in the checked-in `job-registry.json`, so a staged command has
-a drain the moment a sender exists. Steps 1, 2 and 4 are in
-`packages/identity-eventing`, which was outside this lane; step 3 is not, but
-alone it does nothing.
+Sabotage-checked: deleting the fourth `senders.set` fails the staging test and
+the per-verb sender test, and leaves the eleven that were green before green.
+
+The consumer side needed nothing, as expected: `ScimSyncWorkerFeatureInstaller`
+is registered **unconditionally** and `apps/worker`'s own composition test
+already asserts `registeredThrough(composition, "scim-sync")`, so no worker
+change and no worker assertion was missing.
+
+**What the registration does NOT reach, and this was not known when the step
+was scoped.** The fifteen protocol routes never state a directory-sync fact,
+before this change or after it, and the reason is upstream of the ledger:
+`ScimService.verifyToken` answers the token's `connectionId`
+(`scim.service.ts:190-196`) and `scimAuth` keeps only the organization
+(`scim-protocol.api.ts:89`), so every `createUser` / `replaceUser` /
+`updateUser` / `deleteUser` / `createGroup` the door calls carries no
+connection — and `recordUserPush` returns on `if (!input.connectionId)`
+(`scim.service.ts:396`). The Auth0 intake is the same. A directory-sync fact is
+stated PER CONNECTION, so the callers whose history the registration restores
+are the ones that pass one: the token mint (`issueScimToken`), the revoke and
+the connection teardown (`revokeScimSync`), plus anything reaching the service
+directly.
+
+`specs/identity/scim-connection-sync.feature` already carries this as
+`@unimplemented` — "One connection's token cannot touch another connection's
+people" — and closing it is a WRITE-AUTHORITY change, not a wiring one: with a
+connection in hand `deleteUser` and `updateUser` begin calling
+`identities.assertWritable`, and `createUser` begins mapping external ids, so a
+customer whose people were mapped without a connection would start seeing
+refusals. It is not smuggled in beside a registration. The integration suite
+pins the current behaviour with a characterization test that says so, and
+`api-scim.composition.ts`'s docblock names it.
+
+So the plan's earlier "every enterprise SCIM push loses its directory-sync
+history fact" was too broad: every push that CARRIES A CONNECTION lost it, and
+the protocol routes carry none.
 
 Two contradicting docblocks are corrected either way:
 `api-identity-pipelines.composition.ts` no longer claims "nothing on this process

@@ -39,30 +39,33 @@
  * replaces — an identity provider's nightly provisioning run would see fifteen
  * endpoints answering 500 and retry them forever.
  *
- * ## The directory-sync history degrades, and this is why
+ * ## The directory-sync history, and where each half of it runs
  *
  * `ScimSyncLifecycle` states what a push did on the connection's `ScimSync`
  * aggregate. Its guards are REAL here — they read the Postgres projection head
  * this process's connection already holds — and so is the ledger writer, which
- * stages its command and lets the queued run append (ADR-110). What this
- * process does not do is REGISTER `scim-sync` on its eventing, so there is no
- * sender to stage through: the writer says so at `error`, naming the missing
- * pipeline, and lets the push through. Every directory-sync fact is therefore
- * lost on this deployment for as long as that holds — not transiently, and not
- * because an event stack is down.
+ * stages its command and lets the queued run append (ADR-110). The sender it
+ * stages through is this process's own `scim-sync` registration, the fourth in
+ * `api-identity-pipelines.composition.ts`; the worker registers and drains the
+ * consumer side unconditionally (`ScimSyncWorkerFeatureInstaller`), so a staged
+ * command has a drain the moment it lands.
  *
- * That is a smaller and sharper absence than the one this docblock used to
- * name. The writer no longer attempts a durable append it could never
- * complete; what is left is one registration. The worker already registers and
- * drains the consumer side unconditionally
- * (`ScimSyncWorkerFeatureInstaller`), so closing it means adding a producer
- * variant of the directory-sync pipeline beside the three
- * `api-identity-pipelines.composition.ts` registers.
+ * A deployment that composed no queue still has no sender, and there the
+ * writer says so at `error` — naming the pipeline and the verb — and lets the
+ * push through. That degradation is deliberate: what the customer is owed is
+ * the membership consequence, which travels the grants ledger and is durable
+ * before the history is attempted, and refusing an identity provider's push
+ * over our own bookkeeping would turn an event-stack problem into a directory
+ * outage. Supplying a hand-written no-op ledger instead would hide the same
+ * fact behind a stub that never says anything at all.
  *
- * What the customer is owed either way is the membership consequence, which
- * travels the grants ledger and is durable before the history is attempted.
- * Supplying a hand-written no-op ledger instead would hide the same fact
- * behind a stub that starts lying the day the registration lands.
+ * One thing this registration does NOT reach: the fifteen protocol routes.
+ * `verifyToken` answers the token's `connectionId` and the protocol door keeps
+ * only the organization, so a push arriving there carries no connection and a
+ * directory-sync fact is stated per connection. Every caller that passes one —
+ * the token mint, the revoke, the connection teardown — records its history
+ * now. See `specs/identity/scim-connection-sync.feature`, where the connection
+ * binding of a protocol push is still `@unimplemented`.
  */
 import type { AuthService } from "@langwatch/auth-contract";
 import type { AuthzGrantsService } from "@langwatch/authz-contract";

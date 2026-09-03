@@ -82,6 +82,26 @@ Feature: The standalone API process dispatches commands and consumes none
       When the API process composes its identity pipelines
       Then it registers none, and every ledger refuses by name rather than dropping the write
 
+    # The directory-sync ledger is the one that does NOT throw on an absent
+    # sender: a push is an identity provider's HTTP request, and refusing it
+    # because our bookkeeping could not be written would turn an event-stack
+    # problem into a directory outage. So the loss is swallowed — and the
+    # swallow is why the registration has to be asserted somewhere else.
+
+    @integration
+    Scenario: A directory push's history lands on this process's own event stack
+      Given the API process registered the identity pipelines producer-only
+      When an Enterprise directory pushes a person on a connection it holds a token for
+      Then the directory-sync command is staged on the sender the registration produced
+      And nothing reports a missing sender, because this process registers that pipeline
+
+    @integration
+    Scenario: A process with no queue loses the directory-sync history loudly
+      Given the deployment configured no Redis
+      When an Enterprise directory pushes a person
+      Then the push itself succeeds, because a history is never worth refusing a push for
+      And the loss is recorded at error, naming the pipeline and the sender that are missing
+
   Rule: Dispatch is released before the connection under it
 
     @unit

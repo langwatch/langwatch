@@ -1,9 +1,10 @@
 /**
- * The three identity pipelines this process PRODUCES commands on.
+ * The four identity pipelines this process PRODUCES commands on.
  *
  *   identity          a person's thirteen identifier and two-step writes
  *   join-requests     the five verbs a join request has
  *   sso-connections   the fourteen a federated connection has
+ *   scim-sync         the five an Enterprise directory's push states
  *
  * ## Why this file exists
  *
@@ -44,7 +45,7 @@
  *
  * ## Nothing is appended here, and that is the design
  *
- * All three ledgers STAGE and stop (ADR-110, ADR-116): the queued run re-runs
+ * All four ledgers STAGE and stop (ADR-110, ADR-116): the queued run re-runs
  * the same guard the calling path ran and appends what it decides, so the
  * calling path appending as well would write every fact twice. That is why a
  * producer needs no event log — not a gap it is missing one. This process's
@@ -56,25 +57,34 @@
  * unhandled `ConfigurationError` — a generic "unknown error" for a request the
  * worker could serve. It stages now, like its three siblings.
  *
- * ## `scim-sync` is NOT registered, and that costs something
+ * `ScimSyncLedgerWriter` took the same correction, and its swallow is the one
+ * difference between them: a directory's push must never fail because its
+ * history could not be written, so a loss there is logged rather than raised.
  *
- * `api-scim.composition.ts` DOES compose `ScimSyncLedgerWriter` — on every
- * deployment holding the Enterprise application — so this registration's
- * absence is the reason a directory push records no history: the writer stages
- * a command for which this process publishes no sender, says so at `error` by
- * name, and lets the push through. Closing it needs a producer variant of the
- * directory-sync pipeline in `@langwatch/identity-eventing`, beside the three
- * below; the worker already registers and drains the consumer side
- * (`ScimSyncWorkerFeatureInstaller`, unconditional).
+ * ## `scim-sync` is registered here too, and that is what keeps the history
+ *
+ * `api-scim.composition.ts` composes `ScimSyncLedgerWriter` on every deployment
+ * holding the Enterprise application, and this registration is the sender it
+ * stages through. Without it the writer had nowhere to stage: it said so at
+ * `error`, named the pipeline, and let the push through — so a directory's
+ * history was lost permanently rather than transiently.
+ *
+ * It is the ONE of the four that declares no process manager and needs none
+ * declined: a push is the DIRECTORY's to retry on its own schedule, so the
+ * aggregate keeps no wake of its own. The worker registers and drains the
+ * consumer side unconditionally (`ScimSyncWorkerFeatureInstaller`), so a
+ * command staged here has a drain the moment it lands.
  */
 import type { EventSourcing } from "@langwatch/eventing";
 import type { Logger } from "@langwatch/observability";
 import {
   createIdentityProducerPipeline,
   createJoinRequestProducerPipeline,
+  createScimSyncProducerPipeline,
   createSsoConnectionProducerPipeline,
   IDENTITY_PIPELINE_NAME,
   JOIN_REQUEST_PIPELINE_NAME,
+  SCIM_SYNC_PIPELINE_NAME,
   SSO_CONNECTION_PIPELINE_NAME,
 } from "@langwatch/identity-eventing";
 
@@ -89,7 +99,8 @@ const isSender = (value: unknown): value is ApiIdentityCommandSender =>
 /** Reports the composition decisions an absent queue would otherwise hide. */
 export abstract class ApiIdentityPipelinesAbsenceReport {
   /**
-   * No Eventing: every identity, join-request and connection write refuses.
+   * No Eventing: every identity, join-request, connection and directory-sync
+   * write refuses.
    *
    * Named rather than silent because an absent sender is never "nothing
    * happened": each ledger stages, and a staged command with no sender THROWS
@@ -101,7 +112,7 @@ export abstract class ApiIdentityPipelinesAbsenceReport {
 
 export type ApiIdentityPipelinesOptions = Readonly<{
   /**
-   * The producer-only eventing runtime the three definitions are registered
+   * The producer-only eventing runtime the four definitions are registered
    * on, or `undefined` where this process composed no queue.
    */
   eventing: EventSourcing | undefined;
@@ -141,7 +152,7 @@ export class ApiIdentityPipelines {
 }
 
 /**
- * Registers the three definitions producer-only and resolves their senders.
+ * Registers the four definitions producer-only and resolves their senders.
  *
  * With no Eventing the registry is empty and every write refuses BY NAME
  * through the ledger that asked, which is the behaviour a deployment with no
@@ -179,6 +190,14 @@ export function composeApiIdentityPipelines(
       pipeline: SSO_CONNECTION_PIPELINE_NAME,
       registered: eventing.register(createSsoConnectionProducerPipeline({ processName })),
       expected: SSO_CONNECTION_COMMAND_NAMES,
+    }),
+  );
+  senders.set(
+    SCIM_SYNC_PIPELINE_NAME,
+    resolveSenders({
+      pipeline: SCIM_SYNC_PIPELINE_NAME,
+      registered: eventing.register(createScimSyncProducerPipeline({ processName })),
+      expected: SCIM_SYNC_COMMAND_NAMES,
     }),
   );
 
@@ -245,6 +264,21 @@ const JOIN_REQUEST_COMMAND_NAMES = [
   "expireJoin",
 ] as const;
 
+/**
+ * The five an Enterprise directory's push states.
+ *
+ * Every one of them is sent from this tier — the SCIM boundary is a web
+ * request an identity provider makes — and none is sent from anywhere else, so
+ * an absent sender here is a history nobody writes rather than a delay.
+ */
+const SCIM_SYNC_COMMAND_NAMES = [
+  "issueScimToken",
+  "recordScimUserPush",
+  "recordScimGroupMapping",
+  "recordScimApplyFailure",
+  "revokeScimSync",
+] as const;
+
 /** The fourteen a connection has. */
 const SSO_CONNECTION_COMMAND_NAMES = [
   "registerConnection",
@@ -267,7 +301,7 @@ const SSO_CONNECTION_COMMAND_NAMES = [
  * Names the one identity-side absence, at boot.
  *
  * `info` rather than `warn`: a deployment with no Redis has already been told
- * it has no queue, and every write on these three pipelines refuses BY NAME
+ * it has no queue, and every write on these four pipelines refuses BY NAME
  * when it is attempted. There is no second absence to report — a producer
  * holding no event log is the ruling working, not a capability missing.
  */
@@ -283,7 +317,7 @@ export class LoggedApiIdentityPipelinesAbsence extends ApiIdentityPipelinesAbsen
   withoutQueue(): void {
     this.logger.info(
       { reason: "no-queue" },
-      "API composed no Group Queue, so it registered no identity pipeline: attaching a sign-in method, asking to join an organization and every single sign-on connection command refuse by name",
+      "API composed no Group Queue, so it registered no identity pipeline: attaching a sign-in method, asking to join an organization, every single sign-on connection command and every directory-sync fact refuse by name",
     );
   }
 }

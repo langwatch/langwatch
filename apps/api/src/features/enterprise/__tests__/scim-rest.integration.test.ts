@@ -29,10 +29,20 @@
 import { createHash } from "node:crypto";
 
 import { createAppRestSecurity, type AppRestSecurity } from "@langwatch/api/rest";
+import {
+  EventSourcing,
+  type EventSourcedQueueDefinition,
+  type EventSourcedQueueProcessor,
+  EventStoreProducerOnly,
+} from "@langwatch/eventing";
+import type { IdentityEventingPort } from "@langwatch/identity-server";
+import { createLogger } from "@langwatch/observability";
 import { Hono, type ErrorHandler } from "hono";
-import { describe, expect, it } from "vitest";
+import { describe, expect, it, vi } from "vitest";
 
 import { createApiProcessRestFeatures } from "../../../app-rest/app-rest.process-features";
+import { ApiEventingIdentityAdapter } from "../../../app/api-identity-eventing.adapter";
+import { composeApiIdentityPipelines } from "../../../app/api-identity-pipelines.composition";
 import {
   ApiScimAbsenceReport,
   composeApiScimRest,
@@ -41,6 +51,8 @@ import {
 } from "../../../app/api-scim.composition";
 
 const ORGANIZATION_ID = "organization-acme";
+/** The connection a token is minted against, and the whole of its authority. */
+const CONNECTION_ID = "ssoconn_acme";
 const TOKEN = "scim-token-value";
 const BEARER = `Bearer ${TOKEN}`;
 /** The service hashes a presented token before it looks it up, so the rows hold the digest. */
@@ -285,7 +297,204 @@ describe("given a deployment that composed no Enterprise application", () => {
   });
 });
 
+describe("given an API process that registered the directory-sync pipeline producer-only", () => {
+  describe("when a directory's push states a fact on the composed SCIM graph", () => {
+    /** @scenario "A directory push's history lands on this process's own event stack" */
+    it("stages the command on the sender the registration produced, and reports no missing sender", async () => {
+      const queue = producerEventing();
+      const world = scimWorld({ eventing: queue.eventing });
+      const api = mount(world.ports);
+      const losses = recordLedgerLosses();
+
+      // The mounted family is real and answers over this same graph: the
+      // service the ledger hangs off is the one the fifteen protocol routes
+      // are served from, not a second construction.
+      expect((await api.get("/api/scim/v2/Users", BEARER)).status).toBe(200);
+
+      await world.ports!.scim().createUser({
+        organizationId: ORGANIZATION_ID,
+        connectionId: CONNECTION_ID,
+        request: {
+          schemas: ["urn:ietf:params:scim:schemas:core:2.0:User"],
+          userName: "grace@acme.test",
+          name: { givenName: "Grace", familyName: "Hopper" },
+        },
+      });
+
+      // The one leg this tier has (ADR-110): the staged command, on the
+      // `recordScimUserPush` sender `composeApiIdentityPipelines` resolved out
+      // of the `scim-sync` registration. Before that registration existed this
+      // answered `null`, and the writer swallowed the whole history at
+      // `error` — permanently, because the sender was never coming.
+      expect(queue.staged).toHaveLength(1);
+      expect(queue.staged[0]?.payload).toMatchObject({
+        tenantId: ORGANIZATION_ID,
+        organizationId: ORGANIZATION_ID,
+        connectionId: CONNECTION_ID,
+        userId: "user-grace@acme.test",
+        op: "create",
+      });
+      expect(losses.messages).toEqual([]);
+
+      losses.restore();
+      await queue.eventSourcing.close();
+    });
+
+    /**
+     * The registration's OTHER half, and the reason the five names are listed
+     * in the composition rather than read off whatever registered: every verb
+     * a directory push can state resolves to a sender, so a definition that
+     * dropped one would fail this process's boot rather than lose that verb's
+     * facts inside one provider's nightly run.
+     */
+    /** @scenario "A directory push's history lands on this process's own event stack" */
+    it("resolves a sender for every verb the directory-sync ledger names", async () => {
+      const queue = producerEventing();
+
+      for (const command of [
+        "issueScimToken",
+        "recordScimUserPush",
+        "recordScimGroupMapping",
+        "recordScimApplyFailure",
+        "revokeScimSync",
+      ]) {
+        await expect(
+          queue.eventing.tryPipelineCommand({ pipeline: "scim-sync", command }),
+        ).resolves.not.toBeNull();
+      }
+
+      await queue.eventSourcing.close();
+    });
+  });
+
+  describe("when this process composed no queue at all", () => {
+    /** @scenario "A process with no queue loses the directory-sync history loudly" */
+    it("lets the push through and records the loss at error, naming the pipeline and the sender", async () => {
+      const world = scimWorld();
+      const losses = recordLedgerLosses();
+
+      await expect(
+        world.ports!.scim().createUser({
+          organizationId: ORGANIZATION_ID,
+          connectionId: CONNECTION_ID,
+          request: {
+            schemas: ["urn:ietf:params:scim:schemas:core:2.0:User"],
+            userName: "grace@acme.test",
+            name: { givenName: "Grace", familyName: "Hopper" },
+          },
+        }),
+      ).resolves.toMatchObject({ id: "user-grace@acme.test" });
+
+      expect(losses.messages).toHaveLength(1);
+      expect(losses.messages[0]).toContain("scim-sync");
+      expect(losses.messages[0]).toContain("recordScimUserPush");
+
+      losses.restore();
+    });
+  });
+});
+
+describe("given a directory pushing on a token bound to a connection", () => {
+  describe("when the push arrives on the SCIM protocol routes", () => {
+    /**
+     * A characterization, not an approval. `verifyToken` answers the token's
+     * `connectionId` and the protocol door keeps only the organization, so no
+     * protocol push carries the connection its own token was minted for — and
+     * a directory-sync fact is stated per CONNECTION. So the registration
+     * above restores the history for every caller that passes one and changes
+     * nothing for these fifteen routes.
+     *
+     * `specs/identity/scim-connection-sync.feature` holds this as
+     * `@unimplemented` ("One connection's token cannot touch another
+     * connection's people"); closing it is a write-authority change, not a
+     * wiring one, so it is not smuggled in beside a registration.
+     */
+    it("states no directory-sync fact, because the door forwards no connection", async () => {
+      const queue = producerEventing();
+      const world = scimWorld({ eventing: queue.eventing });
+      const api = mount(world.ports);
+
+      const response = await api.post(
+        "/api/scim/v2/Users",
+        {
+          schemas: ["urn:ietf:params:scim:schemas:core:2.0:User"],
+          userName: "grace@acme.test",
+          name: { givenName: "Grace", familyName: "Hopper" },
+        },
+        BEARER,
+      );
+
+      expect(response.status).toBe(201);
+      expect(queue.staged).toEqual([]);
+
+      await queue.eventSourcing.close();
+    });
+  });
+});
+
 // --------------------------------------------------------------------------
+
+/**
+ * This process's own producer-only Eventing, in the shape production composes
+ * it: the REAL {@link EventStoreProducerOnly} over a queue that records rather
+ * than runs, with `composeApiIdentityPipelines` registering the four packaged
+ * definitions on it and handing back the senders it resolved.
+ *
+ * The store is the production one deliberately — a memory store in that seat
+ * accepts an append, holds the event in one process's heap and loses it, which
+ * is how a ledger that appended on this tier passed CI for as long as it did.
+ * What is faked is Redis, and only Redis.
+ */
+function producerEventing() {
+  const staged: Array<{ queue: string; payload: Record<string, unknown> }> = [];
+  const eventSourcing = new EventSourcing({
+    enabled: true,
+    eventStore: EventStoreProducerOnly.create({ processName: "langwatch-api" }),
+    executionTarget: "api",
+    processManagerMode: "producer-only",
+    consumersEnabled: false,
+    queueFactory: (
+      definition: EventSourcedQueueDefinition<Record<string, unknown>>,
+    ): EventSourcedQueueProcessor<Record<string, unknown>> => ({
+      send: async (payload) => {
+        staged.push({ queue: definition.name, payload });
+      },
+      sendBatch: async () => undefined,
+      close: async () => undefined,
+      waitUntilReady: async () => undefined,
+    }),
+  });
+
+  const pipelines = composeApiIdentityPipelines({
+    eventing: eventSourcing,
+    processName: "langwatch-api",
+  });
+
+  return {
+    staged,
+    eventSourcing,
+    eventing: ApiEventingIdentityAdapter.create({ pipelines }),
+  };
+}
+
+/**
+ * Every loss the directory-sync ledger reports while a scenario runs.
+ *
+ * Its own module logger, which is where the line has to land: the writer
+ * SWALLOWS a history it cannot stage, so the log is the only observable the
+ * absence has — and asserting it is empty is what makes "the sender exists
+ * now" a claim with teeth rather than a silence two bugs could produce.
+ */
+function recordLedgerLosses() {
+  const messages: string[] = [];
+  const error = vi
+    .spyOn(createLogger("langwatch:identity:scim-sync-ledger"), "error")
+    .mockImplementation(((_context: Record<string, unknown>, message: string) => {
+      messages.push(message);
+    }) as never);
+
+  return { messages, restore: () => error.mockRestore() };
+}
 
 /**
  * The rows the composed service reads and writes, and the collaborators
@@ -296,7 +505,18 @@ describe("given a deployment that composed no Enterprise application", () => {
  * because the real types are Prisma's generated client and four contract
  * classes, and what these scenarios exercise is a handful of members of each.
  */
-function scimWorld(overrides: { planType?: string; webhookSecret?: string | undefined } = {}) {
+function scimWorld(
+  overrides: {
+    planType?: string;
+    webhookSecret?: string | undefined;
+    /**
+     * The event stack the directory-sync history stages through. Defaults to a
+     * process that registered no pipeline at all, which is what every scenario
+     * above is about — none of them states a directory-sync fact.
+     */
+    eventing?: IdentityEventingPort;
+  } = {},
+) {
   const users = {
     created: [] as Array<{ name: string; email: string }>,
     rows: new Map<string, UserRow>([
@@ -332,7 +552,11 @@ function scimWorld(overrides: { planType?: string; webhookSecret?: string | unde
       findFirst: ({ where }: { where: { hashedToken: string } }) =>
         Promise.resolve(
           where.hashedToken === HASHED_TOKEN
-            ? { id: "scim-token-1", organizationId: ORGANIZATION_ID, connectionId: null }
+            ? {
+                id: "scim-token-1",
+                organizationId: ORGANIZATION_ID,
+                connectionId: CONNECTION_ID,
+              }
             : null,
         ),
       updateMany: ({ where }: { where: { id: string } }) => {
@@ -385,7 +609,13 @@ function scimWorld(overrides: { planType?: string; webhookSecret?: string | unde
       findMany: () => Promise.resolve([]),
       upsert: () => Promise.resolve({}),
     },
-    scimSyncState: { findUnique: () => Promise.resolve(null) },
+    // The directory-sync head the guards read before they state a fact. Empty:
+    // every scenario here is a connection's FIRST push, so the guard states
+    // the fact and no recovery beside it.
+    scimSyncState: {
+      findUnique: () => Promise.resolve(null),
+      findFirst: () => Promise.resolve(null),
+    },
   };
 
   const compositionOptions: ApiScimCompositionOptions = {
@@ -457,12 +687,14 @@ function scimWorld(overrides: { planType?: string; webhookSecret?: string | unde
         return Promise.resolve({ type: overrides.planType ?? "ENTERPRISE" });
       },
     } as never,
-    // No queue on this composition: the directory-sync history says so, at
-    // `error` and by name, and returns rather than failing the push — which is
-    // the package's own rule.
-    eventing: {
-      tryPipelineCommand: () => Promise.resolve(null),
-    } as never,
+    // No queue on this composition unless a scenario supplies one: the
+    // directory-sync history says so, at `error` and by name, and returns
+    // rather than failing the push — which is the package's own rule.
+    eventing:
+      overrides.eventing ??
+      ({
+        tryPipelineCommand: () => Promise.resolve(null),
+      } as never),
     provenOffboarding: false,
     auth0WebhookSecret: "webhookSecret" in overrides ? overrides.webhookSecret : WEBHOOK_SECRET,
   };

@@ -14693,3 +14693,96 @@ reaching a customer as a feature one process offers and the other refuses.
   hosted deployment with no subscription rows still reports
   `absent("subscription")` — the shared policy returns no source, and each root
   still names what that costs in its own words.
+
+## The fourth identity pipeline: an Enterprise directory's history has a sender, 2026-09-03
+
+`api-identity-pipelines.composition.ts` registered three of the four identity
+pipelines producer-only. The fourth, `scim-sync`, was the one
+`api-scim.composition.ts` composes a ledger writer for on every Enterprise
+deployment — so `ScimSyncLedgerWriter` staged a command for which this process
+published no sender, said so at `error` by name, and let the push through. The
+history was lost permanently rather than transiently, and the swallow is why
+nothing else could see it.
+
+```
+BEFORE                                   AFTER
+
+  a directory push that carries            a directory push that carries
+  its connection                           its connection
+    │                                        │
+    ▼                                        ▼
+  ScimSyncLifecycle ─► guards              ScimSyncLifecycle ─► guards
+    │                                        │
+    ▼                                        ▼
+  ScimSyncLedgerWriter.commit              ScimSyncLedgerWriter.commit
+    │                                        │
+    └─ stage ─► tryPipelineCommand           └─ stage ─► tryPipelineCommand
+                 ("scim-sync", verb)                      ("scim-sync", verb)
+                     │                                        │
+                     ▼                                        ▼
+                   null                              the sender the producer
+                     │                               registration produced
+                     ▼                                        │
+        error: "no scim-sync pipeline"                         ▼
+        the push succeeds, the fact                   event-sourcing/jobs
+        is gone for good                                       │
+                                                               ▼
+                                                          apps/worker
+                                                          re-runs the guard,
+                                                          appends, folds
+```
+
+| File | What changed |
+| --- | --- |
+| `packages/identity-eventing/src/adapters/producer.identity-pipelines.adapter.ts` | `createScimSyncProducerPipeline`, the fourth sibling: the packaged `createScimSyncPipeline` over a producer-only projection store and `ScimSyncGuards` over refusing reads. The ONE of the four with no process manager to decline — a push is the directory's to retry, so the aggregate keeps no wake |
+| `packages/identity-eventing/src/index.ts` | exported beside the other three |
+| `apps/api/src/app/api-identity-pipelines.composition.ts` | the fourth `senders.set(SCIM_SYNC_PIPELINE_NAME, …)`, with the five verbs listed as `SCIM_SYNC_COMMAND_NAMES` so a definition that drops one fails this process's boot rather than one provider's nightly run. The docblock's "`scim-sync` is NOT registered, and that costs something" section is now what it registers and why |
+| `apps/api/src/app/api-scim.composition.ts` | its docblock named the missing registration as the cause of the loss; it now names the sender, and names the one caller class the registration does not reach |
+| `packages/features/identity/server/src/adapters/eventing.scim-sync-ledger.adapter.ts` (+ its unit test) | prose only: the no-sender branch is now a deployment with no queue rather than the API, and the test says why it is still asserted there — the swallow leaves nothing else to observe |
+| `packages/identity-eventing/src/adapters/__tests__/producer.identity-pipelines.adapter.unit.test.ts` | the fourth case: the five command names equal the Postgres composition's, and the directory-sync head refuses by name |
+| `apps/api/src/features/enterprise/__tests__/scim-rest.integration.test.ts` | four tests over the REAL graph — `EventStoreProducerOnly` + `composeApiIdentityPipelines` + `ApiEventingIdentityAdapter` + `composeApiScimRest` — with the mounted Hono app answering beside them |
+| `specs/server/api-process-eventing.feature` | two `@integration` scenarios, both bound |
+
+### What the registration does not reach, and it is not the registration's fault
+
+The fifteen protocol routes state no directory-sync fact, before this change or
+after it. `verifyToken` answers the token's `connectionId` and `scimAuth` keeps
+only the organization, so no protocol push carries the connection its own token
+was minted for — and a directory-sync fact is stated per connection, which is
+why `recordUserPush` returns early without one. The Auth0 intake is the same.
+What the registration restores is every caller that passes a connection: the
+token mint, the revoke, the connection teardown.
+
+`specs/identity/scim-connection-sync.feature` holds the connection binding as
+`@unimplemented`. Closing it is a write-authority change — with a connection in
+hand the service starts enforcing `assertWritable` and mapping external ids —
+so it was not smuggled in beside a registration. The integration suite pins the
+current behaviour as a characterization test that names the reason.
+
+### Gates
+
+- `packages/identity-eventing`: `pnpm test` — **13 files / 62 tests passing**;
+  `pnpm typecheck` — **0 errors**.
+- `@langwatch/identity-server`: `pnpm test` — **38 files / 335 tests passing**;
+  `pnpm typecheck` (source and `tsconfig.test.json`) — **0 errors**.
+- `apps/api`: `vitest run src/app src/features/enterprise` — **46 files / 495
+  tests passing**; `tsc --noEmit` — **0 errors**.
+- `apps/worker`: `worker-production.composition` and
+  `worker-feature-registration-order` — **61 tests passing**. No worker source
+  or test changed: the composition test already asserts
+  `registeredThrough(composition, "scim-sync")`.
+- Feature parity: `specs/server/api-process-eventing.feature` **8/8 bound**.
+- `oxlint --config .oxlintrc.architecture.json` over the eight touched files:
+  the only lines are the two pre-existing repo-wide classes that fire on every
+  sibling in those directories (`package-boundaries` on
+  `packages/identity-eventing/src/adapters/*`, `feature-module-classes` on
+  `packages/features/identity/server/src/adapters/*`).
+- Sabotage: deleting the fourth `senders.set` fails exactly the two tests that
+  assert the registration, and nothing else.
+
+### What this pass did NOT do
+
+- **Nothing under `platform/` was created, edited or read.**
+- **No worker change.** The consumer side was already unconditional.
+- **The protocol door still forwards no connection.** That is a write-authority
+  decision with its own `@unimplemented` scenarios, not a wiring gap.

@@ -126,6 +126,7 @@ export {
 export {
   createIdentityProducerPipeline,
   createJoinRequestProducerPipeline,
+  createScimSyncProducerPipeline,
   createSsoConnectionProducerPipeline,
 } from "./adapters/producer.identity-pipelines.adapter";
 export {

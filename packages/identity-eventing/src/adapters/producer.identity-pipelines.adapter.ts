@@ -1,5 +1,5 @@
 /**
- * The three identity pipelines as a PRODUCER registers them.
+ * The four identity pipelines as a PRODUCER registers them.
  *
  * One definition, two registrations. The consumer — the worker — supplies the
  * real Postgres heads, the guards that read them, the mail the join lifecycle
@@ -16,15 +16,16 @@
  * store in a process that was never meant to fold would report a projection as
  * written when nothing was, and the row would simply never appear.
  *
- * TWO OF THE THREE DECLARE A PROCESS MANAGER AND RUN IT THERE. `join-requests`
+ * TWO OF THE FOUR DECLARE A PROCESS MANAGER AND RUN IT THERE. `join-requests`
  * mounts the reminder-and-expiry lifecycle and `sso-connections` mounts the
  * teardown grace, and the runtime used to refuse to register any pipeline
  * declaring one without a durable `ProcessStore` — which made every command on
  * both unsendable from the tier a person's action actually arrives at. A
  * producer-only runtime registers the definition whole and declines the manager
  * by name instead (`EventSourcingOptions.processManagerMode`), so the inbox,
- * outbox and wakes stay the consumer's alone. `identity` mounts none and needed
- * only to be registered at all.
+ * outbox and wakes stay the consumer's alone. `identity` and `scim-sync` mount
+ * none and needed only to be registered at all — a directory's push is retried
+ * by the DIRECTORY, so `scim-sync` has no manager to decline.
  *
  * Forking a definition instead — declaring only the commands a producer sends —
  * is the thing this avoids. The routing triple every job carries is derived
@@ -36,12 +37,14 @@ import {
   IdentityGuards,
   JoinRequestGuards,
   MfaGuards,
+  ScimSyncGuards,
   SsoConnectionGuards,
   type IdentityHeadsRepository,
   type IdentityReservationRepository,
   type IdentityUsersRepository,
   type JoinRequestReadRepository,
   type MfaEnrollmentRepository,
+  type ScimSyncReadRepository,
   type SsoBreakGlassBindingRepository,
   type SsoConnectionReadRepository,
   type SsoConnectionStrandingRepository,
@@ -54,6 +57,8 @@ import type { MfaFoldState } from "../identity/projections/mfaEnrollmentState.fo
 import { createJoinRequestPipeline, type JoinRequestPipeline } from "../join-requests/pipeline";
 import type { JoinRequestLifecyclePort } from "../join-requests/process-manager/joinRequestLifecycle.process";
 import type { JoinRequestFoldState } from "../join-requests/projections/joinRequestState.foldProjection";
+import { createScimSyncPipeline, type ScimSyncPipeline } from "../scim-sync/pipeline";
+import type { ScimSyncFoldState } from "../scim-sync/projections/scimSyncState.foldProjection";
 import { createSsoConnectionPipeline } from "../sso-connections/pipeline";
 import type { ConnectionTeardownPort } from "../sso-connections/process-manager/connectionTeardown.process";
 import type { SsoConnectionFoldState } from "../sso-connections/projections/ssoConnectionState.foldProjection";
@@ -265,5 +270,34 @@ export function createSsoConnectionProducerPipeline(input: {
       }),
     }),
     teardown: new ProducerOnlyConnectionTeardown(processName),
+  });
+}
+
+/**
+ * The directory-sync pipeline for a process that only sends commands on it.
+ *
+ * NO PROCESS MANAGER to decline, unlike its two neighbours: `scim-sync`
+ * declares none on purpose — a push is the DIRECTORY's to retry, so there is
+ * no inbox, outbox or wake for a producer-only runtime to keep off. What a
+ * producer needs from this definition is the same five command dispatchers the
+ * worker's registration carries, so an Enterprise directory push has a sender
+ * to stage its history through.
+ */
+export function createScimSyncProducerPipeline(input: { processName: string }): ScimSyncPipeline {
+  const { processName } = input;
+  const pipeline = "scim-sync";
+  return createScimSyncPipeline({
+    scimSyncProjectionStore: new ProducerOnlyStateProjectionStore<ScimSyncFoldState>(
+      processName,
+      pipeline,
+      "directory sync",
+    ),
+    scimSyncGuards: new ScimSyncGuards({
+      syncs: producerOnlyReads<ScimSyncReadRepository>({
+        processName,
+        pipeline,
+        name: "directory syncs",
+      }),
+    }),
   });
 }

@@ -34,6 +34,13 @@
  * registration is absent, at `error`, so the state is read as the composition
  * defect it is rather than as an event-stack blip that will clear.
  *
+ * The API process registers that pipeline now
+ * (`api-identity-pipelines.composition.ts`, the fourth of four), so what is
+ * left on this branch is a deployment that composed no queue at all and a
+ * script that composed no eventing — both of which have already been told so
+ * at boot. The branch stays because the swallow is what makes it invisible
+ * otherwise: nothing else on the push path would report it.
+ *
  * Like the identity ledger, the pipeline handle is resolved lazily off the
  * App: a bare script that never composes one must still be able to import
  * the runtime.

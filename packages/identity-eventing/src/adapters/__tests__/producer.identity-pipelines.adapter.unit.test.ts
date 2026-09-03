@@ -1,7 +1,7 @@
 /**
  * @vitest-environment node
  *
- * The three identity definitions, as a process that only SENDS on them builds
+ * The four identity definitions, as a process that only SENDS on them builds
  * them.
  *
  * What this pins is the pair of properties a producer variant exists for. The
@@ -17,11 +17,14 @@ import { describe, expect, it } from "vitest";
 import {
   createIdentityProducerPipeline,
   createJoinRequestProducerPipeline,
+  createScimSyncProducerPipeline,
   createSsoConnectionProducerPipeline,
 } from "../producer.identity-pipelines.adapter";
 import { PostgresIdentityPipelineAdapter } from "../postgres.identity-pipeline.adapter";
+import { PostgresScimSyncPipelineAdapter } from "../postgres.scim-sync-pipeline.adapter";
 import { IDENTITY_PIPELINE_NAME } from "../../identity/schemas/constants";
 import { JOIN_REQUEST_PIPELINE_NAME } from "../../join-requests/schemas/constants";
+import { SCIM_SYNC_PIPELINE_NAME } from "../../scim-sync/schemas/constants";
 import { SSO_CONNECTION_PIPELINE_NAME } from "../../sso-connections/schemas/constants";
 
 const PROCESS_NAME = "langwatch-api";
@@ -32,7 +35,7 @@ function commandNamesOf(definition: { commands: ReadonlyArray<{ name: string }> 
 }
 
 describe("given a process that produces identity commands without consuming them", () => {
-  describe("when it builds the three definitions", () => {
+  describe("when it builds the four definitions", () => {
     it("names the pipelines the worker routes on", () => {
       expect(
         (
@@ -55,6 +58,13 @@ describe("given a process that produces identity commands without consuming them
           }
         ).metadata.name,
       ).toBe(SSO_CONNECTION_PIPELINE_NAME);
+      expect(
+        (
+          createScimSyncProducerPipeline({ processName: PROCESS_NAME }) as unknown as {
+            metadata: { name: string };
+          }
+        ).metadata.name,
+      ).toBe(SCIM_SYNC_PIPELINE_NAME);
     });
 
     /**
@@ -69,6 +79,32 @@ describe("given a process that produces identity commands without consuming them
         database: {} as never,
       }).build();
 
+      expect(commandNamesOf(producer as never)).toEqual(commandNamesOf(consumer as never));
+      expect((producer as unknown as { aggregate: { type: string } }).aggregate.type).toBe(
+        (consumer as unknown as { aggregate: { type: string } }).aggregate.type,
+      );
+    });
+
+    /**
+     * The same discriminator for `scim-sync`, and the one that decides whether
+     * an Enterprise directory's push has a history at all: the API resolves
+     * these five names out of the registration at boot, so a producer
+     * declaring four of them would fail the boot rather than lose the fifth
+     * verb's facts in one provider's nightly run.
+     */
+    it("declares the directory-sync verbs the Postgres composition declares", () => {
+      const producer = createScimSyncProducerPipeline({ processName: PROCESS_NAME });
+      const consumer = PostgresScimSyncPipelineAdapter.create({
+        database: {} as never,
+      }).build();
+
+      expect(commandNamesOf(producer as never)).toEqual([
+        "issueScimToken",
+        "recordScimUserPush",
+        "recordScimGroupMapping",
+        "recordScimApplyFailure",
+        "revokeScimSync",
+      ]);
       expect(commandNamesOf(producer as never)).toEqual(commandNamesOf(consumer as never));
       expect((producer as unknown as { aggregate: { type: string } }).aggregate.type).toBe(
         (consumer as unknown as { aggregate: { type: string } }).aggregate.type,
@@ -103,6 +139,27 @@ describe("given a process that produces identity commands without consuming them
 
       await expect(projection.store.store()).rejects.toThrow(
         /langwatch-api registered the sso-connections pipeline as a producer only/,
+      );
+    });
+
+    /**
+     * The directory-sync guard's read, which is the one a producer is most
+     * likely to reach by accident: the SCIM boundary runs the SAME guards on
+     * the calling path, over the real Postgres head, and only the STAGED
+     * re-run uses the definition's copy. A stand-in that answered an empty
+     * head here would state a fact the fold has already recorded.
+     */
+    it("refuses the directory-sync head rather than answering an empty one", async () => {
+      const definition = createScimSyncProducerPipeline({
+        processName: PROCESS_NAME,
+      }) as unknown as {
+        stateProjections: Map<string, { store: { tryLoad(): Promise<unknown> } }>;
+      };
+      const projection = [...definition.stateProjections.values()][0];
+      if (!projection) throw new Error("the scim-sync definition registered no state projection");
+
+      await expect(projection.store.tryLoad()).rejects.toThrow(
+        /langwatch-api registered the scim-sync pipeline as a producer only/,
       );
     });
   });
