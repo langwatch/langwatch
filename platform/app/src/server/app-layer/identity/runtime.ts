@@ -56,11 +56,25 @@ import {
   OrganizationUserRole,
   type PrismaClient,
 } from "~/generated/prisma/client";
+import {
+  BORN_FINALIZED_SIGNUP_FLAG,
+  BornFinalizedOptIn,
+} from "../../better-auth/bornFinalizedOptIn";
+import { LastWayInGuard } from "../../better-auth/last-way-in";
+import { PasskeySignUpRegistration } from "../../better-auth/passkey-signup";
+import { PasswordResetSessionBridge } from "../../better-auth/password-reset-session";
+import { RegisteredIssuers } from "../../better-auth/registeredIssuers";
+import { BetterAuthSessionMinter } from "../../better-auth/session-minter";
+import { SignUpConfirmationEndpoint } from "../../better-auth/sign-up-confirmation";
 import { prisma } from "../../db";
 import { featureFlagService } from "../../featureFlag";
+import { NOT_TARGETED } from "../../featureFlag/targeting";
 import { sendAddressConfirmationEmail } from "../../mailer/addressConfirmationEmail";
 import { sendSignUpVerificationEmail } from "../../mailer/signUpVerificationEmail";
-import { createCredentialUser } from "../../users/credential-user";
+import {
+  createCredentialUser,
+  createPasskeyUser,
+} from "../../users/credential-user";
 import { getApp } from "../app";
 import { grantsLedgerWriter } from "../authz/ledger";
 import { PrismaSystemMigrationStateRepository } from "../system-migrations/repositories/system-migration-state.prisma.repository";
@@ -82,6 +96,7 @@ import {
 } from "./join-request-adapters";
 import { JoinRequestLedgerWriter } from "./join-request-ledger";
 import { JoinRequestsService } from "./join-requests.service";
+import { LastWayInService } from "./last-way-in.service";
 import { IdentityLedgerWriter } from "./ledger";
 import { MemberProvenanceService } from "./member-provenance.service";
 import { MfaLedgerWriter } from "./mfa-ledger";
@@ -110,6 +125,7 @@ import {
   PrismaJoinRequestReadRepository,
 } from "./repositories/join-request.prisma.repository";
 import { PrismaJoinRequestProjectionRepository } from "./repositories/join-request-projection.prisma.repository";
+import { PrismaLastWayInRepository } from "./repositories/last-way-in.prisma.repository";
 import { LegacySsoDomainRoutingRepository } from "./repositories/legacy-sso-domain.prisma.repository";
 import { PrismaLegacySsoOrganizationRepository } from "./repositories/legacy-sso-organization.prisma.repository";
 import { PrismaMemberProvenanceRepository } from "./repositories/member-provenance.prisma.repository";
@@ -984,4 +1000,125 @@ const identityStorage = createIdentityStorageAdapter({
 
 export function identityStorageAdapter(): AdapterFactory<BetterAuthOptions> {
   return identityStorage;
+}
+
+/**
+ * The better-auth boundary tier (ADR-129): the plugins, the guards and the
+ * session minter, composed here like every other identity collaborator so
+ * none of them opens the database itself.
+ *
+ * EVERY INSTANCE IS BUILT INSIDE ITS FACTORY, not at module scope, and that
+ * is load-bearing rather than a style. These classes live under
+ * `server/better-auth/`, whose modules import this file back for their thin
+ * exports — a genuine cycle, and whichever side loads first the other's
+ * classes are still in their temporal dead zone while this module's body
+ * runs. Constructing one here eagerly would throw at import time, in the
+ * process that boots better-auth.
+ */
+
+/** Opening the first session of an account's life, and setting its cookie. */
+export function sessionMinter(): BetterAuthSessionMinter {
+  return new BetterAuthSessionMinter();
+}
+
+/**
+ * The trusted-origin allowlist for a single sign-on request.
+ *
+ * A memoized singleton, because the instance IS the few-second cache: a new
+ * one per request would collapse nothing and turn one ceremony back into a
+ * burst of identical queries. Its reads bypass the connection-issuer port's
+ * own memo deliberately — see the repository for why a named connection is
+ * read fresh.
+ */
+let registeredIssuersInstance: RegisteredIssuers | null = null;
+
+export function ssoRegisteredIssuers(): RegisteredIssuers {
+  registeredIssuersInstance ??= new RegisteredIssuers({
+    issuers: new PrismaSsoConnectionIssuers(prisma),
+    now: Date.now,
+  });
+  return registeredIssuersInstance;
+}
+
+/**
+ * Spending the sign-up confirmation link (ADR-117 §6).
+ *
+ * The verification service is resolved per call rather than captured, for the
+ * reason {@link signUpVerification} is composed per call: it reaches the
+ * mailer, and the mailer is the one dependency a test routinely replaces.
+ */
+export function signUpConfirmationEndpoint(): SignUpConfirmationEndpoint {
+  return new SignUpConfirmationEndpoint({
+    verification: {
+      completeVerification: ({ token }) =>
+        signUpVerification().completeVerification({ token }),
+    },
+    users: {
+      findUserIdByEmail: ({ email }) =>
+        identityUsers.findUserIdByEmail({ normalizedValue: email }),
+    },
+    minter: sessionMinter(),
+  });
+}
+
+/**
+ * Signing somebody in with the password they just set (D13).
+ *
+ * A memoized singleton, because the instance owns the request scope the
+ * endpoint's callback writes into and the after-hook reads back: two
+ * instances would be two scopes, and the hook would find every reset
+ * unattributed.
+ */
+let passwordResetSessionBridgeInstance: PasswordResetSessionBridge | null =
+  null;
+
+export function passwordResetSessionBridge(): PasswordResetSessionBridge {
+  passwordResetSessionBridgeInstance ??= new PasswordResetSessionBridge({
+    minter: sessionMinter(),
+  });
+  return passwordResetSessionBridgeInstance;
+}
+
+/** Creating an account WITH a passkey, rather than adding one to an account. */
+export function passkeySignUp(): PasskeySignUpRegistration {
+  return new PasskeySignUpRegistration({
+    directory: identityUsers,
+    accounts: {
+      createPasskeyUser: ({ email }) => createPasskeyUser({ prisma, email }),
+    },
+    verification: {
+      requestVerification: ({ email }) =>
+        signUpVerification().requestVerification({ email }),
+    },
+  });
+}
+
+/** ADR-116 §3's born-finalized entrance, and the allowlist in front of it. */
+export function bornFinalizedOptIn(): BornFinalizedOptIn {
+  return new BornFinalizedOptIn({
+    organizations: new PrismaLegacySsoOrganizationRepository(prisma),
+    flag: {
+      isEnabled: ({ distinctId, organizationId }) =>
+        featureFlagService.isEnabled(BORN_FINALIZED_SIGNUP_FLAG, {
+          distinctId,
+          defaultValue: false,
+          // Sign-up time: the person has no project yet, and an organization
+          // only when their email domain matches one.
+          projectId: NOT_TARGETED,
+          organizationId: organizationId ?? NOT_TARGETED,
+        }),
+    },
+  });
+}
+
+/** Whether a removal would leave somebody unable to sign in (ADR-119). */
+export function lastWayIn(): LastWayInService {
+  return new LastWayInService({
+    records: new PrismaLastWayInRepository(prisma),
+  });
+}
+
+/** The same answer, as the refusal better-auth's `before` hook raises. */
+export function lastWayInGuard(): LastWayInGuard {
+  return new LastWayInGuard({ lastWayIn: lastWayIn() });
 }

@@ -1,5 +1,5 @@
 import { createLogger } from "@langwatch/observability";
-import { prisma } from "~/server/db";
+import { ssoRegisteredIssuers } from "~/server/app-layer/identity/runtime";
 
 /**
  * The issuers this installation's customers have registered.
@@ -30,7 +30,26 @@ const logger = createLogger("langwatch:better-auth:registered-issuers");
  *  just-registered connection is usable immediately. */
 const CACHE_TTL_MS = 5_000;
 
-let cached: { at: number; issuers: string[] } | null = null;
+/**
+ * The registered issuers, as the allowlist needs them.
+ *
+ * Both reads report their failure by throwing. Deciding that an unreadable
+ * table degrades to the configured origins rather than failing every sign-in
+ * is this file's call, not the store's.
+ */
+export interface SsoIssuerDirectoryPort {
+  /** The issuer one connection registered, or null when it registered none. */
+  findIssuerForConnection(args: {
+    connectionId: string;
+  }): Promise<string | null>;
+  /** Every issuer any connection registered. */
+  findAllIssuers(): Promise<readonly string[]>;
+}
+
+export interface RegisteredIssuersDeps {
+  issuers: SsoIssuerDirectoryPort;
+  now: () => number;
+}
 
 /**
  * Whether this request could need an issuer fetched.
@@ -78,100 +97,117 @@ async function connectionIdInBody(request: Request): Promise<string | null> {
 }
 
 /**
- * The issuers to trust FOR THIS REQUEST, rather than every issuer we hold.
+ * The trusted-origin answer for a single sign-on request, and the few-second
+ * memory that keeps one ceremony from re-reading the same rows.
  *
- * `trustedOrigins` is not only the discovery allowlist this file's docstring
- * describes. better-auth's `originCheckMiddleware` runs the same list against
- * the `Origin` header of every cookie-bearing POST and against
- * `callbackURL` / `redirectTo` / `errorCallbackURL`. So handing it every
- * customer's issuer made one tenant's registered origin a valid CSRF origin
- * and a valid redirect target on the single sign-on endpoints — for every
- * other tenant.
- *
- * Scoping it to the connection the request names removes that entirely: what
- * is left is "you may be redirected to an origin you registered yourself",
- * which is not an escalation, because you already control it.
- *
- * A request that names no connection falls back to the whole set. That is
- * the domain-first sign-in, where the issuer is not known until the domain
- * is resolved — it still needs the discovery fetch to be allowed, and it
- * carries no caller-supplied redirect that the narrow set would protect.
+ * The memory is a field rather than a module binding (ADR-129 rule 5), which
+ * is also what makes it one memory: the composition root hands out a single
+ * instance, so every request in a ceremony reads the same window.
  */
-export async function issuersForRequest(
+export class RegisteredIssuers {
+  private cached: { at: number; issuers: string[] } | null = null;
+
+  constructor(private readonly deps: RegisteredIssuersDeps) {}
+
+  /**
+   * The issuers to trust FOR THIS REQUEST, rather than every issuer we hold.
+   *
+   * `trustedOrigins` is not only the discovery allowlist this class's
+   * docstring describes. better-auth's `originCheckMiddleware` runs the same
+   * list against the `Origin` header of every cookie-bearing POST and against
+   * `callbackURL` / `redirectTo` / `errorCallbackURL`. So handing it every
+   * customer's issuer made one tenant's registered origin a valid CSRF origin
+   * and a valid redirect target on the single sign-on endpoints — for every
+   * other tenant.
+   *
+   * Scoping it to the connection the request names removes that entirely: what
+   * is left is "you may be redirected to an origin you registered yourself",
+   * which is not an escalation, because you already control it.
+   *
+   * A request that names no connection falls back to the whole set. That is
+   * the domain-first sign-in, where the issuer is not known until the domain
+   * is resolved — it still needs the discovery fetch to be allowed, and it
+   * carries no caller-supplied redirect that the narrow set would protect.
+   */
+  async issuersForRequest(request: Request | undefined): Promise<string[]> {
+    if (!isSingleSignOnRequest(request) || !request?.url) return [];
+
+    let named: string | null = null;
+    try {
+      named = connectionIdInPath(new URL(request.url).pathname);
+    } catch {
+      named = null;
+    }
+    named ??= await connectionIdInBody(request);
+    if (named === null) return await this.registeredIssuers();
+
+    const only = await this.issuerForConnection(named);
+    return only === null ? [] : [only];
+  }
+
+  /**
+   * Every registered issuer, or an empty list if we cannot read them.
+   *
+   * A read that fails must NOT take the whole auth request down with it: the
+   * cost of answering with the configured origins alone is one refused single
+   * sign-in with a message naming the trust problem, and the cost of throwing
+   * is every sign-in of every kind failing. It is logged at warn, because a
+   * database this cannot reach is a real fault even though it degrades here.
+   */
+  async registeredIssuers(): Promise<string[]> {
+    const now = this.deps.now();
+    if (this.cached && now - this.cached.at < CACHE_TTL_MS) {
+      return this.cached.issuers;
+    }
+
+    try {
+      const issuers = [...(await this.deps.issuers.findAllIssuers())];
+      this.cached = { at: now, issuers };
+      return issuers;
+    } catch (error) {
+      logger.warn(
+        { error },
+        "could not read registered single sign-on issuers; falling back to the configured trusted origins",
+      );
+      return this.cached?.issuers ?? [];
+    }
+  }
+
+  /**
+   * One connection's issuer, read fresh.
+   *
+   * NOT cached with the rest, and the comment used to say it was. This is the
+   * common path — every `/sso/callback/:providerId` and SAML ACS names a
+   * connection — so it is the read that most looked like it was collapsed by
+   * the five-second window above and never was. Left uncached deliberately
+   * rather than fixed silently: a connection registered a moment ago has to be
+   * dialable immediately, and one row by unique key is a cheap query. The
+   * class docstring's claim about collapsing bursts is about
+   * `registeredIssuers()`, which fans out over every row.
+   */
+  private async issuerForConnection(
+    connectionId: string,
+  ): Promise<string | null> {
+    try {
+      return await this.deps.issuers.findIssuerForConnection({ connectionId });
+    } catch (error) {
+      logger.warn(
+        { error, connectionId },
+        "could not read the single sign-on issuer for this request",
+      );
+      return null;
+    }
+  }
+}
+
+/** The issuers to trust for this request. */
+export function issuersForRequest(
   request: Request | undefined,
 ): Promise<string[]> {
-  if (!isSingleSignOnRequest(request) || !request?.url) return [];
-
-  let named: string | null = null;
-  try {
-    named = connectionIdInPath(new URL(request.url).pathname);
-  } catch {
-    named = null;
-  }
-  named ??= await connectionIdInBody(request);
-  if (named === null) return registeredIssuers();
-
-  const only = await issuerForConnection(named);
-  return only === null ? [] : [only];
+  return ssoRegisteredIssuers().issuersForRequest(request);
 }
 
-/**
- * One connection's issuer, read fresh.
- *
- * NOT cached with the rest, and the comment used to say it was. This is the
- * common path — every `/sso/callback/:providerId` and SAML ACS names a
- * connection — so it is the read that most looked like it was collapsed by
- * the five-second window above and never was. Left uncached deliberately
- * rather than fixed silently: a connection registered a moment ago has to be
- * dialable immediately, and one row by unique key is a cheap query. The
- * module docstring's claim about collapsing bursts is about
- * `registeredIssuers()`, which fans out over every row.
- */
-async function issuerForConnection(
-  connectionId: string,
-): Promise<string | null> {
-  try {
-    const row = await prisma.ssoProvider.findFirst({
-      where: { providerId: connectionId },
-      select: { issuer: true },
-    });
-    return row?.issuer ?? null;
-  } catch (error) {
-    logger.warn(
-      { error, connectionId },
-      "could not read the single sign-on issuer for this request",
-    );
-    return null;
-  }
-}
-
-/**
- * Every registered issuer, or an empty list if we cannot read them.
- *
- * A read that fails must NOT take the whole auth request down with it: the
- * cost of answering with the configured origins alone is one refused single
- * sign-in with a message naming the trust problem, and the cost of throwing
- * is every sign-in of every kind failing. It is logged at warn, because a
- * database this cannot reach is a real fault even though it degrades here.
- */
-export async function registeredIssuers(): Promise<string[]> {
-  const now = Date.now();
-  if (cached && now - cached.at < CACHE_TTL_MS) return cached.issuers;
-
-  try {
-    const rows = await prisma.ssoProvider.findMany({
-      select: { issuer: true },
-    });
-    const issuers = rows
-      .map((row) => row.issuer)
-      .filter((issuer): issuer is string => !!issuer);
-    cached = { at: now, issuers };
-    return issuers;
-  } catch (error) {
-    logger.warn(
-      { error },
-      "could not read registered single sign-on issuers; falling back to the configured trusted origins",
-    );
-    return cached?.issuers ?? [];
-  }
+/** Every registered issuer, or an empty list if we cannot read them. */
+export function registeredIssuers(): Promise<string[]> {
+  return ssoRegisteredIssuers().registeredIssuers();
 }

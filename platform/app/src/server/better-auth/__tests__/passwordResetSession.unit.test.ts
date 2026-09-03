@@ -6,11 +6,15 @@ vi.mock("better-auth/cookies", () => ({
   setSessionCookie: (...args: unknown[]) => setSessionCookie(...args),
 }));
 
-import {
-  recordPasswordReset,
-  runWithPasswordResetScope,
-  signInAfterPasswordReset,
-} from "../password-reset-session";
+// The composition root, which the module's thin exports reach for and these
+// cases do not: the bridge under test is constructed here, over the real
+// minter, so the request scope and the mint are asserted against each other.
+vi.mock("~/server/app-layer/identity/runtime", () => ({
+  passwordResetSessionBridge: vi.fn(),
+}));
+
+import { PasswordResetSessionBridge } from "../password-reset-session";
+import { BetterAuthSessionMinter } from "../session-minter";
 
 /** The after-hook's context, with just the pieces the hook touches. */
 const fakeContext = ({
@@ -31,9 +35,14 @@ const fakeContext = ({
   };
 };
 
+let bridge: PasswordResetSessionBridge;
+
 describe("given a request through the password reset endpoint", () => {
   beforeEach(() => {
     vi.clearAllMocks();
+    bridge = new PasswordResetSessionBridge({
+      minter: new BetterAuthSessionMinter(),
+    });
   });
 
   describe("when the reset was accepted and the callback said who", () => {
@@ -41,9 +50,9 @@ describe("given a request through the password reset endpoint", () => {
     it("opens a session for that account and sets its cookie", async () => {
       const { ctx, createSession } = fakeContext({ path: "/reset-password" });
 
-      await runWithPasswordResetScope(async () => {
-        recordPasswordReset({ userId: "user_1" });
-        await signInAfterPasswordReset(ctx);
+      await bridge.runWithScope(async () => {
+        bridge.recordPasswordReset({ userId: "user_1" });
+        await bridge.signInAfterPasswordReset(ctx);
       });
 
       expect(createSession).toHaveBeenCalledWith("user_1");
@@ -58,9 +67,9 @@ describe("given a request through the password reset endpoint", () => {
       createSession.mockRejectedValue(new Error("session store down"));
 
       await expect(
-        runWithPasswordResetScope(async () => {
-          recordPasswordReset({ userId: "user_1" });
-          await signInAfterPasswordReset(ctx);
+        bridge.runWithScope(async () => {
+          bridge.recordPasswordReset({ userId: "user_1" });
+          await bridge.signInAfterPasswordReset(ctx);
         }),
       ).resolves.toBeUndefined();
       expect(setSessionCookie).not.toHaveBeenCalled();
@@ -75,9 +84,9 @@ describe("given a request through the password reset endpoint", () => {
         returned: new APIError("BAD_REQUEST", { code: "INVALID_TOKEN" }),
       });
 
-      await runWithPasswordResetScope(async () => {
-        recordPasswordReset({ userId: "user_1" });
-        await signInAfterPasswordReset(ctx);
+      await bridge.runWithScope(async () => {
+        bridge.recordPasswordReset({ userId: "user_1" });
+        await bridge.signInAfterPasswordReset(ctx);
       });
 
       expect(createSession).not.toHaveBeenCalled();
@@ -88,7 +97,7 @@ describe("given a request through the password reset endpoint", () => {
     it("opens nothing, because nothing was reset", async () => {
       const { ctx, createSession } = fakeContext({ path: "/reset-password" });
 
-      await runWithPasswordResetScope(() => signInAfterPasswordReset(ctx));
+      await bridge.runWithScope(() => bridge.signInAfterPasswordReset(ctx));
 
       expect(createSession).not.toHaveBeenCalled();
     });
@@ -98,9 +107,9 @@ describe("given a request through the password reset endpoint", () => {
     it("does nothing, even with a user recorded", async () => {
       const { ctx, createSession } = fakeContext({ path: "/sign-in/email" });
 
-      await runWithPasswordResetScope(async () => {
-        recordPasswordReset({ userId: "user_1" });
-        await signInAfterPasswordReset(ctx);
+      await bridge.runWithScope(async () => {
+        bridge.recordPasswordReset({ userId: "user_1" });
+        await bridge.signInAfterPasswordReset(ctx);
       });
 
       expect(createSession).not.toHaveBeenCalled();
@@ -111,10 +120,24 @@ describe("given a request through the password reset endpoint", () => {
     it("records nothing and opens nothing", async () => {
       const { ctx, createSession } = fakeContext({ path: "/reset-password" });
 
-      recordPasswordReset({ userId: "user_1" });
-      await signInAfterPasswordReset(ctx);
+      bridge.recordPasswordReset({ userId: "user_1" });
+      await bridge.signInAfterPasswordReset(ctx);
 
       expect(createSession).not.toHaveBeenCalled();
+    });
+  });
+
+  describe("when better-auth handed the hook no session store", () => {
+    it("opens nothing rather than failing the reset", async () => {
+      const ctx = { path: "/reset-password", context: {} };
+
+      await expect(
+        bridge.runWithScope(async () => {
+          bridge.recordPasswordReset({ userId: "user_1" });
+          await bridge.signInAfterPasswordReset(ctx);
+        }),
+      ).resolves.toBeUndefined();
+      expect(setSessionCookie).not.toHaveBeenCalled();
     });
   });
 });

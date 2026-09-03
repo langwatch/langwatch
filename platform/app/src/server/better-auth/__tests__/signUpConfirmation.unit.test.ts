@@ -1,35 +1,38 @@
 import { IdentityVerificationExpiredError } from "@langwatch/identity";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
-// The three things the endpoint reaches for: the service that spends the
-// link, the directory that finds the account it confirmed, and better-auth's
-// own session writer and cookie setter. The endpoint under test is the real
-// one the plugin mounts.
-const completeVerification = vi.fn();
-vi.mock("~/server/app-layer/identity/runtime", () => ({
-  signUpVerification: () => ({
-    completeVerification: (...args: unknown[]) => completeVerification(...args),
-  }),
-}));
-
-const findFirst = vi.fn();
-vi.mock("~/server/db", () => ({
-  prisma: { user: { findFirst: (...args: unknown[]) => findFirst(...args) } },
-}));
-
 const setSessionCookie = vi.fn();
 vi.mock("better-auth/cookies", () => ({
   setSessionCookie: (...args: unknown[]) => setSessionCookie(...args),
 }));
 
+// The composition root, which the module's thin export reaches for and these
+// cases do not: the endpoint under test is constructed here, over the real
+// minter and in-memory stand-ins for the service that spends the link and the
+// directory that finds the account it confirmed.
+vi.mock("~/server/app-layer/identity/runtime", () => ({
+  signUpConfirmationEndpoint: vi.fn(),
+}));
+
+import { BetterAuthSessionMinter } from "../session-minter";
 import {
-  confirmSignUpAddress,
   SIGN_UP_CONFIRM_ADDRESS_PATH,
+  SignUpConfirmationEndpoint,
   signUpConfirmation,
 } from "../sign-up-confirmation";
 
-/** The endpoint the plugin mounts; its handler is driven directly below. */
-const endpoint = signUpConfirmation().endpoints.confirmSignUpAddress;
+/** The endpoint the plugin mounts. */
+const mounted = signUpConfirmation().endpoints.confirmSignUpAddress;
+
+const completeVerification = vi.fn();
+const findUserIdByEmail = vi.fn();
+
+const endpoint = () =>
+  new SignUpConfirmationEndpoint({
+    verification: { completeVerification },
+    users: { findUserIdByEmail },
+    minter: new BetterAuthSessionMinter(),
+  });
 
 /** A plugin context with just the pieces the handler touches. */
 const fakeContext = ({ token }: { token: string }) => {
@@ -49,8 +52,8 @@ const fakeContext = ({ token }: { token: string }) => {
   return { ctx, createSession, findUserById, json };
 };
 
-const run = async (ctx: unknown) =>
-  (await confirmSignUpAddress(ctx as never)) as {
+const run = async (ctx: ReturnType<typeof fakeContext>["ctx"]) =>
+  (await endpoint().confirmSignUpAddress(ctx)) as {
     body: Record<string, unknown>;
     status: number;
   };
@@ -58,11 +61,11 @@ const run = async (ctx: unknown) =>
 describe("given the sign-up confirmation endpoint", () => {
   beforeEach(() => {
     vi.clearAllMocks();
-    findFirst.mockResolvedValue({ id: "user_1" });
+    findUserIdByEmail.mockResolvedValue("user_1");
   });
 
   it("is mounted on the path the screen posts to", () => {
-    expect(endpoint.path).toBe(SIGN_UP_CONFIRM_ADDRESS_PATH);
+    expect(mounted.path).toBe(SIGN_UP_CONFIRM_ADDRESS_PATH);
     expect(SIGN_UP_CONFIRM_ADDRESS_PATH).toBe("/sign-up/confirm-address");
   });
 
@@ -96,15 +99,27 @@ describe("given the sign-up confirmation endpoint", () => {
       });
     });
 
-    it("finds the account whatever case its address was stored in", async () => {
+    /**
+     * Asked of the directory by address rather than spelled here. Matching it
+     * whatever case the row was written in is that repository's rule, and the
+     * layering guard is what keeps it from being re-spelled at this boundary.
+     */
+    it("asks the directory for the account behind the address it confirmed", async () => {
       const { ctx } = fakeContext({ token: "a-token" });
 
       await run(ctx);
 
-      expect(findFirst).toHaveBeenCalledWith({
-        where: { email: { equals: "sam@acme.com", mode: "insensitive" } },
-        select: { id: true },
-      });
+      expect(findUserIdByEmail).toHaveBeenCalledWith({ email: "sam@acme.com" });
+    });
+
+    it("opens nothing for an address whose account the directory cannot find", async () => {
+      findUserIdByEmail.mockResolvedValue(null);
+      const { ctx, createSession } = fakeContext({ token: "a-token" });
+
+      const answer = await run(ctx);
+
+      expect(createSession).not.toHaveBeenCalled();
+      expect(answer.body).toMatchObject({ signedIn: false });
     });
 
     it("still confirms when no session can be opened", async () => {

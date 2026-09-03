@@ -132,12 +132,8 @@ describe("identity service layering", () => {
       );
       expect(
         ratchet(offenders, [
-          "server/better-auth/bornFinalizedOptIn.ts",
           "server/better-auth/hooks.ts",
           "server/better-auth/index.ts",
-          "server/better-auth/passkey-signup.ts",
-          "server/better-auth/registeredIssuers.ts",
-          "server/better-auth/sign-up-confirmation.ts",
         ]),
       ).toEqual(CLEAN);
     });
@@ -157,12 +153,7 @@ describe("identity service layering", () => {
           "server/app-layer/identity/platform-operators.ts",
           "server/app-layer/identity/runtime.ts",
           "server/app-layer/identity/sso-connection-backoffice.service.ts",
-          "server/better-auth/bornFinalizedOptIn.ts",
           "server/better-auth/hooks.ts",
-          "server/better-auth/last-way-in.ts",
-          "server/better-auth/passkey-signup.ts",
-          "server/better-auth/registeredIssuers.ts",
-          "server/better-auth/sign-up-confirmation.ts",
         ]),
       ).toEqual(CLEAN);
     });
@@ -230,8 +221,6 @@ describe("identity service layering", () => {
           "server/app-layer/identity/runtime.ts",
           "server/app-layer/identity/sso-connection-backoffice.service.ts",
           "server/better-auth/hooks.ts",
-          "server/better-auth/passkey-signup.ts",
-          "server/better-auth/sign-up-confirmation.ts",
           "server/users/credential-user.ts",
         ]),
       ).toEqual(CLEAN);
@@ -242,12 +231,9 @@ describe("identity service layering", () => {
       const offenders = offendersOf(scope, (_file, source) =>
         linesMatching(source, /where:\s*\{\s*ssoDomain\b/),
       );
-      expect(
-        ratchet(offenders, [
-          "server/better-auth/bornFinalizedOptIn.ts",
-          "server/better-auth/hooks.ts",
-        ]),
-      ).toEqual(CLEAN);
+      expect(ratchet(offenders, ["server/better-auth/hooks.ts"])).toEqual(
+        CLEAN,
+      );
     });
 
     /** @scenario "A question about the data is asked in one place" */
@@ -265,12 +251,9 @@ describe("identity service layering", () => {
       const offenders = offendersOf(sourceFiles(BETTER_AUTH), (_file, source) =>
         linesMatching(source, /^let\s/),
       );
-      expect(
-        ratchet(offenders, [
-          "server/better-auth/index.ts",
-          "server/better-auth/registeredIssuers.ts",
-        ]),
-      ).toEqual(CLEAN);
+      expect(ratchet(offenders, ["server/better-auth/index.ts"])).toEqual(
+        CLEAN,
+      );
     });
   });
 });

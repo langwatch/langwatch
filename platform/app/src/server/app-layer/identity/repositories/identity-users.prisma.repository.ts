@@ -61,4 +61,37 @@ export class PrismaIdentityUsersRepository implements IdentityUsersRepository {
     });
     return user?.id ?? null;
   }
+
+  /**
+   * Who holds an address, and everything they could sign into it with.
+   *
+   * The wider read behind the passkey sign-up guard, which has to tell an
+   * account apart from the residue of a ceremony that never finished. Both
+   * credential tables are selected, because a user whose backfill has
+   * finalized keeps theirs in `AccountCredential` rather than `Account`; one
+   * passkey and one membership are enough, because the question is only
+   * whether any exists.
+   *
+   * Case-insensitive for the same reason `findUserIdByEmail` is: rows written
+   * before addresses were stored lowercased may carry capitals, and a
+   * case-twin beside one is two Users answering for one person.
+   */
+  async findAddressHolder({ email }: { email: string }): Promise<{
+    id: string;
+    accounts: { provider: string; password: string | null }[];
+    accountCredentials: { provider: string; password: string | null }[];
+    passkeys: { id: string }[];
+    orgMemberships: { organizationId: string }[];
+  } | null> {
+    return await this.prisma.user.findFirst({
+      where: { email: { equals: email, mode: "insensitive" } },
+      select: {
+        id: true,
+        accounts: { select: { provider: true, password: true } },
+        accountCredentials: { select: { provider: true, password: true } },
+        passkeys: { select: { id: true }, take: 1 },
+        orgMemberships: { select: { organizationId: true }, take: 1 },
+      },
+    });
+  }
 }

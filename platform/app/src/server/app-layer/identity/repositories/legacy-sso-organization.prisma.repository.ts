@@ -32,4 +32,22 @@ export class PrismaLegacySsoOrganizationRepository
       ssoProvider: organization.ssoProvider,
     };
   }
+
+  /**
+   * The organization that claims a domain through the legacy column.
+   *
+   * The other direction of the same pair, for the born-finalized entrance
+   * (ADR-116 §3): it holds an address and needs the organization a targeting
+   * rule can name. `ssoDomain` is unique, so there is one answer or none.
+   */
+  async findByDomain({
+    domain,
+  }: {
+    domain: string;
+  }): Promise<{ id: string } | null> {
+    return await this.prisma.organization.findUnique({
+      where: { ssoDomain: domain },
+      select: { id: true },
+    });
+  }
 }

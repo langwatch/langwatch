@@ -1,9 +1,7 @@
 import { extractEmailDomain } from "@ee/sso/matching";
 import { normalizedRequestPathname } from "@ee/sso/ssoPathGate";
 import { createLogger } from "@langwatch/observability";
-import { prisma } from "~/server/db";
-import { featureFlagService } from "~/server/featureFlag";
-import { NOT_TARGETED } from "~/server/featureFlag/targeting";
+import { bornFinalizedOptIn } from "~/server/app-layer/identity/runtime";
 
 const logger = createLogger("langwatch:identity:born-finalized-opt-in");
 
@@ -24,15 +22,39 @@ export const BORN_FINALIZED_SIGNUP_FLAG =
  */
 const SIGN_UP_PATH_SUFFIX = "/sign-up/email";
 
+/** Which organization a legacy SSO domain names, when one claims it. */
+export interface BornFinalizedOrganizationsPort {
+  findByDomain(args: { domain: string }): Promise<{ id: string } | null>;
+}
+
 /**
- * Whether THIS request may create its user on the identity branch.
+ * The allowlist itself, asked of one address.
+ *
+ * `organizationId` is null where the address's domain names no organization,
+ * which is the ordinary fresh sign-up; the implementation is what decides
+ * what an absent scope means to a targeting rule.
+ */
+export interface BornFinalizedFlagPort {
+  isEnabled(args: {
+    distinctId: string;
+    organizationId: string | null;
+  }): Promise<boolean>;
+}
+
+export interface BornFinalizedOptInDeps {
+  organizations: BornFinalizedOrganizationsPort;
+  flag: BornFinalizedFlagPort;
+}
+
+/**
+ * Whether a request may create its user on the identity branch.
  *
  * ## Where the decision has to be made
  *
  * At the route boundary, and nowhere lower. The storage adapter cannot ask
  * the question — the user does not exist yet, so there is no organization to
  * evaluate a flag against and no state row for the gate to read. Below this
- * function the answer is carried as a request-scoped marker and nothing
+ * class the answer is carried as a request-scoped marker and nothing
  * re-decides it.
  *
  * ## What the request actually tells us
@@ -66,37 +88,44 @@ const SIGN_UP_PATH_SUFFIX = "/sign-up/email";
  * Fails CLOSED on everything: a body it cannot parse, a flag it cannot
  * read, a lookup that throws. Off means "created the way it always was".
  */
-export async function isBornFinalizedSignUp({
-  request,
-}: {
-  request: Request;
-}): Promise<boolean> {
-  if (request.method !== "POST") return false;
-  const pathname = normalizedRequestPathname(request.url);
-  if (!pathname.endsWith(SIGN_UP_PATH_SUFFIX)) return false;
+export class BornFinalizedOptIn {
+  constructor(private readonly deps: BornFinalizedOptInDeps) {}
 
-  const email = await signUpEmailOf(request);
-  if (email === null) return false;
+  async isBornFinalizedSignUp({
+    request,
+  }: {
+    request: Request;
+  }): Promise<boolean> {
+    if (request.method !== "POST") return false;
+    const pathname = normalizedRequestPathname(request.url);
+    if (!pathname.endsWith(SIGN_UP_PATH_SUFFIX)) return false;
 
-  try {
-    const organizationId = await organizationForDomain(email);
-    return await featureFlagService.isEnabled(BORN_FINALIZED_SIGNUP_FLAG, {
-      distinctId: email,
-      defaultValue: false,
-      // Sign-up time: the person has no project yet, and an organization
-      // only when their email domain matches one.
-      projectId: NOT_TARGETED,
-      organizationId: organizationId ?? NOT_TARGETED,
-    });
-  } catch (error) {
-    // Never fail the sign-up over the flag itself: an unreadable flag means
-    // the user is created the way every user was created before this
-    // existed.
-    logger.warn(
-      { error },
-      "could not evaluate the born-finalized sign-up flag; the sign-up takes the legacy branch",
-    );
-    return false;
+    const email = await signUpEmailOf(request);
+    if (email === null) return false;
+
+    try {
+      return await this.deps.flag.isEnabled({
+        distinctId: email,
+        organizationId: await this.organizationForDomain(email),
+      });
+    } catch (error) {
+      // Never fail the sign-up over the flag itself: an unreadable flag means
+      // the user is created the way every user was created before this
+      // existed.
+      logger.warn(
+        { error },
+        "could not evaluate the born-finalized sign-up flag; the sign-up takes the legacy branch",
+      );
+      return false;
+    }
+  }
+
+  /** The organization the address's domain names, when one claims it. */
+  private async organizationForDomain(email: string): Promise<string | null> {
+    const domain = extractEmailDomain(email);
+    if (domain === null) return null;
+    const organization = await this.deps.organizations.findByDomain({ domain });
+    return organization?.id ?? null;
   }
 }
 
@@ -115,13 +144,9 @@ async function signUpEmailOf(request: Request): Promise<string | null> {
   }
 }
 
-/** The organization the address's domain names, when one claims it. */
-async function organizationForDomain(email: string): Promise<string | null> {
-  const domain = extractEmailDomain(email);
-  if (domain === null) return null;
-  const organization = await prisma.organization.findUnique({
-    where: { ssoDomain: domain },
-    select: { id: true },
-  });
-  return organization?.id ?? null;
+/** Whether THIS request may create its user on the identity branch. */
+export function isBornFinalizedSignUp(args: {
+  request: Request;
+}): Promise<boolean> {
+  return bornFinalizedOptIn().isBornFinalizedSignUp(args);
 }

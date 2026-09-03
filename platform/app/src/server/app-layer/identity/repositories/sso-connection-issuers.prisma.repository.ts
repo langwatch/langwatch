@@ -12,18 +12,21 @@ const logger = createLogger("langwatch:identity:connection-issuers");
  * mapping the legacy storage branch needs is a read of something a customer
  * already stated, never a guess derived from the shape of a string.
  *
- * CACHED, for the reason `registeredIssuers.ts` caches the same table: one
- * sign-in ceremony is several requests, each of which asks, and re-reading a
- * handful of rows for every one of them turns one sign-in into a burst of
- * identical queries. The window is short enough that a connection registered
- * a moment ago works on the administrator's first attempt — which is the case
- * that matters, because they are standing on the setup screen when they press
- * it.
+ * THE PORT'S TWO READS ARE CACHED, for the reason the trusted-origin
+ * allowlist caches the same table: one sign-in ceremony is several requests,
+ * each of which asks, and re-reading a handful of rows for every one of them
+ * turns one sign-in into a burst of identical queries. The window is short
+ * enough that a connection registered a moment ago works on the
+ * administrator's first attempt — which is the case that matters, because they
+ * are standing on the setup screen when they press it.
  *
- * A read that fails answers "not a connection" rather than throwing. That
- * degrades to the behavior this replaced (an unanswerable issuer) instead of
- * taking down every sign-in of every kind, and it is logged at warn because a
- * database we cannot reach is a real fault even where it degrades.
+ * When one of those two fails it answers "not a connection" rather than
+ * throwing. That degrades to the behavior this replaced (an unanswerable
+ * issuer) instead of taking down every sign-in of every kind, and it is logged
+ * at warn because a database we cannot reach is a real fault even where it
+ * degrades. The two `find*` reads below are the trusted-origin allowlist's,
+ * and they raise: what an unreadable table costs THAT caller is its own
+ * decision, and it makes a different one.
  */
 export class PrismaSsoConnectionIssuers
   implements IdentityConnectionIssuersPort
@@ -84,6 +87,40 @@ export class PrismaSsoConnectionIssuers
   }): Promise<string | null> {
     const rows = await this.rows();
     return rows.find((row) => row.providerId === providerId)?.issuer ?? null;
+  }
+
+  /**
+   * One connection's issuer, read fresh, or null when it registered none.
+   *
+   * Deliberately outside the memo above. The trusted-origin allowlist asks
+   * this on the common single sign-on path — every `/sso/callback/:providerId`
+   * and SAML ACS names a connection — and a connection registered a moment ago
+   * has to be dialable immediately. One row by unique key is a cheap query.
+   *
+   * Raises what it cannot read, unlike the memoized pair: whether an
+   * unreadable table means "trust nothing" is the allowlist's decision, and
+   * swallowing it here would take that decision away from it.
+   */
+  async findIssuerForConnection({
+    connectionId,
+  }: {
+    connectionId: string;
+  }): Promise<string | null> {
+    const row = await this.prisma.ssoProvider.findFirst({
+      where: { providerId: connectionId },
+      select: { issuer: true },
+    });
+    return row?.issuer ?? null;
+  }
+
+  /** Every issuer any connection registered, read fresh and raising. */
+  async findAllIssuers(): Promise<readonly string[]> {
+    const rows = await this.prisma.ssoProvider.findMany({
+      select: { issuer: true },
+    });
+    return rows
+      .map((row) => row.issuer)
+      .filter((issuer): issuer is string => !!issuer);
   }
 
   private async rows(): Promise<Array<{ providerId: string; issuer: string }>> {
