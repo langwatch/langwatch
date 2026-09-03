@@ -49,7 +49,6 @@ interface LiveSocket {
   socket: WebSocket;
   session: ControlSession;
   unsubscribe: (() => Promise<void>) | null;
-  isAlive: boolean;
   pongs: number;
   ping: NodeJS.Timeout | null;
   heartbeat: NodeJS.Timeout | null;
@@ -167,7 +166,6 @@ export class LocalControlGateway {
       socket: ws,
       session: registered.session,
       unsubscribe: null,
-      isAlive: true,
       pongs: 0,
       ping: null,
       heartbeat: null,
@@ -180,7 +178,6 @@ export class LocalControlGateway {
 
     ws.on("message", (data) => void this.onFrame(live, data));
     ws.on("pong", () => {
-      live.isAlive = true;
       live.pongs += 1;
     });
     ws.on("close", () => void this.detach(live));
@@ -247,7 +244,6 @@ export class LocalControlGateway {
       // Each ping carries its own deadline, so a pong that lands inside the
       // wait keeps the socket even when the next ping already went out.
       const pongsBefore = live.pongs;
-      live.isAlive = false;
       live.socket.ping();
       setTimeout(() => {
         if (live.pongs !== pongsBefore) return;
@@ -261,8 +257,16 @@ export class LocalControlGateway {
     }, this.pingIntervalMs);
     live.ping.unref();
 
+    // Presence is refreshed for as long as the socket is open, and nothing
+    // else. Reading the ping's own in-flight flag here would be wrong twice
+    // over: both clocks run on the same period and are armed in the same tick,
+    // so the ping always clears the flag first and the refresh never runs,
+    // and a peer that stops answering is already handled — the pong deadline
+    // above terminates the socket, detach stops this clock, and presence then
+    // expires on its own. Without this the folder read offline thirty seconds
+    // after it connected, with the command line still connected and healthy.
     live.heartbeat = setInterval(() => {
-      if (!live.isAlive) return;
+      if (live.socket.readyState !== WebSocket.OPEN) return;
       void this.core.heartbeat(live.session);
     }, this.pingIntervalMs);
     live.heartbeat.unref();

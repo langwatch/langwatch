@@ -482,6 +482,29 @@ describe("given an approved control request", () => {
       await cli.closed();
     });
 
+    it("keeps refreshing presence while the socket stays open", async () => {
+      const key = await approvedSessionKey(podA);
+      const { cli } = await shareFolder(podA, key);
+      // Let the writes registration itself makes settle, so the baseline is
+      // the record as it stands with nothing but the heartbeat left to move it.
+      await new Promise((resolve) => setTimeout(resolve, 1_000));
+      const before = (await podA.runtime.presence.read(conversationId))
+        ?.lastSeenAt;
+      expect(before).toBeDefined();
+
+      // Five ping periods of an idle but healthy socket. The presence record
+      // has to move: it expires thirty seconds after the last refresh, so a
+      // heartbeat that never runs takes the folder offline mid-turn while the
+      // command line is still connected.
+      await new Promise((resolve) => setTimeout(resolve, 1_000));
+      const after = (await podA.runtime.presence.read(conversationId))
+        ?.lastSeenAt;
+      expect(after).toBeGreaterThan(before!);
+
+      cli.close();
+      await cli.closed();
+    });
+
     /** @scenario "The connection carries what Langy would otherwise probe" */
     it("carries the checklist Langy would spend a turn asking for", async () => {
       const key = await approvedSessionKey(podA);
