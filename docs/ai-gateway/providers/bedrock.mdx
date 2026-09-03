@@ -49,7 +49,7 @@ curl https://gateway.langwatch.ai/v1/chat/completions \
 | `POST /v1/chat/completions` | Yes |
 | `POST /v1/messages` | Yes, translated |
 | `POST /v1/embeddings` | Yes, for Bedrock embedding models |
-| `POST /v1/images/generations`, `POST /v1/images/edits` | Yes, non-streaming. See [Images](/ai-gateway/api/images) |
+| `POST /v1/images/generations`, `POST /v1/images/edits` | No. Bedrock answers `400` with "The provided model identifier is invalid." for every image model |
 | `GET /v1/models` | Yes, the ids under Custom Models |
 
 `cache_control` blocks on Anthropic models become Converse `cachePoint` markers, and the cache token counts come back in `usage`. See [Cache control](/ai-gateway/cache-control).
