@@ -14,8 +14,15 @@
  * Three claims, weakest to strongest:
  *
  *  1. exactly one module imports the scorer, and it is the background job;
- *  2. exactly one module imports that job, and it is the composition root;
+ *  2. nothing imports that job at all, now the nightly pass is gone;
  *  3. walking out from the request surfaces never arrives at the scorer.
+ *
+ * Claim 2 used to name the composition root, which booked the job nightly. The
+ * appointment is gone (nothing writes `DiscoveredPerson` yet, so every pass
+ * read an empty table) and the job is left with no caller. Asserting the empty
+ * list rather than deleting the claim is the point: the next caller written is
+ * the one that has to be a background job, and this line is what makes adding
+ * it visible in review instead of silent.
  *
  * The third treats the composition root as a leaf, and that exclusion is stated
  * rather than hidden: `presets.ts` composes every service in the process and is
@@ -207,10 +214,8 @@ describe("Feature: where the name scorer can be reached from", () => {
   });
 
   describe("given the modules that import the background job", () => {
-    it("finds exactly the composition root, which only builds it on the worker role", () => {
-      expect(directImportersOf(SUGGESTION_JOB)).toEqual([
-        relative(APP_DIR, COMPOSITION_ROOT),
-      ]);
+    it("finds none, because nothing calls the job yet", () => {
+      expect(directImportersOf(SUGGESTION_JOB)).toEqual([]);
     });
   });
 

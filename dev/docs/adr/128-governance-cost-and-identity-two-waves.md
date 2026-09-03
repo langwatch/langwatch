@@ -876,9 +876,13 @@ The match policy for `IdentityMatch`:
   before any edit distance is computed — a length band plus a
   shared-token requirement — and only surviving pairs are scored. The
   job runs when its inputs change (new or updated discovered people, org
-  membership changes), never per page view. Suggestion rows are
-  invalidated and recomputed by the same job, so the lifecycle v3.8
-  wanted to avoid is a job's, not a screen's.
+  membership changes), never per page view, and **never on a timer**:
+  nothing writes a discovered person yet, so a standing appointment
+  would read an empty table on every organization for ever. The engine
+  is built and runs when something asks it to; the caller arrives with
+  the feed that discovers people, and it is a call site rather than a
+  redesign. Suggestion rows are invalidated and recomputed by the same
+  job, so the lifecycle v3.8 wanted to avoid is a job's, not a screen's.
 
   Accepted cost: a suggestion can be a few minutes stale after a
   discovery, and dismissals are now storable but stay out of v1 (a maybe
