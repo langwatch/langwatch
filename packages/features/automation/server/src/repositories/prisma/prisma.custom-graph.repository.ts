@@ -38,6 +38,20 @@ export class PrismaCustomGraphRepository extends CustomGraphRepository {
     return row !== null;
   }
 
+  async findAllByDashboardId(input: {
+    dashboardId: string;
+    projectId: string;
+  }): Promise<CustomGraph[]> {
+    return (await this.database.customGraph.findMany({
+      where: {
+        dashboardId: input.dashboardId,
+        projectId: input.projectId,
+        kind: BUILDER_CHART_KIND,
+      },
+      orderBy: [{ gridRow: "asc" }, { gridColumn: "asc" }],
+    })) as CustomGraph[];
+  }
+
   async findAllNamesByIds(input: {
     customGraphIds: string[];
     projectId: string;

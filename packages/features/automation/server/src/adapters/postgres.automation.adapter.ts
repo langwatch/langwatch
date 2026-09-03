@@ -86,6 +86,7 @@ export class PostgresAutomationAdapter {
         jobs: this.input.jobs,
         clock: this.input.clock,
         wake: this.input.wake,
+        triggers: triggerRepository,
       }),
       clock: this.input.clock,
       customGraphs: PrismaCustomGraphRepository.create(database),

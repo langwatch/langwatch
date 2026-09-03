@@ -108,12 +108,25 @@ export class AutomationWorkerFeatureInstaller extends WorkerFeatureInstallerPort
   static create<TEvent extends Event>(options: {
     installer: AutomationWorkerCapability<TEvent>;
     eventing: WorkerEventingRuntime;
+    /**
+     * The scheduled-report calendar, when this process composed one.
+     *
+     * It rides Automation's installer rather than one of its own because a
+     * report IS an automation: the rows it fires are `Trigger` rows, the
+     * message it sends goes through Automation's delivery, and the fire it
+     * records lands in the same history the automations page reads. A second
+     * installer would also have to claim a routing key on the shared queue —
+     * the calendar claims none, because it is a Postgres loop rather than a
+     * queue consumer.
+     */
+    reportSchedule?: AutomationReportSchedule;
   }): AutomationWorkerFeatureInstaller {
     return new AutomationWorkerFeatureInstaller(
       () =>
         options.eventing.eventSourcing.register(
           options.installer.buildPipeline({ retention: options.eventing.processStore }),
         ).commands,
+      options.reportSchedule,
     );
   }
 
@@ -122,7 +135,10 @@ export class AutomationWorkerFeatureInstaller extends WorkerFeatureInstallerPort
   readonly triggerMatches = new WorkerAutomationTriggerMatches();
   private installed = false;
 
-  private constructor(private readonly registerPipeline: () => unknown) {
+  private constructor(
+    private readonly registerPipeline: () => unknown,
+    private readonly reportSchedule: AutomationReportSchedule | undefined,
+  ) {
     super();
   }
 
@@ -140,20 +156,31 @@ export class AutomationWorkerFeatureInstaller extends WorkerFeatureInstallerPort
           },
         ),
       );
+      this.reportSchedule?.start();
       this.installed = true;
     }
-    return AutomationWorkerFeatureHandle.create();
+    return AutomationWorkerFeatureHandle.create(this.reportSchedule);
   }
 }
 
+/** The report calendar's lifecycle, as this installer drives it. */
+export interface AutomationReportSchedule {
+  start(): void;
+  stop(): Promise<void>;
+}
+
 class AutomationWorkerFeatureHandle extends WorkerFeatureHandlePort {
-  static create(): AutomationWorkerFeatureHandle {
-    return new AutomationWorkerFeatureHandle();
+  static create(
+    reportSchedule: AutomationReportSchedule | undefined,
+  ): AutomationWorkerFeatureHandle {
+    return new AutomationWorkerFeatureHandle(reportSchedule);
   }
 
-  private constructor() {
+  private constructor(private readonly reportSchedule: AutomationReportSchedule | undefined) {
     super();
   }
 
-  async close(): Promise<void> {}
+  async close(): Promise<void> {
+    await this.reportSchedule?.stop();
+  }
 }

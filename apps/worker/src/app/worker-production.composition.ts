@@ -169,6 +169,10 @@ import {
   TraceProcessingServerInstaller,
 } from "@langwatch/trace-server";
 import { createWorkerAnalytics } from "./worker-analytics.composition";
+import {
+  createWorkerReportSchedule,
+  createWorkerReportTraceList,
+} from "./worker-report-schedule.composition";
 import { createWorkerGovernanceIngestion } from "./worker-governance-ingestion.composition";
 import type { IngestionPullLifecycleDatabase } from "@langwatch/enterprise-governance-server";
 import {
@@ -1097,6 +1101,40 @@ export class WorkerProductionComposition {
       ...(automationAbsence ? { absence: automationAbsence } : {}),
     });
     const automationClock = new WorkerAutomationClock();
+    // ADR-044 Phase 3c: the scheduled-report calendar.
+    //
+    // Composed exactly when this process holds the typed client the calendar
+    // row lives in AND can send: a report that came due on a process with no
+    // mail would claim its slot, render its data and deliver nothing, which is
+    // strictly worse than a slot nobody claimed — the lease settles, the
+    // calendar advances, and the period it summarised is gone.
+    const reportSchedule =
+      options.connection && mail && automationDelivery
+        ? createWorkerReportSchedule({
+            connection: options.connection,
+            clock: automationClock,
+            delivery: automationDelivery,
+            projects: traceServices.projects,
+            analytics: createWorkerAnalytics({
+              resolveClickHouseClient: options.eventing
+                .resolveClickHouseClient as unknown as Parameters<
+                typeof createWorkerAnalytics
+              >[0]["resolveClickHouseClient"],
+              defaultRetentionDays: options.eventing.retention.defaultRetentionDays,
+            }),
+            traces: createWorkerReportTraceList({
+              resolveClickHouseClient: options.eventing
+                .resolveClickHouseClient as unknown as Parameters<
+                typeof createWorkerReportTraceList
+              >[0]["resolveClickHouseClient"],
+              defaultRetentionDays: options.eventing.retention.defaultRetentionDays,
+              baseHost: mail.baseHost,
+            }),
+            baseHost: mail.baseHost,
+            redis: processRedis,
+            ...(options.observability ? { logger: options.observability.logger } : {}),
+          })
+        : undefined;
     const automation = AutomationWorkerFeatureInstaller.create({
       installer: createWorkerAutomationSettlement({
         config: options.config,
@@ -1145,6 +1183,7 @@ export class WorkerProductionComposition {
         ...(options.observability ? { logger: options.observability.logger } : {}),
       }),
       eventing,
+      ...(reportSchedule ? { reportSchedule } : {}),
     });
     // Evaluation's durable pipeline, composed here rather than received.
     //

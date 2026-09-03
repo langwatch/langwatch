@@ -263,6 +263,18 @@ export {
   type ReportGraphInput,
 } from "./services/report-chart.service";
 export { toReportTraceRow } from "./services/report-trace-row.service";
+/**
+ * The two Postgres reads a scheduled report fires through, published so a
+ * background process can compose the handler over its own client.
+ *
+ * A report's fire is recorded in the SAME `TriggerSent` history the automations
+ * page reads its last-sent from, and its panels are the SAME builder charts the
+ * dashboard draws — so both are the feature's own repositories rather than two
+ * queries a composition root writes for itself.
+ */
+export { PrismaTriggerFireHistoryRepository } from "./repositories/prisma/prisma.trigger-fire-history.repository";
+export { PrismaCustomGraphRepository } from "./repositories/prisma/prisma.custom-graph.repository";
+export { ReportScheduleService } from "./services/report-schedule.service";
 export {
   AUTOMATION_AUTO_PAUSED_METRIC_NAME,
   AUTOMATION_CEILING_BREACH_METRIC_NAME,

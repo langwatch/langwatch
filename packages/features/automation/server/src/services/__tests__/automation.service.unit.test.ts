@@ -46,6 +46,9 @@ class EmptyCustomGraphs extends CustomGraphRepository {
   existsInProject(): Promise<boolean> {
     return Promise.resolve(false);
   }
+  findAllByDashboardId(): Promise<[]> {
+    return Promise.resolve([]);
+  }
   findAllNamesByIds(): Promise<[]> {
     return Promise.resolve([]);
   }
@@ -250,6 +253,7 @@ const makeService = (
     jobs: new Jobs(),
     clock: new Clock(),
     wake: new Wake(),
+    triggers,
   }),
   suppressions = new Suppressions(),
 ): AutomationService =>
@@ -462,6 +466,7 @@ describe("AutomationService email suppression", () => {
         jobs: new Jobs(),
         clock: new Clock(),
         wake: new Wake(),
+        triggers: new Triggers(),
       }),
       repo,
     );
@@ -518,6 +523,7 @@ describe("AutomationService email suppression", () => {
         jobs,
         clock: new Clock(),
         wake: new Wake(),
+        triggers,
       }),
     );
 

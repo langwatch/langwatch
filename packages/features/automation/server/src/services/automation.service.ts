@@ -260,41 +260,8 @@ export class AutomationService extends AutomationCapability {
     return this.reportSchedules.remove(input);
   }
 
-  async reconcileReportSchedules(): Promise<{ repaired: number }> {
-    const reports = await this.triggers.findActiveReportTargets();
-    if (reports.length === 0) {
-      return { repaired: 0 };
-    }
-
-    const scheduledTargetIds = new Set<string>();
-    const projectIds = new Set(reports.map((report) => report.projectId));
-    for (const projectId of projectIds) {
-      const schedules = await this.reportSchedules.getAll({ projectId });
-      for (const schedule of schedules) {
-        scheduledTargetIds.add(schedule.triggerId);
-      }
-    }
-
-    let repaired = 0;
-    for (const report of reports) {
-      if (scheduledTargetIds.has(report.id)) {
-        continue;
-      }
-
-      const parsed = ReportScheduleService.tryExtract(report.actionParams);
-      if (!parsed) {
-        continue;
-      }
-
-      await this.reportSchedules.sync({
-        projectId: report.projectId,
-        triggerId: report.id,
-        schedule: parsed.schedule,
-      });
-      repaired += 1;
-    }
-
-    return { repaired };
+  reconcileReportSchedules(): Promise<{ repaired: number }> {
+    return this.reportSchedules.reconcile();
   }
 
   getFireStats(input: { projectId: string }): Promise<TriggerFireStats[]> {

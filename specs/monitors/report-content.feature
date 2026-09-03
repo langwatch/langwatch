@@ -9,6 +9,7 @@ Feature: What a scheduled report actually sends
 
   Rule: A report carries its data, not just a link to it
 
+    @unit
     Scenario: A trace-query report sends the traces that matched
       Given a report whose source is matching traces
       And the author has written a search query for the traces they care about
@@ -17,23 +18,27 @@ Feature: What a scheduled report actually sends
       And each trace carries its own cost, duration, model, and status
       And following the report's link opens the same traces
 
+    @unit
     Scenario: A trace-query report without a query sends the window's traces
       Given a report whose source is matching traces
       And the author has written no search query
       When the report fires
       Then it sends the most recent traces in the report's window
 
+    @unit
     Scenario: A custom-graph report sends the graph
       Given a report whose source is a custom graph
       When the report fires
       Then it sends the graph's series plotted over the report's window
       And it names the graph and its headline value
 
+    @unit
     Scenario: A dashboard report sends every panel on the dashboard
       Given a report whose source is a dashboard
       When the report fires
       Then it sends one chart per panel on that dashboard
 
+    @unit
     Scenario: A report whose source has no data still delivers
       Given a report whose graph returns no data points for the window
       When the report fires

@@ -1,5 +1,4 @@
-import type { ReportChart, ReportSource } from "@langwatch/automation-contract";
-import type { CustomGraph } from "@langwatch/prisma-client/generated";
+import type { CustomGraph, ReportChart, ReportSource } from "@langwatch/automation-contract";
 import {
   aggregateSeriesValues,
   buildSeriesName,
@@ -52,10 +51,7 @@ export interface ReportChartDeps {
     customGraphId: string;
   }): Promise<CustomGraph | null>;
   /** Every panel on a dashboard, in the dashboard's own grid order. */
-  loadDashboardGraphs(params: {
-    projectId: string;
-    dashboardId: string;
-  }): Promise<CustomGraph[]>;
+  loadDashboardGraphs(params: { projectId: string; dashboardId: string }): Promise<CustomGraph[]>;
   getTimeseries(input: AnalyticsTimeseriesInput): Promise<AnalyticsTimeseriesResult>;
 }
 
@@ -117,9 +113,7 @@ async function mapWithConcurrency<T, R>(
       results[index] = await fn(items[index]!, index);
     }
   };
-  await Promise.all(
-    Array.from({ length: Math.min(concurrency, items.length) }, () => worker()),
-  );
+  await Promise.all(Array.from({ length: Math.min(concurrency, items.length) }, () => worker()));
   return results;
 }
 
@@ -277,9 +271,7 @@ async function buildChart({
   }
 
   const timeScale = graphData.timeScale ?? 60;
-  const categories = buckets.map((bucket) =>
-    formatBucketLabel({ date: bucket.date, timeScale }),
-  );
+  const categories = buckets.map((bucket) => formatBucketLabel({ date: bucket.date, timeScale }));
   const series = seriesInputs.map((input, index) => ({
     name: graphData.series?.[index]?.name ?? bucketKeys[index]!,
     data: extractSeriesPoints(buckets, bucketKeys[index]!, graphData.groupBy).map(

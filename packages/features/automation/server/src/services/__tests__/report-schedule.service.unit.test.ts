@@ -2,7 +2,16 @@ import { describe, expect, it } from "vitest";
 import { AutomationClockPort } from "../../ports/automation-clock.port";
 import { ScheduledJobStorePort, type ScheduledJobRecord } from "../../ports/scheduled-jobs.port";
 import { SchedulerWakePort } from "../../ports/scheduler-wake.port";
+import type {
+  ReportScheduleTarget,
+  TriggerRepository,
+} from "../../repositories/trigger.repository";
 import { ReportScheduleService } from "../report-schedule.service";
+
+/** Only the one read the reconcile sweep makes; the rest is not this test's subject. */
+function reportTargets(rows: ReportScheduleTarget[]): TriggerRepository {
+  return { findActiveReportTargets: async () => rows } as unknown as TriggerRepository;
+}
 
 class Clock extends AutomationClockPort {
   now(): Date {
@@ -49,6 +58,7 @@ describe("ReportScheduleService", () => {
       jobs,
       clock: new Clock(),
       wake,
+      triggers: reportTargets([]),
     });
     await service.sync({
       projectId: "p",
