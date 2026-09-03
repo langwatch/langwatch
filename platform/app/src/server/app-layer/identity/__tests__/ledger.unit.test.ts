@@ -286,7 +286,7 @@ describe("the identity ledger writer", () => {
     it("writes the identifier row before staging, with no cursor, and the fold overwrites it whole", async () => {
       const lagging = harness({ foldNeverLands: true });
 
-      const events = await lagging.identity.attachIdentifier(attachData());
+      const facts = await lagging.identity.attachIdentifier(attachData());
 
       // Routable already: the row is there while the command is still queued.
       const provisional = [...lagging.store.provisional.values()];
@@ -298,8 +298,13 @@ describe("the identity ledger writer", () => {
       expect(lagging.store.stored.get(USER)).toBeUndefined();
       expect(await lagging.heads.hasFolded({ userId: USER })).toBe(false);
 
-      // The queue drains: the fold writes the same row whole and sets the
+      // The queue drains: the queued run states the same facts under the
+      // same command, and the fold writes the same row whole and sets the
       // cursor. Nothing about the row changes.
+      const events = identityEventsFor({
+        command: { type: ATTACH_IDENTIFIER_COMMAND_TYPE, data: attachData() },
+        facts,
+      });
       foldInto(lagging.store, events);
       const folded = lagging.store.stored.get(USER)!;
       const identifierId = provisional[0]!.identifierId;
