@@ -1,10 +1,12 @@
 /**
  * What the terminal shows while a folder is shared.
  *
- * One line per call, and nothing else: the command output belongs to Langy,
- * and echoing it here would bury the two lines that matter, the permission
- * question and the disconnect. The line builders are plain functions so a
- * test reads the words rather than the colours.
+ * One line per call, and nothing else: the command output and the failure text
+ * belong to Langy, and echoing them here would bury the two lines that matter,
+ * the permission question and the disconnect. So a call reads as the tool plus
+ * the path or the command, and a failure adds a short reason. The line
+ * builders are plain functions so a test reads the words rather than the
+ * colours.
  */
 
 import chalk from "chalk";
@@ -86,24 +88,60 @@ export function conversationLink({
   }
 }
 
+/** How much of a path or a command one line carries. */
+const MAX_TARGET_LENGTH = 60;
+
+/** How much of a failure one line carries. */
+const MAX_REASON_LENGTH = 70;
+
+/**
+ * `text` cut to `max`, at the last whole word when there is one, and closed
+ * with an ellipsis. A terminal line that wraps twice is not one line.
+ */
+export function shorten(text: string, max: number): string {
+  const flat = text.replace(/\s+/g, " ").trim();
+  if (flat.length <= max) return flat;
+  const cut = flat.slice(0, max);
+  const lastSpace = cut.lastIndexOf(" ");
+  const words = lastSpace > max / 2 ? cut.slice(0, lastSpace) : cut;
+  return `${words.replace(/[\s.,;:!?-]+$/, "")}\u2026`;
+}
+
+/**
+ * The reason a failure reads as. The full text still goes back to Langy, which
+ * is what acts on it; the terminal only says what stopped.
+ */
+export function shortReason(message: string): string {
+  const first = message
+    .split("\n")
+    .map((line) => line.trim())
+    .find((line) => line.length > 0);
+  return shorten(first ?? "failed", MAX_REASON_LENGTH);
+}
+
 /** What one call reads as: the tool and what it points at. */
 export function callLine(call: LocalCall): string {
   switch (call.tool) {
     case "local_read":
-      return `read ${call.params.path}`;
+      return `read ${shorten(call.params.path, MAX_TARGET_LENGTH)}`;
     case "local_write":
-      return `write ${call.params.path}`;
+      return `write ${shorten(call.params.path, MAX_TARGET_LENGTH)}`;
     case "local_edit":
-      return `edit ${call.params.path}`;
+      return `edit ${shorten(call.params.path, MAX_TARGET_LENGTH)}`;
     case "local_bash":
-      return `bash ${call.params.command}`;
+      return `bash ${shorten(call.params.command, MAX_TARGET_LENGTH)}`;
     case "local_grep":
-      return `grep ${call.params.pattern}${call.params.path ? ` in ${call.params.path}` : ""}`;
+      return `grep ${shorten(call.params.pattern, MAX_TARGET_LENGTH)}${call.params.path ? ` in ${shorten(call.params.path, MAX_TARGET_LENGTH)}` : ""}`;
     case "local_find":
-      return `find ${call.params.pattern}`;
+      return `find ${shorten(call.params.pattern, MAX_TARGET_LENGTH)}`;
     case "local_ls":
-      return `ls ${call.params.path ?? "."}`;
+      return `ls ${shorten(call.params.path ?? ".", MAX_TARGET_LENGTH)}`;
   }
+}
+
+/** True when a command ended with a status the developer should see. */
+export function commandFailed(output: BashOutput): boolean {
+  return output.pid === undefined && (output.exitCode ?? 0) !== 0;
 }
 
 /** The size and timing of a command, with no output echoed. */
@@ -137,7 +175,7 @@ export interface LangyUi {
   }) => void;
   noGitRepository: () => void;
   call: (call: LocalCall) => void;
-  callOutcome: (input: { call: LocalCall; outcome: string }) => void;
+  callOutcome: (input: { call: LocalCall; output: BashOutput }) => void;
   callFailed: (input: { call: LocalCall; message: string }) => void;
   permissionAsked: (input: { summary: string; conversationUrl: string }) => void;
   permissionAnswered: (input: {
@@ -178,10 +216,21 @@ export function createUi(writer: UiWriter = consoleWriter): LangyUi {
       );
     },
     call: (call) => writer.line(`${bullet} ${callLine(call)}`),
-    callOutcome: ({ call, outcome }) =>
-      writer.line(`${bullet} ${callLine(call)} ${chalk.gray(`(${outcome})`)}`),
+    callOutcome: ({ call, output }) => {
+      if (commandFailed(output)) {
+        writer.line(
+          `${bullet} ${callLine(call)}${chalk.red(`: exit ${output.exitCode}`)}`,
+        );
+        return;
+      }
+      writer.line(
+        `${bullet} ${callLine(call)} ${chalk.gray(`(${commandOutcome(output)})`)}`,
+      );
+    },
     callFailed: ({ call, message }) =>
-      writer.line(`${bullet} ${callLine(call)} ${chalk.red(`(${message})`)}`),
+      writer.line(
+        `${bullet} ${callLine(call)} ${chalk.red(`failed: ${shortReason(message)}`)}`,
+      ),
     permissionAsked: ({ summary, conversationUrl }) => {
       writer.line(
         chalk.yellow(`  Langy asked to run ${summary}.`) +

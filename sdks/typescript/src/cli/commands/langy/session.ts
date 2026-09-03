@@ -30,12 +30,7 @@ import {
 } from "./fs-ops";
 import { decide } from "./policy";
 import { RelayClient } from "./relay-client";
-import {
-  conversationLink,
-  commandOutcome,
-  createUi,
-  type LangyUi,
-} from "./ui";
+import { conversationLink, createUi, type LangyUi } from "./ui";
 
 /** How long a Ctrl-C waits for the running work to end before it exits anyway. */
 export const SHUTDOWN_DEADLINE_MS = 5_000;
@@ -185,7 +180,7 @@ export function startLangySession(options: LangySessionOptions): LangySession {
       if (call.params.background === true && output.pid !== undefined) {
         background.push({ pid: output.pid, logPath: output.logPath ?? "" });
       }
-      ui.callOutcome({ call, outcome: commandOutcome(output) });
+      ui.callOutcome({ call, output });
       sendResult({ callId: call.callId, output });
     } catch (error) {
       ui.callFailed({ call, message: failureMessage(error) });
