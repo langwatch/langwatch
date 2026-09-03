@@ -8,6 +8,7 @@
  * rather than wrong answers.
  */
 
+import { compare } from "bcrypt";
 import { describe, expect, it } from "vitest";
 
 import { lwqlTenantCapability } from "../capability";
@@ -51,6 +52,53 @@ describe("given a project's LangWatchQL secret", () => {
       // Distinct salts, not merely distinct digests: a shared salt would make
       // one precomputation serve every project in the key map.
       expect(first.slice(0, 29)).not.toBe(second.slice(0, 29));
+    });
+  });
+
+  /**
+   * The capability is the tenant's name in the key map, so the property that
+   * matters is not just that two projects get different strings — it is that a
+   * capability can only ever have come from its own project's secret. Asserted
+   * with bcrypt's own verifier rather than by comparing our derivation against
+   * itself, which would agree with any mistake made in both places.
+   */
+  describe("when a capability is checked against the secrets it could name", () => {
+    it("verifies against its own project's secret and no other", async () => {
+      const mine = `${SECRET}-tenant-a`;
+      const theirs = `${SECRET}-tenant-b`;
+      const capability = await lwqlTenantCapability({ secret: mine });
+
+      expect(await compare(mine, capability)).toBe(true);
+      expect(await compare(theirs, capability)).toBe(false);
+    });
+  });
+
+  /**
+   * The cache is one map shared by every tenant in the process, which is the
+   * one place a capability could be handed to the wrong project. Derive several
+   * tenants, then derive them all again in a different order so every second
+   * call is a cache hit, and require each to still be its own.
+   */
+  describe("when several projects derive capabilities through the shared cache", () => {
+    it("never serves one project the capability of another", async () => {
+      const secrets = ["alpha", "beta", "gamma"].map(
+        (name) => `${SECRET}-${name}`,
+      );
+
+      const cold = await Promise.all(
+        secrets.map((secret) => lwqlTenantCapability({ secret })),
+      );
+      const warm = await Promise.all(
+        [...secrets]
+          .reverse()
+          .map((secret) => lwqlTenantCapability({ secret })),
+      );
+
+      // Every cache hit answered with the same capability as the cold call.
+      expect(warm).toEqual([...cold].reverse());
+      // And no two projects share one, which is what the key map would need to
+      // resolve two tenants to a single row.
+      expect(new Set(cold).size).toBe(secrets.length);
     });
   });
 

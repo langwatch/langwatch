@@ -83,17 +83,37 @@ const CAPABILITY_COST = 10;
 /** Domain separation, so this derivation can never collide with another. */
 const SALT_NAMESPACE = "langwatchql.tenant-capability.salt.v1";
 const SALT_INFO = "langwatchql.tenant-capability.v1";
+const CACHE_KEY_INFO = "langwatchql.tenant-capability.cache-key.v1";
 
 /** bcrypt's salt is 16 bytes, written as 22 characters of its own base64. */
 const SALT_BYTES = 16;
 const SALT_CHARS = 22;
 
+/**
+ * The cache key is its own full-width derivation, not the salt.
+ *
+ * bcrypt fixes the salt at 16 bytes, and keying the cache by it would put a
+ * cross-tenant leak behind a 128-bit birthday bound: two projects deriving one
+ * salt would mean the second is served the first's capability, and reads the
+ * first's rows. 32 bytes here costs nothing and is not the value bcrypt
+ * constrains, so the key does not inherit that limit.
+ */
+const CACHE_KEY_BYTES = 32;
+
 /** The input length past which bcrypt stops reading. See the guard above. */
 const BCRYPT_MAX_SECRET_BYTES = 72;
 
 /**
- * Derived capabilities, keyed by the derived salt rather than by the secret so
- * that nothing in this map can be turned back into a credential.
+ * Derived capabilities, keyed by a one-way derivation of the secret rather than
+ * by the secret itself, so that nothing in this map can be turned back into a
+ * credential.
+ *
+ * Every entry carries the salt it was derived under and a hit is only accepted
+ * when that salt matches the one this call derived. A cache is shared by every
+ * tenant in the process, so "the key matched" is not on its own a good enough
+ * reason to hand back someone's capability; the salt check makes a mistaken hit
+ * a recomputation rather than a cross-tenant read, and it costs one string
+ * comparison.
  *
  * It holds the in-flight hash, not the finished digest, so that concurrent
  * first queries for one project share a single hash instead of each starting
@@ -106,7 +126,10 @@ const BCRYPT_MAX_SECRET_BYTES = 72;
  * limit is the right one.
  */
 const CAPABILITY_CACHE_LIMIT = 10_000;
-const capabilityCache = new Map<string, Promise<string>>();
+const capabilityCache = new Map<
+  string,
+  { readonly salt: string; readonly capability: Promise<string> }
+>();
 
 /**
  * The bcrypt salt for a secret, in the modular-crypt form bcrypt parses.
@@ -127,6 +150,16 @@ function capabilitySalt(secret: string): string {
     .slice(0, SALT_CHARS)
     .replace(/\+/g, ".");
   return `$2b$${String(CAPABILITY_COST).padStart(2, "0")}$${encoded}`;
+}
+
+/**
+ * The cache key for a secret: one-way, full width, and separated from the salt
+ * by its own `info` so the two derivations cannot be confused for each other.
+ */
+function capabilityCacheKey(secret: string): string {
+  return Buffer.from(
+    hkdfSync("sha256", secret, SALT_NAMESPACE, CACHE_KEY_INFO, CACHE_KEY_BYTES),
+  ).toString("hex");
 }
 
 /**
@@ -160,9 +193,14 @@ export async function lwqlTenantCapability({
   }
 
   const salt = capabilitySalt(secret);
-  const cached = capabilityCache.get(salt);
-  if (cached !== undefined) {
-    return cached;
+  const cacheKey = capabilityCacheKey(secret);
+
+  // Only a hit whose salt was derived from *this* secret is this caller's
+  // answer. Anything else is treated as a miss and recomputed, so the worst a
+  // key collision could cost is one hash rather than another tenant's rows.
+  const cached = capabilityCache.get(cacheKey);
+  if (cached !== undefined && cached.salt === salt) {
+    return cached.capability;
   }
 
   const capability = hash(secret, salt);
@@ -172,10 +210,14 @@ export async function lwqlTenantCapability({
       capabilityCache.delete(oldest.value);
     }
   }
-  capabilityCache.set(salt, capability);
+  capabilityCache.set(cacheKey, { salt, capability });
   // A failed hash must not be remembered as this project's answer: drop it so
   // the next query derives again rather than replaying the failure forever.
   // The rejection still reaches this call's caller through the returned promise.
-  capability.catch(() => capabilityCache.delete(salt));
+  capability.catch(() => {
+    if (capabilityCache.get(cacheKey)?.capability === capability) {
+      capabilityCache.delete(cacheKey);
+    }
+  });
   return capability;
 }
