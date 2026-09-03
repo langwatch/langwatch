@@ -94,6 +94,10 @@ export class WorkerStandaloneComposition extends WorkerExecutableCompositionPort
         consumers: { enabled: true },
       },
       database: prisma,
+      // The SAME client, un-narrowed: the tenancy graph's two adapters declare
+      // the generated `PrismaClient` by type, so it crosses whole rather than
+      // through the structural intersection above.
+      connection: database.connection,
       observability,
     });
 

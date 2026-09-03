@@ -8,17 +8,10 @@ import {
   type AuthzGrantsCommandSenders,
 } from "../../ports/authz-grants-command-dispatcher.port";
 import { AUTHZ_GRANT_PIPELINE_NAME } from "../eventing.authz.adapter";
-import {
-  AuthzCutoverFailureReporter,
-  type AuthzCutoverReadFailure,
-} from "../postgres.authz-cutover.adapter";
 import { PostgresAuthzAdapter } from "../postgres.authz.adapter";
+import { type AuthzCounter, AuthzMetricsPort } from "../../ports/authz-metrics.port";
 import type { PostgresAuthzDatabase } from "../../ports/postgres-authz-database.port";
 import { AUTHZ_ENGINE_MIGRATION_NAME } from "../../migrations/legacy-import.authz-grant.migration";
-import {
-  type AuthzRevocationReason,
-  AuthzRevocationTelemetry,
-} from "../../ports/authz-revocation-telemetry.port";
 
 class RecordingDispatcher extends AuthzGrantsCommandDispatcher {
   calls = 0;
@@ -40,18 +33,6 @@ class RecordingDispatcher extends AuthzGrantsCommandDispatcher {
   }
 }
 
-class NullCutoverReporter extends AuthzCutoverFailureReporter {
-  report(_failure: AuthzCutoverReadFailure): void {}
-}
-
-class NullRevocationTelemetry extends AuthzRevocationTelemetry {
-  record(_args: {
-    organizationId: string;
-    reason: AuthzRevocationReason;
-    grantCount: number;
-  }): void {}
-}
-
 function buildDatabase() {
   const auditLog = { createMany: vi.fn(async () => ({ count: 1 })) };
   return {
@@ -60,7 +41,23 @@ function buildDatabase() {
   };
 }
 
+/** Answers the two counters and remembers which were asked for. */
+class RecordingMetrics extends AuthzMetricsPort {
+  readonly asked: string[] = [];
+
+  revocationCounter(reason: string): AuthzCounter {
+    this.asked.push(`revocation:${reason}`);
+    return { inc: () => {} };
+  }
+
+  engineGateReadFailureCounter(): AuthzCounter {
+    this.asked.push("engine-gate-read-failure");
+    return { inc: () => {} };
+  }
+}
+
 describe("PostgresAuthzAdapter", () => {
+  /** @scenario "A process with no metric registry composes AuthZ" */
   it("builds the complete feature without resolving runtime command handles", () => {
     const dispatcher = new RecordingDispatcher();
     const { database, auditLog } = buildDatabase();
@@ -69,8 +66,6 @@ describe("PostgresAuthzAdapter", () => {
       database,
       redis: null,
       dispatcher,
-      cutoverReporter: new NullCutoverReporter(),
-      revocationTelemetry: new NullRevocationTelemetry(),
       newBindingId: () => "binding_1",
       now: () => 1_755_000_000_000,
     }).build();
@@ -84,5 +79,22 @@ describe("PostgresAuthzAdapter", () => {
     expect(built.migration.name).toBe(AUTHZ_ENGINE_MIGRATION_NAME);
     expect(dispatcher.calls).toBe(0);
     expect(auditLog.createMany).not.toHaveBeenCalled();
+  });
+
+  describe("when the composing process renders its own metrics", () => {
+    /** @scenario "A process with a metric registry counts through its own port" */
+    it("resolves both counters from the port it was given", () => {
+      const metrics = new RecordingMetrics();
+
+      PostgresAuthzAdapter.create({
+        database: buildDatabase().database,
+        redis: null,
+        dispatcher: new RecordingDispatcher(),
+        metrics,
+        newBindingId: () => "binding_1",
+      }).build();
+
+      expect(metrics.asked).toContain("engine-gate-read-failure");
+    });
   });
 });

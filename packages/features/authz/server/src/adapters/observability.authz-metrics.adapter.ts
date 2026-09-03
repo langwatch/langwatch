@@ -1,6 +1,5 @@
 import { Counter, type Registry } from "prom-client";
-import type { AuthzCutoverCounter } from "./observability.authz-cutover.adapter";
-import type { AuthzRevocationCounter } from "./observability.authz-revocation.adapter";
+import { type AuthzCounter, AuthzMetricsPort } from "../ports/authz-metrics.port";
 import type { AuthzRevocationReason } from "../ports/authz-revocation-telemetry.port";
 
 /**
@@ -34,20 +33,25 @@ const ENGINE_GATE_READ_FAILURES = {
  * already holds, and a process that composes AuthZ twice (a test harness, a
  * host with two graphs) would otherwise fail at the second composition instead
  * of sharing the series it already has.
+ *
+ * This is the ONE module in the feature that names `prom-client`, and
+ * {@link AuthzMetricsPort} is what keeps it that way: a process composes AuthZ
+ * with this adapter or without one, and only the former imports a registry.
  */
-export class ObservabilityAuthzMetricsAdapter {
+export class ObservabilityAuthzMetricsAdapter extends AuthzMetricsPort {
   static create(options: { registry: Registry }): ObservabilityAuthzMetricsAdapter {
     return new ObservabilityAuthzMetricsAdapter(options.registry);
   }
 
-  private constructor(private readonly registry: Registry) {}
+  private constructor(private readonly registry: Registry) {
+    super();
+  }
 
-  /** Labelled by cause, so one series answers "which kind of direct write". */
-  revocationCounter(reason: AuthzRevocationReason): AuthzRevocationCounter {
+  revocationCounter(reason: AuthzRevocationReason): AuthzCounter {
     return this.resolve(DIRECT_PROJECTION_WRITE, ["reason"]).labels(reason);
   }
 
-  engineGateReadFailureCounter(): AuthzCutoverCounter {
+  engineGateReadFailureCounter(): AuthzCounter {
     return this.resolve(ENGINE_GATE_READ_FAILURES, []);
   }
 

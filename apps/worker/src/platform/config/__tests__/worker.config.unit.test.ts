@@ -48,6 +48,12 @@ describe("resolveWorkerConfig", () => {
         persistDailyCapPaid: 1_000,
         persistDailyCapEnterprise: 10_000,
       },
+      // The epoch cache is OFF unless a deployment opts in, and there is no
+      // demo project unless one is named. Both are read at the API tier's
+      // spellings with the API tier's rule, because a permission read served
+      // from a cache on one process and not the other is one organization with
+      // two answers.
+      authz: { epochCacheEnabled: false, demoProjectId: undefined },
       // Redaction is DEFAULT-ON without any of the four variables: the native
       // floor enforces, and the analysis service is simply absent. The one
       // knob that turns the floor off has to be spelled `off` to do it.
@@ -131,6 +137,7 @@ describe("resolveWorkerConfig", () => {
           blockLocalHttpCalls: false,
           allowedProxyHosts: [],
           environment: {},
+          nlpServiceUrl: undefined,
         },
       },
       // A deployment that set no flag variable overrides nothing and force-

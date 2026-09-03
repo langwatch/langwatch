@@ -2267,3 +2267,76 @@ describe("given a worker that composes the join-request ledger", () => {
     });
   });
 });
+
+/**
+ * THE TENANCY GRAPH IS THE PRECONDITION THE MODEL GATEWAY REFUSED WITHOUT, and
+ * the wiring that carries it is one option on this root — so this is the level
+ * the claim "production stops logging no-tenancy" has to be made at. The
+ * gateway's own composition is proven in
+ * `worker-tenancy.composition.unit.test.ts`; what is under test here is that
+ * the root hands the graph over at all.
+ */
+describe("the model gateway on the production graph", () => {
+  function compositionWithConnection(input: {
+    connection?: object;
+    observability?: { logger: { info: unknown; warn: unknown } };
+  }) {
+    return WorkerProductionComposition.create({
+      config: resolveWorkerConfig({
+        NODE_ENV: "test",
+        // A real 32-byte hex key: the stored-secret cipher refuses anything
+        // else, and this graph composes it for the gateway and three other
+        // verticals.
+        CREDENTIALS_SECRET: "1".repeat(64),
+      }),
+      eventing: {
+        database: createProcessPersistenceDatabase(),
+        resolveClickHouseClient: async () => ({
+          insert: async () => undefined,
+          query: async () => ({ json: async () => [] }),
+        }),
+        groupQueue: { redis: createWorkerProcessRedis() as never },
+        retention: createEventingRetentionConfiguration({ defaultRetentionDays: 49 }),
+      },
+      lifecycle: new Lifecycle(),
+      transport: new Transport(),
+      database: createWorkerProcessDatabase() as never,
+      ...(input.connection ? { connection: { client: input.connection } as never } : {}),
+      ...(input.observability ? { observability: input.observability as never } : {}),
+    });
+  }
+
+  describe("given the typed connection this process opened", () => {
+    /** @scenario "A worker holding the tenancy graph composes the model gateway" */
+    it("says nothing about a missing tenancy graph", () => {
+      const warn = vi.fn();
+
+      compositionWithConnection({
+        connection: createWorkerProcessDatabase(),
+        observability: { logger: { info: vi.fn(), warn } },
+      });
+
+      // Scoped to the gateway's own reason rather than to the logger: this
+      // graph declares other absences honestly, and a bare "never warned"
+      // would pass only until the next one.
+      expect(warn).not.toHaveBeenCalledWith(
+        { reason: "no-tenancy" },
+        expect.stringContaining("composed no model gateway"),
+      );
+    });
+  });
+
+  describe("when the root was given no typed connection", () => {
+    /** @scenario "A worker with no tenancy graph composes no model gateway" */
+    it("names the missing tenancy graph at boot", () => {
+      const warn = vi.fn();
+
+      compositionWithConnection({ observability: { logger: { info: vi.fn(), warn } } });
+
+      expect(warn).toHaveBeenCalledWith(
+        { reason: "no-tenancy" },
+        expect.stringContaining("composed no model gateway"),
+      );
+    });
+  });
+});

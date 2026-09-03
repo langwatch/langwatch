@@ -4,7 +4,7 @@ import {
 } from "@langwatch/authz-contract";
 import type { SystemMigration } from "@langwatch/system-migrations";
 import type { StaticPipelineDefinition } from "@langwatch/eventing";
-import type { AuthzRevocationTelemetry } from "../ports/authz-revocation-telemetry.port";
+import { type AuthzMetricsPort, UncountedAuthzMetrics } from "../ports/authz-metrics.port";
 import type { PostgresAuthzDatabase } from "../ports/postgres-authz-database.port";
 import type {
   AuthzGrantsCommandDispatcher,
@@ -43,9 +43,10 @@ import {
 import { EventingAuthzAdapter } from "./eventing.authz.adapter";
 import {
   type AuthzCutoverDatabase,
-  type AuthzCutoverFailureReporter,
   PostgresAuthzCutoverAdapter,
 } from "./postgres.authz-cutover.adapter";
+import { ObservabilityAuthzCutoverAdapter } from "./observability.authz-cutover.adapter";
+import { ObservabilityAuthzRevocationAdapter } from "./observability.authz-revocation.adapter";
 
 /**
  * The one structural Postgres capability the AuthZ feature needs. A runtime
@@ -64,8 +65,17 @@ export type PostgresAuthzAdapterOptions = {
   database: PostgresAuthzDatabase;
   redis: AuthzEpochRedis | null;
   dispatcher: AuthzGrantsCommandDispatcher;
-  cutoverReporter: AuthzCutoverFailureReporter;
-  revocationTelemetry: AuthzRevocationTelemetry;
+  /**
+   * Where the two AuthZ counters go, on a process that renders any.
+   *
+   * Optional, and that is the whole point of the port: the counters are
+   * operational rather than load-bearing, so a process with no metric registry
+   * composes the same graph and counts nothing. What is NOT optional is the
+   * behaviour behind them — the cutover warning still logs and the revocation
+   * still records — because both are built here from this one input rather
+   * than handed in ready-made.
+   */
+  metrics?: AuthzMetricsPort;
   newBindingId: () => string;
   newCommandId?: () => string;
   now?: () => number;
@@ -165,16 +175,24 @@ export class PostgresAuthzAdapter {
 
   build(): PostgresAuthzBuild {
     const database = this.options.database as unknown as InternalPostgresAuthzDatabase;
+    const metrics = this.options.metrics ?? UncountedAuthzMetrics.create();
     const epoch = RedisAuthzEpochAdapter.create({ redis: this.options.redis });
     const cutover = PostgresAuthzCutoverAdapter.create({
       database,
-      reporter: this.options.cutoverReporter,
+      // Composed here rather than received, so the WHEN of each counter is
+      // described once for every process. A caller that passed its own
+      // reporter would be a second description of "warn, then increment".
+      reporter: ObservabilityAuthzCutoverAdapter.create({
+        counter: metrics.engineGateReadFailureCounter(),
+      }),
     });
     const selectHead = (organizationId: string) => cutover.isOn({ organizationId });
 
     const revocation = PrismaAuthzRevocationRepository.create({
       database,
-      telemetry: this.options.revocationTelemetry,
+      telemetry: ObservabilityAuthzRevocationAdapter.create({
+        counter: (reason) => metrics.revocationCounter(reason),
+      }),
     });
     const ledgerOptions: EventingAuthzLedgerAdapterOptions = {
       database,

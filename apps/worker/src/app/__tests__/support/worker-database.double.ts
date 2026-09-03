@@ -43,6 +43,22 @@ export function createWorkerProcessDatabase(overrides: object = {}) {
     datasetRecord: {},
     // The project's trace automations.
     trigger: {},
+    // The model gateway: the provider rows, the change log its writes append
+    // to, the per-scope defaults and the custom cost catalogue. The three
+    // repositories behind them check at CONSTRUCTION that the client names
+    // their models, so a graph composing the gateway needs every one.
+    modelProvider: {},
+    gatewayChangeEvent: {},
+    modelDefaultConfig: {},
+    modelDefaultConfigScope: {},
+    // The tenancy graph: the organization, its teams and groups, the grants
+    // read model with its audit trail, and the per-organization engine
+    // migration state the cutover gate reads.
+    organization: {},
+    group: {},
+    roleBinding: {},
+    auditLog: {},
+    organizationAuthzMigration: {},
     // Langy's conversation graph: two operational folds, the per-message
     // projection, the turn admission ledger and the session-key reap.
     apiKey: {},

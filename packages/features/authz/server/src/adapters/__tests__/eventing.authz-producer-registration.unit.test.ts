@@ -25,14 +25,6 @@ import {
 import { AuthzGrantsCommandDispatcher } from "../../ports/authz-grants-command-dispatcher.port";
 import type { AuthzGrantsCommandSenders } from "../../ports/authz-grants-command-dispatcher.port";
 import type { PostgresAuthzDatabase } from "../../ports/postgres-authz-database.port";
-import {
-  type AuthzRevocationReason,
-  AuthzRevocationTelemetry,
-} from "../../ports/authz-revocation-telemetry.port";
-import {
-  AuthzCutoverFailureReporter,
-  type AuthzCutoverReadFailure,
-} from "../postgres.authz-cutover.adapter";
 import { PostgresAuthzAdapter } from "../postgres.authz.adapter";
 import { EventingAuthzCommandDispatcherAdapter } from "../eventing.authz-command-dispatcher.adapter";
 import { AUTHZ_GRANT_PIPELINE_NAME } from "../eventing.authz.adapter";
@@ -103,18 +95,6 @@ class NullDispatcher extends AuthzGrantsCommandDispatcher {
   }
 }
 
-class NullCutoverReporter extends AuthzCutoverFailureReporter {
-  report(_failure: AuthzCutoverReadFailure): void {}
-}
-
-class NullRevocationTelemetry extends AuthzRevocationTelemetry {
-  record(_args: {
-    organizationId: string;
-    reason: AuthzRevocationReason;
-    grantCount: number;
-  }): void {}
-}
-
 /** Records what a producer enqueued; a producer-only process starts no consumer. */
 function recordingQueue() {
   const sent: Record<string, unknown>[] = [];
@@ -150,8 +130,6 @@ function buildAuthz() {
     database: { auditLog: { createMany: vi.fn() } } as unknown as PostgresAuthzDatabase,
     redis: null,
     dispatcher: new NullDispatcher(),
-    cutoverReporter: new NullCutoverReporter(),
-    revocationTelemetry: new NullRevocationTelemetry(),
     newBindingId: () => "rolebinding_test",
   }).build();
 }

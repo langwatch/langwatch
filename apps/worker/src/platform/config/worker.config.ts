@@ -246,6 +246,27 @@ export const workerConfigDefinition = RuntimeConfig.define({
    * no-reply tag deliberately degrades instead.
    */
   nextauthSecret: Config.value(optionalEnvironmentString, { env: "NEXTAUTH_SECRET" }),
+  /**
+   * The two AuthZ switches, read raw and interpreted below.
+   *
+   * Read at the API tier's exact spellings and with its exact rule, because
+   * both answer a question that must have ONE answer across the fleet.
+   * `AUTHZ_EPOCH_CACHE` is a legacy opt-in the platform app reads as "1 or
+   * true, anything else off", and two processes disagreeing about whether a
+   * permission read may be served from the epoch cache is worse than either
+   * answer. `DEMO_PROJECT_ID` names the one project everybody may read; blank
+   * is not a project id, so a blank export means no demo project rather than a
+   * project whose id is the empty string — a filter on `""` widens rather than
+   * narrows.
+   *
+   * The demo project's OWNING user is deliberately not read here. It is
+   * attribution for work the demo project does on a request path, and this
+   * process serves none.
+   */
+  authz: {
+    epochCache: Config.value(optionalEnvironmentString, { env: "AUTHZ_EPOCH_CACHE" }),
+    demoProjectId: Config.value(optionalEnvironmentString, { env: "DEMO_PROJECT_ID" }),
+  },
   automation: {
     emailHourlyCap: Config.value(z.coerce.number().int().positive().default(100), {
       env: "TRIGGER_EMAIL_HOURLY_CAP",
@@ -883,6 +904,20 @@ export type WorkerGithubConfig = Readonly<{
   host?: string;
 }>;
 
+/**
+ * The AuthZ decisions this process was configured with, already interpreted.
+ *
+ * The same two fields `apps/api` projects, resolved from the same variables by
+ * the same rule: one deployment, one answer to whether the epoch cache is on
+ * and which project is the demo.
+ */
+export type WorkerAuthzConfig = Readonly<{
+  /** Whether an organization's permission reads may be served from the epoch cache. */
+  epochCacheEnabled: boolean;
+  /** The project every caller may read, where a deployment names one. */
+  demoProjectId: string | undefined;
+}>;
+
 export type WorkerConfig = Readonly<{
   processRole: "worker";
   environment: string;
@@ -905,6 +940,7 @@ export type WorkerConfig = Readonly<{
   /** Absent when the deployment named no `BASE_HOST`; see `resolveWorkerMailConfig`. */
   mail?: WorkerMailConfig;
   automation: WorkerAutomationConfig;
+  authz: WorkerAuthzConfig;
   tracePrivacy: WorkerTracePrivacyConfig;
   /**
    * Where the evaluator service answers, for the callers that are not privacy.
@@ -972,6 +1008,12 @@ export function resolveWorkerConfig(source: Readonly<Record<string, unknown>>): 
     deployment: value.deployment,
     ...(mail ? { mail } : {}),
     automation: resolveWorkerAutomationConfig(value.automation, value.nextauthSecret),
+    authz: {
+      // The platform app's exact rule, so one variable means one thing across
+      // every tier that reads it.
+      epochCacheEnabled: value.authz.epochCache === "1" || value.authz.epochCache === "true",
+      demoProjectId: value.authz.demoProjectId?.trim() || undefined,
+    },
     tracePrivacy: resolveWorkerTracePrivacyConfig({
       tracePrivacy: value.tracePrivacy,
       nodeEnvironment: value.nodeEnvironment,

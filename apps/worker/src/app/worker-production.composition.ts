@@ -9,6 +9,7 @@ import {
 } from "@langwatch/enterprise-worker";
 import type { Logger } from "@langwatch/observability";
 import type { ProcessObservability } from "@langwatch/observability/node";
+import type { PrismaConnection } from "@langwatch/prisma-client";
 import { ResourceScope } from "@langwatch/runtime-composition";
 import {
   type AgentSandboxKeyReapDatabase,
@@ -174,6 +175,10 @@ import {
   tryCreateWorkerModelProviders,
   WorkerModelProviderAbsenceReportPort,
 } from "./worker-model-provider.composition";
+import {
+  tryCreateWorkerTenancy,
+  WorkerTenancyAbsenceReportPort,
+} from "./worker-tenancy.composition";
 import {
   createWorkerEvaluationProcessing,
   WorkerEvaluationAbsenceReportPort,
@@ -343,6 +348,22 @@ type WorkerProductionCompositionBaseOptions = {
   transport: WorkerTransportPort;
   /** The one Prisma client this process opened. */
   database: WorkerDatabaseCompositionOptions;
+  /**
+   * The SAME client, as the typed connection the tenancy graph needs.
+   *
+   * Two names for one object, and it is worth being exact about why rather
+   * than folding them: `database` above is the structural intersection every
+   * feature narrows for itself, which is what lets a composition test hand in
+   * the delegates it exercises and nothing else. `PostgresOrganizationAdapter`
+   * and `PostgresProjectAdapter` do not take a structural type — both declare
+   * `database: PrismaClient` — so the tenancy graph is the one thing here that
+   * needs the generated client itself, passed through with no cast.
+   *
+   * Optional because it can genuinely be absent: a graph composed without it
+   * composes no tenancy, no model gateway and no title model, and each says so
+   * by name. `WorkerStandaloneComposition` always supplies it.
+   */
+  connection?: PrismaConnection;
   /**
    * Pipeline groups whose features have moved out of the legacy registry.
    * Each stays optional until every group in Wave 4 has landed: the shared
@@ -745,6 +766,20 @@ export class WorkerProductionComposition {
     if (options.config.infrastructure.storage.backend === "azure") {
       traceAbsence?.withoutDatasetStorage();
     }
+    // The tenancy graph: the organization, project and permission services,
+    // composed ONCE from the typed client and handed to every consumer that
+    // derives a scope. It is built above the model gateway because the gateway
+    // takes it whole, and above nothing else that would care about the order.
+    const tenancy = tryCreateWorkerTenancy({
+      connection: options.connection,
+      encryption: resolveWorkerStoredSecretCipher(options.config),
+      redis: processRedis,
+      config: options.config,
+      ...(WorkerProductionComposition.tenancyAbsence(options)
+        ? { absence: WorkerProductionComposition.tenancyAbsence(options)! }
+        : {}),
+      ...(options.observability ? { logger: options.observability.logger } : {}),
+    });
     // The model gateway, composed once for every path in this process that
     // resolves a customer's model: topic clustering's four questions and an
     // online evaluation's `X_LITELLM_*` environment. Two gateways would be two
@@ -763,17 +798,12 @@ export class WorkerProductionComposition {
       encryption: options.config.automation.credentialsEncryptionKey
         ? resolveWorkerStoredSecretCipher(options.config)
         : undefined,
-      // THE ONE PRECONDITION THIS PROCESS STILL MISSES. A provider row's scope
-      // is the triple project/team/organization and its reads are authorized,
-      // so the gateway takes the whole tenancy graph — and this process composes
-      // the READ half of Project only (`createWorkerTraceCapabilityServices`),
-      // no `OrganizationService` beyond Billing's tenant lookup, and AuthZ's
-      // consumer pipeline rather than an `AuthzService`. Composing those three
-      // is its own slice: `PostgresOrganizationAdapter` needs an `AuthzService`
-      // and `PostgresAuthzAdapter` needs a metric registry this process does
-      // not hold. Named here so the gap is a decision an operator reads at
-      // boot, not an empty provider list a customer discovers.
-      tenancy: undefined,
+      // A provider row's scope is the triple project/team/organization and its
+      // reads are authorized, so the gateway takes the whole tenancy graph
+      // rather than three services it could be handed from three compositions.
+      // Absent only where this process opened no client at all, which is the
+      // one shape `withoutModelGateway("no-tenancy")` still names.
+      tenancy,
       ...(WorkerProductionComposition.modelProviderAbsence(options)
         ? { absence: WorkerProductionComposition.modelProviderAbsence(options)! }
         : {}),
@@ -784,10 +814,10 @@ export class WorkerProductionComposition {
     // boot rather than one warning per conversation.
     const langyTitleModels = tryCreateWorkerLangyTitleModel({
       modelProviders: modelProviders?.modelProviders,
-      // The READ half of Project this process already composed, which is the
-      // whole of what a model cascade asks of a project directory. The gateway
-      // above still wants the full tenancy graph and does not get it — that is
-      // its own absence, and this one must not restate it.
+      // The READ half of Project, which is the whole of what a model cascade
+      // asks of a project directory — the wide `ProjectService` the tenancy
+      // graph now composes satisfies the same reads, and this path deliberately
+      // asks for no more than it uses.
       projects: traceServices.projects,
       nlpServiceUrl: options.config.infrastructure.modelProvider.nlpServiceUrl,
     });
@@ -805,8 +835,7 @@ export class WorkerProductionComposition {
         config: options.config,
         database: traceDatabase,
         redis: eventingOptions.groupQueue.redis,
-        resolveClickHouseClient: options.eventing
-          .resolveClickHouseClient as unknown as Parameters<
+        resolveClickHouseClient: options.eventing.resolveClickHouseClient as unknown as Parameters<
           typeof createWorkerLangyConversation
         >[0]["resolveClickHouseClient"],
         defaultRetentionDays: options.eventing.retention.defaultRetentionDays,
@@ -1080,8 +1109,7 @@ export class WorkerProductionComposition {
       config: options.config,
       database: options.database,
       redis: processRedis,
-      resolveClickHouseClient: options.eventing
-        .resolveClickHouseClient as unknown as Parameters<
+      resolveClickHouseClient: options.eventing.resolveClickHouseClient as unknown as Parameters<
         typeof createWorkerTopicRuntime
       >[0]["resolveClickHouseClient"],
       ...(modelProviders ? { modelProviders: modelProviders.modelProviders } : {}),
@@ -1480,6 +1508,15 @@ export class WorkerProductionComposition {
   }
 
   /** The boot logger, as the one place the model gateway's absences are declared. */
+  private static tenancyAbsence(
+    options: WorkerProductionCompositionOptions,
+  ): WorkerTenancyAbsenceReportPort | undefined {
+    return options.observability
+      ? LoggedWorkerTenancyAbsence.create(options.observability.logger)
+      : undefined;
+  }
+
+  /** The boot logger, as the one place the model gateway's absences are declared. */
   private static modelProviderAbsence(
     options: WorkerProductionCompositionOptions,
   ): WorkerModelProviderAbsenceReportPort | undefined {
@@ -1800,7 +1837,9 @@ class WorkerProductionLifecycle extends WorkerLifecyclePort {
  * which is why the connection has to be the same one that wrote them.
  */
 class WorkerGroupQueueBlobSweep extends WorkerBlobSweepPort {
-  static create(redis: EventingServerRuntimeOptions["groupQueue"]["redis"]): WorkerGroupQueueBlobSweep {
+  static create(
+    redis: EventingServerRuntimeOptions["groupQueue"]["redis"],
+  ): WorkerGroupQueueBlobSweep {
     return new WorkerGroupQueueBlobSweep(new BlobSweeper({ redis }));
   }
 
@@ -2139,6 +2178,24 @@ export class LoggedWorkerTopicAbsence extends WorkerTopicAbsenceReportPort {
  * resolved, and the two reasons need different actions — one is a variable
  * nobody exported, the other is a capability this process does not compose yet.
  */
+/** Names the one half of the tenancy graph this tier does not serve. */
+export class LoggedWorkerTenancyAbsence extends WorkerTenancyAbsenceReportPort {
+  static create(logger: Pick<Logger, "info">): LoggedWorkerTenancyAbsence {
+    return new LoggedWorkerTenancyAbsence(logger);
+  }
+
+  private constructor(private readonly logger: Pick<Logger, "info">) {
+    super();
+  }
+
+  withoutGrantWrites(): void {
+    this.logger.info(
+      { reason: "consumer-only-ledger" },
+      "worker composed the tenancy graph for reads: it folds grant events rather than producing them, so a grant change for an organization already on the ledger would refuse by name here",
+    );
+  }
+}
+
 export class LoggedWorkerModelProviderAbsence extends WorkerModelProviderAbsenceReportPort {
   static create(logger: Pick<Logger, "warn" | "info">): LoggedWorkerModelProviderAbsence {
     return new LoggedWorkerModelProviderAbsence(logger);

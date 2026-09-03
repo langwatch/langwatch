@@ -93,21 +93,27 @@ export type WorkerLangyConversationCompositionInput = Readonly<{
  * `titleGenerator` is composed where this process composed a model gateway and
  * named an execution proxy, and the generator itself is
  * `@langwatch/langy-server`'s own service over that gateway and this package's
- * trusted message reader. What stays absent is the DEPLOYMENT, not the code: a
- * provider row's scope is the triple project/team/organization and its reads
- * are authorized, so the gateway takes a whole tenancy graph this process does
- * not yet compose — the same precondition `worker-model-provider.composition`
- * names. Absent, the intent answers `null`, which is the same no-op the App
- * takes for an empty transcript: the conversation keeps whatever title it has.
+ * trusted message reader. Both halves are now reachable: the gateway's tenancy
+ * precondition is composed by `worker-tenancy.composition.ts`, so what is left
+ * is the DEPLOYMENT — a process that opened no database, or one that named no
+ * NLP engine. Absent, the intent answers `null`, which is the same no-op the
+ * App takes for an empty transcript: the conversation keeps whatever title it
+ * has.
  *
  * `sessionKeys` mints a scoped API key for the ONE recovery branch where the
  * agent manager answered `428 credentialsRequired` and the stashed handoff
- * carries no key. Minting one needs an authorization graph — effective
- * permissions, an org-membership check and a binding write — that this process
- * does not compose. Absent, it REFUSES BY NAME rather than minting an
- * unscoped key: the outbox retries, and the liveness subscriber terminalises
- * the turn the way it does for any dispatch that never completed. A silently
- * skipped mint would leave the turn hanging with no error anywhere.
+ * carries no key. Two of the three things minting needs now exist here —
+ * effective permissions and the org-membership read both come off the tenancy
+ * graph — and the third does not: a mint ATTACHES A GRANT, and this process
+ * registers the grants pipeline as a consumer rather than resolving its
+ * command senders, so for an organization already on the ledger the attach
+ * would refuse. Composing the minter over that would trade a named absence for
+ * a mint that looks configured and fails on exactly the customers who have
+ * migrated. It also wants an API-key pepper this process does not read. Absent,
+ * it REFUSES BY NAME rather than minting an unscoped key: the outbox retries,
+ * and the liveness subscriber terminalises the turn the way it does for any
+ * dispatch that never completed. A silently skipped mint would leave the turn
+ * hanging with no error anywhere.
  */
 export function createWorkerLangyConversation(
   options: WorkerLangyConversationCompositionInput,

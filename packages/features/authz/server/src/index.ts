@@ -22,6 +22,11 @@ export {
 } from "./ports/authz-grants-command-dispatcher.port";
 export { EventingAuthzCommandDispatcherAdapter } from "./adapters/eventing.authz-command-dispatcher.adapter";
 export { KsuidAuthzBindingIdAdapter } from "./adapters/ksuid.authz-binding-id.adapter";
+export {
+  AuthzMetricsPort,
+  UncountedAuthzMetrics,
+  type AuthzCounter,
+} from "./ports/authz-metrics.port";
 export { AuthzRevocationTelemetry } from "./ports/authz-revocation-telemetry.port";
 export type { AuthzRevocationReason } from "./ports/authz-revocation-telemetry.port";
 export {

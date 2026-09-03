@@ -2,9 +2,7 @@ import type { AuthzGrantsService, AuthzService } from "@langwatch/authz-contract
 import {
   EventingAuthzCommandDispatcherAdapter,
   KsuidAuthzBindingIdAdapter,
-  ObservabilityAuthzCutoverAdapter,
   ObservabilityAuthzMetricsAdapter,
-  ObservabilityAuthzRevocationAdapter,
   PostgresAuthzAdapter,
 } from "@langwatch/authz-server";
 import type { PrismaConnection } from "@langwatch/prisma-client";
@@ -40,11 +38,10 @@ export type ApiAuthzCompositionOptions = {
  * `PostgresAuthzAdapter` builds the read repositories, the ledger writer, the
  * epoch cache, the cutover gate and the grants pipeline definition from ONE
  * guarded Prisma client. What kept this process from calling it was never the
- * database — it was the two collaborators the adapter asks for and no package
- * implemented: the command dispatcher, which needs an Eventing registration,
- * and the revocation telemetry, which needs a metric registry.
+ * database — it was the command dispatcher, which needs an Eventing
+ * registration and which no package implemented.
  *
- * Both are this process's to build now:
+ * What this process supplies:
  *
  *  - The dispatcher binds to a PRODUCER-only registration of the SAME packaged
  *    pipeline definition the worker installs. Nothing here forks it — a forked
@@ -52,9 +49,12 @@ export type ApiAuthzCompositionOptions = {
  *    routing metadata a command carries is stamped from the pipeline and
  *    command names at send time, so a command produced here is routed by the
  *    consumer's registry exactly as one produced there is.
- *  - The telemetry and the cutover reporter take counters from the packaged
- *    metrics adapter over this process's own registry, so both tiers write one
- *    series described one way.
+ *  - The counters, handed in as an `AuthzMetricsPort` over this process's own
+ *    registry, so both tiers write one series described one way. It is the
+ *    PORT rather than the registry that crosses now: the feature builds the
+ *    cutover reporter and the revocation telemetry over whatever it is given,
+ *    and a tier that renders no scrape endpoint composes the same AuthZ graph
+ *    and counts nothing.
  *
  * Registration is passive on purpose. This process starts no consumer loop and
  * owns no event log: it enqueues commands and the worker appends their events
@@ -94,7 +94,6 @@ export class ApiAuthzComposition {
 
   static compose(options: ApiAuthzCompositionOptions): ApiAuthzComposition {
     const dispatcher = EventingAuthzCommandDispatcherAdapter.create();
-    const metrics = ObservabilityAuthzMetricsAdapter.create({ registry: options.registry });
     const bindingIds = KsuidAuthzBindingIdAdapter.create();
 
     const built = PostgresAuthzAdapter.create({
@@ -107,12 +106,10 @@ export class ApiAuthzComposition {
       database: options.database.client,
       redis: options.epoch,
       dispatcher,
-      cutoverReporter: ObservabilityAuthzCutoverAdapter.create({
-        counter: metrics.engineGateReadFailureCounter(),
-      }),
-      revocationTelemetry: ObservabilityAuthzRevocationAdapter.create({
-        counter: (reason) => metrics.revocationCounter(reason),
-      }),
+      // This process renders a scrape endpoint, so AuthZ's two counters go
+      // through its own registry. The feature builds the cutover reporter and
+      // the revocation telemetry over them.
+      metrics: ObservabilityAuthzMetricsAdapter.create({ registry: options.registry }),
       newBindingId: () => bindingIds.newBindingId(),
       cacheEnabled: () => options.config.epochCacheEnabled,
       demoProjectId: () => options.config.demoProjectId,
