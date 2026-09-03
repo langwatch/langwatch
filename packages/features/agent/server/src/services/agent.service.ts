@@ -18,9 +18,52 @@ import {
   parseAgentConfig,
   updateAgentCommandSchema,
 } from "@langwatch/agent-contract";
+import type { ScenarioParameterDefinition } from "@langwatch/scenario-contract";
 import { nanoid } from "nanoid";
 import type { AgentsAuditLogPort, AgentsWorkflowPort } from "../ports/agent.port";
 import type { AgentRepository } from "../repositories/agent.repository";
+
+/**
+ * One agent as the REST list and read answer it: the row, plus the identity
+ * and the declared parameters of a connected agent, absent on the others.
+ */
+export type AgentListRow = {
+  id: string;
+  name: string;
+  type: string;
+  config: Agent["config"];
+  environment: string | null;
+  ownerUserId: string | null;
+  hostLabel: string | null;
+  lastSeenAt: Date | null;
+  parameters: ScenarioParameterDefinition[];
+  createdAt: Date;
+  updatedAt: Date;
+};
+
+/** The parameters a connected agent declares; every other type declares none. */
+export function declaredAgentParameters(
+  agent: Pick<Agent, "type" | "config">,
+): ScenarioParameterDefinition[] {
+  if (agent.type !== "connected") return [];
+  return (agent.config as ConnectedAgentConfig).parameters;
+}
+
+export function toAgentListRow(agent: Agent): AgentListRow {
+  return {
+    id: agent.id,
+    name: agent.name,
+    type: agent.type,
+    config: agent.config,
+    environment: agent.environment ?? null,
+    ownerUserId: agent.ownerUserId ?? null,
+    hostLabel: agent.hostLabel ?? null,
+    lastSeenAt: agent.lastSeenAt ?? null,
+    parameters: declaredAgentParameters(agent),
+    createdAt: agent.createdAt,
+    updatedAt: agent.updatedAt,
+  };
+}
 
 /**
  * Whether Prisma refused a write because a unique index already holds the

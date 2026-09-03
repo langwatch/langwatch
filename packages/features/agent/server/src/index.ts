@@ -8,7 +8,12 @@ export {
 } from "./adapters/prisma.agent.adapter";
 export { UnavailableLinkedWorkflowCopyAdapter } from "./adapters/unavailable.linked-workflow-copy.adapter";
 export { AgentApp, type AgentAppDependencies } from "./app/agent.app";
-export { AgentService } from "./services/agent.service";
+export {
+  AgentService,
+  declaredAgentParameters,
+  toAgentListRow,
+  type AgentListRow,
+} from "./services/agent.service";
 export { AgentTrpcApi, type AgentTrpcContext } from "./transport/api-trpc/agent.api";
 export type { AgentsAuditLogPort, AgentsDatabase, AgentsWorkflowPort } from "./ports/agent.port";
 export { LinkedWorkflowCopyPort } from "./ports/linked-workflow-copy.port";
@@ -44,6 +49,30 @@ export {
   type AgentPlatformUrlBuilder,
   createAgentLegacyRestApp,
 } from "./transport/api-rest/agent-legacy.api";
+
+/**
+ * The `/api/v1/agents` REST family: list, create, read, update, archive,
+ * test, call and the HTTP long-poll `/connect/*` routes (ADR-128).
+ */
+export {
+  type AgentsV1Deps,
+  createAgentV1RestApp,
+} from "./transport/api-rest/agent-v1.api";
+export {
+  registerCallEndpoint,
+  relayCallBodySchema,
+  relayCallResponseSchema,
+  type AgentCallDeps,
+  type AssertConnectedAgentsRunnablePort,
+} from "./transport/api-rest/agent-call.api";
+export {
+  registerConnectEndpoints,
+  postedFramesSchema,
+  registerAnswerSchema,
+  pollAnswerSchema,
+  framesAnswerSchema,
+  type ConnectEndpointDeps,
+} from "./transport/api-rest/agent-connect.api";
 
 /**
  * The connected-agent runtime of this process: the state store, the presence

@@ -123,6 +123,11 @@ export class AgentApp {
     return this.dependencies.agents.getHistory(input);
   }
 
+  /** The display names of the owners of a set of agents, by owner user id. */
+  ownersOf(rows: Parameters<AgentService["ownersOf"]>[0]) {
+    return this.dependencies.agents.ownersOf(rows);
+  }
+
   /**
    * Sends one turn to an agent, through the same adapter a simulation turn
    * uses, and answers what it returned.

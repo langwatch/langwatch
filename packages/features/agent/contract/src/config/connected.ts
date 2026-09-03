@@ -24,7 +24,7 @@ export const connectedParameterDefinitionSchema = z
     description: z.string().optional(),
     defaultValue: connectedParameterValueSchema.optional(),
     secret: z.boolean().optional(),
-    type: z.enum(["text", "number", "boolean"]).optional(),
+    type: z.enum(["string", "number", "boolean"]).optional(),
     options: z.array(connectedParameterValueSchema).optional(),
     required: z.boolean().optional(),
   })

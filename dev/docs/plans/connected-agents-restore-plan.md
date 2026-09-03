@@ -635,20 +635,166 @@ except where noted:**
   tonight, not a Slice-3/4-scoped number — Slices 3-4 lift no `@scenario`
   frames of their own beyond what is already counted above).
 
-**Not started — Slices 5-9.** REST v1 family (`agent-v1.api.ts`,
-`agent-call.api.ts`, `agent-connect.api.ts`), `AgentApp`'s connected
-dependency and enriched `getAll`/`getById` (Slice 6), the process composition
-in `apps/api` and `apps/worker` (Slice 7 — coordinate with
-`a9b5bb9332cf3e2d9`, who is mid-flight flattening
-`api-production.composition.ts`'s collaborator folds; message them again
-before editing that file), the agents-page UI slot (Slice 8), and the final
-parity sweep (Slice 9) remain exactly as this document specifies. Slice 5 is
-the largest remaining unit: main's `agents.v1.ts`/`call.v1.ts`/`connect.v1.ts`
-use a `VersionBuilder` builder this branch does not have, and per §1.2's row
-for `app.ts`/`alias.ts` the destination shape is `createAgentV1RestApp({...})`
-matching `agent-legacy.api.ts`'s `SecuredApp` pattern — read that file
-alongside main's three route files side by side before writing
-`agent-v1.api.ts`, and check the frozen `openapi-document.json` for the exact
-operation shapes already published (the rule bars editing it, so the new
-family's routes must match it, not the reverse). No code for Slices 5-9
-exists yet; nothing was stubbed.
+**Not started — Slices 6-9.** `AgentApp`'s connected dependency and enriched
+`getAll`/`getById` (Slice 6), the process composition in `apps/api` and
+`apps/worker` (Slice 7 — coordinate with `a9b5bb9332cf3e2d9`, who is
+mid-flight flattening `api-production.composition.ts`'s collaborator folds;
+message them again before editing that file, `api-agents.composition.ts` or
+`app-trpc.features.ts`), the agents-page UI slot (Slice 8), and the final
+parity sweep (Slice 9) remain exactly as this document specifies. No code for
+Slices 6-9 exists yet; nothing was stubbed.
+
+## 11. Integration progress (2026-09-03, third pass — Slice 5)
+
+**Done, verified with the named test commands, no deviation from the plan
+except where noted:**
+
+- **Slice 5** — the `/api/v1/agents` REST family, lifted from
+  `origin/main:platform/app/src/app/api/agents/[[...route]]/{agents,call,connect}.v1.ts`
+  and adapted onto this branch's `SecuredApp`/`.access(policy)` Hono pattern
+  (`agent-legacy.api.ts` was the sibling read side by side, as the plan
+  instructed; main's `VersionBuilder` framework does not exist here).
+  - `packages/features/agent/server/src/transport/api-rest/agent-v1.api.ts`
+    (new): `createAgentV1RestApp({security, agents, agentPlatformUrl,
+    connectedRuntime?, connect?, call?})`. Registers, in order, the static
+    `/connect/*` routes (when `connect` is supplied), then `GET /`, `POST /`,
+    `GET /:id`, `PATCH|PUT /:id`, `DELETE /:id`, `POST /:id/test`, then
+    `POST /:id/call` (when `call` is supplied) — matching main's stated
+    ordering reason (`/connect/*` first, or `/:id` would answer for the
+    segment "connect"). `agentResponseSchema` restates main's inline schema
+    (presence/owner/parameters/platformUrl); every field, `operationId` and
+    response code was checked against the frozen
+    `apps/api/src/features/discovery/openapi-document.json` by dumping its
+    `/api/v1/agents*` paths and diffing them against this file's
+    `describeRoute` blocks — not edited, per the rule.
+  - `packages/features/agent/server/src/transport/api-rest/agent-call.api.ts`
+    (new): `registerCallEndpoint`, `relayCallBodySchema`,
+    `relayCallResponseSchema`, `AssertConnectedAgentsRunnablePort` (a port,
+    not an import of `@langwatch/suite-server`'s `assertConnectedAgentsRunnable`
+    — agent-server may not depend on suite-server; the port is satisfied by
+    `apps/api` in Slice 7).
+  - `packages/features/agent/server/src/transport/api-rest/agent-connect.api.ts`
+    (new): `registerConnectEndpoints`, `postedFramesSchema`,
+    `registerAnswerSchema`, `pollAnswerSchema`, `framesAnswerSchema`. Uses
+    `handlerManagedAuth` (from `@langwatch/api`) rather than main's
+    `ProjectEndpointMeta`-shaped access object — the branch's `SecuredApp`
+    already has this exact escape hatch (`.access(handlerManagedAuth(...))`
+    applies no chain), used identically by
+    `packages/features/langy/server/src/transport/api-rest/langy-turns.api.ts`,
+    which was the precedent read. Restated a local `requestBodySchema()`
+    helper (`z.toJSONSchema(schema, {target: "openapi-3.0", reused:
+    "inline"})`) for the `register`/`frames` routes' `requestBody` doc block,
+    the same way `evaluations-legacy.schemas.ts` does — `zValidator`'s
+    auto-generated body doc could not be used here because these two routes
+    parse their body by hand (a parse failure must become a `refused` frame,
+    not a validator 4xx).
+  - `packages/features/agent/server/src/services/agent.service.ts`: added
+    `AgentListRow`, `declaredAgentParameters`, `toAgentListRow` (module-level
+    exports beside the class, mirroring main's `agent.service.ts` shape) —
+    these did not exist yet even though §10's Slice 2 log mentions them; they
+    were the one piece of Slice 2's declared scope not actually landed.
+    Exported from `packages/features/agent/server/src/index.ts`.
+  - `packages/features/agent/server/src/app/agent.app.ts`: added `ownersOf`,
+    delegating 1:1 like every other method (needed by the REST rows'
+    presence/owner enrichment; `AgentApp` had every other piece of
+    `AgentService`'s connected surface delegated already, this one was
+    missed).
+  - **Bug fixed, not a lift**: `packages/features/agent/contract/src/config/connected.ts`'s
+    `connectedParameterDefinitionSchema.type` enum was `["text", "number",
+    "boolean"]`; main's equivalent (`connectedComponentSchema` in
+    `optimization_studio/types/dsl.ts`) reuses `scenarioParameterDefinitionSchema`
+    directly, whose type enum is `["string", "number", "boolean"]` — matching
+    the frozen OpenAPI document. `"text"` was never used anywhere else in the
+    tree (grepped) and no test named it; changed to `"string"`. Without this
+    fix, `declaredAgentParameters`'s return value could not structurally
+    satisfy `ScenarioParameterDefinition[]` without an `as unknown as` cast,
+    which the rules forbid in production code — fixing the enum removed the
+    need for the cast entirely, which is why this was fixed rather than
+    routed around.
+  - `apps/api/src/features/agent/agent-platform-url.ts`: restored the
+    three-way drawer choice (`http` → `agentHttpEditor`, `connected` →
+    `agentConnectedDetail`, else `agentCodeEditor`) — confirmed
+    `agentConnectedDetail` is a registered drawer in
+    `apps/ui/src/features/simulations/index.ts` before wiring it in.
+  - Exported the three new modules' public surface from
+    `packages/features/agent/server/src/index.ts`.
+
+  **Verification**: `pnpm --filter @langwatch/agent-server test`: 11 files /
+  100 passed (unchanged — Slice 5 added no new test files of its own; see
+  gaps below). `pnpm --filter @langwatch/agent-contract test`: 4 files / 14
+  passed, confirming the `connected.ts` enum fix broke nothing. A temporary
+  smoke test (written, run, then deleted — not committed) imported
+  `createAgentV1RestApp`, `registerCallEndpoint`, `registerConnectEndpoints`
+  from a real vitest transform to catch import/naming errors, since **this
+  session was instructed not to run `tsc`/`tsgo` at any scope**, so full type
+  checking of these three new files has NOT happened; the root session should
+  typecheck `@langwatch/agent-contract`, `@langwatch/agent-server`. `pnpm -s
+  lint`: no findings in any file this slice touched or created (checked by
+  grepping the full lint output for each filename). `pnpm --filter
+  @langwatch/architecture-lint test`: 608/609 (one pre-existing, unrelated
+  failure — a NUL byte in `coding-agent-session-clickhouse-dedup.unit.test.ts`,
+  not touched by this pass); no new grammar violations traced to
+  `transport/api-rest/` or `services/`.
+
+  **Deviations / judgment calls, recorded:**
+  - `agent-v1.api.ts` did not reuse main's exact `AgentsApp`/`AgentsVersion`/
+    `AgentsGuard`/`RegisterAgents` type names (main's `VersionBuilder`
+    abstraction has no counterpart) — the branch's shape is
+    `{secured: SecuredApp<...>, deps: AgentsV1Deps}` threaded through four
+    private `register*Endpoints` functions plus `createAgentV1RestApp` itself,
+    matching `agent-legacy.api.ts`'s own internal shape rather than main's.
+  - `AgentPlatformUrlBuilder` is NOT redefined in `agent-v1.api.ts` — it
+    imports the type `agent-legacy.api.ts` already exports, to avoid two
+    identically-named, differently-declared exports colliding out of
+    `index.ts`.
+  - `AgentCallDeps`/`ConnectEndpointDeps` are new port-shaped interfaces
+    (`assertRunnable`, `runtime`, `transport`) that Slice 7's
+    `ApiConnectedAgentsComposition` is expected to satisfy; nothing in
+    `apps/api` constructs them yet — see gaps below.
+
+  **Gaps left inside Slice 5's own scope (not deferred to Slice 7):**
+  - **The family is not mounted anywhere.** `createAgentV1RestApp` is
+    exported and ready, but no `apps/api` composition file calls it yet — that
+    requires `ApiConnectedAgentsComposition` (Slice 7: Redis-backed runtime,
+    `ApiConnectCredentialAdapter`, the `assertRunnable` port wired from
+    `@langwatch/suite-server`), which touches `api-production.composition.ts`
+    and `app-rest.packaged-families.ts` (coordination file). Slice 5 as
+    written asked for this mounting too; it was deliberately left to Slice 7
+    because building even a minimal composition means constructing a real
+    Redis-or-memory runtime and a credential adapter, which is Slice 7's
+    stated content, not Slice 5's.
+  - **No new tests were lifted this pass.** §5's table names
+    `connected-agent-call-route`, `agent-v1-connected-rest`,
+    `connected-agent-long-poll-route` (all in `apps/api/src/features/agent/__tests__`,
+    all needing a mounted family plus Postgres/Redis) and the suite
+    `connected-target.service` integration scenarios (needing
+    `resolveConnectedReferences`/`isAgentUnseen`/`ownerNamesOf`/
+    `agentParameterDefinitionsOf`, which main's `connected-targets.ts` has and
+    the branch's 71-line `connected-target.service.ts` does not — confirmed by
+    diffing the two; only `assertConnectedAgentsRunnable` was ported in an
+    earlier pass). None of these tests can run against a mounted family or a
+    real resolver yet, so lifting them now would either not compile or not
+    exercise real behavior. **This is the single largest remaining gap**:
+    grepping the suite-server tree for the six integration scenario titles
+    (`"A teammate cannot target another person's personal agent"`, `"A run
+    can address a connected agent by name and environment"`, etc.) confirms
+    none are bound.
+  - `resolveConnectedReferences`, `isAgentUnseen`, `ownerNamesOf`,
+    `agentParameterDefinitionsOf` from main's `connected-targets.ts` were
+    never ported to `connected-target.service.ts` in any earlier pass. Restoring
+    them (plus the run-scheduling call site that resolves `<name>@<environment>`
+    targets before scheduling) is real remaining work under this plan's rule
+    that nothing on main may stay absent — it was out of reach this pass given
+    the REST family's own size, and is the right place for the next pass to
+    start inside `packages/features/suite/server/src/services/connected-target.service.ts`.
+
+**Resume point for the next pass**: Slice 6
+(`packages/features/agent/server/src/app/agent.app.ts`'s `connected?:
+{presence, runtime}` dependency per §1.2, then `agent.api.ts`'s `getAll`/
+`getById` reading it), OR finish Slice 5's two gaps above first
+(`connected-target.service.ts`'s missing functions, then mount
+`createAgentV1RestApp` once Slice 7's composition exists — these two are
+tangled: mounting needs Slice 7, so the suite gap is the one piece of Slice 5
+still doable standalone). Either way, message `a9b5bb9332cf3e2d9` before
+touching `api-production.composition.ts`, `api-agents.composition.ts` or
+`app-trpc.features.ts`.
