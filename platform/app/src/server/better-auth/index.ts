@@ -35,6 +35,7 @@ import {
   identityCeremonies,
   identityStorageAdapter,
   resolveSignInMethodPolicy,
+  sessionRevocation,
   twoStepAccount,
 } from "~/server/app-layer/identity/runtime";
 import { prisma } from "~/server/db";
@@ -59,7 +60,6 @@ import {
   signInAfterPasswordReset,
 } from "./password-reset-session";
 import { issuersForRequest } from "./registeredIssuers";
-import { revokeAllSessionsForUser } from "./revokeSessions";
 import { sessionClaimsData } from "./session-claims-hook";
 import {
   SIGN_UP_CONFIRM_ADDRESS_PATH,
@@ -699,7 +699,7 @@ export const auth = betterAuth({
      * the recovery path for a possibly-compromised account, so we revoke all.
      */
     onPasswordReset: async ({ user }) => {
-      await revokeAllSessionsForUser({ prisma, userId: user.id });
+      await sessionRevocation().revokeAll({ userId: user.id });
       // Every old session is gone; the after-hook opens the one new session
       // this reset earned, for the device that set the password. Recorded
       // AFTER the revoke so the new session is never among the revoked.
@@ -891,7 +891,7 @@ export const auth = betterAuth({
    * user with a legacy credential Account row (e.g. from a prior
    * on-prem deployment) to be able to bypass our tRPC `changePassword`
    * mutation — which gates on `env.NEXTAUTH_PROVIDER === "email"` AND
-   * calls `revokeOtherSessionsForUser` (iter 26) — by POSTing directly
+   * revokes the user's other sessions (iter 26) — by POSTing directly
    * to BetterAuth's endpoint. In pure cloud deployments this has zero
    * user impact (no credential accounts exist), but in mixed/migration
    * scenarios it prevents a subtle side-channel around the tRPC gate.

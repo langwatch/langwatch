@@ -2,15 +2,12 @@ import type { LinkProposalDirectoryPort } from "@langwatch/identity-server";
 import { createLogger } from "@langwatch/observability";
 import type { PrismaClient } from "~/generated/prisma/client";
 import { auth as betterAuth } from "~/server/better-auth";
-import {
-  revokeAllSessionsForUser,
-  revokeSessionsForIdentifier,
-} from "~/server/better-auth/revokeSessions";
 import { InviteService } from "~/server/invites/invite.service";
 import type {
   OperatorInvitationPort,
   OperatorSessionPort,
 } from "./identity-lookup.service";
+import type { SessionRevocationService } from "./session-revocation.service";
 
 const logger = createLogger("langwatch:identity:lookup");
 
@@ -24,10 +21,10 @@ const logger = createLogger("langwatch:identity:lookup");
  * everywhere" are two decisions an operator makes, not one with a flag.
  */
 export class BetterAuthOperatorSessions implements OperatorSessionPort {
-  constructor(private readonly prisma: PrismaClient) {}
+  constructor(private readonly sessions: SessionRevocationService) {}
 
   async endAllForUser({ userId }: { userId: string }): Promise<void> {
-    await revokeAllSessionsForUser({ prisma: this.prisma, userId });
+    await this.sessions.revokeAll({ userId });
   }
 
   async endForIdentifier({
@@ -37,11 +34,7 @@ export class BetterAuthOperatorSessions implements OperatorSessionPort {
     userId: string;
     identifierId: string;
   }): Promise<void> {
-    await revokeSessionsForIdentifier({
-      prisma: this.prisma,
-      userId,
-      identifierId,
-    });
+    await this.sessions.revokeForIdentifier({ userId, identifierId });
   }
 }
 

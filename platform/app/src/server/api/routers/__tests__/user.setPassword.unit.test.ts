@@ -36,8 +36,13 @@ const { resolveAuthProviderMock, revokeOtherSessionsMock } = vi.hoisted(() => ({
 vi.mock("@ee/sso/sso-gate", () => ({
   resolveAuthProvider: resolveAuthProviderMock,
 }));
-vi.mock("~/server/better-auth/revokeSessions", () => ({
-  revokeOtherSessionsForUser: revokeOtherSessionsMock,
+// Only the revocation factory is replaced: the router reads the rest of the
+// identity runtime for sign-up identifiers and verification.
+vi.mock("~/server/app-layer/identity/runtime", async (importOriginal) => ({
+  ...(await importOriginal<
+    typeof import("~/server/app-layer/identity/runtime")
+  >()),
+  sessionRevocation: () => ({ revokeOthers: revokeOtherSessionsMock }),
 }));
 
 describe("userRouter.setPassword", () => {

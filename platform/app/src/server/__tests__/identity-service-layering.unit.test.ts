@@ -162,7 +162,6 @@ describe("identity service layering", () => {
           "server/better-auth/last-way-in.ts",
           "server/better-auth/passkey-signup.ts",
           "server/better-auth/registeredIssuers.ts",
-          "server/better-auth/revokeSessions.ts",
           "server/better-auth/sign-up-confirmation.ts",
         ]),
       ).toEqual(CLEAN);
@@ -175,12 +174,7 @@ describe("identity service layering", () => {
       const offenders = offendersOf(AUTH_BOUNDARY_FILES, (_file, source) =>
         linesMatching(source, AUTH_ROW),
       );
-      expect(
-        ratchet(offenders, [
-          "server/api/routers/user.ts",
-          "server/routes/auth.ts",
-        ]),
-      ).toEqual(CLEAN);
+      expect(ratchet(offenders, ["server/api/routers/user.ts"])).toEqual(CLEAN);
     });
   });
 
@@ -261,12 +255,7 @@ describe("identity service layering", () => {
       const offenders = offendersOf(scope, (_file, source) =>
         linesMatching(source, /active-sessions-/),
       );
-      expect(
-        ratchet(offenders, [
-          "server/better-auth/revokeSessions.ts",
-          "server/routes/auth.ts",
-        ]),
-      ).toEqual(CLEAN);
+      expect(ratchet(offenders, [])).toEqual(CLEAN);
     });
   });
 

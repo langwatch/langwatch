@@ -18,6 +18,7 @@ import { compare, hash } from "bcrypt";
 import { z } from "zod";
 import { getApp } from "~/server/app-layer/app";
 import {
+  sessionRevocation,
   signUpIdentifier,
   signUpVerification,
 } from "~/server/app-layer/identity/runtime";
@@ -31,7 +32,6 @@ import {
   Auth0ApiError,
   changeAuth0Password,
 } from "~/server/auth0/passwordService";
-import { revokeOtherSessionsForUser } from "~/server/better-auth/revokeSessions";
 import { GatewayBudgetService } from "~/server/gateway/budget.service";
 import { BudgetOverviewService } from "~/server/gateway/budgetOverview.service";
 import { sendBudgetIncreaseRequestEmail } from "~/server/mailer/budgetIncreaseRequestEmail";
@@ -633,8 +633,7 @@ export const userRouter = createTRPCRouter({
       // same reason `changePassword` skips it: the session id in hand is the
       // operator's, not the subject's.
       if (!ctx.session.user.impersonator && ctx.session.sessionId) {
-        await revokeOtherSessionsForUser({
-          prisma: ctx.prisma,
+        await sessionRevocation().revokeOthers({
           userId: ctx.session.user.id,
           keepSessionId: ctx.session.sessionId,
         });
@@ -786,8 +785,7 @@ export const userRouter = createTRPCRouter({
         // devices' app sessions so a stolen session token cannot outlive a
         // password rotation. Same impersonation safeguard as the email path.
         if (!ctx.session.user.impersonator && ctx.session.sessionId) {
-          await revokeOtherSessionsForUser({
-            prisma: ctx.prisma,
+          await sessionRevocation().revokeOthers({
             userId: ctx.session.user.id,
             keepSessionId: ctx.session.sessionId,
           });
@@ -838,8 +836,7 @@ export const userRouter = createTRPCRouter({
       // admin's tab open. In an impersonation context, password change
       // shouldn't be exposed in the UI, but be defensive.
       if (!ctx.session.user.impersonator && ctx.session.sessionId) {
-        await revokeOtherSessionsForUser({
-          prisma: ctx.prisma,
+        await sessionRevocation().revokeOthers({
           userId: ctx.session.user.id,
           keepSessionId: ctx.session.sessionId,
         });

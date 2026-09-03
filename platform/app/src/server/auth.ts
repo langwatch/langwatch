@@ -69,8 +69,8 @@ export interface Session {
   /**
    * The BetterAuth session row id (Session.id in Postgres). Exposed so
    * server-side mutations like `changePassword` can call
-   * `revokeOtherSessionsForUser({keepSessionId})` without re-fetching the
-   * BetterAuth session via headers. This is the impersonation-aware
+   * `sessionRevocation().revokeOthers({keepSessionId})` without re-fetching
+   * the BetterAuth session via headers. This is the impersonation-aware
    * session id — i.e. the OUTER admin's session id, NOT the impersonated
    * user's id, since impersonation reuses the admin's session row.
    *

@@ -52,7 +52,10 @@ import type { BetterAuthOptions } from "better-auth";
 import type { AdapterFactory } from "better-auth/adapters";
 import { prismaAdapter } from "better-auth/adapters/prisma";
 import { env } from "~/env.mjs";
-import { OrganizationUserRole } from "~/generated/prisma/client";
+import {
+  OrganizationUserRole,
+  type PrismaClient,
+} from "~/generated/prisma/client";
 import { prisma } from "../../db";
 import { featureFlagService } from "../../featureFlag";
 import { sendAddressConfirmationEmail } from "../../mailer/addressConfirmationEmail";
@@ -133,10 +136,13 @@ import {
   IdTokenProviderAssertions,
   PrismaSessionIdentifiers,
   PrismaSessionRecords,
+  PrismaSessionRevocationRecords,
   RedisSessionCache,
+  RedisSessionRevocationCache,
 } from "./session-adapters";
 import { SessionClaimsService } from "./session-claims.service";
 import { SessionInventoryService } from "./session-inventory.service";
+import { SessionRevocationService } from "./session-revocation.service";
 import { SignUpHealthService } from "./sign-up-health.service";
 import { SignUpIdentifierService } from "./sign-up-identifier";
 import { ProjectionSignInAccountLookup } from "./signin-account-lookup";
@@ -826,6 +832,31 @@ export function sessionInventory(): SessionInventoryService {
   return new SessionInventoryService({
     records: new PrismaSessionRecords(prisma),
     cache: new RedisSessionCache(),
+  });
+}
+
+/**
+ * Ending somebody else's sessions: the whole set, every one but the tab
+ * asking, the ones one sign-in method minted, or a single named one.
+ *
+ * The WIDE instrument, and the counterpart to {@link sessionInventory} rather
+ * than a replacement for it — a password reset, a deactivation and a seat
+ * revocation all reach for this one, and none of them is somebody managing
+ * their own devices.
+ *
+ * Takes a client so a caller that already holds one — the user service, the
+ * organization repository — revokes through this service instead of keeping a
+ * second copy of the queries. Production hands in the same client this module
+ * holds; a test hands in its own.
+ */
+export function sessionRevocation({
+  prisma: client = prisma,
+}: {
+  prisma?: PrismaClient;
+} = {}): SessionRevocationService {
+  return new SessionRevocationService({
+    records: new PrismaSessionRevocationRecords(client),
+    cache: new RedisSessionRevocationCache(),
   });
 }
 

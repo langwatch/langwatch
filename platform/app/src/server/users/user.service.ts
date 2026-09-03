@@ -1,11 +1,20 @@
 import { CliTokenRevocationService } from "@ee/governance/services/cliTokenRevocation.service";
 import type { PrismaClient, User } from "~/generated/prisma/client";
-import { revokeAllSessionsForUser } from "../better-auth/revokeSessions";
+import { sessionRevocation } from "../app-layer/identity/runtime";
+import type { SessionRevocationService } from "../app-layer/identity/session-revocation.service";
 
 export class UserService {
   constructor(
     private readonly prisma: PrismaClient,
     private readonly cliTokenRevocation: CliTokenRevocationService = CliTokenRevocationService.create(),
+    /**
+     * Composed over this service's OWN client rather than the app's, so a
+     * caller handing in a client — every test here does — revokes against the
+     * one it handed in.
+     */
+    private readonly sessions: SessionRevocationService = sessionRevocation({
+      prisma,
+    }),
   ) {}
 
   static create(prisma: PrismaClient): UserService {
@@ -90,7 +99,7 @@ export class UserService {
     });
 
     if (emailChanged) {
-      await revokeAllSessionsForUser({ prisma: this.prisma, userId: id });
+      await this.sessions.revokeAll({ userId: id });
     }
 
     return updated;
@@ -145,7 +154,8 @@ export class UserService {
    * update alone is invisible to ongoing sessions for up to 30 days.
    * Every deactivation path (tRPC, SCIM webhook, SCIM provisioning
    * sync) routes through here so they all benefit from the cache
-   * invalidation. See `src/server/better-auth/revokeSessions.ts`.
+   * invalidation. See
+   * `src/server/app-layer/identity/session-revocation.service.ts`.
    *
    * CLI revocation: device-flow access + refresh tokens live in Redis
    * under `lwcli:access:*` / `lwcli:refresh:*` independently of
@@ -160,7 +170,7 @@ export class UserService {
       where: { id },
       data: { deactivatedAt: new Date() },
     });
-    await revokeAllSessionsForUser({ prisma: this.prisma, userId: id });
+    await this.sessions.revokeAll({ userId: id });
     await this.cliTokenRevocation.revokeForUser({ userId: id });
     return user;
   }

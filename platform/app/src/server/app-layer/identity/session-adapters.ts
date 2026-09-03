@@ -10,13 +10,19 @@ import type {
   SessionRecord,
   SessionRecordsPort,
 } from "./session-inventory.service";
+import type {
+  CachedSession,
+  RevocableSession,
+  SessionRevocationCachePort,
+  SessionRevocationRecordsPort,
+} from "./session-revocation.service";
 
 const logger = createLogger("langwatch:identity:session-claims");
 
 /**
- * The reads and writes behind what a session records, and behind ending the
- * sessions one sign-in method minted (D06). Prisma and Redis live here so the
- * services above stay decisions.
+ * The reads and writes behind what a session records, behind ending the
+ * sessions one sign-in method minted (D06), and behind revocation. Prisma and
+ * Redis live here so the services above stay decisions.
  */
 
 /**
@@ -166,13 +172,27 @@ const SESSION_RECORD_SELECT = {
 } as const;
 
 /**
+ * The keys better-auth's `secondaryStorage` adapter writes, spelled here and
+ * nowhere else in the app (`specs/identity/identity-service-layering.feature`).
+ * The adapter prefixes every key it is handed with `better-auth:`, and the two
+ * keys it writes for a session are the session itself, under its token, and
+ * the per-user index of the tokens that are live.
+ */
+const cachedSessionKey = ({ token }: { token: string }) =>
+  `better-auth:${token}`;
+const activeSessionIndexKey = ({ userId }: { userId: string }) =>
+  `better-auth:active-sessions-${userId}`;
+
+/** The App's Redis, or null on a deployment that runs without one. */
+const sessionCacheConnection = () => tryGetApp()?.redis ?? null;
+
+/**
  * better-auth's session cache, cleared for the tokens that are about to stop
  * being valid.
  *
- * The same keys `revokeSessions.ts` clears, for the same reason: better-auth
- * reads the cache before the database, so a deleted row alone is invisible to
- * it for as long as thirty days. The per-user index is rewritten rather than
- * deleted - the sessions that survive this revocation are still in it.
+ * The same keys {@link RedisSessionRevocationCache} clears, for the same
+ * reason: better-auth reads the cache before the database, so a deleted row
+ * alone is invisible to it for as long as thirty days.
  */
 export class RedisSessionCache implements SessionCachePort {
   async dropTokens({
@@ -182,16 +202,16 @@ export class RedisSessionCache implements SessionCachePort {
     userId: string;
     tokens: readonly string[];
   }): Promise<void> {
-    const redis = tryGetApp()?.redis ?? null;
+    const redis = sessionCacheConnection();
     if (!redis) return;
     try {
       for (const token of tokens) {
-        await redis.del(`better-auth:${token}`);
+        await redis.del(cachedSessionKey({ token }));
       }
       // The index is a write-time convenience, not the truth. Dropping it
       // whole costs one extra database read on this person's next request and
       // cannot leave a revoked token listed as live.
-      await redis.del(`better-auth:active-sessions-${userId}`);
+      await redis.del(activeSessionIndexKey({ userId }));
     } catch (error) {
       // The rows are still going. A cache we could not clear delays the
       // revocation; it does not fail it, and saying so is what makes the
@@ -201,5 +221,182 @@ export class RedisSessionCache implements SessionCachePort {
         "could not clear the session cache while ending sessions for one sign-in method; the rows are still being deleted",
       );
     }
+  }
+}
+
+/**
+ * The same cache, as revocation reads and rewrites it.
+ *
+ * Separate from {@link RedisSessionCache} because the error policy differs and
+ * not because the store does: these methods report a failure by throwing, and
+ * `SessionRevocationService` is what decides that a cache it could not clear
+ * delays a revocation rather than failing it.
+ *
+ * A deployment with no Redis reads as an empty cache and accepts every write:
+ * there is nothing cached to leave a revoked person signed in, so absence is
+ * an answer here rather than a failure.
+ */
+export class RedisSessionRevocationCache implements SessionRevocationCachePort {
+  async readIndex({
+    userId,
+  }: {
+    userId: string;
+  }): Promise<readonly CachedSession[] | null> {
+    const redis = sessionCacheConnection();
+    if (!redis) return null;
+    const stored = await redis.get(activeSessionIndexKey({ userId }));
+    if (!stored) return null;
+    try {
+      const parsed: unknown = JSON.parse(stored);
+      if (!Array.isArray(parsed)) return null;
+      return parsed.filter(
+        (session): session is CachedSession =>
+          typeof (session as CachedSession | null)?.token === "string",
+      );
+    } catch (error) {
+      // An index we cannot read is an index we cannot trust, so it answers
+      // the same as a missing one: the caller falls back to the session rows,
+      // which is the safety net that makes the index optional in the first
+      // place.
+      logger.warn(
+        { error, userId },
+        "could not read the cached index of live sessions; falling back to the session rows",
+      );
+      return null;
+    }
+  }
+
+  async writeIndex({
+    userId,
+    sessions,
+  }: {
+    userId: string;
+    sessions: readonly CachedSession[];
+  }): Promise<void> {
+    const redis = sessionCacheConnection();
+    if (!redis) return;
+    await redis.set(
+      activeSessionIndexKey({ userId }),
+      JSON.stringify(sessions),
+    );
+  }
+
+  async dropIndex({ userId }: { userId: string }): Promise<void> {
+    const redis = sessionCacheConnection();
+    if (!redis) return;
+    await redis.del(activeSessionIndexKey({ userId }));
+  }
+
+  async dropSessions({ tokens }: { tokens: readonly string[] }): Promise<void> {
+    const redis = sessionCacheConnection();
+    if (!redis) return;
+    for (const token of tokens) {
+      await redis.del(cachedSessionKey({ token }));
+    }
+  }
+}
+
+/**
+ * The session rows revocation deletes, and the tokens it has to clear from the
+ * cache before it does.
+ *
+ * Every read here is deliberately unfiltered by expiry, unlike
+ * {@link PrismaSessionRecords}: a cached session outlives the row's own expiry
+ * window, so a token skipped for being expired is a token better-auth would
+ * keep answering from.
+ */
+export class PrismaSessionRevocationRecords
+  implements SessionRevocationRecordsPort
+{
+  constructor(private readonly prisma: PrismaClient) {}
+
+  async findTokensForUser({
+    userId,
+  }: {
+    userId: string;
+  }): Promise<readonly string[]> {
+    const sessions = await this.prisma.session.findMany({
+      where: { userId },
+      select: { sessionToken: true },
+    });
+    return sessions.map((session) => session.sessionToken);
+  }
+
+  async findTokensForUserExcept({
+    userId,
+    keepSessionId,
+  }: {
+    userId: string;
+    keepSessionId: string;
+  }): Promise<readonly string[]> {
+    const sessions = await this.prisma.session.findMany({
+      where: { userId, NOT: { id: keepSessionId } },
+      select: { sessionToken: true },
+    });
+    return sessions.map((session) => session.sessionToken);
+  }
+
+  async findTokenForSession({
+    sessionId,
+  }: {
+    sessionId: string;
+  }): Promise<string | null> {
+    const session = await this.prisma.session.findUnique({
+      where: { id: sessionId },
+      select: { sessionToken: true },
+    });
+    return session?.sessionToken ?? null;
+  }
+
+  async findForIdentifier({
+    userId,
+    identifierId,
+  }: {
+    userId: string;
+    identifierId: string;
+  }): Promise<readonly RevocableSession[]> {
+    // The user id is part of the predicate even though the identifier already
+    // implies one: a caller that named somebody else's identifier ends
+    // nothing rather than ending their sessions.
+    return this.prisma.session.findMany({
+      where: { userId, identifierId },
+      select: { id: true, sessionToken: true },
+    });
+  }
+
+  async deleteAllForUser({ userId }: { userId: string }): Promise<number> {
+    const result = await this.prisma.session.deleteMany({ where: { userId } });
+    return result.count;
+  }
+
+  async deleteForUserExcept({
+    userId,
+    keepSessionId,
+  }: {
+    userId: string;
+    keepSessionId: string;
+  }): Promise<number> {
+    const result = await this.prisma.session.deleteMany({
+      where: { userId, NOT: { id: keepSessionId } },
+    });
+    return result.count;
+  }
+
+  async deleteByIds({ ids }: { ids: readonly string[] }): Promise<number> {
+    if (ids.length === 0) return 0;
+    const result = await this.prisma.session.deleteMany({
+      where: { id: { in: [...ids] } },
+    });
+    return result.count;
+  }
+
+  async deleteByToken({ token }: { token: string }): Promise<number> {
+    // `deleteMany` rather than `delete` so a session that has already gone —
+    // the ordinary case when somebody signs out twice — is a count of zero
+    // rather than an exception to swallow.
+    const result = await this.prisma.session.deleteMany({
+      where: { sessionToken: token },
+    });
+    return result.count;
   }
 }

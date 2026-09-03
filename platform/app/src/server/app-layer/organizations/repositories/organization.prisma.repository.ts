@@ -29,8 +29,8 @@ import {
 } from "~/utils/memberRoleConstraints";
 import { GROWTH_SEAT_PLAN_TYPES } from "../../../../../ee/billing/utils/growthSeatEvent";
 import { isCustomRole } from "../../../api/enterprise";
-import { revokeAllSessionsForUser } from "../../../better-auth/revokeSessions";
 import { CustomRoleNotAssignableError } from "../../../role-bindings/errors";
+import { sessionRevocation } from "../../identity/runtime";
 import {
   CannotRemoveSelfAsLastAdminError,
   LiteMemberViewerOnlyError,
@@ -1279,7 +1279,7 @@ export class PrismaOrganizationRepository implements OrganizationRepository {
     if (disabled) {
       // Revoking the seat has to revoke the live session too, or the person
       // keeps working until their token happens to expire.
-      await revokeAllSessionsForUser({ prisma: this.prisma, userId });
+      await sessionRevocation({ prisma: this.prisma }).revokeAll({ userId });
     }
   }
 

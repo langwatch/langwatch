@@ -14,7 +14,7 @@ import { createLogger } from "@langwatch/observability";
 import type { Context } from "hono";
 import { env } from "~/env.mjs";
 import { createServiceApp, publicEndpoint } from "~/server/api/security";
-import { tryGetApp } from "~/server/app-layer/app";
+import { sessionRevocation } from "~/server/app-layer/identity/runtime";
 import { getServerAuthSession } from "~/server/auth";
 import { auth } from "~/server/better-auth";
 import { isBornFinalizedSignUp } from "~/server/better-auth/bornFinalizedOptIn";
@@ -96,26 +96,10 @@ const logoutHandler = async (c: Context) => {
       const session = await auth.api.getSession({ headers });
 
       if (session) {
-        const token = session.session.token;
-
-        try {
-          await prisma.session.delete({
-            where: { sessionToken: token },
-          });
-        } catch {
-          // Session may already be deleted
-        }
-
-        const redisConnection = tryGetApp()?.redis ?? null;
-        if (redisConnection) {
-          try {
-            await redisConnection.del(`better-auth:${token}`);
-            const listKey = `better-auth:active-sessions-${session.user.id}`;
-            await redisConnection.del(listKey);
-          } catch {
-            // Redis cleanup is best-effort
-          }
-        }
+        await sessionRevocation().revokeOne({
+          token: session.session.token,
+          userId: session.user.id,
+        });
       }
     } catch {
       // Session lookup failed — still clear cookies below

@@ -29,6 +29,7 @@ import { PrismaIdentityLookupRepository } from "./repositories/identity-lookup.p
 import {
   identityProjectionStore,
   identityService,
+  sessionRevocation,
   signInRouter,
 } from "./runtime";
 
@@ -66,7 +67,7 @@ export function identityLookup(): IdentityLookupService {
     router: signInRouter,
     identity: identityService,
     links: linkProposals,
-    sessions: new BetterAuthOperatorSessions(prisma),
+    sessions: new BetterAuthOperatorSessions(sessionRevocation()),
     invitations: new InviteServiceOperatorInvitations(prisma),
   });
 }
