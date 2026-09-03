@@ -17,7 +17,7 @@ Open [Annotations](https://app.langwatch.ai/@project/annotations) and click **+*
 | **Score Type** | The score types reviewers fill in. At least one. **Add New** creates a score type from here. |
 
 <Frame>
-<img src="/images/annotations/annotation-queue-create.png" alt="The Create Annotation Queue drawer with Participants, Name, Description and Score Type" />
+<img src="/images/annotations/annotation-queue-create.png" alt="The Create Annotation Queue drawer filled in: a participant, the name with its slug, a description, the Accuracy score type and Save" />
 </Frame>
 
 Click **Save**. The queue appears in the sidebar for every participant. **Edit queue** in the queue's menu reopens the drawer.
@@ -27,7 +27,7 @@ Click **Save**. The queue appears in the sidebar for every participant. **Edit q
 In the [Trace Explorer](https://app.langwatch.ai/@project/traces), select traces and click **Add to annotation queue** in the action bar. From an open trace, the header menu has the same entry.
 
 <Frame>
-<img src="/images/annotations/add-to-annotation-queue.png" alt="The Add to annotation queue dialog with the Send to field" />
+<img src="/images/annotations/add-to-annotation-queue.png" alt="The Add to annotation queue dialog from the Trace Explorer, with Send to open and listing the Support review queue, a person and Add New Queue" />
 </Frame>
 
 In **Send to**, pick one or more queues or people, then click **Send**. A trace is queued once per queue and once per person. From the inbox, select rows and click **Add to queue**; on a queue page the button reads **Move to queue**.
@@ -56,10 +56,10 @@ An item is **Pending** until you click **Next** or **Done** on it, then **Comple
 
 ## Edit a trace
 
-**Edit trace** in the bar, or in the trace header menu, opens the trace in **Annotation mode**. You can change the trace input, output and metadata, and each span's name, type, input, output, parameters and error, or delete a span. The bar counts the changes, for example **3 fields changed, 1 span deleted**. Click **Save**.
+**Edit trace** in the bar, or in the trace header menu, opens the trace in **Annotation mode**. You can change the trace input, output and metadata, and each span's name, type, input, output, parameters and error, or delete a span. The bar counts the changes, for example **1 field changed** or **3 fields changed, 1 span deleted**, and names the scope of the edit, for example **Trace output**. An edited field is highlighted and shows its character delta, and **Reset** on it restores the original. Click **Save**, or **Cancel** to drop the draft.
 
 <Frame>
-<img src="/images/annotations/trace-edit-mode.png" alt="The trace drawer in Annotation mode with the changes summary and the Save button" />
+<img src="/images/annotations/trace-edit-mode.png" alt="The trace drawer in Annotation mode: the blue bar with 1 field changed, the Trace output scope, Cancel and Save, and the edited Output highlighted with +63 and a Reset action" />
 </Frame>
 
 The corrections are stored next to the original trace, never over it. Comments you write while editing are saved as you write them and are not part of the draft.

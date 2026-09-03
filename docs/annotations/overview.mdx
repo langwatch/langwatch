@@ -8,7 +8,7 @@ An annotation is a human review attached to a trace, or to one part of it: a com
 
 ## Annotate a trace
 
-Open a trace from the [Trace Explorer](https://app.langwatch.ai/@project/traces). In the conversation view, hover over a message. Two buttons appear next to it:
+Open a trace from the [Trace Explorer](https://app.langwatch.ai/@project/traces). In the conversation view, hover over a reply. **Translate**, **Annotate** and **Suggest** appear next to it:
 
 | Button | Opens |
 |--------|-------|
@@ -16,13 +16,19 @@ Open a trace from the [Trace Explorer](https://app.langwatch.ai/@project/traces)
 | **Suggest** | **Suggest correction**: an **Expected output** field prefilled with the reply, a diff against the original, the comment and the scores. |
 
 <Frame>
-<img src="/images/annotations/trace-annotate-cluster.png" alt="A message in the trace drawer with the Annotate and Suggest buttons" />
+<img src="/images/annotations/trace-annotate-cluster.png" alt="A reply in the conversation view with the Translate, Annotate and Suggest buttons, and a saved annotation with its comment and Accuracy score beside it" />
 </Frame>
 
-Each score chip opens its options and a **Reason (optional)** field. Click **OK** to set the score, then **Save**. See [Annotation scores](/annotations/scores) to define the score types.
+The composer names its target under the title, for example **Output**. Each score chip opens its question, its options and a **Reason (optional)** field. Click **OK** to set the score, or **Clear** to remove it, then **Save**. See [Annotation scores](/annotations/scores) to define the score types.
 
 <Frame>
-<img src="/images/annotations/annotation-form.png" alt="The Add annotation composer with a comment, the score chips and a reason" />
+<img src="/images/annotations/annotation-form.png" alt="The Add annotation composer targeting Output, with a comment typed, the Accuracy and Issues score chips, and the Accuracy chip open on its question, the options Correct, Partially correct and Wrong, the Reason (optional) field, Clear and OK" />
+</Frame>
+
+**Suggest correction** prefills **Expected output** with the reply. Edit the text; the **Diff** section counts the added and removed characters and highlights the change. **Reset** restores the original reply.
+
+<Frame>
+<img src="/images/annotations/annotation-suggest-form.png" alt="The Suggest correction composer with one sentence added to the Expected output and the Diff section showing +63 -0 with the added sentence highlighted" />
 </Frame>
 
 Every message, span, attribute row and panel in the trace drawer has a **Comment** button too, so an annotation can point at exactly the part that is wrong. The **Annotations** chip in the drawer header counts the annotations on the trace.
@@ -36,13 +42,13 @@ You can edit or delete your own annotations from the trace. Writing annotations 
 [Annotations](https://app.langwatch.ai/@project/annotations) lists the traces queued for review. The sidebar has **Inbox** (everything queued for you or for a queue you are in), **You** (traces sent to you directly), **All** (every annotation in the project) and one entry per queue under **My queues**, each with its pending count.
 
 <Frame>
-<img src="/images/annotations/annotations-inbox.png" alt="The annotations inbox with the Scores column, the Status filter and the Columns button" />
+<img src="/images/annotations/annotations-inbox.png" alt="The annotations inbox: the sidebar with Inbox, You, All and the Support review queue, the Queues, Status: Pending, Columns and All time filters, Export, and the table with the reviewer avatars, Date queued, Input, Output, Scores, Comments and Suggestions" />
 </Frame>
 
-The table shows **People**, **Date queued**, **Input**, **Output**, **Scores**, **Comments** and **Suggestions**. **Columns** adds one column per score type or hides the ones you do not need; the choice is kept per project in your browser.
+The table shows **People** (the reviewer avatars, in a column without a header), **Date queued**, **Input**, **Output**, **Scores**, **Comments** and **Suggestions**. **Columns** adds one column per score type or hides the ones you do not need; the choice is kept per project in your browser.
 
 <Frame>
-<img src="/images/annotations/annotations-columns-menu.png" alt="The Columns menu with the Standard and Score types sections" />
+<img src="/images/annotations/annotations-columns-menu.png" alt="The Columns popover with the 7 shown count, a search box, the Standard section with every column ticked and the Score types section with Issues and Accuracy" />
 </Frame>
 
 **Status** filters **Pending**, **Completed** or **All**; the inbox opens on **Pending**. **Queues** filters by queue. **Export** downloads the visible rows as CSV with the trace id, the status, every visible column and the annotators.
