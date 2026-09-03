@@ -44,8 +44,24 @@ export class GovernanceEventsWorkerFeatureInstaller extends WorkerFeatureInstall
   static create(options: {
     installer: GovernanceEventsWorkerCapability;
     eventing: WorkerEventingRuntime;
+    /**
+     * The spend-spike anomaly evaluator, when this process composed one.
+     *
+     * It rides this installer rather than one of its own because a spend-spike
+     * alert IS a governance signal: the rules it reads are Governance's, the
+     * `governance_kpis` window it evaluates is the one this feature's roll-up
+     * writes, and the webhook it fires leaves through the same fence the
+     * webhook delivery process manager uses. A second installer would also have
+     * to claim a routing key on the shared queue — the evaluator claims none,
+     * because it is a five-minute Postgres loop rather than a queue consumer.
+     */
+    anomalySchedule?: GovernanceAnomalySchedule;
   }): GovernanceEventsWorkerFeatureInstaller {
-    return new GovernanceEventsWorkerFeatureInstaller(options.installer, options.eventing);
+    return new GovernanceEventsWorkerFeatureInstaller(
+      options.installer,
+      options.eventing,
+      options.anomalySchedule,
+    );
   }
 
   readonly name = "governance-events";
@@ -68,6 +84,7 @@ export class GovernanceEventsWorkerFeatureInstaller extends WorkerFeatureInstall
   private constructor(
     private readonly installer: GovernanceEventsWorkerCapability,
     private readonly eventing: WorkerEventingRuntime,
+    private readonly anomalySchedule: GovernanceAnomalySchedule | undefined,
   ) {
     super();
   }
@@ -85,20 +102,31 @@ export class GovernanceEventsWorkerFeatureInstaller extends WorkerFeatureInstall
       }
       this.vkLifecycle.resolve((data) => vkLifecycle.send(data));
       this.budgetCrossing.resolve((data) => budgetCrossing.send(data));
+      this.anomalySchedule?.start();
       this.installed = true;
     }
-    return GovernanceEventsWorkerFeatureHandle.create();
+    return GovernanceEventsWorkerFeatureHandle.create(this.anomalySchedule);
   }
 }
 
+/** The spend-spike evaluator's lifecycle, as this installer drives it. */
+export interface GovernanceAnomalySchedule {
+  start(): void;
+  stop(): Promise<void>;
+}
+
 class GovernanceEventsWorkerFeatureHandle extends WorkerFeatureHandlePort {
-  static create(): GovernanceEventsWorkerFeatureHandle {
-    return new GovernanceEventsWorkerFeatureHandle();
+  static create(
+    anomalySchedule: GovernanceAnomalySchedule | undefined,
+  ): GovernanceEventsWorkerFeatureHandle {
+    return new GovernanceEventsWorkerFeatureHandle(anomalySchedule);
   }
 
-  private constructor() {
+  private constructor(private readonly anomalySchedule: GovernanceAnomalySchedule | undefined) {
     super();
   }
 
-  async close(): Promise<void> {}
+  async close(): Promise<void> {
+    await this.anomalySchedule?.stop();
+  }
 }

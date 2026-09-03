@@ -50,3 +50,9 @@ export {
   currentRegistryRateVersion,
   type WorkerGovernanceIngestionPullHostOptions,
 } from "./governance/governance-ingestion-pull.host";
+
+export {
+  startSpendSpikeAnomalyWorker,
+  type SpendSpikeAnomalyWorkerDependencies,
+  type SpendSpikeAnomalyWorkerHandle,
+} from "./governance/spend-spike-anomaly.worker";

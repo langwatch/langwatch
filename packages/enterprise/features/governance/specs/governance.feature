@@ -78,6 +78,7 @@ Feature: Enterprise governance package boundary
     Then an existing open alert takes precedence over another firing
     And the decision fires only when the minimum baseline and configured ratio are met
 
+  @integration
   Scenario: Anomaly delivery delegates network safety
     Given a fired anomaly has one or more webhook destinations
     When Governance dispatches the alert

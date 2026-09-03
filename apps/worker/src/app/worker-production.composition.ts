@@ -174,6 +174,10 @@ import {
   createWorkerReportTraceList,
 } from "./worker-report-schedule.composition";
 import { createWorkerGovernanceIngestion } from "./worker-governance-ingestion.composition";
+import {
+  createWorkerAnomalyAlertTransport,
+  createWorkerGovernanceAnomalySchedule,
+} from "./worker-governance-anomaly.composition";
 import type { IngestionPullLifecycleDatabase } from "@langwatch/enterprise-governance-server";
 import {
   createWorkerTopicRuntime,
@@ -686,9 +690,26 @@ export class WorkerProductionComposition {
         })
       : undefined;
     const gatewayAbsence = WorkerProductionComposition.gatewayAbsence(options);
+    // The spend-spike evaluator rides this installer, unconditionally, because
+    // every collaborator it needs is one this process already holds: the Prisma
+    // client its rules and alerts live in, the tenant-keyed ClickHouse client
+    // the `governance_kpis` windows are read from, and the same address fence
+    // every other customer-supplied destination in this process leaves through.
+    //
+    // The platform started the loop with none of the third: its evaluator was
+    // built over `prisma` alone, so a fired alert recorded `log_only` and the
+    // admin who configured a webhook was paged by nothing. Composing the
+    // dispatcher here is what closes that, and it is a scheduler, so it claims
+    // no routing key — see the composition for why it has no installer of its
+    // own.
     const governanceEventsInstaller = GovernanceEventsWorkerFeatureInstaller.create({
       installer: { buildProcessing: () => gatewaySpendGraph.governance.buildProcessing() },
       eventing,
+      anomalySchedule: createWorkerGovernanceAnomalySchedule({
+        database: options.database,
+        resolveClickHouseClient: options.eventing.resolveClickHouseClient,
+        transport: createWorkerAnomalyAlertTransport(options.config),
+      }),
     });
     const gatewaySpendGraph = createWorkerGatewaySpend({
       config: options.config,
