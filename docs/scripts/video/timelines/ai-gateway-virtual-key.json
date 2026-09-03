@@ -1,0 +1,112 @@
+{
+  "input": "../../../../.claude/tmp/video/raw/gateway/page@50dce6720c8ed5136b4a75f870667b71.webm",
+  "output": "../../../media/videos/ai-gateway-virtual-key.webm",
+  "fps": 30,
+  "page": { "width": 1440, "height": 900 },
+  "size": { "width": 1664, "height": 1040 },
+  "frame": { "background": "backgrounds/default.webp", "fit": "native" },
+  "quality": { "crf": 38, "cpuUsed": 2 },
+
+  "cut": {
+    "speed": 2,
+    "segments": [
+      [4.5, 43.0],
+      [81.5, 88.2],
+      [97.0, 110.5]
+    ]
+  },
+
+  "cursor": { "start": { "x": 760, "y": 430 } },
+
+  "beats": [
+    {
+      "tRaw": 8.861, "x": 1330, "y": 97,
+      "zoom": 1.9, "zoomAt": { "x": 1230, "y": 130 }, "hold": 0.5,
+      "pause": { "before": 0.9, "after": 0.7 },
+      "note": "New virtual key, a corner, so it earns the zoom. The hold after it carries the camera onto the drawer"
+    },
+    {
+      "tRaw": 12.094, "x": 1176, "y": 123,
+      "zoom": 1.7, "zoomAt": { "x": 1170, "y": 260 }, "hold": 2.6,
+      "note": "name the key, the camera holds while it types"
+    },
+    {
+      "tRaw": 17.284, "x": 1041, "y": 559,
+      "zoom": 1.7, "zoomAt": { "x": 1170, "y": 570 }, "hold": 0.4,
+      "note": "the camera pans down the drawer to the budget"
+    },
+    {
+      "tRaw": 19.932, "x": 1215, "y": 559,
+      "zoom": 1.7, "zoomAt": { "x": 1170, "y": 570 }, "hold": 0.3,
+      "note": "per day becomes per month"
+    },
+    {
+      "tRaw": 21.388, "x": 1100, "y": 595,
+      "zoom": 1.7, "zoomAt": { "x": 1170, "y": 570 }, "hold": 0.5,
+      "click": false, "arc": 0,
+      "note": "read the budget back: max $50 a month, resets on the 1st"
+    },
+    {
+      "tRaw": 24.795, "x": 1375, "y": 859,
+      "zoom": 1.7, "zoomAt": { "x": 1170, "y": 660 }, "hold": 0.2,
+      "note": "Create. The camera eases out because the whole screen changes"
+    },
+    {
+      "tRaw": 28.929, "x": 700, "y": 155,
+      "zoom": 1.55, "zoomAt": { "x": 720, "y": 290 }, "hold": 0.1,
+      "click": false, "arc": 0,
+      "note": "the secret is shown once, and only once"
+    },
+    {
+      "tRaw": 30.056, "x": 940, "y": 155,
+      "zoom": 1.55, "zoomAt": { "x": 720, "y": 290 }, "hold": 0.1,
+      "click": false, "arc": 0,
+      "note": "sweep along the warning"
+    },
+    {
+      "tRaw": 32.778, "x": 700, "y": 354,
+      "zoom": 1.55, "zoomAt": { "x": 720, "y": 290 }, "hold": 0.8,
+      "click": false, "arc": 0,
+      "note": "down to the secret field, which LangWatch stores only as a hash"
+    },
+    {
+      "tRaw": 36.168, "x": 471, "y": 825, "zoom": 1,
+      "note": "tick I have saved it"
+    },
+    {
+      "tRaw": 38.224, "x": 945, "y": 825, "zoom": 1,
+      "note": "close, a close button earns no zoom"
+    },
+    {
+      "tRaw": 85.096, "x": 400, "y": 223,
+      "zoom": 1.6, "zoomAt": { "x": 760, "y": 250 }, "hold": 0.1,
+      "click": false, "arc": 0,
+      "note": "one request went through the key and it is already in the trace explorer"
+    },
+    {
+      "tRaw": 86.8, "x": 690, "y": 223,
+      "zoom": 1.6, "zoomAt": { "x": 760, "y": 250 }, "hold": 0.1,
+      "click": false, "arc": 0,
+      "note": "sweep along the question that was asked"
+    },
+    {
+      "tRaw": 87.6, "x": 915, "y": 190,
+      "zoom": 1.6, "zoomAt": { "x": 760, "y": 250 }, "hold": 1.2,
+      "click": false, "arc": 0,
+      "note": "the origin says Gateway, beside the duration, the cost and the token count"
+    },
+    {
+      "tRaw": 99.5, "x": 400, "y": 258,
+      "zoom": 1.5, "zoomAt": { "x": 700, "y": 300 }, "hold": 0.1,
+      "click": false, "arc": 0,
+      "note": "back on the key list, the new key is at the top"
+    },
+    {
+      "tRaw": 101.5, "x": 1062, "y": 253,
+      "zoom": 1.5, "zoomAt": { "x": 700, "y": 300 }, "hold": 3.5,
+      "click": false, "arc": 0,
+      "note": "the payoff: the spend of that one request has landed on the key"
+    },
+    { "tRaw": 109.9, "hide": true }
+  ]
+}

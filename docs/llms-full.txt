@@ -9533,6 +9533,10 @@ sidebarTitle: Overview
 keywords: ai gateway, llm gateway, virtual keys, llm budgets, openai compatible gateway, anthropic compatible gateway
 ---
 
+<video controls autoPlay muted loop playsInline width="100%">
+  <source src="/media/videos/ai-gateway-virtual-key.webm" type="video/webm" />
+</video>
+
 ## What the gateway does for you
 
 Your provider API keys stay in LangWatch. You add OpenAI, Anthropic, Azure OpenAI, AWS Bedrock, Google Vertex AI, Google Gemini and the other [providers](/ai-gateway/providers/overview) once, under **Settings > Model Providers**.
