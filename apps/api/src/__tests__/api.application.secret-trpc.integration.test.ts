@@ -1,5 +1,6 @@
 import { SecretNotFoundError, SecretService, type Secret } from "@langwatch/secret-contract";
 import { describe, expect, it, vi } from "vitest";
+import { z } from "zod";
 import { ApiApplication } from "../api.application";
 
 const secret: Secret = {
@@ -124,7 +125,7 @@ describe("ApiApplication Secret tRPC composition", () => {
         secretId: "secret-1",
         value: "",
       }),
-    ).rejects.toMatchObject({ code: "BAD_REQUEST" });
+    ).rejects.toMatchObject({ code: "UNPROCESSABLE_CONTENT" });
     expect(authorize).not.toHaveBeenCalled();
     expect(service.update).not.toHaveBeenCalled();
   });
@@ -160,6 +161,27 @@ describe("ApiApplication Secret tRPC composition", () => {
     ).rejects.toMatchObject({
       code: "NOT_FOUND",
       cause: error,
+    });
+  });
+
+  /** @scenario "A schema parse inside a service is a validation failure on the application spine too" */
+  it("promotes a schema parse failure inside a service to validation_error", async () => {
+    const service = new TestSecretService();
+    const parsed = z.object({ value: z.string().min(1) }).safeParse({ value: "" });
+    if (parsed.success) throw new Error("fixture parsed");
+    service.update.mockRejectedValueOnce(parsed.error);
+    const { secrets } = createCaller(service);
+
+    await expect(
+      secrets.update({
+        projectId: "project-1",
+        secretId: "secret-1",
+        value: "rotated-value",
+      }),
+    ).rejects.toMatchObject({
+      code: "UNPROCESSABLE_CONTENT",
+      message: "validation_error",
+      cause: { code: "validation_error" },
     });
   });
 });

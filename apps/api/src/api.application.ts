@@ -1,7 +1,7 @@
 import { AgentService } from "@langwatch/agent-contract";
 import { AgentApp, AgentTrpcApi, type AgentTrpcContext } from "@langwatch/agent-server";
 import type { AuthzPermission } from "@langwatch/authz-contract";
-import { HandledError } from "@langwatch/handled-error";
+import { HandledError, isZodLikeError, ValidationError } from "@langwatch/handled-error";
 import { createLogger, type Logger } from "@langwatch/observability";
 import { runWithContext } from "@langwatch/observability/context";
 import { SecretService } from "@langwatch/secret-contract";
@@ -578,6 +578,14 @@ export class ApiApplication {
                   code: handledErrorCode(cause),
                   message: cause.message,
                   cause,
+                });
+              }
+              if (isZodLikeError(cause)) {
+                const validation = ValidationError.fromZodError(cause);
+                throw new TRPCError({
+                  code: handledErrorCode(validation),
+                  message: validation.code,
+                  cause: validation,
                 });
               }
               logger.error({ path, type, error: result.error }, "tRPC call failed");

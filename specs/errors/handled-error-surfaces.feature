@@ -315,6 +315,13 @@ Feature: Knowable failures reach the customer as themselves
     And the rejected field travels with it so the form can mark it
 
   @integration
+  Scenario: A schema parse inside a service is a validation failure on the application spine too
+    Given a procedure served by the API application's own protected procedure
+    And its service throws a schema parse failure
+    When the call fails
+    Then the caller reads validation_error at 422, not an unknown failure at 500
+
+  @integration
   Scenario: A validation failure is not reported as a platform exception
     Given a service that parses its own data and rejects a field
     When the caller reaches it over tRPC
