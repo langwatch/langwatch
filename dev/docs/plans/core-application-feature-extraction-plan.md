@@ -11307,3 +11307,117 @@ as a dependency of its own. `dev/scripts/install-check-shims.mjs` still lists it
 and stands down when the binary is absent — and the root manifest declares no
 `postinstall`, so on this branch the shims are not installed at all, which is a
 separate gap from this one.
+
+## The transcript visibility matrix rebound in `@langwatch/trace-server`, 2026-09-03
+
+The previous transcript entry closed with the debt: `specs/coding-agent/transcript-rest.feature`
+reported **8 unbound of 11**, and the eight were the transcript read and its
+captured-content visibility matrix, whose bindings were deleted with the
+monolith in `379b452def`. Both suites are now ported beside the code they
+exercise, and the file reports **10/10 scenarios bound — ✓ all bound**.
+
+```
+  DELETED IN 379b452def                        PORTED TO
+
+  platform/app/src/server/api/routers/
+    __tests__/                                 packages/features/trace/server/src/
+      tracesV2.transcript-read                   transport/api-trpc/__tests__/
+        .unit.test.ts (148 lines) ───────────►     traces-v2.transcript-read
+                                                    .unit.test.ts
+      tracesV2.transcript-visibility
+        .integration.test.ts (275) ─────────►     traces-v2.transcript-visibility
+                                                    .integration.test.ts
+
+                                               (new) __tests__/support/
+                                                 transcript-read.support.ts
+```
+
+Every assertion survives verbatim. What changed is construction: the reader
+takes the application and the ports as arguments now, so the two suites no
+longer `vi.mock("~/server/app-layer/app")` — they build a real `TraceApp` over
+two `vi.fn()` stores, and real read ports out of the same implementations
+`readPorts()` wires in `apps/api/src/app/api-trace-read-stack.composition.ts`.
+The log visibility gate, the coding-agent log join and the transcript
+derivation all still run for real.
+
+### The one collaborator that did not come with the code
+
+The visibility matrix used to resolve its `Protections` through
+`getProtectionsForProject(prisma, …)` against a real Postgres project. That
+function is gone; what replaced it is `ApiTraceProtections.getApiKeyProtections`,
+a **private class inside `apps/api/src/app/api-trace-read-stack.composition.ts`**,
+and the `getTestProject` harness it needed exists nowhere in the repo any more.
+
+```
+  THE CHAIN THE SCENARIOS DESCRIBE            WHERE EACH LINK LIVES NOW
+
+  stored policy row                           Postgres              ✘ no harness
+    └─ resolveDataPrivacy(rows, facts)        data-privacy-contract ✔ real, run here
+        └─ isContentVisibleToPublic(cat)      data-privacy-contract ✔ real, run here
+            └─ → Protections                  apps/api, PRIVATE     ✘ projected in-test
+                └─ gateTraceLogVisibility     trace-server          ✔ real, run here
+                    └─ buildTranscript        coding-agent-contract ✔ real, run here
+```
+
+So the suite drives the real resolution and the real public-viewer rule over
+the same `DataPrivacyConfig` values the deleted suite wrote through
+`setForScope`, and projects them onto `Protections` in a named helper the
+docblock points at apps/api for. What is NOT guarded from this package is the
+API process choosing the wrong branch for a key — that is an `apps/api`
+binding, and it belongs with whoever mounts the route (the canonical log read
+is still absent, so the door is still unmounted).
+
+Two further honest notes:
+
+- `getVisibilityCutoffMs` answers `null`. The plan's visibility window is a
+  separate gate the process resolves; the deleted suite anchored its fixture to
+  `Date.now()` for exactly this reason, and that anchoring is kept.
+- `contentPrivacy`'s two functions throw rather than stub. A transcript read of
+  a trace with no stored spans never reaches the span mapping, and these suites
+  store no spans. Throwing also keeps the support module free of a
+  cross-feature `@langwatch/data-privacy-server` import, which
+  `langwatch(package-boundaries)` refuses.
+
+### File → change
+
+| File | Change |
+| --- | --- |
+| `packages/features/trace/server/src/transport/api-trpc/__tests__/traces-v2.transcript-read.unit.test.ts` | NEW. The two `@unit` scenarios, lifted from the deleted suite. |
+| `packages/features/trace/server/src/transport/api-trpc/__tests__/traces-v2.transcript-visibility.integration.test.ts` | NEW. The six `@integration` visibility-matrix scenarios, all three agent wire shapes (claude bare names, `gemini_cli.`- and `codex.`-namespaced) kept. |
+| `packages/features/trace/server/src/transport/api-trpc/__tests__/support/transcript-read.support.ts` | NEW. The `TraceApp` over two store doubles, and the real read ports both suites share. |
+
+No production module was edited, no route was mounted, and nothing under
+`platform/` was created, edited or read.
+
+### Gates
+
+- `@langwatch/trace-server`: `vitest run src/transport/api-trpc/__tests__/traces-v2.transcript-read.unit.test.ts src/transport/api-trpc/__tests__/traces-v2.transcript-visibility.integration.test.ts`
+  — **Test Files 2 passed (2)**, **Tests 11 passed (11)**.
+- `@langwatch/trace-server`: `vitest run src/transport/api-trpc/__tests__`
+  — **Test Files 5 passed (5)**, **Tests 63 passed (63)** (52 before this lane).
+- `check:feature-parity`: `specs/coding-agent/transcript-rest.feature` —
+  **10/10 scenarios bound**, **✓ all bound**. Measured against the same file
+  with the two new suites moved aside, the baseline is **2/10 scenarios
+  bound** — the eight this lane rebinds. The eleventh scenario in the file is
+  `@unimplemented` and is not counted either way.
+- `@langwatch/trace-server`: `tsc --noEmit` — **1 error**, pre-existing and in
+  a file this lane did not touch: `trace-read-mappers.redaction.unit.test.ts`
+  imports `CategoryVisibility` from `../trace-read-mappers.api`, which declares
+  it locally and does not export it (TS2459).
+- `oxlint --config .oxlintrc.architecture.json` over
+  `src/transport/api-trpc/__tests__/` — **no finding on any file this lane
+  wrote**. The two `package-boundaries` errors that remain are on
+  `trace-read-mappers.{conversation-context,redaction}.unit.test.ts`, both at
+  `HEAD`. `oxfmt` run over all three new files.
+
+### The gap this lane did not close
+
+`@langwatch/trace-server`'s `test` script is
+`vitest run --exclude '**/*.integration.test.ts'`, and
+`.github/scripts/run-package-suites.sh` runs each package's `test` script. So
+the visibility suite — like the three `.integration.test.ts` files already in
+this package — is **not run by CI**, even though its six scenarios now count as
+bound. The file is named for its level honestly rather than being renamed to
+sneak into the unit lane; closing it means the package declaring a
+`test:integration` script and CI calling it, which is a package-manifest and
+workflow change this lane did not make.
