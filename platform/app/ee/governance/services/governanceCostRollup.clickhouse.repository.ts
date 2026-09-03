@@ -40,7 +40,7 @@ export interface GovernanceCostRollupRow {
    * Null until a provider restates the cell to a different figure.
    */
   RevisedAt: number | null;
-  /** Unix SECONDS. The epoch on any row written before migration 00088. */
+  /** Unix SECONDS. The epoch on any row written before migration 00090. */
   LastObservedAt: number;
   PulledItemsJson: string;
   Version: string;

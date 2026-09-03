@@ -126,7 +126,7 @@ export function governanceCostRollupStateFromRow(
     revisionCount: row.RevisionCount,
     previousAmountNanoUsd: row.PreviousAmountNanoUsd,
     revisedAt: row.RevisedAt === null ? null : fromUnixSeconds(row.RevisedAt),
-    // A row written before migration 00088 carries the epoch here, which reads
+    // A row written before migration 00090 carries the epoch here, which reads
     // as long since observed and therefore settled — the deliberate backfill,
     // not a gap. The next daily pull re-stamps any day still inside its
     // window, because the pullers look 30 days back.
