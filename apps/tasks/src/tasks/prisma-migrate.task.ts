@@ -26,9 +26,11 @@ export class PrismaMigrateTask extends Task {
       return;
     }
 
-    const configPath = fileURLToPath(
-      new URL("../../../../packages/prisma-client/prisma.config.ts", import.meta.url),
-    );
+    // This process's own config, not `@langwatch/prisma-client`'s: the package
+    // config carries no datasource on purpose, and `prisma migrate deploy`
+    // refuses to run without one. `apps/tasks/prisma.config.ts` points at the
+    // package's schema and migration history and attaches `DATABASE_URL`.
+    const configPath = fileURLToPath(new URL("../../prisma.config.ts", import.meta.url));
 
     await new Promise<void>((resolve, reject) => {
       const child = spawn("pnpm", ["exec", "prisma", "migrate", "deploy", "--config", configPath], {
