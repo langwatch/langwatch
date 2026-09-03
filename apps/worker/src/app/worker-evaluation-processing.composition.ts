@@ -258,13 +258,28 @@ class WorkerEvaluationEngine extends EvaluationExecutionPort {
  * package's own, so the routing key is claimed and a redelivery still collapses
  * onto one job. What refuses is the INTENT behind it, and it refuses by name.
  *
- * WHY IT CANNOT BE COMPOSED HERE. Running an online evaluation resolves the
- * customer's model provider and their managed-provider credentials, renders
- * the trace through the application's own mapping layer, and calls out to the
- * evaluator service; the model-provider cascade alone is a capability this
- * process cannot build. An intent that guessed at any of those would bill a
- * customer's key against a provider they did not choose, or score a trace
- * against inputs they did not map.
+ * WHY IT CANNOT BE COMPOSED HERE, exactly. It is no longer the model-provider
+ * cascade: this process composes its own gateway, and the bridge an execution
+ * reads its `X_LITELLM_*` environment through is written and sits in
+ * `worker-evaluation-model-env.composition.ts`. Four things are genuinely
+ * missing, and every one of them is load-bearing for a correct score:
+ *
+ *   - the EVALUATOR CATALOG. `EvaluationExecutionService` takes an
+ *     `EvaluatorService`, and `@langwatch/evaluator-server` is not a dependency
+ *     of this process.
+ *   - the MONITOR READ BY ID. This process composes `MonitorCatalogService`,
+ *     whose one method lists a project's enabled monitors; resolving ONE by id
+ *     lives on the wide `MonitorService`, which itself wants the evaluator
+ *     catalog above.
+ *   - the TRACE EVIDENCE reads. `getEvaluationSpans` and
+ *     `getEvaluationEvents` exist only on the eight-collaborator
+ *     `TraceService`, which this process does not build.
+ *   - SETTINGS RECOVERY and INPUTS OFFLOAD. Both are declared ports with no
+ *     implementation anywhere in the tree, in any process.
+ *
+ * An intent that guessed at any of those would bill a customer's key against a
+ * provider they did not choose, or score a trace against inputs they did not
+ * map.
  *
  * A THROW RATHER THAN A SKIP, deliberately. A skipped evaluation is a real
  * outcome in this pipeline — it folds, it rolls up, and it can satisfy an

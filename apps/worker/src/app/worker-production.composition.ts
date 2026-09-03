@@ -223,8 +223,10 @@ import {
 import {
   createWorkerGatewaySpend,
   WorkerGatewaySpendAbsenceReportPort,
+  type WorkerGatewaySpendCompositionInput,
 } from "./worker-gateway-spend.composition";
 import {
+  createWorkerWebhookDispatchRateLimiter,
   createWorkerWebhookEgress,
   createWorkerWebhookTransport,
 } from "./worker-webhook-egress.composition";
@@ -259,7 +261,18 @@ export abstract class WorkerTraceAbsenceReportPort {
   /** No pub/sub bridge: the two broadcast subscribers register and stay inert. */
   abstract withoutBroadcast(): void;
 
-  /** Azure object storage: dataset normalization has no backend in this process. */
+  /**
+   * Azure object storage: dataset normalization has no backend in this process.
+   *
+   * UNREACHABLE TODAY, and that is a defect rather than a design. This process
+   * composes its object storage BEFORE it reaches the report, and that
+   * composition throws for an Azure backend with no driver factory — so an
+   * `azure` deployment does not run with normalization refusing by name, it
+   * fails to boot. Closing it means composing the Azure driver (the driver and
+   * its credential resolver are both packaged, and this process already builds
+   * both in its object-storage migration task) over `AZURE_BLOB_*`
+   * configuration leaves the worker does not read yet.
+   */
   abstract withoutDatasetStorage(): void;
 }
 
@@ -340,6 +353,18 @@ export type WorkerInfrastructureCompositionOptions = Omit<
  */
 type WorkerEventingConsumerCompositionOptions = {
   consumers?: WorkerEventingConsumerOptions;
+  /**
+   * Every configured ClickHouse endpoint, shared and private alike.
+   *
+   * The tenant-keyed resolver beside it answers "the client for THIS tenant",
+   * which is the only question a fold or an append may ask. The settlement
+   * sweeper asks the other one — "every instance" — because one sweeper
+   * settles the whole install, and a graph handed a resolver as a PORT has no
+   * connection to enumerate. Optional for exactly that reason: the standalone
+   * worker opened the connection and supplies it; a graph composed over
+   * already-built persistence ports does not, and the sweep says so by name.
+   */
+  resolveClickHouseInstances?: WorkerGatewaySpendCompositionInput["resolveClickHouseInstances"];
 };
 
 type WorkerProductionCompositionBaseOptions = {
@@ -427,9 +452,20 @@ export class WorkerProductionComposition {
     // One fenced outbound sender for the whole process: an automation's webhook
     // alert and a webhook endpoint's delivery count against the same ceiling
     // and answer to the same address policy.
+    //
+    // The counter is composed BESIDE the sender rather than inside it, because
+    // a third outbound hop does not pass through the sender at all: a webhook
+    // endpoint that delivers to a queue is put on that queue directly. Handing
+    // both the same object is what keeps the queue from being the one uncapped
+    // destination in the product.
+    const webhookDispatchRateLimiter = createWorkerWebhookDispatchRateLimiter({
+      config: options.config,
+      redis: eventingOptions.groupQueue.redis,
+    });
     const webhookEgress = createWorkerWebhookEgress({
       config: options.config,
       redis: eventingOptions.groupQueue.redis,
+      rateLimiter: webhookDispatchRateLimiter,
     });
     WorkerProductionComposition.requireMailForConsumers({
       mail,
@@ -616,12 +652,17 @@ export class WorkerProductionComposition {
       config: options.config,
       database: options.database as never,
       resolveClickHouseClient: options.eventing.resolveClickHouseClient,
+      ...(options.eventing.resolveClickHouseInstances
+        ? { resolveClickHouseInstances: options.eventing.resolveClickHouseInstances }
+        : {}),
       redis: eventingOptions.groupQueue.redis,
       ...(options.config.eventing.foldCacheTtlSeconds === undefined
         ? {}
         : { foldCacheTtlSeconds: options.config.eventing.foldCacheTtlSeconds }),
       processStore: eventing.processStore,
       egress: webhookEgress,
+      dispatchRateLimiter: webhookDispatchRateLimiter,
+      ...(infrastructure ? { awsClientConfig: (input) => infrastructure.aws.build(input) } : {}),
       governanceCommands: {
         recordVkLifecycle: (data) => governanceEventsInstaller.commands.recordVkLifecycle(data),
         recordBudgetCrossing: (data) =>
@@ -1970,19 +2011,22 @@ export class LoggedWorkerGatewaySpendAbsence extends WorkerGatewaySpendAbsenceRe
 
   withoutSpendSettlement(): void {
     this.logger.warn(
-      "worker composed the gateway spend pipeline without a settlement sweeper: it needs every configured ClickHouse instance and this process holds a tenant-keyed resolver, so a request whose confirmation never arrives stays admitted rather than being settled as cost-unknown",
+      { reason: "no-clickhouse-instance-directory" },
+      "worker composed the gateway spend pipeline without a settlement sweeper: the sweep settles every configured ClickHouse instance in one pass and this graph was handed a tenant-keyed resolver as a port rather than a connection it can enumerate, so a request whose confirmation never arrives stays admitted rather than being settled as cost-unknown",
     );
   }
 
   withoutSqsWebhookDestinations(): void {
     this.logger.warn(
-      "worker composed webhook delivery without a queue transport: an endpoint that delivers to SQS is refused by name rather than retried, so its events never arrive",
+      { reason: "no-aws-transport" },
+      "worker composed webhook delivery without an AWS transport: an endpoint that delivers to a queue is refused by name rather than retried, so its events never arrive",
     );
   }
 
   withoutWebhookEntitlements(): void {
     this.logger.warn(
-      "worker composed webhook delivery without an entitlement graph: a delivery cannot read its organization's plan, so the batch is refused rather than delivered to an organization that may not have bought the feature",
+      { reason: "no-plan-source" },
+      "worker composed webhook delivery without an entitlement graph: what is missing is the PLAN SOURCE, a signed licence or a subscription row, which no process in this deployment composes — so the batch is refused rather than delivered to an organization that may not have bought the feature, and a baseline plan answered here would silently stop delivering to organizations that did",
     );
   }
 
@@ -2055,13 +2099,14 @@ export class LoggedWorkerAutomationSettlementAbsence extends WorkerAutomationSet
 
   withoutRunawayContainment(): void {
     this.logger.warn(
-      "worker composed automation settlement without runaway containment: an automation past its daily ceiling still skips and still logs the breach, but nobody is notified and a misconfigured automation is not paused",
+      "worker composed automation settlement without runaway containment: the containment POLICY is written and tested inside the automation package but is not exported from it, and no implementation of its port exists in any process — so an automation past its daily ceiling still skips and still logs the breach, but nobody is notified and a misconfigured automation is not paused",
     );
   }
 
   withoutPlanResolvedPersistCap(): void {
     this.logger.warn(
-      "worker composed automation settlement without an entitlement provider: the daily persist ceiling is the paid tier for every project rather than the one its plan grants",
+      { reason: "no-plan-source" },
+      "worker composed automation settlement without an entitlement provider: the same missing PLAN SOURCE the webhook gate names, so the daily persist ceiling is the paid tier for every project rather than the one its plan grants — which is deliberately the generous answer, because a baseline provider composed here would drop every project to the free ceiling instead",
     );
   }
 
@@ -2101,7 +2146,7 @@ export class LoggedWorkerLangyAbsence extends WorkerLangyAbsenceReportPort {
 
   withoutSessionKeyMint(): void {
     this.logger.warn(
-      "worker composed the langy conversation pipeline without an authorization graph: a turn whose agent manager asks for credentials cannot be recovered and fails instead",
+      "worker composed the langy conversation pipeline without an API-key service: the authorization graph itself is composed here, but a mint ATTACHES a grant and this process registers the grants pipeline as a consumer rather than resolving its command senders, so a turn whose agent manager asks for credentials cannot be recovered and fails instead",
     );
   }
 }
@@ -2148,7 +2193,7 @@ export class LoggedWorkerIdentityAbsence extends WorkerIdentityAbsenceReportPort
   withoutDirectoryTokenRevocation(): void {
     this.logger.warn(
       { reason: "no-directory-capability" },
-      "worker composed the SSO connection ledger without a directory capability: a torn-down connection completes on time and its SCIM token rows are left in place, where they fail verification against the connection's torn-down state",
+      "worker composed the SSO connection ledger without a directory capability: NO process in this deployment revokes, and the work is one scoped delete of the connection's SCIM token rows — so a torn-down connection completes on time and those rows are left in place, where they fail verification against the connection's torn-down state",
     );
   }
 }
@@ -2297,7 +2342,7 @@ export class LoggedWorkerTraceAbsence extends WorkerTraceAbsenceReportPort {
   withoutDatasetStorage(): void {
     this.logger.warn(
       { reason: "azure-dataset-storage-unsupported" },
-      "worker composed dataset normalization on an Azure-backed deployment: this process has no Azure blob driver for datasets, so a normalize job fails by name rather than writing chunks somewhere unreadable",
+      "worker composed dataset normalization on an Azure-backed deployment: this process reads no Azure configuration and composes no blob driver for datasets, so a normalize job fails by name rather than writing chunks somewhere unreadable",
     );
   }
 }

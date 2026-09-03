@@ -324,13 +324,23 @@ class WorkerSettlementFilterEvaluator extends AutomationSettlementFilterEvaluato
   private unavailable(): DispatchError {
     return new DispatchError({
       message:
-        "This process cannot match an automation's legacy filters: the matcher and its field schema live beside the analytics filter UI, which a background process must not load. Re-save the automation to convert it to a filter query.",
+        "This process cannot match an automation's legacy filters: the two functions that walked them — the trace-data matcher and the fold-state projection it reads — left the tree with the platform application and were not re-homed, so no process has them. The field matchers they stood on survive as a React-free server subpath of the analytics package. Re-save the automation to convert it to a filter query.",
       retryable: false,
     });
   }
 }
 
-/** `ADD_TO_DATASET`'s row mapping, refused by name. */
+/**
+ * `ADD_TO_DATASET`'s row mapping, refused by name.
+ *
+ * NOT because the rules are unreachable: `mapTraceToDatasetEntry` and
+ * `TRACE_EXPANSIONS` are `@langwatch/trace-contract`'s, already a dependency of
+ * this process and already imported by this file. What blocks the action is
+ * the step BEFORE it — a dataset row is mapped from the full trace record, and
+ * this process composes no reader that answers one (see
+ * `withoutTraceRecordRead`). So the mapper stays refused rather than composed
+ * ahead of the read it would consume, and both close together.
+ */
 class UnavailableDatasetMapper extends AutomationDatasetMapperPort {
   map(_input: {
     trace: TraceRecord;
@@ -339,7 +349,7 @@ class UnavailableDatasetMapper extends AutomationDatasetMapperPort {
   }): Array<Record<string, string | number>> {
     throw new DispatchError({
       message:
-        "This process cannot map a trace onto dataset columns: the mapping rules live beside the mapping editor that writes them, and a second implementation would fill columns that disagreed with the preview.",
+        "This process cannot map a trace onto dataset columns yet: the mapping rules are reachable, but the full trace record they map has no reader composed here, so there is nothing to map.",
       retryable: false,
     });
   }
@@ -351,7 +361,7 @@ class UnavailablePersistActionWriter extends AutomationPersistActionWriterPort {
     return Promise.reject(
       new DispatchError({
         message:
-          "This process composes no annotation queue, so an automation cannot add a trace to one from here.",
+          "This process composes no annotation queue writer, so an automation cannot add a trace to one from here: the queueing service is packaged and reachable, and `@langwatch/annotation-server` is not yet a dependency of this process.",
         retryable: false,
       }),
     );
@@ -361,7 +371,7 @@ class UnavailablePersistActionWriter extends AutomationPersistActionWriterPort {
     return Promise.reject(
       new DispatchError({
         message:
-          "This process composes no dataset writer, so an automation cannot add a trace to a dataset from here.",
+          "This process composes no dataset writer, so an automation cannot add a trace to a dataset from here: the write itself is one packaged call, and the row it would write cannot be produced until a full trace record can be read here.",
         retryable: false,
       }),
     );

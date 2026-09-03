@@ -175,6 +175,22 @@ export class WorkerClickHouseInfrastructure {
   readonly resolveClient = (tenantId: string): Promise<ClickHouseClient> =>
     this.connection.resolve(tenantId);
 
+  /**
+   * Every physical endpoint this deployment configured, the shared one and
+   * each private route, each labelled with the target it serves.
+   *
+   * The one question above deliberately answers "the client for THIS tenant",
+   * and every fold and append must keep asking only that. This second one is
+   * for the work that is not a tenant's: an install-wide sweep settles the
+   * shared instance and every private one in the same pass, so it needs the
+   * directory rather than a route. It is a separate closure rather than the
+   * connection itself for the original reason — a caller still cannot reach
+   * `shared()` and write one organization's rows on another's endpoint.
+   */
+  readonly resolveInstances = async (): Promise<
+    { target: string; client: ClickHouseClient }[]
+  > => [...this.connection.instances()];
+
   close(): Promise<void> {
     return ClickHouseShutdownService.create().shutdown(this.connection);
   }

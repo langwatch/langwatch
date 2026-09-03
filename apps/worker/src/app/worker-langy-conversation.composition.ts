@@ -210,7 +210,7 @@ class WorkerAbsentLangySessionKeys {
   mintForUser(): Promise<never> {
     return Promise.reject(
       new Error(
-        "Langy turn recovery asked for a session key, but this process composes no authorization graph; set up an authz-capable process to mint scoped session keys.",
+        "Langy turn recovery asked for a session key, but this process composes no API-key service to mint one with: a mint attaches an AuthZ grant, and this process registers the grants pipeline as a consumer rather than resolving its command senders, so the attach would refuse for an organization already on the ledger.",
       ),
     );
   }

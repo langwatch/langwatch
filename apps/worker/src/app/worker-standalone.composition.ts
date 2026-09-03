@@ -88,6 +88,11 @@ export class WorkerStandaloneComposition extends WorkerExecutableCompositionPort
       eventing: {
         database: database.connection.client as never,
         resolveClickHouseClient: clickhouse.resolveClient as never,
+        // The other half of the same connection: the tenant-keyed resolver
+        // above for everything a tenant does, and the instance directory for
+        // the one sweep that is nobody's tenant — settling admissions whose
+        // confirmation never arrived, on every configured endpoint at once.
+        resolveClickHouseInstances: clickhouse.resolveInstances,
         retention: createEventingRetentionConfiguration({
           defaultRetentionDays: config.retention.defaultDays,
         }),

@@ -228,11 +228,16 @@ function cachedRunStore(
  * queued while no executor is up is dispatched when one is, and the stall wake
  * is the backstop if none ever is.
  *
- * The refusal rather than a pool is the honest shape today: the pool runs the
- * scenario child process, and the prefetch that feeds it resolves the
- * customer's agents, workflows and secrets through runtimes this process does
- * not compose. A pool wired to a prefetcher that could not answer would fail
- * every run at execution time instead of at boot.
+ * The refusal rather than a pool is the honest shape today, and the scope is
+ * wider than this process: NO process in the repository composes
+ * `ScenarioExecutionPoolService`. Two things are missing rather than parked
+ * with a sibling. The pool spawns a scenario CHILD ENTRYPOINT that left the
+ * tree with the platform application and has not been rebuilt anywhere. And
+ * the prefetcher that feeds it takes eleven collaborators — agents, prompts,
+ * suites, secrets, traces, workflows and projects among them — of which the
+ * agent and prompt servers are not dependencies of this process at all. A pool
+ * wired to a prefetcher that could not answer would fail every run at
+ * execution time instead of at boot.
  *
  * The three prefetch methods are not reachable from the process manager at all;
  * they belong to the tRPC validation path, and they refuse by name so that a

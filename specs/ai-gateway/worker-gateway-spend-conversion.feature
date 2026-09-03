@@ -47,3 +47,27 @@ Feature: The worker mounts the gateway spend and governance signal pipelines
       When the worker composes webhook delivery
       Then the absence is reported by name
       And a deployment that names one stops reporting it
+
+    @unit
+    Scenario: The settlement sweeper mounts once the graph can enumerate its endpoints
+      Given a worker that opened its own ClickHouse connection
+      When it composes the gateway spend pipeline
+      Then the settlement sweeper is mounted
+      And the settlement absence is no longer reported
+      And no routing key is staged for it, because it subscribes to no event
+
+  Rule: A webhook endpoint delivers over the transport it named
+
+    @unit
+    Scenario: A webhook endpoint delivers through the packaged transport
+      Given an endpoint that delivers over HTTPS
+      When the worker dispatches a batch to it
+      Then the batch leaves through the process's own fenced sender
+      And the delivery is recorded against the delivery id the transport produced
+
+    @unit
+    Scenario: An endpoint that delivers to a queue is refused by name without an AWS transport
+      Given an endpoint that delivers to a queue
+      When the worker dispatches a batch to it and composed no AWS transport
+      Then the delivery is refused terminally and the absence is named
+      But a worker that owns the process's AWS transport builds the queue transport instead

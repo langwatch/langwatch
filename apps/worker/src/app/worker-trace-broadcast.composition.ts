@@ -7,13 +7,11 @@ import { tryCreateWorkerTenantBroadcast } from "./worker-tenant-broadcast.compos
 /**
  * The realtime half of trace ingestion, as the port Trace declares.
  *
- * STAGED, NOT MOUNTED. Trace has not converted — the application still
- * registers `traceUpdateBroadcast` and `spanStorageBroadcast` — so nothing in
- * this process publishes yet. What has to be true today is that this
- * composition root CAN answer Trace's own broadcast port from the shared
- * publisher that already ships in `@langwatch/notification-server`, which is
- * what the ledger recorded as the second named absence blocking the
- * conversion.
+ * MOUNTED. This process registers `traceUpdateBroadcast` and
+ * `spanStorageBroadcast` and publishes on both: the platform application that
+ * used to own them is gone, and this composition root answers Trace's own
+ * broadcast port from the shared publisher that ships in
+ * `@langwatch/notification-server`.
  *
  *     TraceTenantBroadcastPort              (trace-server declares it)
  *       └─ WorkerTraceTenantBroadcastAdapter        a rename, nothing else
@@ -22,12 +20,10 @@ import { tryCreateWorkerTenantBroadcast } from "./worker-tenant-broadcast.compos
  *
  * ONE PUBLISHER, THREE PRODUCERS. Trace, Scenario and Langy all advance
  * projections a tenant's tabs are watching, and all three publish the same
- * object onto the same channel. Only Trace declares its port here, because only
- * Trace is converting; Scenario's `simulation_updated` and Langy's
- * `langy_conversation_updated` producers are still the application's and stay
- * that way until those features convert. They will reuse
- * `tryCreateWorkerTenantBroadcast` the same way this does, so the wire format
- * stays single.
+ * object onto the same channel. Each declares its own narrow port and every one
+ * of them resolves through `tryCreateWorkerTenantBroadcast`, so the wire format
+ * stays single: two publishers over two connections would be two formats to
+ * keep aligned.
  *
  * Nothing when the deployment configured no Redis, for the reason the shared
  * composition already gives: this process serves no tabs, so there is no local

@@ -4,6 +4,7 @@ import { InMemoryWebhookDispatchRateLimiterAdapter, WebhookEgressService } from 
 import { resolveWorkerConfig } from "../../platform/config/worker.config";
 import {
   createWorkerGatewaySpend,
+  dispatchWebhookThrough,
   WorkerGatewaySpendAbsenceReportPort,
 } from "../worker-gateway-spend.composition";
 import { createWorkerProcessDatabase } from "./support/worker-database.double";
@@ -45,7 +46,24 @@ class RecordingAbsence extends WorkerGatewaySpendAbsenceReportPort {
   }
 }
 
-function compose(source: Record<string, unknown> = {}) {
+/** One ClickHouse endpoint, answering nothing: enough to build a sweeper over. */
+function instance(target: string) {
+  return {
+    target,
+    client: {
+      insert: async () => undefined,
+      query: async () => ({ json: async () => [] }),
+    },
+  };
+}
+
+function compose(
+  source: Record<string, unknown> = {},
+  substrates: {
+    instances?: Array<ReturnType<typeof instance>>;
+    awsClientConfig?: () => never;
+  } = {},
+) {
   return createWorkerGatewaySpend({
     config: resolveWorkerConfig({ NODE_ENV: "test", ...source }),
     database: createWorkerProcessDatabase() as never,
@@ -53,6 +71,10 @@ function compose(source: Record<string, unknown> = {}) {
       insert: async () => undefined,
       query: async () => ({ json: async () => [] }),
     })) as never,
+    ...(substrates.instances
+      ? { resolveClickHouseInstances: (async () => substrates.instances) as never }
+      : {}),
+    ...(substrates.awsClientConfig ? { awsClientConfig: substrates.awsClientConfig as never } : {}),
     redis: null,
     processStore: {} as never,
     egress: WebhookEgressService.create({
@@ -137,10 +159,11 @@ describe("given the spend spine and the governance signal log this process compo
     });
 
     /**
-     * The settlement sweeper is deliberately absent, and this asserts what that
-     * costs: NOTHING in routing terms, because it subscribes to no event. A
-     * future change that gave it an `.on(...)` handler would start staging a key
-     * this graph does not claim, and this is where that shows up.
+     * The settlement sweeper is absent only where the graph cannot enumerate,
+     * and this asserts what that costs: NOTHING in routing terms, because it
+     * subscribes to no event. A future change that gave it an `.on(...)`
+     * handler would start staging a key this graph does not claim, and this is
+     * where that shows up.
      *
      * @scenario "The settlement sweeper is declared absent, not silently skipped" */
     it("mounts no process manager the registry does not name", () => {
@@ -152,6 +175,42 @@ describe("given the spend spine and the governance signal log this process compo
         "webhookDelivery",
       ]);
     });
+
+    /**
+     * The closure of the settlement absence, asserted on the real definition:
+     * given the instance directory a graph that opened its own ClickHouse
+     * connection holds, the sweeper mounts.
+     *
+     * @scenario "The settlement sweeper is declared absent, not silently skipped" */
+    it("mounts the settlement sweeper once it is handed the instance directory", () => {
+      reset();
+      const definition = compose(
+        {},
+        { instances: [instance("shared")] },
+      ).spend.buildProcessing() as unknown as BuiltDefinition;
+
+      expect([...definition.processManagers.keys()].sort()).toEqual([
+        "gatewayDebits",
+        "spendSettlement",
+        "webhookDelivery",
+      ]);
+    });
+
+    /**
+     * And it still stages no routing key, which is why mounting it does not
+     * change what this consumer claims.
+     *
+     * @scenario "The worker mounts every gateway spend and governance routing key" */
+    it("stages no routing key for the sweeper it mounted", () => {
+      reset();
+      const definition = compose(
+        {},
+        { instances: [instance("shared")] },
+      ).spend.buildProcessing() as unknown as BuiltDefinition;
+
+      const frozen = frozenRoutingKeys("gateway_spend_processing");
+      expect([...registeredKeys(definition)].filter((key) => !frozen.includes(key))).toEqual([]);
+    });
   });
 
   describe("when the composition root reports what it could not build", () => {
@@ -161,6 +220,28 @@ describe("given the spend spine and the governance signal log this process compo
       compose();
 
       expect(RECORDED.absences).toContain("spendSettlement");
+    });
+
+    /** @scenario "The settlement sweeper is declared absent, not silently skipped" */
+    it("stops declaring it once the graph can enumerate its ClickHouse endpoints", () => {
+      reset();
+      compose({}, { instances: [instance("shared")] });
+
+      expect(RECORDED.absences).not.toContain("spendSettlement");
+    });
+
+    /**
+     * The queue transport is never reported at BOOT — it is reported at the
+     * dispatch of an endpoint that named a queue, and only where this graph
+     * composed no AWS transport. Both halves matter: a boot-time report would
+     * fire on every deployment, including ones with no queue endpoint at all.
+     *
+     * @scenario "An endpoint that delivers to a queue is refused by name without an AWS transport" */
+    it("does not report the queue transport absence at boot", () => {
+      reset();
+      compose();
+
+      expect(RECORDED.absences).not.toContain("sqsWebhookDestinations");
     });
 
     /** @scenario "An endpoint secret this deployment encrypted cannot be read without its key" */
@@ -177,6 +258,122 @@ describe("given the spend spine and the governance signal log this process compo
       compose({ CREDENTIALS_SECRET: "a".repeat(64) });
 
       expect(RECORDED.absences).not.toContain("endpointSecretKey");
+    });
+  });
+});
+
+describe("given a webhook endpoint's last hop", () => {
+  /** The batch every case below delivers, so only the destination varies. */
+  const batch = {
+    organizationId: "organization_1",
+    endpointId: "webhook_endpoint_1",
+    body: '{"batch":[]}',
+    batchId: "batch_1",
+    attempt: 1,
+    signingSecrets: ["secret_1"],
+  };
+
+  function dispatcher(options: { awsClientConfig?: () => never } = {}) {
+    const sent: Array<Record<string, unknown>> = [];
+    const dispatch = dispatchWebhookThrough(
+      {
+        config: resolveWorkerConfig({ NODE_ENV: "test" }),
+        egress: {
+          send: async (input: Record<string, unknown>) => {
+            sent.push(input);
+            return { status: 200, body: "ok", eventId: input.eventId };
+          },
+        },
+        absence: new RecordingAbsence(),
+        ...(options.awsClientConfig ? { awsClientConfig: options.awsClientConfig } : {}),
+      } as never,
+      { error: vi.fn(), warn: vi.fn(), info: vi.fn(), debug: vi.fn() } as never,
+    );
+    return { dispatch, sent };
+  }
+
+  describe("when the endpoint delivers over HTTPS", () => {
+    /**
+     * The packaged transport, not a twin: this graph used to hand-roll the
+     * egress call and re-derive the verdict beside it, so the two could drift
+     * about which status codes are worth retrying. The delivery id the log
+     * stores is what only the packaged one produces.
+     *
+     * @scenario "A webhook endpoint delivers through the packaged transport" */
+    it("sends through the process's own fenced sender and answers with a delivery id", async () => {
+      reset();
+      const { dispatch, sent } = dispatcher();
+
+      const result = await dispatch({ ...batch, destination: { kind: "http", url: "https://receiver.test/hook" } } as never);
+
+      expect(sent).toHaveLength(1);
+      expect(sent[0]).toMatchObject({
+        url: "https://receiver.test/hook",
+        eventId: "batch_1",
+        signingSecrets: ["secret_1"],
+        projectId: "organization_1",
+      });
+      expect(result).toMatchObject({ verdict: "success", status: 200, dispatchId: "batch_1" });
+    });
+  });
+
+  describe("when the endpoint delivers to a queue and no AWS transport was composed", () => {
+    /** @scenario "An endpoint that delivers to a queue is refused by name without an AWS transport" */
+    it("refuses terminally and names the absence rather than reporting a delivery", async () => {
+      reset();
+      const { dispatch, sent } = dispatcher();
+
+      const result = await dispatch({
+        ...batch,
+        destination: {
+          kind: "sqs",
+          queueUrl: "https://sqs.eu-west-1.amazonaws.com/123456789012/deliveries",
+          roleArn: null,
+          externalId: null,
+          accessKeyId: null,
+          secretAccessKey: null,
+        },
+      } as never);
+
+      expect(result.verdict).toBe("terminal");
+      expect(RECORDED.absences).toContain("sqsWebhookDestinations");
+      expect(sent).toEqual([]);
+    });
+  });
+
+  describe("when the endpoint delivers to a queue and this graph owns the AWS transport", () => {
+    /**
+     * The closure: the queue branch is BUILT rather than refused, so what the
+     * delivery reaches is the AWS transport asking this process how to build a
+     * client. Before, it never got that far.
+     *
+     * @scenario "An endpoint that delivers to a queue is refused by name without an AWS transport" */
+    it("builds the queue transport and stops naming the absence", async () => {
+      reset();
+      let asked = 0;
+      const { dispatch } = dispatcher({
+        awsClientConfig: (() => {
+          asked += 1;
+          throw new Error("aws client config reached");
+        }) as never,
+      });
+
+      await expect(
+        dispatch({
+          ...batch,
+          destination: {
+            kind: "sqs",
+            queueUrl: "https://sqs.eu-west-1.amazonaws.com/123456789012/deliveries",
+            roleArn: null,
+            externalId: null,
+            accessKeyId: null,
+            secretAccessKey: null,
+          },
+        } as never),
+      ).rejects.toThrow("aws client config reached");
+
+      expect(asked).toBe(1);
+      expect(RECORDED.absences).not.toContain("sqsWebhookDestinations");
     });
   });
 });

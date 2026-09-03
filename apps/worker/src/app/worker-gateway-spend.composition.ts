@@ -12,26 +12,33 @@ import type {
 } from "@langwatch/enterprise-governance-server";
 import { createGovernanceEventsPipeline } from "@langwatch/enterprise-governance-server";
 import {
+  httpWebhookDestination,
+  webhookDestinationFor,
   WebhookDeliveryService,
   WebhookEndpointAdapter,
   WebhookEndpointConfiguration,
   WebhookIdPort,
   WebhookSecretPort,
+  type AwsClientConfigPort,
   type WebhookDeliveryProcessDeps,
+  type WebhookDispatchRequest,
 } from "@langwatch/enterprise-webhook-server";
 import {
+  ClickHouseGatewayOpenAdmissionsAdapter,
   EventingGatewaySpendAdapter,
   GatewayBudgetLedgerAdapter,
   GatewaySpendEventsClickHouseAdapter,
   PostgresGatewayBudgetResolutionAdapter,
+  settlementGraceMs,
   type GatewayBudgetResolutionDatabase,
+  type GatewayClickHouseInstanceResolver,
   type GatewaySpendState,
+  type SpendSettlementProcessDeps,
 } from "@langwatch/gateway-server";
 import { createGatewayChangeEventsPort } from "@langwatch/gateway-server/composition/gateway-change-events";
 import { WEBHOOK_DELIVERY_PROCESS_NAME } from "@langwatch/enterprise-webhook-server";
 import { GATEWAY_DEBITS_PROCESS_NAME } from "@langwatch/enterprise-governance-server";
-import { classifyWebhookStatus, WEBHOOK_DELIVERY_ID_HEADER } from "@langwatch/egress";
-import type { WebhookEgressService } from "@langwatch/egress";
+import type { WebhookDispatchRateLimiterPort, WebhookEgressService } from "@langwatch/egress";
 import { generate } from "@langwatch/ksuid";
 import { createLogger, type Logger } from "@langwatch/observability";
 import type { ProcessStore } from "@langwatch/eventing";
@@ -46,18 +53,25 @@ import type { WorkerConfig } from "../platform/config/worker.config";
 export type WorkerGatewaySpendDatabase = GatewayBudgetResolutionDatabase;
 
 /**
- * Reports the three composition decisions the spend graph would otherwise hide.
+ * Reports the composition decisions the spend graph would otherwise hide.
  *
- * All three are silent in production: a settlement that never runs leaves rows
- * at `admitted` forever, an SQS endpoint that cannot be dispatched to simply
+ * Each is silent in production: a settlement that never runs leaves rows at
+ * `admitted` forever, an SQS endpoint that cannot be dispatched to simply
  * never receives, and an entitlement this process cannot read is the difference
  * between delivering a paid feature to everyone and to nobody.
+ *
+ * The first two are CONDITIONAL, and their condition is which substrates the
+ * graph was handed rather than what this package can build. A graph that
+ * opened its own ClickHouse connection can enumerate every configured
+ * endpoint and sweeps; one handed a tenant-keyed RESOLVER cannot, and says so.
+ * A graph that owns the process's AWS transport delivers to a queue; one built
+ * over already-composed technical ports has none to deliver through.
  */
 export abstract class WorkerGatewaySpendAbsenceReportPort {
   /** No all-instance ClickHouse directory: open admissions are never swept. */
   abstract withoutSpendSettlement(): void;
 
-  /** No SQS transport: endpoints that deliver to a queue refuse by name. */
+  /** No AWS transport: endpoints that deliver to a queue refuse by name. */
   abstract withoutSqsWebhookDestinations(): void;
 
   /** No entitlement graph: webhook delivery cannot read a plan and refuses. */
@@ -72,6 +86,16 @@ export type WorkerGatewaySpendCompositionInput = Readonly<{
   /** The one Prisma client this process opened. */
   database: WorkerGatewaySpendDatabase;
   resolveClickHouseClient: EventingClickHouseClientResolver;
+  /**
+   * Every configured ClickHouse endpoint, shared and private alike.
+   *
+   * The settlement sweeper's read side, and the one thing the tenant-keyed
+   * resolver above cannot answer: one sweeper settles the whole install, so it
+   * asks each instance for its own open admissions rather than routing a
+   * tenant to one. A graph handed only a resolver passes none and the sweep is
+   * reported absent by name.
+   */
+  resolveClickHouseInstances?: GatewayClickHouseInstanceResolver;
   /** The queue's own Redis, for the spend fold's read-through cache. */
   redis?: RedisConnection | null;
   foldCacheTtlSeconds?: number;
@@ -79,6 +103,22 @@ export type WorkerGatewaySpendCompositionInput = Readonly<{
   processStore: ProcessStore;
   /** The SSRF-fenced sender this process already composes for automations. */
   egress: WebhookEgressService;
+  /**
+   * How this process builds an AWS transport: the corporate proxy, the TLS
+   * agent, the assumed role. Absent leaves a queue endpoint undeliverable,
+   * which is reported rather than answered with a client of this module's own
+   * making — one built here would bypass whatever proxy a self-hosted install
+   * routes its egress through.
+   */
+  awsClientConfig?: AwsClientConfigPort;
+  /**
+   * The counter the hourly dispatch cap is kept in.
+   *
+   * The HTTPS transport reads it off the egress service; a queue send never
+   * passes through that sender, so it is handed the same counter directly or a
+   * queue endpoint would be the one uncapped destination in the product.
+   */
+  dispatchRateLimiter?: WebhookDispatchRateLimiterPort;
   /** Governance's two command proxies, published before either installs. */
   governanceCommands: {
     recordVkLifecycle: (data: GovernanceVkLifecycleData) => Promise<void>;
@@ -118,20 +158,22 @@ export type WorkerGatewaySpendComposition = Readonly<{
  * (`gateway-spend.projection.ts`), and re-deriving it would produce a second
  * answer to a question already billed. No model cost catalog is composed.
  *
- * THE SETTLEMENT SWEEPER IS A NAMED ABSENCE. It needs every configured
- * ClickHouse instance, not a client for one tenant — one sweeper settles the
- * shared instance and every private one — and this process holds a tenant-keyed
- * resolver that cannot enumerate. Omitting it drops NO routing key (the sweeper
- * is schedule-driven and subscribes to nothing), so the absence is reported
- * rather than left to be inferred from admissions that stay open forever.
+ * THE SETTLEMENT SWEEPER IS MOUNTED WHERE THE GRAPH CAN ENUMERATE. It needs
+ * every configured ClickHouse instance, not a client for one tenant — one
+ * sweeper settles the shared instance and every private one — so it takes the
+ * instance directory rather than the tenant-keyed resolver everything else
+ * here runs through. A graph that opened its own connection has that
+ * directory; one handed a resolver as a port does not, and the absence is
+ * reported rather than left to be inferred from admissions that stay open
+ * forever. Either way it drops NO routing key: the sweeper is schedule-driven
+ * and subscribes to nothing.
  */
 export function createWorkerGatewaySpend(
   options: WorkerGatewaySpendCompositionInput,
 ): WorkerGatewaySpendComposition {
   const logger = options.logger ?? createLogger("langwatch:gateway-spend");
   const webhookDelivery = createWebhookDeliveryDeps(options, logger);
-
-  options.absence?.withoutSpendSettlement();
+  const settlement = resolveSpendSettlement(options);
 
   const governance: GovernanceEventsWorkerCapability = {
     buildProcessing: () =>
@@ -145,6 +187,7 @@ export function createWorkerGatewaySpend(
       options.resolveClickHouseClient as never,
     ),
     cacheStore: (inner) => cachedSpendFold(inner, options),
+    ...(settlement ? { settlement } : {}),
     webhookDelivery: {
       name: WEBHOOK_DELIVERY_PROCESS_NAME,
       applier: WebhookDeliveryService.create(webhookDelivery).processManager(),
@@ -172,6 +215,104 @@ export function createWorkerGatewaySpend(
       connectSettlement: (sendSettleSpend) =>
         spend.connectSettlement(sendSettleSpend as never),
     },
+  };
+}
+
+/**
+ * The settlement sweeper's read side, or the reason there is none.
+ *
+ * The grace is passed as the raw string the deployment set, because
+ * `settlementGraceMs` owns the parse, its lower bound and the warning it logs
+ * — and the REST settlement policy the API serves calls the same function on
+ * the same variable. Parsing here as well is how the two ends of one grace
+ * window drift apart.
+ */
+function resolveSpendSettlement(
+  options: WorkerGatewaySpendCompositionInput,
+): Omit<SpendSettlementProcessDeps, "sendSettleSpend"> | undefined {
+  const resolveInstances = options.resolveClickHouseInstances;
+  if (!resolveInstances) {
+    options.absence?.withoutSpendSettlement();
+    return undefined;
+  }
+
+  const admissions = ClickHouseGatewayOpenAdmissionsAdapter.create(resolveInstances);
+  return {
+    findOpenAdmissions: (params) => admissions.findOpenAdmissions(params),
+    graceMs: settlementGraceMs(options.config.gateway.spendSettlementGraceMs),
+  };
+}
+
+/**
+ * The last hop for one endpoint, whichever transport it named.
+ *
+ * Both branches are the packaged ones rather than this module's: the HTTPS
+ * branch is the same egress service, the same fence, the same signature and
+ * the same `classifyWebhookStatus` verdict a hand-rolled twin here used to
+ * produce, and the queue branch is the AWS SQS transport that twin refused by
+ * name. One function answering for both is what keeps a customer's
+ * verification code working when they move an integration from a URL to a
+ * queue.
+ *
+ * Without an AWS transport there is no queue branch to build. A client built
+ * here instead would bypass whatever proxy a self-hosted install routes its
+ * egress through, so the absence is reported and a queue endpoint refuses.
+ *
+ * Exported because it is the one composition decision here that is only
+ * observable at DELIVERY time: everything else this module decides is visible
+ * in the built pipeline definition, and this is not, so a test that could not
+ * reach it could not tell a graph that delivers to a queue from one that
+ * refuses.
+ */
+export function dispatchWebhookThrough(
+  options: WorkerGatewaySpendCompositionInput,
+  logger: Logger,
+): WebhookDeliveryProcessDeps["dispatch"] {
+  const allowInsecureLocal = options.config.webhooks.allowInsecureLocalUrls;
+  const awsClientConfig = options.awsClientConfig;
+
+  return async (input) => {
+    if (!awsClientConfig) {
+      if (input.destination.kind === "sqs") {
+        options.absence?.withoutSqsWebhookDestinations();
+        logger.error(
+          { organizationId: input.organizationId, endpointId: input.endpointId },
+          "webhook endpoint delivers to a queue, and this process composes no AWS transport",
+        );
+        return {
+          verdict: "terminal",
+          status: null,
+          body: "",
+          error: "This process composes no AWS transport for queue webhook destinations.",
+        };
+      }
+      return httpWebhookDestination({
+        url: input.destination.url,
+        egress: options.egress,
+        allowInsecureLocal,
+      }).send(dispatchRequestFor(input));
+    }
+
+    return webhookDestinationFor(input.destination, {
+      egress: options.egress,
+      allowInsecureLocal,
+      awsClientConfig,
+      ...(options.dispatchRateLimiter ? { rateLimiter: options.dispatchRateLimiter } : {}),
+    }).send(dispatchRequestFor(input));
+  };
+}
+
+/** The batch as a transport asks for it: the same bytes, either hop. */
+function dispatchRequestFor(
+  input: Parameters<WebhookDeliveryProcessDeps["dispatch"]>[0],
+): WebhookDispatchRequest {
+  return {
+    organizationId: input.organizationId,
+    endpointId: input.endpointId,
+    body: input.body,
+    batchId: input.batchId,
+    attempt: input.attempt,
+    signingSecrets: input.signingSecrets,
   };
 }
 
@@ -222,7 +363,7 @@ function createWebhookDeliveryDeps(
       }),
     }),
     pruneExpiredIdempotencyReceipts: (now) => pruneExpiredIdempotencyReceipts(options, now),
-    dispatch: (input) => dispatchWebhook(options, logger, input),
+    dispatch: dispatchWebhookThrough(options, logger),
     getPlan: (organizationId) => {
       options.absence?.withoutWebhookEntitlements();
       return Promise.reject(
@@ -253,83 +394,6 @@ function pruneExpiredIdempotencyReceipts(
     WHERE "expiresAt" < ${now}
     -- @tenancy: idempotency receipt expiry sweep (system-owned maintenance)
   `;
-}
-
-/** How much of the receiver's response the delivery log keeps. */
-const RESPONSE_SNIPPET_CHARS = 1000;
-
-/**
- * One delivery attempt, through the fence this process already composes.
- *
- * The HTTP branch is the packaged `WebhookEgressService`, argument for argument
- * the same call the application's own HTTP destination makes — same SSRF fence,
- * same timeout, same redirect refusal, same signature, same dispatch cap — and
- * the verdict comes from the same `classifyWebhookStatus`, so the two cannot
- * drift about which status codes are worth retrying.
- *
- * The SQS branch REFUSES BY NAME. Its transport is 491 platform lines over the
- * AWS SQS SDK and an ambient-credential policy this process does not compose,
- * and a queue delivery that silently reported success would leave a customer
- * believing their events arrived.
- */
-async function dispatchWebhook(
-  options: WorkerGatewaySpendCompositionInput,
-  logger: Logger,
-  input: {
-    destination: { kind: string; url?: string };
-    organizationId: string;
-    endpointId: string;
-    body: string;
-    batchId: string;
-    attempt: number;
-    signingSecrets: string[];
-  },
-): Promise<{
-  verdict: "success" | "retryable" | "terminal";
-  status: number | null;
-  body: string;
-  responseHeaders?: Record<string, string>;
-  retryAfterMs?: number;
-  error?: string;
-}> {
-  if (input.destination.kind !== "http" || !input.destination.url) {
-    options.absence?.withoutSqsWebhookDestinations();
-    logger.error(
-      { organizationId: input.organizationId, endpointId: input.endpointId },
-      "webhook endpoint delivers to a queue, and this process composes no queue transport",
-    );
-    return {
-      verdict: "terminal",
-      status: null,
-      body: "",
-      error: "This process composes no SQS webhook transport.",
-    };
-  }
-
-  const result = await options.egress.send({
-    url: input.destination.url,
-    body: input.body,
-    triggerName: input.endpointId,
-    contextLabel: `Webhook endpoint ${input.endpointId}`,
-    // Endpoints are organization-scoped, so their dispatch cap buckets per
-    // organization rather than per project — the application's own choice.
-    projectId: input.organizationId,
-    eventId: input.batchId,
-    dispatchIdHeader: WEBHOOK_DELIVERY_ID_HEADER,
-    signingSecrets: input.signingSecrets,
-    attempt: input.attempt,
-    allowInsecureLocal: options.config.webhooks.allowInsecureLocalUrls,
-  });
-
-  const verdict = classifyWebhookStatus(result.status);
-  return {
-    verdict,
-    status: result.status,
-    body: result.body.slice(0, RESPONSE_SNIPPET_CHARS),
-    ...(result.responseHeaders ? { responseHeaders: result.responseHeaders } : {}),
-    ...(result.retryAfterMs !== undefined ? { retryAfterMs: result.retryAfterMs } : {}),
-    ...(verdict === "success" ? {} : { error: `HTTP ${result.status}` }),
-  };
 }
 
 /** The endpoint id format, as the resource prefix the App already mints. */

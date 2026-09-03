@@ -12760,3 +12760,123 @@ cycle.
   `fallbackTitle`; the words come from the application's code-keyed registry.
 - **The group (b) drawers and the dataset drawers are untouched**, as are
   `trace-web` and the census rows that belong to those lanes.
+
+## `trace-web`'s docs URL typed itself for its dependents, and two ratchet entries clicked, 2026-09-03
+
+`packages/features/trace/web/src/behavior/docs-url.ts` read `import.meta.env.DEV` with no type in scope for anyone but `apps/ui`, so `evaluator-web`, `workflow-web` and `experiment-web` each reported `TS2339: Property 'env' does not exist on type 'ImportMeta'` against a file they only compile as a dependency's source; the module now carries `/// <reference path="../model/ambient.d.ts" />`, the same rule `@langwatch/auth-web`'s ambient states in writing and `screens/traces/index.ts` already followed, and all four packages typecheck at 0 errors. `specs/audit-log/audit-log.feature` (20/20 bound) and `specs/secrets/secrets-manager.feature` (7/7 bound) left `LEGACY_INERT` in `check-feature-parity.ts`, which removes the stale-inert clause from the summary and changes nothing else in the run.
+
+## Worker absences audited: two were stale, eight reasons were, 2026-09-03
+
+`apps/worker` names thirty-one absences — twenty-eight `without*` methods on
+nine report ports, plus three `Unavailable*` stub classes. Two of the API's
+were found this week to rest on claims the tree had outrun; this pass reads
+every one of the worker's against the tree as it stands, rather than against
+the tree the sentence was written for.
+
+The headline is not the count. **Two absences were stale and are closed. Eight
+more were REAL, and said something false about why** — an absence that names
+the wrong blocker sends the next reader to the wrong package, which is a more
+expensive kind of wrong than a missing feature. Those messages are corrected.
+One absence is UNREACHABLE, and finding that out is the most valuable row in
+the table.
+
+### The table
+
+| Absence | Class | Evidence | Action |
+| --- | --- | --- | --- |
+| `withoutSpendSettlement` | **STALE** | `ClickHouseConnection.instances()` (`packages/clickhouse-client/src/connection.ts:112`) enumerates every configured endpoint; `WorkerClickHouseInfrastructure` held that connection and exposed only `resolveClient`. `ClickHouseGatewayOpenAdmissionsAdapter` and `spendSettlementPM` are both packaged, `connectSettlement` was ALREADY wired (`gateway-spend-worker-feature.installer.ts:61`), and the worker already read `LW_SPEND_SETTLEMENT_GRACE_MS` and used it nowhere | **CLOSED.** The sweeper mounts wherever the graph opened its own connection |
+| `withoutSqsWebhookDestinations` | **STALE** | `webhookDestinationFor` + `sqsWebhookDestination` are exported from `@langwatch/enterprise-webhook-server` (`index.ts:148,161`), a declared dependency; the worker hand-rolled the HTTPS branch as a 60-line twin and refused the queue branch | **CLOSED.** Both branches are the packaged transport; the absence is now conditional on this graph owning no AWS transport |
+| `withoutWebhookEntitlements` | REAL GAP | The missing piece is the PLAN SOURCE — a signed licence or a subscription row. `apps/api` composes `EntitlementService` over a BASELINE and reports the same hole as `absent("licence")`/`absent("subscription")` (`api-usage.composition.ts:103-106`). `getFreePlanLimits()` leaves `webhookEndpointsEnabled` undefined, so a baseline provider here would turn a loud refusal into a silent non-delivery for paying organizations | Message names the plan source |
+| `withoutEndpointSecretKey` | DELIBERATE | `config.automation.credentialsEncryptionKey` unset — `CREDENTIALS_SECRET`/`NEXTAUTH_SECRET` | — |
+| `withoutLegacyFilterMatching` | REAL GAP | `matchesTriggerFilters` and `buildPreconditionTraceDataFromFoldState` return NOTHING repo-wide; they died with `platform/app`. The stated reason ("lives beside the analytics filter UI, which a background process must not load") is false — `analytics-web` deliberately publishes `./server/filters/*` as React-free subpaths | Message corrected: the two functions were not re-homed |
+| `withoutTraceRecordRead` | REAL GAP | `TraceRecordPort.getById` has no real implementation anywhere; `apps/api` composes `NullTraceRecordPort` too (`api-trace-read-stack.composition.ts:670-684`). `TraceService.getFullRecord` answers a different type, without `.spans` | — |
+| `withoutDatasetPersist` / `UnavailableDatasetMapper` | REAL GAP, stale reason | The mapper IS reachable: `mapTraceToDatasetEntry` and `TRACE_EXPANSIONS` are `@langwatch/trace-contract`'s (`trace-mapping.ts:1099,816`), already a dependency and already imported by the settlement composition. But `dispatchToDataset` reads the full trace record BEFORE it maps (`persist-action.service.ts:142`), so composing the mapper alone would be wiring nothing can reach | Message corrected: blocked by the record read, and the two close together |
+| `withoutAnnotationQueuePersist` | STALE, blocked on a manifest change | `createOrUpdateQueueItems` is exported (`annotation/server/src/index.ts:27`); `PostgresAnnotationAdapter` takes `{database, projects, organizations}`, all three of which this process holds. `@langwatch/annotation-server` is not a worker dependency | Message names the missing dependency. NOT closed: adding one needs an install, and the root lockfile is shared with live lanes |
+| `withoutRunawayContainment` | REAL GAP | `RunawayContainmentService` exists and is tested but is NOT exported from `@langwatch/automation-server`, and `AutomationRunawayPort` has no real implementation in any process | Message names both |
+| `withoutPlanResolvedPersistCap` | REAL GAP (same root as the webhook gate) | `AutomationPersistCapService` is exported and the ledger already takes `{kind:"resolved"}`. But its `AutomationPlanProvider` needs the same absent plan source, and a baseline provider would drop every project from the paid ceiling to the free one — strictly worse than the current honest fixed-paid fallback | Message says why the fixed cap is the generous answer |
+| `withoutGraphAlertEvaluation` | DELIBERATE | `BASE_HOST` unset ⇒ `config.mail` unresolvable ⇒ `tryCreateWorkerAutomationGraphComposition` returns undefined (`worker-automation-graph.composition.ts:173`) | — |
+| `withoutNotificationDelivery` / `UnavailableNotificationDelivery` | DELIBERATE | Same leaf; the delivery adapter is this process's own and is wired whenever mail resolves | — |
+| `UnavailablePersistActionWriter` | Split | Annotation half: as above. Dataset half: `DatasetService.batchCreateRecords` is one packaged call, blocked by the record read | Both messages corrected |
+| `withoutAgentManager` | DELIBERATE | `OPENCODE_AGENT_URL` + `LANGY_INTERNAL_SECRET` unset; `createLangyWorkerPort` is composed whenever they are set | — |
+| `withoutTitleGeneration` | DELIBERATE | `tryCreateWorkerLangyTitleModel` is composed and wired; what remains is a database and `LANGWATCH_NLP_SERVICE`, exactly as the newest prior record (line 9536) already says | — |
+| `withoutSessionKeyMint` | REAL GAP, **false reason** | The message said "without an authorization graph". This process COMPOSES one (`worker-tenancy.composition.ts:177-219`). What is missing is an `ApiKeyService` — no `PostgresApiKeyAdapter` anywhere in `apps/worker` — and, behind it, the grant ATTACH a mint performs, which this consumer-only graph refuses | Message and refusal string corrected |
+| `withoutEvaluatorExecution` | REAL GAP, **stale reason** | The composition said "the model-provider cascade alone is a capability this process cannot build". It builds one (`worker-production.composition.ts:794-810`), and the `X_LITELLM_*` bridge is written (`worker-evaluation-model-env.composition.ts`). Four things are actually missing: the evaluator catalog (`@langwatch/evaluator-server` is not a dependency), the monitor read BY ID, the `TraceService` evidence reads, and `EvaluationSettingsRecoveryPort`/`EvaluationInputsOffloadPort`, neither of which has an implementation anywhere | Doc block rewritten to name all four |
+| `withoutExecutionReceiptLedger` | REAL GAP, unreachable today | Only `DirectEvaluationExecutionReceipt` exists, and its own doc says it carries no receipt. The branch cannot fire until the execution bundle above is supplied | — |
+| `withoutExecutionPool` | REAL GAP, **understated scope** | The prose read as "parked with a sibling". No process in the repository composes `ScenarioExecutionPoolService`: the scenario CHILD ENTRYPOINT the pool spawns left with `platform/app` and was never rebuilt, and the prefetcher wants eleven collaborators including agent and prompt servers that are not dependencies here | Doc block corrected |
+| `withoutModelGateway("no-encryption")` | DELIBERATE | `CREDENTIALS_SECRET`/`NEXTAUTH_SECRET` unset | — |
+| `withoutModelGateway("no-tenancy")` | DELIBERATE (unreachable in production) | `tryCreateWorkerTenancy` returns undefined only without a typed `connection`, and `WorkerStandaloneComposition` always supplies one — as the record at line 9534 already states | — |
+| `withoutModelTranslation` | DELIBERATE | `LANGWATCH_NLP_SERVICE` unset | — |
+| `withoutConnectionWindows` | DELIBERATE (unreachable in production) | `!redis`, and `WorkerInfrastructureAdapter.create` throws for an unconfigured Redis before this line is reached | — |
+| `withoutClusteringModels` | DELIBERATE | Transitively the encryption secret; the resolver is composed and wired | — |
+| `withoutGrantWrites` | DELIBERATE | Mechanically two lines from closing — `EventingAuthzCommandDispatcherAdapter.sendersFrom()`/`.connect()` is what `api-authz.composition.ts:96,123` does — but the single-producer-per-aggregate decision is recorded at line 9564, no worker call site writes a grant, and the port logs `reason: "consumer-only-ledger"` | — |
+| `withoutBroadcast` | DELIBERATE (unreachable in production) | Same Redis boot guard as `withoutConnectionWindows`. Separately, `worker-trace-broadcast.composition.ts` still claimed "STAGED, NOT MOUNTED … the application still registers `traceUpdateBroadcast`" — the application is gone and the port IS mounted (`worker-production.composition.ts:1071`) | Doc block corrected |
+| `withoutDatasetStorage` | **REAL GAP, and UNREACHABLE** | On `STORED_OBJECTS_BACKEND=azure` this process does not degrade — it fails to BOOT. `createWorkerObjectStorage` runs first and `WorkerStoredObjectStorageRuntimeFactory.create` throws "Worker Azure storage requires a configured Azure driver factory" (`worker-stored-object-storage.adapter.ts:66`); the report sits thirty lines later. Supporting evidence that this is an oversight: `workerDatasetStorageBackendSupported` is exported with ZERO call sites, and `worker.config.ts` reads no `AZURE_BLOB_*` block at all | Port doc now says the branch is unreachable and names the two-part fix |
+| `withoutAppCredentials` | DELIBERATE | `GITHUB_LANGY_APP_ID`/`GITHUB_LANGY_PRIVATE_KEY` unset; the retention half runs regardless | — |
+| `withoutDirectoryTokenRevocation` | REAL GAP, **understated** | The prior record (line 7969) calls it "a SCIM directory capability. Neither is a composition." The work is ONE scoped delete of the connection's SCIM token rows (`scim.repository.ts:293`), and `apps/api` does not compose `PostgresSsoConnectionPipelineAdapter` at all — so NO process in the deployment revokes | Message corrected |
+| `withoutConsumers` | **NOT AN ABSENCE** | A shaping helper: `const {consumers: _consumers, ...persistence} = options`. No port, no report, no refusal. It exists because `WorkerEventingConsumerCompositionOptions` carries `consumers?` and `EventingServerRuntimeOptions` must not | — |
+
+### The two closures
+
+**The settlement sweeper.** The claim was that this process "holds a
+tenant-keyed resolver that cannot enumerate". True of the resolver, false of
+the process: `WorkerClickHouseInfrastructure` holds the whole
+`ClickHouseConnection`, and that class has answered `instances()` — "each
+physical endpoint, once, for migrations, schema checks and shutdown" — the
+entire time. The narrow closure it exposed was a deliberate fence (a caller
+must not reach `shared()` and write one organization's rows on another's
+endpoint), so the fence is kept and a SECOND narrow closure is added beside it:
+
+```
+  WorkerClickHouseInfrastructure
+    ├─ resolveClient(tenantId)     the one question a fold or append may ask
+    └─ resolveInstances()          the one question a whole-install sweep asks
+         └─ ClickHouseGatewayOpenAdmissionsAdapter
+              └─ spendSettlementPM   schedule-only: NO routing key
+```
+
+It stays optional on the composition, and both arms are real:
+`WorkerStandaloneComposition` opened the connection and supplies it;
+`createWorkerDurableComposition` receives a resolver as a PORT and genuinely
+cannot enumerate, so it still reports. The grace is passed as the raw string —
+`settlementGraceMs` owns the parse, its lower bound and its warning, and the
+API's settlement policy calls the same function on the same variable.
+
+**The queue transport.** `dispatchWebhook` was a hand-rolled twin of
+`httpWebhookDestination` — same egress service, same fence, same
+`classifyWebhookStatus` — with an SQS branch that refused terminally. It is
+replaced by `webhookDestinationFor`, which answers for both hops, so a customer
+who moves an integration from a URL to a queue keeps the same signature over the
+same bytes. Two things travel with it: the AWS client config, taken from the
+process's ONE `AwsClientProcessRuntime` rather than built here (a client built
+here would bypass the proxy a self-hosted install routes egress through), and
+the dispatch rate limiter, which `createWorkerWebhookEgress` used to build
+privately. The limiter is now composed beside the sender and handed to both,
+because a queue send never passes through the sender and would otherwise be the
+one uncapped destination in the product.
+
+### What this pass did NOT do
+
+- **No new collaborator was built for a REAL GAP.** Every gap row above names
+  its missing piece and stops there.
+- **No manifest changed and no install ran.** The annotation-queue closure is
+  one dependency away and is left open on purpose: the root lockfile is shared
+  with lanes that are live.
+- **The Azure boot crash is recorded, not fixed.** Closing it needs
+  `AZURE_BLOB_*` configuration leaves this process does not read, which is new
+  work rather than wiring.
+- **`withoutGrantWrites` is left alone** even though it is two lines from
+  closing, because the refusal is a recorded decision and nothing in this
+  process writes a grant.
+
+### Gates
+
+`apps/worker`: `pnpm typecheck` (both `tsconfig.json` and `tsconfig.test.json`)
+— **0 errors**. `vitest run src/app` — **33 files / 258 tests, all passing**.
+`vitest run src/app/__tests__/worker-gateway-spend.composition.unit.test.ts` —
+**13 tests, all passing**, up from 10: the sweeper mounts once the instance
+directory is handed over and still stages no routing key, the absence stops
+being declared, an HTTPS endpoint goes through the packaged transport and comes
+back with the delivery id only that transport produces, and a queue endpoint
+refuses without an AWS transport and reaches it with one. `oxlint` over the
+eleven touched files — clean except seven pre-existing unused-import warnings in
+`worker-production.composition.ts`, none of them in the edited regions.

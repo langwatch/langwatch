@@ -38,6 +38,22 @@ export type WorkerWebhookEgressCompositionOptions = Readonly<{
 }>;
 
 /**
+ * The counter the hourly dispatch cap is kept in, composed on its own.
+ *
+ * Named separately from the sender because not every outbound hop passes
+ * through the sender: a webhook endpoint that delivers to a queue is put on
+ * that queue directly, so the queue transport has to be handed the SAME
+ * counter or it would be the one uncapped destination in the product.
+ */
+export function createWorkerWebhookDispatchRateLimiter(
+  options: WorkerWebhookEgressCompositionOptions,
+): WebhookDispatchRateLimiterPort {
+  return options.redis
+    ? new WorkerWebhookDispatchRateLimiter(options.redis)
+    : InMemoryWebhookDispatchRateLimiterAdapter.create();
+}
+
+/**
  * The one fenced sender this process holds.
  *
  * Composed once and shared, because both outbound surfaces — an automation's
@@ -46,12 +62,13 @@ export type WorkerWebhookEgressCompositionOptions = Readonly<{
  * two counters would let one surface exhaust a budget the other cannot see.
  */
 export function createWorkerWebhookEgress(
-  options: WorkerWebhookEgressCompositionOptions,
+  options: WorkerWebhookEgressCompositionOptions & {
+    /** The process's own counter, where one has already been composed. */
+    rateLimiter?: WebhookDispatchRateLimiterPort;
+  },
 ): WebhookEgressService {
   return WebhookEgressService.create({
-    rateLimiter: options.redis
-      ? new WorkerWebhookDispatchRateLimiter(options.redis)
-      : InMemoryWebhookDispatchRateLimiterAdapter.create(),
+    rateLimiter: options.rateLimiter ?? createWorkerWebhookDispatchRateLimiter(options),
     // The application ties certificate verification to IS_SAAS, not to its
     // address policy, because an on-prem receiver frequently carries a
     // self-signed certificate while private addresses stay refused. Reading
