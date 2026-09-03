@@ -627,6 +627,15 @@ export function createEnvConfig() {
 
       // SCIM
       AUTH0_SCIM_WEBHOOK_SECRET: z.string().optional(),
+
+      // Scenario canary health probe (GET /api/health/scenarios). The run is
+      // pinned to one model and confined to a dedicated canary project, all
+      // resolved here rather than from the request.
+      SCENARIO_CANARY_MODEL: z.string().optional(),
+      SCENARIO_CANARY_PROJECT_ID: z.string().optional(),
+      SCENARIO_CANARY_SCENARIO_ID: z.string().optional(),
+      SCENARIO_CANARY_TARGET_TYPE: z.string().optional(),
+      SCENARIO_CANARY_TARGET_ID: z.string().optional(),
     },
 
     // No client-side env vars — use `publicEnv.ts` instead.
@@ -810,6 +819,11 @@ export function createEnvConfig() {
       SLACK_CHANNEL_SIGNUPS: process.env.SLACK_CHANNEL_SIGNUPS,
       SLACK_CHANNEL_SUBSCRIPTIONS: process.env.SLACK_CHANNEL_SUBSCRIPTIONS,
       AUTH0_SCIM_WEBHOOK_SECRET: process.env.AUTH0_SCIM_WEBHOOK_SECRET,
+      SCENARIO_CANARY_MODEL: process.env.SCENARIO_CANARY_MODEL,
+      SCENARIO_CANARY_PROJECT_ID: process.env.SCENARIO_CANARY_PROJECT_ID,
+      SCENARIO_CANARY_SCENARIO_ID: process.env.SCENARIO_CANARY_SCENARIO_ID,
+      SCENARIO_CANARY_TARGET_TYPE: process.env.SCENARIO_CANARY_TARGET_TYPE,
+      SCENARIO_CANARY_TARGET_ID: process.env.SCENARIO_CANARY_TARGET_ID,
     },
     /**
      * Run `build` or `dev` with `SKIP_ENV_VALIDATION` to skip env validation.

@@ -22,8 +22,10 @@ import { env } from "~/env.mjs";
 import { createServiceApp, publicEndpoint } from "~/server/api/security";
 import { prisma } from "~/server/db";
 import { sendCanary } from "~/server/health-probes/canary.service";
+import { runScenarioHealthCanary } from "~/server/health-probes/scenario-canary.service";
 import type { CollectorRESTParams } from "~/server/tracer/types";
 import type { DeepPartial } from "~/utils/types";
+import { validateInternalSecret } from "./_lib/internal-secret";
 
 const logger = createLogger("langwatch:health-checks");
 
@@ -529,6 +531,53 @@ secured
       status: response?.status,
       body: await response?.json(),
     });
+  });
+
+// ── GET /scenarios ───────────────────────────────────────────────────
+
+// Fires a real scenario run in the dedicated canary project and reports what
+// broke. Authenticated by the shared internal secret (a status-page poller has
+// no user session and no project API key), checked BEFORE any run is queued.
+//
+//   200 { status: "ok", scenarioRunId, durationMs }        healthy
+//   503 { status: "unhealthy", reason, scenarioRunId?, durationMs }
+//   429 { status: "busy" }                                  already in flight
+//
+// @see specs/scenarios/scenario-canary-healthcheck.feature
+secured
+  .access(publicEndpoint("scenario canary health probe"))
+  .get("/scenarios", async (c) => {
+    if (!c.req.header("authorization")) {
+      return c.json(
+        { message: "Authentication token is required." },
+        { status: 401 },
+      );
+    }
+    if (!validateInternalSecret(c)) {
+      return c.json({ message: "Invalid auth token." }, { status: 403 });
+    }
+
+    const result = await runScenarioHealthCanary();
+
+    if ("busy" in result) {
+      return c.json({ status: "busy" }, { status: 429 });
+    }
+    if (result.healthy) {
+      return c.json({
+        status: "ok",
+        scenarioRunId: result.scenarioRunId,
+        durationMs: result.durationMs,
+      });
+    }
+    return c.json(
+      {
+        status: "unhealthy",
+        reason: result.reason,
+        scenarioRunId: result.scenarioRunId,
+        durationMs: result.durationMs,
+      },
+      { status: 503 },
+    );
   });
 
 export const app = secured.hono;
