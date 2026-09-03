@@ -360,7 +360,6 @@ const LEGACY_INERT: string[] = [
   "specs/ai-governance/sessions/personal-sessions.feature",
   "specs/ai-governance/sessions/sessions-inventory.feature",
   "specs/analytics/posthog-cost-control.feature",
-  "specs/audit-log/audit-log.feature",
   "specs/auth/auth-signin-flows.feature",
   "specs/auth/dev-port-origin-alignment.feature",
   "specs/auth/diagnostic-logging-on-auth-failure.feature",
@@ -565,7 +564,6 @@ const LEGACY_INERT: string[] = [
   "specs/scenarios/scenario-drawer-close-on-save.feature",
   "specs/scenarios/scenario-editor-new-agent-flow.feature",
   "specs/scenarios/scenario-library.feature",
-  "specs/secrets/secrets-manager.feature",
   // Helm chart behaviour, verified by charts/langwatch/tests/e2e-overlays.sh.
   // The checker now scans that directory (DEFAULT_SHELL_TEST_ROOTS), so these
   // are bindable: annotate the suite's test functions with `# @scenario` and

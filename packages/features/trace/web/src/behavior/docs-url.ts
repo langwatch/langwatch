@@ -1,3 +1,4 @@
+/// <reference path="../model/ambient.d.ts" />
 /**
  * Returns the docs base URL the UI should link to. On localhost
  * dev (the standard `make dev` shape, control plane on
@@ -44,6 +45,13 @@ const LOCAL_HOSTS = new Set(["localhost", "127.0.0.1", "0.0.0.0"]);
  * module is loaded by `tsx`. `import.meta.env.DEV` is only ever evaluated
  * inside the same `typeof window !== "undefined"` branch as `window.location`,
  * so a non-browser caller never touches it.
+ *
+ * Its TYPE arrives through the triple-slash reference at the top of the file.
+ * A workspace package resolves to another's SOURCE, so every dependent
+ * compiles this module inside its own program, where a `.d.ts` that only this
+ * package's `include` covers is unreachable — the module that needs the
+ * declaration carries the reference, which is the same rule `@langwatch/auth-web`
+ * states and `screens/traces/index.ts` already follows.
  */
 export function getDocsBaseUrl({
   hostname,
