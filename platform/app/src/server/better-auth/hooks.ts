@@ -75,6 +75,14 @@ const reconcileSsoAccounts = async ({
  * Blocks deactivated users. We only get here for BRAND new users, so
  * deactivatedAt should always be null — but we check defensively in case of
  * a pre-seeded deactivated row.
+ *
+ * A NAMELESS ACCOUNT GETS ITS ADDRESS AS ITS NAME. Every screen that names
+ * somebody reads `User.name`, and the ways in that do not ask for one are the
+ * ordinary ones now: a passkey sign-up has no name field at all, an identity
+ * provider may assert none, and an OAuth profile can carry `null`. The header
+ * menu rendered the result as literally "null (sam@acme.com)". This is the one
+ * place every creation path passes through, so filling it here is what stops
+ * each of those paths needing to remember.
  */
 export const beforeUserCreate = async ({
   prisma,
@@ -85,13 +93,19 @@ export const beforeUserCreate = async ({
     string,
     unknown
   >;
-}): Promise<boolean | void> => {
+}): Promise<boolean | void | { data: Record<string, unknown> }> => {
   if (user.deactivatedAt) {
     logger.warn({ email: user.email }, "Blocked signup: user is deactivated");
     return false;
   }
-  // No-op: org auto-assignment happens in the after-create hook so that we
-  // have a real user id to link with.
+
+  // Whitespace counts as empty: a name that renders as an unexplained gap is
+  // the same bug as one that renders as "null".
+  const name = typeof user.name === "string" ? user.name.trim() : "";
+  if (!name) return { data: { ...user, name: user.email } };
+
+  // Otherwise a no-op: org auto-assignment happens in the after-create hook so
+  // that we have a real user id to link with.
 };
 
 /**

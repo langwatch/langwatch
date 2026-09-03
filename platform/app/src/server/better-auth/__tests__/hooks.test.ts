@@ -118,14 +118,59 @@ describe("beforeUserCreate", () => {
     });
   });
 
-  describe("when the user is active", () => {
-    it("does not block and returns void", async () => {
+  describe("when the user is active and brought a name", () => {
+    it("does not block and leaves the name alone", async () => {
       const prisma = makePrismaMock();
       const result = await beforeUserCreate({
         prisma,
-        user: { email: "u@x.com" },
+        user: { email: "u@x.com", name: "Sam Patel" },
       });
       expect(result).toBeUndefined();
+    });
+  });
+
+  // A passkey sign-up asks for no name, an identity provider may assert none,
+  // and an OAuth profile can carry `null`. Every screen that names somebody
+  // reads this column, and the header menu rendered the gap as "null (u@x.com)".
+  describe("when the user arrives with no name", () => {
+    it("fills it with the address, so nothing renders a hole", async () => {
+      const prisma = makePrismaMock();
+      const result = await beforeUserCreate({
+        prisma,
+        user: { email: "u@x.com", name: null },
+      });
+      expect(result).toEqual({
+        data: { email: "u@x.com", name: "u@x.com" },
+      });
+    });
+
+    it("treats a name that is only whitespace as no name at all", async () => {
+      const prisma = makePrismaMock();
+      const result = await beforeUserCreate({
+        prisma,
+        user: { email: "u@x.com", name: "   " },
+      });
+      expect(result).toMatchObject({ data: { name: "u@x.com" } });
+    });
+
+    it("carries every other field the creation brought with it", async () => {
+      const prisma = makePrismaMock();
+      const result = await beforeUserCreate({
+        prisma,
+        user: { email: "u@x.com", image: "https://example.com/a.png" },
+      });
+      expect(result).toMatchObject({
+        data: { image: "https://example.com/a.png", name: "u@x.com" },
+      });
+    });
+
+    it("still blocks a deactivated user rather than naming them", async () => {
+      const prisma = makePrismaMock();
+      const result = await beforeUserCreate({
+        prisma,
+        user: { email: "u@x.com", deactivatedAt: new Date("2020-01-01") },
+      });
+      expect(result).toBe(false);
     });
   });
 });
