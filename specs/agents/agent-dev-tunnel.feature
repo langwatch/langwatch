@@ -11,6 +11,11 @@ Feature: Agent tunnel
   # open relay. Sharing a folder with Langy is a different command,
   # `langwatch langy --share-control` (ADR-129).
 
+  Scenario: The hidden `agent dev` alias still runs the tunnel session
+    Given a developer typing the older command name
+    When they run `langwatch agent dev` instead of `langwatch agent tunnel`
+    Then the same tunnel session starts
+
   Scenario: URL write-back replaces the agent URL and stashes the previous one
     Given a registered HTTP agent pointing at a deployed URL
     When the dev tunnel session points the agent at the tunnel

@@ -72,8 +72,8 @@ Feature: The agent commands show connected agents and run them through the relay
 
   Rule: The help says which command serves which agent type
 
-    Scenario: The dev command help points code agents to connectAgent
-      When I read the help of "langwatch agent dev"
+    Scenario: The tunnel command help points code agents to connectAgent
+      When I read the help of "langwatch agent tunnel"
       Then it says the tunnel is for HTTP agents
       And it names connectAgent and connect_agent for agents written in code
 
