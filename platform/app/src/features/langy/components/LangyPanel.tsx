@@ -43,7 +43,10 @@ import {
   useState,
 } from "react";
 import { useProjectReach } from "~/components/home/useProjectReach";
-import { allModelOptions } from "~/components/ModelSelector";
+import {
+  allModelOptions,
+  useModelSelectionOptions,
+} from "~/components/ModelSelector";
 import { Kbd } from "~/components/ops/shared/Kbd";
 import { IsolatedErrorBoundary } from "~/components/ui/IsolatedErrorBoundary";
 import { Menu } from "~/components/ui/menu";
@@ -95,6 +98,7 @@ import {
   type LangyTurnRequestContext,
 } from "../logic/langyChatTransport";
 import { langyChoicesTimeline } from "../logic/langyChoicesTimeline";
+import { resolveComposerModel } from "../logic/langyComposerModel";
 import { mergeContextChips } from "../logic/langyContextChips";
 import { catchUpConversationFold } from "../logic/langyDurableCatchUp";
 import {
@@ -971,41 +975,47 @@ function LangyPanel({
     () => langyModelsAllowed ?? allModelOptions,
     [langyModelsAllowed],
   );
-  const langyDefaultModel = modelOptions.includes(
+
+  // The models the project can actually serve: the same hook the picker's menu
+  // is built from, so the panel and the menu read one list. It narrows
+  // `modelOptions` to the providers connected at this project, its team or its
+  // organization (ADR-021), which is the ladder the turn's virtual key walks
+  // too. The query underneath is shared with the picker, so it costs no extra
+  // request.
+  const { selectOptions: reachableOptions } = useModelSelectionOptions(
+    modelOptions,
+    modelOverride,
+    "chat",
+    { featureKey: LANGY_GATE_FEATURE_KEY },
+  );
+  const reachableModels = useMemo(
+    () => reachableOptions.map((option) => option.value),
+    [reachableOptions],
+  );
+
+  const langyDefaultModel = reachableModels.includes(
     resolvedDefaultQuery.data?.model ?? "",
   )
     ? resolvedDefaultQuery.data?.model
     : null;
 
-  // Seed the picker with the model the gate resolves to — but keep it inside
-  // the allowlist. If the resolved default isn't allowed, start on the first
-  // allowed model instead.
+  // Seed the picker with the model the gate resolves to, and snap away from one
+  // no connected provider serves. Both rules read the reachable list, so the
+  // composer never holds a model its own menu does not offer and the turn
+  // cannot run.
   useEffect(() => {
-    if (modelOverride) return;
-    const resolved = resolvedDefaultQuery.data?.model;
-    if (
-      resolved &&
-      (!langyModelsAllowed || langyModelsAllowed.includes(resolved))
-    ) {
-      setModelOverride(resolved);
-    } else if (langyModelsAllowed) {
-      setModelOverride(langyModelsAllowed[0]!);
-    }
+    const next = resolveComposerModel({
+      current: modelOverride,
+      resolvedDefault: resolvedDefaultQuery.data?.model,
+      reachable: reachableModels,
+    });
+    if (next) setModelOverride(next);
   }, [
     resolvedDefaultQuery.data?.model,
     modelOverride,
-    langyModelsAllowed,
+    reachableModels,
     setModelOverride,
   ]);
-
-  // Race fix: if the allowlist lands AFTER we seeded an out-of-list model, snap
-  // to the first allowed model.
-  useEffect(() => {
-    if (!langyModelsAllowed) return;
-    if (modelOverride && !langyModelsAllowed.includes(modelOverride)) {
-      setModelOverride(langyModelsAllowed[0]!);
-    }
-  }, [langyModelsAllowed, modelOverride, setModelOverride]);
 
   // ── "Make it the default?" — the ask that follows a model pick ──────────
   // The pick took effect for this conversation the moment it happened; the
@@ -1163,13 +1173,13 @@ function LangyPanel({
 
   // A conversation keeps the model it was last used with: when its history
   // lands, the picker follows the model of its latest turn — unless the user
-  // already picked one since opening it, and never a model the allowlist
-  // refuses (the snap effect above owns that rule).
+  // already picked one since opening it, and never a model the project can no
+  // longer serve (the seed effect above owns that rule).
   useEffect(() => {
     if (!activeConversationId || !conversationLastModel) return;
     if (
-      langyModelsAllowed &&
-      !langyModelsAllowed.includes(conversationLastModel)
+      reachableModels.length > 0 &&
+      !reachableModels.includes(conversationLastModel)
     ) {
       return;
     }
@@ -1177,7 +1187,7 @@ function LangyPanel({
       conversationId: activeConversationId,
       model: conversationLastModel,
     });
-  }, [activeConversationId, conversationLastModel, langyModelsAllowed]);
+  }, [activeConversationId, conversationLastModel, reachableModels]);
 
   /**
    * The conversation's own history failed to load.
