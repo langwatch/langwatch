@@ -6,7 +6,6 @@ package otelrelay
 
 import (
 	"context"
-	"fmt"
 	"io"
 	"net/http"
 	"net/http/httptest"
@@ -23,7 +22,6 @@ import (
 	"go.uber.org/zap/zaptest/observer"
 
 	"github.com/langwatch/langwatch/pkg/clog"
-	"github.com/langwatch/langwatch/services/langyagent/domain"
 )
 
 // The version-rooted anthropic-messages dialect appends /v1/messages to its
@@ -95,8 +93,8 @@ func TestLLMProxy_MessagesLaneInjectsXAPIKey(t *testing.T) {
 	}
 }
 
-// piWorkerInfo registers a pi-harness worker whose customer ingest is the
-// signaling fake, and arms the turn context.
+// registerPiWorker registers a worker whose customer ingest is the signaling
+// fake, and arms the turn context.
 func registerPiWorker(t *testing.T, relay *Relay, gatewayURL, ingestURL string) string {
 	t.Helper()
 	token, err := relay.Register(WorkerInfo{
@@ -107,7 +105,6 @@ func registerPiWorker(t *testing.T, relay *Relay, gatewayURL, ingestURL string) 
 		Model:             "openai/gpt-5-mini",
 		GatewayBaseURL:    gatewayURL,
 		LLMVirtualKey:     "vk-real",
-		Harness:           domain.HarnessPi,
 	})
 	if err != nil {
 		t.Fatalf("Register: %v", err)
@@ -434,43 +431,5 @@ func TestLLMProxy_PiHarnessReadsCachedTokenUsage(t *testing.T) {
 			assertIntAttr("gen_ai.usage.cache_creation.input_tokens", tc.wantCreate)
 			assertIntAttr("gen_ai.usage.cache_creation_1h.input_tokens", tc.wantCreate1h)
 		})
-	}
-}
-
-// Synthesis is GATED on the pi harness: an opencode worker exports its own
-// spans, and the relay must not add a duplicate retelling.
-func TestLLMProxy_OpencodeHarnessSynthesizesNothing(t *testing.T) {
-	gateway := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
-		_, _ = fmt.Fprint(w, `{"usage":{"prompt_tokens":5,"completion_tokens":2}}`)
-	}))
-	defer gateway.Close()
-
-	relay := startRelay(t)
-	ingest := startIngest(t)
-	// The error is checked: an empty token would make the POST below miss every
-	// registered worker, so the negative assertion would pass for the wrong reason.
-	token, err := relay.Register(WorkerInfo{
-		ConversationID:    "conv-oc",
-		LangwatchEndpoint: ingest.srv.URL,
-		LangwatchAPIKey:   "sk-session",
-		GatewayBaseURL:    gateway.URL,
-		LLMVirtualKey:     "vk",
-		Harness:           domain.HarnessOpenCode,
-	})
-	if err != nil {
-		t.Fatalf("Register: %v", err)
-	}
-	relay.SetTurnContext(token, turnContext())
-
-	resp, err := http.Post(relay.LLMBaseURLFor(token)+"/chat/completions", "application/json", strings.NewReader(`{}`))
-	if err != nil {
-		t.Fatalf("proxied LLM call: %v", err)
-	}
-	_, _ = io.ReadAll(resp.Body)
-	resp.Body.Close()
-
-	time.Sleep(300 * time.Millisecond)
-	if len(ingest.lastBody()) != 0 {
-		t.Fatalf("an opencode worker's LLM call must synthesize no span; ingest got %d bytes", len(ingest.lastBody()))
 	}
 }

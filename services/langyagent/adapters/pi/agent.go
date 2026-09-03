@@ -19,7 +19,7 @@ import (
 	"github.com/langwatch/langwatch/services/langyagent/internal/toolmap"
 )
 
-// progressInterval is the heartbeat cadence, mirroring adapters/opencode:
+// progressInterval is the heartbeat cadence:
 // comfortably below the control plane's HEARTBEAT_GRACE (30s) so a live but
 // quiet turn is never mistaken for a dead one.
 const progressInterval = 5 * time.Second
@@ -29,12 +29,11 @@ const progressInterval = 5 * time.Second
 // unbounded map would grow with every tool call the wrapper never settles.
 const maxStartedInputs = 256
 
-// Agent drives ONE langy-worker subprocess over stdio, per-worker stateful,
-// unlike the opencode Agent (which talks HTTP to a port). The pool constructs
-// one per worker, Provisions + Spawns through it, and the app then drives each
-// turn through the app.CodingAgent port. The app.Endpoint parameters are
-// accepted and ignored: a pi worker has no listener, which is the point
-// (stdio isolation, nothing a sibling could dial).
+// Agent drives ONE langy-worker subprocess over stdio, per-worker stateful.
+// The pool constructs one per worker, Provisions + Spawns through it, and the
+// app then drives each turn through the app.CodingAgent port. A pi worker has
+// no listener, which is the point: stdio isolation, nothing a sibling could
+// dial.
 type Agent struct {
 	readinessTimeout time.Duration
 
@@ -85,8 +84,7 @@ var (
 	_ app.TurnBoundary = (*Agent)(nil)
 )
 
-// NewAgent returns a pi CodingAgent. readinessTimeout bounds WaitReady, the
-// same value the pool hands the opencode agent.
+// NewAgent returns a pi CodingAgent. readinessTimeout bounds WaitReady.
 func NewAgent(readinessTimeout time.Duration) *Agent {
 	return &Agent{
 		readinessTimeout: readinessTimeout,
@@ -96,10 +94,9 @@ func NewAgent(readinessTimeout time.Duration) *Agent {
 }
 
 // WaitReady blocks until the wrapper's ready handshake, the process's death,
-// the readiness timeout, or ctx. The timeout maps to the same
-// herr(ErrWorkerNotReady) message the opencode readiness poll returns, so the
-// customer-facing copy does not depend on the harness.
-func (a *Agent) WaitReady(ctx context.Context, _ app.Endpoint) error {
+// the readiness timeout, or ctx. The timeout maps to
+// herr(ErrWorkerNotReady).
+func (a *Agent) WaitReady(ctx context.Context) error {
 	r := a.currentReader()
 	if r == nil {
 		return errors.New("pi agent: WaitReady before Spawn")
@@ -140,7 +137,7 @@ func (a *Agent) WaitReady(ctx context.Context, _ app.Endpoint) error {
 // session must not be re-seeded the transcript it already carries. The reader
 // records the flag before closing ready, and the pool calls OpenSession only
 // after WaitReady, so the read is ordered.
-func (a *Agent) OpenSession(_ context.Context, _ app.Endpoint) (string, bool, error) {
+func (a *Agent) OpenSession(_ context.Context) (string, bool, error) {
 	r := a.currentReader()
 	resumed := r != nil && r.resumed
 	return "pi-" + randomID(), resumed, nil
@@ -150,7 +147,7 @@ func (a *Agent) OpenSession(_ context.Context, _ app.Endpoint) (string, bool, er
 // turn line is written: app.go launches the Stream goroutine before
 // PostMessage with no ordering guarantee, and the wrapper can emit
 // turn_started the instant the line lands, so routing must exist first.
-func (a *Agent) Post(ctx context.Context, _ app.Endpoint, _ string, turn app.Turn) error {
+func (a *Agent) Post(ctx context.Context, _ string, turn app.Turn) error {
 	r := a.currentReader()
 	if r == nil {
 		return errors.New("pi agent: Post before Spawn")
@@ -217,7 +214,7 @@ func (a *Agent) TurnEnded() {
 //   - process death mid-turn (dead closes, no terminal) -> PLAIN error, so the
 //     app routes it to worker_stopped, never agent_error
 //   - ctx cancellation   -> nil
-func (a *Agent) Stream(ctx context.Context, _ app.Endpoint, _ string, sink app.ChatSink) error {
+func (a *Agent) Stream(ctx context.Context, _ string, sink app.ChatSink) error {
 	r := a.currentReader()
 	if r == nil {
 		return errors.New("pi agent: Stream before Spawn")
@@ -234,7 +231,7 @@ func (a *Agent) Stream(ctx context.Context, _ app.Endpoint, _ string, sink app.C
 
 	// All emits go through emitFrame so the concurrent heartbeat ticker can
 	// never interleave with the event loop: the relay push is ONE ordered
-	// stream, so a single mutex serializes frame writes (opencode parity).
+	// stream, so a single mutex serializes frame writes.
 	// Returns false on an emit error (the relay push broke) so callers stop.
 	var emitMu sync.Mutex
 	emitFrame := func(f frames.Frame) bool {
@@ -355,9 +352,9 @@ func (a *Agent) finishTurn(ctx context.Context, st *streamState, ev wireEvent) e
 }
 
 // streamState maps non-terminal wire events onto frames: the answer/reasoning
-// deltas (with the paragraph restore opencode applies when text resumes after
-// a tool call), the tool lifecycle through the shared toolmap tracker, and the
-// plan snapshots.
+// deltas (with the paragraph restore applied when text resumes after a tool
+// call), the tool lifecycle through the shared toolmap tracker, and the plan
+// snapshots.
 type streamState struct {
 	emit           func(frames.Frame) bool
 	tools          *toolmap.ToolCallTracker
@@ -385,8 +382,7 @@ func (s *streamState) apply(ev wireEvent) bool {
 		text := ev.Text
 		// Text resuming AFTER a tool call is a new message segment, but the
 		// deltas carry no boundary: everything downstream concatenates them
-		// into one string. Restore the paragraph the model actually produced
-		// (opencode parity).
+		// into one string. Restore the paragraph the model actually produced.
 		if s.hasEmittedText && s.isAfterTool {
 			text = "\n\n" + text
 		}
@@ -508,7 +504,7 @@ func (s *streamState) applyPlan(ev wireEvent) bool {
 // NotifyShutdownImminent (ADR-048) tells the wrapper the manager will kill the
 // process by deadline; an in-flight turn then terminates with a handoff event
 // carrying the conversation digest.
-func (a *Agent) NotifyShutdownImminent(ctx context.Context, _ app.Endpoint, _ string, deadline time.Time) error {
+func (a *Agent) NotifyShutdownImminent(ctx context.Context, _ string, deadline time.Time) error {
 	return a.writeCommand(ctx, command{Type: "shutdown_imminent", DeadlineMs: deadline.UnixMilli()})
 }
 
@@ -516,7 +512,7 @@ func (a *Agent) NotifyShutdownImminent(ctx context.Context, _ app.Endpoint, _ st
 // exactly the named turn. The wrapper double-checks the id against its running
 // turn, so a stale cancel can never halt the wrong generation. The aborted
 // turn still terminates with turn_done aborted, which Stream settles clean.
-func (a *Agent) AbortTurn(ctx context.Context, _ app.Endpoint, _ string, turnID string) error {
+func (a *Agent) AbortTurn(ctx context.Context, _ string, turnID string) error {
 	if turnID == "" {
 		return errors.New("pi agent: abort needs a turn id")
 	}

@@ -1,7 +1,7 @@
 /**
- * The `todowrite` tool: the plan channel. Schema-compatible with opencode's
- * tool of the same name ({ todos: [{content, status}] }; a bare array is
- * tolerated) because the panel checklist and the X/Y progress protocol depend
+ * The `todowrite` tool: the plan channel. It takes the wrapper shape
+ * ({ todos: [{content, status}] }; a bare array is tolerated)
+ * because the panel checklist and the X/Y progress protocol depend
  * on that shape, but built on pi's official extension pattern
  * (pi.registerTool + session-entry state reconstruction, adapted from
  * examples/extensions/todo.ts).

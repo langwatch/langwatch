@@ -1,7 +1,7 @@
 // Package langyagent is the langyagent manager — process-pool model.
 //
 // One pod, one of THIS process. Per conversation, we spawn a dedicated
-// `opencode` subprocess and route all of that conversation's turns to it.
+// `langy-worker` subprocess and route all of that conversation's turns to it.
 // Credentials are NEVER held by the manager process; they arrive in each
 // request body, get injected into the worker subprocess's env at spawn time,
 // and die with the subprocess. This is the only thing that makes per-session
@@ -132,8 +132,8 @@ type Config struct {
 
 	// UnsafeDevDisableIsolation disables the ADR-033 per-worker UID sandbox: no
 	// os.Chown of worker homes/config to a per-conversation UID, and no setuid
-	// Credential on the opencode subprocess (it runs as the manager's own user).
-	// This exists ONLY so the manager can spawn opencode on a LOCAL DEV box where
+	// Credential on the worker subprocess (it runs as the manager's own user).
+	// This exists ONLY so the manager can spawn a worker on a LOCAL DEV box where
 	// it runs as an unprivileged user — there, the chown and the setuid Credential
 	// both fail with EPERM (they require root + CAP_SETUID/CAP_SETGID/CAP_CHOWN)
 	// and no worker can start at all. Enabling it DESTROYS sibling-worker
@@ -144,12 +144,7 @@ type Config struct {
 	// switched on in production.
 	UnsafeDevDisableIsolation bool `env:"LANGY_UNSAFE_DEV_DISABLE_ISOLATION"`
 
-	// OpenCodeBinaryPath is the opencode executable (resolved via PATH). Not
-	// env-configurable in the original; kept as a fixed default so behavior is
-	// unchanged, but overridable in tests.
-	OpenCodeBinaryPath string
-
-	// PiWorkerBinaryPath is the langy-worker executable the pi harness spawns
+	// PiWorkerBinaryPath is the langy-worker executable a worker spawns
 	// (resolved via PATH when bare). Env-overridable so a host-tier dev manager
 	// can point at a locally built binary (services/langyworker/out) without
 	// installing it on PATH.
@@ -191,7 +186,6 @@ func defaultConfig() Config {
 		ReadinessTimeoutMS:        defaultReadinessTimeoutMS,
 		SessionsRoot:              defaultSessionsRoot,
 		WorkspaceRoot:             defaultWorkspaceRoot,
-		OpenCodeBinaryPath:        "opencode",
 		PiWorkerBinaryPath:        "langy-worker",
 		ShutdownHandoffDeadlineMS: defaultShutdownHandoffDeadlineMS,
 		ShutdownDrainBudgetMS:     defaultShutdownDrainBudgetMS,
@@ -304,7 +298,7 @@ func (c Config) WorkerIdle() time.Duration {
 	return time.Duration(c.WorkerIdleMS) * time.Millisecond
 }
 
-// ReadinessTimeout is how long a spawn waits for opencode to become ready.
+// ReadinessTimeout is how long a spawn waits for a worker to become ready.
 func (c Config) ReadinessTimeout() time.Duration {
 	return time.Duration(c.ReadinessTimeoutMS) * time.Millisecond
 }

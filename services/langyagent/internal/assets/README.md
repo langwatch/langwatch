@@ -44,13 +44,12 @@ A locally built manager therefore has ONLY the github skill unless you copy
    the shared workspace on disk (`assets.MaterializeSkills`) — root-owned,
    world-readable (0755/0644), so every per-conversation UID can read but not
    modify it.
-2. Per spawn, `opencode.Provision` writes the template to the worker's
-   `$HOME/AGENTS.md` byte for byte, and symlinks
-   `$HOME/.config/opencode/skills` → the shared skills dir. That config path
-   is where opencode discovers global skills — each `<name>/SKILL.md` becomes
-   an invokable skill.
-3. opencode reads `$HOME/AGENTS.md` as the project rules doc and surfaces the
-   discovered skills to the model.
+2. Per spawn, `pi.Provision` writes the template to the worker's
+   `$HOME/AGENTS.md` byte for byte, and points the worker config's
+   `skillsDir` at the shared skills dir. That is where the worker loads
+   skills from — each `<name>/SKILL.md` becomes an invokable skill.
+3. The worker reads `$HOME/AGENTS.md` as the project rules doc and surfaces
+   the discovered skills to the model.
 
 ## Editing AGENTS.md — the traps
 

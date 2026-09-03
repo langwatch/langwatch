@@ -2,7 +2,7 @@ import { describe, expect, it } from "vitest";
 import { normalizeTodos, renderTodoList } from "./todowrite.js";
 
 describe("normalizeTodos", () => {
-  describe("when the opencode wrapper shape", () => {
+  describe("when the wrapper shape", () => {
     it("returns the items", () => {
       expect(
         normalizeTodos({

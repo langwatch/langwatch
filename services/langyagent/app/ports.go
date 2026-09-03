@@ -2,7 +2,7 @@
 // turn — acquire a worker, run the turn, map failures — through the consumer
 // interfaces declared here, so it stays testable without a real worker pool or
 // a real HTTP response. Driven adapters implement these ports: app/workerpool
-// backs WorkerPool/Worker, adapters/opencode backs CodingAgent (agent.go),
+// backs WorkerPool/Worker, adapters/pi backs CodingAgent (agent.go),
 // adapters/controlplane backs TurnFinalizer; the driving adapter (transport/rpc)
 // provides the ChatSink.
 package app
@@ -51,7 +51,7 @@ type WorkerPool interface {
 	HasLiveWorker(conversationID string, sig domain.CredentialSignature) bool
 	// Status returns the live worker count and the configured cap.
 	Status() (active, capacity int)
-	// KillSessionVanished recycles a worker whose opencode session disappeared.
+	// KillSessionVanished recycles a worker whose agent session disappeared.
 	KillSessionVanished(conversationID string)
 	// CancelTurn asks the conversation's live worker to abort the named
 	// in-flight turn, the token-burn half of the user's Stop (ADR-078). A
@@ -63,7 +63,7 @@ type WorkerPool interface {
 	// StartReaper begins the idle-worker sweep.
 	StartReaper()
 	// ShutdownHandoff (ADR-048) is the pre-drain SIGTERM step: it notifies each
-	// live worker that shutdown is imminent (so opencode checkpoints the
+	// live worker that shutdown is imminent (so the agent checkpoints the
 	// in-flight turn and emits a terminal handoff frame) and waits, bounded by
 	// deadline, for those turns to quiesce. Runs BEFORE Shutdown so the handoff
 	// frames reach the control plane before the process-group kill.
@@ -74,13 +74,12 @@ type WorkerPool interface {
 
 // TurnAborter is the OPTIONAL capability a CodingAgent (agent.go) implements
 // when it can abort an in-flight turn mid-generation. The worker type-asserts
-// its agent against this at cancel time: an agent without it (opencode today)
-// is a silent no-op, fail-open, so a cancel can never change behavior for a
-// harness that has no abort. Same drive shape as the CodingAgent methods: the
-// endpoint and session route the call, and turnID names the one turn allowed
-// to die.
+// its agent against this at cancel time: an agent without it is a silent
+// no-op, fail-open, so a cancel can never change behavior for an agent that
+// has no abort. Same drive shape as the CodingAgent methods: the session
+// routes the call, and turnID names the one turn allowed to die.
 type TurnAborter interface {
-	AbortTurn(ctx context.Context, ep Endpoint, sessionID, turnID string) error
+	AbortTurn(ctx context.Context, sessionID, turnID string) error
 }
 
 // TurnBoundary is the OPTIONAL capability a CodingAgent implements when it
@@ -94,9 +93,8 @@ type TurnAborter interface {
 // (a turn abandoned between the two), and the NEXT turn's Stream could pick
 // that stale handle up instead of its own. Clearing at the boundary is what
 // makes the handoff unambiguous: turns are serialized by ClaimTurn, so nothing
-// left behind can reach the turn after it. An agent without the capability
-// (opencode, which drives turns over HTTP and keeps no such handle) is a
-// silent no-op.
+// left behind can reach the turn after it. An agent without the capability is
+// a silent no-op.
 type TurnBoundary interface {
 	TurnEnded()
 }
@@ -139,7 +137,7 @@ type Worker interface {
 	Prewarmed() bool
 	// Touch resets the idle timer.
 	Touch()
-	// PostMessage queues the turn on the worker's opencode session. historySeed
+	// PostMessage queues the turn on the worker's agent session. historySeed
 	// is the control plane's conversation-so-far block: folded in ahead of the
 	// prompt on the FIRST message this worker's session receives, ignored once a
 	// prompt has been delivered (the session's own transcript carries it from
@@ -147,7 +145,7 @@ type Worker interface {
 	// (ADR-048) carries an opaque prior-turn checkpoint to resume from; empty on
 	// a cold start.
 	PostMessage(ctx context.Context, system, prompt, historySeed, resumeToken string) error
-	// StreamEvents forwards this session's opencode events into sink until a
+	// StreamEvents forwards this session's agent events into sink until a
 	// terminal event or ctx cancellation.
 	StreamEvents(ctx context.Context, sink ChatSink) error
 	// SetTurnTraceContext records the current turn's trace context for

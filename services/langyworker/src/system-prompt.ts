@@ -2,8 +2,8 @@
  * Per-turn system prompt composition: persona + the turn's `system` block +
  * AGENTS.md, in that order. AGENTS.md goes LAST on purpose: its Replies rules
  * sit at the file's end, and the model weighs the end of the system prompt the
- * most. This mirrors the opencode layout (instructions files append after the
- * per-message system block), which is the layout the reply-style suite was
+ * most. Instructions files append after the per-message system block, which
+ * is the layout the reply-style suite was
  * tuned green against; with AGENTS.md mid-prompt the model slid back to
  * closing replies with next-action menus. Both blocks are byte-stable across
  * a conversation's turns, so the order does not affect provider prompt

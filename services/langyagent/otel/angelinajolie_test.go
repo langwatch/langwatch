@@ -22,7 +22,7 @@ func workerBatch(t *testing.T) ptrace.Traces {
 	t.Helper()
 	td := ptrace.NewTraces()
 	rs := td.ResourceSpans().AppendEmpty()
-	rs.Resource().Attributes().PutStr("service.name", "opencode")
+	rs.Resource().Attributes().PutStr("service.name", "langy-worker")
 	rs.Resource().Attributes().PutStr("customer.internal.hostname", "acme-laptop-01")
 
 	spans := rs.ScopeSpans().AppendEmpty().Spans()

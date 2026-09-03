@@ -3258,13 +3258,9 @@ const presentations = {
     describe: () =>
       "This conversation link isn't one we can open. Start a new chat to keep going.",
   },
-  opencode_session_not_found: {
+  agent_session_not_found: {
     title: "The session was lost",
     describe: () => "Start a new message to continue.",
-  },
-  opencode_auth_not_enforced: {
-    title: "Temporarily unavailable",
-    describe: () => "We're on it. Try again shortly.",
   },
   max_workers_reached: {
     title: "Busy right now",

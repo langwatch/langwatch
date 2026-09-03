@@ -338,12 +338,12 @@ func TestApp_Turn_StreamErrorEmitsWorkerStoppedFrame(t *testing.T) {
 }
 
 func TestApp_Turn_AgentErrorFrameCarriesTypedCauseChain(t *testing.T) {
-	// The agent reported its own failure (an opencode error event) and the LLM
+	// The agent reported its own failure (an error terminal) and the LLM
 	// proxy captured the gateway's typed herr for this turn. The wire frame must
 	// be the vetted agent_error herr with the gateway's herr as a REASON — the
 	// full typed chain the control plane deserializes into a DomainError — and
 	// the raw agent prose must stay in the log, never on the wire.
-	rawAgentProse := "AI_APICallError: something opencode made up"
+	rawAgentProse := "AI_APICallError: something the agent made up"
 	worker := &fakeWorker{
 		claimOK:   true,
 		streamErr: herr.NewLight(context.Background(), domain.ErrAgentError, nil, errors.New(rawAgentProse)),

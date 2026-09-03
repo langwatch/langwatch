@@ -238,7 +238,7 @@ func TestLLMTargetURL(t *testing.T) {
 }
 
 // The proxy's error capture is the wire that lets a turn's terminal frame name
-// the REAL cause instead of opencode's laundered prose. Contract: EVERY >=400
+// the REAL cause instead of the agent's laundered prose. Contract: EVERY >=400
 // answer leaves a capture for LastLLMError — a herr envelope losslessly, a
 // provider-native body as a safe handled upstream error; a later success — or a
 // new turn — clears it; the body always reaches the worker's SDK

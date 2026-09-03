@@ -1,10 +1,10 @@
-// Package toolmap holds the harness-independent tool-frame mapping helpers the
+// Package toolmap holds the tool-frame mapping helpers the
 // coding-agent adapters share: output bounding, the CLI failure-document rule,
 // the plan (todowrite) snapshot mapping, the measured X/Y progress mapper, and
-// the per-turn tool-call de-dupe tracker. Both adapters (opencode and pi) map
+// the per-turn tool-call de-dupe tracker. The adapter maps
 // their own wire events onto internal/frames values through these helpers, so
 // the tool cards, the plan checklist and the progress protocol behave the same
-// whichever harness runs the turn.
+// whichever agent runs the turn.
 package toolmap
 
 import (
@@ -153,7 +153,7 @@ func RawToolValue(raw json.RawMessage) json.RawMessage {
 // call is doing, i.e. whether it carries any argument at all.
 //
 // `{}` is the case that matters and the one RawToolValue cannot see: it is a
-// present, valid, entirely uninformative object. opencode really does emit a
+// present, valid, entirely uninformative object. An agent really does emit a
 // `running` transition whose input is still `{}` and then RE-SEND the same
 // `running` once the arguments have materialized (the re-send is a known shape,
 // see the tracker's dedupe). Treating that first empty `{}` as "we know the
@@ -351,7 +351,7 @@ func reduceJSONValue(v any, maxString, maxItems int) any {
 }
 
 // ToolCallTracker de-dupes the tool lifecycle across re-delivered call updates:
-// a call's state can land on the stream many times (opencode re-publishes a
+// a call's state can land on the stream many times (an agent re-publishes a
 // tool part on every state transition; a wire protocol can re-send an event).
 // The tracker holds the per-turn set of ids it has already opened and closed,
 // which is what guarantees EXACTLY one `start` and one `end` per call. Scoped

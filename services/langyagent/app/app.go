@@ -120,7 +120,7 @@ type ChatRequest struct {
 	HistorySeed string
 	Credentials domain.Credentials
 	// ResumeToken (ADR-048) is an opaque, worker-authored checkpoint from a prior
-	// turn that handed off on shutdown. Threaded into PostMessage so opencode
+	// turn that handed off on shutdown. Threaded into PostMessage so the agent
 	// resumes from it; empty on a normal cold start.
 	ResumeToken string
 	// TurnID is the control plane's idempotency key for this turn. It rides the
@@ -147,7 +147,7 @@ type ChatRequest struct {
 
 // Warm spawns the conversation's worker WITHOUT running a turn.
 //
-// Acquiring a worker is the expensive half of a cold turn: it forks opencode,
+// Acquiring a worker is the expensive half of a cold turn: it forks the worker,
 // lays out the worker home, installs the skills and waits for the session to
 // come up. The control plane knows a turn is coming the moment the browser POSTs
 // — long before the event-sourced dispatch actually reaches us — so it calls this
@@ -190,7 +190,7 @@ func (a *App) Warm(ctx context.Context, conversationID string, creds domain.Cred
 // turn (ADR-078: the token-burn half of the user's Stop). Deliberately returns
 // nothing: the control plane treats a cancel as fire-and-forget. The stopped
 // terminal is already on the durable record before the cancel is sent, so a
-// cancel that finds nothing to halt (worker gone, turn finished, harness
+// cancel that finds nothing to halt (worker gone, turn finished, an agent
 // without abort support) has succeeded at its only job, which is best-effort.
 func (a *App) CancelTurn(ctx context.Context, conversationID, turnID string) {
 	clog.Get(ctx).Info("canceling in-flight turn",
@@ -237,7 +237,7 @@ func (a *App) StartTurn(ctx context.Context, req ChatRequest) (func(context.Cont
 		return nil, err // already a herr from the pool (e.g. ErrCredentialsRequired)
 	}
 	// Per-conversation in-flight guard, turnId-idempotent (review "F"). The
-	// worker's OpenCode session is single-stream — two concurrent DIFFERENT turns
+	// worker's agent session is single-stream — two concurrent DIFFERENT turns
 	// would splice replies (busy → 409). But a redundant dispatch of the SAME
 	// turnId — exactly what the self-retry re-drive of a merely-slow worker
 	// produces — must be a benign no-op, never a second run.
@@ -385,7 +385,7 @@ func (a *App) driveTurn(ctx context.Context, req ChatRequest, worker Worker) {
 		a.finalizeCompletedTurn(ctx, req, sink)
 		a.turnObserved(ctx, start, "handoff", req.Intent)
 	case herr.IsCode(streamErr, domain.ErrAgentError):
-		// The agent itself reported the turn failed (an opencode error event —
+		// The agent itself reported the turn failed (an error terminal —
 		// e.g. its LLM call was rejected). Deterministic and terminal: emit the
 		// vetted `agent_error` herr NOW so the control plane fails the turn in
 		// milliseconds instead of the liveness sweep misreading it as a stall.
@@ -427,7 +427,7 @@ func (a *App) driveTurn(ctx context.Context, req ChatRequest, worker Worker) {
 		}
 		a.turnObserved(ctx, start, "agent-error", req.Intent)
 	case streamErr != nil:
-		// The worker's event stream died before the turn finished — the opencode
+		// The worker's event stream died before the turn finished — the worker
 		// subprocess crashed, was OOM-killed, or the connection dropped. The raw
 		// error is for the log only; the control plane classifies the vetted
 		// `worker_stopped` code into a final "Langy's worker stopped" state (never
