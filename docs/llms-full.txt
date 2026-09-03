@@ -10,13 +10,9 @@ sidebarTitle: Introduction
 keywords: langwatch, llm, ai, observability, evaluation, agent testing, prompt management, coding agents, ai gateway, ai governance, llmops, open-source, github
 ---
 
-<Frame>
-  <img
-    className="block"
-    src="/images/langwatch-quick-preview.gif"
-    alt="LangWatch Quick Preview"
-  />
-</Frame>
+<video controls autoPlay muted loop playsInline width="100%">
+  <source src="/media/videos/introduction.webm" type="video/webm" />
+</video>
 
 
 ## Quick Start

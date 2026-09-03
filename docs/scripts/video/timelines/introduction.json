@@ -1,0 +1,112 @@
+{
+  "input": "../../../../.claude/tmp/video/raw/intro/joined.webm",
+  "output": "../../../media/videos/introduction.webm",
+  "fps": 30,
+  "page": { "width": 1440, "height": 900 },
+  "size": { "width": 1664, "height": 1040 },
+  "frame": { "background": "backgrounds/default.webp", "fit": "native" },
+  "quality": { "crf": 38, "cpuUsed": 2 },
+
+  "cut": { "speed": 2, "segments": [[0, 85.2]] },
+
+  "cursor": { "start": { "x": 700, "y": 500 } },
+
+  "beats": [
+    {
+      "tRaw": 5.31, "x": 400, "y": 223, "zoom": 1, "click": false, "arc": 0,
+      "note": "observe: every conversation the agent had, with its cost and latency"
+    },
+    {
+      "tRaw": 6.99, "x": 900, "y": 223, "zoom": 1, "click": false, "arc": 0,
+      "note": "sweep along the question a customer asked"
+    },
+    {
+      "tRaw": 9.6, "x": 600, "y": 190, "zoom": 1,
+      "note": "open one of them"
+    },
+    {
+      "tRaw": 12.5, "x": 620, "y": 279,
+      "zoom": 1.5, "zoomAt": { "x": 970, "y": 250 }, "hold": 0.1,
+      "click": false, "arc": 0,
+      "note": "the trace drawer: input, output, cost, tokens, model, and the evaluations that scored it"
+    },
+    {
+      "tRaw": 14.0, "x": 1100, "y": 279,
+      "zoom": 1.5, "zoomAt": { "x": 970, "y": 250 }, "hold": 0.1,
+      "click": false, "arc": 0,
+      "note": "read the question"
+    },
+    {
+      "tRaw": 15.6, "x": 620, "y": 363,
+      "zoom": 1.5, "zoomAt": { "x": 970, "y": 250 }, "hold": 0.1,
+      "click": false, "arc": 0,
+      "note": "carriage return to the answer"
+    },
+    {
+      "tRaw": 17.4, "x": 1300, "y": 363,
+      "zoom": 1.5, "zoomAt": { "x": 970, "y": 250 }, "hold": 1.0,
+      "click": false, "arc": 0,
+      "note": "read the answer the agent gave"
+    },
+    {
+      "tRaw": 26.73, "x": 1382, "y": 93,
+      "zoom": 1.9, "zoomAt": { "x": 1230, "y": 130 }, "hold": 0.5,
+      "pause": { "before": 0.8, "after": 0.7 },
+      "note": "test: run the experiment over the whole dataset. A corner, so it earns the zoom"
+    },
+    {
+      "tRaw": 43.7, "x": 1350, "y": 191,
+      "zoom": 1.8, "zoomAt": { "x": 1280, "y": 290 }, "hold": 3.5,
+      "click": false,
+      "note": "the score summary lands: pass rate, average latency and the cost of the whole run"
+    },
+    {
+      "tRaw": 54.5, "x": 700, "y": 300,
+      "zoom": 1.5, "zoomAt": { "x": 950, "y": 300 }, "hold": 0.1,
+      "click": false, "arc": 0,
+      "note": "agent testing: a simulated customer is talking to the agent right now"
+    },
+    {
+      "tRaw": 57.0, "x": 1000, "y": 300,
+      "zoom": 1.5, "zoomAt": { "x": 950, "y": 300 }, "hold": 0.1,
+      "click": false, "arc": 0,
+      "note": "read the answer it gave"
+    },
+    {
+      "tRaw": 61.0, "x": 1000, "y": 440,
+      "zoom": 1.5, "zoomAt": { "x": 950, "y": 300 }, "hold": 0.1,
+      "click": false, "arc": 0,
+      "note": "turn two arrives while the camera is on it"
+    },
+    {
+      "tRaw": 63.0, "x": 700, "y": 470,
+      "zoom": 1.5, "zoomAt": { "x": 950, "y": 330 }, "hold": 1.0,
+      "click": false, "arc": 0,
+      "note": "the agent answers again, still running"
+    },
+    {
+      "tRaw": 67.43, "x": 1215, "y": 559,
+      "zoom": 1.7, "zoomAt": { "x": 1170, "y": 570 }, "hold": 0.3,
+      "note": "build: a virtual key for the agent, with a budget"
+    },
+    {
+      "tRaw": 68.89, "x": 1100, "y": 595,
+      "zoom": 1.7, "zoomAt": { "x": 1170, "y": 570 }, "hold": 0.8,
+      "click": false, "arc": 0,
+      "note": "max $50 a month, resets on the 1st"
+    },
+    {
+      "tRaw": 75.2, "x": 400, "y": 258,
+      "zoom": 1.5, "zoomAt": { "x": 700, "y": 300 }, "hold": 0.1,
+      "click": false, "arc": 0,
+      "note": "the key is live"
+    },
+    {
+      "tRaw": 77.2, "x": 1062, "y": 253,
+      "zoom": 1.5, "zoomAt": { "x": 700, "y": 300 }, "hold": 4.0,
+      "click": false, "arc": 0,
+      "note": "and the spend of its first request has already landed"
+    },
+    { "tRaw": 84.4, "hide": true }
+  ]
+}
