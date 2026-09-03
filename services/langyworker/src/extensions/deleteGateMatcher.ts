@@ -221,6 +221,26 @@ const FILE_EXECUTORS = new Set(["bash", "sh", "zsh", "dash", "ksh", "source", ".
  * segment head is held UNCONDITIONALLY, like write-then-exec: no confirmation
  * releases it. Enumerated so a newly-relevant interpreter missing from this set
  * is a conscious omission the canary (`deleteGate.canary.test.ts`) surfaces.
+ *
+ * `awk`/`gawk`/`mawk` are here because awk has `system()` plus native string
+ * concatenation (`"lang" "watch"`), so `awk 'BEGIN{system("lang" "watch" " …")}'`
+ * assembles the CLI name at runtime past every substring check — the awk-shaped
+ * twin of the Python concat bypass.
+ *
+ * Deliberately NOT added, each judged already-covered or an accepted residual
+ * (a head-based hold would over-block their overwhelmingly benign everyday use):
+ *  - `sed`/`gsed`: GNU sed's `e` command/flag can exec, but a LITERAL `langwatch`
+ *    in a sed script already trips the `mentionsCli` unparseable hold below, a
+ *    quote-splice trips `QUOTE_SPLICE`, and sed has no practical runtime
+ *    string-concatenation primitive to assemble the CLI name otherwise. Holding
+ *    every `sed 's/…/…/'` would be ruinous over-block for near-zero marginal gain.
+ *  - `xargs`, `find -exec`: pass arguments to a command, they do not concatenate
+ *    strings — a `langwatch` they invoke is a literal token caught by
+ *    `mentionsCli`. Holding all `find`/`xargs` would over-block routine use.
+ *  - `env -S`, `busybox` (applet dispatch): head-based detection sees `env`
+ *    (stripped as a runner wrapper) or `busybox`, not the interpreter behind it,
+ *    so a concat payload wrapped in either is a known residual — narrow, and
+ *    unlikely in the worker image. Recorded in the threat model, not closed here.
  */
 export const CODE_INTERPRETERS = new Set([
   "python",
@@ -239,6 +259,9 @@ export const CODE_INTERPRETERS = new Set([
   "lua",
   "tclsh",
   "elixir",
+  "awk",
+  "gawk",
+  "mawk",
 ]);
 
 /** HTTP clients whose invocations reach the REST/GraphQL delete surface. */
@@ -246,6 +269,21 @@ const HTTP_CLIENTS = new Set(["curl", "http", "https", "wget", "fetch", "xh"]);
 
 /** Shell metacharacters that make a segment unresolvable without executing it. */
 const UNRESOLVABLE = /[$`]|<\(/;
+
+/**
+ * A quote character glued to word text on BOTH sides — the bash native
+ * quote-splice (`lang""watch` → `langwatch`, `l"w"` → `lw`, `lang''watch` →
+ * `langwatch`). The shell strips the quotes and joins the neighbours into one
+ * word, so the literal `langwatch`/`lw` the head resolution and `mentionsCli`
+ * substring check both look for is never contiguous in the source — the segment
+ * would be waved through. It is held as unresolvable instead, fail-closed.
+ *
+ * The both-sides-word requirement is what keeps legitimate quoted arguments out:
+ * `--name "my dataset"`, `echo "hello world"`, `grep -r "foo" .` each put a quote
+ * next to whitespace (or a shell boundary) on at least one side, never word text
+ * on both, so none match.
+ */
+const QUOTE_SPLICE = /[A-Za-z0-9]["']+[A-Za-z0-9]/;
 
 const DESTRUCTIVE_VERB_SET = new Set<string>(DESTRUCTIVE_VERBS);
 
@@ -415,8 +453,10 @@ function classifySegment(segment: string): DestructiveMatch | null {
 
   // A segment we cannot resolve statically is held whenever it could reach the
   // product: command substitution, variable expansion, and process
-  // substitution can all spell any command at all.
-  if (UNRESOLVABLE.test(segment)) {
+  // substitution can all spell any command at all — and a bash native
+  // quote-splice (`lang""watch`) reassembles `langwatch`/`lw` past every
+  // substring check, so it is unresolvable to static inspection just the same.
+  if (UNRESOLVABLE.test(segment) || QUOTE_SPLICE.test(segment)) {
     return { kind: "unparseable", segment };
   }
 

@@ -129,6 +129,14 @@ Feature: Langy's worker-side delete gate
         | pnpm test:unit   |
 
     @unit
+    Scenario: A legitimate quoted argument adjacent to whitespace is not over-blocked
+      Given a command whose quotes border whitespace or a shell boundary, not
+        word text on both sides (`echo "hello world"`, `grep -r "foo" .`)
+      When the gated bash command runs
+      Then the gate returns allow:true
+      # The quote-splice hold must not swallow ordinary quoted arguments.
+
+    @unit
     Scenario: A block reason for an unconfirmed delete tells the agent to ask first
       Given a gated bash command deletes a LangWatch resource with no confirmation on record
       When the gate returns allow:false
@@ -188,6 +196,23 @@ Feature: Langy's worker-side delete gate
       Given a bound, valid confirmation is present for the same target
       When a "write" or "edit" tool call's content runs a destructive langwatch command through a code interpreter
       Then the gate returns allow:false
+
+    @unit
+    Scenario: A bash native quote-splice that reassembles the CLI name is held
+      Given a command where quotes splice word text on both sides
+        (`lang""watch`, `l"w"`, `lang''watch`), which bash resolves to a real
+        langwatch or lw invocation
+      When the spliced command deletes a LangWatch resource
+      Then the gate returns allow:false
+      # Held as unresolvable — the literal langwatch/lw is never contiguous statically.
+
+    @unit
+    Scenario: An awk program that concatenates a destructive command through system() is held
+      Given an awk, gawk, or mawk program that builds "langwatch" at runtime by
+        string concatenation inside system()
+      When the program is run as a gated bash command
+      Then the gate returns allow:false
+      # awk is in CODE_INTERPRETERS: system() plus native concat is the awk twin of the Python concat bypass.
 
   Rule: The HTTP matcher catches destructive intent beyond the literal DELETE verb, without over-blocking reads
 
@@ -346,10 +371,10 @@ Feature: Langy's worker-side delete gate
 # AC 7: "Mismatch: confirm A, delete B -> blocked" -> Scenario Outline: A confirmed delete does not authorize a mismatched target
 # AC 8: "Single-use: consumed on first gated allow" -> Scenario: A confirmation is consumed on its first authorized delete
 # AC 9: "Multi-target in one command, partial confirm -> blocked" -> Scenario: A multi-target command with only one target confirmed is blocked entirely
-# AC 10: "Read-only langwatch calls pass" -> Scenario Outline: Read-only langwatch CLI calls pass without confirmation
+# AC 10: "Read-only langwatch calls pass" -> Scenario Outline: Read-only langwatch CLI calls pass without confirmation; Scenario: A legitimate quoted argument adjacent to whitespace is not over-blocked
 # AC 11: "Non-langwatch bash passes" -> Scenario Outline: Non-langwatch bash commands pass without confirmation
 # AC 12: "Block reason is actionable" -> Scenario: A block reason for an unconfirmed delete tells the agent to ask first; Scenario: A block reason for an unresolvable command tells the agent how to re-issue it
-# AC 13: "Write-then-execute is held unconditionally" -> Scenario: A write or edit whose content contains a destructive command is held; Scenario Outline: Executing an agent-written file is held even with a valid confirmation
+# AC 13: "Write-then-execute is held unconditionally" -> Scenario: A write or edit whose content contains a destructive command is held; Scenario Outline: Executing an agent-written file is held even with a valid confirmation; Scenario: A bash native quote-splice that reassembles the CLI name is held; Scenario: An awk program that concatenates a destructive command through system() is held
 # AC 14: "Destructive HTTP beyond literal DELETE is held" -> Scenario: A POST GraphQL delete or archive mutation...; Scenario: A PUT or PATCH soft-delete...; Scenario: A POST to a destructive action endpoint...; Scenario Outline: Each unconfirmed bypass class is blocked at the real tool_call seam (HTTP-shape delete case)
 # AC 15: "Benign HTTP to a langwatch host is NOT over-blocked" -> Scenario: A GET request to a langwatch host is not blocked; Scenario: A read or non-destructive GraphQL POST to a langwatch host is not blocked
 # AC 16: "Equals-form flag values are evaluated" -> Scenario: An equals-form flag value carrying a destructive verb is matched; Scenario Outline: Each unconfirmed bypass class is blocked at the real tool_call seam (equals-form case)

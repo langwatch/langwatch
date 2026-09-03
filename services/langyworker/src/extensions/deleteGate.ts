@@ -170,18 +170,22 @@ export function createDeleteGateExtension(): InlineExtension {
   return {
     name: "langy-delete-gate",
     factory: (pi: ExtensionAPI) => {
-      // Transient in-flight guard against the parallel-dispatch race: pi's
-      // `executeToolCallsParallel` (pi-agent-core agent-loop.js:332-370) runs
-      // every `beforeToolCall`/tool_call preparation before any tool result
-      // lands, so two destructive calls in one assistant turn both see the same
-      // unconsumed confirmation. `session.ts` also pins `toolExecution:
-      // "sequential"` (belt), which interleaves prepare→execute→persist so a
-      // tool result lands first; this Set is the braces. It records each
-      // confirmation the gate has already released within the process. Once a
-      // tool result lands, branch history marks the confirmation consumed and a
-      // fresh confirmation yields a different signature, so the Set never
+      // Inert-today fail-closed backstop for the parallel-dispatch race, NOT
+      // load-bearing under the shipped configuration. `session.ts` pins
+      // `toolExecution: "sequential"`, which interleaves prepare→execute→persist
+      // per call (pi-agent-core agent-loop.js:295-331), so the first delete's
+      // tool result is already in `getBranch()` — marking the confirmation
+      // consumed — before the second call's gate runs: branch history alone
+      // blocks the reuse, and this Set never fires. It exists solely to keep the
+      // gate fail-closed if that setting is ever lost or defaults back to
+      // `"parallel"` (agent-loop.js:332-370, `executeToolCallsParallel`), where
+      // both calls in a wave would see the same unconsumed confirmation. It
+      // records each released signature within the process; once a tool result
+      // lands a fresh confirmation yields a different signature, so it never
       // false-blocks a legitimately new confirmation. Branch history stays the
-      // source of truth for single-use across turns.
+      // source of truth for single-use across turns. (The raw-event integration
+      // test drives two tool_call events with no result between them, bypassing
+      // sequential dispatch, so it exercises this backstop directly.)
       const releasedConfirmationSignatures = new Set<string>();
       pi.on("tool_call", async (event, ctx): Promise<ToolCallEventResult> => {
         let entries: BranchEntryLike[] = [];

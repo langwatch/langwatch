@@ -280,6 +280,51 @@ describe("Interpreter-executed code is held unconditionally", () => {
   });
 });
 
+describe("Bash native quote-splice evasion (Finding A)", () => {
+  /** @scenario A bash native quote-splice that reassembles the CLI name is held */
+  it("holds a quote-splice that bash would resolve to langwatch or lw, even with a valid confirmation", () => {
+    for (const command of [
+      'lang""watch dataset delete d1',
+      "lang''watch dataset delete d1",
+      'l"w" dataset delete d1',
+    ]) {
+      // `bash -c` resolves each to a real `langwatch`/`lw` delete; statically the
+      // literal is spliced apart, so it is held as unresolvable (fail-closed),
+      // and no confirmation can release an unparseable segment.
+      expect(bash(command).allow).toBe(false);
+      expect(bash(command, confirmedForD1).allow).toBe(false);
+      expect(findDestructiveMatches(command)).toContainEqual(
+        expect.objectContaining({ kind: "unparseable" }),
+      );
+    }
+  });
+
+  /** @scenario A legitimate quoted argument adjacent to whitespace is not over-blocked */
+  it("does not over-block a quoted argument that borders whitespace, not word text", () => {
+    // Each quote sits next to whitespace or a shell boundary on at least one
+    // side — a normal quoted argument, never a splice — so these still pass.
+    expect(bash('echo "hello world"').allow).toBe(true);
+    expect(bash('grep -r "foo" .').allow).toBe(true);
+    expect(bash('ls -la "my dir"').allow).toBe(true);
+    expect(bash('langwatch dataset list --filter "some name"').allow).toBe(true);
+  });
+});
+
+describe("awk system() concatenation (Finding B)", () => {
+  /** @scenario An awk program that concatenates a destructive command through system() is held */
+  it("holds an awk/gawk/mawk system() call that builds the CLI name at runtime", () => {
+    for (const interpreter of ["awk", "gawk", "mawk"]) {
+      const payload = `${interpreter} 'BEGIN{system("lang" "watch" " dataset delete d1")}'`;
+      expect(bash(payload).allow).toBe(false);
+      expect(bash(payload, confirmedForD1).allow).toBe(false);
+      // Classified as exec-file (the fail-closed interpreter bucket).
+      expect(findDestructiveMatches(payload)).toContainEqual(
+        expect.objectContaining({ kind: "exec-file" }),
+      );
+    }
+  });
+});
+
 describe("Destructive HTTP beyond the literal DELETE verb", () => {
   /** @scenario A POST GraphQL delete or archive mutation to a langwatch host is held */
   it("holds a POST GraphQL delete/archive mutation to a langwatch host", () => {
