@@ -149,6 +149,7 @@ def compile_source(source):
     """A parameterised source -> (regex, literal prefix), or None if it is exact."""
     pattern = ""
     prefix = []
+    captured = set()
     literal_so_far = True
     has_parameter = False
     for segment in split_path(source):
@@ -160,8 +161,16 @@ def compile_source(source):
             continue
         literal_so_far = False
         has_parameter = True
+        name = match.group(1)
+        # A repeated name cannot be substituted unambiguously, so capture the
+        # first one only and let the destination check report the rest.
+        group = f"?P<{name}>" if name not in captured else "?:"
+        captured.add(name)
         # `:name*` spans the rest of the path, `:name` is one segment.
-        pattern += "(?:/[^/]+)*" if match.group(2) else "/[^/]+"
+        if match.group(2):
+            pattern += f"({group}(?:/[^/]+)*)"
+        else:
+            pattern += f"/({group}[^/]+)"
     if not has_parameter:
         return None
     return re.compile("^" + pattern + "/?$"), "/" + "/".join(prefix)
@@ -178,16 +187,44 @@ wildcard_sources.sort(key=lambda item: len(item[2]), reverse=True)
 
 
 def covering_source(url):
-    """The `source` in docs.json that routes this page URL, or None."""
+    """(source, captures) for the docs.json redirect that routes this page URL.
+
+    The source is None when nothing routes it. The captures are the path
+    segments the parameters matched, keyed by parameter name.
+    """
     if url in by_source:
-        return url
+        return url, {}
     for source, regex, _prefix in wildcard_sources:
-        if regex.match(url):
-            return source
-    return None
+        match = regex.match(url)
+        if match:
+            captures = {
+                name: value.strip("/")
+                for name, value in match.groupdict().items()
+                if value is not None
+            }
+            return source, captures
+    return None, {}
 
 
-def destination_problem(destination, source):
+def resolve_destination(destination, captures):
+    """The concrete path a parameterised destination rewrites to, or None."""
+    segments = []
+    for segment in split_path(destination.split("?", 1)[0]):
+        match = PARAMETER.match(segment)
+        if not match:
+            segments.append(segment)
+            continue
+        value = captures.get(match.group(1))
+        if value is None:
+            return None
+        # A `:name*` capture spans several segments, and matches none when the
+        # source is the section root itself.
+        if value:
+            segments.extend(value.split("/"))
+    return "/".join(segments)
+
+
+def destination_problem(destination, source, captures):
     """None when the destination is good, else the reason it is not."""
     if not isinstance(destination, str) or not destination:
         return "destination is missing"
@@ -202,20 +239,27 @@ def destination_problem(destination, source):
     if not destination.startswith("/"):
         return f"destination '{destination}' is not a path"
     # A section redirect carries the parameter through to the destination,
-    # `/old/:path*` -> `/new/:path*`. The destination is then a pattern rather
-    # than one page, so there is nothing to resolve against the page list. The
-    # source has to capture every parameter the destination substitutes,
-    # otherwise the pattern resolves to nothing.
-    wanted = parameter_names(destination)
-    if wanted:
-        captured = parameter_names(source)
-        missing = [name for name in wanted if name not in captured]
+    # `/old/:path*` -> `/new/:path*`. The source has to capture every parameter
+    # the destination substitutes, and the page the substitution lands on has
+    # to exist, the same as for a destination with no parameter at all.
+    if parameter_names(destination):
+        missing = [
+            name for name in parameter_names(destination) if name not in captures
+        ]
         if missing:
             return (
                 f"destination '{destination}' uses ':{missing[0]}', which "
                 f"source '{source}' does not capture"
             )
-        return None
+        target = resolve_destination(destination, captures)
+        if target is None:
+            return f"destination '{destination}' cannot be resolved from '{source}'"
+        if target in branch_pages:
+            return None
+        return (
+            f"destination '{destination}' resolves to '/{target}', "
+            f"which is not a page on {branch}"
+        )
     target = destination.split("?", 1)[0].rstrip("/").lstrip("/")
     if target in branch_pages:
         return None
@@ -225,7 +269,7 @@ def destination_problem(destination, source):
 gaps = []
 for path in removed:
     url = f"/{path}"
-    source = covering_source(url)
+    source, captures = covering_source(url)
     if source is None:
         # A near miss is worth naming: the ledger may hold the /index form.
         alt = f"{url.rstrip('/')}/index"
@@ -237,7 +281,7 @@ for path in removed:
         else:
             gaps.append(f"{url}: page removed on {branch}, no redirect in docs.json")
         continue
-    problem = destination_problem(by_source[source], source)
+    problem = destination_problem(by_source[source], source, captures)
     if problem:
         via = "" if source == url else f" (via '{source}')"
         gaps.append(f"{url}{via}: {problem}")
