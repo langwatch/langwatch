@@ -169,9 +169,6 @@ function harness(overrides?: {
       tryPipelineCommand: () => {
         throw new Error("the staged sender is supplied directly in this suite");
       },
-      tryEventStore: () => {
-        throw new Error("the identity ledger stages rather than storing directly");
-      },
     },
     stagedSender: async () => (overrides?.noSender ? null : sender),
     convergence: { timeoutMs: 40, pollMs: 5 },

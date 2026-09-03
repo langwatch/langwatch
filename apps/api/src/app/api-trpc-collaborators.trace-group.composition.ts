@@ -271,6 +271,19 @@ export type ApiTraceGroupCollaboratorsOptions = Readonly<{
   resolveClickHouseClient: ((tenantId: string) => Promise<ClickHouseClient>) | null;
   /** The share cache and the retention meter's counters; `null` runs both uncached. */
   redis: Parameters<typeof PostgresShareAdapter.create>[0]["redis"];
+  /**
+   * The process's fixed-window counter, for the ONE read the open internet can
+   * drive: `sharedTrace.get`, which costs five ClickHouse reads and a view
+   * write per call and carries no credential at all.
+   *
+   * Required rather than optional, and that is the point. The per-token and
+   * per-IP ceilings, the refusal and the customer copy all live in
+   * `@langwatch/trace-server`; the only thing a process supplies is the
+   * counter, so a process that composed this group has already decided it has
+   * one. An optional leaf here would let the surface mount with a stand-in
+   * that always allows, which is exactly the state this closed.
+   */
+  rateLimit: SharedTraceTrpcPorts["rateLimit"];
   /** The gateway this process composed, or none where it holds no cipher. */
   modelProviders: ModelProviderService | undefined;
   /** Names a refusal, so a stand-in says which process reached it. */
@@ -517,10 +530,10 @@ export function composeApiTraceGroupCollaborators(
           traceReads
             ? traceReads.tryGetShareViewerProtections(input)
             : Promise.reject(refuse("the share viewer's redactions")),
-        // The share read's own throttle is not composed on this process yet, so
-        // it does not throttle: refusing every anonymous read instead would
-        // take a working public surface off the air over a missing counter.
-        rateLimit: () => Promise.resolve({ allowed: true }),
+        // The PROCESS's counter, not a second one: the 60 reads a minute per
+        // share token and 120 per client address are Trace's numbers, and this
+        // is only where the process says which counter they are kept in.
+        rateLimit: options.rateLimit,
         getClientIp: (req) => clientIpOf(req),
         isTraceNotFound: (error) => traceReads?.isTraceNotFound(error) ?? false,
       } satisfies SharedTraceTrpcPorts,

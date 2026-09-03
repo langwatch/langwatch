@@ -56,18 +56,24 @@ Feature: The standalone API process dispatches commands and consumes none
 
   Rule: The identity ledgers write through this process's own registrations
 
-    # The two identity ledgers read an absent sender differently and neither
-    # reading is "nothing happened": the identity ledger THROWS, because the
-    # queued run is what appends its facts, and the join-request ledger throws
-    # too. So a pipeline this tier never registered is a write that arrives at
-    # the door and cannot leave.
+    # Every identity ledger STAGES and stops: the queued run re-executes the
+    # same guard the calling path ran and appends what it decides (ADR-110), so
+    # a calling path that appended as well would write every fact twice. All of
+    # them read an absent sender the same way, and it is not "nothing
+    # happened" — they THROW. So a pipeline this tier never registered is a
+    # write that arrives at the door and cannot leave.
+    #
+    # The join-request ledger was one correction behind and appended before
+    # staging. On a producer that append is refused by name, so every join verb
+    # failed at the door with a generic unknown error for a request the worker
+    # could have served.
 
     @integration
     Scenario: A join request command lands on this process's own event stack
       Given the API process registered the identity pipelines producer-only
       When somebody asks to join an organization open to their verified domain
-      Then the request's facts are appended before the call returns
-      And the join command is staged on the sender the registration produced
+      Then the join command is staged on the sender the registration produced, before the call returns
+      And this process appends nothing itself, because its event log refuses by name
       And the join lifecycle process manager is declined by name
 
     @integration

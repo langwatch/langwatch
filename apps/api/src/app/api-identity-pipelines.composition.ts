@@ -22,10 +22,10 @@
  * RUN the managers, by name, once at boot.
  *
  * `identity` declares no process manager at all and was simply never registered
- * on this process. That one was the sharper failure of the two, because
- * `IdentityLedgerWriter` does not append and then stage — the QUEUED RUN is
- * what appends — so with no sender its `stage` threw and every ceremony that
- * states an identifier fact failed outright.
+ * on this process. That one was the sharper failure of the two, because a
+ * ledger does not append and then stage — the QUEUED RUN is what appends — so
+ * with no sender its `stage` threw and every ceremony that states an identifier
+ * fact failed outright.
  *
  * ## One definition, two registrations
  *
@@ -42,18 +42,30 @@
  * the queue rejects an unroutable job for redelivery rather than dropping it —
  * so a fork here is a queue that grows forever while the pods stay up.
  *
- * ## What is still absent
+ * ## Nothing is appended here, and that is the design
  *
- * The DURABLE APPEND, for the one ledger that performs it itself.
- * `JoinRequestLedgerWriter.commit` appends the facts before staging the
- * command, and this process's event store is `EventStoreProducerOnly`, which
- * refuses `storeEvents` by name. Registering the pipeline is what makes the
- * staged send real; it does not give this process an event log. See the
- * absence report below, and the plan's ledger.
+ * All three ledgers STAGE and stop (ADR-110, ADR-116): the queued run re-runs
+ * the same guard the calling path ran and appends what it decides, so the
+ * calling path appending as well would write every fact twice. That is why a
+ * producer needs no event log — not a gap it is missing one. This process's
+ * store is `EventStoreProducerOnly` and refuses `storeEvents` by name, which
+ * is the structural half of the same ruling.
  *
- * `scim-sync` is deliberately NOT registered. Nothing on this process composes
- * `ScimSyncLedgerWriter`, so a registration would publish senders for commands
- * no surface here can make.
+ * `JoinRequestLedgerWriter` was one correction behind: it appended before
+ * staging, so on this tier every join verb failed at the door with an
+ * unhandled `ConfigurationError` — a generic "unknown error" for a request the
+ * worker could serve. It stages now, like its three siblings.
+ *
+ * ## `scim-sync` is NOT registered, and that costs something
+ *
+ * `api-scim.composition.ts` DOES compose `ScimSyncLedgerWriter` — on every
+ * deployment holding the Enterprise application — so this registration's
+ * absence is the reason a directory push records no history: the writer stages
+ * a command for which this process publishes no sender, says so at `error` by
+ * name, and lets the push through. Closing it needs a producer variant of the
+ * directory-sync pipeline in `@langwatch/identity-eventing`, beside the three
+ * below; the worker already registers and drains the consumer side
+ * (`ScimSyncWorkerFeatureInstaller`, unconditional).
  */
 import type { EventSourcing } from "@langwatch/eventing";
 import type { Logger } from "@langwatch/observability";
@@ -79,21 +91,12 @@ export abstract class ApiIdentityPipelinesAbsenceReport {
   /**
    * No Eventing: every identity, join-request and connection write refuses.
    *
-   * Named rather than silent because the two ledgers read an absent sender
-   * differently and neither reading is "nothing happened": the identity ledger
-   * throws, and the join-request ledger throws too.
+   * Named rather than silent because an absent sender is never "nothing
+   * happened": each ledger stages, and a staged command with no sender THROWS
+   * by name. A deployment reads that at boot rather than in one person's
+   * ceremony.
    */
   abstract withoutQueue(): void;
-
-  /**
-   * A queue but no event log: the join-request ledger's own durable append.
-   *
-   * Unlike the identity ledger, which lets the queued run append, this one
-   * appends itself before staging — and this process holds
-   * `EventStoreProducerOnly`, which refuses. Reported here rather than at the
-   * first request so a deployment reads it at boot.
-   */
-  abstract withoutDurableAppend(): void;
 }
 
 export type ApiIdentityPipelinesOptions = Readonly<{
@@ -152,8 +155,6 @@ export function composeApiIdentityPipelines(
     options.report?.withoutQueue();
     return ApiIdentityPipelines.create(new Map());
   }
-
-  options.report?.withoutDurableAppend();
 
   const senders = new Map<string, Map<string, ApiIdentityCommandSender>>();
   senders.set(
@@ -263,19 +264,19 @@ const SSO_CONNECTION_COMMAND_NAMES = [
 ] as const;
 
 /**
- * Names both identity-side absences once, at boot.
+ * Names the one identity-side absence, at boot.
  *
- * `warn` rather than `info` for the durable append, and the level is the
- * point: a deployment in that state accepts a join request at the door and
- * fails it in the ledger, which is a customer-visible failure rather than a
- * quiet degradation.
+ * `info` rather than `warn`: a deployment with no Redis has already been told
+ * it has no queue, and every write on these three pipelines refuses BY NAME
+ * when it is attempted. There is no second absence to report — a producer
+ * holding no event log is the ruling working, not a capability missing.
  */
 export class LoggedApiIdentityPipelinesAbsence extends ApiIdentityPipelinesAbsenceReport {
-  static create(logger: Pick<Logger, "info" | "warn">): LoggedApiIdentityPipelinesAbsence {
+  static create(logger: Pick<Logger, "info">): LoggedApiIdentityPipelinesAbsence {
     return new LoggedApiIdentityPipelinesAbsence(logger);
   }
 
-  private constructor(private readonly logger: Pick<Logger, "info" | "warn">) {
+  private constructor(private readonly logger: Pick<Logger, "info">) {
     super();
   }
 
@@ -283,13 +284,6 @@ export class LoggedApiIdentityPipelinesAbsence extends ApiIdentityPipelinesAbsen
     this.logger.info(
       { reason: "no-queue" },
       "API composed no Group Queue, so it registered no identity pipeline: attaching a sign-in method, asking to join an organization and every single sign-on connection command refuse by name",
-    );
-  }
-
-  withoutDurableAppend(): void {
-    this.logger.warn(
-      { reason: "producer-only-event-store" },
-      "API holds a producer-only event store, so the join-request ledger's own durable append refuses: the command is staged but the facts are not written by this process",
     );
   }
 }

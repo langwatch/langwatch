@@ -39,14 +39,9 @@ import {
   EventSourcing,
   type EventSourcedQueueDefinition,
   type EventSourcedQueueProcessor,
-  createTenantId,
+  EventStoreProducerOnly,
 } from "@langwatch/eventing";
-import { EventStoreMemory } from "@langwatch/eventing/testing";
-import { JOIN_REQUESTED_EVENT_TYPE } from "@langwatch/identity-contract";
-import {
-  JOIN_REQUEST_AGGREGATE_TYPE,
-  JOIN_REQUEST_LIFECYCLE_PROCESS_NAME,
-} from "@langwatch/identity-eventing";
+import { JOIN_REQUEST_LIFECYCLE_PROCESS_NAME } from "@langwatch/identity-eventing";
 import { IdentityEventingPort } from "@langwatch/identity-server";
 import type { OrganizationService } from "@langwatch/organization-contract";
 import type { PrismaClient } from "@langwatch/prisma-client/generated";
@@ -177,10 +172,6 @@ function testGrants() {
 /** No event stack: the identity ledger stages nothing, which nothing here needs. */
 class SilentEventing extends IdentityEventingPort {
   async tryPipelineCommand() {
-    return null;
-  }
-
-  async tryEventStore() {
     return null;
   }
 }
@@ -775,14 +766,23 @@ function joinRequestPrisma() {
 }
 
 /**
- * This process's own producer-only Eventing, over a fake event store and a
- * queue that records rather than runs.
+ * This process's own producer-only Eventing, in the shape production composes
+ * it: the REAL {@link EventStoreProducerOnly}, over a queue that records
+ * rather than runs.
+ *
+ * The store is the production one deliberately. This helper used to seat
+ * `EventStoreMemory` here and was named for the production shape without
+ * having it — which is precisely the substitution the producer-only store's
+ * own docblock warns about, and precisely why an append that could never
+ * succeed on this tier passed CI for as long as it did. A memory store accepts
+ * the append, holds the event in one process's heap and loses it; this one
+ * refuses by name, so a ledger that appends here fails the test rather than
+ * the deployment.
  *
  * The runtime is REAL: `composeApiIdentityPipelines` registers the packaged
  * `join-requests` definition on it, process manager and all, and the senders
  * the ledger stages through are the ones that registration produced. What is
- * faked is the two substrates a web process does not hold — the durable log and
- * Redis — so the test can observe what the ledger handed each of them.
+ * faked is Redis.
  *
  * The queue factory is what makes this a producer rather than an inline
  * executor. Without one, `send` runs the command handler in-process, and a
@@ -790,7 +790,7 @@ function joinRequestPrisma() {
  * consumer's work.
  */
 function producerEventing() {
-  const eventStore = EventStoreMemory.createForTesting();
+  const eventStore = EventStoreProducerOnly.create({ processName: "langwatch-api" });
   const staged: Array<{ queue: string; payload: Record<string, unknown> }> = [];
   const eventSourcing = new EventSourcing({
     enabled: true,
@@ -819,14 +819,14 @@ function producerEventing() {
     eventStore,
     staged,
     eventSourcing,
-    eventing: ApiEventingIdentityAdapter.create({ eventSourcing, pipelines }),
+    eventing: ApiEventingIdentityAdapter.create({ pipelines }),
   };
 }
 
 describe("given an API process that registered the identity pipelines producer-only", () => {
   describe("when somebody asks to join an organization open to their domain", () => {
     /** @scenario "A join request command lands on this process's own event stack" */
-    it("appends the request's facts and stages the command through the real /api/trpc handler", async () => {
+    it("stages the command through the real /api/trpc handler rather than appending here", async () => {
       const queue = producerEventing();
       const { application } = composeApplication({
         prismaClient: joinRequestPrisma(),
@@ -845,23 +845,19 @@ describe("given an API process that registered the identity pipelines producer-o
         result: { data: { json: { state: "PENDING" } } },
       });
 
-      // Leg one: the durable append. The ledger waits for it before returning,
-      // so a request that answered PENDING without one would be a request
-      // nothing could ever fold.
+      // The ONE leg this tier has: the staged command, on the sender the
+      // producer registration produced. The queued run re-executes the guard
+      // and appends what it decides (ADR-110), so a staged command IS the
+      // durable write from here — and the ledger waits for it before
+      // answering, so a request that came back PENDING without one would be a
+      // request nothing could ever fold.
+      //
+      // It is also the leg that answered `null` before the registration
+      // existed, which the ledger turns into "the pipeline exposes no
+      // \"requestJoin\" sender" — a write that arrived and could not leave.
       const requestId = (
         body as { result: { data: { json: { joinRequestId: string } } } }
       ).result.data.json.joinRequestId;
-      const appended = await queue.eventStore.getEvents(
-        requestId,
-        { tenantId: createTenantId(JOIN_ORGANIZATION_ID) },
-        JOIN_REQUEST_AGGREGATE_TYPE,
-      );
-      expect(appended.map((event) => event.type)).toEqual([JOIN_REQUESTED_EVENT_TYPE]);
-
-      // Leg two: the staged command, on the sender the producer registration
-      // produced. This is the leg that answered `null` before the registration
-      // existed, which the ledger turns into "the pipeline exposes no
-      // \"requestJoin\" sender" — a write that arrived and could not leave.
       expect(queue.staged).toHaveLength(1);
       expect(queue.staged[0]?.payload).toMatchObject({
         joinRequestId: requestId,
@@ -869,6 +865,14 @@ describe("given an API process that registered the identity pipelines producer-o
         userId: SESSION_USER.id,
         domain: JOIN_DOMAIN,
       });
+
+      // And nothing was appended HERE. The store is the production
+      // producer-only one, so an append on the calling path would have
+      // rejected and failed the whole ceremony — which is exactly what this
+      // tier did before the ledger was corrected.
+      await expect(
+        queue.eventStore.storeEvents([], { tenantId: JOIN_ORGANIZATION_ID } as never, "JoinRequest" as never),
+      ).rejects.toMatchObject({ name: "ConfigurationError" });
 
       await queue.eventSourcing.close();
     });

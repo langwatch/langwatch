@@ -1,4 +1,3 @@
-import type { EventSourcing } from "@langwatch/eventing";
 import { IdentityEventingPort } from "@langwatch/identity-server";
 import type { ApiIdentityPipelines } from "./api-identity-pipelines.composition";
 
@@ -23,30 +22,24 @@ import type { ApiIdentityPipelines } from "./api-identity-pipelines.composition"
  * arrives here and cannot leave.
  *
  * Absent is still a supported shape, and it is the empty registry: a
- * deployment with no queue registers nothing and both ledgers refuse by name,
+ * deployment with no queue registers nothing and every ledger refuses by name,
  * which is the honest answer for a process that cannot enqueue.
+ *
+ * There is no event store here, and there is no seam for one. Under ADR-110
+ * the queued run appends; this tier only sends. The adapter used to publish
+ * the process's store as well, which is how one ledger came to append on the
+ * calling path — against `EventStoreProducerOnly`, which refuses by name, so
+ * every join verb failed at the door.
  */
 export class ApiEventingIdentityAdapter extends IdentityEventingPort {
   static create(input: {
-    /**
-     * The runtime the event store is read off, where this process composed a
-     * queue.
-     *
-     * The runtime rather than the infrastructure that wraps it: what this
-     * needs is the store, and naming the infrastructure would make the adapter
-     * composable only where a real Redis exists.
-     */
-    eventSourcing: EventSourcing | undefined;
     /** The senders read out of this process's own producer registrations. */
     pipelines: ApiIdentityPipelines;
   }): ApiEventingIdentityAdapter {
-    return new ApiEventingIdentityAdapter(input.eventSourcing, input.pipelines);
+    return new ApiEventingIdentityAdapter(input.pipelines);
   }
 
-  private constructor(
-    private readonly eventSourcing: EventSourcing | undefined,
-    private readonly pipelines: ApiIdentityPipelines,
-  ) {
+  private constructor(private readonly pipelines: ApiIdentityPipelines) {
     super();
   }
 
@@ -55,25 +48,5 @@ export class ApiEventingIdentityAdapter extends IdentityEventingPort {
     command: string;
   }): Promise<{ send(data: unknown): Promise<unknown> } | null> {
     return Promise.resolve(this.pipelines.tryCommand(input));
-  }
-
-  tryEventStore<TEvent>(): Promise<{
-    storeEvents(
-      events: TEvent[],
-      context: { tenantId: never },
-      aggregateType: never,
-    ): Promise<unknown>;
-  } | null> {
-    const eventSourcing = this.eventSourcing;
-    if (!eventSourcing?.isEnabled) return Promise.resolve(null);
-    return Promise.resolve(
-      (eventSourcing.getEventStore as () => unknown)() as {
-        storeEvents(
-          events: TEvent[],
-          context: { tenantId: never },
-          aggregateType: never,
-        ): Promise<unknown>;
-      },
-    );
   }
 }

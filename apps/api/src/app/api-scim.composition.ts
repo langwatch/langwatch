@@ -39,24 +39,30 @@
  * replaces — an identity provider's nightly provisioning run would see fifteen
  * endpoints answering 500 and retry them forever.
  *
- * ## The directory-sync history degrades, by the package's own rule
+ * ## The directory-sync history degrades, and this is why
  *
  * `ScimSyncLifecycle` states what a push did on the connection's `ScimSync`
  * aggregate. Its guards are REAL here — they read the Postgres projection head
- * this process's connection already holds — and so is the ledger writer. What
- * this process does not hold is a DURABLE APPEND: its event store is
- * producer-only, so `storeEvents` refuses and `ScimSyncLedgerWriter` logs the
- * miss and returns rather than failing the push. That degradation is the
- * package's own, written down in its docblock: what the customer is owed is
- * the membership consequence, which travels the grants ledger and is durable
- * before the history is attempted. Supplying a hand-written no-op instead
- * would hide the same fact behind a stub that starts lying the day this
- * process gains an event log.
+ * this process's connection already holds — and so is the ledger writer, which
+ * stages its command and lets the queued run append (ADR-110). What this
+ * process does not do is REGISTER `scim-sync` on its eventing, so there is no
+ * sender to stage through: the writer says so at `error`, naming the missing
+ * pipeline, and lets the push through. Every directory-sync fact is therefore
+ * lost on this deployment for as long as that holds — not transiently, and not
+ * because an event stack is down.
  *
- * `scim-sync` stays UNREGISTERED on this process's eventing for the reason
- * `api-identity-pipelines.composition.ts` gives, and now for a sharper one:
- * the writer stages a command only after the append it never reaches, so a
- * registration would publish five senders nothing here can call.
+ * That is a smaller and sharper absence than the one this docblock used to
+ * name. The writer no longer attempts a durable append it could never
+ * complete; what is left is one registration. The worker already registers and
+ * drains the consumer side unconditionally
+ * (`ScimSyncWorkerFeatureInstaller`), so closing it means adding a producer
+ * variant of the directory-sync pipeline beside the three
+ * `api-identity-pipelines.composition.ts` registers.
+ *
+ * What the customer is owed either way is the membership consequence, which
+ * travels the grants ledger and is durable before the history is attempted.
+ * Supplying a hand-written no-op ledger instead would hide the same fact
+ * behind a stub that starts lying the day the registration lands.
  */
 import type { AuthService } from "@langwatch/auth-contract";
 import type { AuthzGrantsService } from "@langwatch/authz-contract";

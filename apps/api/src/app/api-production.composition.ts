@@ -2446,11 +2446,9 @@ export class ApiProductionComposition extends ApiRuntimeCompositionPort {
       report: LoggedApiIdentityPipelinesAbsence.create(createLogger(options.config.serviceName)),
     });
     // Held on the composition as well as handed down: the SCIM directory-sync
-    // history appends through the SAME runtime and the same producer
-    // registrations, and a second adapter would resolve senders out of a
-    // second registry.
+    // history stages through the SAME producer registrations, and a second
+    // adapter would resolve senders out of a second registry.
     const identityEventing = ApiEventingIdentityAdapter.create({
-      eventSourcing: this.composedEventing?.eventSourcing,
       pipelines: identityPipelines,
     });
     this.composedIdentityEventing = identityEventing;
@@ -2787,6 +2785,12 @@ export class ApiProductionComposition extends ApiRuntimeCompositionPort {
       // The SAME Redis the queue owns, which presence and the broadcast fan-out
       // already ride.
       redis: queueInfrastructure?.redis ?? null,
+      // The process's ONE counter, the same instance the unsubscribe family
+      // and every metered REST door consume: two limiters would give one share
+      // token two budgets for one rule. This is what makes the anonymous share
+      // read's 60-per-token and 120-per-address ceilings real rather than
+      // declared — the refusal, its code and its copy already exist.
+      rateLimit: (input) => this.rateLimiter.consume(input),
       modelProviders: this.resolveModelProviders(options, encryption),
       processName: options.config.serviceName,
       ...(this.options.traceReads ? { traceReads: this.options.traceReads } : {}),

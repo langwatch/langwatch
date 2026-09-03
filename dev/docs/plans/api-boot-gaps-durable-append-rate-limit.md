@@ -559,3 +559,165 @@ and that should be checked before treating the share-link path as fully exposed.
 Neither item appears in `core-application-exit-decisions-for-review.md`. Both
 belong there.
 
+
+---
+
+## Ledger — 2026-09-03, both lane-sized closures landed
+
+Two closures, exactly as this brief scoped them, plus two things the audit did
+not have and the work surfaced. Nothing composed a ClickHouse event store on the
+API; the brief recommends against it and the repair went the other way.
+
+### 1. The anonymous share read now meters through the process's counter
+
+```
+BEFORE
+
+  anonymous, no credential
+    │  no header the process ever reads
+    ▼   sharedTrace.get                       (tRPC, public procedure)
+  enforceShareReadLimit             shared-trace.api.ts:147
+    │  60/min per share token ─┐
+    │  120/min per address     │   never built: getClientIp(ctx.req)
+    │                          │   answers undefined, because
+    │                          │   ApiApplication pins ctx.req = undefined
+    │                          ▼
+    │        rateLimit ──► () => ({ allowed: true })      ◄── STUB, silent
+    ▼
+  resolve share ─► 5 ClickHouse reads + a view write, unbounded
+                   and every refresh burns a view (no viewer hash either)
+
+
+AFTER
+
+  anonymous, no credential
+    │  x-forwarded-for
+    ▼   sharedTrace.get
+  enforceShareReadLimit
+    │  ├─ rateLimit({ sharedTrace:token:<t>, 60s, 60 })  ─┐
+    │  └─ rateLimit({ sharedTrace:ip:<addr>, 60s, 120 })  │
+    │                                                     ▼
+    │        options.rateLimit  ──►  ApiRateLimitInfrastructure
+    │        (api-production.composition.ts, the ONE counter)  ──► Redis
+    ▼
+  over budget ─► 429 share_read_rate_limited, the copy already written
+  under budget ─► the share payload
+```
+
+| File | What changed |
+| --- | --- |
+| `apps/api/src/app/api-trpc-collaborators.trace-group.composition.ts` | `rateLimit` is now a **required** option on `ApiTraceGroupCollaboratorsOptions` and is what `ports.sharedTrace.rateLimit` is. Required rather than optional on purpose: an optional leaf is how the always-allow stand-in got in |
+| `apps/api/src/app/api-production.composition.ts` | Passes `rateLimit: (input) => this.rateLimiter.consume(input)` — the same one-line shape `composeUnsubscribe` uses, so one token gets one budget |
+| `apps/api/src/api.application.ts` | `withServices` takes the `Request` and fills `ctx.req` with its headers instead of pinning `undefined`. `createCaller` still gets `undefined`, which is honest — it has no request |
+| `apps/api/src/app/__tests__/api-trpc-collaborators.trace-group.integration.test.ts` | New suite, four tests, over the REAL composed port and a real `ApiRateLimitInfrastructure`, driven through the real `/api/trpc` handler |
+| `specs/server/api-process-anonymous-share-read.feature` | New; two `@integration` scenarios, both bound |
+
+**The second half nobody had named.** Wiring the counter alone would have closed
+only the per-token ceiling. `ApiApplication.withServices` pinned `req: undefined`
+with a docblock about the hosted edge's geo headers — true of the CURRENCY
+surface it was written for, and wrong for the context as a whole. `sharedTrace`
+resolves the caller's address off exactly that member, so the 120-a-minute limit
+could never fire, and the `sha256(ip|user-agent)` viewer hash that collapses one
+person's refreshes into a single viewing was always `undefined` — which the
+transport documents as "every request counts as a viewing", i.e. every refresh
+burned a view off the link's cap. Both are fixed by the same three lines.
+
+**Sabotage-checked, twice.** Restoring `rateLimit: () => Promise.resolve({
+allowed: true })` fails two of the four tests (the metering assertion and the
+refusal); re-pinning `req: undefined` fails the metering assertion on its own.
+
+**Still open, unchanged and deliberately:** `withoutRateLimit` on
+`api-secret-rest.feature.ts` stays declared — four authenticated base paths, and
+the budget question the brief names is a product decision. The 351
+`SecuredApp.access(...)` registrations still cannot reach the framework limiter.
+
+### 2. The join-request ledger stages; the worker appends
+
+```
+BEFORE                                    AFTER
+
+  joinRequests.request                      joinRequests.request
+    │                                         │
+    ▼                                         ▼
+  JoinRequestLedgerWriter.commit            JoinRequestLedgerWriter.commit
+    │                                         │
+    ├─ 1. eventStore.storeEvents()  ╳         ├─ 1. stage(command) ──► event-sourcing/jobs
+    │      EventStoreProducerOnly             │                              │
+    │      → ConfigurationError               │                              ▼
+    │      (not HandledError, so the          │                        apps/worker
+    │       browser reads "unknown            │                          │ re-runs guards
+    │       error" + a trace id)              │                          │ appends to event_log
+    │                                         └─ 2. awaitFold ◄───────────┘ folds Postgres
+    ├─ 2. stage(command)   ── never ran
+    └─ 3. awaitFold(...)   ── never ran
+```
+
+| File | What changed |
+| --- | --- |
+| `packages/features/identity/server/src/adapters/join-request-ledger.adapter.ts` | The append, its resolver and the `eventStore` dep are gone; `commit` is `stage` then `awaitFold`. `stagedSender` is now **async**, which fixed a second defect: the old `stagedSenderVia` always returned a non-null wrapper whose `send` resolved to `undefined` for an unregistered pipeline, so the "no sender" refusal was dead code and the command was dropped **silently** |
+| `packages/features/identity/server/src/ports/identity-eventing.port.ts` | `tryEventStore` deleted. After both ledgers were corrected nothing called it, and leaving the seam is how a ledger walks back into appending on a producer |
+| `apps/api/src/app/api-identity-eventing.adapter.ts` | Its `tryEventStore` and the `eventSourcing` constructor arg go with it |
+| `apps/api/src/app/api-identity-pipelines.composition.ts` | `withoutDurableAppend` deleted — abstract method, call site and logger leg. It had no other subject. The backwards warn text (it claimed the command was staged and only the facts lost; the append ran FIRST, so nothing was staged) is gone with it |
+| `apps/api/src/app/__tests__/api-trpc-collaborators.identity.composition.integration.test.ts` | `producerEventing()` now seats the real `EventStoreProducerOnly`, not `EventStoreMemory`. That substitution is why "leg one: the durable append" passed CI against an append that could never succeed. "Leg one" is now the staged command, and the suite asserts the store still refuses |
+| new: `.../adapters/__tests__/join-request-ledger.adapter.unit.test.ts` | Six tests; the writer had none at all |
+| `specs/server/api-process-eventing.feature` | The join-request scenario said "the request's facts are appended before the call returns". It now says staged, and that this process appends nothing |
+
+### 3. SCIM directory-sync history: the writer is corrected, one registration is not
+
+`ScimSyncLedgerWriter` had the same append-then-stage shape and the same
+guaranteed failure, swallowed at `error` as "could not record a directory sync
+fact". It now stages only.
+
+That does **not** restore the history on its own, and the reason is now the only
+one left: `apps/api` registers `identity`, `join-requests` and `sso-connections`
+producer-only and **not** `scim-sync`, so there is no sender to stage through.
+The writer therefore says exactly that, at `error`, naming the pipeline and the
+command, and lets the push through — the package's rule that a push must never
+fail for its bookkeeping is unchanged.
+
+| File | What changed |
+| --- | --- |
+| `packages/features/identity/server/src/adapters/eventing.scim-sync-ledger.adapter.ts` | The append and its `eventStore()` helper are gone; `commit` stages. The absent-sender path moved from `warn` "appended but not staged" (which was false in both halves) to `error`, naming the pipeline, the sender and what is lost until it exists |
+| `apps/api/src/app/api-scim.composition.ts` | Its docblock explained the loss as a missing durable append. It now names the missing registration, and says the worker's consumer side is already there |
+| new: `.../adapters/__tests__/eventing.scim-sync-ledger.adapter.unit.test.ts` | Five tests: it stages on the registered sender, it resolves the sender by the verb, it lets the push through when there is none, and it logs the loss at `error` with the pipeline and sender named |
+
+**The exact remaining piece, and it is one registration:**
+
+1. `packages/identity-eventing/src/adapters/producer.identity-pipelines.adapter.ts`
+   — add `createScimSyncProducerPipeline({ processName })`, the fourth sibling of
+   the three already there: `createScimSyncPipeline` with a
+   `ProducerOnlyStateProjectionStore<ScimSyncFoldState>` and
+   `new ScimSyncGuards({ syncs: producerOnlyReads<ScimSyncReadRepository>(…) })`.
+   No process manager to decline — `scim-sync` declares none.
+2. Export it from `packages/identity-eventing/src/index.ts`, beside the other
+   three.
+3. `apps/api/src/app/api-identity-pipelines.composition.ts` — a fourth
+   `senders.set(SCIM_SYNC_PIPELINE_NAME, resolveSenders({…}))` with the five
+   command names (`issueScimToken`, `recordScimUserPush`,
+   `recordScimGroupMapping`, `recordScimApplyFailure`, `revokeScimSync`).
+4. `packages/identity-eventing/src/adapters/__tests__/producer.identity-pipelines.adapter.unit.test.ts`
+   — the fourth case.
+
+The consumer side needs nothing: `ScimSyncWorkerFeatureInstaller` is registered
+**unconditionally** at `apps/worker/src/app/worker-production.composition.ts:1382`
+and `scim-sync` is in the checked-in `job-registry.json`, so a staged command has
+a drain the moment a sender exists. Steps 1, 2 and 4 are in
+`packages/identity-eventing`, which was outside this lane; step 3 is not, but
+alone it does nothing.
+
+Two contradicting docblocks are corrected either way:
+`api-identity-pipelines.composition.ts` no longer claims "nothing on this process
+composes `ScimSyncLedgerWriter`" (`api-scim.composition.ts:198` does, on every
+Enterprise deployment), and `api-scim.composition.ts` no longer explains the loss
+as a missing durable append.
+
+### What this leaves in the two rows above
+
+| Row | Now |
+| --- | --- |
+| `withoutDurableAppend` | **CLOSED and deleted.** Not by composing a store — by finishing ADR-110 for the fourth ledger. The absence no longer exists, so nothing is logged at boot |
+| `withoutRateLimit` | **UNCHANGED, still declared.** The larger hole beside it — the anonymous share read — is closed. The budget decision it waits on is still Alex's |
+
+`core-application-feature-extraction-plan.md` still carries the old
+`withoutDurableAppend` rows (lines 7943, 8015, 12942, 13825); that file belongs
+to another lane and was not touched.

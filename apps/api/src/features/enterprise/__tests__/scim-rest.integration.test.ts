@@ -457,11 +457,11 @@ function scimWorld(overrides: { planType?: string; webhookSecret?: string | unde
         return Promise.resolve({ type: overrides.planType ?? "ENTERPRISE" });
       },
     } as never,
-    // No queue on this composition: the directory-sync history says so and
-    // returns rather than failing the push, which is the package's own rule.
+    // No queue on this composition: the directory-sync history says so, at
+    // `error` and by name, and returns rather than failing the push — which is
+    // the package's own rule.
     eventing: {
       tryPipelineCommand: () => Promise.resolve(null),
-      tryEventStore: () => Promise.resolve(null),
     } as never,
     provenOffboarding: false,
     auth0WebhookSecret: "webhookSecret" in overrides ? overrides.webhookSecret : WEBHOOK_SECRET,

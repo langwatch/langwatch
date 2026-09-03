@@ -1,12 +1,18 @@
 /**
  * The directory-sync ledger writer: the app's implementation of
  * `@langwatch/identity-server`'s ScimSyncLedger, in the shape the identity,
- * grants and connection ledgers already have (ADR-110, ADR-101):
+ * grants, connection and join-request ledgers already have (ADR-110):
  *
- *   1. the durable ClickHouse append, WAITED — the fact lands before the
- *      caller returns;
- *   2. the command staged onto the per-sync GroupQueue, awaited — the fold is
- *      the queue's, and nothing here applies a projection itself.
+ *   1. the command staged onto the per-sync GroupQueue — the queued run is what
+ *      APPENDS, re-running the same guard the calling path ran.
+ *
+ * That is the whole of it. This writer used to append to the durable log here
+ * and stage afterwards, ADR-101's original order, which ADR-110 corrected for
+ * every sibling: the queued run re-executes `guards[verb]` and states the same
+ * facts, so appending on the calling path writes each one twice. It also could
+ * not work where it runs — the tier a directory's push arrives at is a
+ * producer, whose event store refuses `storeEvents` by name — so the append
+ * was a guaranteed failure that took the whole history down with it.
  *
  * NO read-your-writes wait, unlike the connection ledger. Nothing on the SCIM
  * request path reads this projection back: the endpoints answer from Postgres
@@ -20,6 +26,13 @@
  * cannot land is logged and swallowed. The opposite choice — refusing a push
  * whose bookkeeping failed — would turn an event-stack blip into a directory
  * outage.
+ *
+ * The swallow is LOUD and NAMES THE MISSING PIECE. A process that composes
+ * this writer without registering the `scim-sync` pipeline on its own eventing
+ * has no sender to stage through, and then every push's history is lost for as
+ * long as that is true — permanently, not transiently. The log line says which
+ * registration is absent, at `error`, so the state is read as the composition
+ * defect it is rather than as an event-stack blip that will clear.
  *
  * Like the identity ledger, the pipeline handle is resolved lazily off the
  * App: a bare script that never composes one must still be able to import
@@ -38,13 +51,7 @@ import {
 import type { ScimSyncLedger } from "../scim-sync-ledger";
 import type { IdentityEventingPort } from "../ports/identity-eventing.port";
 import { createLogger } from "@langwatch/observability";
-import { type AggregateType, createTenantId, type EventStore } from "@langwatch/eventing";
-import {
-  SCIM_SYNC_AGGREGATE_TYPE,
-  SCIM_SYNC_PIPELINE_NAME,
-  type ScimSyncEvent,
-  scimSyncEventsFor,
-} from "@langwatch/identity-eventing";
+import { SCIM_SYNC_PIPELINE_NAME } from "@langwatch/identity-eventing";
 
 const logger = createLogger("langwatch:identity:scim-sync-ledger");
 
@@ -62,9 +69,9 @@ const SENDER_NAME_BY_COMMAND: Record<ScimSyncCommandType, string> = {
 
 export interface ScimSyncLedgerWriterDeps {
   /**
-   * The process's event stack. Both handles are resolved per call, and both
-   * may be absent: a deployment can run with the stack disabled, and the
-   * ledger says so rather than refusing the directory's push.
+   * The process's event stack. The command handle is resolved per call and may
+   * be absent: a deployment can run with the stack disabled, and the ledger
+   * says so rather than refusing the directory's push.
    */
   eventing: IdentityEventingPort;
 }
@@ -74,12 +81,6 @@ export class ScimSyncLedgerWriter implements ScimSyncLedger {
 
   constructor(deps: ScimSyncLedgerWriterDeps) {
     this.eventing = deps.eventing;
-  }
-
-  private eventStore(): Promise<EventStore<ScimSyncEvent> | null> {
-    return this.eventing.tryEventStore<ScimSyncEvent>() as Promise<
-      EventStore<ScimSyncEvent> | null
-    >;
   }
 
   private stagedSender(name: string): Promise<ScimSyncStagedSender | null> {
@@ -96,25 +97,14 @@ export class ScimSyncLedgerWriter implements ScimSyncLedger {
     command: ScimSyncCommand;
     facts: ScimSyncFactInput[];
   }): Promise<void> {
-    const events = scimSyncEventsFor({ command, facts });
-    if (events.length === 0) return;
-    const { scimSyncId, connectionId, tenantId } = command.data;
+    // A guard that stated nothing has nothing to stage. The envelope itself is
+    // the queued run's to stamp now that it is the sole appender, so this asks
+    // the facts rather than building events it would only count.
+    if (facts.length === 0) return;
+    const { scimSyncId, connectionId } = command.data;
 
     try {
-      const eventStore = await this.eventStore();
-      if (!eventStore) {
-        logger.warn(
-          { scimSyncId, connectionId, commandType: command.type },
-          "directory sync history not recorded: the event-sourcing stack is unavailable",
-        );
-        return;
-      }
-      await eventStore.storeEvents(
-        events,
-        { tenantId: createTenantId(tenantId) },
-        SCIM_SYNC_AGGREGATE_TYPE as AggregateType,
-      );
-      await this.stage({ command });
+      await this.stage({ command, scimSyncId, connectionId });
     } catch (error) {
       // Swallowed on purpose, and loudly. The membership consequence this is
       // the bookkeeping for has already landed through the grants ledger; the
@@ -127,17 +117,37 @@ export class ScimSyncLedgerWriter implements ScimSyncLedger {
     }
   }
 
+  /**
+   * The command handed to the queue, which is where the append happens.
+   *
+   * An absent sender is NOT a transient and is not logged as one: it means
+   * this process composed the writer without registering `scim-sync` on its
+   * own eventing, so every push's history is lost for as long as that holds.
+   * The line names the pipeline and the command so the missing registration is
+   * the first thing read, rather than "the stack is unavailable" — which it is
+   * not.
+   */
   private async stage({
     command,
+    scimSyncId,
+    connectionId,
   }: {
     command: ScimSyncCommand;
+    scimSyncId: string;
+    connectionId: string;
   }): Promise<void> {
     const senderName = SENDER_NAME_BY_COMMAND[command.type];
     const sender = await this.stagedSender(senderName);
     if (!sender) {
-      logger.warn(
-        { commandType: command.type, senderName },
-        "directory sync fact appended but not staged: the pipeline exposes no sender for it",
+      logger.error(
+        {
+          scimSyncId,
+          connectionId,
+          commandType: command.type,
+          pipeline: SCIM_SYNC_PIPELINE_NAME,
+          senderName,
+        },
+        `directory sync history not recorded: this process registered no "${SCIM_SYNC_PIPELINE_NAME}" pipeline, so there is no "${senderName}" sender to stage through. The push itself is unaffected; every directory-sync fact is lost until the pipeline is registered on this process's eventing.`,
       );
       return;
     }

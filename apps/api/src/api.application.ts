@@ -500,6 +500,18 @@ export class ApiApplication {
     return this.trpc.createCaller(this.withServices(context));
   }
 
+  /**
+   * The request's headers as a plain record, which is the shape every surface
+   * that reads `ctx.req` expects.
+   *
+   * A `Headers` instance would satisfy the type and answer `undefined` to
+   * every lookup, because those surfaces index it rather than calling `get`.
+   * Lowercased by `Headers` itself, which is what the lookups assume.
+   */
+  private static headersOf(request: Request): Record<string, string> {
+    return Object.fromEntries(request.headers);
+  }
+
   private requireServices(): ApiServices {
     return {
       agents: this.services.agents ?? ApiApplication.unavailableAgents,
@@ -507,7 +519,7 @@ export class ApiApplication {
     };
   }
 
-  private withServices(context: ApiRequestContext): ApiTrpcContext {
+  private withServices(context: ApiRequestContext, request?: Request): ApiTrpcContext {
     return {
       ...context,
       can: context.can ?? (async () => false),
@@ -521,9 +533,23 @@ export class ApiApplication {
       signal: undefined,
       // Written by the operator check when one runs; absent says it did not.
       opsScope: undefined,
-      // The hosted edge's geo headers, which this process never sees and never
-      // quotes a currency from.
-      req: undefined,
+      /**
+       * The incoming request's headers, where one arrived.
+       *
+       * Pinned to `undefined` until now, on the reasoning that this process
+       * never sees the hosted edge's geo headers and quotes no currency from
+       * them. That was true of the CURRENCY surface and wrong for the context
+       * as a whole: `sharedTrace.get` — the one read the open internet can
+       * drive — resolves the caller's address off exactly this member, for
+       * its per-address ceiling and for the hash that collapses one viewer's
+       * refreshes into a single viewing. With `req` absent both fell back to
+       * "no address", so the 120-a-minute limit could never fire and every
+       * refresh burned a view.
+       *
+       * `undefined` remains for `createCaller`, which has no request at all —
+       * the two surfaces that read it already answer for an absent one.
+       */
+      req: request ? { headers: ApiApplication.headersOf(request) } : undefined,
       app: {
         ...this.requireServices(),
         ...(this.features?.application ?? unavailableFeatureApplication),
@@ -580,7 +606,7 @@ export class ApiApplication {
         endpoint,
         req: request,
         router: this.trpc,
-        createContext: async () => this.withServices(await http.createContext(request)),
+        createContext: async () => this.withServices(await http.createContext(request), request),
       });
     const hono = new Hono();
     hono.onError(async (error, context) => {
@@ -603,7 +629,7 @@ export class ApiApplication {
           // On the context AND in the caller's options: a subscription
           // procedure reads whichever its own transport gives it, and only the
           // context reaches one resolved through a v10-shaped caller.
-          { ...this.withServices(await http.createContext(request)), signal },
+          { ...this.withServices(await http.createContext(request), request), signal },
           signal ? { signal } : {},
         ),
     });

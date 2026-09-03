@@ -37,7 +37,9 @@ import { ApiTrpcFeaturesComposition } from "../api-trpc-features.composition";
 import {
   composeApiTraceGroupCollaborators,
   LoggedApiTraceGroupAbsence,
+  type ApiTraceReadStackPort,
 } from "../api-trpc-collaborators.trace-group.composition";
+import { ApiRateLimitInfrastructure } from "../../platform/infrastructure/api-rate-limit.infrastructure";
 import { resolveDataPrivacy } from "@langwatch/data-privacy-contract";
 import { composeApiModelProviderHost } from "../api-model-provider-host.composition";
 import { composeApiStudioHost } from "../api-studio-host.composition";
@@ -643,6 +645,9 @@ describe("given a process that composed no trace read stack", () => {
       defaultRetentionDays: 49,
       resolveClickHouseClient: null,
       redis: null,
+      // Permissive here on purpose: this suite is about what a process with no
+      // read stack REFUSES. The counter's own behaviour is the last suite.
+      rateLimit: async () => ({ allowed: true }),
       modelProviders: undefined,
       processName: "langwatch-api",
       ...(report ? { report } : {}),
@@ -767,6 +772,9 @@ describe("given an API process that composed the real observability collaborator
       defaultRetentionDays: 49,
       resolveClickHouseClient: clickHouse.resolveClient,
       redis: null,
+      // As above: this suite drives the ClickHouse reads, not the anonymous
+      // share read's throttle.
+      rateLimit: async () => ({ allowed: true }),
       modelProviders: undefined,
       processName: "langwatch-api",
       traceReadsFrom: ({ dataRetention, topics }) =>
@@ -1055,6 +1063,263 @@ describe("given an API process that composed the real observability collaborator
         code: "service_unavailable",
         meta: { capability: "the studio event dispatch" },
       });
+    });
+  });
+});
+
+/**
+ * The anonymous share read, over the counter this process actually keeps.
+ *
+ * `sharedTrace.get` is the ONE trace read the open internet can drive: no
+ * credential, five ClickHouse reads and a view write per call. Trace owns the
+ * ceilings (60 reads a minute per share token, 120 per client address), the
+ * refusal and the customer copy; the process owns only the counter they are
+ * kept in. This suite drives the real `/api/trpc` handler over the REAL
+ * composed port, so a stand-in that answered "allowed" without counting —
+ * which is what this process shipped — fails it.
+ */
+describe("given the anonymous share read composed on this process", () => {
+  /** How many token-scoped reads a minute the transport allows. */
+  const READS_PER_TOKEN_PER_MINUTE = 60;
+  /** The address the caller presents, as a proxy forwards it. */
+  const CLIENT_IP = "203.0.113.7";
+
+  /**
+   * A payload the share output contract accepts, so a read that gets past the
+   * counter ANSWERS rather than failing somewhere further down and leaving
+   * "not rate limited" indistinguishable from "broken".
+   */
+  const sharedTracePayload = () => ({
+    project: {
+      id: "project-1",
+      name: "Project",
+      slug: "project",
+      language: "python",
+      framework: "openai",
+    },
+    header: {
+      traceId: "trace-1",
+      timestamp: 1_700_000_000_000,
+      name: "trace",
+      serviceName: "svc",
+      origin: "api",
+      conversationId: null,
+      userId: null,
+      durationMs: 10,
+      spanCount: 1,
+      status: "ok" as const,
+      models: [],
+      totalCost: null,
+      totalTokens: 0,
+      inputTokens: null,
+      outputTokens: null,
+      tokensEstimated: false,
+      traceName: "trace",
+      rootSpanType: null,
+      scenarioRunId: null,
+      attributes: {},
+    },
+    spanTree: [],
+    spansFull: [],
+    spanSignals: [],
+    resources: { rootSpanId: null, resourceAttributes: {}, scope: null, spans: [] },
+    events: [],
+    evaluations: [],
+    isSpanDetailTruncated: false,
+  });
+
+  /**
+   * A read stack that answers the two things the share path asks of one — the
+   * viewer's redactions and the mapper ports — and refuses everything else by
+   * name. The ClickHouse fan-out itself is not what this suite is about.
+   */
+  function shareReadStack(): ApiTraceReadStackPort {
+    return stub<ApiTraceReadStackPort>("traceReads", {
+      readers: () => testTraceReaders(),
+      legacyPorts: () => ({
+        listInputSchema: anySchema,
+        filterInputSchema: anySchema,
+        evaluatorTypeSchema: anySchema,
+        preconditionSchema: anySchema,
+      }),
+      readPorts: () => ({ mappers: {} }),
+      explorerPorts: () => ({}),
+      editOverlayRedaction: () => ({}),
+      getViewerProtections: async () => ({ visibilityCutoffMs: null, canSeeCosts: true }),
+      tryGetShareViewerProtections: async () => ({
+        visibilityCutoffMs: null,
+        canSeeCosts: true,
+      }),
+      isTraceNotFound: () => false,
+    });
+  }
+
+  /**
+   * The record with the share read composed over a real
+   * {@link ApiRateLimitInfrastructure} — no Redis, so it counts in memory,
+   * which is the same arithmetic the Redis path performs.
+   */
+  function composeShareApplication() {
+    const limiter = ApiRateLimitInfrastructure.create();
+    const metered: Array<{ key: string; windowSeconds: number; max: number }> = [];
+    const { broadcast } = testBroadcast();
+    const group = composeApiTraceGroupCollaborators({
+      prisma: testPrisma(),
+      authz: testAuthz(),
+      grants: stub<AuthzGrantsService>("grants"),
+      projects: stub<ProjectService>("projects"),
+      organizations: stub("organizations"),
+      broadcast,
+      defaultRetentionDays: 49,
+      resolveClickHouseClient: null,
+      redis: null,
+      // The shape `api-production.composition.ts` passes: the process's ONE
+      // counter, reached through the same one-line lambda.
+      rateLimit: (input) => {
+        metered.push(input);
+        return limiter.consume(input);
+      },
+      modelProviders: undefined,
+      processName: "langwatch-api",
+      traceReads: shareReadStack(),
+    });
+
+    // The share resolution and the cached payload are the application's, not
+    // the group's: what this suite drives is everything the transport does
+    // BEFORE them, which is the throttle.
+    const traces = group.traces as unknown as Record<string, unknown>;
+    Object.assign(traces, {
+      resolveShareForViewer: async () => ({
+        resourceType: "TRACE",
+        projectId: "project-1",
+        resourceId: "trace-1",
+      }),
+      readCachedSharePayload: async () => sharedTracePayload(),
+    });
+
+    const collaborators = {
+      ...testCollaborators(broadcast),
+      traceGroup: group.ports,
+      application: {
+        ...testApplication(broadcast),
+        traces,
+      } as unknown as ApiTrpcFeatureApplication,
+    } as AnyApiTrpcCollaborators;
+
+    const features = ApiTrpcFeaturesComposition.tryCompose({
+      database: { client: {} as unknown as PrismaClient } as unknown as PrismaConnection,
+      authz: testAuthz(),
+      audit: undefined,
+      collaborators,
+    });
+    if (!features) throw new Error("the record refused to compose against its collaborators");
+
+    return {
+      metered,
+      application: ApiApplication.create({
+        features,
+        http: {
+          createContext: async () => ({
+            actor: () => ({ id: "user-1" }),
+            tryActor: () => undefined,
+            authorize: async () => undefined,
+            // No session at all: this is the surface an anonymous viewer hits.
+            session: null,
+          }),
+        },
+      }),
+    };
+  }
+
+  /**
+   * One anonymous read, over the wire.
+   *
+   * The address rides as a header rather than being injected into the context,
+   * because the header is the only place it can come from: `ctx.req` is built
+   * by the application from the real request.
+   */
+  async function readShare(
+    application: ApiApplication,
+    token: string,
+    clientIp?: string,
+  ): Promise<{ status: number; body: unknown }> {
+    if (!application.hono) throw new Error("HTTP composition was not created.");
+    const encoded = encodeURIComponent(JSON.stringify({ json: { token } }));
+    const response = await application.hono.request(
+      `http://127.0.0.1/api/trpc/sharedTrace.get?input=${encoded}`,
+      clientIp ? { headers: { "x-forwarded-for": clientIp } } : {},
+    );
+    return { status: response.status, body: await response.json() };
+  }
+
+  /**
+   * The handled error's code as the wire carries it, or `null` where the call
+   * succeeded. superjson wraps every payload, errors included, so the
+   * serialized handled error sits under `error.json.data.error`.
+   */
+  function handledCodeOf(body: unknown): string | null {
+    return (
+      (body as { error?: { json?: { data?: { error?: { code?: string } } } } }).error?.json?.data
+        ?.error?.code ?? null
+    );
+  }
+
+  describe("when a share link is opened inside its window", () => {
+    /** @scenario "An anonymous share read is metered against the process's own counter" */
+    it("answers the share payload rather than refusing", async () => {
+      const { application } = composeShareApplication();
+
+      const { status, body } = await readShare(application, "share-token-1", CLIENT_IP);
+
+      expect(status).toBe(200);
+      expect(body).toMatchObject({
+        result: { data: { json: { header: { traceId: "trace-1" } } } },
+      });
+    });
+
+    /** @scenario "An anonymous share read is metered against the process's own counter" */
+    it("counts the read against both the share token and the caller's address", async () => {
+      const { application, metered } = composeShareApplication();
+
+      await readShare(application, "share-token-1", CLIENT_IP);
+
+      expect(metered).toEqual([
+        { key: "sharedTrace:token:share-token-1", windowSeconds: 60, max: 60 },
+        { key: `sharedTrace:ip:${CLIENT_IP}`, windowSeconds: 60, max: 120 },
+      ]);
+    });
+  });
+
+  describe("when one share token is read past its per-minute ceiling", () => {
+    /** @scenario "A share link read past its ceiling is refused with the code its copy is written for" */
+    it("refuses with share_read_rate_limited once the token's window is spent", async () => {
+      const { application } = composeShareApplication();
+
+      for (let read = 0; read < READS_PER_TOKEN_PER_MINUTE; read += 1) {
+        const allowed = await readShare(application, "share-token-1", CLIENT_IP);
+        expect(allowed.status).toBe(200);
+      }
+
+      const { status, body } = await readShare(application, "share-token-1", CLIENT_IP);
+
+      // The code, not the prose: the copy a customer reads is registered
+      // against this code, and the prose is free to change.
+      expect(handledCodeOf(body)).toBe("share_read_rate_limited");
+      expect(status).toBe(429);
+    });
+
+    /** @scenario "A share link read past its ceiling is refused with the code its copy is written for" */
+    it("leaves a second share token's own window untouched", async () => {
+      const { application } = composeShareApplication();
+
+      for (let read = 0; read <= READS_PER_TOKEN_PER_MINUTE; read += 1) {
+        await readShare(application, "share-token-1", CLIENT_IP);
+      }
+
+      const { status, body } = await readShare(application, "share-token-2", CLIENT_IP);
+
+      expect(handledCodeOf(body)).toBeNull();
+      expect(status).toBe(200);
     });
   });
 });
