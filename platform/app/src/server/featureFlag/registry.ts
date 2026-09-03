@@ -334,6 +334,15 @@ export const FEATURE_FLAGS = [
       "Runs Langy turns on the pi worker harness instead of opencode. Evaluated once per turn and rides the worker credential signature, so flipping it re-warms the conversation's worker on the next message rather than mutating a running one. Default ON = pi everywhere; the flag is the per-project rollback lever to opencode. Managed only from the internal flag store (/ops/feature-flags); PostHog and env vars are not consulted.",
   },
   {
+    key: "release_langy_delete_gate",
+    scope: "SYSTEM",
+    defaultValue: true,
+    envOverridable: false,
+    family: "Langy",
+    description:
+      "Registers the pi worker's pre-execution delete gate, which holds every destructive LangWatch command until a genuine, freshly-given, correctly-bound user confirmation is on record (spec: specs/langy/langy-delete-gate.feature, issue #7608). Evaluated once per turn and written into the worker config; a flip takes effect on the next warm/probe-MISS re-warm, not on a live worker. Default ON = the gate ships everywhere; turning it off per project is the rollback lever (the worker registers no gate and destructive commands run unheld). Managed only from the internal flag store (/ops/feature-flags); PostHog and env vars are not consulted.",
+  },
+  {
     key: "release_langy_ui_actions",
     scope: "SYSTEM",
     defaultValue: true,

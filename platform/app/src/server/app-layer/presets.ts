@@ -27,6 +27,7 @@ import {
   mintLangySessionApiKey,
   revokeLangySessionApiKey,
 } from "~/server/app-layer/langy/langyApiKey";
+import { resolveLangyDeleteGate } from "~/server/app-layer/langy/langyDeleteGate";
 import { resolveLangyHarness } from "~/server/app-layer/langy/langyHarness";
 import { createLangyWorkerPort } from "~/server/app-layer/langy/langyWorker";
 import { createLangyTokenBuffer } from "~/server/app-layer/langy/streaming/langyTokenBuffer";
@@ -1436,6 +1437,9 @@ export function initializeDefaultApp(options?: {
     // The harness flag (`release_langy_pi_harness`), evaluated once per turn
     // and riding `credentials.harness` into probe, stash and dispatch.
     resolveHarness: resolveLangyHarness,
+    // The delete-gate flag (`release_langy_delete_gate`), evaluated once per
+    // turn and riding `credentials.deleteGate` into the worker config (#7608).
+    resolveDeleteGate: resolveLangyDeleteGate,
     perDayPrCap: LANGY_GITHUB_PRS_PER_DAY,
     mintSessionKey: ({ session, projectId, organizationId }) =>
       mintLangySessionApiKey({ prisma, session, projectId, organizationId }),

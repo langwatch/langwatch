@@ -25,6 +25,7 @@ import {
   type InlineExtension,
 } from "@earendil-works/pi-coding-agent";
 import type { LangyWorkerConfig } from "./config.js";
+import { createDeleteGateExtension } from "./extensions/deleteGate.js";
 import { writeModelsJson } from "./models.js";
 import { SKILL_TOOL_NAME, createSkillExtension } from "./tools/skill.js";
 import { TODOWRITE_TOOL_NAME, createTodowriteExtension } from "./tools/todowrite.js";
@@ -145,6 +146,9 @@ export async function createLangySession({
       createSystemPromptExtension(systemPrompt),
       createTodowriteExtension(),
       createSkillExtension(config.skillsDir),
+      // The pre-execution delete gate (issue #7608). Registered unless the flag
+      // resolved explicitly OFF; absent means ON (fail-safe — see config.ts).
+      ...(config.deleteGateEnabled === false ? [] : [createDeleteGateExtension()]),
     ],
   });
   await resourceLoader.reload();

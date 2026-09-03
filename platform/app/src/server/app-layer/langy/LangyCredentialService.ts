@@ -264,6 +264,15 @@ export type LangyCredentials = {
    * and the worker re-warms on the other harness.
    */
   harness?: LangyHarness;
+  /**
+   * Whether the worker registers the pre-execution delete gate
+   * (`release_langy_delete_gate`, resolved once per turn, see
+   * `langyDeleteGate.ts`, issue #7608). Rides the credentials envelope into the
+   * worker config's `deleteGateEnabled`. Deliberately NOT part of the worker
+   * signature: a flip takes effect on the next warm/probe-MISS re-warm, not on
+   * a live worker (flip latency is a non-goal). Absent ⇒ the worker defaults ON.
+   */
+  deleteGate?: boolean;
 };
 
 /**
