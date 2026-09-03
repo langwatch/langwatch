@@ -57,6 +57,7 @@
     "zod-validation-error": "^5.0.0"
   },
   "devDependencies": {
+    "@langwatch/test-harness": "workspace:*",
     "typescript": "^7.0.2",
     "vitest": "^4.1.9"
   }

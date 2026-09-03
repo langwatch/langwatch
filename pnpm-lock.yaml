@@ -1263,9 +1263,15 @@ importers:
         specifier: ^4.4.3
         version: 4.4.3
     devDependencies:
+      '@types/js-yaml':
+        specifier: ^4.0.9
+        version: 4.0.9
       '@types/node':
         specifier: ^26.0.1
         version: 26.2.0
+      js-yaml:
+        specifier: ^5.2.0
+        version: 5.2.2
       oxlint:
         specifier: ^1.78.0
         version: 1.78.0
@@ -9442,12 +9448,18 @@ importers:
       '@langwatch/model-provider-contract':
         specifier: workspace:*
         version: link:../features/model-provider/contract
+      '@langwatch/prompt-contract':
+        specifier: workspace:*
+        version: link:../features/prompt/contract
       '@langwatch/role-contract':
         specifier: workspace:*
         version: link:../features/role/contract
       '@langwatch/secret-server':
         specifier: workspace:*
         version: link:../features/secret/server
+      '@langwatch/workflow-contract':
+        specifier: workspace:*
+        version: link:../features/workflow/contract
       '@types/bcrypt':
         specifier: ^6.0.0
         version: 6.0.0

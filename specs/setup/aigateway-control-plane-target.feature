@@ -10,7 +10,7 @@ Feature: AI Gateway control-plane target cannot silently default to the wrong wo
   # control plane answers just as happily as the right one. Only the
   # spend, budget and auth side effects land somewhere else, silently.
   #
-  # `pnpm dev` (platform/app/scripts/start.sh) derives this URL from the
+  # `pnpm dev` (dev/scripts/dev-stack.sh) derives this URL from the
   # app's own PORT before it starts a gateway itself, so a freshly-started
   # gateway is always correct. That path is proven, existing behavior and
   # is not what this feature covers.

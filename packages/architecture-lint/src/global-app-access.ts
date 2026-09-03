@@ -10,16 +10,16 @@ import type { ArchitectureViolation } from "./types";
 const SOURCE_FILE = /\.[cm]?[jt]sx?$/;
 const TEST_SOURCE = /\.(?:test|spec)\.[cm]?[jt]sx?$/;
 const BASELINE_PATH = "packages/architecture-lint/src/global-app-access-baseline.json";
+// The global accessor the rule forbids. Both the file and the alias belonged to
+// the deleted platform application; neither resolves any more, which is exactly
+// the state the rule wants — nothing can import what does not exist. They are
+// kept as the STRINGS the scan matches so a reintroduction under either name is
+// caught the moment it lands, rather than silently allowed by a rule that
+// stopped naming anything.
 const ACCESSOR_FILE = "platform/app/src/server/app-layer/app.ts";
 const ACCESSOR_ALIAS = "~/server/app-layer/app";
 const SYMBOLS = ["getApp", "tryGetApp"] as const;
-const SOURCE_ROOTS = [
-  "apps",
-  "mcp/typescript",
-  "packages",
-  "platform/app",
-  "tools",
-] as const;
+const SOURCE_ROOTS = ["apps", "mcp/typescript", "packages", "tools"] as const;
 
 type ForbiddenSymbol = (typeof SYMBOLS)[number];
 type AccessKind = "import" | "reference";

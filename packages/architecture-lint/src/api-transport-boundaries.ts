@@ -172,7 +172,6 @@ function forbiddenImportReason(
     specifier.startsWith("~/runtime/") ||
     specifier.includes("/server/app-layer/") ||
     specifier.includes("/runtime/app/") ||
-    specifier.includes("platform/app/src/") ||
     (strictFeatureApi &&
       (specifier === "@langwatch/platform-api/runtime" ||
         specifier === "@langwatch/worker/runtime"));

@@ -253,3 +253,46 @@ generated overlay to repository-root `.env.dev-up`. Root tooling loads the
 source, while API and worker validate their own subsets independently. Existing
 path assertions remain truthful until that migration stage lands and must move
 atomically with the scripts that consume them.
+
+## Amendment: three processes, no in-process worker (2026-09-03)
+
+The "In-process workers for local dev (2026-07)" amendment above is **retired**,
+and so is the physical owner the 2026-08 amendment gave it. `platform/app` is
+gone; the product is three Node applications — `apps/ui` (Vite), `apps/api` and
+`apps/worker` — and each is its own process in development exactly as it is in
+production.
+
+`WORKERS_IN_PROCESS` and `START_WORKERS` are dead variables. Nothing reads
+either: there is no `startWorkers()` for an API process to call, no `"all"`
+process role, and no `roleRunsWorkers`. `haven up` refuses a stack whose
+environment still names one, on ANY value rather than only the value that used
+to change what ran, because no value of either describes a topology this
+repository has. `haven up ±workers` is refused the same way — the workers lane
+always runs, so there is nothing left to select.
+
+### What runs a local stack
+
+| Entry point | What it starts |
+| --- | --- |
+| `pnpm dev` | `dev/scripts/dev-stack.sh`: the three Node lanes under `concurrently`, plus aigateway and nlpgo when their toolchain is present and their ports are free |
+| `make haven up` | the same three lanes as supervised children (`ui`, `api`, `workers`), each `pnpm --filter <package> dev` from the workspace root, plus the routed Go services |
+| `make quickstart <preset>` | `dev/compose.dev.yml`'s `ui`, `api` and `workers` services |
+
+The port layout is unchanged and still derived from `PORT` (default 5560): ui on
+`PORT`, api on `PORT + 1000`, worker metrics on `PORT - 2561`, gateway on
+`PORT + 3`. `dev/scripts/check-ports.sh` reserves all three Node ports
+unconditionally — there is no mode in which one of them is unbound.
+
+### Consequences
+
+- One more local process than the 2026-07 default, and it is the honest one:
+  a dev stack that boots and processes no jobs is no longer reachable by
+  configuration.
+- The contributor source of truth is the **workspace-root `.env`**, with
+  haven's `.env.portless` overlay beside it. Every application resolves both
+  from there. A checkout upgrading across this change moves its own file:
+  `mv platform/app/.env .env`.
+- The migration lane the compose stack runs moved to the api service, which
+  owns the schema: Prisma deploy then the ClickHouse task, once, before the
+  process starts. The ui lane waits on it, so a browser never loads the SPA
+  against a half-migrated database.

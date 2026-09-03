@@ -12,7 +12,7 @@ Feature: Machine-wide slots for whole-repo checks
   # several worktrees or agents, is what makes the machine unusable, and neither
   # command knew another was already running.
   #
-  # `platform/app`'s typecheck, lint and format scripts now run through
+  # The repository's typecheck, lint and format scripts run through
   # dev/scripts/check-queue.mjs, a thin wrapper that takes a machine-wide
   # slot, runs the real command, and releases. ONE counter covers all of them,
   # because they compete for the same cores. The state is a directory of
@@ -325,9 +325,9 @@ Feature: Machine-wide slots for whole-repo checks
   # @typescript/native-preview as `tsgo` — so the shims cover both and so does
   # haven's gate (ADR-095).
   #
-  # dev/scripts/install-check-shims.mjs makes platform/app's bin entries
+  # dev/scripts/install-check-shims.mjs makes the workspace root's bin entries
   # themselves the boundary, so the route into the tool stops mattering. Only
-  # platform/app's: sdks/typescript's build runs `tsc --noEmit` on the way to
+  # the root's: sdks/typescript's build runs `tsc --noEmit` on the way to
   # `pnpm dev`, and a dev server that waits for a typecheck slot before it
   # boots is not an improvement.
 

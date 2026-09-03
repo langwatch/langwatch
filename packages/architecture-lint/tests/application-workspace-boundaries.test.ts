@@ -142,7 +142,7 @@ describe("application workspace classification", () => {
   });
 
   it("rejects a wrong fixed name and any apps/shared directory", () => {
-    writeManifest("apps/ui/package.json", { name: "@langwatch/web" });
+    writeManifest("apps/ui/package.json", { name: "@langwatch/frontend" });
     write("apps/ui/src/index.ts", "export {};");
     write("apps/shared/src/index.ts", "export {};");
 

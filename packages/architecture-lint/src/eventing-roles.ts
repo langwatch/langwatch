@@ -217,7 +217,8 @@ export function lintEventingRoles(
 ): ArchitectureViolation[] {
   const violations: ArchitectureViolation[] = [];
   const scanRoots = [
-    join(root, "platform/app/src"),
+    join(root, "apps/api/src"),
+    join(root, "apps/worker/src"),
     join(root, "packages/enterprise/composition/api/src"),
     join(root, "packages/enterprise/composition/worker/src"),
   ];

@@ -44,11 +44,11 @@ function policies(packages: readonly ClassifiedPackage[] = []): string[] {
 describe("Eventing role lint", () => {
   it("accepts synchronous projection evolution and command dispatch from a subscriber", () => {
     write(
-      "platform/app/src/order.projection.ts",
+      "apps/api/src/order.projection.ts",
       "export const project = (state: number) => state + 1;",
     );
     write(
-      "platform/app/src/order.subscriber.ts",
+      "apps/api/src/order.subscriber.ts",
       "export const handle = (commands: { send(): Promise<void> }) => commands.send();",
     );
 
@@ -57,7 +57,7 @@ describe("Eventing role lint", () => {
 
   it("rejects asynchronous and network work in a projection", () => {
     write(
-      "platform/app/src/order.projection.ts",
+      "apps/api/src/order.projection.ts",
       'import "node:http"; export async function project() { await fetch("https://example.com"); }',
     );
 
@@ -66,7 +66,7 @@ describe("Eventing role lint", () => {
 
   it("rejects durable event fabrication from a subscriber", () => {
     write(
-      "platform/app/src/order.subscriber.ts",
+      "apps/api/src/order.subscriber.ts",
       "export const handle = (EventUtils: { createEvent(): void }) => EventUtils.createEvent();",
     );
 
@@ -75,7 +75,7 @@ describe("Eventing role lint", () => {
 
   it("rejects external work from a process definition", () => {
     write(
-      "platform/app/src/order.process.ts",
+      "apps/api/src/order.process.ts",
       "export async function evolve() { await new Promise((resolve) => setTimeout(resolve, 1)); }",
     );
 

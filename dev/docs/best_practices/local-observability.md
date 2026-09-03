@@ -60,7 +60,7 @@ stack keeps **no volume**, so stopping it reclaims every byte regardless. Overri
 
 ## What ships where
 
-| Signal   | Backend    | TS app (`platform/app/`)                   | Go services (nlpgo, aigateway)                         |
+| Signal   | Backend    | TS applications (`apps/{ui,api,worker}`)   | Go services (nlpgo, aigateway)                         |
 | -------- | ---------- | ------------------------------------------ | ------------------------------------------------------ |
 | Traces   | Tempo      | `OTEL_EXPORTER_OTLP_ENDPOINT`              | dual-export via `OTEL_DEBUG_COLLECTOR_ENDPOINT`        |
 | Logs     | Loki       | `PINO_OTEL_ENABLED=true`                   | zap teed to OTLP via `OTEL_DEBUG_COLLECTOR_ENDPOINT`   |
@@ -187,7 +187,7 @@ LW_OBS_GRAFANA_PORT=3100 LW_OBS_OTLP_HTTP_PORT=4319 LW_OBS_PYROSCOPE_PORT=4041 m
 
 ## Reading the data as an agent
 
-**When the stack is up, query this instead of grepping `platform/app/server.log`.**
+**When the stack is up, query this instead of grepping a dev-server log.**
 Indexed attribute search (by service, level, trace id, worktree) finds the
 failure far faster than scanning a multi-megabyte log file — and with the stack
 up the console is muted to `warn+` (haven sets `LOG_CONSOLE_LEVEL`), so the

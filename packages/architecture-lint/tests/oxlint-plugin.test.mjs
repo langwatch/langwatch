@@ -24,11 +24,7 @@ tester.run("package-boundaries", plugin.rules["package-boundaries"], {
       code: 'import type { PrismaClient } from "@prisma/client"; export type Db = PrismaClient;',
     },
     {
-      filename: "platform/app/src/runtime/app/example.ts",
-      code: 'import { AgentService } from "@langwatch/agent-server"; export { AgentService };',
-    },
-    {
-      filename: "platform/app/src/tasks/migrate-agent.ts",
+      filename: "apps/api/src/tasks/migrate-agent.ts",
       code: 'import { AgentMigration } from "@langwatch/agent-server"; export { AgentMigration };',
     },
     {
@@ -52,14 +48,6 @@ tester.run("package-boundaries", plugin.rules["package-boundaries"], {
       code: 'import { GovernanceService } from "@langwatch/enterprise-governance-server"; export { GovernanceService };',
     },
     {
-      filename: "platform/app/src/server/event-sourcing/registration/pipelineRegistry.ts",
-      code: 'import { AgentService } from "@langwatch/agent-server"; export { AgentService };',
-    },
-    {
-      filename: "platform/app/src/server/example/__tests__/agent.integration.test.ts",
-      code: 'import { fixture } from "@langwatch/agent-server/testing"; export { fixture };',
-    },
-    {
       filename: "packages/features/project/server/tests/agent.integration.test.ts",
       code: 'import { fixture } from "@langwatch/agent-server/testing"; export { fixture };',
     },
@@ -76,27 +64,27 @@ tester.run("package-boundaries", plugin.rules["package-boundaries"], {
       errors: [{ messageId: "packageRole" }],
     },
     {
-      filename: "platform/app/src/server/example.ts",
+      filename: "mcp/typescript/src/example.ts",
       code: 'import { AgentService } from "@langwatch/agent-server"; export { AgentService };',
       errors: [{ messageId: "compositionRoot" }],
     },
     {
-      filename: "platform/app/src/server/example.ts",
+      filename: "mcp/typescript/src/example.ts",
       code: 'import { fixture } from "@langwatch/agent-server/testing"; export { fixture };',
       errors: [{ messageId: "compositionRoot" }],
     },
     {
-      filename: "platform/app/src/server/example/__tests__/agent.integration.test.ts",
+      filename: "mcp/typescript/src/__tests__/agent.integration.test.ts",
       code: 'import { AgentService } from "@langwatch/agent-server"; export { AgentService };',
       errors: [{ messageId: "compositionRoot" }],
     },
     {
-      filename: "platform/app/scripts/__tests__/agent.integration.test.ts",
+      filename: "mcp/typescript/scripts/__tests__/agent.integration.test.ts",
       code: 'import { fixture } from "@langwatch/agent-server/testing"; export { fixture };',
       errors: [{ messageId: "compositionRoot" }],
     },
     {
-      filename: "platform/app/prisma/__tests__/agent.integration.test.ts",
+      filename: "mcp/typescript/prisma/__tests__/agent.integration.test.ts",
       code: 'import { fixture } from "@langwatch/agent-server/testing"; export { fixture };',
       errors: [{ messageId: "compositionRoot" }],
     },
@@ -126,12 +114,12 @@ tester.run("package-boundaries", plugin.rules["package-boundaries"], {
       errors: [{ messageId: "retiredPackageRuntime" }],
     },
     {
-      filename: "platform/app/src/server/example.ts",
+      filename: "mcp/typescript/src/example.ts",
       code: 'import { cadence } from "@langwatch/automations/cadences"; export { cadence };',
       errors: [{ messageId: "retiredPackageRuntime" }],
     },
     {
-      filename: "platform/app/src/server/example.ts",
+      filename: "mcp/typescript/src/example.ts",
       code: 'import { service } from "@ee/governance/service"; export { service };',
       errors: [{ messageId: "retiredPackageRuntime" }],
     },
@@ -208,7 +196,7 @@ tester.run("environment-boundaries", plugin.rules["environment-boundaries"], {
       code: 'const suffix = "nv"; export const value = process["e" + suffix];',
     },
     {
-      filename: "platform/app/src/server/example.ts",
+      filename: "mcp/typescript/src/example.ts",
       code: "export const value = process.env.APPLICATION_VALUE;",
     },
   ],
@@ -491,7 +479,7 @@ tester.run("api-context-services", plugin.rules["api-context-services"], {
 tester.run("service-dependencies", plugin.rules["service-dependencies"], {
   valid: [
     {
-      filename: "platform/app/src/server/app-layer/organizations/organization.service.ts",
+      filename: "apps/api/src/services/organization.service.ts",
       code: 'import type { OrganizationRepository } from "./repositories/organization.repository"; import type { PromptTagService } from "../../prompt-config/prompt-tag.service"; export class OrganizationService {}',
     },
     {
@@ -501,12 +489,12 @@ tester.run("service-dependencies", plugin.rules["service-dependencies"], {
   ],
   invalid: [
     {
-      filename: "platform/app/src/server/app-layer/organizations/organization.service.ts",
+      filename: "apps/api/src/services/organization.service.ts",
       code: 'import type { PromptTagRepository } from "../../prompt-config/repositories/prompt-tag.repository"; export class OrganizationService {}',
       errors: [{ messageId: "foreignRepository" }],
     },
     {
-      filename: "platform/app/src/server/app-layer/organizations/organization.service.ts",
+      filename: "apps/api/src/services/organization.service.ts",
       code: 'import type { PromptTagRepository } from "../../prompt-config"; export class OrganizationService {}',
       errors: [{ messageId: "foreignRepository" }],
     },
@@ -516,12 +504,12 @@ tester.run("service-dependencies", plugin.rules["service-dependencies"], {
       errors: [{ messageId: "foreignRepository" }],
     },
     {
-      filename: "platform/app/src/server/app-layer/organizations/organization.service.ts",
+      filename: "apps/api/src/services/organization.service.ts",
       code: 'import { getApp } from "../app"; export class OrganizationService { run() { return getApp().projects; } }',
       errors: [{ messageId: "globalApplication" }],
     },
     {
-      filename: "platform/app/src/server/app-layer/organizations/organization.service.ts",
+      filename: "apps/api/src/services/organization.service.ts",
       code: 'import type { PrismaClient } from "~/generated/prisma/client"; export class OrganizationService { constructor(readonly prisma: PrismaClient) {} }',
       errors: [{ messageId: "databaseClient" }],
     },

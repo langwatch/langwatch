@@ -16,7 +16,7 @@ Feature: Seed presets — a database that is ready to look at
   # tools/thuishaven): `app/db_test.go` (TestDBSeed, TestDBReset). The full
   # ingest-through-the-collector path is only exercised manually, so those
   # scenarios stay `@unimplemented`. The parity checker
-  # (`platform/app/scripts/check-feature-parity.ts`) scans tools/thuishaven's Go
+  # (`packages/architecture-lint/src/check-feature-parity.ts`) scans tools/thuishaven's Go
   # tests: @unit scenarios are bound by `// @scenario` annotations above those
   # test funcs.
 
@@ -84,7 +84,7 @@ Feature: Seed presets — a database that is ready to look at
 
   # --- The mass preset ---
   # Months of coherent, backdated activity, implemented in
-  # platform/app/scripts/seed-mass.ts on the pure generators in
+  # the mass-seed script on the pure generators in
   # scripts/seed-lib/mass-timeline.ts and scripts/seed-lib/mass-metrics.ts.
   # Event-sourced products (scenario simulations, evaluations, experiment
   # runs) are seeded as real commands whose backdated occurredAt the substrate

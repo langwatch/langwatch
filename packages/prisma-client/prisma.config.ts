@@ -6,5 +6,8 @@ export default defineConfig({
   schema: "prisma/schema.prisma",
   migrations: {
     path: "prisma/migrations",
+    // The local-dev / CI fixture. It reads the repository-root .env itself, so
+    // it needs no dotenv preload here.
+    seed: "tsx prisma/seed.ts",
   },
 });

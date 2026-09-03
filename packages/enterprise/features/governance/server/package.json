@@ -40,8 +40,8 @@
     "@langwatch/ksuid": "^2.0.2",
     "@langwatch/model-provider-contract": "workspace:*",
     "@langwatch/observability": "workspace:*",
-    "@langwatch/otlp": "workspace:*",
     "@langwatch/organization-contract": "workspace:*",
+    "@langwatch/otlp": "workspace:*",
     "@langwatch/prisma-client": "workspace:*",
     "@langwatch/project-contract": "workspace:*",
     "@langwatch/project-server": "workspace:*",
@@ -55,6 +55,7 @@
     "zod": "^4.4.3"
   },
   "devDependencies": {
+    "nanoid": "^6.0.0",
     "typescript": "^7.0.2",
     "vitest": "^4.1.9"
   }

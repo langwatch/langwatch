@@ -15,7 +15,7 @@ Feature: haven service selection
   Scenario: A fresh worktree starts lean
     Given a worktree that has never been up
     When the developer runs "haven up"
-    Then the stack runs the app (workers in-process), nlp, gateway, and the idp simulator
+    Then the stack runs the three Node lanes (ui, api, workers), nlp, gateway, and the idp simulator
     And langy is not started
     And the first up prints the selection and how to change it
 
@@ -53,10 +53,14 @@ Feature: haven service selection
     Then the report names the selected services and their health
     And names the services not selected, each with the exact "+svc" to add it
 
-  Scenario: The standalone workers lane is a selection, not an env var
-    When the developer runs "haven up +workers"
-    Then the workers run as their own lane instead of in-process
-    And the choice sticks like any other selection
+  # The workers lane stopped being selectable when the background worker became
+  # its own application: every stack runs it, so ±workers has nothing to pick.
+  # It is refused BY NAME rather than falling into the generic "unknown service"
+  # error, which reads as a typo. See specs/setup/dev-process-topology.feature.
+  Scenario: A retired service delta is refused by name
+    When the developer runs "haven up +workers" or "haven up -workers"
+    Then the command is refused
+    And the refusal says the background worker is its own process now
 
   Scenario: Removed selection env vars name their replacement
     Given the developer still has "LANGWATCH_SKIP_NLP=1" set from before
@@ -65,10 +69,14 @@ Feature: haven service selection
     And the error says the variable no longer selects services
     And it names the one command that replaces it, "haven up -nlp"
 
-  Scenario: A variable haven never read as a selection does not block a stack
-    Given the developer sets "WORKERS_IN_PROCESS=1", which is what plain "pnpm dev" already sets
+  # Neither worker variable describes a topology this repository still has, so
+  # both are refused on ANY value rather than only the one that used to change
+  # what ran, and neither refusal offers a replacement — there is none.
+  Scenario: A knob nothing reads is refused whichever way it is set
+    Given the developer still has "WORKERS_IN_PROCESS" or "START_WORKERS" set from before
     When they run "haven up"
-    Then the stack starts normally
+    Then the command fails instead of starting a stack
+    And the error says the variable no longer does anything, naming no replacement
 
   # Every consumer outside haven spells truthiness differently, so matching one
   # literal lets the others through — and letting one through means running a

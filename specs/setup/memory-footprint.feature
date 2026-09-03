@@ -11,7 +11,7 @@ Feature: Reduced server memory footprint
   # below.
   #
   # The process TOPOLOGY — one Node process or two — is a separate concern,
-  # specified in specs/setup/in-process-workers-dev.feature and decided in
+  # specified in specs/setup/dev-process-topology.feature and decided in
   # dev/docs/adr/004-docker-dev-environment.md. This feature is about what a
   # process loads, not how many of them run.
 

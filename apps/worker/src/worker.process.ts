@@ -1,4 +1,6 @@
+import { setTraceUrlProvider } from "@langwatch/handled-error";
 import { configureLogger, loggerConfigurationFrom } from "@langwatch/observability";
+import { grafanaTraceUrlFromEnv } from "@langwatch/observability/grafana-links";
 import {
   createProcessObservability,
   startOtlpMetricsExport,
@@ -61,6 +63,12 @@ export class WorkerProcess {
     const resources = new ResourceScope();
     const loggerConfiguration = loggerConfigurationFrom(config);
     configureLogger(loggerConfiguration);
+    // The Grafana trace link every serialized HandledError carries. The
+    // package defaults to a no-op provider, so without this registration a
+    // customer-visible error reaches support with no way back to its trace.
+    // Registration only stores the function — `serialize()` reads the
+    // environment per call, so this is safe before the config phase.
+    setTraceUrlProvider(grafanaTraceUrlFromEnv);
     // Before anything records: the instruments resolve a meter once at module
     // scope, so a counter touched ahead of this line writes into a no-op for
     // the life of the process. This process serves no Prometheus registry, so

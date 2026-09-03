@@ -304,7 +304,7 @@ function logCorrectedPath({
   if (!originalPath) return;
   // A NUL joins the pair because it cannot appear in a URL pathname, so no
   // project and path can collide with a different pair.
-  const pair = [projectId, originalPath].join(" ");
+  const pair = [projectId, originalPath].join("\u0000");
   if (!correctedPathIsDueToLog({ pair, now: Date.now() })) return;
 
   logger.warn(

@@ -330,8 +330,9 @@ Feature: Worker graceful shutdown does not sever in-flight ClickHouse work
   @regression @helm-grace-period
   Scenario: The process is told the same drain budget the pod is sized for
     Given the app and workers Deployments are rendered
-    Then each sets SHUTDOWN_DRAIN_TIMEOUT_MS from its own shutdownDrainSeconds
-    And raising shutdownDrainSeconds raises the variable with it
+    Then the workers Deployment sets SHUTDOWN_DRAIN_TIMEOUT_MS from workers.shutdownDrainSeconds
+    And the app Deployment sets API_HTTP_DRAIN_GRACE_MS from app.shutdownDrainSeconds
+    And raising shutdownDrainSeconds raises each process's own variable with it
 
   @regression @helm-grace-period
   Scenario: Operators can raise the grace period for a slower drain

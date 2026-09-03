@@ -149,13 +149,8 @@ function isFeatureServerCompositionRoot(workspacePath) {
   // and the only ways out are to stop testing the wiring or to record a rule
   // gap as if it were debt. A test elsewhere is still held: this is scoped to
   // the composition workspaces, not to test files in general.
-  return (
-    /^(apps\/(api|worker)|packages\/enterprise\/composition\/(api|worker))\/(?:src|tests)\//.test(
-      workspacePath,
-    ) ||
-    /^platform\/app\/src\/runtime\/(app|worker)\//.test(workspacePath) ||
-    /^platform\/app\/src\/tasks\/[^/]+\.ts$/.test(workspacePath) ||
-    workspacePath === "platform/app/src/server/event-sourcing/registration/pipelineRegistry.ts"
+  return /^(apps\/(api|worker)|packages\/enterprise\/composition\/(api|worker))\/(?:src|tests)\//.test(
+    workspacePath,
   );
 }
 
@@ -352,7 +347,10 @@ const boundaryRule = {
       if (
         productionSource &&
         classification.role !== "other" &&
-        (/^(~\/|@app\/|@ee\/)/.test(specifier) || specifier.includes("platform/app"))
+        // `~/`, `@app/` and `@ee/` were the deleted platform application's own
+        // aliases. Nothing resolves them any more, so an import naming one is a
+        // reintroduction, not a legacy edge — and is reported as such.
+        /^(~\/|@app\/|@ee\/)/.test(specifier)
       ) {
         context.report({ node, messageId: "packageRole" });
       }
@@ -1263,15 +1261,16 @@ function serviceOwnerRoot(filename, cwd) {
     /^(packages\/(?:enterprise\/)?features\/[^/]+\/server)\/src\/services\//,
   );
   if (feature) return resolve(cwd, feature[1]);
-  const application = normalized.match(/^(platform\/app\/src\/server\/(?:app-layer\/)?[^/]+)\//);
+  const application = normalized.match(/^(apps\/(?:api|worker|ui)\/src\/[^/]+)\//);
   return application ? resolve(cwd, application[1]) : dirname(filename);
 }
 
 function repositoryTarget(specifier, filename, cwd) {
   if (specifier.startsWith(".")) return resolve(dirname(filename), specifier);
-  if (specifier.startsWith("~/")) {
-    return resolve(cwd, "platform/app/src", specifier.slice(2));
-  }
+  // `~/` was the deleted platform application's alias root. It resolves to
+  // nothing now; returning undefined is what makes an import that still uses it
+  // unresolvable rather than silently pointed at a path that is not there.
+  if (specifier.startsWith("~/")) return undefined;
   return undefined;
 }
 

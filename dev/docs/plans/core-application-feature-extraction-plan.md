@@ -8479,3 +8479,584 @@ failure to support.
 - `git diff --numstat -- platform/app`: **0 insertions on every row** (the two
   binary rows aside), and this lane contributed none of them — it touched
   nothing under `platform/app`.
+
+## Cutover A — the deployment, packaging and CI surfaces, 2026-09-03
+
+The lane that makes the three deployables the thing that actually ships.
+Nothing under `platform/` was edited except one deletion; every file below is
+outside it. **`git diff --numstat -- platform`: 0 insertions on every row.**
+
+```
+  BEFORE                              AFTER
+
+  langwatch/langwatch:latest          langwatch/langwatch:latest
+      │                                   │
+      ├── CMD → platform/app              ├── CMD → /app/apps/api
+      │     prisma:migrate                │     task:prisma-migrate
+      │     (apps/api) ch-migrate         │     task:clickhouse-migrate
+      │     lwql:provision                │     task:lwql-provision
+      │     pnpm start ──► server.mts     │     pnpm start ──► api.entrypoint.ts
+      │                    (DELETED)      │                     │
+      │                                   │                     ├── /api/**  Hono
+      └── workers → /app/apps/worker      │                     └── /*  apps/ui
+            (already cut over)            │                            dist/client
+                                          └── workers → /app/apps/worker
+```
+
+### The shape that was decided, and why
+
+**One image, one interactive process.** `apps/ui` is a Vite build, not a
+deployable: it emits `dist/client` and nothing runs it. The chart has one
+Deployment for the interactive tier and no static one, so the pod that answers
+`/api/*` is the pod a browser asks for `/`. A second Deployment serving files
+would give a rolling deploy two independent rollouts of one artifact, and a
+browser could then load the shell from the new one and its chunks from the old.
+So `apps/api` mounts the static handler `70daaffd2c` left unmounted.
+
+**It is a raw surface, and its predicate is a complement.** The listener already
+offers one raw hook (hosted MCP holds the response for a session's life).
+`ApiStaticSurface` takes the same hook through a `CompositeApiRawSurface` that
+asks the specific surfaces first and the SPA fallback last. `handles` refuses
+exactly what the API claims — `/api/**`, `/metrics`, every canonical and
+misconfigured OTLP path, `/.well-known/openapi` and `/llms.txt` — and both lists
+are IMPORTED from the modules that own them (`canonicalOtlpPath`,
+`isRootDiscoveryPath`) rather than restated, so a path added to the API cannot
+start being answered with the HTML shell. That last part is not hygiene: an OTLP
+exporter handed the site root posts to `/v1/traces`, and a 200 with an HTML body
+reads to it as success before it drops the batch.
+
+### File → change
+
+| File | Change |
+| --- | --- |
+| `infra/docker/Dockerfile` | Install and prune filtered to `@langwatch/platform-api...`, `@langwatch/worker...`, `@langwatch/ui...`; the build runs those three closures; `COPY apps/ui` added and the monolith's COPY, its `vendor/` tarball and the four dead type/spec COPY lines removed; runtime stage copies `apps/ui` whole (apps/api imports `@langwatch/ui/public-config` as source); CMD is four steps from `/app/apps/api`. |
+| `infra/docker/Dockerfile.langyagent` | Dropped the monolith manifest and the four dead COPY lines; added the trace contract (a copy-types input that was never copied — the generator step could not have run) and the API's `openapi-document.json`. Also repointed `COPY packages/langy`, which named a directory the langy feature extraction had already removed, at `packages/features/langy/contract`: every `COPY` source in both Dockerfiles is now verified to exist in the tree. |
+| `mcp/typescript/Dockerfile` | Dropped the monolith manifest and the same dead `packages/langy` manifest line. |
+| `infra/compose.yml` | No change needed: `workers` already ran `/app/apps/worker`, and `app` uses the image CMD. |
+| `apps/api/src/app-static/app-static.surface.ts` | NEW. `ApiStaticSurface`, `pathIsClaimedByTheApi`, `resolveClientDistDir`, `tryCreateApiStaticSurface` and `CompositeApiRawSurface`. |
+| `apps/api/src/app-static/__tests__/app-static-surface.unit.test.ts` | NEW. Pins the complement both ways, the composite's order, and the announced absence. |
+| `apps/api/src/app/api-production.composition.ts` | Two anchored edits: compose the static surface, fold it and hosted MCP into one `rawSurface`. |
+| `apps/api/package.json`, `apps/api/prisma.config.ts` | NEW `task:prisma-migrate` and the CLI configuration it runs under; `prisma` added as a production dependency because the runtime image installs `--prod`. |
+| `apps/api/src/__tests__/dockerfile-runtime-workspace-packages.unit.test.ts` | Ported from `platform/app/src/__tests__/` (which was deleted): the runtime stage must copy the store before each application tree, and must name no monolith path. |
+| `charts/langwatch/templates/_helpers.tpl` | `shutdownEnv` emits `API_HTTP_DRAIN_GRACE_MS` for the app and `SHUTDOWN_DRAIN_TIMEOUT_MS` for the workers; the extraEnvs refusal covers both names. |
+| `charts/langwatch/templates/app/deployment.yaml` | `NEXTAUTH_URL_INTERNAL` removed (no reader); comments corrected. |
+| `charts/langwatch/values.yaml`, `templates/workers/deployment.yaml` | Comment provenance repointed; the Enterprise licence path is `packages/enterprise/LICENSE.md`. |
+| `charts/langwatch/tests/e2e-full-stack.sh` | Seeds from `/app/packages/prisma-client` via `db:seed`. |
+| `charts/langwatch/tests/workers-shutdown.sh` | Asserts each process's own drain variable. |
+| `specs/background/worker-graceful-shutdown.feature` | The drain scenario's steps name the two variables. Scenario titles unchanged, so every binding holds. |
+| `package.json` (root) | `dev` / `dev:app` / `dev:ui` / `dev:api` / `dev:worker` / `dev:concurrent` / `start` / `build:app` / `test:unit` / `typecheck` / `typecheck:all` / `lint:oxlint` / `lint:fix` / `prepare:files` / `start:prepare:files` / `prisma:migrate` / `prisma:seed` all name the applications or the packages. |
+| `pnpm-workspace.yaml` | The `platform/app` member is gone. |
+| `.coderabbit.yaml` | Every review-instruction glob repointed to `apps/**` / `packages/**`. |
+| `sdks/typescript/copy-types.sh` | The two generators reading monolith source are gone (both outputs were imported by nothing). |
+| `sdks/typescript/package.json` | `generate:openapi-types` reads `apps/api/src/features/discovery/openapi-document.json` and fails loudly when it is absent; `test:seed` delegates to the root script. |
+| `sdks/python/Makefile` | Same document, same loud failure; no longer tries to regenerate it first. |
+| `docs/Makefile` | `CANONICAL_SPEC` and the `tsx` it shells out to. |
+| `Makefile` | `sync-all-openapi` refuses and prints the two commands that still work. |
+| `apps/server/**` | `APP_PACKAGE_NAME` → `APP_PACKAGE_NAMES` (three filters); `locateLangwatchDir` → `locateApiDir` / `locateWorkerDir` / `locateUiDir`; the API starts with `pnpm run start` in `apps/api` and the workers in `apps/worker`; Prisma migrates through `task:prisma-migrate`; the dist gate is `apps/ui/dist/client/index.html` alone; the build is `start:prepare:files` then `--filter "@langwatch/ui..."`; install key bumped to `seq5-three-applications`; `distribution-files.json` drops the monolith. |
+| `.github/**` | See the CI table below. |
+
+### What changed in CI
+
+| Workflow | Change |
+| --- | --- |
+| `langwatch-app-ci.yml` | `relevant` filter is `apps/**` + `packages/**`. `typecheck` runs the three applications and caches their own `.tsbuildinfo`. `test-unit` is a three-way matrix over the deployables instead of a four-way shard of one corpus. `test-component` and `test-integration` are **deleted** — their corpus was the monolith's 1,017 integration files — and `package-suites`, which already discovers every workspace member, absorbed the datastore services, the migration steps and the helm setup so those suites run for real instead of self-skipping. `shard-durations` deleted with the reporters it merged. `build` builds `@langwatch/ui...` and smoke-boots `apps/ui`. `feature-parity` runs `@langwatch/architecture-lint`'s `check:feature-parity`. `openapi-completeness` **deleted** — see the losses below. `ci-self-test` stages its canary in `apps/api/src`. |
+| `e2e-ci.yml` | Installs the three closures, builds only the browser bundle, and boots `API_PORT=5570 pnpm --filter @langwatch/platform-api start` — one process serving both the API and the SPA the suite drives. |
+| `sdk-javascript-ci.yml` | Ingest path filters name the trace transport, `packages/api/src/rest`, `apps/api/src/app-rest`, `packages/otlp` and the API listener/entry. Prepare, migrate and seed run at the root; the server starts through the filter. |
+| `npx-server-publish.yml` | Version lock against `apps/api/package.json`; the build covers the three closures; the tarball assertions name the browser bundle, both entry points AS SOURCE, `prisma.config.ts`, the ClickHouse migration directory and the Prisma schema + history, and forbid each application's `node_modules`. |
+| `npx-server-smoke.yml`, `docs-ci.yml`, `gateway-matrix.yaml`, `go-services.yaml`, `codeql.yml`, `publish-docker-ecr.yml`, `migration-order.yml`, `langwatch-chart.yml`, `ssrf-conformance.yaml`, `pr-impact-map.yml` | Path filters, install filters and working directories repointed. `langwatch-chart.yml`'s behavioural step names the three relocated helm suites by package. |
+| `.github/actions/prepare-generated-files`, `.github/scripts/verify-generated-files.sh` | Six generators, not seven: the task registry is gone. Cache paths and required files are the packaged ones. |
+| `.github/release-please-config.json` | The product version is stamped on `apps/api/package.json`. |
+| `.github/scripts/check-added-images.sh` | Allowlist is `apps/ui/public/`. |
+| `.github/package-suites.excluded` | The three applications, because `test-unit` runs them in their own jobs. |
+
+### Judgment calls, recorded
+
+1. **The Prisma migrate runner went into `apps/api`, not `@langwatch/prisma-client`.** The package owns the schema and history but declares `prisma` as a DEV dependency, and the runtime image installs `--prod`; a boot-time `migrate deploy` from there would find no CLI. Another lane was also editing that manifest in the working tree. So `apps/api` gained `task:prisma-migrate`, a `prisma.config.ts` naming the package's schema and history, and `prisma` as a production dependency — the same directory that already runs the ClickHouse migration, so the boot chain is one `cd`.
+2. **The chart's health path stays `/api/health`.** The brief named `/healthz` for the API; the process serves `/api/health` (`api-process.lifecycle.ts`), which is what the chart already probes. Followed the code.
+3. **The app pod's drain variable was WRONG, not merely renamed.** `shutdownEnv` emitted `SHUTDOWN_DRAIN_TIMEOUT_MS` to both pods; `apps/api` reads `API_HTTP_DRAIN_GRACE_MS` and would have fallen back to its 5-second default while its pod was sized for twenty-five. A rollout would have cut live requests short with the grace period still looking right. Fixed, with the chart test and the spec's steps following.
+4. **Six chart environment variables are emitted and read by nothing; only one was removed.** Removed: `NEXTAUTH_URL_INTERNAL` (unconditional, knob-free, no reader). LEFT, because each is gated behind an operator-facing `values.yaml` capability and removing it would delete the capability rather than a leftover — `CLICKHOUSE_BACKUP_METRICS_ENABLED` (the backup gauges now have no writer), `DISABLE_USAGE_STATS`, `CRON_API_KEY` on the app pod (`cronjobs.jobs` ships empty; the cronjobs template's own copy is the operator's Bearer), `OPS_PII_STRICT_PRESIDIO_REDACTION_DISABLED`, `S3_KEY_SALT`, and the `AZURE_OPENAI_ENDPOINT` / `AZURE_OPENAI_KEY` pair — which is also a NAME mismatch, since the model-provider registry's field is `AZURE_OPENAI_API_KEY`. Each belongs to the feature lane that owns the capability. `PGUSER`/`PGPASSWORD`/`PGHOST`/`PGDATABASE` and `REDIS_HOST`/`REDIS_PASSWORD` are NOT dead: they are the `$(VAR)` interpolation sources for `DATABASE_URL` and `REDIS_URL`.
+5. **The two dead SDK generators were deleted rather than repointed.** `src/internal/generated/filters/types.ts` and `.../types/evaluations.ts` were imported by nothing in the SDK. Their new package homes are named in the script for whoever needs them.
+6. **`test-component` and `test-integration` were deleted rather than repointed.** Both existed to shard a corpus that no longer exists. Everything that survived is a package or application suite, and `package-suites` discovers those by asking pnpm for the workspace membership. Giving THAT job the datastores is what keeps the integration halves honest.
+7. **The root `test:component` / `test:integration` / `test:e2e` scripts fail loudly** rather than silently running nothing: no application declares a jsdom or datastore lane yet, and the Playwright suite has no packaged home.
+
+### Named absences and coverage losses
+
+- **The OpenAPI document has no generator and no checker.** `generateOpenAPISpec` went with the task lane; `check-openapi-completeness.ts` and `check-openapi-route-coverage.ts` went with the monolith's `scripts/`. What is left is a checked-in 2.7 MB artifact at `apps/api/src/features/discovery/openapi-document.json` that three routes serve and both SDKs generate clients from. An operation added without a `describeRoute` is now invisible to integrators and to CI alike. `make sync-all-openapi` refuses and says so.
+- **Five repo-level guards went with `platform/app/src/__tests__/`** and only one was ported. Ported: the Dockerfile runtime-workspace guard, because it guards this lane's change directly. NOT ported, and each guarded a file this lane owns or touches: `env-example-sentinels`, `langyagent-shell-tools` (reads `infra/docker/Dockerfile.langyagent`), `no-postinstall-network`, `noBinarySourceFiles`. They belong in `apps/api/src/__tests__/`.
+- **The shard sequencer's duration manifest has no producer.** The reporters lived in the monolith's `test-utils`; `packages/test-harness` holds equivalents that no application's vitest config wires.
+- **`SKIP_LWQL_PROVISION` is no longer honoured.** `apps/api`'s `task:lwql-provision` self-skips when LangWatchQL is unconfigured, which covers the real case; nothing outside the deleted tree set the variable.
+
+### What this lane needs from others
+
+1. **`pnpm-lock.yaml` MUST be regenerated.** Two changes require it and neither is optional: `platform/app` is no longer a workspace member (its importer is stale in the lockfile), and `apps/api` gained a `prisma` dependency. Until then every `--frozen-lockfile` install — CI, both Dockerfiles, the npx first boot — fails. This is the single highest-priority follow-up in the migration.
+2. **`dev/scripts/pack-npm.sh` (Cutover B).** Its exclude list is anchored on the monolith and its staged tree still assumes `platform/app/dist/server/*.cjs`. It must: drop the monolith from the exclude anchors; stage `apps/{api,worker,ui}` including `apps/ui/dist/client`; stop expecting server bundles, since both Node processes ship as source and run through `tsx`; and keep `packages/prisma-client/prisma/{schema.prisma,migrations}` and `apps/api/src/tasks/clickhouse-migrate/migrations`. `apps/server/test/pack-npm-filters.test.ts` moves with it — this lane left it alone deliberately, because its fixtures assert the script's CURRENT shape.
+3. **Branch protection.** `test-component`, `test-integration` and `openapi-completeness` no longer exist. If any is a required check, it will hang. `langwatch-app-complete` is the aggregate gate and has been updated.
+
+### Gates
+
+- `helm lint charts/langwatch`: **0 charts failed**. `helm template` clean with
+  `autogen.enabled=true --set langyagent.chartManaged=false`, and with both
+  `tests/values-e2e*.yaml` profiles. The three `examples/values-*prod.yaml`
+  profiles fail on the langyagent sandbox refusal, identically at `HEAD`.
+- `charts/langwatch/tests/workers-shutdown.sh`: **all 14 assertions pass**
+  (run with `langyagent.chartManaged=false` added to its `BASE`; without it the
+  suite cannot render at `HEAD` either — a pre-existing break).
+- `actionlint` over every workflow: **clean**, except one pre-existing unknown
+  runner label in `publish-docker-app.yml`. The 45 shellcheck findings in
+  `gateway-matrix.yaml` are byte-identical to `HEAD`.
+- `make -n` on `sync-all-openapi`, `docs/Makefile`'s two targets and
+  `sdks/python`'s `generate/api-client`: all resolve.
+- Every changed manifest parses: root `package.json`, `apps/api/package.json`,
+  `sdks/typescript/package.json`, `.github/release-please-config.json`,
+  `apps/server/distribution-files.json`.
+- `apps/api`: `tsc --noEmit` **2 errors, 0 in this lane's files** (a missing
+  `./buildStorageConnectSrc` in another lane's in-flight
+  `app-static.security-headers.ts`, and a DOM-lib error in `apps/ui`'s
+  `public-config.ts` reached through the pre-existing handler import);
+  `tsc --noEmit -p tsconfig.test.json` **1 error, 0 in this lane's files**.
+  `vitest run src/app-static src/__tests__`: **293 passed**.
+- `apps/server`: `tsc --noEmit` clean; `vitest run` **153 of 154 passing**, the
+  one failure being `pack-npm-filters.test.ts` against Cutover B's in-flight
+  edit of `dev/scripts/pack-npm.sh`.
+- `bash -n` on every changed shell script; `node --test` on both `.github`
+  guard suites (**63 passing**).
+- `grep -rn "platform/app\|@langwatch/web"` over every file this lane owns:
+  **zero functional references**. What remains is thirteen lines of six-root
+  merge provenance in `pnpm-workspace.yaml` (the census had already ruled only
+  the member line functional), and glob-matcher FIXTURE strings in
+  `.github/scripts/guard-{path-filters,breaking-change-scope}.test.ts` —
+  arbitrary path literals feeding a matcher, not path filters.
+- `git diff --numstat -- platform`: **0 insertions on all 306 rows**. This
+  lane's only contribution to them is one deletion,
+  `platform/app/src/__tests__/dockerfile-runtime-workspace-packages.unit.test.ts`,
+  ported to `apps/api` in the same change.
+
+## Cutover C — `platform/` is deleted, 2026-09-03
+
+The lane that empties the last 306 files and removes the directory. **`git diff
+--numstat -- platform` reports 0 insertions on all 306 rows**; every file that
+had to survive was moved out first, keeping its shape, with only its own
+imports rewritten.
+
+```
+  BEFORE (bucket 4 + final REST)          AFTER (this lane)
+
+  platform/app/                           platform/ does not exist
+    src/       19 files  2,073 non-test
+    prisma/     3 files                   packages/prisma-client/prisma/
+    e2e/       63 files                   apps/ui/e2e/            (37 kept)
+    specs/     30 files                   specs/                  (merged)
+    scripts/  113 files                   19 kept, 94 deleted
+    vendor/     1 tgz                     registry already had it
+    vitest*/tsconfig*/package.json        deleted with the package
+```
+
+### Where each surviving file went
+
+| From `platform/app/` | To | Why |
+| --- | --- | --- |
+| `src/server/securityHeaders.ts`, `src/server/buildStorageConnectSrc.ts` (+ both suites) | `apps/api/src/app-static/app-static.{security-headers,storage-connect-src}.ts` (+ `__tests__/`) | **The largest last copy in the tree.** `apps/api` sent no security header at all — repo-wide there is no `Content-Security-Policy`, `Referrer-Policy`, `Permissions-Policy` or HSTS outside a per-media response and one OAuth popup, and none at the ingress either. `app-static.asset-base.ts` already held `assetBaseOrigin`, the one argument `buildSecurityHeaders` takes, and its docblock already named the CSP entry it could no longer reach. Wired in `ApiStaticSurface`: the headers are computed once in `tryCreateApiStaticSurface` and set on every response the SPA surface writes, including its 404. That is the surface that serves the document, which is where a browser reads the policy. |
+| `src/server/handled-error-wiring.ts` | a call in `apps/api/src/api.main.ts` and `apps/worker/src/worker.process.ts` | `setTraceUrlProvider` was called from **exactly one place in the repository**, and the package default is a no-op. Deleting the file would have stripped the Grafana trace link from every serialized `HandledError` silently. `grafanaTraceUrlFromEnv` now comes from `@langwatch/observability/grafana-links`, a subpath nothing imported until now. |
+| `prisma/{seed,seed-demo-platform,demo-platform-ids}.ts` | `packages/prisma-client/prisma/` | The package already owned the schema and the migration history, and its `prisma.config.ts` now carries `migrations.seed`. Two platform imports became package ones: `createPrismaPgAdapter` becomes `PrismaDriverAdapterService`, and `encrypt` becomes `AesGcmSecretEncryptionAdapter` from `@langwatch/secret-server` (same algorithm, same `CREDENTIALS_SECRET ?? NEXTAUTH_SECRET` 32-byte hex key, same `iv:ciphertext:authTag` format — verified against the deleted `utils/encryption.ts` at `504d1517f7^`). `loadSeedEnv` now resolves the repository-root `.env` from `import.meta.url` rather than `process.cwd()`, because the seed is invoked three ways from three directories. `scripts/seed-lib/__tests__/demo-platform-config.unit.test.ts` moved with its subject. |
+| `e2e/**` (37 of 63) | `apps/ui/e2e/` | Playwright config + `happy-paths/**` + `save-auth-state.ts`, eight browser dogfood/capture scripts, the `code-agent` scenario suite, and 25 of the 34 `langy/**` files. `apps/ui` gains `test:e2e`, `test:e2e:save-auth-state` and an `e2e/**` exclude in its vitest config — Playwright specs are `*.spec.ts`, which vitest's default include would otherwise collect. |
+| `specs/**` (27 of 30) | `specs/` | The second specs root is gone. 27 files had no counterpart and moved as-is. |
+| `specs/{agents/http-agent-tracing,home/langy-briefing,settings/user-avatar}.feature` | `specs/{agents/http-agent-trace-emission,home/langy-briefing-receipts,settings/user-avatar-upload}.feature` | Three collisions, and **none of them was a second copy of the same feature** — they were different features sharing a filename. Root `user-avatar` covers every way a photo is refused; the platform one covers the upload, the SSO precedence and where the photo renders. Zero scenario titles overlap in any of the three pairs. Renamed rather than merged, each carrying a header saying what it covers and what the file it was renamed away from covers. No scenario was lost. |
+| `src/__tests__/{env-example-sentinels,langyagent-shell-tools,noBinarySourceFiles,no-postinstall-network}`, `src/server/__tests__/identity-package-boundaries`, and 10 `scripts/__tests__/*` | `packages/architecture-lint/tests/` | The only working repository-level vitest home: `dev/scripts/__tests__` is bats-only and would need a package.json and a config to take a `.ts` file. Every one of these guards a subject **outside** `platform` (the Dockerfiles, `.env.example`, `.github/workflows`, `dev/scripts/**`, the identity packages), so the move is where they always belonged. All are `__dirname` to `import.meta.url` and one path level shallower. |
+| `scripts/check-feature-parity.ts` (+ suite) | `packages/architecture-lint/src/` + `tests/`, with a `check:feature-parity` script | Repository-wide spec tooling. Its `SPECS_ROOTS` lost `platform/app/specs` and its test roots lost the four `platform/app/*` entries; `apps` already covered the e2e suite's new home. |
+| `scripts/check-gateway-control-plane.ts` (+ suite) | `apps/api/scripts/` (+ `check:gateway-control-plane`) | It verifies a running gateway points at **this** control plane, and `apps/api` is the control plane. |
+| `scripts/upload-assets-to-cdn.sh` | `apps/ui/scripts/` | ADR-086 uploads the browser bundle, which `apps/ui` builds. |
+| `scripts/{build-mcp-server.sh,ensure-ai-gateway-secrets.sh,ai-server.ts}` + `__tests__/ensure-ai-gateway-secrets.unit.bats` | `dev/scripts/` | Repository dev-loop tooling with no platform subject. **Additions to cutover B's tree**, not edits: deleting live tooling to respect a directory boundary would have been the worse error. |
+| `src/server/__tests__/metrics-instrumentation.unit.test.ts` | `packages/eventing/src/__tests__/metrics-registration.unit.test.ts` | Every symbol it imports is `@langwatch/eventing`'s own `metrics.ts`; the specifier `../metrics` did not even change. |
+| `src/server/app-layer/__tests__/error-remediation.unit.test.ts` | `packages/handled-error/src/__tests__/remediation.unit.test.ts` | Its subject is `REMEDIATION_CODES` / `REMEDIATION_DOC_PATHS` and the `docs/**.mdx` pages they name. |
+| `src/server/nlpgo/__tests__/{_nlpgoBinaryStamp,_nlpgoSubprocess}.ts` (+ 2 suites) | `packages/test-harness/src/nlpgo-{binary-stamp,subprocess}.ts` (+ `__tests__/`) | The Go-binary cache stamp and subprocess harness name only `services/nlpgo`, `cmd/service`, `pkg` and `sdks/go`. `NLPGO_TEST_BIN_DIR` moved from `platform/app/.vitest-tmp` to the repository-root `.vitest-tmp` — **`.github/workflows/langwatch-app-ci.yml:1136` still caches the old path** (cutover A). |
+| `src/server/{annotations,app-layer,evaluators}/__tests__/*.integration.test.ts` | `packages/features/annotation/server/src/adapters/__tests__/`, `packages/enterprise/features/governance/server/src/adapters/__tests__/`, `packages/features/evaluation/server/src/services/__tests__/` | Each moved to the adapter it exercises. All three constructed their client from the global `~/server/db` proxy, which throws unless a process composed it; each now composes its own `PrismaConnectionService` behind a pass-through guard and `describe.skipIf`s without a database URL, which is how the packages' own Postgres suites are written. `~/test-utils/annotation-test-services` had been deleted, so the two collaborator fakes were recovered from `504d1517f7^` into `__tests__/support/`, trimmed to the two the projection read actually calls. |
+| `src/pages/api/collector.stress.test.ts` | `apps/api/src/__tests__/` | It benchmarks OTLP insertions against a live endpoint. `apps/api`'s vitest config excludes `*.stress.test.ts` and `test:stress` names it, which is what `vitest.stress.config.ts` did for platform. |
+| `src/docs/{MANUAL_TESTING,WORKTREES}.md` | `dev/docs/` | `dev/docs/best_practices/git.md:43` repointed. |
+
+### `server/metrics.ts` — the sixteen unowned series, resolved
+
+The file is deleted. Nothing in the repository imported it, and its four
+non-series exports were all already twinned: the `collectDefaultMetrics`
+bootstrap and the fail-closed bearer gate by
+`apps/api/src/platform/infrastructure/{api-metrics.infrastructure,prometheus.api-metrics.adapter}.ts`
+and `apps/worker/src/app/worker-standalone.composition.ts`, and the `PORT - 2561`
+derivation by `worker.config.ts:1331`. Only `normalizeMetricsPath` had no twin,
+and no HTTP-duration histogram with a `path` label exists outside platform to
+need it.
+
+**Ten series moved to the package whose port increments them**, declared with
+`@langwatch/observability`'s OTLP instruments rather than prom-client — `apps/worker`
+serves an empty prom registry on purpose ("every metric it records goes out over
+OTLP"), so a prom-client declaration in a package would be invisible there.
+
+| Series | Declared at | Port it satisfies |
+| --- | --- | --- |
+| `automation_{ceiling_breach,auto_paused,containment_failed}_total` | `packages/features/automation/server/src/adapters/otel.automation-runaway-metrics.adapter.ts` | the three observation methods of `AutomationRunawayPort`, split out as `AutomationRunawayMetricsSink` so a sink need not satisfy the port's nine infrastructure methods. Ships `NoopAutomationRunawayMetrics`. |
+| `automation_overflow_flush_total` | `.../adapters/otel.automation-settlement-observability.adapter.ts` | `AutomationSettlementObservabilityPort`. `capture` stays the caller's — where an error goes is a fact of the process. |
+| `coding_agent_session_list_read_duration_milliseconds` | `packages/features/coding-agent/server/src/adapters/coding-agent-read-metrics.adapter.ts` | `CodingAgentReadMetricsPort`, beside the `Noop` that was already there. |
+| `langwatch_edge_media_extract_fail_open_total` | `packages/features/trace/server/src/adapters/otel.trace-edge-media-telemetry.adapter.ts` | `TraceEdgeMediaTelemetryPort` (optional on the service, called through `?.`). |
+| `event_sourcing_events_stored_total`, `event_sourcing_store_duration_milliseconds` | `packages/eventing/src/metrics.ts`, beside the `es_*` family | `EventSourcingServiceOptions.metrics`. Exported as `PROMETHEUS_EVENT_SOURCING_METRICS` and `NOOP_EVENT_SOURCING_METRICS`. |
+| `langwatch_langy_dispatch_total` | `packages/features/langy/server/src/adapters/otel.langy-worker-metrics.adapter.ts` | `LangyWorkerMetricsPort`, beside `NullLangyWorkerMetricsAdapter`. |
+| `langwatch_langy_blocks_total` | `packages/features/langy/server/src/adapters/otel.langy-block-metrics.adapter.ts` | the `countBlock` seam on `LangyFinalPartsService.build`, whose default is a no-op. |
+
+**Six series deleted, because no code increments them anywhere.** Named, so a
+future reader does not go looking: `langwatch_langy_rate_limit_total` (the
+fail-open is now a bare `.catch(() => ({ allowed: true }))` in
+`api-trpc-collaborators.agent-group.composition.ts:744`, counted by nothing);
+`langwatch_langy_turns_total` (`LangyTurnMetricsPort.count` is composed but
+called by no service, and its outcome union already disagreed with the metric's);
+`langwatch_edge_spool_fail_open_total` (last caller was `presets.ts`, deleted in
+`db03af79cd`); `job_processing_duration_milliseconds` (the queue layer that
+replaced it is `packages/group-queue/src/metrics.ts` with its own `gq_*` series);
+`worker_restarts` (restart is Kubernetes' job now); `event_loop_lag_milliseconds`
+(its `setInterval` self-observer was the only writer, and
+`packages/observability/src/node/process-observability.ts` has no lag
+instrumentation).
+
+**No composition root was changed.** Every one of the ten is still supplied as a
+Noop or left absent, so all ten are unpublished today. That is deliberate and it
+is the honest state: a panel flat because the metric is inert reads exactly like
+a system that is idle. Turning one on is now a one-line swap in
+`apps/api`'s or `apps/worker`'s composition. Two dangling boundary entries stay
+in `histogram-boundaries.ts` for the two deleted histograms
+(`event_loop_lag_milliseconds`, `job_processing_duration_milliseconds`);
+`docs/langwatch-dashboard.json` still queries the latter.
+
+### Deleted, with the reason
+
+| What | Files | Why |
+| --- | ---: | --- |
+| `src/server/{db,posthog,prismaPgAdapter,env-mode-guard,appPackageRoot}.ts` and four suites | 9 | **Twins or dead.** `db.ts` is a proxy over a connection `@langwatch/prisma-client` composes. `posthog.ts` is verbatim `apps/worker/src/platform/infrastructure/worker-product-analytics.adapter.ts`, which carries a frozen-twin test naming it. `prismaPgAdapter.ts` was a two-function `@deprecated` shim. `env-mode-guard.ts` restored `NODE_ENV` after a dotenv `override: true` that no surviving process performs — both apps use `tsx --env-file-if-exists`, which does not override (verified on Node 24.13.0 against `.env.example`'s `NODE_ENV="development"`). `appPackageRoot.ts` walked up to the `@langwatch/web` marker and had zero importers. |
+| `src/server.mts`, `src/noop-css.cjs` | 2 | The boot file imported `./env-load`, `./runtime/executable-bootstrap.config`, `./runtime/app/boot`, `./start` and `./instrumentation.node`, all deleted in bucket 4; the CSS stub existed only for it. |
+| `src/server/__tests__/{auth.getServerAuthSession,rateLimit}.test.ts` | 2 | Subjects deleted as twins by the previous lane. |
+| `src/server/__tests__/frontend-boundary.unit.test.ts` | 1 | **The largest recorded loss, and it is named below.** |
+| `e2e/auth-regression/**` | 13 | One-off `tsx` scripts from the closed NextAuth to BetterAuth audit. Seven import `prisma` from the never-composed `~/server/db` proxy and one imports the already-deleted `~/server/rateLimit`; their own README says they are not in `pnpm test:e2e`. |
+| `e2e/langy/**` fake-workbench chain | 9 | `fake-tab-{document,handlers,run,ui-actions}.ts`, `fake-workbench-tab.ts`, `workbench-assertions.ts` and the three suites that reach them import `~/experiments-v3/**` and `~/features/langy/uiActions/**`, deleted by the census. The other 25 langy files moved. |
+| `scripts/**` operator and dogfood surface | 94 | **55 of the 113 script files import a platform module, and almost every one of those modules is already deleted** — `~/server/app-layer/{app,presets}`, `~/server/clickhouse/clickhouseClient`, `~/runtime/app/**`, `~/env.mjs`, `~/utils/encryption`, `~/server/mailer/**`, `~/server/gateway/**`. `~/server/app-layer/presets` is the composition root; there is nothing to repoint it at. The rest died with them: `seed-lib/**` had no consumer left, `dogfood/governance/**` runs through `seed-demo.runner.ts`, and `generate-task-registry.mjs` read `src/tasks`, gone since bucket 4. Also deleted as twins of what cutover B already moved to `dev/scripts/`: `check-ports.sh`, `kill-dev-tree.sh`, `refresh-dev-s3-env.sh`. And as residue of a producer that no longer exists: `build-server.mjs`, `bundle-optional-externals.mjs`, `start.sh`, `run-task.sh`, `smoke-boot.mjs`. |
+| the OpenAPI guard family | 8 | `check-openapi-{completeness,route-coverage}.ts`, `openapi-route-exclusions.ts`, `lib/hono-route-table.ts`, `scim-api-reference.unit.test.ts` and three suites all read `platform/app/src/app/api/openapiLangWatch.json`, whose producer (`src/tasks/generateOpenAPISpec.ts`) bucket 4 deleted and whose file went with it. A guard over an artefact nothing can regenerate can only be red or lying. `scim-api-reference` also read `platform/app/ee/scim/routes.ts`. **Named absence — see below.** |
+| `vendor/langwatch-scenario-1.3.0.tgz` | 1 | Only `platform/app` used the `file:` specifier; `packages/features/{scenario,trace}/server` resolve `@langwatch/scenario@^1.3.0` from the registry, and the lockfile already pins `1.3.0` there. |
+| `vitest*.config.ts`, `vitest.sequencer.ts`, `vitest.durations.json`, `test-setup.ts`, `tsconfig*.json`, `package.json` | 12 | The harness's include roots were `platform/app/src`, `test-setup.ts` imported the deleted `./src/env.mjs`, and the duration manifest is keyed by platform paths. The lane rule that survives it (`integrationLanes.ts`) already lives in `@langwatch/test-harness`; every app and package carries its own config. |
+
+### Named absences this lane creates or inherits
+
+1. **The server-to-browser import guard is gone and has no replacement.**
+   `frontend-boundary.unit.test.ts` walked the value graph from
+   `src/{server,app/api,pages/api,mcp,tasks}` to browser-only packages, and
+   `CLAUDE.md` still cites it by path as an enforced, build-failing guard. It
+   could not be moved: **19 of its 20 named subjects no longer exist**, both
+   client trees are gone, and its two headline cases had already gone vacuous —
+   walking nine files and zero client files, which is the failure mode its own
+   docblock warns about. `packages/architecture-lint`'s
+   `frontend-ui-boundaries.ts` enforces UI *layer ordering*, not this. Rebuilding
+   it means new roots (`apps/{api,worker}/src`, `packages/**/server/src` against
+   `apps/ui/src`, `packages/**/web/src`), a new `SERVER_ONLY_STATE`, and a live
+   subject for each of its eleven self-validation cases. That is a rewrite, and
+   it is the largest thing this migration has dropped.
+2. **The repository has no OpenAPI specification producer, and now no guard
+   either.** `Makefile:375` still runs the deleted generator.
+   `docs/api-reference/openapiLangWatch.json` is frozen at whatever the last run
+   produced.
+3. **`apps/api` composes no product-analytics sink**, so `posthog.ts` leaving
+   changes nothing: ten places in `apps/api` already declare that absence in
+   prose, and `api.config.ts` has no `POSTHOG_*` leaf to compose one from
+   (`apps/worker` has both). Recorded rather than fixed, because adding the leaf
+   and the adapter is a feature decision, not a move.
+4. **`ApiStaticSurface` is the only thing that sends the CSP.** Anything served
+   outside it — every `/api/*` family Hono answers — still sends no security
+   header. That was also true of the platform application for the API routes it
+   proxied, so it is not a regression, but it is not the whole job either.
+
+### Findings surfaced by the move, not caused by it
+
+- **A real NUL byte in a tracked TypeScript file.** `noBinarySourceFiles`
+  resolved its repository root three levels up from
+  `platform/app/src/__tests__/`, which is `<repo>/platform` — so the guard had
+  only ever scanned that one subtree. Rooted correctly it immediately found
+  `packages/features/trace/server/src/transport/api-rest/otlp-ingest.api.ts:307`
+  joining a pair on a literal NUL character rather than on the two-character
+  escape, which makes git and GitHub treat the whole file as binary. Fixed in
+  place: one byte, replaced by the escape sequence, same string at runtime.
+- **Seven ADR-115 violations in `@langwatch/identity-server`.** Its adapters and
+  Prisma projection repositories import `@langwatch/eventing` directly, which
+  the ADR reserves to `@langwatch/identity-eventing`. The guard has been red
+  since before this lane (verified at `HEAD`); it lived in a suite nobody ran,
+  so nothing read what it said. Recorded as an explicit baseline in
+  `identity-package-boundaries.test.ts` so the rule keeps biting on the eighth
+  file while the identity lane decides between moving the adapters and amending
+  the ADR. **Shrink that list; never add to it.**
+- **`dev-supervisor.unit.test.ts` had drifted from its subject.** Its
+  source-text sabotage expected a three-line `spawn(process.execPath, [` that
+  `dev/scripts/dev-supervisor.mjs` no longer formats that way, so the "sentinel
+  that cannot start" case was asserting against text that had moved. Literal
+  updated. It also used `readFileSync` without importing it, which only worked
+  under platform's harness.
+- **`ci-ingest-path-filter.test.ts` fixtures were fiction.** The workflow's
+  `ingest` filter has already been repointed at the new tree; only the two
+  historical change-sets still named `platform/app` paths, so both were matching
+  nothing. Each now carries its present-day equivalent in `files` with the
+  original list preserved verbatim beside it as `wasFiles`.
+- **Two `@langwatch/trace-server` ClickHouse integration suites still import
+  `.../platform/app/src/server/event-sourcing/__tests__/integration/testContainers`**
+  by relative path. Broken before this lane (the census found them), and there
+  is no `startTestContainers` in `@langwatch/test-harness` to repoint them at —
+  it owns `clickhouse-test-endpoints.ts` instead. The trace lane's.
+
+### For the other cutover lanes
+
+| File | What it still says | Owner |
+| --- | --- | --- |
+| `Makefile:375` | `cd platform/app && pnpm run task generateOpenAPISpec` | cutover B |
+| root `package.json` `test:unit` / `test:component` / `test:integration` / `test:e2e` | filter `@langwatch/web` | cutover A. `test:e2e` is now `pnpm --filter @langwatch/ui test:e2e`; the other three want `pnpm -r`. |
+| `.github/workflows/langwatch-app-ci.yml:1136` | caches `platform/app/.vitest-tmp` | cutover A. The nlpgo harness writes the repository-root `.vitest-tmp` now. |
+| `tools/thuishaven`'s `mass` ingest preset | runs `seed:sample-traces`, `seed:realistic-platform`, `seed:mass` | cutover B. All three scripts are deleted; `haven up`'s `prisma:seed` step survives as `pnpm --filter @langwatch/prisma-client db:seed`. `domain/identity.go`, `domain/overlay.go`, `cmd/help.go` and the README point at `platform/app/prisma/seed.ts`. |
+| `.gitleaks.toml`, `dev/lint/semgrep/langwatch.yml`, `dev/lint/ast-grep/rules/*.yml`, `.oxlintrc.architecture.json`, `packages/architecture-lint/src/{global-app-access,eventing-roles,frontend-ui-boundaries}.ts` + baselines, `oxlint-plugin.mjs`'s `~/` resolver | scopes and allowlist paths under `platform/app/**` | cutover B |
+| `apps/server/{src/services/app-dir.ts,src/services/node-deps.ts}` | probe for `platform/app/package.json` | cutover A |
+
+### Gates
+
+- `git diff --numstat -- platform`: **0 insertions on all 306 rows.**
+  `git status --porcelain -- platform`: 306 `D` rows, nothing untracked.
+- `pnpm install --offline`: green, 183 workspace projects, lockfile +12 lines
+  (the new dev dependencies only). `pnpm-workspace.yaml` never listed
+  `platform/app`, so no glob had to change. pnpm now reports one more cyclic
+  workspace pair — `packages/prisma-client` dev-depends on `@langwatch/secret-server`
+  and `@langwatch/api-key-server` for the seed, which depend on it. Dev-only and
+  a warning, not an error.
+- vitest, per receiving package: `apps/api` 1002/1002, `apps/worker` 445/445,
+  `apps/ui` 999/999, `@langwatch/architecture-lint` 482/482,
+  `@langwatch/eventing` 1031/1031, `@langwatch/handled-error` 64/64,
+  `@langwatch/prisma-client` 104/104, `@langwatch/annotation-server` 10 passed
+  + 3 skipped, `@langwatch/enterprise-governance-server` 591 + 14 skipped,
+  `@langwatch/evaluation-server` 214 + 1 skipped (the three moved integration
+  suites skip without a database URL, by design), `@langwatch/automation-server`
+  228/228, `@langwatch/coding-agent-server` 289/289, `@langwatch/langy-server`
+  506/506.
+- Still red, none of it this lane's and none of it in a file this lane wrote:
+  `@langwatch/trace-server` 3 suites (the two `testContainers` imports above and
+  `TestCodingAgentService.create is not a function`), `@langwatch/test-harness`
+  4 (teardown and compiler-API scans over `packages/features/dashboard/server`
+  and others).
+- `tsc --noEmit`, per receiving package: clean for `@langwatch/{architecture-lint,
+  eventing,handled-error,test-harness,prisma-client,automation-server,langy-server,
+  enterprise-governance-server}` and `apps/worker`. `apps/{api,ui}` and
+  `@langwatch/{annotation,evaluation,coding-agent,trace}-server` report errors,
+  every one of them in another lane's file (`packages/api/src/rest/body-limit.ts`,
+  `packages/group-queue/src/groupQueue.ts`,
+  `packages/features/workflow/web/**`, `apps/ui/src/behavior/public-config.ts`,
+  and three pre-existing test files). No file this lane created or moved appears
+  in any of them.
+- Repository-wide grep: **zero real `~/` imports remain** — the seventeen
+  matches are fixture strings inside `packages/architecture-lint/tests/**` and
+  `packages/test-harness/src/__tests__/**`. Zero `platform/app` references in
+  `infra/`, `charts/`, root `package.json` or `.github/workflows` (cutover A had
+  already cleaned those). What is left is the table above plus prose in `dev/docs`,
+  `specs/**/AUDIT_MANIFEST.md` and `docs/llms-full.txt`.
+
+## Cutover B — the developer loop, 2026-09-03
+
+The lane that moves the dev loop off `platform/app`: haven, `dev/compose.dev.yml`,
+the preset launchers, the `Makefile` dev targets, `CLAUDE.md`, the lint and
+format configuration, `packages/architecture-lint`'s baselines, and the specs
+that describe how a stack starts. Nothing here is application code; every file
+is one an agent or a contributor reads to find out what to run.
+
+```
+  BEFORE                                   AFTER
+
+  pnpm dev ─► platform/app/scripts/         pnpm dev ─► dev/scripts/dev-stack.sh
+              start.sh                                   │
+                │                                        ├─ ensure-ai-gateway-secrets.sh
+                ├─ check-ports.sh                        ├─ check-ports.sh
+                ├─ vite            (dev:vite)            ├─ ui       @langwatch/ui
+                ├─ api             (start:app)           ├─ api      @langwatch/platform-api
+                ├─ workers IN THE API PROCESS            ├─ workers  @langwatch/worker
+                │  (WORKERS_IN_PROCESS=1)                ├─ gateway  services/aigateway
+                ├─ gateway                               └─ nlpgo    services/nlpgo
+                └─ nlpgo
+                                            haven: the `app` child becomes
+  haven: app (vite) + api (bundle,          `ui`; `api` and `workers` run
+  hosting the workers) + optional           unconditionally; `app.<slug>` is
+  `workers` lane                            still the routed hostname
+```
+
+### The three lanes, everywhere
+
+| Entry point | Lanes |
+| --- | --- |
+| `pnpm dev` | `dev/scripts/dev-stack.sh` — ui, api, workers under `concurrently`, plus aigateway and nlpgo when their toolchain is present and their ports are free |
+| `make haven up` | supervised children `ui`, `api`, `workers` (each `pnpm -s --filter <pkg> dev` from the workspace root) plus the routed Go services |
+| `make quickstart <preset>` | `dev/compose.dev.yml`'s `ui`, `api` and `workers` services |
+
+Ports are unchanged and still derived from `PORT` (default 5560): ui on `PORT`,
+api on `PORT + 1000`, worker metrics on `PORT - 2561`, gateway on `PORT + 3`.
+
+### File → change
+
+| File | Change |
+| --- | --- |
+| `tools/thuishaven/app/plan.go` | the `app` lane becomes `ui` (`pnpm -s --filter @langwatch/ui dev`); the `api` lane runs `--filter @langwatch/platform-api dev` instead of the production bundle; the `workers` lane is unconditional and carries no `START_WORKERS`. Three new constants name the packages, and `UIDir`/`UIDirRel` name the Vite lane's own directory |
+| `tools/thuishaven/app/orchestrator.go` | `UpParams.LwDir` deleted (it equalled `WorktreeDir`); `apiBundleRelPath` + `ensureAPIBundle` deleted outright — no lane runs a bundle any more; `prepareDBShell` names the two migration scripts |
+| `tools/thuishaven/app/play.go`, `db.go` | `PlaySandbox.LwDir` deleted; the sandbox prep no longer builds; both migration call sites use `prepareDBShell` |
+| `tools/thuishaven/app/restart.go` | `workers` is always a restart target; the comment about a shared process group is gone with the mode |
+| `tools/thuishaven/app/report.go` | `haven status --json` gains a `lanes` array (`ui`, `api`, `workers` with port + `listening`) |
+| `tools/thuishaven/app/hmr.go`, `ports.go` | the HMR-gate marker is written in `apps/ui`, where the Vite plugin resolves it |
+| `tools/thuishaven/app/config.go`, `deps.go`, `gate.go` | comments corrected |
+| `tools/thuishaven/domain/stack.go` | `HasStandaloneWorkers` deleted; `Stack.Lanes()` added |
+| `tools/thuishaven/domain/selection.go` | `Selection.Workers` deleted; `RetiredSelectionServices` refuses `±workers` by name; `CLIServiceName("app") == "ui"`; `Describe()` names the three lanes |
+| `tools/thuishaven/domain/hygiene.go`, `identity.go` | reclaimable paths and the seed-script reference repointed |
+| `tools/thuishaven/cmd/root.go` | `lwDir` gone — every lane and every dotenv read is the workspace root; `WORKERS_IN_PROCESS` and `START_WORKERS` refused on ANY value; `isFalse` → `isSet` |
+| `tools/thuishaven/cmd/logs.go`, `play.go`, `help.go` | lane colour keyed on `ui`; sandbox literals and help text updated |
+| `tools/thuishaven/adapters/fileregistry/store.go` | `.env.portless` written at the workspace root; the `workers` selection field dropped from the persisted shape |
+| `tools/thuishaven/adapters/portlessproxy/proxy.go` | the project-local portless binary is looked up under the workspace root |
+| `tools/thuishaven/README.md` | the three lanes, `±workers` removed from the examples, the overlay's new location |
+| `dev/compose.dev.yml` | `app` → `ui` (Vite, `LANGWATCH_API_URL: http://api:6560`); new `api` service (owns both migrations, published on `API_PORT`); `workers` points at `http://ui:5560`; mounts are `./apps` with one node_modules volume per application; `ai-server` removed |
+| `dev/scripts/dev-stack.sh` | **new** — the `pnpm dev` launcher |
+| `dev/scripts/check-ports.sh` | **new** (from `platform/app/scripts/`) — reserves all three Node ports unconditionally |
+| `dev/scripts/kill-dev-tree.sh`, `refresh-dev-s3-env.sh` | **new** (from `platform/app/scripts/`) |
+| `dev/scripts/ensure-ai-gateway-secrets.sh` | `ENV_FILE` depth corrected (it resolved one directory ABOVE the checkout after being copied here) and it is called from `dev-stack.sh` |
+| `dev/scripts/dev.sh`, `dev-up.sh` | preset prose and prep run from the workspace root; both allocate an `API_PORT` beside `APP_PORT`; `AI_SERVER_PORT` dropped |
+| `dev/scripts/pack-npm.sh` | anchored excludes are `apps/ui/e2e/auth.json` and `packages/prisma-client/prisma/db.sqlite*`; the `.npmignore` prose is de-pathed |
+| `dev/scripts/boxd-fork.sh` | `cd platform/app` → `cd langwatch` (the VM's clone directory — the old value was a content-keyed sweep's mistake and could never have worked) |
+| `dev/scripts/install-check-shims.mjs` | shims **every** workspace member's `node_modules/.bin`, not just one, and shims `oxlint` and `oxfmt` as well as `tsgo`/`tsc`; `TOOLS` exported and the entry point guarded |
+| `dev/scripts/lib/*.sh`, `dogfood/*`, `__tests__/*.bats` | paths and prose |
+| `.githooks/post-checkout` | copies `.env` from the workspace root, not from a per-application directory |
+| `Makefile` | `refresh-dev-s3` → `dev/scripts/`; `start` is `pnpm dev`; `tsc-watch` takes `app=` and defaults to `apps/api` |
+| `CLAUDE.md` | Development Environment, Commands and Structure rewritten for the three applications; the in-process-workers table replaced; the error-registry, install and `cd` rows repointed |
+| `dev/docs/adr/004-docker-dev-environment.md` | **Amendment: three processes, no in-process worker (2026-09-03)** |
+| `dev/docs/best_practices/README.md` | **Amendment, 2026-09-03** — one path-mapping table instead of rewriting 42 examples across 13 documents; `vitest-performance.md` and `local-observability.md` corrected in place because their MEANING changed |
+| `.oxlintrc.architecture.json` | the `platform/app/**` code-quality and test-file blocks retargeted to `apps/**` + `packages/**`; the 253-pair debt register deleted |
+| `.oxfmtrc.json` | the generated-file ignore repointed at `packages/features/langy/server` |
+| `dev/lint/ast-grep/rules/*.yml`, `dev/lint/semgrep/langwatch.yml` | every `platform/app` scope retargeted; twelve rules would otherwise have been left with no `files:` at all |
+| `packages/architecture-lint/src/*-baseline.json` | every platform row removed — all three baselines are now empty |
+| `packages/architecture-lint/src/{global-app-access,eventing-roles,api-transport-boundaries}.ts`, `oxlint-plugin.mjs` | scan roots and specifier rules repointed |
+| `packages/architecture-lint/tests/*` | fixtures moved off platform paths; `no-postinstall-network` skips a tracked path with no file behind it; the check-queue guard reads the ROOT manifest and the shim list |
+| `specs/setup/dev-process-topology.feature` | **new**, replacing `in-process-workers-dev.feature` (deleted); 4/4 scenarios bound to Go tests |
+| `specs/setup/haven-service-selection.feature` | the two workers scenarios replaced by the retirement ones; 12/12 bound |
+| `specs/setup/{check-slots,quickstart-entry-point,aigateway-control-plane-target,heavy-run-admission,memory-footprint,haven-*}.feature`, `specs/ci/no-committed-screenshots.feature` | paths and prose |
+
+### Judgment calls
+
+- **The `app` routed hostname stays; the LANE is called `ui`.** `app.<slug>` is
+  the one URL a browser uses and `/api` under it is the API, so renaming the
+  hostname would break every bookmark and every `NEXTAUTH_URL` for no gain.
+  `CLIServiceName` maps the internal `app` service to `ui` so `haven logs ui`,
+  `haven restart ui` and the dashboard row all name the process, not the URL.
+- **`workers` stopped being selectable rather than defaulting to on.** Every
+  existing `.haven.json` states `"workers": false`, so a defaulted-on field
+  would have read as "run no background processing at all" for every worktree
+  that never opted in. Deleting the field ignores that key entirely, and
+  `±workers` is refused by name so a developer typing it is told why rather
+  than seeing "unknown service", which reads as a typo.
+- **`WORKERS_IN_PROCESS` and `START_WORKERS` are refused on ANY value.** The
+  old rule refused only the value that used to change what ran, because the
+  other value was what `pnpm dev` itself set. Nothing sets or reads either now,
+  so every spelling is a stale line, and neither refusal offers a replacement —
+  there is none.
+- **`ensureAPIBundle` is deleted, not repointed.** It existed because the api
+  lane ran `node dist/server/server.cjs` and nothing else in an `up` produced
+  that file. The lane runs `tsx watch` now, so there is no artefact to
+  guarantee; keeping a build step would add a minute to every first `up` for a
+  file nobody executes.
+- **The compose migration lane moved to the `api` service.** It owns the schema
+  (`task:prisma-migrate`, `task:clickhouse-migrate`), the `ui` lane waits on it,
+  and running migrations from the Vite container would have been the same work
+  done by the process least able to explain a failure.
+- **`ai-server` is removed from compose rather than repointed.** Its only
+  implementation was a script in the platform application. A service naming a
+  script nobody ships is a slower way to discover the same absence.
+- **The best-practices documents get ONE amendment, not thirteen.** 42 stale
+  paths across 13 files illustrate patterns whose point was never the path; a
+  path-mapping table in the index says the same thing once. The two documents
+  whose MEANING changed — the vitest lane split and the dev-server log — are
+  corrected in place instead.
+- **`install-check-shims.mjs` now shims every member's bin dir.** Each
+  application declares `typescript` itself, so `pnpm --filter <app> typecheck`
+  resolved that member's own `tsc`, not the root's — the heaviest runs on the
+  machine were entirely uncounted. `oxlint` and `oxfmt` are shimmed for the
+  same reason: the root `lint` and `format` scripts call the binaries directly.
+  The cost is that a recursive `pnpm build` now serialises its `tsc` steps to
+  the slot limit on a laptop; CI installs no shims at all.
+- **The legacy-application lint rules keep `platform/app` as their SUBJECT.**
+  `global-app-access.ts`'s accessor path, `application-boundaries.ts`'s legacy
+  root and `legacy-feature-fragments.ts`'s scan root name a directory that no
+  longer exists, which is exactly the state they want. They are the strings a
+  reintroduction would have to match, so they stay, and their tests keep
+  writing synthetic `platform/app` files into a temp root.
+- **Historical ADR bodies are left alone.** `dev/docs/adr/0{09,12,17,18,21,…}`
+  record decisions at their date; rewriting their file references would falsify
+  the record. Only ADR-004 is amended, because it is the one that states what
+  runs today.
+
+### What cutover A still has to wire
+
+These are one-line changes in files this lane may not edit. Each one is a
+capability that exists and is not reachable.
+
+1. **`package.json` `dev` → `bash dev/scripts/dev-stack.sh`.** The current
+   `pnpm --parallel --filter ui --filter api --filter worker dev` starts the
+   three lanes and nothing else: no port pre-flight, no `REDIS_DB_INDEX` per
+   PORT slot (so two worktrees share one Redis database and each other's
+   queues), no `BASE_HOST`/`NEXTAUTH_URL` alignment (so `PORT=5570 pnpm dev`
+   answers 403 `INVALID_ORIGIN` on social sign-in), no AI Gateway secret
+   generation on a fresh clone (issue #3902), and no aigateway/nlpgo autostart.
+   `dev:ui`, `dev:api` and `dev:worker` are correct as they are.
+2. **`concurrently` as a root devDependency.** `dev-stack.sh` runs
+   `pnpm -s exec concurrently`; it is currently only a dependency of
+   `apps/server`.
+3. **`prepare:db` or the two scripts haven calls.** haven runs
+   `pnpm -s run prisma:migrate && pnpm -s run clickhouse:migrate` at the
+   workspace root; both exist. A single `prepare:db` would let the Go side name
+   one script instead of composing the shell.
+4. **`ensure:ai-gateway-secrets` is no longer in `start:prepare:files`.** A
+   fresh clone gets its secrets from `dev-stack.sh` now, but a `make quickstart`
+   run reaches the containers without it.
+5. **The seed-preset ingest scripts have no root home.** `haven db seed demo`
+   runs `pnpm run seed:retention`, `seed:mass`, `seed:sample-traces`,
+   `seed:realistic-platform` and `seed:langy-prompts` at the workspace root.
+   Every failure is a warning, so a stack still comes up, but no preset loads
+   any data until those exist.
+6. **`apps/api` and `apps/worker` load only `../../.env`, not
+   `../../.env.portless`.** haven injects the overlay into each child directly,
+   so a haven stack is unaffected; a hand-run `pnpm --filter @langwatch/platform-api dev`
+   inside a portless worktree reads the wrong ports.
+
+### Named absences
+
+- **The reused-gateway control-plane check is gone.** `dev-stack.sh` warns that
+  a gateway already listening on `PORT + 3` may point at another worktree's
+  control plane, but cannot ask it: the script that did
+  (`GET /debug/control-plane`) went with the platform application.
+- **The transitive frontend-boundary guard has no home.** The rule stands —
+  no value-import chain from server code may reach a browser-only package — but
+  the graph walk that enforced it lived in the platform application's tests.
+  Recorded in `CLAUDE.md` as a rule without a guard.
+- **`.env` must be moved by hand.** Every application resolves `.env` from the
+  workspace root now. A checkout upgrading across this change runs
+  `mv platform/app/.env .env` once; nothing can do it for them, because the
+  file is untracked.
+- **`bats` is not installed on this machine**, so `dev/scripts/__tests__/*.bats`
+  were syntax-checked (`bash -n`) and read, not run.
+
+### Gates
+
+- `tools/thuishaven`: `go build ./...` clean, `go test ./...` **14 packages,
+  all ok**, `gofmt -l` empty, `golangci-lint run` **345 issues** against a
+  **346** baseline measured before this lane (thuishaven is outside the
+  `go-ci / lint` scope; the one issue this lane introduced was fixed).
+- `bash -n`: clean on all 13 changed shell scripts and the git hook.
+- `make -n`: clean on `refresh-dev-s3`, `start`, `tsc-watch`, `quickstart`,
+  `quickstart-help`, `down`, `logs`, `ps`, `clean`, `worktree`, `test-scripts`,
+  `observability`, `haven`, `service`, `service-watch`.
+- `docker compose -f dev/compose.dev.yml --profile full config`: parses;
+  services `redis, postgres, clickhouse, init, api, langevals, langwatch_nlp,
+  ui, workers`.
+- `packages/architecture-lint`: `pnpm exec vitest run` **37 files / 479 tests,
+  all passing**.
+- `check-feature-parity`: `specs/setup/dev-process-topology.feature` **4/4
+  bound**, `specs/setup/haven-service-selection.feature` **12/12 bound**.
+- `oxlint --config .oxlintrc.architecture.json` over `apps packages/…`:
+  **5,778 errors** against a **6,035** baseline on the same paths with the
+  pre-lane config. Both numbers are the migration's cleanup backlog, not a
+  gate (the 2026-09-01 ruling).
+- `git diff --numstat -- platform/app`: **0 insertions on every row** (306
+  rows, all deletions, none of them this lane's).

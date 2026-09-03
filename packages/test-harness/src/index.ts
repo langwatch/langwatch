@@ -74,3 +74,5 @@ export { createWeigher, loadDurationManifest, type DurationManifest } from "./sh
 export { scanTestSourceForUnsafeDeleteMany, type TeardownViolation } from "./teardown-scan";
 export { closeTsAstSession, parseSourceText, parseSourceTexts } from "./ts-ast";
 export { aliasesForFile, parseVitestConfigAliases, type ModuleAlias } from "./vitest-alias-table";
+export * from "./nlpgo-binary-stamp";
+export * from "./nlpgo-subprocess";

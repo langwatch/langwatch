@@ -125,7 +125,8 @@ describe("given the runtime image assembles its node_modules", () => {
       // Guards the guard: if this list ever empties, the assertion below would
       // vacuously pass and stop protecting anything.
       expect(requiredPaths).toContain("handled-error");
-      expect(requiredPaths).toContain("langy");
+      expect(requiredPaths).toContain("prisma-client");
+      expect(requiredPaths).toContain("features/trace/server");
     });
 
     it.each(requiredPaths)("copies packages/%s into the runtime image", (dir) => {

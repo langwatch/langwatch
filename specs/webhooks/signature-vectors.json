@@ -1,7 +1,7 @@
 {
-  "$schema_note": "Generated file. Do not hand-edit: run `pnpm run task generateWebhookSignatureVectors` from platform/app.",
-  "generated_by": "platform/app/src/tasks/generateWebhookSignatureVectors.ts",
-  "generated_from": "platform/app/src/server/webhooks/signature.ts",
+  "$schema_note": "Generated file. Do not hand-edit: run `pnpm --filter @langwatch/worker task:webhook-signature-vectors`.",
+  "generated_by": "packages/egress/src/webhook/signature-vectors.ts",
+  "generated_from": "packages/egress/src/webhook/signature.ts",
   "headers": {
     "signature": "X-LangWatch-Signature",
     "delivery_id": "X-LangWatch-Delivery-Id",
