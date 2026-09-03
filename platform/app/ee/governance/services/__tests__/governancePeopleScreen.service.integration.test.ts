@@ -16,6 +16,7 @@ import { prisma } from "~/server/db";
 import { cleanupTestRows } from "~/test-utils/cleanupTestRows";
 
 import { GovernancePeopleScreenService } from "../governancePeopleScreen.service";
+import { IdentityMatchService } from "../identityMatch.service";
 
 const ns = nanoid(8);
 const organizationId = `org_pscreen_${ns}`;
@@ -89,6 +90,7 @@ describe("Feature: the People screen shows who the providers named", () => {
 
   afterAll(() =>
     cleanupTestRows(prisma, [
+      ["identityMatchSuggestion", { organizationId }],
       ["identityMatch", { organizationId }],
       ["discoveredPerson", { organizationId }],
       ["department", { organizationId }],
@@ -98,31 +100,89 @@ describe("Feature: the People screen shows who the providers named", () => {
     ]),
   );
 
-  it("shows the link, its proof, and the member's department on a linked person", async () => {
-    const people = await service().listPeople({ organizationId });
+  describe("when the list is read", () => {
+    /** @scenario "The list shows what a provider said and what the engine decided" */
+    it("shows each person's identifier, provider, kind, seen range, and link state", async () => {
+      const people = await service().listPeople({ organizationId });
 
-    const linked = people.find((p) => p.id === `linked_${ns}`);
-    expect(linked?.link).toMatchObject({
-      userId: mariaUserId,
-      evidenceKind: "verified_email",
-      memberName: "Maria Silva",
-      departmentName: "Engineering",
+      const stranger = people.find((p) => p.id === `stranger_${ns}`);
+      expect(stranger).toMatchObject({
+        displayText: `stranger@acme.test`,
+        provider: "openai_admin",
+        kind: "person",
+        link: null,
+      });
+      expect(stranger?.firstSeenAt).toEqual(
+        new Date("2026-08-01T00:00:00.000Z"),
+      );
+      expect(stranger?.lastSeenAt).toEqual(
+        new Date("2026-08-01T00:00:00.000Z"),
+      );
+    });
+
+    /** @scenario "A linked person shows their member's department" */
+    it("shows the link, its proof, and the member's department on a linked person", async () => {
+      const people = await service().listPeople({ organizationId });
+
+      const linked = people.find((p) => p.id === `linked_${ns}`);
+      expect(linked?.link).toMatchObject({
+        userId: mariaUserId,
+        evidenceKind: "verified_email",
+        memberName: "Maria Silva",
+        departmentName: "Engineering",
+      });
+    });
+
+    /** @scenario "An erased person shows a stand-in, never the identifier" */
+    it("shows an erased person as erased, wearing the stand-in text", async () => {
+      const people = await service().listPeople({ organizationId });
+
+      const gone = people.find((p) => p.id === `gone_${ns}`);
+      expect(gone?.erasedAt).not.toBeNull();
+      expect(gone?.displayText).toBe("pseudonym_xyz");
+      expect(gone?.rawActorId).toBe("pseudonym_xyz");
     });
   });
 
-  it("shows an unlinked person with no link and no department", async () => {
-    const people = await service().listPeople({ organizationId });
+  describe("given a stored suggestion pairing the stranger with Maria", () => {
+    beforeAll(async () => {
+      await prisma.identityMatchSuggestion.create({
+        data: {
+          id: `sugg_${ns}`,
+          organizationId,
+          discoveredPersonId: `stranger_${ns}`,
+          userId: mariaUserId,
+          score: 0.91,
+          computedAt: new Date("2026-09-01T00:00:00.000Z"),
+        },
+      });
+    });
 
-    const stranger = people.find((p) => p.id === `stranger_${ns}`);
-    expect(stranger?.link).toBeNull();
-  });
+    /** @scenario "A suggestion shows both halves and a confirm action" */
+    it("shows both halves, and confirming links them and clears the queue", async () => {
+      const before = await service().listSuggestions({ organizationId });
+      expect(before).toMatchObject([
+        {
+          id: `sugg_${ns}`,
+          personDisplayText: "stranger@acme.test",
+          personProvider: "openai_admin",
+          memberName: "Maria Silva",
+        },
+      ]);
 
-  it("shows an erased person as erased, wearing the stand-in text", async () => {
-    const people = await service().listPeople({ organizationId });
+      await IdentityMatchService.create(prisma).confirmSuggestion({
+        organizationId,
+        suggestionId: `sugg_${ns}`,
+      });
 
-    const gone = people.find((p) => p.id === `gone_${ns}`);
-    expect(gone?.erasedAt).not.toBeNull();
-    expect(gone?.displayText).toBe("pseudonym_xyz");
-    expect(gone?.rawActorId).toBe("pseudonym_xyz");
+      const after = await service().listSuggestions({ organizationId });
+      expect(after).toEqual([]);
+      const people = await service().listPeople({ organizationId });
+      const stranger = people.find((p) => p.id === `stranger_${ns}`);
+      expect(stranger?.link).toMatchObject({
+        userId: mariaUserId,
+        evidenceKind: "human_confirmed",
+      });
+    });
   });
 });

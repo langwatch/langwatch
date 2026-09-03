@@ -11,9 +11,15 @@
  * export re-publishes the erased person's conversation on every daily pull,
  * with the thirty-day lookback guaranteeing it happens again tomorrow.
  *
+ * Suppression also stands in front of person discovery: the discovery and
+ * directory passes are fed the kept half of the batch, so an erased
+ * identifier can neither be re-discovered from activity nor slip back in
+ * through a directory listing (governance-people-discovery.feature).
+ *
  * Same mocking boundary as pullerWorkerPulledUsage.unit.test.ts.
  *
  * Spec: specs/governance/governance-identity-and-erasure.feature
+ * Spec: specs/governance/governance-people-discovery.feature
  */
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
@@ -21,6 +27,7 @@ const {
   findUnique,
   projectFindFirst,
   suppressionFindMany,
+  personCreate,
   insertEvent,
   handleOtlpTraceRequest,
   runOnce,
@@ -29,6 +36,7 @@ const {
   findUnique: vi.fn(),
   projectFindFirst: vi.fn(),
   suppressionFindMany: vi.fn(),
+  personCreate: vi.fn(),
   insertEvent: vi.fn(),
   handleOtlpTraceRequest: vi.fn(),
   runOnce: vi.fn(),
@@ -45,6 +53,7 @@ vi.mock("~/server/db", () => ({
     erasedIdentifierSuppression: {
       findMany: (...a: unknown[]) => suppressionFindMany(...a),
     },
+    discoveredPerson: { create: (...a: unknown[]) => personCreate(...a) },
   },
 }));
 vi.mock("~/server/app-layer/app", () => ({
@@ -129,6 +138,7 @@ beforeEach(() => {
   vi.stubEnv(ERASURE_SECRET_ENV, SECRET);
   findUnique.mockReset().mockResolvedValue(SOURCE_ROW);
   projectFindFirst.mockReset().mockResolvedValue({ id: "proj_dest" });
+  personCreate.mockReset().mockResolvedValue({ id: "person_1" });
   insertEvent.mockReset().mockResolvedValue(undefined);
   handleOtlpTraceRequest.mockReset().mockResolvedValue({});
   runOnce.mockReset();
@@ -186,6 +196,73 @@ describe("given a pull carrying an event that names an erased person", () => {
       expect(exportedPayload()).toContain(STAYS);
       expect(exportedPayload()).not.toContain(ERASED);
     });
+
+    /** @scenario "An erased identifier is never re-discovered" */
+    it("discovers the other person and never the erased identifier", async () => {
+      runOnce.mockResolvedValue({
+        events: [
+          genieEvent(ERASED, "msg-erased"),
+          genieEvent(STAYS, "msg-stays"),
+        ],
+        cursor: null,
+        errorCount: 0,
+      });
+
+      await runIngestionPull({ sourceId: "src_1", cursor: null });
+
+      expect(personCreate).toHaveBeenCalledTimes(1);
+      expect(JSON.stringify(personCreate.mock.calls)).toContain(STAYS);
+      expect(JSON.stringify(personCreate.mock.calls)).not.toContain(ERASED);
+    });
+  });
+
+  describe("when the event is a directory listing of the erased person", () => {
+    /** @scenario "An erased identifier in the directory is skipped entirely" */
+    it("neither discovers them nor lets their department row through", async () => {
+      runOnce.mockResolvedValue({
+        events: [
+          {
+            source_event_id: "msgraph_directory:erased:2026-08-20",
+            event_timestamp: "2026-08-20T10:00:00.000Z",
+            actor: ERASED,
+            action: "directory_report",
+            target: "Finance",
+            cost_usd: "0",
+            tokens_input: 0,
+            tokens_output: 0,
+            raw_payload: JSON.stringify({ id: ERASED, department: "Finance" }),
+            extra: { department: "Finance", displayName: "Leaver" },
+          },
+        ],
+        cursor: null,
+        errorCount: 0,
+      });
+
+      await runIngestionPull({ sourceId: "src_1", cursor: null });
+
+      // Suppression empties the batch before discovery and the department
+      // sync run; the sync's own empty-batch early return means neither pass
+      // touches a table this harness would have had to mock.
+      expect(personCreate).not.toHaveBeenCalled();
+    });
+  });
+});
+
+describe("given a pull where person discovery itself breaks", () => {
+  /** @scenario "Discovery failing does not cost the run its events" */
+  it("still writes the audit row and exports the conversation", async () => {
+    suppressionFindMany.mockResolvedValue([]);
+    personCreate.mockRejectedValue(new Error("relation does not exist"));
+    runOnce.mockResolvedValue({
+      events: [genieEvent(STAYS, "msg-stays")],
+      cursor: null,
+      errorCount: 0,
+    });
+
+    await runIngestionPull({ sourceId: "src_1", cursor: null });
+
+    expect(insertEvent).toHaveBeenCalled();
+    expect(handleOtlpTraceRequest).toHaveBeenCalledTimes(1);
   });
 });
 

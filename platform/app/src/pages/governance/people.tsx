@@ -9,6 +9,7 @@ import {
   Text,
   VStack,
 } from "@chakra-ui/react";
+import { MATCH_EVIDENCE_KIND } from "@ee/governance/services/logic/identityEvidence";
 import { Archive, ExternalLink, MoreVertical, Pencil } from "lucide-react";
 import { useState } from "react";
 import { ConfirmDialog } from "~/components/gateway/ConfirmDialog";
@@ -92,12 +93,21 @@ function PeoplePage() {
   );
 }
 
-/** The proof column's words, for humans rather than for the enum. */
+/**
+ * The proof column's words, for humans rather than for the enum — keyed off
+ * the engine's own vocabulary so a kind added there fails the build here
+ * instead of silently rendering its slug.
+ */
 const EVIDENCE_LABEL: Record<string, string> = {
-  verified_email: "confirmed address",
-  verified_email_and_directory_id: "confirmed address + directory",
-  human_confirmed: "confirmed by a person",
-};
+  [MATCH_EVIDENCE_KIND.VERIFIED_EMAIL]: "confirmed address",
+  [MATCH_EVIDENCE_KIND.VERIFIED_EMAIL_AND_DIRECTORY_ID]:
+    "confirmed address + directory",
+  [MATCH_EVIDENCE_KIND.DIRECTORY_ID]: "directory identifier",
+  [MATCH_EVIDENCE_KIND.HUMAN_CONFIRMED]: "confirmed by a person",
+} satisfies Record<
+  (typeof MATCH_EVIDENCE_KIND)[keyof typeof MATCH_EVIDENCE_KIND],
+  string
+>;
 
 const fmtDay = (d: Date | string) => {
   const date = typeof d === "string" ? new Date(d) : d;

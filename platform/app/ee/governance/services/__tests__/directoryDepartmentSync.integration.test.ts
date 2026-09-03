@@ -143,6 +143,7 @@ describe("Feature: directory departments land on the entities we already have", 
     ]),
   );
 
+  /** @scenario "A directory department lands on the member it proves" */
   it("assigns a member their directory department through a confirmed address", async () => {
     await prisma.department.create({
       data: { organizationId, name: "Engineering" },
@@ -165,6 +166,7 @@ describe("Feature: directory departments land on the entities we already have", 
     expect((await membership(mariaUserId)).departmentId).toBe(rows[0]?.id);
   });
 
+  /** @scenario "A department the organization has not created yet is created" */
   it("creates a department the organization has not created yet — the SCIM costCenter call", async () => {
     await service().applyDirectoryEvents({
       organizationId,
@@ -199,6 +201,7 @@ describe("Feature: directory departments land on the entities we already have", 
     expect((await membership(jonasUserId)).departmentId).not.toBeNull();
   });
 
+  /** @scenario "A directory row proving no member assigns nobody" */
   it("assigns nobody from a row that proves nobody, and creates no department for it", async () => {
     const outcome = await service().applyDirectoryEvents({
       organizationId,
@@ -215,6 +218,7 @@ describe("Feature: directory departments land on the entities we already have", 
     expect(await departments()).toHaveLength(0);
   });
 
+  /** @scenario "A blank directory department leaves the member's assignment alone" */
   it("leaves a hand-assigned member alone when their directory department is blank", async () => {
     const dept = await prisma.department.create({
       data: { organizationId, name: "Platform" },

@@ -86,7 +86,8 @@ afterAll(() =>
   cleanupTestRows(prisma, [["discoveredPerson", { organizationId }]]),
 );
 
-describe("an actor on a pulled row", () => {
+describe("given a provider's pulled rows naming an actor", () => {
+  /** @scenario "An actor on a pulled row becomes a discovered person" */
   it("becomes a discovered person with the event's own time as both seen dates", async () => {
     await service().recordFromPulledEvents({
       organizationId,
@@ -106,6 +107,7 @@ describe("an actor on a pulled row", () => {
     });
   });
 
+  /** @scenario "Seeing the same actor again moves last-seen forward only" */
   it("only ever widens the seen range on later sightings, in either direction", async () => {
     const at = (iso: string) => activityEvent({ event_timestamp: iso });
     await service().recordFromPulledEvents({
@@ -135,6 +137,7 @@ describe("an actor on a pulled row", () => {
     expect(await personRows()).toEqual(rows);
   });
 
+  /** @scenario "The same identifier on two providers is two discovered people" */
   it("is two discovered people when two providers name the same email", async () => {
     await service().recordFromPulledEvents({
       organizationId,
@@ -155,7 +158,8 @@ describe("an actor on a pulled row", () => {
   });
 });
 
-describe("rows that must not become people", () => {
+describe("given rows that must not become people", () => {
+  /** @scenario "A row naming nobody discovers nobody" */
   it("discovers nobody from an empty actor", async () => {
     await service().recordFromPulledEvents({
       organizationId,
@@ -165,6 +169,7 @@ describe("rows that must not become people", () => {
     expect(await personRows()).toHaveLength(0);
   });
 
+  /** @scenario "A bare-UUID Databricks actor is recorded as a machine login" */
   it("records a bare-UUID Databricks actor as a machine login", async () => {
     const uuid = "2f6b6a10-9f21-4d3a-8f01-6f2f1a9c1b2d";
     await service().recordFromPulledEvents({
@@ -190,7 +195,7 @@ describe("rows that must not become people", () => {
   });
 });
 
-describe("a directory sighting", () => {
+describe("given a directory listing of the tenant's people", () => {
   const oid = "f6481ec4-0000-4000-8000-2a8f29bb1c4a";
 
   it("creates the person under their best name", async () => {
@@ -207,6 +212,7 @@ describe("a directory sighting", () => {
     });
   });
 
+  /** @scenario "A directory row enriches a discovered person's display text" */
   it("upgrades the display text of a person activity discovered as a bare id", async () => {
     // Activity saw the id first — a transcript knows people only as GUIDs.
     await service().recordFromPulledEvents({

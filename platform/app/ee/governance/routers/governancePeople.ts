@@ -16,15 +16,8 @@
  */
 
 import { GovernancePeopleScreenService } from "@ee/governance/services/governancePeopleScreen.service";
-import {
-  IdentityAlreadyLinkedError,
-  IdentityErasedError,
-  IdentityMatchSuggestionNotFoundError,
-} from "@ee/governance/services/identityMatch.errors";
 import { IdentityMatchService } from "@ee/governance/services/identityMatch.service";
 import { IdentityMatchSuggestionService } from "@ee/governance/services/identityMatchSuggestion.service";
-import { HandledError } from "@langwatch/handled-error";
-import { TRPCError } from "@trpc/server";
 import { z } from "zod";
 
 import { createTRPCRouter, protectedProcedure } from "~/server/api/trpc";
@@ -70,45 +63,14 @@ export const governancePeopleRouter = createTRPCRouter({
     .input(z.object({ organizationId: z.string(), suggestionId: z.string() }))
     .permission("governance:manage")
     .mutation(async ({ ctx, input }) => {
-      try {
-        return await IdentityMatchService.create(ctx.prisma).confirmSuggestion({
-          organizationId: input.organizationId,
-          suggestionId: input.suggestionId,
-        });
-      } catch (err) {
-        throw mapError(err);
-      }
+      // No error mapping here, unlike departments.ts: the engine's refusals
+      // (already linked, erased, suggestion gone) all extend HandledError,
+      // which the boundary formatter already serialises with its registered
+      // code and remediation. A local instanceof map would be dead code the
+      // HandledError check shadows.
+      return await IdentityMatchService.create(ctx.prisma).confirmSuggestion({
+        organizationId: input.organizationId,
+        suggestionId: input.suggestionId,
+      });
     }),
 });
-
-/**
- * The engine's refusals shaped for the boundary, each with the code a client
- * can act on: a queue read before somebody else confirmed is a CONFLICT to
- * refresh past, a vanished suggestion is NOT_FOUND, and everything else keeps
- * its `cause` on the way to the logs.
- */
-function mapError(err: unknown): Error {
-  if (HandledError.isHandled(err)) {
-    return err;
-  }
-  if (
-    err instanceof IdentityAlreadyLinkedError ||
-    err instanceof IdentityErasedError
-  ) {
-    return new TRPCError({
-      code: "CONFLICT",
-      message: err.message,
-      cause: err,
-    });
-  }
-  if (err instanceof IdentityMatchSuggestionNotFoundError) {
-    return new TRPCError({
-      code: "NOT_FOUND",
-      message: err.message,
-      cause: err,
-    });
-  }
-  return err instanceof TRPCError
-    ? err
-    : new TRPCError({ code: "INTERNAL_SERVER_ERROR", cause: err });
-}

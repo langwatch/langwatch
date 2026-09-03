@@ -36,6 +36,7 @@ import {
 } from "~/utils/posthogErrorCapture";
 import { decryptCredentials } from "../activity-monitor/ingestionCredentials";
 import type { SourceType } from "../activity-monitor/ingestionSource.service";
+import { DirectoryDepartmentSyncService } from "../directoryDepartmentSync.service";
 import {
   loadErasureSuppression,
   partitionSuppressedEvents,
@@ -45,7 +46,6 @@ import {
   OCSF_ACTIVITY,
   OCSF_SEVERITY,
 } from "../governanceOcsfEvents.clickhouse.repository";
-import { DirectoryDepartmentSyncService } from "../directoryDepartmentSync.service";
 import { ensureHiddenGovernanceProject } from "../governanceProject.service";
 import { PersonDiscoveryService } from "../personDiscovery.service";
 import type {
