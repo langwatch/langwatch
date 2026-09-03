@@ -12930,9 +12930,9 @@ surface's. Six absences that read as stale are that, and they stay.
 | `withoutWorkflowCopies` | **STALE** | `WorkflowService.copy` exists and this process composes the service (`execution.workflows.workflowService`, already read at two other call sites) | **CLOSED**: new `ApiAgentWorkflowCopyAdapter`, resolved through a thunk because the agent service composes before the execution half |
 | `absent("subscription")` | **STALE** | `SaaSPlanProviderService` and `PostgresBillingAdapter` are exported from `@langwatch/enterprise-billing-server` — which `api-usage.composition.ts` already imports two symbols from | **CLOSED**: composed as the `EntitlementSource` the entitlement service consults before its baseline; the absence now fires only when the store genuinely is not there |
 | `absent("operator-runtime")` | **STALE (3 of 4)** | "no packaged implementation anywhere" is false: `EventExplorerService` and `ManagerExplorerService` are exported from `@langwatch/ops-server` | **PARTLY CLOSED** (the scheduled-job store, above); the comment now names what each of the other three actually waits on |
-| `absent("evaluation-runs")` | **STALE claim** | "has not moved out of the platform application" is false — `EvaluationService.getMonitorPerformance` and `ClickHouseMonitorPerformanceRepository` are in `@langwatch/evaluation-server` | **NOT CLOSED, named**: the repository is not exported, and `EvaluationAdapter` demands an executor and a workflow capability this read never touches. One export away |
-| `UnavailableApiScenarioExecution` | **STALE (4 of 5)** | The package ships the concrete `ScenarioExecutionService`; all ten prefetcher collaborators are composed on this process already, and `ScenarioApp` reaches only `prefetch` | **NOT CLOSED, named**: the gap is two config values (`langwatchEndpoint`, `legacyDefaultModel`) no process in the repository reads |
-| `UnavailableApiOrganizationSeatLicense` | **STALE** | This root makes both halves of the same decision under other names (`ApiInviteSeatCensus`; `assertCustomRolesAllowed`) | **NOT CLOSED, named**: `ApiIdentityCollaboratorsOptions` carries no `plans`, so the half cannot ask the provider the process already shares |
+| `absent("evaluation-runs")` | **STALE claim** | "has not moved out of the platform application" is false — `EvaluationService.getMonitorPerformance` and `ClickHouseMonitorPerformanceRepository` are in `@langwatch/evaluation-server` | **CLOSED** by the follow-up below: the fold moved into `MonitorPerformanceService` and `MonitorPerformanceAdapter` composes it over the routed client, so the repository stays private |
+| `UnavailableApiScenarioExecution` | **STALE (4 of 5)** | The package ships the concrete `ScenarioExecutionService`; all ten prefetcher collaborators are composed on this process already, and `ScenarioApp` reaches only `prefetch` | **CLOSED** by the follow-up below: both config values are read now, and the class is deleted. `submit` is refused by `UnavailableScenarioExecutionPoolService`, which is the honest leg |
+| `UnavailableApiOrganizationSeatLicense` | **STALE** | This root makes both halves of the same decision under other names (`ApiInviteSeatCensus`; `assertCustomRolesAllowed`) | **CLOSED** by the follow-up below: `plans` is on the identity options, `ApiOrganizationSeatLicense` decides both halves against the organization's own plan, and the class is deleted |
 | `absent("no-encryption")` | **STALE, kept** | `resolveTenancy` composes nothing without the same `encryption` local, so a composed tenancy is proof the cipher exists | **KEPT**: the branch is the NARROWING for a non-optional input; removing it fails `tsc`, and a silent `return undefined` would drop the gateway with no line saying why. Doc corrected |
 | `absent("plan-allowance")` | **REAL GAP** | "composes no usage meter" is half stale — the plan provider IS held, by eight readers | **MESSAGE CORRECTED**: `UsageOrganizationPort` and `UsageVolumeCounterPort` have no implementation in any tier, so `UsageService` is composed by nobody |
 | `withoutExecutionTelemetry` | **REAL GAP** | "no metrics registry" is wrong: `EvaluationExecutionTelemetryPort` takes no registry, only `record(...)` | **MESSAGE CORRECTED**: nothing in the tree implements the port. Template: `OtelPiiAnalysisMetricsAdapter` |
@@ -12966,11 +12966,17 @@ surface's. Six absences that read as stale are that, and they stay.
    capability it never touches. Doing exactly that to close this would be
    building the thing that comment warns against. The closure is a one-line
    export in `@langwatch/evaluation-server`, and that package is another lane's.
+   *Corrected by the follow-up below:* one export was not enough. The repository
+   answers buckets, and the fold that turns them into the number a person reads
+   was inside `EvaluationService`, so a service moved out beside it and the
+   repository stayed private.
 4. **The seat licence and the scenario executor were named, not built.** Both
    are genuinely stale, and both are their own lane: the seat licence decides
    whether a paid plan's seats may be spent, and the scenario executor needs two
    configuration values that do not exist anywhere. A wrong seat gate is worse
-   than an honest refusal.
+   than an honest refusal. *Both were built in the follow-up below, the seat
+   licence with a composition test that a seat over the plan's limit is refused
+   through the real service.*
 5. **The subscription source lives in `apps/api`, not in the billing package.**
    `ApiSubscriptionEntitlementSource` is the twin of `LicensingEntitlementSource`
    on the licence side, and for the same reason: which source a deployment
@@ -13024,7 +13030,8 @@ surface's. Six absences that read as stale are that, and they stay.
   in another lane's package), the organization seat licence (`plans` on the
   identity options), and the scenario executor (two config values). Each now
   carries its closure recipe in the code rather than a reason that has stopped
-  being true.
+  being true. *All three were closed the same day — see "The three named
+  absences closed" at the end of this document.*
 - **The two operator explorers were not composed.** The event-log explorer wants
   a shared-endpoint ClickHouse accessor `ApiClickHouseInfrastructure` does not
   publish — the same missing piece `events-meter` waits on. The fleet explorer
@@ -13629,3 +13636,192 @@ unknown annotations and 50 inert files, none of them from these files).
   describe the sub-flow round trip end to end, the caller's draft surviving it,
   and Escape returning to the caller — none has a test, and writing one is the
   work of whoever lands the sub-flows.
+
+## The three named absences closed: the trend, the run preparer and the seat licence, 2026-09-03
+
+`2f25bf1f71` audited `apps/api`'s forty-three named absences and left three
+"stale and specified" — the monitors page's seven-day trend, the scenario run
+executor and the organization seat licence. Each carried a closure recipe
+rather than a reason, and this lane spent all three. Two of the three refused a
+customer something the process could answer; the third told an administrator
+the deployment could not decide when what was true is that their plan was full.
+
+### 1. `absent("evaluation-runs")` — the trend
+
+The recipe said "export `ClickHouseMonitorPerformanceRepository` and compose it
+on `resolveClickHouseClient`". Exporting the repository alone would have been
+half a closure: the repository answers BUCKETS, and turning a bucket into the
+number a person reads — a guardrail's pass rate, an evaluator's mean score,
+what an empty window means — lived in `EvaluationService`, behind the executor
+and workflow capability the read never touches. So the fold moved WITH the
+read, into a service of its own, and the repository stayed private.
+
+```
+BEFORE                                   AFTER
+
+ MonitorApp                               MonitorApp
+   evaluations.getMonitorPerformance        evaluations.getMonitorPerformance
+        │                                        │
+        ▼                                        ▼
+   throw "no evaluation-run read stack"     MonitorPerformanceAdapter
+                                                 │  (@langwatch/evaluation-server)
+ @langwatch/evaluation-server                    ▼
+   EvaluationService ─── fold ───┐          MonitorPerformanceService ── fold
+     needs: executor,            │               │
+            inputResolution,     │               ▼
+            workflows,           │          ClickHouseMonitorPerformanceRepository
+            runs repository      │               │  (private to the package)
+   ClickHouseMonitorPerformance ─┘               ▼
+     Repository (unexported)                routed ClickHouse, tenant-keyed
+```
+
+`EvaluationService.getMonitorPerformance` now delegates to the same service, so
+the worker's fold and the API's are one object's rules rather than two copies.
+
+### 2. `UnavailableApiScenarioExecution` — preparing a run
+
+Five legs refused; four of them for a reason that had stopped being true. The
+ledger named the real gap as two configuration values no process in the
+repository read. One of them could not become a leaf: `LANGWATCH_ENDPOINT` is
+already bound by `observability.endpoint`, and `RuntimeConfig` refuses to bind
+one variable twice — deliberately, because one variable must mean one thing. So
+it is PROJECTED off that leaf in the resolution, and only the fallback model is
+new.
+
+```
+BEFORE                                   AFTER
+
+ ScenarioApp.prefetchExecution            ScenarioApp.prefetchExecution
+        │                                        │
+        ▼                                        ▼
+ UnavailableApiScenarioExecution          ScenarioExecutionService (real)
+   submit   ─ refuse                        submit    ─ UnavailableScenarioExecutionPool
+   cancel   ─ refuse                        cancel    ─ Redis channel, else refuse
+   prefetch ─ refuse  ◄── the lie           prefetch  ─ ScenarioExecutionPrefetcherService
+   prepare  ─ refuse                        prepare   ─ the same prefetcher
+   finish   ─ refuse                        finish    ─ ScenarioFailureHandlerService
+
+                                          composed here    handed in
+                                          ──────────────   ──────────────
+                                           scenarios        workflows
+                                           suites           modelProviders
+                                           prompts          secrets
+                                           projects*        traces
+                                           agents*          config ──┐
+                                           secretCipher              │
+                                             (*from options)         │
+                                                                     ▼
+                                          api.config.ts  infrastructure.execution
+                                            langwatchEndpoint ◄ projected from
+                                                                observability.endpoint
+                                                                (LANGWATCH_ENDPOINT)
+                                            defaultModel      ◄ LANGWATCH_DEFAULT_MODEL,
+                                                                registry flagship by default
+                                            nlpServiceUrl     ◄ already there
+```
+
+`submit` stays refused, and honestly: the in-process pool is the worker's, and
+the outbox retries the execute where one exists. `cancel` publishes on the
+process's Redis where it has one, because the run being cancelled is executing
+on another pod.
+
+### 3. `UnavailableApiOrganizationSeatLicense` — the seat
+
+The unsafe direction was not "allow": it was that this root already made BOTH
+halves of the same decision under other names, so an organization could be
+INVITED into a seat it could not RE-ENABLE a membership into. The wiring was
+one option.
+
+```
+BEFORE                                   AFTER
+
+ identity options                         identity options
+   prisma, organizations, grants, …         prisma, organizations, grants, …
+   (no plans)                               plans ◄── this.options.plans ??
+        │                                              this.resolvePlanProvider(options)
+        ▼                                        │
+ UnavailableApiOrganizationSeatLicense           ▼
+   checkLimit ─ 503 service_unavailable    ApiOrganizationSeatLicense
+   assertRoleChangeAllowed ─ 503             checkLimit ── plan.overrideAddingLimitations
+                                             │              ? allowed
+ elsewhere on the SAME root:                 │              : current < max
+   ApiInviteSeatCensus                       │                    │
+     maxMembers / maxMembersLite  ───────────┤                    ▼
+   assertCustomRolesAllowed                  │      PrismaUsageMembershipRepository
+     Enterprise plan type       ─────────────┤        (the SAME counts the usage
+                                             │         panel is read from)
+                                             ▼
+                                        assertRoleChangeAllowed
+                                          getRoleChangeType ─ lite→full re-checks
+                                          │                   the FULL seats
+                                          ├─ LimitExceededError (resource_limit_exceeded)
+                                          └─ custom role assigned?
+                                               assertEnterprisePlanType(RBAC)
+```
+
+A seat refusal is a `LimitExceededError` carrying the counts, which is the shape
+every other member limit in the product raises. What did NOT come across is the
+ops Slack notification the platform fired beside each refusal: it reached a
+vertical this process does not compose, and a notification nobody receives must
+not be able to fail a seat decision.
+
+### File → change
+
+| File | Change |
+| --- | --- |
+| `packages/features/evaluation/server/src/services/monitor-performance.service.ts` | NEW. `MonitorPerformanceService` — the trend read and the fold, moved out of `EvaluationService` whole. |
+| `packages/features/evaluation/server/src/adapters/monitor-performance.clickhouse.adapter.ts` | NEW. `MonitorPerformanceAdapter` — the service over a routed client, so the repository stays private. |
+| `packages/features/evaluation/server/src/services/evaluation.service.ts` | `getMonitorPerformance` delegates; the three private fold helpers moved with it. |
+| `packages/features/evaluation/server/src/index.ts` | Exports the adapter and the service, with the reason beside the repository export that states the same rule. |
+| `apps/api/src/app/api-trpc-collaborators.product-infra.composition.ts` | `composeMonitorPerformance`; the `evaluation-runs` absence deleted from the report enum; the ClickHouse consequence now names the trend. |
+| `apps/api/src/platform/config/api.config.ts` | `execution.defaultModel` (`LANGWATCH_DEFAULT_MODEL`, registry flagship by default) and `execution.langwatchEndpoint`, projected off `observability.endpoint`. |
+| `apps/api/src/app/api-trpc-collaborators.agent-group.composition.ts` | `ApiScenarioExecutionCollaborators` on the options; `composeScenarioExecution`; `UnavailableApiScenarioExecution` deleted; one prompt reader and one suite service now serve both the applications and the prefetcher. |
+| `apps/api/src/app/api-trpc-collaborators.identity.composition.ts` | `plans` on the options; `ApiOrganizationSeatLicense`; `UnavailableApiOrganizationSeatLicense` deleted. |
+| `apps/api/src/app/api-production.composition.ts` | `plans` threaded into the identity composition; the four scenario collaborators and the three config values threaded into the agent group, behind a narrowing every gate above already implies. |
+| `.env.example` | `LANGWATCH_DEFAULT_MODEL` documented beside the NLP and LangEvals addresses, with a note that a run reports its events to `LANGWATCH_ENDPOINT`. |
+| `apps/api/src/app/__tests__/api-trpc-collaborators.product-infra.integration.test.ts` | The trend answered off the routed connection (pass rate folded from real buckets), and the refusal moved to a deployment with no ClickHouse. |
+| `apps/api/src/app/__tests__/api-trpc-collaborators.agent-group.integration.test.ts` | Preparing a run validates through the composed prefetcher and reads the scenario table, where it used to reject with `service_unavailable`. |
+| `apps/api/src/app/__tests__/api-trpc-collaborators.identity.composition.integration.test.ts` | Three tests: a seat over the plan's limit refused with the counts, the same seat given back when there is room, and a custom-role assignment refused on a plan that does not carry them. |
+| `apps/api/src/platform/config/__tests__/api.config.unit.test.ts` | The two new leaves, including the blank-override case that must not resolve to a model named `""`. |
+
+### Gates
+
+- `apps/api`: `tsc --noEmit` **0 errors**; `vitest run src/app src/platform` —
+  **51 files, 550 tests passed**.
+- `@langwatch/evaluation-server`: `typecheck` clean; `test` — **26 files, 214
+  tests passed** (1 skipped).
+- `oxlint` over every touched file — clean of anything this lane wrote. The one
+  warning it reports, an unused `S3Client` in the product-infra composition, is
+  present at `HEAD` on a line no diff here touches.
+- **Every new test was sabotage-checked.** Swapping the composed trend back for
+  the refusing stub fails the product-infra trend test; replacing the prefetcher
+  with a refusing double fails the agent-group preparation test; and the seat
+  licence was sabotaged TWICE — once back to the 503 refusal, once to a licence
+  that allows everything — failing two tests each time, which is what tells a
+  gate that decides from one that merely refuses.
+- Nothing under `platform/` was created, edited or read.
+
+### What this lane did NOT do
+
+- **`assertRoleChangeAllowed` reads no NEW permissions.** `getRoleChangeType` is
+  passed `undefined` for the incoming role's permissions, which is the
+  platform's own call: a built-in role carries none, and a custom one is gated
+  on the plan rather than on a seat one line later.
+- **The ops notification is gone, not deferred.** The platform fired a Slack
+  message beside each seat refusal through `getApp().usageLimits`. This process
+  composes no such vertical, and the org-group half already logs that absence
+  for `notifyResourceLimitReached`.
+- **`langwatchEndpoint` is not its own leaf.** `RuntimeConfig` refuses a second
+  binding for `LANGWATCH_ENDPOINT`, so it is projected off `observability.endpoint`.
+  A deployment that never set it hands the prefetcher an empty origin rather
+  than a guess — and a guess would report a customer's run to `app.langwatch.ai`.
+- **The four scenario collaborators gate the agent group.** Each is already
+  implied by a gate above it, so the branch cannot be reached on this root; it
+  is the narrowing that lets the prefetcher take services rather than optionals,
+  the same call `no-encryption` records one file away.
+- **The absences that remain are the ones `2f25bf1f71` classed as REAL GAPS or
+  DELIBERATE.** Nothing in that census is stale-and-open any more:
+  `plan-allowance`, `withoutExecutionTelemetry`, `usage-mail`,
+  `UnavailableApiPasswordResetMail`, `events-meter`, `withoutDurableAppend` and
+  `withoutRateLimit` each wait on an implementation or a config block that does
+  not exist, and the boundary refusals stay.

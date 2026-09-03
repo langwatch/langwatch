@@ -185,13 +185,30 @@ class SilentEventing extends IdentityEventingPort {
   }
 }
 
+/**
+ * A plan with room for everybody, which is what every scenario here that is
+ * not about seats needs the licence to answer.
+ */
+function roomyPlan() {
+  return {
+    getActivePlan: async () => ({
+      type: "LAUNCH",
+      free: false,
+      maxMembers: 50,
+      maxMembersLite: 50,
+    }),
+  } as never;
+}
+
 function composeIdentityHalf(
   prisma: PrismaClient,
   grants: AuthzGrantsService,
   eventing: IdentityEventingPort = new SilentEventing(),
+  plans: Parameters<typeof composeApiIdentityCollaborators>[0]["plans"] = roomyPlan(),
 ) {
   return composeApiIdentityCollaborators({
     prisma,
+    plans,
     organizations: {
       getSettings: async () => ({ supportContact: null }),
     } as unknown as OrganizationService,
@@ -424,6 +441,78 @@ async function callTrpc(
   return { status: response.status, body: await response.json() };
 }
 
+/** The organization whose plan the seat scenarios below are decided against. */
+const SEAT_ORGANIZATION_ID = "organization-seats";
+/** The membership an administrator is trying to give a seat back to. */
+const SEAT_MEMBER_ID = "user-disabled";
+
+/**
+ * The rows a seat decision reads, and the one write it makes.
+ *
+ * Every model here is one the REAL composed graph reaches: the membership the
+ * service looks up, the enabled memberships and pending invitations the seat
+ * census counts, and the custom roles it classifies a Lite Member by.
+ */
+function seatPrisma(members: ReadonlyArray<{ userId: string; role: string }>) {
+  const updated: Array<{ userId: string; disabledAt: Date | null }> = [];
+  const disabledMember = {
+    userId: SEAT_MEMBER_ID,
+    organizationId: SEAT_ORGANIZATION_ID,
+    role: "MEMBER",
+    disabledAt: new Date("2026-09-01T00:00:00.000Z"),
+    createdAt: new Date("2026-08-01T00:00:00.000Z"),
+    updatedAt: new Date("2026-09-01T00:00:00.000Z"),
+    user: { id: SEAT_MEMBER_ID, name: "Robin", email: "robin@acme.test" },
+  };
+
+  const organizationUser = {
+    findUnique: vi.fn(async () => disabledMember),
+    // The seat census counts ENABLED memberships only: a disabled one holds no
+    // access, so it is out of the pool by definition.
+    findMany: vi.fn(async () => members),
+    update: vi.fn(async ({ data }: { data: { disabledAt: Date | null } }) => {
+      updated.push({ userId: SEAT_MEMBER_ID, disabledAt: data.disabledAt });
+      return disabledMember;
+    }),
+  };
+
+  const client = {
+    organizationUser,
+    customRole: { findMany: vi.fn(async () => []) },
+    organizationInvite: { findMany: vi.fn(async () => []) },
+    // The personal-workspace guard resolves both scope kinds before a role
+    // change is allowed to name a team; this organization has neither a
+    // personal team nor a personal project in scope.
+    team: { findMany: vi.fn(async () => []), findFirst: vi.fn(async () => null) },
+    project: { findMany: vi.fn(async () => []) },
+    roleBinding: { findMany: vi.fn(async () => []) },
+    $transaction: vi.fn(async (run: (tx: unknown) => Promise<unknown>) =>
+      run({ organizationUser }),
+    ),
+  } as unknown as PrismaClient;
+
+  return { client, updated };
+}
+
+/**
+ * The identity half composed against one organization's plan and its seats.
+ *
+ * The licence itself is the composed one — this supplies only the plan the
+ * deployment is on and the rows the census counts.
+ */
+function composeSeatLicence(options: {
+  plan: { maxMembers: number; maxMembersLite: number; overrideAddingLimitations?: boolean };
+  members: ReadonlyArray<{ userId: string; role: string }>;
+}) {
+  const prisma = seatPrisma(options.members);
+  const { grants } = testGrants();
+  const half = composeIdentityHalf(prisma.client, grants, new SilentEventing(), {
+    getActivePlan: async () => ({ type: "LAUNCH", free: false, ...options.plan }),
+  } as never);
+
+  return { organizations: half.organizationRest, prisma };
+}
+
 describe("given an API process composed with the identity half of the record", () => {
   describe("when the sign-up ceremony creates somebody's first organization", () => {
     /** @scenario "A new organization is created with its first team" */
@@ -479,6 +568,92 @@ describe("given an API process composed with the identity half of the record", (
       expect(body).toMatchObject({
         result: { data: { json: { id: "user-1", email: "sam@acme.test" } } },
       });
+    });
+  });
+
+  describe("when an administrator re-enables a membership the plan has no seat for", () => {
+    it("refuses through the composed seat licence rather than writing the seat", async () => {
+      const { organizations, prisma } = composeSeatLicence({
+        plan: { maxMembers: 2, maxMembersLite: 5 },
+        members: [
+          { userId: "user-a", role: "ADMIN" },
+          { userId: "user-b", role: "MEMBER" },
+        ],
+      });
+
+      // Two seats taken on a two-seat plan, so the third cannot be given back.
+      // Refused with the code every other member limit in the product raises,
+      // carrying the counts the limit modal reads.
+      await expect(
+        organizations.setMemberDisabled({
+          organizationId: SEAT_ORGANIZATION_ID,
+          userId: SEAT_MEMBER_ID,
+          disabled: false,
+          actingUser: { id: "user-a" },
+        }),
+      ).rejects.toMatchObject({
+        code: "member_seat_limit_reached",
+        meta: { limitType: "members", current: 2, max: 2 },
+      });
+
+      // And the seat was not given back on the way to the refusal. Before the
+      // licence was composed this path refused too — but with
+      // `service_unavailable`, which told an administrator the deployment
+      // could not decide rather than that their plan was full.
+      expect(prisma.updated).toEqual([]);
+    });
+
+    it("gives the seat back when the plan still has room for it", async () => {
+      const { organizations, prisma } = composeSeatLicence({
+        plan: { maxMembers: 5, maxMembersLite: 5 },
+        members: [
+          { userId: "user-a", role: "ADMIN" },
+          { userId: "user-b", role: "MEMBER" },
+        ],
+      });
+
+      await organizations.setMemberDisabled({
+        organizationId: SEAT_ORGANIZATION_ID,
+        userId: SEAT_MEMBER_ID,
+        disabled: false,
+        actingUser: { id: "user-a" },
+      });
+
+      // The same call the refusal above stopped, answered: a licence that
+      // refused everything would fail this one, which is what tells the two
+      // apart.
+      expect(prisma.updated).toEqual([{ userId: SEAT_MEMBER_ID, disabledAt: null }]);
+    });
+  });
+
+  describe("when a role change assigns a custom role on a plan that does not carry them", () => {
+    it("refuses through the same composed licence rather than binding the role", async () => {
+      const { organizations, prisma } = composeSeatLicence({
+        plan: { maxMembers: 5, maxMembersLite: 5 },
+        members: [{ userId: "user-a", role: "ADMIN" }],
+      });
+
+      // The second half of the same decision: a custom-role assignment is an
+      // Enterprise feature, and this organization is on LAUNCH. Refused before
+      // any binding is written, which is what the gate is for.
+      await expect(
+        organizations.changeMemberRole({
+          organizationId: SEAT_ORGANIZATION_ID,
+          userId: SEAT_MEMBER_ID,
+          role: "EXTERNAL",
+          teamRoleUpdates: [
+            {
+              teamId: "team-1",
+              userId: SEAT_MEMBER_ID,
+              role: "VIEWER",
+              customRoleId: "custom-role-1",
+            },
+          ],
+          currentUserId: "user-a",
+        } as never),
+      ).rejects.toThrow(/Custom roles require an Enterprise plan/);
+
+      expect(prisma.updated).toEqual([]);
     });
   });
 

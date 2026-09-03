@@ -32,21 +32,17 @@
  * asks it: `storedObjects.headById` carries its own `projectId`, and the
  * id-only path is the `/api/files` REST family's.
  *
- * `getMonitorPerformance` — the seven-day trend reads the evaluation RUN
- * stack. That stack HAS moved: `EvaluationService.getMonitorPerformance` and
- * `ClickHouseMonitorPerformanceRepository` both live in
- * `@langwatch/evaluation-server`, and this process holds the routed ClickHouse
- * they read on. What is missing is one line in that package: the repository is
- * not exported, and the only exported route to it is `EvaluationAdapter`, which
- * demands an evaluator executor and a whole workflow capability this read never
- * touches — the precise shape the package's own comment on
- * `ClickHouseEvaluationRepository` says a one-read caller should not synthesise.
- * The closure is to export `ClickHouseMonitorPerformanceRepository` beside it,
- * then compose it here on `resolveClickHouseClient`.
+ * `getMonitorPerformance` is composed now, not absent. The trend is one
+ * ClickHouse read over `evaluation_runs` joined to `trace_summaries`, and
+ * `@langwatch/evaluation-server` publishes it as `MonitorPerformanceAdapter` —
+ * the service alone, without the evaluator executor and workflow capability
+ * `EvaluationAdapter` demands and this read never touches. It runs on the SAME
+ * routed connection the object probe uses.
  *
- * Until then it refuses by name rather than answering `[]`: an empty trend
- * reads as "your monitors caught nothing", which is the one answer a person
- * acts on by turning a monitor off.
+ * A deployment with NO ClickHouse still has no trend to read, and there it
+ * refuses by name rather than answering `[]`: an empty trend reads as "your
+ * monitors caught nothing", which is the one answer a person acts on by
+ * turning a monitor off.
  *
  * ## The retention policy is composed, not re-implemented
  *
@@ -80,6 +76,11 @@ import type { PlanInfo } from "@langwatch/enterprise-licensing-contract";
 import { isEnterpriseTier } from "@langwatch/enterprise-plan-gate";
 import type { PlanProvider } from "@langwatch/entitlement-contract";
 import { EvaluatorReplicationApi, type EvaluatorTrpcPorts } from "@langwatch/evaluator-server";
+import {
+  MonitorPerformanceAdapter,
+  type EvaluationClickHouseResolver,
+  type MonitorPerformanceService,
+} from "@langwatch/evaluation-server";
 import { HandledError } from "@langwatch/handled-error";
 import type { EvaluatorService } from "@langwatch/evaluator-contract";
 import { monitorPreconditionsSchema, type MonitorService } from "@langwatch/monitor-contract";
@@ -206,7 +207,7 @@ export type ApiProductInfraCollaborators = Readonly<{
 
 /** What this half could not compose, and therefore which answer degrades. */
 export abstract class ApiProductInfraAbsenceReport {
-  abstract absent(capability: "clickhouse" | "plans" | "evaluation-runs"): void;
+  abstract absent(capability: "clickhouse" | "plans"): void;
 }
 
 /** Composes the product-infrastructure half from this process's graph. */
@@ -263,18 +264,16 @@ export class LoggedApiProductInfraAbsence extends ApiProductInfraAbsenceReport {
     super();
   }
 
-  absent(capability: "clickhouse" | "plans" | "evaluation-runs"): void {
+  absent(capability: "clickhouse" | "plans"): void {
     this.logger.warn({ capability }, CONSEQUENCE[capability]);
   }
 }
 
 const CONSEQUENCE = {
   clickhouse:
-    "API process composed no ClickHouse connection: every stored-object probe refuses by name rather than reporting a file missing that is not.",
+    "API process composed no ClickHouse connection: every stored-object probe refuses by name rather than reporting a file missing that is not, and the monitors page's seven-day trend refuses rather than reporting that no monitor caught anything.",
   plans:
     "API process composed no plan provider: every retention write refuses by name, because a plan gate that cannot read a plan must not pass.",
-  "evaluation-runs":
-    "API process composed no evaluation-run read: @langwatch/evaluation-server owns the stack but exports ClickHouseMonitorPerformanceRepository to nobody, so the monitors page's seven-day trend refuses by name rather than reporting that no monitor caught anything.",
 } as const;
 
 // ---------------------------------------------------------------------------
@@ -811,21 +810,49 @@ class ApiDataRetentionAdministrators extends DataRetentionAdministratorPort {
 // Monitors
 // ---------------------------------------------------------------------------
 
+/**
+ * The seven-day trend, over the SAME routed ClickHouse the object probe reads.
+ *
+ * The trend alone: `MonitorPerformanceAdapter` composes the read and the fold
+ * that turns its buckets into a guardrail's pass rate or an evaluator's mean
+ * score, and nothing else. `EvaluationAdapter` would compose the same read
+ * behind an evaluator executor and a workflow capability this process never
+ * asks the trend for.
+ *
+ * With no connection there is nothing to read, and the answer is a refusal by
+ * name rather than an empty trend, which a person would read as "no monitor
+ * caught anything" and act on by switching a monitor off.
+ */
+function composeMonitorPerformance(
+  options: ApiProductInfraCollaboratorsOptions,
+): Pick<MonitorPerformanceService, "getMonitorPerformance"> {
+  const resolve = options.resolveClickHouseClient;
+  if (!resolve) {
+    return {
+      getMonitorPerformance: () =>
+        Promise.reject(
+          new ApiProductInfraUnavailableError(
+            "The monitor performance trend, because this deployment composed no ClickHouse connection,",
+          ),
+        ),
+    };
+  }
+  // The one cast this seam takes, and the same one the stored-object port
+  // takes above: the routed connection is typed `unknown` here so this module
+  // does not have to name a ClickHouse client, and each reader states the
+  // shape its own package declares.
+  return MonitorPerformanceAdapter.create({
+    resolveClickHouse: resolve as EvaluationClickHouseResolver,
+  });
+}
+
 function composeMonitors(options: ApiProductInfraCollaboratorsOptions): {
   app: MonitorApp;
   ports: MonitorTrpcPorts;
 } {
-  options.report?.absent("evaluation-runs");
-
   const app = MonitorApp.create({
     monitors: options.monitors,
-    evaluations: {
-      getMonitorPerformance: () => {
-        throw new ApiProductInfraUnavailableError(
-          "The monitor performance trend, because this deployment composed no evaluation-run read stack,",
-        );
-      },
-    },
+    evaluations: composeMonitorPerformance(options),
     evaluators: options.evaluators,
   });
 

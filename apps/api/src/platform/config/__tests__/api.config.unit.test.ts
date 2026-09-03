@@ -1,9 +1,20 @@
+import { getLatestOpenAIChatFlagship } from "@langwatch/model-provider-contract";
 import { describe, expect, it } from "vitest";
 import {
   apiLoggerConfiguration,
   apiObservabilityConfiguration,
   resolveApiConfig,
 } from "../api.config";
+
+/**
+ * The fallback model, derived rather than written down.
+ *
+ * A literal here would pin the assertions to whichever model was newest the
+ * day they were written, and the registry advances: the fact under test is
+ * that an unconfigured deployment gets the CURRENT flagship, not that it gets
+ * a particular one.
+ */
+const REGISTRY_FLAGSHIP_MODEL = getLatestOpenAIChatFlagship() ?? "openai/gpt-5";
 
 describe("API process configuration", () => {
   it("parses the listener and drain settings once at executable composition", () => {
@@ -91,6 +102,10 @@ describe("API process configuration", () => {
           nlpServiceUrl: undefined,
           langevalsEndpoint: undefined,
           publicBaseUrl: undefined,
+          langwatchEndpoint: undefined,
+          // Never blank, even here: a deployment that overrides no model still
+          // has to be able to run a scenario whose target names none.
+          defaultModel: REGISTRY_FLAGSHIP_MODEL,
         },
         // The gateway's own three facts, and the environment it reads a system
         // provider's credential from — which is this call's source, filtered to
@@ -176,6 +191,8 @@ describe("API process configuration", () => {
         nlpServiceUrl: "http://nlp.example.test:5561",
         langevalsEndpoint: "http://langevals.example.test",
         publicBaseUrl: "https://app.example.test",
+        langwatchEndpoint: undefined,
+        defaultModel: REGISTRY_FLAGSHIP_MODEL,
       });
     });
 
@@ -193,7 +210,38 @@ describe("API process configuration", () => {
         nlpServiceUrl: undefined,
         langevalsEndpoint: undefined,
         publicBaseUrl: undefined,
+        langwatchEndpoint: undefined,
+        defaultModel: REGISTRY_FLAGSHIP_MODEL,
       });
+    });
+  });
+
+  describe("when a scenario run's child environment is configured", () => {
+    it("reads the ingestion origin a prepared child reports its own events to", () => {
+      const config = resolveApiConfig({
+        LANGWATCH_ENDPOINT: "https://ingest.example.test",
+      });
+
+      // The SAME variable this process's own telemetry names, which is what a
+      // prepared child was handed before this module existed. Absent it would
+      // fall back to the SDK default — somebody else's deployment.
+      expect(config.infrastructure.execution.langwatchEndpoint).toBe("https://ingest.example.test");
+    });
+
+    it("takes the deployment's model override for a target that names none", () => {
+      const config = resolveApiConfig({
+        LANGWATCH_DEFAULT_MODEL: "openai/gpt-5-mini",
+      });
+
+      expect(config.infrastructure.execution.defaultModel).toBe("openai/gpt-5-mini");
+    });
+
+    it("falls back to the registry flagship rather than to an empty model", () => {
+      const config = resolveApiConfig({ LANGWATCH_DEFAULT_MODEL: "  " });
+
+      // A blank override is not a model: carried to a provider as one it names
+      // a model called "", which fails at the child rather than here.
+      expect(config.infrastructure.execution.defaultModel).toBe(REGISTRY_FLAGSHIP_MODEL);
     });
   });
 
@@ -417,6 +465,8 @@ describe("API process configuration", () => {
         nlpServiceUrl: undefined,
         langevalsEndpoint: undefined,
         publicBaseUrl: undefined,
+        langwatchEndpoint: undefined,
+        defaultModel: REGISTRY_FLAGSHIP_MODEL,
       },
       modelProvider: {
         isSaas: false,

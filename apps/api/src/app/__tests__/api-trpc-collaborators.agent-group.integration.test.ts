@@ -43,14 +43,18 @@ import type {
   AuthzService,
   PermissionDecision,
 } from "@langwatch/authz-contract";
-import type { AgentService } from "@langwatch/agent-contract";
+import { AgentNotFoundError, type AgentService } from "@langwatch/agent-contract";
+import type { ModelProviderService } from "@langwatch/model-provider-contract";
 import type { FeatureFlagService } from "@langwatch/feature-flag-contract";
 import type { OrganizationService } from "@langwatch/organization-contract";
 import type { PresenceEmitterPort } from "@langwatch/presence-server";
 import type { PrismaConnection } from "@langwatch/prisma-client";
 import type { PrismaClient } from "@langwatch/prisma-client/generated";
 import type { ProjectService } from "@langwatch/project-contract";
+import type { SecretService } from "@langwatch/secret-contract";
 import type { SecretEncryptionPort } from "@langwatch/secret-server";
+import type { TraceService } from "@langwatch/trace-contract";
+import type { WorkflowService } from "@langwatch/workflow-contract";
 import type { UserService } from "@langwatch/user-contract";
 import superjson from "superjson";
 import { describe, expect, it, vi } from "vitest";
@@ -115,6 +119,10 @@ function testPrisma() {
     scenario: {
       findMany: vi.fn(async () => []),
       count: vi.fn(async () => 0),
+      // The read PREPARING a run makes, scoped to the project. Empty is a real
+      // answer — this project defines no scenario with that id — and it is the
+      // first thing the prefetcher validates.
+      findFirst: vi.fn(async () => null),
     },
     simulationSuite: {
       findMany: vi.fn(async () => []),
@@ -374,12 +382,23 @@ function composeApplication(
   const projects = {
     getOrganizationId: vi.fn(async () => ORGANIZATION_ID),
     tryGetWithTeam: vi.fn(async () => null),
+    // Preparing a run reads the project's own ingestion key, which is what a
+    // prepared child reports its scenario events with.
+    tryGetById: vi.fn(async () => ({ id: PROJECT_ID, apiKey: "project-api-key" })),
   } as unknown as ProjectService;
 
   const group = composeApiAgentGroupCollaborators({
     prisma: prisma.client,
     authz,
-    agents: stub<AgentService>("agents"),
+    // The agent directory a suite's cases and an HTTP target resolve through.
+    // `getById` answers the feature's own not-found rather than the stub's
+    // refusal, because preparing a run against a target that is not there is a
+    // real answer the drawer renders.
+    agents: stub<AgentService>("agents", {
+      getById: async ({ projectId, id }: { projectId: string; id: string }) => {
+        throw new AgentNotFoundError(id, projectId);
+      },
+    }),
     auth: stub<AuthService>("auth"),
     users: stub<UserService>("users"),
     projects,
@@ -394,6 +413,21 @@ function composeApplication(
     // reader answers the empty set and the live turn buffer is absent.
     resolveClickHouseClient: null,
     redis: null,
+    // The four verticals a scenario RUN is prepared against, and the three
+    // deployment facts its child is booted with. Doubles at the PORTS: what
+    // this half composes over them — the prefetcher, its lookups and the
+    // failure handler — is real.
+    scenarioExecution: {
+      workflows: stub<WorkflowService>("workflows"),
+      modelProviders: stub<ModelProviderService>("modelProviders"),
+      secrets: stub<SecretService>("secrets"),
+      traces: stub<TraceService>("traces"),
+      config: {
+        langwatchEndpoint: "https://ingest.acme.test",
+        nlpServiceUrl: "http://nlp.acme.test:5561",
+        legacyDefaultModel: "openai/gpt-5-mini",
+      },
+    },
     // Absent by default, which is a real deployment shape: with no queue every
     // agent-side write refuses by name. The suite below composes one where the
     // enqueued command is the thing under test.
@@ -788,29 +822,42 @@ describe("given the API process composed the agent-group half from its own graph
     });
   });
 
-  describe("when a capability this process did not compose is reached", () => {
-    it("refuses to execute a scenario by name rather than dropping the run", async () => {
-      const { group } = composeApplication();
+  describe("when a scenario run is prepared against this process's own graph", () => {
+    it("validates the run through the composed prefetcher rather than refusing by name", async () => {
+      const { group, prisma } = composeApplication();
 
       // Driven on the composed application rather than over HTTP, the way the
-      // trace half's absences are: the refusal is what the RUNNER answers, and
-      // reaching it through `scenarios.run` would first have to satisfy a
-      // parameter resolution that reads a scenario row this test does not hold.
-      await expect(
-        group.scenarios.prefetchExecution({
-          context: {
-            projectId: PROJECT_ID,
-            scenarioId: "scenario-1",
-            setId: "set-1",
-            batchRunId: "batch-1",
-            parameters: {},
-            secretParameters: {},
-          },
-          target: { type: "workflow", workflowId: "workflow-1" },
-        } as never),
-      ).rejects.toMatchObject({ code: "service_unavailable" });
-    });
+      // trace half's reads are: reaching this through `scenarios.run` would
+      // first have to satisfy a parameter resolution that reads a scenario row
+      // this test does not hold.
+      const result = await group.scenarios.prefetchExecution({
+        context: {
+          projectId: PROJECT_ID,
+          scenarioId: "scenario-1",
+          setId: "set-1",
+          batchRunId: "batch-1",
+          parameters: {},
+          secretParameters: {},
+        },
+        target: { type: "http", referenceId: "agent-1" },
+      });
 
+      // A STRUCTURED failure naming the missing scenario, which is what the run
+      // drawer renders. Before the executor was composed the same call rejected
+      // with `service_unavailable`, and the person was told the deployment
+      // could not run scenarios at all.
+      expect(result).toEqual({ success: false, error: "Scenario scenario-1 not found" });
+      // And it got there by READING: the composed lookup service ran the real
+      // scenario repository over this connection, scoped to the project.
+      expect(prisma.scenario.findFirst).toHaveBeenCalledWith(
+        expect.objectContaining({
+          where: expect.objectContaining({ id: "scenario-1", projectId: PROJECT_ID }),
+        }),
+      );
+    });
+  });
+
+  describe("when a capability this process did not compose is reached", () => {
     it("refuses to start a Langy turn with the feature's own agent-unavailable code", async () => {
       const { application } = composeApplication();
 

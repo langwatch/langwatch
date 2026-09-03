@@ -2460,6 +2460,11 @@ export class ApiProductionComposition extends ApiRuntimeCompositionPort {
       projects,
       apiKeys: tenancy.apiKeys,
       grants: authz.grants,
+      // The SAME plan provider the invitation half spends a seat against and
+      // the retention gates read, mirroring what `composeProductInfra` one
+      // method away already does: an injected provider wins, and otherwise
+      // this process resolves its own once.
+      plans: this.options.plans ?? this.resolvePlanProvider(options),
       users: session.users,
       auth: session.auth,
       // The SAME Redis the queue owns: presence and the broadcast fan-out ride
@@ -2618,7 +2623,9 @@ export class ApiProductionComposition extends ApiRuntimeCompositionPort {
    * Composes the agent half over this process's own graph.
    *
    * Five things gate it, and each one is read by more than one of the six
-   * surfaces: the database (every scenario, suite and conversation is a row),
+   * surfaces — plus the four collaborators a scenario run is PREPARED against,
+   * which every one of the five already implies (see the narrowing below).
+   * The five: the database (every scenario, suite and conversation is a row),
    * the tenancy graph (a suite resolves its project's organization and the
    * Langy rollout gate resolves the same), the agent directory (a suite's cases
    * run against one), the user directory (a run and a conversation both name
@@ -2653,10 +2660,47 @@ export class ApiProductionComposition extends ApiRuntimeCompositionPort {
       return undefined;
     }
 
+    // The four collaborators a scenario RUN is prepared against, and the
+    // NARROWING for them. Each is already implied by a gate above — the
+    // gateway and the secret store need this database, this tenancy graph and
+    // this cipher; the execution half needs the gateway and the agent
+    // directory; the trace read stack is built by this root whenever the trace
+    // group composes, and that needs the same database, tenancy and identity.
+    // So this branch is unreachable on this root, and it is what lets the
+    // prefetcher below take services rather than optionals: a silent
+    // `undefined` in its place would compose a run preparer against half a
+    // graph.
+    const execution = this.composedExecution;
+    const modelProviders = this.composedModelProviders;
+    const secrets = this.secrets;
+    const traces = this.composedTraceGroup?.traceReads?.readers().tree;
+    if (!execution || !modelProviders || !secrets || !traces) return undefined;
+
     return composeApiAgentGroupCollaborators({
       prisma: database.client,
       authz,
       agents,
+      // Preparing a run reaches four other verticals and three deployment
+      // facts. Every one of them is the object the rest of this process
+      // already serves: the workflow a workflow target hydrates from, the ONE
+      // gateway its three model roles resolve on, the project secrets its run
+      // parameters are decrypted from, and the trace reads an HTTP target's
+      // ingest wait is measured on.
+      scenarioExecution: {
+        workflows: execution.workflows.workflowService,
+        modelProviders,
+        secrets,
+        traces,
+        config: {
+          // Where the CHILD reports its own scenario events: this
+          // deployment's ingestion origin, not the SDK default, which is
+          // somebody else's deployment.
+          langwatchEndpoint: options.config.infrastructure.execution.langwatchEndpoint ?? "",
+          // The SAME engine the studio and every code evaluator dial.
+          nlpServiceUrl: options.config.infrastructure.execution.nlpServiceUrl ?? "",
+          legacyDefaultModel: options.config.infrastructure.execution.defaultModel,
+        },
+      },
       auth: auth.auth,
       // The SAME user directory the browser-session boundary composed: a run's
       // author and the person the session names must be one answer.

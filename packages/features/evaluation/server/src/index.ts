@@ -12,6 +12,18 @@ export {
  * it never touches. Exported so the read is reused rather than written twice.
  */
 export { ClickHouseEvaluationRepository } from "./repositories/clickhouse/evaluation.repository";
+/**
+ * The monitors page's seven-day trend, for a process that reads it and
+ * executes nothing.
+ *
+ * The same rule as the repository above, one layer up: the trend is a single
+ * ClickHouse read, and reaching it through `EvaluationAdapter` would make the
+ * caller synthesise an executor and a workflow capability the read never
+ * touches. The adapter composes the service over a routed client; the
+ * repository behind it stays private to this package.
+ */
+export { MonitorPerformanceAdapter } from "./adapters/monitor-performance.clickhouse.adapter";
+export { MonitorPerformanceService } from "./services/monitor-performance.service";
 export {
   EvaluationEventingAdapter,
   type EvaluationEventingStores,

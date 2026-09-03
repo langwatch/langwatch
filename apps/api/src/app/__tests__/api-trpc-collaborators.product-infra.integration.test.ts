@@ -31,12 +31,17 @@
  *   monitors.getAllForProject    the SAME monitor service the execution half's
  *                                experiment application upserts through,
  *                                answering off this process's own connection.
+ *   monitors.getPerformanceForProject
+ *                                the seven-day trend, composed over the SAME
+ *                                routed ClickHouse the object probe reads and
+ *                                folded by the evaluation package's own
+ *                                service.
  *
  * And two named absences, because an absence nobody can observe is
- * indistinguishable from a stub: with no evaluation-run read stack the
- * seven-day performance trend refuses by name rather than reporting that no
- * monitor caught anything, and with no plan provider a retention write refuses
- * rather than passing a gate it could not evaluate.
+ * indistinguishable from a stub: with no ClickHouse at all the seven-day trend
+ * refuses by name rather than reporting that no monitor caught anything, and
+ * with no plan provider a retention write refuses rather than passing a gate it
+ * could not evaluate.
  */
 import { mkdtempSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
@@ -214,6 +219,39 @@ function testAuthz(): AuthzService {
 }
 
 /** The routed ClickHouse connection the object repository reads through. */
+/**
+ * The rows the trend query answers with: one day inside the current window and
+ * one inside the previous, for whichever evaluator the caller asked about.
+ *
+ * Both axes on every row, because which one the page charts is the monitor's
+ * own answer: the evaluator this file lists is a guardrail, so the trend is
+ * its pass RATE and the scores beside it are the ones a non-guardrail monitor
+ * would have been folded on instead.
+ */
+function performanceRows(params: Record<string, unknown>): Array<Record<string, unknown>> {
+  const evaluatorIds = (params.evaluatorIds as string[] | undefined) ?? [];
+  return evaluatorIds.flatMap((evaluatorId) => [
+    {
+      EvaluatorId: evaluatorId,
+      Period: "current",
+      Day: "2026-09-02",
+      ScoreSum: 1.5,
+      ScoreCount: "2",
+      PassSum: "1",
+      PassCount: "2",
+    },
+    {
+      EvaluatorId: evaluatorId,
+      Period: "previous",
+      Day: "2026-08-26",
+      ScoreSum: 1,
+      ScoreCount: "4",
+      PassSum: "1",
+      PassCount: "4",
+    },
+  ]);
+}
+
 function testClickHouse(storage: ReturnType<typeof testObjectStorage>) {
   const rows = new Map<string, Record<string, unknown>>([
     [
@@ -265,8 +303,21 @@ function testClickHouse(storage: ReturnType<typeof testObjectStorage>) {
       },
     ],
   ]);
+  // The two reads this half runs on one routed connection: the object probe,
+  // keyed by id, and the monitors page's seven-day trend over
+  // `evaluation_runs`. Told apart by the statement rather than by a flag,
+  // because that is what the composition decides between.
   const resolveClient = vi.fn(async () => ({
-    query: async ({ query_params }: { query_params: Record<string, unknown> }) => {
+    query: async ({
+      query,
+      query_params,
+    }: {
+      query: string;
+      query_params: Record<string, unknown>;
+    }) => {
+      if (query.includes("evaluation_runs")) {
+        return { json: async () => performanceRows(query_params) };
+      }
       const row = rows.get(String(query_params.id));
       return { json: async () => (row ? [row] : []) };
     },
@@ -495,7 +546,11 @@ function azureStorageConfig(): ApiStoredObjectsConfigResolution {
 const PAID_PLAN = { free: false, type: "LAUNCH" } as never;
 
 function composeHalf(
-  options: { plans?: undefined; storage?: ApiStoredObjectsConfigResolution } = {},
+  options: {
+    plans?: undefined;
+    storage?: ApiStoredObjectsConfigResolution;
+    resolveClickHouseClient?: null;
+  } = {},
 ) {
   const storage = testObjectStorage();
   const prisma = testPrisma();
@@ -531,7 +586,11 @@ function composeHalf(
 }
 
 function composeApplication(
-  options: { plans?: undefined; storage?: ApiStoredObjectsConfigResolution } = {},
+  options: {
+    plans?: undefined;
+    storage?: ApiStoredObjectsConfigResolution;
+    resolveClickHouseClient?: null;
+  } = {},
 ) {
   const composed = composeHalf(options);
 
@@ -763,9 +822,33 @@ describe("given an API process composed with the product-infrastructure half", (
     });
   });
 
+  describe("when the monitors page charts a project's seven-day trend", () => {
+    it("answers it off the routed ClickHouse rather than refusing by name", async () => {
+      const { application, clickHouse } = composeApplication();
+
+      const { status, body } = await callTrpc(application, "monitors.getPerformanceForProject", {
+        projectId: PROJECT_ID,
+      });
+
+      expect(status).toBe(200);
+      // The composed read, folded by the evaluation package's own service:
+      // this evaluator is a guardrail, so its trend is the pass rate — 1 of 2
+      // this week against 1 of 4 last week. Before this was composed the same
+      // call refused with `service_unavailable`.
+      expect(body).toMatchObject({
+        result: {
+          data: {
+            json: [{ monitorId: "monitor-1", metric: "pass_rate", current: 0.5, previous: 0.25 }],
+          },
+        },
+      });
+      expect(clickHouse.resolveClient).toHaveBeenCalledWith(PROJECT_ID);
+    });
+  });
+
   describe("when a capability this deployment did not compose is reached", () => {
-    it("refuses the performance trend by name rather than reporting an empty one", async () => {
-      const { application } = composeApplication();
+    it("refuses the performance trend by name on a deployment with no ClickHouse", async () => {
+      const { application } = composeApplication({ resolveClickHouseClient: null });
 
       const { body } = await callTrpc(application, "monitors.getPerformanceForProject", {
         projectId: PROJECT_ID,
@@ -773,7 +856,8 @@ describe("given an API process composed with the product-infrastructure half", (
 
       // The status the tRPC lane answers a handled error with is the chain's;
       // what this pins is that the refusal names the capability rather than
-      // the surface reporting an empty trend.
+      // the surface reporting an empty trend, which a person acts on by
+      // switching a monitor off.
       expect(JSON.stringify(body)).toContain("service_unavailable");
     });
 

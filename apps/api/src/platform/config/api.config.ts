@@ -26,6 +26,7 @@ import {
 } from "@langwatch/observability/node";
 import { resolveGroupQueuePolicyFromEnv, type GroupQueuePolicy } from "@langwatch/group-queue";
 import { resolveFeatureFlagConfig, type FeatureFlagConfig } from "@langwatch/feature-flag-contract";
+import { getLatestOpenAIChatFlagship } from "@langwatch/model-provider-contract";
 import { RedisConfigService, type RedisConfigResolution } from "@langwatch/redis-client";
 import type {
   AzureBlobCredentialsConfig,
@@ -47,6 +48,17 @@ const configLogger = (): Pick<Logger, "warn"> => createLogger("langwatch:api:con
  * listener's own drain grace elapses, so the process deadline sits above it.
  */
 const PROCESS_CLOSE_SLACK_MS = 15_000;
+
+/**
+ * The model a scenario target falls back to when nothing else names one.
+ *
+ * Derived from the registry rather than written down, which is what the
+ * platform application's `DEFAULT_MODEL` did and what
+ * `ModelProviderWorkflowStudioDslAdapter` still does: a literal drifts every
+ * time the registry advances, and a deployment that has seeded no model
+ * defaults must still be able to run a scenario.
+ */
+const REGISTRY_FLAGSHIP_MODEL = getLatestOpenAIChatFlagship() ?? "openai/gpt-5";
 
 /**
  * A standalone API bootstrap accepts these deterministic aliases. Existing
@@ -461,8 +473,22 @@ export const apiConfigDefinition = RuntimeConfig.define({
      * four legacy evaluate doors and a trace re-score each refuse by name
      * rather than answering a verdict nothing produced.
      *
-     * Read here rather than where they are used, because this module is the
-     * process's only environment reader.
+     * The two below belong to a prepared SCENARIO CHILD rather than to this
+     * listener, and they are read here for the same reason the three above
+     * are: this module is the process's only environment reader.
+     *
+     * `defaultModel` is the LAST fallback for a run whose target names no
+     * model and whose project seeded no default: without one a scenario fails
+     * at the child with nothing to point at. It is the registry flagship
+     * unless a deployment overrides it, never blank.
+     *
+     * The third value a prepared child needs — the ingestion origin it reports
+     * its own scenario events to — is NOT a leaf here. It is
+     * `LANGWATCH_ENDPOINT`, which `observability.endpoint` already binds, and
+     * this module refuses to bind one variable twice: one variable means one
+     * thing, and a second leaf would let the two readers disagree the day
+     * somebody edited one of them. It is projected off that leaf in the
+     * resolution below.
      */
     execution: {
       nlpServiceUrl: Config.value(optionalEnvironmentString, {
@@ -472,6 +498,9 @@ export const apiConfigDefinition = RuntimeConfig.define({
         env: "LANGEVALS_ENDPOINT",
       }),
       publicBaseUrl: Config.value(optionalEnvironmentString, { env: "BASE_HOST" }),
+      defaultModel: Config.value(optionalEnvironmentString, {
+        env: "LANGWATCH_DEFAULT_MODEL",
+      }),
     },
     /**
      * The three facts the MODEL GATEWAY needs that are the deployment's rather
@@ -723,6 +752,21 @@ export type ApiExecutionConfigResolution = Readonly<{
   langevalsEndpoint: string | undefined;
   /** This deployment's public origin; absent means the studio cannot run a published workflow. */
   publicBaseUrl: string | undefined;
+  /**
+   * Where a prepared scenario child reports its own run events, projected off
+   * the observability leaf that binds the same `LANGWATCH_ENDPOINT`.
+   *
+   * Absent is a real shape: a deployment that never set it has no ingestion
+   * origin to hand a child, and the prefetcher is told so rather than being
+   * given a guess — a child that guessed would report a customer's run to
+   * `app.langwatch.ai`, which is somebody else's deployment.
+   */
+  langwatchEndpoint: string | undefined;
+  /**
+   * The terminal fallback model for a target that names none. Never blank: a
+   * deployment that overrides nothing gets the registry flagship.
+   */
+  defaultModel: string;
 }>;
 
 /**
@@ -900,6 +944,15 @@ export function resolveApiConfig(source: Readonly<Record<string, unknown>>): Api
         nlpServiceUrl: value.infrastructure.execution.nlpServiceUrl?.trim() || undefined,
         langevalsEndpoint: value.infrastructure.execution.langevalsEndpoint?.trim() || undefined,
         publicBaseUrl: value.infrastructure.execution.publicBaseUrl?.trim() || undefined,
+        // The SAME variable the process's own telemetry is exported to, read
+        // once and projected here: a prepared scenario child reports its run
+        // events to the deployment's own collector.
+        langwatchEndpoint: value.observability.endpoint?.trim() || undefined,
+        // A blank override is not a model. It resolves to the registry
+        // flagship rather than to an empty string, which a child would carry
+        // to the provider as a model named "".
+        defaultModel:
+          value.infrastructure.execution.defaultModel?.trim() || REGISTRY_FLAGSHIP_MODEL,
       },
       modelProvider: resolveModelProviderConfig(
         value.infrastructure.modelProvider,

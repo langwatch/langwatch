@@ -36,14 +36,24 @@
  *
  * ## What refuses by name, and why
  *
- * Five capabilities are Enterprise-licensed or belong to a vertical this
- * process does not compose, and each is a NAMED refusal rather than a value
- * that pretends:
+ * The capabilities that are Enterprise-licensed or belong to a vertical this
+ * process does not compose are each a NAMED refusal rather than a value that
+ * pretends:
  *
- *   - the SCIM plan gate, the seat licence, the standard AI-tool catalogue,
- *     the CLI-token revocation and the gateway's budget reads are Enterprise;
- *   - the invitation service and the deployment's marketing notifications
- *     belong to tiers this process does not hold.
+ *   - the SCIM plan gate, the standard AI-tool catalogue, the CLI-token
+ *     revocation and the gateway's routing, key and budget reads are
+ *     Enterprise;
+ *   - an Auth0 password change needs tenant credentials this process holds
+ *     none of;
+ *   - the reissue request an expired invitation's landing page makes and the
+ *     deployment's marketing notifications belong to tiers this half does not
+ *     hold.
+ *
+ * The SEAT LICENCE is not among them any more. It is composed over the plan
+ * provider this process shares with the invitation half and the membership
+ * counts the usage panel is read from, so re-enabling a membership and
+ * elevating a Lite Member are decided against the organization's own plan
+ * rather than refused.
  *
  * Each raises an error naming the capability and the process, so a customer's
  * failure is traceable to a deployment shape rather than to their input. The
@@ -91,6 +101,19 @@ import {
   resolveFederatedMethod,
   signInMethodPolicyPortOver,
 } from "@langwatch/identity-server";
+import {
+  ENTERPRISE_FEATURE_ERRORS,
+  assertEnterprisePlanType,
+} from "@langwatch/enterprise-plan-gate";
+import type { PlanInfo } from "@langwatch/enterprise-licensing-contract";
+import { LimitExceededError } from "@langwatch/enterprise-licensing-contract";
+import type { PlanProvider } from "@langwatch/entitlement-contract";
+import {
+  PrismaUsageMembershipRepository,
+  UsageMembershipPort,
+  getRoleChangeType,
+  type RoleChangeType,
+} from "@langwatch/entitlement-server";
 import { HandledError } from "@langwatch/handled-error";
 import { createLogger, type Logger } from "@langwatch/observability";
 import type { OrganizationService } from "@langwatch/organization-contract";
@@ -103,6 +126,7 @@ import {
   OrganizationSeatLicensePort,
   OrganizationSessionRevocationPort,
   PostgresOrganizationMembershipAdapter,
+  isCustomRole,
   resolveInviteDisplayStatus,
   type GroupTrpcPorts,
   type JoinRequestTrpcPorts,
@@ -120,7 +144,7 @@ import {
   PresenceEmitterPort,
   RuntimePresenceAdapter,
 } from "@langwatch/presence-server";
-import type { PrismaClient } from "@langwatch/prisma-client/generated";
+import type { OrganizationUserRole, PrismaClient } from "@langwatch/prisma-client/generated";
 import type { ProjectService } from "@langwatch/project-contract";
 import type { RedisConnection } from "@langwatch/redis-client";
 import type { UserService } from "@langwatch/user-contract";
@@ -213,6 +237,15 @@ export type ApiIdentityCollaboratorsOptions = Readonly<{
   apiKeys: ApiKeyService;
   /** The grant ledger every membership write states its access on. */
   grants: AuthzGrantsService;
+  /**
+   * Which plan the organization is on, and therefore how many seats it holds.
+   *
+   * The SAME provider the invitation half counts a seat against and every
+   * allowance banner reads: a seat this half refuses and a seat that half
+   * grants must be one number, or an organization can be invited into a seat
+   * it cannot re-enable a membership into.
+   */
+  plans: Pick<PlanProvider, "getActivePlan">;
   /**
    * The user directory and the Auth service, as the browser-session boundary
    * already composed them. Taken rather than built: a second directory is a
@@ -352,49 +385,154 @@ class ApiCapabilityUnavailableError extends HandledError {
 }
 
 /**
- * The seat licence, absent.
+ * The seat licence, over the SAME plan provider and the SAME membership counts
+ * every other allowance in this process reads.
  *
- * Refuses both writes rather than allowing them, which is the same answer the
- * platform application gave a process that composed no licence enforcement.
- * Allowing would be the unsafe direction: re-enabling a membership past the
- * plan's seat count and elevating a Lite Member into a full seat are both
- * things a licence exists to stop, and a process that cannot ask must not
- * decide.
+ * It was a refusal, and the refusal was safe but wrong: this root already makes
+ * both halves of the decision under other names — `ApiInviteSeatCensus`
+ * compares an invitation against `maxMembers` / `maxMembersLite`, and the org
+ * group's `assertCustomRolesAllowed` gates a role change on the plan type — so
+ * a member could be invited into a seat the same organization could not
+ * re-enable a membership into.
  *
- * It is a refusal this process could stop making, and the parts are already
- * here rather than in a package nobody owns. This root makes BOTH halves of the
- * same decision under other names: `ApiInviteSeatCensus` compares seat counts
- * against `maxMembers` / `maxMembersLite` for an invite, and the org group's
- * `assertCustomRolesAllowed` gates a role change on the plan type. What is
- * missing is only the wiring — `ApiIdentityCollaboratorsOptions` carries no
- * `plans`, so this half cannot ask the provider the rest of the process
- * already shares. Until it does, refusing is the safe direction.
+ * The two decisions, and the rules they keep from the platform application byte
+ * for byte:
+ *
+ *   checkLimit               `allowed` is `current < max` on the plan's own
+ *                            allowance, and a plan carrying
+ *                            `overrideAddingLimitations` — the unlimited
+ *                            self-hosted tier — is allowed without a count.
+ *                            It ANSWERS rather than throwing: the caller turns
+ *                            it into `member_seat_limit_reached` carrying the
+ *                            counts, and only the caller knows which write it
+ *                            was about to make.
+ *   assertRoleChangeAllowed  the seat classification first — a Lite Member
+ *                            gaining non-view permissions re-checks the FULL
+ *                            member seats, and a full member dropping to lite
+ *                            re-checks the LITE ones — then the Enterprise
+ *                            requirement that a custom-role assignment
+ *                            implies. Both forms of that assignment count: a
+ *                            `custom:{roleId}` role string, and a built-in role
+ *                            string carrying a `customRoleId`, which the
+ *                            cascade persists as a custom binding just the
+ *                            same.
+ *
+ * A seat refusal is a `LimitExceededError` — `resource_limit_exceeded`,
+ * carrying the allowance in its `meta` — which is the shape every other member
+ * limit in the product raises, so the client's limit modal keeps opening off
+ * one answer.
+ *
+ * What is NOT here: the ops notification the platform fired beside each
+ * refusal. It reached a Slack channel through a vertical this process does not
+ * compose, and a notification nobody receives must not be able to fail a seat
+ * decision.
  */
-class UnavailableApiOrganizationSeatLicense extends OrganizationSeatLicensePort {
-  static create(processName: string): UnavailableApiOrganizationSeatLicense {
-    return new UnavailableApiOrganizationSeatLicense(processName);
+class ApiOrganizationSeatLicense extends OrganizationSeatLicensePort {
+  static create(options: {
+    plans: Pick<PlanProvider, "getActivePlan">;
+    memberships: UsageMembershipPort;
+  }): ApiOrganizationSeatLicense {
+    return new ApiOrganizationSeatLicense(options);
   }
 
-  private constructor(private readonly processName: string) {
+  private constructor(
+    private readonly options: {
+      plans: Pick<PlanProvider, "getActivePlan">;
+      memberships: UsageMembershipPort;
+    },
+  ) {
     super();
   }
 
-  checkLimit(): Promise<OrganizationSeatDecision> {
-    return Promise.reject(
-      new ApiCapabilityUnavailableError({
-        capability: "Enterprise seat licence, so it cannot decide whether a seat is available",
-        processName: this.processName,
-      }),
-    );
+  async checkLimit(input: {
+    organizationId: string;
+    resource: "members" | "membersLite";
+    user?: OrganizationPlanUser | undefined;
+  }): Promise<OrganizationSeatDecision> {
+    const plan = await this.activePlan(input.organizationId, input.user);
+    const max = this.allowance(plan, input.resource);
+    if (plan.overrideAddingLimitations) {
+      return { allowed: true, limitType: input.resource, current: 0, max };
+    }
+
+    const current = await this.seatsTaken(input.organizationId, input.resource);
+    return { allowed: current < max, limitType: input.resource, current, max };
   }
 
-  assertRoleChangeAllowed(): Promise<void> {
-    return Promise.reject(
-      new ApiCapabilityUnavailableError({
-        capability: "Enterprise seat licence, so it cannot authorize a member role change",
-        processName: this.processName,
-      }),
+  async assertRoleChangeAllowed(input: {
+    organizationId: string;
+    currentRole: string;
+    userPermissions: string[] | undefined;
+    role: string;
+    teamRoleUpdates?: ReadonlyArray<{ role: string; customRoleId?: string }> | undefined;
+    user?: OrganizationPlanUser | undefined;
+  }): Promise<void> {
+    const plan = await this.activePlan(input.organizationId, input.user);
+    // The NEW role's permissions are deliberately not read: a built-in role
+    // carries none, and a custom one is gated below on the plan rather than on
+    // a seat. That is the platform's own call, kept.
+    const change = getRoleChangeType(
+      input.currentRole as OrganizationUserRole,
+      input.userPermissions,
+      input.role as OrganizationUserRole,
+      undefined,
     );
+    await this.assertSeatForChange({
+      change,
+      organizationId: input.organizationId,
+      plan,
+    });
+
+    const assignsCustomRole = (input.teamRoleUpdates ?? []).some(
+      (update) => Boolean(update.customRoleId) || isCustomRole(update.role),
+    );
+    if (assignsCustomRole) {
+      assertEnterprisePlanType({
+        planType: plan.type,
+        errorMessage: ENTERPRISE_FEATURE_ERRORS.RBAC,
+      });
+    }
+  }
+
+  private async assertSeatForChange(input: {
+    change: RoleChangeType;
+    organizationId: string;
+    plan: PlanInfo;
+  }): Promise<void> {
+    if (input.change === "no-change" || input.plan.overrideAddingLimitations) return;
+
+    const resource = input.change === "lite-to-full" ? "members" : "membersLite";
+    const max = this.allowance(input.plan, resource);
+    const current = await this.seatsTaken(input.organizationId, resource);
+    if (current >= max) {
+      throw new LimitExceededError(resource, current, max);
+    }
+  }
+
+  private activePlan(
+    organizationId: string,
+    user: OrganizationPlanUser | undefined,
+  ): Promise<PlanInfo> {
+    // The plan provider's own caller shape is the Enterprise licensing one and
+    // the membership half may not name it, so the structural person the two
+    // writes already carry is forwarded as it stands.
+    return this.options.plans.getActivePlan({
+      organizationId,
+      ...(user ? { user } : {}),
+    } as never);
+  }
+
+  private allowance(plan: PlanInfo, resource: "members" | "membersLite"): number {
+    return resource === "members" ? plan.maxMembers : plan.maxMembersLite;
+  }
+
+  private seatsTaken(
+    organizationId: string,
+    resource: "members" | "membersLite",
+  ): Promise<number> {
+    return resource === "members"
+      ? this.options.memberships.getMemberCount(organizationId)
+      : this.options.memberships.getMembersLiteCount(organizationId);
   }
 }
 
@@ -527,6 +665,7 @@ export function composeApiIdentityCollaborators(
     projects,
     apiKeys,
     grants,
+    plans,
     users,
     auth,
     redis,
@@ -548,7 +687,14 @@ export function composeApiIdentityCollaborators(
     database: prisma,
     grants,
     prompts: LoggedApiOrganizationPromptSeed.create({ processName, logger }),
-    seats: UnavailableApiOrganizationSeatLicense.create(processName),
+    // The seat gate, over the SAME counts the usage panel shows and the SAME
+    // plan the invitation half spends a seat against: an administrator refused
+    // here and an administrator shown their usage there cannot be told two
+    // different numbers about one organization.
+    seats: ApiOrganizationSeatLicense.create({
+      plans,
+      memberships: PrismaUsageMembershipRepository.create(prisma),
+    }),
     sessions: AuthServiceOrganizationSessionRevocation.create(auth),
     grantCache: AuthzOrganizationGrantCache.create(grants),
   }).build();

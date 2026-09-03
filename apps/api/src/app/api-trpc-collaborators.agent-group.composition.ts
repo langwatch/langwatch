@@ -47,13 +47,20 @@
  * instead: never a silent no-op, which would leave a customer watching a run
  * that was never queued.
  *
- * Two writes still refuse even with a queue, and both are DEPLOYMENT absences
- * rather than framework ones. Preparing a scenario run resolves its target
- * through ten other verticals' services, so `scenarios.run`'s prefetch refuses.
- * Starting a Langy turn dispatches to the agent manager over HTTP, so a process
- * with no Langy configuration answers the feature's own
- * `langy_agent_unavailable`. Renaming, forking, archiving and importing into a
- * conversation are pure commands and answer for real.
+ * Preparing a scenario run ANSWERS. Its target is resolved through ten other
+ * verticals' services, and this process holds all ten: six it composes here —
+ * the scenario, its suite, the prompt reader, the agent directory, the project
+ * directory and the stored-secret cipher — and four it is handed, the workflow
+ * service, the model gateway, the project secret store and the trace reads.
+ * What it still refuses is SUBMITTING the run, and that one is honest: the
+ * in-process execution pool is the worker's, and the outbox retries the
+ * execute where a pool exists.
+ *
+ * One write still refuses even with a queue, and it is a DEPLOYMENT absence
+ * rather than a framework one: starting a Langy turn dispatches to the agent
+ * manager over HTTP, so a process with no Langy configuration answers the
+ * feature's own `langy_agent_unavailable`. Renaming, forking, archiving and
+ * importing into a conversation are pure commands and answer for real.
  *
  * The OPERATOR back office is the one surface that is mostly absence. Its
  * event-log explorer, its process-manager fleet explorer and its projection
@@ -111,6 +118,9 @@ import {
   PrismaScenarioAdapter,
   ScenarioApp,
   ScenarioClockPort,
+  ScenarioExecutionPrefetcherService,
+  ScenarioExecutionService,
+  ScenarioFailureHandlerService,
   ScenarioFolderIdPort,
   ScenarioIdPort,
   ScenarioSecretCipherPort,
@@ -118,12 +128,22 @@ import {
   ScenarioTabStorePort,
   SimulationClickHouseAdapter,
   SimulationWindowedReadPort,
+  RedisCancellationPublisherAdapter,
   RedisScenarioTabStoreAdapter,
+  UnavailableCancellationPublisherAdapter,
+  UnavailableScenarioExecutionPoolService,
+  type ScenarioExecutionPrefetchConfig,
   type ScenarioTrpcPorts,
   type SimulationReadClient,
   type SimulationWindowedReadInput,
 } from "@langwatch/scenario-server";
+import type { ModelProviderService } from "@langwatch/model-provider-contract";
 import type { SecretEncryptionPort } from "@langwatch/secret-server";
+import type { SecretService } from "@langwatch/secret-contract";
+import type { TraceService } from "@langwatch/trace-contract";
+import type { WorkflowService } from "@langwatch/workflow-contract";
+import type { PromptService } from "@langwatch/prompt-contract";
+import type { SuiteService } from "@langwatch/suite-contract";
 import type { SuiteClickHouseClient } from "@langwatch/suite-server";
 import {
   PostgresSuiteAdapter,
@@ -131,11 +151,10 @@ import {
   SuiteExecutionService,
   SuiteRunIdPort,
 } from "@langwatch/suite-server";
-import {
-  ScenarioExecutionService,
-  type ScenarioService,
-  type ScenarioTabRegistry,
-  type SimulationService,
+import type {
+  ScenarioService,
+  ScenarioTabRegistry,
+  SimulationService,
 } from "@langwatch/scenario-contract";
 import type { UserService } from "@langwatch/user-contract";
 import { generate } from "@langwatch/ksuid";
@@ -228,6 +247,33 @@ const CONSEQUENCE = {
     "API process holds no Redis: the Langy turn stream yields nothing and the browser falls back to the Postgres conversation read, tab presence is per-process, and the operator's queue views report nothing.",
 } as const;
 
+/**
+ * What preparing a scenario run reaches outside this half.
+ *
+ * One entry rather than six loose ones, because they are one decision: a
+ * process either can prepare a run against its own graph or cannot, and the
+ * prefetcher needs the whole set before it can answer anything. `prompts`,
+ * `agents`, `projects`, `scenarios` and `suites` are not here — this half
+ * composes or already holds all five.
+ */
+export type ApiScenarioExecutionCollaborators = Readonly<{
+  /** The workflow behind a workflow target, hydrated with its default model. */
+  workflows: WorkflowService;
+  /** The ONE model gateway the adapter, simulator and judge roles resolve on. */
+  modelProviders: ModelProviderService;
+  /** The project secret store a run's secret parameters are read from. */
+  secrets: SecretService;
+  /** The canonical trace reads an HTTP target's ingest wait is measured on. */
+  traces: TraceService;
+  /**
+   * Where the child reports its own scenario events, where the NLP engine
+   * answers, and the model a target that names none falls back to. All three
+   * are the deployment's rather than the feature's, and all three are read by
+   * `api.config.ts`, which is this process's only environment reader.
+   */
+  config: ScenarioExecutionPrefetchConfig;
+}>;
+
 export type ApiAgentGroupCollaboratorsOptions = Readonly<{
   /** The one guarded connection every row read below runs on. */
   prisma: PrismaClient;
@@ -235,6 +281,18 @@ export type ApiAgentGroupCollaboratorsOptions = Readonly<{
   authz: AuthzService;
   /** The agent directory a suite's cases are run against. */
   agents: AgentService;
+  /**
+   * The four other verticals a scenario RUN is prepared against, and the two
+   * values its child is booted with.
+   *
+   * Taken rather than built, all of them: the workflow behind a workflow
+   * target, the gateway its three model roles resolve through, the project
+   * secrets its run parameters are decrypted from and the trace reads its
+   * ingest wait is measured on are the same objects the rest of this process
+   * serves — a second of any of them would prepare a run against a graph
+   * nobody else can see.
+   */
+  scenarioExecution: ApiScenarioExecutionCollaborators;
   /** The Auth service the back-office user reads resolve a person through. */
   auth: AuthService;
   /** The user directory, as the browser-session boundary already composed it. */
@@ -365,27 +423,17 @@ export function composeApiAgentGroupCollaborators(
     clock: new SystemScenarioClock(),
   });
 
-  const scenarioApp = ScenarioApp.create({
-    scenarios,
-    simulations,
-    // The run EXECUTOR, refused by name. `submit` genuinely has no home here —
-    // it is the in-process worker pool a web process never holds — but the
-    // other four are refused for a smaller reason than this once claimed; see
-    // the class.
-    scenarioExecution: new UnavailableApiScenarioExecution(),
-    scenarioTabs,
-    users: options.users,
-    broadcast: options.broadcast,
-  });
+  // A second prompt reader over the same table, and it cannot hold a second
+  // answer: the product-group half wraps its own in a `PromptApp` that does
+  // not expose the service underneath, and both are stateless reads of a
+  // prompt row by id. ONE here, because the suite listing and the prefetched
+  // prompt target read the same rows.
+  const prompts = PostgresPromptAdapter.create({ database: options.prisma }).build();
 
   const suites = PostgresSuiteAdapter.create({
     database: options.prisma,
     agents: options.agents,
-    // A second prompt reader over the same table, and it cannot hold a second
-    // answer: the product-group half wraps its own in a `PromptApp` that does
-    // not expose the service underneath, and both are stateless reads of a
-    // prompt row by id.
-    prompts: PostgresPromptAdapter.create({ database: options.prisma }).build(),
+    prompts,
     scenarios,
     resolveClickHouseClient: options.resolveClickHouseClient,
     defaultRetentionDays: options.defaultRetentionDays,
@@ -396,12 +444,29 @@ export function composeApiAgentGroupCollaborators(
     }),
     generateId: () => `suite_${nanoid()}`,
   });
+  // ONE suite service behind both applications and the prefetcher: a run's
+  // suite overrides and the suite the page lists are the same rows.
+  const suiteService = suites.build();
 
   const suiteApp = SuiteApp.create({
-    suites: suites.build(),
+    suites: suiteService,
     scenarios,
     projects: options.projects,
     simulations,
+  });
+
+  const scenarioApp = ScenarioApp.create({
+    scenarios,
+    simulations,
+    scenarioExecution: composeScenarioExecution(options, {
+      scenarios,
+      suites: suiteService,
+      prompts,
+      simulations,
+    }),
+    scenarioTabs,
+    users: options.users,
+    broadcast: options.broadcast,
   });
 
   const langyApp = composeLangy(options, pipelines);
@@ -576,43 +641,67 @@ class UnavailableApiScenarioTabStore extends ScenarioTabStorePort {
 }
 
 /**
- * The run executor, refused by name — and refusing MORE than it must.
+ * The run EXECUTOR, composed over this process's own graph.
  *
- * `submit` is the honest half: a web process never holds the in-process pool,
- * and `@langwatch/scenario-server` ships `UnavailableScenarioExecutionPoolService`
- * for exactly that leg.
+ * The four legs, and why each is what it is:
  *
- * The other four are not blocked by a missing collaborator. The package exports
- * the concrete `ScenarioExecutionService`, and every dependency its prefetcher
- * asks for — workflows, prompts, agents, model providers, secrets, projects,
- * scenarios, suites, the trace tree and the stored-secret cipher — is composed
- * on THIS process before the agent group is built. `ScenarioApp` reaches only
- * `prefetch`, so closing it is one composition, not ten.
- *
- * What genuinely does not exist is CONFIGURATION: `ScenarioExecutionPrefetchConfig`
- * wants `langwatchEndpoint` and `legacyDefaultModel`, and no process in the
- * repository reads either. That pair is the whole remaining gap.
+ *   prefetch / prepare  the real prefetcher. Everything it resolves a target
+ *                       against — the workflow, the prompt, the agent, the
+ *                       project, the scenario, its suite's overrides, the
+ *                       model gateway, the project secrets and the trace
+ *                       reads — is composed on THIS process, and `ScenarioApp`
+ *                       reaches this leg alone. It answers a structured
+ *                       failure rather than throwing when a target cannot be
+ *                       resolved, which is what the run drawer renders.
+ *   submit              refused by name, and honestly: the in-process worker
+ *                       pool is the worker's, and `UnavailableScenarioExecutionPoolService`
+ *                       is the package's own name for a pod that does not hold
+ *                       one. The outbox retries the execute elsewhere.
+ *   cancel              published on the process's Redis channel where it has
+ *                       one, because the run being cancelled is executing on
+ *                       another pod. With no Redis it refuses rather than
+ *                       resolving, which would leave a person watching a run
+ *                       they asked to stop.
+ *   finishUnsuccessfulRun
+ *                       the real failure handler, over the SAME simulation
+ *                       service every other run read answers from.
  */
-class UnavailableApiScenarioExecution extends ScenarioExecutionService {
-  submit(): Promise<void> {
-    return this.refuse();
-  }
-  cancel(): Promise<void> {
-    return this.refuse();
-  }
-  prefetch(): Promise<never> {
-    return this.refuse();
-  }
-  prepare(): never {
-    throw new ApiAgentGroupUnavailableError("Preparing a scenario run");
-  }
-  finishUnsuccessfulRun(): Promise<void> {
-    return this.refuse();
-  }
-
-  private refuse(): Promise<never> {
-    return Promise.reject(new ApiAgentGroupUnavailableError("Executing a scenario"));
-  }
+function composeScenarioExecution(
+  options: ApiAgentGroupCollaboratorsOptions,
+  composed: {
+    scenarios: ScenarioService;
+    suites: SuiteService;
+    prompts: PromptService;
+    simulations: SimulationService;
+  },
+): ScenarioExecutionService {
+  const { workflows, modelProviders, secrets, traces, config } = options.scenarioExecution;
+  return ScenarioExecutionService.create({
+    pool: UnavailableScenarioExecutionPoolService.create(),
+    cancellations: options.redis
+      ? RedisCancellationPublisherAdapter.create(options.redis)
+      : UnavailableCancellationPublisherAdapter.create(),
+    prefetcher: ScenarioExecutionPrefetcherService.create({
+      // The SAME cipher the scenario service writes a stored secret with: a
+      // run's secret parameters are decrypted here and encrypted there, and a
+      // second cipher would be a second key.
+      secretCipher: new ApiScenarioSecretCipher(options.encryption),
+      config,
+      scenarios: composed.scenarios,
+      suites: composed.suites,
+      prompts: composed.prompts,
+      agents: options.agents,
+      workflows,
+      projects: options.projects,
+      modelProviders,
+      secrets,
+      traces,
+    }),
+    failures: ScenarioFailureHandlerService.create({
+      agents: options.agents,
+      simulations: composed.simulations,
+    }),
+  });
 }
 
 /**

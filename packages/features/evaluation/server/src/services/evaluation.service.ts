@@ -6,8 +6,6 @@ import {
   evaluationRunLookupSchema,
   evaluationRunsByTraceQuerySchema,
   evaluationExecutionResultSchema,
-  monitorPerformanceQuerySchema,
-  onlineEvaluationPerformanceSchema,
   evaluationSummariesByTraceIdsQuerySchema,
   traceEvaluationsQuerySchema,
   executeEvaluationCommandSchema,
@@ -26,10 +24,8 @@ import type {
   EvaluationExecutionPort,
   EvaluationInputsResolutionPort,
 } from "../ports/evaluation.port";
-import type {
-  MonitorPerformanceBucket,
-  MonitorPerformanceRepository,
-} from "../repositories/monitor-performance.repository";
+import type { MonitorPerformanceRepository } from "../repositories/monitor-performance.repository";
+import { MonitorPerformanceService } from "./monitor-performance.service";
 import type { EvaluationRunRepository } from "../repositories/evaluation.repository";
 
 export type EvaluationServiceOptions = {
@@ -46,8 +42,16 @@ export class EvaluationService extends EvaluationServiceContract {
     return new EvaluationService(options);
   }
 
+  private readonly monitorPerformance: MonitorPerformanceService;
+
   private constructor(private readonly options: EvaluationServiceOptions) {
     super();
+    // The trend is composable on its own, and one process composes it that
+    // way: the monitors page reads it without an executor. Delegated rather
+    // than duplicated so both callers fold the same buckets the same way.
+    this.monitorPerformance = MonitorPerformanceService.create({
+      repository: options.monitorPerformance,
+    });
   }
 
   async executeForTrace(input: ExecuteEvaluationCommand): Promise<EvaluationExecutionResult> {
@@ -141,67 +145,7 @@ export class EvaluationService extends EvaluationServiceContract {
     });
   }
 
-  async getMonitorPerformance(
-    input: MonitorPerformanceQuery,
-  ): Promise<OnlineEvaluationPerformance[]> {
-    const query = monitorPerformanceQuerySchema.parse(input);
-    const buckets = await this.options.monitorPerformance.findBuckets({
-      tenantId: query.tenantId,
-      evaluatorIds: query.monitors.map((monitor) => monitor.id),
-      previousStartMs: query.previousStartMs,
-      currentStartMs: query.currentStartMs,
-      endMs: query.endMs,
-      timeZone: query.timeZone,
-    });
-
-    return this.summarizeMonitorPerformance(query.monitors, buckets).map((value) =>
-      onlineEvaluationPerformanceSchema.parse(value),
-    );
-  }
-
-  private summarizeMonitorPerformance(
-    monitors: MonitorPerformanceQuery["monitors"],
-    buckets: MonitorPerformanceBucket[],
-  ): OnlineEvaluationPerformance[] {
-    const bucketsByEvaluator = new Map<string, MonitorPerformanceBucket[]>();
-    for (const bucket of buckets) {
-      const evaluatorBuckets = bucketsByEvaluator.get(bucket.evaluatorId) ?? [];
-      evaluatorBuckets.push(bucket);
-      bucketsByEvaluator.set(bucket.evaluatorId, evaluatorBuckets);
-    }
-
-    return monitors.map((monitor) => {
-      const monitorBuckets = bucketsByEvaluator.get(monitor.id) ?? [];
-      const current = monitorBuckets
-        .filter((bucket) => bucket.period === "current")
-        .map((bucket) => this.metricTotal(bucket, monitor.isGuardrail));
-      const previous = monitorBuckets
-        .filter((bucket) => bucket.period === "previous")
-        .map((bucket) => this.metricTotal(bucket, monitor.isGuardrail));
-
-      return {
-        monitorId: monitor.id,
-        metric: monitor.isGuardrail ? "pass_rate" : "score",
-        points: current.filter((total) => total.count > 0).map((total) => total.sum / total.count),
-        current: this.average(current),
-        previous: this.average(previous),
-      };
-    });
-  }
-
-  private metricTotal(
-    bucket: MonitorPerformanceBucket,
-    isGuardrail: boolean,
-  ): { sum: number; count: number } {
-    return isGuardrail
-      ? { sum: bucket.passSum, count: bucket.passCount }
-      : { sum: bucket.scoreSum, count: bucket.scoreCount };
-  }
-
-  private average(totals: Array<{ sum: number; count: number }>): number | null {
-    const sum = totals.reduce((value, total) => value + total.sum, 0);
-    const count = totals.reduce((value, total) => value + total.count, 0);
-
-    return count > 0 ? sum / count : null;
+  getMonitorPerformance(input: MonitorPerformanceQuery): Promise<OnlineEvaluationPerformance[]> {
+    return this.monitorPerformance.getMonitorPerformance(input);
   }
 }
