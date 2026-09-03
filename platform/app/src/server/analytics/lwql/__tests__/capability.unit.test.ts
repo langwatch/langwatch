@@ -36,10 +36,18 @@ describe("given a project's LangWatchQL secret", () => {
       );
     });
 
-    it("never carries the raw secret it was derived from", async () => {
-      expect(await lwqlTenantCapability({ secret: SECRET })).not.toContain(
-        SECRET,
-      );
+    /**
+     * The shape, not merely "it is not the secret" — a bcrypt digest could not
+     * contain this secret whatever went wrong, so that assertion can never
+     * fail on its own. This one pins what the key map has to store: the
+     * `$2b$10$` prefix is how the work factor stays readable off the data, and
+     * it is what would change silently if the cost were ever raised.
+     */
+    it("is a cost-10 bcrypt digest and never carries the raw secret", async () => {
+      const capability = await lwqlTenantCapability({ secret: SECRET });
+
+      expect(capability).toMatch(/^\$2b\$10\$[./A-Za-z0-9]{53}$/);
+      expect(capability).not.toContain(SECRET);
     });
 
     it("gives two projects unrelated capabilities", async () => {
@@ -63,6 +71,7 @@ describe("given a project's LangWatchQL secret", () => {
    * itself, which would agree with any mistake made in both places.
    */
   describe("when a capability is checked against the secrets it could name", () => {
+    /** @scenario "Two projects never derive the same tenant capability" */
     it("verifies against its own project's secret and no other", async () => {
       const mine = `${SECRET}-tenant-a`;
       const theirs = `${SECRET}-tenant-b`;
@@ -74,13 +83,16 @@ describe("given a project's LangWatchQL secret", () => {
   });
 
   /**
-   * The cache is one map shared by every tenant in the process, which is the
-   * one place a capability could be handed to the wrong project. Derive several
-   * tenants, then derive them all again in a different order so every second
-   * call is a cache hit, and require each to still be its own.
+   * Determinism across calls and across interleavings — deliberately not a
+   * cache test. A pure function of the secret returns these same values
+   * whether the memoisation is present or absent, which is why the cache's own
+   * properties are pinned in `capability-cache.unit.test.ts`, where a stubbed
+   * boundary can observe them. What this block is for is the key map's
+   * requirement: a project's capability is stable, and no two share one.
    */
-  describe("when several projects derive capabilities through the shared cache", () => {
-    it("never serves one project the capability of another", async () => {
+  describe("when several projects derive capabilities in different orders", () => {
+    /** @scenario "A project's tenant capability is the same every time it is derived" */
+    it("gives each project the same capability every time, and never another's", async () => {
       const secrets = ["alpha", "beta", "gamma"].map(
         (name) => `${SECRET}-${name}`,
       );
@@ -94,7 +106,7 @@ describe("given a project's LangWatchQL secret", () => {
           .map((secret) => lwqlTenantCapability({ secret })),
       );
 
-      // Every cache hit answered with the same capability as the cold call.
+      // The second pass, taken in reverse, answered with the same capabilities.
       expect(warm).toEqual([...cold].reverse());
       // And no two projects share one, which is what the key map would need to
       // resolve two tenants to a single row.
@@ -108,6 +120,7 @@ describe("given a project's LangWatchQL secret", () => {
      * row, so the query succeeds and returns nothing — indistinguishable from a
      * tenant with no data. Throwing is what makes the wiring bug loud.
      */
+    /** @scenario "An unset secret is refused rather than hashed" */
     it("refuses to derive a capability rather than hashing nothing", async () => {
       await expect(lwqlTenantCapability({ secret: "" })).rejects.toThrow(
         /non-empty secret/,
@@ -124,11 +137,22 @@ describe("given a project's LangWatchQL secret", () => {
      * has to be in the code: it is the day someone lengthens the secret that it
      * has to fire.
      */
-    it("refuses the secret rather than silently truncating it", async () => {
-      const atLimit = "x".repeat(72);
+    /**
+     * Pinned on both sides, because only one side is a security bug and the
+     * other is an outage. Testing the refusal alone leaves `>` free to drift to
+     * `>=`, which refuses every 72-byte secret — swallowed by the key-map sync
+     * into a log line, so the project silently never gets a row.
+     */
+    it("accepts a secret of exactly 72 bytes", async () => {
+      expect(await lwqlTenantCapability({ secret: "x".repeat(72) })).toMatch(
+        /^\$2b\$10\$/,
+      );
+    });
 
+    /** @scenario "A secret the derivation cannot represent is refused, never truncated" */
+    it("refuses the first byte past the limit rather than truncating to it", async () => {
       await expect(
-        lwqlTenantCapability({ secret: `${atLimit}-overflow` }),
+        lwqlTenantCapability({ secret: "x".repeat(73) }),
       ).rejects.toThrow(/at most 72 bytes/);
     });
 

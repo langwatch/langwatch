@@ -909,8 +909,11 @@ model Project {
   name                String
   slug                String                    @unique
   apiKey              String                    @unique
-  /// Random per-project secret whose SHA-256 digest is this project's LangWatchQL
-  /// SQL tenant capability in ClickHouse. Deliberately NOT the API key: the
+  /// Random per-project secret whose bcrypt digest, under a salt derived from
+  /// the secret with HKDF, is this project's LangWatchQL SQL tenant capability
+  /// in ClickHouse — see `server/analytics/lwql/capability.ts`, which is the
+  /// only implementation of that derivation and must stay the only one.
+  /// Deliberately NOT the API key: the
   /// credential a caller authenticates with and the capability the database
   /// resolves a tenant from stay decoupled, so rotating one never invalidates
   /// the other, and a leak of the ClickHouse key map's input discloses nothing

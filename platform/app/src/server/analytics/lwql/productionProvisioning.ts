@@ -23,7 +23,7 @@
  * @see specs/analytics/lwql-api.feature
  */
 
-import { lwqlTenantCapability } from "./capability";
+import { CAPABILITY_PREFIX, lwqlTenantCapability } from "./capability";
 import { LWQL_VIEW_CATALOG } from "./catalog/lwqlViews";
 import type { LangWatchQLViewDefinition } from "./catalog/types";
 import { isPostgresResident } from "./catalog/types";
@@ -231,6 +231,17 @@ export function productionPostgresReaderGrantStatements({
   ];
 }
 
+/**
+ * Whether a stored key-map hash was written by the current derivation.
+ *
+ * The cost factor is in the stored value, so a row that does not carry this
+ * prefix was derived by an older generation of `lwqlTenantCapability` and no
+ * longer resolves for its tenant — it has to be re-derived, not trusted.
+ */
+export function isCurrentGenerationCapability(hash: string): boolean {
+  return hash.startsWith(CAPABILITY_PREFIX);
+}
+
 /** One project's key-map row candidate. */
 export interface LwqlKeyMapRow {
   KeyHash: string;
@@ -247,6 +258,17 @@ export interface LwqlKeyMapBackfillPlan {
    * log these loudly rather than skip them quietly.
    */
   blankKeyProjectIds: string[];
+  /**
+   * Project ids whose `lwqlKey` was present but could not be hashed — today
+   * that means a key over bcrypt's 72-byte limit, which the capability refuses
+   * rather than silently truncating.
+   *
+   * Reported per project for the same reason blanks are, and it is why this
+   * plan does not simply propagate the rejection: one unusable key must not
+   * cost every other project its row. Same consequence as a blank key for the
+   * project it names, so the caller logs it just as loudly.
+   */
+  unhashableProjectIds: string[];
 }
 
 /**
@@ -256,9 +278,13 @@ export interface LwqlKeyMapBackfillPlan {
  * capability.
  *
  * That derivation is a KDF (`../capability.ts`), which is why this is `async`
- * and why the hashes are derived up front rather than inside the loop — one
- * costs roughly 200ms, so a serial loop would put the whole backfill on the
- * critical path at 200ms a project.
+ * and why the hashes are derived in batches rather than one at a time. Be
+ * precise about what that buys: bcrypt's async `hash` occupies a libuv thread,
+ * and the pool is four threads by default, so concurrency divides the cost by
+ * about four — measured, 4 hashes take as long as 1, and 64 take sixteen times
+ * as long. It is a constant factor, not an amortisation. The backfill is still
+ * O(projects) in bcrypt time on every deploy, where it used to be
+ * microseconds; on a large deployment that is the cost to watch.
  *
  * Duplicate `(hash, tenant)` pairs are harmless at read time (row filters use
  * `HAVING uniqExact(TenantId) = 1`), but this still de-duplicates within one
@@ -268,42 +294,101 @@ export interface LwqlKeyMapBackfillPlan {
 export async function planLwqlKeyMapBackfill({
   projects,
   existingHashes,
+  tenantsHoldingCurrentCapability = new Set<string>(),
 }: {
   projects: readonly { id: string; lwqlKey: string }[];
   existingHashes: ReadonlySet<string>;
+  /**
+   * Tenants whose key-map row was already written by *this* generation of the
+   * derivation — see {@link CAPABILITY_PREFIX}. Their capability is not
+   * re-derived, which is what keeps a steady-state deploy free of bcrypt work
+   * entirely instead of paying it per project forever.
+   *
+   * Deliberately not "every tenant with any row": on the deploy that changes
+   * the derivation, every project holds a row from the previous generation and
+   * every one of them has to be re-derived. Matching on the current prefix is
+   * what makes this an optimisation rather than a way to skip the migration.
+   *
+   * The assumption it rests on is that a project's `lwqlKey` never changes
+   * after it is minted — it is `@unique @default(dbgenerated(...))` with no
+   * update path. If a rotation path is ever added it must write the key-map
+   * row itself, the way project creation does, because this backfill will no
+   * longer notice.
+   */
+  tenantsHoldingCurrentCapability?: ReadonlySet<string>;
 }): Promise<LwqlKeyMapBackfillPlan> {
   const rowsToInsert: LwqlKeyMapRow[] = [];
-  const blankKeyProjectIds: string[] = [];
+  const unhashableProjectIds: string[] = [];
   const plannedHashes = new Set<string>();
 
   // A blank key is reported, never hashed: the capability refuses an empty
   // secret, and this function's contract is to collect those projects rather
-  // than throw on the first one.
-  const derived = await Promise.all(
-    projects.map(async (project) =>
-      project.lwqlKey
-        ? {
+  // than throw on the first one. Partitioned before the fan-out so the blank
+  // case never has to be re-derived from a missing hash afterwards.
+  const keyed = projects.filter(
+    (project) =>
+      project.lwqlKey && !tenantsHoldingCurrentCapability.has(project.id),
+  );
+  const blankKeyProjectIds = projects
+    .filter((project) => !project.lwqlKey)
+    .map((project) => project.id);
+
+  // Batch by batch, awaited in turn: the concurrency bound only exists if the
+  // batches are sequential — mapping them all into one `Promise.all` would
+  // start every project at once and be exactly the fan-out it is meant to
+  // replace. Each project's refusal is caught rather than propagated, because
+  // `Promise.all` rejecting on the first one would fail the deploy, insert
+  // nothing for anybody, and never name the project at fault; collecting it
+  // keeps this function's documented contract for both refusals, not just for
+  // blanks.
+  for (const batch of chunk(keyed, CAPABILITY_DERIVATION_CONCURRENCY)) {
+    const derived = await Promise.all(
+      batch.map(async (project) => {
+        try {
+          return {
             project,
             hash: await lwqlTenantCapability({ secret: project.lwqlKey }),
-          }
-        : { project, hash: undefined },
-    ),
-  );
+          };
+        } catch {
+          return { project, hash: undefined };
+        }
+      }),
+    );
 
-  for (const { project, hash } of derived) {
-    if (hash === undefined) {
-      blankKeyProjectIds.push(project.id);
-      continue;
+    for (const { project, hash } of derived) {
+      if (hash === undefined) {
+        unhashableProjectIds.push(project.id);
+        continue;
+      }
+      if (existingHashes.has(hash) || plannedHashes.has(hash)) continue;
+      plannedHashes.add(hash);
+      rowsToInsert.push({
+        [KEY_MAP_COLUMNS.keyHash]: hash,
+        [KEY_MAP_COLUMNS.tenantId]: project.id,
+      });
     }
-    if (existingHashes.has(hash) || plannedHashes.has(hash)) continue;
-    plannedHashes.add(hash);
-    rowsToInsert.push({
-      [KEY_MAP_COLUMNS.keyHash]: hash,
-      [KEY_MAP_COLUMNS.tenantId]: project.id,
-    });
   }
 
-  return { rowsToInsert, blankKeyProjectIds };
+  return { rowsToInsert, blankKeyProjectIds, unhashableProjectIds };
+}
+
+/**
+ * How many capabilities are derived at once.
+ *
+ * bcrypt's async `hash` runs on the libuv thread pool, which is four threads
+ * unless `UV_THREADPOOL_SIZE` says otherwise, so mapping every project at once
+ * buys nothing past the fourth and starves the same pool that serves
+ * `dns.lookup` — which the ClickHouse and Postgres clients need mid-backfill.
+ * Deriving in bounded batches keeps the win and leaves the pool breathing.
+ */
+const CAPABILITY_DERIVATION_CONCURRENCY = 4;
+
+function chunk<T>(items: readonly T[], size: number): T[][] {
+  const batches: T[][] = [];
+  for (let index = 0; index < items.length; index += size) {
+    batches.push(items.slice(index, index + size));
+  }
+  return batches;
 }
 
 /**

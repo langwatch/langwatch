@@ -23,6 +23,7 @@ import type { LangWatchQLViewDefinition } from "../catalog/types";
 import { lwqlPostgresViews } from "../catalog/types";
 import type { LangWatchQLConnection } from "../executor";
 import {
+  isCurrentGenerationCapability,
   LWQL_KEY_MAP_TABLE,
   lwqlKeyMapTableQualifiedName,
   lwqlPostgresSchemaFromDatabaseUrl,
@@ -227,7 +228,104 @@ describe("given planLwqlKeyMapBackfill", () => {
           projects: [{ id: "project-blank", lwqlKey: "" }],
           existingHashes: new Set(),
         }),
-      ).resolves.toBeDefined();
+      ).resolves.toEqual({
+        rowsToInsert: [],
+        blankKeyProjectIds: ["project-blank"],
+        unhashableProjectIds: [],
+      });
+    });
+  });
+
+  /**
+   * The capability's second refusal, and the one that arrived with bcrypt: a
+   * key past 72 bytes cannot be hashed without silently truncating it. The
+   * contract is the same as for a blank key — collect the project, keep going —
+   * and the reason is the blast radius. Propagating the rejection would fail
+   * the whole deploy-time backfill, insert nothing for anyone, and never name
+   * the project at fault.
+   */
+  /**
+   * The backfill runs on every pod's boot path, before the listener starts and
+   * inside the startup probe's budget, so what it does on the *second* deploy
+   * matters more than what it does on the first. Deriving a capability costs
+   * roughly 200ms; doing it for every project on every deploy is a KDF per
+   * project of boot latency forever, and at enough projects it outruns the
+   * probe and the pod never converges.
+   */
+  describe("when a project already holds a current-generation row", () => {
+    /** @scenario "A deploy re-derives only the projects whose key-map row is out of date" */
+    it("derives nothing for it, so a steady-state deploy does no bcrypt work", async () => {
+      const plan = await planLwqlKeyMapBackfill({
+        projects: [{ id: "project-mapped", lwqlKey: "a-perfectly-normal-key" }],
+        existingHashes: new Set(),
+        tenantsHoldingCurrentCapability: new Set(["project-mapped"]),
+      });
+
+      expect(plan.rowsToInsert).toEqual([]);
+      expect(plan.blankKeyProjectIds).toEqual([]);
+      expect(plan.unhashableProjectIds).toEqual([]);
+    });
+
+    /**
+     * The skip keys on the *current* generation, not on "has any row at all".
+     * Every project holds a previous-generation row on the deploy that changes
+     * the derivation, and skipping those would leave the key map permanently
+     * stale — the migration would silently never happen.
+     */
+    /** @scenario "A deploy re-derives only the projects whose key-map row is out of date" */
+    it("still derives for a project whose only row is a previous generation", async () => {
+      const plan = await planLwqlKeyMapBackfill({
+        projects: [{ id: "project-stale", lwqlKey: "a-perfectly-normal-key" }],
+        existingHashes: new Set(["a".repeat(64)]),
+        tenantsHoldingCurrentCapability: new Set(),
+      });
+
+      expect(plan.rowsToInsert).toEqual([
+        {
+          KeyHash: expect.stringMatching(/^\$2b\$10\$/),
+          TenantId: "project-stale",
+        },
+      ]);
+    });
+  });
+
+  /**
+   * The prefix test is what separates those two cases, and it reads the cost
+   * factor out of the stored value — so it has to move if the cost ever does.
+   */
+  describe("when a stored hash is checked for its generation", () => {
+    it("accepts this derivation's digests and rejects a bare sha256 hex", async () => {
+      const current = await lwqlTenantCapability({
+        secret: "generation-check",
+      });
+
+      expect(isCurrentGenerationCapability(current)).toBe(true);
+      expect(isCurrentGenerationCapability("a".repeat(64))).toBe(false);
+      // A different cost factor is a different generation, not a variant.
+      expect(isCurrentGenerationCapability(`$2b$12$${"a".repeat(53)}`)).toBe(
+        false,
+      );
+    });
+  });
+
+  describe("when a project's lwqlKey is longer than bcrypt reads", () => {
+    /** @scenario "One project's unusable secret never costs the other projects their key-map rows" */
+    it("reports that project and still plans rows for the others", async () => {
+      const plan = await planLwqlKeyMapBackfill({
+        projects: [
+          { id: "project-overlong", lwqlKey: "x".repeat(73) },
+          { id: "project-healthy", lwqlKey: "a-perfectly-normal-key" },
+        ],
+        existingHashes: new Set(),
+      });
+
+      expect(plan.unhashableProjectIds).toEqual(["project-overlong"]);
+      expect(plan.rowsToInsert).toEqual([
+        {
+          KeyHash: expect.stringMatching(/^\$2b\$10\$/),
+          TenantId: "project-healthy",
+        },
+      ]);
     });
   });
 

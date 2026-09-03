@@ -24,6 +24,7 @@ import { createLogger } from "@langwatch/observability";
 import { lwqlConnectionFromEnv } from "../server/analytics/lwql/executor";
 import { LWQL_KEY_MAP_INSERT_SETTINGS } from "../server/analytics/lwql/lwqlKeyMap.repository";
 import {
+  isCurrentGenerationCapability,
   type LwqlKeyMapBackfillPlan,
   lwqlKeyMapTableQualifiedName,
   lwqlPostgresSchemaFromDatabaseUrl,
@@ -89,24 +90,41 @@ async function planBackfillFromCurrentState({
   // "every ClickHouse query MUST filter on TenantId" rule cannot apply to.
   // `qualified()` (via lwqlKeyMapTableQualifiedName) validates the
   // interpolated database and table identifiers.
+  // The tenant id comes back alongside the hash so the planner can tell a
+  // project that already holds a current-generation row from one that needs
+  // deriving. Without it every deploy re-derives every project's capability —
+  // a KDF per project on the pod's boot path, before the listener starts.
   const existingResult = await client.query({
-    query: `SELECT DISTINCT ${KEY_MAP_COLUMNS.keyHash} FROM ${table}`,
+    query: `SELECT DISTINCT ${KEY_MAP_COLUMNS.keyHash}, ${KEY_MAP_COLUMNS.tenantId} FROM ${table}`,
     format: "JSONEachRow",
   });
   const existingRows = (await existingResult.json()) as Array<
     Record<string, string>
   >;
   // `noUncheckedIndexedAccess` types the lookup as `string | undefined` even
-  // though every row genuinely carries this column (it is the only thing the
-  // query selects) — filtered, not defaulted, so a row that somehow lacked it
-  // is dropped rather than coerced into a bogus "" entry in the set.
+  // though every row genuinely carries these columns (they are the only thing
+  // the query selects) — filtered, not defaulted, so a row that somehow lacked
+  // one is dropped rather than coerced into a bogus "" entry in the set.
   const existingHashes = new Set(
     existingRows
       .map((row) => row[KEY_MAP_COLUMNS.keyHash])
       .filter((hash): hash is string => hash !== undefined),
   );
+  const tenantsHoldingCurrentCapability = new Set(
+    existingRows
+      .filter((row) => {
+        const hash = row[KEY_MAP_COLUMNS.keyHash];
+        return hash !== undefined && isCurrentGenerationCapability(hash);
+      })
+      .map((row) => row[KEY_MAP_COLUMNS.tenantId])
+      .filter((tenantId): tenantId is string => tenantId !== undefined),
+  );
 
-  return planLwqlKeyMapBackfill({ projects, existingHashes });
+  return planLwqlKeyMapBackfill({
+    projects,
+    existingHashes,
+    tenantsHoldingCurrentCapability,
+  });
 }
 
 async function backfillKeyMap({
@@ -134,6 +152,19 @@ async function backfillKeyMap({
         projectIds: plan.blankKeyProjectIds,
       },
       "lwql key-map backfill found projects with an empty lwqlKey — these projects cannot authenticate to LangWatchQL until their key is regenerated",
+    );
+  }
+
+  // Same consequence as a blank key — no key-map row, so no LangWatchQL access
+  // — and the same reason to be loud about it. Reported per project rather than
+  // aborting the run, so one unusable key never costs the rest their rows.
+  if (plan.unhashableProjectIds.length > 0) {
+    logger.error(
+      {
+        count: plan.unhashableProjectIds.length,
+        projectIds: plan.unhashableProjectIds,
+      },
+      "lwql key-map backfill could not derive a capability for these projects — their lwqlKey is unusable (over bcrypt's 72-byte limit) and they cannot authenticate to LangWatchQL until it is regenerated",
     );
   }
 

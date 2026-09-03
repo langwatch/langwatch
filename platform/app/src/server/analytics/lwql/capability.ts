@@ -54,6 +54,19 @@
  * process, so it is written to fail towards a wasted hash rather than towards
  * the wrong tenant: see {@link capabilityCache}.
  *
+ * Be exact about what the work factor buys, because the encoding above gives
+ * some of it back. The first 29 characters of every capability are the salt,
+ * and the salt is `HKDF-SHA256(secret)` — so anyone holding a capability can
+ * test a candidate secret with two HMACs instead of a cost-10 bcrypt. Against
+ * a guessable secret that would matter, and the honest reading is that bcrypt
+ * is here to satisfy the rule that a hash of a secret is a KDF, not to make
+ * this digest expensive to attack. What actually makes guessing hopeless is
+ * the input: `lwqlKey` is a database-minted UUID, so there is no dictionary
+ * and no shortcut to 122 bits. Closing the gap properly would mean mixing in a
+ * value that never leaves the control plane — a pepper, or a salt derived from
+ * the project id rather than the secret — and either is a re-provisioning of
+ * the key map, so it is a deliberate decision rather than a tidy-up.
+ *
  * None of this is what makes the digest safe to hold, and the work factor
  * should not be mistaken for the control. What keeps it safe is that it is
  * useless without a session only the control plane can open: the restricted
@@ -85,21 +98,27 @@ import { hash } from "bcrypt";
 const CAPABILITY_COST = 10;
 
 /**
- * HKDF inputs. The namespace separates this feature's derivations from any
- * other use of the same secret; the two `info` values separate the bcrypt salt
- * from the cache key, so neither can ever be mistaken for the other.
+ * HKDF inputs, named for the parameter each one is passed as.
  *
- * The namespace string still reads `…salt.v1` because it is the value that was
- * mixed into every capability already derived. Renaming it would change every
- * digest, which is a re-provisioning of the key map, not a tidy-up.
+ * {@link CAPABILITY_HKDF_SALT} is HKDF's *salt*: it separates this feature's
+ * derivations from any other use of the same secret. The two `info` values
+ * separate the bcrypt salt from the cache key, so a derivation for one can
+ * never be mistaken for the other.
+ *
+ * All three strings are part of the wire format. Changing any of them changes
+ * every capability, which is a re-provisioning of the key map rather than a
+ * tidy-up — so they carry a version suffix and are not edited in place. The
+ * historical `…salt.v1` in the first value is a name, not a description of
+ * which parameter it feeds; it is left alone for that reason.
  */
-const CAPABILITY_NAMESPACE = "langwatchql.tenant-capability.salt.v1";
-const SALT_INFO = "langwatchql.tenant-capability.v1";
+const CAPABILITY_HKDF_SALT = "langwatchql.tenant-capability.salt.v1";
+const BCRYPT_SALT_INFO = "langwatchql.tenant-capability.v1";
 const CACHE_KEY_INFO = "langwatchql.tenant-capability.cache-key.v1";
 
-/** bcrypt's salt is 16 bytes, written as 22 characters of its own base64. */
+/** bcrypt reads exactly 16 salt bytes, written as 22 base64 characters. */
 const SALT_BYTES = 16;
-const SALT_CHARS = 22;
+/** Derived, never stated: base64 carries 6 bits a character. */
+const SALT_CHARS = Math.ceil((SALT_BYTES * 8) / 6);
 
 /**
  * The cache key is its own full-width derivation, not the salt.
@@ -114,6 +133,17 @@ const CACHE_KEY_BYTES = 32;
 
 /** The input length past which bcrypt stops reading. See the guard above. */
 const BCRYPT_MAX_SECRET_BYTES = 72;
+
+/**
+ * The modular-crypt prefix every capability this module derives begins with.
+ *
+ * Exported because the cost factor is part of the wire format: a stored digest
+ * that does not start with this was derived by an older generation of this
+ * function and no longer names its tenant. The backfill uses it to tell a row
+ * it can trust from one it has to replace, which is the only way to know that
+ * without re-deriving every project's capability on every deploy.
+ */
+export const CAPABILITY_PREFIX = `$2b$${String(CAPABILITY_COST).padStart(2, "0")}$`;
 
 /**
  * Derived capabilities, keyed by a one-way derivation of the secret rather than
@@ -146,22 +176,36 @@ const capabilityCache = new Map<
 /**
  * The bcrypt salt for a secret, in the modular-crypt form bcrypt parses.
  *
- * HKDF rather than a bare digest because deriving a salt is what a KDF is for,
- * and the 16 bytes are written in bcrypt's alphabet — which is `./A-Za-z0-9`,
- * so the one character standard base64 produces that bcrypt would reject (`+`)
- * is mapped onto `.`. The trailing bits of the 22nd character are unused, and
- * bcrypt canonicalises them in its output; that is deterministic too, so the
- * digest still round-trips.
+ * HKDF rather than a bare digest because deriving a salt is what a KDF is for.
+ * The 16 bytes are then written as *standard* base64 with `+` remapped to `.`,
+ * which lands them in the alphabet bcrypt accepts (`./A-Za-z0-9`) — the only
+ * character standard base64 emits that bcrypt would reject.
+ *
+ * This is deliberately not bcrypt's own base64, whose ordering differs, so the
+ * salt bcrypt decodes is a permutation of the HKDF output rather than the
+ * output itself. That costs nothing here: the mapping is injective (`.` never
+ * occurs in standard base64) and deterministic, so distinct secrets still get
+ * distinct salts. It matters only to a reimplementation — a second
+ * implementation in another language must copy *this* encoding, not bcrypt's,
+ * or it will derive different capabilities and silently match no key-map row.
+ * The trailing bits of the 22nd character are unused; bcrypt canonicalises
+ * them in its output, deterministically, so the digest still round-trips.
  */
 function capabilitySalt(secret: string): string {
   const derived = Buffer.from(
-    hkdfSync("sha256", secret, CAPABILITY_NAMESPACE, SALT_INFO, SALT_BYTES),
+    hkdfSync(
+      "sha256",
+      secret,
+      CAPABILITY_HKDF_SALT,
+      BCRYPT_SALT_INFO,
+      SALT_BYTES,
+    ),
   );
   const encoded = derived
     .toString("base64")
     .slice(0, SALT_CHARS)
     .replace(/\+/g, ".");
-  return `$2b$${String(CAPABILITY_COST).padStart(2, "0")}$${encoded}`;
+  return `${CAPABILITY_PREFIX}${encoded}`;
 }
 
 /**
@@ -173,7 +217,7 @@ function capabilityCacheKey(secret: string): string {
     hkdfSync(
       "sha256",
       secret,
-      CAPABILITY_NAMESPACE,
+      CAPABILITY_HKDF_SALT,
       CACHE_KEY_INFO,
       CACHE_KEY_BYTES,
     ),
@@ -189,6 +233,17 @@ function capabilityCacheKey(secret: string): string {
  * zero rows, and is indistinguishable from a tenant with no data. Throwing is
  * what turns a silent wrong answer into a loud wiring failure; a plain `Error`
  * because nothing a caller does fixes it (ADR-045).
+ *
+ * Refuses a secret over 72 bytes for the same reason, and it is the more
+ * dangerous of the two: bcrypt stops reading there, so two secrets sharing a
+ * 72-byte prefix would derive one capability and the two projects holding it
+ * would read each other's rows. Callers that hash a set of projects should
+ * expect this per project rather than letting one bad key take the batch down.
+ *
+ * The result is memoised process-wide per secret, so only the first call for a
+ * project pays the work factor — roughly 200ms — and later calls are a map
+ * lookup. That is why this is async and must never be made synchronous: a
+ * 200ms blocking hash on a shared API process stalls every in-flight request.
  *
  * @param secret - the project's LangWatchQL secret (`Project.lwqlKey`),
  *   in its raw form. Never logged, never sent to the database, and never
@@ -218,10 +273,32 @@ export async function lwqlTenantCapability({
   // key collision could cost is one hash rather than another tenant's rows.
   const cached = capabilityCache.get(cacheKey);
   if (cached !== undefined && cached.salt === salt) {
+    // Re-inserted so the map orders by last use rather than by first: eviction
+    // walks insertion order, and without this a project queried on every
+    // request is dropped as readily as one queried once at boot.
+    capabilityCache.delete(cacheKey);
+    capabilityCache.set(cacheKey, cached);
     return cached.capability;
   }
 
-  const capability = hash(secret, salt);
+  // bcrypt validates a salt's *shape* but not its alphabet: a character
+  // outside `./A-Za-z0-9` stops its base64 decoder early and leaves the rest
+  // of the salt buffer as uninitialised memory, so it answers with a digest
+  // under a salt nobody chose instead of refusing. Today's encoder cannot emit
+  // one — but switching it to `base64url` would, and the symptom would be a
+  // capability that matches no key-map row, which reads exactly like a tenant
+  // with no data. Checking the digest carries the salt it was asked for turns
+  // that into the loud failure this module's header insists on. The final salt
+  // character is excluded because bcrypt canonicalises its unused trailing
+  // bits.
+  const capability = hash(secret, salt).then((digest) => {
+    if (!digest.startsWith(salt.slice(0, -1))) {
+      throw new Error(
+        "LangWatchQL tenant capability: bcrypt returned a digest under a different salt than it was given",
+      );
+    }
+    return digest;
+  });
   if (capabilityCache.size >= CAPABILITY_CACHE_LIMIT) {
     const oldest = capabilityCache.keys().next();
     if (!oldest.done) {
