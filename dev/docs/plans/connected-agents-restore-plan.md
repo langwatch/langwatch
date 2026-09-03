@@ -563,3 +563,92 @@ lifted from `origin/main:platform/app/src/server/connected-agents/session.core.t
 agentPlatformUrl: AgentPlatformUrlBuilder, replicaCount, now }` replacing
 `{ runtime, prisma, replicaCount, now }`). No code for Slices 3-9 exists yet;
 nothing was stubbed.
+
+## 10. Integration progress (2026-09-03, second pass)
+
+**Done, verified with the named test commands, no deviation from the plan
+except where noted:**
+
+- **Slice 3** — `packages/features/agent/server/src/ports/connect-credential.port.ts`
+  (new; `ConnectCredentialPort.resolve` + `ResolvedConnectCredential`) is a
+  forced seam: main's `authenticate()` inlined `TokenResolver` and
+  `enforceApiKeyCeiling`, both of which live in `@langwatch/api-key-*`, which
+  `agent-server` may not depend on (§8's own rule). The port's single
+  `resolve` call folds all four of main's steps (resolve, key-kind refusal,
+  `scenarios:manage` ceiling, `project_required` naming) into the adapter the
+  process supplies; the session service no longer branches on refusal reason
+  itself. `connected-agent-session.service.ts` (verbatim lift of
+  `session.core.ts`'s logic; class renamed `AgentSessionCore` unchanged).
+  **Deviation, recorded**: `SessionCoreOptions` carries one field beyond
+  §1.2's shorthand — `agentRepository: AgentRepository` — because
+  `connected-agent-presence.projection.ts` (Slice 2) is a private module only
+  this service and its own tests may reach by relative import, and it takes
+  the repository directly, not through `AgentService`. §1.2's row summarizes
+  the constructor as "prisma becomes AgentService or the credential port,"
+  which undercounts this one field; the fuller shape is `{ runtime, agents,
+  agentRepository, credentials, agentPlatformUrl, replicaCount, now }`.
+  `connected-agent-long-poll.service.ts` (verbatim lift of
+  `long-poll.transport.ts`, extends `SessionCoreOptions`).
+  Tests: `connected-agent-long-poll.service.unit.test.ts` (3 scenarios, all
+  `@scenario`-tagged, verbatim titles). `@langwatch/handled-error` added to
+  `agent-server`'s `package.json` dependencies (used by `HandledError.isHandled`
+  in the session service; was missing and broke resolution).
+  `pnpm --filter @langwatch/agent-server test`: 11 files / 100 passed.
+  Touched packages: `@langwatch/agent-contract` (no changes needed — already
+  complete from Slice 1/2), `@langwatch/agent-server`.
+
+- **Slice 4** — `packages/features/agent/server/src/ports/connect-upgrade-router.port.ts`
+  (new; `ConnectUpgradeRouterPort` + `UpgradeHandler`).
+  `packages/features/agent/server/src/transport/api-ws/connected-agent-connect.api.ts`
+  (verbatim lift of `connect.gateway.ts`; `ConnectGatewayOptions` extends
+  `SessionCoreOptions`; `PING_INTERVAL_MS`/`PONG_WAIT_MS`/`PRESENCE_REFRESH_MS`
+  read from the contract's `connected-agent.constants.ts` rather than
+  restated). `ws@^8.21.0` + `@types/ws@^8.18.1` added to `agent-server`'s
+  `package.json` (already resolved in the lockfile via `sdks/typescript`, so
+  no new third-party package entered the workspace, matching §3).
+  `apps/api/src/api-http.listener.ts` gained `ApiUpgradeSurfacePort` (abstract
+  `attach(server)`) and an `upgrades?` option, attached in the constructor
+  after `createServer`. `apps/api/src/api-upgrade-router.ts` (new;
+  `ApiUpgradeRouter` implements both `ApiUpgradeSurfacePort` and the
+  package's `ConnectUpgradeRouterPort` — main's `upgrade-router.ts` body,
+  moved verbatim, wrapped as a class per §1.2's row for that file).
+  Tests: `connected-agent-connect.api.unit.test.ts` (gateway-guards, 3
+  `@scenario`-tagged scenarios, verbatim titles, plus one untagged 404 guard,
+  matching main's file exactly).
+  `pnpm --filter @langwatch/agent-server test`: 11 files / 100 passed (same
+  run as Slice 3 above — both slices verified together).
+  `pnpm --filter @langwatch/platform-api test:unit src/__tests__/api-http.listener.integration.test.ts`:
+  4/4 passed (no regression from the new `upgrades` option; not yet wired to
+  a live gateway — that is Slice 7's `ApiUpgradeRouter.create()` wiring).
+  Touched packages: `@langwatch/agent-server`, `@langwatch/platform-api`.
+
+- **Architecture-lint**: `pnpm --filter @langwatch/architecture-lint test`
+  ran with one pre-existing, unrelated failure
+  (`tests/cli-comment-review.test.ts`, a 5s timeout on an unrelated CLI
+  fixture — not touched by this pass): 598/599 passed. `pnpm -s lint` (the
+  CLI directly) exits 0; the only non-comment-block findings under
+  `packages/features/agent/server` are `eventing-projection-purity` on the
+  Slice 2 projection and `fallible-result-naming` on two Slice 2 repository
+  methods — pre-existing from the prior pass, not introduced by Slices 3-4.
+  `check-feature-parity.ts | grep -c '✗ \['` reads 3235 at the start of this
+  pass (a repo-wide count that moves with every agent's concurrent work
+  tonight, not a Slice-3/4-scoped number — Slices 3-4 lift no `@scenario`
+  frames of their own beyond what is already counted above).
+
+**Not started — Slices 5-9.** REST v1 family (`agent-v1.api.ts`,
+`agent-call.api.ts`, `agent-connect.api.ts`), `AgentApp`'s connected
+dependency and enriched `getAll`/`getById` (Slice 6), the process composition
+in `apps/api` and `apps/worker` (Slice 7 — coordinate with
+`a9b5bb9332cf3e2d9`, who is mid-flight flattening
+`api-production.composition.ts`'s collaborator folds; message them again
+before editing that file), the agents-page UI slot (Slice 8), and the final
+parity sweep (Slice 9) remain exactly as this document specifies. Slice 5 is
+the largest remaining unit: main's `agents.v1.ts`/`call.v1.ts`/`connect.v1.ts`
+use a `VersionBuilder` builder this branch does not have, and per §1.2's row
+for `app.ts`/`alias.ts` the destination shape is `createAgentV1RestApp({...})`
+matching `agent-legacy.api.ts`'s `SecuredApp` pattern — read that file
+alongside main's three route files side by side before writing
+`agent-v1.api.ts`, and check the frozen `openapi-document.json` for the exact
+operation shapes already published (the rule bars editing it, so the new
+family's routes must match it, not the reverse). No code for Slices 5-9
+exists yet; nothing was stubbed.

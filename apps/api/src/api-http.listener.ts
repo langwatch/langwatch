@@ -29,6 +29,15 @@ export abstract class ApiRawRequestSurfacePort {
   abstract handle(request: IncomingMessage, response: ServerResponse): void;
 }
 
+/**
+ * A second `upgrade` listener on this process's own server (ADR-128): the
+ * connected-agent WebSocket gateway is the only registrant today, routed by
+ * pathname behind this port so the listener does not need to know it exists.
+ */
+export abstract class ApiUpgradeSurfacePort {
+  abstract attach(server: Server): void;
+}
+
 export type ApiHttpListenerOptions = Readonly<{
   application: Hono;
   host?: string;
@@ -37,6 +46,8 @@ export type ApiHttpListenerOptions = Readonly<{
   logger?: Pick<Logger, "error" | "info">;
   /** Served before the Hono application; see {@link ApiRawRequestSurfacePort}. */
   rawSurface?: ApiRawRequestSurfacePort | undefined;
+  /** Attached to the server's own `upgrade` event; see {@link ApiUpgradeSurfacePort}. */
+  upgrades?: ApiUpgradeSurfacePort | undefined;
 }>;
 
 /**
@@ -78,6 +89,7 @@ export class ApiHttpListener {
     this.server.on("error", (error) => {
       this.options.logger?.error({ error }, "API HTTP listener failed");
     });
+    options.upgrades?.attach(this.server);
   }
 
   start(): Promise<ApiListenerAddress> {

@@ -98,3 +98,29 @@ export {
   type AgentPresence,
   type AgentPresenceStatus,
 } from "./services/connected-agent-presence.service";
+export {
+  ConnectCredentialPort,
+  type ResolvedConnectCredential,
+} from "./ports/connect-credential.port";
+export {
+  AgentSessionCore,
+  type ConnectCredentials,
+  type SessionCoreOptions,
+  type SessionInfo,
+} from "./services/connected-agent-session.service";
+export {
+  INSTANCE_TOKEN_HEADER,
+  LongPollTransport,
+  type LongPollTransportOptions,
+  type RegisterAnswer,
+  refusalStatus,
+} from "./services/connected-agent-long-poll.service";
+export {
+  ConnectUpgradeRouterPort,
+  type UpgradeHandler,
+} from "./ports/connect-upgrade-router.port";
+export {
+  CONNECT_PATH,
+  ConnectGateway,
+  type ConnectGatewayOptions,
+} from "./transport/api-ws/connected-agent-connect.api";
