@@ -45,10 +45,14 @@
  *
  * **The work factor would otherwise be paid per query.** It is paid per
  * *project*, once per process: the secret is stable, so the digest is memoised
- * under the derived salt. That also keeps the raw secret out of the cache —
- * the key is the salt, which the secret cannot be recovered from. A cold call
- * costs roughly 200ms, which is why it is awaited off the event loop rather
- * than hashed synchronously; every later query for that project reads the map.
+ * under a one-way derivation of it, which keeps the raw secret out of the cache
+ * because nothing there can be turned back into a credential. A cold call costs
+ * roughly 200ms, which is why it is awaited off the event loop rather than
+ * hashed synchronously; every later query for that project reads the map.
+ *
+ * That cache is the one structure in this file shared by every tenant in the
+ * process, so it is written to fail towards a wasted hash rather than towards
+ * the wrong tenant: see {@link capabilityCache}.
  *
  * None of this is what makes the digest safe to hold, and the work factor
  * should not be mistaken for the control. What keeps it safe is that it is
@@ -80,8 +84,16 @@ import { hash } from "bcrypt";
  */
 const CAPABILITY_COST = 10;
 
-/** Domain separation, so this derivation can never collide with another. */
-const SALT_NAMESPACE = "langwatchql.tenant-capability.salt.v1";
+/**
+ * HKDF inputs. The namespace separates this feature's derivations from any
+ * other use of the same secret; the two `info` values separate the bcrypt salt
+ * from the cache key, so neither can ever be mistaken for the other.
+ *
+ * The namespace string still reads `…salt.v1` because it is the value that was
+ * mixed into every capability already derived. Renaming it would change every
+ * digest, which is a re-provisioning of the key map, not a tidy-up.
+ */
+const CAPABILITY_NAMESPACE = "langwatchql.tenant-capability.salt.v1";
 const SALT_INFO = "langwatchql.tenant-capability.v1";
 const CACHE_KEY_INFO = "langwatchql.tenant-capability.cache-key.v1";
 
@@ -143,7 +155,7 @@ const capabilityCache = new Map<
  */
 function capabilitySalt(secret: string): string {
   const derived = Buffer.from(
-    hkdfSync("sha256", secret, SALT_NAMESPACE, SALT_INFO, SALT_BYTES),
+    hkdfSync("sha256", secret, CAPABILITY_NAMESPACE, SALT_INFO, SALT_BYTES),
   );
   const encoded = derived
     .toString("base64")
@@ -158,7 +170,13 @@ function capabilitySalt(secret: string): string {
  */
 function capabilityCacheKey(secret: string): string {
   return Buffer.from(
-    hkdfSync("sha256", secret, SALT_NAMESPACE, CACHE_KEY_INFO, CACHE_KEY_BYTES),
+    hkdfSync(
+      "sha256",
+      secret,
+      CAPABILITY_NAMESPACE,
+      CACHE_KEY_INFO,
+      CACHE_KEY_BYTES,
+    ),
   ).toString("hex");
 }
 
