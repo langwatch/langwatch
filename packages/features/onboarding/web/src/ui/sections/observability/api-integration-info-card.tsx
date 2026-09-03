@@ -1,12 +1,13 @@
 import { Text, VStack } from "@chakra-ui/react";
 import type React from "react";
 import { usePublicEnv } from "../../../behavior/use-public-env";
-import { toaster } from "@langwatch/design-system/toaster";
+import { useOnboardingHost } from "../../../model/onboarding-host";
 import { useActiveProject } from "../active-project-context";
 import { CLOUD_ENDPOINT } from "../../../model/shared/build-mcp-config";
 import { CopyableInputWithPrefix } from "../../elements/observability/copyable-input-with-prefix";
 
 export function ApiIntegrationInfoCard(): React.ReactElement {
+  const host = useOnboardingHost();
   const { project } = useActiveProject();
   const publicEnv = usePublicEnv();
 
@@ -18,22 +19,14 @@ export function ApiIntegrationInfoCard(): React.ReactElement {
   }: {
     withBashPrefix?: boolean;
   }): Promise<void> {
-    try {
-      await navigator.clipboard.writeText(
-        withBashPrefix ? `LANGWATCH_API_KEY=${effectiveApiKey}` : effectiveApiKey,
-      );
-      toaster.create({
-        title: "Copied",
-        description: "API key copied to clipboard",
-        type: "success",
-      });
-    } catch {
-      toaster.create({
-        title: "Copy failed",
-        description: "Couldn't copy the API key. Please try again.",
-        type: "error",
-      });
-    }
+    // The clipboard is a browser singleton and the confirmation is the
+    // application's, so the host owns both ends: it writes, confirms, and
+    // reports a refusal through the same feedback capability every other
+    // failure in this package travels on.
+    await host.copyToClipboard({
+      text: withBashPrefix ? `LANGWATCH_API_KEY=${effectiveApiKey}` : effectiveApiKey,
+      succeeded: { title: "Copied", description: "API key copied to clipboard" },
+    });
   }
 
   async function copyEndpoint({
@@ -41,21 +34,10 @@ export function ApiIntegrationInfoCard(): React.ReactElement {
   }: {
     withBashPrefix?: boolean;
   }): Promise<void> {
-    try {
-      await navigator.clipboard.writeText(
-        withBashPrefix ? `LANGWATCH_ENDPOINT=${effectiveEndpoint}` : effectiveEndpoint,
-      );
-      toaster.create({
-        title: "Copied",
-        description: "Endpoint copied to clipboard",
-      });
-    } catch {
-      toaster.create({
-        title: "Copy failed",
-        description: "Couldn't copy the endpoint. Please try again.",
-        type: "error",
-      });
-    }
+    await host.copyToClipboard({
+      text: withBashPrefix ? `LANGWATCH_ENDPOINT=${effectiveEndpoint}` : effectiveEndpoint,
+      succeeded: { title: "Copied", description: "Endpoint copied to clipboard" },
+    });
   }
 
   return (

@@ -14,6 +14,7 @@ import type { ReactElement, ReactNode } from "react";
 import {
   AuthHostPort,
   AuthHostProvider,
+  type AuthFailureNotice,
   type AuthPublicEnvironment,
   type AuthRouteReading,
 } from "./model/auth-host";
@@ -40,6 +41,8 @@ export const TEST_PUBLIC_ENVIRONMENT: AuthPublicEnvironment = {
 export type TestAuthHostOptions = {
   publicEnvironment?: Partial<AuthPublicEnvironment>;
   route?: Partial<AuthRouteReading>;
+  /** Records the refusals a screen reported, for a suite that asserts on them. */
+  failed?: (failure: AuthFailureNotice) => void;
 };
 
 /** A host that answers from values a test wrote, and nothing else. */
@@ -48,12 +51,14 @@ export class TestAuthHost extends AuthHostPort {
     return new TestAuthHost(
       { ...TEST_PUBLIC_ENVIRONMENT, ...options.publicEnvironment },
       { pathname: "/auth/signin", params: {}, query: {}, ...options.route },
+      options.failed,
     );
   }
 
   private constructor(
     private readonly environment: AuthPublicEnvironment,
     private readonly reading: AuthRouteReading,
+    private readonly onFailed: ((failure: AuthFailureNotice) => void) | undefined,
   ) {
     super();
   }
@@ -64,6 +69,10 @@ export class TestAuthHost extends AuthHostPort {
 
   route(): AuthRouteReading {
     return this.reading;
+  }
+
+  failed(failure: AuthFailureNotice): void {
+    this.onFailed?.(failure);
   }
 }
 

@@ -116,7 +116,15 @@ export async function executeUiAction({
   handlers: LangyUiActionHandlers;
   claim: (args: { actionId: string }) => Promise<{ isClaimed: boolean }>;
   complete: CompleteUiAction;
-  onHandlerError?: (info: { kind: string; message: string }) => void;
+  /**
+   * Reports a handler that threw, with the failure itself.
+   *
+   * `error` travels alongside the read `message` because the words a customer
+   * reads are resolved from the failure's code by the composition's
+   * presentation registry (ADR-045); `message` stays because the dispatch's own
+   * bookkeeping already read it.
+   */
+  onHandlerError?: (info: { kind: string; message: string; error: unknown }) => void;
 }): Promise<UiActionExecution> {
   const key = uiActionDedupKey({ turnId, actionId: entry.actionId });
   if (!reserveNavigate({ seen, key })) return "duplicate";
@@ -149,7 +157,7 @@ export async function executeUiAction({
       complete,
       outcome: { actionId: entry.actionId, ok: false, errorCode },
     });
-    onHandlerError?.({ kind: entry.kind, message });
+    onHandlerError?.({ kind: entry.kind, message, error });
     return "handler-failed";
   }
 

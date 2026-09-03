@@ -107,6 +107,16 @@ export type TraceSuccessNotice = {
 export type TraceFailureNotice = {
   error: unknown;
   fallbackTitle: string;
+  /**
+   * A sentence for a refusal the SCREEN can say more about than the registry.
+   *
+   * Ignored the moment the error carries a code the composition has copy for,
+   * so it can never talk over registered copy. It is the channel for the
+   * failures that have no code at all — a guard decided in the browser — and
+   * for the ones whose registered copy is generic where the screen holds the
+   * server's own numbers.
+   */
+  description?: string;
   id?: string;
 };
 

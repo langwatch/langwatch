@@ -321,11 +321,11 @@ function dispatchUiActionToPage({
         ...(result !== undefined ? { result } : {}),
         ...(errorCode ? { errorCode } : {}),
       }),
-    onHandlerError: ({ kind }) => {
-      toaster.create({
-        title: "Langy's change didn't apply",
+    onHandlerError: ({ kind, error }) => {
+      showErrorToast({
+        error,
+        fallbackTitle: "Langy's change didn't apply",
         description: `The page could not carry out ${kind}. Nothing else was affected.`,
-        type: "error",
       });
     },
   }).catch(() => undefined);
@@ -1730,12 +1730,11 @@ function LangyPanel({
         resetChatEngine({ clearMessages: true });
         startNewConversation();
       }
-    } catch {
-      toaster.create({
-        title: "Langy",
-        description: "Failed to delete conversation.",
-        type: "error",
-        duration: 5000,
+    } catch (error) {
+      showErrorToast({
+        error,
+        fallbackTitle: "Couldn't delete the conversation",
+        description: "The conversation is still there. Try again in a moment.",
       });
     }
   };
@@ -1743,12 +1742,11 @@ function LangyPanel({
   const handleRenameConversation = async (id: string, title: string) => {
     try {
       await renameConversation(id, title);
-    } catch {
-      toaster.create({
-        title: "Langy",
-        description: "Failed to rename conversation.",
-        type: "error",
-        duration: 5000,
+    } catch (error) {
+      showErrorToast({
+        error,
+        fallbackTitle: "Couldn't rename the conversation",
+        description: "The old name is still in place. Try again in a moment.",
       });
       throw new Error("Failed to rename conversation");
     }
@@ -1761,11 +1759,10 @@ function LangyPanel({
       if (discardedProposalIds.has(proposalId)) return;
       const handler = proposalHandlersRef?.current?.[proposal.kind];
       if (!handler) {
-        toaster.create({
-          title: "Cannot apply",
-          description: `No handler for '${proposal.kind}' on this page.`,
-          type: "error",
-          duration: 5000,
+        showErrorToast({
+          error: void 0,
+          fallbackTitle: "Cannot apply this change here",
+          description: `This page cannot carry out ${proposal.kind}. Open the page it belongs to and apply it there.`,
         });
         return;
       }

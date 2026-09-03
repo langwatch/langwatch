@@ -53,6 +53,7 @@ export {
   AuthHostPort,
   AuthHostProvider,
   type AuthErrorExplanation,
+  type AuthFailureNotice,
   type AuthPublicEnvironment,
   type AuthRouteReading,
 } from "../../model/auth-host";

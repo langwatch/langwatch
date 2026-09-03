@@ -169,10 +169,13 @@ export function ScenarioAIGeneration({ form }: ScenarioAIGenerationProps) {
       const classified = classifyGenerationError(error);
       const needsConfiguration =
         classified.cta === "configure" || classified.cta === "configure-and-retry";
+      // STAYS ON THE DESIGN SYSTEM TOASTER: a generation failure that needs a
+      // model provider offers the way to configure one, and the feedback port
+      // has no slot for an offered action. See the plan doc's UI ledger.
       toaster.create({
         title: classified.title,
         description: classified.copy,
-        type: "error",
+        type: "error", // no-raw-error-toast-ok
         duration: TOAST_DURATION_MS,
         action: needsConfiguration
           ? {

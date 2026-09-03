@@ -17,6 +17,7 @@ import { CascadeArchiveDialog } from "../../elements/cascade-archive-dialog";
 import { Drawer } from "@langwatch/workflow-web/components/ui/drawer";
 import { Menu } from "@langwatch/design-system/menu";
 import { toaster } from "@langwatch/design-system/toaster";
+import { showErrorToast } from "../../../behavior/errors";
 import { getComplexProps, getFlowCallbacks, useDrawer } from "@langwatch/ui-drawer";
 import { useOrganizationTeamProject } from "../../../behavior/use-organization-team-project";
 import type { AgentWithFields } from "@langwatch/agent-contract";
@@ -88,11 +89,11 @@ export function AgentListDrawer(props: AgentListDrawerProps) {
         type: "success",
       });
     },
-    onError: () => {
-      toaster.create({
-        title: "Error deleting agent",
+    onError: (error) => {
+      showErrorToast({
+        error,
+        fallbackTitle: "Couldn't delete the agent",
         description: "Please try again later.",
-        type: "error",
       });
     },
   });
@@ -147,11 +148,11 @@ export function AgentListDrawer(props: AgentListDrawerProps) {
               type: "success",
             });
           },
-          onError: () => {
-            toaster.create({
-              title: "Error deleting agent",
+          onError: (error) => {
+            showErrorToast({
+              error,
+              fallbackTitle: "Couldn't delete the agent",
               description: "Please try again later.",
-              type: "error",
             });
           },
         },

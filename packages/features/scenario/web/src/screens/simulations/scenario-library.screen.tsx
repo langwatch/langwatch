@@ -20,7 +20,6 @@ import { DashboardLayout } from "../../ui/sections/dashboard-layout";
 import { ScenarioCreateModal } from "../../ui/sections/scenarios/scenario-create-modal";
 import { ScenarioTable } from "../../ui/elements/scenarios/scenario-table";
 import { PageLayout } from "@langwatch/design-system/page-layout";
-import { toaster } from "@langwatch/design-system/toaster";
 import { HandledErrorAlert, showErrorToast } from "../../behavior/errors";
 import type { Scenario } from "../../model/prisma-types";
 import { useDrawer } from "@langwatch/ui-drawer";
@@ -72,10 +71,13 @@ function ScenarioLibraryPage() {
   const batchArchiveMutation = api.scenarios.batchArchive.useMutation({
     onSuccess: (result) => {
       if (result.failed.length > 0) {
-        toaster.create({
-          title: "Some scenarios couldn't be archived",
+        // A partial success: the server answered, and the count is the only
+        // fact there is about what did not land. There is no failure to hand
+        // over, so the screen's own line is what the reader gets.
+        showErrorToast({
+          error: void 0,
+          fallbackTitle: "Some scenarios couldn't be archived",
           description: `${result.failed.length} failed. Please retry.`,
-          type: "error",
         });
       }
       void utils.scenarios.getAll.invalidate();

@@ -159,6 +159,7 @@ describe("executeUiAction", () => {
       expect(onHandlerError).toHaveBeenCalledWith({
         kind: ENTRY.kind,
         message: "no such target",
+        error: expect.anything(),
       });
     });
   });
@@ -230,6 +231,7 @@ describe("executeUiAction", () => {
       expect(onHandlerError).toHaveBeenCalledWith({
         kind: ENTRY.kind,
         message: "no such target",
+        error: expect.anything(),
       });
     });
   });

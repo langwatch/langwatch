@@ -8480,6 +8480,222 @@ failure to support.
   binary rows aside), and this lane contributed none of them — it touched
   nothing under `platform/app`.
 
+## UI: the eight packages that still toasted their own failures, 2026-09-03
+
+The named absence at the end of the record above: **30 files across eight
+`packages/features/*/web` packages imported `@langwatch/design-system/toaster`
+directly** and raised their own error toasts, so the presentation registry that
+slice had just wired behind `UiFeedbackPort.failed` did not reach them. This is
+that slice. Twenty-one of those files raise nothing but a success, an info
+notice or a warning and were left exactly as written — the rule is about
+FAILURES, not about the toaster. What changed is every failure, plus a guard so
+the shape cannot come back.
+
+```
+  BEFORE                                    AFTER
+
+  scenario/web  ─┐                          scenario/web  ─┐
+  langy/web     ─┤                          langy/web     ─┤ host.failed / the
+  auth/web      ─┼─► design-system/toaster  auth/web      ─┼─► family's own
+  trace/web     ─┤    "Error deleting        trace/web     ─┤   showErrorToast
+  analytics/web ─┤     dashboard"            analytics/web ─┤        │
+  onboarding/web─┤    (24 hardcoded          onboarding/web─┘        ▼
+  organization/w─┤     error toasts)         organization/w─►  UiFeedbackPort
+  navigation/web─┘                                                   │
+                                                                     ▼
+                                                     model/errors/presentation
+                                                     (494 codes, tips, docsUrl,
+                                                      trace id)
+```
+
+### What moved, by package
+
+- **`analytics/web`** — the three dashboard mutations in
+  `custom-dashboards-section.tsx` toasted `"Error renaming dashboard"` from an
+  `onError` that took no argument at all. They take the error now and hand it to
+  `host.failed`, which the family's port already had. The "Cannot delete the
+  last dashboard" notice is a `warning` and stays: it is a guard, not a failure.
+- **`trace/web`** — `editable-trace-name.tsx` was the only `toaster.error` in
+  the corpus. `RenameTraceOutcome` now carries the raw `error` beside the read
+  rejection shape, `TraceFailureNotice` gained the `description` channel every
+  other family's already had, and the rename reports through `host.failed`.
+- **`organization/web`** — `copy-input.tsx` reports both outcomes through
+  `useOrganizationHost()` rather than the toaster. It reads the HOST, not the
+  family's `organization-feedback` re-binder, because `ui-web-layer-direction`
+  correctly refuses an `elements/` file that depends upward on `behavior/`;
+  `model/` is what an element may reach, and the host lives there.
+- **`onboarding/web`** — `api-integration-info-card.tsx` asks
+  `host.copyToClipboard`, the capability the port has had all along, instead of
+  driving `navigator.clipboard` and both toasts itself. `code-preview.tsx` now
+  shares the package's own `copyToClipboard` helper with `InlineCopyButton`
+  rather than repeating it.
+- **`langy/web`** — four error toasts in `langy-panel.tsx` and two in
+  `langy-timeseries-card.tsx` go through the family's existing module-level
+  `showErrorToast`, which is already bound to `LangyHostPort`. Four of the six
+  were `catch {}` with no binding; they catch the error now and hand it over.
+  `executeUiAction`'s `onHandlerError` carries `error` alongside the `message`
+  it already read, so a handler that threw a `HandledError` resolves.
+- **`scenario/web`** — the partial-archive notice in
+  `scenario-library.screen.tsx` and both agent-deletion failures in
+  `agent-list-drawer.tsx` go through the family's `showErrorToast`. The other
+  fifteen scenario files in the absence raise successes, warnings and info
+  notices only.
+- **`auth/web`** — the front door had no feedback slot at all. `AuthHostPort`
+  gained `failed(AuthFailureNotice)`, `behavior/auth-feedback.ts` is the
+  re-binder in the shape automations, gateway, ops and coding-agent already
+  state, and `signin.screen.tsx` / `signup.screen.tsx` report through it. Wired
+  in `apps/ui/src/features/auth/behavior/auth-host.adapter.ts` (a new
+  `AuthHostActions`) and the one component that constructs it.
+
+### Judgment calls
+
+- **The front door's re-binder reads an OPTIONAL host, and it is the only one
+  that does.** Every other family's screens are always mounted inside their
+  frontend feature; sign-in and sign-up are also rendered by twelve suites that
+  compose nothing above them, and `useAuthHost()` would have turned "this suite
+  mounted no host" into "sign-in throws". With no host the refusal still reaches
+  the reader — both screens put the same sentence in the card's inline alert —
+  so the second channel degrades and warns rather than failing.
+- **The provider that constructs the auth host was edited, which is one file
+  past the adapter.** A new action on a port has to be answered somewhere, and
+  `auth-host-provider.tsx` is where `UiAuthHost.create` is called; the edit is
+  the one anchored argument.
+- **`navigation/web` was left as written.** Its single toaster call is the
+  easter-egg `info` notice in `use-easter-egg-effects.ts` — not a failure, so
+  the rule does not reach it. Giving `NavigationHostPort` a notice slot for one
+  non-failure caller would mean editing `navigation-host-provider.tsx` to carry
+  a capability nothing else asks for, which is mechanism bought for a joke.
+- **`auth/web`'s `use-accept-invite-once.ts` was left as written.** It is in the
+  30, and its only toast is the SUCCESS on an accepted invite; its `onError`
+  already declines to toast and reports inline instead, which is the better
+  channel and was already correct.
+- **The onboarding clipboard helper stays on the Design System toaster, and
+  says why in its own docblock.** Two of its callers — `InlineCopyButton` and
+  `CodePreview` — are imported by `@langwatch/trace-web`'s API-key card, which
+  mounts no onboarding host and cannot. Routing the helper through
+  `useOnboardingHost()` was written, and it took two `trace-web` suites down
+  with `"No onboarding host is mounted above this screen"`; a shared affordance
+  may not demand a host the family that borrowed it has no way to supply. A
+  clipboard refusal is also the one failure that can afford this: it has no
+  code, never crosses a wire, and nothing the registry knows is given up.
+- **The trace rename's specific line loses to the registry, deliberately.** A
+  too-long name raises `ValidationError`, whose registry copy reads "Check your
+  input · Some of the values aren't valid." — less specific than the screen's
+  "Trace names are limited to 200 characters (you used 210)." The error travels
+  whole anyway and the specific line rides as `description`, which the registry
+  outranks for a registered code. Two authoring surfaces for one code is the
+  thing the registry exists to prevent, and the durable fix is on the server:
+  `meta.fieldErrors`, or a code of its own. Named below rather than worked
+  around here.
+- **Five failure toasts keep an ACTION and stay on the toaster, each marked.**
+  `UiFailureNotice` has no slot for an offered action, and adding one is a
+  change to `apps/ui/src/behavior/ui-capabilities.ts` and `ui-feedback.ts`,
+  which this lane does not own. Routing them would have bought the registry's
+  words and thrown away the button that acts on them —
+  `suite_all_scenarios_archived`'s registry copy literally reads "Edit the plan
+  to include active scenarios," and the toast is where "Edit Run Plan" lives.
+  Each carries `// no-raw-error-toast-ok` and a sentence saying why:
+  `show-suite-run-error.ts`, `scenario-ai-generation.tsx`, and three in
+  `use-run-scenario.ts` (the model-provider gate, and two of
+  `buildRunOutcomeToast`'s three branches — that builder reports one run OUTCOME
+  in three shapes and splitting one shape off it would give a run two ways of
+  being reported).
+
+### The guard
+
+`no-raw-error-toasts.unit.test.ts` already scanned `packages/`, and it already
+caught the wrong WORDS. It could not catch the wrong CHANNEL: `toaster.create({
+title: "Error deleting agent", type: "error" })` renders no error message and
+was invisible to every rule in the file. A second corpus test closes it — **in a
+`packages/features/*/web` file that imports `@langwatch/design-system/toaster`,
+a failure-shaped toast is a finding**: `toaster.error(...)` by its method,
+`type: "error"` by its argument. Success, info and warning are untouched, so the
+21 files that raise only those stay clean and no exemption was needed for them.
+
+Three details are load-bearing:
+
+- **The binding is read from the import clause**, not assumed to be `toaster`,
+  so `import { toaster as appToaster }` does not walk past it.
+- **`type: "error"` is not scoped to an enclosing toaster call.**
+  `use-run-scenario.ts` builds its config in a named function and passes it
+  (`toaster.create(buildRunOutcomeToast(...))`), so a rule that read only the
+  call's arguments would have been blind to precisely the file that took the
+  trouble to hoist. In a file whose only reason to import the toaster is to
+  raise toasts, an error-shaped literal IS an error toast.
+- **It has its own file floor** (`FEATURE_WEB_TOASTER_FILE_FLOOR`, 10 against 26
+  today), for the reason the file already states about the other one: a rule
+  that scans nothing reports no offenders forever, and this one's two ways of
+  going quiet are the path shape and the module specifier.
+
+The rule was shown to land: re-writing one `showErrorToast` in
+`agent-list-drawer.tsx` back to `toaster.create({ type: "error" })` fails the
+guard naming `agent-list-drawer.tsx:96`, and restoring it turns it green.
+
+### Named absences
+
+- **`UiFailureNotice` has no `action`.** Five sites need one and are marked;
+  see the judgment call above. It is the next thing this port wants, and it is a
+  change to `apps/ui`'s own capability rather than to any package.
+- **`validation_error`'s registry copy cannot read a `field`/`maxLength` meta.**
+  It reads `meta.fieldErrors` and `meta.formErrors` only, so the trace rename's
+  rejection — which names `newName`, its limit and what arrived — degrades to
+  the generic line. Either the server sends `fieldErrors`, or the code gets its
+  own entry.
+- **`navigation/web` still reaches the toaster** for the easter egg, by
+  decision rather than oversight; it is the one file of the 30 that ends this
+  slice unchanged and unmarked, and the guard passes it because an `info` toast
+  is not a failure.
+- **The onboarding clipboard helper and the two components that share it**
+  remain on the toaster, with one marked line. Moving them wants either an
+  optional host on `OnboardingHostPort` or `@langwatch/trace-web` no longer
+  borrowing an onboarding component — neither of which is a copy slice.
+- **A SECOND absence this slice surfaced and did not create.**
+  `@langwatch/trace-web` carries its own toast singleton
+  (`ui/blocks/toaster.tsx`) and its own copy resolver
+  (`behavior/errors/logic/resolve-error-copy.ts`) behind a package-local
+  `showErrorToast`, and `@langwatch/workflow-web` has the same shape in
+  `behavior/studio-host/toaster.ts`. Neither imports
+  `@langwatch/design-system/toaster`, so neither was in the 30 and neither is a
+  finding here — but a second toaster and a second copy table are exactly what
+  the registry exists to prevent, and roughly 40 error toasts sit behind them.
+  That is a family-sized slice of its own; the guard as written will not stop it
+  growing, and widening it to a package-local toaster is the first thing that
+  slice should do.
+
+### Gates
+
+- Per-package `tsc --noEmit`: **clean** in all eight —
+  `@langwatch/trace-web`, `analytics-web`, `organization-web`,
+  `onboarding-web`, `langy-web`, `scenario-web`, `auth-web`, `navigation-web`.
+- Per-package `vitest run`, all green: trace **231 files / 1817**, analytics
+  **53 / 384**, organization **8 / 92**, onboarding **5 / 40**, langy
+  **75 / 739**, scenario **52 / 421 + 1 skipped**, auth **27 / 192**. The
+  scenario suite reported three `beforeEach` timeouts on its first run
+  (`all-runs-default-open`, `suites-page-loading`,
+  `simulations-page-quick-run-no-nav`) and green on the next two, in files this
+  lane does not touch — slow dynamic imports under load, not this change.
+- `apps/ui`: `tsc --noEmit -p tsconfig.json` **6 errors**, all `TS7006` in
+  `packages/features/workflow/web`, **0 in this lane's files**;
+  `-p tsconfig.test.json` **11 errors** in 5 files, the same six plus the five
+  pre-existing rows in `tests/trpc-agent-browser.adapter` and
+  `tests/ui-session*` — byte-identical to the baseline the record above set.
+- `apps/ui`: `vitest run` **100 files / 1009 tests passing**, from a baseline of
+  100 / 999 — this lane adds ten tests to the existing guard file and no new
+  file.
+- `architecture-lint` (`--no-declarations --no-legacy-application-migration`):
+  **2115 findings, byte-identical to the baseline**, and identical per package —
+  analytics 19, auth 24, langy 41, navigation 17, onboarding 20, organization
+  30, scenario 137, trace 180, `apps/ui` 92. One rule DID gain an occurrence
+  mid-lane (`ui-web-layer-direction` on `copy-input.tsx`, from the
+  `elements/ → behavior/` import) and the fix is the judgment call recorded
+  above, not a baseline bump.
+- `oxfmt` / `oxlint`: no file this lane touched gained an issue. Four onboarding
+  and langy/scenario files carry pre-existing format drift and pre-existing
+  `package-boundaries` findings, identical before and after; the one file this
+  lane reformatted is the guard test, which it owns.
+- `git diff --numstat -- platform/app`: this lane touched nothing under
+  `platform/app`.
+
 ## Cutover A — the deployment, packaging and CI surfaces, 2026-09-03
 
 The lane that makes the three deployables the thing that actually ships.

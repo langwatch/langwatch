@@ -118,7 +118,7 @@ function buildRunOutcomeToast({
     return {
       title: "Scenario run failed",
       description: "The scenario encountered an error during execution.",
-      type: "error" as const,
+      type: "error" as const, // no-raw-error-toast-ok
       action: viewRunAction("View failed run"),
     };
   }
@@ -126,7 +126,7 @@ function buildRunOutcomeToast({
   return {
     title: "Run timed out",
     description: "The scenario run took too long to start. Please try again.",
-    type: "error" as const,
+    type: "error" as const, // no-raw-error-toast-ok
   };
 }
 
@@ -153,10 +153,14 @@ export function useRunScenario({
 
       // Check if model providers are configured before attempting to run
       if (!hasEnabledProviders) {
+        // STAYS ON THE DESIGN SYSTEM TOASTER: a browser-side gate with no
+        // failure to hand over, whose whole point is the link that fixes it,
+        // and the feedback port has no slot for an offered action. See the plan
+        // doc's UI ledger.
         toaster.create({
           title: "No model provider configured",
           description: "A model provider must be configured to run scenarios.",
-          type: "error",
+          type: "error", // no-raw-error-toast-ok
           action: {
             label: "Configure model providers",
             onClick: () =>

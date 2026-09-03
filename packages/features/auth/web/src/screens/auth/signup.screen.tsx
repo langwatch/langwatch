@@ -14,6 +14,7 @@ import { useEffect, useState } from "react";
 import { useForm } from "react-hook-form";
 import { z } from "zod";
 import { FrontDoorShell } from "../../ui/sections/front-door-shell";
+import { useShowErrorToast } from "../../behavior/auth-feedback";
 import { useIdentityFrontDoor } from "../../behavior/use-identity-front-door";
 import { VerificationFirstSignUp } from "../../ui/sections/verification-first-sign-up";
 import { HandledErrorAlert } from "../../ui/elements/handled-error-alert";
@@ -23,7 +24,6 @@ import { useSearchParams } from "../../behavior/use-route";
 import { HorizontalFormControl } from "../../ui/elements/horizontal-form-control";
 import { LogoIcon } from "../../ui/elements/logo-icon";
 import { Link } from "../../ui/elements/link";
-import { toaster } from "@langwatch/design-system/toaster";
 import { usePublicEnv } from "../../behavior/use-public-env";
 import { authApi as api } from "../../behavior/auth-api";
 import { authFailureMessage, isCredentialRejection } from "../../model/auth-failure-message";
@@ -138,6 +138,7 @@ function SignUpForm() {
   const [signInLoading, setSignInLoading] = useState(false);
   const [submitError, setSubmitError] = useState<string | null>(null);
   const [showRecoveryLinks, setShowRecoveryLinks] = useState(false);
+  const showErrorToast = useShowErrorToast();
 
   const onSubmit = async (values: z.infer<typeof schema>) => {
     setSubmitError(null);
@@ -176,6 +177,10 @@ function SignUpForm() {
     // refuses to put a bare identifier on screen.
     setSignInLoading(true);
     let message: string | null = null;
+    // The refusal itself, where there was one to catch. A provider that
+    // ANSWERS "no" leaves this undefined: there is no error object in that
+    // branch, only the response the sentence above was composed from.
+    let refusal: unknown;
     try {
       const response = await signIn("credentials", {
         email: values.email,
@@ -216,6 +221,7 @@ function SignUpForm() {
       // so nothing here is shown: the caught error goes to the console for
       // whoever is debugging, and the customer reads the fallback.
       console.error("sign-in after sign-up threw", error);
+      refusal = error;
       message = authFailureMessage({
         fallback: accountWasJustCreated ? SIGN_UP_FALLBACK : RECOVERY_FALLBACK,
       });
@@ -225,10 +231,10 @@ function SignUpForm() {
 
     if (message) {
       setSubmitError(message);
-      toaster.create({
-        title: "Couldn't sign you in",
+      showErrorToast({
+        error: refusal,
+        fallbackTitle: "Couldn't sign you in",
         description: message,
-        type: "error",
       });
     }
   };

@@ -2,10 +2,25 @@ import { useInvalidateProcedure } from "@langwatch/platform-api-client";
 import { readChangeTraceNameRejection } from "@langwatch/trace-contract";
 import { traceApi } from "../trace-api";
 
+/**
+ * How a rename turned out.
+ *
+ * A refusal carries the raw `error` as well as the shape read off it: the words
+ * a customer reads come from the composition's code-keyed registry, which needs
+ * the failure itself rather than a summary of it (ADR-045). The read fields stay
+ * because the too-long case is the one the screen can say more about than the
+ * registry's generic `validation_error` line.
+ */
 export type RenameTraceOutcome =
   | { ok: true }
-  | { ok: false; reason: "too-long"; maxLength: number; receivedLength: number }
-  | { ok: false; reason: "unknown" };
+  | {
+      ok: false;
+      reason: "too-long";
+      error: unknown;
+      maxLength: number;
+      receivedLength: number;
+    }
+  | { ok: false; reason: "unknown"; error: unknown };
 
 export type UseRenameTraceResult = {
   rename: (input: {
@@ -71,10 +86,11 @@ export function useRenameTrace(): UseRenameTraceResult {
         const rejection = readChangeTraceNameRejection(
           (error as { data?: { error?: { meta?: unknown } } })?.data?.error?.meta,
         );
-        if (!rejection) return { ok: false, reason: "unknown" };
+        if (!rejection) return { ok: false, reason: "unknown", error };
         return {
           ok: false,
           reason: "too-long",
+          error,
           maxLength: rejection.maxLength,
           receivedLength: rejection.receivedLength,
         };

@@ -30,18 +30,23 @@ import { useUiCapabilities } from "../../../../behavior/ui-capabilities";
 import { UiAuthHost } from "../../behavior/auth-host.adapter";
 
 function AuthHost({ children }: { children: ReactNode }) {
-  const { route } = useUiCapabilities();
+  const { route, feedback } = useUiCapabilities();
   const reading = route.reading();
   const address = useUiAddress();
   const pathname = address.split("?")[0]?.split("#")[0] ?? "/";
 
   const host = useMemo(
     () =>
-      UiAuthHost.create({
-        publicEnvironment: toPublicEnvironment(readPublicAppConfig()),
-        route: { pathname, params: reading.params, query: reading.query },
-      }),
-    [pathname, reading.params, reading.query],
+      UiAuthHost.create(
+        {
+          publicEnvironment: toPublicEnvironment(readPublicAppConfig()),
+          route: { pathname, params: reading.params, query: reading.query },
+        },
+        // The application's own feedback capability, so a refused sign-in reads
+        // the code-keyed registry rather than a sentence the screen wrote.
+        { failed: (failure) => feedback.failed(failure) },
+      ),
+    [pathname, reading.params, reading.query, feedback],
   );
 
   return <AuthHostProvider value={host}>{children}</AuthHostProvider>;

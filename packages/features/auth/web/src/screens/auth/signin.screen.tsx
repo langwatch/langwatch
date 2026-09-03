@@ -16,6 +16,7 @@ import { useForm } from "react-hook-form";
 import { z } from "zod";
 import { FrontDoorShell } from "../../ui/sections/front-door-shell";
 import { IdentifierFirstSignIn } from "../../ui/sections/identifier-first-sign-in";
+import { useShowErrorToast } from "../../behavior/auth-feedback";
 import { useIdentityFrontDoor } from "../../behavior/use-identity-front-door";
 import { safeRedirectTarget, signIn, useSession } from "../../behavior/auth-client";
 import { replaceLocation } from "../../behavior/browser-navigation";
@@ -23,7 +24,6 @@ import Link from "../../ui/elements/router-link";
 import { useSearchParams } from "../../behavior/use-route";
 import { HorizontalFormControl } from "../../ui/elements/horizontal-form-control";
 import { LogoIcon } from "../../ui/elements/logo-icon";
-import { toaster } from "@langwatch/design-system/toaster";
 import { usePublicEnv } from "../../behavior/use-public-env";
 import { authFailureMessage } from "../../model/auth-failure-message";
 import { isStableAuthError, normalizeErrorCode, SignInError } from "./sign-in-error.screen";
@@ -144,12 +144,17 @@ function SignInForm() {
 
   const [signInLoading, setSignInLoading] = useState(false);
   const [submitError, setSubmitError] = useState<string | null>(null);
+  const showErrorToast = useShowErrorToast();
 
   const onSubmit = async (values: z.infer<typeof schema>) => {
     setSubmitError(null);
     setSignInLoading(true);
 
     let message: string | null = null;
+    // The refusal itself, where there was one to catch. A provider that
+    // ANSWERS "no" leaves this undefined: there is no error object in that
+    // branch, only the response the sentence above was composed from.
+    let refusal: unknown;
     try {
       const response = await signIn("credentials", {
         email: values.email,
@@ -165,6 +170,7 @@ function SignInForm() {
         });
       }
     } catch (error) {
+      refusal = error;
       message = authFailureMessage({
         message: error instanceof Error ? error.message : void 0,
       });
@@ -174,10 +180,10 @@ function SignInForm() {
 
     if (message) {
       setSubmitError(message);
-      toaster.create({
-        title: "Could not sign in",
+      showErrorToast({
+        error: refusal,
+        fallbackTitle: "Could not sign in",
         description: message,
-        type: "error",
       });
     }
   };

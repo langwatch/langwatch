@@ -36,6 +36,7 @@ import {
 import type { ValueType } from "recharts/types/component/DefaultTooltipContent";
 
 import { toaster } from "@langwatch/design-system/toaster";
+import { showErrorToast } from "../../../../../behavior/errors";
 import { useOrganizationTeamProject } from "../../../../../behavior/use-organization-team-project";
 import { api } from "../../../../../behavior/langy-api";
 import { useRouter } from "../../../../../behavior/next-router";
@@ -411,8 +412,8 @@ function SaveToDashboard({ graph, title }: { graph: unknown; title?: string }) {
           },
         },
       });
-    } catch {
-      toaster.create({ type: "error", title: "Couldn't save the chart" });
+    } catch (error) {
+      showErrorToast({ error, fallbackTitle: "Couldn't save the chart" });
     } finally {
       setSaving(false);
     }
@@ -426,8 +427,8 @@ function SaveToDashboard({ graph, title }: { graph: unknown; title?: string }) {
         name,
       });
       await save(dashboard.id);
-    } catch {
-      toaster.create({ type: "error", title: "Couldn't create the dashboard" });
+    } catch (error) {
+      showErrorToast({ error, fallbackTitle: "Couldn't create the dashboard" });
       setSaving(false);
     }
   };

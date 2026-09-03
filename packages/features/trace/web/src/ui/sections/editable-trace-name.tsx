@@ -1,9 +1,9 @@
 import { Box, HStack, IconButton, Input, Text, VStack } from "@chakra-ui/react";
 import { Tooltip } from "@langwatch/design-system/tooltip";
-import { toaster } from "@langwatch/design-system/toaster";
 import { TRACE_NAME_MAX_LENGTH } from "@langwatch/trace-contract";
 import { useEffect, useId, useRef, useState } from "react";
 import { LuCheck, LuX } from "react-icons/lu";
+import { useTraceHost } from "../../behavior/trace-host";
 import { useRenameTrace } from "./internal/use-rename-trace";
 
 export type EditableTraceNameProps = {
@@ -35,6 +35,7 @@ export function EditableTraceName({
   titleText,
   titleIsFallback,
 }: EditableTraceNameProps) {
+  const host = useTraceHost();
   const { rename, isPending } = useRenameTrace();
   const [isEditing, setIsEditing] = useState(false);
   const [draft, setDraft] = useState("");
@@ -88,13 +89,14 @@ export function EditableTraceName({
       return;
     }
 
-    // The server sends the handled error's code and meta, never prose
-    // (ADR-045), so the copy is written here. A too-long name is the one case
-    // worth spelling out, using the limit the server reported; everything else
-    // gets one calm generic line. The editor stays open either way so the user
-    // can correct the value.
-    toaster.error({
-      title: "Couldn't rename trace",
+    // The failure goes to the host whole, so the composition's code-keyed
+    // registry writes the words and the toast carries the trace id (ADR-045).
+    // The line below is what the screen offers where the registry has nothing
+    // for the code; the too-long case spells out the limit the server reported.
+    // The editor stays open either way so the user can correct the value.
+    host.failed({
+      error: outcome.error,
+      fallbackTitle: "Couldn't rename trace",
       description:
         outcome.reason === "too-long"
           ? `Trace names are limited to ${outcome.maxLength} characters (you used ${outcome.receivedLength}).`

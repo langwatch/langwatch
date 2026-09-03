@@ -40,10 +40,18 @@ export function showSuiteRunError({
 
   if (handled && NOTHING_RUNNABLE_CODES.has(handled.code)) {
     const { title, description } = explainHandledError(handled);
+    // STAYS ON THE DESIGN SYSTEM TOASTER, and it is the only failure in this
+    // package that does. `ScenarioHostPort.failed` — and the `UiFailureNotice`
+    // behind it — has no slot for an offered ACTION, and this toast is the
+    // action: both codes mean the run plan has nothing runnable left in it, and
+    // "Edit Run Plan" is the single way out. Routing it through the port would
+    // buy the registry's words and lose the button that acts on them. The slot
+    // is a change to the application's feedback capability rather than to this
+    // package; see the plan doc's UI ledger.
     toaster.create({
       title,
       description: description || undefined,
-      type: "error",
+      type: "error", // no-raw-error-toast-ok
       action: { label: "Edit Run Plan", onClick: onEditRunPlan },
     });
     return;

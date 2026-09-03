@@ -78,12 +78,8 @@ export function CustomDashboardsSection({ projectSlug }: CustomDashboardsSection
           onSuccess: () => {
             void dashboardsQuery.refetch();
           },
-          onError: () => {
-            toaster.create({
-              title: "Error renaming dashboard",
-              type: "error",
-              duration: 3000,
-            });
+          onError: (error) => {
+            host.failed({ error, fallbackTitle: "Couldn't rename the dashboard" });
           },
         },
       );
@@ -111,12 +107,8 @@ export function CustomDashboardsSection({ projectSlug }: CustomDashboardsSection
         onSuccess: () => {
           void dashboardsQuery.refetch();
         },
-        onError: () => {
-          toaster.create({
-            title: "Error reordering dashboards",
-            type: "error",
-            duration: 3000,
-          });
+        onError: (error) => {
+          host.failed({ error, fallbackTitle: "Couldn't reorder the dashboards" });
         },
       },
     );
@@ -189,12 +181,8 @@ export function CustomDashboardsSection({ projectSlug }: CustomDashboardsSection
                   }
                 }
               },
-              onError: () => {
-                toaster.create({
-                  title: "Error deleting dashboard",
-                  type: "error",
-                  duration: 3000,
-                });
+              onError: (error) => {
+                host.failed({ error, fallbackTitle: "Couldn't delete the dashboard" });
               },
               onSettled: () => setDashboardToDelete(null),
             },

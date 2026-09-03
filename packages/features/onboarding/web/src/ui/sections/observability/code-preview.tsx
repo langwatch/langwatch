@@ -11,8 +11,8 @@ import type React from "react";
 import { useMemo, useState } from "react";
 import type { HighlighterGeneric } from "shiki";
 import { useColorMode } from "@langwatch/design-system/color-mode";
-import { toaster } from "@langwatch/design-system/toaster";
 import { Tooltip } from "@langwatch/design-system/tooltip";
+import { copyToClipboard } from "../../../behavior/shared/copy-to-clipboard";
 import { InlineCopyButton } from "../shared/inline-copy-button";
 
 /**
@@ -137,20 +137,15 @@ export function CodePreview({
   async function copyLLMPrompt(): Promise<void> {
     if (!llmPrompt) return;
 
-    try {
-      await navigator.clipboard.writeText(llmPrompt);
-      toaster.create({
-        title: "Copied LLM prompt",
-        description: "Integration prompt copied to clipboard",
-        type: "success",
-      });
-    } catch {
-      toaster.create({
-        title: "Failed to copy",
-        description: "Could not copy to clipboard",
-        type: "error",
-      });
-    }
+    // The same clipboard helper `InlineCopyButton` uses, so the two copy
+    // affordances on this block behave identically and neither writes a toast
+    // of its own. That helper stays on the Design System singleton on purpose —
+    // see its docblock: this component is also mounted by `@langwatch/trace-web`,
+    // which has no onboarding host to ask.
+    await copyToClipboard({
+      text: llmPrompt,
+      successMessage: "Integration prompt copied to clipboard",
+    });
   }
 
   if (!code) return null;

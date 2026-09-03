@@ -41,14 +41,6 @@ const PACKAGE_ROOT = fileURLToPath(new URL("../../../../", import.meta.url));
  */
 const ROOTS = [
   join(PACKAGE_ROOT, "src"),
-  // The platform application, while it still exists. The registry moved here
-  // ahead of the code that raises into it, so a walk of this app alone would
-  // report every code still declared over there as dead and invite deleting
-  // copy the migration needs back. `existsSync` below is what makes the
-  // narrowing automatic rather than a second edit somebody has to remember:
-  // when `platform/app` goes, this root drops out and the codes it was the
-  // last raiser of go red, which is the moment to decide about them.
-  join(PACKAGE_ROOT, "../../platform/app/src"),
   // The two processes the verticals moved INTO. They raise codes this registry
   // has to carry copy for exactly as the application did — a guard that walked
   // only the tree being emptied would go quieter with every move, which is the

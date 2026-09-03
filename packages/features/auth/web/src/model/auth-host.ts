@@ -84,6 +84,31 @@ export type AuthErrorExplanation = {
   description?: string;
 };
 
+/**
+ * A failure, as a front-door screen knows it.
+ *
+ * The raw `error` travels, never a sentence the screen composed: since #5984
+ * the wire message of a handled error is its code slug, so a screen that wrote
+ * its own copy would print the slug at the customer. The words come from the
+ * composition's code-keyed presentation registry (ADR-045).
+ *
+ * `description` is the front door's own channel, and it carries more weight
+ * here than anywhere else. A sign-in refusal is usually the auth provider
+ * answering rather than a procedure throwing, so there is frequently no code to
+ * look up at all — `authFailureMessage` composes the sentence from the
+ * provider's answer, and that sentence is what the reader gets when the
+ * registry has nothing to say.
+ */
+export type AuthFailureNotice = {
+  error: unknown;
+  /** What the reader was doing, for a code the registry does not list. */
+  fallbackTitle: string;
+  /** A sentence the screen already had, where the registry has none. */
+  description?: string;
+  /** Dedupes a retried failure onto its own notice rather than stacking. */
+  id?: string;
+};
+
 /** The one thing a front-door screen is handed. */
 export abstract class AuthHostPort {
   /** The deployment's public configuration. */
@@ -91,6 +116,17 @@ export abstract class AuthHostPort {
 
   /** Where this document is, and what it was opened with. */
   abstract route(): AuthRouteReading;
+
+  /**
+   * Reports a failure the reader should be told about.
+   *
+   * The front door raises these from two screens only — sign-in and sign-up,
+   * both of which already show the same refusal inline. The toast is the
+   * second channel for a reader whose eyes are on the button rather than the
+   * top of the card, and routing it here is what lets the application's
+   * registry, its trace id and its docs link reach the front door at all.
+   */
+  abstract failed(failure: AuthFailureNotice): void;
 }
 
 const AuthHostContext = createContext<AuthHostPort | null>(null);

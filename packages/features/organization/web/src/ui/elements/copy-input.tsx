@@ -12,9 +12,9 @@
 
 import { Input } from "@chakra-ui/react";
 import { InputGroup, type InputGroupProps } from "@langwatch/design-system/input-group";
-import { toaster } from "@langwatch/design-system/toaster";
 import { Copy as FiCopy, Eye as FiEye, EyeOff as FiEyeOff } from "lucide-react";
 import { useState } from "react";
+import { useOrganizationHost } from "../../model/organization-host";
 
 export function CopyInput(
   props: {
@@ -31,6 +31,7 @@ export function CopyInput(
 ) {
   const [visible, setVisible] = useState(false);
   const isSecure = !!props.secureMode;
+  const host = useOrganizationHost();
 
   return (
     <InputGroup
@@ -44,21 +45,21 @@ export function CopyInput(
         }
 
         if (!navigator.clipboard) {
-          toaster.create({
-            title: `Your browser does not support clipboard access, please copy the ${props.label} manually`,
-            type: "error",
-            duration: 2000,
+          // A refusal the BROWSER made, so there is no failure to hand over and
+          // no code for the registry to look up. The host still reports it, so
+          // it reads like every other failure in the product rather than like a
+          // toast this element invented.
+          host.failed({
+            error: void 0,
+            fallbackTitle: "Couldn't copy",
+            description: `This browser does not allow clipboard access. Copy the ${props.label} manually.`,
           });
           return;
         }
 
         void (async () => {
           await navigator.clipboard.writeText(props.value);
-          toaster.create({
-            title: `${props.label} copied to your clipboard`,
-            type: "success",
-            duration: 2000,
-          });
+          host.succeeded({ title: `${props.label} copied to your clipboard` });
         })();
       }}
       endElement={

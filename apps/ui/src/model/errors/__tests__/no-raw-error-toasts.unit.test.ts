@@ -52,17 +52,14 @@ const PACKAGE_ROOT = fileURLToPath(new URL("../../../../", import.meta.url));
  * pattern can appear, not just where the migration happened to look.
  *
  * The workspace packages DO carry UI now — every `packages/**\/web` family
- * renders its own toasts — so they are a root alongside this app, and the
- * platform application stays one while it still has screens. `existsSync`
+ * renders its own toasts — so they are a root alongside this app. `existsSync`
  * filters rather than throws, so a tree that goes away narrows the walk
  * instead of taking every case down with it; the file floor below is what
  * turns a narrowing nobody intended into a failure.
  */
-const ROOTS = [
-  join(PACKAGE_ROOT, "src"),
-  join(PACKAGE_ROOT, "../../packages"),
-  join(PACKAGE_ROOT, "../../platform/app/src"),
-].filter((root) => existsSync(root));
+const ROOTS = [join(PACKAGE_ROOT, "src"), join(PACKAGE_ROOT, "../../packages")].filter((root) =>
+  existsSync(root),
+);
 
 /**
  * Cheap substring test that decides whether a file is worth parsing.
@@ -92,6 +89,17 @@ const WORTH_SCANNING =
  * a rename does.
  */
 const SCANNED_FILE_FLOOR = 200;
+
+/**
+ * The same floor, for the feature-web rule below.
+ *
+ * Roughly two dozen `packages/features/*\/web` files still import the Design
+ * System toaster — all for success, info and warning notices now — and that
+ * count only falls as families keep moving. The floor is low enough to survive
+ * that and high enough to catch the real failure mode: the path shape or the
+ * module specifier changing, which would silently reduce the rule to nothing.
+ */
+const FEATURE_WEB_TOASTER_FILE_FLOOR = 10;
 
 /** Copy slots a customer reads, in an object literal or a JSX attribute. */
 const COPY_KEYS = new Set(["title", "description", "fallbackTitle"]);
@@ -800,6 +808,91 @@ function findLeaks(raw: string): number[] {
 
 const leaksIn = (source: string): boolean => findLeaks(source).length > 0;
 
+/* ------------------------------------------------------------------ */
+/* Feature-web packages may not shape a failure for the app's toaster  */
+/* ------------------------------------------------------------------ */
+
+/**
+ * A file inside a `packages/features/<family>/web` package.
+ *
+ * These are the browser halves of the moved families, and the grammar they are
+ * held to is stricter than the application's: a screen reaches the application
+ * through its host port and the feedback capability the host injects, never
+ * through a singleton of its own. Everything else in this file is about WHAT a
+ * toast says; this rule is about WHO is allowed to raise a failure at all.
+ */
+const FEATURE_WEB_FILE = /[/\\]packages[/\\]features[/\\][^/\\]+[/\\]web[/\\]/;
+
+/** The Design System toaster's module specifier, however the import is spelled. */
+const DESIGN_SYSTEM_TOASTER_IMPORT = /\bfrom\s*["']@langwatch\/design-system\/toaster["']/;
+
+/**
+ * The names this file bound the Design System toaster to.
+ *
+ * Read from the import clause rather than assumed to be `toaster`, so an alias
+ * (`import { toaster as appToaster }`) does not walk past the rule.
+ */
+const TOASTER_IMPORT_CLAUSE =
+  /import\s*\{([^}]*)\}\s*from\s*["']@langwatch\/design-system\/toaster["']/g;
+
+/** `type: "error"`, with or without the `as const` a builder writes. */
+const ERROR_TOAST_TYPE = /\btype\s*:\s*["']error["']/g;
+
+function designSystemToasterBindings(source: string): Set<string> {
+  const names = new Set<string>();
+  for (const match of source.matchAll(TOASTER_IMPORT_CLAUSE)) {
+    for (const entry of match[1]!.split(",")) {
+      const parts = entry.trim().split(/\s+as\s+/);
+      const bound = (parts[1] ?? parts[0] ?? "").trim();
+      if (bound) names.add(bound);
+    }
+  }
+  return names;
+}
+
+/**
+ * Every line where a feature-web file shapes a FAILURE for the Design System
+ * toaster.
+ *
+ * Two spellings, because the toaster offers both: `toaster.error(...)` names
+ * the severity in the method, and `toaster.create({ type: "error" })` names it
+ * in the argument. A success, an info notice or a warning is none of the
+ * guard's business — those may stay, and the families that raise them are not
+ * bypassing anything.
+ *
+ * The `type: "error"` test is not scoped to an enclosing `toaster` call on
+ * purpose. `use-run-scenario.ts` builds its toast config in a named function
+ * and passes it (`toaster.create(buildRunOutcomeToast(...))`), so a rule that
+ * only read the arguments of the call would have been blind to exactly the
+ * file that took the trouble to hoist. In a file whose only reason to import
+ * the toaster is to raise toasts, an error-shaped literal IS an error toast.
+ */
+function findToastedFailures(raw: string): number[] {
+  if (!DESIGN_SYSTEM_TOASTER_IMPORT.test(raw)) return [];
+
+  const source = stripComments(raw);
+  const suppressed = suppressedLines(raw);
+  const bindings = designSystemToasterBindings(source);
+  const lines = new Set<number>();
+
+  for (const name of bindings) {
+    const call = new RegExp(`(?:^|[^\\w$.])${name}\\s*\\??\\.\\s*error\\s*\\(`, "g");
+    for (const match of source.matchAll(call)) {
+      lines.add(lineOf(source, match.index + match[0].length - 1));
+    }
+  }
+
+  if (bindings.size > 0) {
+    for (const match of source.matchAll(ERROR_TOAST_TYPE)) {
+      lines.add(lineOf(source, match.index));
+    }
+  }
+
+  return [...lines]
+    .filter((line) => !markerCovers(suppressed, line, line))
+    .sort((left, right) => left - right);
+}
+
 function walk(dir: string, out: string[] = []): string[] {
   for (const entry of readdirSync(dir, { withFileTypes: true })) {
     const path = join(dir, entry.name);
@@ -1094,6 +1187,109 @@ describe("error toasts", () => {
         `dev/docs/best_practices/error-handling.md. If a line is genuinely fine, ` +
         `mark that one line with // ${SUPPRESSION_MARKER} rather than exempting ` +
         `the whole file.`,
+    ).toEqual([]);
+  });
+});
+
+describe("the feature-web failure detector", () => {
+  describe("given a failure raised on the Design System toaster", () => {
+    it.each([
+      [
+        "as a create with an error type",
+        `import { toaster } from "@langwatch/design-system/toaster";\ntoaster.create({ title: "Couldn't save", type: "error" });`,
+      ],
+      [
+        "as the error method",
+        `import { toaster } from "@langwatch/design-system/toaster";\ntoaster.error({ title: "Couldn't save" });`,
+      ],
+      [
+        "under an aliased import",
+        `import { toaster as appToaster } from "@langwatch/design-system/toaster";\nappToaster.error({ title: "Couldn't save" });`,
+      ],
+      [
+        "hoisted into a builder the call never sees",
+        `import { toaster } from "@langwatch/design-system/toaster";\nconst build = () => ({ title: "x", type: "error" as const });\ntoaster.create(build());`,
+      ],
+    ])("catches it %s", (_shape, source) => {
+      expect(findToastedFailures(source).length).toBeGreaterThan(0);
+    });
+  });
+
+  describe("given a notice that is not a failure", () => {
+    it.each([
+      [
+        "a success",
+        `import { toaster } from "@langwatch/design-system/toaster";\ntoaster.create({ title: "Saved", type: "success" });`,
+      ],
+      [
+        "a warning",
+        `import { toaster } from "@langwatch/design-system/toaster";\ntoaster.create({ title: "Nothing matched", type: "warning" });`,
+      ],
+      [
+        "an info notice",
+        `import { toaster } from "@langwatch/design-system/toaster";\ntoaster.create({ title: "Cancellation requested", type: "info" });`,
+      ],
+    ])("stays quiet about %s", (_shape, source) => {
+      expect(findToastedFailures(source)).toEqual([]);
+    });
+
+    it("stays quiet about a failure raised through a host re-binder", () => {
+      const source = [
+        `import { useScenarioToaster } from "../behavior/scenario-feedback";`,
+        `toaster.create({ title: "Couldn't save", type: "error" });`,
+      ].join("\n");
+      expect(findToastedFailures(source)).toEqual([]);
+    });
+  });
+
+  describe("when a line carries the opt-out marker", () => {
+    it("stays quiet about that line only", () => {
+      const source = [
+        `import { toaster } from "@langwatch/design-system/toaster";`,
+        `toaster.create({ title: "a", type: "error", action: A }); // ${SUPPRESSION_MARKER}`,
+        `toaster.create({ title: "b", type: "error" });`,
+      ].join("\n");
+      expect(findToastedFailures(source)).toEqual([3]);
+    });
+  });
+});
+
+describe("feature-web packages", () => {
+  /** @scenario "A moved family reports a failure through its host, not the toaster" */
+  it("never raise a failure on the Design System toaster", () => {
+    const offenders: string[] = [];
+    let scanned = 0;
+
+    for (const file of ROOTS.flatMap((root) => walk(root))) {
+      if (!FEATURE_WEB_FILE.test(file)) continue;
+
+      const raw = readFileSync(file, "utf8");
+      if (!DESIGN_SYSTEM_TOASTER_IMPORT.test(raw)) continue;
+
+      scanned++;
+      const rel = relative(PACKAGE_ROOT, file);
+      for (const line of findToastedFailures(raw)) offenders.push(`${rel}:${line}`);
+    }
+
+    expect(
+      scanned,
+      `The guard found ${scanned} feature-web files importing the Design System ` +
+        `toaster, which is fewer than a tree this size can plausibly have — the ` +
+        `path shape (${String(FEATURE_WEB_FILE)}) or the module specifier has ` +
+        `almost certainly changed, and a rule that scans nothing passes forever.`,
+    ).toBeGreaterThan(FEATURE_WEB_TOASTER_FILE_FLOOR);
+
+    expect(
+      offenders,
+      `These lines raise a FAILURE on the application's toast singleton from ` +
+        `inside a feature-web package. A screen there reports a failure through ` +
+        `its host port — host.failed({ error, fallbackTitle }), or the family's ` +
+        `own showErrorToast / useShowErrorToast re-binder — so the composition's ` +
+        `code-keyed registry writes the words and the toast carries the trace ` +
+        `id. Success, info and warning notices may stay on the toaster. If a ` +
+        `line genuinely cannot travel (an offered ACTION has no slot on the ` +
+        `feedback port yet), mark that one line with // ${SUPPRESSION_MARKER} ` +
+        `and say why.`,
     ).toEqual([]);
   });
 });

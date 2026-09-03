@@ -17,6 +17,7 @@
 
 import {
   AuthHostPort,
+  type AuthFailureNotice,
   type AuthPublicEnvironment,
   type AuthRouteReading,
 } from "@langwatch/auth-web/screens/auth";
@@ -26,12 +27,27 @@ export type AuthHostReadings = {
   route: AuthRouteReading;
 };
 
+/**
+ * The one thing the front door DOES rather than reads.
+ *
+ * It is the application's feedback capability, forwarded: `ui-feedback`
+ * resolves the words from the failure's code against the presentation registry,
+ * so the two sign-in screens stop composing their own error copy over the
+ * Design System toaster.
+ */
+export type AuthHostActions = {
+  failed: (failure: AuthFailureNotice) => void;
+};
+
 export class UiAuthHost extends AuthHostPort {
-  static create(readings: AuthHostReadings): UiAuthHost {
-    return new UiAuthHost(readings);
+  static create(readings: AuthHostReadings, actions: AuthHostActions): UiAuthHost {
+    return new UiAuthHost(readings, actions);
   }
 
-  private constructor(private readonly readings: AuthHostReadings) {
+  private constructor(
+    private readonly readings: AuthHostReadings,
+    private readonly actions: AuthHostActions,
+  ) {
     super();
   }
 
@@ -41,5 +57,9 @@ export class UiAuthHost extends AuthHostPort {
 
   route(): AuthRouteReading {
     return this.readings.route;
+  }
+
+  failed(failure: AuthFailureNotice): void {
+    this.actions.failed(failure);
   }
 }

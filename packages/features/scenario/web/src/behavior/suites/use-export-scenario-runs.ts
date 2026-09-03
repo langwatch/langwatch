@@ -6,7 +6,7 @@ import type {
   ScenarioRunExportMode,
   ScenarioRunExportRequest,
   ScenarioRunExportStatusFilter,
-} from "../../model/export/scenario-runs/types";
+} from "@langwatch/scenario-contract";
 import { api } from "../scenario-api";
 
 /**
