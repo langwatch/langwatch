@@ -1,7 +1,7 @@
 /**
  * The save-time granularity rules, and the A5 premise they rest on: that the
  * validator accepts a bound parameter *inside* an `INTERVAL` expression —
- * `INTERVAL {period_granularity_seconds:UInt32} SECOND` — which is the whole
+ * `INTERVAL {dashboard_context_granularity_seconds:UInt32} SECOND` — which is the whole
  * mechanism. ClickHouse compiles `INTERVAL 1 HOUR` to a function call
  * (`toIntervalHour`), so the unit of an offered step cannot itself be a
  * bound value; the seconds-multiplier form is the seam that leaves the
@@ -29,8 +29,8 @@ const POLICY = {
 };
 
 const BOTH_PERIODS: LangWatchQLParameter[] = [
-  { name: "period_start", type: "DateTime" },
-  { name: "period_end", type: "DateTime" },
+  { name: "dashboard_context_period_start", type: "DateTime" },
+  { name: "dashboard_context_period_end", type: "DateTime" },
 ];
 
 /** The `message` of a thrown error, or the reason there is none. */
@@ -47,18 +47,18 @@ describe("the validator accepts a bound parameter inside INTERVAL (A5)", () => {
   it("parses and permits the granularity multiplier in the bucketing expression", () => {
     const result = validateLangWatchQL({
       sql:
-        "SELECT toStartOfInterval(OccurredAt, INTERVAL {period_granularity_seconds:UInt32} SECOND) AS bucket, " +
+        "SELECT toStartOfInterval(OccurredAt, INTERVAL {dashboard_context_granularity_seconds:UInt32} SECOND) AS bucket, " +
         "count() AS events FROM traces " +
-        "WHERE OccurredAt >= {period_start:DateTime} AND OccurredAt < {period_end:DateTime} " +
+        "WHERE OccurredAt >= {dashboard_context_period_start:DateTime} AND OccurredAt < {dashboard_context_period_end:DateTime} " +
         "GROUP BY bucket ORDER BY bucket",
       ...POLICY,
     });
 
     expect(result.ok).toBe(true);
     expect(result.ok && result.parameters).toEqual([
-      { name: "period_granularity_seconds", type: "UInt32" },
-      { name: "period_start", type: "DateTime" },
-      { name: "period_end", type: "DateTime" },
+      { name: "dashboard_context_granularity_seconds", type: "UInt32" },
+      { name: "dashboard_context_period_start", type: "DateTime" },
+      { name: "dashboard_context_period_end", type: "DateTime" },
     ]);
   });
 });
@@ -68,7 +68,7 @@ describe("assertLangWatchQLGranularityDeclaration (save-time rules)", () => {
     expect(() =>
       assertLangWatchQLGranularityDeclaration([
         ...BOTH_PERIODS,
-        { name: "period_granularity_seconds", type: "UInt32" },
+        { name: "dashboard_context_granularity_seconds", type: "UInt32" },
       ]),
     ).not.toThrow();
   });
@@ -85,7 +85,7 @@ describe("assertLangWatchQLGranularityDeclaration (save-time rules)", () => {
       expect(() =>
         assertLangWatchQLGranularityDeclaration([
           ...BOTH_PERIODS,
-          { name: "period_granularity_seconds", type },
+          { name: "dashboard_context_granularity_seconds", type },
         ]),
       ).toThrow(LangWatchQLReservedGranularityTypeError);
     }
@@ -94,14 +94,14 @@ describe("assertLangWatchQLGranularityDeclaration (save-time rules)", () => {
   it("refuses granularity declared without either period bound", () => {
     expect(() =>
       assertLangWatchQLGranularityDeclaration([
-        { name: "period_granularity_seconds", type: "UInt32" },
-        { name: "period_start", type: "DateTime" },
+        { name: "dashboard_context_granularity_seconds", type: "UInt32" },
+        { name: "dashboard_context_period_start", type: "DateTime" },
       ]),
     ).toThrow(LangWatchQLGranularityRequiresTimeWindowError);
 
     expect(() =>
       assertLangWatchQLGranularityDeclaration([
-        { name: "period_granularity_seconds", type: "UInt32" },
+        { name: "dashboard_context_granularity_seconds", type: "UInt32" },
       ]),
     ).toThrow(LangWatchQLGranularityRequiresTimeWindowError);
   });
@@ -113,27 +113,27 @@ describe("assertLangWatchQLGranularityDeclaration (save-time rules)", () => {
     // against it would be fiction.
     expect(() =>
       assertLangWatchQLGranularityDeclaration([
-        { name: "period_granularity_seconds", type: "UInt32" },
-        { name: "period_start", type: "String" },
-        { name: "period_end", type: "DateTime" },
+        { name: "dashboard_context_granularity_seconds", type: "UInt32" },
+        { name: "dashboard_context_period_start", type: "String" },
+        { name: "dashboard_context_period_end", type: "DateTime" },
       ]),
     ).toThrow(LangWatchQLGranularityRequiresTimeWindowError);
   });
 
   it("tells a mistyped bound apart from an absent one in the copy", () => {
     // Both bounds are declared here. Telling the author to declare
-    // period_start sends them looking for a line already on screen; what
+    // dashboard_context_period_start sends them looking for a line already on screen; what
     // they have to change is its type.
     const mistyped = messageOf(() =>
       assertLangWatchQLGranularityDeclaration([
-        { name: "period_granularity_seconds", type: "UInt32" },
-        { name: "period_start", type: "String" },
-        { name: "period_end", type: "DateTime" },
+        { name: "dashboard_context_granularity_seconds", type: "UInt32" },
+        { name: "dashboard_context_period_start", type: "String" },
+        { name: "dashboard_context_period_end", type: "DateTime" },
       ]),
     );
     const absent = messageOf(() =>
       assertLangWatchQLGranularityDeclaration([
-        { name: "period_granularity_seconds", type: "UInt32" },
+        { name: "dashboard_context_granularity_seconds", type: "UInt32" },
       ]),
     );
 

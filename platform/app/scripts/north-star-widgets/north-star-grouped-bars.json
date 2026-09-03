@@ -4,7 +4,7 @@
   "queries": [
     {
       "name": "main",
-      "sql": "SELECT model,\n  sum(PromptTokens) AS prompt,\n  sum(CompletionTokens) AS completion\nFROM (\n  SELECT TraceId, arrayJoin(Models) AS model, PromptTokens, CompletionTokens\n  FROM trace_metrics\n  WHERE OccurredAt >= {period_start:DateTime} AND OccurredAt < {period_end:DateTime}\n    AND TotalDurationMs > 0\n)\nGROUP BY model\nORDER BY prompt + completion DESC\nLIMIT 8",
+      "sql": "SELECT model,\n  sum(PromptTokens) AS prompt,\n  sum(CompletionTokens) AS completion\nFROM (\n  SELECT TraceId, arrayJoin(Models) AS model, PromptTokens, CompletionTokens\n  FROM trace_metrics\n  WHERE OccurredAt >= {dashboard_context_period_start:DateTime} AND OccurredAt < {dashboard_context_period_end:DateTime}\n    AND TotalDurationMs > 0\n)\nGROUP BY model\nORDER BY prompt + completion DESC\nLIMIT 8",
       "parameters": []
     }
   ]

@@ -32,7 +32,7 @@ import {
 import { api } from "~/utils/api";
 
 import type {
-  ChartFrameParams,
+  ChartFrameDashboardContext,
   ChartQueryError,
   ChartQueryResult,
 } from "./bridge/bridgeProtocol";
@@ -168,7 +168,10 @@ export function useDashboardWidgetExecutor(
     [recordRun, runValidated],
   );
 
-  const params: ChartFrameParams = useMemo(
+  const params: Pick<
+    ChartFrameDashboardContext,
+    "timeWindow" | "granularitySeconds"
+  > = useMemo(
     () => ({
       timeWindow: { start: pageWindow.start, end: pageWindow.end },
       granularitySeconds,

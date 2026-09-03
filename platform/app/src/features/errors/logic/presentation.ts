@@ -359,7 +359,7 @@ const presentations = {
   lwql_reserved_parameter_type: {
     title: "The time window has to be a date and time",
     describe: () =>
-      "Declare period_start and period_end as DateTime, for example {period_start:DateTime}, and run the query again.",
+      "Declare dashboard_context_period_start and dashboard_context_period_end as DateTime, for example {dashboard_context_period_start:DateTime}, and run the query again.",
   },
   // `LangWatchQLReservedGranularityTypeError` carries a `granularityFault` of
   // either `"declared-type"` or `"step-value"`, but the three doors that can
@@ -372,7 +372,7 @@ const presentations = {
   lwql_granularity_parameter_type: {
     title: "The granularity has to be declared as UInt32",
     describe: () =>
-      "Declare period_granularity_seconds as UInt32, for example {period_granularity_seconds:UInt32}, and run the query again.",
+      "Declare dashboard_context_granularity_seconds as UInt32, for example {dashboard_context_granularity_seconds:UInt32}, and run the query again.",
   },
   lwql_granularity_too_fine: {
     title: "That granularity would return too many datapoints",
@@ -382,7 +382,7 @@ const presentations = {
   lwql_granularity_requires_window: {
     title: "Granularity needs the period parameters",
     describe: () =>
-      "A query declaring period_granularity_seconds must also declare {period_start:DateTime} and {period_end:DateTime}, so the datapoint budget can be checked against the selected period.",
+      "A query declaring dashboard_context_granularity_seconds must also declare {dashboard_context_period_start:DateTime} and {dashboard_context_period_end:DateTime}, so the datapoint budget can be checked against the selected period.",
   },
   lwql_not_enabled: {
     title: "Custom SQL isn't switched on here",

@@ -10,7 +10,8 @@ import { Box, Button, Text, VStack } from "@chakra-ui/react";
 import { useEffect, useMemo, useRef, useState } from "react";
 
 import type {
-  ChartFrameParams,
+  ChartFrameDashboardContext,
+  ChartFrameParamsSnapshot,
   ChartFrameTheme,
 } from "./bridge/bridgeProtocol";
 import {
@@ -28,9 +29,13 @@ export interface SandboxedChartFrameProps {
   /** The widget's React/TSX source. The frame re-mounts whenever this changes. */
   code: string;
   executeQuery: ChartFrameExecuteQuery;
-  /** Initial params; later changes are pushed as `lw:params-change`. */
-  params: ChartFrameParams;
-  theme: ChartFrameTheme;
+  /**
+   * Initial host-supplied dashboard context (time window, granularity,
+   * theme, ids); later changes are pushed as `lw:dashboard-context-change`.
+   */
+  dashboardContext: ChartFrameDashboardContext;
+  /** Author-declared parameter defaults, delivered once on `lw:init`. */
+  params?: ChartFrameParamsSnapshot;
   onLog: (entry: ChartFrameLogEntry) => void;
   /**
    * `LW.navigate(target, params)` from the frame. A widget host with no
@@ -52,8 +57,8 @@ export interface SandboxedChartFrameProps {
 export function SandboxedChartFrame({
   code,
   executeQuery,
+  dashboardContext,
   params,
-  theme,
   onLog,
   onNavigate,
   maxHeight = CHART_FRAME_MAX_HEIGHT_PX,
@@ -78,11 +83,15 @@ export function SandboxedChartFrame({
   onLogRef.current = onLog;
   const onNavigateRef = useRef(onNavigate);
   onNavigateRef.current = onNavigate;
-  const initialParamsRef = useRef(params);
+  const initialDashboardContextRef = useRef(dashboardContext);
+  const paramsRef = useRef(params);
+  paramsRef.current = params;
   const bridgeRef = useRef<ReturnType<typeof createFrameBridge> | null>(null);
 
-  // generation and srcdoc re-key the frame; params/theme are deliberately
-  // not dependencies (initial values only — updates travel as lw:params-change).
+  // generation and srcdoc re-key the frame; dashboardContext/params are
+  // deliberately not dependencies (initial values only — dashboardContext
+  // updates travel as lw:dashboard-context-change; params has no live update
+  // path yet).
   useEffect(() => {
     const iframe = iframeRef.current;
     if (!iframe) return;
@@ -90,8 +99,8 @@ export function SandboxedChartFrame({
       iframe,
       executeQuery: (queryName, params, signal) =>
         executeQueryRef.current(queryName, params, signal),
-      params: initialParamsRef.current,
-      theme,
+      dashboardContext: initialDashboardContextRef.current,
+      params: paramsRef.current,
       onLog: (entry) => onLogRef.current(entry),
       onHeightChange: setHeight,
       onNavigate: (target, navParams) =>
@@ -105,11 +114,11 @@ export function SandboxedChartFrame({
     };
   }, [generation, srcdoc]);
 
-  // Push param updates into the live frame without re-mounting it.
+  // Push dashboard context updates into the live frame without re-mounting it.
   useEffect(() => {
-    initialParamsRef.current = params;
-    bridgeRef.current?.postParamsChange(params);
-  }, [params]);
+    initialDashboardContextRef.current = dashboardContext;
+    bridgeRef.current?.postDashboardContextChange(dashboardContext);
+  }, [dashboardContext]);
 
   if (tornDown) {
     return (

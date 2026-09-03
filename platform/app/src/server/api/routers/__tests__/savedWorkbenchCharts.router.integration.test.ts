@@ -115,9 +115,9 @@ const NETWORK_SPEC = {
  * bound. Two copies could drift into agreeing with a bug in either.
  */
 const GRANULARITY_WITH_BOUNDS_SQL =
-  "SELECT toStartOfInterval(OccurredAt, INTERVAL {period_granularity_seconds:UInt32} SECOND) AS bucket, " +
+  "SELECT toStartOfInterval(OccurredAt, INTERVAL {dashboard_context_granularity_seconds:UInt32} SECOND) AS bucket, " +
   "count() AS value FROM analytics.traces " +
-  "WHERE OccurredAt >= {period_start:DateTime} AND OccurredAt < {period_end:DateTime} " +
+  "WHERE OccurredAt >= {dashboard_context_period_start:DateTime} AND OccurredAt < {dashboard_context_period_end:DateTime} " +
   "GROUP BY bucket ORDER BY bucket";
 
 const ALL_ANALYTICS: Permission[] = [
@@ -472,9 +472,9 @@ describe("the saved workbench chart router", () => {
     // are declared alongside — without them, the bucket budget no surface can
     // compute is exactly the one the dashboard needs.
     const GRANULARITY_WITHOUT_BOUNDS_SQL =
-      "SELECT toStartOfInterval(OccurredAt, INTERVAL {period_granularity_seconds:UInt32} SECOND) AS bucket, " +
+      "SELECT toStartOfInterval(OccurredAt, INTERVAL {dashboard_context_granularity_seconds:UInt32} SECOND) AS bucket, " +
       "count() AS value FROM analytics.traces " +
-      "WHERE OccurredAt >= {period_start:DateTime} " +
+      "WHERE OccurredAt >= {dashboard_context_period_start:DateTime} " +
       "GROUP BY bucket ORDER BY bucket";
 
     describe("when the member saves it without both period parameters", () => {

@@ -1,8 +1,9 @@
 /**
  * The period a submission reports over.
  *
- * Two values that look like parameters and deliberately are not: `period_start`
- * and `period_end` are supplied by whatever surface is showing the chart, and
+ * Two values that look like parameters and deliberately are not:
+ * `dashboard_context_period_start` and `dashboard_context_period_end` are
+ * supplied by whatever surface is showing the chart, and
  * the backend refuses a request that sends either among its own named
  * parameters. That is what makes a workbench-authored chart follow a dashboard
  * once it is placed on one — and why a member's one-off override adjusts the

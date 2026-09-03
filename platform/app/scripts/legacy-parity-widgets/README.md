@@ -5,7 +5,7 @@ dashboard charts (metrics, users, evaluations pages) as LangWatchQL-backed
 widgets, so dashboards can replace those pages chart-for-chart.
 
 Every query below declares no explicit parameters — each uses only the
-reserved `{period_start:DateTime}` / `{period_end:DateTime}` bounds, which the
+reserved `{dashboard_context_period_start:DateTime}` / `{dashboard_context_period_end:DateTime}` bounds, which the
 executor fills from the page's own time window automatically (see
 `platform/app/src/features/custom-chart-playground/presets.ts`).
 

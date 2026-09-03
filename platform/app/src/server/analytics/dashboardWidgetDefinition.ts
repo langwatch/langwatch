@@ -8,7 +8,7 @@
  * values: the names and JS types the query accepts, so the parent can check
  * a frame's `params` argument against it before ever forwarding anything to
  * `analytics.lwql.query` as a real bind parameter. The reserved
- * `{period_start}`/`{period_end}`/`{period_granularity_seconds}` placeholders
+ * `{dashboard_context_period_start}`/`{dashboard_context_period_end}`/`{dashboard_context_granularity_seconds}` placeholders
  * are supplied by the executor regardless of what a query declares here —
  * they are the page window, not an author-declared parameter.
  *
@@ -41,6 +41,14 @@ const MAX_PARAMETER_VALUE_LENGTH = 4_000;
 const MAX_CODE_LENGTH = 200_000;
 
 /**
+ * Every author-declared parameter name starting with this prefix is
+ * rejected — the prefix, not a fixed name list, is what "reserved" means.
+ * Host-supplied dashboard context (the page's window/granularity) lives in
+ * this namespace; author-declared params never may.
+ */
+export const DASHBOARD_CONTEXT_PARAMETER_PREFIX = "dashboard_context_";
+
+/**
  * Bound automatically by the executor from the page's window/granularity —
  * never an author-declared parameter. A query names one of these the same way
  * the `lwql-charts` skill's SQL does; declaring a parameter under one of
@@ -54,27 +62,23 @@ const MAX_CODE_LENGTH = 200_000;
  */
 export const RESERVED_PARAMETERS = [
   {
-    name: "period_start",
+    name: "dashboard_context_period_start",
     type: "DateTime",
     description:
       "Start of the dashboard's selected time range — bound automatically.",
   },
   {
-    name: "period_end",
+    name: "dashboard_context_period_end",
     type: "DateTime",
     description: "End of the selected time range (exclusive).",
   },
   {
-    name: "period_granularity_seconds",
+    name: "dashboard_context_granularity_seconds",
     type: "UInt32",
     description:
       "Suggested bucket size in seconds for the selected range.",
   },
 ] as const;
-
-const RESERVED_PARAMETER_NAMES = new Set(
-  RESERVED_PARAMETERS.map((p) => p.name),
-);
 
 /**
  * The JS types a bound parameter's value may take. Scalars only, matching
@@ -96,8 +100,8 @@ const queryParameterDeclarationSchema = z
       .max(MAX_QUERY_NAME_LENGTH)
       .regex(QUERY_NAME_PATTERN)
       .refine(
-        (name) => !RESERVED_PARAMETER_NAMES.has(name),
-        "Reserved for the page window — pick a different parameter name",
+        (name) => !name.startsWith(DASHBOARD_CONTEXT_PARAMETER_PREFIX),
+        `The "${DASHBOARD_CONTEXT_PARAMETER_PREFIX}" prefix is reserved for the dashboard context — pick a different parameter name`,
       ),
     type: queryParameterTypeSchema,
     /**
@@ -197,13 +201,13 @@ export function validateDashboardWidgetQueryParams(
   );
   if (undeclared.length > 0) {
     const [first] = undeclared;
-    if (first && RESERVED_PARAMETER_NAMES.has(first)) {
+    if (first && first.startsWith(DASHBOARD_CONTEXT_PARAMETER_PREFIX)) {
       return {
         ok: false,
         error: {
           code: "dashboard_widget_query_reserved_param",
           title: "Reserved query parameter",
-          message: `"${first}" is bound automatically from the page's own window and granularity — a query never sets it, and LW.query must not pass it either.`,
+          message: `"${first}" is bound automatically from the page's own dashboard context (window and granularity) — a query never sets it, and LW.query must not pass it either.`,
         },
       };
     }
