@@ -53,7 +53,7 @@ describe("GET /api/health/scenarios", () => {
     return mod.app;
   }
 
-  describe("access policy declaration", () => {
+  describe("given the route is registered", () => {
     /** @scenario "The scenario canary route is declared internal-secret, never public" */
     it("declares the scenario canary route as internalSecret so the OpenAPI spec never advertises this LLM-spend endpoint as unauthenticated", async () => {
       // The handler gates in-handler on validateInternalSecret, so its declared

@@ -20,7 +20,14 @@ import {
 } from "~/server/scenarios/scenario-event.enums";
 import type { ScenarioResults } from "~/server/scenarios/schemas/event-schemas";
 
+vi.mock("~/server/scenarios/launch-scenario-run.service", () => ({
+  launchScenarioRun: vi.fn(),
+}));
+
+import { launchScenarioRun } from "~/server/scenarios/launch-scenario-run.service";
+
 import {
+  buildProductionDeps,
   classifyCanaryOutcome,
   createSingleFlightScenarioCanary,
   parseCanaryConfig,
@@ -28,6 +35,7 @@ import {
   runScenarioCanary,
   SCENARIO_CANARY_ATTEMPT_BUDGET_MS,
   SCENARIO_CANARY_TOTAL_BUDGET_MS,
+  type CanaryConfig,
   type ScenarioCanaryDeps,
   type ScenarioRunSnapshot,
 } from "../scenario-canary.service";
@@ -149,7 +157,6 @@ describe("runScenarioCanary", () => {
     /** @scenario "A run that never reaches terminal within budget times out without being cancelled" */
     it("issues no cancel command for the run", async () => {
       const clock = fakeClock();
-      const cancel = vi.fn();
       const deps: ScenarioCanaryDeps = {
         queueRun: async () => ({ scenarioRunId: "canary-run-1" }),
         getScenarioRunData: async () => ({
@@ -165,7 +172,6 @@ describe("runScenarioCanary", () => {
       // The deps contract carries no cancel hook at all — there is nothing
       // for the orchestrator to call, which is the point: no cancel command
       // exists for this probe to issue.
-      expect(cancel).not.toHaveBeenCalled();
       expect("cancelRun" in deps).toBe(false);
     });
 
@@ -309,6 +315,28 @@ describe("runScenarioCanary", () => {
       expect(queueRunCalls).toBe(1);
     });
   });
+
+  describe("given a canary scenario configured with its own model", () => {
+    describe("when queueRun is invoked", () => {
+      /** @scenario "The canary run uses the model configured on the canary scenario" */
+      it("does not pass a model override to launchScenarioRun", async () => {
+        vi.mocked(launchScenarioRun).mockResolvedValue({
+          scenarioRunId: "canary-run-1",
+        } as Awaited<ReturnType<typeof launchScenarioRun>>);
+        const config: CanaryConfig = {
+          projectId: "canary-project",
+          scenarioId: "canary-scenario",
+          target: { type: "prompt", referenceId: "canary-prompt" },
+        };
+
+        await buildProductionDeps(config).queueRun();
+
+        expect(launchScenarioRun).toHaveBeenCalledTimes(1);
+        const [callArgs] = vi.mocked(launchScenarioRun).mock.calls[0]!;
+        expect(callArgs).not.toHaveProperty("model");
+      });
+    });
+  });
 });
 
 describe("createSingleFlightScenarioCanary", () => {
@@ -349,36 +377,13 @@ describe("createSingleFlightScenarioCanary", () => {
   });
 });
 
-describe("given the canary scenario is queued with no model override", () => {
-  /** @scenario "The canary run uses the model configured on the canary scenario" */
-  it("passes no model override to the queue call, so the run inherits the model configured on the canary scenario record", async () => {
-    const clock = fakeClock();
-    let queueRunCallArgs: unknown[] = [];
-    const deps: ScenarioCanaryDeps = {
-      queueRun: async (...args: unknown[]) => {
-        queueRunCallArgs = args;
-        return { scenarioRunId: "canary-run-1" };
-      },
-      getScenarioRunData: async () => ({
-        status: ScenarioRunStatus.SUCCESS,
-        results: verdictResults(Verdict.SUCCESS),
-      }),
-      ...clock,
-    };
-
-    await runScenarioCanary(deps);
-
-    expect(queueRunCallArgs).toEqual([]);
-  });
-});
-
 describe("raceAgainstRealDeadline", () => {
   /** @scenario "A wedged datastore times out and releases the in-flight lock" */
   it("resolves to the work value when the work settles before the deadline", async () => {
-    const result = await raceAgainstRealDeadline(
-      1_000,
-      Promise.resolve("done"),
-    );
+    const result = await raceAgainstRealDeadline({
+      ms: 1_000,
+      work: Promise.resolve("done"),
+    });
 
     expect(result).toEqual({ value: "done" });
   });
@@ -388,7 +393,7 @@ describe("raceAgainstRealDeadline", () => {
     vi.useFakeTimers();
     try {
       const wedged = new Promise<string>(() => undefined);
-      const raced = raceAgainstRealDeadline(1_000, wedged);
+      const raced = raceAgainstRealDeadline({ ms: 1_000, work: wedged });
 
       await vi.advanceTimersByTimeAsync(1_000);
 

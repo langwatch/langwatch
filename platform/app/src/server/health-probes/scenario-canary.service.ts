@@ -95,10 +95,10 @@ export interface ScenarioRunSnapshot {
  * production implementation ({@link raceAgainstRealDeadline}) uses `setTimeout`;
  * the unit tests drive it with vitest fake timers.
  */
-export type DeadlineRace = <T>(
-  ms: number,
-  work: Promise<T>,
-) => Promise<{ timedOut: true } | { value: T }>;
+export type DeadlineRace = <T>(options: {
+  ms: number;
+  work: Promise<T>;
+}) => Promise<{ timedOut: true } | { value: T }>;
 
 /**
  * The queue/poll boundary and the clock the orchestrator drives, injected so
@@ -135,7 +135,7 @@ export interface ScenarioCanaryDeps {
  * run is left to terminate on its own (no cancel); a late rejection from it is
  * swallowed so it never surfaces as an unhandled rejection.
  */
-export const raceAgainstRealDeadline: DeadlineRace = (ms, work) => {
+export const raceAgainstRealDeadline: DeadlineRace = ({ ms, work }) => {
   let timer: ReturnType<typeof setTimeout> | undefined;
   const timeout = new Promise<{ timedOut: true }>((resolve) => {
     timer = setTimeout(() => resolve({ timedOut: true }), ms);
@@ -185,10 +185,13 @@ export function classifyCanaryOutcome({
  * error is classified inside the documented contract instead of escaping as a
  * raw 500.
  */
-async function runCanaryAttempt(
-  deps: ScenarioCanaryDeps,
-  hardDeadline: number,
-): Promise<{ scenarioRunId?: string; verdict: CanaryVerdict }> {
+async function runCanaryAttempt({
+  deps,
+  hardDeadline,
+}: {
+  deps: ScenarioCanaryDeps;
+  hardDeadline: number;
+}): Promise<{ scenarioRunId?: string; verdict: CanaryVerdict }> {
   const raceDeadline = deps.raceDeadline ?? raceAgainstRealDeadline;
   const deadline = Math.min(
     deps.now() + SCENARIO_CANARY_ATTEMPT_BUDGET_MS,
@@ -197,17 +200,20 @@ async function runCanaryAttempt(
   let scenarioRunId: string | undefined;
 
   try {
-    const queued = await raceDeadline(deadline - deps.now(), deps.queueRun());
+    const queued = await raceDeadline({
+      ms: deadline - deps.now(),
+      work: deps.queueRun(),
+    });
     if ("timedOut" in queued) {
       return { verdict: { healthy: false, reason: "timeout" } };
     }
     scenarioRunId = queued.value.scenarioRunId;
 
     while (deps.now() < deadline) {
-      const read = await raceDeadline(
-        deadline - deps.now(),
-        deps.getScenarioRunData(scenarioRunId),
-      );
+      const read = await raceDeadline({
+        ms: deadline - deps.now(),
+        work: deps.getScenarioRunData(scenarioRunId),
+      });
       if ("timedOut" in read) break;
       const snapshot = read.value;
       if (snapshot && isTerminalStatus(snapshot.status)) {
@@ -242,7 +248,7 @@ export async function runScenarioCanary(
   const startedAt = deps.now();
   const hardDeadline = startedAt + SCENARIO_CANARY_TOTAL_BUDGET_MS;
 
-  const first = await runCanaryAttempt(deps, hardDeadline);
+  const first = await runCanaryAttempt({ deps, hardDeadline });
   if (first.verdict.healthy || deps.now() >= hardDeadline) {
     return {
       ...first.verdict,
@@ -251,7 +257,7 @@ export async function runScenarioCanary(
     };
   }
 
-  const second = await runCanaryAttempt(deps, hardDeadline);
+  const second = await runCanaryAttempt({ deps, hardDeadline });
   return {
     ...second.verdict,
     scenarioRunId: second.scenarioRunId,
@@ -340,7 +346,7 @@ function resolveCanaryConfig(): CanaryConfig | { invalid: string } {
  * through the shared launcher into the dedicated canary project, and reads
  * status back through the same simulations read service the Results tab uses.
  */
-function buildProductionDeps(config: CanaryConfig): ScenarioCanaryDeps {
+export function buildProductionDeps(config: CanaryConfig): ScenarioCanaryDeps {
   const { projectId, scenarioId, target } = config;
 
   return {
