@@ -22,7 +22,7 @@ import {
 } from "react-icons/lu";
 import { CreateExperimentButton } from "../../ui/elements/experiments/create-experiment-button";
 import { ConfirmDialog } from "@langwatch/design-system/confirm-dialog";
-import { NoDataInfoBlock } from "@langwatch/workflow-web/ui/elements/no-data-info-block";
+import { NoDataInfoBlock } from "@langwatch/design-system/no-data-info-block";
 import { ListTable } from "@langwatch/design-system/list-table";
 import { FullWidthListPageContent } from "../../ui/elements/ui/layouts/full-width-list-page-content";
 import { Link } from "@langwatch/workflow-web/studio-host/link";
@@ -33,7 +33,7 @@ import { useRouter } from "@langwatch/workflow-web/studio-host/next-router";
 import { formatEvaluationSummary } from "../../ui/elements/experiments/BatchEvaluationV2/batch-evaluation-summary";
 import { CopyExperimentDialog } from "../../ui/elements/experiments/copy-experiment-dialog";
 import { NavigationFooter, useNavigationFooter } from "../../ui/elements/navigation-footer";
-import { OverflownTextWithTooltip } from "@langwatch/workflow-web/components/OverflownText";
+import { OverflownTextWithTooltip } from "@langwatch/design-system/overflown-text";
 import { PageLayout } from "@langwatch/design-system/page-layout";
 import { Menu } from "@langwatch/design-system/menu";
 import { toaster } from "@langwatch/workflow-web/studio-host/toaster";
@@ -90,14 +90,7 @@ export function ExperimentsPage() {
 
   const navigationFooter = useNavigationFooter();
 
-  /**
-   * One page of the project's experiments.
-   *
-   * `platform/app` typed this off the mounted `AppRouter`; the borrowed entry
-   * in the workflow family's procedure map declares the PATH — the half the
-   * React Query cache key is made of — and leaves the row to the caller, so the
-   * row is stated here. Every field is one the table renders.
-   */
+  /** One page of the project's experiments; every field is one the table renders. */
   const experiments = api.experiments.getAllForEvaluationsList.useQuery(
     {
       projectId: project?.id ?? "",
@@ -138,10 +131,7 @@ export function ExperimentsPage() {
 
   if (!project) return null;
 
-  const taskTypeToLabel: Record<
-    keyof typeof LEGACY_EXPERIMENT_TASK_TYPES,
-    string
-  > = {
+  const taskTypeToLabel: Record<keyof typeof LEGACY_EXPERIMENT_TASK_TYPES, string> = {
     real_time: "Legacy live workflow",
     llm_app: "LLM App Experiment",
     prompt_creation: "Prompt Experiment",
@@ -205,9 +195,7 @@ export function ExperimentsPage() {
       ) : (
         <FullWidthListPageContent>
           <VStack width="full" gap={4} align="stretch">
-            <Text color="fg.muted">
-              Compare configurations and analyze batch test results
-            </Text>
+            <Text color="fg.muted">Compare configurations and analyze batch test results</Text>
             <>
               <ListTable width="full">
                 <Table.Header>
@@ -286,10 +274,7 @@ export function ExperimentsPage() {
                               }}
                             >
                               <Table.Cell>
-                                <OverflownTextWithTooltip
-                                  lineClamp={1}
-                                  wordBreak="break-word"
-                                >
+                                <OverflownTextWithTooltip lineClamp={1} wordBreak="break-word">
                                   {experiment.name ?? experiment.slug}
                                 </OverflownTextWithTooltip>
                               </Table.Cell>
@@ -301,10 +286,7 @@ export function ExperimentsPage() {
                                 </Badge>
                               </Table.Cell>
                               <Table.Cell>
-                                <OverflownTextWithTooltip
-                                  lineClamp={1}
-                                  wordBreak="break-word"
-                                >
+                                <OverflownTextWithTooltip lineClamp={1} wordBreak="break-word">
                                   {experiment.dataset?.name ?? "-"}
                                 </OverflownTextWithTooltip>
                               </Table.Cell>
@@ -325,13 +307,10 @@ export function ExperimentsPage() {
                                   "-"
                                 )}
                               </Table.Cell>
-                              <Table.Cell>
-                                {experiment.runsSummary.count ?? "-"}
-                              </Table.Cell>
+                              <Table.Cell>{experiment.runsSummary.count ?? "-"}</Table.Cell>
                               <Table.Cell>
                                 <HStack gap={1}>
-                                  {experiment.runsSummary.latestRun?.timestamps
-                                    ?.finishedAt ? (
+                                  {experiment.runsSummary.latestRun?.timestamps?.finishedAt ? (
                                     <>
                                       <LuCircleCheckBig
                                         size={14}
@@ -339,20 +318,14 @@ export function ExperimentsPage() {
                                       />
                                       <Text fontSize="sm">Completed</Text>
                                     </>
-                                  ) : experiment.runsSummary.latestRun?.timestamps
-                                      ?.stoppedAt ? (
+                                  ) : experiment.runsSummary.latestRun?.timestamps?.stoppedAt ? (
                                     <>
-                                      <LuCircleX
-                                        size={14}
-                                        color="var(--chakra-colors-red-500)"
-                                      />
+                                      <LuCircleX size={14} color="var(--chakra-colors-red-500)" />
                                       <Text fontSize="sm">Stopped</Text>
                                     </>
-                                  ) : experiment.runsSummary.latestRun?.timestamps
-                                      ?.updatedAt &&
+                                  ) : experiment.runsSummary.latestRun?.timestamps?.updatedAt &&
                                     Date.now() -
-                                      experiment.runsSummary.latestRun.timestamps
-                                        .updatedAt <
+                                      experiment.runsSummary.latestRun.timestamps.updatedAt <
                                       5 * 60 * 1000 ? (
                                     <>
                                       <Spinner size="xs" />
@@ -377,12 +350,7 @@ export function ExperimentsPage() {
                                 {new Date(experiment.updatedAt).toLocaleString()}
                               </Table.Cell>
                               <Table.Cell>
-                                <Box
-                                  width="full"
-                                  height="full"
-                                  display="flex"
-                                  justifyContent="end"
-                                >
+                                <Box width="full" height="full" display="flex" justifyContent="end">
                                   <Menu.Root>
                                     <Menu.Trigger
                                       aria-label={`Actions for ${
@@ -447,8 +415,7 @@ export function ExperimentsPage() {
                                             setCopyDialogState({
                                               open: true,
                                               experimentId: experiment.id,
-                                              experimentName:
-                                                experiment.name ?? experiment.slug,
+                                              experimentName: experiment.name ?? experiment.slug,
                                             });
                                           }}
                                         >
@@ -524,17 +491,7 @@ export function ExperimentsPage() {
   );
 }
 
-/**
- * The grant the address carries, stated where the screen is rather than wrapped
- * around it.
- *
- * `platform/app` wrapped this page in `withPermissionGuard("experiments:view",
- * { layoutComponent: DashboardLayout })`. Both halves belong to the route now:
- * the composing application puts `withUiPageGuard` in front of the loader with
- * this permission, and the chrome is the layout route the screen is a child of.
- * The named export the page key used to resolve is gone with the wrapper — the
- * key names this module's default now.
- */
+/** The permission `withUiPageGuard` checks in front of this route's loader. */
 export const EXPERIMENTS_PAGE_PERMISSION = "experiments:view";
 
 export default ExperimentsPage;

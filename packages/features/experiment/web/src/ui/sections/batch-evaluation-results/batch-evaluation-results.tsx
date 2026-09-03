@@ -1,9 +1,4 @@
-/**
- * BatchEvaluationResults - Main wrapper component for batch evaluation results
- *
- * This is the main entry point that combines the sidebar and table.
- * It replaces BatchEvaluationV2 with a cleaner, V3-style visualization.
- */
+/** Main entry point combining the sidebar and table (V3-style, replaces BatchEvaluationV2). */
 
 import {
   Alert,
@@ -23,7 +18,7 @@ import { BarChart2, Download, ExternalLink } from "react-feather";
 import type { Experiment } from "@langwatch/experiment-contract";
 import type { Project } from "@langwatch/workflow-web/model/prisma-types";
 import { EvaluatorResultChip } from "@langwatch/evaluator-web/components/shared/EvaluatorResultChip";
-import { ExternalImage } from "@langwatch/workflow-web/components/ExternalImage";
+import { ExternalImage } from "@langwatch/design-system/external-image";
 import { Link } from "@langwatch/workflow-web/studio-host/link";
 import { describeCellFailure } from "../../../model/experiments-v3/cell-failure";
 import { TraceIdPeek } from "@langwatch/trace-web/explorer/components/TraceIdPeek";
@@ -48,7 +43,10 @@ import {
 import { downloadCsv, getRunDisplayName } from "@langwatch/experiment-web";
 import { isRunFinished } from "@langwatch/experiment-web";
 import { useComparisonMode } from "@langwatch/experiment-web";
-import { RUN_COLORS, useMultiRunData } from "../../../behavior/batch-evaluation-results/use-multi-run-data";
+import {
+  RUN_COLORS,
+  useMultiRunData,
+} from "../../../behavior/batch-evaluation-results/use-multi-run-data";
 import { useResultDisplayPreferences } from "@langwatch/experiment-web";
 import { useResultsGrouping } from "@langwatch/experiment-web";
 import { useShowComparisonLeaderboard } from "../../../behavior/batch-evaluation-results/use-show-comparison-leaderboard";
@@ -70,15 +68,10 @@ const REFETCH_GRACE_PERIOD_MS = 3000; // 3 seconds
 type RouterQuery = Record<string, string | string[] | undefined>;
 
 /**
- * The router query that applying `groupBy` would produce, or `null` when
- * it would be a no-op — replacing the URL with an identical query still
- * costs a navigation, and in Next that re-runs every `router.query`
- * effect on the page.
+ * The router query `groupBy` would produce, or `null` for a no-op (an
+ * identical-query replace still costs a navigation and re-runs effects).
  */
-const queryWithGroupBy = (
-  query: RouterQuery,
-  groupBy: string | null,
-): RouterQuery | null => {
+const queryWithGroupBy = (query: RouterQuery, groupBy: string | null): RouterQuery | null => {
   if (groupBy) {
     if (query.groupBy === groupBy) return null;
     return { ...query, groupBy };
@@ -95,14 +88,9 @@ export function BatchEvaluationResults({
   selectedRunId: externalSelectedRunId,
   onSelectRunId,
 }: BatchEvaluationResultsProps) {
-  /**
-   * THE LITE-MEMBER GUARD DID NOT TRAVEL. `useLiteMemberGuard` read the
-   * reader's ORGANIZATION role off the application's own hook and hid the CSV
-   * export from an EXTERNAL member. The host port carries permissions, not the
-   * organization role — the same absence `@langwatch/ui-drawer` recorded about
-   * `CurrentDrawer`'s restriction — so the export button is offered to everyone
-   * who can open the page, and the server still refuses the download it must.
-   */
+  // The lite-member CSV-export guard did not travel: the host port carries
+  // permissions, not organization role, so the button is offered to everyone
+  // who can open the page and the server still refuses the download.
   const isLiteMember = false;
   const { openDrawer } = useDrawer();
   const showComparisonLeaderboard = useShowComparisonLeaderboard();
@@ -136,15 +124,7 @@ export function BatchEvaluationResults({
     });
   }, []);
 
-  /**
-   * The experiment's runs, named by the row the sidebar already declares.
-   *
-   * `platform/app` typed this off the mounted `AppRouter`; the borrowed entry in
-   * the workflow family's procedure map declares the PATH — the half the React
-   * Query cache key is made of — and leaves the row to the caller.
-   * `BatchRunSummary` is what this file hands the sidebar, so it is what the
-   * procedure is read as.
-   */
+  /** The experiment's runs, read as `BatchRunSummary` (what this file hands the sidebar). */
   const runsQuery = api.experiments.getExperimentBatchEvaluationRuns.useQuery(
     {
       projectId: project?.id ?? "",
@@ -160,12 +140,10 @@ export function BatchEvaluationResults({
   const router = useRouter();
 
   // Get runId from URL query params
-  const queryRunId =
-    typeof router.query.runId === "string" ? router.query.runId : undefined;
+  const queryRunId = typeof router.query.runId === "string" ? router.query.runId : undefined;
 
   // Determine which run ID to use (priority: external prop > URL query > first run)
-  const selectedRunId =
-    externalSelectedRunId ?? queryRunId ?? runsQuery.data?.runs[0]?.runId;
+  const selectedRunId = externalSelectedRunId ?? queryRunId ?? runsQuery.data?.runs[0]?.runId;
 
   // Handle run selection - updates URL query param
   const handleSelectRun = useCallback(
@@ -303,9 +281,7 @@ export function BatchEvaluationResults({
   // Sort chronologically so fallback "Run #N" numbering is stable
   const runNameMap = useMemo(() => {
     const map: Record<string, string | React.ReactNode> = {};
-    const sorted = [...sidebarRuns].sort(
-      (a, b) => a.timestamps.createdAt - b.timestamps.createdAt,
-    );
+    const sorted = [...sidebarRuns].sort((a, b) => a.timestamps.createdAt - b.timestamps.createdAt);
     sorted.forEach((run, index) => {
       map[run.runId] = getRunDisplayName({
         commitMessage: run.workflowVersion?.commitMessage,
@@ -323,9 +299,7 @@ export function BatchEvaluationResults({
       return compareParam.split(",").filter(Boolean);
     }
     if (Array.isArray(compareParam)) {
-      return (compareParam as unknown[]).filter(
-        (id): id is string => typeof id === "string",
-      );
+      return (compareParam as unknown[]).filter((id): id is string => typeof id === "string");
     }
     return undefined;
   }, [router.query.compare]);
@@ -440,8 +414,7 @@ export function BatchEvaluationResults({
   // 2. Not in compare mode but with 2+ targets in single run
   const targetCount = transformedData?.targetColumns.length ?? 0;
 
-  const canShowCharts =
-    (compareMode && (comparisonData?.length ?? 0) >= 2) || targetCount >= 2;
+  const canShowCharts = (compareMode && (comparisonData?.length ?? 0) >= 2) || targetCount >= 2;
 
   // Charts visibility state - default to visible when available
   const defaultChartsVisible = canShowCharts;
@@ -607,10 +580,7 @@ export function BatchEvaluationResults({
             </Link>
           )}
           {experiment?.type === "EVALUATIONS_V3" && (
-            <Link
-              href={`/${project?.slug}/experiments/workbench/${experiment?.slug}`}
-              asChild
-            >
+            <Link href={`/${project?.slug}/experiments/workbench/${experiment?.slug}`} asChild>
               <Button size="sm" variant="outline" textDecoration="none">
                 <ExternalLink size={16} /> Open Experiment
               </Button>

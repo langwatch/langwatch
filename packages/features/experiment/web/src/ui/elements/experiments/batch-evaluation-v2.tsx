@@ -29,7 +29,7 @@ import { api } from "@langwatch/workflow-web/studio-host/api";
 import { formatTimeAgo } from "@langwatch/workflow-web/utils/formatTimeAgo";
 import { getColorForString } from "@langwatch/design-system/rotating-colors";
 import { getRunDisplayName } from "@langwatch/experiment-web";
-import { OverflownTextWithTooltip } from "@langwatch/workflow-web/components/OverflownText";
+import { OverflownTextWithTooltip } from "@langwatch/design-system/overflown-text";
 import {
   BatchEvaluationV2EvaluationSummary,
   formatEvaluationSummary,
@@ -47,16 +47,11 @@ export function BatchEvaluationV2({
   project: Project;
   experiment: Experiment;
 }) {
-  const {
-    batchEvaluationRuns,
-    selectedRun,
-    selectedRunId,
-    setSelectedRunId,
-    isFinished,
-  } = useBatchEvaluationState({
-    project,
-    experiment,
-  });
+  const { batchEvaluationRuns, selectedRun, selectedRunId, setSelectedRunId, isFinished } =
+    useBatchEvaluationState({
+      project,
+      experiment,
+    });
 
   const { downloadCSV, isDownloadCSVEnabled } = useBatchEvaluationDownloadCSV({
     project,
@@ -108,12 +103,7 @@ export function BatchEvaluationV2({
                 href={`/${project.slug}/studio/${experiment.workflowId}`}
                 asChild
               >
-                <Button
-                  size="sm"
-                  textDecoration="none"
-                  marginBottom="-6px"
-                  colorPalette="orange"
-                >
+                <Button size="sm" textDecoration="none" marginBottom="-6px" colorPalette="orange">
                   <ExternalLink size={16} /> Open Workflow
                 </Button>
               </Link>
@@ -127,8 +117,7 @@ export function BatchEvaluationV2({
             )}
           </HStack>
           {batchEvaluationRuns.isLoading ||
-          (batchEvaluationRuns.error &&
-            batchEvaluationRuns.error.data?.httpStatus == 404) ? (
+          (batchEvaluationRuns.error && batchEvaluationRuns.error.data?.httpStatus == 404) ? (
             <Skeleton width="100%" height="30px" />
           ) : batchEvaluationRuns.error ? (
             <Alert.Root status="error">
@@ -157,22 +146,15 @@ export function BatchEvaluationV2({
             </>
           )}
         </VStack>
-        {selectedRun && (
-          <BatchEvaluationV2EvaluationSummary run={selectedRun} showProgress />
-        )}
+        {selectedRun && <BatchEvaluationV2EvaluationSummary run={selectedRun} showProgress />}
       </VStack>
     </HStack>
   );
 }
 
 /**
- * Polls as fast as the query allows while a selected run is missing from the
- * fetched list, and gives up after a deadline.
- *
- * The deadline is armed once per wait, on a ref, rather than on every re-run:
- * the run list churns while we wait, and re-arming on each change would push
- * the deadline out for as long as the churn lasts, which is exactly the case
- * it exists to stop.
+ * Polls while a selected run is missing from the list, giving up after a
+ * deadline armed once per wait (on a ref) so list churn can't push it out.
  */
 function useKeepFetchingWhileRunIsMissing({
   isRunMissing,
@@ -239,9 +221,7 @@ export const useBatchEvaluationState = ({
       selectedRunId ??
       (typeof router.query.runId === "string" ? router.query.runId : null) ??
       batchEvaluationRuns.data?.runs[0]?.runId;
-    const selectedRun = batchEvaluationRuns.data?.runs.find(
-      (r: any) => r.runId === selectedRunId_,
-    );
+    const selectedRun = batchEvaluationRuns.data?.runs.find((r: any) => r.runId === selectedRunId_);
     return { selectedRunId_, selectedRun };
   }, [selectedRunId, router.query.runId, batchEvaluationRuns.data?.runs]);
 
@@ -378,8 +358,7 @@ export function BatchEvaluationV2RunList({
             </HStack>
           )}
           {batchEvaluationRuns.data?.runs.map((run: any, index: any) => {
-            const runCost =
-              (run.summary.datasetCost ?? 0) + (run.summary.evaluationsCost ?? 0);
+            const runCost = (run.summary.datasetCost ?? 0) + (run.summary.evaluationsCost ?? 0);
             const runName = getRunDisplayName({
               commitMessage: run.workflowVersion?.commitMessage,
               index,
@@ -425,8 +404,7 @@ export function BatchEvaluationV2RunList({
                     wordBreak="break-all"
                   >
                     {runName}
-                    {getFinishedAt(run.timestamps, new Date().getTime()) ===
-                      undefined && (
+                    {getFinishedAt(run.timestamps, new Date().getTime()) === undefined && (
                       <Spinner
                         size="xs"
                         display="inline-block"
@@ -435,35 +413,22 @@ export function BatchEvaluationV2RunList({
                       />
                     )}
                   </OverflownTextWithTooltip>
-                  <HStack
-                    color="fg.subtle"
-                    fontSize={size === "sm" ? "12px" : "13px"}
-                    gap={1}
-                  >
+                  <HStack color="fg.subtle" fontSize={size === "sm" ? "12px" : "13px"} gap={1}>
                     {Object.values(run.summary.evaluations)
                       .slice(0, 2)
                       .map((evaluation: any, index: number) => (
                         <React.Fragment key={evaluation.name}>
                           {index > 0 && <Text>·</Text>}
-                          <Tooltip
-                            content={evaluation.name}
-                            positioning={{ placement: "top" }}
-                          >
+                          <Tooltip content={evaluation.name} positioning={{ placement: "top" }}>
                             <Text>{formatEvaluationSummary(evaluation, true)}</Text>
                           </Tooltip>
                         </React.Fragment>
                       ))}
                     {!!runCost && (
                       <>
-                        {Object.keys(run.summary.evaluations).length > 0 && (
-                          <Text>·</Text>
-                        )}
+                        {Object.keys(run.summary.evaluations).length > 0 && <Text>·</Text>}
                         <Text whiteSpace="nowrap">
-                          <FormatMoney
-                            amount={runCost}
-                            currency="USD"
-                            format="$0.00[0]"
-                          />
+                          <FormatMoney amount={runCost} currency="USD" format="$0.00[0]" />
                         </Text>
                       </>
                     )}
@@ -475,12 +440,7 @@ export function BatchEvaluationV2RunList({
                         : "Waiting for steps..."}
                     </Text>
                     {run.timestamps.stoppedAt && (
-                      <Box
-                        width="6px"
-                        height="6px"
-                        background="red.300"
-                        borderRadius="full"
-                      />
+                      <Box width="6px" height="6px" background="red.300" borderRadius="full" />
                     )}
                   </HStack>
                 </VStack>

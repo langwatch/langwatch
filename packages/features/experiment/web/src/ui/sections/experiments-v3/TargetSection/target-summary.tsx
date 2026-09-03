@@ -9,7 +9,7 @@ import {
 import { Tooltip } from "@langwatch/design-system/tooltip";
 import { PassRateCoverageChip } from "../../../elements/shared/pass-rate-coverage-chip";
 import { passRateCoverage } from "../../../../model/shared/pass-rate-coverage";
-import { useInteractiveTooltip } from "@langwatch/workflow-web/hooks/useInteractiveTooltip";
+import { useInteractiveTooltip } from "@langwatch/design-system/use-interactive-tooltip";
 import { useEvaluatorNames } from "../../../../behavior/experiments-v3/use-evaluator-name";
 import type { EvaluatorConfig } from "../../../../model/experiments-v3/types";
 import type { TargetAggregate } from "../../../../model/experiments-v3/compute-aggregates";
@@ -27,15 +27,10 @@ type TargetSummaryProps = {
 };
 
 /**
- * Compact summary display for target evaluation results.
- * Shows pass rate and score inline, with a hover tooltip for full details.
- *
- * NOTE: We manually control tooltip open/close state with useInteractiveTooltip
- * because this tooltip contains nested tooltips (for latency/cost stats).
- * Chakra's built-in interactive behavior conflicts with nested tooltips,
- * so we handle the hover logic ourselves via contentProps mouse handlers.
+ * Compact pass-rate/score summary with a hover tooltip for details.
+ * `useInteractiveTooltip` drives open/close by hand since this tooltip
+ * nests others (latency/cost stats), which Chakra's `interactive` breaks.
  */
-// Helper to get evaluator name from the evaluators array
 const getEvaluatorName = ({
   evaluatorId,
   evaluatorNames,

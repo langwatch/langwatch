@@ -1,33 +1,28 @@
 /**
- * Read-only results table for a batch evaluation run: dataset inputs,
- * predicted outputs, evaluator inputs, cost/duration, and the evaluator's
- * score/passed/label/details per row.
- *
- * Virtualized TanStack-style table (fixed row heights) with the live-run
- * affordances the old grid had: stays pinned to the bottom while results
- * stream in (unless the user scrolls up), click-to-expand on any value
- * cell, and error/skipped/true/false cell tinting.
+ * Read-only, virtualized results table for a batch evaluation run: inputs,
+ * outputs, cost/duration, score/passed/label/details; auto-pins to the
+ * bottom while streaming, click-to-expand cells, error/skipped tinting.
  */
 import { Box, Button, HStack } from "@chakra-ui/react";
 import { useVirtualizer } from "@tanstack/react-virtual";
 import numeral from "numeral";
 import { type ReactNode, useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { TraceIdPeek } from "@langwatch/trace-web/explorer/components/TraceIdPeek";
-import { useDrawer } from "@langwatch/workflow-web/studio-host/use-drawer";
+import { useDrawer } from "@langwatch/ui-host/use-drawer";
 import type { ExperimentRunWithItems } from "@langwatch/experiment-contract";
 import { formatMilliseconds } from "@langwatch/trace-web/utils/formatMilliseconds";
-import { formatMoney } from "@langwatch/workflow-web/utils/formatMoney";
-import { ExternalImage, getImageUrl } from "@langwatch/workflow-web/components/ExternalImage";
-import { ExpandedTextDialog, HoverableBigText } from "@langwatch/workflow-web/components/HoverableBigText";
+import { formatMoney } from "@langwatch/design-system/format-money";
+import { ExternalImage, getImageUrl } from "@langwatch/design-system/external-image";
+import {
+  ExpandedTextDialog,
+  HoverableBigText,
+} from "@langwatch/workflow-web/components/HoverableBigText";
 import { getEvaluationColumns } from "../../../../model/experiments/BatchEvaluationV2/utils";
 
 type EvaluationRowData = {
   rowNumber: number;
   datasetEntry?: ExperimentRunWithItems["dataset"][number];
-  evaluationsForEntry: Record<
-    string,
-    ExperimentRunWithItems["evaluations"][number] | undefined
-  >;
+  evaluationsForEntry: Record<string, ExperimentRunWithItems["evaluations"][number] | undefined>;
 };
 
 type CellState = "error" | "skipped" | "true" | "false" | undefined;
@@ -107,8 +102,7 @@ export function BatchEvaluationV2EvaluationResult({
     const firstEntry = Object.values(datasetByIndex)[0];
     for (const column of Array.from(datasetColumns)) {
       const mightHaveImages =
-        typeof firstEntry?.entry?.[column] === "string" &&
-        getImageUrl(firstEntry.entry[column]!);
+        typeof firstEntry?.entry?.[column] === "string" && getImageUrl(firstEntry.entry[column]!);
       cols.push({
         id: `dataset_${column}`,
         header: `Dataset Input (${column})`,
@@ -142,8 +136,7 @@ export function BatchEvaluationV2EvaluationResult({
           const entry = row.datasetEntry;
           if (entry?.error) return entry.error;
           let value = (entry?.predicted as any)?.[node]?.[column];
-          if (value === void 0 && node === "end")
-            value = (entry?.predicted as any)?.[column];
+          if (value === void 0 && node === "end") value = (entry?.predicted as any)?.[column];
           return value;
         };
         cols.push({
@@ -193,8 +186,7 @@ export function BatchEvaluationV2EvaluationResult({
         const predCost = row.datasetEntry?.cost ?? 0;
         const evalCost = row.evaluationsForEntry[evaluator]?.cost ?? 0;
         if (!predCost && !evalCost) return "-";
-        const fmt = (v: number) =>
-          formatMoney({ amount: v, currency: "USD" }, "$0.00[00]");
+        const fmt = (v: number) => formatMoney({ amount: v, currency: "USD" }, "$0.00[00]");
         return `Prediction: ${predCost ? fmt(predCost) : "-"}, Evaluation: ${
           evalCost ? fmt(evalCost) : "-"
         }`;
@@ -208,8 +200,7 @@ export function BatchEvaluationV2EvaluationResult({
       minWidth: 120,
       render: (row) => {
         const total =
-          (row.datasetEntry?.duration ?? 0) +
-          (row.evaluationsForEntry[evaluator]?.duration ?? 0);
+          (row.datasetEntry?.duration ?? 0) + (row.evaluationsForEntry[evaluator]?.duration ?? 0);
         return total ? formatMilliseconds(total) : "-";
       },
       text: (row) => {
@@ -243,9 +234,7 @@ export function BatchEvaluationV2EvaluationResult({
         header: titleCase(column),
         minWidth: isDetails ? 240 : 120,
         render: (row) => {
-          const evaluation = row.evaluationsForEntry[evaluator] as
-            | Record<string, any>
-            | undefined;
+          const evaluation = row.evaluationsForEntry[evaluator] as Record<string, any> | undefined;
           if (isDetails) {
             return (
               <HoverableBigText lineClamp={1} maxWidth="300px" whiteSpace="pre-wrap">
@@ -258,19 +247,14 @@ export function BatchEvaluationV2EvaluationResult({
           return formatEvalValue(evaluation?.[column]);
         },
         text: (row) => {
-          const evaluation = row.evaluationsForEntry[evaluator] as
-            | Record<string, any>
-            | undefined;
-          if (!isDetails && evaluation?.status === "error")
-            return evaluation?.details ?? "Error";
+          const evaluation = row.evaluationsForEntry[evaluator] as Record<string, any> | undefined;
+          if (!isDetails && evaluation?.status === "error") return evaluation?.details ?? "Error";
           if (!isDetails && evaluation?.status === "skipped")
             return evaluation?.details ?? "Skipped";
           return `${formatEvalValue(evaluation?.[column])}`;
         },
         cellState: (row) => {
-          const evaluation = row.evaluationsForEntry[evaluator] as
-            | Record<string, any>
-            | undefined;
+          const evaluation = row.evaluationsForEntry[evaluator] as Record<string, any> | undefined;
           if (isDetails) return undefined;
           if (evaluation?.status === "error") return "error";
           if (evaluation?.status === "skipped") return "skipped";
@@ -282,9 +266,7 @@ export function BatchEvaluationV2EvaluationResult({
     }
 
     // Trace column
-    const hasAnyTraceId = Object.values(datasetByIndex).some(
-      (d) => d.traceId && d.traceId !== "0",
-    );
+    const hasAnyTraceId = Object.values(datasetByIndex).some((d) => d.traceId && d.traceId !== "0");
     if (hasAnyTraceId) {
       cols.push({
         id: "trace",

@@ -32,20 +32,56 @@ import type { ProjectPickGroup } from "../model/project-pick-items";
  * The segment boundary is load-bearing. `/acme-app-staging/traces` is not a
  * sub-path of `/acme-app`, and a plain `startsWith` would rewrite it into an
  * address that belongs to neither project.
+ *
+ * `routePattern` (`:name` params, e.g. `/:project/traces/:traceId`) is what
+ * tells a pick to drop a second dynamic segment rather than carry it into the
+ * target project — a trace id can't exist there, so the pick lands on the
+ * segment's parent instead of building a 404ing per-project URL. Mirrors
+ * platform/app's retired `buildProjectSwitchHref`, minus its route table:
+ * this reads the boundary off the router's own matched pattern instead.
  */
 export function projectSwitchHref({
   pathname,
+  routePattern,
   currentSlug,
   nextSlug,
 }: {
   pathname: string;
+  routePattern?: string | undefined;
   currentSlug: string | undefined;
   nextSlug: string;
 }): string {
   if (!currentSlug) return `/${nextSlug}`;
   const prefix = `/${currentSlug}`;
   if (pathname !== prefix && !pathname.startsWith(`${prefix}/`)) return `/${nextSlug}`;
-  return `/${nextSlug}${pathname.slice(prefix.length)}`;
+  const kept = dropExtraDynamicSegment({ pathname, routePattern });
+  return `/${nextSlug}${kept.slice(prefix.length)}`;
+}
+
+/**
+ * Truncates `pathname` at the first dynamic segment past `:project`, per
+ * `routePattern`. Segment counts have to line up (a stale or absent pattern
+ * just carries the whole path through) since the truncation index is read
+ * off the pattern and applied to the path.
+ */
+function dropExtraDynamicSegment({
+  pathname,
+  routePattern,
+}: {
+  pathname: string;
+  routePattern: string | undefined;
+}): string {
+  if (!routePattern) return pathname;
+  const patternSegments = routePattern.split("/");
+  const pathSegments = pathname.split("/");
+  if (patternSegments.length !== pathSegments.length) return pathname;
+
+  const extraDynamicIndex = patternSegments.findIndex(
+    (segment, index) => index > 1 && segment.startsWith(":"),
+  );
+  if (extraDynamicIndex === -1) return pathname;
+
+  return pathSegments.slice(0, extraDynamicIndex).join("/") || "/";
 }
 
 /**
@@ -63,6 +99,7 @@ export function useProjectPickGroups(): ProjectPickGroup[] {
   const organization = host?.organization();
   const project = host?.project();
   const pathname = host?.pathname() ?? "/";
+  const routePattern = host?.routePattern();
 
   return useMemo(() => {
     if (!host || !organization) return [];
@@ -81,10 +118,11 @@ export function useProjectPickGroups(): ProjectPickGroup[] {
           label: candidate.name,
           href: projectSwitchHref({
             pathname,
+            routePattern,
             currentSlug: project?.slug,
             nextSlug: candidate.slug,
           }),
         })),
       }));
-  }, [host, organization, pathname, project?.slug]);
+  }, [host, organization, pathname, routePattern, project?.slug]);
 }

@@ -9,7 +9,7 @@ import { FormatMoney } from "@langwatch/workflow-web/optimization_studio/compone
 import type { AppRouter } from "@langwatch/workflow-web/studio-host/api";
 import type { ExperimentRun } from "@langwatch/experiment-contract";
 import { formatMilliseconds } from "@langwatch/trace-web/utils/formatMilliseconds";
-import { formatMoney } from "@langwatch/workflow-web/utils/formatMoney";
+import { formatMoney } from "@langwatch/design-system/format-money";
 import { HoverableBigText } from "@langwatch/workflow-web/components/HoverableBigText";
 import { EvaluationProgressBar } from "./evaluation-progress-bar";
 
@@ -87,8 +87,7 @@ export function BatchEvaluationV2EvaluationSummary({
           <Box lineClamp={1} whiteSpace="nowrap">
             <FormatMoney
               amount={
-                (run.summary.datasetAverageCost ?? 0) +
-                (run.summary.evaluationsAverageCost ?? 0)
+                (run.summary.datasetAverageCost ?? 0) + (run.summary.evaluationsAverageCost ?? 0)
               }
               currency="USD"
               format="$0.00[00]"
@@ -216,13 +215,7 @@ export function BatchEvaluationV2EvaluationSummary({
         )}
       </HStack>
       {showProgress && !finishedAt && (
-        <HStack
-          width="full"
-          padding={3}
-          borderTop="1px solid"
-          borderColor="border"
-          gap={2}
-        >
+        <HStack width="full" padding={3} borderTop="1px solid" borderColor="border" gap={2}>
           <Text whiteSpace="nowrap" marginTop="-1px" paddingX={2}>
             Running
           </Text>

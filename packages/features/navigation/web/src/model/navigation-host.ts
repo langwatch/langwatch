@@ -323,6 +323,19 @@ export abstract class NavigationHostPort {
   abstract pathname(): string;
 
   /**
+   * The router's matched pattern for the address on screen, params spelled
+   * `:name` — `/:project/traces/:traceId` for `/acme-app/traces/trace_abc`.
+   *
+   * The one reader is the project switcher: a trace id can't exist in another
+   * project, so picking a project on a route with a second dynamic segment
+   * drops to the segment's parent instead of building a 404. Optional because
+   * a host with no router (a test, a static shell) has no pattern to give.
+   */
+  routePattern(): string | undefined {
+    return void 0;
+  }
+
+  /**
    * The segments a catch-all route captured, already joined with "/".
    *
    * One reader: the project-prefixed redirect, whose whole job is to put the

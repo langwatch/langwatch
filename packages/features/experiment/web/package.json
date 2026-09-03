@@ -86,6 +86,7 @@
     "@langwatch/prompt-web": "workspace:*",
     "@langwatch/trace-web": "workspace:*",
     "@langwatch/ui-drawer": "workspace:*",
+    "@langwatch/ui-host": "workspace:*",
     "@langwatch/workflow-contract": "workspace:*",
     "@langwatch/workflow-web": "workspace:*",
     "@opentelemetry/api": "^1.9.1",

@@ -1,16 +1,6 @@
 /**
  * @vitest-environment jsdom
- *
- * Regression test for the legacy evaluation wizard redirect page.
- *
- * Two things are under test. First the fire-once guard: the compat router is a
- * fresh object on every render, so a redirect effect that depends on it and has
- * no guard re-fires `replace` every render (in the browser that surfaced as
- * "Maximum update depth exceeded"). Each case re-renders repeatedly and asserts
- * `replace` is still called exactly once. Second the routing target: the wizard
- * was removed, so a bare URL opens a fresh workbench, a workbench-native
- * experiment opens in the workbench, and an experiment that predates the
- * workbench routes to the workflow it was run from instead.
+ * The fire-once redirect guard, and the routing target per experiment type.
  * See specs/experiments-v3/evaluation-creation-entrypoints.feature.
  */
 
@@ -22,9 +12,7 @@ const { replaceMock, routerState, experimentState } = vi.hoisted(() => ({
   replaceMock: vi.fn(),
   routerState: { query: {} as Record<string, unknown> },
   experimentState: {
-    data: undefined as
-      | { type?: string; workbenchState?: unknown; workflowId?: string }
-      | undefined,
+    data: undefined as { type?: string; workbenchState?: unknown; workflowId?: string } | undefined,
     isFetched: false,
   },
 }));
@@ -41,7 +29,7 @@ vi.mock("@langwatch/workflow-web/studio-host/use-organization-team-project", () 
   }),
 }));
 
-vi.mock("@langwatch/workflow-web/ui/elements/loading-screen", () => ({
+vi.mock("@langwatch/design-system/loading-screen", () => ({
   LoadingScreen: () => <div data-testid="loading" />,
 }));
 
@@ -60,8 +48,7 @@ vi.mock("@langwatch/workflow-web/studio-host/api", () => ({
   },
 }));
 
-const { default: EvaluationWizardRedirect } =
-  await import("../evaluation-wizard-redirect.screen");
+const { default: EvaluationWizardRedirect } = await import("../evaluation-wizard-redirect.screen");
 
 const renderRepeatedly = () => {
   const { rerender } = render(<EvaluationWizardRedirect />);
@@ -101,9 +88,7 @@ describe("Evaluation wizard redirect", () => {
       renderRepeatedly();
 
       expect(replaceMock).toHaveBeenCalledTimes(1);
-      expect(replaceMock).toHaveBeenCalledWith(
-        "/test-project/experiments/workbench/saved-1",
-      );
+      expect(replaceMock).toHaveBeenCalledWith("/test-project/experiments/workbench/saved-1");
     });
   });
 

@@ -48,10 +48,10 @@ import type {
   ExperimentRunWorkflowVersion,
 } from "@langwatch/experiment-contract";
 import { api } from "@langwatch/workflow-web/studio-host/api";
-import { formatMoney } from "@langwatch/workflow-web/utils/formatMoney";
+import { formatMoney } from "@langwatch/design-system/format-money";
 import { formatTimeAgo } from "@langwatch/workflow-web/utils/formatTimeAgo";
 import { getColorForString } from "@langwatch/design-system/rotating-colors";
-import { titleCase } from "@langwatch/workflow-web/utils/stringCasing";
+import { titleCase } from "@langwatch/design-system/string-casing";
 import { getRunDisplayName } from "../../../index";
 
 /** The runs query, with the contract's row rather than the router's inference. */
@@ -102,14 +102,7 @@ export function DSPyExperiment({
         dspyRunsPlusIncoming={dspyRunsPlusIncoming}
       />
       <Box width="calc(100vw - 391px)" height="full" position="relative">
-        <VStack
-          align="start"
-          width="100%"
-          maxWidth="1200px"
-          height="full"
-          gap={8}
-          padding={6}
-        >
+        <VStack align="start" width="100%" maxWidth="1200px" height="full" gap={8} padding={6}>
           <HStack width="full" align="end">
             <Heading as="h1" size="lg">
               {experiment.name ?? experiment.slug}
@@ -151,21 +144,18 @@ export function DSPyExperiment({
                     />
                   </Card.Body>
                 </Card.Root>
-                {stepToDisplay &&
-                  (!highlightedRun || highlightedRun === stepToDisplay.run_id) && (
-                    <Card.Root width="100%">
-                      <Card.Body padding={0}>
-                        <RunDetails
-                          project={project}
-                          experiment={experiment}
-                          dspyStepSummary={stepToDisplay}
-                          workflowVersion={
-                            runsById?.[stepToDisplay.run_id]?.workflow_version
-                          }
-                        />
-                      </Card.Body>
-                    </Card.Root>
-                  )}
+                {stepToDisplay && (!highlightedRun || highlightedRun === stepToDisplay.run_id) && (
+                  <Card.Root width="100%">
+                    <Card.Body padding={0}>
+                      <RunDetails
+                        project={project}
+                        experiment={experiment}
+                        dspyStepSummary={stepToDisplay}
+                        workflowVersion={runsById?.[stepToDisplay.run_id]?.workflow_version}
+                      />
+                    </Card.Body>
+                  </Card.Root>
+                )}
               </>
             )
           )}
@@ -195,16 +185,7 @@ export const useDSPyExperimentState = ({
   setSelectedRuns?: (runs: string[]) => void;
   incomingRunIds?: string[];
 }) => {
-  /**
-   * The optimizer's runs, named by the contract rather than by the mounted
-   * router.
-   *
-   * `platform/app` typed this off `AppRouter`; the borrowed entry in the
-   * workflow family's procedure map declares the PATH — the half the React
-   * Query cache key is made of — and leaves the row to the caller.
-   * `DSPyRunsSummary` is `@langwatch/experiment-contract`'s own, so this is a
-   * repoint rather than a restatement.
-   */
+  /** The optimizer's runs, typed by `@langwatch/experiment-contract`'s own `DSPyRunsSummary`. */
   const dspyRuns = api.experiments.getExperimentDSPyRuns.useQuery(
     {
       projectId: project.id,
@@ -295,17 +276,15 @@ export const useDSPyExperimentState = ({
     );
 
   const optimizerNames = Array.from(
-    new Set(
-      visibleRuns?.flatMap((run) => run.steps.map((step) => step.optimizer.name)) ?? [],
-    ),
+    new Set(visibleRuns?.flatMap((run) => run.steps.map((step) => step.optimizer.name)) ?? []),
   );
   const labelNames = Array.from(
     new Set(visibleRuns?.flatMap((run) => run.steps.map((step) => step.label)) ?? []),
   );
 
-  const nonMatchingRunIds = Array.from(
-    new Set([...selectedRuns_, ...incomingRunIds]),
-  ).filter((runId) => !dspyRuns.data?.some((run) => run.runId === runId));
+  const nonMatchingRunIds = Array.from(new Set([...selectedRuns_, ...incomingRunIds])).filter(
+    (runId) => !dspyRuns.data?.some((run) => run.runId === runId),
+  );
   const dspyRunsPlusIncoming =
     nonMatchingRunIds.length > 0
       ? ([{ runId: nonMatchingRunIds[0] }, ...(dspyRuns.data ?? [])] as ({
@@ -354,10 +333,7 @@ export function DSPyExperimentRunList({
 
   // Map real run IDs to their chronological index for stable "Run #N" numbering
   const runIndexById = useMemo(
-    () =>
-      new Map(
-        (dspyRuns.data ?? []).map((realRun, realIndex) => [realRun.runId, realIndex]),
-      ),
+    () => new Map((dspyRuns.data ?? []).map((realRun, realIndex) => [realRun.runId, realIndex])),
     [dspyRuns.data],
   );
 
@@ -501,10 +477,7 @@ export function DSPyExperimentRunList({
                         <>
                           <Text>·</Text>
                           <Text>
-                            {formatMoney(
-                              { amount: runCost, currency: "USD" },
-                              "$0.00[0]",
-                            )}
+                            {formatMoney({ amount: runCost, currency: "USD" }, "$0.00[0]")}
                           </Text>
                         </>
                       )}
@@ -564,9 +537,7 @@ export const RunDetails = React.memo(
                     height="18px"
                     background="gray.300"
                     borderRadius="100%"
-                    backgroundColor={
-                      getColorForString("colors", dspyStepSummary.run_id).color
-                    }
+                    backgroundColor={getColorForString("colors", dspyStepSummary.run_id).color}
                   />
                 </>
               ) : (
@@ -595,9 +566,7 @@ export const RunDetails = React.memo(
               />
               <MetadataTag
                 label="Step Tokens"
-                value={numeral(dspyStepSummary.llm_calls_summary.total_tokens).format(
-                  "0a",
-                )}
+                value={numeral(dspyStepSummary.llm_calls_summary.total_tokens).format("0a")}
               />
               <MetadataTag
                 label={
@@ -626,12 +595,7 @@ export const RunDetails = React.memo(
           lazyMount
           unmountOnExit
         >
-          <Tabs.List
-            position="relative"
-            overflowX="auto"
-            overflowY="hidden"
-            whiteSpace="nowrap"
-          >
+          <Tabs.List position="relative" overflowX="auto" overflowY="hidden" whiteSpace="nowrap">
             {size === "sm" && (
               <Center
                 minHeight="31px"
@@ -669,12 +633,7 @@ export const RunDetails = React.memo(
             {size === "sm" && (
               <>
                 <Spacer />
-                <HStack
-                  paddingX={4}
-                  color="fg.muted"
-                  fontSize="12px"
-                  textTransform="uppercase"
-                >
+                <HStack paddingX={4} color="fg.muted" fontSize="12px" textTransform="uppercase">
                   <Text>
                     Step Cost:{" "}
                     {formatMoney(
@@ -784,8 +743,7 @@ export const RunDetails = React.memo(
                     </Table.Row>
                   ) : dspyStep.data ? (
                     dspyStep.data.predictors.map(({ name, predictor }, index) => {
-                      const signature =
-                        predictor?.extended_signature ?? predictor?.signature;
+                      const signature = predictor?.extended_signature ?? predictor?.signature;
                       return (
                         <Table.Row key={index}>
                           <Table.Cell background="gray.50" textAlign="center">
@@ -994,8 +952,7 @@ export const RunDetails = React.memo(
                 ) : dspyStep.data ? (
                   dspyStep.data.llm_calls.map((llmCall, index) => {
                     const response =
-                      llmCall.response?.choices?.[0]?.message?.content ??
-                      llmCall.response?.output;
+                      llmCall.response?.choices?.[0]?.message?.content ?? llmCall.response?.output;
                     return (
                       <Table.Row key={index}>
                         <Table.Cell background="gray.50" textAlign="center">
@@ -1024,10 +981,7 @@ export const RunDetails = React.memo(
                         </Table.Cell>
                         <Table.Cell>
                           {llmCall.cost ? (
-                            formatMoney(
-                              { amount: llmCall.cost, currency: "USD" },
-                              "$0.00[0000]",
-                            )
+                            formatMoney({ amount: llmCall.cost, currency: "USD" }, "$0.00[0000]")
                           ) : llmCall.response.cached ? (
                             <HStack align="start">
                               <Text>$0.00</Text>
@@ -1058,11 +1012,7 @@ export const RunDetails = React.memo(
   },
 );
 
-function CollapsableSignature({
-  signature,
-}: {
-  signature: Record<string, any> | undefined;
-}) {
+function CollapsableSignature({ signature }: { signature: Record<string, any> | undefined }) {
   const [isOpen, setIsOpen] = useState(false);
   return (
     <VStack>
@@ -1260,13 +1210,7 @@ export function DSPyRunsScoresChart({
             }}
           />
           {bestScore.index && (
-            <ReferenceDot
-              x={bestScore.index}
-              y={bestScore.score}
-              r={8}
-              fill="gold"
-              stroke="none"
-            >
+            <ReferenceDot x={bestScore.index} y={bestScore.score} r={8} fill="gold" stroke="none">
               <Label
                 value="Best"
                 position="top"
@@ -1292,15 +1236,14 @@ export function DSPyRunsScoresChart({
               />
             ) : null,
           )}
-          {stepToDisplay &&
-            (!highlightedRun || highlightedRun === stepToDisplay.run_id) && (
-              <ReferenceDot
-                x={stepToDisplay.index}
-                y={stepsFlattenedByIndex[stepToDisplay.index]?.[stepToDisplay.run_id]}
-                stroke={getColor(stepToDisplay.run_id)}
-                fill={getColor(stepToDisplay.run_id)}
-              />
-            )}
+          {stepToDisplay && (!highlightedRun || highlightedRun === stepToDisplay.run_id) && (
+            <ReferenceDot
+              x={stepToDisplay.index}
+              y={stepsFlattenedByIndex[stepToDisplay.index]?.[stepToDisplay.run_id]}
+              stroke={getColor(stepToDisplay.run_id)}
+              fill={getColor(stepToDisplay.run_id)}
+            />
+          )}
         </LineChart>
       </ResponsiveContainer>
     </Box>
@@ -1316,9 +1259,7 @@ export function DSPyExperimentSummary({
 }: {
   project: Project;
   experiment: Experiment;
-  run:
-    | DSPyRunsSummary
-    | undefined;
+  run: DSPyRunsSummary | undefined;
   onApply?: (appliedOptimizations: AppliedOptimization[]) => void;
   onViewLogs?: () => void;
 }) {
@@ -1410,9 +1351,7 @@ export function DSPyExperimentSummary({
     >
       <VStack align="start" gap={1}>
         <Text fontWeight="500" lineClamp={1}>
-          {!bestScoreLabel || bestScoreLabel === "score"
-            ? "Best Score"
-            : titleCase(bestScoreLabel)}
+          {!bestScoreLabel || bestScoreLabel === "score" ? "Best Score" : titleCase(bestScoreLabel)}
         </Text>
         <Text lineClamp={1} whiteSpace="nowrap">
           {numeral(bestScore).format("0.[00]")}

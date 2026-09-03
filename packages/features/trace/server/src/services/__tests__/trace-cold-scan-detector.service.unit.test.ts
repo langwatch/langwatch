@@ -2,7 +2,7 @@ import { readdirSync, readFileSync } from "node:fs";
 import { dirname, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 import { describe, expect, it } from "vitest";
-import { TIME_PARTITIONED_TABLES } from "../trace-cold-scan-detector.service";
+import { TIME_PARTITIONED_TABLES } from "@langwatch/clickhouse-client";
 
 /**
  * The cold-scan detector fails OPEN: `detectColdScan` only inspects tables

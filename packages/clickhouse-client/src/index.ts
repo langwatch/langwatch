@@ -150,3 +150,8 @@ export * from "./privateRouteKey";
 export { ClickHouseMigrateTask } from "./tasks/clickhouse-migrate.task";
 export { parseConnectionUrl } from "./tasks/goose.migration-runner";
 export type { ClickHouseConfig } from "./tasks/goose.migration-runner";
+
+/** Every time-partitioned table's prunable columns — the one map the
+ * trace-server cold-scan detector and the analytics-server JOIN bound guard
+ * both read, so they can't drift apart. */
+export { TIME_PARTITIONED_TABLES } from "./timePartitionedTables";

@@ -1,12 +1,4 @@
-import {
-  Box,
-  Button,
-  HStack,
-  Portal,
-  Skeleton,
-  Text,
-  VStack,
-} from "@chakra-ui/react";
+import { Box, Button, HStack, Portal, Skeleton, Text, VStack } from "@chakra-ui/react";
 import type { SerializedHandledError } from "@langwatch/handled-error";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
@@ -22,7 +14,7 @@ import { Tooltip } from "@langwatch/design-system/tooltip";
 import { describeCellFailure } from "../../../../model/experiments-v3/cell-failure";
 import { TraceIdPeek } from "@langwatch/trace-web/explorer/components/TraceIdPeek";
 import { useDrawer } from "@langwatch/ui-drawer";
-import { useEscapeKey } from "@langwatch/workflow-web/hooks/useEscapeKey";
+import { useEscapeKey } from "@langwatch/design-system/use-escape-key";
 import { parseLLMError } from "../../../../model/format-llm-error";
 import { formatTargetOutput } from "../../../../model/format-target-output";
 import { useEvaluationsV3Store } from "../../../../behavior/experiments-v3/use-evaluations-v3-store";
@@ -98,12 +90,11 @@ export function TargetCellContent({
   const { openDrawer } = useDrawer();
   const targetName = useTargetName(target);
   const openEvaluatorEditor = useOpenEvaluatorEditor();
-  const { evaluators, activeDatasetId, removeEvaluator } =
-    useEvaluationsV3Store((state) => ({
-      evaluators: state.evaluators,
-      activeDatasetId: state.activeDatasetId,
-      removeEvaluator: state.removeEvaluator,
-    }));
+  const { evaluators, activeDatasetId, removeEvaluator } = useEvaluationsV3Store((state) => ({
+    evaluators: state.evaluators,
+    activeDatasetId: state.activeDatasetId,
+    removeEvaluator: state.removeEvaluator,
+  }));
 
   // Code evaluators (DB type "code") route their edit flow to the code editor.
   const codeEvaluatorIds = useCodeEvaluatorIds(evaluators);
@@ -126,8 +117,7 @@ export function TargetCellContent({
   // Check if content overflows
   useEffect(() => {
     if (outputRef.current) {
-      const isContentOverflowing =
-        outputRef.current.scrollHeight > OUTPUT_MAX_HEIGHT;
+      const isContentOverflowing = outputRef.current.scrollHeight > OUTPUT_MAX_HEIGHT;
       setIsOverflowing(isContentOverflowing);
     }
   }, [output]);
@@ -189,9 +179,7 @@ export function TargetCellContent({
 
   // Truncate for performance (but keep full text for expanded view)
   const isTruncated = rawOutput.length > MAX_DISPLAY_CHARS;
-  const displayOutput = isTruncated
-    ? rawOutput.slice(0, MAX_DISPLAY_CHARS)
-    : rawOutput;
+  const displayOutput = isTruncated ? rawOutput.slice(0, MAX_DISPLAY_CHARS) : rawOutput;
 
   // Render output content - can be collapsed or expanded
   const renderOutput = (expanded: boolean) => {
@@ -219,13 +207,9 @@ export function TargetCellContent({
             color="red.fg"
             fontSize="13px"
             align="start"
-            cursor={
-              isErrorOverflowing && !isErrorExpanded ? "pointer" : undefined
-            }
+            cursor={isErrorOverflowing && !isErrorExpanded ? "pointer" : undefined}
             onClick={() => setIsErrorExpanded(true)}
-            onDoubleClick={
-              isErrorOverflowing ? () => setIsErrorExpanded(false) : undefined
-            }
+            onDoubleClick={isErrorOverflowing ? () => setIsErrorExpanded(false) : undefined}
           >
             <Box flexShrink={0} paddingTop={0.5}>
               <LuCircleAlert size={16} />
@@ -270,12 +254,7 @@ export function TargetCellContent({
         // Expanded view - scrollable, no max height
         return (
           <VStack flex={1} overflowY="auto" minHeight={0} align="start">
-            <Text
-              fontSize="11px"
-              color="fg.muted"
-              fontWeight="700"
-              textTransform="uppercase"
-            >
+            <Text fontSize="11px" color="fg.muted" fontWeight="700" textTransform="uppercase">
               Output
             </Text>
             <Text fontSize="13px" whiteSpace="pre-wrap" wordBreak="break-word">
@@ -377,9 +356,7 @@ export function TargetCellContent({
               isCodeEvaluator: codeEvaluatorIds.has(evaluator.id),
             }),
           onRemove: () => removeEvaluator(evaluator.id),
-          onRerun: onRerunEvaluator
-            ? () => onRerunEvaluator(evaluator.id)
-            : undefined,
+          onRerun: onRerunEvaluator ? () => onRerunEvaluator(evaluator.id) : undefined,
           onRunOnAllRows: onRunEvaluatorOnAllRows
             ? () => onRunEvaluatorOnAllRows(evaluator.id)
             : undefined,
@@ -398,11 +375,7 @@ export function TargetCellContent({
         justifyContent="flex-start"
         data-testid={`add-evaluator-button-${target.id}`}
         // When evaluators exist, show on hover only (unless in expanded view)
-        className={
-          chipEvaluators.length > 0 && !inExpandedView
-            ? "cell-action-btn"
-            : undefined
-        }
+        className={chipEvaluators.length > 0 && !inExpandedView ? "cell-action-btn" : undefined}
         opacity={chipEvaluators.length > 0 && !inExpandedView ? 0 : 1}
         transition="opacity 0.15s"
       >
@@ -457,11 +430,7 @@ export function TargetCellContent({
       )}
       {/* Trace link button - left of copy button */}
       {traceId && (
-        <Tooltip
-          content="View trace"
-          positioning={{ placement: "top" }}
-          openDelay={100}
-        >
+        <Tooltip content="View trace" positioning={{ placement: "top" }} openDelay={100}>
           <Button
             size="xs"
             variant="ghost"
@@ -574,13 +543,7 @@ export function TargetCellContent({
               animation: "scale-in 0.15s ease-out",
             }}
           >
-            <VStack
-              align="stretch"
-              gap={2}
-              height="100%"
-              position="relative"
-              overflow="hidden"
-            >
+            <VStack align="stretch" gap={2} height="100%" position="relative" overflow="hidden">
               {renderActionButtons(true)}
               <Box flex={1} minHeight={0} overflowY="auto">
                 {renderOutput(true)}

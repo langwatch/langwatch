@@ -10,77 +10,13 @@
  *
  * This module flags those queries so the resilient client can warn on them.
  * It is detection-only: it never changes the query or its behaviour.
+ *
+ * The table list itself, {@link TIME_PARTITIONED_TABLES}, lives in
+ * `@langwatch/clickhouse-client` — analytics-server's JOIN time-bound guard
+ * reads the same map, so the two cannot drift.
  */
 
-/**
- * Tables partitioned by a time expression, mapped to the column names that, when
- * used in a WHERE/PREWHERE comparison, let ClickHouse prune partitions.
- *
- * Kept in sync with the ClickHouse migrations by
- * `__tests__/cold-scan-detector.coverage.unit.test.ts`, which parses every
- * `PARTITION BY` out of the migration files and fails when one is missing here.
- * That test exists because the failure mode is SILENT: a table absent from this
- * map is treated as not time-partitioned and is never flagged, so a new table
- * gets no cold-scan detection at all and nobody finds out.
- *
- * Not hypothetical — this map covered 11 of 35 partitioned tables until the
- * coverage test was added, and the 24 missing ones included `trace_analytics`
- * and `trace_summaries`, whose unwindowed reads were running as UNDETECTED cold
- * scans at ~350/min in production.
- */
-export const TIME_PARTITIONED_TABLES = {
-  stored_spans: ["StartTime"],
-  stored_log_records: ["TimeUnixMs"],
-  stored_metric_records: ["TimeUnixMs"],
-  log_records: ["TimeUnixMs"],
-  metric_data_points: ["TimeUnixMs"],
-  metric_series: ["LastSeenAt"],
-  metric_time_rollups: ["BucketStart"],
-  metric_usage_estimates: ["AcceptedAt", "AcceptedHour"],
-  log_usage_estimates: ["AcceptedAt", "AcceptedHour"],
-  event_log: ["EventOccurredAt"],
-  billable_events: ["EventTimestamp"],
-  governance_ocsf_events: ["EventTime"],
-
-  // Fold / projection tables. Read by aggregate id, which is NOT a sort-key
-  // prefix on several of them, so an unwindowed read is a tenant-wide scan
-  // across every partition — exactly what this detector exists to surface.
-  trace_analytics: ["OccurredAt"],
-  trace_analytics_rollup: ["BucketStart"],
-  trace_summaries: ["OccurredAt"],
-  evaluation_analytics: ["OccurredAt"],
-  evaluation_analytics_rollup: ["BucketStart"],
-  evaluation_runs: ["ScheduledAt"],
-  coding_agent_sessions: ["StartedAt"],
-  coding_agent_trace_sessions: ["OccurredAt"],
-  coding_agent_session_events: ["TimeUnixMs"],
-  session_metric_series: ["AsOf"],
-
-  // Run / experiment tables.
-  experiment_runs: ["StartedAt"],
-  experiment_run_items: ["OccurredAt"],
-  simulation_runs: ["StartedAt"],
-  simulation_run_metrics: ["OccurredAt"],
-  // The rollup prunes on its plain `PartitionMonth` anchor, not `OccurredAt`:
-  // that column is an AggregateFunction state there and cannot be a partition
-  // expression.
-  simulation_run_metrics_rollup: ["PartitionMonth"],
-  suite_runs: ["StartedAt"],
-  dspy_steps: ["CreatedAt"],
-
-  // Gateway / governance / misc.
-  gateway_budget_ledger_events: ["OccurredAt"],
-  // The spend record: month-partitioned on OccurredAt with a fixed
-  // 13-month TTL; the pull surface is ranged by contract, and any
-  // unwindowed read here walks all 13 months under FINAL.
-  gateway_spend: ["OccurredAt"],
-  gateway_budget_scope_totals: ["PeriodStart"],
-  governance_kpis: ["HourBucket"],
-  automation_audit: ["OccurredAt"],
-  langy_analytics_events: ["OccurredAt"],
-  langy_messages: ["CreatedAt"],
-  stored_objects: ["created_at"],
-} as const satisfies Record<string, readonly string[]>;
+import { TIME_PARTITIONED_TABLES } from "@langwatch/clickhouse-client";
 
 /** Strip line and block comments so they can't hide or fake a predicate. */
 function stripComments(sql: string): string {
@@ -100,10 +36,7 @@ function stripComments(sql: string): string {
 function hasTimePredicate(sql: string, column: string): boolean {
   const col = column.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
   // column <op> ...   (e.g. StartTime >= {from})
-  const colThenOp = new RegExp(
-    `\\b${col}\\b\\s*(?:>=|<=|<>|!=|=|>|<|\\bBETWEEN\\b|\\bIN\\b)`,
-    "i",
-  );
+  const colThenOp = new RegExp(`\\b${col}\\b\\s*(?:>=|<=|<>|!=|=|>|<|\\bBETWEEN\\b|\\bIN\\b)`, "i");
   // ... <op> column   (e.g. {from} <= StartTime)
   const opThenCol = new RegExp(`(?:>=|<=|<>|!=|=|>|<)\\s*\\b${col}\\b`, "i");
   return colThenOp.test(sql) || opThenCol.test(sql);

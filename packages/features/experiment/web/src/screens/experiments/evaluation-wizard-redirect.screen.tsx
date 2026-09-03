@@ -1,17 +1,13 @@
 import { useEffect, useRef } from "react";
-import { LoadingScreen } from "@langwatch/workflow-web/ui/elements/loading-screen";
+import { LoadingScreen } from "@langwatch/design-system/loading-screen";
 import { ExperimentType } from "../../model/prisma-types";
 import { useOrganizationTeamProject } from "@langwatch/workflow-web/studio-host/use-organization-team-project";
 import { api } from "@langwatch/workflow-web/studio-host/api";
 import { useRouter } from "@langwatch/workflow-web/studio-host/next-router";
 
 /**
- * The evaluation wizard was removed in favor of the evaluations workbench.
- * A brand-new evaluation opens the workbench directly. A saved experiment can
- * only open in the workbench if it is workbench-native (EVALUATIONS_V3 or a
- * legacy wizard run that carries workbenchState); older experiments predate
- * that data model, so they route to the workflow they were run from instead
- * of a workbench that cannot render them.
+ * Redirects to the workbench when workbench-native (EVALUATIONS_V3 or a
+ * legacy run carrying workbenchState); otherwise to the workflow it ran from.
  */
 export default function EvaluationWizardRedirect() {
   const router = useRouter();

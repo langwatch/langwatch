@@ -20,7 +20,7 @@ import type { Experiment, Project } from "@langwatch/workflow-web/model/prisma-t
 import type { BatchEvaluation } from "../../../model/prisma-types";
 import { api } from "@langwatch/workflow-web/studio-host/api";
 import { Tooltip } from "@langwatch/design-system/tooltip";
-import { formatMoney } from "@langwatch/workflow-web/utils/formatMoney";
+import { formatMoney } from "@langwatch/design-system/format-money";
 
 export default function BatchEvaluation({
   project,
@@ -29,14 +29,7 @@ export default function BatchEvaluation({
   project: Project;
   experiment: Experiment;
 }) {
-  /**
-   * The run's rows, named by the shape this file already renders.
-   *
-   * `platform/app` typed this off the mounted `AppRouter`; the borrowed entry in
-   * the workflow family's procedure map declares the PATH — which is the part
-   * the React Query cache key is made of — and leaves the row to the caller, so
-   * the row is stated here. `BatchEvaluation` is the schema's own.
-   */
+  /** The run's rows, named by the shape this file already renders. */
   const evaluationsQuery = api.batchRecord.getAllByexperimentSlug.useQuery({
     projectId: project.id ?? "",
     experimentSlug: experiment.slug ?? "",
@@ -114,18 +107,12 @@ export default function BatchEvaluation({
   };
 
   const totalCost = evaluations.data?.reduce((acc, curr) => acc + curr.cost, 0);
-  const earliestEvaluation = evaluations.data?.reduce(
-    (acc: BatchEvaluation | undefined, curr) => {
-      return !acc || new Date(curr.createdAt) < new Date(acc.createdAt) ? curr : acc;
-    },
-    undefined,
-  );
-  const latestEvaluation = evaluations.data?.reduce(
-    (acc: BatchEvaluation | undefined, curr) => {
-      return !acc || new Date(curr.createdAt) > new Date(acc.createdAt) ? curr : acc;
-    },
-    undefined,
-  );
+  const earliestEvaluation = evaluations.data?.reduce((acc: BatchEvaluation | undefined, curr) => {
+    return !acc || new Date(curr.createdAt) < new Date(acc.createdAt) ? curr : acc;
+  }, undefined);
+  const latestEvaluation = evaluations.data?.reduce((acc: BatchEvaluation | undefined, curr) => {
+    return !acc || new Date(curr.createdAt) > new Date(acc.createdAt) ? curr : acc;
+  }, undefined);
   const runtime =
     latestEvaluation && earliestEvaluation
       ? new Date(latestEvaluation.createdAt).getTime() -
@@ -243,17 +230,10 @@ export default function BatchEvaluation({
                       : score}
                   </Text>
                   <Text fontSize="13px" fontWeight="500" marginBottom="4px" opacity={0.8}>
-                    {passedOrScoreMetric[evaluation] === "score"
-                      ? "avg score"
-                      : "pass rate"}
+                    {passedOrScoreMetric[evaluation] === "score" ? "avg score" : "pass rate"}
                   </Text>
                 </HStack>
-                <HStack
-                  fontSize="11px"
-                  textTransform="uppercase"
-                  fontWeight="600"
-                  color="fg.muted"
-                >
+                <HStack fontSize="11px" textTransform="uppercase" fontWeight="600" color="fg.muted">
                   {groupedByEvaluation?.[evaluation]?.skipped.length && (
                     <Text>
                       <Box
@@ -338,77 +318,104 @@ export default function BatchEvaluation({
           ) : evaluations.data && evaluations.data.length == 0 ? (
             <Text>No data found</Text>
           ) : (
-            Object.entries(groupedByEvaluation ?? {}).map(
-              ([evaluationKey, evaluations]) => {
-                const hasExpectedOutput = evaluations.all.some(
-                  (evaluation) => (evaluation.data as JsonObject)?.expected_output,
-                );
-                const hasDetails = evaluations.all.some(
-                  (evaluation) => evaluation.details,
-                );
+            Object.entries(groupedByEvaluation ?? {}).map(([evaluationKey, evaluations]) => {
+              const hasExpectedOutput = evaluations.all.some(
+                (evaluation) => (evaluation.data as JsonObject)?.expected_output,
+              );
+              const hasDetails = evaluations.all.some((evaluation) => evaluation.details);
 
-                return (
-                  <VStack key={evaluationKey} align="start" gap={8} paddingTop={12}>
-                    <Heading as={"h2"} size="md">
-                      {evaluationKey}
-                    </Heading>
-                    <Box>
-                      <Table.Root variant="line" borderWidth="1px" borderColor="border">
-                        <Table.Header>
-                          <Table.Row>
-                            <Table.ColumnHeader>Input</Table.ColumnHeader>
-                            <Table.ColumnHeader>Output</Table.ColumnHeader>
-                            {hasExpectedOutput && (
-                              <Table.ColumnHeader>Expected Output</Table.ColumnHeader>
-                            )}
-                            <Table.ColumnHeader>Status</Table.ColumnHeader>
-                            <Table.ColumnHeader minWidth={120} textAlign="center">
-                              {passedOrScoreMetric[evaluationKey] === "score"
-                                ? "Score"
-                                : "Passed"}
-                            </Table.ColumnHeader>
-                            {hasDetails && (
-                              <Table.ColumnHeader>Details</Table.ColumnHeader>
-                            )}
-                            <Table.ColumnHeader>Cost</Table.ColumnHeader>
-                            <Table.ColumnHeader>Created</Table.ColumnHeader>
-                          </Table.Row>
-                        </Table.Header>
-                        <Table.Body>
-                          {evaluations.all.map((evaluation, i) => {
-                            const input = ((evaluation?.data as JsonObject)?.input ??
-                              "") as string;
-                            const output = ((evaluation?.data as JsonObject)?.output ??
-                              "") as string;
-                            const expected_output = ((evaluation?.data as JsonObject)
-                              ?.expected_output ?? "") as string;
+              return (
+                <VStack key={evaluationKey} align="start" gap={8} paddingTop={12}>
+                  <Heading as={"h2"} size="md">
+                    {evaluationKey}
+                  </Heading>
+                  <Box>
+                    <Table.Root variant="line" borderWidth="1px" borderColor="border">
+                      <Table.Header>
+                        <Table.Row>
+                          <Table.ColumnHeader>Input</Table.ColumnHeader>
+                          <Table.ColumnHeader>Output</Table.ColumnHeader>
+                          {hasExpectedOutput && (
+                            <Table.ColumnHeader>Expected Output</Table.ColumnHeader>
+                          )}
+                          <Table.ColumnHeader>Status</Table.ColumnHeader>
+                          <Table.ColumnHeader minWidth={120} textAlign="center">
+                            {passedOrScoreMetric[evaluationKey] === "score" ? "Score" : "Passed"}
+                          </Table.ColumnHeader>
+                          {hasDetails && <Table.ColumnHeader>Details</Table.ColumnHeader>}
+                          <Table.ColumnHeader>Cost</Table.ColumnHeader>
+                          <Table.ColumnHeader>Created</Table.ColumnHeader>
+                        </Table.Row>
+                      </Table.Header>
+                      <Table.Body>
+                        {evaluations.all.map((evaluation, i) => {
+                          const input = ((evaluation?.data as JsonObject)?.input ?? "") as string;
+                          const output = ((evaluation?.data as JsonObject)?.output ?? "") as string;
+                          const expected_output = ((evaluation?.data as JsonObject)
+                            ?.expected_output ?? "") as string;
 
-                            return (
-                              <Table.Row key={i}>
+                          return (
+                            <Table.Row key={i}>
+                              <Table.Cell>
+                                <Tooltip content={input}>
+                                  <Text lineClamp={2} display="block" maxWidth={230}>
+                                    {input}
+                                  </Text>
+                                </Tooltip>
+                              </Table.Cell>
+                              <Table.Cell>
+                                <Tooltip content={output}>
+                                  <Text lineClamp={2} display="block" maxWidth={230}>
+                                    {output}
+                                  </Text>
+                                </Tooltip>
+                              </Table.Cell>
+                              {hasExpectedOutput && (
                                 <Table.Cell>
-                                  <Tooltip content={input}>
+                                  <Tooltip content={expected_output}>
                                     <Text lineClamp={2} display="block" maxWidth={230}>
-                                      {input}
+                                      {expected_output}
                                     </Text>
                                   </Tooltip>
                                 </Table.Cell>
-                                <Table.Cell>
-                                  <Tooltip content={output}>
-                                    <Text lineClamp={2} display="block" maxWidth={230}>
-                                      {output}
-                                    </Text>
-                                  </Tooltip>
-                                </Table.Cell>
-                                {hasExpectedOutput && (
-                                  <Table.Cell>
-                                    <Tooltip content={expected_output}>
-                                      <Text lineClamp={2} display="block" maxWidth={230}>
-                                        {expected_output}
-                                      </Text>
-                                    </Tooltip>
-                                  </Table.Cell>
-                                )}
+                              )}
+                              <Table.Cell
+                                color={
+                                  evaluation.status === "skipped"
+                                    ? "yellow.700"
+                                    : evaluation.status === "error"
+                                      ? "red.700"
+                                      : undefined
+                                }
+                              >
+                                {evaluation.status}
+                              </Table.Cell>
+                              {evaluation.status === "processed" ? (
                                 <Table.Cell
+                                  textAlign="center"
+                                  fontWeight="500"
+                                  color={
+                                    passedOrScoreMetric[evaluationKey] === "score"
+                                      ? evaluation.score < 0.5
+                                        ? "red.500"
+                                        : "green.500"
+                                      : evaluation.passed
+                                        ? "green.500"
+                                        : "red.500"
+                                  }
+                                >
+                                  {passedOrScoreMetric[evaluationKey] === "score"
+                                    ? numeral(evaluation.score).format("0.00")
+                                    : evaluation.passed
+                                      ? "True"
+                                      : "False"}
+                                </Table.Cell>
+                              ) : (
+                                <Table.Cell textAlign="center">-</Table.Cell>
+                              )}
+                              {hasDetails && (
+                                <Table.Cell
+                                  maxWidth={300}
                                   color={
                                     evaluation.status === "skipped"
                                       ? "yellow.700"
@@ -417,74 +424,33 @@ export default function BatchEvaluation({
                                         : undefined
                                   }
                                 >
-                                  {evaluation.status}
+                                  <Tooltip content={evaluation.details}>
+                                    <Text lineClamp={1} wordBreak="break-all" display="block">
+                                      {evaluation.details}
+                                    </Text>
+                                  </Tooltip>
                                 </Table.Cell>
-                                {evaluation.status === "processed" ? (
-                                  <Table.Cell
-                                    textAlign="center"
-                                    fontWeight="500"
-                                    color={
-                                      passedOrScoreMetric[evaluationKey] === "score"
-                                        ? evaluation.score < 0.5
-                                          ? "red.500"
-                                          : "green.500"
-                                        : evaluation.passed
-                                          ? "green.500"
-                                          : "red.500"
-                                    }
-                                  >
-                                    {passedOrScoreMetric[evaluationKey] === "score"
-                                      ? numeral(evaluation.score).format("0.00")
-                                      : evaluation.passed
-                                        ? "True"
-                                        : "False"}
-                                  </Table.Cell>
-                                ) : (
-                                  <Table.Cell textAlign="center">-</Table.Cell>
-                                )}
-                                {hasDetails && (
-                                  <Table.Cell
-                                    maxWidth={300}
-                                    color={
-                                      evaluation.status === "skipped"
-                                        ? "yellow.700"
-                                        : evaluation.status === "error"
-                                          ? "red.700"
-                                          : undefined
-                                    }
-                                  >
-                                    <Tooltip content={evaluation.details}>
-                                      <Text
-                                        lineClamp={1}
-                                        wordBreak="break-all"
-                                        display="block"
-                                      >
-                                        {evaluation.details}
-                                      </Text>
-                                    </Tooltip>
-                                  </Table.Cell>
-                                )}
-                                <Table.Cell>
-                                  {evaluation.cost
-                                    ? formatMoney({
-                                        amount: evaluation.cost,
-                                        currency: "USD",
-                                      })
-                                    : "-"}
-                                </Table.Cell>
-                                <Table.Cell>
-                                  {new Date(evaluation.createdAt).toLocaleString()}
-                                </Table.Cell>
-                              </Table.Row>
-                            );
-                          })}
-                        </Table.Body>
-                      </Table.Root>
-                    </Box>
-                  </VStack>
-                );
-              },
-            )
+                              )}
+                              <Table.Cell>
+                                {evaluation.cost
+                                  ? formatMoney({
+                                      amount: evaluation.cost,
+                                      currency: "USD",
+                                    })
+                                  : "-"}
+                              </Table.Cell>
+                              <Table.Cell>
+                                {new Date(evaluation.createdAt).toLocaleString()}
+                              </Table.Cell>
+                            </Table.Row>
+                          );
+                        })}
+                      </Table.Body>
+                    </Table.Root>
+                  </Box>
+                </VStack>
+              );
+            })
           )}
         </VStack>
       </Box>
