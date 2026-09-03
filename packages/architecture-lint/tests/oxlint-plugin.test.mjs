@@ -13,6 +13,7 @@ const tester = new RuleTester({
   languageOptions: { sourceType: "module" },
 });
 
+/** @scenario "LangWatch house rules keep executable fixtures" */
 tester.run("package-boundaries", plugin.rules["package-boundaries"], {
   valid: [
     {
@@ -146,6 +147,7 @@ tester.run("package-boundaries", plugin.rules["package-boundaries"], {
   ],
 });
 
+/** @scenario "LangWatch house rules keep executable fixtures" */
 tester.run("environment-boundaries", plugin.rules["environment-boundaries"], {
   valid: [
     {
@@ -281,6 +283,7 @@ tester.run("environment-boundaries", plugin.rules["environment-boundaries"], {
   ],
 });
 
+/** @scenario "LangWatch house rules keep executable fixtures" */
 tester.run("feature-module-classes", plugin.rules["feature-module-classes"], {
   valid: [
     {

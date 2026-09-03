@@ -117,9 +117,7 @@ const DEFAULT_TEST_ROOTS: string[] = [
  * token, expressed as a hash-comment above an `@test "..." {` line —
  * blank lines and further comments may sit between the two.
  */
-const DEFAULT_BATS_TEST_ROOTS: string[] = [
-  "dev/scripts/__tests__",
-];
+const DEFAULT_BATS_TEST_ROOTS: string[] = ["dev/scripts/__tests__"];
 
 /**
  * Roots scanned for `.sh` shell tests. Helm chart behaviour is verified by
@@ -654,7 +652,7 @@ const LEGACY_INERT: string[] = [
   "specs/workflows/workflow-management.feature",
 ];
 
-const TEST_FILE_RE = /\.test\.tsx?$/;
+const TEST_FILE_RE = /\.test\.(?:tsx?|mjs)$/;
 const BATS_FILE_RE = /\.bats$/;
 const SHELL_TEST_FILE_RE = /\.sh$/;
 const GO_TEST_FILE_RE = /_test\.go$/;
@@ -833,6 +831,9 @@ export function discoverFeatureFiles(roots: readonly string[] = SPECS_ROOTS): st
 // Non-backtracking: find `@scenario <title>` tokens, then verify proximity
 // to an `it(` / `test(` call with a linear forward scan (see
 // `isFollowedByTestCall`). Doing it all in the regex invites ReDoS.
+// Oxlint's `RuleTester` (`tests/*.test.mjs`) registers its cases through
+// `tester.run(name, rule, { valid, invalid })`, with `RuleTester.it = it`
+// underneath, so that call is the test call for a fixture suite.
 const ANNOTATION_RE = /@scenario[ \t]+(?:"([^"\n]+)"|'([^'\n]+)'|([^\n*]+?))[ \t]*(?:\*\/|$)/gm;
 
 function isFollowedByTestCall(src: string, start: number): boolean {
@@ -857,7 +858,7 @@ function isFollowedByTestCall(src: string, start: number): boolean {
       continue;
     }
     const rest = src.slice(i);
-    const m = rest.match(/^(?:it|test)(?:\.[a-zA-Z]+)?\s*\(/);
+    const m = rest.match(/^(?:it|test|tester\.run)(?:\.[a-zA-Z]+)?\s*\(/);
     return m !== null;
   }
   return false;
