@@ -50,6 +50,24 @@
 # its integration coverage wherever a database exists. Only a suite that cannot
 # do that belongs in the register, with that as its stated reason.
 #
+# THE INTEGRATION LANE
+#
+# Most packages run one suite: a bare `vitest run` collects `*.unit.test.ts`
+# and `*.integration.test.ts` alike, so naming `test` runs everything the
+# package has. A few split the two, because their integration half wants a
+# different vitest — serial forks against one shared datastore rather than a
+# concurrent pool. Those declare `test:integration`, and this job runs it
+# after the package's unit script.
+#
+# Preferring `test:unit` and stopping there is what turns that split into a
+# blind spot. `@langwatch/trace-server` excluded every `*.integration.test.ts`
+# from both of its scripts and declared no third one, so four suites ran in no
+# job at all — and read as green, because a suite CI never starts cannot fail.
+# So a package is discovered by EITHER script, and one declaring both is run
+# twice. Neither run is optional: the registers gate the PACKAGE, not the
+# script, so an excluded package skips both and a registered allowed failure
+# tolerates both.
+#
 # Usage: bash .github/scripts/run-package-suites.sh
 # Environment: none required. Anything the suites themselves read (DATABASE_URL,
 # REDIS_URL, CREDENTIALS_SECRET) is supplied by the calling job.
@@ -143,8 +161,10 @@ REG_ALL_REASONS=("${EXCLUDED_REASONS[@]+"${EXCLUDED_REASONS[@]}"}" "${ALLOWED_RE
 # second copy of pnpm-workspace.yaml's globs that could drift from it. The node
 # step turns it into `<name>\t<relative dir>\t<script>` rows, choosing the
 # script the same way for every package: `test:unit` where a package draws the
-# distinction, `test` where that is the only suite it has. Packages with
-# neither are silently absent, which is correct — there is nothing to run.
+# distinction, `test` where that is the only suite it has, and
+# `test:integration` beside it where the package declares a separate
+# integration lane. Packages with none of them are silently absent, which is
+# correct — there is nothing to run.
 LIST_JSON="$(pnpm list --recursive --depth -1 --json 2>/dev/null)"
 if [ -z "$LIST_JSON" ]; then
   echo "::error::pnpm list returned nothing. The workspace could not be enumerated, so this job cannot know what it is meant to run."
@@ -163,9 +183,12 @@ process.stdin.on("data", (c) => (raw += c)).on("end", () => {
     const manifest = path.join(project.path, "package.json");
     if (!fs.existsSync(manifest)) continue;
     const scripts = JSON.parse(fs.readFileSync(manifest, "utf8")).scripts || {};
-    const script = scripts["test:unit"] ? "test:unit" : scripts.test ? "test" : null;
-    if (!script) continue;
-    rows.push([project.name, path.relative(root, project.path), script].join("\t"));
+    const script = scripts["test:unit"] ? "test:unit" : scripts.test ? "test" : "";
+    const integration = scripts["test:integration"] ? "test:integration" : "";
+    if (!script && !integration) continue;
+    rows.push(
+      [project.name, path.relative(root, project.path), script, integration].join("\t"),
+    );
   }
   rows.sort();
   process.stdout.write(rows.join("\n"));
@@ -173,12 +196,12 @@ process.stdin.on("data", (c) => (raw += c)).on("end", () => {
 ')"
 
 if [ -z "$DISCOVERED" ]; then
-  echo "::error::No workspace package declares a test or test:unit script. That is not a state this repository has ever been in, so treat it as a broken discovery step rather than as good news."
+  echo "::error::No workspace package declares a test, test:unit or test:integration script. That is not a state this repository has ever been in, so treat it as a broken discovery step rather than as good news."
   exit 1
 fi
 
 ALL_NAMES=()
-while IFS=$'\t' read -r name _dir _script; do
+while IFS=$'\t' read -r name _dir _script _integration; do
   [ -n "$name" ] && ALL_NAMES+=("$name")
 done <<< "$DISCOVERED"
 
@@ -210,7 +233,7 @@ done
 # looks like a broken test and is not one.
 PASSED=(); FAILED=(); TOLERATED=(); UNEXPECTED_PASS=(); SKIPPED=()
 
-while IFS=$'\t' read -r name dir script; do
+while IFS=$'\t' read -r name dir script integration; do
   [ -n "$name" ] || continue
 
   if in_list "$name" "${EXCLUDED_NAMES[@]+"${EXCLUDED_NAMES[@]}"}"; then
@@ -224,10 +247,21 @@ while IFS=$'\t' read -r name dir script; do
   tolerated=no
   in_list "$name" "${ALLOWED_NAMES[@]+"${ALLOWED_NAMES[@]}"}" && tolerated=yes
 
-  echo "::group::$name ($dir) — pnpm run $script"
-  pnpm --filter "$name" run "$script"
-  status=$?
-  echo "::endgroup::"
+  # Every script the package declares, in order, under ONE outcome. The first
+  # non-zero is what the package is judged on and what the message names; the
+  # rest still run, so a PR sees both failures at once rather than one per push.
+  status=0
+  failed_script=""
+  for suite_script in $script $integration; do
+    echo "::group::$name ($dir) — pnpm run $suite_script"
+    pnpm --filter "$name" run "$suite_script"
+    suite_status=$?
+    echo "::endgroup::"
+    if [ "$suite_status" -ne 0 ] && [ "$status" -eq 0 ]; then
+      status=$suite_status
+      failed_script="$suite_script"
+    fi
+  done
 
   if [ "$status" -eq 0 ]; then
     if [ "$tolerated" = yes ]; then
@@ -241,7 +275,7 @@ while IFS=$'\t' read -r name dir script; do
     echo "::warning::$name failed, and is a registered allowed failure: $(reason_for "$name")"
   else
     FAILED+=("$name")
-    echo "::error::$name failed (pnpm run $script, exit $status). Fix it, or add it to $ALLOWED_FILE with a reason."
+    echo "::error::$name failed (pnpm run $failed_script, exit $status). Fix it, or add it to $ALLOWED_FILE with a reason."
   fi
 done <<< "$DISCOVERED"
 

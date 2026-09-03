@@ -1,6 +1,6 @@
 /**
- * Integration tests for `findByTraceId` partition pruning on a real ClickHouse
- * testcontainer (production `trace_summaries` schema:
+ * Integration tests for `findByTraceId` partition pruning against the migrated
+ * ClickHouse the running job supplies (production `trace_summaries` schema:
  * `ReplacingMergeTree(UpdatedAt)`, `PARTITION BY toYearWeek(OccurredAt)`,
  * `ORDER BY (TenantId, TraceId)`).
  *
@@ -15,12 +15,18 @@
 import type { ClickHouseClient } from "@clickhouse/client";
 import { nanoid } from "nanoid";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
-import { startTestContainers } from "../../../../../../../../platform/app/src/server/event-sourcing/__tests__/integration/testContainers";
 import { TraceSummaryClickHouseRepository } from "../trace-summary.repository";
+import {
+  createTestClickHouseClient,
+  testClickHouseUrl,
+} from "./support/clickhouse-endpoint.support";
 
 const tenantId = `test-tsumm-resolve-${nanoid()}`;
 const presentTraceId = `trace-${nanoid()}`;
 const base = Date.now() - 60 * 60 * 1000;
+
+const clickHouseUrl = testClickHouseUrl();
+const integration = describe.skipIf(clickHouseUrl === null);
 
 let ch: ClickHouseClient;
 let repo: TraceSummaryClickHouseRepository;
@@ -66,8 +72,8 @@ function makeRow(traceId: string, occurredAtMs: number) {
 }
 
 beforeAll(async () => {
-  const containers = await startTestContainers();
-  ch = containers.clickHouseClient;
+  if (!clickHouseUrl) return;
+  ch = createTestClickHouseClient(clickHouseUrl);
   repo = TraceSummaryClickHouseRepository.create({
     resolveClient: async () => ch,
     defaultRetentionDays: 30,
@@ -87,6 +93,7 @@ afterAll(async () => {
       query: "ALTER TABLE trace_summaries DELETE WHERE TenantId = {tenantId:String}",
       query_params: { tenantId },
     });
+    await ch.close();
   }
 });
 
@@ -117,7 +124,7 @@ function recordingRepo(): {
   };
 }
 
-describe("TraceSummaryClickHouseRepository.findByTraceId (integration)", () => {
+integration("TraceSummaryClickHouseRepository.findByTraceId (integration)", () => {
   it("returns the trace when no occurredAtMs hint is passed", async () => {
     const result = await repo.findByTraceId({ tenantId, traceId: presentTraceId });
 

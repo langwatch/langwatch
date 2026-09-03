@@ -12,6 +12,5 @@
     "verbatimModuleSyntax": true,
     "noEmit": true
   },
-  "include": ["src/**/*.ts"],
-  "exclude": ["src/**/__tests__/**/*.integration.test.ts"]
+  "include": ["src/**/*.ts"]
 }

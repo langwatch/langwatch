@@ -11625,3 +11625,151 @@ process missing either of those costs.
   about it was read or edited.
 - **Nothing under `platform/` was created, edited or read**, and no
   OpenAPI artifact was regenerated.
+
+## A package's integration lane runs, or the job says why, 2026-09-03
+
+`@langwatch/trace-server` shipped `"test": "vitest run --exclude
+'**/*.integration.test.ts'"` under both of its script names and declared no
+third one. `.github/scripts/run-package-suites.sh` runs `test:unit` where a
+package draws the distinction and `test` otherwise, so the exclusion landed and
+nothing replaced it: four integration suites ran in no job in this repository.
+Nothing was red, because a suite CI never starts cannot fail.
+
+### The census
+
+Every `packages/**` manifest, against the `*.integration.test.ts(x)` files its
+scripts actually collect. 172 packages carry a manifest; 53 own at least one
+integration file. **Two** of the 53 do not run them:
+
+| package | `test` | `test:unit` | `test:integration` | integration files it does not run |
+| --- | --- | --- | --- | --- |
+| `@langwatch/trace-server` | `vitest run --exclude '**/*.integration.test.ts'` | same | — | all 4 |
+| `@langwatch/coding-agent-server` | `vitest run` (config excludes `src/**/*.integration.test.ts`) | — | `vitest run --config vitest.integration.config.ts` | all 3 |
+
+The other 51 are already covered and were left alone. Their `test`/`test:unit`
+is a bare `vitest run`, whose default `include` matches `*.integration.test.ts`
+as readily as `*.unit.test.ts`; the eight that narrow it (`src/**/*.test.ts`,
+`src/**/*.test.{ts,tsx}`) still match the suffix. Widening the change to them
+would have added a second script that runs the same files twice.
+
+The second package is the more instructive failure. It DID declare
+`test:integration` — but discovery never asked for that script, so CI never ran
+it, and behind it sat `include:
+["tests/subscribers/pull-request-mapping-throttle.integration.test.ts"]`, a path
+with no `tests/` directory under it any more. Verified rather than assumed:
+running that config as it stood prints `No test files found, exiting with code
+1`. So the declaration was not merely inert, it was a job that would go red the
+day anyone wired it — which is why the glob had to land in the same change as
+the wiring.
+
+### What the four unreached trace suites needed
+
+Two need nothing: `trace-export.service.integration.test.ts` drives the export
+generator over a mocked `TraceService`, and
+`traces-v2.transcript-visibility.integration.test.ts` drives the real privacy
+resolution over two store doubles. Both pass on a laptop with no services.
+
+The other two were **not merely unrun, they were unresolvable**. Both imported
+`startTestContainers` from
+`platform/app/src/server/event-sourcing/__tests__/integration/testContainers`,
+and `platform/app` is deleted. That is what the blanket `--exclude` was
+concealing: the lane could not have collected even if something had asked it to.
+`packages/features/trace/server/tsconfig.json` carried the matching hole —
+`"exclude": ["src/**/__tests__/**/*.integration.test.ts"]` — so no typecheck
+compiled the dead import either. A file excluded from the runner and from the
+compiler is not a test; it is a comment that costs a review.
+
+They now take the shape every other package suite that needs a datastore already
+uses — `@langwatch/analytics-server`'s `evaluation_analytics` suite and
+`@langwatch/ops-server`'s four redis suites: read the connection string the job
+supplies (`TEST_CLICKHOUSE_URL`, else `CI_CLICKHOUSE_URL`), and
+`describe.skipIf` it away when there is none. The `package-suites` job runs
+`pnpm task:clickhouse-migrate` before the suites, so in CI that string points at
+the PRODUCTION schema and the DDL↔repository column contract is asserted for
+real, with no second container and no second copy of the DDL beside the
+migrations.
+
+### The gate change, and why it is one line of shape rather than a list
+
+`run-package-suites.sh` already discovers packages from `pnpm list` rather than
+from a hand-written block, which is what keeps a NEW package from being
+invisible by default. The same argument applies one level down: it now discovers
+a package by EITHER `test`/`test:unit` OR `test:integration`, and runs every
+script the package declares under ONE outcome. The two registers keep gating the
+PACKAGE, not a script — an excluded package skips both lanes, a registered
+allowed failure tolerates both — so neither register gains a new dimension, and
+no workflow file changed at all. The job already stands up Postgres, ClickHouse
+and Redis and already exports the URLs; the integration lanes simply arrive to
+find them.
+
+Both `include` globs are globs on purpose. The literal path in the sibling
+package is precisely how a declared lane rots into a silent one.
+
+### File → change
+
+| File | Change |
+| --- | --- |
+| `.github/scripts/run-package-suites.sh` | Discovery emits `test:integration` as a fourth column and admits a package that declares only it; the run loop runs every declared script under one outcome and names the failing script. New `THE INTEGRATION LANE` docblock. |
+| `.github/scripts/__tests__/run-package-suites.test.sh` | Three fixture packages (two-lane, integration-only, excluded-and-two-lane); the stub `pnpm` can now fail one SCRIPT rather than a whole package; four `@scenario`-bound cases. |
+| `specs/ci/package-suite-integration-lane.feature` | NEW. Four `@unit` scenarios, all bound. |
+| `packages/features/trace/server/package.json` | Adds `test:integration`. |
+| `packages/features/trace/server/vitest.integration.config.ts` | NEW. `include: ["src/**/*.integration.test.ts"]`, serial forks, and a docblock naming the one datastore the lane wants. |
+| `packages/features/trace/server/tsconfig.json` | Drops `"exclude": ["src/**/__tests__/**/*.integration.test.ts"]`. The files the runner skipped were the files the compiler skipped. |
+| `.../clickhouse/__tests__/support/clickhouse-endpoint.support.ts` | NEW. `testClickHouseUrl()` / `createTestClickHouseClient()`, the replacement for the deleted `startTestContainers`. |
+| `.../clickhouse/__tests__/trace-summary.repository.integration.test.ts` | Dead `platform/app` import removed; gated on the connection string; closes its client. |
+| `.../clickhouse/__tests__/trace-analytics.repository.integration.test.ts` | Same, and `stopTestContainers()` becomes `ch.close()`. |
+| `packages/features/coding-agent/server/vitest.integration.config.ts` | Stale literal `include` becomes `src/**/*.integration.test.ts`; docblock names what the lane needs. |
+
+### Gates
+
+- `@langwatch/trace-server`: `pnpm test:unit` — **Test Files 142 passed (142)**,
+  **Tests 2396 passed (2396)**, unchanged from before this lane.
+- `@langwatch/trace-server`: `pnpm test:integration` — **Test Files 2 passed |
+  2 skipped (4)**, **Tests 17 passed | 7 skipped (24)**. All four collect, which
+  is what two of them could not do at `HEAD`. The two skips are the ClickHouse
+  suites with no connection string configured on this machine.
+- The skip is conditional, not vacuous: rerun with
+  `TEST_CLICKHOUSE_URL=http://default@127.0.0.1:59123/test_langwatch`, the two
+  suites open their gate and fail on `connect ECONNREFUSED 127.0.0.1:59123`.
+  A suite that skips on an absent variable and connects on a present one is
+  wired; one that skips either way is not, and this distinguishes them.
+- `@langwatch/coding-agent-server`: `pnpm test:integration` with
+  `TEST_REDIS_URL=redis://localhost:6379/9` — **Test Files 3 passed (3)**,
+  **Tests 12 passed (12)**. At `HEAD` the same command matched zero files.
+  `pnpm test` (its unit lane) — **Test Files 22 passed (22)**, **Tests 289
+  passed (289)**.
+- `.github/scripts/__tests__/run-package-suites.test.sh` — **20 passed, 0
+  failed** (16 before). Run again against the `HEAD` copy of the gate, the four
+  new cases go **4 failed** — the patch is what they detect, not the fixture.
+- `bash -n` on both shell files — clean. `shellcheck -S warning` on both —
+  **0 findings**.
+- `check:feature-parity`: `specs/ci/package-suite-integration-lane.feature` —
+  **4/4 scenarios bound · ✓ all bound**. The whole-tree run exits 1 on
+  pre-existing debt (4,658 unbound scenarios, 50 inert files) that this lane
+  neither added to nor inherited.
+- `@langwatch/trace-server`: `tsc --noEmit` — **0 errors**, now WITH the four
+  integration files in the program.
+- `oxfmt --check` and `oxlint --config .oxlintrc.architecture.json` over the
+  files this lane wrote — **no findings**. Both packages fail a whole-directory
+  `oxfmt --check` at `HEAD`; that is not this lane's diff.
+- `node --test` over all four `.github/scripts/*.test.ts` guards — **82 passed,
+  0 failed**. `actionlint` on `langwatch-app-ci.yml` — three pre-existing
+  shellcheck notes on blocks this lane did not touch; no workflow file changed.
+
+### What this lane did NOT do
+
+- **It did not widen to the other 51 packages that own integration files.**
+  They already run them. A `test:integration` there would run the same files a
+  second time and call the duplication coverage.
+- **It did not touch a workflow.** The `package-suites` job's services, env
+  block and step are unchanged; the gate discovers the new lanes on its own,
+  which is the property that made the discovery rewrite worth doing.
+- **It did not add a line to either register.** No suite was tolerated red and
+  no suite was excluded to make this green.
+- **`@langwatch/coding-agent-server`'s `tsc --noEmit` is still red** — three
+  errors about `traceCanonicalisation` in
+  `clickhouse.coding-agent-processing.adapter.unit.test.ts`, on files this lane
+  did not open. Pre-existing, and left that way rather than folded into a CI
+  change.
+- **Nothing under `platform/` was created, edited or read.** The one import that
+  still pointed there is gone.

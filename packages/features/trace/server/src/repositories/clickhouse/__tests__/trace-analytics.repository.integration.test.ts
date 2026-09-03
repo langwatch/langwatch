@@ -17,11 +17,14 @@ import type { ClickHouseClient } from "@clickhouse/client";
 import { nanoid } from "nanoid";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import type { TraceAnalyticsRow } from "@langwatch/trace-server";
-import {
-  startTestContainers,
-  stopTestContainers,
-} from "../../../../../../../../platform/app/src/server/event-sourcing/__tests__/integration/testContainers";
 import { TraceAnalyticsClickHouseRepository } from "../trace-analytics.repository";
+import {
+  createTestClickHouseClient,
+  testClickHouseUrl,
+} from "./support/clickhouse-endpoint.support";
+
+const clickHouseUrl = testClickHouseUrl();
+const integration = describe.skipIf(clickHouseUrl === null);
 
 let ch: ClickHouseClient;
 let repo: TraceAnalyticsClickHouseRepository;
@@ -83,8 +86,8 @@ function traceRow(over: Partial<TraceAnalyticsRow> = {}): TraceAnalyticsRow {
 }
 
 beforeAll(async () => {
-  const containers = await startTestContainers();
-  ch = containers.clickHouseClient;
+  if (!clickHouseUrl) return;
+  ch = createTestClickHouseClient(clickHouseUrl);
   repo = TraceAnalyticsClickHouseRepository.create({
     resolveClient: async () => ch,
     defaultRetentionDays: 30,
@@ -97,11 +100,11 @@ afterAll(async () => {
       query: `ALTER TABLE trace_analytics DELETE WHERE TenantId = {tenantId:String}`,
       query_params: { tenantId },
     });
+    await ch.close();
   }
-  await stopTestContainers();
 });
 
-describe("trace_analytics round-trip (migrations 00039 + 00056 + 00061)", () => {
+integration("trace_analytics round-trip (migrations 00039 + 00056 + 00061)", () => {
   describe("given a fully populated slim row", () => {
     it("reads back every read-back column so the fold recovers its state", async () => {
       const row = traceRow({ traceId: `${tag}-rt` });
