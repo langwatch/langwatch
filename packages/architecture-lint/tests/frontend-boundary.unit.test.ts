@@ -26,6 +26,7 @@ import { existsSync, readFileSync, readdirSync } from "node:fs";
 import { dirname, join, relative, sep } from "node:path";
 import { fileURLToPath } from "node:url";
 import { describe, expect, it } from "vitest";
+import { browserOnlyPackage } from "../src/browser-packages";
 import { walkFiles } from "../src/files";
 import {
   chainsToSeeds,
@@ -38,38 +39,6 @@ import {
 } from "../src/module-graph";
 
 const REPO_ROOT = join(dirname(fileURLToPath(import.meta.url)), "..", "..", "..");
-
-/**
- * Packages that only make sense in a browser. Prefix-matched on the specifier.
- *
- * The OpenTelemetry entries are deliberately narrow. Most of `@opentelemetry/*`
- * is isomorphic and the backend legitimately depends on it (`api`, `core`,
- * `resources`, `sdk-trace-base`, `semantic-conventions`, the OTLP exporters);
- * only these three are browser-bound — a `WebTracerProvider`, and
- * instrumentation for the DOM and `window.fetch`. Banning the scope wholesale
- * would make this guard unusable; leaving the scope out entirely is what let
- * the `@langwatch/react-rum` barrel reach three backend files unnoticed.
- *
- * `motion` is here alongside `framer-motion` because it is the same library
- * under its current name, and it is already a dependency of the web packages.
- * Listing only the old name is the same shape of gap.
- */
-const BROWSER_ONLY_PACKAGES = [
-  "react",
-  "react-dom",
-  "react-router",
-  "react-feather",
-  "lucide-react",
-  "framer-motion",
-  "motion",
-  "@chakra-ui",
-  "@ark-ui",
-  "@emotion",
-  "@zag-js",
-  "@opentelemetry/sdk-trace-web",
-  "@opentelemetry/instrumentation-document-load",
-  "@opentelemetry/instrumentation-fetch",
-];
 
 /**
  * The one allowed terminal: `@langwatch/mail` renders its templates with
@@ -179,9 +148,6 @@ const browserModuleRoots = (): string[] => {
 
 const BROWSER_MODULE_ROOTS = browserModuleRoots();
 
-const bannedPackage = (specifier: string): string | undefined =>
-  BROWSER_ONLY_PACKAGES.find((name) => specifier === name || specifier.startsWith(`${name}/`));
-
 const bannedModule = (target: string | undefined): string | undefined =>
   target !== void 0 && BROWSER_MODULE_ROOTS.some((root) => target.startsWith(root))
     ? show(target)
@@ -210,7 +176,7 @@ const graphReaching = ({
     resolve: resolver.resolve,
     forbidden: ({ specifier, target }) => {
       if (packages) {
-        const name = bannedPackage(specifier);
+        const name = browserOnlyPackage(specifier);
         if (name) return `package ${name}`;
       }
       if (modules) {

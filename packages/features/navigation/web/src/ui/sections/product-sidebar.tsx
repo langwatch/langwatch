@@ -16,6 +16,7 @@ import { ArrowLeft, Search } from "lucide-react";
 import { useRef, useState } from "react";
 import { useLlmOpsProjectSlug } from "../../behavior/use-llm-ops-project-slug";
 import { useMenuScrollPosition } from "../../behavior/use-menu-scroll-position";
+import { useOpsAttentionCount } from "../../behavior/use-ops-attention-count";
 import { useReachableProducts } from "../../behavior/use-reachable-products";
 import { useSettingsMenu } from "../../behavior/use-settings-menu";
 import { useVisibleSectionNavItems } from "../../behavior/use-visible-section-nav-items";
@@ -31,7 +32,7 @@ import {
   governanceNavItems,
   type SectionNavItemData,
 } from "../../model/section-nav-items";
-import { isSettingsMenuItemActive } from "../../model/settings-menu";
+import { isSettingsMenuItemActive, OPS_ATTENTION_HREF } from "../../model/settings-menu";
 import { SHELL_SIDEBAR_WIDTH_COMPACT, SHELL_SIDEBAR_WIDTH_EXPANDED } from "../../model/shell-layout";
 import { SideMenuDensityProvider } from "../elements/side-menu-density";
 import { SideMenuItem, SideMenuLink } from "../blocks/side-menu-link";
@@ -176,6 +177,7 @@ function SettingsBackEntry({ showLabel }: { showLabel: boolean }) {
 function SettingsMenuBody({ showExpanded }: { showExpanded: boolean }) {
   const pathname = useNavigationHost().pathname();
   const groups = useSettingsMenu();
+  const opsAttentionCount = useOpsAttentionCount();
 
   return (
     <>
@@ -194,6 +196,7 @@ function SettingsMenuBody({ showExpanded }: { showExpanded: boolean }) {
               href={item.href}
               isActive={isSettingsMenuItemActive({ item, pathname })}
               showLabel={showExpanded}
+              badgeNumber={item.href === OPS_ATTENTION_HREF ? opsAttentionCount : undefined}
               rightElement={
                 item.isEnterprise ? (
                   <Badge

@@ -298,6 +298,16 @@ function projectGroup({ isLiteMember }: SettingsMenuGates): SettingsMenuGroup {
 }
 
 /**
+ * The entry the operations attention badge sits on.
+ *
+ * The badge counts blocked groups and dead-lettered jobs, which is what the
+ * Dashboard entry opens onto — the legacy sidebar put the same number on the
+ * same link. Named here rather than matched in the renderer so the entry and
+ * its badge cannot drift apart when the address moves.
+ */
+export const OPS_ATTENTION_HREF = "/ops";
+
+/**
  * Every internal ops page, in one list. This is the only place the ops
  * pages are offered in the new navigation modes, so a page missing here
  * cannot be reached from the menu at all. `opsMenuReachability` pins it
@@ -312,7 +322,7 @@ export function opsGroup(): SettingsMenuGroup {
     items: [
       {
         label: "Dashboard",
-        href: "/ops",
+        href: OPS_ATTENTION_HREF,
         isExactMatch: true,
         // The queues address redirects onto the dashboard, which reads
         // the same queues.

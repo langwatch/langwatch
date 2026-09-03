@@ -15263,3 +15263,193 @@ these two. The nearest to closing are still the ones that table lists:
 `withoutAnnotationQueuePersist` (one dependency), `withoutTraceRecordRead` and
 the dataset half that waits on it, and `withoutDatasetStorage`, whose Azure
 branch is unreachable because the process fails to boot before it.
+
+## Portability is a property of a module, not of its name — and the badge nobody called, 2026-09-03
+
+Two findings from the ownerless-surfaces census, closed together because both
+are the same failure: a rule or a wire that reads correct and is not.
+
+### The portability rule admitted packages by name
+
+`ui-screen-closure`, `ui-surface-closure` and `ui-browser-capability` all asked
+one question of a first-party import — is this `@langwatch/design-system` or a
+`*-contract`? — and refused everything else as "a first-party implementation
+package". That verdict was wrong for every framework-free platform module the
+browser genuinely shares. `@langwatch/config/docs-url` is a URL builder over a
+single type-only import and was reported five times;
+`@langwatch/handled-error`'s subpaths — the codes, the customer-facing
+presentation table and the reader that turns a wire payload into them — were
+reported twenty. A rule that refuses the presentation registry pushes each web
+package toward a private copy of the codes, which is the drift the registry
+exists to prevent.
+
+The admission now reads the module. `createPortableModuleOracle` resolves a
+first-party specifier to the file it loads and walks its VALUE closure: an
+import of React or another browser-only toolkit, of the transport, router,
+session or storage capabilities a screen must receive rather than reach for, of
+server, Prisma or environment implementation, or of a Node builtin makes the
+module non-portable, as does rendering JSX (the compiler-emitted
+`react/jsx-runtime` edge counts) or naming a browser capability in code. The
+two ROLES stay admitted by name and have to be: the Design System is React by
+construction, and ADR-004 names a feature contract portable in that role.
+`import type` is erased, so a portable module may still name any type.
+
+The verdicts the walk returns are the interesting part.
+`@langwatch/observability`'s root is admitted — its closure is seven files over
+`pino` and `superjson`, exactly the "browser-safe public API" its own header
+claims — while `@langwatch/observability/node` is refused for Node builtins and
+`process.env`, `@langwatch/ui-drawer` for Chakra and React, and
+`@langwatch/platform-api-client` for React and a browser transport global. The
+oracle is memoised per specifier and builds its resolver lazily, so a tree that
+never asks pays nothing; the whole lint run went from 12.3s to 15.3s.
+
+**A second defect fell out of it, and it was the larger one.**
+`@langwatch/redaction` kept failing the walk on `process.env`, which appears in
+that package exactly once — inside a docblock. `withoutComments` blanked
+comments with a bare `ts.createScanner` loop, and a scanner needs
+`rescanTemplateToken` to continue a template literal with a substitution. It
+never called it, so the backtick pairing fell out of phase at the first
+`${...}` and stayed there: every backtick after it — including the ones
+docblocks put around inline code — flipped a span the scanner then reported as
+template text rather than as the comment it is. In
+`packages/redaction/src/secrets.ts` the desync began at line 192 and never
+recovered. The parser decides now, and the answer is memoised by source text
+because the closure walks ask repeatedly. Two source-level findings went with
+it — `langy-panel.tsx` and `lens-tab.tsx` were both reported for
+`localStorage`, and both only mention it in a `//` comment explaining what they
+do NOT do.
+
+`BROWSER_ONLY_PACKAGES` moved to `src/browser-packages.ts` and the
+memory-footprint guard imports it, so the list a backend may not reach and the
+list that disqualifies a shared module cannot drift apart.
+
+### `ops.getBadgeCounts` was served and called by nobody
+
+Census row 46. The procedure answers on `ops:view`; the legacy chrome's
+`OpsSection` rendered its two integers on the Ops Dashboard entry; the section
+went with the chrome in `957774da28` and the badge went with it. An operator
+with parked groups and dead-lettered jobs waiting read a menu that looked idle,
+with no error and no log line.
+
+The renderer never left — `side-menu-link.tsx` still takes `badgeNumber` and
+still hides at zero. What was missing was the number and the wire. The count
+now comes from `navigationApi.ops.getBadgeCounts`, declared in
+`@langwatch/navigation-web`'s own map exactly as `annotation.getPendingItemsCount`
+already is, and typed by `OpsApiGetBadgeCountsOutput` — published in
+`@langwatch/ops-contract` beside `OpsBadgeCounts`, following `04ba1ac99d`. The
+two differ by one field and the difference is the point: the service always has
+a `computedAt`, the transport answers `null` when no collector is running,
+because those zeroes mean "we cannot say" rather than "nothing is wrong".
+
+**Not through `@langwatch/ops-web`'s map, and that is deliberate.** ADR-004
+seals a frontend feature off from another feature's web package: `opsApi` is
+exported from `@langwatch/ops-web/screens/ops`, an owner-only screen entry the
+`ops` feature owns, so navigation importing it would be an `ui-screen-owner`
+violation, and adding an entry to `OpsApiMap` that nothing in that package
+calls would be dead code. The segment path is what actually matters — tRPC keys
+a React Query entry on the procedure path alone, so this poll and every `ops.*`
+read the operations screens make share one cache entry. `ops-api.ts` says so in
+two docblocks; both claimed the badge "still polls from `platform/app`", and
+both now name where it lives.
+
+`OPS_ATTENTION_HREF` names the entry in the menu model rather than matching an
+href in the renderer, so the badge cannot drift off its link when the address
+moves. Two things did not travel: the `SHOW_OPS_IN_MAIN_SIDEBAR` allowlist,
+which steered a sidebar that no longer exists, and the two-tier poll — off-route
+the legacy section asked for these two integers and on-route derived them from
+the full dashboard snapshot every ten seconds. The heavy half belongs to the
+operations package and reaching for it here would take the dependency ADR-004
+seals, so the cheap one polls everywhere at sixty seconds and the badge trails
+the dashboard it sits beside by up to a minute. The query is gated on
+`opsAccess().hasAccess` because the procedure REFUSES rather than answers empty:
+it is mounted behind a throwing policy, not the probe the menu's own gate uses.
+
+### File → change
+
+| File | Change |
+| --- | --- |
+| `packages/architecture-lint/src/browser-packages.ts` | NEW. `BROWSER_ONLY_PACKAGES` and `browserOnlyPackage`, shared by the rule and the memory-footprint guard |
+| `packages/architecture-lint/src/frontend-ui-boundaries.ts` | `createPortableModuleOracle`, `PORTABLE_BY_ROLE`, `isPortableFirstPartyImport`; `withoutComments` reads the parsed tree; the oracle threaded through the three closure walks |
+| `packages/architecture-lint/tests/frontend-boundary.unit.test.ts` | Imports the shared list instead of keeping a second copy |
+| `packages/architecture-lint/tests/frontend-ui-boundaries.test.ts` | Three scenarios: a portable module admitted, the same module refused once its closure reaches React, and a docblock after a template substitution |
+| `packages/architecture-lint/specs/frontend-feature-boundaries.feature` | The three scenarios above, tagged and bound |
+| `packages/features/ops/contract/src/ops-snapshot.service.ts` | `OpsApiGetBadgeCountsOutput` — the transport's shape, stated as the widening it is |
+| `packages/features/ops/web/src/behavior/ops-api.ts` | Two docblocks corrected: the badge does not poll from `platform/app` |
+| `packages/features/navigation/web/src/behavior/navigation-api.ts` | `ops.getBadgeCounts` in the map |
+| `packages/features/navigation/web/src/behavior/use-ops-attention-count.ts` | NEW. The gated, polled count |
+| `packages/features/navigation/web/src/model/settings-menu.ts` | `OPS_ATTENTION_HREF` |
+| `packages/features/navigation/web/src/ui/sections/product-sidebar.tsx` | `badgeNumber` on the entry that names it |
+| `packages/features/navigation/web/src/ui/sections/__tests__/ops-attention-badge.integration.test.tsx` | NEW. Five scenarios over the rendered settings sidebar |
+| `specs/navigation/ops-navigation-v2.feature` | Three scenarios for the badge, bound |
+
+### Gates
+
+`packages/architecture-lint`: **37 of 38 files / 497 tests passing**;
+`frontend-ui-boundaries.test.ts` 33/33 and `frontend-boundary.unit.test.ts`
+16/16. The one red file is `identity-package-boundaries.test.ts`, and it is red
+at HEAD for a reason that has nothing to do with this pass:
+`eventing.scim-sync-ledger.adapter.ts` no longer imports `@langwatch/eventing`
+and its `EVENTING_IMPORT_BASELINE` still expects it. The file is byte-identical
+to HEAD, so the baseline is the identity lane's to shrink. `tsc --noEmit`
+clean.
+
+`@langwatch/navigation-web` 188 tests, `@langwatch/ops-web` 241,
+`@langwatch/ops-contract` 8 — all passing, all three typechecking clean.
+`apps/ui`: **98 files / 1034 tests passing** and `tsc --noEmit` clean. (Two
+earlier runs of the same suite failed 3–7 tests in `chrome-drawer`,
+`gateway-routes` and `installed-ui-drawers`; each file passes alone and the
+failures were `waitFor` timeouts under concurrent load from the other lanes.)
+
+`check-feature-parity`: `frontend-feature-boundaries.feature` 3/17 bound (was
+0/14 — the fourteen that were already unbound still are),
+`ops-navigation-v2.feature` 4/12 (was 1/9).
+
+oxfmt clean on every touched file. oxlint: `browser-packages.ts`,
+`use-ops-attention-count.ts`, `settings-menu.ts`, `product-sidebar.tsx`, the two
+new tests and `ops-snapshot.service.ts` are clean; `frontend-ui-boundaries.ts`
+holds at HEAD's 150 and `ops-api.ts` at HEAD's 30. One error is new:
+`navigation-api.ts` gains a `no-invalid-void-type` for `input: void`, the 58th
+instance of the api-map idiom in `packages/features` and the same words
+`ops-api.ts` uses thirty times for the same router. Three files —
+`product-sidebar.tsx`, `settings-menu.ts`, `ops-snapshot.service.ts` — are NOT
+oxfmt-clean at HEAD; each edit was re-applied over HEAD's text so this pass
+reformats none of them.
+
+**Violation delta: 2,169 → 2,124.** Forty-four are this pass's, and the tree
+moved under it by one net (the analytics lane removed two
+`precondition-matchers` findings, the API lane added one). Of the forty-four:
+thirty-nine are the portability admission — `@langwatch/observability` 13,
+`@langwatch/handled-error` and its three subpaths 20,
+`@langwatch/config/docs-url` 5, `@langwatch/ui/public-config` 1, which the
+rule's own "allowed" line already sanctioned — and five are the comment
+stripper: `@langwatch/redaction` 3, plus the two `localStorage` mentions.
+Item 2 added **zero**: the run before and after it is 2,124 either way, because
+`@langwatch/ops-contract` is portable by role.
+
+**Sabotage, five patches, each shown to land.** The oracle forced to `true` →
+the React scenario and the surface-closure test fail. The oracle forced to
+`false` → the portable-module scenario fails. `withoutComments` reverted to the
+scanner → the template-substitution scenario fails. `badgeNumber` removed from
+the settings entry → the badge scenario fails. `enabled: hasAccess` widened to
+`true` → the no-access scenario fails.
+
+### What this pass did NOT do
+
+`@langwatch/ksuid` is still reported four times as "a first-party implementation
+package". It is not first-party — it is a third-party package published under
+the `@langwatch` scope, and the rule's `startsWith("@langwatch/")` cannot tell.
+Deciding that a specifier resolving to no workspace package is therefore
+external would fix the message and open a hole in the same line, and it would
+break the existing fixtures, which name packages the temp root does not
+declare. Left as a named false positive.
+
+`@langwatch/redaction`'s root now passes the walk, but `@langwatch/ui-drawer`
+(51) and `@langwatch/platform-api-client` (40) are correctly refused and remain
+the two largest first-party findings. They are real: one is a React toolkit,
+the other a transport.
+
+`packages/features/ops/server` is another lane's. The half of `04ba1ac99d`'s
+pattern that annotates the resolver — `.query(({ ctx }): OpsApiGetBadgeCountsOutput => …)`
+on `ops.api.ts:301`, replacing the inline structural type — is not done here.
+The published type and the transport's answer match structurally, so the badge
+is correct today; the annotation is what would keep them matching.

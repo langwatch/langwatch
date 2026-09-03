@@ -97,6 +97,30 @@ Feature: Frontend feature boundary lint
     And app routing and browser capabilities remain in their named owners
 
   @unit @architecture
+  Scenario: A framework-free first-party module is portable into browser UI
+    Given a screen imports a shared platform module such as the handled-error presentation table
+    And nothing that module pulls at runtime reaches React, a browser capability, server code or Node.js
+    When architecture lint resolves the screen dependency closure
+    Then it accepts the import as portable
+    And it does not name the module a first-party implementation package
+
+  @unit @architecture
+  Scenario: A shared module stops being portable the day its closure reaches React
+    Given a screen imports that same shared platform module
+    And a module it pulls one hop away begins importing React
+    When architecture lint resolves the screen dependency closure
+    Then it rejects the import and names the module the screen asked for
+    And a frontend feature importing the same module is rejected with it
+
+  @unit @architecture
+  Scenario: A docblock stays a comment after a template literal
+    Given a screen writes a template literal with a substitution
+    And a docblock below it names a browser capability to explain what the screen does not do
+    When architecture lint reads the source for browser capabilities
+    Then it reports nothing
+    And the capability check reads code rather than the comments about it
+
+  @unit @architecture
   Scenario: Browser source remains independent of backend implementations
     Given a frontend feature, screen or surface uses fetch, transport, router, session, Node.js, a feature server package, generated Prisma, AppRouter, an environment module or a legacy app alias
     When architecture lint checks the source

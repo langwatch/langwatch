@@ -15,8 +15,8 @@
  * THE SEGMENT NAMES ARE LOAD-BEARING. `ops`, `bugReports` and `ssoConnections`
  * are mount points on the root router, and tRPC hashes that path into the React
  * Query cache key; spell one differently and these hooks quietly stop sharing a
- * cache with the `api.ops.*` call sites that have not moved — the navigation
- * badge, which still polls `ops.getBadgeCounts` from `platform/app`, is exactly
+ * cache with the other `ops.*` call sites — the navigation badge, which polls
+ * `ops.getBadgeCounts` from `@langwatch/navigation-web`'s own map, is exactly
  * such a call site.
  *
  * THIS MODULE IS THE ONE GOVERNED-CLOSURE EXCEPTION IN THE PACKAGE. ADR-004
@@ -679,9 +679,10 @@ export type OpsApiMap = {
  * One instance for the package. `@trpc/react-query` keys its React Query
  * entries on the procedure PATH alone, so this instance and the application's
  * own `api` proxy share cache entries given the same QueryClient — which is
- * what keeps the navigation badge's `ops.getBadgeCounts` and this package's
- * `ops.listDeadLetterCounts` reading one another's invalidations while the two
- * halves are split across packages.
+ * what keeps the navigation badge's `ops.getBadgeCounts`, declared in
+ * `@langwatch/navigation-web`, and this package's `ops.listDeadLetterCounts`
+ * reading one another's invalidations while the two halves are split across
+ * packages.
  */
 export const opsApi = createFeatureApi<OpsApiMap>();
 

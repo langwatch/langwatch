@@ -35,6 +35,7 @@
     "@langwatch/authz-contract": "workspace:*",
     "@langwatch/design-system": "workspace:*",
     "@langwatch/feature-flag-contract": "workspace:*",
+    "@langwatch/ops-contract": "workspace:*",
     "@langwatch/platform-api-client": "workspace:*",
     "date-fns": "^4.1.0",
     "lucide-react": "^1.22.0",

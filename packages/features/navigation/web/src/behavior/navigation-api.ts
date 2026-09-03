@@ -19,6 +19,7 @@
  */
 
 import type { AgentType } from "@langwatch/agent-contract";
+import type { OpsApiGetBadgeCountsOutput } from "@langwatch/ops-contract";
 import { createFeatureApi } from "@langwatch/platform-api-client";
 
 export type NavigationHomeResolution = {
@@ -245,6 +246,26 @@ export type NavigationApiMap = {
   evaluators: {
     getAll: {
       query: { input: { projectId: string }; output: Array<{ id: string; name: string }> };
+    };
+  };
+
+  ops: {
+    /**
+     * The operations attention badge: blocked groups plus dead-lettered jobs.
+     *
+     * THE SEGMENT NAME IS LOAD-BEARING here for a second reason. `ops` is the
+     * mount point `@langwatch/ops-web` also calls, and tRPC keys a React Query
+     * entry on the procedure path alone — so this poll and any `ops.*` read the
+     * operations screens make share one cache and one another's invalidations,
+     * which is exactly what the two halves being in different packages needs.
+     *
+     * Declared here rather than imported from the operations package because
+     * ADR-004 seals a frontend feature off from another feature's web package:
+     * the badge is navigation's, the procedure is Ops', and the CONTRACT is
+     * what the two agree on.
+     */
+    getBadgeCounts: {
+      query: { input: void; output: OpsApiGetBadgeCountsOutput };
     };
   };
 };

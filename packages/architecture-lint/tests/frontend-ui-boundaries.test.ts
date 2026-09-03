@@ -79,6 +79,19 @@ function webPackage(feature: string, exports: Record<string, string>): Classifie
   };
 }
 
+/**
+ * A first-party workspace package that is not a web package: the platform
+ * modules a browser screen shares, whose portability the rule decides by
+ * reading them.
+ */
+function writeSharedPackage(
+  name: string,
+  directory: string,
+  exports: Record<string, string>,
+): void {
+  write(`${directory}/package.json`, JSON.stringify({ name, type: "module", exports }));
+}
+
 function writeWebFeature(feature: string, name: string, dependencies: string[] = []): void {
   write(
     `packages/features/${feature}/web/src/features/${name}/feature.json`,
@@ -545,6 +558,117 @@ describe("frontend UI architecture boundaries", () => {
       10,
     );
     expect(policies([promptWeb])).not.toContain("ui-web-public-entry");
+  });
+
+  /** @scenario A framework-free first-party module is portable into browser UI */
+  it("admits a shared first-party module whose closure reaches no framework or browser capability", () => {
+    const promptWeb = webPackage("prompt", {
+      "./screens/prompt-studio": "./src/screens/prompt-studio/index.ts",
+    });
+    writeCatalogue([
+      { id: "prompt-studio", screens: ["@langwatch/prompt-web/screens/prompt-studio"] },
+    ]);
+    writeSharedPackage("@langwatch/handled-error", "packages/handled-error", {
+      "./presentation": "./src/presentation.ts",
+    });
+    write(
+      "packages/handled-error/src/presentation.ts",
+      [
+        'import { CODES } from "./codes";',
+        "export const titleFor = (code: string) => CODES[code];",
+      ].join("\n"),
+    );
+    write(
+      "packages/handled-error/src/codes.ts",
+      "export const CODES: Record<string, string> = {};",
+    );
+    write(
+      "packages/features/prompt/web/src/screens/prompt-studio/index.ts",
+      [
+        'import { titleFor } from "@langwatch/handled-error/presentation";',
+        "export const PromptStudio = titleFor;",
+      ].join("\n"),
+    );
+    write(
+      "apps/ui/src/features/prompt-studio/route.ts",
+      'import { titleFor } from "@langwatch/handled-error/presentation";\nexport const title = titleFor;',
+    );
+
+    expect(policies([promptWeb]).filter((policy) => policy === "ui-screen-closure")).toEqual([]);
+    expect(policies([promptWeb]).filter((policy) => policy === "ui-browser-capability")).toEqual(
+      [],
+    );
+  });
+
+  /** @scenario A shared module stops being portable the day its closure reaches React */
+  it("reports the same shared module once a module it pulls imports React", () => {
+    const promptWeb = webPackage("prompt", {
+      "./screens/prompt-studio": "./src/screens/prompt-studio/index.ts",
+    });
+    writeCatalogue([
+      { id: "prompt-studio", screens: ["@langwatch/prompt-web/screens/prompt-studio"] },
+    ]);
+    writeSharedPackage("@langwatch/handled-error", "packages/handled-error", {
+      "./presentation": "./src/presentation.ts",
+    });
+    write(
+      "packages/handled-error/src/presentation.ts",
+      [
+        'import { CODES } from "./codes";',
+        "export const titleFor = (code: string) => CODES[code];",
+      ].join("\n"),
+    );
+    // One hop away, and behind the entry the screen names: the closure is what
+    // decides, not the specifier.
+    write(
+      "packages/handled-error/src/codes.ts",
+      ['import { useMemo } from "react";', "export const CODES = { useMemo };"].join("\n"),
+    );
+    write(
+      "packages/features/prompt/web/src/screens/prompt-studio/index.ts",
+      [
+        'import { titleFor } from "@langwatch/handled-error/presentation";',
+        "export const PromptStudio = titleFor;",
+      ].join("\n"),
+    );
+    write(
+      "apps/ui/src/features/prompt-studio/route.ts",
+      'import { titleFor } from "@langwatch/handled-error/presentation";\nexport const title = titleFor;',
+    );
+
+    expect(
+      lint([promptWeb])
+        .filter((violation) => violation.policy === "ui-screen-closure")
+        .map((violation) => violation.specifier),
+    ).toEqual(["@langwatch/handled-error/presentation"]);
+    expect(
+      lint([promptWeb])
+        .filter((violation) => violation.policy === "ui-browser-capability")
+        .map((violation) => violation.specifier),
+    ).toEqual(["@langwatch/handled-error/presentation"]);
+  });
+
+  /** @scenario A docblock stays a comment after a template literal */
+  it("reads a docblock that follows a template substitution as the comment it is", () => {
+    const promptWeb = webPackage("prompt", {
+      "./screens/prompt-studio": "./src/screens/prompt-studio/index.ts",
+    });
+    writeCatalogue([
+      { id: "prompt-studio", screens: ["@langwatch/prompt-web/screens/prompt-studio"] },
+    ]);
+    write(
+      "packages/features/prompt/web/src/screens/prompt-studio/index.ts",
+      [
+        // The substitution is the whole subject: it is what threw a scanner out
+        // of phase, so that every comment after it read as template text.
+        "export const label = (name: string) => `prompt ${name}`;",
+        "",
+        "/** A draft the reader left in `localStorage` is not one this screen reads. */",
+        "export const draft = undefined;",
+      ].join("\n"),
+    );
+
+    expect(policies([promptWeb]).filter((policy) => policy === "ui-screen-closure")).toEqual([]);
   });
 
   it("keeps browser UI out of server, Prisma, AppRouter, environment, and legacy application imports", () => {

@@ -13,6 +13,21 @@ export interface OpsBadgeCounts {
   computedAt: Date;
 }
 
+/**
+ * What `ops.getBadgeCounts` answers — the two integers the navigation badge
+ * renders, and when they were computed.
+ *
+ * The TRANSPORT's shape rather than the service's, and the widening is the
+ * whole difference: a running collector always has a `computedAt`, so
+ * {@link OpsBadgeCounts} states one, while the application answers `null` when
+ * no collector is running. Those zeroes mean "we cannot say" rather than
+ * "nothing is wrong", and stamping the current time beside them would present
+ * unavailable data as a fresh all-clear.
+ */
+export type OpsApiGetBadgeCountsOutput = Omit<OpsBadgeCounts, "computedAt"> & {
+  computedAt: Date | null;
+};
+
 export interface OpsSnapshotAbortSignal {
   readonly aborted: boolean;
   addEventListener(type: "abort", listener: () => void, options: { once: true }): void;

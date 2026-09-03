@@ -3,12 +3,17 @@ import { builtinModules } from "node:module";
 import { dirname, isAbsolute, join, relative, resolve, sep } from "node:path";
 import ts from "typescript";
 import { z } from "zod";
+import { browserOnlyPackage } from "./browser-packages";
 import { walkFiles } from "./files";
 import {
+  createWorkspaceModuleResolver,
   moduleImports,
+  rendersJsx,
   resolveRelativeModule,
   resolveSourceCandidate,
+  walkValueImportGraph,
   type ModuleImport,
+  type WorkspaceModuleResolver,
 } from "./module-graph";
 import type { ArchitectureViolation, ClassifiedPackage } from "./types";
 
@@ -142,7 +147,9 @@ function resolveUiSourceImport(sourceImport: SourceImport, sourceRoot: string): 
   });
   if (relativeTarget) return relativeTarget;
   if (!/^(?:~|@)\//.test(sourceImport.specifier)) return void 0;
-  return resolveSourceCandidate({ candidate: resolve(sourceRoot, sourceImport.specifier.slice(2)) });
+  return resolveSourceCandidate({
+    candidate: resolve(sourceRoot, sourceImport.specifier.slice(2)),
+  });
 }
 
 function readUiFeatureCatalogue(root: string): {
@@ -362,6 +369,8 @@ function forbiddenBrowserCapabilityImport(specifier: string): string | undefined
   return BROWSER_CAPABILITY_IMPORTS.find(([pattern]) => pattern.test(specifier))?.[1];
 }
 
+const commentFreeSources = new Map<string, string>();
+
 /**
  * The source with its comments blanked out, positions intact.
  *
@@ -371,27 +380,64 @@ function forbiddenBrowserCapabilityImport(specifier: string): string | undefined
  * the case that found this: its header explains that the browser has no
  * `process.env`, and saying so was the violation.
  *
+ * The PARSER decides what a comment is, not a bare scanner. A template literal
+ * with a substitution needs `rescanTemplateToken` to be continued correctly,
+ * and a plain `scan()` loop does not call it: the backtick pairing falls out of
+ * phase at the first `${...}` and stays there, so every backtick after it —
+ * including the ones docblocks put around inline code — flips a span the
+ * scanner then reports as template text rather than as the comment it is.
+ * `packages/redaction/src/secrets.ts` is the case that found this. Its
+ * docblock quotes `process.env.OPENAI_API_KEY` to say the matcher treats that
+ * as code rather than as key material, the quote was read as a use of it, and
+ * the package stopped counting as portable. Everything after the first such
+ * template leaked, which is why this could not be fixed by excusing one
+ * pattern.
+ *
+ * Walking the parsed tree costs one parse per distinct source and is exact,
+ * which is why the answer is memoised by source text rather than recomputed
+ * for each of the closure walks that ask.
+ *
  * Comments are replaced by spaces rather than removed, so every offset a
  * later check reports still lines up with the file on disk. Newlines survive
  * for the same reason.
  */
 function withoutComments(source: string): string {
-  const scanner = ts.createScanner(ts.ScriptTarget.Latest, false, ts.LanguageVariant.JSX, source);
-  const characters = source.split("");
-  for (let token = scanner.scan(); token !== ts.SyntaxKind.EndOfFileToken; token = scanner.scan()) {
-    if (
-      token !== ts.SyntaxKind.SingleLineCommentTrivia &&
-      token !== ts.SyntaxKind.MultiLineCommentTrivia
-    ) {
-      continue;
-    }
+  const known = commentFreeSources.get(source);
+  if (known !== void 0) return known;
 
-    for (let index = scanner.getTokenStart(); index < scanner.getTokenEnd(); index += 1) {
+  const sourceFile = ts.createSourceFile(
+    "source.tsx",
+    source,
+    ts.ScriptTarget.Latest,
+    true,
+    ts.ScriptKind.TSX,
+  );
+  const characters = source.split("");
+  const blank = (range: ts.CommentRange): void => {
+    for (let index = range.pos; index < range.end; index += 1) {
       if (characters[index] !== "\n") characters[index] = " ";
     }
-  }
+  };
+  // Tokens rather than nodes: `forEachChild` skips punctuation, and a JSX
+  // comment lives in the trivia before the closing brace of `{/* ... */}`.
+  const visit = (node: ts.Node): void => {
+    const children = node.getChildren(sourceFile);
 
-  return characters.join("");
+    if (children.length === 0) {
+      for (const range of ts.getLeadingCommentRanges(source, node.pos) ?? []) blank(range);
+
+      return;
+    }
+
+    for (const child of children) visit(child);
+  };
+
+  visit(sourceFile);
+
+  const blanked = characters.join("");
+  commentFreeSources.set(source, blanked);
+
+  return blanked;
 }
 
 function browserCapabilitySourceViolations(source: string): string[] {
@@ -402,7 +448,119 @@ function browserCapabilitySourceViolations(source: string): string[] {
   );
 }
 
-function forbiddenWebPresentationImport(specifier: string): string | undefined {
+/**
+ * The two roles that are portable because of what they ARE, whatever they
+ * import.
+ *
+ * The Design System is React by construction — it is the one presentation
+ * dependency browser UI is meant to share — so no framework check can admit
+ * it. A feature contract is the declared shape of a feature's data, and ADR-004
+ * names it portable in that role.
+ *
+ * Everything else first-party has to prove it.
+ */
+const PORTABLE_BY_ROLE = /^@langwatch\/(?:design-system(?:\/|$)|[^/]+-contract(?:\/|$))/;
+
+export type PortableModuleOracle = {
+  /** Whether a first-party specifier resolves to a provably portable module. */
+  isPortable: (specifier: string) => boolean;
+};
+
+/**
+ * Whether a first-party module is portable into browser UI, decided by reading
+ * it rather than by reading its package name.
+ *
+ * The name test this replaces admitted the Design System and `*-contract` and
+ * refused every other `@langwatch/*` specifier as "a first-party implementation
+ * package". That verdict was wrong for the framework-free platform modules the
+ * browser genuinely shares: `@langwatch/config/docs-url` is a URL builder over
+ * a type-only import, and `@langwatch/handled-error`'s subpaths are the error
+ * codes, the customer-facing presentation table and the reader that turns a
+ * wire payload into them. Refusing those pushed every web package toward a
+ * private copy of the codes — which is the drift the presentation registry
+ * exists to prevent.
+ *
+ * Portable means the module's whole VALUE closure stays clear of React and the
+ * other browser-only toolkits, of the transport, router, session and storage
+ * capabilities a screen must receive rather than reach for, of server, Prisma
+ * and environment implementation, and of Node builtins. `import type` is
+ * erased, so a portable module may still name any type it likes. A module that
+ * renders JSX is framework-bound whether or not it names React, so the walk
+ * counts the compiler-emitted `react/jsx-runtime` edge too.
+ *
+ * A specifier that resolves to no workspace package is left to the caller's own
+ * rule: this oracle answers about code it can read, and an unresolvable
+ * `@langwatch/*` specifier is either a package outside the workspace or a
+ * subpath its manifest does not export.
+ */
+function createPortableModuleOracle({ root }: { root: string }): PortableModuleOracle {
+  let resolver: WorkspaceModuleResolver | undefined;
+  const answers = new Map<string, boolean>();
+
+  const nonPortableEdge = (specifier: string): string | undefined => {
+    if (NODE_BUILTIN_SPECIFIERS.has(specifier)) return "a Node.js builtin";
+
+    return (
+      browserOnlyPackage(specifier) ??
+      forbiddenBrowserCapabilityImport(specifier) ??
+      isForbiddenUiSpecifier(specifier)
+    );
+  };
+
+  const isPortable = (specifier: string): boolean => {
+    const known = answers.get(specifier);
+
+    if (known !== void 0) return known;
+
+    const workspace = (resolver ??= createWorkspaceModuleResolver({ root }));
+    const packageName = specifier
+      .split("/")
+      .slice(0, specifier.startsWith("@") ? 2 : 1)
+      .join("/");
+    const entry = workspace.packages.has(packageName)
+      ? workspace.resolve({ specifier, file: join(root, "package.json") })
+      : void 0;
+    const portable =
+      entry !== void 0 &&
+      walkValueImportGraph({
+        roots: [entry],
+        resolve: (options) => workspace.resolve(options),
+        forbidden: ({ specifier: edge }) => nonPortableEdge(edge),
+        emitted: ({ file }) =>
+          rendersJsx({ file })
+            ? "react/jsx-runtime"
+            : browserCapabilitySourceViolations(readFileSync(file, "utf8"))[0],
+      }).seeds.size === 0;
+
+    answers.set(specifier, portable);
+
+    return portable;
+  };
+
+  return { isPortable };
+}
+
+/**
+ * Whether browser UI may import a first-party specifier: because of the role
+ * the package plays, or because the module proved it.
+ */
+function isPortableFirstPartyImport({
+  specifier,
+  portable,
+}: {
+  specifier: string;
+  portable: PortableModuleOracle;
+}): boolean {
+  return PORTABLE_BY_ROLE.test(specifier) || portable.isPortable(specifier);
+}
+
+function forbiddenWebPresentationImport({
+  specifier,
+  portable,
+}: {
+  specifier: string;
+  portable: PortableModuleOracle;
+}): string | undefined {
   const forbiddenUiSpecifier = isForbiddenUiSpecifier(specifier);
   if (forbiddenUiSpecifier) return forbiddenUiSpecifier;
   const forbiddenCapability = forbiddenBrowserCapabilityImport(specifier);
@@ -413,21 +571,27 @@ function forbiddenWebPresentationImport(specifier: string): string | undefined {
   if (/^@langwatch\/[^/]+-web(?:\/|$)/.test(specifier)) {
     return "a feature-web public entry";
   }
-  if (
-    specifier.startsWith("@langwatch/") &&
-    !/^@langwatch\/(?:design-system(?:\/|$)|[^/]+-contract(?:\/|$))/.test(specifier)
-  ) {
-    return "a first-party implementation package instead of a portable contract or the Design System";
+  if (specifier.startsWith("@langwatch/") && !isPortableFirstPartyImport({ specifier, portable })) {
+    return "a first-party implementation package instead of a portable module, a contract, or the Design System";
   }
   return void 0;
 }
 
-function forbiddenFrontendFeatureImport(specifier: string): string | undefined {
+function forbiddenFrontendFeatureImport({
+  specifier,
+  portable,
+}: {
+  specifier: string;
+  portable: PortableModuleOracle;
+}): string | undefined {
   const forbiddenCapability = forbiddenBrowserCapabilityImport(specifier);
   if (forbiddenCapability) return forbiddenCapability;
+  const declaredWebCapability = /^@langwatch\/[^/]+-web(?:\/|$)/.test(specifier);
+
   if (
     specifier.startsWith("@langwatch/") &&
-    !/^@langwatch\/(?:design-system(?:\/|$)|[^/]+-(?:contract|web)(?:\/|$))/.test(specifier)
+    !declaredWebCapability &&
+    !isPortableFirstPartyImport({ specifier, portable })
   ) {
     return "a first-party implementation package outside platform or a declared web capability";
   }
@@ -657,6 +821,7 @@ function lintUiSourceBoundaries(
   root: string,
   catalogue: UiFeatureCatalogue,
   webPackages: readonly WebPackage[],
+  portable: PortableModuleOracle,
 ): ArchitectureViolation[] {
   const sourceRoot = join(root, "apps", "ui", "src");
   const featuresRoot = join(sourceRoot, "features");
@@ -729,7 +894,7 @@ function lintUiSourceBoundaries(
 
       const forbiddenFeatureImport =
         importerFeature && !forbidden
-          ? forbiddenFrontendFeatureImport(sourceImport.specifier)
+          ? forbiddenFrontendFeatureImport({ specifier: sourceImport.specifier, portable })
           : void 0;
       if (forbiddenFeatureImport) {
         violations.push({
@@ -941,6 +1106,7 @@ function forbiddenSurfaceDirectory(packageSourceRoot: string, file: string): str
 function lintWebScreenClosures(
   root: string,
   webPackages: readonly WebPackage[],
+  portable: PortableModuleOracle,
 ): ArchitectureViolation[] {
   const violations: ArchitectureViolation[] = [];
   for (const pkg of webPackages) {
@@ -987,7 +1153,7 @@ function lintWebScreenClosures(
             continue;
           }
           const forbiddenImport =
-            forbiddenWebPresentationImport(sourceImport.specifier) ??
+            forbiddenWebPresentationImport({ specifier: sourceImport.specifier, portable }) ??
             (isLegacyApplicationRelativeImport(root, current, sourceImport.specifier)
               ? "legacy platform/app implementation"
               : void 0);
@@ -1000,7 +1166,10 @@ function lintWebScreenClosures(
               message: `An owner-only screen may not import ${forbiddenImport}.`,
             });
           }
-          const targetFile = resolveRelativeModule({ file: sourceImport.file, specifier: sourceImport.specifier });
+          const targetFile = resolveRelativeModule({
+            file: sourceImport.file,
+            specifier: sourceImport.specifier,
+          });
           if (!targetFile) continue;
           if (!isWithin(sourceRoot, targetFile)) {
             violations.push({
@@ -1021,13 +1190,10 @@ function lintWebScreenClosures(
   return violations;
 }
 
-function forbiddenSurfaceImport(specifier: string): string | undefined {
-  return forbiddenWebPresentationImport(specifier);
-}
-
 function lintWebSurfaceClosures(
   root: string,
   webPackages: readonly WebPackage[],
+  portable: PortableModuleOracle,
 ): ArchitectureViolation[] {
   const violations: ArchitectureViolation[] = [];
   for (const pkg of webPackages) {
@@ -1100,7 +1266,7 @@ function lintWebSurfaceClosures(
             continue;
           }
           const forbiddenImport =
-            forbiddenSurfaceImport(sourceImport.specifier) ??
+            forbiddenWebPresentationImport({ specifier: sourceImport.specifier, portable }) ??
             (isLegacyApplicationRelativeImport(root, current, sourceImport.specifier)
               ? "legacy platform/app implementation"
               : void 0);
@@ -1113,7 +1279,10 @@ function lintWebSurfaceClosures(
               message: `A shareable surface may not import ${forbiddenImport}.`,
             });
           }
-          const targetFile = resolveRelativeModule({ file: sourceImport.file, specifier: sourceImport.specifier });
+          const targetFile = resolveRelativeModule({
+            file: sourceImport.file,
+            specifier: sourceImport.specifier,
+          });
           if (!targetFile) continue;
           if (!isWithin(sourceRoot, targetFile)) {
             violations.push({
@@ -1555,6 +1724,7 @@ export function lintFrontendUiBoundaries(
   );
   const selectedPackageNames = new Set(catalogue.governedWebPackages);
   const selectedWebPackages = webPackages.filter((pkg) => selectedPackageNames.has(pkg.name));
+  const portable = createPortableModuleOracle({ root });
   return [
     ...violations,
     ...lintUiRootDirectories(root),
@@ -1565,8 +1735,8 @@ export function lintFrontendUiBoundaries(
     ...lintDeclaredCapabilities(root, catalogue, webPackages),
     ...lintWebPublicExports(selectedWebPackages),
     ...lintWebPrivateStructure(selectedWebPackages),
-    ...lintUiSourceBoundaries(root, catalogue, webPackages),
-    ...lintWebScreenClosures(root, selectedWebPackages),
-    ...lintWebSurfaceClosures(root, selectedWebPackages),
+    ...lintUiSourceBoundaries(root, catalogue, webPackages, portable),
+    ...lintWebScreenClosures(root, selectedWebPackages, portable),
+    ...lintWebSurfaceClosures(root, selectedWebPackages, portable),
   ];
 }
