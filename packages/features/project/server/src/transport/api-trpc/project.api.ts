@@ -33,6 +33,7 @@ import {
   ProjectPermissionDeniedError,
   type AuthzPermission,
 } from "@langwatch/authz-contract";
+import { HandledError } from "@langwatch/handled-error";
 import {
   CannotArchiveCurrentProjectError,
   ProjectNotFoundError,
@@ -360,10 +361,16 @@ export class ProjectTrpcApi {
           return await ctx.app.projects.requestTopicClustering(input, ctx.actor());
         } catch (error) {
           ports.reportTopicClusteringFailure(error, { projectId: input.projectId });
-          // The failures behind this are event-store and projection internals
-          // — Prisma detail, hostnames — which is a cause we cannot name and
-          // the caller cannot act on. It stays an ordinary error so the
-          // boundary degrades it to an unknown failure carrying a trace id
+          // A refusal the process already named — a deployment that composes
+          // no clustering scheduler is the one that reaches here — is
+          // re-raised untouched. Its cause is known and its caller can act on
+          // it, so wrapping it would spend a name the boundary would then
+          // report as a trace id.
+          if (HandledError.isHandled(error)) throw error;
+          // Everything else behind this is event-store and projection
+          // internals — Prisma detail, hostnames — which is a cause we cannot
+          // name and the caller cannot act on. It stays an ordinary error so
+          // the boundary degrades it to an unknown failure carrying a trace id
           // rather than dressing an infrastructure fault up as handled.
           throw new Error("Failed to trigger topic clustering", { cause: error });
         }

@@ -18,6 +18,7 @@
  * procedure it has already composed.
  */
 import { ApiKeyNotFoundError, type ApiKeyService } from "@langwatch/api-key-contract";
+import { HandledError } from "@langwatch/handled-error";
 import {
   PersonalProjectProtectedError,
   PersonalWorkspaceBoundaryError,
@@ -45,6 +46,25 @@ type TestContext = {
  * off the tRPC code: without the process's handled-error middleware in the
  * chain, every handled error arrives here as the cause of a generic wrapper.
  */
+/**
+ * The refusal a process raises when it composed no clustering scheduler — the
+ * API process is the deployment that does. Restated here rather than imported
+ * because the composition root that raises it is a host of this package, not a
+ * dependency of it; what this surface owes the caller is that a refusal shaped
+ * like this one arrives intact.
+ */
+class NoClusteringSchedulerError extends HandledError {
+  declare readonly code: "service_unavailable";
+
+  constructor() {
+    super("service_unavailable", "This deployment has no topic-clustering scheduler.", {
+      httpStatus: 503,
+      fault: "platform",
+    });
+    this.name = "NoClusteringSchedulerError";
+  }
+}
+
 async function expectRefusal(
   call: Promise<unknown>,
   expected: { code: string; httpStatus: number },
@@ -603,9 +623,39 @@ describe("ProjectTrpcApi", () => {
     });
 
     /**
+     * The one cause behind this that IS nameable: a deployment that composed
+     * no scheduler refuses by name, and the caller can act on it — there is
+     * nothing to retry, and somebody has to turn the service on. Re-raised
+     * untouched, it reaches the client as its own code; wrapped, the client
+     * would get a trace id for a condition we could have named.
+     *
+     * @scenario "A deployment without a clustering scheduler refuses by name"
+     */
+    it("re-raises a named refusal rather than degrading it", async () => {
+      const { caller, reportTopicClusteringFailure } = harness({
+        topics: { getClusteringStatus: async () => ({ isRunInFlight: false }) as never },
+        topicClustering: {
+          requestClustering: async () => {
+            throw new NoClusteringSchedulerError();
+          },
+        },
+      });
+
+      await expectRefusal(caller.triggerTopicClustering({ projectId: "project_123" }), {
+        code: "service_unavailable",
+        httpStatus: 503,
+      });
+      expect(reportTopicClusteringFailure).toHaveBeenCalledWith(expect.any(Error), {
+        projectId: "project_123",
+      });
+    });
+
+    /**
      * The cause is an event-store internal, which is neither nameable nor
      * actionable, so it stays an ordinary error and degrades to an unknown
      * failure with a trace id rather than being dressed up as handled.
+     *
+     * @scenario "A clustering run that fails inside the platform degrades to an unknown failure"
      */
     it("reports the failure and raises an unhandled error", async () => {
       const { caller, reportTopicClusteringFailure } = harness({

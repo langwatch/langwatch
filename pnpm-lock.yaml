@@ -455,6 +455,9 @@ importers:
       openapi-types:
         specifier: ^12.1.3
         version: 12.1.3
+      prisma:
+        specifier: 7.9.1
+        version: 7.9.1(@types/react-dom@19.2.4(@types/react@19.2.18))(@types/react@19.2.18)(magicast@0.5.4)(react-dom@19.2.8(react@19.2.8))(react@19.2.8)(typescript@7.0.2)
       prom-client:
         specifier: ^15.1.3
         version: 15.1.3
@@ -486,6 +489,9 @@ importers:
       '@types/node':
         specifier: ^26.0.1
         version: 26.2.0
+      simple-statistics:
+        specifier: ^7.9.2
+        version: 7.9.2
       typescript:
         specifier: ^7.0.2
         version: 7.0.2
@@ -734,6 +740,18 @@ importers:
         specifier: ^4.4.3
         version: 4.4.3
     devDependencies:
+      '@ai-sdk/openai':
+        specifier: ^3.0.79
+        version: 3.0.79(zod@4.4.3)
+      '@langwatch/prisma-client':
+        specifier: workspace:*
+        version: link:../../packages/prisma-client
+      '@langwatch/scenario':
+        specifier: ^1.3.0
+        version: 1.3.0(@aws-sdk/credential-provider-node@3.972.79)(@cfworker/json-schema@4.1.1)(@smithy/signature-v4@5.7.0)(ai@6.0.217(zod@4.4.3))(bufferutil@4.1.0)(encoding@0.1.13)(vitest@4.1.10)
+      '@langwatch/scenario-server':
+        specifier: workspace:*
+        version: link:../../packages/features/scenario/server
       '@opentelemetry/api':
         specifier: ^1.9.1
         version: 1.9.1
@@ -743,6 +761,9 @@ importers:
       '@opentelemetry/semantic-conventions':
         specifier: ^1.41.1
         version: 1.43.0
+      '@playwright/test':
+        specifier: ^1.61.1
+        version: 1.61.1
       '@testing-library/react':
         specifier: ^16.3.2
         version: 16.3.2(@testing-library/dom@10.4.1)(@types/react-dom@19.2.4(@types/react@19.2.18))(@types/react@19.2.18)(react-dom@19.2.8(react@19.2.8))(react@19.2.8)
@@ -758,12 +779,24 @@ importers:
       '@vitejs/plugin-react':
         specifier: ^6.0.3
         version: 6.0.3(babel-plugin-react-compiler@1.0.0)(vite@8.1.2(@types/node@26.2.0)(esbuild@0.28.1)(jiti@2.7.0)(sass@1.101.0)(terser@5.48.0)(tsx@4.22.4)(yaml@2.9.0))
+      ai:
+        specifier: ^6.0.161
+        version: 6.0.217(zod@4.4.3)
       dotenv:
         specifier: ^17.4.2
         version: 17.4.2
       jsdom:
         specifier: ^30.0.1
         version: 30.0.1(@noble/hashes@2.2.0)
+      nanoid:
+        specifier: ^6.0.0
+        version: 6.0.0
+      playwright:
+        specifier: 1.61.1
+        version: 1.61.1
+      tsx:
+        specifier: ^4.22.4
+        version: 4.22.4
       typescript:
         specifier: ^7.0.2
         version: 7.0.2
@@ -1872,6 +1905,9 @@ importers:
         specifier: ^4.4.3
         version: 4.4.3
     devDependencies:
+      nanoid:
+        specifier: ^6.0.0
+        version: 6.0.0
       typescript:
         specifier: ^7.0.2
         version: 7.0.2
@@ -2951,6 +2987,9 @@ importers:
         specifier: ^4.4.3
         version: 4.4.3
     devDependencies:
+      '@langwatch/test-harness':
+        specifier: workspace:*
+        version: link:../../../test-harness
       typescript:
         specifier: ^7.0.2
         version: 7.0.2
@@ -4494,6 +4533,9 @@ importers:
         specifier: ^5.0.0
         version: 5.0.0(zod@4.4.3)
     devDependencies:
+      '@langwatch/test-harness':
+        specifier: workspace:*
+        version: link:../../../test-harness
       typescript:
         specifier: ^7.0.2
         version: 7.0.2
@@ -6892,6 +6934,9 @@ importers:
       '@langwatch/authz-contract':
         specifier: workspace:*
         version: link:../../authz/contract
+      '@langwatch/handled-error':
+        specifier: workspace:*
+        version: link:../../../handled-error
       '@langwatch/organization-contract':
         specifier: workspace:*
         version: link:../../organization/contract
@@ -9388,6 +9433,24 @@ importers:
         specifier: ^4.4.3
         version: 4.4.3
     devDependencies:
+      '@langwatch/api-key-server':
+        specifier: workspace:*
+        version: link:../features/api-key/server
+      '@langwatch/enterprise-licensing-server':
+        specifier: workspace:*
+        version: link:../enterprise/features/licensing/server
+      '@langwatch/model-provider-contract':
+        specifier: workspace:*
+        version: link:../features/model-provider/contract
+      '@langwatch/role-contract':
+        specifier: workspace:*
+        version: link:../features/role/contract
+      '@langwatch/secret-server':
+        specifier: workspace:*
+        version: link:../features/secret/server
+      '@types/bcrypt':
+        specifier: ^6.0.0
+        version: 6.0.0
       '@types/lodash-es':
         specifier: ^4.17.12
         version: 4.17.12
@@ -9397,9 +9460,18 @@ importers:
       '@types/pg':
         specifier: ^8.20.3
         version: 8.20.4
+      bcrypt:
+        specifier: ^6.0.0
+        version: 6.0.0
+      dotenv:
+        specifier: ^17.4.2
+        version: 17.4.2
       prisma:
         specifier: 7.9.1
         version: 7.9.1(@types/react-dom@19.2.4(@types/react@19.2.18))(@types/react@19.2.18)(magicast@0.5.4)(react-dom@19.2.8(react@19.2.8))(react@19.2.8)(typescript@7.0.2)
+      tsx:
+        specifier: ^4.22.4
+        version: 4.22.4
       typescript:
         specifier: ^7.0.2
         version: 7.0.2
@@ -9607,1196 +9679,6 @@ importers:
       vitest:
         specifier: ^4.1.9
         version: 4.1.10(@opentelemetry/api@1.9.1)(@types/node@26.2.0)(@vitest/browser-playwright@4.1.10)(@vitest/coverage-v8@4.1.10)(@vitest/ui@4.1.10)(jsdom@30.0.1(@noble/hashes@2.2.0))(msw@2.15.0(@types/node@26.2.0)(typescript@7.0.2))(vite@8.1.2(@types/node@26.2.0)(esbuild@0.28.1)(jiti@2.7.0)(sass@1.101.0)(terser@5.48.0)(tsx@4.22.4)(yaml@2.9.0))
-
-  platform/app:
-    dependencies:
-      '@ag-ui/core':
-        specifier: ~0.0.57
-        version: 0.0.57
-      '@ai-sdk/openai':
-        specifier: ^3.0.79
-        version: 3.0.79(zod@4.4.3)
-      '@ai-sdk/openai-compatible':
-        specifier: ^2.0.55
-        version: 2.0.55(zod@4.4.3)
-      '@aws-sdk/client-cloudwatch-logs':
-        specifier: ^3.1080.0
-        version: 3.1108.0
-      '@aws-sdk/client-lambda':
-        specifier: ^3.1080.0
-        version: 3.1108.0
-      '@aws-sdk/client-s3':
-        specifier: ^3.1080.0
-        version: 3.1108.0
-      '@aws-sdk/client-ses':
-        specifier: ^3.1080.0
-        version: 3.1108.0
-      '@aws-sdk/client-sqs':
-        specifier: ^3.1080.0
-        version: 3.1108.0
-      '@aws-sdk/s3-request-presigner':
-        specifier: ^3.1080.0
-        version: 3.1108.0
-      '@azure/identity':
-        specifier: ^4.13.1
-        version: 4.13.1
-      '@better-auth/passkey':
-        specifier: 1.7.1
-        version: 1.7.1(@better-auth/core@1.7.1(@better-auth/utils@0.5.0)(@better-fetch/fetch@1.3.1)(@opentelemetry/api@1.9.1)(better-call@1.4.0(zod@4.4.3))(jose@6.2.3)(kysely@0.28.17)(nanostores@1.4.0))(@better-auth/utils@0.5.0)(@better-fetch/fetch@1.3.1)(better-auth@1.7.1(@opentelemetry/api@1.9.1)(@prisma/client@7.9.1(prisma@7.9.1(@types/react-dom@19.2.4(@types/react@19.2.18))(@types/react@19.2.18)(magicast@0.5.4)(react-dom@19.2.8(react@19.2.8))(react@19.2.8)(typescript@7.0.2))(typescript@7.0.2))(mysql2@3.15.3)(pg@8.22.0)(prisma@7.9.1(@types/react-dom@19.2.4(@types/react@19.2.18))(@types/react@19.2.18)(magicast@0.5.4)(react-dom@19.2.8(react@19.2.8))(react@19.2.8)(typescript@7.0.2))(react-dom@19.2.8(react@19.2.8))(react@19.2.8)(vitest@4.1.10))(better-call@1.4.0(zod@4.4.3))(nanostores@1.4.0)
-      '@chakra-ui/react':
-        specifier: ^3.36.0
-        version: 3.36.0(@emotion/react@11.14.0(@types/react@19.2.18)(react@19.2.8))(react-dom@19.2.8(react@19.2.8))(react@19.2.8)
-      '@clickhouse/client':
-        specifier: ^1.23.0
-        version: 1.23.0
-      '@clickhouse/parser':
-        specifier: 0.3.0
-        version: 0.3.0
-      '@copilotkit/runtime':
-        specifier: ~1.8.14
-        version: 1.8.14(26b65b6ac01091463709a2d020e78ae5)
-      '@copilotkit/shared':
-        specifier: 1.8.13
-        version: 1.8.13(encoding@0.1.13)
-      '@google-cloud/dlp':
-        specifier: ^6.7.0
-        version: 6.7.0
-      '@hono/node-server':
-        specifier: '>=2.0.10'
-        version: 2.0.10(hono@4.13.1)
-      '@hono/standard-validator':
-        specifier: ^0.2.3
-        version: 0.2.3(@standard-schema/spec@1.1.0)(hono@4.13.1)
-      '@langwatch/actor':
-        specifier: workspace:*
-        version: link:../../packages/actor
-      '@langwatch/agent-contract':
-        specifier: workspace:*
-        version: link:../../packages/features/agent/contract
-      '@langwatch/agent-server':
-        specifier: workspace:*
-        version: link:../../packages/features/agent/server
-      '@langwatch/agent-web':
-        specifier: workspace:*
-        version: link:../../packages/features/agent/web
-      '@langwatch/analytics-contract':
-        specifier: workspace:*
-        version: link:../../packages/features/analytics/contract
-      '@langwatch/analytics-server':
-        specifier: workspace:*
-        version: link:../../packages/features/analytics/server
-      '@langwatch/analytics-web':
-        specifier: workspace:*
-        version: link:../../packages/features/analytics/web
-      '@langwatch/annotation-contract':
-        specifier: workspace:*
-        version: link:../../packages/features/annotation/contract
-      '@langwatch/annotation-server':
-        specifier: workspace:*
-        version: link:../../packages/features/annotation/server
-      '@langwatch/annotation-web':
-        specifier: workspace:*
-        version: link:../../packages/features/annotation/web
-      '@langwatch/api':
-        specifier: workspace:*
-        version: link:../../packages/api
-      '@langwatch/api-key-contract':
-        specifier: workspace:*
-        version: link:../../packages/features/api-key/contract
-      '@langwatch/api-key-server':
-        specifier: workspace:*
-        version: link:../../packages/features/api-key/server
-      '@langwatch/auth-contract':
-        specifier: workspace:*
-        version: link:../../packages/features/auth/contract
-      '@langwatch/auth-server':
-        specifier: workspace:*
-        version: link:../../packages/features/auth/server
-      '@langwatch/authz-contract':
-        specifier: workspace:*
-        version: link:../../packages/features/authz/contract
-      '@langwatch/authz-server':
-        specifier: workspace:*
-        version: link:../../packages/features/authz/server
-      '@langwatch/automation-contract':
-        specifier: workspace:*
-        version: link:../../packages/features/automation/contract
-      '@langwatch/automation-server':
-        specifier: workspace:*
-        version: link:../../packages/features/automation/server
-      '@langwatch/aws-client':
-        specifier: workspace:*
-        version: link:../../packages/aws-client
-      '@langwatch/clickhouse-client':
-        specifier: workspace:*
-        version: link:../../packages/clickhouse-client
-      '@langwatch/coding-agent-contract':
-        specifier: workspace:*
-        version: link:../../packages/features/coding-agent/contract
-      '@langwatch/coding-agent-server':
-        specifier: workspace:*
-        version: link:../../packages/features/coding-agent/server
-      '@langwatch/coding-agent-web':
-        specifier: workspace:*
-        version: link:../../packages/features/coding-agent/web
-      '@langwatch/config':
-        specifier: workspace:*
-        version: link:../../packages/config
-      '@langwatch/dashboard-contract':
-        specifier: workspace:*
-        version: link:../../packages/features/dashboard/contract
-      '@langwatch/dashboard-server':
-        specifier: workspace:*
-        version: link:../../packages/features/dashboard/server
-      '@langwatch/data-privacy-contract':
-        specifier: workspace:*
-        version: link:../../packages/features/data-privacy/contract
-      '@langwatch/data-privacy-server':
-        specifier: workspace:*
-        version: link:../../packages/features/data-privacy/server
-      '@langwatch/data-privacy-web':
-        specifier: workspace:*
-        version: link:../../packages/features/data-privacy/web
-      '@langwatch/data-retention-contract':
-        specifier: workspace:*
-        version: link:../../packages/features/data-retention/contract
-      '@langwatch/data-retention-server':
-        specifier: workspace:*
-        version: link:../../packages/features/data-retention/server
-      '@langwatch/data-retention-web':
-        specifier: workspace:*
-        version: link:../../packages/features/data-retention/web
-      '@langwatch/dataset-contract':
-        specifier: workspace:*
-        version: link:../../packages/features/dataset/contract
-      '@langwatch/dataset-server':
-        specifier: workspace:*
-        version: link:../../packages/features/dataset/server
-      '@langwatch/dataset-web':
-        specifier: workspace:*
-        version: link:../../packages/features/dataset/web
-      '@langwatch/design-system':
-        specifier: workspace:*
-        version: link:../../packages/design-system
-      '@langwatch/enterprise-api':
-        specifier: workspace:*
-        version: link:../../packages/enterprise/composition/api
-      '@langwatch/enterprise-audit-log-server':
-        specifier: workspace:*
-        version: link:../../packages/enterprise/features/audit-log/server
-      '@langwatch/enterprise-billing-contract':
-        specifier: workspace:*
-        version: link:../../packages/enterprise/features/billing/contract
-      '@langwatch/enterprise-billing-server':
-        specifier: workspace:*
-        version: link:../../packages/enterprise/features/billing/server
-      '@langwatch/enterprise-billing-web':
-        specifier: workspace:*
-        version: link:../../packages/enterprise/features/billing/web
-      '@langwatch/enterprise-governance-contract':
-        specifier: workspace:*
-        version: link:../../packages/enterprise/features/governance/contract
-      '@langwatch/enterprise-governance-server':
-        specifier: workspace:*
-        version: link:../../packages/enterprise/features/governance/server
-      '@langwatch/enterprise-governance-web':
-        specifier: workspace:*
-        version: link:../../packages/enterprise/features/governance/web
-      '@langwatch/enterprise-licensing-contract':
-        specifier: workspace:*
-        version: link:../../packages/enterprise/features/licensing/contract
-      '@langwatch/enterprise-licensing-server':
-        specifier: workspace:*
-        version: link:../../packages/enterprise/features/licensing/server
-      '@langwatch/enterprise-licensing-web':
-        specifier: workspace:*
-        version: link:../../packages/enterprise/features/licensing/web
-      '@langwatch/enterprise-managed-provider-contract':
-        specifier: workspace:*
-        version: link:../../packages/enterprise/features/managed-provider/contract
-      '@langwatch/enterprise-managed-provider-server':
-        specifier: workspace:*
-        version: link:../../packages/enterprise/features/managed-provider/server
-      '@langwatch/enterprise-managed-provider-web':
-        specifier: workspace:*
-        version: link:../../packages/enterprise/features/managed-provider/web
-      '@langwatch/enterprise-plan-gate':
-        specifier: workspace:*
-        version: link:../../packages/enterprise/plan-gate
-      '@langwatch/enterprise-saas-contract':
-        specifier: workspace:*
-        version: link:../../packages/enterprise/features/saas/contract
-      '@langwatch/enterprise-saas-web':
-        specifier: workspace:*
-        version: link:../../packages/enterprise/features/saas/web
-      '@langwatch/enterprise-scim-contract':
-        specifier: workspace:*
-        version: link:../../packages/enterprise/features/scim/contract
-      '@langwatch/enterprise-scim-server':
-        specifier: workspace:*
-        version: link:../../packages/enterprise/features/scim/server
-      '@langwatch/enterprise-sso-contract':
-        specifier: workspace:*
-        version: link:../../packages/enterprise/features/sso/contract
-      '@langwatch/enterprise-sso-server':
-        specifier: workspace:*
-        version: link:../../packages/enterprise/features/sso/server
-      '@langwatch/enterprise-webhook-contract':
-        specifier: workspace:*
-        version: link:../../packages/enterprise/features/webhook/contract
-      '@langwatch/enterprise-webhook-server':
-        specifier: workspace:*
-        version: link:../../packages/enterprise/features/webhook/server
-      '@langwatch/enterprise-worker':
-        specifier: workspace:*
-        version: link:../../packages/enterprise/composition/worker
-      '@langwatch/entitlement-contract':
-        specifier: workspace:*
-        version: link:../../packages/features/entitlement/contract
-      '@langwatch/entitlement-server':
-        specifier: workspace:*
-        version: link:../../packages/features/entitlement/server
-      '@langwatch/evaluation-contract':
-        specifier: workspace:*
-        version: link:../../packages/features/evaluation/contract
-      '@langwatch/evaluation-server':
-        specifier: workspace:*
-        version: link:../../packages/features/evaluation/server
-      '@langwatch/evaluator-contract':
-        specifier: workspace:*
-        version: link:../../packages/features/evaluator/contract
-      '@langwatch/evaluator-server':
-        specifier: workspace:*
-        version: link:../../packages/features/evaluator/server
-      '@langwatch/evaluator-web':
-        specifier: workspace:*
-        version: link:../../packages/features/evaluator/web
-      '@langwatch/eventing':
-        specifier: workspace:*
-        version: link:../../packages/eventing
-      '@langwatch/experiment-contract':
-        specifier: workspace:*
-        version: link:../../packages/features/experiment/contract
-      '@langwatch/experiment-server':
-        specifier: workspace:*
-        version: link:../../packages/features/experiment/server
-      '@langwatch/experiment-web':
-        specifier: workspace:*
-        version: link:../../packages/features/experiment/web
-      '@langwatch/feature-flag-contract':
-        specifier: workspace:*
-        version: link:../../packages/features/feature-flag/contract
-      '@langwatch/feature-flag-server':
-        specifier: workspace:*
-        version: link:../../packages/features/feature-flag/server
-      '@langwatch/feature-flag-web':
-        specifier: workspace:*
-        version: link:../../packages/features/feature-flag/web
-      '@langwatch/gateway-contract':
-        specifier: workspace:*
-        version: link:../../packages/features/gateway/contract
-      '@langwatch/gateway-server':
-        specifier: workspace:*
-        version: link:../../packages/features/gateway/server
-      '@langwatch/gateway-web':
-        specifier: workspace:*
-        version: link:../../packages/features/gateway/web
-      '@langwatch/github-contract':
-        specifier: workspace:*
-        version: link:../../packages/features/github/contract
-      '@langwatch/github-server':
-        specifier: workspace:*
-        version: link:../../packages/features/github/server
-      '@langwatch/github-web':
-        specifier: workspace:*
-        version: link:../../packages/features/github/web
-      '@langwatch/group-queue':
-        specifier: workspace:*
-        version: link:../../packages/group-queue
-      '@langwatch/handled-error':
-        specifier: workspace:*
-        version: link:../../packages/handled-error
-      '@langwatch/identity-contract':
-        specifier: workspace:*
-        version: link:../../packages/features/identity/contract
-      '@langwatch/identity-eventing':
-        specifier: workspace:*
-        version: link:../../packages/identity-eventing
-      '@langwatch/identity-server':
-        specifier: workspace:*
-        version: link:../../packages/features/identity/server
-      '@langwatch/ksuid':
-        specifier: ^2.0.2
-        version: 2.0.2(patch_hash=edd8defd29b1ef2b8aae1ae6d2c0d68b69a8789e0018817b024fb88ff9f36980)
-      '@langwatch/langy-contract':
-        specifier: workspace:*
-        version: link:../../packages/features/langy/contract
-      '@langwatch/langy-server':
-        specifier: workspace:*
-        version: link:../../packages/features/langy/server
-      '@langwatch/langy-web':
-        specifier: workspace:*
-        version: link:../../packages/features/langy/web
-      '@langwatch/log-contract':
-        specifier: workspace:*
-        version: link:../../packages/features/log/contract
-      '@langwatch/log-server':
-        specifier: workspace:*
-        version: link:../../packages/features/log/server
-      '@langwatch/mcp-server':
-        specifier: workspace:*
-        version: link:../../mcp/typescript
-      '@langwatch/metric-contract':
-        specifier: workspace:*
-        version: link:../../packages/features/metric/contract
-      '@langwatch/metric-server':
-        specifier: workspace:*
-        version: link:../../packages/features/metric/server
-      '@langwatch/model-provider-contract':
-        specifier: workspace:*
-        version: link:../../packages/features/model-provider/contract
-      '@langwatch/model-provider-server':
-        specifier: workspace:*
-        version: link:../../packages/features/model-provider/server
-      '@langwatch/monitor-contract':
-        specifier: workspace:*
-        version: link:../../packages/features/monitor/contract
-      '@langwatch/monitor-server':
-        specifier: workspace:*
-        version: link:../../packages/features/monitor/server
-      '@langwatch/notification-contract':
-        specifier: workspace:*
-        version: link:../../packages/features/notification/contract
-      '@langwatch/notification-server':
-        specifier: workspace:*
-        version: link:../../packages/features/notification/server
-      '@langwatch/observability':
-        specifier: workspace:*
-        version: link:../../packages/observability
-      '@langwatch/ops-contract':
-        specifier: workspace:*
-        version: link:../../packages/features/ops/contract
-      '@langwatch/ops-server':
-        specifier: workspace:*
-        version: link:../../packages/features/ops/server
-      '@langwatch/ops-web':
-        specifier: workspace:*
-        version: link:../../packages/features/ops/web
-      '@langwatch/organization-contract':
-        specifier: workspace:*
-        version: link:../../packages/features/organization/contract
-      '@langwatch/organization-server':
-        specifier: workspace:*
-        version: link:../../packages/features/organization/server
-      '@langwatch/platform-api':
-        specifier: workspace:*
-        version: link:../../apps/api
-      '@langwatch/platform-api-client':
-        specifier: workspace:*
-        version: link:../../packages/platform-api-client
-      '@langwatch/platform-api-contract':
-        specifier: workspace:*
-        version: link:../../packages/platform-api-contract
-      '@langwatch/presence-contract':
-        specifier: workspace:*
-        version: link:../../packages/features/presence/contract
-      '@langwatch/presence-server':
-        specifier: workspace:*
-        version: link:../../packages/features/presence/server
-      '@langwatch/presence-web':
-        specifier: workspace:*
-        version: link:../../packages/features/presence/web
-      '@langwatch/prisma-client':
-        specifier: workspace:*
-        version: link:../../packages/prisma-client
-      '@langwatch/project-contract':
-        specifier: workspace:*
-        version: link:../../packages/features/project/contract
-      '@langwatch/project-server':
-        specifier: workspace:*
-        version: link:../../packages/features/project/server
-      '@langwatch/prompt-contract':
-        specifier: workspace:*
-        version: link:../../packages/features/prompt/contract
-      '@langwatch/prompt-server':
-        specifier: workspace:*
-        version: link:../../packages/features/prompt/server
-      '@langwatch/prompt-web':
-        specifier: workspace:*
-        version: link:../../packages/features/prompt/web
-      '@langwatch/react-rum':
-        specifier: workspace:*
-        version: link:../../packages/react-rum
-      '@langwatch/redaction':
-        specifier: workspace:*
-        version: link:../../packages/redaction
-      '@langwatch/redis-client':
-        specifier: workspace:*
-        version: link:../../packages/redis-client
-      '@langwatch/role-contract':
-        specifier: workspace:*
-        version: link:../../packages/features/role/contract
-      '@langwatch/role-server':
-        specifier: workspace:*
-        version: link:../../packages/features/role/server
-      '@langwatch/runtime-composition':
-        specifier: workspace:*
-        version: link:../../packages/runtime-composition
-      '@langwatch/scenario':
-        specifier: file:vendor/langwatch-scenario-1.3.0.tgz
-        version: file:platform/app/vendor/langwatch-scenario-1.3.0.tgz(@aws-sdk/credential-provider-node@3.972.79)(@cfworker/json-schema@4.1.1)(ai@6.0.217(zod@4.4.3))(bufferutil@4.1.0)(encoding@0.1.13)(vitest@4.1.10)
-      '@langwatch/scenario-contract':
-        specifier: workspace:*
-        version: link:../../packages/features/scenario/contract
-      '@langwatch/scenario-server':
-        specifier: workspace:*
-        version: link:../../packages/features/scenario/server
-      '@langwatch/scenario-web':
-        specifier: workspace:*
-        version: link:../../packages/features/scenario/web
-      '@langwatch/secret-contract':
-        specifier: workspace:*
-        version: link:../../packages/features/secret/contract
-      '@langwatch/secret-server':
-        specifier: workspace:*
-        version: link:../../packages/features/secret/server
-      '@langwatch/server':
-        specifier: workspace:*
-        version: link:../../apps/server
-      '@langwatch/share-contract':
-        specifier: workspace:*
-        version: link:../../packages/features/share/contract
-      '@langwatch/share-server':
-        specifier: workspace:*
-        version: link:../../packages/features/share/server
-      '@langwatch/share-web':
-        specifier: workspace:*
-        version: link:../../packages/features/share/web
-      '@langwatch/ssrf':
-        specifier: workspace:*
-        version: link:../../packages/ssrf
-      '@langwatch/stored-object-contract':
-        specifier: workspace:*
-        version: link:../../packages/features/stored-object/contract
-      '@langwatch/stored-object-server':
-        specifier: workspace:*
-        version: link:../../packages/features/stored-object/server
-      '@langwatch/suite-contract':
-        specifier: workspace:*
-        version: link:../../packages/features/suite/contract
-      '@langwatch/suite-server':
-        specifier: workspace:*
-        version: link:../../packages/features/suite/server
-      '@langwatch/suite-web':
-        specifier: workspace:*
-        version: link:../../packages/features/suite/web
-      '@langwatch/system-migrations':
-        specifier: workspace:*
-        version: link:../../packages/system-migrations
-      '@langwatch/topic-contract':
-        specifier: workspace:*
-        version: link:../../packages/features/topic/contract
-      '@langwatch/topic-server':
-        specifier: workspace:*
-        version: link:../../packages/features/topic/server
-      '@langwatch/trace-contract':
-        specifier: workspace:*
-        version: link:../../packages/features/trace/contract
-      '@langwatch/trace-server':
-        specifier: workspace:*
-        version: link:../../packages/features/trace/server
-      '@langwatch/trace-web':
-        specifier: workspace:*
-        version: link:../../packages/features/trace/web
-      '@langwatch/ui':
-        specifier: workspace:*
-        version: link:../../apps/ui
-      '@langwatch/user-contract':
-        specifier: workspace:*
-        version: link:../../packages/features/user/contract
-      '@langwatch/user-server':
-        specifier: workspace:*
-        version: link:../../packages/features/user/server
-      '@langwatch/user-web':
-        specifier: workspace:*
-        version: link:../../packages/features/user/web
-      '@langwatch/worker':
-        specifier: workspace:*
-        version: link:../../apps/worker
-      '@langwatch/workflow-contract':
-        specifier: workspace:*
-        version: link:../../packages/features/workflow/contract
-      '@langwatch/workflow-server':
-        specifier: workspace:*
-        version: link:../../packages/features/workflow/server
-      '@langwatch/workflow-web':
-        specifier: workspace:*
-        version: link:../../packages/features/workflow/web
-      '@modelcontextprotocol/sdk':
-        specifier: ^1.29.0
-        version: 1.29.0(@cfworker/json-schema@4.1.1)(zod@4.4.3)
-      '@opentelemetry/api':
-        specifier: ^1.9.1
-        version: 1.9.1
-      '@opentelemetry/api-logs':
-        specifier: 0.221.0
-        version: 0.221.0
-      '@opentelemetry/core':
-        specifier: 2.10.0
-        version: 2.10.0(@opentelemetry/api@1.9.1)
-      '@opentelemetry/exporter-logs-otlp-http':
-        specifier: 0.221.0
-        version: 0.221.0(@opentelemetry/api@1.9.1)
-      '@opentelemetry/exporter-logs-otlp-proto':
-        specifier: ^0.221.0
-        version: 0.221.0(@opentelemetry/api@1.9.1)
-      '@opentelemetry/exporter-metrics-otlp-http':
-        specifier: 0.221.0
-        version: 0.221.0(@opentelemetry/api@1.9.1)
-      '@opentelemetry/exporter-metrics-otlp-proto':
-        specifier: ^0.221.0
-        version: 0.221.0(@opentelemetry/api@1.9.1)
-      '@opentelemetry/exporter-trace-otlp-http':
-        specifier: ^0.221.0
-        version: 0.221.0(@opentelemetry/api@1.9.1)
-      '@opentelemetry/exporter-trace-otlp-proto':
-        specifier: ^0.221.0
-        version: 0.221.0(@opentelemetry/api@1.9.1)
-      '@opentelemetry/host-metrics':
-        specifier: ^0.39.0
-        version: 0.39.0(@opentelemetry/api@1.9.1)
-      '@opentelemetry/instrumentation':
-        specifier: ^0.221.0
-        version: 0.221.0(@opentelemetry/api@1.9.1)
-      '@opentelemetry/instrumentation-aws-sdk':
-        specifier: ^0.76.0
-        version: 0.76.0(@opentelemetry/api@1.9.1)
-      '@opentelemetry/instrumentation-ioredis':
-        specifier: ^0.69.0
-        version: 0.69.0(@opentelemetry/api@1.9.1)
-      '@opentelemetry/instrumentation-openai':
-        specifier: ^0.19.0
-        version: 0.19.0(@opentelemetry/api@1.9.1)
-      '@opentelemetry/instrumentation-pino':
-        specifier: ^0.67.0
-        version: 0.67.0(@opentelemetry/api@1.9.1)
-      '@opentelemetry/instrumentation-runtime-node':
-        specifier: ^0.34.0
-        version: 0.34.0(@opentelemetry/api@1.9.1)
-      '@opentelemetry/otlp-exporter-base':
-        specifier: 0.221.0
-        version: 0.221.0(@opentelemetry/api@1.9.1)
-      '@opentelemetry/otlp-transformer':
-        specifier: 0.55.0
-        version: 0.55.0(@opentelemetry/api@1.9.1)
-      '@opentelemetry/otlp-transformer-next':
-        specifier: npm:@opentelemetry/otlp-transformer@0.219.0
-        version: '@opentelemetry/otlp-transformer@0.219.0(@opentelemetry/api@1.9.1)'
-      '@opentelemetry/otlp-transformer-telemetry':
-        specifier: npm:@opentelemetry/otlp-transformer@0.221.0
-        version: '@opentelemetry/otlp-transformer@0.221.0(@opentelemetry/api@1.9.1)'
-      '@opentelemetry/resource-detector-aws':
-        specifier: ^2.19.0
-        version: 2.21.0(@opentelemetry/api@1.9.1)
-      '@opentelemetry/resources':
-        specifier: ^2.8.0
-        version: 2.10.0(@opentelemetry/api@1.9.1)
-      '@opentelemetry/sdk-logs':
-        specifier: ^0.221.0
-        version: 0.221.0(@opentelemetry/api@1.9.1)
-      '@opentelemetry/sdk-metrics':
-        specifier: ^2.8.0
-        version: 2.10.0(@opentelemetry/api@1.9.1)
-      '@opentelemetry/sdk-node':
-        specifier: 0.221.0
-        version: 0.221.0(@opentelemetry/api@1.9.1)
-      '@opentelemetry/sdk-trace-base':
-        specifier: 2.10.0
-        version: 2.10.0(@opentelemetry/api@1.9.1)
-      '@opentelemetry/sdk-trace-node':
-        specifier: 2.10.0
-        version: 2.10.0(@opentelemetry/api@1.9.1)
-      '@opentelemetry/semantic-conventions':
-        specifier: ^1.41.1
-        version: 1.43.0
-      '@prisma/adapter-pg':
-        specifier: 7.9.1
-        version: 7.9.1
-      '@prisma/client':
-        specifier: 7.9.1
-        version: 7.9.1(prisma@7.9.1(@types/react-dom@19.2.4(@types/react@19.2.18))(@types/react@19.2.18)(magicast@0.5.4)(react-dom@19.2.8(react@19.2.8))(react@19.2.8)(typescript@7.0.2))(typescript@7.0.2)
-      '@pyroscope/nodejs':
-        specifier: 0.6.2
-        version: 0.6.2(express@5.2.1)
-      '@react-email/components':
-        specifier: ^1.0.12
-        version: 1.0.12(react-dom@19.2.8(react@19.2.8))(react@19.2.8)
-      '@react-email/render':
-        specifier: ^2.0.9
-        version: 2.0.9(react-dom@19.2.8(react@19.2.8))(react@19.2.8)
-      '@sendgrid/mail':
-        specifier: ^8.1.6
-        version: 8.1.6
-      '@slack/webhook':
-        specifier: ^7.1.0
-        version: 7.1.0
-      '@standard-community/standard-json':
-        specifier: ^0.3.5
-        version: 0.3.5(@standard-schema/spec@1.1.0)(@types/json-schema@7.0.15)(effect@3.20.0)(quansync@0.2.11)(typebox@1.3.7)(valibot@1.4.2(typescript@7.0.2))(zod-to-json-schema@3.25.2(zod@4.4.3))(zod@4.4.3)
-      '@standard-community/standard-openapi':
-        specifier: ^0.2.9
-        version: 0.2.9(@standard-community/standard-json@0.3.5(@standard-schema/spec@1.1.0)(@types/json-schema@7.0.15)(effect@3.20.0)(quansync@0.2.11)(typebox@1.3.7)(valibot@1.4.2(typescript@7.0.2))(zod-to-json-schema@3.25.2(zod@4.4.3))(zod@4.4.3))(@standard-schema/spec@1.1.0)(effect@3.20.0)(openapi-types@12.1.3)(typebox@1.3.7)(valibot@1.4.2(typescript@7.0.2))(zod-openapi@4.2.4(zod@4.4.3))(zod@4.4.3)
-      '@standard-schema/spec':
-        specifier: ^1.1.0
-        version: 1.1.0
-      '@t3-oss/env-core':
-        specifier: ^0.13.11
-        version: 0.13.11(typescript@7.0.2)(valibot@1.4.2(typescript@7.0.2))(zod@4.4.3)
-      '@trpc/client':
-        specifier: 11.18.0
-        version: 11.18.0(@trpc/server@11.18.0(typescript@7.0.2))(typescript@7.0.2)
-      '@trpc/react-query':
-        specifier: 11.18.0
-        version: 11.18.0(@tanstack/react-query@5.101.4(react@19.2.8))(@trpc/client@11.18.0(@trpc/server@11.18.0(typescript@7.0.2))(typescript@7.0.2))(@trpc/server@11.18.0(typescript@7.0.2))(react@19.2.8)(typescript@7.0.2)
-      '@trpc/server':
-        specifier: 11.18.0
-        version: 11.18.0(typescript@7.0.2)
-      ai:
-        specifier: ^6.0.161
-        version: 6.0.217(zod@4.4.3)
-      ajv:
-        specifier: ^8.20.0
-        version: 8.20.0
-      bcrypt:
-        specifier: ^6.0.0
-        version: 6.0.0
-      better-auth:
-        specifier: ^1.7.1
-        version: 1.7.1(@opentelemetry/api@1.9.1)(@prisma/client@7.9.1(prisma@7.9.1(@types/react-dom@19.2.4(@types/react@19.2.18))(@types/react@19.2.18)(magicast@0.5.4)(react-dom@19.2.8(react@19.2.8))(react@19.2.8)(typescript@7.0.2))(typescript@7.0.2))(mysql2@3.15.3)(pg@8.22.0)(prisma@7.9.1(@types/react-dom@19.2.4(@types/react@19.2.18))(@types/react@19.2.18)(magicast@0.5.4)(react-dom@19.2.8(react@19.2.8))(react@19.2.8)(typescript@7.0.2))(react-dom@19.2.8(react@19.2.8))(react@19.2.8)(vitest@4.1.10)
-      chalk:
-        specifier: ^6.0.0
-        version: 6.0.0
-      croner:
-        specifier: ^10.0.1
-        version: 10.0.1
-      date-fns:
-        specifier: ^4.4.0
-        version: 4.4.0
-      deepmerge:
-        specifier: ^4.3.1
-        version: 4.3.1
-      diff:
-        specifier: ^9.0.0
-        version: 9.0.0
-      dotenv:
-        specifier: ^17.4.2
-        version: 17.4.2
-      express-prom-bundle:
-        specifier: ^8.0.0
-        version: 8.0.0(prom-client@15.1.3)
-      fastq:
-        specifier: ^1.20.1
-        version: 1.20.1
-      geoip-country:
-        specifier: ^5.0.202607010001
-        version: 5.0.202607010001
-      hono:
-        specifier: '>=4.12.34'
-        version: 4.13.1
-      hono-openapi:
-        specifier: ^1.3.1
-        version: 1.3.1(@hono/standard-validator@0.2.3(@standard-schema/spec@1.1.0)(hono@4.13.1))(@standard-community/standard-json@0.3.5(@standard-schema/spec@1.1.0)(@types/json-schema@7.0.15)(effect@3.20.0)(quansync@0.2.11)(typebox@1.3.7)(valibot@1.4.2(typescript@7.0.2))(zod-to-json-schema@3.25.2(zod@4.4.3))(zod@4.4.3))(@standard-community/standard-openapi@0.2.9(@standard-community/standard-json@0.3.5(@standard-schema/spec@1.1.0)(@types/json-schema@7.0.15)(effect@3.20.0)(quansync@0.2.11)(typebox@1.3.7)(valibot@1.4.2(typescript@7.0.2))(zod-to-json-schema@3.25.2(zod@4.4.3))(zod@4.4.3))(@standard-schema/spec@1.1.0)(effect@3.20.0)(openapi-types@12.1.3)(typebox@1.3.7)(valibot@1.4.2(typescript@7.0.2))(zod-openapi@4.2.4(zod@4.4.3))(zod@4.4.3))(@types/json-schema@7.0.15)(hono@4.13.1)(openapi-types@12.1.3)
-      import-in-the-middle:
-        specifier: 3.3.3
-        version: 3.3.3
-      ioredis:
-        specifier: 5.10.1
-        version: 5.10.1
-      js-yaml:
-        specifier: ^5.2.0
-        version: 5.2.2
-      jsonpath-plus:
-        specifier: ^10.4.0
-        version: 10.4.0
-      jsonwebtoken:
-        specifier: ^9.0.3
-        version: 9.0.3
-      langwatch:
-        specifier: workspace:*
-        version: link:../../sdks/typescript
-      libphonenumber-js:
-        specifier: ^1.13.7
-        version: 1.13.7
-      liqe:
-        specifier: ^3.8.7
-        version: 3.8.7
-      liquidjs:
-        specifier: '>=10.26.0 <11'
-        version: 10.27.1
-      lodash-es:
-        specifier: ^4.18.1
-        version: 4.18.1
-      marked:
-        specifier: ^18.0.5
-        version: 18.0.5
-      monacopilot:
-        specifier: ^1.2.12
-        version: 1.2.12(monaco-editor@0.55.1)
-      msgpackr:
-        specifier: ^2.0.4
-        version: 2.0.4
-      nanoid:
-        specifier: ^6.0.0
-        version: 6.0.0
-      node-fetch-cache:
-        specifier: ^5.1.0
-        version: 5.1.0
-      nodemailer:
-        specifier: ^9.0.3
-        version: 9.0.3
-      numeral:
-        specifier: ^2.0.6
-        version: 2.0.6
-      ohm-js:
-        specifier: ^17.5.0
-        version: 17.5.0
-      openai:
-        specifier: ^7.4.0
-        version: 7.4.0(@aws-sdk/credential-provider-node@3.972.79)(@smithy/signature-v4@5.7.0)(ws@8.21.1(bufferutil@4.1.0))(zod@4.4.3)
-      openapi-fetch:
-        specifier: ^0.17.0
-        version: 0.17.0
-      openapi-types:
-        specifier: ^12.1.3
-        version: 12.1.3
-      papaparse:
-        specifier: ^5.5.4
-        version: 5.5.4
-      pg:
-        specifier: ^8.22.0
-        version: 8.22.0
-      pino:
-        specifier: ^10.3.1
-        version: 10.3.1
-      pino-opentelemetry-transport:
-        specifier: ^4.0.2
-        version: 4.0.2(pino@10.3.1)
-      pino-pretty:
-        specifier: ^13.1.3
-        version: 13.1.3
-      posthog-js:
-        specifier: ^1.396.9
-        version: 1.415.6
-      posthog-node:
-        specifier: ^5.39.4
-        version: 5.48.1(rxjs@7.8.2)
-      prisma:
-        specifier: 7.9.1
-        version: 7.9.1(@types/react-dom@19.2.4(@types/react@19.2.18))(@types/react@19.2.18)(magicast@0.5.4)(react-dom@19.2.8(react@19.2.8))(react@19.2.8)(typescript@7.0.2)
-      prom-client:
-        specifier: ^15.1.3
-        version: 15.1.3
-      ra-data-simple-prisma:
-        specifier: ^3.1.3
-        version: 3.1.3(@prisma/client@7.9.1(prisma@7.9.1(@types/react-dom@19.2.4(@types/react@19.2.18))(@types/react@19.2.18)(magicast@0.5.4)(react-dom@19.2.8(react@19.2.8))(react@19.2.8)(typescript@7.0.2))(typescript@7.0.2))
-      react:
-        specifier: ^19.2.7
-        version: 19.2.8
-      react-router:
-        specifier: ^8.0.1
-        version: 8.3.0(react-dom@19.2.8(react@19.2.8))(react@19.2.8)
-      require-in-the-middle:
-        specifier: 8.0.1
-        version: 8.0.1
-      safe-regex2:
-        specifier: ^5.1.1
-        version: 5.1.1
-      sanitize-html:
-        specifier: ^2.17.5
-        version: 2.17.5
-      slugify:
-        specifier: ^1.6.9
-        version: 1.6.9
-      stripe:
-        specifier: ^15.12.0
-        version: 15.12.0
-      superjson:
-        specifier: ^2.2.6
-        version: 2.2.6
-      tiktoken:
-        specifier: ^1.0.22
-        version: 1.0.22
-      ts-pattern:
-        specifier: ^5.9.0
-        version: 5.9.0
-      undici:
-        specifier: '>=8.9.0 <9'
-        version: 8.10.0
-      ws:
-        specifier: ^8.21.0
-        version: 8.21.1(bufferutil@4.1.0)
-      xksuid:
-        specifier: ^0.0.4
-        version: 0.0.4
-      zod:
-        specifier: ^4.4.3
-        version: 4.4.3
-      zod-to-json-schema:
-        specifier: ^3.25.2
-        version: 3.25.2(zod@4.4.3)
-      zod-validation-error:
-        specifier: ^5.0.0
-        version: 5.0.0(zod@4.4.3)
-      zustand:
-        specifier: ^4.5.7
-        version: 4.5.7(@types/react@19.2.18)(immer@11.1.8)(react@19.2.8)
-    devDependencies:
-      '@ai-sdk/react':
-        specifier: ^3.0.219
-        version: 3.0.219(react@19.2.8)(zod@4.4.3)
-      '@chakra-ui/charts':
-        specifier: ^3.36.0
-        version: 3.36.0(@chakra-ui/react@3.36.0(@emotion/react@11.14.0(@types/react@19.2.18)(react@19.2.8))(react-dom@19.2.8(react@19.2.8))(react@19.2.8))(react-dom@19.2.8(react@19.2.8))(react@19.2.8)(recharts@3.9.1(@types/react@19.2.18)(react-dom@19.2.8(react@19.2.8))(react-is@19.2.7)(react@19.2.8)(redux@5.0.1))
-      '@copilotkit/react-core':
-        specifier: ~1.8.14
-        version: 1.8.14(@types/react@19.2.18)(encoding@0.1.13)(graphql@16.14.2)(react-dom@19.2.8(react@19.2.8))(react@19.2.8)
-      '@copilotkit/react-ui':
-        specifier: ~1.8.14
-        version: 1.8.14(@types/react@19.2.18)(encoding@0.1.13)(graphql@16.14.2)(react-dom@19.2.8(react@19.2.8))(react@19.2.8)
-      '@copilotkit/runtime-client-gql':
-        specifier: 1.8.13
-        version: 1.8.13(encoding@0.1.13)(graphql@16.14.2)(react@19.2.8)
-      '@dnd-kit/core':
-        specifier: ^6.3.1
-        version: 6.3.1(react-dom@19.2.8(react@19.2.8))(react@19.2.8)
-      '@dnd-kit/sortable':
-        specifier: ^10.0.0
-        version: 10.0.0(@dnd-kit/core@6.3.1(react-dom@19.2.8(react@19.2.8))(react@19.2.8))(react@19.2.8)
-      '@dnd-kit/utilities':
-        specifier: 3.2.2
-        version: 3.2.2(react@19.2.8)
-      '@emotion/react':
-        specifier: ^11.14.0
-        version: 11.14.0(@types/react@19.2.18)(react@19.2.8)
-      '@hookform/resolvers':
-        specifier: ^5.4.0
-        version: 5.4.0(react-hook-form@7.80.0(react@19.2.8))
-      '@microlink/react-json-view':
-        specifier: ^1.31.21
-        version: 1.31.21(@types/react@19.2.18)(react-dom@19.2.8(react@19.2.8))(react@19.2.8)
-      '@microsoft/fetch-event-source':
-        specifier: ^2.0.1
-        version: 2.0.1
-      '@monaco-editor/react':
-        specifier: ^4.7.0
-        version: 4.7.0(monaco-editor@0.55.1)(react-dom@19.2.8(react@19.2.8))(react@19.2.8)
-      '@opentelemetry/instrumentation-document-load':
-        specifier: ^0.66.0
-        version: 0.66.0(@opentelemetry/api@1.9.1)
-      '@opentelemetry/instrumentation-fetch':
-        specifier: ^0.221.0
-        version: 0.221.0(@opentelemetry/api@1.9.1)
-      '@opentelemetry/sdk-trace-web':
-        specifier: 2.10.0
-        version: 2.10.0(@opentelemetry/api@1.9.1)
-      '@paper-design/shaders-react':
-        specifier: ^0.0.76
-        version: 0.0.76(@types/react@19.2.18)(react@19.2.8)
-      '@playwright/test':
-        specifier: ^1.61.1
-        version: 1.61.1
-      '@tanstack/react-query':
-        specifier: 5.101.4
-        version: 5.101.4(react@19.2.8)
-      '@tanstack/react-table':
-        specifier: ^8.21.3
-        version: 8.21.3(react-dom@19.2.8(react@19.2.8))(react@19.2.8)
-      '@tanstack/react-virtual':
-        specifier: ^3.14.5
-        version: 3.14.5(react-dom@19.2.8(react@19.2.8))(react@19.2.8)
-      '@testcontainers/clickhouse':
-        specifier: ^12.0.4
-        version: 12.0.4
-      '@testcontainers/postgresql':
-        specifier: ^12.0.4
-        version: 12.1.0
-      '@testcontainers/redis':
-        specifier: ^12.0.4
-        version: 12.0.4
-      '@testing-library/jest-dom':
-        specifier: ^7.0.1
-        version: 7.0.1(@testing-library/dom@10.4.1)(vitest@4.1.10)
-      '@testing-library/react':
-        specifier: ^16.3.2
-        version: 16.3.2(@testing-library/dom@10.4.1)(@types/react-dom@19.2.4(@types/react@19.2.18))(@types/react@19.2.18)(react-dom@19.2.8(react@19.2.8))(react@19.2.8)
-      '@testing-library/user-event':
-        specifier: ^14.6.1
-        version: 14.6.1(@testing-library/dom@10.4.1)
-      '@tiptap/extension-document':
-        specifier: ^3.27.1
-        version: 3.27.1(@tiptap/core@3.27.1(@tiptap/pm@3.27.1))
-      '@tiptap/extension-history':
-        specifier: ^3.27.1
-        version: 3.27.1(@tiptap/extensions@3.27.1(@tiptap/core@3.27.1(@tiptap/pm@3.27.1))(@tiptap/pm@3.27.1))
-      '@tiptap/extension-paragraph':
-        specifier: ^3.27.1
-        version: 3.27.1(@tiptap/core@3.27.1(@tiptap/pm@3.27.1))
-      '@tiptap/extension-placeholder':
-        specifier: ^3.27.1
-        version: 3.27.1(@tiptap/extensions@3.27.1(@tiptap/core@3.27.1(@tiptap/pm@3.27.1))(@tiptap/pm@3.27.1))
-      '@tiptap/extension-text':
-        specifier: ^3.27.1
-        version: 3.27.1(@tiptap/core@3.27.1(@tiptap/pm@3.27.1))
-      '@tiptap/pm':
-        specifier: ^3.27.1
-        version: 3.27.1
-      '@tiptap/react':
-        specifier: ^3.27.1
-        version: 3.27.1(@floating-ui/dom@1.7.6)(@tiptap/core@3.27.1(@tiptap/pm@3.27.1))(@tiptap/pm@3.27.1)(@types/react-dom@19.2.4(@types/react@19.2.18))(@types/react@19.2.18)(react-dom@19.2.8(react@19.2.8))(react@19.2.8)
-      '@types/bcrypt':
-        specifier: ^6.0.0
-        version: 6.0.0
-      '@types/diff':
-        specifier: ^8.0.0
-        version: 8.0.0
-      '@types/jsonwebtoken':
-        specifier: ^9.0.10
-        version: 9.0.10
-      '@types/lodash-es':
-        specifier: ^4.17.12
-        version: 4.17.12
-      '@types/mustache':
-        specifier: ^4.2.6
-        version: 4.2.6
-      '@types/node':
-        specifier: ^26.0.1
-        version: 26.2.0
-      '@types/nodemailer':
-        specifier: ^8.0.1
-        version: 8.0.1
-      '@types/nprogress':
-        specifier: ^0.2.3
-        version: 0.2.3
-      '@types/numeral':
-        specifier: ^2.0.5
-        version: 2.0.5
-      '@types/papaparse':
-        specifier: ^5.5.2
-        version: 5.5.2
-      '@types/pg':
-        specifier: ^8.20.3
-        version: 8.20.4
-      '@types/picomatch':
-        specifier: ^4.0.2
-        version: 4.0.3
-      '@types/qs':
-        specifier: ^6.15.1
-        version: 6.15.1
-      '@types/react':
-        specifier: ^19.2.17
-        version: 19.2.18
-      '@types/react-dom':
-        specifier: ^19.2.3
-        version: 19.2.4(@types/react@19.2.18)
-      '@types/sanitize-html':
-        specifier: ^2.16.1
-        version: 2.16.1
-      '@types/semver':
-        specifier: ^7.7.1
-        version: 7.8.0
-      '@types/ws':
-        specifier: ^8.18.1
-        version: 8.18.1
-      '@vitejs/plugin-react':
-        specifier: ^6.0.3
-        version: 6.0.3(babel-plugin-react-compiler@1.0.0)(vite@8.1.2(@types/node@26.2.0)(esbuild@0.28.1)(jiti@2.7.0)(sass@1.101.0)(terser@5.48.0)(tsx@4.22.4)(yaml@2.9.0))
-      '@vitest/browser':
-        specifier: '>=4.1.10'
-        version: 4.1.10(bufferutil@4.1.0)(msw@2.15.0(@types/node@26.2.0)(typescript@7.0.2))(vite@8.1.2(@types/node@26.2.0)(esbuild@0.28.1)(jiti@2.7.0)(sass@1.101.0)(terser@5.48.0)(tsx@4.22.4)(yaml@2.9.0))(vitest@4.1.10)
-      '@vitest/browser-playwright':
-        specifier: ^4.1.9
-        version: 4.1.10(bufferutil@4.1.0)(msw@2.15.0(@types/node@26.2.0)(typescript@7.0.2))(playwright@1.61.1)(vite@8.1.2(@types/node@26.2.0)(esbuild@0.28.1)(jiti@2.7.0)(sass@1.101.0)(terser@5.48.0)(tsx@4.22.4)(yaml@2.9.0))(vitest@4.1.10)
-      '@vitest/coverage-v8':
-        specifier: ^4.1.9
-        version: 4.1.10(@vitest/browser@4.1.10)(vitest@4.1.10)
-      '@vitest/ui':
-        specifier: ^4.1.9
-        version: 4.1.10(vitest@4.1.10)
-      '@xyflow/react':
-        specifier: ^12.11.1
-        version: 12.11.1(@types/react-dom@19.2.4(@types/react@19.2.18))(@types/react@19.2.18)(immer@11.1.8)(react-dom@19.2.8(react@19.2.8))(react@19.2.8)
-      babel-plugin-react-compiler:
-        specifier: ^1.0.0
-        version: 1.0.0
-      chakra-react-select:
-        specifier: ^6.1.3
-        version: 6.1.3(@chakra-ui/react@3.36.0(@emotion/react@11.14.0(@types/react@19.2.18)(react@19.2.8))(react-dom@19.2.8(react@19.2.8))(react@19.2.8))(@types/react@19.2.18)(next-themes@0.4.6(react-dom@19.2.8(react@19.2.8))(react@19.2.8))(react-dom@19.2.8(react@19.2.8))(react@19.2.8)
-      clsx:
-        specifier: 2.1.1
-        version: 2.1.1
-      concurrently:
-        specifier: ^10.0.3
-        version: 10.0.3
-      emoji-picker-react:
-        specifier: ^4.19.1
-        version: 4.19.1(react@19.2.8)
-      encoding:
-        specifier: ^0.1.13
-        version: 0.1.13
-      esbuild:
-        specifier: ^0.28.1
-        version: 0.28.1
-      fast-deep-equal:
-        specifier: ^3.1.3
-        version: 3.1.3
-      fishery:
-        specifier: ^2.4.0
-        version: 2.4.0
-      immer:
-        specifier: ^11.1.8
-        version: 11.1.8
-      jsdom:
-        specifier: ^30.0.1
-        version: 30.0.1(@noble/hashes@2.2.0)
-      long:
-        specifier: ^5.3.2
-        version: 5.3.2
-      lucide-react:
-        specifier: ^1.22.0
-        version: 1.22.0(react@19.2.8)
-      mermaid:
-        specifier: ^11.16.0
-        version: 11.16.1
-      monaco-editor:
-        specifier: ^0.55.1
-        version: 0.55.1
-      motion:
-        specifier: ^12.42.2
-        version: 12.42.2(@emotion/is-prop-valid@1.4.0)(react-dom@19.2.8(react@19.2.8))(react@19.2.8)
-      mustache:
-        specifier: ^4.2.0
-        version: 4.2.0
-      next-themes:
-        specifier: ^0.4.6
-        version: 0.4.6(react-dom@19.2.8(react@19.2.8))(react@19.2.8)
-      node-mocks-http:
-        specifier: ^1.17.2
-        version: 1.17.2(@types/express@5.0.6)(@types/node@26.2.0)
-      nprogress:
-        specifier: ^0.2.0
-        version: 0.2.0
-      picomatch:
-        specifier: '>=4.0.4'
-        version: 4.0.5
-      playwright:
-        specifier: 1.61.1
-        version: 1.61.1
-      qs:
-        specifier: ^6.15.3
-        version: 6.15.3
-      react-contextual-analytics:
-        specifier: ^1.1.2
-        version: 1.1.2(react-dom@19.2.8(react@19.2.8))(react@19.2.8)
-      react-dnd:
-        specifier: ^16.0.1
-        version: 16.0.1(@types/node@26.2.0)(@types/react@19.2.18)(react@19.2.8)
-      react-dnd-html5-backend:
-        specifier: ^16.0.1
-        version: 16.0.1
-      react-dom:
-        specifier: ^19.2.7
-        version: 19.2.8(react@19.2.8)
-      react-error-boundary:
-        specifier: ^6.1.2
-        version: 6.1.2(react@19.2.8)
-      react-feather:
-        specifier: ^2.0.10
-        version: 2.0.10(react@19.2.8)
-      react-hook-form:
-        specifier: ^7.80.0
-        version: 7.80.0(react@19.2.8)
-      react-icons:
-        specifier: ^5.7.0
-        version: 5.7.0(react@19.2.8)
-      react-markdown:
-        specifier: ^10.1.0
-        version: 10.1.0(@types/react@19.2.18)(react@19.2.8)
-      react-papaparse:
-        specifier: ^4.4.0
-        version: 4.4.0
-      react-resizable-panels:
-        specifier: ^2.1.9
-        version: 2.1.9(react-dom@19.2.8(react@19.2.8))(react@19.2.8)
-      react-spinners:
-        specifier: ^0.17.0
-        version: 0.17.0(react-dom@19.2.8(react@19.2.8))(react@19.2.8)
-      react-vega:
-        specifier: 8.0.0
-        version: 8.0.0(react-dom@19.2.8(react@19.2.8))(react@19.2.8)(vega-embed@7.1.0(vega-lite@6.4.3(vega@6.3.1))(vega@6.3.1))
-      recharts:
-        specifier: ^3.9.1
-        version: 3.9.1(@types/react@19.2.18)(react-dom@19.2.8(react@19.2.8))(react-is@19.2.7)(react@19.2.8)(redux@5.0.1)
-      remark-gfm:
-        specifier: ^4.0.1
-        version: 4.0.1
-      rich-textarea:
-        specifier: ^0.27.0
-        version: 0.27.0(react@19.2.8)
-      sass:
-        specifier: ^1.101.0
-        version: 1.101.0
-      selfsigned:
-        specifier: ^5.5.0
-        version: 5.5.0
-      semver:
-        specifier: ^7.8.5
-        version: 7.8.5
-      shiki:
-        specifier: ^4.3.0
-        version: 4.3.0
-      simple-statistics:
-        specifier: ^7.9.2
-        version: 7.9.2
-      testcontainers:
-        specifier: ^12.0.4
-        version: 12.0.4
-      tsx:
-        specifier: ^4.22.4
-        version: 4.22.4
-      typescript:
-        specifier: ^7.0.2
-        version: 7.0.2
-      use-debounce:
-        specifier: ^10.1.1
-        version: 10.1.1(react@19.2.8)
-      usehooks-ts:
-        specifier: ^3.1.1
-        version: 3.1.1(react@19.2.8)
-      vega:
-        specifier: 6.3.1
-        version: 6.3.1
-      vega-embed:
-        specifier: 7.1.0
-        version: 7.1.0(vega-lite@6.4.3(vega@6.3.1))(vega@6.3.1)
-      vega-lite:
-        specifier: 6.4.3
-        version: 6.4.3(vega@6.3.1)
-      vite:
-        specifier: ^8.1.2
-        version: 8.1.2(@types/node@26.2.0)(esbuild@0.28.1)(jiti@2.7.0)(sass@1.101.0)(terser@5.48.0)(tsx@4.22.4)(yaml@2.9.0)
-      vitest:
-        specifier: ^4.1.9
-        version: 4.1.10(@opentelemetry/api@1.9.1)(@types/node@26.2.0)(@vitest/browser-playwright@4.1.10)(@vitest/coverage-v8@4.1.10)(@vitest/ui@4.1.10)(jsdom@30.0.1(@noble/hashes@2.2.0))(msw@2.15.0(@types/node@26.2.0)(typescript@7.0.2))(vite@8.1.2(@types/node@26.2.0)(esbuild@0.28.1)(jiti@2.7.0)(sass@1.101.0)(terser@5.48.0)(tsx@4.22.4)(yaml@2.9.0))
-      zundo:
-        specifier: ^2.3.0
-        version: 2.3.0(zustand@4.5.7(@types/react@19.2.18)(immer@11.1.8)(react@19.2.8))
-    optionalDependencies:
-      '@rollup/rollup-linux-x64-gnu':
-        specifier: ^4.62.2
-        version: 4.62.2
-      bufferutil:
-        specifier: ^4.1.0
-        version: 4.1.0
 
   plugins/langwatch:
     devDependencies:
@@ -11281,10 +10163,6 @@ packages:
     resolution: {integrity: sha512-u+NT61JZEkRFtpL0CAw1N1dwxnaLgwVXQl/zjJxTGgLyS/jTIdg2SdoEoCTHxgDyCnqa1HEi9QOoE9/pYRNpOQ==}
     engines: {node: '>=20.0.0'}
 
-  '@aws-sdk/client-cloudwatch-logs@3.1108.0':
-    resolution: {integrity: sha512-GVd4/2L2QXc8PLWMzlO/nfa3OpW929ae484r+Lv95efuuSS7eEAjbftyQTH7abCHn4BDIXaXCcX20B8T0WnbGQ==}
-    engines: {node: '>=20.0.0'}
-
   '@aws-sdk/client-lambda@3.1108.0':
     resolution: {integrity: sha512-l8zjB18DP0zvW7/KbAlMS6DLFTxBY4tVY2N1OH4dLw891AGuRo4VdJeYGFpVgbUp+0OZlhJkjzryVU5eVK+RlQ==}
     engines: {node: '>=20.0.0'}
@@ -11522,10 +10400,6 @@ packages:
 
   '@babel/traverse@7.29.7':
     resolution: {integrity: sha512-EhlfNQtZ+NK22w5BM61ciuiq1m58ed33Wr1Xan//ZRTy6hgjnwyCffRYwzsGXdASJSUJ1guZILsErh1eQcl+zw==}
-    engines: {node: '>=6.9.0'}
-
-  '@babel/types@7.29.7':
-    resolution: {integrity: sha512-4zBIxpPzowiZpusoFkyGVwakdRJUyuH5PxQ/PrqghfdFWWasvnCdPfQXHrenDai+gyLARulZjZowCOj6fjT4pA==}
     engines: {node: '>=6.9.0'}
 
   '@babel/types@7.29.8':
@@ -12908,18 +11782,6 @@ packages:
       '@google/genai':
         optional: true
 
-  '@langwatch/scenario@file:platform/app/vendor/langwatch-scenario-1.3.0.tgz':
-    resolution: {integrity: sha512-g9Uv5vEeXAVqJzTsDbBaEJvJkQYzlOkDDN3WbkXBshHcIXLhOD0/V4wm0rUJLd0phHWt+vfb+0EEJviyzIpW9Q==, tarball: file:platform/app/vendor/langwatch-scenario-1.3.0.tgz}
-    version: 1.3.0
-    engines: {node: '>=20', pnpm: '>=8'}
-    peerDependencies:
-      '@google/genai': '>=2.0.0'
-      ai: ^6.0.161
-      vitest: '>=4.1.0'
-    peerDependenciesMeta:
-      '@google/genai':
-        optional: true
-
   '@levischuck/tiny-cbor@0.2.11':
     resolution: {integrity: sha512-llBRm4dT4Z89aRsm6u2oEZ8tfwL/2l6BwpZ7JcyieouniDECM5AqNgr/y08zalEIvW3RSK4upYyybDcmjXqAow==}
 
@@ -13084,10 +11946,6 @@ packages:
   '@noble/ciphers@2.2.0':
     resolution: {integrity: sha512-Z6pjIZ/8IJcCGzb2S/0Px5J81yij85xASuk1teLNeg75bfT07MV3a/O2Mtn1I2se43k3lkVEcFaR10N4cgQcZA==}
     engines: {node: '>= 20.19.0'}
-
-  '@noble/hashes@1.4.0':
-    resolution: {integrity: sha512-V1JJ1WTRUqHHrOSh597hURcMqVKVGL/ea3kv0gSnEdsEZ0/+VyPghM1lMNGc00z7CIQorSvbKpuJkxvuHbvdbg==}
-    engines: {node: '>= 16'}
 
   '@noble/hashes@2.2.0':
     resolution: {integrity: sha512-IYqDGiTXab6FniAgnSdZwgWbomxpy9FtYvLKs7wCUs2a8RkITG+DFGO1DM9cr+E3/RgADRpFjrKVaJ1z6sjtEg==}
@@ -13398,12 +12256,6 @@ packages:
     peerDependencies:
       '@opentelemetry/api': ^1.3.0
 
-  '@opentelemetry/instrumentation-aws-sdk@0.76.0':
-    resolution: {integrity: sha512-gg2QaDtWeFezRt2mAl9vBQ38y60tzUShKg1KA9uTgsMJimUHaBnB3X8kEH9Of8jKWT4DDoDcSA37gPcoEc0hiA==}
-    engines: {node: ^18.19.0 || >=20.6.0}
-    peerDependencies:
-      '@opentelemetry/api': ^1.3.0
-
   '@opentelemetry/instrumentation-document-load@0.66.0':
     resolution: {integrity: sha512-e4ymSy64SFKd1TYnbFOpdInuw0x8mRzONdHnfsaTyFojiizDjwNv9klYUrIxmVQ/J2RLFvnKYHwgrgc/u2yFZQ==}
     engines: {node: ^18.19.0 || >=20.6.0}
@@ -13412,30 +12264,6 @@ packages:
 
   '@opentelemetry/instrumentation-fetch@0.221.0':
     resolution: {integrity: sha512-PPfEC0dIvhieidxtajOsbgFZ2RBUhCsk1ztHE6I5uinNc4JocL+UNRQY6iCBsckI0rjTwYvsYRYOJUjGyLhIug==}
-    engines: {node: ^18.19.0 || >=20.6.0}
-    peerDependencies:
-      '@opentelemetry/api': ^1.3.0
-
-  '@opentelemetry/instrumentation-ioredis@0.69.0':
-    resolution: {integrity: sha512-I9sZtxXWZ1tRXtRNTEVxpokGtXy6RL1SZhtPVh7zxH78t8ar71V5Dx4bnQiUjKTDzItpC73krD8c0/cEWA9oLg==}
-    engines: {node: ^18.19.0 || >=20.6.0}
-    peerDependencies:
-      '@opentelemetry/api': ^1.3.0
-
-  '@opentelemetry/instrumentation-openai@0.19.0':
-    resolution: {integrity: sha512-zHz7m/aUMDyAap7UMzaaxDkbmxEyUOfMBfh+7KICNwTBmIOypMnuUWwXWAfIJLgl+2dnZlNzxZRknULeS4YIhg==}
-    engines: {node: ^18.19.0 || >=20.6.0}
-    peerDependencies:
-      '@opentelemetry/api': ^1.3.0
-
-  '@opentelemetry/instrumentation-pino@0.67.0':
-    resolution: {integrity: sha512-Hb6phi2x1bq23OIiesj4imQvXs9Y5MMLtpgXH9hOuMm9LpBYz2cxPNgpgZ/XATuRclP1eRPoSl399o5XKwfoIA==}
-    engines: {node: ^18.19.0 || >=20.6.0}
-    peerDependencies:
-      '@opentelemetry/api': ^1.3.0
-
-  '@opentelemetry/instrumentation-runtime-node@0.34.0':
-    resolution: {integrity: sha512-Yb3PcmuK/iIOWY49GSEcSGl7fR4r6UqhZnuy5EWvFaqKqqs9SYnQeyQUEAbnBnSougRpwFBDbdN1SSGcvMhbtQ==}
     engines: {node: ^18.19.0 || >=20.6.0}
     peerDependencies:
       '@opentelemetry/api': ^1.3.0
@@ -13553,16 +12381,6 @@ packages:
     engines: {node: ^18.19.0 || >=20.6.0}
     peerDependencies:
       '@opentelemetry/api': '>=1.0.0 <1.10.0'
-
-  '@opentelemetry/redis-common@0.38.3':
-    resolution: {integrity: sha512-VCghU1JYs/4gP6Gqf/xro9MEsZ7LrMv2uONVsaESKL38ZOB9BqnI98FfS23wjMnHlpuE+TTaWSoAVNpTwYXzjw==}
-    engines: {node: ^18.19.0 || >=20.6.0}
-
-  '@opentelemetry/resource-detector-aws@2.21.0':
-    resolution: {integrity: sha512-Veavy+khoywR+Hv065SU5jucFTGTiW1KXo39CsJ+8wqdYYz8jiRJPnQ20Kd+X9HbV2+Abb0l5CrJIdxK1ZOqBg==}
-    engines: {node: ^18.19.0 || >=20.6.0}
-    peerDependencies:
-      '@opentelemetry/api': ^1.0.0
 
   '@opentelemetry/resources@1.28.0':
     resolution: {integrity: sha512-cIyXSVJjGeTICENN40YSvLDAq4Y2502hGK3iN7tfdynQLKWb3XWZQEkPc+eSx47kiy11YeFAlYkEfXwR1w8kfw==}
@@ -15023,12 +13841,6 @@ packages:
     os: [linux]
     libc: [glibc]
 
-  '@rollup/rollup-linux-x64-gnu@4.62.2':
-    resolution: {integrity: sha512-5BqxR/pshjey51iliyzTD5Xi3EN0aLmQ2lZ3lvefVV9c82BvrLo2/6OT55iifpWBufs6kdwWbuOKS841DrmK9A==}
-    cpu: [x64]
-    os: [linux]
-    libc: [glibc]
-
   '@rollup/rollup-linux-x64-musl@4.59.0':
     resolution: {integrity: sha512-2UdiwS/9cTAx7qIUZB/fWtToJwvt0Vbo0zmnYt7ED35KPg13Q0ym1g442THLC7VyI6JfYTP4PiSOWyoMdV2/xg==}
     cpu: [x64]
@@ -15381,23 +14193,6 @@ packages:
   '@swc/helpers@0.5.23':
     resolution: {integrity: sha512-5lSsMOTXURePglDfvuAQUqkGek9Hg2kksOYay2m0+XR++b2NWYL/4sWyuvVBIs8oKnJaxkdi9whaL/sqN13afw==}
 
-  '@t3-oss/env-core@0.13.11':
-    resolution: {integrity: sha512-sM7GYY+KL7H/Hl0BE0inWfk3nRHZOLhmVn7sHGxaZt9FAR6KqREXAE+6TqKfiavfXmpRxO/OZ2QgKRd+oiBYRQ==}
-    peerDependencies:
-      arktype: ^2.1.0
-      typescript: '>=5.0.0'
-      valibot: ^1.0.0-beta.7 || ^1.0.0
-      zod: ^3.24.0 || ^4.0.0
-    peerDependenciesMeta:
-      arktype:
-        optional: true
-      typescript:
-        optional: true
-      valibot:
-        optional: true
-      zod:
-        optional: true
-
   '@tanstack/query-core@5.101.4':
     resolution: {integrity: sha512-gNwcvOJcRbLWPOLG/2OBm+zM+Yv+MKsXKEOWC57USuZDEsI71hEErQsiEGx5wX9rzWWkfwM0fVSPoiIFSsxfiw==}
 
@@ -15426,14 +14221,8 @@ packages:
   '@tanstack/virtual-core@3.17.3':
     resolution: {integrity: sha512-8Np/TFELpI0ySuJoVmjvOrQYXH/8sTX0Biv9szhFhY39xOdAAY+smrMxjxOum/ux3eM8MUJQsEJ0/R0UpvC8dw==}
 
-  '@testcontainers/clickhouse@12.0.4':
-    resolution: {integrity: sha512-tyCFPnnK9XfpnpWZBAvskUkNhGJpKjGtONSoWaP+asj1hn4cVPJN3GD4PpRB979mt6GO0BFjxsVuvtBCtGlevA==}
-
   '@testcontainers/clickhouse@12.1.0':
     resolution: {integrity: sha512-5hI5LcIR/TZfbY59R7GnV33kTQZQg04rb7rlJKxFfm8z4nAbeiUaRM+HN6VHGujhDjCqlYn9TjaljkfhCUWHow==}
-
-  '@testcontainers/postgresql@12.1.0':
-    resolution: {integrity: sha512-Pjf2VSVNirEPfz36nidyrVAnZvc2YhajOznY4VgyEsvfTd5qiMNOuPq96drREvxAUtXl5SFLX7vXj7sSq4aTcA==}
 
   '@testcontainers/redis@12.0.4':
     resolution: {integrity: sha512-44Ov3Lcptb3KqljcCy6xIJ2VxNsN+3Kw/YpBiotZpOcI4iLgLNmcOgvCFPVo+vDoh4rCfgtNUEbIpL5Mu7oRuw==}
@@ -15733,10 +14522,6 @@ packages:
 
   '@types/deep-eql@4.0.2':
     resolution: {integrity: sha512-c9h9dVVMigMPc4bwTvC5dxqtqJZwQPePsWjPlpSOnojbor6pGqdk541lfA7AqFQr5pB1BRdq0juY9db81BwyFw==}
-
-  '@types/diff@8.0.0':
-    resolution: {integrity: sha512-o7jqJM04gfaYrdCecCVMbZhNdG6T1MHg/oQoRFdERLV+4d+V7FijhiEAbFu0Usww84Yijk9yH58U4Jk4HbtzZw==}
-    deprecated: This is a stub types definition. diff provides its own type definitions, so you do not need this installed.
 
   '@types/docker-modem@3.0.6':
     resolution: {integrity: sha512-yKpAGEuKRSS8wwx0joknWxsmLha78wNMe9R2S3UNsVOkZded8UqOrV8KoeDXoXsjndxwyF3eIhyClGbO1SEhEg==}
@@ -17006,10 +15791,6 @@ packages:
     resolution: {integrity: sha512-/Nf7TyzTx6S3yRJObOAV7956r8cr2+Oj8AC5dt8wSP3BQAoeX58NoHyCU8P8zGkNXStjTSi6fzO6F0pBdcYbEg==}
     engines: {node: '>= 0.8'}
 
-  bytestreamjs@2.0.1:
-    resolution: {integrity: sha512-U1Z/ob71V/bXfVABvNr/Kumf5VyeQRBEm6Txb0PQ6S7V5GpBM3w4Cbqz/xPDicR5tN0uvDifng8C+5qECeGwyQ==}
-    engines: {node: '>=6.0.0'}
-
   c12@3.3.4:
     resolution: {integrity: sha512-cM0ApFQSBXuourJejzwv/AuPRvAxordTyParRVcHjjtXirtkzM0uK2L9TTn9s0cXZbG7E55jCivRQzoxYmRAlA==}
     peerDependencies:
@@ -17257,11 +16038,6 @@ packages:
   concat-stream@2.0.0:
     resolution: {integrity: sha512-MWufYdFw53ccGjCA+Ol7XJYpAlW6/prSMzuPOTRnJGcGzuhLn4Scrz7qf6o8bROZ514ltazcIFJZevcfbo0x7A==}
     engines: {'0': node >= 6.0}
-
-  concurrently@10.0.3:
-    resolution: {integrity: sha512-hc3LH4UaKWd/bbyDK/IGVa4RB6PtQ3CUYwtrkzqHn+wIG3Hr5fhpRlk0L/gCa8ZE1L/Ufj50Zho69cI5w8SQBA==}
-    engines: {node: '>=22'}
-    hasBin: true
 
   concurrently@9.2.4:
     resolution: {integrity: sha512-TZ0CEhyzvFjgtAvHTusDMgj7wNdihCh7LLLrzdUOXIhdlnL2JBBGA9eJxR24rtqgmdjh3OA3hrN1rCHj6HM8qA==}
@@ -17648,10 +16424,6 @@ packages:
     resolution: {integrity: sha512-HVQE3AAb/pxF8fQAoiqpvg9i3evqug3hoiwakOyZAwJm+6vZehbkYXZ0l4JxS+I3QxM97v5aaRNhj8v5oBhekw==}
     engines: {node: '>=0.10'}
 
-  depd@1.1.2:
-    resolution: {integrity: sha512-7emPTl6Dpo6JRXOXjLRxck+FlLRX5847cLKEn00PLAgc3g2hTZZgr+e4c2v6QpSmLeFP3n5yUo7ft6avBK/5jQ==}
-    engines: {node: '>= 0.6'}
-
   depd@2.0.0:
     resolution: {integrity: sha512-g7nH6P6dyDioJogAAGprGpCtVImJhpPk/roCzdb3fIh61/s/nPsfR6onyMwkCAR/OlC3yBC0lESvUoQEAssIrw==}
     engines: {node: '>= 0.8'}
@@ -17995,12 +16767,6 @@ packages:
   expect-type@1.4.0:
     resolution: {integrity: sha512-KfYbmpRm0VbLjEvVa9yGwCi9GI34xvi7A/HXYWQO65CSD2u3MczUJSuwXKFIxlGsgBQizV9q5J9NHj4VG0n+pA==}
     engines: {node: '>=12.0.0'}
-
-  express-prom-bundle@8.0.0:
-    resolution: {integrity: sha512-UHdpaMks6Z/tvxQsNzhsE7nkdXb4/zEh/jwN0tfZSZOEF+aD0dlfl085EU4jveOq09v01c5sIUfjV4kJODZ2eQ==}
-    engines: {node: '>=18'}
-    peerDependencies:
-      prom-client: '>=15.0.0'
 
   express-rate-limit@8.6.0:
     resolution: {integrity: sha512-XKJXDsASUOo0LLtFwW5hCcQGH0N4WQc/Rn8/Pvoia+TJFOkkFPvrtW9lZOeeNcxQJspvOIERMwiRLsVFlhHEkA==}
@@ -19857,18 +18623,6 @@ packages:
     resolution: {integrity: sha512-LA4ZjwlnUblHVgq0oBF3Jl/6h/Nvs5fzBLwdEF4nuxnFdsfajde4WfxtJr3CaiH+F6ewcIB/q4jQ4UzPyid+CQ==}
     hasBin: true
 
-  node-mocks-http@1.17.2:
-    resolution: {integrity: sha512-HVxSnjNzE9NzoWMx9T9z4MLqwMpLwVvA0oVZ+L+gXskYXEJ6tFn3Kx4LargoB6ie7ZlCLplv7QbWO6N+MysWGA==}
-    engines: {node: '>=14'}
-    peerDependencies:
-      '@types/express': ^4.17.21 || ^5.0.0
-      '@types/node': '*'
-    peerDependenciesMeta:
-      '@types/express':
-        optional: true
-      '@types/node':
-        optional: true
-
   node-pty@1.1.0:
     resolution: {integrity: sha512-20JqtutY6JPXTUnL0ij1uad7Qe1baT46lyolh2sSENDd4sTzKZ4nmAFkeAARDKwmlLjPx6XKRlwRUxwjOy+lUg==}
 
@@ -20340,10 +19094,6 @@ packages:
   pkg-types@2.3.1:
     resolution: {integrity: sha512-y+ichcgc2LrADuhLNAx8DFjVfgz91pRxfZdI3UDhxHvcVEZsenLO+7XaU5vOp0u/7V/wZ+plyuQxtrDlZJ+yeg==}
 
-  pkijs@3.4.0:
-    resolution: {integrity: sha512-emEcLuomt2j03vxD54giVB4SxTjnsqkU692xZOZXHDVoYyypEm+b3jpiTcc+Cf+myooc+/Ly0z01jqeNHVgJGw==}
-    engines: {node: '>=16.0.0'}
-
   playwright-core@1.61.1:
     resolution: {integrity: sha512-h7Qlt6m4REp25qvIdvbDtVmD4LqVXfpRxhORv9L0jzETM05p4fuPJ3dKyuSXQxDSbXnmS79HAgi9589lGSpLkg==}
     engines: {node: '>=18'}
@@ -20810,13 +19560,6 @@ packages:
       react: ^19.2.7
       react-dom: ^19.2.7
 
-  react-vega@8.0.0:
-    resolution: {integrity: sha512-euye4Gec2ScnUK1zbSA2tzZXUwBmbba8bfbzaRVhdEJTGQfaD78bSgqrccrl9b2fKZS1TZXR0NADEHVe6nxvBg==}
-    peerDependencies:
-      react: ^19.2.7
-      react-dom: ^19.2.7
-      vega-embed: ^7
-
   react@19.2.8:
     resolution: {integrity: sha512-PWaYA1L/q9u2u7xYQi+Y3L3Yfnie7XyLeaJICV1MGD6LprsBxcAqGjYyr0eY3p+QdsA+x/Irkt4Qif8D63+Sbw==}
     engines: {node: '>=0.10.0'}
@@ -21100,10 +19843,6 @@ packages:
 
   selderee@0.11.0:
     resolution: {integrity: sha512-5TF+l7p4+OsnP8BCCvSyZiSPc4x4//p5uPwK8TCnVPJYRmU2aYKMpOXvw8zM5a5JvuuCGN1jmsMwuU2W02ukfA==}
-
-  selfsigned@5.5.0:
-    resolution: {integrity: sha512-ftnu3TW4+3eBfLRFnDEkzGxSF/10BJBkaLJuBHZX0kiPS7bRdlpZGu6YGt4KngMkdTwJE6MbjavFpqHvqVt+Ew==}
-    engines: {node: '>=18'}
 
   semver@6.3.1:
     resolution: {integrity: sha512-BR7VvDCVHO+q2xBEWskxS6DJE1qRnb7DxzUrogb71CWoSficBxYsiAGd+Kl0mmq/MprG9yArRkyrQxTO6XjMzA==}
@@ -21850,10 +20589,6 @@ packages:
 
   url-parse@1.5.10:
     resolution: {integrity: sha512-WypcfiRhfeUP9vvF0j6rw0J3hrWrw6iZv3+22h6iRMJ/8z1Tj6XfLP4DsUix5MhMPnXpiHDoKyoZ/bdCkwBCiQ==}
-
-  url-value-parser@2.2.0:
-    resolution: {integrity: sha512-yIQdxJpgkPamPPAPuGdS7Q548rLhny42tg8d4vyTNzFqvOnwqrgHXvgehT09U7fwrzxi3RxCiXjoNUNnNOlQ8A==}
-    engines: {node: '>=6.0.0'}
 
   urlpattern-polyfill@10.1.0:
     resolution: {integrity: sha512-IGjKp/o0NL3Bso1PymYURCJxMPNAf/ILOpendP9f5B6e1rTJgdgiOvgfoT8VxCAdY+Wisb9uhGaJJf3yZ2V9nw==}
@@ -22798,27 +21533,17 @@ snapshots:
       '@smithy/types': 4.17.0
       tslib: 2.8.1
 
-  '@aws-sdk/client-cloudwatch-logs@3.1108.0':
-    dependencies:
-      '@aws-sdk/core': 3.977.7
-      '@aws-sdk/credential-provider-node': 3.972.79
-      '@aws-sdk/types': 3.974.3
-      '@smithy/core': 3.32.0
-      '@smithy/fetch-http-handler': 5.7.0
-      '@smithy/node-http-handler': 4.10.0
-      '@smithy/types': 4.17.0
-      tslib: 2.8.1
-
   '@aws-sdk/client-lambda@3.1108.0':
     dependencies:
-      '@aws-sdk/core': 3.977.7
+      '@aws-sdk/core': 3.977.8
       '@aws-sdk/credential-provider-node': 3.972.79
-      '@aws-sdk/types': 3.974.3
+      '@aws-sdk/types': 3.974.4
       '@smithy/core': 3.32.0
       '@smithy/fetch-http-handler': 5.7.0
       '@smithy/node-http-handler': 4.10.0
       '@smithy/types': 4.17.0
       tslib: 2.8.1
+    optional: true
 
   '@aws-sdk/client-s3@3.1108.0':
     dependencies:
@@ -23287,11 +22012,6 @@ snapshots:
     transitivePeerDependencies:
       - supports-color
 
-  '@babel/types@7.29.7':
-    dependencies:
-      '@babel/helper-string-parser': 7.29.7
-      '@babel/helper-validator-identifier': 7.29.7
-
   '@babel/types@7.29.8':
     dependencies:
       '@babel/helper-string-parser': 7.29.7
@@ -23407,22 +22127,6 @@ snapshots:
       - encoding
       - utf-8-validate
 
-  '@browserbasehq/stagehand@1.14.0(@playwright/test@1.61.1)(bufferutil@4.1.0)(deepmerge@4.3.1)(dotenv@17.4.2)(encoding@0.1.13)(openai@7.4.0(@aws-sdk/credential-provider-node@3.972.79)(ws@8.21.1(bufferutil@4.1.0))(zod@4.4.3))(zod@4.4.3)':
-    dependencies:
-      '@anthropic-ai/sdk': 0.27.3(encoding@0.1.13)
-      '@browserbasehq/sdk': 2.16.0(encoding@0.1.13)
-      '@playwright/test': 1.61.1
-      deepmerge: 4.3.1
-      dotenv: 17.4.2
-      openai: 7.4.0(@aws-sdk/credential-provider-node@3.972.79)(@smithy/signature-v4@5.7.0)(ws@8.21.1(bufferutil@4.1.0))(zod@4.4.3)
-      ws: 8.21.3(bufferutil@4.1.0)
-      zod: 4.4.3
-      zod-to-json-schema: 3.25.2(zod@4.4.3)
-    transitivePeerDependencies:
-      - bufferutil
-      - encoding
-      - utf-8-validate
-
   '@bufbuild/protobuf@2.13.0': {}
 
   '@cfworker/json-schema@4.1.1': {}
@@ -23510,185 +22214,6 @@ snapshots:
     transitivePeerDependencies:
       - encoding
       - graphql
-
-  '@copilotkit/runtime@1.8.14(26b65b6ac01091463709a2d020e78ae5)':
-    dependencies:
-      '@ag-ui/client': 0.0.47
-      '@ag-ui/core': 0.0.57
-      '@ag-ui/encoder': 0.0.47
-      '@ag-ui/proto': 0.0.47
-      '@anthropic-ai/sdk': 0.27.3(encoding@0.1.13)
-      '@copilotkit/shared': 1.8.14(encoding@0.1.13)
-      '@graphql-yoga/plugin-defer-stream': 3.21.2(graphql-yoga@5.21.2(graphql@16.14.2))(graphql@16.14.2)
-      '@langchain/community': 0.3.59(e23c5a64fccf46b3b04cc561f75107ba)
-      '@langchain/core': 0.3.80(@opentelemetry/api@1.9.1)(@opentelemetry/exporter-trace-otlp-proto@0.221.0(@opentelemetry/api@1.9.1))(@opentelemetry/sdk-trace-base@2.10.0(@opentelemetry/api@1.9.1))(openai@4.104.0(encoding@0.1.13)(ws@8.21.1(bufferutil@4.1.0))(zod@3.25.76))(ws@8.21.1(bufferutil@4.1.0))
-      '@langchain/google-gauth': 0.1.8(@langchain/core@0.3.80(@opentelemetry/api@1.9.1)(@opentelemetry/exporter-trace-otlp-proto@0.221.0(@opentelemetry/api@1.9.1))(@opentelemetry/sdk-trace-base@2.10.0(@opentelemetry/api@1.9.1))(openai@4.104.0(encoding@0.1.13)(ws@8.21.1(bufferutil@4.1.0))(zod@3.25.76))(ws@8.21.1(bufferutil@4.1.0)))(encoding@0.1.13)(zod@3.25.76)
-      '@langchain/langgraph-sdk': 0.0.70(@langchain/core@0.3.80(@opentelemetry/api@1.9.1)(@opentelemetry/exporter-trace-otlp-proto@0.221.0(@opentelemetry/api@1.9.1))(@opentelemetry/sdk-trace-base@2.10.0(@opentelemetry/api@1.9.1))(openai@4.104.0(encoding@0.1.13)(ws@8.21.1(bufferutil@4.1.0))(zod@3.25.76))(ws@8.21.1(bufferutil@4.1.0)))(react@19.2.8)
-      '@langchain/openai': 0.4.9(@langchain/core@0.3.80(@opentelemetry/api@1.9.1)(@opentelemetry/exporter-trace-otlp-proto@0.221.0(@opentelemetry/api@1.9.1))(@opentelemetry/sdk-trace-base@2.10.0(@opentelemetry/api@1.9.1))(openai@4.104.0(encoding@0.1.13)(ws@8.21.1(bufferutil@4.1.0))(zod@3.25.76))(ws@8.21.1(bufferutil@4.1.0)))(encoding@0.1.13)(ws@8.21.1(bufferutil@4.1.0))
-      class-transformer: 0.5.1
-      class-validator: 0.14.4
-      express: 4.22.2
-      graphql: 16.14.2
-      graphql-scalars: 1.25.0(graphql@16.14.2)
-      graphql-yoga: 5.21.2(graphql@16.14.2)
-      groq-sdk: 0.5.0(encoding@0.1.13)
-      langchain: 0.3.37(@langchain/core@0.3.80(@opentelemetry/api@1.9.1)(@opentelemetry/exporter-trace-otlp-proto@0.221.0(@opentelemetry/api@1.9.1))(@opentelemetry/sdk-trace-base@2.10.0(@opentelemetry/api@1.9.1))(openai@4.104.0(encoding@0.1.13)(ws@8.21.1(bufferutil@4.1.0))(zod@3.25.76))(ws@8.21.1(bufferutil@4.1.0)))(@opentelemetry/api@1.9.1)(@opentelemetry/exporter-trace-otlp-proto@0.221.0(@opentelemetry/api@1.9.1))(@opentelemetry/sdk-trace-base@2.10.0(@opentelemetry/api@1.9.1))(axios@1.19.0)(handlebars@4.7.9)(openai@4.104.0(encoding@0.1.13)(ws@8.21.1(bufferutil@4.1.0))(zod@3.25.76))(ws@8.21.1(bufferutil@4.1.0))
-      openai: 4.104.0(encoding@0.1.13)(ws@8.21.1(bufferutil@4.1.0))(zod@3.25.76)
-      partial-json: 0.1.7
-      pino: 10.3.1
-      pino-pretty: 13.1.3
-      reflect-metadata: 0.2.2
-      rxjs: 7.8.2
-      type-graphql: 2.0.0-rc.1(class-validator@0.14.4)(graphql-scalars@1.25.0(graphql@16.14.2))(graphql@16.14.2)
-      zod: 3.25.76
-    transitivePeerDependencies:
-      - '@arcjet/redact'
-      - '@aws-crypto/sha256-js'
-      - '@aws-sdk/client-bedrock-agent-runtime'
-      - '@aws-sdk/client-bedrock-runtime'
-      - '@aws-sdk/client-dynamodb'
-      - '@aws-sdk/client-kendra'
-      - '@aws-sdk/client-lambda'
-      - '@aws-sdk/client-s3'
-      - '@aws-sdk/client-sagemaker-runtime'
-      - '@aws-sdk/client-sfn'
-      - '@aws-sdk/credential-provider-node'
-      - '@aws-sdk/dsql-signer'
-      - '@azure/search-documents'
-      - '@azure/storage-blob'
-      - '@browserbasehq/sdk'
-      - '@browserbasehq/stagehand'
-      - '@clickhouse/client'
-      - '@cloudflare/ai'
-      - '@datastax/astra-db-ts'
-      - '@elastic/elasticsearch'
-      - '@getmetal/metal-sdk'
-      - '@getzep/zep-cloud'
-      - '@getzep/zep-js'
-      - '@gomomento/sdk'
-      - '@gomomento/sdk-core'
-      - '@google-ai/generativelanguage'
-      - '@google-cloud/storage'
-      - '@gradientai/nodejs-sdk'
-      - '@huggingface/inference'
-      - '@huggingface/transformers'
-      - '@ibm-cloud/watsonx-ai'
-      - '@lancedb/lancedb'
-      - '@langchain/anthropic'
-      - '@langchain/aws'
-      - '@langchain/cerebras'
-      - '@langchain/cohere'
-      - '@langchain/deepseek'
-      - '@langchain/google-genai'
-      - '@langchain/google-vertexai'
-      - '@langchain/google-vertexai-web'
-      - '@langchain/groq'
-      - '@langchain/mistralai'
-      - '@langchain/ollama'
-      - '@langchain/xai'
-      - '@layerup/layerup-security'
-      - '@libsql/client'
-      - '@mendable/firecrawl-js'
-      - '@mlc-ai/web-llm'
-      - '@mozilla/readability'
-      - '@neondatabase/serverless'
-      - '@notionhq/client'
-      - '@opensearch-project/opensearch'
-      - '@opentelemetry/api'
-      - '@opentelemetry/exporter-trace-otlp-proto'
-      - '@opentelemetry/sdk-trace-base'
-      - '@pinecone-database/pinecone'
-      - '@planetscale/database'
-      - '@premai/prem-sdk'
-      - '@qdrant/js-client-rest'
-      - '@raycast/api'
-      - '@rockset/client'
-      - '@smithy/eventstream-codec'
-      - '@smithy/protocol-http'
-      - '@smithy/signature-v4'
-      - '@smithy/util-utf8'
-      - '@spider-cloud/spider-client'
-      - '@supabase/supabase-js'
-      - '@tensorflow-models/universal-sentence-encoder'
-      - '@tensorflow/tfjs-converter'
-      - '@tensorflow/tfjs-core'
-      - '@upstash/ratelimit'
-      - '@upstash/redis'
-      - '@upstash/vector'
-      - '@vercel/kv'
-      - '@vercel/postgres'
-      - '@writerai/writer-sdk'
-      - '@xata.io/client'
-      - '@zilliz/milvus2-sdk-node'
-      - apify-client
-      - assemblyai
-      - axios
-      - azion
-      - better-sqlite3
-      - cassandra-driver
-      - cborg
-      - cheerio
-      - chromadb
-      - closevector-common
-      - closevector-node
-      - closevector-web
-      - cohere-ai
-      - convex
-      - crypto-js
-      - d3-dsv
-      - discord.js
-      - duck-duck-scrape
-      - encoding
-      - epub2
-      - fast-xml-parser
-      - firebase-admin
-      - google-auth-library
-      - googleapis
-      - handlebars
-      - hnswlib-node
-      - html-to-text
-      - ibm-cloud-sdk-core
-      - ignore
-      - interface-datastore
-      - ioredis
-      - it-all
-      - jsdom
-      - jsonwebtoken
-      - llmonitor
-      - lodash
-      - lunary
-      - mammoth
-      - mariadb
-      - mem0ai
-      - mongodb
-      - mysql2
-      - neo4j-driver
-      - notion-to-md
-      - officeparser
-      - pdf-parse
-      - peggy
-      - pg
-      - pg-copy-streams
-      - pickleparser
-      - playwright
-      - portkey-ai
-      - puppeteer
-      - pyodide
-      - react
-      - redis
-      - replicate
-      - sonix-speech-recognition
-      - srt-parser-2
-      - supports-color
-      - typeorm
-      - typesense
-      - usearch
-      - voy-search
-      - weaviate-client
-      - web-auth-library
-      - word-extractor
-      - ws
-      - youtubei.js
 
   '@copilotkit/runtime@1.8.14(344bf3837e3ac57fd65f27c353988c08)':
     dependencies:
@@ -24499,6 +23024,7 @@ snapshots:
     dependencies:
       '@standard-schema/spec': 1.1.0
       hono: 4.13.1
+    optional: true
 
   '@hookform/resolvers@5.4.0(react-hook-form@7.80.0(react@19.2.8))':
     dependencies:
@@ -24749,86 +23275,6 @@ snapshots:
       - handlebars
       - peggy
 
-  '@langchain/community@0.3.59(e23c5a64fccf46b3b04cc561f75107ba)':
-    dependencies:
-      '@browserbasehq/stagehand': 1.14.0(@playwright/test@1.61.1)(bufferutil@4.1.0)(deepmerge@4.3.1)(dotenv@17.4.2)(encoding@0.1.13)(openai@7.4.0(@aws-sdk/credential-provider-node@3.972.79)(ws@8.21.1(bufferutil@4.1.0))(zod@4.4.3))(zod@4.4.3)
-      '@ibm-cloud/watsonx-ai': 1.7.9
-      '@langchain/core': 0.3.80(@opentelemetry/api@1.9.1)(@opentelemetry/exporter-trace-otlp-proto@0.221.0(@opentelemetry/api@1.9.1))(@opentelemetry/sdk-trace-base@2.10.0(@opentelemetry/api@1.9.1))(openai@4.104.0(encoding@0.1.13)(ws@8.21.1(bufferutil@4.1.0))(zod@3.25.76))(ws@8.21.1(bufferutil@4.1.0))
-      '@langchain/openai': 0.6.9(@langchain/core@0.3.80(@opentelemetry/api@1.9.1)(@opentelemetry/exporter-trace-otlp-proto@0.221.0(@opentelemetry/api@1.9.1))(@opentelemetry/sdk-trace-base@2.10.0(@opentelemetry/api@1.9.1))(openai@4.104.0(encoding@0.1.13)(ws@8.21.1(bufferutil@4.1.0))(zod@3.25.76))(ws@8.21.1(bufferutil@4.1.0)))(ws@8.21.1(bufferutil@4.1.0))
-      '@langchain/weaviate': 0.2.3(@langchain/core@0.3.80(@opentelemetry/api@1.9.1)(@opentelemetry/exporter-trace-otlp-proto@0.221.0(@opentelemetry/api@1.9.1))(@opentelemetry/sdk-trace-base@2.10.0(@opentelemetry/api@1.9.1))(openai@4.104.0(encoding@0.1.13)(ws@8.21.1(bufferutil@4.1.0))(zod@3.25.76))(ws@8.21.1(bufferutil@4.1.0)))
-      binary-extensions: 2.3.0
-      flat: 5.0.2
-      ibm-cloud-sdk-core: 5.4.8
-      js-yaml: 4.3.1
-      langchain: 0.3.37(@langchain/core@0.3.80(@opentelemetry/api@1.9.1)(@opentelemetry/exporter-trace-otlp-proto@0.221.0(@opentelemetry/api@1.9.1))(@opentelemetry/sdk-trace-base@2.10.0(@opentelemetry/api@1.9.1))(openai@4.104.0(encoding@0.1.13)(ws@8.21.1(bufferutil@4.1.0))(zod@3.25.76))(ws@8.21.1(bufferutil@4.1.0)))(@opentelemetry/api@1.9.1)(@opentelemetry/exporter-trace-otlp-proto@0.221.0(@opentelemetry/api@1.9.1))(@opentelemetry/sdk-trace-base@2.10.0(@opentelemetry/api@1.9.1))(axios@1.19.0)(handlebars@4.7.9)(openai@4.104.0(encoding@0.1.13)(ws@8.21.1(bufferutil@4.1.0))(zod@3.25.76))(ws@8.21.1(bufferutil@4.1.0))
-      langsmith: 0.6.0(@opentelemetry/api@1.9.1)(@opentelemetry/exporter-trace-otlp-proto@0.221.0(@opentelemetry/api@1.9.1))(@opentelemetry/sdk-trace-base@2.10.0(@opentelemetry/api@1.9.1))(openai@4.104.0(encoding@0.1.13)(ws@8.21.1(bufferutil@4.1.0))(zod@3.25.76))(ws@8.21.1(bufferutil@4.1.0))
-      math-expression-evaluator: 2.0.7
-      openai: 4.104.0(encoding@0.1.13)(ws@8.21.1(bufferutil@4.1.0))(zod@3.25.76)
-      uuid: 11.1.1
-      zod: 3.25.76
-    optionalDependencies:
-      '@aws-crypto/sha256-js': 5.2.0
-      '@aws-sdk/client-bedrock-runtime': 3.1048.0
-      '@aws-sdk/client-lambda': 3.1108.0
-      '@aws-sdk/client-s3': 3.1108.0
-      '@aws-sdk/credential-provider-node': 3.972.79
-      '@browserbasehq/sdk': 2.16.0(encoding@0.1.13)
-      '@clickhouse/client': 1.23.0
-      '@smithy/util-utf8': 2.3.0
-      fast-xml-parser: 5.7.2
-      google-auth-library: 10.6.2
-      html-to-text: 9.0.5
-      ignore: 5.2.4
-      ioredis: 5.10.1
-      jsdom: 30.0.1(@noble/hashes@2.2.0)
-      jsonwebtoken: 9.0.3
-      lodash: 4.18.1
-      mysql2: 3.15.3
-      pg: 8.22.0
-      playwright: 1.61.1
-      weaviate-client: 3.14.0
-      ws: 8.21.1(bufferutil@4.1.0)
-    transitivePeerDependencies:
-      - '@langchain/anthropic'
-      - '@langchain/aws'
-      - '@langchain/cerebras'
-      - '@langchain/cohere'
-      - '@langchain/deepseek'
-      - '@langchain/google-genai'
-      - '@langchain/google-vertexai'
-      - '@langchain/google-vertexai-web'
-      - '@langchain/groq'
-      - '@langchain/mistralai'
-      - '@langchain/ollama'
-      - '@langchain/xai'
-      - '@opentelemetry/api'
-      - '@opentelemetry/exporter-trace-otlp-proto'
-      - '@opentelemetry/sdk-trace-base'
-      - axios
-      - handlebars
-      - peggy
-
-  '@langchain/core@0.3.80(@opentelemetry/api@1.9.1)(@opentelemetry/exporter-trace-otlp-proto@0.221.0(@opentelemetry/api@1.9.1))(@opentelemetry/sdk-trace-base@2.10.0(@opentelemetry/api@1.9.1))(openai@4.104.0(encoding@0.1.13)(ws@8.21.1(bufferutil@4.1.0))(zod@3.25.76))(ws@8.21.1(bufferutil@4.1.0))':
-    dependencies:
-      '@cfworker/json-schema': 4.1.1
-      ansi-styles: 5.2.0
-      camelcase: 6.3.0
-      decamelize: 1.2.0
-      js-tiktoken: 1.0.21
-      langsmith: 0.6.0(@opentelemetry/api@1.9.1)(@opentelemetry/exporter-trace-otlp-proto@0.221.0(@opentelemetry/api@1.9.1))(@opentelemetry/sdk-trace-base@2.10.0(@opentelemetry/api@1.9.1))(openai@4.104.0(encoding@0.1.13)(ws@8.21.1(bufferutil@4.1.0))(zod@3.25.76))(ws@8.21.1(bufferutil@4.1.0))
-      mustache: 4.2.0
-      p-queue: 6.6.2
-      p-retry: 4.6.2
-      uuid: 11.1.1
-      zod: 3.25.76
-      zod-to-json-schema: 3.25.2(zod@3.25.76)
-    transitivePeerDependencies:
-      - '@opentelemetry/api'
-      - '@opentelemetry/exporter-trace-otlp-proto'
-      - '@opentelemetry/sdk-trace-base'
-      - openai
-      - ws
-
   '@langchain/core@0.3.80(@opentelemetry/api@1.9.1)(@opentelemetry/exporter-trace-otlp-proto@0.221.0(@opentelemetry/api@1.9.1))(@opentelemetry/sdk-trace-base@2.10.0(@opentelemetry/api@1.9.1))(openai@4.104.0(encoding@0.1.13)(ws@8.21.3(bufferutil@4.1.0))(zod@3.25.76))(ws@8.21.3(bufferutil@4.1.0))':
     dependencies:
       '@cfworker/json-schema': 4.1.1
@@ -24892,30 +23338,12 @@ snapshots:
       - openai
       - ws
 
-  '@langchain/google-common@0.1.8(@langchain/core@0.3.80(@opentelemetry/api@1.9.1)(@opentelemetry/exporter-trace-otlp-proto@0.221.0(@opentelemetry/api@1.9.1))(@opentelemetry/sdk-trace-base@2.10.0(@opentelemetry/api@1.9.1))(openai@4.104.0(encoding@0.1.13)(ws@8.21.1(bufferutil@4.1.0))(zod@3.25.76))(ws@8.21.1(bufferutil@4.1.0)))(zod@3.25.76)':
-    dependencies:
-      '@langchain/core': 0.3.80(@opentelemetry/api@1.9.1)(@opentelemetry/exporter-trace-otlp-proto@0.221.0(@opentelemetry/api@1.9.1))(@opentelemetry/sdk-trace-base@2.10.0(@opentelemetry/api@1.9.1))(openai@4.104.0(encoding@0.1.13)(ws@8.21.1(bufferutil@4.1.0))(zod@3.25.76))(ws@8.21.1(bufferutil@4.1.0))
-      uuid: 11.1.1
-      zod-to-json-schema: 3.25.2(zod@3.25.76)
-    transitivePeerDependencies:
-      - zod
-
   '@langchain/google-common@0.1.8(@langchain/core@0.3.80(@opentelemetry/api@1.9.1)(@opentelemetry/exporter-trace-otlp-proto@0.221.0(@opentelemetry/api@1.9.1))(@opentelemetry/sdk-trace-base@2.10.0(@opentelemetry/api@1.9.1))(openai@4.104.0(encoding@0.1.13)(ws@8.21.3(bufferutil@4.1.0))(zod@3.25.76))(ws@8.21.3(bufferutil@4.1.0)))(zod@3.25.76)':
     dependencies:
       '@langchain/core': 0.3.80(@opentelemetry/api@1.9.1)(@opentelemetry/exporter-trace-otlp-proto@0.221.0(@opentelemetry/api@1.9.1))(@opentelemetry/sdk-trace-base@2.10.0(@opentelemetry/api@1.9.1))(openai@4.104.0(encoding@0.1.13)(ws@8.21.3(bufferutil@4.1.0))(zod@3.25.76))(ws@8.21.3(bufferutil@4.1.0))
       uuid: 11.1.1
       zod-to-json-schema: 3.25.2(zod@3.25.76)
     transitivePeerDependencies:
-      - zod
-
-  '@langchain/google-gauth@0.1.8(@langchain/core@0.3.80(@opentelemetry/api@1.9.1)(@opentelemetry/exporter-trace-otlp-proto@0.221.0(@opentelemetry/api@1.9.1))(@opentelemetry/sdk-trace-base@2.10.0(@opentelemetry/api@1.9.1))(openai@4.104.0(encoding@0.1.13)(ws@8.21.1(bufferutil@4.1.0))(zod@3.25.76))(ws@8.21.1(bufferutil@4.1.0)))(encoding@0.1.13)(zod@3.25.76)':
-    dependencies:
-      '@langchain/core': 0.3.80(@opentelemetry/api@1.9.1)(@opentelemetry/exporter-trace-otlp-proto@0.221.0(@opentelemetry/api@1.9.1))(@opentelemetry/sdk-trace-base@2.10.0(@opentelemetry/api@1.9.1))(openai@4.104.0(encoding@0.1.13)(ws@8.21.1(bufferutil@4.1.0))(zod@3.25.76))(ws@8.21.1(bufferutil@4.1.0))
-      '@langchain/google-common': 0.1.8(@langchain/core@0.3.80(@opentelemetry/api@1.9.1)(@opentelemetry/exporter-trace-otlp-proto@0.221.0(@opentelemetry/api@1.9.1))(@opentelemetry/sdk-trace-base@2.10.0(@opentelemetry/api@1.9.1))(openai@4.104.0(encoding@0.1.13)(ws@8.21.1(bufferutil@4.1.0))(zod@3.25.76))(ws@8.21.1(bufferutil@4.1.0)))(zod@3.25.76)
-      google-auth-library: 8.9.0(encoding@0.1.13)
-    transitivePeerDependencies:
-      - encoding
-      - supports-color
       - zod
 
   '@langchain/google-gauth@0.1.8(@langchain/core@0.3.80(@opentelemetry/api@1.9.1)(@opentelemetry/exporter-trace-otlp-proto@0.221.0(@opentelemetry/api@1.9.1))(@opentelemetry/sdk-trace-base@2.10.0(@opentelemetry/api@1.9.1))(openai@4.104.0(encoding@0.1.13)(ws@8.21.3(bufferutil@4.1.0))(zod@3.25.76))(ws@8.21.3(bufferutil@4.1.0)))(encoding@0.1.13)(zod@3.25.76)':
@@ -24960,16 +23388,6 @@ snapshots:
       react: 19.2.8
       react-dom: 19.2.8(react@19.2.8)
 
-  '@langchain/langgraph-sdk@0.0.70(@langchain/core@0.3.80(@opentelemetry/api@1.9.1)(@opentelemetry/exporter-trace-otlp-proto@0.221.0(@opentelemetry/api@1.9.1))(@opentelemetry/sdk-trace-base@2.10.0(@opentelemetry/api@1.9.1))(openai@4.104.0(encoding@0.1.13)(ws@8.21.1(bufferutil@4.1.0))(zod@3.25.76))(ws@8.21.1(bufferutil@4.1.0)))(react@19.2.8)':
-    dependencies:
-      '@types/json-schema': 7.0.15
-      p-queue: 6.6.2
-      p-retry: 4.6.2
-      uuid: 11.1.1
-    optionalDependencies:
-      '@langchain/core': 0.3.80(@opentelemetry/api@1.9.1)(@opentelemetry/exporter-trace-otlp-proto@0.221.0(@opentelemetry/api@1.9.1))(@opentelemetry/sdk-trace-base@2.10.0(@opentelemetry/api@1.9.1))(openai@4.104.0(encoding@0.1.13)(ws@8.21.1(bufferutil@4.1.0))(zod@3.25.76))(ws@8.21.1(bufferutil@4.1.0))
-      react: 19.2.8
-
   '@langchain/langgraph-sdk@0.0.70(@langchain/core@0.3.80(@opentelemetry/api@1.9.1)(@opentelemetry/exporter-trace-otlp-proto@0.221.0(@opentelemetry/api@1.9.1))(@opentelemetry/sdk-trace-base@2.10.0(@opentelemetry/api@1.9.1))(openai@4.104.0(encoding@0.1.13)(ws@8.21.3(bufferutil@4.1.0))(zod@3.25.76))(ws@8.21.3(bufferutil@4.1.0)))(react@19.2.8)':
     dependencies:
       '@types/json-schema': 7.0.15
@@ -25006,17 +23424,6 @@ snapshots:
       - react
       - react-dom
 
-  '@langchain/openai@0.4.9(@langchain/core@0.3.80(@opentelemetry/api@1.9.1)(@opentelemetry/exporter-trace-otlp-proto@0.221.0(@opentelemetry/api@1.9.1))(@opentelemetry/sdk-trace-base@2.10.0(@opentelemetry/api@1.9.1))(openai@4.104.0(encoding@0.1.13)(ws@8.21.1(bufferutil@4.1.0))(zod@3.25.76))(ws@8.21.1(bufferutil@4.1.0)))(encoding@0.1.13)(ws@8.21.1(bufferutil@4.1.0))':
-    dependencies:
-      '@langchain/core': 0.3.80(@opentelemetry/api@1.9.1)(@opentelemetry/exporter-trace-otlp-proto@0.221.0(@opentelemetry/api@1.9.1))(@opentelemetry/sdk-trace-base@2.10.0(@opentelemetry/api@1.9.1))(openai@4.104.0(encoding@0.1.13)(ws@8.21.1(bufferutil@4.1.0))(zod@3.25.76))(ws@8.21.1(bufferutil@4.1.0))
-      js-tiktoken: 1.0.21
-      openai: 4.104.0(encoding@0.1.13)(ws@8.21.1(bufferutil@4.1.0))(zod@3.25.76)
-      zod: 3.25.76
-      zod-to-json-schema: 3.25.2(zod@3.25.76)
-    transitivePeerDependencies:
-      - encoding
-      - ws
-
   '@langchain/openai@0.4.9(@langchain/core@0.3.80(@opentelemetry/api@1.9.1)(@opentelemetry/exporter-trace-otlp-proto@0.221.0(@opentelemetry/api@1.9.1))(@opentelemetry/sdk-trace-base@2.10.0(@opentelemetry/api@1.9.1))(openai@4.104.0(encoding@0.1.13)(ws@8.21.3(bufferutil@4.1.0))(zod@3.25.76))(ws@8.21.3(bufferutil@4.1.0)))(encoding@0.1.13)(ws@8.21.3(bufferutil@4.1.0))':
     dependencies:
       '@langchain/core': 0.3.80(@opentelemetry/api@1.9.1)(@opentelemetry/exporter-trace-otlp-proto@0.221.0(@opentelemetry/api@1.9.1))(@opentelemetry/sdk-trace-base@2.10.0(@opentelemetry/api@1.9.1))(openai@4.104.0(encoding@0.1.13)(ws@8.21.3(bufferutil@4.1.0))(zod@3.25.76))(ws@8.21.3(bufferutil@4.1.0))
@@ -25026,15 +23433,6 @@ snapshots:
       zod-to-json-schema: 3.25.2(zod@3.25.76)
     transitivePeerDependencies:
       - encoding
-      - ws
-
-  '@langchain/openai@0.6.9(@langchain/core@0.3.80(@opentelemetry/api@1.9.1)(@opentelemetry/exporter-trace-otlp-proto@0.221.0(@opentelemetry/api@1.9.1))(@opentelemetry/sdk-trace-base@2.10.0(@opentelemetry/api@1.9.1))(openai@4.104.0(encoding@0.1.13)(ws@8.21.1(bufferutil@4.1.0))(zod@3.25.76))(ws@8.21.1(bufferutil@4.1.0)))(ws@8.21.1(bufferutil@4.1.0))':
-    dependencies:
-      '@langchain/core': 0.3.80(@opentelemetry/api@1.9.1)(@opentelemetry/exporter-trace-otlp-proto@0.221.0(@opentelemetry/api@1.9.1))(@opentelemetry/sdk-trace-base@2.10.0(@opentelemetry/api@1.9.1))(openai@4.104.0(encoding@0.1.13)(ws@8.21.1(bufferutil@4.1.0))(zod@3.25.76))(ws@8.21.1(bufferutil@4.1.0))
-      js-tiktoken: 1.0.21
-      openai: 5.12.2(ws@8.21.1(bufferutil@4.1.0))(zod@3.25.76)
-      zod: 3.25.76
-    transitivePeerDependencies:
       - ws
 
   '@langchain/openai@0.6.9(@langchain/core@0.3.80(@opentelemetry/api@1.9.1)(@opentelemetry/exporter-trace-otlp-proto@0.221.0(@opentelemetry/api@1.9.1))(@opentelemetry/sdk-trace-base@2.10.0(@opentelemetry/api@1.9.1))(openai@4.104.0(encoding@0.1.13)(ws@8.21.3(bufferutil@4.1.0))(zod@3.25.76))(ws@8.21.3(bufferutil@4.1.0)))(ws@8.21.3(bufferutil@4.1.0))':
@@ -25088,11 +23486,6 @@ snapshots:
       - '@smithy/signature-v4'
       - ws
 
-  '@langchain/textsplitters@0.1.0(@langchain/core@0.3.80(@opentelemetry/api@1.9.1)(@opentelemetry/exporter-trace-otlp-proto@0.221.0(@opentelemetry/api@1.9.1))(@opentelemetry/sdk-trace-base@2.10.0(@opentelemetry/api@1.9.1))(openai@4.104.0(encoding@0.1.13)(ws@8.21.1(bufferutil@4.1.0))(zod@3.25.76))(ws@8.21.1(bufferutil@4.1.0)))':
-    dependencies:
-      '@langchain/core': 0.3.80(@opentelemetry/api@1.9.1)(@opentelemetry/exporter-trace-otlp-proto@0.221.0(@opentelemetry/api@1.9.1))(@opentelemetry/sdk-trace-base@2.10.0(@opentelemetry/api@1.9.1))(openai@4.104.0(encoding@0.1.13)(ws@8.21.1(bufferutil@4.1.0))(zod@3.25.76))(ws@8.21.1(bufferutil@4.1.0))
-      js-tiktoken: 1.0.21
-
   '@langchain/textsplitters@0.1.0(@langchain/core@0.3.80(@opentelemetry/api@1.9.1)(@opentelemetry/exporter-trace-otlp-proto@0.221.0(@opentelemetry/api@1.9.1))(@opentelemetry/sdk-trace-base@2.10.0(@opentelemetry/api@1.9.1))(openai@4.104.0(encoding@0.1.13)(ws@8.21.3(bufferutil@4.1.0))(zod@3.25.76))(ws@8.21.3(bufferutil@4.1.0)))':
     dependencies:
       '@langchain/core': 0.3.80(@opentelemetry/api@1.9.1)(@opentelemetry/exporter-trace-otlp-proto@0.221.0(@opentelemetry/api@1.9.1))(@opentelemetry/sdk-trace-base@2.10.0(@opentelemetry/api@1.9.1))(openai@4.104.0(encoding@0.1.13)(ws@8.21.3(bufferutil@4.1.0))(zod@3.25.76))(ws@8.21.3(bufferutil@4.1.0))
@@ -25107,12 +23500,6 @@ snapshots:
     dependencies:
       '@langchain/core': 0.3.80(@opentelemetry/api@1.9.1)(@opentelemetry/exporter-trace-otlp-proto@0.221.0(@opentelemetry/api@1.9.1))(@opentelemetry/sdk-trace-base@2.10.0(@opentelemetry/api@1.9.1))(openai@7.4.0(@aws-sdk/credential-provider-node@3.972.79)(@smithy/signature-v4@5.7.0)(ws@8.21.3(bufferutil@4.1.0))(zod@4.4.3))(ws@8.21.3(bufferutil@4.1.0))
       js-tiktoken: 1.0.21
-
-  '@langchain/weaviate@0.2.3(@langchain/core@0.3.80(@opentelemetry/api@1.9.1)(@opentelemetry/exporter-trace-otlp-proto@0.221.0(@opentelemetry/api@1.9.1))(@opentelemetry/sdk-trace-base@2.10.0(@opentelemetry/api@1.9.1))(openai@4.104.0(encoding@0.1.13)(ws@8.21.1(bufferutil@4.1.0))(zod@3.25.76))(ws@8.21.1(bufferutil@4.1.0)))':
-    dependencies:
-      '@langchain/core': 0.3.80(@opentelemetry/api@1.9.1)(@opentelemetry/exporter-trace-otlp-proto@0.221.0(@opentelemetry/api@1.9.1))(@opentelemetry/sdk-trace-base@2.10.0(@opentelemetry/api@1.9.1))(openai@4.104.0(encoding@0.1.13)(ws@8.21.1(bufferutil@4.1.0))(zod@3.25.76))(ws@8.21.1(bufferutil@4.1.0))
-      uuid: 11.1.1
-      weaviate-client: 3.14.0
 
   '@langchain/weaviate@0.2.3(@langchain/core@0.3.80(@opentelemetry/api@1.9.1)(@opentelemetry/exporter-trace-otlp-proto@0.221.0(@opentelemetry/api@1.9.1))(@opentelemetry/sdk-trace-base@2.10.0(@opentelemetry/api@1.9.1))(openai@4.104.0(encoding@0.1.13)(ws@8.21.3(bufferutil@4.1.0))(zod@3.25.76))(ws@8.21.3(bufferutil@4.1.0)))':
     dependencies:
@@ -25197,39 +23584,6 @@ snapshots:
       - utf-8-validate
 
   '@langwatch/scenario@1.3.0(@aws-sdk/credential-provider-node@3.972.79)(@cfworker/json-schema@4.1.1)(@smithy/signature-v4@5.7.0)(ai@6.0.217(zod@4.4.3))(bufferutil@4.1.0)(encoding@0.1.13)(vitest@4.1.10)':
-    dependencies:
-      '@ag-ui/core': 0.0.28
-      '@ai-sdk/openai': 3.0.79(zod@3.25.76)
-      '@elevenlabs/elevenlabs-js': 2.58.0(bufferutil@4.1.0)(encoding@0.1.13)
-      '@openai/agents': 0.3.9(@aws-sdk/credential-provider-node@3.972.79)(@cfworker/json-schema@4.1.1)(@smithy/signature-v4@5.7.0)(bufferutil@4.1.0)(ws@8.21.3(bufferutil@4.1.0))(zod@3.25.76)
-      '@opentelemetry/api': 1.9.1
-      '@opentelemetry/context-async-hooks': 2.7.1(@opentelemetry/api@1.9.1)
-      '@opentelemetry/sdk-node': 0.217.0(@opentelemetry/api@1.9.1)
-      '@opentelemetry/sdk-trace-base': 2.7.1(@opentelemetry/api@1.9.1)
-      '@opentelemetry/sdk-trace-node': 2.7.1(@opentelemetry/api@1.9.1)
-      ai: 6.0.217(zod@4.4.3)
-      chalk: 5.6.2
-      ffmpeg-static: 5.3.0
-      fft.js: 4.0.4
-      langwatch: link:sdks/typescript
-      open: 11.0.0
-      openai: 6.49.0(@aws-sdk/credential-provider-node@3.972.79)(@smithy/signature-v4@5.7.0)(ws@8.21.3(bufferutil@4.1.0))(zod@3.25.76)
-      rxjs: 7.8.2
-      vitest: 4.1.10(@opentelemetry/api@1.9.1)(@types/node@26.2.0)(@vitest/browser-playwright@4.1.10)(@vitest/coverage-v8@4.1.10)(@vitest/ui@4.1.10)(jsdom@30.0.1(@noble/hashes@2.2.0))(msw@2.15.0(@types/node@26.2.0)(typescript@7.0.2))(vite@8.1.2(@types/node@26.2.0)(esbuild@0.28.1)(jiti@2.7.0)(sass@1.101.0)(terser@5.48.0)(tsx@4.22.4)(yaml@2.9.0))
-      ws: 8.21.3(bufferutil@4.1.0)
-      xksuid: 0.0.4
-      zod: 3.25.76
-    transitivePeerDependencies:
-      - '@aws-sdk/credential-provider-node'
-      - '@cfworker/json-schema'
-      - '@smithy/hash-node'
-      - '@smithy/signature-v4'
-      - bufferutil
-      - encoding
-      - supports-color
-      - utf-8-validate
-
-  '@langwatch/scenario@file:platform/app/vendor/langwatch-scenario-1.3.0.tgz(@aws-sdk/credential-provider-node@3.972.79)(@cfworker/json-schema@4.1.1)(ai@6.0.217(zod@4.4.3))(bufferutil@4.1.0)(encoding@0.1.13)(vitest@4.1.10)':
     dependencies:
       '@ag-ui/core': 0.0.28
       '@ai-sdk/openai': 3.0.79(zod@3.25.76)
@@ -25447,8 +23801,6 @@ snapshots:
     optional: true
 
   '@noble/ciphers@2.2.0': {}
-
-  '@noble/hashes@1.4.0': {}
 
   '@noble/hashes@2.2.0': {}
 
@@ -25901,15 +24253,6 @@ snapshots:
       '@opentelemetry/api': 1.9.1
       systeminformation: 5.33.1
 
-  '@opentelemetry/instrumentation-aws-sdk@0.76.0(@opentelemetry/api@1.9.1)':
-    dependencies:
-      '@opentelemetry/api': 1.9.1
-      '@opentelemetry/core': 2.10.0(@opentelemetry/api@1.9.1)
-      '@opentelemetry/instrumentation': 0.221.0(@opentelemetry/api@1.9.1)
-      '@opentelemetry/semantic-conventions': 1.43.0
-    transitivePeerDependencies:
-      - supports-color
-
   '@opentelemetry/instrumentation-document-load@0.66.0(@opentelemetry/api@1.9.1)':
     dependencies:
       '@opentelemetry/api': 1.9.1
@@ -25927,43 +24270,6 @@ snapshots:
       '@opentelemetry/instrumentation': 0.221.0(@opentelemetry/api@1.9.1)
       '@opentelemetry/sdk-trace-web': 2.10.0(@opentelemetry/api@1.9.1)
       '@opentelemetry/semantic-conventions': 1.43.0
-    transitivePeerDependencies:
-      - supports-color
-
-  '@opentelemetry/instrumentation-ioredis@0.69.0(@opentelemetry/api@1.9.1)':
-    dependencies:
-      '@opentelemetry/api': 1.9.1
-      '@opentelemetry/instrumentation': 0.221.0(@opentelemetry/api@1.9.1)
-      '@opentelemetry/redis-common': 0.38.3
-      '@opentelemetry/semantic-conventions': 1.43.0
-    transitivePeerDependencies:
-      - supports-color
-
-  '@opentelemetry/instrumentation-openai@0.19.0(@opentelemetry/api@1.9.1)':
-    dependencies:
-      '@opentelemetry/api': 1.9.1
-      '@opentelemetry/api-logs': 0.221.0
-      '@opentelemetry/instrumentation': 0.221.0(@opentelemetry/api@1.9.1)
-      '@opentelemetry/semantic-conventions': 1.43.0
-    transitivePeerDependencies:
-      - supports-color
-
-  '@opentelemetry/instrumentation-pino@0.67.0(@opentelemetry/api@1.9.1)':
-    dependencies:
-      '@opentelemetry/api': 1.9.1
-      '@opentelemetry/api-logs': 0.221.0
-      '@opentelemetry/core': 2.10.0(@opentelemetry/api@1.9.1)
-      '@opentelemetry/instrumentation': 0.221.0(@opentelemetry/api@1.9.1)
-      '@opentelemetry/semantic-conventions': 1.43.0
-    transitivePeerDependencies:
-      - supports-color
-
-  '@opentelemetry/instrumentation-runtime-node@0.34.0(@opentelemetry/api@1.9.1)':
-    dependencies:
-      '@opentelemetry/api': 1.9.1
-      '@opentelemetry/api-logs': 0.221.0
-      '@opentelemetry/core': 2.10.0(@opentelemetry/api@1.9.1)
-      '@opentelemetry/instrumentation': 0.221.0(@opentelemetry/api@1.9.1)
     transitivePeerDependencies:
       - supports-color
 
@@ -26119,15 +24425,6 @@ snapshots:
     dependencies:
       '@opentelemetry/api': 1.9.1
       '@opentelemetry/core': 2.10.0(@opentelemetry/api@1.9.1)
-
-  '@opentelemetry/redis-common@0.38.3': {}
-
-  '@opentelemetry/resource-detector-aws@2.21.0(@opentelemetry/api@1.9.1)':
-    dependencies:
-      '@opentelemetry/api': 1.9.1
-      '@opentelemetry/core': 2.10.0(@opentelemetry/api@1.9.1)
-      '@opentelemetry/resources': 2.10.0(@opentelemetry/api@1.9.1)
-      '@opentelemetry/semantic-conventions': 1.43.0
 
   '@opentelemetry/resources@1.28.0(@opentelemetry/api@1.9.1)':
     dependencies:
@@ -27322,9 +25619,6 @@ snapshots:
   '@rollup/rollup-linux-x64-gnu@4.59.0':
     optional: true
 
-  '@rollup/rollup-linux-x64-gnu@4.62.2':
-    optional: true
-
   '@rollup/rollup-linux-x64-musl@4.59.0':
     optional: true
 
@@ -27700,12 +25994,6 @@ snapshots:
     dependencies:
       tslib: 2.8.1
 
-  '@t3-oss/env-core@0.13.11(typescript@7.0.2)(valibot@1.4.2(typescript@7.0.2))(zod@4.4.3)':
-    optionalDependencies:
-      typescript: 7.0.2
-      valibot: 1.4.2(typescript@7.0.2)
-      zod: 4.4.3
-
   '@tanstack/query-core@5.101.4': {}
 
   '@tanstack/react-query@5.101.4(react@19.2.8)':
@@ -27729,25 +26017,7 @@ snapshots:
 
   '@tanstack/virtual-core@3.17.3': {}
 
-  '@testcontainers/clickhouse@12.0.4':
-    dependencies:
-      testcontainers: 12.0.4
-    transitivePeerDependencies:
-      - bare-abort-controller
-      - bare-buffer
-      - react-native-b4a
-      - supports-color
-
   '@testcontainers/clickhouse@12.1.0':
-    dependencies:
-      testcontainers: 12.1.0
-    transitivePeerDependencies:
-      - bare-abort-controller
-      - bare-buffer
-      - react-native-b4a
-      - supports-color
-
-  '@testcontainers/postgresql@12.1.0':
     dependencies:
       testcontainers: 12.1.0
     transitivePeerDependencies:
@@ -28119,10 +26389,6 @@ snapshots:
       '@types/ms': 2.1.0
 
   '@types/deep-eql@4.0.2': {}
-
-  '@types/diff@8.0.0':
-    dependencies:
-      diff: 9.0.0
 
   '@types/docker-modem@3.0.6':
     dependencies:
@@ -28919,6 +27185,7 @@ snapshots:
       tinyglobby: 0.2.17
       tinyrainbow: 3.1.1
       vitest: 4.1.10(@opentelemetry/api@1.9.1)(@types/node@26.2.0)(@vitest/browser-playwright@4.1.10)(@vitest/coverage-v8@4.1.10)(@vitest/ui@4.1.10)(jsdom@30.0.1(@noble/hashes@2.2.0))(msw@2.15.0(@types/node@26.2.0)(typescript@7.0.2))(vite@8.1.2(@types/node@26.2.0)(esbuild@0.28.1)(jiti@2.7.0)(sass@1.101.0)(terser@5.48.0)(tsx@4.22.4)(yaml@2.9.0))
+    optional: true
 
   '@vitest/utils@3.2.4':
     dependencies:
@@ -29753,7 +28020,8 @@ snapshots:
 
   babel-plugin-react-compiler@1.0.0:
     dependencies:
-      '@babel/types': 7.29.7
+      '@babel/types': 7.29.8
+    optional: true
 
   bail@2.0.2: {}
 
@@ -29940,8 +28208,6 @@ snapshots:
   byline@5.0.0: {}
 
   bytes@3.1.2: {}
-
-  bytestreamjs@2.0.1: {}
 
   c12@3.3.4(magicast@0.5.4):
     dependencies:
@@ -30170,15 +28436,6 @@ snapshots:
       inherits: 2.0.4
       readable-stream: 3.6.2
       typedarray: 0.0.6
-
-  concurrently@10.0.3:
-    dependencies:
-      chalk: 5.6.2
-      rxjs: 7.8.2
-      shell-quote: 1.9.0
-      supports-color: 10.2.2
-      tree-kill: 1.2.2
-      yargs: 18.0.0
 
   concurrently@9.2.4:
     dependencies:
@@ -30554,8 +28811,6 @@ snapshots:
 
   denque@2.1.0: {}
 
-  depd@1.1.2: {}
-
   depd@2.0.0: {}
 
   dequal@2.0.3: {}
@@ -30706,6 +28961,7 @@ snapshots:
   encoding@0.1.13:
     dependencies:
       iconv-lite: 0.6.3
+    optional: true
 
   end-of-stream@1.4.5:
     dependencies:
@@ -30959,13 +29215,6 @@ snapshots:
 
   expect-type@1.4.0: {}
 
-  express-prom-bundle@8.0.0(prom-client@15.1.3):
-    dependencies:
-      '@types/express': 5.0.6
-      on-finished: 2.4.1
-      prom-client: 15.1.3
-      url-value-parser: 2.2.0
-
   express-rate-limit@8.6.0(express@5.2.1):
     dependencies:
       debug: 4.4.3(supports-color@10.2.2)
@@ -31140,7 +29389,8 @@ snapshots:
 
   fflate@0.4.9: {}
 
-  fflate@0.8.3: {}
+  fflate@0.8.3:
+    optional: true
 
   ffmpeg-static@5.3.0:
     dependencies:
@@ -31807,7 +30057,8 @@ snapshots:
 
   immer@11.1.8: {}
 
-  immutable@5.1.9: {}
+  immutable@5.1.9:
+    optional: true
 
   import-fresh@3.3.1:
     dependencies:
@@ -32144,30 +30395,6 @@ snapshots:
 
   kysely@0.28.17: {}
 
-  langchain@0.3.37(@langchain/core@0.3.80(@opentelemetry/api@1.9.1)(@opentelemetry/exporter-trace-otlp-proto@0.221.0(@opentelemetry/api@1.9.1))(@opentelemetry/sdk-trace-base@2.10.0(@opentelemetry/api@1.9.1))(openai@4.104.0(encoding@0.1.13)(ws@8.21.1(bufferutil@4.1.0))(zod@3.25.76))(ws@8.21.1(bufferutil@4.1.0)))(@opentelemetry/api@1.9.1)(@opentelemetry/exporter-trace-otlp-proto@0.221.0(@opentelemetry/api@1.9.1))(@opentelemetry/sdk-trace-base@2.10.0(@opentelemetry/api@1.9.1))(axios@1.19.0)(handlebars@4.7.9)(openai@4.104.0(encoding@0.1.13)(ws@8.21.1(bufferutil@4.1.0))(zod@3.25.76))(ws@8.21.1(bufferutil@4.1.0)):
-    dependencies:
-      '@langchain/core': 0.3.80(@opentelemetry/api@1.9.1)(@opentelemetry/exporter-trace-otlp-proto@0.221.0(@opentelemetry/api@1.9.1))(@opentelemetry/sdk-trace-base@2.10.0(@opentelemetry/api@1.9.1))(openai@4.104.0(encoding@0.1.13)(ws@8.21.1(bufferutil@4.1.0))(zod@3.25.76))(ws@8.21.1(bufferutil@4.1.0))
-      '@langchain/openai': 0.6.9(@langchain/core@0.3.80(@opentelemetry/api@1.9.1)(@opentelemetry/exporter-trace-otlp-proto@0.221.0(@opentelemetry/api@1.9.1))(@opentelemetry/sdk-trace-base@2.10.0(@opentelemetry/api@1.9.1))(openai@4.104.0(encoding@0.1.13)(ws@8.21.1(bufferutil@4.1.0))(zod@3.25.76))(ws@8.21.1(bufferutil@4.1.0)))(ws@8.21.1(bufferutil@4.1.0))
-      '@langchain/textsplitters': 0.1.0(@langchain/core@0.3.80(@opentelemetry/api@1.9.1)(@opentelemetry/exporter-trace-otlp-proto@0.221.0(@opentelemetry/api@1.9.1))(@opentelemetry/sdk-trace-base@2.10.0(@opentelemetry/api@1.9.1))(openai@4.104.0(encoding@0.1.13)(ws@8.21.1(bufferutil@4.1.0))(zod@3.25.76))(ws@8.21.1(bufferutil@4.1.0)))
-      js-tiktoken: 1.0.21
-      js-yaml: 4.3.1
-      jsonpointer: 5.0.1
-      langsmith: 0.6.0(@opentelemetry/api@1.9.1)(@opentelemetry/exporter-trace-otlp-proto@0.221.0(@opentelemetry/api@1.9.1))(@opentelemetry/sdk-trace-base@2.10.0(@opentelemetry/api@1.9.1))(openai@4.104.0(encoding@0.1.13)(ws@8.21.1(bufferutil@4.1.0))(zod@3.25.76))(ws@8.21.1(bufferutil@4.1.0))
-      openapi-types: 12.1.3
-      p-retry: 4.6.2
-      uuid: 11.1.1
-      yaml: 2.9.0
-      zod: 3.25.76
-    optionalDependencies:
-      axios: 1.19.0(debug@4.4.3)
-      handlebars: 4.7.9
-    transitivePeerDependencies:
-      - '@opentelemetry/api'
-      - '@opentelemetry/exporter-trace-otlp-proto'
-      - '@opentelemetry/sdk-trace-base'
-      - openai
-      - ws
-
   langchain@0.3.37(@langchain/core@0.3.80(@opentelemetry/api@1.9.1)(@opentelemetry/exporter-trace-otlp-proto@0.221.0(@opentelemetry/api@1.9.1))(@opentelemetry/sdk-trace-base@2.10.0(@opentelemetry/api@1.9.1))(openai@4.104.0(encoding@0.1.13)(ws@8.21.3(bufferutil@4.1.0))(zod@3.25.76))(ws@8.21.3(bufferutil@4.1.0)))(@opentelemetry/api@1.9.1)(@opentelemetry/exporter-trace-otlp-proto@0.221.0(@opentelemetry/api@1.9.1))(@opentelemetry/sdk-trace-base@2.10.0(@opentelemetry/api@1.9.1))(axios@1.19.0)(handlebars@4.7.9)(openai@4.104.0(encoding@0.1.13)(ws@8.21.3(bufferutil@4.1.0))(zod@3.25.76))(ws@8.21.3(bufferutil@4.1.0)):
     dependencies:
       '@langchain/core': 0.3.80(@opentelemetry/api@1.9.1)(@opentelemetry/exporter-trace-otlp-proto@0.221.0(@opentelemetry/api@1.9.1))(@opentelemetry/sdk-trace-base@2.10.0(@opentelemetry/api@1.9.1))(openai@4.104.0(encoding@0.1.13)(ws@8.21.3(bufferutil@4.1.0))(zod@3.25.76))(ws@8.21.3(bufferutil@4.1.0))
@@ -32239,16 +30466,6 @@ snapshots:
       - '@opentelemetry/sdk-trace-base'
       - openai
       - ws
-
-  langsmith@0.6.0(@opentelemetry/api@1.9.1)(@opentelemetry/exporter-trace-otlp-proto@0.221.0(@opentelemetry/api@1.9.1))(@opentelemetry/sdk-trace-base@2.10.0(@opentelemetry/api@1.9.1))(openai@4.104.0(encoding@0.1.13)(ws@8.21.1(bufferutil@4.1.0))(zod@3.25.76))(ws@8.21.1(bufferutil@4.1.0)):
-    dependencies:
-      p-queue: 6.6.2
-    optionalDependencies:
-      '@opentelemetry/api': 1.9.1
-      '@opentelemetry/exporter-trace-otlp-proto': 0.221.0(@opentelemetry/api@1.9.1)
-      '@opentelemetry/sdk-trace-base': 2.10.0(@opentelemetry/api@1.9.1)
-      openai: 4.104.0(encoding@0.1.13)(ws@8.21.1(bufferutil@4.1.0))(zod@3.25.76)
-      ws: 8.21.1(bufferutil@4.1.0)
 
   langsmith@0.6.0(@opentelemetry/api@1.9.1)(@opentelemetry/exporter-trace-otlp-proto@0.221.0(@opentelemetry/api@1.9.1))(@opentelemetry/sdk-trace-base@2.10.0(@opentelemetry/api@1.9.1))(openai@4.104.0(encoding@0.1.13)(ws@8.21.3(bufferutil@4.1.0))(zod@3.25.76))(ws@8.21.3(bufferutil@4.1.0)):
     dependencies:
@@ -33581,22 +31798,6 @@ snapshots:
 
   node-gyp-build@4.8.4: {}
 
-  node-mocks-http@1.17.2(@types/express@5.0.6)(@types/node@26.2.0):
-    dependencies:
-      accepts: 1.3.8
-      content-disposition: 0.5.4
-      depd: 1.1.2
-      fresh: 0.5.2
-      merge-descriptors: 1.0.3
-      methods: 1.1.2
-      mime: 1.6.0
-      parseurl: 1.3.3
-      range-parser: 1.3.0
-      type-is: 1.6.18
-    optionalDependencies:
-      '@types/express': 5.0.6
-      '@types/node': 26.2.0
-
   node-pty@1.1.0:
     dependencies:
       node-addon-api: 7.1.1
@@ -33669,21 +31870,6 @@ snapshots:
       is-inside-container: 1.0.0
       powershell-utils: 0.1.0
       wsl-utils: 0.3.1
-
-  openai@4.104.0(encoding@0.1.13)(ws@8.21.1(bufferutil@4.1.0))(zod@3.25.76):
-    dependencies:
-      '@types/node': 18.19.130
-      '@types/node-fetch': 2.6.13
-      abort-controller: 3.0.0
-      agentkeepalive: 4.6.0
-      form-data-encoder: 1.7.2
-      formdata-node: 4.4.1
-      node-fetch: 2.7.0(encoding@0.1.13)
-    optionalDependencies:
-      ws: 8.21.1(bufferutil@4.1.0)
-      zod: 3.25.76
-    transitivePeerDependencies:
-      - encoding
 
   openai@4.104.0(encoding@0.1.13)(ws@8.21.3(bufferutil@4.1.0))(zod@3.25.76):
     dependencies:
@@ -33771,6 +31957,7 @@ snapshots:
       '@smithy/signature-v4': 5.7.0
       ws: 8.21.1(bufferutil@4.1.0)
       zod: 4.4.3
+    optional: true
 
   openai@7.4.0(@aws-sdk/credential-provider-node@3.972.79)(@smithy/signature-v4@5.7.0)(ws@8.21.3(bufferutil@4.1.0))(zod@4.4.3):
     optionalDependencies:
@@ -34174,15 +32361,6 @@ snapshots:
       confbox: 0.2.4
       exsolve: 1.1.1
       pathe: 2.0.3
-
-  pkijs@3.4.0:
-    dependencies:
-      '@noble/hashes': 1.4.0
-      asn1js: 3.0.10
-      bytestreamjs: 2.0.1
-      pvtsutils: 1.3.6
-      pvutils: 1.1.5
-      tslib: 2.8.1
 
   playwright-core@1.61.1: {}
 
@@ -34729,13 +32907,6 @@ snapshots:
       react: 19.2.8
       react-dom: 19.2.8(react@19.2.8)
 
-  react-vega@8.0.0(react-dom@19.2.8(react@19.2.8))(react@19.2.8)(vega-embed@7.1.0(vega-lite@6.4.3(vega@6.3.1))(vega@6.3.1)):
-    dependencies:
-      fast-deep-equal: 3.1.3
-      react: 19.2.8
-      react-dom: 19.2.8(react@19.2.8)
-      vega-embed: 7.1.0(vega-lite@6.4.3(vega@6.3.1))(vega@6.3.1)
-
   react@19.2.8: {}
 
   readable-stream@2.3.8:
@@ -35114,6 +33285,7 @@ snapshots:
       source-map-js: 1.2.1
     optionalDependencies:
       '@parcel/watcher': 2.5.6
+    optional: true
 
   saxes@6.0.0:
     dependencies:
@@ -35126,11 +33298,6 @@ snapshots:
   selderee@0.11.0:
     dependencies:
       parseley: 0.12.1
-
-  selfsigned@5.5.0:
-    dependencies:
-      '@peculiar/x509': 1.14.3
-      pkijs: 3.4.0
 
   semver@6.3.1: {}
 
@@ -36022,8 +34189,6 @@ snapshots:
     dependencies:
       querystringify: 2.2.0
       requires-port: 1.0.0
-
-  url-value-parser@2.2.0: {}
 
   urlpattern-polyfill@10.1.0: {}
 

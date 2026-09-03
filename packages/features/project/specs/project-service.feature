@@ -61,6 +61,20 @@ Feature: Shared project service
     And it does not construct Prisma or a Project repository per request
 
   @unit
+  Scenario: A deployment without a clustering scheduler refuses by name
+    Given a process composes the project surface with no topic-clustering scheduler
+    When a caller asks for a manual clustering run
+    Then the caller is told this deployment does not offer that service
+    And the refusal reaches the caller by name rather than as an unknown failure
+
+  @unit
+  Scenario: A clustering run that fails inside the platform degrades to an unknown failure
+    Given a process composes the project surface with a clustering scheduler
+    When the scheduler fails for a reason no caller can act on
+    Then the process records the failure
+    And the caller is told only that the request failed, with a trace id to quote
+
+  @unit
   Scenario: A project is born with packaged credentials
     Given a process composes the project service
     When the service creates a project

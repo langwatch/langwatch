@@ -514,25 +514,25 @@ describe("given an API process composed with the org-group half of the record", 
 
   describe("when no clustering scheduler runs in this process", () => {
     /**
-     * The refusal is real and named — the composition raises
-     * `service_unavailable` naming the scheduler — but the project transport
-     * deliberately degrades EVERY clustering failure to an unnamed error,
-     * because the causes behind it are event-store internals a caller cannot
-     * act on. So what a caller observes is a failure with a trace id rather
-     * than an accepted run; the name is in this process's log.
+     * The composition raises `service_unavailable` naming the scheduler, and
+     * the project transport re-raises it untouched: the cause is known — this
+     * process composes no clustering wake path — and the caller can act on it,
+     * so the name reaches the wire instead of a trace id for a condition we
+     * could have named. The transport's deliberate degradation is still there
+     * underneath it, and still covers the event-store internals a caller
+     * cannot act on; it just no longer swallows the refusal above them.
      */
-    it("fails the request rather than accepting a run nobody starts", async () => {
+    it("refuses the request by name rather than accepting a run nobody starts", async () => {
       const { application } = composeApplication();
 
-      const { status, body } = await callTrpc(
+      const { body } = await callTrpc(
         application,
         "project.triggerTopicClustering",
         { projectId: PROJECT_ID },
         "mutation",
       );
 
-      expect(status).toBe(500);
-      expect(refusal(body)).toContain("Failed to trigger topic clustering");
+      expect(refusal(body)).toContain("service_unavailable");
       expect(refusal(body)).not.toContain('"success":true');
     });
   });
