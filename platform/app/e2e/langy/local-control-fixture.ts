@@ -145,6 +145,12 @@ let cliApiKeyPromise: Promise<string> | null = null;
  *
  * The key carries one PROJECT-scoped binding, so the platform resolves the
  * project from the key alone and the command line never has to name one.
+ *
+ * The mint is read back before it is used. A `apiKey.create` that answers 200
+ * has been seen to leave the binding unwritten under load, and the key that
+ * comes back then reaches every route with "does not grant langy:view". That
+ * failure surfaces two minutes later as a command line that never printed its
+ * prompt, which says nothing about the cause, so it is caught here instead.
  */
 export function getCliApiKey(): Promise<string> {
   cliApiKeyPromise ??= (async () => {
@@ -167,26 +173,52 @@ export function getCliApiKey(): Promise<string> {
           `no organization holds project ${PROJECT_ID}; check LANGY_PROJECT_ID`,
         );
       }
-      const created = await trpcMutate<{ token: string }>({
-        cookie,
-        path: "apiKey.create",
-        input: {
-          organizationId,
-          name: `langy-local-control-e2e ${new Date().toISOString()}`,
-          keyType: "personal",
-          permissionMode: "all",
-          bindings: [
-            { role: "ADMIN", scopeType: "PROJECT", scopeId: PROJECT_ID },
-          ],
-        },
-      });
-      return created.token;
+      let refusal = "";
+      for (let attempt = 0; attempt < 3; attempt += 1) {
+        const created = await trpcMutate<{ token: string }>({
+          cookie,
+          path: "apiKey.create",
+          input: {
+            organizationId,
+            name: `langy-local-control-e2e ${new Date().toISOString()}`,
+            keyType: "personal",
+            permissionMode: "all",
+            bindings: [
+              { role: "ADMIN", scopeType: "PROJECT", scopeId: PROJECT_ID },
+            ],
+          },
+        });
+        refusal = await keyRefusal(created.token);
+        if (refusal === "") return created.token;
+        console.log(`[fixture] minted key refused, minting again: ${refusal}`);
+      }
+      throw new Error(
+        `every minted key was refused by the control route: ${refusal}`,
+      );
     } catch (error) {
       cliApiKeyPromise = null;
       throw error;
     }
   })();
   return cliApiKeyPromise;
+}
+
+/**
+ * Empty when the key reaches the control route, otherwise the words the
+ * platform refused it with. The list read needs the same permission the
+ * command line needs, so it is the cheapest proof the key carries it.
+ */
+async function keyRefusal(token: string): Promise<string> {
+  try {
+    const response = await fetch(`${APP_BASE}/api/v1/langy/control/requests`, {
+      headers: { "X-Auth-Token": token, "X-Project-Id": PROJECT_ID },
+      signal: AbortSignal.timeout(30_000),
+    });
+    if (response.ok) return "";
+    return `${response.status} ${(await response.text()).slice(0, 200)}`;
+  } catch (error) {
+    return String(error);
+  }
 }
 
 // ---------------------------------------------------------------------------
