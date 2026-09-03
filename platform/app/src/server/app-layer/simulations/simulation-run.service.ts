@@ -4,6 +4,7 @@ import type {
   BatchRunDataResult,
   BatchSummary,
   ExternalSetSummary,
+  ScenarioLastResultSummary,
   ScenarioRunData,
   ScenarioSetData,
 } from "~/server/scenarios/scenario-event.types";
@@ -75,6 +76,7 @@ export class SimulationRunService {
     cursor?: string;
     startDate?: number;
     endDate?: number;
+    shouldIncludeMessages?: boolean;
   }): Promise<{
     runs: ScenarioRunData[];
     nextCursor?: string;
@@ -115,6 +117,20 @@ export class SimulationRunService {
     return this.repository.getInternalSuiteSummaries(params);
   }
 
+  /**
+   * The latest run result per scenario inside the window, for the last-result
+   * cells of the scenarios table. Kept separate from the scenario list read
+   * so the list renders instantly and the cells stream in.
+   */
+  async getLastResultSummaries(params: {
+    projectId: string;
+    scenarioIds?: string[];
+    startDate?: number;
+    endDate?: number;
+  }): Promise<ScenarioLastResultSummary[]> {
+    return this.repository.getLastResultSummaries(params);
+  }
+
   async getRunDataForAllSuites(params: {
     projectId: string;
     limit?: number;
@@ -122,6 +138,7 @@ export class SimulationRunService {
     startDate?: number;
     endDate?: number;
     sinceTimestamp?: number;
+    shouldIncludeMessages?: boolean;
   }) {
     return this.repository.getRunDataForAllSuites(params);
   }

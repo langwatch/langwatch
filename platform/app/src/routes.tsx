@@ -85,6 +85,9 @@ const routes: RouteObject[] = [
     ...page(() => import("./pages/auth/verify-email")),
   },
   { path: "/auth/error", ...page(() => import("./pages/auth/error")) },
+  // Join before create (ADR-117 §6): a new account passes through here on its
+  // way to making an organization. Renders nothing until D12 fills it.
+  { path: "/auth/join", ...page(() => import("./pages/auth/join")) },
 
   // Top-level pages
   { path: "/", ...page(() => import("./pages/index")) },
@@ -325,12 +328,6 @@ const routes: RouteObject[] = [
         ...page(() => import("./pages/me/budget/request")),
       },
 
-      // CLI device-flow approval (RFC 8628 user-facing screen)
-      {
-        path: "/cli/auth",
-        ...page(() => import("./pages/cli/auth")),
-      },
-
       // AI Gateway: org-scoped admin pages live under /gateway/** at the top
       // level, like /governance. Every gateway resource (VirtualKey /
       // GatewayBudget / ModelProvider) is org-keyed by the schema, so the
@@ -384,6 +381,14 @@ const routes: RouteObject[] = [
       },
       ...legacyRedirectRoutes,
     ],
+  },
+
+  // CLI device-flow approval (RFC 8628 user-facing screen). Top level, like
+  // /onboarding: it is a confirm-a-code screen, not a page of the app, and
+  // the Langy panel must not mount on it.
+  {
+    path: "/cli/auth",
+    ...page(() => import("./pages/cli/auth")),
   },
 
   // Project routes — wrapped in a layout route that mounts Langy ONCE per
@@ -608,6 +613,16 @@ const routes: RouteObject[] = [
         ...page(() => import("./pages/[project]/experiments/[experiment]")),
       },
 
+      // Agent Testing (catch-all, behind release_ui_agent_testing_v2_enabled)
+      {
+        path: "/:project/agent-testing",
+        ...page(() => import("./pages/[project]/agent-testing/[[...path]]")),
+      },
+      {
+        path: "/:project/agent-testing/*",
+        ...page(() => import("./pages/[project]/agent-testing/[[...path]]")),
+      },
+
       // Simulations (catch-all)
       {
         path: "/:project/simulations/scenarios",
@@ -694,6 +709,10 @@ const routes: RouteObject[] = [
   {
     path: "/ops/backoffice/subscriptions",
     ...page(() => import("./pages/ops/backoffice/subscriptions")),
+  },
+  {
+    path: "/ops/backoffice/sso-connections",
+    ...page(() => import("./pages/ops/backoffice/sso-connections")),
   },
 
   // @project redirect - Next.js parallel route that redirects /@project/path to /:project/path

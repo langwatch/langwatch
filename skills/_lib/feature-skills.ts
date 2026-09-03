@@ -17,6 +17,8 @@ export const FEATURE_SKILLS = [
   "agent-improve",
   "level-up",
   "datasets",
+  "context-sweet-spot",
+  "provider-cost-comparison",
 ] as const;
 
 // Skills that ship only with Langy. Their canonical sources still live at the

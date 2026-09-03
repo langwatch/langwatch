@@ -25,6 +25,7 @@ import {
 import { authzGrantsCommands } from "../authz/ledger";
 import { PrismaAuthzMigrationRepository } from "../authz/repositories/authz-migration.prisma.repository";
 import {
+  connectionGrandfatherMigration,
   identifierBackfillMigration,
   identityNewbornReconciliation,
   identitySecretHealMigration,
@@ -33,7 +34,6 @@ import {
   migrationRunsOnThisInstallation,
   organizationMigrates,
 } from "./cohort";
-import { MigrationNotAvailableOnInstallationError } from "./errors";
 import { RedisMigrationLeaseRepository } from "./repositories/migration-lease.redis.repository";
 import { PrismaOrganizationTenantSource } from "./repositories/organization-tenant-source.prisma.repository";
 import { PrismaSystemMigrationEnrollmentRepository } from "./repositories/system-migration-enrollment.prisma.repository";
@@ -133,6 +133,10 @@ export function registeredMigrations(): SystemMigration[] {
       ledger: authzEngineLedger,
       now: () => Date.now(),
     }),
+    // D04 (ADR-117 §5): the organization's legacy SSO strings become
+    // connection history, proved by routing. Dark — the connection projection
+    // decides nothing until `SSOCONN_ROUTING` is flipped.
+    connectionGrandfatherMigration(),
   ];
 }
 
@@ -281,16 +285,22 @@ export async function migrationPassCohort(): Promise<
  * every organization. Enrollment is read once, fresh, at the start of each
  * pass; membership is answered per candidate user with two cheap indexed
  * reads rather than materializing every enrolled organization's member list
- * into memory (the runner visits each user once per pass). Members of
- * private-dataplane organizations are excluded exactly as those
- * organizations are. A user outside every organization has nothing to enroll
- * them on cloud and stays on the legacy path until they join one; their
- * sign-in is unaffected (the write gate answers false; the D03 read fork
- * falls back to legacy routing).
+ * into memory (the runner visits each user once per pass). A user outside
+ * every organization has nothing to enroll them on cloud and stays on the
+ * legacy path until they join one; their sign-in is unaffected (the write
+ * gate answers false; the D03 read fork falls back to legacy routing).
  *
  * A user-rooted migration declaring `enrolledAutomatically` admits every
- * user instead, private-dataplane members still excepted - the same rule the
- * organization cohort applies, on this axis.
+ * user instead.
+ *
+ * Membership of a private-dataplane organization is NOT a reason to leave
+ * somebody out, and used to be: a user tenant could not be placed at all, so
+ * excluding them was the only way to avoid writing somewhere wrong. It can
+ * be placed now - user data lands on the shared instance, whoever they
+ * belong to, because what these events record is how a person signs in
+ * rather than any organization's data. Excluding them would strand exactly
+ * those people on the legacy path forever, which is the same reason the
+ * organization cohort never excluded their organizations.
  */
 export async function userMigrationPassCohort(): Promise<
   (args: { tenantId: string; migrationName: string }) => Promise<boolean>
@@ -299,39 +309,16 @@ export async function userMigrationPassCohort(): Promise<
   const automatic = automaticallyEnrolledMigrationNames();
   const enrolledByMigration =
     await enrollmentRepository.findEnrolledOrganizationIdsByMigration();
-  // The same exclusion the organization cohort applies: a private-dataplane
-  // organization is never swept up, and neither are its members - a user's
-  // identity events would otherwise land in the shared platform log while
-  // the organization's own data stays on its private instance. It survives
-  // an automatic enrollment too: that declaration widens WHO the rollout
-  // reaches, and this exclusion is not pacing but where the events land.
-  const privateOrganizationIds = [...getPrivateClickHouseUrls().keys()];
-  const belongsToPrivateDataplane = async (
-    userId: string,
-  ): Promise<boolean> => {
-    if (privateOrganizationIds.length === 0) return false;
-    const membership = await prisma.organizationUser.findFirst({
-      where: { userId, organizationId: { in: privateOrganizationIds } },
-      select: { userId: true },
-    });
-    return membership !== null;
-  };
-  const enrolledPublicByMigration = new Map<string, string[]>();
+  const enrolledByMigrationList = new Map<string, string[]>();
   for (const migration of registeredUserMigrations()) {
-    enrolledPublicByMigration.set(
-      migration.name,
-      [
-        ...(enrolledByMigration.get(migration.name) ?? new Set<string>()),
-      ].filter((id) => !privateOrganizationIds.includes(id)),
-    );
+    enrolledByMigrationList.set(migration.name, [
+      ...(enrolledByMigration.get(migration.name) ?? new Set<string>()),
+    ]);
   }
   return async ({ tenantId, migrationName }) => {
-    if (automatic.has(migrationName)) {
-      return !(await belongsToPrivateDataplane(tenantId));
-    }
-    const organizationIds = enrolledPublicByMigration.get(migrationName) ?? [];
+    if (automatic.has(migrationName)) return true;
+    const organizationIds = enrolledByMigrationList.get(migrationName) ?? [];
     if (organizationIds.length === 0) return false;
-    if (await belongsToPrivateDataplane(tenantId)) return false;
     const enrolledMembership = await prisma.organizationUser.findFirst({
       where: { userId: tenantId, organizationId: { in: organizationIds } },
       select: { userId: true },
@@ -415,18 +402,6 @@ export async function runSystemMigrationTargetedPass({
     (migration) => migration.name === migrationName,
   );
   if (userMigration) {
-    // The same exclusion `userMigrationPassCohort` applies: a
-    // private-dataplane organization's members are never swept up - their
-    // identity events would land in the shared platform log while the
-    // organization's own data stays on its private instance - and neither
-    // enrollment nor an automatic declaration carries that rule, so the
-    // targeted run refuses outright.
-    if (
-      env.IS_SAAS === true &&
-      getPrivateClickHouseUrls().has(organizationId)
-    ) {
-      throw new MigrationNotAvailableOnInstallationError();
-    }
     const runner = new SystemMigrationRunnerService({
       state: systemMigrationState,
       lease: new RedisMigrationLeaseRepository(redis),

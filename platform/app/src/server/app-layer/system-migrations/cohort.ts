@@ -32,10 +32,22 @@
  * instance when one is configured, refusing to fall back to the shared
  * client rather than leaking. Leaving those organizations out would strand
  * them on their legacy path forever - the very drift an automatic cohort
- * exists to end. The USER-rooted cohort is the case that genuinely cannot
- * place its events: a user tenant resolves to neither a project nor an
- * organization, so `userMigrationPassCohort` excludes private-dataplane
- * members there, and only there.
+ * exists to end.
+ *
+ * The USER-rooted cohort places its events too, and a USER is a tenant kind
+ * in its own right for that purpose - not a project, not an organization,
+ * and not resolved into either, because a tenant is a PROJECT id and one
+ * user reaches many projects across many organizations with no single one of
+ * them to call theirs. Identity history is platform-level, so it lands on the
+ * shared instance.
+ *
+ * `userMigrationPassCohort` used to except a private-dataplane MEMBER, and no
+ * longer does. That exception existed because a user tenant could not be
+ * placed at all; now it can - the resolver routes every user tenant to the
+ * shared instance without consulting membership - so the person has a
+ * perfectly good answer and migrates like anybody else. Keeping them out
+ * would have stranded exactly them on the legacy path, which is the reason
+ * this axis does not hold their organizations back either.
  *
  * SELF-HOSTED is paced per migration, at release time, by the migration's
  * own `runsAutomaticallyOnSelfHosted` declaration. There is no enrollment

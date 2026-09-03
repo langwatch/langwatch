@@ -534,8 +534,8 @@ describe("CodingAgentSessionFoldProjection", () => {
       ...overrides,
     });
 
-    /** @scenario Repository identity and worktree set once and do not move */
-    it("keeps the first repository and worktree when a later event names another", () => {
+    /** @scenario Repository identity and worktree follow the latest context event */
+    it("moves the repository and worktree to the latest event's answer", () => {
       const projection = makeProjection();
       let state = initStateOf(projection);
 
@@ -556,10 +556,37 @@ describe("CodingAgentSessionFoldProjection", () => {
         state,
       );
 
+      expect(state.repositoryHost).toBe("gitlab.com");
+      expect(state.repositoryOwner).toBe("other");
+      expect(state.repositoryName).toBe("gadgets");
+      expect(state.gitWorktree).toBe("gadgets-hotfix");
+    });
+
+    /** @scenario A context event that omits a field keeps the previous value */
+    it("keeps the declared repository and worktree when a later event omits them", () => {
+      const projection = makeProjection();
+      let state = initStateOf(projection);
+
+      state = projection.handleCodingAgentSessionLogFactsContributed(
+        logFactsEvent({ facts: contextFacts() }),
+        state,
+      );
+      state = projection.handleCodingAgentSessionLogFactsContributed(
+        logFactsEvent({
+          facts: {
+            "event.name": "langwatch.session_context",
+            "vcs.ref.head.name": "feat/only-a-branch",
+          },
+          timeMs: 2_500,
+        }),
+        state,
+      );
+
       expect(state.repositoryHost).toBe("github.com");
       expect(state.repositoryOwner).toBe("acme");
       expect(state.repositoryName).toBe("widgets");
       expect(state.gitWorktree).toBe("widgets");
+      expect(state.gitBranch).toBe("feat/only-a-branch");
     });
 
     /** @scenario The branch follows the latest session context event */

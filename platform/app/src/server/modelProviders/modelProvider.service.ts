@@ -828,6 +828,28 @@ export class ModelProviderService {
       tx,
     );
 
+    // Onboarding seed on the enable flip. A row created disabled, or turned off
+    // and back on, never went through `applyCreate`'s seed, so the scope could
+    // sit with an enabled provider and no default for the roles that provider
+    // fills. The seed is per key, so a role the scope already carries is left
+    // exactly as the user set it.
+    if (input.enabled && !existingProvider.enabled) {
+      const seedScopes: ScopeInput[] =
+        scopes ??
+        existingProvider.scopes.map((scope) => ({
+          scopeType: scope.scopeType as ScopeInput["scopeType"],
+          scopeId: scope.scopeId,
+        }));
+      for (const scope of seedScopes) {
+        await seedOnboardingDefaultsForProvider({
+          prisma: tx as unknown as PrismaClient,
+          provider: input.provider,
+          scopeType: scope.scopeType,
+          scopeId: scope.scopeId,
+        });
+      }
+    }
+
     // A running gateway is serving the previous credential, base URL, headers
     // and routing handle from cache. Rotating a key or renaming a handle is
     // exactly the moment where that matters, so the eviction rides the same

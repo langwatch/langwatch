@@ -17,6 +17,7 @@ import {
   type AccountQuery,
   type AccountWhere,
   IdentityUnsupportedStorageQueryError,
+  issuerForProviderId,
   parseAccountQuery,
 } from "./account-queries";
 import type { IdentityAccountCeremonies } from "./ceremony-types";
@@ -36,6 +37,31 @@ import type {
 
 const logger = createLogger("langwatch:identity:storage-adapter");
 
+/**
+ * A refusal, logged on its way out.
+ *
+ * better-auth catches an adapter throw and turns it into a redirect carrying
+ * the error CODE and nothing else, so an unlogged refusal reaches the
+ * customer as a sign-in error page and leaves NOTHING behind to diagnose it
+ * with. That is not hypothetical: `identity_unsupported_storage_query` broke
+ * production sign-in and appeared zero times in the logs for the whole
+ * outage, while the detail naming the exact shape sat unread on the error's
+ * own `reasons`. It is logged at error because it is `fault: "platform"` —
+ * nothing the customer did caused it and nothing they can do fixes it.
+ *
+ * Returns the error so a caller can `throw refused(...)` and keep the throw
+ * visible at the site it happens.
+ */
+const refused = <T>(error: T): T => {
+  if (error instanceof IdentityUnsupportedStorageQueryError) {
+    logger.error(
+      { err: error, detail: error.reasons[0]?.message },
+      "the identity storage adapter refused a better-auth account operation; the sign-in or account write it belongs to fails",
+    );
+  }
+  return error;
+};
+
 /** The secret set the identity branch owns. Everything else on the `account`
  *  model is linkage, and linkage is a command rather than a column write. */
 const SECRET_FIELDS = [
@@ -51,6 +77,47 @@ const SECRET_FIELDS = [
 /** Written by the store itself, so an update naming it is not a linkage
  *  rewrite and does not have to refuse. */
 const UPDATE_PASSTHROUGH_FIELDS = ["createdAt", "updatedAt"] as const;
+
+/**
+ * Linkage columns better-auth RESTATES on an update it means as a secret
+ * write — accepted when the value it carries already matches the row, and
+ * refused when it differs.
+ *
+ * A restatement is not a rewrite. better-auth 1.7 rebuilt the sign-in token
+ * refresh (`oauth2/link-account`) to send `providerId` alongside the tokens,
+ * echoing back the value it just read; 1.6 sent `scope` and no linkage at
+ * all. Refusing the echo failed EVERY OAuth sign-in for a latched user, so
+ * the field alone cannot decide this — only the field and its value together
+ * can. Equality is what makes accepting it safe: a matching value writes
+ * nothing, and a differing one is a real rewrite and still refuses.
+ */
+const LINKAGE_RESTATEMENT_FIELDS = [
+  "providerId",
+  "issuer",
+  "accountId",
+  "userId",
+] as const;
+
+type LinkageRestatementField = (typeof LINKAGE_RESTATEMENT_FIELDS)[number];
+
+const isLinkageRestatementField = (
+  field: string,
+): field is LinkageRestatementField =>
+  LINKAGE_RESTATEMENT_FIELDS.some((known) => known === field);
+
+/**
+ * The value a row states for a linkage field, with `issuer` resolved the
+ * same way the served row resolves it — a row attached before the fact
+ * carried an issuer answers with the synthetic form better-auth minted, and
+ * that is the value better-auth is echoing back.
+ */
+const linkageValueOf = (
+  row: IdentityAccountRow,
+  field: LinkageRestatementField,
+): string =>
+  field === "issuer"
+    ? (row.issuer ?? issuerForProviderId(row.providerId))
+    : row[field];
 
 export interface IdentityStorageAdapterDeps {
   /**
@@ -238,6 +305,31 @@ function identityCustomAdapter({
       return typeof clause?.value === "string" ? clause.value : null;
     };
 
+    /**
+     * Whether an `account` write is scoped to one user and NOTHING else —
+     * every row they hold, named by no provider, subject or row id.
+     *
+     * That shape reaches `deleteMany` from exactly one place: better-auth
+     * erasing the user. A delete that names anything further is somebody
+     * unlinking a method, and must keep meeting the guards that decide
+     * whether removing it would strand them.
+     */
+    const isWholeUserScope = (
+      model: string,
+      where: readonly CleanedWhere[] | undefined,
+    ): boolean => {
+      const canonical = canonicalWhere(model, where);
+      const clause = canonical[0];
+      return (
+        canonical.length === 1 &&
+        clause !== undefined &&
+        clause.field === "userId" &&
+        (clause.operator === undefined ||
+          clause.operator.toLowerCase() === "eq") &&
+        typeof clause.value === "string"
+      );
+    };
+
     /** The record a `user` query names outright — the same narrowing
      *  `namedUserId` applies, one field over, because on the `user` model the
      *  user IS the record. */
@@ -269,16 +361,27 @@ function identityCustomAdapter({
     const secretsOfUpdate = (
       operation: string,
       update: Row,
+      rows: readonly IdentityAccountRow[],
     ): IdentityAccountSecrets => {
+      /** A linkage field whose value every named row already states — an
+       *  echo of what better-auth just read, which writes nothing. */
+      const restatesItself = (field: string): boolean =>
+        isLinkageRestatementField(field) &&
+        rows.length > 0 &&
+        rows.every((row) => linkageValueOf(row, field) === update[field]);
+
       const foreign = Object.keys(update).filter(
         (field) =>
           !SECRET_FIELDS.some((secret) => secret === field) &&
-          !UPDATE_PASSTHROUGH_FIELDS.some((passed) => passed === field),
+          !UPDATE_PASSTHROUGH_FIELDS.some((passed) => passed === field) &&
+          !restatesItself(field),
       );
       if (foreign.length > 0) {
-        throw new IdentityUnsupportedStorageQueryError(
-          `identity storage adapter: better-auth issued an account ${operation} that writes linkage columns (${foreign.sort().join(", ")}). ` +
-            "Linkage is event-truth on the identity branch, so it can only be stated as a command, never written as a column.",
+        throw refused(
+          new IdentityUnsupportedStorageQueryError(
+            `identity storage adapter: better-auth issued an account ${operation} that writes linkage columns (${foreign.sort().join(", ")}). ` +
+              "Linkage is event-truth on the identity branch, so it can only be stated as a command, never written as a column.",
+          ),
         );
       }
       return secretsOf(update);
@@ -290,6 +393,24 @@ function identityCustomAdapter({
      * An empty array is an ANSWER — this user holds no such account — and
      * is never a reason to read the legacy table as well.
      */
+    /**
+     * The row as better-auth 1.7 expects it, carrying the issuer half of its
+     * account key.
+     *
+     * The identifier STORES the issuer — stated on the attach, exactly as
+     * better-auth decided it — so the stored value is served verbatim. The
+     * derivation is a floor for a row attached before the fact carried one,
+     * and never a preference: a real OIDC connection's issuer is its own URL,
+     * and no rule of ours would arrive at it. Deriving over a stored value
+     * would hand back `local:oauth:google` for an account better-auth keyed
+     * by `https://accounts.google.com`, and it would look like a missing
+     * sign-in method rather than a wrong column.
+     */
+    const withIssuer = (row: IdentityAccountRow): IdentityAccountRow => ({
+      ...row,
+      issuer: row.issuer ?? issuerForProviderId(row.providerId),
+    });
+
     const serveAccounts = async (
       query: AccountQuery,
     ): Promise<IdentityAccountRow[] | null> => {
@@ -299,6 +420,19 @@ function identityCustomAdapter({
         case "byUserAndProvider": {
           const rows = await accounts.findByUser({ userId: query.userId });
           return rows.filter((row) => row.providerId === query.providerId);
+        }
+        case "byUserProviderSubject": {
+          // The user is named, so the gate is decidable without resolving the
+          // subject first — and the row is read under that user, which is
+          // what keeps a subject collision between two IdPs from answering
+          // with the wrong person's account.
+          if (!(await routesToIdentity({ userId: query.userId }))) return null;
+          const row = await accounts.findByProviderSubject({
+            userId: query.userId,
+            providerId: query.providerId,
+            providerAccountId: query.accountId,
+          });
+          return row === null ? null : [row];
         }
         case "byId":
         case "byIds": {
@@ -367,7 +501,14 @@ function identityCustomAdapter({
         // operator has enrolled anyone.
         return null;
       }
-      return serveAccounts(parseAccountQuery({ operation, where: canonical }));
+      let query: AccountQuery;
+      try {
+        query = parseAccountQuery({ operation, where: canonical });
+      } catch (error) {
+        throw refused(error);
+      }
+      const served = await serveAccounts(query);
+      return served === null ? null : served.map(withIssuer);
     };
 
     const applySecrets = async ({
@@ -409,6 +550,11 @@ function identityCustomAdapter({
         id: canonical.id,
         userId,
         providerId,
+        // The issuer better-auth resolved for this write, passed through so
+        // the fact states the account key the library itself decided. Drop
+        // it and the ceremony falls back to deriving one, which is wrong for
+        // every provider that brings a real issuer of its own.
+        issuer: canonical.issuer,
         accountId: canonical.accountId,
         createdAt: canonical.createdAt,
       });
@@ -677,6 +823,7 @@ function identityCustomAdapter({
               secrets: secretsOfUpdate(
                 "update",
                 toCanonicalKeys(model, update as Row),
+                [first],
               ),
             });
             const [fresh] = await accounts.findByAccountIds({
@@ -732,6 +879,7 @@ function identityCustomAdapter({
               secrets: secretsOfUpdate(
                 "updateMany",
                 toCanonicalKeys(model, update),
+                rows,
               ),
             });
             return rows.length;
@@ -775,7 +923,18 @@ function identityCustomAdapter({
             operation: "deleteMany",
             where,
           });
-          if (rows !== null) return detachOnIdentityBranch(rows);
+          if (rows !== null) {
+            return detachOnIdentityBranch(rows, {
+              // Every account row of one user, named by nothing else, is
+              // better-auth erasing that user: `deleteUser` fans this out
+              // before `user.delete.before` runs. The erase is stated ONCE by
+              // `beforeUserDelete`, so the rows go without a detach apiece —
+              // which is also what keeps the strands guard, written for
+              // unlinking a method from a LIVING user, from refusing to let a
+              // user holding one way in be deleted at all.
+              erasingUser: isWholeUserScope(model, where),
+            });
+          }
         }
         return legacy.deleteMany({ model, where });
       },
@@ -813,13 +972,19 @@ function identityCustomAdapter({
      */
     async function detachOnIdentityBranch(
       rows: readonly IdentityAccountRow[],
+      { erasingUser = false }: { erasingUser?: boolean } = {},
     ): Promise<number> {
-      for (const row of rows) {
-        await ceremonies.beforeAccountDelete({
-          id: row.id,
-          userId: row.userId,
-          providerId: row.providerId,
-        });
+      // An erase states itself, whole, through `beforeUserDelete`. Detaching
+      // each row on the way would state the same removal twice and would ask
+      // a guard about stranding a user who is being erased.
+      if (!erasingUser) {
+        for (const row of rows) {
+          await ceremonies.beforeAccountDelete({
+            id: row.id,
+            userId: row.userId,
+            providerId: row.providerId,
+          });
+        }
       }
       const accountIds = rows.map((row) => row.id);
       await accounts.deleteCredentials({ accountIds });

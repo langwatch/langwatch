@@ -3,6 +3,7 @@ import type {
   DetachIdentifierCommandData,
   EraseUserCommandData,
   IdentityFact,
+  ProposeLinkCommandData,
   VerifyIdentifierCommandData,
 } from "@langwatch/identity";
 
@@ -39,6 +40,21 @@ export interface IdentityVerificationWrites {
   verifyIdentifier(
     input: VerifyIdentifierCommandData,
   ): Promise<IdentityFact[]>;
+}
+
+/**
+ * The ONE verb an SSO callback's linking decision states on its own (ADR-117
+ * §3): the proposal it records when the evidence is not two-sided.
+ *
+ * Auto-linking is deliberately absent. A link is made by creating the provider
+ * account through better-auth, which fires the account ceremony that attaches
+ * the identifier — "never a hand-written Account insert", and by the same
+ * token never a hand-written identifier either. A callback that could attach
+ * directly would be a second way to claim a row, which is the whole risk this
+ * flow is guarding.
+ */
+export interface IdentityLinkProposalWrites {
+  proposeLink(input: ProposeLinkCommandData): Promise<IdentityFact[]>;
 }
 
 /** The verbs one backfill pass states: adopt, establish, compensate. */

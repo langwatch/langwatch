@@ -2,7 +2,7 @@ import { scopedApiKey } from "@/internal/credentialContext";
 import chalk from "chalk";
 import { createSpinner } from "../../utils/spinner";
 import { resolveCredentials } from "../../utils/apiKey";
-import { formatFetchError } from "../../utils/formatFetchError";
+import { readFetchFailure } from "../../utils/formatFetchError";
 import { failSpinner } from "../../utils/spinnerError";
 import type { CommandResult } from "../../utils/output";
 import { buildAuthHeaders } from "@/internal/api/auth";
@@ -76,8 +76,11 @@ export const getSimulationRunCommand = async (
     );
 
     if (!response.ok) {
-      const message = await formatFetchError(response);
-      failSpinner({ spinner, error: new Error(message), action: "fetch simulation run" });
+      failSpinner({
+        spinner,
+        error: await readFetchFailure(response),
+        action: "fetch simulation run",
+      });
       process.exit(1);
     }
 
@@ -100,6 +103,8 @@ export const getSimulationRunCommand = async (
       updatedAt: number;
       durationInMs: number;
       totalCost?: number;
+      note?: string | null;
+      scenarioVersion?: number | null;
     };
 
     spinner.succeed(`Found simulation run "${run.name ?? run.scenarioRunId}"`);
@@ -124,6 +129,15 @@ export const getSimulationRunCommand = async (
           console.log(`    ${chalk.gray("Cost:")}        $${run.totalCost.toFixed(4)}`);
         }
         console.log(`    ${chalk.gray("Started:")}     ${new Date(run.timestamp).toLocaleString()}`);
+        // Both lines are left out when the run carries nothing: a run stored
+        // before versions were recorded has no version to name, and a batch
+        // started without a note has no note.
+        if (run.scenarioVersion) {
+          console.log(`    ${chalk.gray("Version:")}     v${run.scenarioVersion}`);
+        }
+        if (run.note) {
+          console.log(`    ${chalk.gray("Note:")}        ${run.note}`);
+        }
 
         if (run.results) {
           console.log();

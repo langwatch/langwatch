@@ -326,6 +326,19 @@ const presentations = {
       return field ? `There's no field called "${field}".` : "";
     },
   },
+  lwql_unknown_identifier: {
+    title: "This query names a column that doesn't exist",
+    // The name is the whole value of this message, so it is quoted back when
+    // the server's refusal carried it. It may not: the extractor that reads it
+    // fails closed rather than relaying the raw refusal, so the fallback has
+    // to stand on its own and still tell the reader what to do.
+    describe: (error) => {
+      const identifier = str(error, "identifier", "");
+      return identifier
+        ? `There's no column called "${identifier}". Check the spelling against the dataset's columns.`
+        : "Check the column names against the dataset's columns.";
+    },
+  },
   lwql_unparseable: {
     title: "This query couldn't be read",
     describe: () => "Check the SQL syntax and try again.",
@@ -475,6 +488,101 @@ const presentations = {
       "This agent points at a local development tunnel that seems to have ended. Run `langwatch agent dev` again on the machine that started it, or restore the agent's URL in its settings.",
   },
 
+  // ---- connected agents ----
+  agent_register_only: {
+    title: "This agent is registered from code",
+    describe: () =>
+      "Its name, environment and parameters come from the process that runs it. Change the code and start the process again.",
+  },
+  agent_test_refused: {
+    title: "This agent cannot be tested as it is set up",
+    describe: (error) => {
+      const reason = safeProse(str(error, "reason", ""));
+      return reason
+        ? `${reason}. Fix the agent and test it again.`
+        : "Check the agent's configuration and test it again.";
+    },
+  },
+  agent_not_found: {
+    title: "Agent not found",
+    describe: () =>
+      "No agent with that id is in this project. It may have been archived, or the id belongs to another project.",
+  },
+  agent_offline: {
+    title: "This agent is not running",
+    describe: (error) => {
+      const name = str(error, "agentName", "the agent");
+      const environment = str(error, "environment", "");
+      const where = environment ? ` in ${environment}` : "";
+      return `No process running ${name}${where} is connected. Start the process that runs it, then run again.`;
+    },
+  },
+  agent_owner_only: {
+    title: "This development agent belongs to someone else",
+    describe: (error) => {
+      const owner = str(error, "ownerName", "its owner");
+      return `Only ${owner} can run simulations against it. Connect your own copy of the agent, or ask them to run it.`;
+    },
+  },
+  agent_call_timeout: {
+    title: "The agent did not answer in time",
+    describe: () =>
+      "The agent took longer than its call budget to answer a turn. Check it for slow work, or raise its timeout.",
+  },
+  agent_call_failed: {
+    title: "The agent raised an error",
+    // The function's own error text rides on `meta.message` for the CLI and
+    // the run drawer's envelope; relayed prose is never rendered here.
+    describe: () =>
+      "The decorated function raised an error. The process logs carry the stack, and the run shows what it said.",
+  },
+  agent_disconnected: {
+    title: "The agent disconnected mid-call",
+    describe: () =>
+      "The process working on this turn disconnected before it answered. The turn was not sent again, since the function may have run. Check the process, then run again.",
+  },
+  agent_instance_lost: {
+    title: "The pinned instance is gone",
+    describe: () =>
+      "This agent pins each conversation to one instance, and that instance disconnected. Start the process again, then run again.",
+  },
+  agent_busy: {
+    title: "Every instance of this agent is busy",
+    describe: () =>
+      "The connected instances are at their concurrency. Wait a moment and try again, or raise the concurrency on the decorated function.",
+  },
+  agent_parameter_invalid: {
+    title: "A declared parameter cannot be used",
+    describe: (error) => {
+      const name = str(error, "name", "");
+      const reason = safeProse(str(error, "reason", ""));
+      const subject = name ? `The parameter "${name}"` : "A parameter";
+      return reason
+        ? `${subject} cannot be declared: ${reason}.`
+        : `${subject} cannot be declared. Check its name, its type and its options.`;
+    },
+  },
+  agent_register_refused: {
+    title: "The agent could not be registered",
+    describe: () =>
+      "Check the API key, the project and the permissions the process connects with. The process prints the reason at startup.",
+  },
+  agent_session_unknown: {
+    title: "The agent process needs to register again",
+    describe: () =>
+      "The platform no longer knows this instance. The SDK registers again on its own; restart the process if it does not.",
+  },
+  agent_payload_too_large: {
+    title: "This turn is too large",
+    describe: (error) => {
+      const what = str(error, "what", "payload");
+      if (what === "session") {
+        return "The session value the agent returned is above the size limit. Return a small value, such as a conversation id or a token, not the conversation itself.";
+      }
+      return `The ${what} is above the size limit. Trim the conversation or the attachments, or raise the limit on a self-hosted deployment.`;
+    },
+  },
+
   // ---- agent-submitted reports ----
   agent_report_rate_limited: {
     // The reader here is usually a coding agent's operator on the CLI or MCP,
@@ -496,6 +604,18 @@ const presentations = {
   evaluator_config_error: {
     title: "This evaluator isn't configured correctly",
     describe: () => "Check its settings and try again.",
+  },
+  evaluator_no_inputs_resolved: {
+    title: "This evaluator had nothing to read",
+    // `meta.evaluatorName` is the name the customer gave the evaluator, so it
+    // is theirs to read back. Named consumer: the results cell, which is the
+    // only place this failure is drawn, and which sits beside several other
+    // evaluators the reader has to tell apart.
+    describe: (error) => {
+      const name = str(error, "evaluatorName", "");
+      const whose = name ? `the fields of ${name}` : "its fields";
+      return `Map ${whose} in the evaluator settings, then run again.`;
+    },
   },
   evaluator_execution_error: {
     title: "The evaluator failed to run",
@@ -783,9 +903,14 @@ const presentations = {
     // Distinct from `no_provider_configured` (nothing connected at all) and
     // from `llm_model_not_set` (a workflow node with an empty field): here a
     // provider exists but nothing has chosen which model to use.
+    //
+    // Names Default Models rather than "your project's model settings": the
+    // default is almost always written at the organization scope, which is
+    // where the onboarding seed lands it, so pointing at the project sent
+    // people to a page that was not the one holding the value.
     title: "Choose a model first",
     describe: () =>
-      "Nothing has a model set yet. Pick one in your project's model settings, then try again.",
+      "No default model is set yet. Open Settings, then Default Models, and pick one for your organization.",
   },
   model_restricted_for_feature: {
     // Distinct from `model_not_configured`: a model IS set, but it's
@@ -1234,10 +1359,95 @@ const presentations = {
         : "A pending invite for this address already exists. Revoke it first to send a new one.";
     },
   },
+  invite_expired: {
+    title: "This invitation has expired",
+    describe: () =>
+      "Ask for a fresh one and whoever invited you can send it in one click.",
+  },
   invite_not_found: {
     title: "Invite not found",
     describe: () =>
       "It may have been revoked or already accepted. Reload to see the pending invites.",
+  },
+  invite_throttled: {
+    title: "That was just sent",
+    describe: (error) => {
+      const seconds = num(error, "retryAfterSeconds", 0);
+      const minutes = Math.ceil(seconds / 60);
+      return seconds > 0
+        ? `Check the inbox — including spam — and try again in ${minutes} ${minutes === 1 ? "minute" : "minutes"}.`
+        : "Check the inbox — including spam — before sending another.";
+    },
+  },
+  invite_wrong_account: {
+    title: "You're signed in as a different account",
+    describe: (error) => {
+      const hint = str(error, "invitedHint", "");
+      return hint
+        ? `This invitation was sent to ${hint}. Sign out and sign back in as that account to accept it.`
+        : "Sign out and sign back in as the account this invitation was sent to.";
+    },
+  },
+  // ---------------------------------------------------------------------
+  // Joining an organization (D12, ADR-117)
+  //
+  // `join_not_available` is the deliberately vague one, and it is vague on
+  // purpose: it answers an organization that does not exist, one that turned
+  // joining off, one whose identity provider already admits people, and an
+  // address nobody has verified. Copy that told those apart would be an
+  // oracle for which organizations exist and who works at them. So it names
+  // the ONE thing the reader can act on — ask a colleague — and stops.
+  // ---------------------------------------------------------------------
+  join_not_available: {
+    title: "Nothing to join with this address",
+    describe: () =>
+      "If you expected to find your team here, ask a colleague to send you an invitation.",
+  },
+  join_request_not_found: {
+    title: "That request is no longer there",
+    describe: () =>
+      "It may have been answered or withdrawn already. Refresh to see what is waiting now.",
+  },
+  join_request_not_pending: {
+    title: "That request was already answered",
+    describe: () =>
+      "Somebody approved, rejected or withdrew it. Refresh to see where it ended up.",
+  },
+  join_request_already_pending: {
+    title: "You have already asked",
+    describe: () =>
+      "Your request is waiting for an administrator. You will get an email either way.",
+  },
+  join_request_throttled: {
+    title: "Give it a moment",
+    describe: (error) => {
+      const seconds = num(error, "retryAfterSeconds", 0);
+      if (seconds <= 0) return "Try that again shortly.";
+      const days = Math.ceil(seconds / 86400);
+      if (seconds >= 86400) {
+        return `Try again in ${days} ${days === 1 ? "day" : "days"}.`;
+      }
+      const minutes = Math.ceil(seconds / 60);
+      return `Try again in ${minutes} ${minutes === 1 ? "minute" : "minutes"}.`;
+    },
+  },
+  join_auto_not_licensed: {
+    title: "Automatic joining needs a licence",
+    describe: () =>
+      "Colleagues can still ask to join and you approve them. To let them in without asking, add a licence.",
+  },
+  // Company domains only, and the copy stops there. Listing what counts as a
+  // consumer mail provider would turn the refusal into a way to enumerate
+  // the deny-list.
+  join_auto_domain_unproven: {
+    title: "That domain is not proven yet",
+    describe: () =>
+      "Automatic joining works for company domains that at least two of your members have verified. Personal email domains are never eligible.",
+  },
+  join_auto_connection_admits: {
+    title: "Your identity provider already admits that domain",
+    describe: () =>
+      "People on it sign in through single sign-on, so there is nothing for automatic joining to add.",
   },
   team_not_in_organization: {
     title: "That team isn't in this organization",
@@ -1353,6 +1563,27 @@ const presentations = {
     title: "SCIM token not found",
     describe: () =>
       "It may already be revoked. Reload to see the current tokens.",
+  },
+  scim_connection_required: {
+    // The connection is the token's whole authority, so this is a field the
+    // caller left out rather than a policy refusal — say which field.
+    title: "Choose a connection for this token",
+    describe: () =>
+      "A directory token works against one single sign-on connection. Pick the connection your identity provider syncs from.",
+  },
+  scim_connection_not_found: {
+    // Reads the same for a connection that never existed and one belonging to
+    // somebody else, on purpose: the copy must not confirm the second.
+    title: "Connection not found",
+    describe: () =>
+      "That single sign-on connection isn't one of this organization's. Reload to see the current connections.",
+  },
+  scim_write_outside_connection: {
+    // The identity provider is pointed at the wrong connection. Nothing about
+    // the person is wrong, so the fix is in the provider's configuration.
+    title: "That person belongs to another connection",
+    describe: () =>
+      "Each directory token only manages the people its own connection provisioned. Use the token issued for the connection this person came from.",
   },
   insufficient_permissions: {
     // Names the permission when the server sent one, for the same reason
@@ -1515,21 +1746,31 @@ const presentations = {
   },
   // ---- scenario run parameters ----
   scenario_parameter_unknown: {
-    // Both lists are our own names, not free text: the run dialog needs to
-    // show the rejected one so the typo is visible, and the declared ones so
-    // the customer can see what they meant to write.
-    title: "No scenario in this run has a parameter by that name",
+    // The lists and the target are our own names, not free text: the run
+    // dialog needs to show the rejected name so the typo is visible, the
+    // declared ones so the customer can see what they meant to write, and the
+    // target because a run against another agent can accept the same name.
+    title: "Nothing in this run declares a parameter by that name",
     describe: (error) => {
       const unknown = strList(error, "unknownKeys");
       const declared = strList(error, "declaredNames");
+      const target = str(error, "targetLabel", "");
+      const source = target
+        ? `by any scenario in this run, and not by ${target}`
+        : "by any scenario in this run, and not by the agent it runs against";
       const rejected =
         unknown.length > 0
-          ? `${listLabels(unknown)} ${unknown.length === 1 ? "isn't" : "aren't"} declared by any scenario in this run.`
-          : "One of the values supplied isn't declared by any scenario in this run.";
+          ? `${listLabels(unknown)} ${unknown.length === 1 ? "isn't" : "aren't"} declared ${source}.`
+          : `One of the values supplied isn't declared ${source}.`;
       return declared.length > 0
         ? `${rejected} You can set ${listLabels(declared)}.`
-        : `${rejected} None of its scenarios declare parameters.`;
+        : `${rejected} This run declares no parameters at all.`;
     },
+  },
+  scenario_test_suite_not_found: {
+    title: "That test suite isn't available",
+    describe: () =>
+      "It may have been archived or removed. Reload, then pick a test suite again.",
   },
   scenario_parameter_missing: {
     title: "This run is missing a parameter value",
@@ -1546,10 +1787,42 @@ const presentations = {
       return `${subject} ${scenarioFieldLabel(error)} reads ${plural ? "them" : "it"}. ${remedy}`;
     },
   },
+  scenario_parameter_option_invalid: {
+    // The name and the options are declared configuration, not free text:
+    // the dialog shows what the parameter accepts next to the refused value.
+    title: "This value is not one of the parameter's options",
+    describe: (error) => {
+      const name = str(error, "name", "");
+      const options = strList(error, "options");
+      const subject = name
+        ? `The value supplied for ${name} is not one it accepts.`
+        : "The value supplied is not one the parameter accepts.";
+      return options.length > 0
+        ? `${subject} Choose one of ${listLabels(options)}.`
+        : `${subject} Choose one of its declared options.`;
+    },
+  },
+  scenario_parameter_required: {
+    title: "This run is missing a required parameter value",
+    describe: (error) => {
+      const missing = strList(error, "names");
+      const plural = missing.length > 1;
+      const subject =
+        missing.length > 0
+          ? `${listLabels(missing)} ${plural ? "are required and have no values" : "is required and has no value"}.`
+          : "A required parameter has no value.";
+      return `${subject} Set ${plural ? "values" : "a value"} for this run, or give ${plural ? "them" : "it"} a default where the parameter is declared.`;
+    },
+  },
   scenario_parameter_template_invalid: {
     title: "This scenario's text couldn't be filled in",
     describe: (error) =>
       `${scenarioFieldLabel(error)} references a parameter in a way we can't read. Check it is written as params.name, then try again.`,
+  },
+  scenario_reserved_set_id: {
+    title: "This run can't be saved to that set",
+    describe: () =>
+      "That set belongs to LangWatch and holds a run plan's results. Leave the set empty for a one-off run, or give the run a set name of your own.",
   },
   scenario_run_export_unauthenticated: {
     title: "Log in to export simulation runs",
@@ -1596,6 +1869,18 @@ const presentations = {
           : `${scenarioFieldLabel(error)} reads a secret parameter.`;
       return `${subject} A secret reaches the target as secrets.name and cannot be written into the scenario text, because that text is recorded with the run.`;
     },
+  },
+  scenario_stale_version: {
+    // Nothing was written: the save is refused before the update, so the copy
+    // can promise the customer's own edit is still theirs to redo.
+    title: "This scenario changed since you loaded it",
+    describe: () =>
+      "Reload to pick up the latest version, then make your change again.",
+  },
+  scenario_version_not_found: {
+    title: "That version is not available",
+    describe: () =>
+      "It may have been removed. Open the history to see what this scenario still has.",
   },
   // ---- billing ----
   billing_customer_email_required: {
@@ -1714,6 +1999,123 @@ const presentations = {
     title: "Only a verified sign-in method can be primary",
     describe: () => "Verify this sign-in method first, then make it primary.",
   },
+  identity_detach_strands_user: {
+    // Covers both shapes of the same problem: nothing verified left at all,
+    // and nothing left that a recovery message could reach. The remedy is
+    // the same either way, so the copy names the one that always works.
+    title: "You'd have no way back into your account",
+    describe: () =>
+      "This is your last way in, or the last one we could reach you at. Add a verified email address first, then remove this one.",
+  },
+  identity_mfa_code_invalid: {
+    // Deliberately says nothing about whether two-step verification is even
+    // set up on this account. A wrong code and a code for an enrollment
+    // nobody holds read identically here, on purpose.
+    title: "That code didn't work",
+    describe: () =>
+      "Check your authenticator app for the current code and enter it again.",
+  },
+  identity_mfa_enrollment_expired: {
+    title: "That setup took too long",
+    describe: () =>
+      "Start setting up two-step verification again, and scan the new code.",
+  },
+  identity_mfa_locked_out: {
+    title: "Too many incorrect codes",
+    describe: () =>
+      "Wait a few minutes and try again. If you've lost your authenticator, use a backup code or ask an administrator to reset it.",
+  },
+  identity_mfa_backup_codes_exhausted: {
+    title: "You've used every backup code",
+    describe: () =>
+      "Sign in with your authenticator app and generate a new set, or ask an administrator to reset two-step verification for you.",
+  },
+  identity_mfa_required_by_organization: {
+    title: "An organization you belong to requires two-step verification",
+    describe: () =>
+      "You can't turn it off while you're a member. Ask an administrator to lift the requirement, or leave the organization first.",
+  },
+  identity_mfa_enrollment_required: {
+    // Not an authentication failure: nobody is signed out and every other
+    // organization still works. The copy has to make that obvious, or people
+    // read it as a session problem and try signing in again.
+    title: "This organization requires two-step verification",
+    describe: () =>
+      "Set up two-step verification to continue here. You're still signed in, and your other organizations are unaffected.",
+  },
+  identity_passkey_ceremony_failed: {
+    title: "That passkey attempt didn't finish",
+    describe: () =>
+      "It may have been cancelled or timed out. Try again, or use another way to sign in.",
+  },
+  identity_passkey_not_recognized: {
+    // Same answer whether the credential belongs to somebody else or to
+    // nobody: this endpoint does not tell callers which passkeys exist.
+    title: "We couldn't use that passkey",
+    describe: () =>
+      "Try again, or sign in another way and check which passkeys are on your account.",
+  },
+  cannot_impersonate_without_second_factor: {
+    title: "Set up two-step verification first",
+    describe: () =>
+      "This organization requires two-step verification, so viewing it as another person requires it on your own account too.",
+  },
+  sso_connection_invalid_transition: {
+    title: "This single sign-on connection has moved on",
+    describe: () =>
+      "Someone else changed it, or it is no longer at the step this action applies to. Refresh to see where it is now.",
+  },
+  sso_connection_domain_taken: {
+    // Says the domain is spoken for and stops there: which organization holds
+    // it is not something a second claimant is entitled to learn from a
+    // refusal. Support has the history and can say more to the right person.
+    title: "That domain is already verified elsewhere",
+    describe: () =>
+      "Another single sign-on connection has already proved ownership of this domain. Contact support to resolve the claim.",
+  },
+  sso_connection_activation_blocked: {
+    title: "This connection isn't ready to go live",
+    describe: () =>
+      "Turning it on needs a verified domain, a successful test sign-in, and a way for someone to get in without the identity provider.",
+  },
+  sso_connection_string_edit_retired: {
+    title: "Single sign-on is configured on the connection now",
+    describe: () =>
+      "The old domain and provider fields no longer control where anyone signs in. Change the organization's single sign-on connection instead.",
+  },
+  sso_connection_teardown_strands_users: {
+    title: "Removing this connection would lock people out",
+    describe: () =>
+      "Some people can only sign in through it. Give them another verified sign-in method first, then remove it.",
+  },
+  sso_connection_operator_act_required: {
+    // Read by two very different people: a LangWatch operator whose session
+    // is no longer on the staff list, and an organization administrator who
+    // found the command another way. The words serve the second, because the
+    // first can read the trace id — and they point at the thing that IS
+    // available to an administrator rather than stopping at "no".
+    title: "Only LangWatch can decide this",
+    describe: () =>
+      "Approving a domain claim and vouching for a domain are LangWatch's to do. Prove the domain by publishing the record we give you, or contact support.",
+  },
+  sso_saml_not_self_serve: {
+    title: "SAML connections are set up with us",
+    describe: () =>
+      "Single sign-on you can set up yourself is OpenID Connect for now. Contact support to set up SAML and we will do it with you.",
+  },
+  identity_link_proposed: {
+    title: "An administrator needs to confirm this sign-in",
+    // Deliberately says nothing about whether an account exists, who holds the
+    // address, or what the evidence was. This is answered to whoever arrived,
+    // and that is not necessarily the owner of the address.
+    describe: () =>
+      "Your workspace administrator has been asked to confirm it. Try again once they have.",
+  },
+  identity_jit_disabled: {
+    title: "This workspace does not create accounts automatically",
+    describe: () =>
+      "Ask a workspace administrator to invite you, then sign in again.",
+  },
   identity_unsupported_storage_query: {
     title: "We couldn't read your sign-in methods",
     describe: () =>
@@ -1768,6 +2170,15 @@ const presentations = {
     title: "This dataset's columns have changed",
     describe: () =>
       "Reload to pick up the current columns, then make your change again.",
+  },
+  storage_not_writable: {
+    // fault: platform. Storage for this deployment was never provisioned, so
+    // retrying changes nothing and there is no customer-side setting to fix.
+    // Which directory and which variables an operator has to set are in the
+    // tips and in the server log, not here.
+    title: "Storage for this workspace isn't set up",
+    describe: () =>
+      "Nothing was saved. An administrator has to set up storage before rows can be added.",
   },
   export_failed: {
     // fault: platform. The export ran on our side and did not finish, so the
@@ -1845,6 +2256,21 @@ const presentations = {
     title: "This run plan points at targets that no longer exist",
     describe: () => "Edit the plan to remove them.",
   },
+  suite_scope_empty: {
+    title: "This run plan covers no scenario",
+    describe: () =>
+      "Its scope matches nothing right now. Widen it in the plan, then run again.",
+  },
+  suite_scope_not_allowed: {
+    title: "A test suite takes no scope",
+    describe: () =>
+      "It runs the scenarios filed in it. File scenarios into it to change what it covers.",
+  },
+  suite_targets_required: {
+    title: "Choose an agent to run against",
+    describe: () =>
+      "This suite has no agent or prompt to test yet. Pick one in the run dialog, then run again.",
+  },
 
   // ---- automations & notifications ----
   template_not_found: {
@@ -1909,7 +2335,7 @@ const presentations = {
   },
   test_fire_unavailable: {
     title: "Nothing to test yet",
-    // `meta.reason` is the sentence the service wrote for this exact case
+    // `meta.reason` is the sentence the service wrote for this exact scenario
     // ("This automation has no email recipients to test-fire to.") — it names
     // WHICH piece is missing, which the generic line cannot. It is also the
     // error's own message, authored server-side, never relayed.
@@ -2367,6 +2793,65 @@ const presentations = {
     title: "The model provider timed out",
     describe: () => "Try again in a moment.",
   },
+  /*
+   * The three below used to reach customers as provider_timeout — "try again
+   * in a moment" for a settings mistake that would repeat forever. Each one
+   * names the setting to change instead, and the model from `meta` where it
+   * narrows the answer.
+   *
+   * They deliberately do NOT name the provider. `meta.provider` carries the
+   * dispatch engine's own id ("vertex", "vllm"), which is not a name to show
+   * anyone, and turning it into one needs a table. The app already has two and
+   * they disagree: `server/modelProviders/registry` calls Bedrock "Bedrock" and
+   * is what Settings → Model Providers renders, while
+   * `features/onboarding/regions/model-providers/registry` calls it "AWS
+   * Bedrock". A third table here would have disagreed with both, and a name the
+   * customer cannot find on the page this copy sends them to is worse than no
+   * name at all. Importing the one Settings renders is not open either: it
+   * statically pulls the model catalog (`loadModelCatalog` → `llmModels.json`,
+   * ~570 KB) into every bundle that renders an error message.
+   *
+   * Little is lost. The gateway's remediation tips already name the provider
+   * and its credential artefact ("Vertex AI authenticates with a Google Cloud
+   * service-account JSON document, not an API key…"), so the customer still
+   * learns which provider failed — from the line that also tells them what to
+   * do about it. Name it here once one client-safe provider-name module exists.
+   */
+  provider_credential_invalid: {
+    // "Can't be used" rather than "not accepted": nothing reached the provider,
+    // so nobody accepted or refused anything. The sibling code below is the one
+    // the provider actually judged, and the two titles have to say which is
+    // which or the split buys nothing.
+    title: "Those provider credentials can't be used",
+    describe: () =>
+      "The credentials saved for this provider could not be used to authenticate. Check them in Settings → Model Providers.",
+  },
+  provider_credential_rejected: {
+    title: "The model provider rejected its credentials",
+    describe: () =>
+      "The provider received the credentials and refused them, so the account behind them is what to check — not their format.",
+  },
+  provider_config_invalid: {
+    title: "This provider is not set up to serve that model",
+    describe: (error) => {
+      const model = str(error, "model", "");
+      if (model) {
+        return `No provider on this project is configured for ${model}. Add it to one in Settings → Model Providers.`;
+      }
+      return "Add the model to this provider in Settings → Model Providers, or send the request to a provider that serves it.";
+    },
+  },
+  provider_connection_failed: {
+    // Distinct from the app's `provider_unreachable`, which is a credential
+    // CHECK finding nothing answering. This one is a real request that never
+    // left, so the copy must not say anything about a key being unchecked.
+    title: "The model provider could not be reached",
+    describe: () => "Try again in a moment.",
+  },
+  request_abandoned: {
+    title: "The request was cancelled before the provider answered",
+    describe: () => "Send it again if you still need the answer.",
+  },
   chain_exhausted: {
     title: "Every provider failed",
     describe: () => "Check your provider settings, then try again.",
@@ -2602,7 +3087,7 @@ const presentations = {
   },
   idempotency_error: {
     // Two refusals share one code because the caller's next move is the same
-    // shape in both cases: stop reusing this key, or wait for the first
+    // shape in both scenarios: stop reusing this key, or wait for the first
     // request to land. `meta.reason` is what lets the copy say which.
     title: "That idempotency key can't answer this request",
     describe: (error) =>
@@ -2613,6 +3098,15 @@ const presentations = {
   cache_rule_not_found: {
     title: "Cache rule not found",
     describe: () => "It may have been archived by someone else.",
+  },
+  cache_entry_not_found: {
+    // One answer for every way a read comes back empty: never written, past
+    // its lifetime, dropped, or written before the instance's encryption key
+    // changed. The next step is the same in all of them, so the copy names it
+    // and says nothing about which one happened.
+    title: "No cache entry with that name",
+    describe: () =>
+      "The entry was never stored, or its lifetime has passed. Produce the value again and store it.",
   },
   budget_not_found: {
     title: "Budget not found",
@@ -2649,7 +3143,7 @@ const presentations = {
     // Deliberately says nothing more. `pkg/config` builds this error's meta by
     // resolving each failed struct field to its environment variable name, so
     // the detail here is literally a list of our env vars — the operator finds
-    // them in the service logs, where they belong. This is the clearest case
+    // them in the service logs, where they belong. This is the clearest scenario
     // in the registry of a code whose meta must never be rendered.
     describe: () => "We've been notified. Try again in a moment.",
   },
@@ -2679,7 +3173,7 @@ const presentations = {
     // code (llmproxy.go), which is a value from a small known set rather than
     // free text — it cannot smuggle a key, and the ones we recognise map to
     // copy written here. Everything else gets the generic line: a failure we
-    // cannot name is exactly the ADR-045 "unknown" case, and a trace id serves
+    // cannot name is exactly the ADR-045 "unknown" scenario, and a trace id serves
     // the customer better than a sentence we cannot vouch for.
     title: "The model provider rejected that",
     describe: (error) => {
@@ -3041,7 +3535,7 @@ function describeUpstreamStatus({
 /**
  * Fallback headline for a failure that arrives with NO code at all.
  *
- * Only for that case. `fault` is a coarse attribution with a server-side
+ * Only for that scenario. `fault` is a coarse attribution with a server-side
  * default of `customer`, so using it as a headline for an unrecognised code
  * meant a platform failure whose payload predated the field read "Check your
  * input", and a customer's own Python error read "A connected service didn't
@@ -3121,7 +3615,7 @@ export function explainHandledError(
       // chrome without a single person having read them.
       //
       // Empty is not a loss. The callers fall back to the server's first
-      // remediation tip, which WAS written for this case, and failing that to
+      // remediation tip, which WAS written for this scenario, and failing that to
       // the generic line plus a trace id — the ADR-045 "unknown" path, working
       // exactly as intended. The fix for a code that lands here often is to
       // give it a registry entry, not to recite whatever it arrived with.

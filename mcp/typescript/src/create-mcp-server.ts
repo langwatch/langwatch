@@ -8,10 +8,16 @@ import {
   createDatasetSchema,
   datasetColumnDefinitionSchema,
 } from "./schemas/create-dataset.js";
+import {
+  runParametersSchema,
+  runPlanScopeSchema,
+  runPlanTargetSchema,
+} from "./schemas/run-plan.js";
 import { handleExperimentResults } from "./tools/get-experiment-results.js";
 import { handleExperimentListRuns } from "./tools/list-experiment-runs.js";
 import { handleExperimentList } from "./tools/list-experiments.js";
 import { handleRunExperiment, handleExperimentStatus } from "./tools/run-experiment.js";
+import { handleTestAgent } from "./tools/test-agent.js";
 
 const modelSchema = z
   .string()
@@ -360,7 +366,7 @@ NOTE: Prompts can be managed two ways. Determine which approach the user needs:
 
   server.tool(
     "platform_get_prompt",
-    "Get a specific prompt from the LangWatch platform by ID or handle, including messages, model config, and version history.",
+    "Get a specific prompt from the LangWatch platform by ID or handle, including messages, model config, and version history. Use format: 'json' for the full raw API payload, or 'digest' (default) for a formatted summary.",
     {
       idOrHandle: z.string().describe("Prompt ID or handle"),
       version: z
@@ -371,6 +377,12 @@ NOTE: Prompts can be managed two ways. Determine which approach the user needs:
         'Fetch the version pointed to by this tag (e.g., "production", "staging"). ' +
         'Alternatively, use shorthand in idOrHandle: "pizza-prompt:production"'
       ),
+      format: z
+        .enum(["digest", "json"])
+        .optional()
+        .describe(
+          "Output format: 'digest' (default, AI-readable) or 'json' (full raw data)"
+        ),
     },
     withToolLogging("platform_get_prompt", async (params) => {
       if (params.version != null && params.tag) {
@@ -528,6 +540,12 @@ NOTE: Scenarios can be created two ways. Determine which approach the user needs
         .array(z.string())
         .optional()
         .describe("Tags for organizing and filtering scenarios"),
+      testSuiteId: z
+        .string()
+        .nullish()
+        .describe(
+          "The test suite to file this scenario in. Pass a test suite ID, or null to unfile it."
+        ),
     },
     withToolLogging("platform_create_scenario", async (params) => {
       requireApiKey();
@@ -546,6 +564,10 @@ NOTE: Scenarios can be created two ways. Determine which approach the user needs
     "platform_list_scenarios",
     "List all scenarios on the LangWatch platform. Returns AI-readable digest by default.",
     {
+      testSuiteId: z
+        .string()
+        .optional()
+        .describe("Only the scenarios filed in this test suite"),
       format: z
         .enum(["digest", "json"])
         .optional()
@@ -602,6 +624,12 @@ NOTE: Scenarios can be created two ways. Determine which approach the user needs
         .array(z.string())
         .optional()
         .describe("Updated labels"),
+      testSuiteId: z
+        .string()
+        .nullish()
+        .describe(
+          "The test suite to file this scenario in. Pass a test suite ID, or null to unfile it."
+        ),
     },
     withToolLogging("platform_update_scenario", async (params) => {
       requireApiKey();
@@ -635,113 +663,297 @@ NOTE: Scenarios can be created two ways. Determine which approach the user needs
     })
   );
 
-  // --- Platform Suite / Run Plan Tools (require API key) ---
-  // These tools manage suites (run plans) on the LangWatch platform via API.
+  // --- Platform Run Plan Tools (require API key) ---
+  // A run plan is what you run, and its NAME identifies it: running a name
+  // that exists replaces that plan's configuration, running a new name
+  // creates the plan. A test suite groups scenarios; running one is
+  // sugar that creates or joins the plan "<suite name> <target name>".
 
   server.tool(
-    "platform_list_suites",
-    "List all suites (run plans) on the LangWatch platform. A suite bundles scenarios with targets for batch execution.",
+    "platform_run_plan",
+    "Run scenarios against targets. The plan name identifies the run plan: an existing name is re-run with the configuration you send here, a new name creates the plan. Configuration is the scope, the targets, the repeat count and the models; parameters, the note and the idempotency key belong to this run alone. Send more than one target to compare them in the same run, and give a target its own parameters to compare one agent on two models.",
+    {
+      name: z
+        .string()
+        .optional()
+        .describe(
+          "The run plan to run. An existing name is replaced with this configuration, a new name creates the plan. Omit to let the server name it after the suite and the target.",
+        ),
+      scope: runPlanScopeSchema.describe(
+        "What the plan covers: every scenario in the project, the scenarios filed in given test suites, the scenarios carrying given labels, or the hand-picked list in scenarioIds.",
+      ),
+      scenarioIds: z
+        .array(z.string())
+        .optional()
+        .describe(
+          "The scenarios to run. Read only when scope.mode is 'scenarios'.",
+        ),
+      targets: z
+        .array(runPlanTargetSchema)
+        .describe(
+          "What to run the scenarios against. Every target runs every scenario, and the results show one column for each, so this is how one run compares two agents or one agent on two models.",
+        ),
+      repeatCount: z
+        .number()
+        .int()
+        .min(1)
+        .max(5)
+        .optional()
+        .describe("How many times to run each scenario against each target (1 to 5, default 1)"),
+      simulatorModel: z
+        .string()
+        .optional()
+        .describe("Model that plays the user. Omit for the project default."),
+      judgeModel: z
+        .string()
+        .optional()
+        .describe("Model that judges the criteria. Omit for the project default."),
+      parameters: runParametersSchema
+        .optional()
+        .describe(
+          "Values for the parameters the scenarios declare, by name. They apply to every target; a target that names the same parameter overrides them for itself.",
+        ),
+      note: z
+        .string()
+        .max(200)
+        .optional()
+        .describe("One short line saying why this run was started (max 200 characters)"),
+      idempotencyKey: z
+        .string()
+        .optional()
+        .describe("Send the same key to make a retry join the run it already started instead of starting a second one."),
+    },
+    withToolLogging("platform_run_plan", async (params) => {
+      requireApiKey();
+      const { handleRunPlan } = await import("./tools/run-plan.js");
+      return {
+        content: [{ type: "text", text: await handleRunPlan(params) }],
+      };
+    })
+  );
+
+  server.tool(
+    "platform_list_run_plans",
+    "List the run plans of the project. A run plan holds the configuration a run used, keyed by its name.",
+    {
+      includeArchived: z
+        .boolean()
+        .optional()
+        .describe("Include archived plans (default false)"),
+      format: z
+        .enum(["digest", "json"])
+        .optional()
+        .describe("Output format: 'digest' (default) or 'json' (raw data)"),
+    },
+    withToolLogging("platform_list_run_plans", async (params) => {
+      requireApiKey();
+      const { handleListRunPlans } = await import("./tools/list-run-plans.js");
+      return {
+        content: [{ type: "text", text: await handleListRunPlans(params) }],
+      };
+    })
+  );
+
+  server.tool(
+    "platform_get_run_plan",
+    "Get the full configuration of a run plan: what it covers, its targets, its repeat count and its models.",
+    {
+      id: z.string().describe("The run plan ID"),
+      format: z
+        .enum(["digest", "json"])
+        .optional()
+        .describe("Output format: 'digest' (default) or 'json'"),
+    },
+    withToolLogging("platform_get_run_plan", async (params) => {
+      requireApiKey();
+      const { handleGetRunPlan } = await import("./tools/get-run-plan.js");
+      return {
+        content: [{ type: "text", text: await handleGetRunPlan(params) }],
+      };
+    })
+  );
+
+  server.tool(
+    "platform_rerun_run_plan",
+    "Run a plan again with the configuration it already holds. Only the parameters and the note belong to the new run.",
+    {
+      id: z.string().describe("The run plan ID to run again"),
+      parameters: runParametersSchema
+        .optional()
+        .describe("Values for the parameters the scenarios declare, by name."),
+      note: z
+        .string()
+        .max(200)
+        .optional()
+        .describe("One short line saying why this run was started (max 200 characters)"),
+    },
+    withToolLogging("platform_rerun_run_plan", async (params) => {
+      requireApiKey();
+      const { handleRerunRunPlan } = await import("./tools/rerun-run-plan.js");
+      return {
+        content: [{ type: "text", text: await handleRerunRunPlan(params) }],
+      };
+    })
+  );
+
+  server.tool(
+    "platform_archive_run_plan",
+    "Archive a run plan. Its past runs stay readable and the name is free for a new plan.",
+    {
+      id: z.string().describe("The run plan ID to archive"),
+    },
+    withToolLogging("platform_archive_run_plan", async (params) => {
+      requireApiKey();
+      const { handleArchiveRunPlan } = await import(
+        "./tools/archive-run-plan.js"
+      );
+      return {
+        content: [{ type: "text", text: await handleArchiveRunPlan(params) }],
+      };
+    })
+  );
+
+  // --- Platform Test Suite Tools (require API key) ---
+  // A test suite groups scenarios: a name and the scenarios filed in it.
+
+  server.tool(
+    "platform_list_test_suites",
+    "List the test suites of the project. A test suite groups scenarios.",
     {
       format: z
         .enum(["digest", "json"])
         .optional()
         .describe("Output format: 'digest' (default) or 'json' (raw data)"),
     },
-    withToolLogging("platform_list_suites", async (params) => {
+    withToolLogging("platform_list_test_suites", async (params) => {
       requireApiKey();
-      const { handleListSuites } = await import("./tools/list-suites.js");
+      const { handleListTestSuites } = await import(
+        "./tools/list-test-suites.js"
+      );
       return {
-        content: [{ type: "text", text: await handleListSuites(params) }],
+        content: [{ type: "text", text: await handleListTestSuites(params) }],
       };
     })
   );
 
   server.tool(
-    "platform_get_suite",
-    "Get detailed information about a specific suite (run plan) by ID.",
+    "platform_create_test_suite",
+    "Create a test suite. A test suite groups scenarios: file a scenario in it by passing the suite ID as testSuiteId on platform_create_scenario or platform_update_scenario.",
     {
-      id: z.string().describe("The suite ID"),
+      name: z.string().describe("Test suite name"),
+    },
+    withToolLogging("platform_create_test_suite", async (params) => {
+      requireApiKey();
+      const { handleCreateTestSuite } = await import(
+        "./tools/create-test-suite.js"
+      );
+      return {
+        content: [{ type: "text", text: await handleCreateTestSuite(params) }],
+      };
+    })
+  );
+
+  server.tool(
+    "platform_get_test_suite",
+    "Get a test suite and the scenarios filed in it.",
+    {
+      id: z.string().describe("The test suite ID"),
       format: z
         .enum(["digest", "json"])
         .optional()
         .describe("Output format: 'digest' (default) or 'json'"),
     },
-    withToolLogging("platform_get_suite", async (params) => {
+    withToolLogging("platform_get_test_suite", async (params) => {
       requireApiKey();
-      const { handleGetSuite } = await import("./tools/get-suite.js");
+      const { handleGetTestSuite } = await import("./tools/get-test-suite.js");
       return {
-        content: [{ type: "text", text: await handleGetSuite(params) }],
+        content: [{ type: "text", text: await handleGetTestSuite(params) }],
       };
     })
   );
 
   server.tool(
-    "platform_create_suite",
-    "Create a new suite (run plan) that bundles scenarios with targets for batch execution.",
+    "platform_rename_test_suite",
+    "Rename a test suite.",
     {
-      name: z.string().describe("Suite name"),
-      description: z.string().optional().describe("Suite description"),
-      scenarioIds: z.array(z.string()).describe("Array of scenario IDs to include"),
-      targets: z.string().describe('JSON array of target objects, e.g. [{"type":"http","referenceId":"agent_abc"}]'),
-      repeatCount: z.number().optional().describe("Number of times to repeat each scenario-target pair (default: 1)"),
-      labels: z.array(z.string()).optional().describe("Tags for organizing suites"),
+      id: z.string().describe("The test suite ID"),
+      name: z.string().describe("The new name"),
     },
-    withToolLogging("platform_create_suite", async (params) => {
+    withToolLogging("platform_rename_test_suite", async (params) => {
       requireApiKey();
-      const { handleCreateSuite } = await import("./tools/create-suite.js");
+      const { handleRenameTestSuite } = await import(
+        "./tools/rename-test-suite.js"
+      );
       return {
-        content: [{ type: "text", text: await handleCreateSuite(params) }],
+        content: [{ type: "text", text: await handleRenameTestSuite(params) }],
       };
     })
   );
 
   server.tool(
-    "platform_update_suite",
-    "Update an existing suite (run plan).",
+    "platform_archive_test_suite",
+    "Archive a test suite. The scenarios filed in it are archived with it.",
     {
-      id: z.string().describe("The suite ID to update"),
-      name: z.string().optional().describe("New suite name"),
-      description: z.string().optional().describe("New description"),
-      scenarioIds: z.array(z.string()).optional().describe("New array of scenario IDs"),
-      targets: z.string().optional().describe("New JSON array of targets"),
-      repeatCount: z.number().optional().describe("New repeat count"),
-      labels: z.array(z.string()).optional().describe("New labels"),
+      id: z.string().describe("The test suite ID to archive"),
     },
-    withToolLogging("platform_update_suite", async (params) => {
+    withToolLogging("platform_archive_test_suite", async (params) => {
       requireApiKey();
-      const { handleUpdateSuite } = await import("./tools/update-suite.js");
+      const { handleArchiveTestSuite } = await import(
+        "./tools/archive-test-suite.js"
+      );
       return {
-        content: [{ type: "text", text: await handleUpdateSuite(params) }],
+        content: [{ type: "text", text: await handleArchiveTestSuite(params) }],
       };
     })
   );
 
   server.tool(
-    "platform_run_suite",
-    "Trigger a suite run. Schedules all scenario x target x repeat jobs for execution.",
+    "platform_run_test_suite",
+    "Run every scenario of a test suite against targets. This creates or joins the run plan named '<suite name> <target name>' unless you send a name of your own. Send more than one target to compare them in the same run, and give a target its own parameters to compare one agent on two models.",
     {
-      id: z.string().describe("The suite ID to run"),
+      id: z.string().describe("The test suite ID to run"),
+      targets: z
+        .array(runPlanTargetSchema)
+        .describe(
+          "What to run the scenarios against. Every target runs every scenario, and the results show one column for each.",
+        ),
+      name: z
+        .string()
+        .optional()
+        .describe(
+          "The run plan to run. Omit to let the server name it after the suite and the target.",
+        ),
+      repeatCount: z
+        .number()
+        .int()
+        .min(1)
+        .max(5)
+        .optional()
+        .describe("How many times to run each scenario against each target (1 to 5, default 1)"),
+      simulatorModel: z
+        .string()
+        .optional()
+        .describe("Model that plays the user. Omit for the project default."),
+      judgeModel: z
+        .string()
+        .optional()
+        .describe("Model that judges the criteria. Omit for the project default."),
+      parameters: runParametersSchema
+        .optional()
+        .describe(
+          "Values for the parameters the scenarios declare, by name. They apply to every target; a target that names the same parameter overrides them for itself.",
+        ),
+      note: z
+        .string()
+        .max(200)
+        .optional()
+        .describe("One short line saying why this run was started (max 200 characters)"),
     },
-    withToolLogging("platform_run_suite", async (params) => {
+    withToolLogging("platform_run_test_suite", async (params) => {
       requireApiKey();
-      const { handleRunSuite } = await import("./tools/run-suite.js");
+      const { handleRunTestSuite } = await import("./tools/run-test-suite.js");
       return {
-        content: [{ type: "text", text: await handleRunSuite(params) }],
-      };
-    })
-  );
-
-  server.tool(
-    "platform_archive_suite",
-    "Archive (soft-delete) a suite (run plan).",
-    {
-      id: z.string().describe("The suite ID to archive"),
-    },
-    withToolLogging("platform_archive_suite", async (params) => {
-      requireApiKey();
-      const { handleArchiveSuite } = await import("./tools/archive-suite.js");
-      return {
-        content: [{ type: "text", text: await handleArchiveSuite(params) }],
+        content: [{ type: "text", text: await handleRunTestSuite(params) }],
       };
     })
   );
@@ -941,7 +1153,7 @@ NOTE: Scenarios can be created two ways. Determine which approach the user needs
 
   server.tool(
     "platform_list_agents",
-    "List all agents in the LangWatch project with their names, types, and IDs.",
+    "List all agents in the LangWatch project with their names, types and IDs. A connected agent (one that registered itself from code with connectAgent or connect_agent) also shows its environment, whether it is online, how many instances are connected, and its owner.",
     {},
     withToolLogging("platform_list_agents", async () => {
       requireApiKey();
@@ -954,7 +1166,7 @@ NOTE: Scenarios can be created two ways. Determine which approach the user needs
 
   server.tool(
     "platform_get_agent",
-    "Get detailed information about a specific agent by its ID, including its configuration.",
+    "Get detailed information about a specific agent by its ID, including its configuration. A connected agent also shows its environment, status, the run parameters it declared (with options and defaults) and the instances connected right now.",
     {
       id: z.string().describe("The agent ID"),
     },
@@ -969,7 +1181,7 @@ NOTE: Scenarios can be created two ways. Determine which approach the user needs
 
   server.tool(
     "platform_create_agent",
-    "Create a new agent. Supported types: 'signature' (LLM prompt), 'code' (Python), 'workflow' (sub-workflow), 'http' (external API).",
+    "Create a new agent. Supported types: 'signature' (LLM prompt), 'code' (Python), 'workflow' (sub-workflow), 'http' (external API). A 'connected' agent is not created here: it registers itself from code, with connectAgent from langwatch/agent in TypeScript or langwatch.connect_agent in Python, and appears in the list once that process runs.",
     {
       name: z.string().describe("Agent name"),
       type: z.enum(["signature", "code", "workflow", "http"]).describe("Agent type"),
@@ -1021,16 +1233,47 @@ NOTE: Scenarios can be created two ways. Determine which approach the user needs
 
   server.tool(
     "platform_run_agent",
-    "Execute an agent with JSON input. HTTP agents call their configured URL directly; workflow-linked agents execute via the workflow engine.",
+    "Run one turn of an agent. A connected agent runs through the platform relay on a live instance: give `message` (one user turn) or `input` with a `messages` list, plus `parameters` and `threadId` to continue a conversation. HTTP agents call their configured URL directly; workflow-linked agents execute via the workflow engine.",
     {
       id: z.string().describe("The agent ID to run"),
-      input: z.string().optional().describe("Input data as a JSON object string"),
+      input: z
+        .string()
+        .optional()
+        .describe(
+          "Input data as a JSON object string. For a connected agent it is the relay body: messages (OpenAI style), and optionally threadId, session and params.",
+        ),
+      message: z
+        .string()
+        .optional()
+        .describe("One user message to send to a connected agent, instead of input"),
+      parameters: z
+        .record(z.string(), z.union([z.string(), z.number(), z.boolean()]))
+        .optional()
+        .describe("Run parameter values for a connected agent, by name"),
+      threadId: z
+        .string()
+        .optional()
+        .describe("Continue a conversation on a connected agent"),
     },
     withToolLogging("platform_run_agent", async (params) => {
       requireApiKey();
       const { handleRunAgent } = await import("./tools/run-agent.js");
       return {
         content: [{ type: "text", text: await handleRunAgent(params) }],
+      };
+    })
+  );
+
+  server.tool(
+    "platform_test_agent",
+    "Test an agent with one scripted scenario run: the user sends \"ping\", the agent answers, and the run succeeds when the answer arrives. No model is used, and no scenario, run plan or test suite is added to the project. Answers at once with the scenario run id to follow with platform_get_simulation_run; the run itself is asynchronous.",
+    {
+      id: z.string().describe("The agent ID to test"),
+    },
+    withToolLogging("platform_test_agent", async (params) => {
+      requireApiKey();
+      return {
+        content: [{ type: "text", text: await handleTestAgent(params) }],
       };
     })
   );

@@ -1,0 +1,83 @@
+---
+title: Results
+sidebarTitle: Results
+keywords: langwatch, agent testing, results, run plans, pass rate, trend, run detail, conversation drawer, judge reasoning, run status, export csv
+description: The Results tab lists every run plan of the project with its pass rate and trend. Open a plan for its runs, and a run for every conversation and verdict.
+---
+
+## The Results tab
+
+**Test Runs** shows the number of scenario executions in the period. The period is **Last 7 days**, **Last 15 days** or **Last 30 days**; runs older than 30 days are in cold storage and do not appear here.
+
+<Frame>
+<img className="block" src="/images/agent-testing/results-tab.png" alt="The Results tab grouped by run plan, with the pass rate and the trend of each plan" />
+</Frame>
+
+**Group by** sets what a row is:
+
+| Group by | One row per | Columns |
+|---|---|---|
+| **Run plan** | Run plan | Run plan, Last run, Scope, Targets, Pass, Trend |
+| **Scenario** | Scenario, across every plan it ran in | Scenario, Labels, Runs, Pass, Trend |
+| **Target** | Target, with a parameter variant as its own target | Target, Scenarios covered, Runs, Pass, Trend |
+| **None** | Scenario execution | Scenario, Run plan, Target, When, Result |
+
+The filters narrow every grouping: **Scenario**, **Label**, **Target** and **All statuses**, **Passed** or **Failed**. **Reset filters** clears them.
+
+**Pass** is green at 100%, amber from 40%, red below, and grey with no result. **Trend** shows the last runs as bars, oldest first, at most 14.
+
+**Charts** opens the tiles **Executions**, **Pass rate**, **Failing scenarios** and **Cost** for the period, and **Pass rate over time**.
+
+<Frame>
+<img className="block" src="/images/agent-testing/results-charts.png" alt="The Charts block with the four tiles and the pass rate over time" />
+</Frame>
+
+## A run plan and its runs
+
+Press a run plan. The sidebar lists its runs as **Run #n** with the note, the time and the pass rate; **Load More...** loads older ones. The header of the selected run shows **Pass**, **Completed**, **Avg Agent Latency**, **Avg Agent Cost**, **Total Duration** and **Total Cost**.
+
+<Frame>
+<img className="block" src="/images/agent-testing/run-detail-table.png" alt="A run plan with its runs in the sidebar, the summary pills and the table of results" />
+</Frame>
+
+**Show run settings** opens the configuration the run used: **Started**, **Targets**, **Parameters**, **Repeat**, **Simulator model** and **Judge model**.
+
+The **Table** view has one row per scenario execution: **Result**, **Scenario**, **Evaluators** and **Time · cost**. The row menu offers **Open the conversation**, **Rerun this scenario** and **Edit scenario**. The **Grid** view shows the same executions as cards, one colour per result, each ending in `Completed` or `Failed`.
+
+<Frame>
+<img className="block" src="/images/agent-testing/run-detail-grid.png" alt="The Grid view of a run, one card per scenario execution" />
+</Frame>
+
+**Export as CSV** downloads the run. **Run again** starts a new run with the plan's configuration, and **Stop all** cancels the conversations still running.
+
+## A conversation
+
+Press a row to open the drawer. The header shows the **Status**, the criteria count, the **Duration**, the **Cost** and when it **Ran**. The transcript follows, with **View trace** on every turn whose trace has arrived.
+
+<Frame>
+<img className="block" src="/images/agent-testing/run-drawer-failed.png" alt="The conversation drawer of a failed run, with the failed criteria and the judge reasoning" />
+</Frame>
+
+Under the transcript: **FAILED CRITERIA**, **PASSED CRITERIA** and **JUDGE REASONING**, then **Parameters** with the values the run used, a secret parameter masked. **Edit Scenario** opens the scenario in the editor.
+
+While the run is going, the drawer shows `The conversation is running…` and then `The judge is reading the conversation…`, and the verdict appears in place when it is in.
+
+## What a status means
+
+The **Result** column of the table shows `Passed`, `Failed` or `Running`. The **Status** chip of the drawer is more precise:
+
+| Status | Meaning | What to do |
+|---|---|---|
+| `completed` | The judge delivered a verdict. The verdict itself is `PASSED` or `FAILED`. | On a fail, read **JUDGE REASONING**, then the transcript. |
+| `running`, `queued`, `pending` | The conversation, or the verdict, is not done. | Wait, or **Stop**. |
+| `failed` with an error in the drawer | The target did not answer: the URL is wrong, the agent is down, the authentication was refused, or a local tunnel ended. The drawer shows the error the target returned. | Fix the agent, then **Rerun this scenario**. |
+| `cancelled` | Stopped with **Stop** or **Stop all**. | **Rerun this scenario** when needed. |
+| `stalled` | The run stopped reporting before a verdict. | **Rerun this scenario**. A stalled run counts as not passed. |
+
+<Frame>
+<img className="block" src="/images/agent-testing/run-drawer-unreachable.png" alt="The conversation drawer of a run whose target could not be reached, with the error" />
+</Frame>
+
+A criterion the judge could not decide is inconclusive. A criterion about an internal action goes inconclusive when the agent's traces did not arrive; see [Linking your traces](/agent-testing/linking-your-traces#when-traces-do-not-arrive).
+
+Also check: [Run plans](/agent-testing/run-plans), [Compare agents](/agent-testing/compare-agents), [Run from CI](/agent-testing/run-from-ci) for the batch API behind the same runs.

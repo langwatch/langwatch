@@ -53,8 +53,11 @@ export type SourceType =
   | "claude_code"
   | "claude_cowork"
   | "workato"
+  /** Retired: reads the directory audit, which holds no conversations. */
   | "copilot_studio"
+  | "copilot_studio_dataverse"
   | "openai_compliance"
+  | "openai_admin"
   | "claude_compliance"
   | "anthropic_admin"
   | "databricks_genie"
@@ -67,13 +70,31 @@ export const SUPPORTED_SOURCE_TYPES: readonly SourceType[] = [
   "claude_cowork",
   "workato",
   "copilot_studio",
+  "copilot_studio_dataverse",
   "openai_compliance",
+  "openai_admin",
   "claude_compliance",
   "anthropic_admin",
   "databricks_genie",
   "s3_custom",
   "http_custom",
 ] as const;
+
+const PUSH_SOURCE_TYPES: ReadonlySet<SourceType> = new Set([
+  "otel_generic",
+  "claude_code",
+  "claude_cowork",
+  "workato",
+  "s3_custom", // webhook callback path authenticated by ingest secret
+]);
+
+export function isPushSourceType({
+  sourceType,
+}: {
+  sourceType: SourceType;
+}): boolean {
+  return PUSH_SOURCE_TYPES.has(sourceType);
+}
 
 export interface CreateIngestionSourceInput {
   organizationId: string;
@@ -115,8 +136,8 @@ export interface UpdateIngestionSourceInput {
 
 export interface CreatedIngestionSource {
   source: IngestionSource;
-  /** Raw ingestSecret — exposed exactly once at creation and never persisted. */
-  ingestSecret: string;
+  /** Raw ingestSecret — exposed exactly once at creation and never persisted. Null for non-push sources. */
+  ingestSecret: string | null;
 }
 
 const ROTATION_GRACE_MS = 24 * 60 * 60 * 1000;
@@ -245,6 +266,45 @@ const CURSOR_MUST_NOT_MOVE: ReportImmutabilityVerdict = {
  * because it is the same thing the adapter consults, and it is read through
  * the shared predicate so the two cannot drift apart.
  */
+/**
+ * The adapter a source runs under is fixed at create.
+ *
+ * Without this, the destination check above can be walked around rather than
+ * defeated. It reads the adapter off the stored row, so it validates a
+ * `databricks_genie` source against the Databricks host rule — but the request
+ * that satisfied that rule with a real workspace URL can also carry
+ * `adapter: "http_polling"` and a `url` of its own. The check passes, the new
+ * adapter is written, and the next run resolves the stored credential envelope
+ * and sends it to that URL. The caller never reads the secret; the server
+ * delivers it.
+ *
+ * Pinning the adapter is what makes the destination rule mean anything: a
+ * config can only ever be judged against the rules of the adapter that will
+ * actually run it. Absent still means unchanged — the composer does not render
+ * this field, so a client cannot send it back.
+ */
+export function assertAdapterUnchanged({
+  stored,
+  incoming,
+}: {
+  stored: Record<string, unknown>;
+  incoming: Record<string, unknown>;
+}): void {
+  const storedAdapter = stored.adapter;
+  if (typeof storedAdapter !== "string") return;
+  if (incoming.adapter === undefined) return;
+  if (incoming.adapter === storedAdapter) return;
+
+  const complaint =
+    `This source runs on the ${storedAdapter} adapter, which is fixed when ` +
+    "the source is created. Changing it would point the credentials this " +
+    "source already holds at a different service. Archive this source and " +
+    "create a new one to change how it pulls.";
+  throw new ValidationError(complaint, {
+    meta: { formErrors: [complaint] },
+  });
+}
+
 export function assertReportUnchangedOncePulled({
   existing,
   incoming,
@@ -531,8 +591,9 @@ export class IngestionSourceService {
     // lazy-create logic anywhere else (master_orchestrator constraint).
     await ensureHiddenGovernanceProject(this.prisma, input.organizationId);
 
-    const ingestSecret = generateIngestSecret();
-    const ingestSecretHash = hashIngestSecret(ingestSecret);
+    const isPush = isPushSourceType({ sourceType: input.sourceType });
+    const ingestSecret = isPush ? generateIngestSecret() : null;
+    const ingestSecretHash = ingestSecret ? hashIngestSecret(ingestSecret) : "";
 
     // Phase 10 carryover — the schema has `parserConfig` but no
     // `pullConfig` column; the puller worker actually reads
@@ -549,7 +610,7 @@ export class IngestionSourceService {
       ...(input.pullConfig ?? {}),
       ...(input.parserConfig ?? {}),
     };
-    assertPullDestinationAllowed(requestedParserConfig);
+    assertPullDestinationAllowed({ parserConfig: requestedParserConfig });
     await assertTraceDestinationIsOwnLiveProject({
       prisma: this.prisma,
       organizationId: input.organizationId,
@@ -558,6 +619,15 @@ export class IngestionSourceService {
     const mergedParserConfig = encryptParserConfigCredentials(
       requestedParserConfig,
     )!;
+
+    // The @@unique([organizationId, name]) constraint spans all rows
+    // including archived ones. If an archived source holds the name,
+    // rename it so the new source can take it.
+    await this.freeArchivedName({
+      organizationId: input.organizationId,
+      name: input.name,
+    });
+
     const source = await this.prisma.ingestionSource.create({
       data: {
         organizationId: input.organizationId,
@@ -591,7 +661,13 @@ export class IngestionSourceService {
     // lives out here because the guard only runs on the parserConfig path
     // while the write is shared by every path.
     let cursorMustNotMove = false;
-    if (input.name !== undefined) data.name = input.name;
+    if (input.name !== undefined && input.name !== existing.name) {
+      await this.freeArchivedName({
+        organizationId: input.organizationId,
+        name: input.name,
+      });
+      data.name = input.name;
+    }
     if (input.description !== undefined) data.description = input.description;
     if (input.parserConfig !== undefined) {
       // A client never handles the stored secret, in either direction. It is
@@ -618,16 +694,34 @@ export class IngestionSourceService {
       // must mean "unchanged" for all of them, not just the secret.
       const stored = (existing.parserConfig as Record<string, unknown>) ?? {};
       for (const key of Object.keys(stored)) {
-        const hiddenFromClients = key === "credentials" || key.startsWith("_");
+        // `adapter` and `schedule` join the list for the same reason as the
+        // rest: the composer deliberately renders neither, so a client cannot
+        // send them back and absent must mean unchanged. Dropping `adapter`
+        // leaves a pull source the worker can no longer dispatch — a rename
+        // would quietly stop the source pulling.
+        const hiddenFromClients =
+          key === "credentials" ||
+          key === "adapter" ||
+          key === "schedule" ||
+          key.startsWith("_");
         if (hiddenFromClients && incoming[key] === undefined) {
           incoming[key] = stored[key];
         }
       }
+      assertAdapterUnchanged({ stored, incoming });
       ({ cursorMustNotMove } = assertReportUnchangedOncePulled({
         existing,
         incoming,
       }));
-      assertPullDestinationAllowed(incoming);
+      // The adapter comes from the stored row, not from `incoming`. The edit
+      // form sends back only the fields it renders and `adapter` is not one of
+      // them, so dispatching on the incoming value would make this check do
+      // nothing on precisely the request that repoints the host — leaving the
+      // destination pinned at create and free afterwards.
+      assertPullDestinationAllowed({
+        parserConfig: incoming,
+        adapterId: stored.adapter as string,
+      });
       data.parserConfig = encryptParserConfigCredentials(
         incoming,
       ) as Prisma.InputJsonValue;
@@ -739,6 +833,18 @@ export class IngestionSourceService {
     organizationId: string,
   ): Promise<{ source: IngestionSource; ingestSecret: string }> {
     const existing = await this.requireById(id, organizationId);
+    if (!isPushSourceType({ sourceType: existing.sourceType as SourceType })) {
+      throw new ValidationError(
+        "Only push-mode sources have an ingest secret to rotate.",
+        {
+          meta: {
+            formErrors: [
+              "Only push-mode sources have an ingest secret to rotate.",
+            ],
+          },
+        },
+      );
+    }
     const newSecret = generateIngestSecret();
     const newHash = hashIngestSecret(newSecret);
     const priorParser =
@@ -770,6 +876,35 @@ export class IngestionSourceService {
       await syncPullProcessBestEffort({ prisma: this.prisma, source });
     }
     return source;
+  }
+
+  // ---- name-collision helpers -------------------------------------------
+
+  /**
+   * If an archived source in this org holds `name`, rename it to
+   * `"name (archived <id-suffix>)"` so the unique constraint allows
+   * a new source to take the name. No-op when no collision exists or
+   * the colliding source is still active.
+   */
+  private async freeArchivedName({
+    organizationId,
+    name,
+  }: {
+    organizationId: string;
+    name: string;
+  }): Promise<void> {
+    const collider = await this.prisma.ingestionSource.findUnique({
+      where: {
+        organizationId_name: { organizationId, name },
+      },
+      select: { id: true, archivedAt: true },
+    });
+    if (!collider?.archivedAt) return;
+
+    await this.prisma.ingestionSource.update({
+      where: { id: collider.id },
+      data: { name: `${name} (archived ${collider.id})` },
+    });
   }
 
   /**

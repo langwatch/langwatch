@@ -152,6 +152,28 @@ export const scenarioEventsRouter = createTRPCRouter({
       });
     }),
 
+  // The latest run result per scenario inside the window, for the
+  // last-result cells of the scenarios table. Separate from the scenario list read on
+  // purpose: the list renders instantly and these cells stream in.
+  getLastResultSummaries: protectedProcedure
+    .input(
+      projectSchema
+        .extend({
+          scenarioIds: z.array(z.string()).optional(),
+        })
+        .extend(dateRangeFields),
+    )
+    .permission("scenarios:view")
+    .query(async ({ input }) => {
+      const service = getApp().simulations.runs;
+      const dates = resolveDateRange(input);
+      return service.getLastResultSummaries({
+        projectId: input.projectId,
+        scenarioIds: input.scenarioIds,
+        ...dates,
+      });
+    }),
+
   // Cheap freshness probe for the run history views: returns only the latest
   // UpdatedAt across the project's runs in the window. Clients poll this tiny
   // response and invalidate getSuiteRunData only when the value advances,

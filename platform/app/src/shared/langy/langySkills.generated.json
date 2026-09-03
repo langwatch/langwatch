@@ -23,9 +23,16 @@
 	{
 		"id": "connect-agent",
 		"label": "Connect agent",
-		"description": "Connect the codebase's AI agent to LangWatch agent simulations over HTTP, so scenario suites run against it from the platform. Finds or adds the agent's chat endpoint, wires authentication for scenario traffic, makes the server adopt the W3C traceparent header so the judge reads the agent's own traces, registers the agent with the `langwatch` CLI, and runs the first suite. Use when the user wants platform scenarios to test their real, deployed agent.",
+		"description": "Connect the codebase's AI agent to LangWatch agent testing over HTTP, so test suites run against it from the platform. Finds or adds the agent's chat endpoint, wires authentication for scenario traffic, makes the server adopt the W3C traceparent header so the judge reads the agent's own traces, registers the agent with the `langwatch` CLI, and runs the first test suite. Use when the user wants platform scenarios to test their real, deployed agent.",
 		"category": "skill",
-		"userPrompt": "Connect my agent to LangWatch simulations"
+		"userPrompt": "Connect my agent to LangWatch agent testing"
+	},
+	{
+		"id": "context-sweet-spot",
+		"label": "Context sweet spot",
+		"description": "Investigates the context economics of your own coding-agent sessions in LangWatch. Reads real sessions to find where carrying a fat context stops paying for itself, measured in cache rebuilds, compactions and cost per turn, and delivers a report with the context size your sessions should stay under, with example sessions behind every claim. Use when coding-agent sessions feel expensive or degrade as they grow.",
+		"category": "skill",
+		"userPrompt": "Find my context sweet spot"
 	},
 	{
 		"id": "datasets",
@@ -113,7 +120,7 @@
 	{
 		"id": "prompt-optimization",
 		"label": "Prompt optimization",
-		"description": "Improve a prompt on the evaluations workbench through a measured loop. Duplicate the target column, form a hypothesis from failing rows, edit the copy's prompt draft, run, compare pass rate and cost, and repeat until the numbers hold. Use when the user asks to optimize or improve a prompt, when they arrive from the workbench's \"Optimize this prompt\" menu item, or when they want their bot to answer better. Bootstraps a missing dataset or evaluator first.",
+		"description": "Improve a prompt on the evaluations workbench through a measured loop. Score the baseline first, then duplicate the target column, form a hypothesis from failing rows, edit the copy's prompt draft, run, compare pass rate and cost, and repeat until the numbers hold. Use when the user asks to optimize or improve a prompt, when they arrive from the workbench's \"Optimize this prompt\" menu item, or when they want their bot to answer better. Bootstraps a missing dataset or evaluator first.",
 		"category": "skill"
 	},
 	{
@@ -122,6 +129,13 @@
 		"description": "Version and manage your agent's prompts with LangWatch Prompts CLI. Use for both onboarding (set up prompt versioning for an entire codebase) and targeted operations (version a specific prompt, create a new prompt version). Supports Python and TypeScript.",
 		"category": "skill",
 		"userPrompt": "Version my prompts with LangWatch"
+	},
+	{
+		"id": "provider-cost-comparison",
+		"label": "Provider cost comparison",
+		"description": "Prices your real LangWatch usage mix against other model providers. Exports your actual token mix per model, including the cache read and write split, fetches current price cards, and reprices the same month of usage under each candidate, with the cache sensitivity stated. Use when someone asks whether a cheaper provider or model would actually save money on your workload.",
+		"category": "skill",
+		"userPrompt": "Would another provider be cheaper for my usage?"
 	},
 	{
 		"id": "scenarios",

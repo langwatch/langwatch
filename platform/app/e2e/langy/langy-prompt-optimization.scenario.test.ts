@@ -25,9 +25,13 @@ import {
 import { runScenarioAndLog } from "./scenario-logger";
 import {
   getWorkbenchState,
-  listExperimentRuns,
   seedOptimizationWorkbench,
 } from "./seed-optimization-workbench";
+import {
+  expectInterleavedTranscript,
+  expectOptimizedWorkbench,
+  readBaselineTarget,
+} from "./workbench-assertions";
 import { api, ensurePromptId, request } from "./workbench-rest";
 
 const model = openai("gpt-5-mini");
@@ -42,6 +46,7 @@ describe("Langy prompt optimization: the improvement loop", () => {
     /** @scenario Langy runs a subset before the full dataset */
     /** @scenario Progress is narrated before and after each run */
     /** @scenario The user steps away and the loop continues on the backend */
+    /** @scenario The recorded turn reads in the order it happened */
     it("improves the prompt on a duplicate and leaves the baseline byte-identical", async () => {
       const seeded = await seedOptimizationWorkbench({
         name: "support-quality",
@@ -49,17 +54,17 @@ describe("Langy prompt optimization: the improvement loop", () => {
         goldenStyle: "free-text",
         withEvaluator: true,
       });
-      const before = await getWorkbenchState(seeded.experimentSlug);
-      const baselineBefore = JSON.stringify(
-        before.state.targets.find((t) => t.id === seeded.baselineTargetId),
-      );
+      const baselineBefore = await readBaselineTarget({
+        slug: seeded.experimentSlug,
+        baselineTargetId: seeded.baselineTargetId,
+      });
 
       const langy = makeLangyAdapter();
       const result = await runOptimizeScenario({
         langy,
         name: "happy guided improvement loop",
         description:
-          "A non-technical webshop founder has a support-bot experiment fully set up (dataset, prompt column, answer-match evaluator) and wants the bot to answer better. Langy runs the improvement loop: read the state, duplicate the baseline, ground a hypothesis in failing rows, edit the copy's draft, run scoped, compare, narrate.",
+          "A non-technical webshop founder has a support-bot experiment fully set up (dataset, prompt column, answer-match evaluator) and wants the bot to answer better. Langy runs the improvement loop: read the state, score the baseline, duplicate the baseline, ground a hypothesis in failing rows, edit the copy's draft, run scoped, compare, narrate.",
         slug: seeded.experimentSlug,
         script: [
           scenario.user(
@@ -75,32 +80,30 @@ describe("Langy prompt optimization: the improvement loop", () => {
         criteria: LANGY_OPTIMIZE_LOOP_CRITERIA,
       });
       if (!result.success) console.log("JUDGE REASONING:", result.reasoning);
-      expect(result.success).toBe(true);
+
+      // The facts come before the verdict: asserting the judge first lets one
+      // criterion the model missed hide every Layer-2 check behind it, so a
+      // regression in what the loop actually left behind reads as a wording
+      // complaint. The reasoning is printed above either way.
 
       // Layer 2, through the REST surface: the baseline column is untouched,
       // a candidate column exists carrying a draft, the evaluator was wired
-      // onto the candidate, and at least one run was recorded.
-      const after = await getWorkbenchState(seeded.experimentSlug);
-      const baselineAfter = JSON.stringify(
-        after.state.targets.find((t) => t.id === seeded.baselineTargetId),
-      );
-      expect(baselineAfter).toBe(baselineBefore);
-      const candidates = after.state.targets.filter(
-        (t) => t.id !== seeded.baselineTargetId && t.type === "prompt",
-      );
-      expect(candidates.length).toBeGreaterThan(0);
-      expect(candidates.some((t) => t.localPromptConfig)).toBe(true);
-      const evaluator = after.state.evaluators[0];
-      expect(evaluator).toBeDefined();
-      const evaluatorTargets = Object.keys(
-        evaluator!.mappings[seeded.datasetId] ?? {},
-      );
-      expect(candidates.some((t) => evaluatorTargets.includes(t.id))).toBe(
-        true,
-      );
-      expect(
-        (await listExperimentRuns(seeded.experimentSlug)).length,
-      ).toBeGreaterThan(0);
+      // onto the candidate, and at least one run was recorded. Shared with the
+      // live-page suite, so both read the same outcome the same way.
+      await expectOptimizedWorkbench({
+        slug: seeded.experimentSlug,
+        baselineTargetId: seeded.baselineTargetId,
+        datasetId: seeded.datasetId,
+        baselineBefore,
+      });
+
+      // Layer 2, the record: read the conversation back the way the panel
+      // reads it on reload. A record holding every call first and one closing
+      // paragraph loses the account of the work in between.
+      await expectInterleavedTranscript(langy.state.conversationId);
+
+      // Layer 1 last: the conversation itself, graded against the loop rubric.
+      expect(result.success).toBe(true);
     });
   });
 

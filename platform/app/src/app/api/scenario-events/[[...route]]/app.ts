@@ -20,6 +20,11 @@ import {
 import { extractInlineMediaFromEvent } from "~/server/stored-objects/content-extractor";
 import { createStoredObjectsService } from "~/server/stored-objects/stored-objects-factory";
 import {
+  batchRunPath,
+  readTestingInterface,
+  scenarioSetPath,
+} from "~/server/suites/platform-path";
+import {
   encodeContent,
   encodeEnd,
   encodeStart,
@@ -123,10 +128,6 @@ secured.access(requires("scenarios:create")).post(
       await broadcastStreamingEvent(project.id, event);
     }
 
-    const path = `/${project.slug}/simulations/${
-      event.scenarioSetId || DEFAULT_SET_ID
-    }`;
-
     const base = process.env.BASE_HOST;
 
     if (!base) {
@@ -137,7 +138,17 @@ secured.access(requires("scenarios:create")).post(
       return c.json({ success: false }, 500);
     }
 
-    const url = `${base}${path}`;
+    // The scenario library appends the batch run id to this and prints it as
+    // the address to follow the run at, so it names the interface the project
+    // reads.
+    const ui = await readTestingInterface({
+      projectId: project.id,
+      organizationId: c.get("apiKeyOrganizationId"),
+    });
+    const url = `${base}/${project.slug}${scenarioSetPath({
+      ui,
+      scenarioSetId: event.scenarioSetId || DEFAULT_SET_ID,
+    })}`;
 
     return c.json({ success: true, url }, 201);
   },
@@ -191,12 +202,19 @@ secured.access(requires("scenarios:create")).post(
     }
 
     // Built server-side from ids rather than accepted as a URL: a handoff can
-    // only ever point a browser at this instance's own simulations page. The
-    // ids are caller-supplied and only length-bounded, so they are encoded — a
-    // `#` or `?` in one would otherwise truncate the rest of the path.
-    const url = `${base}/${project.slug}/simulations/${encodeURIComponent(
-      scenarioSetId || DEFAULT_SET_ID,
-    )}/${encodeURIComponent(batchRunId)}`;
+    // only ever point a browser at this instance's own page for the run, in
+    // the interface the project reads. The ids are caller-supplied and only
+    // length-bounded, so they are encoded: a `#` or `?` in one would otherwise
+    // truncate the rest of the path.
+    const ui = await readTestingInterface({
+      projectId: project.id,
+      organizationId: c.get("apiKeyOrganizationId"),
+    });
+    const url = `${base}/${project.slug}${batchRunPath({
+      ui,
+      scenarioSetId: scenarioSetId || DEFAULT_SET_ID,
+      batchRunId,
+    })}`;
 
     const hasLiveTab = await scenarioTabRegistry.hasLiveTab({
       projectId: project.id,
@@ -236,16 +254,17 @@ secured.access(requires("scenarios:create")).post(
   },
 );
 
-// DELETE /api/scenario-events - Archive all simulation runs for a scenario
-// set. A scenarioSetId is MANDATORY: an unqualified request is rejected so a
+// DELETE /api/scenario-events - Archive simulation runs. Exactly ONE scope is
+// MANDATORY: a scenarioSetId (archive every run in the set) or a
+// scenarioRunId (archive one run). An unqualified request is rejected so a
 // single call can never archive every run in the project. Stays at `:manage`:
-// it is bulk destruction, and only the administration grain should carry it.
+// it is destruction, and only the administration grain should carry it.
 export const route = secured.access(requires("scenarios:manage")).delete(
   "/",
   blockTraceUsageExceededMiddleware,
   describeRoute({
     description:
-      "Archive all simulation runs for a scenario set. Pass `scenarioSetId=default` to archive runs in the implicit default set; future SDK runs without an explicit setId will repopulate it.",
+      "Archive simulation runs. Pass exactly one of `scenarioSetId` (archives every run in the set; `scenarioSetId=default` targets the implicit default set) or `scenarioRunId` (archives that one run).",
     responses: {
       ...baseResponses,
       200: {
@@ -254,8 +273,14 @@ export const route = secured.access(requires("scenarios:manage")).delete(
           "application/json": { schema: resolver(responseSchemas.archive) },
         },
       },
-      400: {
-        description: "Missing or invalid scenarioSetId",
+      422: {
+        description: "Missing or invalid scope parameter",
+        content: {
+          "application/json": { schema: resolver(responseSchemas.error) },
+        },
+      },
+      404: {
+        description: "Scenario run not found in this project",
         content: {
           "application/json": { schema: resolver(responseSchemas.error) },
         },
@@ -264,19 +289,40 @@ export const route = secured.access(requires("scenarios:manage")).delete(
   }),
   zValidator(
     "query",
-    z.object({
-      scenarioSetId: z
-        .string()
-        .min(1, "scenarioSetId query parameter is required"),
-    }),
+    z
+      .object({
+        scenarioSetId: z.string().min(1).optional(),
+        scenarioRunId: z.string().min(1).optional(),
+      })
+      .refine(
+        (query) =>
+          (query.scenarioSetId === undefined) !==
+          (query.scenarioRunId === undefined),
+        {
+          message:
+            "Pass exactly one of scenarioSetId or scenarioRunId as a query parameter",
+        },
+      ),
   ),
   async (c) => {
     const { project } = c.var;
-    const { scenarioSetId } = c.req.valid("query");
+    const { scenarioSetId, scenarioRunId } = c.req.valid("query");
+
+    if (scenarioRunId !== undefined) {
+      const result = await archiveScenarioRun({
+        projectId: project.id,
+        scenarioRunId,
+      });
+      if (result === null) {
+        return c.json({ error: "Scenario run not found" }, 404);
+      }
+      return c.json(result, 200);
+    }
 
     const result = await archiveScenarioSetRuns({
       projectId: project.id,
-      scenarioSetId,
+      // The refine above guarantees exactly one scope, so setId is present.
+      scenarioSetId: scenarioSetId!,
     });
 
     return c.json(result, 200);
@@ -361,6 +407,37 @@ function isStreamingEvent(type: string): boolean {
     type === ScenarioEventType.TOOL_CALL_ARGS ||
     type === ScenarioEventType.TOOL_CALL_END
   );
+}
+
+/**
+ * Archives ONE simulation run after checking it belongs to the project.
+ * Returns null when the project holds no such run, so a caller can never
+ * archive another tenant's run by guessing its id. Exported as a test seam.
+ */
+export async function archiveScenarioRun({
+  projectId,
+  scenarioRunId,
+}: {
+  projectId: string;
+  scenarioRunId: string;
+}): Promise<{
+  archived: number;
+  failed: number;
+  scenarioRunId: string;
+} | null> {
+  const run = await getApp().simulations.runs.getScenarioRunData({
+    projectId,
+    scenarioRunId,
+  });
+  if (!run) return null;
+
+  await getApp().simulations.deleteRun({
+    tenantId: projectId,
+    scenarioRunId,
+    occurredAt: Date.now(),
+  });
+
+  return { archived: 1, failed: 0, scenarioRunId };
 }
 
 /**

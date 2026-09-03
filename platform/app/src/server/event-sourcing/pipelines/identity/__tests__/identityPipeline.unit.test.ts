@@ -106,6 +106,10 @@ describe("identity pipeline", () => {
             inMemoryIdentityUsers(),
             inMemoryIdentityReservations(),
           ),
+          // Two-step verification rides this same pipeline (D06); this test
+          // exercises the identifier half, so its store is never reached.
+          mfaProjectionStore: new InMemoryStateStore() as never,
+          mfaGuards: null as never,
         }),
       );
       try {
@@ -117,6 +121,7 @@ describe("identity pipeline", () => {
           accountId: "acc_1",
           provider: "google",
           providerId: "google",
+          issuer: "https://accounts.google.com",
           providerAccountId: "gid_123",
           value: "Sam.J+x@Acme.com",
           occurredAtMs: T0,
@@ -128,7 +133,7 @@ describe("identity pipeline", () => {
         const facts = Object.values(projection.state.identifiers);
         expect(facts).toHaveLength(1);
         expect(facts[0]!.userId).toBe(USER);
-        expect(facts[0]!.value).toBe("sam.j@acme.com");
+        expect(facts[0]!.value).toBe("sam.j+x@acme.com");
         expect(facts[0]!.state).toBe("VERIFIED");
         // The cursor is the commit marker: it names the applied event.
         expect(projection.cursor.eventId).not.toBe("");

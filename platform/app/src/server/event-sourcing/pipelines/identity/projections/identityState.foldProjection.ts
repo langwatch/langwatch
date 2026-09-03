@@ -19,6 +19,8 @@ import {
   identifierDetachedEventSchema,
   identifierVerifiedEventSchema,
   identityEventSchema,
+  type LinkProposedEvent,
+  linkProposedEventSchema,
   type PrimaryChangedEvent,
   primaryChangedEventSchema,
   type UserErasedEvent,
@@ -34,6 +36,7 @@ const identityEvents = [
   primaryChangedEventSchema,
   identifierDetachedEventSchema,
   userErasedEventSchema,
+  linkProposedEventSchema,
 ] as const;
 
 /** The reducer's heads plus the base class's bookkeeping stamps — server
@@ -132,6 +135,20 @@ export class IdentityStateFoldProjection
 
   handleIdentityUserErased(
     event: UserErasedEvent,
+    state: IdentityFoldState,
+  ): IdentityFoldState {
+    return this.fold(event, state);
+  }
+
+  /**
+   * Folded like every other fact, and the reducer leaves the heads alone: a
+   * proposal states that no identifier was attached. It runs through the same
+   * path anyway so the projection's cursor advances past it — a fact the fold
+   * skipped would leave the read-your-writes wait watching for a cursor that
+   * never moves.
+   */
+  handleIdentityLinkProposed(
+    event: LinkProposedEvent,
     state: IdentityFoldState,
   ): IdentityFoldState {
     return this.fold(event, state);

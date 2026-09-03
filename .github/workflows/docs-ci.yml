@@ -164,6 +164,27 @@ jobs:
       - name: Check docs structure
         run: go run ./cmd/docscheck
 
+  check_prose:
+    needs: changes
+    if: needs.changes.outputs.relevant == 'true'
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          fetch-depth: 0
+
+      # The check reads docs written in the pull request and prints them in a
+      # ::error annotation, which GitHub reads as a workflow command. This
+      # proves the values are encoded before they reach one.
+      - name: Check the prose script encodes its annotations
+        run: bash docs/scripts/check-docs-prose.test.sh
+
+      - name: Check docs prose for banned words
+        run: bash docs/scripts/check-docs-prose.sh
+        env:
+          DOCS_PROSE_BASE: ${{ github.event.pull_request.base.sha || github.event.before || 'origin/main' }}
+
   check_generated_files:
     needs: changes
     if: needs.changes.outputs.relevant == 'true' && needs.changes.outputs.heavy == 'true'
@@ -211,8 +232,11 @@ jobs:
       - name: Check for stale generated files
         run: |
           STALE=0
+          # Every page the skills manifest drives, read from the generator, so
+          # a new entry in the manifest is covered without editing this list.
+          SKILL_PAGES=$(node docs/scripts/generate-skills-pages.mjs --list-pages)
           if ! git diff --exit-code \
-            docs/skills/directory.mdx docs/skills/pms-and-domain-experts.mdx \
+            $SKILL_PAGES \
             docs/llms.txt docs/llms-full.txt \
             docs/api-reference/openapiLangWatch.json docs/docs.json; then
             STALE=1
@@ -237,11 +261,11 @@ jobs:
           fi
 
   docs-complete:
-    needs: [changes, check_links, check_structure, check_generated_files]
+    needs: [changes, check_links, check_structure, check_prose, check_generated_files]
     if: always()
     runs-on: ubuntu-latest
     steps:
       - uses: re-actors/alls-green@05ac9388f0aebcb5727afa17fcccfecd6f8ec5fe # v1.2.2
         with:
           jobs: ${{ toJSON(needs) }}
-          allowed-skips: check_links, check_structure, check_generated_files
+          allowed-skips: check_links, check_structure, check_prose, check_generated_files

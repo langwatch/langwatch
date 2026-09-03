@@ -39,6 +39,7 @@ import type { DatasetColumnType } from "~/server/datasets/types";
 import type { EvaluatorTypes } from "~/server/evaluations/evaluators";
 import type { EvaluatorWithFields } from "~/server/evaluators/evaluator.service";
 import { api } from "~/utils/api";
+import { newTargetId } from "../actions/transforms/addTarget";
 import { DRAWER_WIDTH } from "../constants";
 import { resolveTargetNameFromCache } from "../hooks/resolveTargetName";
 import { useDatasetSync } from "../hooks/useDatasetSync";
@@ -67,6 +68,7 @@ import {
   isGoldenFieldSatisfied,
   LEGACY_PAIRWISE_EVALUATOR_TYPE,
 } from "../types";
+import { connectedTargetFields } from "../utils/connectedAgentTarget";
 import { convertInlineToRowRecords } from "../utils/datasetConversion";
 import { isRowEmpty } from "../utils/emptyRowDetection";
 import { createEvaluatorEditorCallbacks } from "../utils/evaluatorEditorCallbacks";
@@ -437,6 +439,24 @@ export function EvaluationsV3Table({
     (savedAgent: AgentWithFields) => {
       const config = savedAgent.config as Record<string, unknown>;
 
+      // A connected agent runs in the customer's own process, so the column
+      // reads the turn to send and the parameters the function declares
+      // rather than the fields of a node.
+      if (savedAgent.type === "connected") {
+        const { inputs, outputs } = connectedTargetFields(savedAgent.config);
+        addOrReplaceTarget({
+          id: newTargetId(),
+          type: "agent",
+          agentType: "connected",
+          dbAgentId: savedAgent.id,
+          inputs,
+          outputs,
+          mappings: {},
+        });
+        closeDrawer();
+        return;
+      }
+
       // Check if this is an HTTP agent by looking at savedAgent.type or config structure
       const isHttpAgent =
         savedAgent.type === "http" ||
@@ -479,7 +499,7 @@ export function EvaluationsV3Table({
         savedAgent.type === "workflow" && fieldsResolved;
 
       const targetConfig: TargetConfig = {
-        id: `target_${Date.now()}`, // Generate unique ID for the workbench
+        id: newTargetId(),
         type: "agent", // This is a target of type "agent" (code/workflow/http)
         agentType: isHttpAgent
           ? "http"
@@ -557,7 +577,7 @@ export function EvaluationsV3Table({
       };
 
       const targetConfig: TargetConfig = {
-        id: `target_${Date.now()}`,
+        id: newTargetId(),
         type: "evaluator",
         targetEvaluatorId: evaluator.id,
         inputs,
@@ -598,7 +618,7 @@ export function EvaluationsV3Table({
     }) => {
       // Convert prompt to TargetConfig format (prompt type)
       // Use the actual inputs/outputs from the prompt data (already fetched in PromptListDrawer)
-      const targetId = `target_${Date.now()}`;
+      const targetId = newTargetId();
       const targetConfig: TargetConfig = {
         id: targetId,
         type: "prompt",
@@ -932,7 +952,7 @@ export function EvaluationsV3Table({
           useEvaluationsV3Store.getState().activeDatasetId;
 
         // Create target with pending mappings
-        const targetId = `target_${Date.now()}`;
+        const targetId = newTargetId();
         const targetConfig: TargetConfig = {
           id: targetId,
           type: "prompt",

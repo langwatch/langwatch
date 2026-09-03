@@ -137,6 +137,18 @@ export interface CodingAgentSessionRepository {
     branches: string[];
     startedAtFromMs: number;
   }): Promise<CodingAgentBranchSessionRow[]>;
+
+  /**
+   * The same rows as `listByRepositoryBranch`, fetched by session id instead
+   * of by repository: the read behind fact-stamp discovery, where a session's
+   * stamped rows name a repository its own row has since moved away from.
+   * `startedAtFromMs` is required for the same partition-pruning reason.
+   */
+  listBySessionIds(params: {
+    tenantIds: string[];
+    sessionIds: string[];
+    startedAtFromMs: number;
+  }): Promise<CodingAgentBranchSessionRow[]>;
 }
 
 /** No-op store for deployments without ClickHouse. */
@@ -163,6 +175,10 @@ export class NullCodingAgentSessionRepository
   }
 
   async listByRepositoryBranch(): Promise<CodingAgentBranchSessionRow[]> {
+    return [];
+  }
+
+  async listBySessionIds(): Promise<CodingAgentBranchSessionRow[]> {
     return [];
   }
 }

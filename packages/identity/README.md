@@ -14,6 +14,9 @@ and nothing that reads or writes.
               inferred types) · IdentifierFact · IdentityHeads
  reduce       reduceIdentity(heads, fact) — the one reducer, folded by the
               app's projection and by the replay proof alike
+ identifier-  identityStreamsFor · reduceIdentifier · primaryChangeFacts ·
+ aggregate    userErasureFacts — which stream a fact is stated on, and one
+              identifier's head folded on its own (ADR-127)
  errors       the refusal family (identity_identifier_not_found, …) and the
               two verification codes
  backfill     backfillParityDiffs · orphanedIdentifierRows — what "proven"
@@ -27,4 +30,5 @@ that is [`@langwatch/identity-server`](../identity-server/README.md), over
 repository interfaces the app implements with Prisma and composes once in
 `platform/app/src/server/app-layer/identity/runtime.ts`.
 
-Spec: `specs/identity/identifier-model.feature`.
+Spec: `specs/identity/identifier-model.feature`,
+`specs/identity/identifier-aggregate.feature`.

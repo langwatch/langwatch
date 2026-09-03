@@ -33,9 +33,13 @@ export {
   evaluateRules,
   featureFlagRuleSchema,
   featureFlagRulesSchema,
+  featureFlagRulesWriteSchema,
   parseRules,
+  readNeedsOrganizationAge,
   resolveEffectiveForListing,
 } from "./rules";
+export type { FeatureFlagTargetId, NotTargeted } from "./targeting";
+export { NOT_TARGETED, toRuleContextId } from "./targeting";
 export type {
   FeatureFlagEvaluateOptions,
   FeatureFlagServiceInterface,

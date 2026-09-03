@@ -69,6 +69,7 @@ import {
 import { getServerAuthSession } from "~/server/auth";
 import { prisma } from "~/server/db";
 import { featureFlagService } from "~/server/featureFlag";
+import { NOT_TARGETED } from "~/server/featureFlag/targeting";
 import { GatewayBudgetService } from "~/server/gateway/budget.service";
 import { BudgetOverviewService } from "~/server/gateway/budgetOverview.service";
 import { resolveSupportContact } from "~/server/organizations/resolveSupportContact";
@@ -894,7 +895,11 @@ secured.access(CLI_POLICY).post("/exchange", async (c: Context) => {
     let cliApiKey: string | undefined;
     let cliApiKeyId: string | undefined;
     let cliApiKeyScope:
-      | { kind: "organization" | "projects"; project_ids: string[] }
+      | {
+          kind: "organization" | "projects";
+          project_ids: string[];
+          permissions: string[];
+        }
       | undefined;
     if (record.key_selection) {
       // Same normalization the other label paths use, and the user-chosen
@@ -948,6 +953,7 @@ secured.access(CLI_POLICY).post("/exchange", async (c: Context) => {
       cliApiKeyScope = {
         kind: minted.scope.kind,
         project_ids: minted.scope.projectIds,
+        permissions: minted.permissions,
       };
     }
 
@@ -1947,7 +1953,10 @@ secured
       );
     }
 
-    const monitor = new ActivityMonitorService(prisma);
+    const monitor = new ActivityMonitorService({
+      prisma,
+      repository: getApp().governance.activityMonitor,
+    });
     const events = await monitor.eventsForSource({
       organizationId: tokenRecord.organization_id,
       sourceId,
@@ -2006,7 +2015,10 @@ secured
         404,
       );
     }
-    const monitor = new ActivityMonitorService(prisma);
+    const monitor = new ActivityMonitorService({
+      prisma,
+      repository: getApp().governance.activityMonitor,
+    });
     const health = await monitor.sourceHealthMetrics({
       organizationId: tokenRecord.organization_id,
       sourceId,
@@ -2754,6 +2766,8 @@ secured.access(cliApproveAuth).post("/approve", async (c: Context) => {
   const governanceEnabled = await featureFlagService
     .isEnabled("release_ui_ai_governance_enabled", {
       distinctId: session.user.id,
+      // Device login picks an organization, not a project.
+      projectId: NOT_TARGETED,
       organizationId: organization_id,
       defaultValue: true,
     })

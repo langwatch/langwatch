@@ -22,6 +22,7 @@ import {
   usePeriodSelector,
 } from "~/components/PeriodSelector";
 import { ExternalSetDetailPanel } from "~/components/suites/ExternalSetDetailPanel";
+import { ReturnToNewSimulationsBanner } from "~/components/suites/ReturnToNewSimulationsBanner";
 import { RunHistoryPanel } from "~/components/suites/RunHistoryPanel";
 import { SuiteArchiveDialog } from "~/components/suites/SuiteArchiveDialog";
 import { SuiteContextMenu } from "~/components/suites/SuiteContextMenu";
@@ -370,6 +371,7 @@ export default function SimulationsPage() {
             <HStack justify="space-between" align="center" w="full">
               <PageLayout.Heading>Simulations</PageLayout.Heading>
               <HStack>
+                <ReturnToNewSimulationsBanner target="runs" />
                 <PeriodSelector
                   period={period}
                   mode={mode}

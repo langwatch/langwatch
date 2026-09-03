@@ -1,6 +1,7 @@
 import {
   IDENTIFIER_ATTACHED_EVENT_TYPE,
   IDENTIFIER_DEAD_ENDED_EVENT_TYPE,
+  IDENTIFIER_DETACHED_EVENT_TYPE,
   IDENTIFIER_VERIFIED_EVENT_TYPE,
   IdentityCommandRefusedError,
 } from "@langwatch/identity";
@@ -36,7 +37,7 @@ describe("attachIdentifier guard", () => {
       const attached = facts[0]!;
       expect(attached.type).toBe(IDENTIFIER_ATTACHED_EVENT_TYPE);
       if (attached.type !== IDENTIFIER_ATTACHED_EVENT_TYPE) return;
-      expect(attached.data.value).toBe("sam.j@acme.com");
+      expect(attached.data.value).toBe("sam.j+x@acme.com");
       expect(attached.data.domain).toBe("acme.com");
       expect(attached.data.identifierHash).toMatch(/^hmac:[0-9a-f]{64}$/);
       expect(attached.data.state).toBe("VERIFIED");
@@ -49,6 +50,10 @@ describe("attachIdentifier guard", () => {
         "domain",
         "identifierHash",
         "identifierId",
+        // WHO asserted the subject. An identifier too, and the loudest kind:
+        // it is the IdP's own public issuer URL, which is what better-auth
+        // 1.7 keys the account by.
+        "issuer",
         "provider",
         // The provider's own subject (ADR-116). An identifier, not a secret:
         // it is the public `sub` an IdP puts in a token, and the projection
@@ -89,7 +94,10 @@ describe("attachIdentifier guard", () => {
       const heads = new InMemoryHeads();
       const reservations = new InMemoryReservations();
       await reservations.claim({
-        normalizedValue: "sam.j@acme.com",
+        // Tagged, because the tag is part of the address (6b62a98725): the
+        // lock this attach contends for is the one on the value it actually
+        // normalizes to, not on the untagged mailbox beside it.
+        normalizedValue: "sam.j+x@acme.com",
         userId: "user_other",
         identifierId: "idf_theirs",
         commandId: "idcmd_theirs",
@@ -112,7 +120,10 @@ describe("attachIdentifier guard", () => {
       const heads = new InMemoryHeads();
       const reservations = new InMemoryReservations();
       await reservations.claim({
-        normalizedValue: "sam.j@acme.com",
+        // Tagged, because the tag is part of the address (6b62a98725): the
+        // lock this attach contends for is the one on the value it actually
+        // normalizes to, not on the untagged mailbox beside it.
+        normalizedValue: "sam.j+x@acme.com",
         userId: USER,
         identifierId: "idf_mine",
         commandId: "idcmd_mine",
@@ -475,9 +486,65 @@ describe("markPrimary guard", () => {
         occurredAtMs: T0 + 2000,
         actor: ACTOR,
       });
+      expect(facts).toHaveLength(1);
       expect(facts[0]!.data).toMatchObject({
         identifierId: "idf_work",
         previousIdentifierId: "idf_personal",
+      });
+    });
+
+    /** @scenario "Exactly one PRIMARY survives, whoever was standing" */
+    it("names every standing PRIMARY, so no demotion is left to a fold", async () => {
+      // Two standing PRIMARY is only reachable from a partial replay window.
+      // The old guard named the first it found and left the rest to the fold's
+      // sweep; a per-identifier fold has no sweep, so the command names them
+      // all (ADR-127).
+      const heads = new InMemoryHeads();
+      heads.heads.set(
+        USER,
+        headsWith(
+          fact({ identifierId: "idf_work", state: "VERIFIED" }),
+          fact({ identifierId: "idf_a", state: "PRIMARY", value: "sam@a.dev" }),
+          fact({ identifierId: "idf_b", state: "PRIMARY", value: "sam@b.dev" }),
+        ),
+      );
+      const facts = await new IdentityGuards(heads, users, new InMemoryReservations()).markPrimary({
+        tenantId: USER,
+        userId: USER,
+        commandId: "idcmd_p2",
+        identifierId: "idf_work",
+        occurredAtMs: T0 + 2000,
+        actor: ACTOR,
+      });
+      expect(facts).toHaveLength(2);
+      expect(
+        facts.map((emitted) => emitted.data).sort((left, right) =>
+          JSON.stringify(left).localeCompare(JSON.stringify(right)),
+        ),
+      ).toMatchObject([
+        { identifierId: "idf_work", previousIdentifierId: "idf_a" },
+        { identifierId: "idf_work", previousIdentifierId: "idf_b" },
+      ]);
+    });
+  });
+
+  describe("when nobody holds PRIMARY", () => {
+    /** @scenario "A first primary change routes one stream only" */
+    it("states one promotion naming no previous", async () => {
+      const heads = new InMemoryHeads();
+      heads.heads.set(USER, headsWith(fact({ identifierId: "idf_work", state: "VERIFIED" })));
+      const facts = await new IdentityGuards(heads, users, new InMemoryReservations()).markPrimary({
+        tenantId: USER,
+        userId: USER,
+        commandId: "idcmd_p3",
+        identifierId: "idf_work",
+        occurredAtMs: T0 + 2000,
+        actor: ACTOR,
+      });
+      expect(facts).toHaveLength(1);
+      expect(facts[0]!.data).toMatchObject({
+        identifierId: "idf_work",
+        previousIdentifierId: null,
       });
     });
 
@@ -573,6 +640,20 @@ describe("detachIdentifier guard", () => {
       const attached = await guards.attachIdentifier(attachData());
       const identifierId = (attached[0]!.data as { identifierId: string }).identifierId;
       heads.fold(USER, attached);
+      // A second way in, so this exercises tombstone semantics rather than
+      // the strands guard — detaching somebody's last verified identifier is
+      // refused outright (D07).
+      heads.fold(
+        USER,
+        await guards.attachIdentifier(
+          attachData({
+            commandId: "idcmd_keep",
+            accountId: "acc_keep",
+            providerAccountId: "gid_keep",
+            value: "sam.keep@acme.com",
+          }),
+        ),
+      );
 
       const detached = await detach(heads, identifierId);
       expect(detached).toHaveLength(1);
@@ -580,7 +661,7 @@ describe("detachIdentifier guard", () => {
       expect(heads.heads.get(USER)?.identifiers[identifierId]).toMatchObject({
         state: "DETACHED",
         detachedAtMs: T0 + 5000,
-        value: "sam.j@acme.com",
+        value: "sam.j+x@acme.com",
       });
       expect(await detach(heads, identifierId)).toEqual([]);
     });
@@ -606,6 +687,119 @@ describe("eraseUser guard", () => {
       expect(
         (facts[0]!.data as { erasedIdentifierIds: string[] }).erasedIdentifierIds.sort(),
       ).toEqual(["idf_a", "idf_b"]);
+    });
+  });
+});
+
+describe("detachIdentifier strands guard", () => {
+  const detach = (heads: InMemoryHeads, identifierId: string) =>
+    new IdentityGuards(
+      heads,
+      users,
+      new InMemoryReservations(),
+    ).detachIdentifier({
+      tenantId: USER,
+      userId: USER,
+      commandId: "idcmd_d2",
+      identifierId,
+      occurredAtMs: T0 + 5000,
+      actor: ACTOR,
+    });
+
+  describe("when the passkey is the only verified way in", () => {
+    /** @scenario "Removing the last way in is refused" */
+    it("refuses with identity_detach_strands_user and leaves the passkey working", async () => {
+      const heads = new InMemoryHeads();
+      const passkey = fact({
+        identifierId: "idf_passkey",
+        provider: "passkey",
+        value: "cred_abc",
+        domain: null,
+        state: "VERIFIED",
+      });
+      heads.heads.set(USER, headsWith(passkey));
+
+      const attempt = detach(heads, "idf_passkey");
+      await expect(attempt).rejects.toMatchObject({
+        code: "identity_detach_strands_user",
+      });
+      // Refused before any fact exists, so the passkey still signs them in.
+      expect(heads.heads.get(USER)?.identifiers.idf_passkey?.state).toBe(
+        "VERIFIED",
+      );
+    });
+  });
+
+  describe("when only passkeys would be left", () => {
+    /** @scenario "Removing is refused when nothing is left to recover with" */
+    it("refuses because losing the other would leave no way back", async () => {
+      const heads = new InMemoryHeads();
+      heads.heads.set(
+        USER,
+        headsWith(
+          fact({
+            identifierId: "idf_passkey_a",
+            provider: "passkey",
+            value: "cred_a",
+            domain: null,
+          }),
+          fact({
+            identifierId: "idf_passkey_b",
+            provider: "passkey",
+            value: "cred_b",
+            domain: null,
+          }),
+        ),
+      );
+
+      // Two passkeys and no verified email: removing one leaves a way IN but
+      // no address anybody could be recovered through.
+      await expect(detach(heads, "idf_passkey_a")).rejects.toMatchObject({
+        code: "identity_detach_strands_user",
+      });
+    });
+
+    /** @scenario "Removal follows the same guards as every other identifier" */
+    it("allows the removal once a verified email is there to recover through", async () => {
+      const heads = new InMemoryHeads();
+      heads.heads.set(
+        USER,
+        headsWith(
+          fact({
+            identifierId: "idf_passkey_a",
+            provider: "passkey",
+            value: "cred_a",
+            domain: null,
+          }),
+          fact({ identifierId: "idf_email", provider: "email" }),
+        ),
+      );
+
+      expect(await detach(heads, "idf_passkey_a")).toEqual([
+        {
+          type: IDENTIFIER_DETACHED_EVENT_TYPE,
+          data: { identifierId: "idf_passkey_a", actor: ACTOR },
+        },
+      ]);
+    });
+
+    it("does not refuse an unverified identifier, which strands nobody", async () => {
+      const heads = new InMemoryHeads();
+      heads.heads.set(
+        USER,
+        headsWith(
+          fact({
+            identifierId: "idf_unverified",
+            provider: "email",
+            state: "ATTACHED",
+            verifiedAtMs: null,
+          }),
+        ),
+      );
+
+      // Nobody could have signed in with it, so removing it takes nothing
+      // away — the guard is about ways IN, not about rows.
+      expect(await detach(heads, "idf_unverified")).toHaveLength(1);
     });
   });
 });

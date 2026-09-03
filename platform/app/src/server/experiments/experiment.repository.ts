@@ -366,8 +366,30 @@ export class ExperimentRepository {
         autoSaved: true,
       },
       select: { id: true },
+      orderBy: { counterVersion: "desc" },
+    });
+  }
+
+  /**
+   * The highest number the experiment's numbered versions hold, or 0 when it
+   * has none. The next numbered write takes one more than this, which is what
+   * makes the numbers a reader sees run 1, 2, 3 with no gaps.
+   */
+  async findMaxNumberedVersion(
+    input: { projectId: string; experimentId: string },
+    options?: { tx?: Prisma.TransactionClient },
+  ): Promise<number> {
+    const client = options?.tx ?? this.prisma;
+    const highest = await client.experimentVersion.findFirst({
+      where: {
+        projectId: input.projectId,
+        experimentId: input.experimentId,
+        autoSaved: false,
+      },
+      select: { version: true },
       orderBy: { version: "desc" },
     });
+    return highest?.version ?? 0;
   }
 
   async createVersion(
@@ -397,34 +419,49 @@ export class ExperimentRepository {
     projectId: string;
     experimentId: string;
     version: number;
-  }): Promise<{ version: number; state: Prisma.JsonValue } | null> {
+  }): Promise<{
+    version: number;
+    autoSaved: boolean;
+    state: Prisma.JsonValue;
+  } | null> {
     return await this.prisma.experimentVersion.findFirst({
       where: {
         projectId: input.projectId,
         experimentId: input.experimentId,
         version: input.version,
       },
-      select: { version: true, state: true },
+      select: { version: true, autoSaved: true, state: true },
     });
   }
 
-  /** Version list, newest first. `beforeVersion` pages backwards through it. */
+  /**
+   * Version list, newest content first. The order is `counterVersion`, not
+   * `version`: the rolling autosave row is rewritten in place and keeps the
+   * number it was last written at, while a numbered row takes the next number
+   * in its own sequence, so only the counter says which row is newer.
+   *
+   * `beforeCounterVersion` pages backwards through the same order.
+   */
   async findVersions(
     input: {
       projectId: string;
       experimentId: string;
       take: number;
-      beforeVersion?: number;
+      beforeCounterVersion?: number;
     },
     options?: { tx?: Prisma.TransactionClient },
   ): Promise<
     Array<{
       version: number;
+      counterVersion: number;
       autoSaved: boolean;
       commitMessage: string | null;
       authorId: string | null;
       authorLabel: string;
+      /** The run that wrote this version, when a run wrote it. */
+      runId: string | null;
       createdAt: Date;
+      updatedAt: Date;
     }>
   > {
     const client = options?.tx ?? this.prisma;
@@ -432,19 +469,22 @@ export class ExperimentRepository {
       where: {
         projectId: input.projectId,
         experimentId: input.experimentId,
-        ...(input.beforeVersion === undefined
+        ...(input.beforeCounterVersion === undefined
           ? {}
-          : { version: { lt: input.beforeVersion } }),
+          : { counterVersion: { lt: input.beforeCounterVersion } }),
       },
       select: {
         version: true,
+        counterVersion: true,
         autoSaved: true,
         commitMessage: true,
         authorId: true,
         authorLabel: true,
+        runId: true,
         createdAt: true,
+        updatedAt: true,
       },
-      orderBy: { version: "desc" },
+      orderBy: { counterVersion: "desc" },
       take: input.take,
     });
   }

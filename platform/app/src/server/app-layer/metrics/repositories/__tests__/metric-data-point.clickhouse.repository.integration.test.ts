@@ -354,11 +354,17 @@ describe("given a cumulative series long enough to span several rollup buckets",
       }).recomputeAffectedRollupsMany({ points: samples(countedSeriesId) });
     }, 60_000);
 
-    it("reads once for the successors and once for the affected buckets", async () => {
+    it("keeps its read count flat however many points the chunk holds", async () => {
       // The seek budget folds all twelve successor seeks into one statement
       // and every affected bucket into a second. Reading per point would make
       // this grow with the chunk instead.
-      expect(reads).toBe(2);
+      //
+      // The third is the wide predecessor pass. This series is new, so no
+      // bucket finds a predecessor in the near window and every one of them
+      // falls through to it — the common path under series churn, and one
+      // extra round trip whatever the chunk size. What matters here is that
+      // three does not become four when the chunk grows.
+      expect(reads).toBe(3);
     });
 
     it("still produces the same rollups as the uncounted chunk", async () => {

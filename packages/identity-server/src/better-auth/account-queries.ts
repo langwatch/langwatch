@@ -29,8 +29,18 @@ export interface AccountWhere {
 }
 
 export type AccountQuery =
-  /** findOAuthUser, findAccountByProviderId — the IdP callback's lookup. */
+  /** findAccountByKey, findAccountOwnerByKey — the IdP callback's lookup.
+   *  (Named `findAccountByProviderId` / `findOAuthUser` before 1.7.) */
   | { kind: "byProviderSubject"; providerId: string; accountId: string }
+  /** The same lookup with the user already named, which 1.7 issues when it
+   *  updates a user it has a row for. Served as the subject lookup, refined
+   *  to the user that was asked about. */
+  | {
+      kind: "byUserProviderSubject";
+      userId: string;
+      providerId: string;
+      accountId: string;
+    }
   /** The row better-auth already holds an id for (token refresh, delete). */
   | { kind: "byId"; id: string }
   | { kind: "byIds"; ids: string[] }
@@ -91,6 +101,56 @@ const operatorIsEnumerated = (clause: AccountWhere): boolean =>
     clause.operator?.toLowerCase() ?? "eq",
   );
 
+/**
+ * better-auth's `issuer`, inverted back to the `providerId` this branch keys
+ * on — or null when it cannot be.
+ *
+ * 1.7 re-keyed an account from `(providerId, accountId)` to
+ * `(issuer, accountId)`, and synthesises the issuer from the provider id for
+ * every provider that declares none of its own: `local:<id>` for local
+ * credentials, `local:oauth:<id>` for a social provider. `Identifier` stores
+ * the provider id verbatim and no issuer at all, so a query that names only
+ * the issuer is answerable exactly when the issuer is one of those two
+ * synthetic forms.
+ *
+ * A provider that brings its OWN issuer — a real enterprise OIDC issuer URL —
+ * is deliberately NOT derivable here, and must keep reaching the refusal
+ * below. Guessing a provider id from an issuer we never minted is the silent
+ * wrong answer this whole module exists to prevent: it would resolve one
+ * IdP's subject onto another IdP's user.
+ */
+const OAUTH_ISSUER_PREFIX = "local:oauth:";
+const LOCAL_ISSUER_PREFIX = "local:";
+
+/**
+ * The issuer better-auth 1.7 expects to see ON a row it is given back.
+ *
+ * `Identifier` stores no issuer — the provider id is its truth — so the
+ * branch mints the synthetic one 1.7 would have minted itself. Without it a
+ * credential row comes back failing 1.7's own `issuer = local:credential`
+ * filter, which reads to the customer as a wrong password rather than as a
+ * missing column.
+ */
+export const issuerForProviderId = (providerId: string): string =>
+  providerId === "credential"
+    ? `${LOCAL_ISSUER_PREFIX}${encodeURIComponent(providerId)}`
+    : `${OAUTH_ISSUER_PREFIX}${encodeURIComponent(providerId)}`;
+
+export const providerIdFromIssuer = (issuer: string): string | null => {
+  for (const prefix of [OAUTH_ISSUER_PREFIX, LOCAL_ISSUER_PREFIX]) {
+    if (issuer.startsWith(prefix)) {
+      const encoded = issuer.slice(prefix.length);
+      if (encoded.length === 0) return null;
+      try {
+        return decodeURIComponent(encoded);
+      } catch {
+        return null;
+      }
+    }
+  }
+  return null;
+};
+
 const only = (where: readonly AccountWhere[], ...fields: string[]): boolean =>
   where.length === fields.length &&
   fields.every((field) =>
@@ -133,6 +193,34 @@ export function parseAccountQuery({
     const providerId = valueOf(where, "providerId");
     if (typeof accountId === "string" && typeof providerId === "string") {
       return { kind: "byProviderSubject", providerId, accountId };
+    }
+  }
+  // better-auth 1.7's account key. The issuer stands in for the provider id
+  // it was minted from; a `providerId` clause beside it is the same fact said
+  // twice, and is preferred verbatim when present rather than derived.
+  if (only(where, "accountId", "issuer")) {
+    const accountId = valueOf(where, "accountId");
+    const issuer = valueOf(where, "issuer");
+    if (typeof accountId === "string" && typeof issuer === "string") {
+      const providerId = providerIdFromIssuer(issuer);
+      if (providerId !== null) {
+        return { kind: "byProviderSubject", providerId, accountId };
+      }
+    }
+  }
+  if (only(where, "accountId", "issuer", "providerId", "userId")) {
+    const accountId = valueOf(where, "accountId");
+    const providerId = valueOf(where, "providerId");
+    const userId = valueOf(where, "userId");
+    if (
+      typeof accountId === "string" &&
+      typeof providerId === "string" &&
+      typeof userId === "string"
+    ) {
+      // `userId` is a refinement, not decoration: the pair below is unique,
+      // but answering a query that named a user with another user's row is
+      // the cross-tenant miss this module refuses to make.
+      return { kind: "byUserProviderSubject", userId, providerId, accountId };
     }
   }
   if (onlyIdIn(where)) {

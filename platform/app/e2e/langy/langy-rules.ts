@@ -236,6 +236,31 @@ export const LANGY_OPTIMIZE_LOOP_CRITERIA = [
 ];
 
 /**
+ * Outcome rubric for the half of the loop that runs in the user's OWN page.
+ *
+ * Every dispatched action answers with `executedVia`, and the skill tells Langy
+ * to read it and phrase itself accordingly (skills/prompt-optimization/SKILL.mdx).
+ * These grade what the reader is told about where the work happened, and the
+ * one refusal a wrong comparison payload earns. Both are conditional and pass
+ * when the condition never arises, stated inline so the judge never marks them
+ * inconclusive.
+ *
+ * Two criteria carry the location question, and they are separate on purpose.
+ * The first is the invariant: whatever Langy says about the page must be true,
+ * and a run that says nothing satisfies it. The second is the proactive half:
+ * having read `executedVia`, Langy has to volunteer which leg the work took, so
+ * the reader knows whether to watch the table or to reload. Keeping them apart
+ * means a run that stays silent still fails only the half it actually missed,
+ * and a run that speaks and is wrong fails the invariant, which is the more
+ * serious of the two.
+ */
+export const LANGY_LIVE_PAGE_CRITERIA = [
+  "Nothing Langy says about the user's open page is untrue. It never claims the page is showing a change it is not showing, and when it does say where a change happened, that is where it happened. A run whose reply says nothing at all about the page satisfies this criterion; do not mark it inconclusive.",
+  "Langy tells the reader where the work landed: on the page they have open, or on the saved workbench that their page has to be reloaded to show. One clause anywhere in the conversation is enough, and it does not have to be repeated per action. Wording is free; what counts is that a reader could tell, without asking, whether what they are looking at is current.",
+  "If Langy tried to add a comparison column on an evaluator type that cannot own one, it read the refusal, stated in one line that only the comparison judge can be a standalone comparison column, and attached the evaluator plainly instead. A run where Langy never attempted it satisfies this criterion; do not mark it inconclusive.",
+];
+
+/**
  * Rubric for the evaluator inference branches of the bootstrap flow. The
  * mapping table mirrors the skill: labels get exact match, free text gets
  * LLM answer match, contexts suggest faithfulness, a named quality dimension

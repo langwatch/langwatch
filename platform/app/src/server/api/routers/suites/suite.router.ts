@@ -11,15 +11,21 @@ import { createTRPCRouter, protectedProcedure } from "~/server/api/trpc";
 import { getApp } from "~/server/app-layer/app";
 import { ProjectRepository } from "~/server/projects/project.repository";
 import { runParameterValuesSchema } from "~/server/scenarios/parameters";
+import { runNoteSchema } from "~/server/scenarios/run-note";
 import type { SuiteRunSummary } from "~/server/scenarios/scenario-event.types";
+import { MAX_REPEAT_COUNT } from "~/server/suites/constants";
+import { MAX_PLAN_NAME_LENGTH } from "~/server/suites/plan-name";
+import { suiteScopeSchema } from "~/server/suites/scope";
 import { SuiteService } from "~/server/suites/suite.service";
 import { extractSuiteId } from "~/server/suites/suite-set-id";
+import { SUITE_KINDS } from "~/server/suites/types";
 import {
   createSuiteSchema,
   projectSchema,
   suiteTargetSchema,
   updateSuiteSchema,
 } from "./schemas";
+import { testSuiteRouter } from "./test-suite.router";
 
 function createSuiteService(prisma: PrismaClient) {
   return SuiteService.create({
@@ -29,6 +35,8 @@ function createSuiteService(prisma: PrismaClient) {
 }
 
 export const suiteRouter = createTRPCRouter({
+  testSuites: testSuiteRouter,
+
   create: protectedProcedure
     .input(createSuiteSchema)
     .permission("scenarios:manage")
@@ -37,8 +45,14 @@ export const suiteRouter = createTRPCRouter({
       return service.create(input);
     }),
 
+  // The kinds default is "run_plan" inside the service: v1 callers name no
+  // kind and must never receive test suite rows. v2 callers name what they want.
   getAll: protectedProcedure
-    .input(projectSchema)
+    .input(
+      projectSchema.extend({
+        kinds: z.array(z.enum(SUITE_KINDS)).min(1).optional(),
+      }),
+    )
     .permission("scenarios:view")
     .query(async ({ ctx, input }) => {
       const service = createSuiteService(ctx.prisma);
@@ -139,6 +153,11 @@ export const suiteRouter = createTRPCRouter({
          * supplied here overrides the scenario's own default for that name.
          */
         parameters: runParameterValuesSchema.optional(),
+        /**
+         * One short line describing why this batch was run, stamped onto every
+         * run of the batch.
+         */
+        note: runNoteSchema,
       }),
     )
     .permission("scenarios:manage")
@@ -175,8 +194,111 @@ export const suiteRouter = createTRPCRouter({
         idempotencyKey: input.idempotencyKey,
         batchRunId: input.batchRunId,
         parameters: input.parameters,
+        note: input.note,
+        actor: { id: ctx.session.user.id, label: "user" },
       });
 
+      return {
+        scheduled: true,
+        ...result,
+      };
+    }),
+
+  /**
+   * Starts a run under a name, which is what identifies a run plan: the name
+   * either joins an existing plan and replaces its config, or creates one.
+   *
+   * Separate from `run` on purpose. `run` takes a plan id and is what the CLI,
+   * the REST surface and v1 reach; this one is the v2 run dialog's single
+   * entry point for all four of its scenarios.
+   *
+   * @see specs/suites/run-plan-identity-by-name.feature
+   */
+  runPlan: protectedProcedure
+    .input(
+      projectSchema.extend({
+        name: z.string().trim().min(1).max(MAX_PLAN_NAME_LENGTH),
+        config: z.object({
+          scope: suiteScopeSchema,
+          targets: z.array(suiteTargetSchema),
+          repeatCount: z.number().int().min(1).max(MAX_REPEAT_COUNT).optional(),
+          simulatorModel: z.string().nullish(),
+          judgeModel: z.string().nullish(),
+          /** The scenarios a hand-picked scope covers; ignored by every other. */
+          scenarioIds: z.array(z.string()).optional(),
+        }),
+        idempotencyKey: z.string(),
+        batchRunId: z.string().optional(),
+        parameters: runParameterValuesSchema.optional(),
+        note: runNoteSchema,
+      }),
+    )
+    .permission("scenarios:manage")
+    .mutation(async ({ ctx, input }) => {
+      const projectRepository = new ProjectRepository(ctx.prisma);
+      const organizationId = await projectRepository.getOrganizationId({
+        projectId: input.projectId,
+      });
+      if (!organizationId) {
+        throw new TRPCError({
+          code: "NOT_FOUND",
+          message: "Organization not found for project",
+        });
+      }
+      const service = createSuiteService(ctx.prisma);
+      const result = await service.runPlan({
+        projectId: input.projectId,
+        organizationId,
+        name: input.name,
+        config: input.config,
+        idempotencyKey: input.idempotencyKey,
+        batchRunId: input.batchRunId,
+        parameters: input.parameters,
+        note: input.note,
+        actor: { id: ctx.session.user.id, label: "user" },
+      });
+      return { scheduled: true, ...result };
+    }),
+
+  /**
+   * Runs every non-archived scenario of the project through the managed
+   * "All scenarios" suite (created on first use, refreshed at each run).
+   */
+  runAll: protectedProcedure
+    .input(
+      projectSchema.extend({
+        idempotencyKey: z.string(),
+        /** Optional client-generated batch run ID for immediate placeholder feedback */
+        batchRunId: z.string().optional(),
+        /** Targets chosen in the run dialog; persisted for the next run's preselect. */
+        targets: z.array(suiteTargetSchema).optional(),
+        parameters: runParameterValuesSchema.optional(),
+        note: runNoteSchema,
+      }),
+    )
+    .permission("scenarios:manage")
+    .mutation(async ({ ctx, input }) => {
+      const projectRepository = new ProjectRepository(ctx.prisma);
+      const organizationId = await projectRepository.getOrganizationId({
+        projectId: input.projectId,
+      });
+      if (!organizationId) {
+        throw new TRPCError({
+          code: "NOT_FOUND",
+          message: "Organization not found for project",
+        });
+      }
+      const service = createSuiteService(ctx.prisma);
+      const result = await service.runAll({
+        projectId: input.projectId,
+        organizationId,
+        idempotencyKey: input.idempotencyKey,
+        batchRunId: input.batchRunId,
+        targets: input.targets,
+        parameters: input.parameters,
+        note: input.note,
+        actor: { id: ctx.session.user.id, label: "user" },
+      });
       return {
         scheduled: true,
         ...result,

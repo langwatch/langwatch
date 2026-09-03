@@ -19,7 +19,7 @@ export const queueRunCommandDataSchema = z.object({
   /** Target for execution. Used by the process manager's execute intent to spawn the right adapter. */
   target: z
     .object({
-      type: z.enum(["prompt", "http", "code", "workflow"]),
+      type: z.enum(["prompt", "http", "code", "workflow", "connected"]),
       referenceId: z.string(),
     })
     .optional(),

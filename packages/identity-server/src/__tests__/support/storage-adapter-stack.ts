@@ -229,6 +229,7 @@ export function identityStack({
           accountId: null,
           provider: "email",
           providerId: null,
+          issuer: null,
           providerAccountId: null,
           value: email,
           occurredAtMs: createdAtMs,

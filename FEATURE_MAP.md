@@ -14,7 +14,7 @@ Near-complete coverage landed across three PRs:
 ```
 observability/       — Tracing, Analytics, User Events, Annotations
 evaluations/         — Experiments, Online Evaluation (guardrails via as_guardrail=True)
-agent-simulations/   — Scenarios, Runs, Suites
+agent-simulations/   — Scenarios, Runs, Test Suites, Run Plans
 prompt-management/   — Prompts, Prompt Playground
 library/             — Agents, Workflows, Evaluators, Datasets
 dashboards/          — Custom analytics dashboards
@@ -71,12 +71,13 @@ Legend: ✅ present · — absent · `—` no SDK/CLI/skill/MCP by design
 | **Agent Simulations** | | | | | | | | | | |
 | Scenarios | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ |
 | Runs | — | ✅ | ✅ | ✅ | — | ✅ | ✅ | — | ✅ | ✅ |
-| Suites (Run Plans) | ✅ | ✅ | — | ✅ | — | ✅ | ✅ | — | ✅ | — |
+| Test Suites | ✅ | ✅ | — | ✅ | — | ✅ | ✅ | — | ✅ | — |
+| Run Plans | ✅ | ✅ | — | ✅ | — | ✅ | ✅ | — | ✅ | — |
 | **Prompt Management** | | | | | | | | | | |
 | Prompts | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | — | ✅ | ✅ |
 | Prompt Playground | — | — | — | — | — | ✅ | — | — | ✅ | ✅ |
 | **Library** | | | | | | | | | | |
-| Agents | ✅ | ✅ | — | ✅ | — | ✅ | ✅ | — | ✅ | — |
+| Agents | ✅ | ✅ | — | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ |
 | Workflows | ✅ | ✅ | — | ✅ | — | ✅ | ✅ | — | ✅ | ✅ |
 | Evaluators | ✅ | ✅ | — | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ |
 | Datasets | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | — | ✅ | ✅ |
@@ -114,7 +115,7 @@ Legend: ✅ present · — absent · `—` no SDK/CLI/skill/MCP by design
   - The organization-scoped families (everything above except Teams) need an Enterprise plan, and answer `402 enterprise_plan_required` on any plan below it. Teams is ungated.
   - `langwatch organizations create|list|get` is a separate, plan-ungated family. It provisions organizations on a **self-hosted** instance and authenticates with the instance administrator credential (`LANGWATCH_INSTANCE_ADMIN_API_KEY`) rather than an organization API key, so it answers `404` wherever that credential is unset and on LangWatch Cloud, where the family does not exist at all. It is listed under Organization because it addresses the same resource.
 - **Skills (platform side)** — Only `analytics`, `scenarios`, and `evaluators` have dedicated platform-side skills. Most features use shared platform skill conventions through MCP tools directly.
-- **Docs**: The column tracks the feature's canonical guide page, not its API reference: every REST family gets generated reference pages under `docs/api-reference/`, so counting those would make the column say `✅` everywhere and measure nothing. A handful of features (agents, suites, dashboards, triggers, secrets, model defaults) still lack canonical public docs pages, as do the organization management features.
+- **Docs**: The column tracks the feature's canonical guide page, not its API reference: every REST family gets generated reference pages under `docs/api-reference/`, so counting those would make the column say `✅` everywhere and measure nothing. A handful of features (suites, dashboards, triggers, secrets, model defaults) still lack canonical public docs pages, as do the organization management features.
 - **CLI hints** — `surfaces.code.hints` is an optional per-command map (`"trace search" → example invocation`) on the agent-critical groups. It powers the CLI's machine-readable catalog (`langwatch commands`) and compact help tree (`langwatch help-tree`); additive only, consumers that don't know it ignore it.
 
 ## Where to Find Things
@@ -145,9 +146,9 @@ Legend: ✅ present · — absent · `—` no SDK/CLI/skill/MCP by design
 - **Scenario SDK** — separate: `@langwatch/scenario` / `langwatch-scenario`
 
 ### Skills
-- **Feature skills** — `skills/{tracing,evaluations,scenarios,prompts}/SKILL.md`
-- **Cross-cutting** — `skills/{analytics,datasets}/SKILL.md`
-- **Meta** — `skills/level-up/SKILL.md` (orchestrates the feature skills)
+- **Feature skills** — `skills/{tracing,evaluations,scenarios,prompts}/SKILL.mdx`
+- **Cross-cutting** — `skills/{analytics,datasets}/SKILL.mdx`
+- **Meta** — `skills/level-up/SKILL.mdx` (orchestrates the feature skills)
 - **Recipes** — `skills/recipes/{debug-instrumentation,improve-setup,test-cli-usability,evaluate-multimodal,generate-rag-dataset,test-compliance}`
 
 ### Documentation
@@ -162,7 +163,7 @@ Validation checklist:
 
 - Every `api` value corresponds to a route in `platform/app/src/app/api/` or `platform/app/src/pages/api/`
 - Every `mcp` tool name appears in `mcp/typescript/src/index.ts`
-- Every `skill` name has a `skills/{name}/SKILL.md`
+- Every `skill` name has a `skills/{name}/SKILL.mdx`
 - Every `cli` command exists in `sdks/typescript/src/cli/`
 - Every `ui` route exists in `platform/app/src/utils/routes.ts`
 - No aspirational entries — use `plannedSync` for future intent
