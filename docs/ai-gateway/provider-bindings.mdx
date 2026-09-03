@@ -1,6 +1,6 @@
 ---
 title: Gateway provider settings
-description: Gateway-specific settings (rate limits, fallback priority, provider config overrides) now live on each ModelProvider's Advanced tab.
+description: Gateway-specific settings (fallback priority, provider config overrides) now live on each ModelProvider's Advanced tab.
 sidebarTitle: Gateway provider settings
 ---
 
@@ -14,7 +14,7 @@ There is no separate gateway-binding entity to create, list, edit, or disable. O
 
 The old binding model had two rows per logical credential: a `ModelProvider` (where the API key lived) and a `GatewayProviderCredential` (where gateway-only metadata like RPM, RPD, slot, fallback priority lived). The split forced operators to navigate two pages, remember which fields belonged where, and pay the cognitive cost of "slot" labels that only mattered for VK fallback-chain composition.
 
-Folding the gateway-specific fields onto the ModelProvider itself collapses the surface to a single editable record. The rest of the system (VKs, routing policies, traces) refers to ModelProviders by id; nothing references a separate binding row.
+Folding the gateway-specific fields onto the ModelProvider itself collapses the surface to a single editable record. The rest of the system (VKs, routing policies, traces) refers to ModelProviders by id, and no part of it references a separate binding row.
 
 ## What replaced the binding
 
@@ -23,7 +23,7 @@ Folding the gateway-specific fields onto the ModelProvider itself collapses the 
 | `GatewayProviderCredential` row | (deleted, fields folded onto `ModelProvider`) |
 | Bound to a project | Lives at any of `ORGANIZATION`, `TEAM`, `PROJECT` scope (see [Scope](#scope)) |
 | `slot` (free-form label) | Removed. VKs now reference ModelProviders by id directly; the routing policy carries the ordered list |
-| `rate_limit.rpm`, `.tpm`, `.rpd` | Same fields, now on **ModelProvider → Advanced (Gateway)** tab |
+| `rate_limit.rpm`, `.tpm`, `.rpd` | The same inputs are on the **ModelProvider → Advanced (Gateway)** tab. The gateway does not read them. See [Rate limits](/ai-gateway/rate-limits) for the limits it does enforce |
 | `fallback_priority_global` | Same field, on the Advanced tab. Default-policy ordering uses this then `createdAt` |
 | `provider_credential_id` (VK reference) | VKs reference `model_provider_id` directly |
 
@@ -34,7 +34,7 @@ For the new wire shape of the bundle a VK resolves to, see the [`/config/:vk_id`
 1. Open **Settings → Model Providers**.
 2. Pick (or create) the provider you want gateway traffic to use.
 3. Switch to the **Advanced (Gateway)** tab inside the editor drawer.
-4. Fill in the gateway-only fields (RPM / TPM / RPD / fallback priority / providerConfig JSON overrides). The provider credential itself (API key, region, endpoint) stays on the **Basic** tab and is reused by both the gateway and the rest of LangWatch.
+4. Fill in the gateway-only fields (fallback priority, providerConfig JSON overrides). The provider credential itself (API key, region, endpoint) stays on the **Basic** tab and is reused by both the gateway and the rest of LangWatch.
 5. Save. The new settings reach the gateway within ~30 s via the `/changes` long-poll.
 
 ## Scope
@@ -51,17 +51,9 @@ A VK's eligible-provider set is the union of every ModelProvider whose scope is 
 
 ## Fields on the Advanced (Gateway) tab
 
-### Rate limit: RPM
+### Rate limits (RPM, TPM, RPD)
 
-**R**equests **p**er **m**inute the gateway dispatches through this ModelProvider before returning `429 rate_limit_exceeded`. Independent of any VK-level rate limit; combines via token-bucket cross-dimension accounting.
-
-### Rate limit: TPM
-
-**T**okens **p**er **m**inute. Stored in v1, enforcement waits on the streaming-usage accumulator (v1.1).
-
-### Rate limit: RPD
-
-**R**equests **p**er **d**ay rolling window.
+The tab has an input for each of the three, and the value you save is stored on the row. The gateway does not enforce any of them: the config bundle it reads carries no rate limit on a provider, and its limiter counts requests per virtual key. Set a ceiling on the key instead. See [Rate limits](/ai-gateway/rate-limits).
 
 ### Fallback priority (global)
 
@@ -84,4 +76,4 @@ Create a second ModelProvider row of the same family (e.g. two OpenAI rows for `
 - [Virtual keys](/ai-gateway/virtual-keys): multi-scope semantics and how a VK's eligible-provider set is computed.
 - [Concepts](/ai-gateway/concepts): mental model for the gateway primitives.
 - [RBAC](/ai-gateway/rbac): `modelProviders:manage` gates the Advanced tab; the old `gatewayProviders:*` resource is retired.
-- [Rate limits](/ai-gateway/rate-limits): RPM/RPD/TPM dimension model.
+- [Rate limits](/ai-gateway/rate-limits): RPM and RPD on a virtual key, which is where the gateway enforces them.
