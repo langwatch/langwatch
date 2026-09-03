@@ -9,6 +9,11 @@
  * worked. This is the way out of that, and the reason it is safe to expose
  * with no proof beyond the session is the one refusal asserted below — it can
  * fill an empty slot and never replace a full one.
+ *
+ * What the ROUTER decides is asserted here: the policy, the provider gate, the
+ * session it is willing to spare, and the refusal it turns into a transport
+ * code. Writing the hash, creating the row and ending the other sessions are
+ * `CredentialAccountService`'s, and its own test drives them over fakes.
  */
 
 import { beforeEach, describe, expect, it, vi } from "vitest";
@@ -29,51 +34,47 @@ vi.mock("@ee/audit-log/auditLog", () => ({
   auditLog: vi.fn().mockResolvedValue(undefined),
 }));
 
-const { resolveAuthProviderMock, revokeOtherSessionsMock } = vi.hoisted(() => ({
+const { resolveAuthProviderMock, setFirstPasswordMock } = vi.hoisted(() => ({
   resolveAuthProviderMock: vi.fn(),
-  revokeOtherSessionsMock: vi.fn(),
+  setFirstPasswordMock: vi.fn(),
 }));
 vi.mock("@ee/sso/sso-gate", () => ({
   resolveAuthProvider: resolveAuthProviderMock,
 }));
-// Only the revocation factory is replaced: the router reads the rest of the
-// identity runtime for sign-up identifiers and verification.
+// Only the credential-account factory is replaced: the router reads the rest
+// of the identity runtime for sign-up verification.
 vi.mock("~/server/app-layer/identity/runtime", async (importOriginal) => ({
   ...(await importOriginal<
     typeof import("~/server/app-layer/identity/runtime")
   >()),
-  sessionRevocation: () => ({ revokeOthers: revokeOtherSessionsMock }),
+  credentialAccounts: () => ({ setFirstPassword: setFirstPasswordMock }),
 }));
 
 describe("userRouter.setPassword", () => {
-  let accountFindFirst: ReturnType<typeof vi.fn>;
-  let accountUpdate: ReturnType<typeof vi.fn>;
-  let accountCreate: ReturnType<typeof vi.fn>;
-
   beforeEach(() => {
     vi.clearAllMocks();
     resolveAuthProviderMock.mockResolvedValue("email");
-    revokeOtherSessionsMock.mockResolvedValue(void 0);
-    accountFindFirst = vi.fn().mockResolvedValue(null);
-    accountUpdate = vi.fn().mockResolvedValue({});
-    accountCreate = vi.fn().mockResolvedValue({});
+    setFirstPasswordMock.mockResolvedValue("set");
   });
 
-  const createCaller = () => {
+  const createCaller = ({
+    impersonating = false,
+  }: {
+    impersonating?: boolean;
+  } = {}) => {
     const ctx = createInnerTRPCContext({
       session: {
-        user: { id: "user-1", email: "sam@acme.com" },
+        user: {
+          id: "user-1",
+          email: "sam@acme.com",
+          ...(impersonating
+            ? { impersonator: { id: "operator-1", email: "ops@acme.com" } }
+            : {}),
+        },
         sessionId: "sess-1",
         expires: "2099-01-01",
       },
     });
-    (ctx as any).prisma = {
-      account: {
-        findFirst: accountFindFirst,
-        update: accountUpdate,
-        create: accountCreate,
-      },
-    };
     return userRouter.createCaller(ctx);
   };
 
@@ -82,45 +83,35 @@ describe("userRouter.setPassword", () => {
 
   describe("given an account created by a passkey, holding no password", () => {
     /** @scenario An account with no password can set a first one */
-    it("fills the empty credential row rather than asking for a current password", async () => {
-      accountFindFirst.mockResolvedValue({ id: "acc-1", password: null });
-
+    it("hands the typed password to the credential service and reports success", async () => {
       await expect(call()).resolves.toMatchObject({ success: true });
 
-      expect(accountUpdate).toHaveBeenCalledWith(
-        expect.objectContaining({ where: { id: "acc-1" } }),
-      );
-      // Hashed, never the plaintext that was typed.
-      const written = accountUpdate.mock.calls[0]?.[0].data.password as string;
-      expect(written).not.toBe("a-good-password");
-      expect(written.startsWith("$2")).toBe(true);
-    });
-
-    it("creates the credential row where an older account has none", async () => {
-      accountFindFirst.mockResolvedValue(null);
-
-      await expect(call()).resolves.toMatchObject({ success: true });
-
-      // The row is what password reset updates in place, so recovery cannot
-      // work until it exists.
-      expect(accountCreate).toHaveBeenCalledWith(
+      expect(setFirstPasswordMock).toHaveBeenCalledWith(
         expect.objectContaining({
-          data: expect.objectContaining({
-            userId: "user-1",
-            provider: "credential",
-          }),
+          userId: "user-1",
+          password: "a-good-password",
         }),
       );
     });
 
     /** @scenario A new password ends every other session */
-    it("ends every other session, because a password outlives revoking one", async () => {
-      accountFindFirst.mockResolvedValue({ id: "acc-1", password: null });
-
+    it("names the tab that is asking as the one session to spare", async () => {
       await call();
 
-      expect(revokeOtherSessionsMock).toHaveBeenCalledWith(
-        expect.objectContaining({ userId: "user-1", keepSessionId: "sess-1" }),
+      expect(setFirstPasswordMock).toHaveBeenCalledWith(
+        expect.objectContaining({ keepSessionId: "sess-1" }),
+      );
+    });
+
+    it("spares nothing while an operator is impersonating", async () => {
+      // The session id in hand is the operator's, so sparing it would sign the
+      // subject out of every device and leave the operator's tab open.
+      await createCaller({ impersonating: true }).setPassword({
+        password: "a-good-password",
+      });
+
+      expect(setFirstPasswordMock).toHaveBeenCalledWith(
+        expect.objectContaining({ keepSessionId: null }),
       );
     });
   });
@@ -132,13 +123,13 @@ describe("userRouter.setPassword", () => {
      * session into a credential that survives the session being revoked.
      */
     /** @scenario Setting a password can never overwrite one */
-    it("refuses, and writes nothing", async () => {
-      accountFindFirst.mockResolvedValue({ id: "acc-1", password: "$2b$10$x" });
+    it("refuses, in the words the screen shows", async () => {
+      setFirstPasswordMock.mockResolvedValue("already_has_password");
 
-      await expect(call()).rejects.toMatchObject({ code: "BAD_REQUEST" });
-      expect(accountUpdate).not.toHaveBeenCalled();
-      expect(accountCreate).not.toHaveBeenCalled();
-      expect(revokeOtherSessionsMock).not.toHaveBeenCalled();
+      await expect(call()).rejects.toMatchObject({
+        code: "BAD_REQUEST",
+        message: expect.stringContaining("already has a password"),
+      });
     });
   });
 
@@ -148,7 +139,7 @@ describe("userRouter.setPassword", () => {
         // The policy check runs before anything is read or written.
         message: expect.stringContaining("8"),
       });
-      expect(accountFindFirst).not.toHaveBeenCalled();
+      expect(setFirstPasswordMock).not.toHaveBeenCalled();
     });
   });
 
@@ -157,7 +148,7 @@ describe("userRouter.setPassword", () => {
       resolveAuthProviderMock.mockResolvedValue("auth0");
 
       await expect(call()).rejects.toMatchObject({ code: "BAD_REQUEST" });
-      expect(accountFindFirst).not.toHaveBeenCalled();
+      expect(setFirstPasswordMock).not.toHaveBeenCalled();
     });
   });
 });

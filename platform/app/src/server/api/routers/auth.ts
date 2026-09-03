@@ -230,13 +230,19 @@ export const authRouter = createTRPCRouter({
         "reads the session user's own address confirmation state; no tenant scope is involved and no other account is reachable",
     })
     .query(async ({ ctx }) => {
-      const row = await ctx.prisma.user.findUnique({
-        where: { id: ctx.session.user.id },
-        select: { email: true, emailVerified: true },
-      });
+      // The address comes off the session rather than from a second read of
+      // the row the session was built from, and its state comes from the one
+      // service that decides what an address already is — the same answer
+      // sign-up reads, so the nudge and the sign-up screen cannot disagree
+      // about whether somebody has confirmed themselves. A session carrying
+      // no address has nothing to confirm.
+      const email = ctx.session.user.email ?? null;
+      if (!email) return { email: null, confirmed: false };
+
       return {
-        email: row?.email ?? null,
-        confirmed: Boolean(row?.emailVerified),
+        email,
+        confirmed:
+          (await signUpVerification().addressState({ email })) === "confirmed",
       };
     }),
 

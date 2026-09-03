@@ -48,6 +48,7 @@ import {
   IdentityCeremonies,
   MfaCeremonies,
 } from "@langwatch/identity-server/better-auth";
+import { compare, hash } from "bcrypt";
 import type { BetterAuthOptions } from "better-auth";
 import type { AdapterFactory } from "better-auth/adapters";
 import { prismaAdapter } from "better-auth/adapters/prisma";
@@ -56,6 +57,7 @@ import {
   OrganizationUserRole,
   type PrismaClient,
 } from "~/generated/prisma/client";
+import { changeAuth0Password } from "../../auth0/passwordService";
 import {
   BORN_FINALIZED_SIGNUP_FLAG,
   BornFinalizedOptIn,
@@ -71,10 +73,7 @@ import { featureFlagService } from "../../featureFlag";
 import { NOT_TARGETED } from "../../featureFlag/targeting";
 import { sendAddressConfirmationEmail } from "../../mailer/addressConfirmationEmail";
 import { sendSignUpVerificationEmail } from "../../mailer/signUpVerificationEmail";
-import {
-  createCredentialUser,
-  createPasskeyUser,
-} from "../../users/credential-user";
+import { trackServerEvent } from "../../posthog";
 import { getApp } from "../app";
 import { grantsLedgerWriter } from "../authz/ledger";
 import { PrismaSystemMigrationStateRepository } from "../system-migrations/repositories/system-migration-state.prisma.repository";
@@ -87,6 +86,7 @@ import {
 } from "./break-glass-binding";
 import { InProcessBreakGlassLimiter } from "./break-glass-limiter";
 import { IdentitySsoConnectionGrandfatherMigration } from "./connection-grandfather.migration";
+import { CredentialAccountService } from "./credential-account.service";
 import { IdentityIdentifierBackfillMigration } from "./identifier-backfill.migration";
 import {
   EmailJoinRequestNotifier,
@@ -110,6 +110,7 @@ import {
   PrismaSessionFactors,
 } from "./organization-mfa-adapters";
 import { AdminEmailPlatformOperators } from "./platform-operators";
+import { PrismaCredentialAccountRepository } from "./repositories/credential-account.prisma.repository";
 import { PrismaIdentityAccountsRepository } from "./repositories/identity-accounts.prisma.repository";
 import { PrismaIdentityBackfillRepository } from "./repositories/identity-backfill.prisma.repository";
 import { PrismaIdentityHeadsRepository } from "./repositories/identity-heads.prisma.repository";
@@ -926,25 +927,18 @@ export function signUpVerification(): SignUpVerificationService {
         sendSignUpVerificationEmail({ email, verificationUrl }),
     },
     accounts: {
+      // Nobody has been asked for a name on this path: the person typed an
+      // address and a password into a log-in form, and the service writes the
+      // address in its place, the same as `user.register`. The credential
+      // identifier is stated by the same call — the front door reads the
+      // projection, so an account with no identifier is an account the door
+      // says does not exist, and this path's whole purpose is to hand somebody
+      // an account they can immediately sign in to.
       createCredentialAccount: async ({ email, passwordHash }) => {
-        // Nobody has been asked for a name on this path: the person typed an
-        // address and a password into a log-in form. The address stands in
-        // until onboarding offers to replace it, the same as `user.register`.
-        const created = await createCredentialUser({
-          prisma,
-          name: email,
+        await credentialAccounts().openCredentialAccount({
+          name: null,
           email,
           passwordHash,
-        });
-        // Stated here rather than left to the backfill: the front door reads
-        // the projection, so an account with no identifier is an account the
-        // door says does not exist — and this path's whole purpose is to hand
-        // somebody an account they can immediately sign in to.
-        await signUpIdentifier().attachCredentialIdentifier({
-          userId: created.id,
-          email,
-          accountId: created.accountId,
-          occurredAtMs: created.accountCreatedAt.getTime(),
         });
       },
       markAddressConfirmed: async ({ email }) => {
@@ -1084,7 +1078,8 @@ export function passkeySignUp(): PasskeySignUpRegistration {
   return new PasskeySignUpRegistration({
     directory: identityUsers,
     accounts: {
-      createPasskeyUser: ({ email }) => createPasskeyUser({ prisma, email }),
+      createPasskeyUser: ({ email }) =>
+        credentialAccounts().openPasskeyAccount({ email }),
     },
     verification: {
       requestVerification: ({ email }) =>
@@ -1121,4 +1116,63 @@ export function lastWayIn(): LastWayInService {
 /** The same answer, as the refusal better-auth's `before` hook raises. */
 export function lastWayInGuard(): LastWayInGuard {
   return new LastWayInGuard({ lastWayIn: lastWayIn() });
+}
+
+/**
+ * bcrypt's cost for every password the credential service writes.
+ *
+ * It was a literal at each of the three sites that wrote one — registering,
+ * setting a first password and changing one, all of them in the user router —
+ * so raising it meant finding all three, and a site that was missed would go
+ * on writing weaker hashes than the ones beside it with nothing to show for
+ * it. better-auth's own legacy-hash bridge still carries a copy; that module
+ * composes nothing through this root yet.
+ */
+const PASSWORD_HASH_ROUNDS = 10;
+
+/**
+ * An account's own credentials (ADR-129): opening one with a password or a
+ * passkey, listing and unlinking the ways in, and setting, changing or simply
+ * having a password.
+ *
+ * Composed per call like the write surfaces around it — the identifier attach
+ * it states goes through a ledger that resolves the pipeline handle lazily, so
+ * it must not be built at module load.
+ *
+ * bcrypt, Auth0's Management API and the analytics milestone arrive as
+ * closures for the same reason every other environment-facing dependency here
+ * does: the service states WHEN a password is hashed and WHO gets a sign-up
+ * counted, and this root states what does the hashing and the counting.
+ */
+export function credentialAccounts(): CredentialAccountService {
+  return new CredentialAccountService({
+    records: new PrismaCredentialAccountRepository(prisma),
+    // The one case-insensitive address lookup, shared with the identity
+    // guards rather than re-spelled for registration (ADR-129 rule 4).
+    directory: identityUsers,
+    passwords: {
+      hash: ({ password }) => hash(password, PASSWORD_HASH_ROUNDS),
+      matches: ({ password, hash: stored }) => compare(password, stored),
+    },
+    federated: {
+      changePassword: ({
+        email,
+        federatedUserId,
+        currentPassword,
+        newPassword,
+      }) =>
+        changeAuth0Password({
+          email,
+          auth0UserId: federatedUserId,
+          currentPassword,
+          newPassword,
+        }),
+    },
+    identifiers: signUpIdentifier(),
+    sessions: sessionRevocation(),
+    milestones: {
+      signedUp: ({ userId }) =>
+        trackServerEvent({ userId, event: "signed_up" }),
+    },
+  });
 }

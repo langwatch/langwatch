@@ -165,7 +165,7 @@ describe("identity service layering", () => {
       const offenders = offendersOf(AUTH_BOUNDARY_FILES, (_file, source) =>
         linesMatching(source, AUTH_ROW),
       );
-      expect(ratchet(offenders, ["server/api/routers/user.ts"])).toEqual(CLEAN);
+      expect(ratchet(offenders, [])).toEqual(CLEAN);
     });
   });
 
@@ -217,11 +217,9 @@ describe("identity service layering", () => {
       );
       expect(
         ratchet(offenders, [
-          "server/api/routers/user.ts",
           "server/app-layer/identity/runtime.ts",
           "server/app-layer/identity/sso-connection-backoffice.service.ts",
           "server/better-auth/hooks.ts",
-          "server/users/credential-user.ts",
         ]),
       ).toEqual(CLEAN);
     });

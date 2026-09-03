@@ -1,14 +1,20 @@
 /**
  * Unit tests for userRouter.register.
  *
- * Covers the PostHog signed_up milestone, and the ADR-027 provider coercion:
- * see specs/licensing/sso-license-gating.feature. The signup page registers
- * through this tRPC mutation (not better-auth's /sign-up/email), so the
- * email-mode coercion must apply here too: on a denied SSO-capable deployment
- * the resolved provider is "email" and registration must work, while a
- * licensed SSO deployment keeps refusing direct registration.
+ * Covers the ADR-027 provider coercion (see
+ * specs/licensing/sso-license-gating.feature) and the confirmation link the
+ * account-creating call sends. The signup page registers through this tRPC
+ * mutation (not better-auth's /sign-up/email), so the email-mode coercion must
+ * apply here too: on a denied SSO-capable deployment the resolved provider is
+ * "email" and registration must work, while a licensed SSO deployment keeps
+ * refusing direct registration.
+ *
+ * Opening the account itself — the duplicate-address refusal, the hash, the
+ * credential identifier and the sign-up milestone — is
+ * `CredentialAccountService`'s, and its own test drives them over fakes.
  */
 import { beforeEach, describe, expect, it, vi } from "vitest";
+import { EmailAlreadyRegisteredError } from "~/server/users/errors";
 import { createInnerTRPCContext } from "../../trpc";
 import { userRouter } from "../user";
 
@@ -16,14 +22,6 @@ import { userRouter } from "../user";
 // below, so the two can disagree and that is the point of the coercion tests.
 vi.mock("../../../../env.mjs", () => ({
   env: { NEXTAUTH_PROVIDER: "auth0", BASE_HOST: "http://localhost:5560" },
-}));
-
-const { mockTrackServerEvent } = vi.hoisted(() => ({
-  mockTrackServerEvent: vi.fn(),
-}));
-
-vi.mock("~/server/posthog", () => ({
-  trackServerEvent: mockTrackServerEvent,
 }));
 
 vi.mock("~/server/rateLimit", () => ({
@@ -49,20 +47,19 @@ const { resolveAuthProviderMock } = vi.hoisted(() => ({
 const { requestVerificationMock } = vi.hoisted(() => ({
   requestVerificationMock: vi.fn(),
 }));
-const { attachCredentialIdentifierMock } = vi.hoisted(() => ({
-  attachCredentialIdentifierMock: vi.fn(),
+const { registerMock } = vi.hoisted(() => ({
+  registerMock: vi.fn(),
 }));
 
-// The account-creating call is what sends the confirmation link, so the
-// service it sends through is the seam this suite drives. Its other two
-// methods answer "no proof was carried in", which is the plain sign-up path.
+// The account-creating call is what sends the confirmation link, so the two
+// services it drives are the seam this suite reads. The verification service's
+// other two methods answer "no proof was carried in", which is the plain
+// sign-up path.
 vi.mock("~/server/app-layer/identity/runtime", async (importOriginal) => ({
   ...(await importOriginal<
     typeof import("~/server/app-layer/identity/runtime")
   >()),
-  signUpIdentifier: () => ({
-    attachCredentialIdentifier: attachCredentialIdentifierMock,
-  }),
+  credentialAccounts: () => ({ register: registerMock }),
   signUpVerification: () => ({
     claimAddressProof: vi.fn().mockResolvedValue(null),
     markAddressConfirmed: vi.fn().mockResolvedValue(undefined),
@@ -86,64 +83,32 @@ vi.mock("../../rbac", async (importOriginal) => {
 });
 
 describe("userRouter.register()", () => {
-  let userFindFirstMock: ReturnType<typeof vi.fn>;
-  let userCreateMock: ReturnType<typeof vi.fn>;
-  let accountCreateMock: ReturnType<typeof vi.fn>;
-
   beforeEach(() => {
     vi.clearAllMocks();
-    userFindFirstMock = vi.fn().mockResolvedValue(null);
-    userCreateMock = vi
-      .fn()
-      .mockResolvedValue({ id: "user-1", name: "Alice", email: "a@x.com" });
-    accountCreateMock = vi.fn().mockResolvedValue({
-      id: "account-1",
-      createdAt: new Date("2026-08-28T00:00:00.000Z"),
-    });
+    registerMock.mockResolvedValue({ id: "user-1" });
     // Most cases here are the coerced/email-mode deployment; the licensed-SSO
     // case overrides this.
     resolveAuthProviderMock.mockResolvedValue("email");
-    attachCredentialIdentifierMock.mockResolvedValue(undefined);
     requestVerificationMock.mockResolvedValue(undefined);
   });
 
-  const createCaller = () => {
-    const ctx = createInnerTRPCContext({ session: null });
-    const prismaMock = {
-      user: { findFirst: userFindFirstMock, create: userCreateMock },
-      account: { create: accountCreateMock },
-      $transaction: vi.fn(
-        async (cb: (tx: unknown) => unknown) =>
-          await cb({
-            user: { create: userCreateMock },
-            account: { create: accountCreateMock },
-          }),
-      ),
-    };
-    (ctx as any).prisma = prismaMock;
-    return userRouter.createCaller(ctx);
-  };
+  const createCaller = () =>
+    userRouter.createCaller(createInnerTRPCContext({ session: null }));
 
   describe("when registration succeeds", () => {
-    /** @scenario Email-mode registration tracks the PostHog signed_up milestone exactly once */
-    it("tracks the signed_up analytics event with the new user id", async () => {
-      const result = await createCaller().register({
+    it("answers with the id of the account that was opened", async () => {
+      await expect(
+        createCaller().register({
+          name: "Alice",
+          email: "a@x.com",
+          password: "supersecret",
+        }),
+      ).resolves.toEqual({ id: "user-1" });
+
+      expect(registerMock).toHaveBeenCalledWith({
         name: "Alice",
         email: "a@x.com",
         password: "supersecret",
-      });
-
-      expect(result).toEqual({ id: "user-1" });
-      expect(mockTrackServerEvent).toHaveBeenCalledTimes(1);
-      expect(mockTrackServerEvent).toHaveBeenCalledWith({
-        userId: "user-1",
-        event: "signed_up",
-      });
-      expect(attachCredentialIdentifierMock).toHaveBeenCalledWith({
-        userId: "user-1",
-        email: "a@x.com",
-        accountId: "account-1",
-        occurredAtMs: new Date("2026-08-28T00:00:00.000Z").getTime(),
       });
     });
   });
@@ -155,49 +120,22 @@ describe("userRouter.register()", () => {
      * the customer is locked out with "User already exists" forever.
      */
     /** @scenario "A capitalised email creates an account sign-in can find" */
-    it("stores the canonically normalized address", async () => {
+    it("hands on the canonically normalized address", async () => {
       await createCaller().register({
         name: "Joel",
         email: "Joel.During@example.com",
         password: "supersecret",
       });
 
-      expect(userCreateMock).toHaveBeenCalledWith({
-        data: { name: "Joel", email: "joel.during@example.com" },
-      });
-      expect(attachCredentialIdentifierMock).toHaveBeenCalledWith({
-        userId: "user-1",
-        email: "joel.during@example.com",
-        accountId: "account-1",
-        occurredAtMs: new Date("2026-08-28T00:00:00.000Z").getTime(),
-      });
-    });
-
-    /** @scenario "A capitalised email creates an account sign-in can find" */
-    it("finds an existing account regardless of its stored casing", async () => {
-      userFindFirstMock.mockResolvedValue({ id: "user-1" });
-
-      await expect(
-        createCaller().register({
-          name: "Joel",
-          email: "Joel.During@example.com",
-          password: "supersecret",
-        }),
-      ).rejects.toMatchObject({ code: "CONFLICT" });
-
-      expect(userFindFirstMock).toHaveBeenCalledWith({
-        where: {
-          email: { equals: "joel.during@example.com", mode: "insensitive" },
-        },
-      });
-      expect(userCreateMock).not.toHaveBeenCalled();
+      expect(registerMock).toHaveBeenCalledWith(
+        expect.objectContaining({ email: "joel.during@example.com" }),
+      );
     });
   });
 
   describe("when the user already exists", () => {
-    /** @scenario A rejected registration tracks no PostHog signed_up milestone */
-    it("does not track signed_up", async () => {
-      userFindFirstMock.mockResolvedValue({ id: "user-1" });
+    it("surfaces the handled refusal the signup screen keys its recovery on", async () => {
+      registerMock.mockRejectedValue(new EmailAlreadyRegisteredError());
 
       // The refusal is the handled email_already_registered error (the signup
       // screen keys its recovery flow off this code), surfaced through tRPC
@@ -210,7 +148,7 @@ describe("userRouter.register()", () => {
         }),
       ).rejects.toMatchObject({ code: "CONFLICT" });
 
-      expect(mockTrackServerEvent).not.toHaveBeenCalled();
+      expect(requestVerificationMock).not.toHaveBeenCalled();
     });
   });
 
@@ -226,7 +164,7 @@ describe("userRouter.register()", () => {
           password: "password-123",
         }),
       ).resolves.toMatchObject({ id: "user-1" });
-      expect(userCreateMock).toHaveBeenCalled();
+      expect(registerMock).toHaveBeenCalled();
     });
   });
 
@@ -242,7 +180,7 @@ describe("userRouter.register()", () => {
           password: "password-123",
         }),
       ).rejects.toMatchObject({ code: "BAD_REQUEST" });
-      expect(userCreateMock).not.toHaveBeenCalled();
+      expect(registerMock).not.toHaveBeenCalled();
     });
   });
 

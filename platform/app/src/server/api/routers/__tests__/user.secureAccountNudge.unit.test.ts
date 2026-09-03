@@ -30,18 +30,33 @@ vi.mock("~/server/rateLimit", () => ({
   rateLimit: vi.fn().mockResolvedValue({ allowed: true }),
 }));
 
+const { secureAccountFactsMock } = vi.hoisted(() => ({
+  secureAccountFactsMock: vi.fn(),
+}));
+// What the offer is decided FROM is the credential service's read; what the
+// offer IS stays the router's decision, and that is what these assert.
+vi.mock("~/server/app-layer/identity/runtime", async (importOriginal) => ({
+  ...(await importOriginal<
+    typeof import("~/server/app-layer/identity/runtime")
+  >()),
+  credentialAccounts: () => ({ secureAccountFacts: secureAccountFactsMock }),
+}));
+
 describe("userRouter.secureAccountNudge", () => {
-  let passkeyCount: ReturnType<typeof vi.fn>;
-  let userFindUnique: ReturnType<typeof vi.fn>;
+  /** What the account holds, as the credential service reads it back. */
+  const held: {
+    passkeys: number;
+    twoStepEnabled: boolean;
+    nudgeDismissedAt: Date | null;
+  } = { passkeys: 0, twoStepEnabled: false, nudgeDismissedAt: null };
 
   beforeEach(() => {
     vi.clearAllMocks();
     envState.env.MFA_ENROLLMENT_OPEN = "off";
-    passkeyCount = vi.fn().mockResolvedValue(0);
-    userFindUnique = vi.fn().mockResolvedValue({
-      passkeyNudgeDismissedAt: null,
-      twoFactorEnabled: false,
-    });
+    held.passkeys = 0;
+    held.twoStepEnabled = false;
+    held.nudgeDismissedAt = null;
+    secureAccountFactsMock.mockImplementation(async () => ({ ...held }));
   });
 
   const call = (signedInWith?: "password" | "passkey" | "federated") => {
@@ -53,10 +68,6 @@ describe("userRouter.secureAccountNudge", () => {
         ...(signedInWith ? { signedInWith } : {}),
       },
     });
-    (ctx as any).prisma = {
-      passkey: { count: passkeyCount },
-      user: { findUnique: userFindUnique },
-    };
     return userRouter.createCaller(ctx).secureAccountNudge({});
   };
 
@@ -71,7 +82,7 @@ describe("userRouter.secureAccountNudge", () => {
     });
 
     it("offers nothing to somebody who already holds one", async () => {
-      passkeyCount.mockResolvedValue(1);
+      held.passkeys = 1;
 
       await expect(call()).resolves.toMatchObject({
         offer: false,
@@ -85,7 +96,7 @@ describe("userRouter.secureAccountNudge", () => {
       envState.env.MFA_ENROLLMENT_OPEN = "on";
       // Holding a passkey already, so the passkey half is settled and what
       // these assertions read is the two-step half on its own.
-      passkeyCount.mockResolvedValue(1);
+      held.passkeys = 1;
     });
 
     /** @scenario "Only what the deployment offers is offered" */
@@ -100,10 +111,7 @@ describe("userRouter.secureAccountNudge", () => {
 
     /** @scenario "Each half disappears once the person has it" */
     it("offers nothing to somebody who already has one", async () => {
-      userFindUnique.mockResolvedValue({
-        passkeyNudgeDismissedAt: null,
-        twoFactorEnabled: true,
-      });
+      held.twoStepEnabled = true;
 
       await expect(call("password")).resolves.toEqual({
         offer: false,
@@ -115,7 +123,7 @@ describe("userRouter.secureAccountNudge", () => {
 
     /** @scenario "The offer covers whichever of the two the person lacks" */
     it("offers both halves at once to somebody who has neither", async () => {
-      passkeyCount.mockResolvedValue(0);
+      held.passkeys = 0;
 
       await expect(call("password")).resolves.toEqual({
         offer: true,
@@ -133,21 +141,13 @@ describe("userRouter.secureAccountNudge", () => {
 
     /** @scenario "One dismissal answers the whole offer" */
     it("stays silent about BOTH halves, not only the one they declined", async () => {
-      userFindUnique.mockResolvedValue({
-        passkeyNudgeDismissedAt: new Date(),
-        twoFactorEnabled: false,
-      });
+      held.nudgeDismissedAt = new Date();
 
       await expect(call()).resolves.toMatchObject({ offer: false });
     });
 
     it("asks again once the interval has passed", async () => {
-      userFindUnique.mockResolvedValue({
-        passkeyNudgeDismissedAt: new Date(
-          Date.now() - 31 * 24 * 60 * 60 * 1000,
-        ),
-        twoFactorEnabled: false,
-      });
+      held.nudgeDismissedAt = new Date(Date.now() - 31 * 24 * 60 * 60 * 1000);
 
       await expect(call()).resolves.toMatchObject({ offer: true });
     });
