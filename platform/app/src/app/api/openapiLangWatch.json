@@ -50446,6 +50446,133 @@
                                   "type": "object",
                                   "properties": {
                                     "role": {
+                                      "type": "string"
+                                    },
+                                    "content": {
+                                      "type": "array",
+                                      "items": {
+                                        "anyOf": [
+                                          {
+                                            "type": "object",
+                                            "properties": {
+                                              "type": {
+                                                "type": "string",
+                                                "const": "text"
+                                              },
+                                              "text": {
+                                                "type": "string"
+                                              },
+                                              "citations": {
+                                                "type": [
+                                                  "array",
+                                                  "null"
+                                                ],
+                                                "items": {}
+                                              }
+                                            },
+                                            "required": [
+                                              "type",
+                                              "text"
+                                            ]
+                                          },
+                                          {
+                                            "type": "object",
+                                            "properties": {
+                                              "type": {
+                                                "type": "string",
+                                                "const": "tool_use"
+                                              },
+                                              "id": {
+                                                "type": "string"
+                                              },
+                                              "name": {
+                                                "type": "string"
+                                              },
+                                              "input": {}
+                                            },
+                                            "required": [
+                                              "type",
+                                              "id",
+                                              "name"
+                                            ]
+                                          },
+                                          {
+                                            "type": "object",
+                                            "properties": {
+                                              "type": {
+                                                "type": "string",
+                                                "const": "tool_result"
+                                              },
+                                              "tool_use_id": {
+                                                "type": "string"
+                                              },
+                                              "content": {
+                                                "anyOf": [
+                                                  {
+                                                    "type": "string"
+                                                  },
+                                                  {
+                                                    "type": "array",
+                                                    "items": {}
+                                                  }
+                                                ]
+                                              },
+                                              "is_error": {
+                                                "type": "boolean"
+                                              }
+                                            },
+                                            "required": [
+                                              "type",
+                                              "tool_use_id"
+                                            ]
+                                          },
+                                          {
+                                            "type": "object",
+                                            "properties": {
+                                              "type": {
+                                                "type": "string",
+                                                "const": "thinking"
+                                              },
+                                              "thinking": {
+                                                "type": "string"
+                                              },
+                                              "signature": {
+                                                "type": "string"
+                                              }
+                                            },
+                                            "required": [
+                                              "type",
+                                              "thinking"
+                                            ]
+                                          },
+                                          {
+                                            "type": "object",
+                                            "properties": {
+                                              "type": {
+                                                "type": "string",
+                                                "const": "redacted_thinking"
+                                              },
+                                              "data": {
+                                                "type": "string"
+                                              }
+                                            },
+                                            "required": [
+                                              "type",
+                                              "data"
+                                            ]
+                                          }
+                                        ]
+                                      }
+                                    }
+                                  },
+                                  "required": [
+                                    "content"
+                                  ]
+                                },
+                                {
+                                  "type": "object",
+                                  "properties": {
+                                    "role": {
                                       "anyOf": [
                                         {
                                           "type": "string",
@@ -63605,7 +63732,6 @@
             }
           }
         },
-        "parameters": [],
         "security": [
           {
             "project_api_key": []
@@ -64021,7 +64147,6 @@
             }
           }
         },
-        "parameters": [],
         "requestBody": {
           "required": true,
           "content": {
@@ -66473,16 +66598,6 @@
             }
           }
         },
-        "parameters": [
-          {
-            "schema": {
-              "type": "string"
-            },
-            "in": "path",
-            "name": "id",
-            "required": true
-          }
-        ],
         "requestBody": {
           "required": true,
           "content": {
@@ -66942,6 +67057,16 @@
             }
           }
         },
+        "parameters": [
+          {
+            "schema": {
+              "type": "string"
+            },
+            "in": "path",
+            "name": "id",
+            "required": true
+          }
+        ],
         "security": [
           {
             "project_api_key": []
@@ -67099,6 +67224,8 @@
     },
     "/api/triggers/{id}/fires": {
       "get": {
+        "operationId": "getApiTriggersByIdFires",
+        "description": "What this automation has done: its fires, newest first. Metadata only — no trace ids and no trace content.",
         "responses": {
           "200": {
             "description": "Success",
@@ -67249,7 +67376,6 @@
             }
           }
         },
-        "operationId": "getApiTriggersByIdFires",
         "parameters": [
           {
             "in": "query",
@@ -67270,7 +67396,6 @@
             "required": true
           }
         ],
-        "description": "What this automation has done: its fires, newest first. Metadata only — no trace ids and no trace content.",
         "security": [
           {
             "project_api_key": []
@@ -67280,6 +67405,8 @@
     },
     "/api/triggers/{id}/enable": {
       "post": {
+        "operationId": "postApiTriggersByIdEnable",
+        "description": "Resume an automation. A report's schedule is put back on the calendar.",
         "responses": {
           "200": {
             "description": "Trigger resumed",
@@ -67707,7 +67834,6 @@
             }
           }
         },
-        "operationId": "postApiTriggersByIdEnable",
         "parameters": [
           {
             "schema": {
@@ -67718,7 +67844,6 @@
             "required": true
           }
         ],
-        "description": "Resume an automation. A report's schedule is put back on the calendar.",
         "security": [
           {
             "project_api_key": []
@@ -67728,6 +67853,8 @@
     },
     "/api/triggers/{id}/disable": {
       "post": {
+        "operationId": "postApiTriggersByIdDisable",
+        "description": "Pause an automation. A report stops claiming its schedule.",
         "responses": {
           "200": {
             "description": "Trigger paused",
@@ -68155,7 +68282,6 @@
             }
           }
         },
-        "operationId": "postApiTriggersByIdDisable",
         "parameters": [
           {
             "schema": {
@@ -68166,7 +68292,6 @@
             "required": true
           }
         ],
-        "description": "Pause an automation. A report stops claiming its schedule.",
         "security": [
           {
             "project_api_key": []
@@ -68176,6 +68301,8 @@
     },
     "/api/triggers/{id}/test-fire": {
       "post": {
+        "operationId": "postApiTriggersByIdTestFire",
+        "description": "Send this automation's message to the destination it is configured with, so you can confirm it arrives. Nothing is recorded as a fire.",
         "responses": {
           "200": {
             "description": "Test fire sent",
@@ -68333,7 +68460,6 @@
             }
           }
         },
-        "operationId": "postApiTriggersByIdTest-fire",
         "parameters": [
           {
             "schema": {
@@ -68344,7 +68470,6 @@
             "required": true
           }
         ],
-        "description": "Send this automation's message to the destination it is configured with, so you can confirm it arrives. Nothing is recorded as a fire.",
         "security": [
           {
             "project_api_key": []
