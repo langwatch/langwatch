@@ -230,6 +230,10 @@ function startForeground({
   timeout?: number;
 }): RunningCommand {
   const log = fs.createWriteStream(logPath, { flags: "a" });
+  // The log is a convenience, never the answer: the shared folder can be moved
+  // or removed while a command runs, and an unhandled stream error would take
+  // the whole session down. Drop the log and keep the command's own output.
+  log.on("error", () => undefined);
   const child = spawn("bash", ["-lc", command], {
     cwd: root,
     detached: true,
@@ -260,8 +264,15 @@ function startForeground({
 
   const result = new Promise<BashOutput>((resolve, reject) => {
     // The log is closed before the result settles, so a caller that reads the
-    // file the moment the command answers finds every line in it.
-    const closeLog = (then: () => void) => log.end(then);
+    // file the moment the command answers finds every line in it. A stream
+    // that already failed is past closing, so the result settles at once.
+    const closeLog = (then: () => void) => {
+      if (log.destroyed || log.writableEnded) {
+        then();
+        return;
+      }
+      log.end(then);
+    };
 
     child.on("error", (error) => {
       clearTimeout(limit);

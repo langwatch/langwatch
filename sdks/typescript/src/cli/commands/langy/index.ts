@@ -30,6 +30,10 @@ export interface LangyCommandOptions {
   shareControl?: boolean;
   /** Declared only so the refusal can say why, see `refuseStructuredOutput`. */
   output?: string;
+  /** The global `--json` flag, passed on by the registration. */
+  json?: boolean;
+  /** The global `--jq` flag, passed on by the registration. */
+  jq?: boolean;
 }
 
 /**
@@ -37,13 +41,14 @@ export interface LangyCommandOptions {
  * goes and ends when the user stops it, so there is no document to render.
  */
 export const INTERACTIVE_ONLY_MESSAGE =
-  "`langy` is an interactive session, not a query, so it has no structured output. Run it without -o/--output.";
+  "`langy` is an interactive session, not a query, so it has no structured output. Run it without -o/--output, --json or --jq.";
 
 /** The refusal for a structured-output request, or null when none was made. */
 export function refuseStructuredOutput(
   options: LangyCommandOptions,
 ): string | null {
-  return options.output === undefined ? null : INTERACTIVE_ONLY_MESSAGE;
+  const asked = options.output !== undefined || options.json === true || options.jq === true;
+  return asked ? INTERACTIVE_ONLY_MESSAGE : null;
 }
 
 export async function langyCommand(

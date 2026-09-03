@@ -1787,26 +1787,46 @@ export function buildProgram({ bin }: { bin?: string } = {}): Command {
     },
   );
 
-  // A live, human-only session: it never returns a CommandResult, so it is
-  // registered with a plain action. It owns `-o/--output` so the refusal can
-  // name the reason instead of the generic "no structured output yet".
-  program
-    .command("langy")
-    .description(
-      "Share this folder with the Langy conversation that asked for it. Langy then reads, edits and runs commands here, with your toolchain, and asks you in the LangWatch panel before anything that is not read-only",
-    )
-    .option(
-      "--share-control",
-      "Share control of this folder with the Langy session that requested it (what a bare `langwatch langy` does today)",
-    )
-    .option(
-      "-o, --output <format>",
-      "Not available: this command is an interactive session and prints as it goes",
-    )
-    .action(async (options: { shareControl?: boolean; output?: string }) => {
+  // A live, human-only session: it never returns a CommandResult, and it never
+  // prints a table either. Registered as rendering its own result so the
+  // auto-detected agent mode does not warn that a table nobody printed is not
+  // machine-readable; the command then refuses a real structured-output
+  // request itself, naming the reason instead of the generic "no structured
+  // output yet".
+  rendersOwnResult(
+    program
+      .command("langy")
+      .description(
+        "Share this folder with the Langy conversation that asked for it. Langy then reads, edits and runs commands here, with your toolchain, and asks you in the LangWatch panel before anything that is not read-only",
+      )
+      .option(
+        "--share-control",
+        "Share control of this folder with the Langy session that requested it (what a bare `langwatch langy` does today)",
+      )
+      .option(
+        "-o, --output <format>",
+        "Not available: this command is an interactive session and prints as it goes",
+      ),
+  ).action(
+    async (
+      options: { shareControl?: boolean; output?: string },
+      command: Command,
+    ) => {
+      // `--json` and `--jq` are global, so they never reach the command's own
+      // options. They are read here and passed on, or the refusal below would
+      // miss them now that the format gate lets this command through.
+      const globals = command.optsWithGlobals() as {
+        json?: unknown;
+        jq?: unknown;
+      };
       const { langyCommand: impl } = await import("./commands/langy/index.js");
-      return impl(options);
-    });
+      return impl({
+        ...options,
+        ...(globals.json !== undefined ? { json: true } : {}),
+        ...(globals.jq !== undefined ? { jq: true } : {}),
+      });
+    },
+  );
 
   // Add agent command group
   const agentCmd = program
