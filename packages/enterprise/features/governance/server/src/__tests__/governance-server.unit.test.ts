@@ -9,6 +9,7 @@ class FixedRate extends PulledUsageRatePort {
 }
 
 describe("governance server", () => {
+  /** @scenario "Pulled usage keeps money lossless" */
   it("converts provider decimal money without floating-point drift", () => {
     const service = PulledUsagePricingService.create(new FixedRate());
     expect(
@@ -20,6 +21,21 @@ describe("governance server", () => {
     ).toBe(45_000);
   });
 
+  /** @scenario "Pulled usage keeps money lossless" */
+  it("refuses a cost outside the exactly-representable nano-USD range", () => {
+    // 1e7 USD is 1e16 nano-USD, past Number.MAX_SAFE_INTEGER. Rounding a money
+    // figure is the one outcome this service may not have.
+    const service = PulledUsagePricingService.create(new FixedRate());
+    expect(() =>
+      service.price({
+        basis: "provider_reported",
+        costUsd: "10000000",
+        costStatus: "exact",
+      }),
+    ).toThrow(/exceeds the exactly-representable nano-USD range/);
+  });
+
+  /** @scenario "Pull outcomes cannot regress the projected cursor" */
   it("does not regress a projected cursor for a stale completion", () => {
     const projection = new IngestionPullRunStatusProjection();
     const current = {

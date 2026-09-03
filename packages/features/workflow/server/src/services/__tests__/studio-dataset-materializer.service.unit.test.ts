@@ -112,6 +112,7 @@ const savedDataset = () =>
   });
 
 describe("StudioDatasetMaterializerService", () => {
+  /** @scenario "Execution materializes a saved entry dataset through DatasetService" */
   it("inlines saved datasets for evaluation runs", async () => {
     const datasets = new TestDatasetService(savedDataset());
     const event = makeEvent(
@@ -142,6 +143,7 @@ describe("StudioDatasetMaterializerService", () => {
     });
   });
 
+  /** @scenario "Execution materializes a saved entry dataset through DatasetService" */
   it("preserves inline datasets without fetching", async () => {
     const datasets = new TestDatasetService();
     const event = makeEvent(

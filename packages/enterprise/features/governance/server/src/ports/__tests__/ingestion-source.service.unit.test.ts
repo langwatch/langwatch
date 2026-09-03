@@ -153,6 +153,7 @@ describe("IngestionSourceService", () => {
     );
   });
 
+  /** @scenario "Saving without touching the secret keeps the existing credential" */
   it("preserves stored credentials and rotation metadata on ordinary edits", async () => {
     const { service, repository } = harness();
     repository.row = source({
@@ -176,6 +177,26 @@ describe("IngestionSourceService", () => {
     });
   });
 
+  /** @scenario "Entering a new secret replaces the stored one" */
+  it("encrypts a freshly typed credential on the edit path, not only on create", async () => {
+    const { service, repository } = harness();
+    repository.row = source({ parserConfig: { credentials: "enc:v1:c2VjcmV0" } });
+
+    await service.updateSource({
+      id: "source-1",
+      organizationId: "org-1",
+      parserConfig: { credentials: { token: "sk-ant-admin-new" } },
+    });
+
+    expect(repository.updateInput?.parserConfig?.credentials).toEqual(
+      expect.stringMatching(/^enc:v1:/),
+    );
+    expect(repository.updateInput?.parserConfig).not.toEqual(
+      expect.objectContaining({ credentials: { token: "sk-ant-admin-new" } }),
+    );
+  });
+
+  /** @scenario "A stored envelope is never sent back to the server" */
   it("refuses a stored encrypted credential replay before changing the source", async () => {
     const { service, repository } = harness();
     repository.row = source({
@@ -220,6 +241,7 @@ describe("IngestionSourceService", () => {
     expect(repository.updateInput).toBeNull();
   });
 
+  /** @scenario "The report cannot be changed once a cursor exists" */
   it("refuses a report change after the source has pulled", async () => {
     const { service, repository } = harness();
     repository.row = source({
@@ -237,6 +259,7 @@ describe("IngestionSourceService", () => {
     expect(repository.updateInput).toBeNull();
   });
 
+  /** @scenario "A source that starts pulling mid-save does not lose the rule" */
   it("atomically pins a report change before the first pull", async () => {
     const { service, repository } = harness();
     repository.row = source({
@@ -259,6 +282,7 @@ describe("IngestionSourceService", () => {
     });
   });
 
+  /** @scenario "A source that starts pulling mid-save does not lose the rule" */
   it("refuses a report update when a pull wins the race", async () => {
     const { service, repository } = harness();
     repository.row = source({

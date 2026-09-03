@@ -102,6 +102,7 @@ describe("feature catalogue", () => {
     ]);
   });
 
+  /** @scenario "Every production subject has exactly one owner" */
   it("keeps cross-entry ownership checks after schema parsing", () => {
     root = mkdtempSync(join(tmpdir(), "feature-catalogue-"));
     writeCatalogue({

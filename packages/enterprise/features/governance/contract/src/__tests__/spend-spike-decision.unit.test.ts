@@ -50,6 +50,7 @@ function input(overrides: {
 
 describe("evaluateSpendSpike — pure decision logic", () => {
   describe("when current spend is well above baseline + ratio", () => {
+    /** @scenario "Spend spike decisions are deterministic" */
     it("fires when current >= baseline * ratio with baseline above minimum", () => {
       const result = evaluateSpendSpike(
         input({ currentSpendUsd: 10, baselineSpendUsd: 2 }),
@@ -69,6 +70,7 @@ describe("evaluateSpendSpike — pure decision logic", () => {
   });
 
   describe("when baseline is below minBaselineUsd", () => {
+    /** @scenario "Spend spike decisions are deterministic" */
     it("skips 'below_baseline' — signal too small to trigger", () => {
       const result = evaluateSpendSpike(
         input({
@@ -136,6 +138,7 @@ describe("evaluateSpendSpike — pure decision logic", () => {
       expect(result.reason).toMatch(/Existing open alert/);
     });
 
+    /** @scenario "Spend spike decisions are deterministic" */
     it("dedup takes precedence over below_baseline check", () => {
       // Even when the spend is way too low to fire, we should NOT
       // re-evaluate the same window if an open alert exists. This

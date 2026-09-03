@@ -48,12 +48,14 @@ describe("isEditablePullSource", () => {
 });
 
 describe("isBackfillStartLocked", () => {
+  /** @scenario "Backfill start is not editable once a usage cursor has moved" */
   it("locks the start for a usage source that has already pulled", () => {
     // The usage cursor never rewinds, so an edit here would silently do
     // nothing.
     expect(isBackfillStartLocked({ hasPulled: true, report: "usage" })).toBe(true);
   });
 
+  /** @scenario "Backfill start stays editable on a cost source that has pulled" */
   it("leaves the start editable for a cost source that has already pulled", () => {
     // The cost cursor binds `startingAt` into its identity: moving the start
     // discards the cursor and re-reads the widened window. That is the repair
@@ -61,11 +63,13 @@ describe("isBackfillStartLocked", () => {
     expect(isBackfillStartLocked({ hasPulled: true, report: "cost" })).toBe(false);
   });
 
+  /** @scenario "Backfill start is editable before the source has run" */
   it("leaves the start editable before the first pull, whatever the report", () => {
     expect(isBackfillStartLocked({ hasPulled: false, report: "usage" })).toBe(false);
     expect(isBackfillStartLocked({ hasPulled: false, report: "cost" })).toBe(false);
   });
 
+  /** @scenario "A source whose stored configuration names no report is not locked" */
   it("does not lock a source whose config carries no report", () => {
     // Claiming immutability we cannot justify is the worse error: it sends an
     // admin to archive-and-recreate over a field that may well be editable.
@@ -85,6 +89,7 @@ describe("isEditSaveBlocked", () => {
   });
 
   describe("given a pull source whose config this form rebuilds", () => {
+    /** @scenario "An invalid cron expression is rejected at save time" */
     it("blocks a cron the cadence field has already marked invalid", () => {
       // The create drawer refuses this; the edit drawer used to accept the
       // click and let the server say no.
@@ -144,6 +149,7 @@ describe("lockedParserKeys", () => {
      * nothing catches it: the ids sit in different namespaces and both sets
      * survive.
      */
+    /** @scenario "The report cannot be changed once a cursor exists" */
     it("locks the report on a usage source", () => {
       expect(lockedParserKeys({ hasPulled: true, report: "usage" })).toContain("report");
     });
@@ -154,12 +160,14 @@ describe("lockedParserKeys", () => {
       expect(lockedParserKeys({ hasPulled: true, report: "cost" })).toContain("report");
     });
 
+    /** @scenario "Backfill start is not editable once a usage cursor has moved" */
     it("still locks the backfill start on a usage source", () => {
       expect(lockedParserKeys({ hasPulled: true, report: "usage" })).toEqual(
         expect.arrayContaining(["startingAt", "report"]),
       );
     });
 
+    /** @scenario "Backfill start stays editable on a cost source that has pulled" */
     it("leaves the cost source's backfill start editable", () => {
       // Locking it would remove the only lever for repairing wrong early
       // figures — see the sibling suite above.
@@ -168,12 +176,14 @@ describe("lockedParserKeys", () => {
   });
 
   describe("given a source that has never pulled", () => {
+    /** @scenario "Backfill start is editable before the source has run" */
     it("locks nothing", () => {
       expect(lockedParserKeys({ hasPulled: false, report: "usage" })).toEqual([]);
     });
   });
 
   describe("given a source whose config carries no report", () => {
+    /** @scenario "A source whose stored configuration names no report is not locked" */
     it("locks nothing, rather than locking a field it cannot name", () => {
       expect(lockedParserKeys({ hasPulled: true, report: undefined })).toEqual([]);
     });
@@ -196,6 +206,7 @@ describe("parserFieldPresentation", () => {
     required: true,
   };
 
+  /** @scenario "The edit form opens with the secret field empty" */
   it("on edit, tells the admin a blank secret keeps the current key", () => {
     const p = parserFieldPresentation({ field: secretField, mode: "edit" });
 
@@ -237,6 +248,7 @@ describe("parserFieldPresentation", () => {
 });
 
 describe("seedComposerParserConfig", () => {
+  /** @scenario "The edit form opens with the secret field empty" */
   it("maps a stored config back onto the form fields", () => {
     const values = seedComposerParserConfig({
       sourceType: "anthropic_admin",
@@ -253,6 +265,7 @@ describe("seedComposerParserConfig", () => {
     expect(values.startingAt).toBe("2026-08-01T00:00:00.000Z");
   });
 
+  /** @scenario "The edit form opens with the secret field empty" */
   it("leaves every secret field blank rather than pre-filling it", () => {
     const values = seedComposerParserConfig({
       sourceType: "anthropic_admin",
@@ -262,6 +275,7 @@ describe("seedComposerParserConfig", () => {
     expect(values.credentialsToken ?? "").toBe("");
   });
 
+  /** @scenario "A stored envelope is never sent back to the server" */
   it("never surfaces a stored credential into the form, even if one reaches it", () => {
     // `toDto` strips `credentials` today, so this should be unreachable. It is
     // asserted anyway because the cost of that stripping regressing is the
@@ -278,6 +292,7 @@ describe("seedComposerParserConfig", () => {
     expect(values.credentialsToken ?? "").toBe("");
   });
 
+  /** @scenario "A stored envelope is never sent back to the server" */
   it("round-trips an untouched form without proposing any credential change", () => {
     const stored = {
       adapter: "anthropic_admin",

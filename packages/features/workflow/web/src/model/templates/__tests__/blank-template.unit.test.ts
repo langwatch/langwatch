@@ -39,6 +39,13 @@ describe("blankTemplate", () => {
         ]);
       });
 
+      /** @scenario "New Studio workflows use portable templates and entry defaults" */
+      it("ships no model, leaving the project's resolved default to fill it", () => {
+        // A browser template that pinned a model would ship one project's
+        // resolved default to every other project.
+        expect(param({ nodeId: "llm_call", identifier: "llm" })).toBeUndefined();
+      });
+
       it("names its input and output input/output", () => {
         expect((node("llm_call").data as { inputs: unknown }).inputs).toEqual([
           { identifier: "input", type: "str" },

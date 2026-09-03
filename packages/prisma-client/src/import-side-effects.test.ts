@@ -10,6 +10,7 @@ vi.mock("@prisma/adapter-pg", () => ({ PrismaPg: adapterConstructor }));
 vi.mock("./generated/client", () => ({ PrismaClient: clientConstructor }));
 
 describe("package import", () => {
+  /** @scenario "Importing the Prisma client package has no process side effects" */
   it("constructs no client, adapter, or pool and exports no ready-made client", async () => {
     const exports = await import("./index");
 
@@ -21,6 +22,7 @@ describe("package import", () => {
     expect(exports).not.toHaveProperty("pool");
   });
 
+  /** @scenario "Importing the Prisma client package has no process side effects" */
   it("contains no ambient environment reads outside generated code", async () => {
     const sources: string[] = [];
     for await (const path of glob("*.ts", { cwd: import.meta.dirname })) {

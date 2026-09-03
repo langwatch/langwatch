@@ -101,6 +101,7 @@ beforeEach(() => {
 });
 
 describe("Workflow prompt picker flow", () => {
+  /** @scenario "Node selection transitions use named drawer host ports" */
   it("updates and selects a dropped node, while the app port owns drawer effects", () => {
     let callbacks: PromptPickerCallbacks | undefined;
     const port: PromptPickerPort = {
@@ -132,6 +133,7 @@ describe("Workflow prompt picker flow", () => {
     mounted.unmount();
   });
 
+  /** @scenario "Node selection transitions use named drawer host ports" */
   it("clears and selects the placeholder when creating a new prompt", () => {
     let callbacks: PromptPickerCallbacks | undefined;
     const port: PromptPickerPort = {
@@ -152,6 +154,7 @@ describe("Workflow prompt picker flow", () => {
     mounted.unmount();
   });
 
+  /** @scenario "Node selection transitions use named drawer host ports" */
   it("deletes a cancelled prompt placeholder", () => {
     let callbacks: PromptPickerCallbacks | undefined;
     const port: PromptPickerPort = {

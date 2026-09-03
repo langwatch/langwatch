@@ -44,6 +44,7 @@ function event(eventId: string, eventTimeMs: number): GovernanceOcsfExportRow {
 }
 
 describe("DefaultGovernanceOcsfExportService", () => {
+  /** @scenario "OCSF export uses a stable compound cursor" */
   it("returns an empty page without reading events when no tenant exists", async () => {
     const events = new FixedEventReader();
     const page = await DefaultGovernanceOcsfExportService.create({
@@ -59,6 +60,7 @@ describe("DefaultGovernanceOcsfExportService", () => {
     expect(events.findAll).not.toHaveBeenCalled();
   });
 
+  /** @scenario "OCSF export uses a stable compound cursor" */
   it("returns the final event as the compound cursor", async () => {
     const events = new FixedEventReader();
     events.findAll.mockResolvedValue([event("event-1", 100), event("event-2", 100)]);
@@ -84,6 +86,7 @@ describe("DefaultGovernanceOcsfExportService", () => {
     });
   });
 
+  /** @scenario "OCSF export uses a stable compound cursor" */
   it("fails clearly when a tenant exists without event storage", async () => {
     await expect(
       DefaultGovernanceOcsfExportService.create({

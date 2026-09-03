@@ -114,6 +114,7 @@ describe("AnomalyRuleService", () => {
     });
   });
 
+  /** @scenario "Anomaly rule reads are tenant scoped" */
   it("does not expose a rule owned by another organization", async () => {
     const service = AnomalyRuleService.create({
       repository: new MemoryAnomalyRuleRepository([rule()]),

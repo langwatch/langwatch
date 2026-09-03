@@ -16,7 +16,6 @@
 # owned by ../licensing/self-hosted-enterprise-discovery.feature.
 # Repository lint and format migration is owned by oxc-toolchain.feature.
 
-@unimplemented
 Feature: Physical application workspace boundaries
   As a platform maintainer
   I want UI, API, worker and self-host execution in separate workspace packages
@@ -24,6 +23,7 @@ Feature: Physical application workspace boundaries
 
   Rule: Every executable has one truthful application package
 
+    @unimplemented
     @architecture @typecheck
     Scenario: The repository exposes four application workspaces
       Given the physical application split is complete
@@ -34,6 +34,7 @@ Feature: Physical application workspace boundaries
       And apps/server is the @langwatch/server package
       And platform/app no longer exists
 
+    @unimplemented
     @architecture @packaging
     Scenario: The repository root is not the published server package
       Given the application workspaces have been created
@@ -42,6 +43,7 @@ Feature: Physical application workspace boundaries
       And apps/server owns the publishable @langwatch/server manifest and binary
       And contributor commands at the root delegate to the owning workspace package
 
+    @unimplemented
     @architecture @typecheck
     Scenario: Application packages are composition roots rather than shared libraries
       Given UI, API, worker and server need reusable behaviour
@@ -51,6 +53,7 @@ Feature: Physical application workspace boundaries
       And shared product behaviour comes from its owning feature contract or implementation package
       And shared infrastructure comes from a deliberately named package
 
+    @unimplemented
     @architecture @development @typecheck
     Scenario: Combined development is a contributor composition rather than an application dependency
       Given local development hosts API and worker in one process
@@ -63,6 +66,7 @@ Feature: Physical application workspace boundaries
 
   Rule: Browser and interactive server graphs are physically separate
 
+    @unimplemented
     @architecture @web @typecheck
     Scenario: The UI package is browser safe
       Given the UI composes product screens
@@ -70,6 +74,7 @@ Feature: Physical application workspace boundaries
       Then it may depend on feature contracts, feature web packages, the Design System and browser-safe API clients
       And it imports no Node runtime, Prisma client, feature server, API application, worker application or server launcher source
 
+    @unimplemented
     @architecture @trpc @typecheck
     Scenario: Browser typing does not evaluate the tRPC server router
       Given the UI calls an existing application tRPC procedure
@@ -80,6 +85,7 @@ Feature: Physical application workspace boundaries
       And the UI does not import AppRouter or another declaration from the API implementation
       And a type-only import is not accepted as an application boundary
 
+    @unimplemented
     @architecture @trpc @migration
     Scenario: The temporary API contract cannot drift from the router
       Given a legacy application procedure is represented by @langwatch/platform-api-contract
@@ -88,6 +94,7 @@ Feature: Physical application workspace boundaries
       And the contract imports no router, handler or API implementation declaration
       And a mismatch fails before the UI or API is built
 
+    @unimplemented
     @architecture @api @typecheck
     Scenario: The API package owns only the interactive process
       Given the API application is built
@@ -96,6 +103,7 @@ Feature: Physical application workspace boundaries
       And it starts no queue consumer, process manager, scheduler or one-shot product task
       And it imports no UI source or worker application source
 
+    @unimplemented
     @architecture @api @runtime
     Scenario: API transports share one composed application
       Given the API process has constructed its LangWatch App
@@ -104,6 +112,7 @@ Feature: Physical application workspace boundaries
       And tRPC receives that same App through ctx.app
       And neither transport constructs feature services or repositories per request
 
+    @unimplemented
     @architecture @worker @typecheck
     Scenario: The worker package owns background execution
       Given the worker application is built
@@ -111,6 +120,7 @@ Feature: Physical application workspace boundaries
       And one-shot product tasks are worker entry points
       And it imports no React source, browser state, Hono route composition, tRPC router or static asset server
 
+    @unimplemented
     @architecture @server @typecheck
     Scenario: The server package remains a launcher rather than a backend library
       Given @langwatch/server is installed
@@ -121,6 +131,7 @@ Feature: Physical application workspace boundaries
 
   Rule: Enterprise code follows the same strict feature ownership
 
+    @unimplemented
     @architecture @enterprise @typecheck
     Scenario: Enterprise has one portable root package and one legal license boundary
       Given enterprise packages are installed
@@ -133,6 +144,7 @@ Feature: Physical application workspace boundaries
       And the root package imports no enterprise feature implementation, React, Node runtime, transport or persistence adapter
       And source archives and staged distributions retain the root notice
 
+    @unimplemented
     @architecture @enterprise @typecheck
     Scenario: Each runtime has one convenient enterprise composition package
       Given UI, API and worker each install enterprise capabilities
@@ -143,6 +155,7 @@ Feature: Physical application workspace boundaries
       And each composition package exports a class with static create
       And no application maintains a second list of individual enterprise feature implementations
 
+    @unimplemented
     @architecture @enterprise @typecheck
     Scenario: Enterprise grouping does not merge runtime dependency graphs
       Given the three enterprise composition packages
@@ -152,6 +165,7 @@ Feature: Physical application workspace boundaries
       And the worker composition imports only portable contracts and enterprise worker or server installers
       And no composition package imports either of the other two composition packages
 
+    @unimplemented
     @architecture @enterprise @typecheck
     Scenario: Enterprise features use the strict version-zero package layout
       Given reusable enterprise product behaviour is extracted from platform/app/ee
@@ -163,6 +177,7 @@ Feature: Physical application workspace boundaries
       And product licensing lives at packages/enterprise/features/licensing rather than in an aggregate package
       And every Enterprise feature uses its singular identifier from the ownership catalogue
 
+    @unimplemented
     @architecture @enterprise @licensing
     Scenario: Signed licenses feed rather than replace provider-neutral entitlements
       Given enterprise availability may come from SaaS plan state or a signed self-host license
@@ -171,6 +186,7 @@ Feature: Physical application workspace boundaries
       And the final availability decision uses the provider-neutral Entitlements contract
       And no enterprise feature assumes every Enterprise customer has a signed license
 
+    @unimplemented
     @integration @enterprise @licensing
     Scenario: Unlicensed self-hosted deployments retain enterprise discovery
       Given the distribution contains the enterprise composition and feature packages
@@ -180,6 +196,7 @@ Feature: Physical application workspace boundaries
       And protected enterprise operations remain unavailable
       And entitlement affects use rather than whether the source package was installed
 
+    @unimplemented
     @architecture @enterprise @typecheck
     Scenario: The application no longer contains an unstructured EE source tree
       Given the physical application split is complete
@@ -190,6 +207,7 @@ Feature: Physical application workspace boundaries
       And no catch-all enterprise implementation or legacy package replaces them
       And no core package imports an enterprise implementation
 
+    @unimplemented
     @integration @enterprise @deployment
     Scenario: Moving EE source does not change enterprise availability
       Given the current image and self-host distribution include enterprise behaviour
@@ -208,6 +226,7 @@ Feature: Physical application workspace boundaries
       And the API consumes an artifact location rather than importing UI source
       And the detailed static, cache, CDN and security behaviour remains owned by the existing server specifications
 
+    @unimplemented
     @integration @development
     Scenario: Development keeps the UI and API processes separate
       Given a developer starts the combined local experience
@@ -218,6 +237,7 @@ Feature: Physical application workspace boundaries
 
   Rule: Process configuration remains explicit while the UI stays environment-free
 
+    @unimplemented
     @architecture @configuration @typecheck
     Scenario: Process applications validate only their own environment
       Given API, worker and server are composed independently
@@ -227,6 +247,7 @@ Feature: Physical application workspace boundaries
       And UI owns no deployment environment schema or secret
       And UI receives allow-listed public runtime configuration from the API
 
+    @unimplemented
     @integration @development
     Scenario: Contributor environment files survive removal of the monolithic package
       Given a contributor uses quickstart, Haven or a root development command
@@ -237,6 +258,7 @@ Feature: Physical application workspace boundaries
 
   Rule: Prisma is an explicitly owned infrastructure client
 
+    @unimplemented
     @architecture @prisma @typecheck
     Scenario: One Prisma client package owns the relational substrate
       Given PostgreSQL persistence is used by application and feature code
@@ -254,6 +276,7 @@ Feature: Physical application workspace boundaries
       And no environment variable is read
       And no ready-made client, lazy proxy or module singleton is exported
 
+    @unimplemented
     @architecture @prisma @typecheck
     Scenario: Product behaviour does not move into the Prisma client package
       Given a feature persists relational state
@@ -264,6 +287,7 @@ Feature: Physical application workspace boundaries
       And contract and web packages do not import @langwatch/prisma-client
       And no product package re-exports the generated Prisma surface
 
+    @unimplemented
     @integration @prisma @runtime
     Scenario: Standalone processes own separate Prisma clients
       Given API and worker run as separate processes
@@ -272,6 +296,7 @@ Feature: Physical application workspace boundaries
       And each closes its client through its own resource scope
       And closing one process does not depend on the other process
 
+    @unimplemented
     @integration @prisma @runtime
     Scenario: Combined development shares Prisma explicitly
       Given local development hosts API and worker in one process
@@ -290,6 +315,7 @@ Feature: Physical application workspace boundaries
       And its worker command starts the worker
       And no additional image is required by the source split
 
+    @unimplemented
     @integration @deployment
     Scenario: No new network service is required
       Given a deployment worked before the application workspace split
@@ -307,6 +333,7 @@ Feature: Physical application workspace boundaries
       And first boot installs the @langwatch/server workspace closure
       And the operator is not required to install a renamed package
 
+    @unimplemented
     @architecture @build
     Scenario: Each application graph can be checked independently
       Given the four application manifests and their workspace dependencies
@@ -317,6 +344,7 @@ Feature: Physical application workspace boundaries
 
   Rule: Migration stages remain runnable and temporary seams disappear
 
+    @unimplemented
     @architecture @migration
     Scenario: Migration lint prevents new debt while allowing the baseline to shrink
       Given platform/app still contains legacy application-boundary edges
@@ -327,6 +355,7 @@ Feature: Physical application workspace boundaries
       And removing an edge requires removing its baseline entry
       And the completed split has no migration baseline
 
+    @unimplemented
     @architecture @migration
     Scenario: Product behaviour moves vertically before its application root
       Given reusable product behaviour still lives inside platform/app
@@ -339,6 +368,7 @@ Feature: Physical application workspace boundaries
       And the still-runnable application consumes those package exports
       And no application root becomes a replacement product implementation package
 
+    @unimplemented
     @integration @migration
     Scenario: Every extraction stage preserves supported entry points
       Given one planned extraction stage has been applied
@@ -347,6 +377,7 @@ Feature: Physical application workspace boundaries
       And the production API still serves the UI artifact
       And no deployment topology change is required to adopt that stage
 
+    @unimplemented
     @architecture @migration
     Scenario: Retiring the monolithic package leaves no compatibility layer
       Given the last supported caller has moved out of platform/app

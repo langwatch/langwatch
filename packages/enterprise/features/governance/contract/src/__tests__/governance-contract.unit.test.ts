@@ -6,6 +6,7 @@ import {
 } from "../index";
 
 describe("governance contract", () => {
+  /** @scenario "A pull schedule is validated portably" */
   it("uses a runnable five-field pull schedule", () => {
     expect(isValidPullSchedule("*/15 * * * *")).toBe(true);
     expect(isValidPullSchedule("0 0 30 2 *")).toBe(false);

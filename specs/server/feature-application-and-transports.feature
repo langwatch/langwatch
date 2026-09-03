@@ -48,7 +48,7 @@ Feature: The feature application and its transports
 
   # ─── The typed context ──────────────────────────────────────────────────
 
-  @unimplemented @unit
+  @unit
   Scenario: The context exposes the application the composition root supplied
     Given a transport composed with a feature application
     When a handler reads the application off its context
@@ -77,14 +77,14 @@ Feature: The feature application and its transports
     When any of the input schema, the output schema or the access policy is absent
     Then the endpoint does not compile
 
-  @unimplemented @unit
+  @unit
   Scenario: A handler receives validated input and returns a value
     Given an endpoint with a declared input schema
     When a request arrives
     Then the handler receives input already validated against that schema
     And it returns a value rather than composing a response
 
-  @unimplemented @unit
+  @unit
   Scenario: A handler is given input only when input was declared
     Given an endpoint that declares no input schema
     Then its handler is given no input to read
@@ -96,7 +96,7 @@ Feature: The feature application and its transports
     Then its handler answers with nothing
     And returning a value from it does not compile
 
-  @unimplemented @unit
+  @unit
   Scenario: Answering requires an output schema
     Given an endpoint whose handler returns a value
     When no output schema is declared
@@ -116,27 +116,27 @@ Feature: The feature application and its transports
     When that field is not in the input schema
     Then the endpoint does not compile
 
-  @unimplemented @integration
+  @integration
   Scenario: A caller may not reach a scope their credential does not cover
     Given a caller holding a permission in their own project
     And a request naming a different project in its input
-    When the request reaches either transport
+    When the request reaches the REST transport
     Then it is refused
     And the refusal does not disclose whether the named project exists
 
-  @unimplemented @unit
+  @unit
   Scenario: Authorization is decided after the input is validated
     Given an endpoint whose permission is bound to an input field
     Then the scope is read from the validated input
     And never from the unvalidated request
 
-  @unimplemented @unit
+  @unit
   Scenario: The transport owns the response
     Given a handler that returns a value
     Then the framework renders it for that transport
     And the handler never names a status code, an envelope or a content type
 
-  @unimplemented @unit
+  @unit
   Scenario: The transport owns the failure
     Given a handler that throws a handled error
     Then the framework maps it to that transport's refusal, with its code

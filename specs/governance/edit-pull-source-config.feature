@@ -11,24 +11,28 @@ Feature: Edit the configuration of a pull-mode ingestion source
 
   Rule: A stored secret is never shown, and never has to be re-typed
 
+    @unit
     Scenario: The edit form opens with the secret field empty
       When the admin opens the edit form for the source
       Then the adapter configuration fields are shown
       And the admin API key field is empty
       And the field explains that leaving it blank keeps the current key
 
+    @unit
     Scenario: Saving without touching the secret keeps the existing credential
       When the admin changes only the display name
       And saves the form
       Then the submitted configuration carries no credentials key at all
       And the stored upstream credential is unchanged
 
+    @unit
     Scenario: Entering a new secret replaces the stored one
       When the admin enters a new admin API key
       And saves the form
       Then the submitted configuration carries the new key
       And the stored credential is replaced with an encrypted envelope
 
+    @unit
     Scenario: A stored envelope is never sent back to the server
       When the admin saves the form without changing anything
       Then the submitted configuration carries no encrypted envelope
@@ -36,21 +40,24 @@ Feature: Edit the configuration of a pull-mode ingestion source
 
   Rule: Adapter settings are validated before they reach the database
 
+    @unit
     Scenario: A backfill start date is normalized before saving
       When the admin enters a backfill start of "2026-08-01"
       And saves the form
       Then the stored backfill start is a timezone-carrying instant
 
+    @unit
     Scenario: An invalid bucket width is rejected at save time
       When the admin enters a bucket width of "5m"
       And saves the form
       Then the form reports the value as invalid
       And the source configuration is left unchanged
 
+    @unit
     Scenario: An invalid cron expression is rejected at save time
       When the admin enters a pull schedule of "not a cron"
       And saves the form
-      Then the form reports the schedule as invalid
+      Then the save is refused
       And the source configuration is left unchanged
 
   Rule: A setting that can no longer take effect is not offered as editable
@@ -59,16 +66,43 @@ Feature: Edit the configuration of a pull-mode ingestion source
     # after the first successful run is accepted and then ignored. An input
     # that silently does nothing is worse than no input.
 
+    @unit
     Scenario: Backfill start is editable before the source has run
       Given the source has not yet completed a pull
       When the admin opens the edit form
       Then the backfill start is editable
 
-    Scenario: Backfill start is not editable once the cursor has moved
+    @unit
+    Scenario: Backfill start is not editable once a usage cursor has moved
       Given the source has completed at least one pull
+      And the source is configured for the usage report
       When the admin opens the edit form
       Then the backfill start is shown but cannot be changed
-      And the form explains that the cursor has already moved past it
+
+    # The cost cursor binds the backfill start into its own identity, so moving
+    # the start discards the cursor and re-reads the widened window. That is the
+    # repair lever for wrong early figures; locking it would send an admin to
+    # archive-and-recreate to correct a number.
+    @unit
+    Scenario: Backfill start stays editable on a cost source that has pulled
+      Given the source has completed at least one pull
+      And the source is configured for the cost report
+      When the admin opens the edit form
+      Then the backfill start is still editable
+
+    # Claiming an immutability we cannot justify is the worse error.
+    @unit
+    Scenario: A source whose stored configuration names no report is not locked
+      Given the source has completed at least one pull
+      And the stored configuration carries no report
+      When the admin opens the edit form
+      Then no adapter field is locked
+
+    Scenario: A locked backfill start says why it is locked
+      Given the source has completed at least one pull
+      And the source is configured for the usage report
+      When the admin opens the edit form
+      Then the form explains that the cursor has already moved past it
 
   Rule: The report kind is fixed once a source has pulled
 
@@ -78,12 +112,14 @@ Feature: Edit the configuration of a pull-mode ingestion source
     # start and its events land beside the old ones under different ids —
     # nothing collides, nothing complains, and the same money is counted twice.
 
+    @unit
     Scenario: The report cannot be changed once a cursor exists
       Given the source has completed at least one pull
       When the admin submits a change of report
       Then the save is refused
-      And the refusal points at archiving and recreating the source instead
+      And the form locks the report rather than offering a save the server refuses
 
+    @unit
     Scenario: A source that starts pulling mid-save does not lose the rule
       Given the source has not yet completed a pull
       And the admin submits a change of report

@@ -9,29 +9,37 @@ Feature: Enterprise governance package boundary
       And technical execution is delegated through narrow capability ports
       And governance does not own those features' transport or persistence engines
 
+    @unit
     Scenario: A new governance subject is deliberate
-      Given the governance package has declared source subjects
-      When source for a new subject is added
-      Then architecture lint rejects it until feature.json declares the subject
-      And the boundary ADR and feature specification describe its ownership
+      Given packages/features/catalogue.json declares every subject governance owns
+      And the governance feature.json selects only its layout version
+      When governance source introduces a module for a subject the catalogue withholds
+      Then architecture lint reports the module and names the feature that owns the subject
+      And adding that subject to the governance feature.json is refused in its own right
+      And it does not suppress the violation it was written to legitimise
+      And the boundary ADR and feature specification describe any catalogue expansion
 
+  @unit
   Scenario: A pull schedule is validated portably
     Given a five-field UTC cron schedule
     When the governance contract validates it
     Then runnable schedules are accepted
     And impossible schedules are rejected
 
+  @unit
   Scenario: Pull outcomes cannot regress the projected cursor
     Given a completed pull has advanced a source cursor
     When an older completion arrives later
     Then the projected cursor remains at the newer completion
 
+  @unit
   Scenario: Governance signals remain idempotent at the event store
     Given a virtual-key lifecycle event or a budget crossing is recorded
     When the same governed fact is submitted again
     Then the lifecycle identity is scoped to its subject and occurrence
     And the budget identity is scoped to its bucket, kind, and period
 
+  @unit
   Scenario: Pulled usage keeps money lossless
     Given a provider-reported decimal USD value
     When governance prices the observation
@@ -44,6 +52,7 @@ Feature: Enterprise governance package boundary
     Then governance chooses between the governance and project homes
     And the application remains responsible for authentication and redirect transport
 
+  @unit
   Scenario: Governance evaluates quarantine fill without owning trace storage
     Given the application supplies a governance tenant and trace-activity reader
     When governance evaluates the current quarantine fill window
@@ -56,11 +65,13 @@ Feature: Enterprise governance package boundary
     Then the rule scope, severity, threshold and destinations are validated by the Governance contract
     And Postgres access remains behind the Governance server repository
 
+  @unit
   Scenario: Anomaly rule reads are tenant scoped
     Given an anomaly rule belongs to one organization
     When another organization requests that rule by identifier
     Then Governance returns no rule
 
+  @unit
   Scenario: Spend spike decisions are deterministic
     Given a valid spend spike threshold and current and baseline spend windows
     When Governance evaluates the threshold
@@ -87,6 +98,7 @@ Feature: Enterprise governance package boundary
     And a missing target is not reported as a successful assignment
     And the department remains an accounting dimension rather than an access grant
 
+  @unit
   Scenario: OCSF export uses a stable compound cursor
     Given Governance has OCSF events ordered by event time and event identifier
     When a security consumer requests an export page
@@ -94,6 +106,7 @@ Feature: Enterprise governance package boundary
     And an organization without a Governance tenant receives an empty page
     And ClickHouse remains behind the injected event reader
 
+  @unit
   Scenario: Ingestion template authoring is tenant safe and auditable
     Given an organization can see platform templates and its own templates
     When an administrator creates, updates, clones or archives a template

@@ -248,6 +248,7 @@ describe("feature package boundary lint", () => {
   });
 
   /** @scenario Every feature package owns a complete architecture record */
+  /** @scenario "A new durable domain changes its architecture records" */
   it("rejects an incomplete feature boundary ADR", () => {
     featurePackage({ feature: "agent", role: "contract" });
     write(
@@ -256,6 +257,14 @@ describe("feature package boundary lint", () => {
     );
 
     expect(policies()).toContain("architecture-record");
+
+    // The Gherkin half of the record is required too: a catalogued feature
+    // whose root carries an ADR but no executable specification is the same
+    // undocumented expansion, and must fail the same gate.
+    rmSync(join(root, "packages/features/agent/specs"), { recursive: true });
+    expect(
+      lintWorkspace({ root, declarations: false }).map((violation) => violation.message),
+    ).toContain("Every documented feature boundary must own at least one Gherkin spec.");
   });
 
   /** @scenario Web production code cannot acquire backend dependencies */
@@ -580,6 +589,7 @@ describe("strict feature source layout", () => {
   });
 
   /** @scenario Central subjects make broad feature ownership explicit */
+  /** @scenario "Every production subject has exactly one owner" */
   it("rejects contract and server modules that claim another feature subject", () => {
     featurePackage({ feature: "anomaly-rule", role: "contract" });
     featurePackage({
@@ -634,14 +644,37 @@ describe("strict feature source layout", () => {
     expect(policies()).toContain("feature-catalogue");
   });
 
+  /** @scenario "A local manifest cannot broaden a feature" */
+  /** @scenario "A new governance subject is deliberate" */
   it("rejects local subject ownership expansion", () => {
-    featurePackage({ feature: "governance", role: "contract" });
+    featurePackage({ feature: "project", role: "contract" });
+    featurePackage({ feature: "governance", role: "server" });
+    write(
+      "packages/features/governance/server/src/services/project.service.ts",
+      "export class ProjectService { static create() { return new ProjectService(); } }",
+    );
     write(
       "packages/features/governance/feature.json",
       JSON.stringify({ layoutVersion: 0, subjects: ["project"] }),
     );
 
-    expect(policies()).toContain("feature-source-subject");
+    const violations = lintWorkspace({ root, declarations: false }).filter(
+      (violation) => violation.policy === "feature-source-subject",
+    );
+    const messages = violations.map((violation) => violation.message);
+
+    // The local manifest is refused in its own right...
+    expect(messages).toContain(
+      "feature.json may only select layoutVersion; feature ownership is declared centrally.",
+    );
+    // ...and it does not suppress the claim it was written to legitimise.
+    expect(
+      violations.some(
+        (violation) =>
+          violation.file.includes("project.service.ts") &&
+          violation.message.includes('belongs to the singular "project" feature'),
+      ),
+    ).toBe(true);
   });
 });
 

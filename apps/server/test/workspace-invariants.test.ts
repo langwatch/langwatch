@@ -313,6 +313,7 @@ describe("the repo is a single pnpm workspace", () => {
   });
 
   describe("when the published package manifest is read", () => {
+    /** @scenario "The self-host command remains compatible" */
     it("keeps publishing ownership in apps/server", () => {
       const root = readJson("package.json") as {
         name?: string;
@@ -396,6 +397,7 @@ describe("the repo is a single pnpm workspace", () => {
 
   describe("when the end-user install arguments are built", () => {
     /** @scenario The install still refuses to drift from the lockfile */
+    /** @scenario "The self-host command remains compatible" */
     it("pins both install passes to the lockfile and to the app's closure", () => {
       // Both invariants an `npx @langwatch/server` first boot depends on:
       // --frozen-lockfile makes the install reproducible-or-failed, and the

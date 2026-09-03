@@ -154,6 +154,7 @@ describe("WorkflowStudioCopyService", () => {
     });
 
     describe("when it is copied with its datasets", () => {
+      /** @scenario "Copying referenced datasets uses the Dataset service" */
       it("copies each referenced dataset once, however many nodes name it", async () => {
         const { service, datasets } = build();
 
@@ -173,6 +174,7 @@ describe("WorkflowStudioCopyService", () => {
         ]);
       });
 
+      /** @scenario "Copying referenced datasets uses the Dataset service" */
       it("points every reference to that dataset at the copy, name included", async () => {
         const { service } = build();
 
@@ -194,6 +196,7 @@ describe("WorkflowStudioCopyService", () => {
         });
       });
 
+      /** @scenario "Copying referenced datasets uses the Dataset service" */
       it("leaves a parameter the node does not declare as a dataset alone", async () => {
         const { service } = build();
 

@@ -7,7 +7,6 @@
 # Enterprise catalogue membership remains owned by
 # ../../packages/enterprise/specs/enterprise-catalogue.feature.
 
-@unimplemented
 Feature: Singular feature ownership
   As a platform maintainer
   I want each product domain to have one singular feature and service boundary
@@ -15,6 +14,7 @@ Feature: Singular feature ownership
 
   Rule: Durable product domains have separate singular owners
 
+    @unimplemented
     @architecture @catalogue
     Scenario Outline: Primary product domains remain separate features
       Given the product domain <domain>
@@ -40,6 +40,7 @@ Feature: Singular feature ownership
         | dataset        | packages/features/dataset        |
         | topic          | packages/features/topic          |
 
+    @unimplemented
     @architecture @naming
     Scenario: Feature roots and package names use the singular catalogue identifier
       Given a governed feature is registered in the ownership catalogue
@@ -48,6 +49,7 @@ Feature: Singular feature ownership
       And contract, server, and web package names derive from that identifier
       And a plural alias is not accepted as a second feature root
 
+    @unimplemented
     @architecture @granularity
     Scenario: A subordinate endpoint remains with its product owner
       Given user profile and user avatar have separate compatibility URLs
@@ -55,6 +57,7 @@ Feature: Singular feature ownership
       Then both delegate to the canonical User service
       And no avatar service package or caller-owned user repository exists
 
+    @unimplemented
     @architecture @granularity
     Scenario: Related independently useful domains do not collapse into a theme
       Given a use case combines a project, API key, model provider, prompt, and dataset
@@ -62,6 +65,7 @@ Feature: Singular feature ownership
       Then each durable domain retains its own feature service contract
       And the use case composes those contracts without creating an AI configuration feature
 
+    @unimplemented
     @architecture @granularity
     Scenario: Analytical products do not collapse into the query engine
       Given Dashboard owns dashboards, graphs, saved workbench charts, and ordering
@@ -70,6 +74,7 @@ Feature: Singular feature ownership
       Then they consume the canonical Analytics service
       And Analytics does not own their durable lifecycle
 
+    @unimplemented
     @architecture @granularity
     Scenario: Shared GitHub lifecycle does not belong to one consumer
       Given Coding Agent and Langy both use GitHub installations and pull-request linkage
@@ -102,6 +107,7 @@ Feature: Singular feature ownership
 
   Rule: Features collaborate through one canonical service
 
+    @unimplemented
     @architecture @typecheck
     Scenario: A feature consumes another feature through its contract
       Given Governance needs project information
@@ -110,6 +116,7 @@ Feature: Singular feature ownership
       And it imports no Project repository, Project server implementation, or generated Project persistence type
       And it declares no GovernanceProjectService
 
+    @unimplemented
     @architecture @service
     Scenario: Public cross-feature capability is a service contract
       Given a feature has a contract, server implementation, and private persistence
@@ -120,6 +127,7 @@ Feature: Singular feature ownership
 
   Rule: Core and Enterprise ownership remain truthful
 
+    @unimplemented
     @architecture @licensing
     Scenario: SaaS remains inside the Enterprise source-license boundary
       Given SaaS deployment integrations contain Enterprise-licensed vendor integration source
@@ -129,6 +137,7 @@ Feature: Singular feature ownership
       And the Enterprise catalogue contains saas
       And deployment-mode activation is not described as an Enterprise entitlement gate
 
+    @unimplemented
     @architecture @ops
     Scenario: Platform administration belongs to core Ops
       Given backoffice administration and operational tooling are available to every installation
@@ -138,6 +147,7 @@ Feature: Singular feature ownership
       And no packages/enterprise/features/admin root remains
       And existing admin routes may remain thin compatibility transports
 
+    @unimplemented
     @architecture @governance
     Scenario: Governance owns governance behaviour only
       Given Governance needs user, project, personal-workspace, virtual-key, or model-provider behaviour
@@ -147,6 +157,7 @@ Feature: Singular feature ownership
 
   Rule: Ownership migration preserves compatibility
 
+    @unimplemented
     @integration @api
     Scenario: Existing API paths survive a feature move
       Given a REST, RPC, or tRPC endpoint is moved behind a feature service
@@ -154,6 +165,7 @@ Feature: Singular feature ownership
       Then the compatibility adapter delegates to the canonical service
       And the response and handled-error contract remain compatible
 
+    @unimplemented
     @architecture @migration
     Scenario: Feature extraction remains vertical and incremental
       Given the monolith still owns unextracted behaviour

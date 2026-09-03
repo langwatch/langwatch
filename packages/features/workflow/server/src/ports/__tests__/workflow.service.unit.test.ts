@@ -272,6 +272,7 @@ describe("WorkflowService", () => {
     expect(studioEvents.enriched).toEqual([]);
   });
 
+  /** @scenario "A workflow definition is versioned through one service" */
   it("creates, versions and publishes through the repository boundary", async () => {
     const workflowService = ServerWorkflowService.create({
       repository: new FakeWorkflowRepository(),
@@ -289,6 +290,41 @@ describe("WorkflowService", () => {
     });
     expect(result.version.workflowId).toBe(result.workflow.id);
     expect(result.workflow.publishedId).toBe(result.version.id);
+    // The version carries the portable envelope the service stamps, not the
+    // caller's raw DSL object.
+    expect(result.version.dsl).toMatchObject({
+      name: "Triage",
+      workflow_id: result.workflow.id,
+      state: {},
+    });
+  });
+
+  /** @scenario "Published version selection is tenant scoped" */
+  it("does not resolve a published version for another project", async () => {
+    const repository = new FakeWorkflowRepository();
+    const workflowService = service(repository);
+    const version = await repository.createVersion({
+      id: "version_1",
+      workflowId: "workflow_1",
+      projectId: "project_1",
+      parentId: null,
+      version: "1",
+      autoSaved: false,
+      commitMessage: "first",
+      dsl: { name: "Triage", version: "1", nodes: [], edges: [] },
+    });
+    await repository.publish({
+      id: "workflow_1",
+      projectId: "project_1",
+      versionId: version.id,
+    });
+
+    await expect(
+      workflowService.getPublishedVersion({
+        workflowId: "workflow_1",
+        projectId: "project_2",
+      }),
+    ).rejects.toThrow();
   });
 
   it("throws a concrete error when a workflow is not published", async () => {
@@ -325,6 +361,7 @@ describe("WorkflowService", () => {
     ]);
   });
 
+  /** @scenario "Version history preserves the Studio response" */
   it("returns version history with the same sparse tags and previous DSL as the transport", async () => {
     const repository = new FakeWorkflowRepository();
     const previous = await repository.createVersion({
@@ -393,6 +430,7 @@ describe("WorkflowService", () => {
     ]);
   });
 
+  /** @scenario "Restoring an old version migrates its graph" */
   it("restores the migrated graph and updates the workflow display metadata", async () => {
     const repository = new FakeWorkflowRepository();
     const version = await repository.createVersion({
@@ -423,6 +461,7 @@ describe("WorkflowService", () => {
     });
   });
 
+  /** @scenario "Published version selection is tenant scoped" */
   it("validates and dispatches a resolved published version through the execution port", async () => {
     const repository = new FakeWorkflowRepository();
     const execution = new FakeWorkflowExecutionPort();

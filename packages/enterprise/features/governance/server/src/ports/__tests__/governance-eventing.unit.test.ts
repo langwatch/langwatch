@@ -302,6 +302,7 @@ describe("governance Eventing adapters", () => {
 });
 
 describe("governance signal eventing", () => {
+  /** @scenario "Governance signals remain idempotent at the event store" */
   it("keeps virtual-key lifecycle appends ordered and idempotent per subject", async () => {
     const data = {
       tenantId: "project-1",
@@ -327,6 +328,7 @@ describe("governance signal eventing", () => {
     });
   });
 
+  /** @scenario "Governance signals remain idempotent at the event store" */
   it("keys a budget crossing once per bucket, kind, and billing period", async () => {
     const data = {
       tenantId: "project-1",
@@ -381,6 +383,7 @@ describe("ingestion pull process and projection", () => {
     processKey: "source-1",
   };
 
+  /** @scenario "Pull outcomes cannot regress the projected cursor" */
   it("does not let a superseded completion regress the process cursor", () => {
     const state: IngestionPullProcessState = {
       sourceId: "source-1",
@@ -437,6 +440,7 @@ describe("ingestion pull process and projection", () => {
     expect(result.nextWakeAt).toBe(902_000);
   });
 
+  /** @scenario "Pull outcomes cannot regress the projected cursor" */
   it("does not let an older projected completion regress the run cursor", () => {
     const projection = IngestionPullRunStatusEventingProjection.create({
       tryLoad: async () => null,

@@ -52,6 +52,7 @@ describe("QuarantineFillEvaluatorService", () => {
     });
   });
 
+  /** @scenario "Governance evaluates quarantine fill without owning trace storage" */
   it("computes spans per minute and the default threshold", async () => {
     const stats = await evaluator(
       new StubTraceActivityPort([
@@ -78,6 +79,7 @@ describe("QuarantineFillEvaluatorService", () => {
     expect(stats.exceeded).toBe(true);
   });
 
+  /** @scenario "Governance evaluates quarantine fill without owning trace storage" */
   it("drops unattributed rows from both the breakdown and total", async () => {
     const stats = await evaluator(
       new StubTraceActivityPort([
@@ -103,6 +105,7 @@ describe("QuarantineFillEvaluatorService", () => {
     expect(stats).toMatchObject({ spanCount: 0, rate: 0, exceeded: false });
   });
 
+  /** @scenario "Governance evaluates quarantine fill without owning trace storage" */
   it("rejects composition without a ClickHouse capability", async () => {
     await expect(
       evaluator().evaluate({ organizationId: ORGANIZATION_ID }),

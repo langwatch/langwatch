@@ -71,7 +71,8 @@ function runtimeStage(dockerfile: string): string {
   return dockerfile.slice(lastFrom.index);
 }
 
-const stage = runtimeStage(readFileSync(DOCKERFILE_PATH, "utf-8"));
+const dockerfile = readFileSync(DOCKERFILE_PATH, "utf-8");
+const stage = runtimeStage(dockerfile);
 const workspacePackages = packagesByName();
 
 /** Workspace packages the three applications need at runtime (prod deps only). */
@@ -110,6 +111,30 @@ describe("given the runtime image assembles its node_modules", () => {
         storeCopy,
         "the store copy must precede the app copy — the app tree is symlinks into it",
       ).toBeLessThan(appCopy);
+    });
+
+    /** @scenario "API and worker remain commands in the same image" */
+    it("starts the API by default and leaves the worker a command in the same image", () => {
+      // One runtime stage, two commands. The default CMD is the API; the
+      // worker is the same image run with its own start script from its own
+      // working directory (charts/langwatch/templates/workers/deployment.yaml
+      // sets workingDir /app/apps/worker and runs `pnpm run start`). A second
+      // image would show up here as a second runtime FROM.
+      const runtimeStages = [...dockerfile.matchAll(/^FROM .*$/gm)].filter(
+        (match) => !/\bAS\s+builder\b/.test(match[0]),
+      );
+      expect(runtimeStages).toHaveLength(1);
+
+      const cmd = /^CMD .*$/m.exec(stage)?.[0] ?? "";
+      expect(cmd, "the runtime stage must declare a default command").not.toBe("");
+      expect(cmd).toContain("/app/apps/api");
+
+      const worker: { scripts?: Record<string, string> } = JSON.parse(
+        readFileSync(path.join(REPO_ROOT, "apps/worker/package.json"), "utf-8"),
+      );
+      expect(worker.scripts?.start, "the worker command the image runs").toContain(
+        "worker.entrypoint.ts",
+      );
     });
 
     it("names no monolith path", () => {

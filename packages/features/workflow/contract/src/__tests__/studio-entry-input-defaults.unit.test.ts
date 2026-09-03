@@ -30,6 +30,7 @@ describe("entryInlineWithDefaults", () => {
   });
 
   describe("given a column that is present but has missing cells", () => {
+    /** @scenario "New Studio workflows use portable templates and entry defaults" */
     it("fills only the null/undefined cells and leaves provided values", () => {
       const fields: Field[] = [{ identifier: "lang", type: "str", value: "en" }];
 
@@ -73,6 +74,7 @@ describe("applyEntryInputDefaults", () => {
     }) as unknown as StudioWorkflow;
 
   describe("given an entry node with a defaulted input missing from the dataset", () => {
+    /** @scenario "New Studio workflows use portable templates and entry defaults" */
     it("backfills the entry's inline dataset with the default", () => {
       const workflow = workflowWithEntry({
         outputs: [

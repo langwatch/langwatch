@@ -130,6 +130,7 @@ describe("serveStaticOrFallback", () => {
   });
 
   describe("when a non-asset route is requested", () => {
+    /** @scenario "The production API serves the built UI artifact" */
     it("returns the SPA index.html as text/html", async () => {
       const res = await fetch(`${baseUrl}/projects/foo/traces`);
       expect(res.status).toBe(200);

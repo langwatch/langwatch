@@ -609,3 +609,103 @@ was already `@regression @unit` and unbound. The new pin test satisfies the regr
 sentence too ("no retention mutation is issued"), so it binds both — that is the single scenario
 the unbound count fell by. Its second clause there, "trace follows the 49-day retention policy",
 remains a rider.
+
+---
+
+## Lane 2 and 3 ledger — 2026-09-03
+
+Six of the seven files land; `oxc-toolchain.feature` does not, for the reason below. 46 scenarios
+newly enforced and bound, zero left unbound.
+
+| Feature file | Bound | Untagged, with reason |
+| --- | --- | --- |
+| `packages/enterprise/features/governance/specs/governance.feature` | **10 of 19** — S2 (rewritten), S3, S4, S5, S6, S8, S10, S11, S15, S16 | S1 "orchestrates rather than absorbs" — no test; the only evidence is the server manifest, and governance legitimately depends on `@langwatch/{project,trace}-server`, so a naive contracts-only assertion would be false. S7 persona home — "the application remains responsible for authentication and redirect transport" has no subject in the resolver's own test. S9 anomaly-rule validation — the clause enumerates scope, severity, threshold and destinations; only threshold and rule type are ever rejected. S12 anomaly delivery — clause 3 names an SSRF-safe adapter that **nothing constructs**: `SsrfSafeAnomalyAlertHttpAdapter` and `startSpendSpikeAnomalyWorker` have zero callers repo-wide. S13 storage syntax — the ClickHouse half lives in `composition/api/src/governance/governance-kpis.clickhouse.repository.ts`, which has no test file. S14 departments — "an accounting dimension rather than an access grant" has no permission surface to assert against. S17 platform catalog reconcile — `syncPlatformCatalog` is called by no test; the memory repository's copy is dead scaffolding. S18 transports — the Hono half of the `When` is false: no Hono route resolves governance setup state. S19 contracts are transport independent — true, but the repo's import-graph walker runs backend→browser only. |
+| `packages/features/workflow/specs/workflow-service.feature` | **8 of 21** — S1, S2, S3, S4, S7, S16 (reworded), S17, S19 | S5 — the Studio half of "Studio or execution materialises" is `transport/api-trpc/workflow.api.ts:540`, and `server/src/transport/` has no `__tests__` directory. S6 — `studioClientEventSchema` is never the subject of a test, the browser half has zero references, and the optimizer parameter shape is untested. S8, S9, S10, S11, S13 — each ends in an "application composition supplies X" clause that the platform deletion falsified: the create mutation, the project queries and dialogs, the Experiment renderers, the compatibility imports and the secrets transport are all inside Workflow Web now. Reworded and bound only where a test proves the reworded claim (S16). S12 — `buildLlmSignatureNode` has no test. S14 — `WorkflowNodeHostProvider` and `useWorkflowNodeHost` appear in no test file at all. S15 (reworded to the truth: one node registry, one inline default edge, canvas mounted by Workflow Web) — still no test; its only neighbour reads the component source with `fs.readFileSync` and a regex. S18 — `StudioEventPreparerService` sequences enrich-then-materialize and has no test file; swap the two lines and the package stays green. S20 — no test calls `POST /workflows/:id/evaluate`, and neither permission gate is exercised. S21 — "validates required entry inputs and model credentials" reaches two `ValidationError` throws no test has ever reached. |
+| `specs/governance/edit-pull-source-config.feature` | **13 of 15+3** — S1–S8, the three rewritten backfill-lock scenarios, S10 (clause 4 amended), S11 | "A locked backfill start says why it is locked" — the copy lives in an unexported `PullConfigEditFields`; no test renders it. "A pull-mode source is not told its ingest secret is immutable", "A push-mode source is told both are immutable", "Editing is reachable from the detail page", "A viewer without manage permission cannot edit" — all four need a render of `SourceEditDrawer` / `IngestionSourceDetailPage` that nobody has written; the closest existing test asserts the *list*'s Add button and is already bound elsewhere. |
+| `specs/server/feature-application-and-transports.feature` | **8 of 19** — S4, S8, S9, S11, S14, S15, S16, S17 | S1 — "it receives every service and port the feature's operations use" is not a testable proposition as written. S2, S3, S18, S19 — the two-door family: **no test in the repo drives both transports**, and none compares a REST refusal code with a tRPC one. S5 — clause 2 is false on the REST door, which restates the caller as a framework-owned `RequestActor`. S6 — the implementation contradicts it: `ServiceContext` extends Hono's `Context`, so `c.get("things")` is the dominant idiom in this very test file. S7, S12, S13 — compile-refusal scenarios with no `@ts-expect-error` or `expectTypeOf` anywhere near them; `public-rest.unit.test.ts`'s module-scope `AssertTrue<…>` aliases are real but sit outside any `it(`, so the checker cannot see them. S10 — its Given is refused by the implementation: `assertRouteDef` throws when no output schema is declared, so "an endpoint that declares no output schema" has no subject. |
+| `specs/dependencies/application-workspace-boundaries.feature` | **4 of 36** — "Importing the Prisma client package has no process side effects", "The production API serves the built UI artifact", "API and worker remain commands in the same image", "The self-host command remains compatible" | `@unimplemented` moved from the feature to the 32 scenarios no test proves. Of the eight other binding-tagged ones: "Unlicensed self-hosted deployments retain enterprise discovery" and "Moving EE source does not change enterprise availability" have no test. "Development keeps the UI and API processes separate" — `vite-browser-entry.unit.test.ts` proves only the root-discovery proxy, not `/api`, and neither of the other two clauses. "Contributor environment files survive removal of the monolithic package" — the bats overlay suite pins what `.env.dev-up` contains, not that the root `.env` is the source of truth. "Standalone processes own separate Prisma clients" — the API half is proven by `api-database.infrastructure.unit.test.ts`; the worker has no equivalent. "Combined development shares Prisma explicitly" and its sibling name `tools/dev-runtime`, **which does not exist**: the repo went to three processes instead. "No new network service is required" and "Every extraction stage preserves supported entry points" have no test. |
+| `specs/dependencies/singular-feature-ownership.feature` | **3 of 16** — "Every production subject has exactly one owner", "A local manifest cannot broaden a feature", "A new durable domain changes its architecture records" | `@unimplemented` moved from the feature to the 13 scenarios no test proves. The only other binding-tagged one, "Existing API paths survive a feature move", needs a compatibility-adapter test nobody has written. The rest carry `@architecture`/`@catalogue`/`@granularity` tags, which do not bind. |
+| `specs/dependencies/oxc-toolchain.feature` | **0 — left as it was** | Its eleven binding-tagged scenarios have no test between them, and the one with a real fixture suite cannot be bound at all: `LangWatch house rules keep executable fixtures` is served by `packages/architecture-lint/tests/oxlint-plugin.test.mjs`, and the parity checker's `TEST_FILE_RE` is `/\.test\.tsx?$/`, so **no `.mjs` file can carry a binding**. Everything else is a CI-behaviour or command-behaviour claim with no runner: the nearest thing in the tree is `check-queue.test.ts`'s assertion that `oxlint` and `oxfmt` are the shimmed tools of the root checks, which serves two `@architecture` scenarios that do not bind. The census's "11 bindable" counted binding *tags*, not scenarios a test proves. |
+
+### Where a test was tightened rather than trusted
+
+- **feature-package-boundaries** — `rejects local subject ownership expansion` now writes a
+  governance `project.service.ts` beside the local manifest and asserts both halves: the manifest
+  is refused in its own right, *and* it does not suppress the claim it was written to legitimise
+  (`belongs to the singular "project" feature`). `rejects an incomplete feature boundary ADR` now
+  also proves the Gherkin half of the record, by removing the specs directory and asserting
+  `Every documented feature boundary must own at least one Gherkin spec.`
+- **governance** — a new `refuses a cost outside the exactly-representable nano-USD range` reaches
+  the `pulled-usage-pricing.service.ts` guard that no test had ever reached; a new
+  `encrypts a freshly typed credential on the edit path, not only on create` proves the update
+  path encrypts, which was asserted only on create.
+- **apps/api** — a new `starts the API by default and leaves the worker a command in the same
+  image` pins the single runtime stage, the default `CMD` under `/app/apps/api`, and the worker's
+  own start script. The wrong-project refusal moved out of the version-selection test into
+  `refuses a project the credential does not cover without saying whether it exists`, which now
+  asserts the body names neither the project nor "not found".
+- **packages/api** — `exposes the process app directly on the handler context` carries a
+  `@ts-expect-error` on an operation the composed app does not expose, which is the scenario's
+  second clause and is load-bearing under `pnpm typecheck`. `installs no input validation` now
+  spies the handler and asserts the framework passed `undefined`, twice. `rejects a validated
+  project target…` declares `z.string().trim()` and adds a padded request that can only be
+  accepted if the scope is read post-validation. `refuses a raw Response…` now asserts the
+  transport kept the content type and dropped the handler's bytes.
+- **workflow** — `creates, versions and publishes…` now pins the portable envelope the service
+  stamps (`workflow_id`, `state`); a new `does not resolve a published version for another
+  project` closes the tenant clause the fake repository could not prove on its own; a new
+  `ships no model, leaving the project's resolved default to fill it` closes the template clause.
+
+### Spec text corrected before binding
+
+1. **`governance.feature` S2 was factually inverted.** It said lint "rejects it until `feature.json`
+   declares the subject". `packages/architecture-lint/src/workspace.ts:84` rejects *any* key but
+   `layoutVersion` with "feature.json may only select layoutVersion; feature ownership is declared
+   centrally", and subjects live in `packages/features/catalogue.json` (governance owns 22 there).
+   Rewritten to that truth and bound to `rejects local subject ownership expansion`.
+2. **`edit-pull-source-config.feature`'s backfill lock was unconditional.** `isBackfillStartLocked`
+   (`governance-inventory.screen.tsx:1190`) is `hasPulled && report === "usage"` — deliberately, as
+   its own comment explains: the cost cursor binds `startingAt` into its identity, so moving the
+   start is the repair lever for wrong early figures. Split into a usage lock, a cost-editable
+   scenario and a no-report scenario, all three bound; the "explains why it is locked" copy became
+   its own untagged scenario. S10's "the refusal points at archiving and recreating" was also
+   false of the refusal — that copy is client-side, rendered because `lockedParserKeys` locks the
+   report — so the clause now says what the form does.
+3. **`workflow-service.feature` S15's `edgeTypes` registry does not exist.** The only `edgeTypes`
+   in the tree is `useMemo(() => ({ default: WorkflowEdge }), [])` at
+   `optimization-studio.tsx:500`; there is a node registry (`workflow-nodes.registry.ts`) and no
+   edge registry, and `apps/ui` imports no `@xyflow` at all, so "the application mounts" was wrong
+   too. Reworded to the truth and left untagged, since no test asserts either half. S16's
+   "application port" became "injected drawer port" for the same reason — the picker-flow adapters
+   moved into Workflow Web — and that one *is* bound.
+4. **`feature-application-and-transports.feature` S14 said "either transport".** Only the REST door
+   is exercised; narrowed to it rather than tagging a claim about both.
+
+### Gate, before and after
+
+```
+before  Enforced: 1376 file(s) · Legacy: 15 file(s) · Inert: 391 file(s)
+        FAIL: 4629 unbound scenario(s) in enforced files, 352 unknown annotation(s),
+              28 file(s) enforce no scenario at all
+
+after   Enforced: 1376 file(s) · Legacy: 15 file(s) · Inert: 380 file(s)
+        FAIL: 4628 unbound scenario(s) in enforced files, 352 unknown annotation(s),
+              17 file(s) enforce no scenario at all
+```
+
+The fatal-inert count is a moving target while other lanes land: it read 30, then 28, in two runs
+minutes apart before this lane touched anything. Six of the eleven cleared between those two
+measurements are this lane's; the rest are not. The unbound count did not move for this lane —
+every scenario tagged here was annotated in the same pass — and the single unbound scenario
+recovered is another lane's.
+
+### Two findings worth acting on outside this lane
+
+1. **`packages/architecture-lint/tests/oxlint-plugin.test.mjs` can never bind a scenario.** The
+   checker's `TEST_FILE_RE` is `/\.test\.tsx?$/`, so its thirteen RuleTester fixture suites are
+   invisible to the gate. Widening the regex to `.test.mjs` is a one-line change that would make
+   `oxc-toolchain.feature`'s only fixture-backed scenario bindable, but it recomputes bindings
+   repo-wide and should land on its own.
+2. **Two governance wiring gaps, not test gaps.** `SsrfSafeAnomalyAlertHttpAdapter` and
+   `startSpendSpikeAnomalyWorker` have no callers anywhere in `apps/` or `packages/`. The whole
+   spend-spike anomaly delivery path describes behaviour no process currently starts.

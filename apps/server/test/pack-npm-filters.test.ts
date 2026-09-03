@@ -285,6 +285,7 @@ describe("npm pack staging filters", () => {
 
   describe("the published manifest", () => {
     /** @scenario Every entry point the published package advertises resolves inside it */
+    /** @scenario "The self-host command remains compatible" */
     it("relocates every advertised entry point onto the staged layout", () => {
       const root = buildFixture(["apps/api/src/config.ts"]);
       const stageDir = join(root, "_stage");

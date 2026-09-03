@@ -90,6 +90,7 @@ describe("IngestionTemplateService", () => {
     expect(rows[0]?.ottlRules).toBe("");
   });
 
+  /** @scenario "Ingestion template authoring is tenant safe and auditable" */
   it("validates source type before persistence", async () => {
     const repository = new MemoryIngestionTemplateRepository();
     const service = IngestionTemplateService.create({ repository });
@@ -123,6 +124,7 @@ describe("IngestionTemplateService", () => {
     );
   });
 
+  /** @scenario "Ingestion template authoring is tenant safe and auditable" */
   it("refuses platform mutation without exposing another organization", async () => {
     const repository = new MemoryIngestionTemplateRepository();
     const service = IngestionTemplateService.create({ repository });

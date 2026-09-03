@@ -1,23 +1,27 @@
 Feature: Workflow service boundary
 
+  @unit
   Scenario: A workflow definition is versioned through one service
     Given a valid workflow DSL
     When the Workflow service creates the workflow
     Then it persists the definition and its first version
     And callers receive portable Workflow contract values
 
+  @unit
   Scenario: Published version selection is tenant scoped
     Given a workflow with a published version in a project
     When the service resolves its published version
     Then it returns that version
     And a workflow from another project is not visible
 
+  @unit
   Scenario: Version history preserves the Studio response
     Given a workflow has current, latest, published and parent versions
     When the service lists its version history
     Then it returns the author and sparse version tags
     And it includes DSL only in the requested history mode
 
+  @unit
   Scenario: Restoring an old version migrates its graph
     Given a persisted workflow version uses an older graph shape
     When the service restores that version
@@ -35,6 +39,7 @@ Feature: Workflow service boundary
     When a browser or server consumes the event
     Then it validates the same Zod 4 contract and optimizer parameter shape
 
+  @unit
   Scenario: New Studio workflows use portable templates and entry defaults
     Given a user creates a blank or custom-evaluator workflow
     When an inline entry dataset is materialized
@@ -82,18 +87,21 @@ Feature: Workflow service boundary
     When a node needs application-only execution or dataset data
     Then Workflow uses its injected browser host port
 
-  Scenario: Canvas renderer and edge registries use the Workflow browser surface
-    Given the application mounts a Workflow React Flow canvas
+  Scenario: The canvas resolves its renderers from the Workflow browser surface
+    Given the Workflow browser surface mounts the React Flow canvas
     When it resolves node or default-edge renderers
-    Then it consumes the Workflow browser registries
+    Then node renderers come from the Workflow node registry
+    And the single default edge renderer is wrapped inline
     And the application retains only page and host composition
 
-  Scenario: Node selection transitions use named application drawer ports
+  @unit
+  Scenario: Node selection transitions use named drawer host ports
     Given a prompt, evaluator, or agent node is dropped on the canvas
     When the user selects, creates, or cancels the resource
     Then Workflow updates the placeholder and selection through its store
-    And the application port performs only drawer navigation and callback wiring
+    And the injected drawer port performs only navigation and callback wiring
 
+  @unit
   Scenario: Execution materializes a saved entry dataset through DatasetService
     Given a Studio execution event references a saved entry dataset
     When Workflow materializes the event with an injected DatasetService
@@ -105,6 +113,7 @@ Feature: Workflow service boundary
     Then Workflow enriches the event before materializing referenced datasets
     And application transports do not copy the preparation helper
 
+  @unit
   Scenario: Copying referenced datasets uses the Dataset service
     Given a workflow copy includes referenced datasets
     When Workflow copies the definition into another project

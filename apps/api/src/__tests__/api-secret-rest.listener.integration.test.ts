@@ -127,10 +127,6 @@ describe("standalone Secret REST listener", () => {
     const conflict = await api.fetch("/api/v1/secrets?projectId=project-1", {
       headers: { ...credentials, "X-API-Version": "v2" },
     });
-    const wrongProject = await api.fetch("/api/secret?projectId=project-2", {
-      headers: { ...credentials },
-    });
-
     expect(explicit.headers.get("X-API-Version-Status")).toBe("stable");
     expect(explicit.headers.get("X-API-Version")).toBe("v1");
     expect(latest.headers.get("X-API-Version-Status")).toBe("latest");
@@ -141,8 +137,23 @@ describe("standalone Secret REST listener", () => {
     await expect(unsupported.json()).resolves.toMatchObject({ code: "invalid_api_version" });
     expect(conflict.status).toBe(400);
     await expect(conflict.json()).resolves.toMatchObject({ code: "api_version_conflict" });
+  });
+
+  /** @scenario "A caller may not reach a scope their credential does not cover" */
+  it("refuses a project the credential does not cover without saying whether it exists", async () => {
+    const api = await startApi();
+
+    const wrongProject = await api.fetch("/api/secret?projectId=project-2", {
+      headers: { ...credentials },
+    });
+
     expect(wrongProject.status).toBe(403);
-    await expect(wrongProject.json()).resolves.toMatchObject({ code: "project_input_mismatch" });
+    const body = (await wrongProject.text()).toLowerCase();
+    expect(JSON.parse(body)).toMatchObject({ code: "project_input_mismatch" });
+    // The refusal is the same whether or not project-2 is real, so it must not
+    // name it, quote it back, or say it was not found.
+    expect(body).not.toContain("project-2");
+    expect(body).not.toContain("not found");
   });
 
   it("resolves the credential, checks the declared permission and attributes the write", async () => {

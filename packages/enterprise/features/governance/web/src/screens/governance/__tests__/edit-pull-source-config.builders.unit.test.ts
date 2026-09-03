@@ -31,6 +31,7 @@ import {
 import { composer } from "./edit-pull-source-config.fixture";
 
 describe("buildAnthropicAdminPullConfig on the edit path", () => {
+  /** @scenario "Saving without touching the secret keeps the existing credential" */
   it("given a blank secret, omits the credentials key entirely so the stored one is kept", () => {
     const config = buildAnthropicAdminPullConfig(
       composer({ credentialsToken: "", report: "usage", bucketWidth: "1h" }),
@@ -45,6 +46,7 @@ describe("buildAnthropicAdminPullConfig on the edit path", () => {
     expect(Object.keys(config!)).not.toContain("credentials");
   });
 
+  /** @scenario "A backfill start date is normalized before saving" */
   it("given a blank secret, still validates and normalizes every other field", () => {
     const config = buildAnthropicAdminPullConfig(
       composer({
@@ -62,6 +64,7 @@ describe("buildAnthropicAdminPullConfig on the edit path", () => {
     expect(parsed.startingAt).toBe("2026-08-01T00:00:00.000Z");
   });
 
+  /** @scenario "Entering a new secret replaces the stored one" */
   it("given a freshly typed secret, carries it so the stored one is replaced", () => {
     const config = buildAnthropicAdminPullConfig(
       composer({ credentialsToken: "sk-ant-admin-new", report: "usage" }),
@@ -73,6 +76,7 @@ describe("buildAnthropicAdminPullConfig on the edit path", () => {
     });
   });
 
+  /** @scenario "An invalid bucket width is rejected at save time" */
   it("given an invalid bucket width, refuses the save on the edit path too", () => {
     // A real token, deliberately: with a blank one this would return null
     // whether or not the bucket width was ever checked, and the test would
@@ -144,6 +148,7 @@ describe("buildEditedParserConfig", () => {
     expect(next.workspaceId).toBe("ws_kept");
   });
 
+  /** @scenario "Saving without touching the secret keeps the existing credential" */
   it("carries no credentials key when the secret was left blank", () => {
     const rebuilt = buildAnthropicAdminPullConfig(
       composer({ credentialsToken: "", report: "usage" }),
@@ -160,6 +165,7 @@ describe("buildEditedParserConfig", () => {
     expect(next).not.toHaveProperty("credentials");
   });
 
+  /** @scenario "A stored envelope is never sent back to the server" */
   it("drops a stored envelope rather than replaying it to the server", () => {
     const next = buildEditedParserConfig({
       sourceType: "anthropic_admin",
@@ -248,6 +254,7 @@ describe("buildEditSubmission", () => {
     expect(submit({ name: "   " }).submission).toBeNull();
   });
 
+  /** @scenario "An invalid bucket width is rejected at save time" */
   it("given a pull field the adapter cannot parse, refuses the save", () => {
     // Nothing validates pullConfig server-side, so a bad bucket width saved
     // here would sit in the row looking fine and fail on every pull.
@@ -319,6 +326,7 @@ describe("buildEditSubmission", () => {
     expect(submission?.parserConfig.sharedSecretLastFour).toBe("9931");
   });
 
+  /** @scenario "Saving without touching the secret keeps the existing credential" */
   it("trims the name and nulls an emptied description", () => {
     const { submission } = submit({ name: "  Renamed  ", description: "   " });
 
@@ -332,6 +340,7 @@ describe("buildEditSubmission", () => {
     expect(submit().submission?.parserConfig).not.toHaveProperty("credentials");
   });
 
+  /** @scenario "Entering a new secret replaces the stored one" */
   it("carries a freshly typed secret so the stored one is replaced", () => {
     const { submission } = submit({
       parserConfig: {

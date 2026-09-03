@@ -118,6 +118,7 @@ describe("PrismaIngestionTemplateRepository", () => {
    * a recorded transaction, rather than by a suite that needs a database.
    */
   describe("when an organization template is created", () => {
+    /** @scenario "Ingestion template authoring is tenant safe and auditable" */
     it("writes the row and its audit entry in one transaction", async () => {
       const prisma = transactionalPrisma();
       const repository = PrismaIngestionTemplateRepository.create(prisma.database);
