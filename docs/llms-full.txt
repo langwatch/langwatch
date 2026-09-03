@@ -10070,7 +10070,7 @@ Every block emits:
 
 ---
 title: Gateway provider settings
-description: Gateway-specific settings (fallback priority, provider config overrides) now live on each ModelProvider's Advanced tab.
+description: Gateway-specific settings (Fallback priority, Provider config (JSON)) now live on each ModelProvider's Advanced (Gateway) section.
 sidebarTitle: Gateway provider settings
 ---
 
@@ -10094,7 +10094,7 @@ Folding the gateway-specific fields onto the ModelProvider itself collapses the 
 | Bound to a project | Lives at any of `ORGANIZATION`, `TEAM`, `PROJECT` scope (see [Scope](#scope)) |
 | `slot` (free-form label) | Removed. VKs now reference ModelProviders by id directly; the routing policy carries the ordered list |
 | `rate_limit.rpm`, `.tpm`, `.rpd` | The same inputs are on the **ModelProvider → Advanced (Gateway)** tab. The gateway does not read them. See [Rate limits](/ai-gateway/rate-limits) for the limits it does enforce |
-| `fallback_priority_global` | Same field, on the Advanced tab. Default-policy ordering uses this then `createdAt` |
+| `fallback_priority_global` | Same field, on the **Advanced (Gateway)** tab. Default-policy ordering uses this then `createdAt` |
 | `provider_credential_id` (VK reference) | VKs reference `model_provider_id` directly |
 
 For the new wire shape of the bundle a VK resolves to, see the [`/config/:vk_id` contract](/ai-gateway/api/management#config-vk-id) and the `vk-config-bundle.feature` spec.
@@ -10104,7 +10104,7 @@ For the new wire shape of the bundle a VK resolves to, see the [`/config/:vk_id`
 1. Open **Settings → Model Providers**.
 2. Pick (or create) the provider you want gateway traffic to use.
 3. Switch to the **Advanced (Gateway)** tab inside the editor drawer.
-4. Fill in the gateway-only fields (fallback priority, providerConfig JSON overrides). The provider credential itself (API key, region, endpoint) stays on the **Basic** tab and is reused by both the gateway and the rest of LangWatch.
+4. Fill in the gateway-only fields, **Fallback priority** and **Provider config (JSON)**. The provider credential itself (API key, region, endpoint) stays on the **Basic** tab and is reused by both the gateway and the rest of LangWatch.
 5. Save. The new settings reach the gateway within ~30 s via the `/changes` long-poll.
 
 ## Scope
@@ -10135,7 +10135,7 @@ Free-form JSON merged onto the ModelProvider's basic config at gateway-dispatch 
 
 ### Read-only diagnostic block
 
-The Advanced tab also surfaces health status, circuit-breaker state, and the last `disabledAt` timestamp. These are populated by the gateway; the operator can't write them directly.
+The **Advanced (Gateway)** tab also surfaces health status, circuit-breaker state, and the last `disabledAt` timestamp. These are populated by the gateway; the operator can't write them directly.
 
 ## Multiple deployments of the same provider
 
@@ -10145,7 +10145,7 @@ Create a second ModelProvider row of the same family (e.g. two OpenAI rows for `
 
 - [Virtual keys](/ai-gateway/virtual-keys): multi-scope semantics and how a VK's eligible-provider set is computed.
 - [Concepts](/ai-gateway/concepts): mental model for the gateway primitives.
-- [RBAC](/ai-gateway/rbac): `modelProviders:manage` gates the Advanced tab; the old `gatewayProviders:*` resource is retired.
+- [RBAC](/ai-gateway/rbac): `modelProviders:manage` gates the **Advanced (Gateway)** tab; the old `gatewayProviders:*` resource is retired.
 - [Rate limits](/ai-gateway/rate-limits): RPM and RPD on a virtual key, which is where the gateway enforces them.
 
 ---
