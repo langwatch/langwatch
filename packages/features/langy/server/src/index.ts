@@ -117,13 +117,19 @@ export type {
 } from "./adapters/langy-worker-http.adapter";
 export { NullLangyWorkerMetricsAdapter } from "./adapters/null-langy-worker-metrics.adapter";
 export { UnavailableLangyWorkerAdapter } from "./adapters/unavailable-langy-worker.adapter";
-export { LangyWorkerMetricsPort, LangyWorkerPort } from "./ports/langy-turn-runtime.port";
+export {
+  LANGY_UI_ACTIONS_FLAG,
+  LangyUiActionSurfacePort,
+  LangyWorkerMetricsPort,
+  LangyWorkerPort,
+} from "./ports/langy-turn-runtime.port";
 export type {
   LangyWorkerCancelInput,
   LangyWorkerDispatchInput,
   LangyWorkerProbeInput,
   LangyWorkerWarmInput,
 } from "./ports/langy-turn-runtime.port";
+export { FeatureFlagLangyUiActionSurfaceAdapter } from "./adapters/feature-flag.langy-ui-action-surface.adapter";
 export { createLangyConversationProcessingPipeline } from "./adapters/eventing.langy-conversation.adapter";
 export type { LangyConversationProcessingPipelineDeps } from "./adapters/eventing.langy-conversation.adapter";
 export {
@@ -247,10 +253,7 @@ export {
   type LangyRestCredentialPorts,
   type LangyRestCredentialReader,
 } from "./transport/api-rest/langy-rest.credentials";
-export {
-  LANGY_API_KEY_TURNS_FLAG,
-  LANGY_UI_ACTIONS_FLAG,
-} from "./transport/api-rest/langy-rest.flags";
+export { LANGY_API_KEY_TURNS_FLAG } from "./transport/api-rest/langy-rest.flags";
 export { hasLangyAccess, LANGY_RELEASE_FLAG } from "./services/langy-access.service";
 export {
   resolveLangyActorSession,

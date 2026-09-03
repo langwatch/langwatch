@@ -85,6 +85,7 @@ describe("PostgresLangyAdapter", () => {
         revoke: vi.fn(),
       },
       context: { render: vi.fn(() => null) },
+      uiActionSurface: { resolve: vi.fn(async () => true) },
       metrics: { count: vi.fn() },
     });
     const database: LangyDatabase = undefined!;
@@ -179,6 +180,7 @@ function compositionOptions() {
     perDayPrCap: 0,
     sessionKeys: { mint: vi.fn(), revoke: vi.fn() },
     context: { render: vi.fn(() => null) },
+    uiActionSurface: { resolve: vi.fn(async () => true) },
     metrics: { count: vi.fn() },
   });
 }

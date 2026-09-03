@@ -89,14 +89,17 @@ export abstract class LangyTurnContextPort {
   abstract render(input: { context: object; isUiActionSurfaceOpen: boolean }): string | null;
 }
 
+/** The rollout flag `LangyUiActionSurfacePort.resolve` evaluates. */
+export const LANGY_UI_ACTIONS_FLAG = "release_langy_ui_actions" as const;
+
 /**
  * Answers whether the live UI-action channel is open for this turn.
  *
  * The turn block advertises `langwatch ui actions` only while the dispatch
  * route would answer it; with the flag off that route is a dark 404, and an
  * agent sent there spends the turn on a surface that behaves as if it were
- * never deployed. Optional: a composition that supplies no resolver leaves the
- * channel advertised, which is the flag's own default.
+ * never deployed. Never throws: a flag-store blip must not stop the turn, and
+ * must fail toward the closed channel — see the adapter for that contract.
  */
 export abstract class LangyUiActionSurfacePort {
   abstract resolve(input: {

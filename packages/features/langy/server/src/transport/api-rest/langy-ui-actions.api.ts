@@ -39,7 +39,7 @@ import {
   type UiActionRedis,
 } from "#services/langy-ui-action.service";
 import { LangyTokenBuffer } from "#streaming/langy-token-buffer";
-import { LANGY_UI_ACTIONS_FLAG } from "./langy-rest.flags";
+import { LANGY_UI_ACTIONS_FLAG } from "#ports/langy-turn-runtime.port";
 import {
   resolveLangyRestCaller,
   type LangyRestCredentialPorts,

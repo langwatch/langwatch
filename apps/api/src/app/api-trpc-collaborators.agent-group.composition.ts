@@ -86,6 +86,7 @@ import type { EventSourcing } from "@langwatch/eventing";
 import { PrismaScheduledJobStore } from "@langwatch/eventing/server";
 import { HandledError, NotFoundError } from "@langwatch/handled-error";
 import {
+  FeatureFlagLangyUiActionSurfaceAdapter,
   LangyApp,
   LangyTokenBuffer,
   LangyTurnAccessStore,
@@ -172,8 +173,7 @@ import {
   composeApiAgentPipelines,
   type ApiAgentPipelines,
 } from "./api-agent-pipelines.composition";
-import type { AnyApiTrpcCollaborators } from "../app-trpc/app-trpc.collaborators";
-import type { ApiTrpcFeatureApplication, ApiTrpcPortsContext } from "../app-trpc/app-trpc.context";
+import type { ApiTrpcPortsContext } from "../app-trpc/app-trpc.context";
 import type { ApiAuditPort } from "../api-request.policy";
 import type { AppTrpcDeclaredCheck } from "../app-trpc/app-trpc.policy-kit";
 import type { LangyTrpcGates } from "../features/langy/langy-trpc.mount";
@@ -566,42 +566,6 @@ export function composeApiAgentGroupCollaborators(
   };
 }
 
-/**
- * Folds this half into whatever the other halves supplied.
- *
- * Merged rather than replacing, and the application slice merged field by
- * field, for the reason {@link ApiTrpcCollaborators.application} states: a
- * request carries ONE application.
- *
- * `ops` is written here even though the identity half already writes a narrow
- * `isAdmin` reader into the same slot. That is deliberate and it is not a
- * conflict: the operator SURFACE reads the whole application, the narrow reader
- * (the SSO connection door, which gates on the staff list rather than on
- * `ops:*`) is satisfied by it unchanged, and one object answering both is the
- * only shape in which the staff list cannot differ between the two doors.
- */
-export function withApiAgentGroupCollaborators(
-  base: AnyApiTrpcCollaborators | undefined,
-  group: ApiAgentGroupCollaborators | undefined,
-): AnyApiTrpcCollaborators | undefined {
-  if (!base || !group) return base;
-  return {
-    ...base,
-    scenarios: group.ports.scenarios,
-    langy: group.ports.langy,
-    langyGates: group.ports.langyGates,
-    langyEgress: group.ports.langyEgress,
-    ops: group.ports.ops,
-    opsCheck: group.ports.opsCheck,
-    application: {
-      ...base.application,
-      scenarios: group.scenarios,
-      suites: group.suites,
-      langy: group.langy,
-      ops: group.ops,
-    } as ApiTrpcFeatureApplication,
-  } as unknown as AnyApiTrpcCollaborators;
-}
 
 // ---------------------------------------------------------------------------
 // Scenario and Suite
@@ -858,6 +822,7 @@ function composeLangy(
     // The one turn port that answers for real here: rendering the composer's
     // context chips is pure, and the contract package owns it.
     context: { render: renderLangyTurnContext },
+    uiActionSurface: FeatureFlagLangyUiActionSurfaceAdapter.create(options.featureFlags),
     metrics: { count: () => undefined },
     accessStore: redis ? LangyTurnAccessStore.create({ redis }) : null,
     handoffStore: redis ? LangyTurnHandoffStore.create({ redis }) : null,

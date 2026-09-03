@@ -57,6 +57,7 @@ function makeDeps(over: Partial<LangyTurnServiceDeps> = {}) {
       revoke: vi.fn(async () => undefined),
     },
     context: { render: vi.fn(() => null) },
+    uiActionSurface: { resolve: vi.fn(async () => true) },
     metrics: { count: vi.fn() },
     admission: {
       claim: vi.fn(async () => ({

@@ -64,6 +64,7 @@ function makeFixture(over: Partial<LangyTurnServiceDeps> = {}) {
       revoke: vi.fn(async () => undefined),
     },
     context: { render: vi.fn(() => null) },
+    uiActionSurface: { resolve: vi.fn(async () => true) },
     metrics: { count: vi.fn() },
     admission: {
       claim: vi.fn(async () => ({
@@ -160,6 +161,27 @@ describe("LangyTurnService.startConversationTurn ui-action surface", () => {
       expect(prompt).not.toContain("langwatch ui actions");
       // The rest of the screen context still travels.
       expect(prompt).toContain("my-exp");
+    });
+
+    /** @scenario A flag-store blip must not stop the turn, and must not advertise a surface it could not confirm */
+    it("starts the turn with the channel closed when the flag store fails", async () => {
+      const fixture = makeFixture({
+        context: { render: renderLangyTurnContext },
+        uiActionSurface: {
+          resolve: vi.fn(async () => {
+            throw new Error("flag store unavailable");
+          }),
+        },
+      } as unknown as Partial<LangyTurnServiceDeps>);
+
+      await LangyTurnService.create(fixture.deps).startConversationTurn({
+        ...input,
+        turnContext: experimentContext,
+      });
+
+      const [dispatched] = fixture.dispatch.mock.calls[0] as unknown as [{ prompt: string }];
+      expect(dispatched.prompt).not.toContain("langwatch ui actions");
+      expect(dispatched.prompt).toContain("my-exp");
     });
   });
 });
