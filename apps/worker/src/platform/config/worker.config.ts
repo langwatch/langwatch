@@ -1,10 +1,22 @@
 import {
   assertObservabilityDoesNotSelfIngest,
+  authzConfigDefinition,
+  clickhouseConfigDefinition,
   Config,
-  environmentBooleanSchema,
+  egressConfigDefinition,
   environmentOneOrTrueSchema,
+  githubAppConfigDefinition,
+  groupQueueConfigDefinition,
+  licensingConfigDefinition,
+  loggerConfigDefinition,
+  mailConfigDefinition,
+  objectStorageConfigDefinition,
+  observabilityConfigDefinition,
   parseDataplaneS3RoutingTable,
+  postgresConfigDefinition,
+  redisConfigDefinition,
   resolveTelemetryConfiguration,
+  runtimeIdentityConfigDefinition,
   RuntimeConfig,
   type ConfigValue,
 } from "@langwatch/config";
@@ -34,11 +46,6 @@ const PROCESS_CLOSE_SLACK_MS = 15_000;
 
 const optionalEnvironmentString = z.string().optional();
 
-/** Empty credentials mean that the AWS SDK's default provider chain is in use. */
-const optionalEnvironmentSecret = optionalEnvironmentString.transform((value) =>
-  value?.trim() ? value : undefined,
-);
-
 const optionalProxyValue = optionalEnvironmentString.transform((value) => {
   const trimmed = value?.trim();
   return trimmed || undefined;
@@ -47,34 +54,12 @@ const optionalProxyValue = optionalEnvironmentString.transform((value) => {
 export const workerConfigDefinition = RuntimeConfig.define({
   /** A standalone worker owns background consumer behaviour once installed. */
   processRole: Config.value(z.literal("worker").default("worker"), { env: "WORKER_PROCESS_ROLE" }),
-  environment: Config.value(z.string().min(1).default("local"), { env: "ENVIRONMENT" }),
-  nodeEnvironment: Config.value(
-    z.enum(["development", "test", "production"]).default("development"),
-    {
-      env: "NODE_ENV",
-    },
-  ),
+  ...runtimeIdentityConfigDefinition,
   serviceName: Config.value(z.string().min(1).default("langwatch:worker"), {
     env: "WORKER_SERVICE_NAME",
   }),
-  serviceVersion: Config.value(z.string().min(1).optional(), {
-    env: "SERVICE_VERSION",
-  }),
-  logger: {
-    format: Config.value(z.enum(["pretty", "json"]).optional(), { env: "LOG_FORMAT" }),
-    level: Config.value(z.string().min(1).optional(), { env: "LOG_LEVEL" }),
-    consoleLevel: Config.value(z.string().min(1).optional(), { env: "LOG_CONSOLE_LEVEL" }),
-    otelExportEnabled: Config.value(environmentBooleanSchema.optional(), {
-      env: "LOG_OTEL_EXPORT_ENABLED",
-    }),
-  },
-  observability: {
-    apiKey: Config.secret({ optional: true, env: "LANGWATCH_API_KEY" }),
-    endpoint: Config.url({ optional: true, env: "LANGWATCH_ENDPOINT" }),
-    processorType: Config.value(z.enum(["simple", "batch"]).default("batch"), {
-      env: "LANGWATCH_PROCESSOR_TYPE",
-    }),
-  },
+  logger: { ...loggerConfigDefinition },
+  observability: { ...observabilityConfigDefinition },
   shutdown: {
     queueDrainTimeoutMs: Config.value(optionalEnvironmentString, {
       env: "SHUTDOWN_DRAIN_TIMEOUT_MS",
@@ -88,9 +73,8 @@ export const workerConfigDefinition = RuntimeConfig.define({
    * retention, and a standalone worker has to be able to boot without one.
    */
   github: {
-    appId: Config.value(optionalEnvironmentString, { env: "GITHUB_LANGY_APP_ID" }),
+    ...githubAppConfigDefinition,
     privateKey: Config.secret({ optional: true, env: "GITHUB_LANGY_PRIVATE_KEY" }),
-    host: Config.value(optionalEnvironmentString, { env: "GITHUB_LANGY_HOST" }),
   },
   /**
    * Which product this deployment is, as the one variable both graphs read.
@@ -131,9 +115,7 @@ export const workerConfigDefinition = RuntimeConfig.define({
      * it is licensed at all. Blank is not a key, so it resolves to nothing
      * rather than to an empty string that would refuse every licence.
      */
-    licensePublicKey: Config.value(optionalEnvironmentString, {
-      env: "LANGWATCH_LICENSE_PUBLIC_KEY",
-    }),
+    licensePublicKey: licensingConfigDefinition.publicKey,
   },
   /**
    * The Stripe secret the monthly usage report is sent with.
@@ -201,30 +183,7 @@ export const workerConfigDefinition = RuntimeConfig.define({
    */
   mail: {
     baseHost: Config.value(optionalEnvironmentString, { env: "BASE_HOST" }),
-    defaultFrom: Config.value(optionalEnvironmentString, { env: "EMAIL_DEFAULT_FROM" }),
-    provider: Config.value(optionalEnvironmentString, { env: "EMAIL_PROVIDER" }),
-    ses: {
-      // Presence-based, exactly as the App reads it: existing deployments treat
-      // USE_AWS_SES=false as enabled, and changing that would select a
-      // different gateway at send time in one process and not the other.
-      enabled: Config.value(optionalEnvironmentString, { env: "USE_AWS_SES" }),
-      region: Config.value(optionalEnvironmentString, { env: "AWS_REGION" }),
-      endpoint: Config.value(optionalEnvironmentString, { env: "AWS_SES_ENDPOINT" }),
-    },
-    sendgrid: {
-      apiKey: Config.secret({ optional: true, env: "SENDGRID_API_KEY" }),
-    },
-    smtp: {
-      url: Config.secret({ optional: true, env: "SMTP_URL" }),
-      host: Config.value(optionalEnvironmentString, { env: "SMTP_HOST" }),
-      port: Config.value(optionalEnvironmentString, { env: "SMTP_PORT" }),
-      user: Config.value(optionalEnvironmentString, { env: "SMTP_USER" }),
-      password: Config.secret({ optional: true, env: "SMTP_PASSWORD" }),
-      secure: Config.value(optionalEnvironmentString, { env: "SMTP_SECURE" }),
-    },
-    resend: {
-      apiKey: Config.secret({ optional: true, env: "RESEND_API_KEY" }),
-    },
+    ...mailConfigDefinition,
   },
   /**
    * What the graph-alert half of Automation needs that is not a transport.
@@ -278,10 +237,7 @@ export const workerConfigDefinition = RuntimeConfig.define({
    * attribution for work the demo project does on a request path, and this
    * process serves none.
    */
-  authz: {
-    epochCache: Config.value(optionalEnvironmentString, { env: "AUTHZ_EPOCH_CACHE" }),
-    demoProjectId: Config.value(optionalEnvironmentString, { env: "DEMO_PROJECT_ID" }),
-  },
+  authz: { ...authzConfigDefinition },
   automation: {
     emailHourlyCap: Config.value(z.coerce.number().int().positive().default(100), {
       env: "TRIGGER_EMAIL_HOURLY_CAP",
@@ -500,9 +456,7 @@ export const workerConfigDefinition = RuntimeConfig.define({
      * ledger head and every read-side repository in this process live in the
      * same database the control plane writes.
      */
-    database: {
-      url: Config.value(optionalEnvironmentString, { env: "DATABASE_URL" }),
-    },
+    database: { ...postgresConfigDefinition },
     /**
      * The event store's endpoint, plus the per-organization private routes.
      *
@@ -511,50 +465,11 @@ export const workerConfigDefinition = RuntimeConfig.define({
      * (`CLICKHOUSE_URL__<label>__<organizationId>`), so there is no fixed set
      * to declare and the shared parser is what both processes read them with.
      */
-    clickhouse: {
-      url: Config.value(optionalEnvironmentString, { env: "CLICKHOUSE_URL" }),
-    },
-    redis: {
-      url: Config.value(optionalEnvironmentString, { env: "REDIS_URL" }),
-      clusterEndpoints: Config.value(optionalEnvironmentString, {
-        env: "REDIS_CLUSTER_ENDPOINTS",
-      }),
-      dbIndex: Config.value(optionalEnvironmentString, { env: "REDIS_DB_INDEX" }),
-    },
-    groupQueue: {
-      globalConcurrency: Config.value(optionalEnvironmentString, {
-        env: "GLOBAL_QUEUE_CONCURRENCY",
-      }),
-      zstdWritesEnabled: Config.value(optionalEnvironmentString, {
-        env: "GROUP_QUEUE_ZSTD_WRITES_ENABLED",
-      }),
-      msgpackWritesEnabled: Config.value(optionalEnvironmentString, {
-        env: "GROUP_QUEUE_MSGPACK_WRITES_ENABLED",
-      }),
-      tenantConcurrencyCap: Config.value(optionalEnvironmentString, {
-        env: "LANGWATCH_DISPATCH_TENANT_CAP",
-      }),
-      globalConcurrencyBudget: Config.value(optionalEnvironmentString, {
-        env: "LANGWATCH_DISPATCH_GLOBAL_BUDGET",
-      }),
-    },
+    clickhouse: { ...clickhouseConfigDefinition },
+    redis: { ...redisConfigDefinition },
+    groupQueue: { ...groupQueueConfigDefinition },
     storage: {
-      backend: Config.value(z.enum(["s3", "azure"]).optional(), {
-        env: "STORED_OBJECTS_BACKEND",
-      }),
-      localFilesystemRoot: Config.value(optionalEnvironmentString, {
-        env: "LANGWATCH_LOCAL_STORAGE_PATH",
-      }),
-      s3: {
-        bucket: Config.value(optionalEnvironmentString, { env: "S3_BUCKET_NAME" }),
-        endpoint: Config.value(optionalEnvironmentString, { env: "S3_ENDPOINT" }),
-        region: Config.value(optionalEnvironmentString, { env: "S3_REGION" }),
-        accessKeyId: Config.value(optionalEnvironmentSecret, { env: "S3_ACCESS_KEY_ID" }),
-        secretAccessKey: Config.value(optionalEnvironmentSecret, {
-          env: "S3_SECRET_ACCESS_KEY",
-        }),
-        sessionToken: Config.value(optionalEnvironmentSecret, { env: "S3_SESSION_TOKEN" }),
-      },
+      ...objectStorageConfigDefinition,
       /**
        * The operator's assertion that the Azure container reaps orphaned trace
        * spool objects.
@@ -573,40 +488,6 @@ export const workerConfigDefinition = RuntimeConfig.define({
       azureSpoolRetentionConfirmed: Config.value(environmentOneOrTrueSchema, {
         env: "AZURE_BLOB_SPOOL_RETENTION_CONFIRMED",
       }),
-      /**
-       * The Azure Blob account this process reads and writes dataset chunks
-       * through, mirroring the `AZURE_BLOB_*` block the App reads for the
-       * same purpose (`api.config.ts`). Interpreted nowhere here —
-       * `resolveAzureCredentials` is the one place that decides which auth
-       * mode applies.
-       */
-      azure: {
-        authMode: Config.value(optionalEnvironmentString, { env: "AZURE_BLOB_AUTH_MODE" }),
-        accountName: Config.value(optionalEnvironmentString, {
-          env: "AZURE_BLOB_ACCOUNT_NAME",
-        }),
-        accountKey: Config.value(optionalEnvironmentString, {
-          env: "AZURE_BLOB_ACCOUNT_KEY",
-        }),
-        container: Config.value(optionalEnvironmentString, { env: "AZURE_BLOB_CONTAINER" }),
-        endpoint: Config.value(optionalEnvironmentString, { env: "AZURE_BLOB_ENDPOINT" }),
-        authorityHost: Config.value(optionalEnvironmentString, {
-          env: "AZURE_BLOB_AUTHORITY_HOST",
-        }),
-        tokenAudience: Config.value(optionalEnvironmentString, {
-          env: "AZURE_BLOB_TOKEN_AUDIENCE",
-        }),
-        allowInsecureTokenEndpointForTests: Config.value(optionalEnvironmentString, {
-          env: "AZURE_BLOB_ALLOW_INSECURE_TOKEN_ENDPOINT_FOR_TESTS",
-        }),
-        identity: {
-          tenantId: Config.value(optionalEnvironmentString, { env: "AZURE_TENANT_ID" }),
-          clientId: Config.value(optionalEnvironmentString, { env: "AZURE_CLIENT_ID" }),
-          federatedTokenFile: Config.value(optionalEnvironmentString, {
-            env: "AZURE_FEDERATED_TOKEN_FILE",
-          }),
-        },
-      },
     },
     outboundProxy: {
       https: Config.value(optionalProxyValue, { env: "HTTPS_PROXY" }),
@@ -646,12 +527,7 @@ export const workerConfigDefinition = RuntimeConfig.define({
      * credential that saves on one screen and fails on the other.
      */
     modelProvider: {
-      blockLocalHttpCalls: Config.value(environmentOneOrTrueSchema, {
-        env: "BLOCK_LOCAL_HTTP_CALLS",
-      }),
-      allowedProxyHosts: Config.value(optionalEnvironmentString, {
-        env: "ALLOWED_PROXY_HOSTS",
-      }),
+      ...egressConfigDefinition,
       // Where the OpenAI-compatible execution proxy answers. The SAME variable
       // `apps/api` resolves its authoring model handles through, because a
       // model call this process makes and a model call that one makes must
@@ -1131,6 +1007,14 @@ export function resolveWorkerConfig(source: Readonly<Record<string, unknown>>): 
         s3: {
           ...value.infrastructure.storage.s3,
           region: resolveS3Region(value.infrastructure.storage.s3),
+          // The shared object-storage block carries these three as raw,
+          // untrimmed leaves (its s3 credential shape is the same one
+          // `apps/api` reads); this process trims blank-to-undefined itself,
+          // which is what the block's own dedicated `optionalEnvironmentSecret`
+          // transform used to do before the leaf moved into `@langwatch/config`.
+          accessKeyId: value.infrastructure.storage.s3.accessKeyId?.trim() || undefined,
+          secretAccessKey: value.infrastructure.storage.s3.secretAccessKey?.trim() || undefined,
+          sessionToken: value.infrastructure.storage.s3.sessionToken?.trim() || undefined,
         },
         azure: {
           backend: value.infrastructure.storage.backend ?? "s3",

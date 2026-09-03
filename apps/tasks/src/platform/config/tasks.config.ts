@@ -1,4 +1,10 @@
-import { Config, type ConfigValue, RuntimeConfig } from "@langwatch/config";
+import {
+  Config,
+  type ConfigValue,
+  objectStorageConfigDefinition,
+  runtimeIdentityConfigDefinition,
+  RuntimeConfig,
+} from "@langwatch/config";
 import { z } from "zod";
 
 /**
@@ -9,25 +15,25 @@ import { z } from "zod";
  * process refuses to boot. A task that actually needs the handle finds out
  * by name, at the moment it asks for it (`requirePrisma()`, ...), not at
  * boot.
+ *
+ * `storage` is the shared `objectStorageConfigDefinition` block, the same one
+ * `apps/api` and `apps/worker` bind — so `S3_BUCKET_NAME`, `STORED_OBJECTS_BACKEND`
+ * etc. mean the same thing here. `TasksHost.objectStorage`
+ * (`platform/infrastructure/tasks-stored-object-storage.adapter.ts`) is S3 +
+ * local-filesystem only; the `azure` leaves are read but unused today — see
+ * that file's Azure named-absence note.
  */
 export const tasksConfigDefinition = RuntimeConfig.define({
   databaseUrl: Config.value(z.string().min(1).optional(), { env: "DATABASE_URL" }),
   clickhouseUrl: Config.value(z.string().min(1).optional(), { env: "CLICKHOUSE_URL" }),
   redisUrl: Config.value(z.string().min(1).optional(), { env: "REDIS_URL" }),
-  objectStorageBucket: Config.value(z.string().min(1).optional(), {
-    env: "STORED_OBJECTS_BUCKET",
-  }),
+  storage: { ...objectStorageConfigDefinition },
   /** Consumed by `ModelProviderCredentialsMigrateTask`; absent means that
    * task refuses at run time rather than at catalogue construction. */
   credentialsSecret: Config.secret({ optional: true, env: "CREDENTIALS_SECRET" }),
   /** Comma-separated module specifiers loaded at boot; see task-modules-loader.ts. */
   taskModules: Config.value(z.string().optional(), { env: "LANGWATCH_TASK_MODULES" }),
-  nodeEnvironment: Config.value(
-    z.enum(["development", "test", "production"]).default("development"),
-    {
-      env: "NODE_ENV",
-    },
-  ),
+  nodeEnvironment: runtimeIdentityConfigDefinition.nodeEnvironment,
 });
 
 export type TasksConfig = ConfigValue<typeof tasksConfigDefinition>;

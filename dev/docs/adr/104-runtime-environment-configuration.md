@@ -263,3 +263,26 @@ behaviour.
   the system.
 - Caller-specific capabilities need a separate authenticated query instead of
   being placed in the convenient public configuration response.
+
+## Amendment 2026-09-04: shared config blocks move into `@langwatch/config`
+
+`apps/api`'s and `apps/worker`'s `RuntimeConfig.define` declarations carried
+59 identical environment bindings each — Postgres, Redis, ClickHouse, object
+storage (S3 and Azure), mail, GroupQueue, egress policy, observability,
+logger, AuthZ, runtime identity, licensing, and the shared Langy GitHub App
+leaves — because each runtime composes its own schema per this ADR's decision
+and had no shared vocabulary for the bindings every deployable process reads
+identically.
+
+Thirteen concern blocks now live as `packages/config/src/<concern>.config.ts`,
+each its own `RuntimeConfig.define` object in the style
+[ADR-001](../../../packages/config/adrs/001-shared-runtime-configuration.md)
+already established for `telemetryConfigDefinition`. `api.config.ts` and
+`worker.config.ts` spread the blocks they need into their own definition
+rather than repeating the leaves, so a binding's environment name and
+validation live in one place while each runtime still decides which blocks it
+installs and what it adds beside them — a per-app-only leaf, or a stricter
+validator, stays with the app that needs it. This does not change this ADR's
+decision that a runtime owns and composes its own schema: the shared package
+still reads no `process.env` itself and exports mechanics, not a global
+schema.
