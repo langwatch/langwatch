@@ -30,28 +30,18 @@ import { env } from "~/env.mjs";
 import { tryGetApp } from "~/server/app-layer/app";
 import {
   BACKUP_CODE_COUNT,
+  databaseHooks as composeDatabaseHooks,
   deploymentIsFederationCapable,
   identityBridgeCeremonies,
   identityCeremonies,
   identityStorageAdapter,
   resolveSignInMethodPolicy,
   sessionRevocation,
+  ssoAssertion,
   twoStepAccount,
 } from "~/server/app-layer/identity/runtime";
 import { prisma } from "~/server/db";
-import { fireActivityTrackingNurturing } from "../../../ee/billing/nurturing/hooks/activityTracking";
-import { ensureUserSyncedToCio } from "../../../ee/billing/nurturing/hooks/userSync";
 import { sendResetPasswordEmail } from "../mailer/resetPasswordEmail";
-import {
-  afterAccountCreate,
-  afterAccountUpdate,
-  afterSessionCreate,
-  afterUserCreate,
-  beforeAccountCreate,
-  beforeSessionCreate,
-  beforeUserCreate,
-  ssoAssertionDecision,
-} from "./hooks";
 import { isLastWayInPath, refuseIfItClosesTheLastDoor } from "./last-way-in";
 import { passkeySignUpRegistration } from "./passkey-signup";
 import { passkeyRelyingParty } from "./passkeyRelyingParty";
@@ -252,8 +242,7 @@ const plugins = [
      * lives here and not in a database hook.
      */
     resolveUser: async (input) =>
-      ssoAssertionDecision({
-        prisma,
+      ssoAssertion().decide({
         providerId: input.providerId,
         email: input.providerUser.email,
       }),
@@ -755,16 +744,14 @@ export const auth = betterAuth({
     user: {
       create: {
         before: async (user) =>
-          beforeUserCreate({
-            prisma,
+          composeDatabaseHooks().beforeUserCreate({
             user: user as {
               email: string;
               deactivatedAt?: Date | null;
             } & Record<string, unknown>,
           }),
         after: async (user) => {
-          await afterUserCreate({
-            prisma,
+          await composeDatabaseHooks().afterUserCreate({
             user: user as { id: string; email: string; name: string },
           });
         },
@@ -784,8 +771,7 @@ export const auth = betterAuth({
     account: {
       create: {
         before: async (account) => {
-          await beforeAccountCreate({
-            prisma,
+          await composeDatabaseHooks().beforeAccountCreate({
             account: {
               userId: account.userId,
               providerId: account.providerId,
@@ -805,8 +791,7 @@ export const auth = betterAuth({
         after: async (account) => {
           if (!account.userId || !account.providerId || !account.accountId)
             return;
-          await afterAccountCreate({
-            prisma,
+          await composeDatabaseHooks().afterAccountCreate({
             account: {
               userId: account.userId as string,
               providerId: account.providerId as string,
@@ -822,8 +807,7 @@ export const auth = betterAuth({
           // for users whose correct-provider account is already linked.
           if (!account.userId || !account.providerId || !account.accountId)
             return;
-          await afterAccountUpdate({
-            prisma,
+          await composeDatabaseHooks().afterAccountUpdate({
             account: {
               userId: account.userId as string,
               providerId: account.providerId as string,
@@ -853,8 +837,7 @@ export const auth = betterAuth({
          * answered, a passkey, a federated callback.
          */
         before: async (session, context) => {
-          const refusal = await beforeSessionCreate({
-            prisma,
+          const refusal = await composeDatabaseHooks().beforeSessionCreate({
             session: { userId: session.userId },
           });
           if (refusal === false) return false;
@@ -864,11 +847,8 @@ export const auth = betterAuth({
           });
         },
         after: async (session) => {
-          await afterSessionCreate({
-            prisma,
+          await composeDatabaseHooks().afterSessionCreate({
             userId: session.userId,
-            fireActivityTrackingNurturing,
-            ensureUserSyncedToCio,
           });
         },
       },

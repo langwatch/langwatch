@@ -10,6 +10,9 @@
  * is a closure passed from here — the packages read no env of their own.
  */
 
+import { fireActivityTrackingNurturing } from "@ee/billing/nurturing/hooks/activityTracking";
+import { fireSsoAutoAddNurturingCalls } from "@ee/billing/nurturing/hooks/ssoAutoAdd";
+import { ensureUserSyncedToCio } from "@ee/billing/nurturing/hooks/userSync";
 import { PlanTypes } from "@ee/billing/planTypes";
 import { platformSSOAllowed } from "@ee/sso/sso-gate";
 import { SsoLicenseRepository } from "@ee/sso/sso-license.repository";
@@ -57,11 +60,13 @@ import {
   OrganizationUserRole,
   type PrismaClient,
 } from "~/generated/prisma/client";
+import { captureException } from "~/utils/posthogErrorCapture";
 import { changeAuth0Password } from "../../auth0/passwordService";
 import {
   BORN_FINALIZED_SIGNUP_FLAG,
   BornFinalizedOptIn,
 } from "../../better-auth/bornFinalizedOptIn";
+import { BetterAuthDatabaseHooks } from "../../better-auth/hooks";
 import { LastWayInGuard } from "../../better-auth/last-way-in";
 import { PasskeySignUpRegistration } from "../../better-auth/passkey-signup";
 import { PasswordResetSessionBridge } from "../../better-auth/password-reset-session";
@@ -71,6 +76,7 @@ import { SignUpConfirmationEndpoint } from "../../better-auth/sign-up-confirmati
 import { prisma } from "../../db";
 import { featureFlagService } from "../../featureFlag";
 import { NOT_TARGETED } from "../../featureFlag/targeting";
+import { InviteService } from "../../invites/invite.service";
 import { sendAddressConfirmationEmail } from "../../mailer/addressConfirmationEmail";
 import { sendSignUpVerificationEmail } from "../../mailer/signUpVerificationEmail";
 import { trackServerEvent } from "../../posthog";
@@ -137,6 +143,7 @@ import {
   PrismaSignUpAccountDirectory,
   PrismaSignUpVerificationTokenStore,
 } from "./repositories/signup-verification.prisma.repository";
+import { PrismaSsoAccountReconciliationRepository } from "./repositories/sso-account-reconciliation.prisma.repository";
 import { PrismaSsoBreakGlassRepository } from "./repositories/sso-break-glass.prisma.repository";
 import { PrismaSsoConnectionIssuers } from "./repositories/sso-connection-issuers.prisma.repository";
 import { PrismaSsoConnectionProjectionRepository } from "./repositories/sso-connection-projection.prisma.repository";
@@ -147,6 +154,7 @@ import {
 } from "./repositories/sso-connection-reads.prisma.repository";
 import { SsoConnectionDomainRoutingRepository } from "./repositories/sso-connection-routing.prisma.repository";
 import { PrismaSsoCredentialStore } from "./repositories/sso-credential.prisma.repository";
+import { PrismaSsoMembershipRepository } from "./repositories/sso-membership.prisma.repository";
 import { ConnectionFirstDomainRoutingRepository } from "./repositories/sso-routing-connection-first.repository";
 import { IdentitySecretHealMigration } from "./secret-heal.migration";
 import {
@@ -170,6 +178,8 @@ import {
 } from "./signin-method-policy";
 import { SignUpVerificationService } from "./signup-verification.service";
 import { buildSignUpVerificationUrl } from "./signup-verification-link";
+import { SsoArrivalService } from "./sso-arrival.service";
+import { SsoAssertionService } from "./sso-assertion.service";
 import { SsoConnectionLedgerWriter } from "./sso-connection-ledger";
 import { HttpsDomainProofFileLookup } from "./sso-domain-file-lookup";
 import { HttpSsoIssuerDiscovery } from "./sso-issuer-discovery";
@@ -1173,6 +1183,95 @@ export function credentialAccounts(): CredentialAccountService {
     milestones: {
       signedUp: ({ userId }) =>
         trackServerEvent({ userId, event: "signed_up" }),
+    },
+  });
+}
+
+/**
+ * Whether an assertion from a customer's identity provider may become a
+ * session (ADR-129), over the connection projection and the membership rows.
+ *
+ * Composed per call like every other read surface here: it holds no state,
+ * and better-auth reaches it from a plugin callback rather than at module
+ * load.
+ */
+export function ssoAssertion(): SsoAssertionService {
+  return new SsoAssertionService({
+    connections: new PrismaSsoConnectionReadRepository(prisma),
+    memberships: new PrismaSsoMembershipRepository(prisma),
+  });
+}
+
+/**
+ * What happens to somebody arriving through a single sign-on connection, and
+ * to somebody whose address domain a legacy `Organization.ssoDomain` claims
+ * (ADR-129).
+ *
+ * The join-request service and the grant writer are reached through closures
+ * rather than captured: both resolve the pipeline handle when they run, so a
+ * service composed before the App exists still appends once one does.
+ */
+export function ssoArrival(): SsoArrivalService {
+  return new SsoArrivalService({
+    connections: new PrismaSsoConnectionReadRepository(prisma),
+    memberships: new PrismaSsoMembershipRepository(prisma),
+    invites: {
+      // Find-then-apply is one decision, so it is one port call: an invite
+      // that exists is the invite that wins, and its role and team
+      // assignments replace the default membership entirely.
+      applyPendingInvite: async ({ userId, organizationId, email }) => {
+        const invites = InviteService.create(prisma);
+        const pending = await invites.findPendingByOrgAndEmail({
+          organizationId,
+          email,
+        });
+        if (!pending) return null;
+        await invites.applyInvite({ userId, invite: pending });
+        return { inviteId: pending.id };
+      },
+    },
+    joinRequests: {
+      requestFromSsoArrival: (args) =>
+        joinRequestsService().requestFromSsoArrival(args),
+    },
+    grants: {
+      attachBindings: (args) => grantsLedgerWriter().attachBindings(args),
+    },
+    notifications: {
+      announceSignup: (args) => {
+        void getApp()
+          .notifications.sendSlackSignupEvent(args)
+          .catch(captureException);
+      },
+      startNurturing: (args) => fireSsoAutoAddNurturingCalls(args),
+    },
+  });
+}
+
+/**
+ * better-auth's whole `databaseHooks:` entry as one class (ADR-129).
+ *
+ * The hooks decide nothing about the data: each one translates better-auth's
+ * row into a call on a service above, which is what makes "a hook that wants
+ * a row has nothing to ask but a service" a property of the type rather than
+ * a review comment.
+ */
+export function databaseHooks(): BetterAuthDatabaseHooks {
+  return new BetterAuthDatabaseHooks({
+    users: identityUsers,
+    organizations: new PrismaLegacySsoOrganizationRepository(prisma),
+    accounts: new PrismaSsoAccountReconciliationRepository(prisma),
+    ssoArrival: ssoArrival(),
+    federationAllowed: () => platformSSOAllowed(),
+    analytics: {
+      // The same distinct id posthog-js identifies with client-side, so this
+      // server event joins the browser person.
+      trackSignUp: ({ userId }) =>
+        trackServerEvent({ userId, event: "signed_up" }),
+    },
+    nurturing: {
+      trackActivity: (args) => fireActivityTrackingNurturing(args),
+      syncProfile: (args) => ensureUserSyncedToCio(args),
     },
   });
 }

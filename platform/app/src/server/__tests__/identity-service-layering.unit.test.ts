@@ -130,12 +130,9 @@ describe("identity service layering", () => {
             /prisma\/client/.test(specifier),
         ),
       );
-      expect(
-        ratchet(offenders, [
-          "server/better-auth/hooks.ts",
-          "server/better-auth/index.ts",
-        ]),
-      ).toEqual(CLEAN);
+      expect(ratchet(offenders, ["server/better-auth/index.ts"])).toEqual(
+        CLEAN,
+      );
     });
   });
 
@@ -153,7 +150,6 @@ describe("identity service layering", () => {
           "server/app-layer/identity/platform-operators.ts",
           "server/app-layer/identity/runtime.ts",
           "server/app-layer/identity/sso-connection-backoffice.service.ts",
-          "server/better-auth/hooks.ts",
         ]),
       ).toEqual(CLEAN);
     });
@@ -219,7 +215,6 @@ describe("identity service layering", () => {
         ratchet(offenders, [
           "server/app-layer/identity/runtime.ts",
           "server/app-layer/identity/sso-connection-backoffice.service.ts",
-          "server/better-auth/hooks.ts",
         ]),
       ).toEqual(CLEAN);
     });
@@ -229,9 +224,7 @@ describe("identity service layering", () => {
       const offenders = offendersOf(scope, (_file, source) =>
         linesMatching(source, /where:\s*\{\s*ssoDomain\b/),
       );
-      expect(ratchet(offenders, ["server/better-auth/hooks.ts"])).toEqual(
-        CLEAN,
-      );
+      expect(ratchet(offenders, [])).toEqual(CLEAN);
     });
 
     /** @scenario "A question about the data is asked in one place" */

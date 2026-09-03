@@ -34,20 +34,27 @@ export class PrismaLegacySsoOrganizationRepository
   }
 
   /**
-   * The organization that claims a domain through the legacy column.
+   * The organization that claims a domain through the legacy `ssoDomain`
+   * column — the ONE place that lookup is spelled.
    *
-   * The other direction of the same pair, for the born-finalized entrance
-   * (ADR-116 §3): it holds an address and needs the organization a targeting
-   * rule can name. `ssoDomain` is unique, so there is one answer or none.
+   * It was spelled four times, and the copies had already started to differ
+   * in what they selected. `ssoProvider` comes back with the row because
+   * every caller that has the domain then asks whether the provider matches,
+   * and `name` because the one that auto-joins announces it.
+   *
+   * Unlike `findLegacySso` above, an organization with a domain and no
+   * provider is still answered: enforcement asks about the provider
+   * separately, and swallowing the row here would silently turn a
+   * half-configured organization into no organization at all.
    */
   async findByDomain({
     domain,
   }: {
     domain: string;
-  }): Promise<{ id: string } | null> {
+  }): Promise<{ id: string; name: string; ssoProvider: string | null } | null> {
     return await this.prisma.organization.findUnique({
       where: { ssoDomain: domain },
-      select: { id: true },
+      select: { id: true, name: true, ssoProvider: true },
     });
   }
 }

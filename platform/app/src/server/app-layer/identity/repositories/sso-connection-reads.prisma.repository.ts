@@ -11,6 +11,7 @@ import type {
   SsoDomainClaimQueueRepository,
 } from "@langwatch/identity-server";
 import type { PrismaClient } from "~/generated/prisma/client";
+import type { SignInConnection } from "../sso-assertion.service";
 import { rowToConnection } from "./sso-connection-projection.prisma.repository";
 
 /**
@@ -93,6 +94,36 @@ export class PrismaSsoConnectionReadRepository
       orderBy: { updatedAt: "desc" },
     });
     return row === null ? null : rowToConnection(row);
+  }
+
+  /**
+   * The connection an assertion names, as the two sign-in decisions read it
+   * (ADR-129): may this connection assert this address, and what happens to
+   * somebody arriving through it.
+   *
+   * A narrow projection rather than `findConnection` above, and `lapsedDomains`
+   * from the COLUMN rather than re-derived from the proofs: the column is what
+   * the reproof sweep writes, so a domain whose grace expires mid-request is
+   * still routing until that sweep says otherwise (ADR-123). Deriving it here
+   * would move the moment a domain stops provisioning off the sweep and onto
+   * whoever happens to sign in.
+   */
+  async findConnectionForSignIn({
+    connectionId,
+  }: {
+    connectionId: string;
+  }): Promise<SignInConnection | null> {
+    return await this.prisma.ssoConnection.findUnique({
+      where: { id: connectionId },
+      select: {
+        organizationId: true,
+        state: true,
+        verifiedDomains: true,
+        lapsedDomains: true,
+        arrivalPolicy: true,
+        createdBy: true,
+      },
+    });
   }
 }
 
