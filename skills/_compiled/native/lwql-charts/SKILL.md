@@ -31,15 +31,15 @@ Read the datasets, their grain, their time column, and which columns are `availa
 
 A chart that should follow the dashboard's period selector declares the reserved bound parameters instead of hardcoding dates:
 
-- `{period_start:DateTime}` / `{period_end:DateTime}` — the surface's period, half-open `[start, end)`
-- `{period_granularity_seconds:UInt32}` — the surface's datapoint step, in seconds
+- `{dashboard_context_period_start:DateTime}` / `{dashboard_context_period_end:DateTime}` — the surface's period, half-open `[start, end)`
+- `{dashboard_context_granularity_seconds:UInt32}` — the surface's datapoint step, in seconds
 
 ```sql
 SELECT
-  toStartOfInterval(OccurredAt, INTERVAL {period_granularity_seconds:UInt32} SECOND) AS bucket,
+  toStartOfInterval(OccurredAt, INTERVAL {dashboard_context_granularity_seconds:UInt32} SECOND) AS bucket,
   count() AS traces
 FROM analytics.traces
-WHERE OccurredAt >= {period_start:DateTime} AND OccurredAt < {period_end:DateTime}
+WHERE OccurredAt >= {dashboard_context_period_start:DateTime} AND OccurredAt < {dashboard_context_period_end:DateTime}
 GROUP BY bucket
 ORDER BY bucket
 ```

@@ -133,7 +133,7 @@ const query = protectedProcedure
       timeWindow: lwqlTimeWindowSchema.optional(),
       /**
        * The datapoint step for a statement that declares
-       * `{period_granularity_seconds:UInt32}`, in seconds — restricted to the
+       * `{dashboard_context_granularity_seconds:UInt32}`, in seconds — restricted to the
        * offered steps ({@link lwqlGranularityStepSchema}) so an off-list value
        * is a schema rejection here rather than reaching the service's backstop.
        * The bucket-budget arithmetic and its refusal are still the service's.

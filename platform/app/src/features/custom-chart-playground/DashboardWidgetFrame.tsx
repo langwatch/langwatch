@@ -25,6 +25,7 @@ import { usePeriodSelector } from "~/components/PeriodSelector";
 import { useColorMode } from "~/components/ui/color-mode";
 import { dashboardWidgetDefinitionSchema } from "~/server/analytics/dashboardWidgetDefinition";
 
+import type { ChartFrameDashboardContext } from "./bridge/bridgeProtocol";
 import { SandboxedChartFrame } from "./SandboxedChartFrame";
 import { useDashboardWidgetChartNavigate } from "./useDashboardWidgetChartNavigate";
 import { useDashboardWidgetExecutor } from "./useDashboardWidgetExecutor";
@@ -43,6 +44,10 @@ export interface DashboardWidgetFrameProps {
   /** Host context for `LW.navigate` — never read off the frame's own params. */
   readonly projectSlug: string;
   readonly maxHeight: number;
+  /** The dashboard this widget is placed on, where the caller has one. */
+  readonly dashboardId?: string;
+  /** The widget's own name, for LW.dashboardContext.widgetName. */
+  readonly widgetName?: string;
 }
 
 export function DashboardWidgetFrame({
@@ -51,6 +56,8 @@ export function DashboardWidgetFrame({
   projectId,
   projectSlug,
   maxHeight,
+  dashboardId,
+  widgetName,
 }: DashboardWidgetFrameProps) {
   const { colorMode } = useColorMode();
   const { period } = usePeriodSelector();
@@ -75,11 +82,43 @@ export function DashboardWidgetFrame({
   const parsed = dashboardWidgetDefinitionSchema.safeParse(graph);
   const definition = parsed.success ? parsed.data : { code: "", queries: [] };
 
-  const { executeQuery, params } = useDashboardWidgetExecutor(
+  const { executeQuery, params: hostParams } = useDashboardWidgetExecutor(
     projectId,
     definition.queries,
     { timeWindow },
   );
+
+  // Known host-side at this boundary; timezone reads the browser's own zone
+  // the same way a widget's clock would. dashboardId/widgetName are optional
+  // on the wire — omitted where a caller (e.g. the playground) has none.
+  const dashboardContext: ChartFrameDashboardContext = useMemo(
+    () => ({
+      timeWindow: hostParams.timeWindow,
+      granularitySeconds: hostParams.granularitySeconds,
+      timezone: Intl.DateTimeFormat().resolvedOptions().timeZone,
+      theme: colorMode === "dark" ? "dark" : "light",
+      widgetId: id,
+      projectId,
+      dashboardId,
+      widgetName,
+    }),
+    [hostParams, colorMode, id, projectId, dashboardId, widgetName],
+  );
+
+  // Every declared parameter's default, deduped by name across the widget's
+  // queries — LW.params has no other source of a value yet (no dashboard-side
+  // override UI).
+  const paramsSnapshot = useMemo(() => {
+    const defaults: Record<string, string | number | boolean> = {};
+    for (const query of definition.queries) {
+      for (const parameter of query.parameters ?? []) {
+        if (parameter.default !== undefined) {
+          defaults[parameter.name] = parameter.default;
+        }
+      }
+    }
+    return defaults;
+  }, [definition.queries]);
 
   if (!parsed.success) {
     return (
@@ -94,8 +133,8 @@ export function DashboardWidgetFrame({
       key={id}
       code={definition.code}
       executeQuery={executeQuery}
-      params={params}
-      theme={colorMode === "dark" ? "dark" : "light"}
+      dashboardContext={dashboardContext}
+      params={paramsSnapshot}
       onLog={noopLog}
       onNavigate={onNavigate}
       maxHeight={maxHeight}

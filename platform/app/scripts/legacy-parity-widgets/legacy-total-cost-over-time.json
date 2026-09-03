@@ -4,7 +4,7 @@
   "queries": [
     {
       "name": "main",
-      "sql": "SELECT toStartOfDay(OccurredAt) AS bucket, sum(TotalCost) AS cost\nFROM trace_metrics\nWHERE OccurredAt >= {period_start:DateTime} AND OccurredAt < {period_end:DateTime}\n  AND TotalDurationMs > 0\nGROUP BY bucket\nORDER BY bucket",
+      "sql": "SELECT toStartOfDay(OccurredAt) AS bucket, sum(TotalCost) AS cost\nFROM trace_metrics\nWHERE OccurredAt >= {dashboard_context_period_start:DateTime} AND OccurredAt < {dashboard_context_period_end:DateTime}\n  AND TotalDurationMs > 0\nGROUP BY bucket\nORDER BY bucket",
       "parameters": []
     }
   ]

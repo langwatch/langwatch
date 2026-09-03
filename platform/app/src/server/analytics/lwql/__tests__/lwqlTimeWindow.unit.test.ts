@@ -21,8 +21,8 @@ import {
 import type { LangWatchQLParameter } from "../validation/validate";
 
 const PERIOD: LangWatchQLParameter[] = [
-  { name: "period_start", type: "DateTime" },
-  { name: "period_end", type: "DateTime" },
+  { name: "dashboard_context_period_start", type: "DateTime" },
+  { name: "dashboard_context_period_end", type: "DateTime" },
 ];
 
 const WINDOW = {
@@ -163,8 +163,8 @@ describe("given a statement and the window a surface is showing", () => {
       });
 
       expect(resolved.parameters).toEqual({
-        period_start: "2026-02-20 00:00:00",
-        period_end: "2026-02-27 00:00:00",
+        dashboard_context_period_start: "2026-02-20 00:00:00",
+        dashboard_context_period_end: "2026-02-27 00:00:00",
       });
       expect(resolved.followsTimeWindow).toBe(true);
       expect(resolved.awaitingTimeWindow).toEqual([]);
@@ -179,8 +179,8 @@ describe("given a statement and the window a surface is showing", () => {
 
       expect(resolved.parameters).toEqual({
         name: "checkout",
-        period_start: "2026-02-20 00:00:00",
-        period_end: "2026-02-27 00:00:00",
+        dashboard_context_period_start: "2026-02-20 00:00:00",
+        dashboard_context_period_end: "2026-02-27 00:00:00",
       });
     });
   });
@@ -189,12 +189,12 @@ describe("given a statement and the window a surface is showing", () => {
     /** @scenario "A statement declaring only one reserved period parameter is given that one" */
     it("binds the one it declared and sends no value for the other", () => {
       const resolved = resolveLangWatchQLTimeWindow({
-        declared: [{ name: "period_start", type: "DateTime" }],
+        declared: [{ name: "dashboard_context_period_start", type: "DateTime" }],
         timeWindow: WINDOW,
       });
 
       expect(resolved.parameters).toEqual({
-        period_start: "2026-02-20 00:00:00",
+        dashboard_context_period_start: "2026-02-20 00:00:00",
       });
       expect(resolved.followsTimeWindow).toBe(true);
     });
@@ -242,8 +242,8 @@ describe("given a statement and the window a surface is showing", () => {
       });
 
       expect(resolved.parameters).toEqual({
-        period_start: "2026-02-27 00:00:00",
-        period_end: "2026-02-20 00:00:00",
+        dashboard_context_period_start: "2026-02-27 00:00:00",
+        dashboard_context_period_end: "2026-02-20 00:00:00",
       });
       expect(resolved.followsTimeWindow).toBe(true);
       expect(resolved.awaitingTimeWindow).toEqual([]);
@@ -256,8 +256,8 @@ describe("given a statement and the window a surface is showing", () => {
       });
 
       expect(resolved.parameters).toEqual({
-        period_start: "2026-02-20 00:00:00",
-        period_end: "2026-02-20 00:00:00",
+        dashboard_context_period_start: "2026-02-20 00:00:00",
+        dashboard_context_period_end: "2026-02-20 00:00:00",
       });
       expect(resolved.followsTimeWindow).toBe(true);
       expect(resolved.awaitingTimeWindow).toEqual([]);
@@ -270,8 +270,8 @@ describe("given a statement and the window a surface is showing", () => {
       const resolved = resolveLangWatchQLTimeWindow({ declared: PERIOD });
 
       expect(resolved.awaitingTimeWindow).toEqual([
-        "period_end",
-        "period_start",
+        "dashboard_context_period_end",
+        "dashboard_context_period_start",
       ]);
       expect(resolved.followsTimeWindow).toBe(true);
       expect(resolved.parameters).toBeUndefined();
@@ -286,12 +286,12 @@ describe("given a request that reaches for a name the surface owns", () => {
       const run = () =>
         resolveLangWatchQLTimeWindow({
           declared: PERIOD,
-          parameters: { period_start: "2020-01-01 00:00:00" },
+          parameters: { dashboard_context_period_start: "2020-01-01 00:00:00" },
           timeWindow: WINDOW,
         });
 
       expect(codeOf(run)).toBe("lwql_reserved_parameter_supplied");
-      expect(metaOf(run)).toEqual({ parameters: ["period_start"] });
+      expect(metaOf(run)).toEqual({ parameters: ["dashboard_context_period_start"] });
     });
 
     /** @scenario "A caller that supplies a reserved period parameter itself is refused" */
@@ -300,7 +300,7 @@ describe("given a request that reaches for a name the surface owns", () => {
         codeOf(() =>
           resolveLangWatchQLTimeWindow({
             declared: [],
-            parameters: { period_end: "2020-01-01 00:00:00" },
+            parameters: { dashboard_context_period_end: "2020-01-01 00:00:00" },
           }),
         ),
       ).toBe("lwql_reserved_parameter_supplied");
@@ -312,12 +312,12 @@ describe("given a request that reaches for a name the surface owns", () => {
     it("refuses, naming the declaration to rewrite", () => {
       const run = () =>
         resolveLangWatchQLTimeWindow({
-          declared: [{ name: "period_start", type: "String" }],
+          declared: [{ name: "dashboard_context_period_start", type: "String" }],
           timeWindow: WINDOW,
         });
 
       expect(codeOf(run)).toBe("lwql_reserved_parameter_type");
-      expect(metaOf(run)).toEqual({ parameters: ["period_start"] });
+      expect(metaOf(run)).toEqual({ parameters: ["dashboard_context_period_start"] });
     });
 
     /**
@@ -329,8 +329,8 @@ describe("given a request that reaches for a name the surface owns", () => {
       expect(
         codeOf(() =>
           resolveLangWatchQLTimeWindow({
-            declared: [{ name: "period_start", type: "String" }],
-            parameters: { period_start: "2020-01-01 00:00:00" },
+            declared: [{ name: "dashboard_context_period_start", type: "String" }],
+            parameters: { dashboard_context_period_start: "2020-01-01 00:00:00" },
           }),
         ),
       ).toBe("lwql_reserved_parameter_type");

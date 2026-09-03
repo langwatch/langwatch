@@ -18,16 +18,39 @@ interface LwTimeWindow {
   readonly end: number;
 }
 
-/** The page-level parameters \`LW.params\` holds and \`LW.onParamsChange\` reports. */
-interface LwParams {
+type LwTheme = "light" | "dark";
+
+/**
+ * Host-supplied, read-only snapshot of the dashboard's own state —
+ * everything a widget did NOT author itself. Set synchronously before
+ * author code's first line runs; updates in place on
+ * \`LW.onDashboardContextChange\` (or live via \`LW.useDashboardContext\`) —
+ * read it fresh each time rather than caching it.
+ *
+ * \`widgetId\`/\`dashboardId\`/\`projectId\`/\`widgetName\` are optional: not
+ * every host (e.g. the playground preview) can supply them.
+ */
+interface LwDashboardContext {
   readonly timeWindow: LwTimeWindow;
   readonly granularitySeconds: number;
+  /** IANA zone name, e.g. "America/Sao_Paulo". */
+  readonly timezone?: string;
+  readonly theme: LwTheme;
+  readonly widgetId?: string;
+  readonly dashboardId?: string;
+  readonly projectId?: string;
+  readonly widgetName?: string;
 }
-
-type LwTheme = "light" | "dark";
 
 /** A bound value for one of a query's declared parameters. */
 type LwQueryParamValue = string | number | boolean;
+
+/**
+ * The widget's author-declared parameters and their current values (today,
+ * always their declared defaults — there is no dashboard-side UI to
+ * override them yet).
+ */
+type LwParams = Readonly<Record<string, LwQueryParamValue>>;
 
 interface LwQueryColumn {
   readonly name: string;
@@ -65,7 +88,7 @@ interface LwChartQueryState {
   readonly data: readonly Record<string, unknown>[] | null;
   /** True only on the first load (no data yet), not on background refetches. */
   readonly isLoading: boolean;
-  /** True for the initial load AND every refetch (params change, page time window change, manual \`refetch()\`). */
+  /** True for the initial load AND every refetch (dashboard context change, manual \`refetch()\`). */
   readonly isFetching: boolean;
   readonly isError: boolean;
   readonly error: LwQueryError | null;
@@ -74,13 +97,19 @@ interface LwChartQueryState {
   readonly refetch: () => void;
 }
 
-/** The API a dashboard widget's code runs against, injected as \`window.LW\`. */
+/**
+ * The API a dashboard widget's code runs against, injected as \`window.LW\`.
+ *
+ * Split in two by who supplies the value: \`dashboardContext\` is host-owned
+ * (time window, granularity, theme, ids) and changes when the dashboard
+ * itself changes; \`params\` is the widget's own author-declared parameters,
+ * unrelated to the dashboard's state.
+ */
 interface LwApi {
-  /**
-   * The dashboard's current page-level parameters (time window, granularity).
-   * Set synchronously before author code's first line runs; updates in place
-   * on \`LW.onParamsChange\` — read it fresh each time rather than caching it.
-   */
+  /** The dashboard's current context. See {@link LwDashboardContext}. */
+  readonly dashboardContext: LwDashboardContext;
+
+  /** The widget's current author-declared parameter values. */
   readonly params: LwParams;
 
   /** The dashboard's current color theme, fixed for the frame's lifetime. */
@@ -92,11 +121,12 @@ interface LwApi {
    * cross the bridge. Reject with an \`LwQueryError\`.
    *
    * Prefer \`useChartQuery\` in React widget code — it wraps this promise with
-   * loading/error state and automatic refetch on page-level param changes.
+   * loading/error state and automatic refetch on dashboard context changes.
    *
-   * Reserved parameter names (\`period_start\`, \`period_end\`,
-   * \`period_granularity_seconds\`) are bound automatically from \`LW.params\`
-   * and should not be passed here.
+   * Reserved parameter names (\`dashboard_context_period_start\`,
+   * \`dashboard_context_period_end\`, \`dashboard_context_granularity_seconds\`)
+   * are bound automatically from \`LW.dashboardContext\` and should not be
+   * passed here.
    */
   query: (
     queryName: string,
@@ -107,8 +137,9 @@ interface LwApi {
    * The recommended way to fetch: wraps \`LW.query\` in a React hook with the
    * same shape as TanStack Query's \`useQuery\` (data, isLoading, isFetching,
    * isError, error, status, refetch). Refetches automatically whenever the
-   * page's time window or granularity changes, via \`LW.onParamsChange\` —
-   * a widget using this hook stays live without touching that API directly.
+   * dashboard context (time window, granularity) changes, via
+   * \`LW.onDashboardContextChange\` — a widget using this hook stays live
+   * without touching that API directly.
    */
   useChartQuery: (
     queryName: string,
@@ -122,11 +153,26 @@ interface LwApi {
   setHeight: (px: number) => void;
 
   /**
-   * Subscribes to page-level parameter changes (time window, granularity).
+   * Subscribes to dashboard context changes (time window, granularity).
    * Returns an unsubscribe function — call it on cleanup (e.g. a React
-   * effect's return) to avoid leaking a listener per mount.
+   * effect's return) to avoid leaking a listener per mount. Prefer
+   * \`useDashboardContext\` in React widget code.
    */
-  onParamsChange: (callback: (params: LwParams) => void) => () => void;
+  onDashboardContextChange: (
+    callback: (dashboardContext: LwDashboardContext) => void,
+  ) => () => void;
+
+  /**
+   * React hook returning the live \`LW.dashboardContext\`, re-rendering
+   * whenever the host pushes an update.
+   */
+  useDashboardContext: () => LwDashboardContext;
+
+  /**
+   * React hook returning the live \`LW.params\` — the widget's author-declared
+   * parameter values, re-rendering on change.
+   */
+  useParams: () => LwParams;
 
   /** Reports an error to the parent's console/telemetry without throwing. */
   error: (err: unknown) => void;

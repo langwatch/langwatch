@@ -2,19 +2,19 @@
  * LangWatchQL analytics SQL — the time-window and granularity vocabulary.
  *
  * A statement says whether it follows the surface's period by *declaring* two
- * reserved bound parameters, `{period_start:DateTime}` and
- * `{period_end:DateTime}`. Nothing else records the fact: a field on the saved
+ * reserved bound parameters, `{dashboard_context_period_start:DateTime}` and
+ * `{dashboard_context_period_end:DateTime}`. Nothing else records the fact: a field on the saved
  * record would be a second source of truth able to disagree with the statement
  * it describes, and the disagreement would surface as a chart quietly showing a
  * different period from the one beside it — which is the whole failure this
  * contract exists to prevent.
  *
- * The interval those two names describe is half-open, `[period_start,
- * period_end)`. A convention this module documents rather than something it can
+ * The interval those two names describe is half-open, `[dashboard_context_period_start,
+ * dashboard_context_period_end)`. A convention this module documents rather than something it can
  * enforce — the author writes the comparison — and it is what the schema
  * browser tells a member writing SQL.
  *
- * A third reserved name, `{period_granularity_seconds:UInt32}`, opts a
+ * A third reserved name, `{dashboard_context_granularity_seconds:UInt32}`, opts a
  * statement into the surface's datapoint bucket size on the same terms. The
  * three together are the surface's — {@link LWQL_SURFACE_PARAMETERS} — and a
  * request carrying a value for any of them is refused. The steps the surface
@@ -41,17 +41,17 @@ export interface LangWatchQLTimeWindow {
 }
 
 /** Inclusive lower bound of the period the surface is showing. */
-export const LWQL_PERIOD_START_PARAMETER = "period_start";
+export const LWQL_PERIOD_START_PARAMETER = "dashboard_context_period_start";
 
 /** Exclusive upper bound of the period the surface is showing. */
-export const LWQL_PERIOD_END_PARAMETER = "period_end";
+export const LWQL_PERIOD_END_PARAMETER = "dashboard_context_period_end";
 
 /**
  * The names a statement may declare to follow the surface's period.
  *
- * Namespaced with a `period_` prefix so that a later well-known parameter —
- * `period_granularity`, `period_timezone` — cannot collide with a name a member
- * was already using for something of their own.
+ * Namespaced with a `dashboard_context_` prefix so that a later well-known
+ * parameter — `dashboard_context_timezone` — cannot collide with a name a
+ * member was already using for something of their own.
  */
 export const LWQL_TIME_WINDOW_PARAMETERS = [
   LWQL_PERIOD_START_PARAMETER,
@@ -65,15 +65,15 @@ export type LangWatchQLTimeWindowParameter =
  * The datapoint-bucket size the surface sets for charts that opt into it,
  * in seconds.
  *
- * Declared in a statement as `{period_granularity_seconds:UInt32}` and used
+ * Declared in a statement as `{dashboard_context_granularity_seconds:UInt32}` and used
  * as the multiplier of a fixed-unit interval -- `INTERVAL
- * {period_granularity_seconds:UInt32} SECOND` -- because ClickHouse compiles
+ * {dashboard_context_granularity_seconds:UInt32} SECOND` -- because ClickHouse compiles
  * `INTERVAL 1 HOUR` to a *function name* (`toIntervalHour`), so the unit of
  * an offered step cannot itself be a bound value. Fixing the unit at seconds
  * and making the multiplier the bound parameter is what leaves the surface
  * one value to inject.
  */
-export const LWQL_PERIOD_GRANULARITY_PARAMETER = "period_granularity_seconds";
+export const LWQL_PERIOD_GRANULARITY_PARAMETER = "dashboard_context_granularity_seconds";
 
 /**
  * Every reserved name the surface owns: the two window bounds and the

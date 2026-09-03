@@ -477,7 +477,7 @@ describe("given the LangWatchQL service", () => {
   describe("when the statement declares the reserved time-window parameters", () => {
     const PERIOD_SQL =
       "SELECT count() AS value FROM analytics.traces " +
-      "WHERE OccurredAt >= {period_start:DateTime} AND OccurredAt < {period_end:DateTime}";
+      "WHERE OccurredAt >= {dashboard_context_period_start:DateTime} AND OccurredAt < {dashboard_context_period_end:DateTime}";
     const TIME_WINDOW = {
       start: new Date("2026-02-20T00:00:00.000Z"),
       end: new Date("2026-02-27T00:00:00.000Z"),
@@ -495,8 +495,8 @@ describe("given the LangWatchQL service", () => {
       });
 
       expect(executor.calls[0]!.parameters).toEqual({
-        period_start: "2026-02-20 00:00:00",
-        period_end: "2026-02-27 00:00:00",
+        dashboard_context_period_start: "2026-02-20 00:00:00",
+        dashboard_context_period_end: "2026-02-27 00:00:00",
       });
       // The statement itself is never rewritten to carry them.
       expect(executor.calls[0]!.sql).toBe(PERIOD_SQL);
@@ -518,7 +518,7 @@ describe("given the LangWatchQL service", () => {
       }
 
       expect(
-        executor.calls.map((call) => call.parameters?.period_start),
+        executor.calls.map((call) => call.parameters?.dashboard_context_period_start),
       ).toEqual(["2026-02-20 00:00:00", "2026-03-20 00:00:00"]);
     });
 
@@ -531,12 +531,12 @@ describe("given the LangWatchQL service", () => {
           project: PROJECT,
           protections: FULLY_PERMITTED,
           sql: PERIOD_SQL,
-          parameters: { period_start: "2020-01-01 00:00:00" },
+          parameters: { dashboard_context_period_start: "2020-01-01 00:00:00" },
           timeWindow: TIME_WINDOW,
         });
 
       expect(await codeOf(run)).toBe("lwql_reserved_parameter_supplied");
-      expect(await metaOf(run)).toEqual({ parameters: ["period_start"] });
+      expect(await metaOf(run)).toEqual({ parameters: ["dashboard_context_period_start"] });
       expect(
         executor.calls,
         "a chart that pinned its own window reached the database",
@@ -548,7 +548,7 @@ describe("given the LangWatchQL service", () => {
       const executor = recordingExecutor();
       const service = serviceWith(executor);
       const sql =
-        "SELECT count() FROM analytics.traces WHERE TraceName = {period_start:String}";
+        "SELECT count() FROM analytics.traces WHERE TraceName = {dashboard_context_period_start:String}";
 
       expect(
         await codeOf(() =>
@@ -597,7 +597,7 @@ describe("given the LangWatchQL service", () => {
             sql: PERIOD_SQL,
           }),
         ),
-      ).toEqual({ parameters: ["period_end", "period_start"] });
+      ).toEqual({ parameters: ["dashboard_context_period_end", "dashboard_context_period_start"] });
       expect(executor.calls).toHaveLength(0);
 
       // Saving is not running: the window belongs to whoever later renders the
@@ -609,21 +609,21 @@ describe("given the LangWatchQL service", () => {
       });
       expect(validated.followsTimeWindow).toBe(true);
       expect(validated.awaitingTimeWindow).toEqual([
-        "period_end",
-        "period_start",
+        "dashboard_context_period_end",
+        "dashboard_context_period_start",
       ]);
     });
 
     it("defers a declared granularity to the surface instead of refusing it as caller-missing", () => {
-      // The caller is forbidden to supply period_granularity_seconds, so the
+      // The caller is forbidden to supply dashboard_context_granularity_seconds, so the
       // missing-parameter sweep naming it was a dead end: a refusal asking
       // for a value the caller may never send. The declaration is awaiting
       // the surface -- the granularity resolver binds the step at run.
       const service = serviceWith(recordingExecutor());
       const sql =
-        "SELECT toStartOfInterval(OccurredAt, INTERVAL {period_granularity_seconds:UInt32} SECOND) AS bucket, " +
+        "SELECT toStartOfInterval(OccurredAt, INTERVAL {dashboard_context_granularity_seconds:UInt32} SECOND) AS bucket, " +
         "count() AS value FROM analytics.traces " +
-        "WHERE OccurredAt >= {period_start:DateTime} AND OccurredAt < {period_end:DateTime} " +
+        "WHERE OccurredAt >= {dashboard_context_period_start:DateTime} AND OccurredAt < {dashboard_context_period_end:DateTime} " +
         "GROUP BY bucket ORDER BY bucket";
 
       const validated = service.validate({
@@ -633,7 +633,7 @@ describe("given the LangWatchQL service", () => {
         timeWindow: TIME_WINDOW,
       });
       expect(validated.awaitingTimeWindow).toEqual([
-        "period_granularity_seconds",
+        "dashboard_context_granularity_seconds",
       ]);
 
       // Saving has no window either; the whole reserved trio is deferred.
@@ -643,9 +643,9 @@ describe("given the LangWatchQL service", () => {
         sql,
       });
       expect(saved.awaitingTimeWindow).toEqual([
-        "period_end",
-        "period_granularity_seconds",
-        "period_start",
+        "dashboard_context_period_end",
+        "dashboard_context_granularity_seconds",
+        "dashboard_context_period_start",
       ]);
     });
   });
@@ -676,9 +676,9 @@ describe("given the LangWatchQL service", () => {
 
   describe("when the statement declares the granularity parameter", () => {
     const GRANULARITY_SQL =
-      "SELECT toStartOfInterval(OccurredAt, INTERVAL {period_granularity_seconds:UInt32} SECOND) AS bucket, " +
+      "SELECT toStartOfInterval(OccurredAt, INTERVAL {dashboard_context_granularity_seconds:UInt32} SECOND) AS bucket, " +
       "count() AS value FROM analytics.traces " +
-      "WHERE OccurredAt >= {period_start:DateTime} AND OccurredAt < {period_end:DateTime} " +
+      "WHERE OccurredAt >= {dashboard_context_period_start:DateTime} AND OccurredAt < {dashboard_context_period_end:DateTime} " +
       "GROUP BY bucket ORDER BY bucket";
     const TIME_WINDOW = {
       start: new Date("2026-02-20T00:00:00.000Z"),
@@ -700,9 +700,9 @@ describe("given the LangWatchQL service", () => {
       });
 
       expect(executor.calls[0]!.parameters).toEqual({
-        period_start: "2026-02-20 00:00:00",
-        period_end: "2026-02-27 00:00:00",
-        period_granularity_seconds: 3600,
+        dashboard_context_period_start: "2026-02-20 00:00:00",
+        dashboard_context_period_end: "2026-02-27 00:00:00",
+        dashboard_context_granularity_seconds: 3600,
       });
       expect(result.followsGranularity).toBe(true);
       expect(result.granularitySeconds).toBe(3600);
@@ -725,7 +725,7 @@ describe("given the LangWatchQL service", () => {
 
       expect(await codeOf(run)).toBe("lwql_parameter_missing");
       expect(await metaOf(run)).toEqual({
-        parameters: ["period_granularity_seconds"],
+        parameters: ["dashboard_context_granularity_seconds"],
       });
       expect(
         executor.calls,
@@ -741,9 +741,9 @@ describe("given the LangWatchQL service", () => {
         sql: GRANULARITY_SQL,
       });
       expect(validated.awaitingTimeWindow).toEqual([
-        "period_end",
-        "period_granularity_seconds",
-        "period_start",
+        "dashboard_context_period_end",
+        "dashboard_context_granularity_seconds",
+        "dashboard_context_period_start",
       ]);
     });
 

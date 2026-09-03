@@ -108,26 +108,26 @@ const registry = {
     tips: [
       "Read `meta.parameters`; it lists every parameter the SQL declares that the request left unset",
       "Send a value for each under `parameters`, keyed by the name inside the braces: `{since:DateTime}` reads `parameters.since`",
-      "`period_start` and `period_end` are the exception; send them as `timeWindow: { start, end }`, never under `parameters`",
-      "`period_granularity_seconds` is also an exception; send it as the request's own `granularitySeconds` field, never under `parameters`",
+      "`dashboard_context_period_start` and `dashboard_context_period_end` are the exception; send them as `timeWindow: { start, end }`, never under `parameters`",
+      "`dashboard_context_granularity_seconds` is also an exception; send it as the request's own `granularitySeconds` field, never under `parameters`",
     ],
   },
   lwql_reserved_parameter_supplied: {
     tips: [
       "Read `meta.parameters`; it lists the reserved names the request set for itself",
-      "`period_start` and `period_end` are supplied by the surface showing the chart; send `timeWindow: { start, end }` instead and drop them from `parameters`",
+      "`dashboard_context_period_start` and `dashboard_context_period_end` are supplied by the surface showing the chart; send `timeWindow: { start, end }` instead and drop them from `parameters`",
     ],
   },
   lwql_reserved_parameter_type: {
     tips: [
       "Read `meta.parameters`; it lists the reserved names declared with the wrong type",
-      "Declare each as `DateTime` or `DateTime64`, for example `{period_start:DateTime}`; the interval they describe is half-open, `>= {period_start:DateTime} AND < {period_end:DateTime}`",
+      "Declare each as `DateTime` or `DateTime64`, for example `{dashboard_context_period_start:DateTime}`; the interval they describe is half-open, `>= {dashboard_context_period_start:DateTime} AND < {dashboard_context_period_end:DateTime}`",
     ],
   },
   lwql_granularity_parameter_type: {
     tips: [
       "Read `meta.parameters`; it lists the parameter whose declaration was refused",
-      "Declare period_granularity_seconds as UInt32, for example {period_granularity_seconds:UInt32}",
+      "Declare dashboard_context_granularity_seconds as UInt32, for example {dashboard_context_granularity_seconds:UInt32}",
       "When the surface supplies the step itself, it must be one of the offered steps: 1 second, 1 minute, or 1 hour",
     ],
   },
@@ -139,7 +139,7 @@ const registry = {
   },
   lwql_granularity_requires_window: {
     tips: [
-      "A chart declaring period_granularity_seconds must also declare {period_start:DateTime} and {period_end:DateTime}",
+      "A chart declaring dashboard_context_granularity_seconds must also declare {dashboard_context_period_start:DateTime} and {dashboard_context_period_end:DateTime}",
       "The bucket budget is computed against the period those two bounds describe",
     ],
   },

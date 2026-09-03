@@ -76,7 +76,7 @@ const configureTypeScriptDefaults: BeforeMount = (monaco) => {
   }
 };
 
-/** Matches ClickHouse bound-param tokens like `{period_start:DateTime}`. */
+/** Matches ClickHouse bound-param tokens like `{dashboard_context_period_start:DateTime}`. */
 const BOUND_PARAM_PATTERN = /\{([A-Za-z_][A-Za-z0-9_]*):[A-Za-z0-9_]+\}/g;
 
 const RESERVED_PARAM_NAMES = new Set(RESERVED_PARAMETERS.map((p) => p.name));

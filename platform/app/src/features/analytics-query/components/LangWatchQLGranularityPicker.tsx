@@ -2,7 +2,7 @@
  * The step a submission buckets at.
  *
  * A third value that looks like a parameter and deliberately is not:
- * `period_granularity_seconds` is supplied by whatever surface is showing the
+ * `dashboard_context_granularity_seconds` is supplied by whatever surface is showing the
  * chart, exactly as the period is, and the backend refuses a request that sends
  * it among its own named parameters. Offering it as a filled-in parameter would
  * be offering the member a way to be refused.

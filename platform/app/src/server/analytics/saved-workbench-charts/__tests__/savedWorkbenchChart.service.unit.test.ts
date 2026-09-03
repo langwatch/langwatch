@@ -818,9 +818,9 @@ describe("running a saved workbench chart", () => {
 
   /** Declares both reserved window bounds and the granularity parameter. */
   const BUCKETED_SQL =
-    "SELECT toStartOfInterval(OccurredAt, INTERVAL {period_granularity_seconds:UInt32} SECOND) AS bucket, " +
+    "SELECT toStartOfInterval(OccurredAt, INTERVAL {dashboard_context_granularity_seconds:UInt32} SECOND) AS bucket, " +
     "count() AS value FROM analytics.traces " +
-    "WHERE OccurredAt >= {period_start:DateTime} AND OccurredAt < {period_end:DateTime} " +
+    "WHERE OccurredAt >= {dashboard_context_period_start:DateTime} AND OccurredAt < {dashboard_context_period_end:DateTime} " +
     "AND TraceName = {name:String} GROUP BY bucket ORDER BY bucket";
 
   async function saveBucketedChart(
@@ -865,9 +865,9 @@ describe("running a saved workbench chart", () => {
           // Saved alongside the query at save time.
           name: "checkout",
           // Injected from the surface at run time.
-          period_start: "2026-02-20 00:00:00",
-          period_end: "2026-02-27 00:00:00",
-          period_granularity_seconds: 3600,
+          dashboard_context_period_start: "2026-02-20 00:00:00",
+          dashboard_context_period_end: "2026-02-27 00:00:00",
+          dashboard_context_granularity_seconds: 3600,
         });
         expect(result.rows).toEqual([{ value: 1 }]);
         expect(result.followsTimeWindow).toBe(true);

@@ -124,7 +124,7 @@ export class LangWatchQLParameterMissingError extends HandledError {
 
 /**
  * The refusal sentence for exactly the names the request carried, agreeing in
- * number so a single supplied name does not read as "values for period_start".
+ * number so a single supplied name does not read as "values for dashboard_context_period_start".
  *
  * Built from the supplied names rather than a fixed phrase because the same
  * code covers the two window bounds and the granularity step, and naming the
@@ -145,7 +145,7 @@ function suppliedParameterSentence(supplied: readonly string[]): string {
 /**
  * The request carried a value for a parameter the surface owns.
  *
- * `period_start`, `period_end` and `period_granularity_seconds` are supplied by
+ * `dashboard_context_period_start`, `dashboard_context_period_end` and `dashboard_context_granularity_seconds` are supplied by
  * whatever is showing the chart — the dashboard's period and step, the
  * workbench's page period — and a caller that sets one is pinning something
  * that will then ignore the surface it sits on. Refused rather than
@@ -254,7 +254,7 @@ export class LangWatchQLReservedGranularityTypeError extends HandledError {
       "lwql_granularity_parameter_type",
       fault === "step-value"
         ? "The datapoint granularity must be one of the offered steps: 1 second, 1 minute, or 1 hour."
-        : "The query declares period_granularity_seconds with a type that is not UInt32.",
+        : "The query declares dashboard_context_granularity_seconds with a type that is not UInt32.",
       {
         httpStatus: 400,
         fault: "customer",
@@ -308,7 +308,7 @@ export class LangWatchQLGranularityTooFineError extends HandledError {
 }
 
 /**
- * A statement declared `period_granularity_seconds` without a usable period
+ * A statement declared `dashboard_context_granularity_seconds` without a usable period
  * window for the bucket budget to be computed against -- either bound absent,
  * or present but declared as something other than a date-time.
  *
@@ -319,7 +319,7 @@ export class LangWatchQLGranularityTooFineError extends HandledError {
  * the fix, and the schema browser spells them.
  *
  * The two causes get different copy. Telling an author to declare
- * `period_start` when it is on screen, declared `String`, sends them looking
+ * `dashboard_context_period_start` when it is on screen, declared `String`, sends them looking
  * for a line that is already there.
  */
 export class LangWatchQLGranularityRequiresTimeWindowError extends HandledError {
@@ -337,8 +337,8 @@ export class LangWatchQLGranularityRequiresTimeWindowError extends HandledError 
     super(
       "lwql_granularity_requires_window",
       mistyped.length > 0 && absent.length === 0
-        ? "A chart declaring period_granularity_seconds must declare period_start and period_end as DateTime."
-        : "A chart declaring period_granularity_seconds must also declare period_start and period_end.",
+        ? "A chart declaring dashboard_context_granularity_seconds must declare dashboard_context_period_start and dashboard_context_period_end as DateTime."
+        : "A chart declaring dashboard_context_granularity_seconds must also declare dashboard_context_period_start and dashboard_context_period_end.",
       {
         httpStatus: 400,
         fault: "customer",

@@ -13,20 +13,15 @@
  * @see specs/analytics/lwql-workbench.feature
  */
 
-import {
-  Box,
-  Button,
-  chakra,
-  HStack,
-  Input,
-  Stack,
-  Text,
-  VStack,
-} from "@chakra-ui/react";
-import { ChevronDown, ChevronRight, Plus, Trash2 } from "lucide-react";
+import { Box, Button, HStack, Text, VStack } from "@chakra-ui/react";
+import { ChevronDown, ChevronRight } from "lucide-react";
 import { useCallback, useState } from "react";
 
-import { ReservedParamRow } from "~/components/analytics/ReservedParamRow";
+import {
+  QueryParametersPanel,
+  reservedPrefixProblem,
+  type QueryParameterRowVM,
+} from "~/components/analytics/QueryParametersPanel";
 import { RESERVED_PARAMETERS } from "~/server/analytics/dashboardWidgetDefinition";
 
 import type { LangWatchQLParameterValue } from "../logic/lwqlRequestState";
@@ -34,12 +29,27 @@ import type { LangWatchQLParameterValue } from "../logic/lwqlRequestState";
 /** What a row's text means. The four shapes the API accepts. */
 type ParameterKind = "text" | "number" | "boolean" | "null";
 
-const KIND_LABELS: readonly { value: ParameterKind; label: string }[] = [
-  { value: "text", label: "Text" },
+/**
+ * The type picker's own vocabulary (shared with the "variables" visual
+ * language — `~/prompts/components/ui/VariableTypeIcon`), and the mapping
+ * back to a `ParameterKind`. `text` displays as `string` so the icon/label
+ * line up with the rest of the product without adding a case to that shared
+ * module for this editor's own naming.
+ */
+const TYPE_OPTIONS = [
+  { value: "string", label: "Text" },
   { value: "number", label: "Number" },
   { value: "boolean", label: "Boolean" },
   { value: "null", label: "Null" },
 ];
+
+function kindToDisplayType(kind: ParameterKind): string {
+  return kind === "text" ? "string" : kind;
+}
+
+function displayTypeToKind(type: string): ParameterKind {
+  return type === "string" ? "text" : (type as ParameterKind);
+}
 
 interface ParameterRow {
   /** Stable across renames, so a row keeps its identity while being typed. */
@@ -124,17 +134,10 @@ function rowProblem({
   if (rows.filter((other) => other.name.trim() === name).length > 1) {
     return "Use this name once.";
   }
+  const reservedProblem = reservedPrefixProblem(name);
+  if (reservedProblem) return reservedProblem;
   return valueOf(row) === undefined ? "Enter a number." : undefined;
 }
-
-const SELECT_STYLE = {
-  borderWidth: "1px",
-  borderColor: "border",
-  borderRadius: "6px",
-  fontSize: "13px",
-  paddingX: 2,
-  height: "32px",
-} as const;
 
 /** A refusal about named parameters, said where those parameters are edited. */
 function ParameterAlert({
@@ -165,40 +168,8 @@ function ParameterAlert({
   );
 }
 
-function ParameterValueField({
-  row,
-  onChange,
-}: {
-  row: ParameterRow;
-  onChange: (text: string) => void;
-}) {
-  if (row.kind === "boolean") {
-    return (
-      <chakra.select
-        aria-label="Parameter value"
-        value={row.text === "true" ? "true" : "false"}
-        {...SELECT_STYLE}
-        onChange={(event) => onChange(event.target.value)}
-      >
-        <option value="true">true</option>
-        <option value="false">false</option>
-      </chakra.select>
-    );
-  }
-
-  return (
-    <Input
-      size="sm"
-      aria-label="Parameter value"
-      placeholder="Value"
-      disabled={row.kind === "null"}
-      value={row.kind === "null" ? "" : row.text}
-      onChange={(event) => onChange(event.target.value)}
-    />
-  );
-}
-
-function ParameterRowFields({
+/** Builds this row's view model for the shared {@link QueryParametersPanel}. */
+function rowVM({
   row,
   rows,
   onPatch,
@@ -209,50 +180,25 @@ function ParameterRowFields({
   rows: readonly ParameterRow[];
   onPatch: (changes: Partial<Omit<ParameterRow, "id">>) => void;
   onRemove: () => void;
-}) {
-  const problem = rowProblem({ row, rows });
-
-  return (
-    <Stack gap={1}>
-      <HStack gap={2}>
-        <Input
-          size="sm"
-          aria-label="Parameter name"
-          placeholder="Name"
-          value={row.name}
-          onChange={(event) => onPatch({ name: event.target.value })}
-        />
-        <chakra.select
-          aria-label="Parameter type"
-          value={row.kind}
-          {...SELECT_STYLE}
-          onChange={(event) =>
-            onPatch({ kind: event.target.value as ParameterKind })
-          }
-        >
-          {KIND_LABELS.map((kind) => (
-            <option key={kind.value} value={kind.value}>
-              {kind.label}
-            </option>
-          ))}
-        </chakra.select>
-        <ParameterValueField row={row} onChange={(text) => onPatch({ text })} />
-        <Button
-          size="xs"
-          variant="ghost"
-          aria-label={`Remove parameter ${row.name || row.id}`}
-          onClick={onRemove}
-        >
-          <Trash2 size={14} />
-        </Button>
-      </HStack>
-      {problem && (
-        <Text fontSize="12px" color="red.fg">
-          {problem}
-        </Text>
-      )}
-    </Stack>
-  );
+}): QueryParameterRowVM {
+  return {
+    id: row.id,
+    name: row.name,
+    onNameChange: (name) => onPatch({ name }),
+    type: kindToDisplayType(row.kind),
+    onTypeChange: (type) => onPatch({ kind: displayTypeToKind(type) }),
+    value: row.text,
+    onValueChange: (text) => onPatch({ text }),
+    valueKind:
+      row.kind === "boolean"
+        ? "boolean"
+        : row.kind === "null"
+          ? "disabled"
+          : "input",
+    inputType: row.kind === "number" ? "number" : "text",
+    onRemove,
+    problem: rowProblem({ row, rows }),
+  };
 }
 
 /** Everything one edit of the form settles, reported together. */
@@ -267,8 +213,9 @@ export interface LangWatchQLParametersEditorProps {
   /** Names the last submission declared and did not supply. */
   missingParameters: readonly string[];
   /**
-   * Names the last submission sent that the surface owns — `period_start` and
-   * `period_end`, which are set by the time window rather than here.
+   * Names the last submission sent that the surface owns —
+   * `dashboard_context_period_start` and `dashboard_context_period_end`,
+   * which are set by the time window rather than here.
    */
   reservedParameters: readonly string[];
   /**
@@ -282,8 +229,9 @@ export interface LangWatchQLParametersEditorProps {
   initialParameters?: Readonly<Record<string, LangWatchQLParameterValue>>;
   /**
    * Current live values for the reserved parameters, keyed by name — the same
-   * `period_start`/`period_end`/`period_granularity_seconds` the time window
-   * and granularity picker above already show, formatted the way the
+   * `dashboard_context_period_start`/`dashboard_context_period_end`/
+   * `dashboard_context_granularity_seconds` the time window and granularity
+   * picker above already show, formatted the way the
    * statement receives them. Shown as read-only rows above the author's own,
    * the way the dashboard widget editor already does, so a member can see
    * what those names resolve to without triggering a refusal first.
@@ -382,38 +330,21 @@ export function LangWatchQLParametersEditor({
       />
 
       {isOpen && (
-        <Stack gap={2}>
-          {RESERVED_PARAMETERS.map((reserved) => (
-            <ReservedParamRow
-              key={reserved.name}
-              reserved={reserved}
-              {...(builtinValues[reserved.name] !== undefined
-                ? { value: builtinValues[reserved.name] }
-                : {})}
-            />
-          ))}
-          {rows.map((row) => (
-            <ParameterRowFields
-              key={row.id}
-              row={row}
-              rows={rows}
-              onPatch={(changes) => patch(row.id, changes)}
-              onRemove={() =>
-                update(rows.filter((other) => other.id !== row.id))
-              }
-            />
-          ))}
-
-          <Box>
-            <Button
-              size="xs"
-              variant="outline"
-              onClick={() => update([...rows, newRow()])}
-            >
-              <Plus size={14} /> Add parameter
-            </Button>
-          </Box>
-        </Stack>
+        <QueryParametersPanel
+          reserved={RESERVED_PARAMETERS}
+          dashboardContextValues={builtinValues}
+          typeOptions={TYPE_OPTIONS}
+          rows={rows.map((row) =>
+            rowVM({
+              row,
+              rows,
+              onPatch: (changes) => patch(row.id, changes),
+              onRemove: () =>
+                update(rows.filter((other) => other.id !== row.id)),
+            }),
+          )}
+          onAdd={() => update([...rows, newRow()])}
+        />
       )}
     </VStack>
   );

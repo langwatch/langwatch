@@ -10,14 +10,39 @@
  * port in both directions.
  */
 
-/** The page-level parameters the frame reads and is notified about. */
-export interface ChartFrameParams {
+export type ChartFrameTheme = "light" | "dark";
+
+/**
+ * Host-supplied, read-only context the frame is notified about — the
+ * dashboard's own state, never something author code can set. Delivered on
+ * `lw:init` and again on every `lw:dashboard-context-change`.
+ *
+ * `widgetId`/`dashboardId`/`projectId`/`widgetName` are optional: not every
+ * frame boundary (e.g. the playground preview, which has no persisted
+ * dashboard record yet) can supply them.
+ */
+export interface ChartFrameDashboardContext {
   /** Epoch milliseconds — plain numbers so the payload is structured-clonable. */
   readonly timeWindow: { readonly start: number; readonly end: number };
   readonly granularitySeconds: number;
+  /** IANA zone name, e.g. "America/Sao_Paulo". */
+  readonly timezone?: string;
+  readonly theme: ChartFrameTheme;
+  readonly widgetId?: string;
+  readonly dashboardId?: string;
+  readonly projectId?: string;
+  readonly widgetName?: string;
 }
 
-export type ChartFrameTheme = "light" | "dark";
+/**
+ * A snapshot of the widget's author-declared parameters and their current
+ * values — the widget definition's declared params with defaults, since
+ * there is no dashboard-side UI to override them yet. Delivered on
+ * `lw:init` only.
+ */
+export type ChartFrameParamsSnapshot = Readonly<
+  Record<string, ChartQueryParamValue>
+>;
 
 /**
  * A bound parameter's value, as the frame may supply it to `LW.query`.
@@ -61,8 +86,9 @@ export interface ChartQueryError {
 
 export interface LwInitMessage {
   readonly type: "lw:init";
-  readonly params: ChartFrameParams;
-  readonly theme: ChartFrameTheme;
+  readonly dashboardContext: ChartFrameDashboardContext;
+  /** Author-declared parameters and their current (default) values. */
+  readonly params: ChartFrameParamsSnapshot;
 }
 
 export interface LwQueryResultMessage {
@@ -77,16 +103,16 @@ export interface LwQueryErrorMessage {
   readonly error: ChartQueryError;
 }
 
-export interface LwParamsChangeMessage {
-  readonly type: "lw:params-change";
-  readonly params: ChartFrameParams;
+export interface LwDashboardContextChangeMessage {
+  readonly type: "lw:dashboard-context-change";
+  readonly dashboardContext: ChartFrameDashboardContext;
 }
 
 export type ParentToFrameMessage =
   | LwInitMessage
   | LwQueryResultMessage
   | LwQueryErrorMessage
-  | LwParamsChangeMessage;
+  | LwDashboardContextChangeMessage;
 
 // ---------------------------------------------------------------------------
 // Frame → parent (over the transferred port)

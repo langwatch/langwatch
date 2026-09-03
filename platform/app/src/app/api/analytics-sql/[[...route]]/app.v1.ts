@@ -77,13 +77,13 @@ const lwqlQuerySchema = z.object({
    * Honoured here and not only on the dashboard, because the same saved chart
    * is readable from both and a statement that follows the period must not have
    * two different meanings depending on which surface asked. Its values fill the
-   * reserved `period_start` / `period_end` parameters the statement declares —
+   * reserved `dashboard_context_period_start` / `dashboard_context_period_end` parameters the statement declares —
    * which is also why sending either of those under `parameters` is refused.
    */
   timeWindow: lwqlTimeWindowSchema.optional(),
   /**
    * The datapoint step for a statement that declares
-   * `{period_granularity_seconds:UInt32}`, in seconds — the REST twin of the
+   * `{dashboard_context_granularity_seconds:UInt32}`, in seconds — the REST twin of the
    * workbench's step control, so a statement's bucketing means the same thing
    * at both doors. Restricted to the steps the surface actually offers
    * ({@link lwqlGranularityStepSchema}) rather than any positive integer, so

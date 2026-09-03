@@ -886,7 +886,7 @@ describe("given the LangWatchQL analytics SQL REST endpoints", () => {
 
     const PERIOD_SQL = () =>
       `SELECT count() AS value FROM ${database}.traces ` +
-      `WHERE OccurredAt >= {period_start:DateTime} AND OccurredAt < {period_end:DateTime}`;
+      `WHERE OccurredAt >= {dashboard_context_period_start:DateTime} AND OccurredAt < {dashboard_context_period_end:DateTime}`;
 
     /** Rows a period-aware statement returns for one window. */
     const countFor = async (timeWindow: { start: Date; end: Date }) => {
@@ -954,7 +954,7 @@ describe("given the LangWatchQL analytics SQL REST endpoints", () => {
     it("refuses a request that pins the window under its own parameters", async () => {
       const response = await post(openProject, {
         sql: PERIOD_SQL(),
-        parameters: { period_start: "2020-01-01 00:00:00" },
+        parameters: { dashboard_context_period_start: "2020-01-01 00:00:00" },
         timeWindow: { start: second(-60), end: second(60) },
       });
       const body = (await response.json()) as Record<string, any>;

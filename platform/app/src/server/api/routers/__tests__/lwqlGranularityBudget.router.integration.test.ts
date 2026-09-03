@@ -83,9 +83,9 @@ function createCaller() {
 
 /** Declares the granularity parameter alongside both reserved period bounds. */
 const GRANULARITY_SQL =
-  "SELECT toStartOfInterval(OccurredAt, INTERVAL {period_granularity_seconds:UInt32} SECOND) AS bucket, " +
+  "SELECT toStartOfInterval(OccurredAt, INTERVAL {dashboard_context_granularity_seconds:UInt32} SECOND) AS bucket, " +
   "count() AS value FROM analytics.traces " +
-  "WHERE OccurredAt >= {period_start:DateTime} AND OccurredAt < {period_end:DateTime} " +
+  "WHERE OccurredAt >= {dashboard_context_period_start:DateTime} AND OccurredAt < {dashboard_context_period_end:DateTime} " +
   "GROUP BY bucket ORDER BY bucket";
 
 /** Seven days, in seconds — the window the request reports over. */
