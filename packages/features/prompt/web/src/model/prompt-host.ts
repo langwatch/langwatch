@@ -78,6 +78,26 @@ export type PromptCopyTarget = {
 };
 
 /**
+ * Whether this deployment runs the playground chat, and what to say when it
+ * does not.
+ *
+ * The chat is not a screen this package can decide about on its own: it talks
+ * to a chat runtime the SERVER has to mount, and whether one is mounted is a
+ * property of the process the screen was served from. `apps/api` declares that
+ * family absent at boot in so many words — "API process serves no
+ * /api/copilotkit" — so on this deployment the chat had nowhere to post, and
+ * rendered anyway. A reader typed a message and got a 404 with no explanation.
+ *
+ * The words travel with the answer rather than being written here, because the
+ * copy a customer reads is resolved from an error code by the host's
+ * presentation registry, and a package that composed its own sentence would be
+ * the one place in the product where that is not true.
+ */
+export type PromptPlaygroundChatAvailability =
+  | { available: true }
+  | { available: false; title: string; description: string };
+
+/**
  * A `platform/app` drawer this screen opens by address rather than by mounting.
  *
  * `traceV2Details` is registered in `platform/app/src/components/drawerRegistry.ts`
@@ -129,6 +149,9 @@ export abstract class PromptHostPort {
 
   /** Every project the reader may copy a prompt into. */
   abstract copyTargets(): readonly PromptCopyTarget[];
+
+  /** Whether this deployment runs the playground chat the Conversation tab hosts. */
+  abstract playgroundChat(): PromptPlaygroundChatAvailability;
 
   /**
    * Where the persisted prompt tabs are kept, and where the store logs.

@@ -28,7 +28,7 @@ import { HandledErrorAlert } from "../../ui/elements/handled-error-alert";
 import { useShowErrorToast } from "../../behavior/governance-feedback";
 import { useGovernanceScope } from "../../behavior/governance-session";
 import { api, type RouterOutputs } from "../../behavior/governance-api";
-import { docsUrl } from "../../model/docs-url";
+import { docsUrl } from "@langwatch/config/docs-url";
 /**
  * Anomaly rule authoring surface, wired to api.anomalyRules.* (Sergey
  * slice B2 — real PG persistence). Rules persist immediately; the

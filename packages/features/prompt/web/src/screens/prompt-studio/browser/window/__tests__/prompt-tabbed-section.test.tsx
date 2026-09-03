@@ -461,6 +461,7 @@ function FormWrapper({
 const renderPromptTabbedSection = (
   props: Partial<Parameters<typeof PromptTabbedSection>[0]> = {},
   formValues?: Partial<PromptConfigFormValues>,
+  host: FakePromptHost = testHost,
 ) => {
   const defaultProps = {
     layoutMode: "vertical" as const,
@@ -473,7 +474,7 @@ const renderPromptTabbedSection = (
 
   return render(
     <ChakraProvider value={defaultSystem}>
-      <PromptHostProvider value={testHost}>
+      <PromptHostProvider value={host}>
         <FormWrapper defaultValues={formValues}>
           <PromptTabbedSection {...defaultProps} />
         </FormWrapper>
@@ -674,6 +675,65 @@ describe("PromptTabbedSection Layout Modes", () => {
         (el) => (el as HTMLInputElement).value === "kept",
       );
       expect(restored).toBeDefined();
+    });
+  });
+});
+
+/**
+ * The Conversation tab on a deployment that runs no chat runtime.
+ *
+ * `apps/api` declares `/api/copilotkit` absent at boot, so on this application
+ * the chat had nowhere to post: it rendered, took a message, and 404'd. What
+ * the tab must do instead is say so — and it must not offer to reset a chat
+ * that is not mounted.
+ */
+describe("given a deployment that runs no playground chat", () => {
+  const unavailableHost = new FakePromptHost({
+    playgroundChat: {
+      available: false,
+      title: "The playground chat isn't available here",
+      description: "This deployment doesn't run the chat playground.",
+    },
+  });
+
+  beforeEach(() => {
+    localStorage.clear();
+    clearStoreInstances();
+    const store = getStoreForTesting({ projectId: TEST_PROJECT_ID, capabilities });
+    store.getState().addTab({ data: createTabData() });
+  });
+
+  afterEach(() => {
+    cleanup();
+    clearStoreInstances();
+    localStorage.clear();
+    tabIdRef.current = "test-tab-id";
+  });
+
+  describe("when the reader opens the Conversation tab", () => {
+    it("explains the absence instead of mounting a chat that cannot send", () => {
+      renderPromptTabbedSection({ layoutMode: "vertical" }, void 0, unavailableHost);
+
+      expect(screen.getByText("The playground chat isn't available here")).toBeInTheDocument();
+      expect(
+        screen.getByText("This deployment doesn't run the chat playground."),
+      ).toBeInTheDocument();
+      expect(screen.queryByTestId("copilot-chat")).not.toBeInTheDocument();
+    });
+
+    it("offers no reset for a chat that is not there", () => {
+      renderPromptTabbedSection({ layoutMode: "vertical" }, void 0, unavailableHost);
+
+      expect(screen.queryByRole("button", { name: /reset chat/i })).not.toBeInTheDocument();
+    });
+  });
+
+  describe("when the deployment does run one", () => {
+    it("mounts the chat as before", () => {
+      renderPromptTabbedSection({ layoutMode: "vertical" });
+
+      expect(screen.getByTestId("copilot-chat")).toBeInTheDocument();
+      expect(screen.getByRole("button", { name: /reset chat/i })).toBeInTheDocument();
     });
   });
 });

@@ -17,7 +17,7 @@ import { HandledErrorAlert } from "../../ui/elements/handled-error-alert";
 import { useGatewayHost } from "../../model/gateway-host";
 import { useOrganizationTeamProject } from "../../behavior/gateway-session";
 import { api } from "../../behavior/gateway-api";
-import { docsUrl } from "../../model/docs-url";
+import { docsUrl } from "@langwatch/config/docs-url";
 
 /**
  * The routing policy editor opens at the name the registry answers to.

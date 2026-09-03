@@ -153,6 +153,7 @@
     "@langwatch/annotation-web": "workspace:*",
     "@langwatch/coding-agent-contract": "workspace:*",
     "@langwatch/coding-agent-web": "workspace:*",
+    "@langwatch/config": "workspace:*",
     "@langwatch/data-privacy-contract": "workspace:*",
     "@langwatch/dataset-contract": "workspace:*",
     "@langwatch/dataset-web": "workspace:*",

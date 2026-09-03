@@ -24,6 +24,8 @@
 
 import { describe, expect, it, vi } from "vitest";
 import { UiPromptHost } from "../src/features/prompt/behavior/prompt-host.adapter";
+import { explainHandledError } from "../src/model/errors/presentation";
+import { promptPlaygroundChatAvailability } from "../src/features/prompt/model/prompt-playground-chat-availability";
 
 function hostWith(query: Record<string, string | undefined>) {
   const setQuery = vi.fn();
@@ -50,6 +52,7 @@ function hostWith(query: Record<string, string | undefined>) {
         },
         logger: { info: () => undefined, warn: () => undefined, error: () => undefined },
       },
+      playgroundChat: promptPlaygroundChatAvailability(),
     },
     {
       setQuery,
@@ -119,6 +122,45 @@ describe("given the prompt host", () => {
       const { host } = hostWith({});
 
       expect(host.isReportedGlobally(new Error("refused"))).toBe(false);
+    });
+  });
+
+  /**
+   * The Conversation tab asks whether there is a chat runtime to talk to, and
+   * on this deployment there is not: `apps/api` declares `/api/copilotkit`
+   * absent at boot, so the chat had nowhere to post and rendered anyway.
+   *
+   * The words are asserted to come from the code-keyed presentation registry
+   * rather than from a sentence written at the seam — that is the whole reason
+   * the answer carries copy at all, and a hand-written string here would pass a
+   * looser test while putting unregistered prose in front of a customer.
+   */
+  describe("when a screen asks whether the playground chat is available", () => {
+    it("says it is not, in the registry's own words", () => {
+      const { host } = hostWith({});
+      const answer = host.playgroundChat();
+
+      const registered = explainHandledError({
+        code: "prompt_playground_chat_unavailable",
+        meta: {},
+        httpStatus: 501,
+        fault: "platform",
+        retryable: false,
+        tips: [],
+        docsUrl: void 0,
+        traceId: void 0,
+        reasons: [],
+      });
+
+      // Copy was written for this code, rather than the degraded form that
+      // humanises the slug — which is what a missing registry entry would give
+      // the reader, and it reads as "Prompt playground chat unavailable".
+      expect(registered.isRegistered).toBe(true);
+      expect(answer).toEqual({
+        available: false,
+        title: registered.title,
+        description: registered.description,
+      });
     });
   });
 

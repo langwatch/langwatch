@@ -14,6 +14,10 @@
       "types": "./src/index.ts",
       "default": "./src/index.ts"
     },
+    "./docs-url": {
+      "types": "./src/docs-url.ts",
+      "default": "./src/docs-url.ts"
+    },
     "./public-app-config": {
       "types": "./src/public-app-config.ts",
       "default": "./src/public-app-config.ts"

@@ -21,6 +21,7 @@
  */
 
 import type { ReactNode } from "react";
+import { configureDocsRuntime } from "@langwatch/config/docs-url";
 import { registerChunkReloadListener } from "./behavior/chunk-reload";
 import { readPublicAppConfig } from "./behavior/public-config";
 import { toPublicEnvironment } from "./behavior/public-environment";
@@ -54,10 +55,26 @@ function useNoNavigationTracking() {}
  * inject the boot configuration surfaces through the root error boundary with
  * `readPublicAppConfig`'s own sentence, instead of blanking the document before
  * React mounts.
+ *
+ * This is also where the docs runtime is configured, because it is the first
+ * and only point that holds both halves of it. `@langwatch/config/docs-url` is
+ * shared by five families that each used to read `import.meta.env.DEV` for
+ * themselves; it receives the deployment's mode instead, and a package may not
+ * read the environment. It resolves as production until told otherwise — the
+ * safe default, since the docs-origin allowlist in `read-handled-error` is
+ * derived from it — so it is configured here, above the router, before any
+ * screen renders a link.
  */
 let publicEnvironment: PublicEnvironment | undefined;
 function useBootPublicEnvironment(): { data: PublicEnvironment | undefined } {
-  publicEnvironment ??= toPublicEnvironment(readPublicAppConfig());
+  if (!publicEnvironment) {
+    const config = readPublicAppConfig();
+    configureDocsRuntime({
+      mode: config.mode,
+      hostname: typeof window === "undefined" ? undefined : window.location.hostname,
+    });
+    publicEnvironment = toPublicEnvironment(config);
+  }
   return { data: publicEnvironment };
 }
 

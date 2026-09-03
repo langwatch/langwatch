@@ -89,6 +89,7 @@ const mount = (element: ReactElement) =>
 describe("given the dataset editor opened from a bare drawer address", () => {
   describe("when the reader names a dataset and creates it", () => {
     /** @scenario "A bare-URL open of the dataset editor creates the dataset and closes" */
+    /** @scenario "A sub-flow target with no caller closes the drawer itself" */
     it("writes the dataset and closes, with no caller to tell", async () => {
       mount(<AddOrEditDatasetDrawer open />);
 

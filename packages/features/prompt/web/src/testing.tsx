@@ -26,6 +26,7 @@ import {
   type PromptCopyTarget,
   type PromptFailureNotice,
   type PromptHostScope,
+  type PromptPlaygroundChatAvailability,
   type PromptPlatformDrawer,
   type PromptRouteReading,
   type PromptSuccessNotice,
@@ -73,6 +74,7 @@ export class FakePromptHost extends PromptHostPort {
       copyTargets?: readonly PromptCopyTarget[];
       storage?: PromptBrowserStorage;
       reportedGlobally?: boolean;
+      playgroundChat?: PromptPlaygroundChatAvailability;
     } = {},
   ) {
     super();
@@ -129,6 +131,14 @@ export class FakePromptHost extends PromptHostPort {
 
   copyTargets(): readonly PromptCopyTarget[] {
     return this.options.copyTargets ?? [];
+  }
+
+  /**
+   * Available unless a test says otherwise, which is what the suites written
+   * before the deployment could refuse it are asserting about.
+   */
+  playgroundChat(): PromptPlaygroundChatAvailability {
+    return this.options.playgroundChat ?? { available: true };
   }
 
   tabCapabilities(): PromptTabsCapabilities {

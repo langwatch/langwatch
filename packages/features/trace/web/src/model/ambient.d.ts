@@ -16,18 +16,3 @@ declare module "*?raw" {
   const content: string;
   export default content;
 }
-
-/**
- * The build-time environment the application injects.
- *
- * `docsUrl` reads `import.meta.env` for the docs host override; declaring the
- * shape here rather than referencing `vite/client` keeps the package's type
- * surface to what it actually uses.
- */
-interface ImportMetaEnv {
-  readonly [key: string]: string | boolean | undefined;
-}
-
-interface ImportMeta {
-  readonly env: ImportMetaEnv;
-}

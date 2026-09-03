@@ -44,6 +44,7 @@ export {
   type PromptCopyTarget,
   type PromptFailureNotice,
   type PromptHostScope,
+  type PromptPlaygroundChatAvailability,
   type PromptPlatformDrawer,
   type PromptRouteReading,
   type PromptSuccessNotice,

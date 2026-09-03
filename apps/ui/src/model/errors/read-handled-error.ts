@@ -7,7 +7,7 @@ import {
   type SerializedReason,
 } from "@langwatch/handled-error";
 
-import { getDocsBaseUrl } from "../docs-url";
+import { canonicalDocsBaseUrl, docsBaseUrl } from "@langwatch/config/docs-url";
 
 import { APP_ERROR_CODES } from "./codes";
 
@@ -330,10 +330,11 @@ function isRecord(value: unknown): value is Record<string, unknown> {
 /**
  * The origins a docs link may point at, for the runtime asking.
  *
- * Derived from the same helper that BUILDS them (`model/docs-url`), so the
- * allowlist cannot drift from what the server actually sends: the canonical
- * docs site, plus whatever THIS runtime would link to — which is the local
- * Mintlify on :3000 only in a development build served from a local host.
+ * Derived from the same module that BUILDS them (`@langwatch/config/docs-url`),
+ * so the allowlist cannot drift from what the server actually sends: the
+ * canonical docs site, plus whatever THIS runtime would link to — which is the
+ * local Mintlify on :3000 only for a development deployment served from a local
+ * host, and only once a composition root has said so.
  *
  * The local origin is deliberately not a constant member. Pinning both branches
  * unconditionally put `http://localhost:3000` in the allowlist of every
@@ -350,11 +351,7 @@ function isRecord(value: unknown): value is Record<string, unknown> {
  * evaluated this module.
  */
 function docsOrigins(): Set<string> {
-  return new Set(
-    [getDocsBaseUrl({ hostname: "app.langwatch.ai", isDev: false }), getDocsBaseUrl()].map(
-      (base) => new URL(base).origin,
-    ),
-  );
+  return new Set([canonicalDocsBaseUrl(), docsBaseUrl()].map((base) => new URL(base).origin));
 }
 
 /**

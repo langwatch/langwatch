@@ -16,16 +16,19 @@
  *
  * This file exists because the runtime is a property of the whole suite, not of
  * one test, and the default unit suite's is incidental: it supplies a `window`
- * on `localhost`, so the only thing keeping it out of the development branch is
- * the ambient value of `import.meta.env.DEV`. A regression test for a
- * production-only vulnerability must not rest on that. `@vitest-environment
- * node` removes `window` entirely, which is the condition `getDocsBaseUrl`
- * reads first — so this file is the production case by construction, and stays
- * one however the shared setup changes.
+ * on `localhost`, so the only thing that ever kept it out of the development
+ * branch was the ambient value of `import.meta.env.DEV`. A regression test for
+ * a production-only vulnerability must not rest on that. Two things now keep it
+ * off: `@langwatch/config/docs-url` resolves for the runtime a composition root
+ * CONFIGURED, and no suite configures one, so the default is production; and
+ * `@vitest-environment node` removes `window` as well. So this file is the
+ * production case by construction, and stays one however the shared setup
+ * changes.
  *
  * The complementary half, that a contributor's local docs still resolve, is
- * `utils/__tests__/docsUrl.unit.test.ts`: it drives `getDocsBaseUrl` with
- * explicit `{ hostname, isDev }` rather than depending on a runtime at all.
+ * `packages/config/src/__tests__/docs-url.unit.test.ts`: it drives the resolver
+ * with an explicit `{ mode, hostname }` rather than depending on a runtime at
+ * all.
  */
 import { describe, expect, it } from "vitest";
 

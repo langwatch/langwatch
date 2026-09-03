@@ -26,6 +26,7 @@ import { browserUiLogger, browserUiStorage } from "../../../../behavior/ui-brows
 import { useUiCapabilities } from "../../../../behavior/ui-capabilities";
 import { UiPromptHost, type PromptTabCapabilities } from "../../behavior/prompt-host.adapter";
 import { promptCopyTargets } from "../../model/prompt-copy-targets";
+import { promptPlaygroundChatAvailability } from "../../model/prompt-playground-chat-availability";
 
 /**
  * The browser services the packaged tab store runs on.
@@ -40,6 +41,15 @@ const tabCapabilities: PromptTabCapabilities = {
   storage: browserUiStorage,
   logger: browserUiLogger,
 };
+
+/**
+ * The chat runtime this application serves, which is none.
+ *
+ * Resolved once at module scope because it is a property of the composition
+ * rather than of the reader, the project or the address — see
+ * `model/prompt-playground-chat-availability` for why the answer is what it is.
+ */
+const playgroundChat = promptPlaygroundChatAvailability();
 
 function PromptHost({ children }: { children: ReactNode }) {
   const { session, navigation, route, feedback } = useUiCapabilities();
@@ -88,6 +98,7 @@ function PromptHost({ children }: { children: ReactNode }) {
           copyTargets,
           route: reading,
           tabCapabilities,
+          playgroundChat,
         },
         {
           setQuery: (next, options) => route.setQuery(next, options),

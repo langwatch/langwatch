@@ -32,6 +32,7 @@
     "@hookform/resolvers": "^5.2.2",
     "@langwatch/authz-contract": "workspace:*",
     "@langwatch/authz-web": "workspace:*",
+    "@langwatch/config": "workspace:*",
     "@langwatch/design-system": "workspace:*",
     "@langwatch/enterprise-billing-web": "workspace:*",
     "@langwatch/gateway-contract": "workspace:*",

@@ -15,6 +15,8 @@ import {
   PromptPlaygroundChat,
   type PromptPlaygroundChatRef,
 } from "../../chat/prompt-playground-chat";
+import { PromptPlaygroundChatUnavailable } from "../../chat/prompt-playground-chat-unavailable";
+import { usePromptHost } from "../../../../model/prompt-host";
 import { DemonstrationsTabContent } from "./demonstrations-tab-content";
 import type { LayoutMode } from "../../../../surfaces/prompt-layout";
 
@@ -78,6 +80,15 @@ export function PromptTabbedSection({
   const hasDemonstrations = demonstrationRows.length > 0;
   const chatRef = useRef<PromptPlaygroundChatRef>(null);
   const [activeTab, setActiveTab] = useState<PromptTab>(PromptTab.Conversation);
+
+  /**
+   * Whether this deployment has a chat runtime to talk to.
+   *
+   * Asked of the host rather than assumed, because it is a property of the
+   * process that served the page. Where the answer is no, the tab explains
+   * itself instead of mounting a chat whose every send is a 404.
+   */
+  const playgroundChat = usePromptHost().playgroundChat();
 
   // Local state for variable values - allows fast typing without store re-renders
   const [localVariableValues, setLocalVariableValues] =
@@ -187,7 +198,7 @@ export function PromptTabbedSection({
             {(tabs) => (
               <>
                 <Box flex={1} />
-                {tabs.value === PromptTab.Conversation && (
+                {tabs.value === PromptTab.Conversation && playgroundChat.available && (
                   <Tooltip
                     content="Start a new conversation"
                     positioning={{ placement: "top" }}
@@ -233,11 +244,18 @@ export function PromptTabbedSection({
           position="relative"
         >
           <Box position="absolute" bottom={0} left={0} width="full" height="full" maxHeight="full">
-            <PromptPlaygroundChat
-              ref={chatRef}
-              formValues={formValues}
-              variables={runtimeVariables}
-            />
+            {playgroundChat.available ? (
+              <PromptPlaygroundChat
+                ref={chatRef}
+                formValues={formValues}
+                variables={runtimeVariables}
+              />
+            ) : (
+              <PromptPlaygroundChatUnavailable
+                title={playgroundChat.title}
+                description={playgroundChat.description}
+              />
+            )}
           </Box>
         </Tabs.Content>
         <Tabs.Content value={PromptTab.Variables} height="full">

@@ -421,6 +421,7 @@ describe("given a drawer the framework may not let close itself", () => {
 
   for (const { drawer, component, address } of CLOSED_BY_THE_ADAPTER) {
     describe(`when the address opens ${drawer}`, () => {
+      /** @scenario "A drawer the framework cannot let close itself is handed the close to call" */
       it("is given the close to call", async () => {
         const props = await openAddress(address, component);
 

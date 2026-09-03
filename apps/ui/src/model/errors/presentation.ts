@@ -639,6 +639,15 @@ const presentations = {
     describe: () =>
       "None of the prompts you picked is a copy of this one. Reload to see its current copies, then pick again.",
   },
+  prompt_playground_chat_unavailable: {
+    // Not a failure the reader caused, and not one that will pass: this
+    // deployment runs no chat service behind the playground at all, so the
+    // Conversation tab says so instead of taking a message it cannot send.
+    // Names what still works, because the rest of the studio does.
+    title: "The playground chat isn't available here",
+    describe: () =>
+      "This deployment doesn't run the chat playground. You can still edit, save and deploy this prompt, and test it from your own application.",
+  },
   system_prompt_required: {
     title: "A system prompt is required",
     describe: () => "Add one before running this.",

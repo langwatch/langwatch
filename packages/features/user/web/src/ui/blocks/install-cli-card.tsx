@@ -3,7 +3,7 @@ import { Check, Copy, ExternalLink, Terminal } from "lucide-react";
 import { useState } from "react";
 
 import { usePersonalWorkspaceHost } from "../../model/personal-workspace-host";
-import { docsUrl } from "../../model/docs-url";
+import { docsUrl } from "@langwatch/config/docs-url";
 import { Link } from "../elements/personal-link";
 
 /**

@@ -28,6 +28,7 @@ import type {
   PromptCopyTarget,
   PromptFailureNotice,
   PromptHostScope,
+  PromptPlaygroundChatAvailability,
   PromptRouteReading,
   PromptSuccessNotice,
 } from "@langwatch/prompt-web/screens/prompt-studio";
@@ -61,6 +62,7 @@ export type PromptHostReadings = {
   copyTargets: readonly PromptCopyTarget[];
   route: PromptRouteReading;
   tabCapabilities: PromptTabCapabilities;
+  playgroundChat: PromptPlaygroundChatAvailability;
 };
 
 export type PromptHostActions = {
@@ -135,6 +137,18 @@ export class UiPromptHost extends PromptHostPort {
 
   tabCapabilities(): PromptTabCapabilities {
     return this.readings.tabCapabilities;
+  }
+
+  /**
+   * Whether this deployment runs the playground chat.
+   *
+   * A reading rather than a decision taken here, for the same reason as every
+   * other member of this class: the adapter is a value object over what has
+   * already been resolved, and what resolves this is
+   * `model/prompt-playground-chat-availability`.
+   */
+  playgroundChat(): PromptPlaygroundChatAvailability {
+    return this.readings.playgroundChat;
   }
 
   requestUpgrade(): void {

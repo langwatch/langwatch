@@ -518,7 +518,6 @@ const LEGACY_INERT: string[] = [
   "specs/monitors/replicate-monitor-to-project.feature",
   "specs/monitors/workflow-evaluator-checktype.feature",
   "specs/monitors/workflow-evaluator-mappings.feature",
-  "specs/navigation/child-drawer-nesting.feature",
   "specs/navigation/home-navigation.feature",
   "specs/nlp-go/dataset-block.feature",
   "specs/nlp-go/http-block.feature",

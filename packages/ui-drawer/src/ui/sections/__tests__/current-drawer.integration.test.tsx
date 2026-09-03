@@ -160,6 +160,7 @@ describe("the drawer host", () => {
 
   describe("given a reader who walked from one drawer into another", () => {
     describe("when they go back", () => {
+      /** @scenario "Going back from a sub-flow returns to the drawer that opened it" */
       it("returns to the first drawer with its parameters restored", async () => {
         mount("/acme/traces");
         const user = userEvent.setup();

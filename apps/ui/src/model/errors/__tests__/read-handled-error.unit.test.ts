@@ -197,7 +197,8 @@ describe("readHandledError", () => {
      * the runtime is a property of the whole suite, so that file pins it with
      * `@vitest-environment node` instead of inheriting whatever this one has.
      * The other half — that a contributor's local docs still resolve — is
-     * `docsUrl.unit.test.ts`, which drives `getDocsBaseUrl` by explicit inputs.
+     * `packages/config/src/__tests__/docs-url.unit.test.ts`, which drives the
+     * resolver by explicit inputs.
      */
   });
 

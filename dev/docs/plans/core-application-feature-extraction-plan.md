@@ -13463,3 +13463,169 @@ Four scenarios are new and every one of them is bound:
 `An annotation-queue automation is refused by the package it needs`, and the
 extra `And` on `A trace whose full record this process cannot read still
 notifies`.
+
+## Five copies of one docs helper, a chat with nowhere to post, and a spec that said the opposite of the doc, 2026-09-03
+
+Three UI-lane debts that were each recorded and none of them acted on: a helper
+copied into five packages so that four of them could read `import.meta.env`
+where a package may not, a browser surface pointing at an API route this process
+declares absent at boot, and a feature file whose stated premise is the one
+shape `dev/docs/best_practices/drawers.md` says never to use.
+
+### One docs helper, not five
+
+`docs-url.ts` existed five times — `apps/ui/src/model`, and one each in
+`@langwatch/trace-web`, `@langwatch/user-web`, `@langwatch/gateway-web` and
+`@langwatch/enterprise-governance-web`. Every copy decided the local-Mintlify
+branch by reading `import.meta.env.DEV`, which is exactly what
+`environment-boundaries` refuses: *"Reusable packages receive typed
+configuration; they must not read environment variables directly."* Two copies
+were reported by the rule. **The other three were not, because they read through
+a cast** — `(import.meta as unknown as { env?: { DEV?: boolean } }).env` — and
+the rule matches a `MetaProperty` object, which a `TSAsExpression` is not. A
+silenced rule reads exactly like a satisfied one.
+
+The deployment fact all five were reaching for is already on the contract every
+browser is handed: `PublicAppConfig.mode`. So the five collapse into
+`@langwatch/config/docs-url`, a framework-free module that RECEIVES the mode.
+`@langwatch/config` rather than a web package because a web package another web
+package imports is the shape none of the five families would accept — each one's
+own docblock said so, twice naming "a promotion, not a move".
+
+| File | Change |
+| --- | --- |
+| `packages/config/src/docs-url.ts` | **New.** `resolveDocsBaseUrl({ mode, hostname })` is pure; `configureDocsRuntime` installs the runtime at the composition root; `docsBaseUrl`/`docsUrl`/`canonicalDocsBaseUrl` read it. Type-only import of `PublicAppConfig` so `mode` cannot drift from the contract and no zod reaches the bundle |
+| `packages/config/package.json` | `./docs-url` subpath export |
+| `apps/ui/src/ui.entrypoint.tsx` | Configures the runtime where the public config is first read, above the router — `useBootPublicEnvironment` runs first in `UiInnerProviders`, before any screen renders a link |
+| `apps/ui/src/model/errors/read-handled-error.ts`, `packages/features/trace/web/.../read-handled-error.ts` | The docs-origin allowlist derives from `canonicalDocsBaseUrl()` + `docsBaseUrl()` instead of two `getDocsBaseUrl` calls |
+| five `docs-url.ts` copies, `apps/ui/src/model/__tests__/docs-url.unit.test.ts` | **Deleted** |
+| `packages/features/trace/web/src/model/ambient.d.ts` | The `ImportMetaEnv`/`ImportMeta` declaration is gone with the read it existed for; the triple-slash reference the last commit added went with the file that carried it |
+| four web `package.json` | `@langwatch/config` as a workspace dependency |
+
+**The security check keeps its behaviour, and gains a floor.** `safeDocsUrl`
+accepts a docs link only from an allowlisted origin, and the local origin is a
+member only for a development runtime on a local host — the property that keeps
+`http://localhost:3000` out of a production bundle's allowlist, where an
+upstream could otherwise point "Read the docs" at a service on the viewer's own
+machine. It used to rest on `import.meta.env.DEV` being false and, in a suite,
+on `@vitest-environment node` removing `window`. It now rests on the module
+resolving as production until a composition root says otherwise, which no test
+does — a stricter default than the one it replaces, and the docs-origin
+regression file's docblock says so.
+
+### The playground chat had nowhere to post
+
+Recorded in this ledger and not acted on: *"the browser still points
+`runtimeUrl` at `/api/copilotkit` (`prompt-playground-chat.tsx`), so the
+prompt-studio playground chat 404s rather than merely being unmigrated"*. It is
+the DEFAULT tab of `/[project]/prompts`, behind a permission and no flag, so a
+member with `prompts:view` landed on a chat, typed, and got nothing.
+
+**The ledger supports hiding the surface, not retiring it.** What is recorded as
+deliberate and kept is the SERVER absence — a boundary refusal, because the
+adapter reaches the retired studio's post-event module, the platform Lambda
+runtime and a browser package. Nothing anywhere says the playground is retired.
+So the chat is declared absent rather than deleted, through the host port, and
+the day a runtime is mounted the answer flips and the chat is back.
+
+| File | Change |
+| --- | --- |
+| `packages/features/prompt/web/src/model/prompt-host.ts` | `playgroundChat(): PromptPlaygroundChatAvailability` — `{ available: true }`, or `false` carrying the title and description |
+| `.../chat/prompt-playground-chat-unavailable.tsx` | **New.** The empty state the Conversation tab renders instead |
+| `.../browser/window/prompt-tabbed-section.tsx` | Renders the chat only when the host says there is one, and drops "Reset chat" when there is not |
+| `apps/ui/src/features/prompt/model/prompt-playground-chat-availability.ts` | **New.** This application's answer — unavailable, worded by the presentation registry |
+| `apps/ui/src/model/errors/{codes,presentation}.ts` | `prompt_playground_chat_unavailable` and its copy |
+| `apps/api/package.json` | `@copilotkit/runtime` removed — no file under `apps/api/src` imports it. `pnpm install --offline` succeeded, no network: `+2 -126` packages |
+
+### The spec that said the opposite of the doc
+
+`specs/navigation/child-drawer-nesting.feature` opened with "Child drawers are
+rendered via local React state within the parent drawer component, NOT via URL
+navigation" — the shape the drawers doc names as the thing never to do, because
+a hand-mounted `Drawer.Root` sits outside the history `useDrawer` keeps. All ten
+scenarios were `@unimplemented`, so it enforced nothing while reading as a
+decision somebody had taken.
+
+Rewritten to the doc's pattern: `openDrawer` pushes onto the stack, `goBack`
+restores the caller, the caller passes `onClose` and a target reaches for
+`closeDrawer` only when it was handed no ending. Six scenarios, three of them
+bound to tests that already exist and prove exactly this:
+
+| Scenario | Bound to |
+| --- | --- |
+| Going back from a sub-flow returns to the drawer that opened it | `packages/ui-drawer/src/ui/sections/__tests__/current-drawer.integration.test.tsx:163` |
+| A drawer the framework cannot let close itself is handed the close to call | `apps/ui/tests/installed-ui-drawers.integration.test.tsx:424` |
+| A sub-flow target with no caller closes the drawer itself | `packages/features/dataset/web/.../add-or-edit-dataset-drawer.integration.test.tsx:92` |
+
+The other three stay `@unimplemented` and say what they are waiting for.
+`packages/architecture-lint/src/check-feature-parity.ts` loses its `LEGACY_INERT`
+entry for the file, which the checker requires the moment the file enforces
+anything — `staleInert` is empty with it gone.
+
+### Judgment calls
+
+- **The docs runtime is installed, not threaded.** `docsUrl(path)` is called
+  inline in five components and, more decisively, by `read-handled-error`, which
+  is a pure parser and can hold no React context. The mutable module value is
+  the same shape as `configureLogger` and `setTraceUrlProvider`; what changed is
+  that the ambient globals it replaces were `import.meta.env.DEV` and
+  `window.location`.
+- **`mode: "test"` is not a local-docs mode.** A suite is not a deployment
+  anybody opens links from, and treating it as development would admit
+  `http://localhost:3000` to the allowlist of every jsdom suite served from
+  localhost — the exact hole the docs-origin regression exists for.
+- **The Conversation tab keeps its place rather than disappearing.** A tab that
+  vanishes leaves a reader who used the chat with no explanation at all. It
+  keeps the tab and says why, which is also what makes the absence visible to us
+  rather than quietly gone.
+- **The empty state's words come from the registry, through the port.** A
+  package may not import the application's presentation registry, so the answer
+  carries the copy rather than the code. The alternative — a sentence written in
+  the package — would be the one customer-facing string in the product that no
+  registry entry owns.
+- **The dataset bare-URL test now binds two scenarios.** It is the only test that
+  drives the no-caller ending, and the two files ask different things of it:
+  `drawer-opened-with-no-caller.feature` asks whether the WORK finishes, this
+  file asks which ENDING runs. A comment in the feature says so, rather than
+  leaving a reader to find the overlap.
+
+### Gates
+
+`apps/ui`: `vitest run tests` — **98 files / 1034 tests**, `pnpm typecheck` — 0
+errors. `@langwatch/config` — 11 files / 80 tests, typecheck clean.
+`@langwatch/trace-web` — 234 / 1836, typecheck clean. `@langwatch/user-web` — 11
+/ 89, clean. `@langwatch/gateway-web` — 38 / 304, clean.
+`@langwatch/enterprise-governance-web` — 25 / 226, clean. `@langwatch/prompt-web`
+— 38 files / 646 tests (2 skipped); its typecheck reports **8 errors in two files
+this lane does not touch** (`use-load-span-into-prompt-playground.ts`,
+`draggable-tabs-browser-store.ts`, both `trpc.spans` on a workflow router) —
+pre-existing, and both files are absent from this lane's `git status`.
+`@langwatch/dataset-web` — 19 / 118, clean. `@langwatch/ui-drawer` — 3 / 18,
+clean. `apps/api`: `tsc --noEmit` — 0 errors. `oxlint` with
+`.oxlintrc.architecture.json` over every touched file: clean, except
+`check-feature-parity.ts`, which reports **91 `logical-statement-spacing` errors
+at HEAD and 91 after the one-line deletion** — identical, and none of them near
+it. `oxfmt --check`: clean on every file this lane touched; the trace family's
+`read-handled-error.ts` carries formatting debt at HEAD in regions this change
+does not enter. Feature parity for
+`specs/navigation/child-drawer-nesting.feature`: **6 scenarios, 3 enforced, 0
+unbound, 3 `@unimplemented`**, no unknown annotations, `staleInert` empty (the
+repository-wide run still reports its pre-existing 4,633 unbound scenarios, 352
+unknown annotations and 50 inert files, none of them from these files).
+
+### What this lane did NOT do
+
+- **Nothing under `platform/` was created, edited or read.**
+- **The `@copilotkit/*` dependencies in `@langwatch/prompt-web` stay.** The chat
+  component is not deleted, so its imports are not dead — only unreachable while
+  the host answers `available: false`.
+- **The API still serves no `/api/copilotkit`,** and nothing in `apps/api/src`
+  was touched. The boundary refusal and its boot log are unchanged; what changed
+  is that the browser no longer pretends otherwise.
+- **`@langwatch/trace-web` still carries its own copy of `read-handled-error`,
+  `presentation.ts` and `codes.ts`.** That is a second duplication, larger than
+  this one, and it is not this lane's.
+- **The three `@unimplemented` drawer scenarios were not implemented.** They
+  describe the sub-flow round trip end to end, the caller's draft surviving it,
+  and Escape returning to the caller — none has a test, and writing one is the
+  work of whoever lands the sub-flows.

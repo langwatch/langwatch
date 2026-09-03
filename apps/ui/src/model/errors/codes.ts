@@ -322,6 +322,7 @@ export const APP_ERROR_CODES = [
   "prompt_no_copies_selected",
   "prompt_not_a_copy",
   "prompt_not_found",
+  "prompt_playground_chat_unavailable",
   "provider_endpoint_redirected",
   "provider_key_invalid",
   "provider_key_missing",

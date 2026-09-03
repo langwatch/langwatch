@@ -1,5 +1,5 @@
 import { api } from "../../behavior/personal-workspace-api";
-import { docsUrl } from "../../model/docs-url";
+import { docsUrl } from "@langwatch/config/docs-url";
 import { AgentActionsMenu } from "./agent-actions-menu";
 
 /**

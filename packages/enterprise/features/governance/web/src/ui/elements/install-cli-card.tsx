@@ -1,8 +1,8 @@
 // Family-local copy of `platform/app/src/components/me/InstallCliCard.tsx`.
 // The personal-workspace family takes its own copy when it moves; this one is
 // governance's. Two seams are substituted: the deployment shape comes from the
-// host port rather than `usePublicEnv`, and the docs base is the family-local
-// copy of the same helper.
+// host port rather than `usePublicEnv`, and the docs base comes from
+// `@langwatch/config/docs-url`, which every family now shares.
 import {
   Box,
   Button,
@@ -17,7 +17,7 @@ import { Check, Copy, ExternalLink, Terminal } from "lucide-react";
 import { useState } from "react";
 
 import { useGovernanceHost } from "../../model/governance-host";
-import { docsUrl } from "../../model/docs-url";
+import { docsUrl } from "@langwatch/config/docs-url";
 import { Link } from "./governance-link";
 
 /**
