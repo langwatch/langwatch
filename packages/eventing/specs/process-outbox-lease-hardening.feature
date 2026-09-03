@@ -42,6 +42,13 @@ Feature: Process outbox lease hardening
     And the abandonment is counted
     And a drain that is merely slow but under the threshold is not abandoned
 
+  @unit @poll-phase
+  Scenario: Outbox workers registered together do not poll in lockstep
+    Given several process managers whose outbox workers start in the same tick
+    When each worker arms its recovery poll
+    Then each worker's poll is phase-shifted by its own fraction of one interval
+    And no two workers registered together lease on the same schedule
+
   @unit @attempt-accounting
   Scenario: Attempt counting survives crashes between delivery and acknowledgement
     Given a message whose delivery crashed after the handler ran but before the acknowledgement

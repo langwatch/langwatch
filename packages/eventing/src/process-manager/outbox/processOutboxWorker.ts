@@ -16,6 +16,11 @@ const DEFAULT_STUCK_DRAIN_TIMEOUT_MS = 300_000;
  */
 const MAX_ABANDONED_DRAINS = 5;
 
+function clampFraction(value: number): number {
+  if (!Number.isFinite(value)) return 0;
+  return Math.min(Math.max(value, 0), 1);
+}
+
 export interface ProcessOutboxWorkerOptions {
   dispatcher: Pick<OutboxDispatcherService, "runOnce">;
   logger: Logger;
@@ -35,6 +40,14 @@ export interface ProcessOutboxWorkerOptions {
    * retained at once.
    */
   stuckDrainTimeoutMs?: number;
+  /**
+   * Fraction of one interval, in [0, 1), by which this worker's recovery poll
+   * is phase-shifted. Every process manager registers its worker in the same
+   * tick, so an unphased fleet leases in lockstep once per interval and
+   * contends for the same few Postgres connections forever; the default draws
+   * a phase per worker so the polls spread across the interval instead.
+   */
+  jitter?: () => number;
   now?: () => number;
 }
 
@@ -51,6 +64,7 @@ export class ProcessOutboxWorker {
   private readonly intervalMs: number;
   private readonly batchSize: number;
   private readonly stuckDrainTimeoutMs: number;
+  private readonly jitter: () => number;
   private readonly now: () => number;
 
   private timer: NodeJS.Timeout | null = null;
@@ -72,18 +86,24 @@ export class ProcessOutboxWorker {
       1,
       options.stuckDrainTimeoutMs ?? DEFAULT_STUCK_DRAIN_TIMEOUT_MS,
     );
+    this.jitter = options.jitter ?? Math.random;
     this.now = options.now ?? Date.now;
   }
 
-  /** Starts an immediate drain plus the recovery poll. Idempotent. */
+  /** Starts an immediate drain plus the phase-shifted recovery poll. Idempotent. */
   start(): void {
     if (this.started) return;
     this.started = true;
-    this.timer = setInterval(() => this.triggerDrain(), this.intervalMs);
+    const phaseMs = Math.floor(clampFraction(this.jitter()) * this.intervalMs);
+    this.timer = setTimeout(() => {
+      if (!this.started) return;
+      this.timer = setInterval(() => this.triggerDrain(), this.intervalMs);
+      this.timer.unref();
+    }, phaseMs);
     this.timer.unref();
     this.triggerDrain();
     this.logger.info(
-      { intervalMs: this.intervalMs, batchSize: this.batchSize },
+      { intervalMs: this.intervalMs, batchSize: this.batchSize, phaseMs },
       "ProcessOutboxWorker started",
     );
   }
@@ -106,7 +126,7 @@ export class ProcessOutboxWorker {
     if (!this.started) return;
     this.started = false;
     this.drainRequested = false;
-    if (this.timer) clearInterval(this.timer);
+    if (this.timer) clearTimeout(this.timer);
     this.timer = null;
     await this.inFlight;
     this.logger.info({}, "ProcessOutboxWorker stopped");
@@ -190,10 +210,7 @@ export class ProcessOutboxWorker {
         limit: this.batchSize,
       });
     } catch (error) {
-      this.logger.warn(
-        { error },
-        "ProcessOutboxWorker drain failed; the next poll will retry",
-      );
+      this.logger.warn({ error }, "ProcessOutboxWorker drain failed; the next poll will retry");
     }
   }
 }

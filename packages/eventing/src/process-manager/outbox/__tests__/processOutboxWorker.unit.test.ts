@@ -26,6 +26,7 @@ describe("ProcessOutboxWorker", () => {
     const worker = new ProcessOutboxWorker({
       dispatcher: { runOnce },
       logger: makeLogger(),
+      jitter: () => 0,
       batchSize: 25,
       now: () => 123,
     });
@@ -45,6 +46,7 @@ describe("ProcessOutboxWorker", () => {
     const worker = new ProcessOutboxWorker({
       dispatcher: { runOnce },
       logger,
+      jitter: () => 0,
       intervalMs: 100,
     });
 
@@ -80,6 +82,7 @@ describe("ProcessOutboxWorker", () => {
     const worker = new ProcessOutboxWorker({
       dispatcher: { runOnce },
       logger: makeLogger(),
+      jitter: () => 0,
       intervalMs: 100,
     });
 
@@ -107,6 +110,7 @@ describe("ProcessOutboxWorker", () => {
     const worker = new ProcessOutboxWorker({
       dispatcher: { runOnce },
       logger: makeLogger(),
+      jitter: () => 0,
       // Prove notify, rather than the recovery poll, causes the second drain.
       intervalMs: 60_000,
     });
@@ -136,6 +140,7 @@ describe("ProcessOutboxWorker", () => {
     const worker = new ProcessOutboxWorker({
       dispatcher: { runOnce },
       logger,
+      jitter: () => 0,
       name: "pilot",
       intervalMs: 100,
       stuckDrainTimeoutMs: 1_000,
@@ -164,6 +169,7 @@ describe("ProcessOutboxWorker", () => {
     const worker = new ProcessOutboxWorker({
       dispatcher: { runOnce },
       logger,
+      jitter: () => 0,
       name: "pilot",
       intervalMs: 100,
       stuckDrainTimeoutMs: 1_000,
@@ -177,9 +183,7 @@ describe("ProcessOutboxWorker", () => {
     expect(runOnce).toHaveBeenCalledTimes(5);
     const refusals = vi
       .mocked(logger.error)
-      .mock.calls.filter(([, message]) =>
-        String(message).includes("refusing to start another"),
-      );
+      .mock.calls.filter(([, message]) => String(message).includes("refusing to start another"));
     // Said once, not once per poll: the refusal must not flood the logs.
     expect(refusals).toHaveLength(1);
     await worker.stop();
@@ -197,6 +201,7 @@ describe("ProcessOutboxWorker", () => {
     const worker = new ProcessOutboxWorker({
       dispatcher: { runOnce },
       logger: makeLogger(),
+      jitter: () => 0,
       name: "pilot",
       intervalMs: 100,
       stuckDrainTimeoutMs: 1_000,
@@ -232,6 +237,7 @@ describe("ProcessOutboxWorker", () => {
     const worker = new ProcessOutboxWorker({
       dispatcher: { runOnce },
       logger,
+      jitter: () => 0,
       name: "pilot",
       intervalMs: 100,
       stuckDrainTimeoutMs: 10_000,
@@ -247,5 +253,55 @@ describe("ProcessOutboxWorker", () => {
     await vi.advanceTimersByTimeAsync(0);
     expect(runOnce).toHaveBeenCalledTimes(2);
     await worker.stop();
+  });
+
+  /** @scenario Outbox workers registered together do not poll in lockstep */
+  it("phase-shifts the recovery poll by the drawn fraction of one interval", async () => {
+    vi.useFakeTimers();
+    const runOnce = vi.fn().mockResolvedValue(report());
+    const worker = new ProcessOutboxWorker({
+      dispatcher: { runOnce },
+      logger: makeLogger(),
+      intervalMs: 1_000,
+      jitter: () => 0.25,
+    });
+
+    worker.start();
+    await vi.advanceTimersByTimeAsync(0);
+    expect(runOnce).toHaveBeenCalledTimes(1);
+
+    // The unphased worker would have polled here; this one has not armed yet.
+    await vi.advanceTimersByTimeAsync(1_000);
+    expect(runOnce).toHaveBeenCalledTimes(1);
+
+    await vi.advanceTimersByTimeAsync(250);
+    expect(runOnce).toHaveBeenCalledTimes(2);
+
+    await vi.advanceTimersByTimeAsync(1_000);
+    expect(runOnce).toHaveBeenCalledTimes(3);
+    await worker.stop();
+  });
+
+  /** @scenario Outbox workers registered together do not poll in lockstep */
+  it("draws a distinct phase per worker by default", () => {
+    vi.useFakeTimers();
+    const draw = vi.spyOn(Math, "random").mockReturnValueOnce(0.1).mockReturnValueOnce(0.8);
+    const logger = makeLogger();
+    const workers = [0, 1].map(
+      () =>
+        new ProcessOutboxWorker({
+          dispatcher: { runOnce: vi.fn().mockResolvedValue(report()) },
+          logger,
+          intervalMs: 1_000,
+        }),
+    );
+
+    for (const worker of workers) worker.start();
+
+    const phases = vi
+      .mocked(logger.info)
+      .mock.calls.map(([fields]) => (fields as { phaseMs: number }).phaseMs);
+    expect(phases).toEqual([100, 800]);
+    draw.mockRestore();
   });
 });
