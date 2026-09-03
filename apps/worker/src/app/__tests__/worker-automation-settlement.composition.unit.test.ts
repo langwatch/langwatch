@@ -38,13 +38,37 @@ const RECORDED: {
   mail: Array<{ to: string; bcc: string[] | undefined; subject: string; html: string }>;
   claims: Array<{ triggerId: string; traceId: string; projectId: string }>;
   lastRunAt: Array<{ triggerId: string; projectId: string }>;
-} = { absences: [], mail: [], claims: [], lastRunAt: [] };
+  datasetAppends: Array<{
+    slugOrId: string;
+    projectId: string;
+    entries: Array<Record<string, unknown>>;
+  }>;
+  captured: string[];
+} = { absences: [], mail: [], claims: [], lastRunAt: [], datasetAppends: [], captured: [] };
 
 function reset(): void {
   RECORDED.absences.length = 0;
   RECORDED.mail.length = 0;
   RECORDED.claims.length = 0;
   RECORDED.lastRunAt.length = 0;
+  RECORDED.datasetAppends.length = 0;
+  RECORDED.captured.length = 0;
+}
+
+/**
+ * The composition's own logger, which is also where a TERMINAL persist refusal
+ * lands: settlement captures it rather than rethrowing, because a refusal that
+ * can never succeed must dead-letter visibly instead of redelivering forever.
+ */
+function recordingLogger() {
+  return {
+    error: (fields: Record<string, unknown>) => {
+      if (typeof fields.error === "string") RECORDED.captured.push(fields.error);
+    },
+    warn: () => undefined,
+    info: () => undefined,
+    debug: () => undefined,
+  } as never;
 }
 
 class RecordingAbsence extends WorkerAutomationSettlementAbsenceReportPort {
@@ -80,8 +104,15 @@ class FrozenClock extends AutomationClockPort {
   }
 }
 
+/** One row of the automations table, as this process's Postgres holds it. */
+type TriggerRow = {
+  id: string;
+  action: string;
+  actionParams: Record<string, unknown>;
+} & Record<string, unknown>;
+
 /** One active email automation over a filter query, as Postgres holds it. */
-const TRIGGER_ROW = {
+const TRIGGER_ROW: TriggerRow = {
   id: "trigger-1",
   projectId: "project-1",
   name: "Error rate",
@@ -107,18 +138,18 @@ const TRIGGER_ROW = {
   traceDebounceMs: 0,
 };
 
-function prismaDouble() {
+function prismaDouble(trigger: TriggerRow) {
   return {
     trigger: {
-      findMany: async () => [TRIGGER_ROW],
-      findFirst: async () => TRIGGER_ROW,
-      findUnique: async () => TRIGGER_ROW,
+      findMany: async () => [trigger],
+      findFirst: async () => trigger,
+      findUnique: async () => trigger,
       update: async (input: { where: { id: string; projectId: string } }) => {
         RECORDED.lastRunAt.push({
           triggerId: input.where.id,
           projectId: input.where.projectId,
         });
-        return TRIGGER_ROW;
+        return trigger;
       },
     },
     triggerSent: {
@@ -160,13 +191,65 @@ class RecordingMailer {
   }
 }
 
-function compose(over: { notifications?: boolean } = {}) {
+/** The same automation, written to append its matches to a dataset. */
+const DATASET_TRIGGER_ROW: TriggerRow = {
+  ...TRIGGER_ROW,
+  id: "trigger-2",
+  action: "ADD_TO_DATASET",
+  actionParams: {
+    datasetId: "support-replies",
+    datasetMapping: {
+      mapping: {
+        question: { source: "input" },
+        answer: { source: "output" },
+      },
+      expansions: [],
+    },
+  },
+};
+
+/** The same automation again, written to queue its matches for annotation. */
+const ANNOTATION_TRIGGER_ROW: TriggerRow = {
+  ...TRIGGER_ROW,
+  id: "trigger-3",
+  action: "ADD_TO_ANNOTATION_QUEUE",
+  actionParams: {
+    annotators: [{ id: "user_ada", name: "Ada" }],
+    createdByUserId: "user_ada",
+  },
+};
+
+/** One captured trace, as the process's own full-record read answers it. */
+const TRACE_RECORD = {
+  trace_id: "trace-1",
+  project_id: "project-1",
+  metadata: {},
+  timestamps: { started_at: 1, inserted_at: 2, updated_at: 3 },
+  input: { value: "how do I reset my password?" },
+  output: { value: "open the settings page" },
+  spans: [
+    {
+      span_id: "span-1",
+      trace_id: "trace-1",
+      type: "llm",
+      timestamps: { started_at: 1, finished_at: 2 },
+    },
+  ],
+};
+
+type ComposeOverrides = {
+  notifications?: boolean;
+  datasets?: boolean;
+  trigger?: TriggerRow;
+};
+
+function compose(over: ComposeOverrides = {}) {
   const config = resolveWorkerConfig(ENVIRONMENT);
   const delivery = tryDelivery(config, over.notifications !== false);
 
   return createWorkerAutomationSettlement({
     config,
-    prisma: prismaDouble() as never,
+    prisma: prismaDouble(over.trigger ?? TRIGGER_ROW) as never,
     clock: new FrozenClock(),
     ...(delivery ? { notifications: delivery } : {}),
     projects: {
@@ -181,20 +264,40 @@ function compose(over: { notifications?: boolean } = {}) {
         occurredAt: 1,
         spanCount: 1,
       }),
-      // What this process's own reader does: the full record enriches a
-      // candidate the fold state already produced, so an unavailable one
-      // degrades the digest's metadata rather than losing the notification.
+      // The reader this process composes when it holds no typed client: the
+      // full record enriches a candidate the fold state already produced, so
+      // an unavailable one degrades the digest's metadata rather than losing
+      // the notification.
       getById: async () => {
-        throw new AutomationTraceRecordUnavailableError("no full record read in this process");
+        if (over.datasets !== true) {
+          throw new AutomationTraceRecordUnavailableError("no full record read in this process");
+        }
+        return TRACE_RECORD;
       },
       classifyQuery: () => ({ evaluations: false, events: false, spans: false }),
       deriveEvents: async () => [],
     } as never,
     evaluations: { findRunsByTraceId: async () => [] } as never,
     heartbeat: { tryResolveClickHouseClient: async () => null } as never,
+    ...(over.datasets === true ? { datasets: recordingDatasets() } : {}),
     redis: null,
     absence: new RecordingAbsence(),
+    logger: recordingLogger(),
   });
+}
+
+/** Dataset's own write, recorded at the one call this path makes. */
+function recordingDatasets() {
+  return {
+    batchCreateRecords: async (input: {
+      slugOrId: string;
+      projectId: string;
+      entries: Array<Record<string, unknown>>;
+    }) => {
+      RECORDED.datasetAppends.push(input);
+      return [];
+    },
+  } as never;
 }
 
 function tryDelivery(config: ReturnType<typeof resolveWorkerConfig>, wanted: boolean) {
@@ -268,7 +371,7 @@ function registeredKeys(definition: BuiltDefinition): Set<string> {
   return keys;
 }
 
-function build(over: { notifications?: boolean } = {}): BuiltDefinition {
+function build(over: ComposeOverrides = {}): BuiltDefinition {
   return compose(over).buildPipeline({
     retention: { deleteDispatchedBefore: async () => 0 },
   }) as unknown as BuiltDefinition;
@@ -364,15 +467,85 @@ describe("given the automations pipeline this process composes for itself", () =
       reset();
       build();
 
+      // `traceRecordRead` is absent from this list on purpose: the record read
+      // is composed beside the trace reader, so the reads composition is what
+      // reports it. Everything reported HERE is a decision this composition
+      // makes.
       expect(RECORDED.absences).toEqual([
         "graphAlertEvaluation",
         "legacyFilterMatching",
-        "traceRecordRead",
         "datasetPersist",
         "annotationQueuePersist",
         "runawayContainment",
         "planResolvedPersistCap",
       ]);
+    });
+  });
+
+  describe("when a confirmed match is appended to a dataset", () => {
+    /** @scenario "A confirmed match is appended to its dataset from this process" */
+    it("stops reporting the dataset write as absent once the writer is composed", () => {
+      reset();
+      build({ datasets: true, trigger: DATASET_TRIGGER_ROW });
+
+      expect(RECORDED.absences).not.toContain("datasetPersist");
+      expect(RECORDED.absences).toContain("annotationQueuePersist");
+    });
+
+    /** @scenario "A confirmed match is appended to its dataset from this process" */
+    it("maps the trace onto the columns the automation named and appends them", async () => {
+      reset();
+      const settlement = build({
+        datasets: true,
+        trigger: DATASET_TRIGGER_ROW,
+      }).processManagers.get("triggerSettlement");
+      if (!settlement) throw new Error("the pipeline registered no triggerSettlement");
+
+      await settlement.config.intents.persistMatch!.run(
+        { triggerId: "trigger-2", traceIds: ["trace-1"], boundary: 1 } as never,
+        { projectId: "project-1", messageKey: "persist:1", attempt: 1 } as never,
+      );
+
+      expect(RECORDED.datasetAppends).toHaveLength(1);
+      expect(RECORDED.datasetAppends[0]!.slugOrId).toBe("support-replies");
+      expect(RECORDED.datasetAppends[0]!.projectId).toBe("project-1");
+      // The columns are the mapping's, and their values come out of the record
+      // the read answered — which is what "the columns the customer previewed"
+      // means, since the preview drives the same two functions.
+      expect(RECORDED.datasetAppends[0]!.entries).toEqual([
+        {
+          id: "trigger-2-trace-1-0",
+          selected: true,
+          question: "how do I reset my password?",
+          answer: "open the settings page",
+        },
+      ]);
+      expect(RECORDED.lastRunAt).toEqual([{ triggerId: "trigger-2", projectId: "project-1" }]);
+    });
+  });
+
+  describe("when a confirmed match is queued for annotation", () => {
+    /** @scenario "An annotation-queue automation is refused by the package it needs" */
+    it("refuses by naming the package that is not a dependency of this process", async () => {
+      reset();
+      const settlement = build({
+        datasets: true,
+        trigger: ANNOTATION_TRIGGER_ROW,
+      }).processManagers.get("triggerSettlement");
+      if (!settlement) throw new Error("the pipeline registered no triggerSettlement");
+
+      await settlement.config.intents.persistMatch!.run(
+        { triggerId: "trigger-3", traceIds: ["trace-1"], boundary: 1 } as never,
+        { projectId: "project-1", messageKey: "persist:1", attempt: 1 } as never,
+      );
+
+      expect(RECORDED.captured).toHaveLength(1);
+      expect(RECORDED.captured[0]).toContain("@langwatch/annotation-server");
+      expect(RECORDED.captured[0]).toContain("is not a dependency of this process");
+      // Nothing was appended and nothing was stamped: a refusal must not look
+      // like a match that ran.
+      expect(RECORDED.datasetAppends).toEqual([]);
+      expect(RECORDED.lastRunAt).toEqual([]);
     });
   });
 });

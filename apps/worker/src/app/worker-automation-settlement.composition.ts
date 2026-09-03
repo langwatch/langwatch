@@ -2,6 +2,7 @@ import type {
   AutomationPersistCapBreach,
   DatasetActionParams,
 } from "@langwatch/automation-contract";
+import type { DatasetRecordEntry } from "@langwatch/dataset-contract";
 import {
   AutomationClockPort,
   AutomationDatasetMapperPort,
@@ -34,11 +35,19 @@ import {
   type AutomationSettlementLedgerDatabase,
   type AutomationSecretCrypto,
 } from "@langwatch/automation-server";
+import type { DatasetService } from "@langwatch/dataset-contract";
 import type { EvaluationRunData } from "@langwatch/evaluation-contract";
 import { DispatchError } from "@langwatch/eventing";
 import { createLogger, type Logger } from "@langwatch/observability";
 import type { RedisConnection } from "@langwatch/redis-client";
-import type { DerivedTraceEvent, TraceRecord, TraceSummaryData } from "@langwatch/trace-contract";
+import {
+  mapTraceToDatasetEntry,
+  traceSchema,
+  TRACE_EXPANSIONS,
+  type DerivedTraceEvent,
+  type TraceRecord,
+  type TraceSummaryData,
+} from "@langwatch/trace-contract";
 import { TraceQueryEvaluationService } from "@langwatch/trace-server";
 import type { AutomationWorkerCapability } from "../features/automation/automation-worker-feature.installer";
 import type { WorkerConfig } from "../platform/config/worker.config";
@@ -59,6 +68,14 @@ export type WorkerAutomationSettlementCompositionOptions = Readonly<{
   graphActivity?: AutomationGraphActivityPort | undefined;
   /** Reads the recency the heartbeat sweep decides absence from. */
   heartbeat: AutomationHeartbeatPort;
+  /**
+   * Where an `ADD_TO_DATASET` automation appends its mapped rows.
+   *
+   * The dataset feature's own service, narrowed to the one call this path
+   * makes. Absent exactly when this graph composed no typed Prisma client, in
+   * which case the record it would map cannot be read either.
+   */
+  datasets?: WorkerAutomationDatasetWriter | undefined;
   redis?: RedisConnection | null;
   absence?: WorkerAutomationSettlementAbsenceReportPort;
   logger?: Logger;
@@ -81,6 +98,16 @@ export type AutomationSettlementDeliveryComposition = Readonly<{
 /** Those transports plus the origin every link in a digest is built from. */
 export type AutomationSettlementNotifications = AutomationSettlementDeliveryComposition &
   Readonly<{ baseHost: string }>;
+
+/**
+ * The ONE dataset write `ADD_TO_DATASET` makes, declared where it is made.
+ *
+ * `DatasetService` is twenty-odd methods over datasets, records, uploads and
+ * chunked content; this path reaches one, and it is the same one the
+ * application called. Naming the method rather than the service is what keeps a
+ * process that settles matches from having to compose the upload half.
+ */
+export type WorkerAutomationDatasetWriter = Pick<DatasetService, "batchCreateRecords">;
 
 /**
  * What this process CANNOT do about a settled match, said once at composition.
@@ -108,24 +135,32 @@ export abstract class WorkerAutomationSettlementAbsenceReportPort {
    * The full trace record, spans and all.
    *
    * Two paths want it: the digest's fallback when the summary fold has not
-   * landed, and `ADD_TO_DATASET`'s row mapping. The read is the application's
-   * legacy trace service with its per-project protections resolution, which is
-   * not packaged.
+   * landed, and `ADD_TO_DATASET`'s row mapping. Reported by the trace-read
+   * composition rather than here, because that is where the decision is made:
+   * the read is Trace's own packaged legacy read over the typed Prisma client,
+   * and a graph given no client can compose none.
    */
   abstract withoutTraceRecordRead(): void;
 
   /**
-   * `ADD_TO_DATASET`.
+   * `ADD_TO_DATASET`'s WRITE.
    *
-   * The mapping from a trace to dataset columns lives in the trace WEB package
-   * beside the mapping editor that writes it, so the same expansion rules serve
-   * the preview and the write. A background process cannot import it, and a
-   * SECOND implementation of it would fill datasets whose columns disagreed
-   * with what the customer previewed.
+   * The row MAPPING is composed unconditionally — `mapTraceToDatasetEntry` and
+   * `TRACE_EXPANSIONS` are `@langwatch/trace-contract`'s, so the columns this
+   * process fills are the columns the customer previewed. What can be absent is
+   * the dataset service the mapped rows are appended through, which is composed
+   * over the typed Prisma client and this process's own object storage.
    */
   abstract withoutDatasetPersist(): void;
 
-  /** `ADD_TO_ANNOTATION_QUEUE`, whose writer is Annotation's own service. */
+  /**
+   * `ADD_TO_ANNOTATION_QUEUE`, whose writer is Annotation's own service.
+   *
+   * `createOrUpdateQueueItems` is exported from `@langwatch/annotation-server`
+   * and every collaborator it takes is one this process holds. The package is
+   * not a dependency of this one, and adding one is a manifest change rather
+   * than wiring — so the action is refused BY NAME here.
+   */
   abstract withoutAnnotationQueuePersist(): void;
 
   /**
@@ -180,8 +215,7 @@ export function createWorkerAutomationSettlement(
   if (!options.graphActivity) absence?.withoutGraphAlertEvaluation();
   if (!options.notifications) absence?.withoutNotificationDelivery();
   absence?.withoutLegacyFilterMatching();
-  absence?.withoutTraceRecordRead();
-  absence?.withoutDatasetPersist();
+  if (!options.datasets) absence?.withoutDatasetPersist();
   absence?.withoutAnnotationQueuePersist();
   absence?.withoutRunawayContainment();
   absence?.withoutPlanResolvedPersistCap();
@@ -209,8 +243,8 @@ export function createWorkerAutomationSettlement(
       automation: ledger,
       projects: options.projects,
       traces: options.traces,
-      mapper: new UnavailableDatasetMapper(),
-      writer: new UnavailablePersistActionWriter(),
+      mapper: new WorkerAutomationDatasetMapper(),
+      writer: new WorkerAutomationPersistActionWriter(options.datasets),
     }),
     delivery: notifications.delivery,
     emailCaps: notifications.emailCaps,
@@ -331,50 +365,84 @@ class WorkerSettlementFilterEvaluator extends AutomationSettlementFilterEvaluato
 }
 
 /**
- * `ADD_TO_DATASET`'s row mapping, refused by name.
+ * `ADD_TO_DATASET`'s row mapping, over the rules the customer previewed with.
  *
- * NOT because the rules are unreachable: `mapTraceToDatasetEntry` and
- * `TRACE_EXPANSIONS` are `@langwatch/trace-contract`'s, already a dependency of
- * this process and already imported by this file. What blocks the action is
- * the step BEFORE it — a dataset row is mapped from the full trace record, and
- * this process composes no reader that answers one (see
- * `withoutTraceRecordRead`). So the mapper stays refused rather than composed
- * ahead of the read it would consume, and both close together.
+ * `mapTraceToDatasetEntry` and `TRACE_EXPANSIONS` are `@langwatch/trace-contract`'s
+ * — the SAME functions the mapping editor drives its preview from — so a
+ * dataset filled here holds the columns the customer saw before saving. A
+ * second implementation of the expansion rules is what would fill datasets that
+ * disagreed with the preview, which is why this maps rather than re-derives.
+ *
+ * Composed unconditionally: it is a pure function of the record it is handed,
+ * so it has nothing to be absent. A process that cannot read a record never
+ * reaches it (`dispatchToDataset` reads first), and one that cannot write the
+ * mapped rows refuses at the writer below.
  */
-class UnavailableDatasetMapper extends AutomationDatasetMapperPort {
-  map(_input: {
+class WorkerAutomationDatasetMapper extends AutomationDatasetMapperPort {
+  map(input: {
     trace: TraceRecord;
     mapping: DatasetActionParams["datasetMapping"]["mapping"];
     expansions: readonly string[];
   }): Array<Record<string, string | number>> {
-    throw new DispatchError({
-      message:
-        "This process cannot map a trace onto dataset columns yet: the mapping rules are reachable, but the full trace record they map has no reader composed here, so there is nothing to map.",
-      retryable: false,
-    });
+    const trace = traceSchema.parse(input.trace);
+    const expansions = new Set(
+      input.expansions.filter(
+        (value): value is keyof typeof TRACE_EXPANSIONS => value in TRACE_EXPANSIONS,
+      ),
+    );
+
+    return mapTraceToDatasetEntry(trace, input.mapping, expansions);
   }
 }
 
-/** The two persist writes, refused by name rather than dropped. */
-class UnavailablePersistActionWriter extends AutomationPersistActionWriterPort {
+/**
+ * The two persist writes: the dataset append for real, the queue by name.
+ *
+ * The dataset half is Dataset's own `batchCreateRecords`, which is the one call
+ * the application made — including the chunked `s3_jsonl` branch, because the
+ * service is composed with this process's own storage resolver rather than
+ * with the Postgres half alone.
+ *
+ * The annotation half refuses, and the refusal names a MANIFEST line rather
+ * than a missing capability: `createOrUpdateQueueItems` is exported from
+ * `@langwatch/annotation-server`, `PostgresAnnotationAdapter` takes a database,
+ * a project service and an organization service — all three of which this
+ * process holds — and the package is simply not a dependency of this one.
+ */
+class WorkerAutomationPersistActionWriter extends AutomationPersistActionWriterPort {
+  constructor(private readonly datasets: WorkerAutomationDatasetWriter | undefined) {
+    super();
+  }
+
   addToAnnotationQueue(): Promise<void> {
     return Promise.reject(
       new DispatchError({
         message:
-          "This process composes no annotation queue writer, so an automation cannot add a trace to one from here: the queueing service is packaged and reachable, and `@langwatch/annotation-server` is not yet a dependency of this process.",
+          "This process composes no annotation queue writer, so an automation cannot add a trace to one from here: the queueing service is packaged and every collaborator it takes is one this process holds, but `@langwatch/annotation-server` is not a dependency of this process, so nothing here can import it.",
         retryable: false,
       }),
     );
   }
 
-  addToDataset(): Promise<void> {
-    return Promise.reject(
-      new DispatchError({
+  async addToDataset(input: {
+    datasetId: string;
+    projectId: string;
+    datasetRecords: DatasetRecordEntry[];
+  }): Promise<void> {
+    const datasets = this.datasets;
+    if (!datasets) {
+      throw new DispatchError({
         message:
-          "This process composes no dataset writer, so an automation cannot add a trace to a dataset from here: the write itself is one packaged call, and the row it would write cannot be produced until a full trace record can be read here.",
+          "This process composes no dataset writer, so an automation cannot add a trace to a dataset from here: the write is composed over the typed Prisma client this graph was given, and it was given none.",
         retryable: false,
-      }),
-    );
+      });
+    }
+
+    await datasets.batchCreateRecords({
+      slugOrId: input.datasetId,
+      projectId: input.projectId,
+      entries: input.datasetRecords,
+    });
   }
 }
 

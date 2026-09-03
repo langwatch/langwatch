@@ -47,7 +47,39 @@ Feature: The background worker owns automation settlement
   @unit
   Scenario: A trace whose full record this process cannot read still notifies
     Given a settled match whose fold state is present
-    And a process that composes no full-record trace read
+    And a process that opened no database client, and so composes no full-record
+      trace read
     When the digest is built
     Then the notification is sent from the fold state alone
     And the record's absence is reported as unavailable rather than as missing
+    And the missing read is named once at composition rather than at the digest
+
+  @unit
+  Scenario: The worker reads a settled trace's full record for itself
+    Given a process that opened its own database client and ClickHouse
+    When the full record for a settled trace is asked for
+    Then the read runs against this process's own ClickHouse, scoped to the
+      project
+    And a trace the project does not hold answers as gone rather than as a
+      capability this process lacks
+    And a project whose privacy policy cannot be resolved has its captured
+      content hidden rather than the read failing
+    And nothing is reported as absent
+
+  @unit
+  Scenario: A confirmed match is appended to its dataset from this process
+    Given an active automation that appends matched traces to a dataset
+    When a confirmed match is persisted through the pipeline's own intent handler
+    Then the trace is mapped onto exactly the columns the automation named
+    And the mapped rows are appended to the dataset the automation named
+    And the automation is stamped as having run
+    And the dataset write is no longer reported as a capability this process
+      lacks
+
+  @unit
+  Scenario: An annotation-queue automation is refused by the package it needs
+    Given an active automation that queues matched traces for annotation
+    When a confirmed match is persisted through the pipeline's own intent handler
+    Then the match is refused by name, naming the package this process does not
+      depend on
+    And nothing is appended and the automation is not stamped as having run

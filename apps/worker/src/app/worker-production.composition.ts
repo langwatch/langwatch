@@ -186,7 +186,10 @@ import {
 import type { WorkerFeatureFlagDatabase } from "./worker-feature-flags.composition";
 import type { WorkerProjectStorageDatabase } from "./worker-object-storage.composition";
 import type { WorkerTraceCapabilityDatabase } from "./worker-trace-capability-services.composition";
-import { createWorkerDatasetNormalization } from "./worker-dataset-normalization.composition";
+import {
+  createWorkerDatasetNormalization,
+  createWorkerDatasetWrites,
+} from "./worker-dataset-normalization.composition";
 import { createWorkerFeatureFlags } from "./worker-feature-flags.composition";
 import { createWorkerGovernanceRollups } from "./worker-governance-rollups.composition";
 import { createWorkerObjectStorage } from "./worker-object-storage.composition";
@@ -206,6 +209,7 @@ import {
   WorkerAutomationHeartbeat,
   WorkerAutomationSettlementEvaluationReader,
   WorkerAutomationSettlementTraceReader,
+  WorkerTraceRecordReader,
 } from "./worker-automation-settlement-reads.composition";
 import { createWorkerTraceSpool } from "./worker-trace-blob.composition";
 import { tryCreateWorkerTraceBroadcast } from "./worker-trace-broadcast.composition";
@@ -988,14 +992,49 @@ export class WorkerProductionComposition {
     // two questions — a trace's summary and whether a saved filter reads
     // evaluations — and two readers would give one process two answers to the
     // second, which is what decides whether an alert fires at all.
+    const automationAbsence = WorkerProductionComposition.automationAbsence(options);
+    // The full trace record, and the dataset append that consumes it.
+    //
+    // ONE gate for both, and it is the typed Prisma client: the packaged legacy
+    // read declares the generated client by type, and so does Dataset's
+    // Postgres adapter. They are composed as a PAIR rather than independently
+    // because `dispatchToDataset` reads the record BEFORE it maps — a writer
+    // without the read has nothing to write, and a read without the writer
+    // still serves the digest's fallback, which is why the read is the one that
+    // is passed on its own.
+    const traceRecords = options.connection
+      ? WorkerTraceRecordReader.create({
+          connection: options.connection,
+          resolveClickHouseClient: options.eventing
+            .resolveClickHouseClient as unknown as Parameters<
+            typeof WorkerTraceRecordReader.create
+          >[0]["resolveClickHouseClient"],
+          dataPrivacy: traceServices.dataPrivacy,
+          traceCanonicalisation,
+          ...(options.observability ? { logger: options.observability.logger } : {}),
+        })
+      : undefined;
+    const automationDatasets =
+      options.connection && traceRecords
+        ? createWorkerDatasetWrites({
+            database: options.connection.client,
+            storage: objectStorage,
+          })
+        : undefined;
+    // ONE trace reader for both halves of this process's Automation work.
+    // The settlement digest and Evaluation's alert subscriber ask it the same
+    // two questions — a trace's summary and whether a saved filter reads
+    // evaluations — and two readers would give one process two answers to the
+    // second, which is what decides whether an alert fires at all.
     const settlementTraceReader = WorkerAutomationSettlementTraceReader.create({
       traceSummaryStore: traceStores.traceSummaryStore,
       resolveClickHouseClient: options.eventing.resolveClickHouseClient as unknown as Parameters<
         typeof WorkerAutomationSettlementTraceReader.create
       >[0]["resolveClickHouseClient"],
+      ...(traceRecords ? { records: traceRecords } : {}),
+      ...(automationAbsence ? { absence: automationAbsence } : {}),
     });
     const automationClock = new WorkerAutomationClock();
-    const automationAbsence = WorkerProductionComposition.automationAbsence(options);
     const automation = AutomationWorkerFeatureInstaller.create({
       installer: createWorkerAutomationSettlement({
         config: options.config,
@@ -1006,6 +1045,7 @@ export class WorkerProductionComposition {
           : {}),
         projects: traceServices.projects,
         traces: settlementTraceReader,
+        ...(automationDatasets ? { datasets: automationDatasets } : {}),
         evaluations: WorkerAutomationSettlementEvaluationReader.create({
           resolveClickHouse: options.eventing.resolveClickHouseClient as unknown as Parameters<
             typeof WorkerAutomationSettlementEvaluationReader.create
@@ -2081,19 +2121,22 @@ export class LoggedWorkerAutomationSettlementAbsence extends WorkerAutomationSet
 
   withoutTraceRecordRead(): void {
     this.logger.warn(
-      "worker composed automation settlement without the full trace read: a digest entry whose summary fold has not landed is refused rather than filled in from the trace record",
+      { reason: "no-typed-prisma-connection" },
+      "worker composed automation settlement without the full trace read: the read is Trace's own packaged legacy read and needs the typed Prisma client this graph was given none of, so a digest entry whose summary fold has not landed is refused rather than filled in from the trace record, and ADD_TO_DATASET cannot map a row",
     );
   }
 
   withoutDatasetPersist(): void {
     this.logger.warn(
-      "worker composed automation settlement without the dataset row mapping: an ADD_TO_DATASET automation is refused by name rather than writing rows whose columns disagree with the mapping the customer previewed",
+      { reason: "no-typed-prisma-connection" },
+      "worker composed automation settlement without the dataset write: the row mapping is composed and is the same one the customer previewed with, but the dataset service the mapped rows are appended through needs the typed Prisma client this graph was given none of, so an ADD_TO_DATASET automation is refused by name",
     );
   }
 
   withoutAnnotationQueuePersist(): void {
     this.logger.warn(
-      "worker composed automation settlement without an annotation queue writer: an ADD_TO_ANNOTATION_QUEUE automation is refused by name",
+      { reason: "annotation-server-not-a-dependency" },
+      "worker composed automation settlement without an annotation queue writer: createOrUpdateQueueItems is exported from @langwatch/annotation-server and every collaborator it takes is one this process holds, but that package is not a dependency of this one, so an ADD_TO_ANNOTATION_QUEUE automation is refused by name",
     );
   }
 

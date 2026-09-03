@@ -4,6 +4,7 @@ import {
   DatasetNormalizationWorkerPort,
   type DatasetNormalizationSender,
   type DatasetNormalizePayload,
+  type DatasetService,
 } from "@langwatch/dataset-contract";
 import {
   DatasetContentRepository,
@@ -11,11 +12,13 @@ import {
   DatasetS3ClientResolver,
   DatasetStorageResolver,
   LocalDatasetStorageAdapter,
+  PostgresDatasetAdapter,
   S3DatasetStorageAdapter,
   type DatasetContentDatabase,
   type DatasetS3ClientLease,
   type DatasetStorage,
 } from "@langwatch/dataset-server";
+import type { PrismaClient } from "@langwatch/prisma-client/generated";
 import type { StoredObjectStorageRuntime } from "@langwatch/stored-object-server/storage";
 import type {
   WorkerProjectS3SourcePort,
@@ -55,12 +58,7 @@ import type {
  */
 export function createWorkerDatasetNormalization(options: {
   database: DatasetContentDatabase;
-  storage: {
-    runtime: StoredObjectStorageRuntime;
-    aws: AwsClientProcessRuntime;
-    projects: WorkerProjectS3SourcePort;
-    globalS3?: WorkerProjectS3Target;
-  };
+  storage: WorkerDatasetObjectStorage;
 }): DatasetNormalizationWorkerPort {
   return new WorkerDatasetNormalizationAdapter(
     DatasetNormalizationService.create({
@@ -68,6 +66,40 @@ export function createWorkerDatasetNormalization(options: {
       storage: new WorkerDatasetStorageResolver(options.storage),
     }),
   );
+}
+
+/** The object storage a dataset's chunked content is read and written through. */
+export type WorkerDatasetObjectStorage = {
+  runtime: StoredObjectStorageRuntime;
+  aws: AwsClientProcessRuntime;
+  projects: WorkerProjectS3SourcePort;
+  globalS3?: WorkerProjectS3Target;
+};
+
+/**
+ * Dataset's own service, composed for the ONE write a background process makes:
+ * an automation appending a matched trace's mapped rows.
+ *
+ * It is composed with the SAME storage resolver the normalize job above uses,
+ * and that is the whole reason it is here rather than beside the automation
+ * graph. A dataset whose `contentLayout` is `s3_jsonl` keeps its rows in
+ * chunked objects, and `batchCreateRecords` only takes that branch when the
+ * service was given a content port — so a Postgres-only composition would
+ * silently write the rows of an object-backed dataset into a table nothing
+ * reads. One resolver means the append lands where the upload put the rest.
+ *
+ * The typed client rather than the structural database: the adapter narrows
+ * four Prisma delegates for itself, and this process's one client satisfies
+ * every one of them without a cast at the seam.
+ */
+export function createWorkerDatasetWrites(options: {
+  database: PrismaClient;
+  storage: WorkerDatasetObjectStorage;
+}): DatasetService {
+  return PostgresDatasetAdapter.create({
+    database: options.database,
+    storageResolver: new WorkerDatasetStorageResolver(options.storage),
+  }).build();
 }
 
 /** Whether this deployment's object storage can back dataset normalization. */
@@ -101,14 +133,7 @@ class WorkerDatasetNormalizationAdapter extends DatasetNormalizationWorkerPort {
 class WorkerDatasetStorageResolver extends DatasetStorageResolver {
   private readonly s3: S3DatasetStorageAdapter;
 
-  constructor(
-    private readonly storage: {
-      runtime: StoredObjectStorageRuntime;
-      aws: AwsClientProcessRuntime;
-      projects: WorkerProjectS3SourcePort;
-      globalS3?: WorkerProjectS3Target;
-    },
-  ) {
+  constructor(private readonly storage: WorkerDatasetObjectStorage) {
     super();
     this.s3 = S3DatasetStorageAdapter.create(
       new WorkerDatasetS3ClientResolver(storage.aws, storage.projects, storage.globalS3),

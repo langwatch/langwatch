@@ -13221,3 +13221,245 @@ every scenario added here is bound.
   its premise ("child drawers are rendered via local React state") now
   contradicts the drawers doc. Every scenario in it is `@unimplemented`, so it
   enforces nothing; rewriting it belongs with whoever implements it.
+
+## The worker reads a trace record, and fills a dataset from it, 2026-09-03
+
+The audit at 97fd817658 left `withoutTraceRecordRead` as the blocker behind two
+other absences, and named its reason: "the read is the application's legacy
+trace service with its per-project protections resolution, which is not
+packaged." **Half of that sentence was already false.** The read is packaged —
+`ClickHouseTraceService` is exported from `@langwatch/trace-server` and has been
+since Trace's extraction — and the protections resolution is not the
+application's either: `getProtectionsForProject` was the ANONYMOUS
+data-privacy resolution with costs forced on, and this process composes a
+`DataPrivacyResolutionService` already (`worker-trace-capability-services.composition.ts`).
+
+So three absences close together, and one stays open for a reason that is one
+line long.
+
+### What the read actually needed
+
+| Collaborator | Where it comes from | Held here? |
+| --- | --- | --- |
+| the READ itself | `ClickHouseTraceService.create` (`@langwatch/trace-server`) | packaged |
+| the tenant-keyed ClickHouse | `options.eventing.resolveClickHouseClient` | yes |
+| `TraceCanonicalisationService` | built at `worker-production.composition.ts:560` for the coding-agent fold | yes |
+| the typed `PrismaClient` | `options.connection.client` — the same seam the tenancy graph takes | yes, when the graph was given one |
+| the redactions | `DataPrivacyResolutionService.getResolvedForProject` | yes |
+| the plan's VISIBILITY WINDOW | `VisibilityWindowService` over a `PlanProvider` | **no** |
+
+The `prisma` argument is required by type and read on no path of this call —
+every field of the record comes out of ClickHouse — but it is passed through
+whole rather than cast, because the alternative is a `as PrismaClient` at the
+seam the typed-Prisma rule exists to remove.
+
+### The one field that is not filled, said out loud
+
+`visibilityCutoffMs` teases content older than the free tier's allowance. It
+needs the plan source this process does not compose — the SAME absence
+`withoutPlanResolvedPersistCap` and `withoutWebhookEntitlements` already name —
+and both available defaults are worse than stating the gap:
+
+- an unconditional free window teases a **paid** organization's dataset rows,
+  and every **self-hosted** deployment's, since `EntitlementService` gives a
+  non-SaaS install `UNLIMITED_PLAN` and this process cannot tell;
+- refusing the whole read keeps three capabilities shut over a field that
+  cannot fire on either path that reaches it — the digest fallback and the
+  dataset row both read a trace that has just settled a match, so the cutoff is
+  always in its past.
+
+It is written into the class doc rather than left to be discovered. The
+data-privacy half — which is the part that decides whether a customer's
+conversation may be read at all — is honoured in full and fails CLOSED: an
+unresolvable policy hides captured content and hides every custom attribute
+behind a `*` pattern, because the redact helpers no-op on an empty list.
+
+### What the read is NOT
+
+The application reached the same object through `TraceService.getById`, which
+layered three passes on top. None is composed here, and each for its own
+reason rather than one blanket one:
+
+- **trace-id PREFIX resolution** answers a human typing a truncated id into a
+  URL. Every id reaching this reader came out of a settled match's own event.
+- **the coding-agent LOG JOIN** needs the CANONICAL log read, which is a Log
+  service behind a PII redaction port. No process in the deployment composes
+  one — `apps/api` refuses it in `api-trace-read-stack.composition.ts` for
+  exactly this reason — so a coding-agent trace's dataset row carries its span
+  content without the joined transcript. Stated, not silent.
+- **the reviewer EDIT OVERLAY** is opt-in per caller and the record read never
+  opted in, in the application either.
+
+### Before
+
+```
+  WorkerAutomationSettlementTraceReader
+    ├─ tryGetSummary   fold store          REAL
+    ├─ classifyQuery   Trace's parser      REAL
+    ├─ deriveEvents    stored_spans        REAL
+    └─ getById         ─────────────────── REFUSES  ─┐
+                                                     │ withoutTraceRecordRead
+  AutomationPersistActionService                     │
+    ├─ mapper  UnavailableDatasetMapper     THROWS ◄──┤ withoutDatasetPersist
+    └─ writer  UnavailablePersistActionWriter         │
+         ├─ addToDataset          REFUSES ◄───────────┘
+         └─ addToAnnotationQueue  REFUSES  ── withoutAnnotationQueuePersist
+```
+
+### After
+
+```
+  WorkerAutomationSettlementTraceReader
+    ├─ tryGetSummary / classifyQuery / deriveEvents   unchanged
+    └─ getById ─► WorkerTraceRecordReader                       (new)
+                    ├─ ClickHouseTraceService     trace-server's own read
+                    │    ├─ connection.client     typed, no cast
+                    │    └─ resolveClickHouseClient
+                    └─ protections(projectId)
+                         ├─ DataPrivacyResolutionService  public branch
+                         ├─ canSeeCosts: true             as the app answered
+                         └─ visibilityCutoffMs  ABSENT — no plan source
+
+  AutomationPersistActionService
+    ├─ mapper  WorkerAutomationDatasetMapper          UNCONDITIONAL
+    │            └─ mapTraceToDatasetEntry + TRACE_EXPANSIONS
+    │                 (trace-contract's — the preview's own functions)
+    └─ writer  WorkerAutomationPersistActionWriter
+         ├─ addToDataset ─► DatasetService.batchCreateRecords
+         │                    └─ PostgresDatasetAdapter
+         │                         ├─ connection.client
+         │                         └─ WorkerDatasetStorageResolver  ← shared
+         │                              with job:datasetNormalize
+         └─ addToAnnotationQueue  REFUSES  ── withoutAnnotationQueuePersist
+```
+
+Two things about the diagram are decisions rather than shape:
+
+**The mapper is unconditional.** It is a pure function of the record it is
+handed, so it has nothing to be absent. The previous `UnavailableDatasetMapper`
+existed only to keep the mapping refused ahead of the read; with the read
+composed it is deleted rather than made conditional, and a process that cannot
+read a record never reaches it — `dispatchToDataset` reads first.
+
+**The dataset service shares the normalize job's storage resolver.** A dataset
+whose `contentLayout` is `s3_jsonl` keeps its rows in chunked objects, and
+`batchCreateRecords` only takes that branch when the service holds a content
+port. A Postgres-only composition would have written an object-backed dataset's
+rows into a table nothing reads — a write that succeeds and loses the data. So
+`createWorkerDatasetWrites` lives beside `createWorkerDatasetNormalization` and
+both build `WorkerDatasetStorageResolver`.
+
+**Where `withoutTraceRecordRead` is reported moved.** It is declared by the
+reads composition now, not the settlement composition, because that is where
+the decision is made. The settlement composition reports what IT decides.
+
+### The annotation queue: everything but one manifest line
+
+Not closed, and not because anything is missing. `createOrUpdateQueueItems` is
+exported from `@langwatch/annotation-server`, `PostgresAnnotationAdapter` takes
+`{database, projects, organizations}` — all three of which this process holds at
+the automation wiring site (`options.connection.client`, `tenancy.projects`,
+`tenancy.organizations`) — and the trace-existence check the writer needs is
+`ClickHouseTraceExistenceRepository`, already exported from `@langwatch/trace-server`
+over the resolver this graph passes everywhere else.
+
+**The one thing needed, in `apps/worker/package.json` `dependencies`:**
+
+```json
+    "@langwatch/annotation-server": "workspace:*",
+```
+
+(If `pnpm typecheck` then complains that the inferred `AnnotationService` type
+is not portable, `"@langwatch/annotation-contract": "workspace:*"` follows it —
+the composition below names no annotation type of its own, so it should not.)
+
+It is not added here on purpose: the root lockfile is shared with lanes that
+are live, and an install is not wiring. **The composition it unblocks, written
+out so the next pass is a paste rather than a rediscovery** — and deliberately
+NOT committed behind a guard, because a guarded import that typechecks without
+the dependency is a composition that looks done and does nothing:
+
+`worker-automation-settlement.composition.ts` — the writer gains a second
+collaborator beside `datasets`:
+
+```ts
+import { createOrUpdateQueueItems } from "@langwatch/annotation-server";
+
+/** The annotation queue write, and the trace-existence check it asks for. */
+export type WorkerAutomationAnnotationWriter = Readonly<{
+  annotations: Parameters<typeof createOrUpdateQueueItems>[0]["annotations"];
+  findExistingTraceIds: Parameters<typeof createOrUpdateQueueItems>[0]["findExistingTraceIds"];
+}>;
+
+// in WorkerAutomationPersistActionWriter:
+  async addToAnnotationQueue(input: {
+    traceIds: string[];
+    projectId: string;
+    annotators: string[];
+    userId: string;
+  }): Promise<void> {
+    const queue = this.annotations;
+    if (!queue) {
+      throw new DispatchError({ message: /* the message it has today */ "", retryable: false });
+    }
+
+    await createOrUpdateQueueItems({ ...input, ...queue });
+  }
+```
+
+`worker-production.composition.ts` — beside `automationDatasets`:
+
+```ts
+const automationAnnotations =
+  options.connection && tenancy
+    ? {
+        annotations: PostgresAnnotationAdapter.create({
+          database: options.connection.client,
+          projects: tenancy.projects,
+          organizations: tenancy.organizations,
+        }).build(),
+        // Which of the ids sent address a trace this project holds is trace
+        // storage's answer, not Annotation's — the same split the application
+        // made, over this process's own ClickHouse.
+        findExistingTraceIds: ({ projectId, traceIds }) =>
+          ClickHouseTraceExistenceRepository.create({
+            resolveClient: options.eventing.resolveClickHouseClient as never,
+          }).findExistingTraceIds({ projectId, traceIds }),
+      }
+    : undefined;
+```
+
+and the absence becomes `if (!options.annotations) absence?.withoutAnnotationQueuePersist();`.
+
+### What this pass did NOT do
+
+- **No manifest changed and no install ran.** As above.
+- **No plan provider was composed.** The worker holds
+  `@langwatch/enterprise-billing-server` and `config.deployment.{saas,adminEmails}`,
+  so `SaaSPlanProviderService` is buildable here — but the API layers
+  `EntitlementService` (`@langwatch/entitlement-server`) and `UNLIMITED_PLAN`
+  (`@langwatch/enterprise-licensing-contract`) over it, and neither is a
+  dependency of this process. That is two more manifest lines and a
+  self-hosted-versus-SaaS decision, which belongs with the webhook gate and the
+  persist ceiling rather than with a trace read.
+- **Nothing under `platform/` was created, edited or read.**
+
+### Gates
+
+`apps/worker`: `pnpm typecheck` (both `tsconfig.json` and `tsconfig.test.json`)
+— **0 errors**. `vitest run src/app src/platform` — **44 files / 384 tests, all
+passing**. `packages/architecture-lint` — **38 files / 495 tests, all passing**
+(the frontend-boundary walk crosses the new `trace-server` and `dataset-server`
+value imports). `oxlint` over the six touched files — clean except the seven
+pre-existing unused-import warnings in `worker-production.composition.ts`, none
+of them in the edited regions. `oxfmt --check` — clean. Feature parity for
+`specs/automations/worker-automation-settlement-conversion.feature` — **8/8
+scenarios bound, all bound** (the repository-wide run still reports its 4,633
+pre-existing unbound scenarios).
+
+Four scenarios are new and every one of them is bound:
+`The worker reads a settled trace's full record for itself`,
+`A confirmed match is appended to its dataset from this process`,
+`An annotation-queue automation is refused by the package it needs`, and the
+extra `And` on `A trace whose full record this process cannot read still
+notifies`.
