@@ -110,7 +110,7 @@ describe("Langy changes a connected agent through the shared folder", () => {
               // takes neither today. Naming the run parameter here would ask
               // the question the scenario exists to answer.
               scenario.user(
-                "my refund scenario always runs on the pro plan. Let me pick the account and the plan when a run starts, and make that scenario run against the account acme-free on the free plan",
+                "my refund scenario always runs on the pro plan, because my support agent has no way to take an account or a plan. Let me choose them when a run starts, and run that scenario against the account acme-free on the free plan",
               ),
               scenario.agent(),
               async (_state, executor) => {
@@ -122,9 +122,13 @@ describe("Langy changes a connected agent through the shared folder", () => {
                     "[layer2] tools without code_access:",
                     langy.state.toolNames.join(", "),
                   );
+                  // The read is a diagnostic, so its own failure must not
+                  // stand in for the assertion below.
                   console.log(
                     "[layer2] reply:",
-                    await watcher!.lastAssistantText(),
+                    await watcher!
+                      .lastAssistantText()
+                      .catch((error: unknown) => `unreadable: ${String(error)}`),
                   );
                 }
                 expect(langy.state.toolNames).toContain("code_access");
