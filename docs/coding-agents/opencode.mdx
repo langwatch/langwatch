@@ -75,6 +75,8 @@ Pass one scope flag, and one only:
 | `langwatch instrument opencode --key <ingest-key>` | The project that owns the key, with no login. See [Headless machines and CI](/coding-agents/headless-and-ci). |
 | `langwatch instrument opencode --personal` | Back to your personal workspace |
 
+LangWatch mints one personal key per device and never replaces another device's key, so setting up a second machine does not stop this one. A machine cloned from another keeps the parent's key until it mints its own.
+
 The wrapper accepts the same flags: `langwatch opencode --project acme-app` pins the project and then starts OpenCode. `--project` and `--personal` are LangWatch flags; LangWatch removes them from the command line before OpenCode reads it.
 
 ### Remove the setup

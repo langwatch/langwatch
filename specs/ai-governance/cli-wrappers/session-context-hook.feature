@@ -263,10 +263,64 @@ Rule: The hook never disturbs the session
     Then nothing is posted and the exit code is zero
 
   @unit
-  Scenario: The hook never writes to stdout even when the post fails
+  Scenario: The hook writes nothing to stdout when the post fails
     Given a hook invocation whose telemetry endpoint is unreachable
     When the hook runs
     Then stdout stays empty and the exit code is zero
+
+Rule: A revoked ingest key heals itself
+
+  # A personal ingest key can die under a running agent: revoked on the
+  # API-keys page, rotated by an older server, evicted by the per-tool cap.
+  # The agent's own exporter answers that 401 with silence, and so did the
+  # hook, so a machine could export into a void for weeks. The hook is the one
+  # process that learns the key is dead on every session, so it repairs it:
+  # re-mint through the CLI's own resolver, rewrite the wiring, retry the
+  # record, and tell the user to restart the agent, which still holds the old
+  # key in its environment. The notice is the only thing the hook ever writes
+  # to stdout.
+
+  @unit
+  Scenario: A rejected personal key is re-minted, rewired and retried
+    Given a signed-in CLI whose cached personal key the collector answers 401 to
+    When the hook runs
+    Then a new key is minted and the tool's wiring is rewritten
+    And the record is posted again with the new key
+    And the user is told to restart the agent
+
+  @unit
+  Scenario: A rejected key with no login to mint with stays silent
+    Given a CLI that is not signed in
+    And a collector that answers 401
+    When the hook runs
+    Then nothing is re-minted, stdout stays empty and the exit code is zero
+
+  @unit
+  Scenario: A second rejection inside the throttle window does not re-mint
+    Given a hook that healed a rejected key minutes ago
+    When the collector answers 401 again
+    Then no new key is minted
+
+  @unit
+  Scenario: A tool pinned to a project is not re-minted on the personal path
+    Given a tool pinned to a project key
+    And a collector that answers 401
+    When the hook runs
+    Then no personal key is minted
+
+  @unit
+  Scenario: A pasted credential is never replaced
+    Given a hook exporting with a key that is not the cached personal key
+    And a collector that answers 401
+    When the hook runs
+    Then no personal key is minted
+
+  @unit
+  Scenario: A key the platform still lists as live is not re-minted
+    Given a signed-in CLI whose cached key the platform still lists as live
+    And a collector that answers 401
+    When the hook runs
+    Then no new key is minted
 
   @unit
   Scenario: A payload that never arrives does not outlive the session

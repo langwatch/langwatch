@@ -61,6 +61,13 @@ import {
   stateFilePath,
   writeFingerprint,
 } from "@/cli/utils/governance/hook-state";
+import * as fs from "node:fs";
+import * as path from "node:path";
+
+import {
+  type HealedTarget,
+  healRevokedIngestKey,
+} from "@/cli/utils/governance/ingest-key-heal";
 import { drainSessionContextSpool } from "@/cli/utils/governance/session-context-spool";
 import {
   defaultClaudeSessionRegistryDir,
@@ -126,6 +133,15 @@ export interface HookCommandOptions {
   claudeRegistryDir?: string;
   /** Reads the CLI's device config, the fallback telemetry target. */
   readCliConfig?: () => CliTelemetryConfig;
+  /**
+   * Repairs a personal ingest key the collector rejected: re-mints, rewrites
+   * the wiring, returns the target to retry with. Injectable so a test needs
+   * no login; defaults to the real healer.
+   */
+  healRevokedKey?: (params: {
+    agent: string;
+    rejectedToken: string | undefined;
+  }) => Promise<HealedTarget | null>;
 }
 
 /**
@@ -158,6 +174,7 @@ export async function hookCommand({
   stateDir = defaultStateDir(),
   claudeRegistryDir,
   readCliConfig = loadConfig,
+  healRevokedKey = healRevokedIngestKey,
 }: HookCommandOptions): Promise<void> {
   try {
     await runHook({
@@ -170,6 +187,7 @@ export async function hookCommand({
       stateDir,
       claudeRegistryDir,
       readCliConfig,
+      healRevokedKey,
     });
   } catch (error) {
     debug({ message: `hook failed: ${(error as Error).message}`, env });
@@ -186,6 +204,7 @@ async function runHook({
   stateDir,
   claudeRegistryDir,
   readCliConfig,
+  healRevokedKey,
 }: {
   tool: string;
   env: NodeJS.ProcessEnv;
@@ -196,6 +215,7 @@ async function runHook({
   stateDir: string;
   claudeRegistryDir?: string;
   readCliConfig: () => CliTelemetryConfig;
+  healRevokedKey: NonNullable<HookCommandOptions["healRevokedKey"]>;
 }): Promise<void> {
   const spec = TOOLS[tool.trim().toLowerCase().replace(/-/g, "_")];
   if (!spec) {
@@ -231,7 +251,7 @@ async function runHook({
     env,
   });
 
-  await postOwnSessionContext({
+  const own = await postOwnSessionContext({
     spec,
     agent,
     sessionId,
@@ -245,14 +265,112 @@ async function runHook({
     target,
   });
 
+  // A 401 means the key this device exports with is dead: revoked on the
+  // platform, rotated by an older server, evicted by the cap. The agent's own
+  // exporter fails the same way and says nothing, so this is the one place
+  // the device finds out. Re-mint, rewrite the wiring, retry, and tell the
+  // user to restart the agent: the running process still holds the old key.
+  let liveTarget = target;
+  if (own.httpStatus === 401 && !healedRecently({ stateDir, agent, now })) {
+    recordHealAttempt({ stateDir, agent, now });
+    const healed = await healRevokedKey({
+      agent,
+      rejectedToken: bearerOf(target.headers),
+    }).catch((error: Error) => {
+      debug({ message: `heal failed: ${error.message}`, env });
+      return null;
+    });
+    if (healed) {
+      liveTarget = healed;
+      debug({ message: "ingest key re-minted and wiring rewritten", env });
+      await own.retry?.(healed);
+      if (agent === "claude_code") notifyClaude(HEAL_NOTICE);
+    }
+  }
+
   // Whatever this hook had to say about its own directory is said. Anything
   // the agent declared from a shell that could not reach the collector goes
   // out now, last, so the declared checkout is the session's current one.
   await drainSessionContextSpool({
     stateDir,
     now,
-    post: (payload) => postSessionContext({ target, env, payload, fetchImpl }),
+    post: async (payload) =>
+      (await postSessionContext({ target: liveTarget, env, payload, fetchImpl }))
+        .ok,
   });
+}
+
+/** What the user reads after a heal; Claude Code shows `systemMessage`. */
+const HEAL_NOTICE =
+  "LangWatch: the ingest key this machine exports with had been revoked. A new key was minted and wired; restart Claude Code so telemetry resumes.";
+
+/** How long one heal attempt stands before the hook tries again. */
+const HEAL_THROTTLE_MS = 10 * 60 * 1000;
+
+function healStateFile({
+  stateDir,
+  agent,
+}: {
+  stateDir: string;
+  agent: string;
+}): string {
+  return path.join(stateDir, `heal-${agent}.json`);
+}
+
+/** Whether a heal was attempted inside the throttle window. */
+function healedRecently({
+  stateDir,
+  agent,
+  now,
+}: {
+  stateDir: string;
+  agent: string;
+  now: () => number;
+}): boolean {
+  try {
+    const raw = fs.readFileSync(healStateFile({ stateDir, agent }), "utf8");
+    const attemptedAt = Number((JSON.parse(raw) as { attemptedAt?: number }).attemptedAt);
+    return Number.isFinite(attemptedAt) && now() - attemptedAt < HEAL_THROTTLE_MS;
+  } catch {
+    return false;
+  }
+}
+
+function recordHealAttempt({
+  stateDir,
+  agent,
+  now,
+}: {
+  stateDir: string;
+  agent: string;
+  now: () => number;
+}): void {
+  try {
+    fs.mkdirSync(stateDir, { recursive: true });
+    fs.writeFileSync(
+      healStateFile({ stateDir, agent }),
+      JSON.stringify({ attemptedAt: now() }),
+    );
+  } catch {
+    // A throttle we cannot record costs one extra attempt next time.
+  }
+}
+
+/** The bearer token in a target's headers, without the scheme. */
+function bearerOf(headers: Record<string, string>): string | undefined {
+  const value = headers.Authorization ?? headers.authorization;
+  const token = value?.replace(/^Bearer\s+/i, "").trim();
+  if (!token) return undefined;
+  return token;
+}
+
+/**
+ * The one line the hook ever writes to stdout. Claude Code reads a hook's
+ * stdout as JSON and shows `systemMessage` to the user; it carries no
+ * `additionalContext`, so nothing reaches the model.
+ */
+function notifyClaude(message: string): void {
+  process.stdout.write(`${JSON.stringify({ systemMessage: message })}\n`);
 }
 
 /**
@@ -284,7 +402,7 @@ async function postOwnSessionContext({
   stateDir: string;
   claudeRegistryDir?: string;
   target: TelemetryTarget;
-}): Promise<void> {
+}): Promise<OwnContextOutcome> {
   const projectDir = spec.projectDirVar ? env[spec.projectDirVar] : undefined;
   const directory = firstNonEmpty(input.cwd, projectDir) ?? process.cwd();
   // The session's own name, as claude itself holds it. The SessionStart
@@ -312,7 +430,7 @@ async function postOwnSessionContext({
       message: `no git repository with an origin remote at ${directory}`,
       env,
     });
-    return;
+    return { httpStatus: null };
   }
 
   const fingerprint = sessionContextFingerprint(context, { name });
@@ -321,7 +439,7 @@ async function postOwnSessionContext({
   const stateFile = stateFilePath({ stateDir, agent, sessionId });
   if (readFingerprint(stateFile) === fingerprint) {
     debug({ message: "context unchanged since the last post", env });
-    return;
+    return { httpStatus: null };
   }
 
   const payload = buildSessionContextLogPayload({
@@ -335,24 +453,53 @@ async function postOwnSessionContext({
     name,
   });
 
+  const recordFingerprint = (): void => {
+    try {
+      writeFingerprint({ stateFile, fingerprint, now });
+    } catch (error) {
+      // A fingerprint we cannot record costs one duplicate record next time.
+      debug({
+        message: `could not record the fingerprint: ${(error as Error).message}`,
+        env,
+      });
+    }
+    debug({ message: `posted ${fingerprint}`, env });
+  };
+
   const posted = await postSessionContext({
     target,
     env,
     payload,
     fetchImpl,
   });
-  if (!posted) return;
-
-  try {
-    writeFingerprint({ stateFile, fingerprint, now });
-  } catch (error) {
-    // A fingerprint we cannot record costs one duplicate record next time.
-    debug({
-      message: `could not record the fingerprint: ${(error as Error).message}`,
-      env,
-    });
+  if (!posted.ok) {
+    return {
+      httpStatus: posted.status,
+      retry: async (healed) => {
+        const again = await postSessionContext({
+          target: healed,
+          env,
+          payload,
+          fetchImpl,
+        });
+        if (again.ok) recordFingerprint();
+        return again.ok;
+      },
+    };
   }
-  debug({ message: `posted ${fingerprint}`, env });
+
+  recordFingerprint();
+  return { httpStatus: posted.status };
+}
+
+/**
+ * How the hook's own post went: the collector's status (null when nothing
+ * was sent), and, after a rejection, a way to send the same record again to
+ * a healed target and record its fingerprint on success.
+ */
+interface OwnContextOutcome {
+  httpStatus: number | null;
+  retry?: (target: TelemetryTarget) => Promise<boolean>;
 }
 
 /**
@@ -411,7 +558,7 @@ export async function postSessionContext({
   env: NodeJS.ProcessEnv;
   payload: unknown;
   fetchImpl: typeof fetch;
-}): Promise<boolean> {
+}): Promise<{ ok: boolean; status: number | null }> {
   const controller = new AbortController();
   const timer = setTimeout(() => controller.abort(), POST_TIMEOUT_MS);
   try {
@@ -428,12 +575,12 @@ export async function postSessionContext({
     });
     if (!response.ok) {
       debug({ message: `collector answered ${response.status}`, env });
-      return false;
+      return { ok: false, status: response.status };
     }
-    return true;
+    return { ok: true, status: response.status };
   } catch (error) {
     debug({ message: `post failed: ${(error as Error).message}`, env });
-    return false;
+    return { ok: false, status: null };
   } finally {
     clearTimeout(timer);
   }
