@@ -1,4 +1,10 @@
 // SPDX-License-Identifier: LicenseRef-LangWatch-Enterprise
+// The operation descriptions come from the module that DECLARES them, not from
+// this package's own barrel. The barrel re-exports this file, so importing
+// through it is a cycle: under a bundler's hoisting it happens to resolve, and
+// under Node's own ESM loader it is a temporal-dead-zone crash at module load
+// (`Cannot access 'CREATE_GROUP' before initialization`) that takes down every
+// process reaching this package.
 import {
   CREATE_GROUP,
   CREATE_USER,
@@ -15,7 +21,7 @@ import {
   PATCH_USER,
   REPLACE_GROUP,
   REPLACE_USER,
-} from "@langwatch/enterprise-scim-server";
+} from "../../api/scim/scim.api";
 import {
   ScimProtocolError,
   scimCreateGroupRequestSchema,
@@ -168,32 +174,34 @@ export function createScimProtocolRestApp(options: {
       }),
     );
 
-  secured.access(DISCOVERY).get("/ResourceTypes", describeRoute(operations.listResourceTypes), (c) =>
-    c.json({
-      schemas: ["urn:ietf:params:scim:api:messages:2.0:ListResponse"],
-      totalResults: 2,
-      itemsPerPage: 2,
-      startIndex: 1,
-      Resources: [
-        {
-          schemas: ["urn:ietf:params:scim:schemas:core:2.0:ResourceType"],
-          id: "User",
-          name: "User",
-          endpoint: "/api/scim/v2/Users",
-          schema: "urn:ietf:params:scim:schemas:core:2.0:User",
-          meta: { resourceType: "ResourceType", location: "/api/scim/v2/ResourceTypes/User" },
-        },
-        {
-          schemas: ["urn:ietf:params:scim:schemas:core:2.0:ResourceType"],
-          id: "Group",
-          name: "Group",
-          endpoint: "/api/scim/v2/Groups",
-          schema: "urn:ietf:params:scim:schemas:core:2.0:Group",
-          meta: { resourceType: "ResourceType", location: "/api/scim/v2/ResourceTypes/Group" },
-        },
-      ],
-    }),
-  );
+  secured
+    .access(DISCOVERY)
+    .get("/ResourceTypes", describeRoute(operations.listResourceTypes), (c) =>
+      c.json({
+        schemas: ["urn:ietf:params:scim:api:messages:2.0:ListResponse"],
+        totalResults: 2,
+        itemsPerPage: 2,
+        startIndex: 1,
+        Resources: [
+          {
+            schemas: ["urn:ietf:params:scim:schemas:core:2.0:ResourceType"],
+            id: "User",
+            name: "User",
+            endpoint: "/api/scim/v2/Users",
+            schema: "urn:ietf:params:scim:schemas:core:2.0:User",
+            meta: { resourceType: "ResourceType", location: "/api/scim/v2/ResourceTypes/User" },
+          },
+          {
+            schemas: ["urn:ietf:params:scim:schemas:core:2.0:ResourceType"],
+            id: "Group",
+            name: "Group",
+            endpoint: "/api/scim/v2/Groups",
+            schema: "urn:ietf:params:scim:schemas:core:2.0:Group",
+            meta: { resourceType: "ResourceType", location: "/api/scim/v2/ResourceTypes/Group" },
+          },
+        ],
+      }),
+    );
 
   secured.access(DISCOVERY).get("/Schemas", describeRoute(operations.listSchemas), (c) =>
     c.json({
@@ -346,17 +354,15 @@ export function createScimProtocolRestApp(options: {
     );
   });
 
-  secured
-    .access(SCIM)
-    .get("/Users/:id", describeRoute(operations.getUser), async (c) =>
-      scimJson(
-        c,
-        await scim().getUser({
-          id: c.req.param("id"),
-          organizationId: c.get("scimOrganizationId"),
-        }),
-      ),
-    );
+  secured.access(SCIM).get("/Users/:id", describeRoute(operations.getUser), async (c) =>
+    scimJson(
+      c,
+      await scim().getUser({
+        id: c.req.param("id"),
+        organizationId: c.get("scimOrganizationId"),
+      }),
+    ),
+  );
 
   secured.access(SCIM).put("/Users/:id", describeRoute(operations.replaceUser), async (c) => {
     const body = await json(c);

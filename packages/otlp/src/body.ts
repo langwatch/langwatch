@@ -34,7 +34,7 @@ import type {
   IExportMetricsServiceRequest,
   IExportTraceServiceRequest,
 } from "@opentelemetry/otlp-transformer";
-import * as root from "@opentelemetry/otlp-transformer/build/src/generated/root";
+import * as rootModule from "@opentelemetry/otlp-transformer/build/src/generated/root";
 import {
   OtlpBodyTooLargeError,
   OtlpBodyUnreadableError,
@@ -45,10 +45,28 @@ const gunzipAsync = promisify(gunzip);
 const inflateAsync = promisify(inflate);
 const brotliDecompressAsync = promisify(brotliDecompress);
 
+/**
+ * The generated protobuf root, through whichever shape the loader hands it in.
+ *
+ * `.../generated/root` is CommonJS. A bundler that applies the interop shim
+ * (Vite, so every vitest run) copies the exports onto the namespace and
+ * `root.opentelemetry` resolves; Node's own ESM loader does not — its
+ * lexer finds no named exports on this file, so the namespace is
+ * `{ default }` and the same expression is `undefined.proto`. That is a
+ * module-load crash, not a runtime one: it takes down every process that
+ * imports this package, which is `apps/api` and the OpenAPI generator both.
+ * So the root is read through `default` first and the namespace second, and
+ * the package's tests keep the bundler path honest.
+ */
+export const otlpProtobufRoot: Record<string, any> =
+  (rootModule as { default?: Record<string, any> }).default ??
+  (rootModule as unknown as Record<string, any>);
+
+const root = otlpProtobufRoot;
+
 const traceRequestType = (root as any).opentelemetry.proto.collector.trace.v1
   .ExportTraceServiceRequest;
-const logRequestType = (root as any).opentelemetry.proto.collector.logs.v1
-  .ExportLogsServiceRequest;
+const logRequestType = (root as any).opentelemetry.proto.collector.logs.v1.ExportLogsServiceRequest;
 const metricsRequestType = (root as any).opentelemetry.proto.collector.metrics.v1
   .ExportMetricsServiceRequest;
 
@@ -158,9 +176,7 @@ function acquireReader(
 }
 
 /** Drain the reader, refusing the body the moment it passes the byte bound. */
-async function drainWithinLimit(
-  reader: ReadableStreamDefaultReader<Uint8Array>,
-): Promise<Buffer> {
+async function drainWithinLimit(reader: ReadableStreamDefaultReader<Uint8Array>): Promise<Buffer> {
   const chunks: Uint8Array[] = [];
   let held = 0;
 
@@ -258,11 +274,7 @@ export function parseOtlpTraces(
   if (body.byteLength === 0) {
     return { ok: true, request: { resourceSpans: [] } };
   }
-  return parseWithFallback<IExportTraceServiceRequest>(
-    body,
-    contentType,
-    traceRequestType,
-  );
+  return parseWithFallback<IExportTraceServiceRequest>(body, contentType, traceRequestType);
 }
 
 export function parseOtlpLogs(
@@ -282,11 +294,7 @@ export function parseOtlpMetrics(
   if (body.byteLength === 0) {
     return { ok: true, request: { resourceMetrics: [] } };
   }
-  return parseWithFallback<IExportMetricsServiceRequest>(
-    body,
-    contentType,
-    metricsRequestType,
-  );
+  return parseWithFallback<IExportMetricsServiceRequest>(body, contentType, metricsRequestType);
 }
 
 function parseWithFallback<T>(
@@ -391,7 +399,5 @@ function describeJsonFailure(message: string): string {
   }
 
   const position = /position (\d+)/.exec(message)?.[1];
-  return position
-    ? `invalid JSON at position ${position}`
-    : "invalid JSON: unexpected token";
+  return position ? `invalid JSON at position ${position}` : "invalid JSON: unexpected token";
 }

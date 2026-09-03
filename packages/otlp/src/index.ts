@@ -24,6 +24,7 @@ export { normalizeOtlpAttributeMap, otlpScalarValue } from "./attribute-map";
 export { bytesToHex, decodeBase64OpenTelemetryId } from "./id";
 export {
   OTLP_MAX_BODY_BYTES,
+  otlpProtobufRoot,
   parseOtlpLogs,
   parseOtlpMetrics,
   parseOtlpTraces,

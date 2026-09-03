@@ -1107,24 +1107,55 @@ jobs:
           GH_TOKEN: ${{ github.token }}
         run: bash .github/scripts/notify-slack-job-failure.sh feature-parity
 
-  # The generated OpenAPI document is what external integrators compile
-  # clients from, and an operation missing its body, parameters or success
-  # response still appears in it. This turns each omission into a failure.
+  # The frozen OpenAPI document against the surface the API process mounts.
+  #
+  # This replaces `openapi-completeness`, which was deleted at the deployment
+  # cutover along with the generator it read. The check is not the same one and
+  # deliberately so. The old pair asserted that every documented operation
+  # carried a body, parameters and a success response; this one asserts the
+  # fact those presupposed — that the operation is still SERVED.
+  #
+  # `apps/api/src/features/discovery/openapi-document.json` is frozen: three
+  # routes serve it and both SDKs generate clients from it, so this job never
+  # writes it. The task describes the mounted surface into a scratch file and
+  # diffs the two.
+  #
+  # ONE direction fails: an operation the document lists that no route on the
+  # process answers. An integrator generated a client from it, and the call now
+  # 404s. Operations served and undocumented are printed and never failed on,
+  # because the document is frozen and every route added since the freeze is
+  # one of them — failing there would make this a wall rather than a signal.
+  openapi-drift:
+    needs: changes
+    if: needs.changes.outputs.relevant == 'true'
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v6
+        with:
+          # Drops docs/ + assets/ media. See LEAN CHECKOUT at the top of this file.
+          sparse-checkout: |
+            /*
+            !/docs/media/
+            !/docs/images/
+            !/assets/
+          sparse-checkout-cone-mode: false
 
-  # REMOVED AT THE DEPLOYMENT CUTOVER, and this is a recorded coverage loss.
-  #
-  # `openapi-completeness` ran two scripts — check-openapi-completeness.ts and
-  # check-openapi-route-coverage.ts — over the generated OpenAPI document. All
-  # three went with the monolith: the scripts had no packaged home, and the
-  # generator (`generateOpenAPISpec`) was deleted when the task lane went,
-  # because twelve of its sixteen module inputs no longer existed.
-  #
-  # What is left is a CHECKED-IN artifact at
-  # apps/api/src/features/discovery/openapi-document.json, which three routes
-  # serve and the TypeScript SDK's client types are generated from. Nothing
-  # regenerates it and nothing checks it. Restoring both belongs to the lane
-  # that owns the REST surface; until then an operation added without a
-  # describeRoute is invisible to integrators and to CI alike.
+      - uses: ./.github/actions/setup-pnpm-node
+        with:
+          install: "@langwatch/platform-api..."
+
+      - uses: ./.github/actions/prepare-generated-files
+
+      - name: Check the frozen OpenAPI document against the served surface
+        run: pnpm --filter @langwatch/platform-api run task:openapi-check
+
+      - name: Notify Slack on failure
+        if: failure() && github.ref == 'refs/heads/main'
+        env:
+          SLACK_RELEASE_NOTIFICATION_WEBHOOK_URL: ${{ secrets.SLACK_RELEASE_NOTIFICATION_WEBHOOK_URL }}
+          GH_TOKEN: ${{ github.token }}
+        run: bash .github/scripts/notify-slack-job-failure.sh openapi-drift
 
   build:
     needs: changes
@@ -1400,6 +1431,7 @@ jobs:
         lint,
         ast-grep,
         feature-parity,
+        openapi-drift,
         build,
         ci-scripts-test,
         ci-self-test,
@@ -1411,4 +1443,4 @@ jobs:
       - uses: re-actors/alls-green@05ac9388f0aebcb5727afa17fcccfecd6f8ec5fe # v1.2.2
         with:
           jobs: ${{ toJSON(needs) }}
-          allowed-skips: typecheck, typecheck-packages, test-unit, package-suites, lint, ast-grep, feature-parity, build, ci-scripts-test, ci-self-test
+          allowed-skips: typecheck, typecheck-packages, test-unit, package-suites, lint, ast-grep, feature-parity, openapi-drift, build, ci-scripts-test, ci-self-test

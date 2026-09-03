@@ -368,8 +368,13 @@ function createPlatformUrl(publicBaseUrl: string | undefined): PlatformUrlBuilde
  * hand-maintained organization-exclusive set that its own source marked
  * `@deprecated`. Deriving all three from `ALL_PERMISSIONS` is what makes the
  * catalogue `/api/roles` publishes and the check the engine performs one fact.
+ *
+ * Exported because the OpenAPI generator needs the SAME vocabulary: the custom
+ * roles family builds its request enum from this list at mount time, so a
+ * description composed over a stand-in vocabulary would publish an enum the
+ * running process does not accept.
  */
-const REGISTRY_RBAC_VOCABULARY: AppRestRbacVocabulary = {
+export const REGISTRY_RBAC_VOCABULARY: AppRestRbacVocabulary = {
   actions: [...new Set(ALL_PERMISSIONS.map((permission) => permission.split(":")[1] ?? ""))].sort(),
   resources: [...new Set(ALL_PERMISSIONS.map((permission) => permissionResource(permission)))],
   isOrganizationExclusive: (resource: string) => {

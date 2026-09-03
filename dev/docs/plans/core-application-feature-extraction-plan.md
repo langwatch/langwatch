@@ -8797,7 +8797,7 @@ reads to it as success before it drops the batch.
 
 ### Named absences and coverage losses
 
-- **The OpenAPI document has no generator and no checker.** `generateOpenAPISpec` went with the task lane; `check-openapi-completeness.ts` and `check-openapi-route-coverage.ts` went with the monolith's `scripts/`. What is left is a checked-in 2.7 MB artifact at `apps/api/src/features/discovery/openapi-document.json` that three routes serve and both SDKs generate clients from. An operation added without a `describeRoute` is now invisible to integrators and to CI alike. `make sync-all-openapi` refuses and says so.
+- **The OpenAPI document has no generator and no checker.** `generateOpenAPISpec` went with the task lane; `check-openapi-completeness.ts` and `check-openapi-route-coverage.ts` went with the monolith's `scripts/`. What is left is a checked-in 2.7 MB artifact at `apps/api/src/features/discovery/openapi-document.json` that three routes serve and both SDKs generate clients from. An operation added without a `describeRoute` is now invisible to integrators and to CI alike. `make sync-all-openapi` refuses and says so. **CLOSED, 2026-09-03** — `apps/api/src/tasks/openapi-document/` describes the mounted surface and diffs it against the frozen artifact, `make sync-all-openapi` runs the check, and CI's `openapi-drift` job fails on a removal. The document stays frozen; nothing writes it. See the record at the end of this document, including the 20 operations it publishes that nothing serves.
 - **Five repo-level guards went with `platform/app/src/__tests__/`** and only one was ported. Ported: the Dockerfile runtime-workspace guard, because it guards this lane's change directly. NOT ported, and each guarded a file this lane owns or touches: `env-example-sentinels`, `langyagent-shell-tools` (reads `infra/docker/Dockerfile.langyagent`), `no-postinstall-network`, `noBinarySourceFiles`. They belong in `apps/api/src/__tests__/`.
 - **The shard sequencer's duration manifest has no producer.** The reporters lived in the monolith's `test-utils`; `packages/test-harness` holds equivalents that no application's vitest config wires.
 - **`SKIP_LWQL_PROVISION` is no longer honoured.** `apps/api`'s `task:lwql-provision` self-skips when LangWatchQL is unconfigured, which covers the real case; nothing outside the deleted tree set the variable.
@@ -9941,3 +9941,245 @@ walk is there when that list is.
 | `packages/architecture-lint/src/index.ts` | Exports the module-graph surface. |
 | `specs/setup/memory-footprint.feature` | "Server code cannot reach browser-only UI, even transitively" re-worded for the new roots (title unchanged, so the binding holds); "Backend code never imports a module out of a browser package" added, `@unit`. |
 | `CLAUDE.md` | The row names the new path and both refusals. |
+
+## The OpenAPI document gets a producer and a guard again, 2026-09-03
+
+Cutover A recorded the largest live coverage loss of the migration in one
+sentence: *"The OpenAPI document has no generator and no checker."*
+`generateOpenAPISpec` went with the task lane, `check-openapi-completeness.ts`
+and `check-openapi-route-coverage.ts` went with the monolith's `scripts/`,
+`make sync-all-openapi` refused, and what was left was a 2.7 MB checked-in
+artifact that three routes serve and both SDKs generate clients from — with
+nothing able to say whether it still described the API.
+
+Both halves are back, and neither writes the artifact.
+
+```
+  BEFORE                                AFTER
+
+  48 x generateSpecs(oneFamily)         createApiProcessRestFeatures(...)
+        │  each family built                    │  the SAME enumeration
+        │  standalone, off any mount            │  production mounts
+        ▼                                       ▼
+  deepmerge.all([...48, currentSpec])    ONE Hono, every family routed in
+        │  + a 46-prefix "replace,               │
+        │    don't merge" list                   ▼
+        ▼                                 ONE generateSpecs pass
+  WRITES app/api/openapiLangWatch.json          │
+        (the artifact itself)                   ▼
+                                          writes the path the CALLER named
+                                          (default: node_modules/.cache)
+                                                │
+                                                ▼
+                                          checker diffs it against the
+                                          FROZEN document, exit 1 on a
+                                          removal outside the baseline
+```
+
+### The shape that was decided, and why
+
+**One pass over one mounted app, not forty-eight passes over forty-eight
+standalone ones.** hono-openapi hangs its route metadata off a package-local
+symbol, so a second app instance built beside the mounted one is invisible to
+it; and the versioned families publish dotted, parameterless RPC names
+(`/api/organization/organization.getSettings`) that the default
+`excludeStaticFile` filter drops silently as static files. Both facts point the
+same way: describe the app the process actually routes into, with that filter
+off. The retired generator could not do this because the families were never
+mounted together anywhere — `createApiProcessRestFeatures` is what changed. The
+deepmerge, the 46-prefix replace list and the stale-path prune are all gone
+with it; what survived is the security stamp, which reads each operation's
+credential class out of the route policy registry.
+
+**The generator writes only where the caller points it.** `generateOpenApiDocument({ outputPath })`
+takes the path as a required argument — not a defaulted one — so no run can
+clobber the frozen document by forgetting an argument. The two entry points
+fall back to `node_modules/.cache/openapi/served-openapi-document.json`. The
+checker opens the frozen document for READING and nothing else, which two unit
+tests pin: one hashes the real artifact before and after a default run, the
+other points `frozenPath` at a sentinel this test owns and asserts the bytes
+come back identical.
+
+**The failing direction is removal, and only removal.** A documented operation
+the process serves no route for is breaking — an integrator generated a client
+from it and the call now 404s. An operation served and undocumented is not, and
+cannot be made to fail while the document is frozen, because every route added
+since the freeze is one of them. CI reports the second and fails on the first.
+
+**A documented operation whose route is still mounted is NOT a removal, even
+when the generator cannot describe it.** Ten operations in the frozen document
+were written by hand rather than generated — six `/api/annotations` and four
+`/api/trace/*` — because those families carry no `describeRoute`. They answer.
+Calling them deletions would have reported ten live endpoints as broken, so the
+checker classifies against the mounted app's own route table (`app.routes`,
+through `documentedPathOf`) as well as against the generated document, and
+reports them as `undescribed`.
+
+**Absences are named, not skipped.** A family the description cannot cover is
+pushed onto a report with its reason, and the run prints them. Six today.
+
+### The numbers
+
+| | |
+| --- | ---: |
+| Operations the process **serves and describes** | **287** |
+| Operations the frozen document **lists** | **317** |
+| removed (documented, no route answers) | **20** |
+| — of those, in the recorded baseline | **20** |
+| — regressions (outside the baseline) | **0** |
+| undescribed (documented by hand, route still answers) | **10** |
+| added (served, undocumented) | **0** |
+| changed (security requirement moved) | **0** |
+| unpublishable (served, no scheme can express the credential) | **2** |
+
+`added: 0` and `changed: 0` are the load-bearing numbers. Every one of the 287
+operations the generator produces is already in the frozen document with the
+same security requirement, which is what says the new one-pass generator is
+faithful to the forty-eight-pass one it replaces rather than merely plausible.
+
+**The 20 removals, all of them recorded in `UNSERVED_AT_BASELINE`:**
+
+| What | Ops | Why it does not answer |
+| --- | ---: | --- |
+| `/api/scim/v2/**` | 15 | **The API process mounts no SCIM application.** Not because the routes are gone: `createScimProtocolRestApp` is still exported by `@langwatch/enterprise-scim-server`. Neither `createApiProcessRestFeatures` nor the packaged enumeration names it, so an identity provider following the published document reaches nothing. This is the largest live gap between what we publish and what answers, and it is one composition away from closing. |
+| `POST /api/track_event`, `POST /api/events/track` | 2 | `mountApiPackagedRestFamilies` names `tracked-events` absent at boot: no package owns the tracked-event span builder. |
+| `GET /api/traces/{traceId}/transcript` | 1 | `mountTracesRest` leaves the route unregistered on purpose — this process composes neither the coding-agent session store nor the log canonicaliser, and an empty transcript reads as "the agent did nothing". |
+| `GET /`, `POST /` | 2 | **Residue, not routes.** The retired generator described each family from a standalone app and merged the results, so a family generated before its base path was applied contributed its operations at the document ROOT. These two carry the prompt library's list and create bodies. No process ever served them. |
+
+**The two unpublishable operations** are a real defect the stamp surfaced:
+`POST /api/export/scenario-runs/download` and `POST /api/workflows/post_event`
+both carry a `describeRoute` and both reach by `session`, which has no security
+scheme a consumer of the public API can present.
+`securityForCredentialClass` refuses to invent one and names the two honest
+answers — give the document a scheme, or keep the operation out. The generator
+takes the second and reports the operation, rather than publishing an empty
+requirement that would make every generated client emit an unauthenticated
+call. Both belong to the lane that owns those routes: either drop the
+`describeRoute` or move the route to a credential a client holds.
+
+### Two module-load crashes found on the way, and fixed
+
+Neither is cosmetic: each takes down **every Node process that imports the
+package**, `apps/api` included, and each is invisible under vitest because
+Vite's interop and hoisting paper over both. The generator runs under `tsx`,
+which is Node's own ESM loader, so it hit them in order.
+
+1. **`packages/otlp/src/body.ts` — CJS namespace with no named exports.**
+   `import * as root from "@opentelemetry/otlp-transformer/build/src/generated/root"`
+   then `root.opentelemetry.proto...` at module scope. Node's cjs-module-lexer
+   finds no named exports on that generated file, so the namespace is
+   `{ default, "module.exports" }` and the expression is `undefined.proto`.
+   Fixed by reading through `default` first, exported as `otlpProtobufRoot` so
+   the second site imports it instead of repeating the dance —
+   `packages/features/trace/server/.../otlp-ingest.api.ts` had the identical
+   two lines.
+2. **`packages/enterprise/features/scim/server/.../scim-protocol.api.ts` — a
+   self-referential barrel import.** It imported its fifteen operation
+   descriptions from `@langwatch/enterprise-scim-server`, its OWN package
+   barrel, which re-exports that same file. Under Node's ESM loader that is a
+   temporal dead zone: `Cannot access 'CREATE_GROUP' before initialization`.
+   Repointed at `../../api/scim/scim.api`, the module that declares them.
+
+Both packages' suites are green after the change (150 and 80 tests), and both
+typecheck clean.
+
+### Judgment calls, recorded
+
+1. **A BASELINE, rather than failing red on arrival.** The brief asks the check
+   to fail on removals. Twenty operations were already unserved before this
+   lane, so a bare rule would have been red on its first run and therefore
+   ignored. `UNSERVED_AT_BASELINE` records those twenty with a reason each; the
+   check fails on the twenty-first. The list is a debt list — *shrink it, never
+   add to it* — and a unit test asserts every entry is still a real removal, so
+   an entry that stops applying has to be deleted rather than left making the
+   guard weaker than it reads.
+2. **The document envelope moved into the producer.** `info`, `servers`, the
+   document-wide `security` and the `project_api_key` / `admin_api_key` schemes
+   were hand-maintained INSIDE the checked-in JSON and survived each run only
+   because the old generator merged the previous document back into the new
+   one. With the merge gone they are values in the code that writes the
+   document. `instance_admin_key` is imported from
+   `@langwatch/organization-server`, which declares it; `scim_bearer` is
+   restated, because `@langwatch/enterprise-scim-server` is not a dependency of
+   this application — it mounts no SCIM family — and adding one for a scheme
+   would be worse than a comment.
+3. **`REGISTRY_RBAC_VOCABULARY` was exported** from
+   `api-packaged-rest.composition.ts` (one word). The custom-roles family
+   builds its request enum from the vocabulary at MOUNT time, so a description
+   composed over a stand-in vocabulary would publish an enum the running
+   process does not accept.
+4. **Four families are mounted beside `createApiProcessRestFeatures`, and this
+   task restates the four factory calls.** `api-production.composition.ts`
+   routes five more apps after the list; the secret family, API keys, the
+   gateway platform family and gateway spend all publish operations and all
+   take providers, so all four are described. What is copied is the FACTORY
+   CALL, not the routes — a family that changes shape breaks this build.
+5. **Two families are named absences rather than fabricated.**
+   `gateway-internal` and `elevenlabs-webhook` need a live Prisma connection
+   and the gateway service graph at BUILD time, not per request. Neither
+   publishes an operation (the first is ingress-blocked, the second is a vendor
+   callback with no `describeRoute`), so the document loses nothing and the
+   report says so rather than the composition pretending.
+6. **The CI job is `openapi-drift`, not `openapi-completeness`.** It sits where
+   the deleted job's placeholder comment was, and it is deliberately not the
+   same check: the old pair asserted that every documented operation carried a
+   body, parameters and a success response. This one asserts the fact those
+   presupposed — that the operation is still served. Completeness is worth
+   restoring on top of this; it needs the document to be tracking reality
+   first.
+
+### File → change
+
+| File | Change |
+| --- | --- |
+| `apps/api/src/tasks/openapi-document/openapi-document.surface.ts` | NEW. Composes the process's REST surface for description: `createApiProcessRestFeatures` over refusing stand-ins, the four tail families, and the named-absence report. |
+| `apps/api/src/tasks/openapi-document/openapi-document.generator.ts` | NEW. One `generateSpecs` pass, the document envelope, `stampSecurityFromRegistry`, the `$defs` and empty-path prunes, `DEFAULT_SCRATCH_PATH`, and the served-route table the checker classifies against. |
+| `apps/api/src/tasks/openapi-document/openapi-document.checker.ts` | NEW. Generates to scratch, diffs against the frozen document, classifies removed / undescribed / added / changed, holds `UNSERVED_AT_BASELINE` and renders the report. |
+| `apps/api/src/tasks/openapi-document/openapi-{generate,check}.entrypoint.ts` | NEW. The two runners. Both take the scratch path as an optional first argument; the check takes the document to compare against as an optional second, which is READ and never written — it is also how the failing path is exercised from a shell without touching the frozen file. The check exits 1 only on a removal outside the baseline. |
+| `apps/api/src/tasks/openapi-document/__tests__/openapi-document.unit.test.ts` | NEW. 12 tests: a route from every one of the 42 mounted families, the security invariant, the two sabotage-proof "never writes the frozen path" cases, and one case per drift class. |
+| `apps/api/package.json` | `task:openapi-generate` and `task:openapi-check`. |
+| `apps/api/src/app/api-packaged-rest.composition.ts` | `REGISTRY_RBAC_VOCABULARY` exported, with the reason. |
+| `packages/otlp/src/{body,index}.ts` | `otlpProtobufRoot`: the CJS root read through `default` first, and exported. |
+| `packages/features/trace/server/src/transport/api-rest/otlp-ingest.api.ts` | Imports that root instead of repeating the broken direct import. |
+| `packages/enterprise/features/scim/server/src/transport/api-rest/scim-protocol.api.ts` | Operation descriptions imported from the declaring module, not the package's own barrel. |
+| `Makefile` | `sync-all-openapi` runs the checker, prints where it wrote and what differs, and says the frozen document was NOT written. It no longer refuses. |
+| `.github/workflows/langwatch-app-ci.yml` | `openapi-drift` job where the deleted `openapi-completeness` placeholder was; added to `langwatch-app-complete`'s `needs` and `allowed-skips`. |
+| `specs/api-reference/openapi-document-drift.feature` | NEW. Eight `@unit` scenarios, each bound by a `@scenario` annotation on the test that covers it. |
+
+### Gates
+
+- `apps/api`: `tsc --noEmit` **1 error, 0 in this lane's files** (the
+  pre-existing DOM-lib error in `apps/ui/src/behavior/public-config.ts` that
+  Cutover A also recorded); `tsc --noEmit -p tsconfig.test.json` **5 errors, 0
+  in this lane's files** (two other lanes' in-flight test files plus the same
+  DOM one).
+- `apps/api`: `vitest run src/tasks/openapi-document src/app-rest` — **53
+  passed**, 5 files.
+- `packages/otlp`: **150 passed**, 7 files. `packages/enterprise/.../scim/server`:
+  **80 passed**, 9 files. `packages/features/trace/server`: the five OTLP suites
+  **103 passed**; its `typecheck` is byte-identical to `HEAD` (2 errors, both in
+  another lane's `trace-read-mappers.redaction.unit.test.ts`).
+- `make -n sync-all-openapi` resolves; a real `make sync-all-openapi` exits 0
+  and leaves `git status` on `apps/api/src/features/discovery` and
+  `docs/api-reference` clean.
+- `actionlint .github/workflows/langwatch-app-ci.yml`: **3 findings, byte for
+  byte the same three shellcheck notes as `HEAD`** — none in the new job.
+- `oxlint` and `oxfmt` clean over every file this lane touched.
+
+### What this lane leaves for others
+
+1. **Mount the SCIM 2.0 family.** Fifteen published operations answer nothing,
+   and the mountable app already exists. That is the single biggest entry in
+   the baseline.
+2. **Decide what the two session-only documented routes should be.**
+   `POST /api/export/scenario-runs/download` and `POST /api/workflows/post_event`
+   are advertised to integrators who cannot call them.
+3. **Completeness, on top of drift.** The deleted `check-openapi-completeness.ts`
+   asserted every documented operation carried a body, parameters and a success
+   response. Nothing does that today, and the generated document is now a real
+   input for it.
+4. **The ten hand-written operations.** `/api/annotations` (6) and
+   `/api/trace/*` (4) are served by routes with no `describeRoute`, so the
+   document describes them by hand and nothing keeps the two in step. Adding
+   the descriptions to those routes would move them from `undescribed` into the
+   generated 287.

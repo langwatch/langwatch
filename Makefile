@@ -371,28 +371,23 @@ endif
 worktree:
 	@./dev/scripts/worktree.sh $(WORKTREE_ARG)
 
-# Re-derive the SDK clients from the OpenAPI document.
+# Describe the REST surface the API process actually mounts, and say how it
+# differs from the frozen document.
 #
-# The GENERATOR is gone. `generateOpenAPISpec` was deleted with the monolith's
-# task lane, because twelve of its sixteen module inputs no longer existed —
-# so the document at apps/api/src/features/discovery/openapi-document.json is
-# a checked-in artifact with nothing that regenerates it. This target now
-# refuses rather than pretending, because the failure it would otherwise hide
-# is the worst kind: both SDKs regenerating cleanly from a document that has
-# silently stopped tracking the routes the API serves.
+# The DOCUMENT IS FROZEN. `apps/api/src/features/discovery/openapi-document.json`
+# is served by three routes and both SDKs generate clients from it, so nothing
+# here writes it — not this target, not the task it runs. What the generator
+# produces goes to a scratch file, and the check prints what a person would
+# have to look at before replacing the artifact by hand.
 #
 # To regenerate the CLIENTS from the document as it stands, run the two
-# commands below by hand. To regenerate the DOCUMENT, the API process needs a
-# generator again — see the "openapi-completeness" note in
-# .github/workflows/langwatch-app-ci.yml.
+# commands the output names.
 sync-all-openapi:
-	@echo "sync-all-openapi: the OpenAPI document has no generator." >&2
-	@echo "  apps/api/src/features/discovery/openapi-document.json is checked in and" >&2
-	@echo "  nothing regenerates it since the monolith's task lane was deleted." >&2
-	@echo "  To refresh the CLIENTS from it as it stands:" >&2
-	@echo "    cd sdks/typescript && pnpm run generate:openapi-types" >&2
-	@echo "    cd sdks/python && make generate/api-client" >&2
-	@exit 1
+	@pnpm --filter @langwatch/platform-api task:openapi-check
+	@echo ""
+	@echo "The frozen document was NOT written. To refresh the clients from it as it stands:"
+	@echo "    cd sdks/typescript && pnpm run generate:openapi-types"
+	@echo "    cd sdks/python && make generate/api-client"
 
 # Included last on purpose (see the note next to `include dev/boxd.mk`): the
 # `make haven <sub>` passthrough must define its no-op goals after the real

@@ -55,12 +55,12 @@ import {
   parseOtlpLogs,
   parseOtlpMetrics,
   parseOtlpTraces,
+  otlpProtobufRoot,
   readCorrectedPath,
   readOtlpBody,
 } from "@langwatch/otlp";
 import { SpanKind, SpanStatusCode } from "@opentelemetry/api";
 import type { IExportTraceServiceRequest } from "@opentelemetry/otlp-transformer";
-import * as root from "@opentelemetry/otlp-transformer/build/src/generated/root";
 import type { Context } from "hono";
 import type { ContentfulStatusCode } from "hono/utils/http-status";
 import { getLangWatchTracer } from "langwatch";
@@ -76,8 +76,16 @@ import {
 } from "../../services/ingest-key-provenance.rules";
 import type { TraceRequestCollectionResult } from "../../services/trace-ingestion.service";
 
-const traceRequestType = (root as any).opentelemetry.proto.collector.trace.v1
-  .ExportTraceServiceRequest;
+/**
+ * The generated protobuf message this receiver decodes into.
+ *
+ * Read through `@langwatch/otlp`'s resolved root rather than by importing the
+ * generated CommonJS module a second time: under Node's own ESM loader the
+ * namespace carries no named exports, so the direct import is `undefined` and
+ * this line is a module-load crash for every process that reaches it.
+ */
+const traceRequestType =
+  otlpProtobufRoot.opentelemetry.proto.collector.trace.v1.ExportTraceServiceRequest;
 
 const loggerTraces = createLogger("langwatch:otel:v1:traces");
 const loggerLogs = createLogger("langwatch:otel:v1:logs");
