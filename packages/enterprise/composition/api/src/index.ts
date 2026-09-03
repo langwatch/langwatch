@@ -91,6 +91,28 @@ export class EnterpriseApiComposition {
  * only enterprise thing an api-role application is allowed to see.
  */
 export { createScimTokensRestApp, ScimApp } from "@langwatch/enterprise-scim-server";
+/**
+ * The SCIM 2.0 provisioning family, the Auth0 intake beside it, and the two
+ * pieces an API-role process composes the directory-sync service from.
+ *
+ * Here for the same reason the token family above is: the fifteen protocol
+ * routes are Enterprise behaviour an api-role application mounts, and the only
+ * Enterprise module it may name is this one. `PostgresScimAdapter` is the
+ * feature's own composition seam — one build, one service — and
+ * `ScimSyncLifecycle` is the directory-sync history that service states its
+ * facts through, which the process supplies over identity's guards and ledger.
+ */
+export {
+  createScimProtocolRestApp,
+  createScimWebhookRestApp,
+  PostgresScimAdapter,
+  ScimSyncLifecycle,
+  ScimSyncLifecyclePort,
+  type PostgresScimAdapterOptions,
+  type ScimSyncLifecycleDeps,
+  type ScimWebhookRestPorts,
+} from "@langwatch/enterprise-scim-server";
+export type { ScimService } from "@langwatch/enterprise-scim-contract";
 export { eventMatches } from "@langwatch/enterprise-webhook-contract";
 export {
   createWebhookRestApp,

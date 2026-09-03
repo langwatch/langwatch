@@ -23,6 +23,12 @@
  *   - the CREDENTIAL, through the process's one
  *     {@link ApiHandlerManagedCredentials}, so the OTLP door and the framework
  *     chain cannot decide differently about the same caller.
+ *   - the TRACKED-EVENT SPAN BUILDER, over the same dedup claim and the same
+ *     command sender. A customer's feedback event is stored as one synthetic
+ *     span whose id is a digest of `${trace_id}:${eventId}`, and the worker
+ *     mints the identical span when an SDK reports the same feedback on a
+ *     live span — so the two collapse onto one row only while both claim it
+ *     against this keyspace.
  *
  * ## What is named as absent
  *
@@ -52,15 +58,14 @@ import {
 import type { EventSourcing } from "@langwatch/eventing";
 import { createLogger, type Logger } from "@langwatch/observability";
 import type { RedisConnection } from "@langwatch/redis-client";
-import {
-  DEFAULT_PII_REDACTION_LEVEL,
-  type RecordSpanCommandData,
-} from "@langwatch/trace-contract";
+import { DEFAULT_PII_REDACTION_LEVEL, type RecordSpanCommandData } from "@langwatch/trace-contract";
 import {
   createTraceProcessingProducerPipeline,
   TraceIngestionService,
   TraceIngressCommandPort,
+  TraceSpanCollectionService,
   TraceSpanDedupPort,
+  TrackedEventSpanService,
   type CollectorCredential,
   type CollectorCredentialPort,
   type CollectorSpanIngestPort,
@@ -120,13 +125,15 @@ export type ApiTraceIngestOptions = Readonly<{
 }>;
 
 /**
- * Both ingest doors' ports, composed over ONE ingestion service.
+ * Every ingest door's ports, composed over ONE dedup gate and ONE command
+ * sender.
  *
- * The OTLP receiver and the SDK collector are two wires into one path: the
- * same `trace_processing` producer registration, the same Redis dedup claim,
- * the same coding-agent span filter. One composition rather than two, because
- * a second `TraceIngestionService` would be a second dedup gate — and a span
- * exported to one door and retried against the other would be recorded twice.
+ * The OTLP receiver, the SDK collector and the tracked-event intake are three
+ * wires into one path: the same `trace_processing` producer registration, the
+ * same Redis dedup claim, the same coding-agent span filter. One composition
+ * rather than three, because a second `TraceIngestionService` would be a
+ * second dedup gate — and a span exported to one door and retried against
+ * another would be recorded twice.
  */
 export type ApiTraceIngestComposition = Readonly<{
   /** `POST /api/otel/v1/*` and its path aliases. */
@@ -140,6 +147,17 @@ export type ApiTraceIngestComposition = Readonly<{
    * family publishes its own unauthenticated sentence.
    */
   collectorCredential: CollectorCredentialPort;
+  /**
+   * The builder `POST /api/events/track` and `POST /api/track_event` record
+   * through: one customer feedback event as the one synthetic span that
+   * carries it.
+   *
+   * On the SAME dedup and command ports as the two doors above, which is what
+   * makes a REST rating and an SDK's `langwatch.event` collapse onto one row —
+   * the span id is a digest of `${trace_id}:${eventId}`, so it only dedups if
+   * both paths claim it against the same keyspace.
+   */
+  trackedEventSpans: TrackedEventSpanService;
 }>;
 
 /**
@@ -186,8 +204,17 @@ export function composeApiTraceIngest(
         ingestion.handleOtlpTraceRequest(tenantId, traceRequest, DEFAULT_PII_REDACTION_LEVEL),
     },
     ingestSpan: (input) => ingestion.ingestNormalizedSpan(input as never),
-    collectorCredential: async ({ request }) =>
-      toCollectorCredential(await authenticate(request)),
+    collectorCredential: async ({ request }) => toCollectorCredential(await authenticate(request)),
+    // A SECOND `TraceSpanCollectionService` over the SAME `dedup` and
+    // `commands` objects, not a second gate: the class holds no state of its
+    // own beyond those two references, so both instances claim the same Redis
+    // keys and send on the same registration. It is built here rather than
+    // reached for through `TraceIngestionService` because that class composes
+    // its collection privately and exposes only `ingestNormalizedSpan`, and
+    // the tracked-event builder needs the collaborator itself.
+    trackedEventSpans: TrackedEventSpanService.create({
+      collection: TraceSpanCollectionService.create({ dedup, commands }),
+    }),
   };
 }
 
@@ -281,7 +308,8 @@ function resolveRecordSpan(input: {
   eventing: EventSourcing;
   processName: string;
 }): (data: RecordSpanCommandData) => Promise<unknown> {
-  const registered = tryGetPipeline(input.eventing) ??
+  const registered =
+    tryGetPipeline(input.eventing) ??
     input.eventing.register(
       createTraceProcessingProducerPipeline({ processName: input.processName }),
     );
@@ -294,9 +322,7 @@ function resolveRecordSpan(input: {
   return (data) => recordSpan.send(data);
 }
 
-function tryGetPipeline(
-  eventing: EventSourcing,
-): { commands: unknown } | undefined {
+function tryGetPipeline(eventing: EventSourcing): { commands: unknown } | undefined {
   try {
     return eventing.getPipeline(TRACE_PROCESSING_PIPELINE) as unknown as {
       commands: unknown;

@@ -268,6 +268,31 @@ export const apiConfigDefinition = RuntimeConfig.define({
     env: "LANGY_INTERNAL_SECRET",
   }),
   /**
+   * The two directory-sync switches this deployment set.
+   *
+   * `auth0WebhookSecret` is the shared secret Auth0 presents on its SCIM log
+   * stream. An unvalidated optional string for the reason every credential
+   * above is, and what blank means is the intake's own rule: it answers 404
+   * rather than 401, so an install that never configured directory sync looks
+   * like one that never served the path.
+   *
+   * `provenOffboarding` is D08's `SCIM_V2_GRANTS`, off by default. On, a
+   * directory deactivation revokes the member's grants through the AuthZ
+   * ledger and states the removal on the connection's sync history; off, the
+   * previous direct offboarding write runs unchanged. Read here rather than
+   * from the flag registry because it is a CONSTRUCTION input to the SCIM
+   * service — one answer for the process, not one per organization — and a
+   * per-tenant flag would mean two offboarding paths inside one push.
+   */
+  scim: {
+    auth0WebhookSecret: Config.value(optionalEnvironmentString, {
+      env: "AUTH0_SCIM_WEBHOOK_SECRET",
+    }),
+    provenOffboarding: Config.value(environmentBooleanSchema.default(false), {
+      env: "SCIM_V2_GRANTS",
+    }),
+  },
+  /**
    * The operator secret the ClickHouse EXPLAIN endpoint is presented with.
    *
    * An unvalidated optional string for the reason every credential above is,

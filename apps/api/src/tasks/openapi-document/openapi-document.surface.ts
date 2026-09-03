@@ -167,6 +167,16 @@ function packagedCollaborators(): ApiPackagedRestCollaborators {
       simulations: refuse("Simulations"),
       storedObjects: refuse("Stored objects"),
       suites: refuse("Suites"),
+      // A bag whose members refuse rather than a provider that does: the mount
+      // reads the bag to build the family, and only a REQUEST would reach one
+      // of the five ports inside it.
+      trackedEvents: () => ({
+        assertPredefinedEventPayload: refuse<void>("Tracked-event validation"),
+        generateEventId: refuse<string>("Tracked-event id generation"),
+        recordTrackedEvent: refuse<Promise<void>>("Tracked-event recording"),
+        reportError: refuse<void>("The tracked-event error sink"),
+        describeValidationError: refuse<string>("Tracked-event validation prose"),
+      }),
       webhooks: refuse("Webhooks"),
       workflows: refuse("Workflows"),
     },
@@ -287,6 +297,14 @@ function processPorts(): ApiProcessRestPorts {
     github: opaque(),
     authCliDeviceFlow: opaque(),
     governanceCli: opaque(),
+    // The SCIM 2.0 provisioning surface. Both families are described: the
+    // fifteen protocol operations are the frozen document's largest single
+    // block, and the Auth0 intake carries no `describeRoute`, so mounting it
+    // here adds a served route and no operation.
+    scim: {
+      scim: refuse("The SCIM directory-sync service"),
+      webhookSecret: () => undefined,
+    },
     governanceIngest: {
       governance: refuse("Governance"),
       projects: refuse("The internal project directory"),
@@ -378,23 +396,6 @@ function mountProcessTailFamilies(options: {
 }
 
 /**
- * The SCIM 2.0 provisioning family, and why it is not here.
- *
- * NOT because the routes are gone: `@langwatch/enterprise-scim-server` still
- * exports `createScimProtocolRestApp`. The API process mounts no SCIM
- * application at all — neither `createApiProcessRestFeatures` nor the packaged
- * enumeration names one — so describing the family here would publish fifteen
- * operations this process answers 404 to. The frozen document already lists
- * them, and surfacing that is the point of the checker, so it is recorded as
- * an absence rather than papered over.
- */
-const SCIM_ABSENCE: OpenApiSurfaceAbsence = {
-  family: "scim",
-  because:
-    "`createScimProtocolRestApp` exists in @langwatch/enterprise-scim-server and this process mounts no SCIM application, so all fifteen `/api/scim/v2/**` operations are documented and unserved",
-};
-
-/**
  * Every family the process mounts, in one app, described and never served.
  */
 export function composeOpenApiDocumentSurface(): OpenApiDocumentSurface {
@@ -420,7 +421,6 @@ export function composeOpenApiDocumentSurface(): OpenApiDocumentSurface {
   }
 
   mountProcessTailFamilies({ app, security, absences });
-  absences.push(SCIM_ABSENCE);
 
   return { app, absences };
 }

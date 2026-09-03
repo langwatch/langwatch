@@ -2661,7 +2661,7 @@ neither has a caller in this repository.
 | POST | `/api/experiment/init` | hma(experiments:manage, apiKey) | 200 `{path, slug}`; 400; 401; 403 `{error, limitType, current, max}` | — | yes — "Create an experiment" | **moved** → `@langwatch/experiment-server` `experiment-init.api.ts`; the 403 limit branch is transcribed on the CODE but unreachable — no licence enforcement is composed here |
 | POST | `/api/mcp/authorize` | hma([], session) | 200 `{redirect}`; 400 ×3; 401; 403; 500 | **demo-project check before the RoleBinding probe** — a demo project grants global `project:view` and must never reach it | no | **moved** → `@langwatch/hosted-mcp-server` `mcp-authorize.api.ts`; mounted. The demo-project refusal is its own port and still runs BEFORE the permission probe, which would pass for the demo project |
 | POST | `/api/optimization/:workflowId/:versionId` | hma(workflows:manage, apiKey) | shared with the workflow run below | delegates to the same handler so the two cannot drift | yes — "Run a workflow version (legacy path)" | **moved** → `@langwatch/workflow-server` `workflow-run.api.ts` |
-| POST | `/api/track_event` | hma(traces:create, apiKey) | 200 `{message:"Event tracked"}`; 400 ×2; 401; 403 | shares `track-event.service` with `/api/events/track` | yes — "Track an event (legacy path)" | **named absence** (`tracked-events`), logged at boot with both URLs. `@langwatch/trace-server` owns `tracked-event.api.ts`, but the span builder it records through was the retired application's and no package owns it; mounting would accept a customer's feedback event and record nothing |
+| POST | `/api/track_event` | hma(traces:create, apiKey) | 200 `{message:"Event tracked"}`; 400 ×2; 401; 403 | shares its recorder with `/api/events/track` | yes — "Track an event (legacy path)" | **moved** → `@langwatch/trace-server` `tracked-event.api.ts`; **mounted**. Not a second handler: `mountTrackedEventLegacyPathRest` replays the request against the canonical `/api/events/track` route, so both URLs authenticate, validate and record through one chain |
 | POST | `/api/track_usage` | pub | 200 `{message}`; 400; 429 + `Retry-After` | global → per-IP before the body parse, per-instance after | no | **deleted**. An unauthenticated PostHog relay for the marketing site, excluded from the document and with no caller in the repository; the rate limiting (#6071) existed only because it was open. A product-usage signal belongs on the telemetry path, not on a public REST door |
 | POST | `/api/trigger/slack` | hma(triggers:manage, apiKey) | 200 `{message}`; 400 `{message, errors?}`; 401; 403; 500 | superseded by `/api/triggers` | yes — "Create a Slack alert trigger" | **moved** → `@langwatch/automation-server` `slack-trigger.api.ts`; mounted alongside `createTriggerRestApp`, which is why the `triggers` family builds two apps |
 | POST | `/api/workflows/:workflowId/run` | hma(workflows:manage, apiKey) | 200 run result; 400/401/403/404 | — | yes — "Run a workflow" | **moved**; three URLs, one handler |
@@ -2720,7 +2720,7 @@ neither has a caller in this repository.
 | GET | `/api/github-langy/setup` | pub | alias of `/api/github/setup` | kept until a deprecation path exists | no | **moved**, same family |
 | POST | `/api/github-langy/webhook` | pub | alias of `/api/github/webhook` | same | no | **moved**, same family |
 | POST | `/api/elevenlabs/webhook/:modelProviderId` | pub (`ElevenLabs-Signature` HMAC, per-tenant secret) | 200 `{received}`; 400/401/404 | 404 for an unknown provider id doubles as anti-enumeration | no | **moved and now MOUNTED** — `composeApiGatewayRealtimeSessions` publishes the `GatewayRealtimeSessionCollaborators` bag the booking uses, so the settlement prices through the same adapter class; absent without the cipher or the spend confirmation |
-| POST | `/api/webhooks/auth0-scim` | int | 200 `{received}`; 400/401/404 | — | no | moved → `@langwatch/enterprise-scim-server`; not mounted, same reason |
+| POST | `/api/webhooks/auth0-scim` | int | 200 `{received}`; 400/401/404 | — | no | **moved and serving** — same composition as the protocol family; `AUTH0_SCIM_WEBHOOK_SECRET` unset keeps the 404 |
 
 ###### Transports and the packaged families still mounted from platform
 
@@ -2728,13 +2728,13 @@ neither has a caller in this repository.
 | --- | --- | --- | --- | --- | --- | --- |
 | GET,POST | `/api/trpc/*` | hma([], both) | tRPC fetch-adapter response; escaped throws become a tRPC-shaped 500 envelope | GET before POST | no | superseded — `apps/api` serves its own `/api/trpc`; `routes/trpc.ts` **deleted** |
 | GET | `/api/sse/*` | hma([], session) | `text/event-stream`; 400/404 `{message}` | — | no | superseded — `createSseSubscriptionApp` serves the same wire; `routes/sse.ts` **deleted** |
-| — | `/api/scim/v2/*` (15 routes) | 3× pub discovery, 12× int | SCIM protocol errors as `application/scim+json` | — | yes | moved → `@langwatch/enterprise-scim-server`; **not mounted** — this process refuses the Enterprise SCIM application by name |
+| — | `/api/scim/v2/*` (15 routes) | 3× pub discovery, 12× int | SCIM protocol errors as `application/scim+json` | — | yes | **moved and serving** — `api-scim.composition.ts` builds the directory-sync service from this process's Prisma, user directory, grant ledger and plan provider; absent (404, not 500) where no Enterprise governance application was composed |
 | POST | `/api/analytics/timeseries` | req(analytics:view) | 200 `{currentPeriod, previousPeriod}` | — | yes | **moved** — over the analytics half's own `AnalyticsApp`; the body is the package's `timeseriesInputSchema` (metric/group-by no longer enum-narrowed at the wire) |
 | — | `/api/v1/projects/:projectId/analytics/*` (9 routes) | req(analytics:view/create/update/delete) | canonical envelope | LangWatchQL routes then saved-chart routes | yes | **moved** — the whole family into `@langwatch/analytics-server`; the saved-chart half arrives through a port over `DashboardApp` |
 | — | `/api/organization/*` (10 routes) | org policy + Enterprise gate on every route | versioned management envelope | plan gate after RBAC | yes | **moved** — 7 of 10 answer; the 3 invitation routes refuse `service_unavailable` (no `InviteService`) |
 | — | `/api/prompts/*` (13 routes) | req(prompts:view/create/update/manage) | — | `:id{.+?}` sub-resources before the bare `:id{.+}` | yes | **moved** — over the product-group half's `PromptApp`; the nurturing trail logs instead of firing |
 | — | `/api/v1/secret`, `/api/v1/secrets`, `/api/secret` (5 ops × 3 bases) | per-op RBAC | — | — | yes | **already served by `apps/api`** (`ApiSecretRestFeature`, plus `/api/secrets`) |
-| — | the 30 families of the packaged enumeration | mixed | — | mounted per family, conditionally | mixed | **moved** → `apps/api/src/app-rest/app-rest.packaged-families.ts`, bound by `composeApiPackagedRest`. `createAppRestFeatures` is **deleted**: 27 families mount from services this process already composes, and 3 (`user-avatar`, `tracked-events`, `copilotkit`) are named absences logged at boot |
+| — | the 30 families of the packaged enumeration | mixed | — | mounted per family, conditionally | mixed | **moved** → `apps/api/src/app-rest/app-rest.packaged-families.ts`, bound by `composeApiPackagedRest`. `createAppRestFeatures` is **deleted**: 27 families mount from services this process already composes, and 2 (`user-avatar`, `copilotkit`) are named absences logged at boot |
 
 ##### What moved, and the shape the rest follows
 
@@ -8100,7 +8100,7 @@ package may import the other; the composition holds both.
 | `POST /api/trigger/slack` | `@langwatch/automation-server` `slack-trigger.api.ts` | mounted as the `triggers` family's second app |
 | `GET /api/image-proxy` | `apps/api/src/features/image-proxy/` | mounted over `@langwatch/egress` |
 | `POST /api/webhooks/stripe` | `@langwatch/enterprise-billing-server` `stripe-webhook.api.ts` | moved, **not mounted** — no Stripe client here |
-| `POST /api/track_event` | `@langwatch/trace-server` `tracked-event.api.ts` | **named absence** — no span builder |
+| `POST /api/track_event` | `@langwatch/trace-server` `tracked-event.api.ts` | mounted; the legacy URL replays into the canonical `/api/events/track` route rather than handling it |
 | `POST /api/track_usage` | — | **deleted** |
 | `POST /api/demo/hotel_bot` | — | **deleted** |
 
@@ -8121,10 +8121,14 @@ that depends on it, to satisfy one operator door.
   object whose owner kind is not the avatar one, and this process's file read
   answers a row that does not carry the owner kind. Mounting it would let one
   authenticated caller pull another tenant's trace media.
-- **`tracked-events`** (`/api/events/track`, `/api/track_event`). The span
-  builder both URLs record through was the retired application's and no package
-  owns it. A door mounted here would accept a customer's feedback event and
-  record nothing, which is worse than 404.
+- ~~**`tracked-events`** (`/api/events/track`, `/api/track_event`).~~ **CLOSED,
+  2026-09-03.** The claim was that no package owned the span builder; it does —
+  `TrackedEventSpanService` moved with the worker conversion. Both URLs are
+  mounted over the ingest composition's own span collection. See "Both
+  tracked-event doors answer". The family is still conditional, on the trace
+  COMMAND QUEUE rather than on a missing builder: with nowhere to send the span
+  it stays off, because a door that answers 200 to a rating it drops is worse
+  than a 404.
 - **`copilotkit`.** The prompt-studio adapter it dispatches through reaches the
   retired studio post-event module, the platform Lambda runtime and a browser
   package. `apps/api/src/features/copilotkit/` is deleted rather than kept as a
@@ -8136,8 +8140,8 @@ that depends on it, to satisfy one operator door.
   `ApiRestCapabilityUnavailableError("workflow evaluation runner")` rather than
   silently succeeding.
 
-All five are logged at boot by `LoggedApiPackagedRestAbsence`, each with the
-consequence rather than the missing symbol.
+All of these are logged at boot by `LoggedApiPackagedRestAbsence`, each with
+the consequence rather than the missing symbol.
 
 ### Judgment calls
 
@@ -10279,7 +10283,7 @@ faithful to the forty-eight-pass one it replaces rather than merely plausible.
 | What | Ops | Why it does not answer |
 | --- | ---: | --- |
 | `/api/scim/v2/**` | 15 | **The API process mounts no SCIM application.** Not because the routes are gone: `createScimProtocolRestApp` is still exported by `@langwatch/enterprise-scim-server`. Neither `createApiProcessRestFeatures` nor the packaged enumeration names it, so an identity provider following the published document reaches nothing. This is the largest live gap between what we publish and what answers, and it is one composition away from closing. |
-| `POST /api/track_event`, `POST /api/events/track` | 2 | `mountApiPackagedRestFamilies` names `tracked-events` absent at boot: no package owns the tracked-event span builder. |
+| `POST /api/track_event`, `POST /api/events/track` | 2 | ~~`mountApiPackagedRestFamilies` names `tracked-events` absent at boot.~~ **Closed** — the family is mounted; see "Both tracked-event doors answer". |
 | `GET /api/traces/{traceId}/transcript` | 1 | `mountTracesRest` leaves the route unregistered on purpose — this process composes neither the coding-agent session store nor the log canonicaliser, and an empty transcript reads as "the agent did nothing". |
 | `GET /`, `POST /` | 2 | **Residue, not routes.** The retired generator described each family from a standalone app and merged the results, so a family generated before its base path was applied contributed its operations at the document ROOT. These two carry the prompt library's list and create bodies. No process ever served them. |
 
@@ -10405,9 +10409,9 @@ typecheck clean.
 
 ### What this lane leaves for others
 
-1. **Mount the SCIM 2.0 family.** Fifteen published operations answer nothing,
-   and the mountable app already exists. That is the single biggest entry in
-   the baseline.
+1. ~~**Mount the SCIM 2.0 family.**~~ **Closed** — see "The SCIM 2.0
+   provisioning surface answers" below. The fifteen operations left
+   `UNSERVED_AT_BASELINE`, which is twenty entries down to five.
 2. **Decide what the two session-only documented routes should be.**
    `POST /api/export/scenario-runs/download` and `POST /api/workflows/post_event`
    are advertised to integrators who cannot call them.
@@ -10687,3 +10691,365 @@ workflow's `mounted.failed(` to anything else fails it naming
   warnings across the touched set, all pre-existing.
 - `git diff --numstat -- platform/app`: this lane touched nothing under
   `platform/app`.
+
+## The SCIM 2.0 provisioning surface answers, 2026-09-03
+
+The OpenAPI producer's ledger closed with one sentence about the largest live
+gap in the whole extraction: *"Fifteen published operations answer nothing, and
+the mountable app already exists."* An identity provider following the frozen
+document — the document both SDKs generate clients from — reached a 404 on
+every one of `/api/scim/v2/**`, and `POST /api/webhooks/auth0-scim` beside
+them. Both are served now, and nothing new was written to serve them: the
+service is composed out of collaborators this process already held.
+
+```
+  BEFORE                                  AFTER
+
+  createScimProtocolRestApp               ports.scim
+    exported, named by nobody                   │
+                                                ▼
+  orgGroup: "Enterprise SCIM              composeApiScimRest(...)
+   application, so it can neither          prisma ─┐
+   list nor mint a token"                  grants ─┤
+                                           users  ─┼─► PostgresScimAdapter
+  15 documented operations                 auth   ─┤      .build()
+  ->  404                                  plans  ─┤        │
+                                           gov.   ─┘        ▼
+                                           (Enterprise)  ScimService
+                                                            │
+                                            ┌───────────────┴──────────┐
+                                            ▼                          ▼
+                                   /api/scim/v2/** (15)   /api/webhooks/auth0-scim
+```
+
+### What is composed, and from where
+
+Every collaborator is TAKEN from a half this process already composed. That is
+the whole reason the family could be mounted at all, and it is also the
+correctness argument: a directory's push has to reach the same membership write
+a person's own invitation acceptance does.
+
+| Collaborator | Taken from | What it decides |
+| --- | --- | --- |
+| `prisma` | `composedDatabase.connection.client` | the tokens, memberships, groups and the directory's external ids |
+| `grants` | `composedAuthz.grants` | where a push's membership consequence is actually written |
+| `users` | `composedAuth.compose().users` | the SAME directory the members screen and the invitation write through |
+| `auth` | `composedAuth.compose().auth` | the session severance a SCIM-managed email change forces |
+| `governance` | `options.enterprise.governance.governance` | the department a cost-centre attribute maps to — **and the gate** |
+| `plans` | `composedPlanProvider` | the Enterprise entitlement `verifyToken` turns into a 403 |
+| `lifecycle` | identity's `ScimSyncGuards` + `ScimSyncLedgerWriter` over `composedIdentityEventing` | the connection's directory-sync history (D08) |
+| `provenOffboarding` | `api.config.ts` → `SCIM_V2_GRANTS` | whether a deactivation revokes grants before it deactivates |
+| `auth0WebhookSecret` | `api.config.ts` → `AUTH0_SCIM_WEBHOOK_SECRET` | whether the intake exists at all (404 when blank) |
+
+**The Enterprise gate is `governance`, not a boolean.** SCIM is an Enterprise
+capability and the department owner is the one collaborator above a core
+deployment cannot hold, so requiring it IS the gate: a deployment that composed
+the Enterprise application serves both families, and OSS mounts neither and is
+told at boot which collaborator decided it (`LoggedApiScimAbsence`). A boolean
+could be true while the graph under it was half-built; this cannot.
+
+**`ApiEventingIdentityAdapter` is now held on the composition** rather than
+built and handed straight down. The directory-sync history appends through the
+same runtime and the same producer registrations the identity ledgers use, and
+a second adapter would resolve command senders out of a second registry — which
+answers `null` for every command the first one holds.
+
+### Absences closed
+
+- **`/api/scim/v2/*` (15 routes)** — moved in wave 3a, mounted here. The three
+  discovery routes answer anonymously (an identity provider negotiates
+  capabilities before a token exists); the twelve behind the bearer answer
+  `application/scim+json` on every refusal, which is what Okta and Entra parse.
+- **`POST /api/webhooks/auth0-scim`** — same composition, same service. Blank
+  secret is a 404 rather than a 401, so an install that never enabled directory
+  sync looks like one that never served the path.
+- **`UNSERVED_AT_BASELINE`: 20 → 5.** The fifteen SCIM entries are deleted
+  rather than left behind, which the unit test requires — it asserts every
+  remaining entry is still a real removal. `task:openapi-check` reports
+  `served: 302, removed: 5, added: 0, changed: 0`. (A sibling lane's
+  tracked-events mount took it to 3 while this one ran; the docblock's count
+  names both.)
+
+### Absences remaining
+
+- **The directory-sync history is written and dropped.** `ScimSyncLifecycle`'s
+  guards are real — they read the Postgres `ScimSyncState` head over this
+  process's own connection — and so is `ScimSyncLedgerWriter`. What this
+  process does not hold is a DURABLE APPEND: its event store is
+  `EventStoreProducerOnly`, so `storeEvents` refuses, the writer logs the miss
+  and returns, and the push is unaffected. That degradation is the package's
+  own and is written down in its docblock; the alternative was a hand-written
+  no-op that would start lying the day this process gains an event log.
+- **`scim-sync` stays unregistered on this process's eventing**, and now for a
+  sharper reason than `api-identity-pipelines.composition.ts` gave: the ledger
+  writer stages a command only AFTER the append it never reaches, so a
+  registration would publish five senders nothing here can call.
+- **`enterprise.application.scimApp` is still the host's.** The `scimToken.*`
+  tRPC namespace and the `/api/scim-tokens` REST family read the `ScimApp` the
+  Enterprise port supplies; this composition builds only the `ScimService` the
+  protocol family and the intake need. Both are pure readers of the same rows
+  through the same class — no cache, no state — so they cannot answer
+  differently, but they are two constructions and collapsing them means putting
+  the service on the port. That is a change to the Enterprise seam, and it is
+  the seam's lane rather than this one's.
+
+### Findings surfaced by the mount, not caused by it
+
+1. **The protocol family never passes `connectionId`.** `scimAuth` verifies the
+   bearer, `verifyToken` returns `{organizationId, connectionId}`, and the
+   middleware sets only `scimOrganizationId` — so every route calls
+   `createUser`/`replaceUser`/`updateUser` without the connection. D08's
+   per-connection identity mapping (`ScimExternalId`) and every
+   `lifecycle.userPushed` fact are therefore unreachable from the fifteen
+   routes; only the token surface reaches the lifecycle. **This is faithful to
+   the platform route it replaced** — checked against
+   `platform/app/src/server/enterprise/scim/routes.ts` at `4faa77c658`, which
+   also carried `scimOrganizationId` alone — so it is a gap in the moved
+   transport and not a regression from mounting it. Fixing it would turn on
+   D08's per-connection writes as a side effect of a mounting lane, which is
+   why it is recorded here rather than done here.
+2. **`PostgresScimAdapter` still takes `database: object`** and casts at the
+   repository (`PrismaScimRepository.create` re-checks the models by key at
+   runtime). The composition hands it the process's typed `PrismaClient`, so
+   nothing above the adapter throws the type away; the seam inside the package
+   is on `typed-prisma-seam`'s baseline and belongs to the SCIM package's own
+   cleanup.
+
+### Judgment calls, recorded
+
+1. **Composed in `apps/api`, reached through `@langwatch/enterprise-api`.** An
+   api-role application may name exactly one Enterprise module, so the
+   composition package re-exports `createScimProtocolRestApp`,
+   `createScimWebhookRestApp`, `PostgresScimAdapter` and `ScimSyncLifecycle`
+   beside the `createScimTokensRestApp` it already re-exported. `apps/api`
+   gains no dependency on `@langwatch/enterprise-scim-server`, which is what
+   `enterprise-direction` requires.
+2. **One port entry for two families.** `ApiScimRestPorts` is
+   `{ scim, webhookSecret }` and both families take it, because they provision
+   through one service: a process holding one and not the other would let a
+   directory create a member on a door the other cannot see.
+3. **`SCIM_V2_GRANTS` is read in `api.config.ts`, not from the flag registry.**
+   `provenOffboarding` is a CONSTRUCTION input to the service — one answer for
+   the process, not one per organization — and a per-tenant flag would mean two
+   offboarding paths inside a single push. It defaults off, which is D08's own
+   default, so a deploy changes nothing on its own.
+4. **The integration suite drives the REAL `ScimService`.** Doubles sit at the
+   Prisma models and at the process's own services, never at the thing under
+   test. Fifteen operations were published and unanswered for the whole
+   extraction, so what has to be pinned is not that a route exists but that a
+   push reaches the account create, the `OrganizationUser` row and the AuthZ
+   organization binding — a fake service would have proved the mount and none
+   of that.
+5. **The absence report names the FIRST missing collaborator, not all six.** A
+   deployment without the Enterprise application is missing exactly one thing,
+   and six lines for one cause reads as six problems.
+
+### File → change
+
+| File | Change |
+| --- | --- |
+| `apps/api/src/app/api-scim.composition.ts` | NEW. `composeApiScimRest`, `ApiScimRestPorts`, `ApiScimAbsenceReport` / `LoggedApiScimAbsence`. Builds the service through `PostgresScimAdapter` and the D08 lifecycle over identity's guards and ledger writer. |
+| `apps/api/src/app-rest/app-rest.process-features.ts` | `scim?: ApiScimRestPorts` on `ApiProcessRestPorts`; both families mounted, with the namespace-ordering note. |
+| `apps/api/src/app/api-production.composition.ts` | `composeScimRest`, the `composedScimEnvironment` config pair, and `composedIdentityEventing` held so one adapter serves both ledgers. |
+| `apps/api/src/platform/config/api.config.ts` | `scim: { auth0WebhookSecret, provenOffboarding }` — `AUTH0_SCIM_WEBHOOK_SECRET` and `SCIM_V2_GRANTS`. |
+| `apps/api/src/features/enterprise/__tests__/scim-rest.integration.test.ts` | NEW. 11 tests through the real Hono app over the real service: list, provision, conflict, the 401-before-plan order, the 403 for an unentitled plan, anonymous discovery, the intake's three answers, and the OSS refusal by name. |
+| `apps/api/src/tasks/openapi-document/openapi-document.surface.ts` | The SCIM ports supplied; `SCIM_ABSENCE` deleted. |
+| `apps/api/src/tasks/openapi-document/openapi-document.checker.ts` | The fifteen `/api/scim/v2/**` entries deleted from `UNSERVED_AT_BASELINE`. |
+| `apps/api/src/tasks/openapi-document/__tests__/openapi-document.unit.test.ts` | `/api/scim/v2/Users` added to the route-per-family list. |
+| `apps/api/src/platform/config/__tests__/api.config.unit.test.ts` | The new block in the whole-shape assertion, plus its two cases. |
+| `packages/enterprise/composition/api/src/index.ts` | Re-exports the two REST factories, the Postgres adapter, the sync lifecycle and the `ScimService` type. |
+
+### Gates
+
+- `apps/api`: `tsc --noEmit` **0 errors**; `tsc --noEmit -p tsconfig.test.json`
+  **3 errors, 0 in this lane's files** (all three in another lane's
+  `src/app-trpc/__tests__/app-trpc.features.unit.test.ts`, where a test root's
+  context no longer satisfies the record's `github` slice).
+- `apps/api`: `vitest run` — **1039 passed**, 102 files, no failures.
+- `packages/enterprise/features/scim/server`: **80 passed**, 9 files — the
+  recorded baseline, unchanged.
+- `task:openapi-check`: `removed` **20 → 5** for this lane alone, measured
+  before a sibling's tracked-events mount landed; **3** on the tree as it
+  stands, with `regressions: 0`, `added: 0`, `changed: 0` throughout.
+  `served` went 287 → 302 on this lane's fifteen, and reads 303 now.
+- `oxlint`: clean over every file this lane touched. `oxfmt`: every line this
+  lane wrote is formatted, checked by running the formatter on a copy and
+  diffing — `app-rest.process-features.ts` and `api-production.composition.ts`
+  each carry pre-existing drift on lines this lane did not write (3 hunks and
+  164 lines respectively), and it is left where it was rather than swept in.
+- `git diff --numstat -- platform/app`: this lane touched nothing under
+  `platform/app`.
+
+## Both tracked-event doors answer, 2026-09-03
+
+The `tracked-events` absence was recorded three times — in the packaged mount,
+in the boot log's `CONSEQUENCE` map, and twice in this plan — and every one of
+them said the same thing: *"the tracked-event span builder was the retired
+application's and no package owns it."* That stopped being true at the worker
+conversion. `TrackedEventSpanService` is in `@langwatch/trace-server`, the
+worker already composes it, and `createEventsRestApp` has been exported with
+its five ports documented the whole time. What was missing was not a builder;
+it was a span collection to hand it.
+
+```
+  BEFORE                                    AFTER
+
+  createEventsRestApp                       services.trackedEvents
+    exported, named by nobody                       │
+                                                    ▼
+  report.absent("tracked-events")           createApiTrackedEventPorts
+    "no package owns the builder"             │ assertPredefinedEventPayload
+                                              │ generateEventId
+  POST /api/events/track  -> 404              │ recordTrackedEvent ─┐
+  POST /api/track_event   -> 404              │ reportError          │
+                                              │ describeValidation   │
+  composeApiTraceIngest                                              ▼
+    otlp ──────┐                              TrackedEventSpanService
+    ingestSpan ┼─► TraceIngestionService           │
+    collector  ┘     └─ TraceSpanCollection        ▼
+                        ├─ dedup  (Redis)   TraceSpanCollectionService
+                        └─ commands                ├─ dedup    ── the SAME
+                                                   └─ commands ── objects
+                                                          │
+                                    ┌─────────────────────┴────────┐
+                                    ▼                              ▼
+                          POST /api/events/track  ◄──replay── POST /api/track_event
+                          (secured, describeRoute)          (raw Hono, no policy,
+                                                             terminates nothing)
+```
+
+### The two URLs are one endpoint
+
+`POST /api/track_event` predates `POST /api/events/track`, and every pre-rename
+SDK release still posts to it. The retired application served them as two
+handlers over one `track-event.service`; this mounts ONE and replays the other
+into it. `mountTrackedEventLegacyPathRest` is raw Hono with no access policy
+because it terminates nothing — it rewrites the path and hands the request to
+the canonical route, which authenticates it exactly as it would a direct call.
+So the legacy URL answers the same 200, 400, 401 and 403 from the same chain,
+and the pair cannot drift the first time one of them gains a check.
+
+Not a redirect, for the reason `createOtlpPathAliasRestApp` is not one: the
+callers are SDKs and server-side scripts, and a 307 that some HTTP clients
+replay and others drop would repair part of the fleet and silently lose the
+rest. The body is read into memory rather than streamed through, because a
+`Request` built from another request's stream needs `duplex: "half"` and is
+single-use, and a tracked event is a few hundred bytes.
+
+### The span collection, and why there are two of them
+
+`composeApiTraceIngest` now returns a fourth member, `trackedEventSpans`, built
+over a SECOND `TraceSpanCollectionService` on the SAME `dedup` and `commands`
+objects the OTLP receiver and the SDK collector already use. That is not a
+second dedup gate: the class holds no state beyond those two references, so
+both instances claim the same Redis keys and send on the same registration.
+
+It matters that they do. `TrackedEventSpanService` mints a span whose id is a
+digest of `${trace_id}:${eventId}`, and the worker's `trackedEventSync`
+subscriber mints the identical span when an SDK reports the same feedback on a
+live span. A retried REST call and a redelivered SDK event collapse onto one
+row only while both claim it against one keyspace — a second composition would
+score the same rating twice.
+
+A second instance rather than a reference because `TraceIngestionService.create`
+composes its collection privately and exposes only `ingestNormalizedSpan`; the
+builder needs the collaborator itself. Reaching into the package to expose it
+would have been a redesign of a file this lane is lifting, not shifting.
+
+### Failure paths
+
+| Failure | Answer |
+| --- | --- |
+| Body is not JSON | `400 {error:"Bad request"}` — the family's own, unchanged |
+| Base schema rejects | `400 {error: <zodErrorMessage>}`, naming the field |
+| Predefined type violates its own schema | `ValidationError` (`validation_error`), caught by the route, `400` naming the field |
+| Anything else reaches `describeValidationError` | one customer-safe sentence; the internal message is never rendered |
+| Dispatch to the pipeline throws | logged; the caller still gets `200` — the family's existing behaviour, untouched |
+
+`ValidationError` carries `httpStatus: 422` and that never reaches the caller:
+the route catches the throw and answers `400`, which is what the endpoint has
+always answered a malformed event with and what a deployed client reads.
+
+### Judgment calls, recorded
+
+1. **A SERVICE entry, not a port.** `TrackedEventPorts` is spelled "ports", but
+   `services` is where a family's own condition lives in this file, and the
+   packaged-families test asserts that a process holding no services mounts
+   nothing. A port-decided family would have been the one exception to that
+   invariant and would have broken the assertion for a naming preference.
+2. **`generateEventId` delegates to `TrackedEventSpanService.generateEventId`**
+   rather than calling `generate("trackedevent")` here. The prefix is part of
+   ids already in customers' databases; a second spelling of it puts two shapes
+   of id in one column.
+3. **`describeValidationError` refuses to render an unrecognised error.** The
+   two shapes the route can hand it are a `ZodError` and this lane's
+   `ValidationError`, and both name a field. Anything else gets one fixed
+   sentence: the 400 body is returned before much is known about the caller,
+   and `fromError(someInfraError).message` would put a hostname in it.
+4. **`/api/track_event` publishes no `describeRoute`.** The frozen document
+   describes it by hand — summary, tags, its own request and response
+   schemas — and the generator cannot reproduce that from a path rewrite. It
+   therefore lands in the checker's `undescribed` list (served, hand-described)
+   rather than `removed`, which is exactly what that category exists for. The
+   alternative was transcribing a `describeRoute` onto the alias, which would
+   publish a second description of one operation.
+5. **No `@langwatch/trace-server` file was edited.** The transport, the ports
+   interface and the span service are all as the package shipped them.
+
+### Absence closed
+
+- **`tracked-events`** — the `report.absent("tracked-events")` call and its
+  `CONSEQUENCE` entry are gone. The entry is not deleted from the map: it is
+  rewritten, because the family is still conditional on the trace command
+  queue, and a process without one must still say why the door is missing.
+- **`UNSERVED_AT_BASELINE`: two entries deleted.** `POST /api/events/track`
+  is now served AND described; `POST /api/track_event` is served and
+  hand-described. The remaining absences (`user-avatar`, `copilotkit`) are
+  unchanged.
+
+### File → change
+
+| File | Change |
+| --- | --- |
+| `apps/api/src/features/trace/tracked-event-ports.adapter.ts` | NEW. `createApiTrackedEventPorts` — the five ports over `TrackedEventSpanService`, `predefinedEventsSchemas`, `zodErrorMessage` and the process logger. |
+| `apps/api/src/features/trace/tracked-event-rest.mount.ts` | NEW. `mountTrackedEventLegacyPathRest` — `POST /api/track_event` replayed into the canonical route. |
+| `apps/api/src/app/api-trace-ingest.composition.ts` | `trackedEventSpans` on `ApiTraceIngestComposition`, built over a second `TraceSpanCollectionService` on the same `dedup` and `commands`. |
+| `apps/api/src/app/api-packaged-rest.composition.ts` | `traceIngest` option; `trackedEventPortsFrom`; the `CONSEQUENCE` sentence rewritten from "no package owns it" to "no command queue". |
+| `apps/api/src/app/api-production.composition.ts` | `traceIngest: otlpIngest` passed to `composeApiPackagedRest`. |
+| `apps/api/src/app-rest/app-rest.packaged-families.ts` | `trackedEvents?: () => TrackedEventPorts` on the services; the family mounted as two apps; `report?.absent("tracked-events")` deleted. |
+| `apps/api/src/tasks/openapi-document/openapi-document.surface.ts` | The tracked-event stand-in: a bag whose five members refuse, so the family is described without being served. |
+| `apps/api/src/tasks/openapi-document/openapi-document.checker.ts` | The two tracked-event entries deleted from `UNSERVED_AT_BASELINE`. |
+| `apps/api/src/features/trace/__tests__/tracked-event-ports.unit.test.ts` | NEW. 8 tests over a real `TraceSpanCollectionService` with a recording command port: the two validation passes, the id shape, the deterministic span id, the attribute encoding, the customer-safe fallback and the error sink. |
+| `apps/api/src/app-rest/__tests__/api-rest.packaged-families.integration.test.ts` | Both URLs in `FAMILY_PATHS`; `tracked-events` out of the unconditional-absence set; four tests driving the real ports through the real chain. |
+| `specs/api-reference/tracked-event-validation.feature` | Three `@integration` scenarios for the two-URL contract and the no-recorder case. |
+
+### Gates
+
+- `apps/api`: `tsc --noEmit` **0 errors**. `tsc --noEmit -p tsconfig.test.json`
+  **3 errors, 0 in this lane's files** — all three in
+  `src/app-trpc/__tests__/app-trpc.features.unit.test.ts`, which this lane did
+  not touch and which is clean in `git status`.
+- `apps/api`: `vitest run src/app-rest src/features/trace src/tasks/openapi-document`
+  — **Test Files 7 passed (7)**, **Tests 75 passed (75)**.
+- `packages/features/trace/server`: `vitest run src/transport/api-rest src/services`
+  — **Test Files 78 passed (78)**, **Tests 1381 passed (1381)**. No file in
+  that package was edited.
+- `task:openapi-check`: `served: 303`, `removed: 3 (0 outside the baseline)`,
+  `undescribed: 11` (now including `POST /api/track_event`), `added: 0`,
+  `changed: 0`. The absence list no longer names `tracked-events`.
+- `check:feature-parity`: `specs/api-reference/tracked-event-validation.feature`
+  — **8/8 scenarios bound**.
+- `oxlint`: clean over every file this lane touched — the only warnings under
+  the touched directories are in `api-rest.authoring-families.integration.test.ts`
+  and `trace-rest.integration.test.ts`, neither of which this lane edited.
+  `oxfmt`: every line this lane wrote is formatted, checked by running the
+  formatter on a copy and diffing. Four files under the touched paths carry
+  pre-existing drift on lines this lane did not write —
+  `api-production.composition.ts` (164 lines, another lane's),
+  `app-rest.process-features.ts`, `api-rest.authoring-families.integration.test.ts`
+  and `trace-rest.integration.test.ts` — and it is left where it was.
+  `api-trace-ingest.composition.ts`, `api-packaged-rest.composition.ts` and
+  `tracked-event-ports.adapter.ts` were run through the formatter, which
+  reflowed three untouched lines in the first of them; those three are the only
+  cosmetic changes this lane did not author.
+- Nothing under `platform/` was created, edited or read.

@@ -58,6 +58,9 @@ describe("API process configuration", () => {
       gatewayInternalSecret: undefined,
       gatewayJwtSecret: undefined,
       langyInternalSecret: undefined,
+      // The directory-sync block: no Auth0 secret configured, and D08's
+      // grants path off, which is the flag's own default.
+      scim: { auth0WebhookSecret: undefined, provenOffboarding: false },
       metricsApiKey: undefined,
       spendSettlementGraceMs: undefined,
       browserSession: undefined,
@@ -233,6 +236,24 @@ describe("API process configuration", () => {
       );
       expect(resolveApiConfig({ DEMO_PROJECT_ID: "   " }).authz.demoProjectId).toBeUndefined();
       expect(resolveApiConfig({}).authz.demoProjectId).toBeUndefined();
+    });
+  });
+
+  describe("when the directory-sync switches are set", () => {
+    it("reads the Auth0 intake secret verbatim, because it is compared byte for byte", () => {
+      const raw = "  shared-secret  ";
+
+      expect(resolveApiConfig({ AUTH0_SCIM_WEBHOOK_SECRET: raw }).scim.auth0WebhookSecret).toBe(
+        raw,
+      );
+      expect(resolveApiConfig({}).scim.auth0WebhookSecret).toBeUndefined();
+    });
+
+    it("leaves D08's grants offboarding off unless a deployment turns it on", () => {
+      expect(resolveApiConfig({}).scim.provenOffboarding).toBe(false);
+      expect(resolveApiConfig({ SCIM_V2_GRANTS: "1" }).scim.provenOffboarding).toBe(true);
+      expect(resolveApiConfig({ SCIM_V2_GRANTS: "true" }).scim.provenOffboarding).toBe(true);
+      expect(resolveApiConfig({ SCIM_V2_GRANTS: "0" }).scim.provenOffboarding).toBe(false);
     });
   });
 

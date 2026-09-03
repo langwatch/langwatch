@@ -274,6 +274,11 @@ import { composeApiGithubRest } from "../features/github/github-rest.mount";
 import { composeApiAuthCliDeviceFlow } from "../features/auth/auth-cli-device-flow-rest.mount";
 import { composeApiGovernanceCliRest } from "../features/enterprise/governance-cli-rest.mount";
 import { composeApiGovernanceIngestRest } from "../features/enterprise/governance-ingest-rest.mount";
+import {
+  composeApiScimRest,
+  LoggedApiScimAbsence,
+  type ApiScimRestPorts,
+} from "./api-scim.composition";
 import type { AuthCliDeviceFlowRestPorts } from "@langwatch/auth-server";
 import type {
   GovernanceCliRestPorts,
@@ -541,6 +546,15 @@ export class ApiProductionComposition extends ApiRuntimeCompositionPort {
   private composedClickHouse: ApiClickHouseInfrastructure | undefined;
   private composedAnalytics: ApiAnalyticsCollaborators | undefined;
   private composedIdentity: ApiIdentityCollaborators | undefined;
+  /**
+   * The identity ledgers' event stack, or none.
+   *
+   * Held as well as passed into the identity half because a second writer
+   * appends through it: the SCIM directory-sync history states its facts on
+   * the same runtime and the same producer registrations, and a second adapter
+   * built beside this one would resolve senders out of a second registry.
+   */
+  private composedIdentityEventing: ApiEventingIdentityAdapter | undefined;
   private composedExecution: ApiExecutionCollaborators | undefined;
   private composedProduct: ApiProductCollaborators | undefined;
   private composedTraceGroup: ApiTraceGroupCollaborators | undefined;
@@ -653,6 +667,19 @@ export class ApiProductionComposition extends ApiRuntimeCompositionPort {
     allowedProxyHosts: readonly string[];
   }> = { demoProjectId: undefined, blockLocalHttpCalls: true, allowedProxyHosts: [] };
   /**
+   * The two directory-sync switches, held for the same reason the two above
+   * are: {@link composeDoors} is handed services rather than a configuration.
+   *
+   * `provenOffboarding` is a CONSTRUCTION input to the SCIM service rather
+   * than a per-request read, so it has to be settled before the doors are
+   * built; the Auth0 secret rides beside it because the same composition takes
+   * both.
+   */
+  private composedScimEnvironment: Readonly<{
+    auth0WebhookSecret: string | undefined;
+    provenOffboarding: boolean;
+  }> = { auth0WebhookSecret: undefined, provenOffboarding: false };
+  /**
    * The operator-only ClickHouse EXPLAIN family, where this deployment
    * provisioned the dedicated readonly account it runs as.
    *
@@ -726,6 +753,10 @@ export class ApiProductionComposition extends ApiRuntimeCompositionPort {
       demoProjectId: options.config.authz.demoProjectId,
       blockLocalHttpCalls: options.config.infrastructure.modelProvider.blockLocalHttpCalls,
       allowedProxyHosts: options.config.infrastructure.modelProvider.allowedProxyHosts,
+    };
+    this.composedScimEnvironment = {
+      auth0WebhookSecret: options.config.scim.auth0WebhookSecret,
+      provenOffboarding: options.config.scim.provenOffboarding,
     };
     // Held rather than read at the call: this process's configuration is read
     // once, here, and the evaluator runtime is composed lazily further down.
@@ -1225,6 +1256,11 @@ export class ApiProductionComposition extends ApiRuntimeCompositionPort {
     // composition above already built — the same `trace_processing` producer
     // registration, never a second one.
     const governanceIngest = this.composeGovernanceIngestRest(otlpIngest?.otlp.traces);
+    // The SCIM 2.0 provisioning surface, over the SAME directory the members
+    // screen writes through and the SAME grant ledger every other membership
+    // change is recorded on. Absent without an Enterprise governance
+    // application, which is this family's gate — see the composition.
+    const scim = this.composeScimRest(serviceName);
     // The charted reads and the prompt library, over the SAME applications the
     // browser's `analytics.getTimeseries` and `prompts.*` procedures resolve
     // on. Taken from the halves rather than built a second time: two analytics
@@ -1619,6 +1655,10 @@ export class ApiProductionComposition extends ApiRuntimeCompositionPort {
       redis: this.composedQueueRedis,
       secrets,
       session: authoringSession,
+      // The SAME dedup gate and command sender the OTLP receiver and the SDK
+      // collector use, which is what makes a retried `POST /api/events/track`
+      // and a redelivered SDK feedback event one recorded rating.
+      traceIngest: otlpIngest,
       apiKeys: tenancy.apiKeys,
       organizations: tenancy.organizations,
       projects,
@@ -1666,6 +1706,7 @@ export class ApiProductionComposition extends ApiRuntimeCompositionPort {
         ...(authCliDeviceFlow ? { authCliDeviceFlow } : {}),
         ...(governanceCli ? { governanceCli } : {}),
         ...(governanceIngest ? { governanceIngest } : {}),
+        ...(scim ? { scim } : {}),
         ...(publicBaseUrl ? { publicBaseUrl } : {}),
         ...(healthProbes ? { healthProbes } : {}),
         ...(this.composedOpsExplain
@@ -2171,6 +2212,35 @@ export class ApiProductionComposition extends ApiRuntimeCompositionPort {
   }
 
   /**
+   * The SCIM 2.0 provisioning surface's collaborators, or none.
+   *
+   * Every one of them is TAKEN from a half this process already composed
+   * rather than built here: the user directory is the identity half's, the
+   * grant ledger is AuthZ's, the plan provider is the one every Enterprise
+   * gate reads, and the event stack is the one the identity ledgers append
+   * through. A second of any of them would let a directory push and a person's
+   * own action disagree about what a membership is.
+   *
+   * The Enterprise governance application is what decides whether the family
+   * is here at all — see {@link composeApiScimRest} for why that is the gate.
+   */
+  private composeScimRest(serviceName: string): ApiScimRestPorts | undefined {
+    const session = this.composedAuth?.compose();
+    return composeApiScimRest({
+      prisma: this.composedDatabase?.connection.client,
+      grants: this.composedAuthz?.grants,
+      users: session?.users,
+      auth: session?.auth,
+      governance: this.options.enterprise?.governance.governance,
+      plans: this.composedPlanProvider,
+      eventing: this.composedIdentityEventing,
+      provenOffboarding: this.composedScimEnvironment.provenOffboarding,
+      auth0WebhookSecret: this.composedScimEnvironment.auth0WebhookSecret,
+      report: LoggedApiScimAbsence.create(createLogger(serviceName)),
+    });
+  }
+
+  /**
    * The Activity Monitor's receivers' collaborators, or none.
    *
    * The trace collection is HANDED IN rather than built, because it carries
@@ -2353,6 +2423,15 @@ export class ApiProductionComposition extends ApiRuntimeCompositionPort {
       processName: options.config.serviceName,
       report: LoggedApiIdentityPipelinesAbsence.create(createLogger(options.config.serviceName)),
     });
+    // Held on the composition as well as handed down: the SCIM directory-sync
+    // history appends through the SAME runtime and the same producer
+    // registrations, and a second adapter would resolve senders out of a
+    // second registry.
+    const identityEventing = ApiEventingIdentityAdapter.create({
+      eventSourcing: this.composedEventing?.eventSourcing,
+      pipelines: identityPipelines,
+    });
+    this.composedIdentityEventing = identityEventing;
     return composeApiIdentityCollaborators({
       prisma: database.client,
       organizations: tenancy.organizations,
@@ -2367,10 +2446,7 @@ export class ApiProductionComposition extends ApiRuntimeCompositionPort {
       // The SAME counter the public REST surface meters through, so a budget
       // cannot be spent twice by asking on two paths.
       rateLimit: (request) => this.rateLimiter.consume(request),
-      eventing: ApiEventingIdentityAdapter.create({
-        eventSourcing: this.composedEventing?.eventSourcing,
-        pipelines: identityPipelines,
-      }),
+      eventing: identityEventing,
       resources: options.resources,
       deployment: this.options.identity ?? {},
       mail: this.options.mail,

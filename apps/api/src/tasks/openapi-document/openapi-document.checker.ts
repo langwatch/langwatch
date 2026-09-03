@@ -91,33 +91,12 @@ export type OpenApiDriftReport = Readonly<{
  * SHRINK IT; NEVER ADD TO IT. An entry leaves when the family is mounted
  * again or when the operation is deliberately dropped from the document — and
  * the document is frozen, so in practice that means mounting the family.
+ * Twenty at the baseline, three today: the fifteen `/api/scim/v2/**`
+ * operations left when `api-scim.composition.ts` gave this process a
+ * directory-sync service to mount them over, and the two tracked-event
+ * intakes left with the family that now serves them.
  */
 export const UNSERVED_AT_BASELINE: readonly string[] = [
-  // The SCIM 2.0 provisioning family, fifteen operations. The mountable app
-  // still exists — `createScimProtocolRestApp` in
-  // `@langwatch/enterprise-scim-server` — and this process mounts no SCIM
-  // application, so an identity provider following the document reaches
-  // nothing. This is the largest live gap between what is published and what
-  // answers, and it is one composition away from closing.
-  "DELETE /api/scim/v2/Groups/{id}",
-  "DELETE /api/scim/v2/Users/{id}",
-  "GET /api/scim/v2/Groups",
-  "GET /api/scim/v2/Groups/{id}",
-  "GET /api/scim/v2/ResourceTypes",
-  "GET /api/scim/v2/Schemas",
-  "GET /api/scim/v2/ServiceProviderConfig",
-  "GET /api/scim/v2/Users",
-  "GET /api/scim/v2/Users/{id}",
-  "PATCH /api/scim/v2/Groups/{id}",
-  "PATCH /api/scim/v2/Users/{id}",
-  "POST /api/scim/v2/Groups",
-  "POST /api/scim/v2/Users",
-  "PUT /api/scim/v2/Groups/{id}",
-  "PUT /api/scim/v2/Users/{id}",
-  // The tracked-event intake, which `mountApiPackagedRestFamilies` names
-  // absent at boot: no package owns the tracked-event span builder.
-  "POST /api/events/track",
-  "POST /api/track_event",
   // The coding-agent transcript join on a trace read. `mountTracesRest` leaves
   // the route unregistered on purpose — this process composes neither the
   // session store nor the log canonicaliser, and an empty transcript reads as

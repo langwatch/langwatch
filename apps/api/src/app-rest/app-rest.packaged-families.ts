@@ -96,6 +96,7 @@ import type {
 import { createFilesRestApp } from "@langwatch/stored-object-server";
 import type { SuiteApp } from "@langwatch/suite-server";
 import { createSuiteRestApp } from "@langwatch/suite-server";
+import { createEventsRestApp, type TrackedEventPorts } from "@langwatch/trace-server";
 import { createMeRestApp } from "@langwatch/user-server";
 import type { WorkflowService } from "@langwatch/workflow-contract";
 import type { WorkflowEvaluationTrigger } from "@langwatch/workflow-server";
@@ -111,6 +112,7 @@ import {
   createAgentCacheRestApp,
 } from "../features/agent-cache/agent-cache-rest";
 import { createSecretLegacyRestApp } from "../features/secret/secret-legacy-rest";
+import { mountTrackedEventLegacyPathRest } from "../features/trace/tracked-event-rest.mount";
 
 /**
  * The product services this process may or may not have composed.
@@ -165,6 +167,16 @@ export type ApiPackagedRestServices = Readonly<{
   simulations?: (() => SimulationService) | undefined;
   storedObjects?: (() => StoredObjectApp) | undefined;
   suites?: (() => SuiteApp) | undefined;
+  /**
+   * Recording a customer's feedback event as the one span that carries it,
+   * plus the second validation pass, the id, the error sink and the rendered
+   * rejection the family's two URLs need.
+   *
+   * Absent takes BOTH URLs off rather than mounting a door that answers 200
+   * and drops the event: a rating a customer believes they gave and we did not
+   * store is worse than a 404 they can see.
+   */
+  trackedEvents?: (() => TrackedEventPorts) | undefined;
   /**
    * The webhook platform: endpoints, health, the emitted-events log, the
    * entitlement gate, the test-fire hop and the idempotency ledger.
@@ -642,6 +654,27 @@ export function mountApiPackagedRestFamilies(options: {
       : null,
   );
 
+  // Both tracked-event doors, mounted together over the SAME ports.
+  // `/api/track_event` is the URL every pre-rename SDK release posts to and
+  // `/api/events/track` is the canonical one; the legacy app replays the
+  // request against the canonical route rather than handling it, so the two
+  // cannot answer differently. The alias takes the canonical app as an
+  // argument, so a process that composed no tracked-event ports mounts
+  // neither.
+  const trackedEvents = services.trackedEvents;
+  mount(
+    "tracked-events",
+    trackedEvents
+      ? () => {
+          const canonical = createEventsRestApp({
+            security,
+            ports: trackedEvents(),
+          }).hono as unknown as MountableRestApp;
+          return [canonical, mountTrackedEventLegacyPathRest({ canonical })];
+        }
+      : null,
+  );
+
   // Both automation doors, mounted together over the SAME application. The
   // narrow `/api/trigger/slack` predates `/api/triggers` and keeps its own
   // path, body spelling and refusal bodies; a process holding one and not the
@@ -690,10 +723,9 @@ export function mountApiPackagedRestFamilies(options: {
   // The two families this process cannot build at all, named here rather than
   // silently missing. `/api/user-avatar` needs the object's OWNER KIND to keep
   // its broad read from serving trace media, and this process's file read
-  // answers a row that does not carry one; `/api/events/track` needs the
-  // tracked-event span builder, which no package owns.
+  // answers a row that does not carry one; `/api/copilotkit` dispatches
+  // through an adapter that reaches the retired studio's runtime.
   report?.absent("user-avatar");
-  report?.absent("tracked-events");
   report?.absent("copilotkit");
 
   return features;

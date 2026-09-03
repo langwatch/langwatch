@@ -52,6 +52,9 @@ import {
   type GovernanceCliRestPorts,
   type GovernanceIngestRestPorts,
 } from "@langwatch/enterprise-governance-server";
+import { createScimProtocolRestApp, createScimWebhookRestApp } from "@langwatch/enterprise-api";
+
+import type { ApiScimRestPorts } from "../app/api-scim.composition";
 
 import type { ApiLangyRestComposition } from "../features/langy/langy-rest.mount";
 
@@ -417,6 +420,17 @@ export type ApiProcessRestPorts = Readonly<{
    */
   governanceIngest?: GovernanceIngestRestPorts | undefined;
   /**
+   * The SCIM 2.0 provisioning surface's collaborators, or none.
+   *
+   * None where this process composed no Enterprise SCIM application. The
+   * fifteen protocol routes and the Auth0 intake are one entry because they
+   * provision through one service: a process holding one and not the other
+   * would let a directory create a member on one door the other cannot see.
+   * Left off rather than mounted refusing — an identity provider's nightly
+   * run retries a 500 forever, and reads a 404 as "not configured here".
+   */
+  scim?: ApiScimRestPorts | undefined;
+  /**
    * The deployment's public origin, where it declared one.
    *
    * Deep links on a REST response are built from it. Optional because a
@@ -705,6 +719,19 @@ export function createApiProcessRestFeatures(options: {
   const governanceIngest = ports.governanceIngest;
   if (governanceIngest) {
     features.push(createGovernanceIngestRestApp({ security, ports: governanceIngest }));
+  }
+
+  // The SCIM 2.0 provisioning family and the Auth0 intake beside it.
+  // `/api/scim/v2` is a literal namespace nothing else claims, and
+  // `/api/webhooks/auth0-scim` is a literal path under a namespace whose only
+  // other claimant is the packaged webhook family's `/api/webhooks/v1/*` — a
+  // disjoint set — so both are order-free among the families here. Three of
+  // the fifteen carry no credential on purpose: an identity provider
+  // negotiates capabilities before a token exists.
+  const scim = ports.scim;
+  if (scim) {
+    features.push(createScimProtocolRestApp({ security, scim: scim.scim }));
+    features.push(createScimWebhookRestApp({ security, ports: scim }));
   }
 
   // The v1 trace reads. `/api/traces` is a literal first segment nothing above

@@ -35,7 +35,11 @@ import type { Logger } from "@langwatch/observability";
 import { SecretApp, type SecretEncryptionPort } from "@langwatch/secret-server";
 import type { SecretService } from "@langwatch/secret-contract";
 import type { StoredObjectsService } from "@langwatch/stored-object-server";
-import { extractInlineMediaFromEvent, TraceMediaStorePort } from "@langwatch/trace-server";
+import {
+  extractInlineMediaFromEvent,
+  TraceMediaStorePort,
+  type TrackedEventPorts,
+} from "@langwatch/trace-server";
 import type { WorkflowEvaluationOutcome } from "@langwatch/workflow-server";
 import type { MiddlewareHandler } from "hono";
 
@@ -50,6 +54,8 @@ import type { ApiProductInfraCollaborators } from "./api-trpc-collaborators.prod
 import type { ApiAuthzComposition } from "./api-authz.composition";
 import type { ApiHandlerManagedCredentials } from "./api-handler-managed-credential";
 import type { ApiHandlerManagedSessionPort } from "./api-handler-managed-session";
+import type { ApiTraceIngestComposition } from "./api-trace-ingest.composition";
+import { createApiTrackedEventPorts } from "../features/trace/tracked-event-ports.adapter";
 import { createAgentPlatformUrlBuilder } from "../features/agent/agent-platform-url";
 import { createDatasetDirectUploadAuthorizer } from "../features/dataset/dataset-direct-upload-auth";
 import { createScenarioRunPlatformUrlBuilder } from "../features/scenario/scenario-run-platform-url";
@@ -100,6 +106,17 @@ export type ApiPackagedRestCompositionOptions = Readonly<{
   secrets: SecretService | undefined;
   /** The browser session, where this deployment composed a transport. */
   session: ApiHandlerManagedSessionPort | undefined;
+  /**
+   * The ingest doors' one dedup gate and command sender, where this process
+   * registered a command queue.
+   *
+   * TAKEN rather than built here, and for a sharper reason than the rest of
+   * this file gives: the tracked-event family writes a span whose id is a
+   * digest of the trace and event ids, and that only deduplicates a retried
+   * REST call against a redelivered SDK event while both claim the same Redis
+   * keys. A second composition would score the same rating twice.
+   */
+  traceIngest: ApiTraceIngestComposition | undefined;
   /** The credential pair and the project directory every family resolves through. */
   apiKeys: ApiKeyService;
   organizations: OrganizationService;
@@ -209,6 +226,11 @@ export function composeApiPackagedRest(
           }
         : {}),
       ...(options.secrets ? { secrets: secretAppFrom(options.secrets) } : {}),
+      // Both tracked-event URLs, over the SAME span collection the OTLP
+      // receiver and the SDK collector send on. Absent where this process
+      // registered no command queue: with nowhere to send the span, the door
+      // would answer 200 to a rating it then dropped.
+      ...(options.traceIngest ? { trackedEvents: trackedEventPortsFrom(options) } : {}),
       ...(options.execution
         ? { workflows: () => options.execution!.workflows.workflowService }
         : {}),
@@ -316,6 +338,25 @@ function secretAppFrom(secrets: SecretService): () => SecretApp {
 }
 
 /**
+ * The tracked-event family's ports, over the span builder the ingest
+ * composition already holds.
+ *
+ * Bound once and handed back by a provider, the way the two applications above
+ * are: the bag is closures over one builder and one logger, and building a
+ * second one per mount would make the two doors' error sinks two objects for
+ * no gain.
+ */
+function trackedEventPortsFrom(
+  options: ApiPackagedRestCompositionOptions,
+): () => TrackedEventPorts {
+  const ports = createApiTrackedEventPorts({
+    spans: options.traceIngest!.trackedEventSpans,
+    logger: options.logger,
+  });
+  return () => ports;
+}
+
+/**
  * The agent cache's store and cipher.
  *
  * Absent without a cipher: an entry holds whatever an agent produced — a
@@ -410,7 +451,7 @@ const CONSEQUENCE: Partial<Record<ApiPackagedRestFamilyName, string>> = {
   "user-avatar":
     "API process serves no /api/user-avatar: its broad read is safe only because it refuses any object whose owner kind is not the avatar one, and this process's file read answers a row that does not carry the owner kind. Serving it without that check would let one authenticated caller pull another tenant's trace media.",
   "tracked-events":
-    "API process serves no /api/events/track: the tracked-event span builder was the retired application's and no package owns it, so a door mounted here would accept a customer's feedback event and record nothing.",
+    "API process serves neither /api/events/track nor /api/track_event: recording a feedback event needs the trace command queue this process did not register, and a door mounted without one would answer 200 to a rating it then dropped.",
   copilotkit:
     "API process serves no /api/copilotkit: the prompt-studio adapter it dispatches through reaches the retired studio post-event module, the platform Lambda runtime and a browser package, none of which a server composition may hold.",
 };

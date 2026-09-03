@@ -67,6 +67,7 @@ const A_ROUTE_FROM_EVERY_MOUNTED_FAMILY = [
   "/api/scenario-events",
   "/api/scenarios",
   "/api/scim-tokens/2026-08-07/",
+  "/api/scim/v2/Users",
   "/api/secret",
   "/api/secrets",
   "/api/simulation-runs",

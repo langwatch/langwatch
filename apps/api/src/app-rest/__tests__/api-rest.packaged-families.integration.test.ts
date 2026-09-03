@@ -15,6 +15,14 @@
  * requests through the real chain.
  */
 import { createAppRestSecurity, type AppRestSecurity } from "@langwatch/api/rest";
+import type { RecordSpanCommandData } from "@langwatch/trace-contract";
+import {
+  TraceIngressCommandPort,
+  TraceSpanCollectionService,
+  TraceSpanDedupPort,
+  TrackedEventSpanService,
+  type TrackedEventPorts,
+} from "@langwatch/trace-server";
 import { Hono, type ErrorHandler, type MiddlewareHandler } from "hono";
 import { describe, expect, it, vi } from "vitest";
 
@@ -23,6 +31,7 @@ import {
   type ApiPackagedRestFamilyName,
 } from "../app-rest.packaged-families";
 import { createApiProcessRestFeatures } from "../app-rest.process-features";
+import { createApiTrackedEventPorts } from "../../features/trace/tracked-event-ports.adapter";
 
 const project = { id: "project-1", slug: "acme", teamId: "team-1", name: "Acme" };
 
@@ -54,6 +63,8 @@ const FAMILY_PATHS: ReadonlyArray<readonly [ApiPackagedRestFamilyName, string]> 
   ["simulation-runs", "/api/simulation-runs"],
   ["suites", "/api/suites"],
   ["teams", "/api/teams"],
+  ["tracked-events", "/api/events/track"],
+  ["tracked-events", "/api/track_event"],
   ["triggers", "/api/triggers"],
   ["triggers", "/api/trigger/slack"],
   ["webhooks", "/api/webhooks/v1"],
@@ -92,9 +103,8 @@ describe("given a process that composed none of the packaged services", () => {
       expect(new Set(absent)).toEqual(
         new Set([
           ...new Set(FAMILY_PATHS.map(([family]) => family)),
-          // The three this process cannot build at all, named unconditionally.
+          // The two this process cannot build at all, named unconditionally.
           "user-avatar",
-          "tracked-events",
           "copilotkit",
         ]),
       );
@@ -196,6 +206,103 @@ describe("given the workflow family on a process with no evaluation runner", () 
   });
 });
 
+/**
+ * The tracked-event family, whose two URLs are one endpoint.
+ *
+ * `/api/track_event` predates `/api/events/track` and every pre-rename SDK
+ * release still posts to it, so the pair is driven together: what these pin is
+ * that the legacy URL reaches the SAME recorder and answers the SAME refusal,
+ * because a second handler would drift the first time one of them gained a
+ * check the other did not.
+ *
+ * Spec: specs/api-reference/tracked-event-validation.feature
+ */
+describe("given the tracked-event family", () => {
+  describe("when a customer posts a valid event to the canonical URL", () => {
+    it("records it and answers the sentence every SDK release reads", async () => {
+      const { collaborators, recorded } = withTrackedEvents();
+      const api = mount(collaborators);
+
+      const response = await api.fetch("/api/events/track", {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({
+          trace_id: "trace_1",
+          event_type: "thumbs_up_down",
+          metrics: { vote: 1 },
+        }),
+      });
+
+      expect(response.status).toBe(200);
+      await expect(response.json()).resolves.toEqual({ message: "Event tracked" });
+      expect(recorded).toHaveLength(1);
+      expect(recorded[0]).toMatchObject({ project: { id: "project-1" } });
+    });
+  });
+
+  describe("when the same event is posted to the legacy URL", () => {
+    /** @scenario The legacy URL reaches the same recorder as the canonical one */
+    it("reaches the SAME recorder, rather than a second handler that could drift", async () => {
+      const { collaborators, recorded } = withTrackedEvents();
+      const api = mount(collaborators);
+
+      const response = await api.fetch("/api/track_event", {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({
+          trace_id: "trace_1",
+          event_type: "thumbs_up_down",
+          metrics: { vote: 1 },
+          event_id: "trackedevent_supplied",
+        }),
+      });
+
+      expect(response.status).toBe(200);
+      await expect(response.json()).resolves.toEqual({ message: "Event tracked" });
+      expect(recorded).toHaveLength(1);
+      // The caller's own id is honoured on both URLs, which is what makes a
+      // retried POST idempotent rather than a second rating.
+      expect(recorded[0]).toMatchObject({ eventId: "trackedevent_supplied" });
+    });
+  });
+
+  describe("when a predefined event violates its own schema", () => {
+    /** @scenario A predefined event that violates its schema is rejected, not errored */
+    /** @scenario A rejected event is rejected the same way on both URLs */
+    it("answers 400 naming the field, on both URLs, and records nothing", async () => {
+      for (const path of ["/api/events/track", "/api/track_event"]) {
+        const { collaborators, recorded } = withTrackedEvents();
+        const api = mount(collaborators);
+
+        const response = await api.fetch(path, {
+          method: "POST",
+          headers: { "content-type": "application/json" },
+          body: JSON.stringify({
+            trace_id: "trace_1",
+            event_type: "thumbs_up_down",
+            metrics: { vote: 2 },
+          }),
+        });
+
+        expect(response.status, `${path} should reject the payload`).toBe(400);
+        const body = (await response.json()) as { error: string };
+        expect(body.error).toContain("vote");
+        expect(recorded, `${path} should record nothing`).toHaveLength(0);
+      }
+    });
+  });
+
+  describe("when this process composed no tracked-event recorder", () => {
+    /** @scenario Neither URL is served without a recorder to send the event to */
+    it("serves neither URL rather than answering 200 to an event it drops", () => {
+      const api = mount(collaboratorsWith({}));
+
+      expect(api.claims("/api/events/track")).toBe(false);
+      expect(api.claims("/api/track_event")).toBe(false);
+    });
+  });
+});
+
 // ---------------------------------------------------------------------------
 // Harness
 // ---------------------------------------------------------------------------
@@ -267,6 +374,7 @@ function fullCollaborators(): ApiPackagedRestCollaborators {
       simulations: anyService,
       storedObjects: anyService,
       suites: anyService,
+      trackedEvents: anyService,
       webhooks: anyService,
       workflows: anyService,
     },
@@ -276,6 +384,69 @@ function fullCollaborators(): ApiPackagedRestCollaborators {
 
 function emptyCollaborators(): ApiPackagedRestCollaborators {
   return { services: {}, ports: fullPorts() };
+}
+
+/**
+ * The tracked-event family over the REAL ports this process composes, whose
+ * span collection records the command rather than enqueueing it.
+ *
+ * Real rather than stubbed because the two-pass validation the tests above
+ * drive lives in the ports, not in the transport: a stand-in that accepted
+ * everything would leave the 400 unproven.
+ */
+function withTrackedEvents(): {
+  collaborators: ApiPackagedRestCollaborators;
+  recorded: Array<{ project: { id: string }; eventId: string }>;
+  commands: RecordSpanCommandData[];
+} {
+  const recorded: Array<{ project: { id: string }; eventId: string }> = [];
+  const commands: RecordSpanCommandData[] = [];
+
+  const real = createApiTrackedEventPorts({
+    spans: TrackedEventSpanService.create({
+      collection: TraceSpanCollectionService.create({
+        dedup: new GrantingDedup(),
+        commands: new RecordingCommands(commands),
+      }),
+    }),
+    logger: { error: () => {} },
+  });
+
+  const ports: TrackedEventPorts = {
+    ...real,
+    recordTrackedEvent: async (input) => {
+      recorded.push({ project: { id: input.project.id }, eventId: input.eventId });
+      await real.recordTrackedEvent(input);
+    },
+  };
+
+  return {
+    recorded,
+    commands,
+    collaborators: collaboratorsWith({ trackedEvents: () => ports }),
+  };
+}
+
+/** Every claim granted: dedup is not what these tests are about. */
+class GrantingDedup extends TraceSpanDedupPort {
+  async tryAcquireProcessingLock(): Promise<boolean> {
+    return true;
+  }
+
+  async confirmProcessed(): Promise<void> {}
+
+  async releaseOnFailure(): Promise<void> {}
+}
+
+/** The one command handoff, recorded rather than enqueued. */
+class RecordingCommands extends TraceIngressCommandPort {
+  constructor(private readonly sent: RecordSpanCommandData[]) {
+    super();
+  }
+
+  async recordSpan(data: RecordSpanCommandData): Promise<void> {
+    this.sent.push(data);
+  }
 }
 
 function collaboratorsWith(

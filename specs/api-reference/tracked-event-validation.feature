@@ -51,3 +51,31 @@ Feature: Tracked-event validation answers the caller
     Then the response status is 400
     And the response names the "vote" field
     And the event is not recorded
+
+  # The endpoint has two URLs. `POST /api/track_event` predates
+  # `POST /api/events/track` and every pre-rename SDK release still posts to
+  # it, so the pair has to stay one endpoint: the legacy URL replays the
+  # request against the canonical route rather than being a second handler,
+  # because two handlers over one recorder drift the first time one of them
+  # gains a check the other does not.
+
+  @integration
+  Scenario: The legacy URL reaches the same recorder as the canonical one
+    Given a valid "thumbs_up_down" event carrying the caller's own event id
+    When the customer posts it to the legacy tracked-event URL
+    Then the event is recorded with the id the caller supplied
+    And the response is the same confirmation the canonical URL answers
+
+  @integration
+  Scenario: A rejected event is rejected the same way on both URLs
+    Given a "thumbs_up_down" event whose vote is outside the allowed range
+    When the customer posts it to either tracked-event URL
+    Then the response status is 400
+    And the response names the "vote" field
+    And the event is not recorded
+
+  @integration
+  Scenario: Neither URL is served without a recorder to send the event to
+    Given a process that registered no trace command queue
+    When the mounted paths are enumerated
+    Then neither tracked-event URL is served
