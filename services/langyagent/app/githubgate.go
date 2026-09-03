@@ -66,6 +66,7 @@ func newGithubGate(hasCredential bool, cancel func()) *githubGate {
 // alone answers "what ran, and how did it end?".
 type gateToolFrame struct {
 	Type  string `json:"type"`
+	Name  string `json:"name"`
 	Phase string `json:"phase"`
 	Input struct {
 		Command string `json:"command"`
@@ -73,6 +74,15 @@ type gateToolFrame struct {
 	Output  string `json:"output"`
 	IsError *bool  `json:"isError"`
 }
+
+// localToolPrefix names the tools that do not run in the worker at all: they
+// run in the folder the developer shared from their own machine (ADR-129),
+// with their own git identity and their own `gh` login. The GitHub App is not
+// in that path, so a `git push` or a `gh pr create` there needs nothing from
+// the platform and must never trip this gate. Without the carve-out the whole
+// local-control path dies on `git fetch origin` with an install card the
+// developer has no reason to act on.
+const localToolPrefix = "local_"
 
 // Observe inspects one emitted frame. Inspect-only from the sink's point of
 // view, it never blocks or fails the emit; a trip is surfaced by canceling
@@ -90,6 +100,9 @@ func (g *githubGate) Observe(f frames.Frame) {
 		return
 	}
 	if tf.Type != "tool" || tf.Phase != "end" || tf.Input.Command == "" {
+		return
+	}
+	if strings.HasPrefix(tf.Name, localToolPrefix) {
 		return
 	}
 	if !commandNeedsGithubAuth(tf.Input.Command) {
