@@ -44,6 +44,7 @@ const FAMILY_PATHS: ReadonlyArray<readonly [ApiPackagedRestFamilyName, string]> 
   ["agent-cache", "/api/agent-cache"],
   ["agents", "/api/agents"],
   ["coding-agent", "/api/coding-agent"],
+  ["coding-agent-v1", "/api/v1/coding-agent"],
   ["dashboards", "/api/dashboards"],
   ["dashboards", "/api/graphs"],
   ["dataset", "/api/dataset"],

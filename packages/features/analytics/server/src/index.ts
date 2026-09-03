@@ -103,11 +103,13 @@ export {
 } from "./clickhouse/query-errors";
 export { generateClickHouseFilterConditions } from "./filters/clickhouse/filter-conditions";
 
-/** The governed-SQL REST family: LangWatchQL query + schema, and saved charts. */
+/** The saved-chart REST family. */
 export {
   createLangWatchQLRestApp,
   type LangWatchQLRestPorts,
 } from "./transport/api-rest/langwatch-ql.api";
+/** The one door for raw LangWatchQL: `/api/v1/query`. */
+export { createQueryRestApp, registerQueryRoutes } from "./transport/api-rest/query.api";
 export type { SavedWorkbenchChartRestService } from "./transport/api-rest/langwatch-ql-route-guards";
 
 // The LangWatchQL key map: the row a project's access is granted by, written at

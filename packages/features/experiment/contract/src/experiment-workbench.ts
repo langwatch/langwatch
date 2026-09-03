@@ -289,9 +289,12 @@ export type EvaluatorConfig = Omit<
 
 /**
  * Agent types for targets (matches database agent types).
- * Used to determine which type of DSL node to generate.
+ *
+ * Says how the column runs the agent: which DSL node the row becomes, or, for
+ * a connected agent, that the row is one turn through the relay rather than a
+ * node at all.
  */
-export const agentTypeEnum = z.enum(["code", "signature", "workflow", "http"]);
+export const agentTypeEnum = z.enum(["code", "signature", "workflow", "http", "connected"]);
 export type AgentTypeEnum = z.infer<typeof agentTypeEnum>;
 
 /**

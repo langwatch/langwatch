@@ -38,7 +38,8 @@ const FilterContainer = ({
     gap={2}
     paddingX={2}
     paddingY={1}
-    border={hasBorder ? "1px solid lightgray" : "none"}
+    border={hasBorder ? "1px solid" : "none"}
+    borderColor={hasBorder ? "border.muted" : undefined}
     borderRadius="md"
   >
     <Box color="fg.subtle">
@@ -63,7 +64,10 @@ const FilterLabel = ({ children }: { children: React.ReactNode }) => {
 
 const FilterValue = ({ children }: { children: React.ReactNode }) => {
   return (
-    <Box padding={1} borderRightRadius="md">
+    // minWidth 0 opts out of the flex child's min-width: auto, so a long
+    // unbreakable value (a monitor id) clamps inside the chip instead of
+    // widening it past its border.
+    <Box padding={1} borderRightRadius="md" minWidth={0} overflow="hidden">
       <ClampedText lineClamp={1}>{children}</ClampedText>
     </Box>
   );

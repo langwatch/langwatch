@@ -42,6 +42,10 @@ class TestPresentation extends AgentHttpEditorPresentationPort {
     return null;
   }
 
+  renderTestPanel() {
+    return null;
+  }
+
   explainTestError() {
     return { title: "Request failed" };
   }

@@ -10,12 +10,7 @@ keywords:
 
 Langy writes and runs Scenario simulation tests and evaluations through the `langwatch` CLI, so they live in your project like any test or evaluator you wrote by hand. Which one it picks depends on what the question needs to prove; see the table below.
 
-<Info>
-  **Also check:** [Ask Langy](/langy/chat) (how you request a test), [Pull
-  requests](/langy/pull-requests) (the tests it wrote run in your CI), [Agent
-  Simulations](/agent-simulations/introduction) and [Evaluations](/evaluations/overview)
-  (the product surfaces these land in).
-</Info>
+<Info>**Also check:** [Ask Langy](/langy/chat) (how you request a test), [Pull requests](/langy/pull-requests) (the tests it wrote run in your CI), [Agent Testing](/agent-testing/overview) and [Evaluations](/evaluations/overview) (the product surfaces these land in).</Info>
 
 ## Scenario simulation tests
 
@@ -30,11 +25,10 @@ langwatch scenario create
 langwatch scenario run
 ```
 
-The runs land in the Simulations surface, where you can filter, group, and open any run.
+The runs land in Agent Testing > Results, where you can filter, group, and open any run.
 
-<Frame caption="The Simulations overview filtered to red-team runs. Each row is a scenario run with its outcome.">
-  ![Simulations overview filtered to red-team
-  runs](/images/langy/testing/redteam-overview.png)
+<Frame caption="The results overview filtered to red-team runs. Each row is a scenario run with its outcome.">
+  ![Results overview filtered to red-team runs](/images/langy/testing/redteam-overview.png)
 </Frame>
 
 Open a run to see the judge's verdict and its reasoning against your criteria.
@@ -49,7 +43,7 @@ When a run fails, the detail includes the bug log so you can see exactly where t
   ![Failed run detail with bug log](/images/langy/testing/failed-run-buglog.png)
 </Frame>
 
-Read more in the Agent Simulations docs: [Introduction](/agent-simulations/introduction), [Getting started](/agent-simulations/getting-started), [Red teaming](/agent-simulations/red-teaming), and [Voice agents](/agent-simulations/voice-agents).
+Read more in the Agent Testing docs: [Overview](/agent-testing/overview), [Write scenarios in code](/agent-testing/scenarios-in-code), [Red teaming](/agent-testing/red-teaming), and [Voice agents](/agent-testing/voice-agents).
 
 ## Evaluations
 
@@ -71,11 +65,11 @@ Use each for a different job:
 
 Langy picks based on what your question needs to prove:
 
-| You want to check                               | Langy writes               |
-| ----------------------------------------------- | -------------------------- |
+| You want to check | Langy writes |
+|---|---|
 | The agent handles a full conversation correctly | A Scenario simulation test |
-| One run scores well on a criterion              | An evaluation              |
-| Live traffic stays within a criterion           | An online monitor          |
-| Two models or prompts, head to head             | An experiment              |
+| One run scores well on a criterion | An evaluation |
+| Live traffic stays within a criterion | An online monitor |
+| Two models or prompts, head to head | An experiment |
 
 You can also name the one you want in the [chat](/langy/chat): "write a Scenario test that..." or "set up an evaluator for...".

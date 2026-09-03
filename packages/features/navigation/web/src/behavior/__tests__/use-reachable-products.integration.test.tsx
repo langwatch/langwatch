@@ -55,8 +55,7 @@ describe("useReachableProducts", () => {
     });
   });
 
-  describe("when the caller is in legacy mode", () => {
-    /** @scenario "Legacy mode runs no navigation-v2 queries" */
+  describe("when the caller disables the hook", () => {
     it("asks for no product flag at all", () => {
       const host = hostWithEveryFlagOn();
       const featureFlag = vi.spyOn(host, "featureFlag");

@@ -297,7 +297,7 @@ describe("given the agents page", () => {
       const user = userEvent.setup({ pointerEventsCheck: 0 });
       const { host } = await mountScreen({ new: "agent" });
 
-      expect(screen.getByText("Choose Agent Type")).toBeInTheDocument();
+      expect(screen.getByText("Choose Agent Connection Type")).toBeInTheDocument();
       await user.click(screen.getByTestId("agent-type-code"));
 
       expect(host.setQueryCalls).toEqual([{ new: void 0 }]);

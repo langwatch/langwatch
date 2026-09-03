@@ -53,6 +53,7 @@ export const SETUP_SKILL_BODIES = `;
  * unit test fails when the two drift.
  */
 export const SETUP_SKILL_IDS = [
+  "connect-agent",
   "datasets",
   "experiments",
   "online-evaluations",

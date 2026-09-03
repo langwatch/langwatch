@@ -1,21 +1,25 @@
 /**
- * Every run entry of the Test cases tab. Each one opens the run dialog; the
+ * Every run entry of the Scenarios tab. Each one opens the run dialog; the
  * dialog owns the target choice, the note, the overrides, and the run itself.
  *
  * @see specs/features/agent-testing/cases-table.feature
  */
 
 import { useCallback, useState } from "react";
-import { getOnPlatformSetId } from "@langwatch/scenario-contract";
 import { toaster } from "@langwatch/design-system/toaster";
 import { readScenarioTarget } from "../../use-scenario-target";
 import type { RunDialogSubject, RunStartedInfo } from "../run/run-dialog";
-import type { AgentTestingSelection } from "../../../../behavior/agent-testing/use-agent-testing-routing";
 import { useAgentTestingStore } from "../use-agent-testing-store";
 import type { TestCase, TestSuiteEntry } from "../../../../model/agent-testing/cases/test-cases";
 import { useOpenLiveRun } from "../../../../behavior/agent-testing/cases/use-open-live-run";
 
-/** The run dialog subject of a whole suite, with the cases it holds. */
+/**
+ * The run dialog subject of a whole suite, with the scenarios it holds.
+ *
+ * A test suite carries no run option of its own, so the subject brings none.
+ * The dialog then preselects from the newest run plan of the suite, which is
+ * what `useRunHistorySeed` reads.
+ */
 function runSubjectForSuite({
   suite,
   cases,
@@ -23,65 +27,52 @@ function runSubjectForSuite({
   suite: TestSuiteEntry;
   cases: TestCase[];
 }): RunDialogSubject {
-  const persisted = suite.targets?.[0];
   return {
     kind: "suite",
     suiteId: suite.id,
     name: suite.name,
     scenarioIds: cases
-      .filter((testCase) => testCase.folderId === suite.id)
+      .filter((testCase) => testCase.testSuiteId === suite.id)
       .map((testCase) => testCase.id),
-    initialTarget: persisted ? { type: persisted.type, id: persisted.referenceId } : null,
-    persistedTarget: persisted ?? null,
+    initialTarget: null,
+    persistedTarget: null,
   };
 }
 
 /**
- * What happens the moment a run is queued. Shared by the table and the case
+ * What happens the moment a run is queued. Shared by the table and the scenario
  * editor, so a run started from either one opens the same way.
+ *
+ * The run set is always the one of the plan the run joined, so the drawer and
+ * the runs rail read the run back under that plan.
  */
-export function useRunStartedHandler({
-  projectId,
-  setRunningCaseId,
-}: {
-  projectId: string;
-  /** Marks the row of a one-off run while it starts. */
-  setRunningCaseId?: (scenarioId: string | null) => void;
-}): (info: RunStartedInfo) => void {
+export function useRunStartedHandler(): (info: RunStartedInfo) => void {
   const { openLiveRun } = useOpenLiveRun();
   const setPendingRun = useAgentTestingStore((state) => state.setPendingRun);
 
   return useCallback(
-    (info: RunStartedInfo) => {
-      const scenarioSetId = info.scenarioSetId ?? getOnPlatformSetId(projectId);
-      setPendingRun({ batchRunId: info.batchRunId, scenarioSetId });
-      if (!info.scenarioId) {
+    ({ batchRunId, scenarioSetId, scenarioId, targetId }: RunStartedInfo) => {
+      setPendingRun({ batchRunId, scenarioSetId });
+      if (!scenarioId) {
         toaster.create({ title: "Run scheduled", type: "success" });
         return;
       }
-      // A one-off run opens in the drawer right away and streams into it.
-      setRunningCaseId?.(info.scenarioId);
-      openLiveRun({
-        batchRunId: info.batchRunId,
-        scenarioSetId,
-        scenarioId: info.scenarioId,
-        targetId: info.targetId,
-      });
+      // A run of one scenario opens in the drawer right away and streams into
+      // it, so the person watches the conversation without leaving the table.
+      openLiveRun({ batchRunId, scenarioSetId, scenarioId, targetId });
     },
-    [setPendingRun, setRunningCaseId, openLiveRun, projectId],
+    [setPendingRun, openLiveRun],
   );
 }
 
 export type CaseRunActions = {
-  /** The set or case the run dialog is open on, if any. */
+  /** The suite or scenario the run dialog is open on, if any. */
   runSubject: RunDialogSubject | null;
   closeRunDialog: () => void;
-  /** The case whose one-off run is starting, so its row can say so. */
-  runningCaseId: string | null;
-  clearRunningCase: () => void;
   onRunStarted: (info: RunStartedInfo) => void;
   runCase: (testCase: TestCase) => void;
-  runSelectedSet: () => void;
+  /** Runs the suite that is open. */
+  runSelectedSuite: () => void;
   runSuiteById: (suiteId: string) => void;
 };
 
@@ -89,19 +80,15 @@ export function useCaseRunActions({
   projectId,
   cases,
   suites,
-  selection,
   selectedSuite,
 }: {
   projectId: string;
   cases: TestCase[];
   suites: TestSuiteEntry[];
-  selection: AgentTestingSelection;
   selectedSuite: TestSuiteEntry | null;
 }): CaseRunActions {
   const [runSubject, setRunSubject] = useState<RunDialogSubject | null>(null);
-  const [runningCaseId, setRunningCaseId] = useState<string | null>(null);
-  const lastRunTarget = useAgentTestingStore((state) => state.lastRunTarget);
-  const onRunStarted = useRunStartedHandler({ projectId, setRunningCaseId });
+  const onRunStarted = useRunStartedHandler();
 
   const runCase = useCallback(
     (testCase: TestCase) => {
@@ -118,13 +105,10 @@ export function useCaseRunActions({
     [projectId],
   );
 
-  const runSelectedSet = useCallback(() => {
-    if (selection.kind === "suite" && selectedSuite) {
-      setRunSubject(runSubjectForSuite({ suite: selectedSuite, cases }));
-      return;
-    }
-    setRunSubject({ kind: "all", initialTarget: lastRunTarget });
-  }, [selection, selectedSuite, cases, lastRunTarget]);
+  const runSelectedSuite = useCallback(() => {
+    if (!selectedSuite) return;
+    setRunSubject(runSubjectForSuite({ suite: selectedSuite, cases }));
+  }, [selectedSuite, cases]);
 
   const runSuiteById = useCallback(
     (suiteId: string) => {
@@ -137,11 +121,9 @@ export function useCaseRunActions({
   return {
     runSubject,
     closeRunDialog: () => setRunSubject(null),
-    runningCaseId,
-    clearRunningCase: () => setRunningCaseId(null),
     onRunStarted,
     runCase,
-    runSelectedSet,
+    runSelectedSuite,
     runSuiteById,
   };
 }

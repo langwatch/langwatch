@@ -376,7 +376,6 @@ export function NavigationHostSection({
           currentUser,
           organizationRole,
           rememberedProjectSlug: memory.selection.projectSlug,
-          lastVisitedHomeKind: memory.lastVisitedHomeKind as "" | "project" | "personal",
           waiting: <UiPageLoading />,
           notFound: <UiPageLoading />,
           pathname,

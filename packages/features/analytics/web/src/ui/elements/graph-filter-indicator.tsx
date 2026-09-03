@@ -13,7 +13,7 @@ export function GraphFilterIndicator({ filters }: GraphFilterIndicatorProps) {
     <Tooltip
       content={
         <VStack align="start" backgroundColor="black" color="white" height="100%" textWrap="wrap">
-          <FilterDisplay filters={filters} />
+          <FilterDisplay filters={filters} shouldClampValues={false} />
         </VStack>
       }
       positioning={{ placement: "top" }}

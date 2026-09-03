@@ -50,7 +50,7 @@ export class PrismaSuiteRepository extends SuiteRepository {
         projectId: input.projectId,
         name: input.name,
         slug: input.slug,
-        kind: "custom",
+        kind: "run_plan",
         description: input.description ?? null,
         scenarioIds: input.scenarioIds,
         scope: input.scope ? (input.scope as Prisma.InputJsonValue) : void 0,
@@ -66,7 +66,7 @@ export class PrismaSuiteRepository extends SuiteRepository {
 
   async list(input: { projectId: string }): Promise<Suite[]> {
     const rows = await this.database.simulationSuite.findMany({
-      where: { projectId: input.projectId, kind: "custom", archivedAt: null },
+      where: { projectId: input.projectId, kind: "run_plan", archivedAt: null },
       orderBy: { updatedAt: "desc" },
     });
     return rows.map(mapSuite);
@@ -88,7 +88,7 @@ export class PrismaSuiteRepository extends SuiteRepository {
         where: {
           id: input.id,
           projectId: input.projectId,
-          kind: "custom",
+          kind: "run_plan",
           archivedAt: null,
         },
         select: { scenarioIds: true, scope: true },
@@ -98,7 +98,7 @@ export class PrismaSuiteRepository extends SuiteRepository {
       }
 
       const scope = parseSuiteScope(suite.scope);
-      if (scope.mode === "cases") {
+      if (scope.mode === "scenarios") {
         return suite.scenarioIds;
       }
 
@@ -106,7 +106,7 @@ export class PrismaSuiteRepository extends SuiteRepository {
         where: {
           projectId: input.projectId,
           archivedAt: null,
-          ...(scope.mode === "folders" ? { folderId: { in: scope.folderIds } } : {}),
+          ...(scope.mode === "test_suites" ? { testSuiteId: { in: scope.testSuiteIds } } : {}),
           ...(scope.mode === "labels" ? { labels: { hasSome: scope.labels } } : {}),
         },
         select: { id: true },
@@ -127,7 +127,7 @@ export class PrismaSuiteRepository extends SuiteRepository {
       where: {
         id: input.id,
         projectId: input.projectId,
-        kind: "custom",
+        kind: "run_plan",
         archivedAt: null,
       },
     });
@@ -139,7 +139,7 @@ export class PrismaSuiteRepository extends SuiteRepository {
       where: {
         projectId: input.projectId,
         slug: input.slug,
-        kind: "custom",
+        kind: "run_plan",
         archivedAt: null,
       },
     });
@@ -163,7 +163,7 @@ export class PrismaSuiteRepository extends SuiteRepository {
         where: {
           projectId: input.projectId,
           labels: { has: input.label },
-          kind: "custom",
+          kind: "run_plan",
           archivedAt: null,
         },
         orderBy: { createdAt: "asc" },
@@ -198,7 +198,7 @@ export class PrismaSuiteRepository extends SuiteRepository {
           projectId: input.projectId,
           name: input.name,
           slug,
-          kind: "custom",
+          kind: "run_plan",
           scenarioIds: input.scenarioIds,
           targets: (input.targets ?? []) as Prisma.InputJsonValue,
           repeatCount: 1,
@@ -212,7 +212,7 @@ export class PrismaSuiteRepository extends SuiteRepository {
   async update(input: UpdateSuiteCommand & { slug?: string }): Promise<Suite> {
     const { id, projectId, slug, scope, targets, ...data } = input;
     const row = await this.database.simulationSuite.update({
-      where: { id, projectId, kind: "custom", archivedAt: null },
+      where: { id, projectId, kind: "run_plan", archivedAt: null },
       data: {
         ...data,
         ...(slug === void 0 ? {} : { slug }),
@@ -225,7 +225,7 @@ export class PrismaSuiteRepository extends SuiteRepository {
 
   async archive(input: SuiteIdInput & { archivedAt: Date; archivedSlug: string }): Promise<Suite> {
     const row = await this.database.simulationSuite.update({
-      where: { id: input.id, projectId: input.projectId, kind: "custom" },
+      where: { id: input.id, projectId: input.projectId, kind: "run_plan" },
       data: { archivedAt: input.archivedAt, slug: input.archivedSlug },
     });
     return mapSuite(row);

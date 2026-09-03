@@ -24,6 +24,7 @@ import {
   type ContributeLogFactsCommandData,
 } from "@langwatch/coding-agent-contract";
 import { EventingContributeLogFactsAdapter } from "../../adapters/eventing.contribute-log-facts.adapter";
+import { InMemorySessionContextMemoAdapter } from "../../adapters/in-memory.session-context-memo.adapter";
 import { CodingAgentSessionLogProjection } from "../coding-agent-session-log.projection";
 import { CodingAgentSessionStateProjection } from "../coding-agent-session-state.projection";
 import { buildTestCodingAgentProcessingPipeline } from "../../adapters/__tests__/fixtures/coding-agent-processing.fixture";
@@ -87,7 +88,9 @@ function batchParamsFor({
     payloads: payloads as unknown as Record<string, unknown>[],
     commandType: CONTRIBUTE_LOG_FACTS_COMMAND_TYPE,
     commandSchema: EventingContributeLogFactsAdapter.schema,
-    handler: EventingContributeLogFactsAdapter.create(),
+    handler: EventingContributeLogFactsAdapter.create({
+      contextMemo: new InMemorySessionContextMemoAdapter(),
+    }),
     getAggregateId: EventingContributeLogFactsAdapter.getAggregateId,
     storeEventsFn: storeEventsFn as never,
     aggregateType: "coding_agent_session" as const,

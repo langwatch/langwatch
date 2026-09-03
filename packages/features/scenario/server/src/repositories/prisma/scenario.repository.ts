@@ -10,12 +10,12 @@ import {
   changedSnapshotFields,
   parseSnapshotEnvelope,
   scenarioAuthorLabelSchema,
-  scenarioFolderSchema,
+  scenarioTestSuiteSchema,
   scenarioRunConfigSchema,
   scenarioSchema,
   scenarioSnapshotSchemaVersion,
-  ScenarioFolderNotFoundError,
-  ScenarioFolderSlugUnavailableError,
+  ScenarioTestSuiteNotFoundError,
+  ScenarioTestSuiteSlugUnavailableError,
   ScenarioNotFoundError,
   ScenarioStaleVersionError,
   ScenarioVersionNotFoundError,
@@ -24,12 +24,12 @@ import {
   type Scenario,
   type ScenarioActor,
   type ScenarioCreateInput,
-  type ScenarioFolder,
-  type ScenarioFolderCreateInput,
-  type ScenarioFolderIdInput,
-  type ScenarioFolderRenameInput,
-  type ScenarioFolderRunDefinition,
-  type ScenarioFolderUpdateInput,
+  type ScenarioTestSuite,
+  type ScenarioTestSuiteCreateInput,
+  type ScenarioTestSuiteIdInput,
+  type ScenarioTestSuiteRenameInput,
+  type ScenarioTestSuiteRunDefinition,
+  type ScenarioTestSuiteUpdateInput,
   type ScenarioReferenceState,
   type ScenarioRunConfig,
   type ScenarioUpdateInput,
@@ -49,12 +49,12 @@ function slugify(value: string): string {
       .toLowerCase()
       .trim()
       .replace(/[^a-z0-9]+/g, "-")
-      .replace(/^-|-$/g, "") || "folder"
+      .replace(/^-|-$/g, "") || "test-suite"
   );
 }
 
-function mapFolder(row: unknown): ScenarioFolder {
-  return scenarioFolderSchema.parse(row);
+function mapTestSuite(row: unknown): ScenarioTestSuite {
+  return scenarioTestSuiteSchema.parse(row);
 }
 
 function mapVersionSummary(row: PrismaScenarioVersion): ScenarioVersionSummary {
@@ -95,9 +95,11 @@ export class PrismaScenarioRepository extends ScenarioRepository {
     input: ScenarioCreateInput & { id: string; actor: ScenarioActor },
   ): Promise<Scenario> {
     return this.database.$transaction(async (transaction) => {
-      if (input.folderId) {
-        const folders = await this.lockFolders(transaction, input.projectId, [input.folderId]);
-        this.assertAssignableFolder(input.folderId, folders.get(input.folderId));
+      if (input.testSuiteId) {
+        const testSuites = await this.lockTestSuites(transaction, input.projectId, [
+          input.testSuiteId,
+        ]);
+        this.assertAssignableTestSuite(input.testSuiteId, testSuites.get(input.testSuiteId));
       }
 
       const { actor, parameters: inputParameters, ...scenarioInput } = input;
@@ -118,8 +120,8 @@ export class PrismaScenarioRepository extends ScenarioRepository {
           schemaVersion: scenarioSnapshotSchemaVersion,
         },
       });
-      if (input.folderId) {
-        await this.reconcileLockedFolder(transaction, input.projectId, input.folderId);
+      if (input.testSuiteId) {
+        await this.reconcileLockedTestSuite(transaction, input.projectId, input.testSuiteId);
       }
       return scenario;
     });
@@ -180,7 +182,7 @@ export class PrismaScenarioRepository extends ScenarioRepository {
       const current = await this.lockActiveScenario(transaction, input);
       this.assertExpectedVersion(input, current);
 
-      const touchedFolderIds = await this.lockTouchedFolders(transaction, input, current);
+      const touchedTestSuiteIds = await this.lockTouchedTestSuites(transaction, input, current);
       const versioned = touchesVersionedFields(input);
       const updated = await this.persistUpdate(transaction, input, current, versioned);
 
@@ -188,8 +190,8 @@ export class PrismaScenarioRepository extends ScenarioRepository {
         await this.appendVersion(transaction, input, current, updated);
       }
 
-      if (input.folderId !== void 0) {
-        await this.reconcileLockedFolders(transaction, input.projectId, touchedFolderIds);
+      if (input.testSuiteId !== void 0) {
+        await this.reconcileLockedTestSuites(transaction, input.projectId, touchedTestSuiteIds);
       }
 
       return updated;
@@ -265,15 +267,17 @@ export class PrismaScenarioRepository extends ScenarioRepository {
       if (!found) return null;
       if (found.archivedAt) return scenarioSchema.parse(found);
 
-      const folders = await this.lockFolders(transaction, input.projectId, [found.folderId]);
+      const testSuites = await this.lockTestSuites(transaction, input.projectId, [
+        found.testSuiteId,
+      ]);
 
       const row = await transaction.scenario.update({
         where: { id: input.id, projectId: input.projectId },
         data: { archivedAt: input.archivedAt },
       });
-      const folder = found.folderId ? folders.get(found.folderId) : void 0;
-      if (found.folderId && folder?.kind === "folder" && folder.archivedAt === null) {
-        await this.reconcileLockedFolder(transaction, input.projectId, found.folderId);
+      const testSuite = found.testSuiteId ? testSuites.get(found.testSuiteId) : void 0;
+      if (found.testSuiteId && testSuite?.kind === "test_suite" && testSuite.archivedAt === null) {
+        await this.reconcileLockedTestSuite(transaction, input.projectId, found.testSuiteId);
       }
       return scenarioSchema.parse(row);
     });
@@ -292,8 +296,8 @@ export class PrismaScenarioRepository extends ScenarioRepository {
       const activeRows = rows.filter((row) => row.archivedAt === null);
       if (activeRows.length === 0) return { archived, missing };
 
-      const folderIds = activeRows.map((row) => row.folderId);
-      await this.lockFolders(transaction, input.projectId, folderIds);
+      const testSuiteIds = activeRows.map((row) => row.testSuiteId);
+      await this.lockTestSuites(transaction, input.projectId, testSuiteIds);
 
       await transaction.scenario.updateMany({
         where: {
@@ -303,7 +307,7 @@ export class PrismaScenarioRepository extends ScenarioRepository {
         },
         data: { archivedAt: input.archivedAt },
       });
-      await this.reconcileLockedFolders(transaction, input.projectId, folderIds);
+      await this.reconcileLockedTestSuites(transaction, input.projectId, testSuiteIds);
       return { archived, missing };
     });
   }
@@ -345,7 +349,9 @@ export class PrismaScenarioRepository extends ScenarioRepository {
     return rows.map((row) => scenarioSchema.pick({ id: true, name: true }).parse(row));
   }
 
-  async createFolder(input: ScenarioFolderCreateInput & { id: string }): Promise<ScenarioFolder> {
+  async createTestSuite(
+    input: ScenarioTestSuiteCreateInput & { id: string },
+  ): Promise<ScenarioTestSuite> {
     const baseSlug = slugify(input.name);
     for (let suffix = 0; suffix < 100; suffix += 1) {
       const slug = suffix === 0 ? baseSlug : `${baseSlug}-${suffix + 1}`;
@@ -356,102 +362,106 @@ export class PrismaScenarioRepository extends ScenarioRepository {
             projectId: input.projectId,
             name: input.name,
             slug,
-            kind: "folder",
+            kind: "test_suite",
             scenarioIds: [],
             targets: [],
             repeatCount: 1,
             labels: [],
           },
         });
-        return mapFolder(row);
+        return mapTestSuite(row);
       } catch (error) {
         if (!this.isSlugConflict(error)) throw error;
       }
     }
-    throw new ScenarioFolderSlugUnavailableError(input.name);
+    throw new ScenarioTestSuiteSlugUnavailableError(input.name);
   }
 
-  async findFolders(input: { projectId: string }): Promise<ScenarioFolder[]> {
+  async findTestSuites(input: { projectId: string }): Promise<ScenarioTestSuite[]> {
     const rows = await this.database.simulationSuite.findMany({
-      where: { projectId: input.projectId, kind: "folder", archivedAt: null },
+      where: { projectId: input.projectId, kind: "test_suite", archivedAt: null },
       orderBy: { updatedAt: "desc" },
     });
-    return rows.map(mapFolder);
+    return rows.map(mapTestSuite);
   }
 
-  async tryFindFolder(input: ScenarioFolderIdInput): Promise<ScenarioFolder | null> {
+  async tryFindTestSuite(input: ScenarioTestSuiteIdInput): Promise<ScenarioTestSuite | null> {
     const row = await this.database.simulationSuite.findFirst({
       where: {
-        id: input.folderId,
+        id: input.testSuiteId,
         projectId: input.projectId,
-        kind: "folder",
+        kind: "test_suite",
         archivedAt: null,
       },
     });
-    return row ? mapFolder(row) : null;
+    return row ? mapTestSuite(row) : null;
   }
 
-  async renameFolder(input: ScenarioFolderRenameInput): Promise<ScenarioFolder> {
+  async renameTestSuite(input: ScenarioTestSuiteRenameInput): Promise<ScenarioTestSuite> {
     return this.database.$transaction(async (transaction) => {
-      const folders = await this.lockFolders(transaction, input.projectId, [input.folderId]);
-      this.assertAssignableFolder(input.folderId, folders.get(input.folderId));
+      const testSuites = await this.lockTestSuites(transaction, input.projectId, [
+        input.testSuiteId,
+      ]);
+      this.assertAssignableTestSuite(input.testSuiteId, testSuites.get(input.testSuiteId));
 
       const row = await transaction.simulationSuite.update({
-        where: { id: input.folderId, projectId: input.projectId },
+        where: { id: input.testSuiteId, projectId: input.projectId },
         data: { name: input.name },
       });
-      return mapFolder(row);
+      return mapTestSuite(row);
     });
   }
 
-  async updateFolder(input: ScenarioFolderUpdateInput): Promise<ScenarioFolder> {
-    const { folderId, projectId, targets, ...data } = input;
+  async updateTestSuite(input: ScenarioTestSuiteUpdateInput): Promise<ScenarioTestSuite> {
+    const { testSuiteId, projectId, targets, ...data } = input;
     const found = await this.database.simulationSuite.findFirst({
-      where: { id: folderId, projectId, kind: "folder", archivedAt: null },
+      where: { id: testSuiteId, projectId, kind: "test_suite", archivedAt: null },
       select: { id: true },
     });
-    if (!found) throw new ScenarioFolderNotFoundError(folderId);
+    if (!found) throw new ScenarioTestSuiteNotFoundError(testSuiteId);
 
     const row = await this.database.simulationSuite.update({
-      where: { id: folderId, projectId },
+      where: { id: testSuiteId, projectId },
       data: {
         ...data,
         ...(targets === void 0 ? {} : { targets: targets as Prisma.InputJsonValue }),
       },
     });
-    return mapFolder(row);
+    return mapTestSuite(row);
   }
 
-  async getFolderRunDefinition(input: ScenarioFolderIdInput): Promise<ScenarioFolderRunDefinition> {
+  async getTestSuiteRunDefinition(
+    input: ScenarioTestSuiteIdInput,
+  ): Promise<ScenarioTestSuiteRunDefinition> {
     return this.database.$transaction(async (transaction) => {
-      const folder = await transaction.simulationSuite.findFirst({
+      const testSuite = await transaction.simulationSuite.findFirst({
         where: {
-          id: input.folderId,
+          id: input.testSuiteId,
           projectId: input.projectId,
-          kind: "folder",
+          kind: "test_suite",
           archivedAt: null,
         },
       });
-      if (!folder) throw new ScenarioFolderNotFoundError(input.folderId);
+      if (!testSuite) throw new ScenarioTestSuiteNotFoundError(input.testSuiteId);
 
       const scenarios = await transaction.scenario.findMany({
-        where: { projectId: input.projectId, folderId: input.folderId },
+        where: { projectId: input.projectId, testSuiteId: input.testSuiteId },
         select: { id: true },
         orderBy: { createdAt: "asc" },
       });
       return {
-        folder: mapFolder(folder),
+        testSuite: mapTestSuite(testSuite),
         scenarioIds: scenarios.map((scenario) => scenario.id),
       };
     });
   }
 
-  async archiveFolder(
-    input: ScenarioFolderIdInput & { archivedAt: Date },
-  ): Promise<ScenarioFolder> {
+  async archiveTestSuite(
+    input: ScenarioTestSuiteIdInput & { archivedAt: Date },
+  ): Promise<ScenarioTestSuite> {
     return this.database.$transaction(async (transaction) => {
       const memberRows = await transaction.scenario.findMany({
-        where: { projectId: input.projectId, folderId: input.folderId },
+        where: { projectId: input.projectId, testSuiteId: input.testSuiteId },
         select: { id: true },
       });
       await this.lockScenarios(
@@ -459,25 +469,27 @@ export class PrismaScenarioRepository extends ScenarioRepository {
         input.projectId,
         memberRows.map((row) => row.id),
       );
-      const folders = await this.lockFolders(transaction, input.projectId, [input.folderId]);
-      const folder = folders.get(input.folderId);
-      if (!folder || folder.kind !== "folder") {
-        throw new ScenarioFolderNotFoundError(input.folderId);
+      const testSuites = await this.lockTestSuites(transaction, input.projectId, [
+        input.testSuiteId,
+      ]);
+      const testSuite = testSuites.get(input.testSuiteId);
+      if (!testSuite || testSuite.kind !== "test_suite") {
+        throw new ScenarioTestSuiteNotFoundError(input.testSuiteId);
       }
-      if (folder.archivedAt) return mapFolder(folder);
+      if (testSuite.archivedAt) return mapTestSuite(testSuite);
 
       await transaction.scenario.updateMany({
-        where: { projectId: input.projectId, folderId: input.folderId, archivedAt: null },
+        where: { projectId: input.projectId, testSuiteId: input.testSuiteId, archivedAt: null },
         data: { archivedAt: input.archivedAt },
       });
-      const archivedSlug = folder.slug.endsWith("--archived")
-        ? folder.slug
-        : `${folder.slug}--archived-${folder.id.slice(-6)}`;
+      const archivedSlug = testSuite.slug.endsWith("--archived")
+        ? testSuite.slug
+        : `${testSuite.slug}--archived-${testSuite.id.slice(-6)}`;
       const row = await transaction.simulationSuite.update({
-        where: { id: input.folderId, projectId: input.projectId },
+        where: { id: input.testSuiteId, projectId: input.projectId },
         data: { archivedAt: input.archivedAt, slug: archivedSlug },
       });
-      return mapFolder(row);
+      return mapTestSuite(row);
     });
   }
 
@@ -500,16 +512,16 @@ export class PrismaScenarioRepository extends ScenarioRepository {
     }
   }
 
-  private async lockTouchedFolders(
+  private async lockTouchedTestSuites(
     transaction: Prisma.TransactionClient,
     input: ScenarioWriteInput,
     current: Scenario,
   ): Promise<Array<string | null | undefined>> {
-    const touched = input.folderId === void 0 ? [] : [current.folderId, input.folderId];
-    const folders = await this.lockFolders(transaction, input.projectId, touched);
-    const targetFolderId = input.folderId;
-    if (targetFolderId !== void 0 && targetFolderId !== null) {
-      this.assertAssignableFolder(targetFolderId, folders.get(targetFolderId));
+    const touched = input.testSuiteId === void 0 ? [] : [current.testSuiteId, input.testSuiteId];
+    const testSuites = await this.lockTestSuites(transaction, input.projectId, touched);
+    const targetTestSuiteId = input.testSuiteId;
+    if (targetTestSuiteId !== void 0 && targetTestSuiteId !== null) {
+      this.assertAssignableTestSuite(targetTestSuiteId, testSuites.get(targetTestSuiteId));
     }
 
     return touched;
@@ -583,9 +595,12 @@ export class PrismaScenarioRepository extends ScenarioRepository {
     });
   }
 
-  private assertAssignableFolder(folderId: string, folder: SimulationSuite | undefined): void {
-    if (!folder || folder.kind !== "folder" || folder.archivedAt !== null) {
-      throw new ScenarioFolderNotFoundError(folderId);
+  private assertAssignableTestSuite(
+    testSuiteId: string,
+    testSuite: SimulationSuite | undefined,
+  ): void {
+    if (!testSuite || testSuite.kind !== "test_suite" || testSuite.archivedAt !== null) {
+      throw new ScenarioTestSuiteNotFoundError(testSuiteId);
     }
   }
 
@@ -619,55 +634,63 @@ export class PrismaScenarioRepository extends ScenarioRepository {
     return rows;
   }
 
-  private async lockFolders(
+  private async lockTestSuites(
     transaction: Prisma.TransactionClient,
     projectId: string,
-    folderIds: Array<string | null | undefined>,
+    testSuiteIds: Array<string | null | undefined>,
   ): Promise<Map<string, SimulationSuite>> {
     const ids = [
-      ...new Set(folderIds.filter((folderId): folderId is string => typeof folderId === "string")),
+      ...new Set(
+        testSuiteIds.filter(
+          (testSuiteId): testSuiteId is string => typeof testSuiteId === "string",
+        ),
+      ),
     ].sort();
-    const folders = new Map<string, SimulationSuite>();
-    for (const folderId of ids) {
+    const testSuites = new Map<string, SimulationSuite>();
+    for (const testSuiteId of ids) {
       await transaction.$executeRaw`
         SELECT id
         FROM "SimulationSuite"
-        WHERE id = ${folderId} AND "projectId" = ${projectId}
+        WHERE id = ${testSuiteId} AND "projectId" = ${projectId}
         FOR UPDATE
       `;
-      const folder = await transaction.simulationSuite.findFirst({
-        where: { id: folderId, projectId },
+      const testSuite = await transaction.simulationSuite.findFirst({
+        where: { id: testSuiteId, projectId },
       });
-      if (folder) folders.set(folderId, folder);
+      if (testSuite) testSuites.set(testSuiteId, testSuite);
     }
-    return folders;
+    return testSuites;
   }
 
-  private async reconcileLockedFolders(
+  private async reconcileLockedTestSuites(
     transaction: Prisma.TransactionClient,
     projectId: string,
-    folderIds: Array<string | null | undefined>,
+    testSuiteIds: Array<string | null | undefined>,
   ): Promise<void> {
     const ids = [
-      ...new Set(folderIds.filter((folderId): folderId is string => typeof folderId === "string")),
+      ...new Set(
+        testSuiteIds.filter(
+          (testSuiteId): testSuiteId is string => typeof testSuiteId === "string",
+        ),
+      ),
     ].sort();
-    for (const folderId of ids) {
-      await this.reconcileLockedFolder(transaction, projectId, folderId);
+    for (const testSuiteId of ids) {
+      await this.reconcileLockedTestSuite(transaction, projectId, testSuiteId);
     }
   }
 
-  private async reconcileLockedFolder(
+  private async reconcileLockedTestSuite(
     transaction: Prisma.TransactionClient,
     projectId: string,
-    folderId: string,
+    testSuiteId: string,
   ): Promise<void> {
     const members = await transaction.scenario.findMany({
-      where: { projectId, folderId, archivedAt: null },
+      where: { projectId, testSuiteId, archivedAt: null },
       select: { id: true },
       orderBy: { createdAt: "asc" },
     });
     await transaction.simulationSuite.update({
-      where: { id: folderId, projectId },
+      where: { id: testSuiteId, projectId },
       data: { scenarioIds: members.map((member) => member.id) },
     });
   }

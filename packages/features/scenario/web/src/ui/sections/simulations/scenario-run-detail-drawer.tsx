@@ -27,6 +27,7 @@ import {
 import { useRunAgainActions } from "./use-run-again-actions";
 import { useRunDetailFacts } from "../../../behavior/simulations/use-run-detail-facts";
 import { useRunStateStream } from "../../../behavior/simulations/use-run-state-stream";
+import { isAgentTestScenarioId } from "@langwatch/scenario-contract";
 
 /**
  * The Agent Testing variant: wider, side by side when the width allows, and
@@ -211,7 +212,15 @@ function ClassicScenarioRunDetailDrawer({ open }: ScenarioRunDetailDrawerProps) 
 
   return (
     <>
-      <Drawer.Root open={!!open} onOpenChange={() => closeDrawer()} placement="end" size="lg">
+      <Drawer.Root
+        open={!!open}
+        // Only a close is a close; see AgentTestingRunDrawer.
+        onOpenChange={({ open: isOpen }) => {
+          if (!isOpen) closeDrawer();
+        }}
+        placement="end"
+        size="lg"
+      >
         {/* Transparent at the Content level so the header band below can run
             its own translucent + backdrop-blur fill over the drawer's
             scrolling content — same recipe as the Traces V2 drawer shell. */}
@@ -485,11 +494,12 @@ function ClassicScenarioRunDetailDrawer({ open }: ScenarioRunDetailDrawerProps) 
         isLoading={isRunning}
       />
 
-      {/* Child drawer: Scenario Editor — managed via local state */}
+      {/* Child drawer: Scenario Editor, managed via local state. An agent
+          test run has no scenario row, so the editor gets no id to read. */}
       <ScenarioFormDrawer
         open={scenarioEditorOpen}
         onClose={() => setScenarioEditorOpen(false)}
-        scenarioId={scenarioId}
+        scenarioId={scenarioId && isAgentTestScenarioId(scenarioId) ? undefined : scenarioId}
       />
     </>
   );

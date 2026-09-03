@@ -62,12 +62,19 @@ describe("given the pull-cadence cron mapping", () => {
      * a source that looks configured, reports no error, and returns nothing.
      */
     it("recommends a schedule for every pull-mode source the catalog offers", () => {
-      const missing = SOURCE_TYPE_OPTIONS.filter(
-        (option) =>
-          option.mode === "pull" &&
-          !option.deprecated &&
-          recommendedPullSchedule(option.value) === null,
-      ).map((option) => option.value);
+      const pullOptions = SOURCE_TYPE_OPTIONS.filter(
+        (option) => option.mode === "pull" && !option.deprecated,
+      );
+      // The candidate set has to be proven non-empty first, the same way the
+      // round-trip test above proves it. Folding the selection and the check
+      // into one filter makes an empty result mean either "every pull source
+      // has a schedule" or "nothing is a pull source any more", and the
+      // assertion cannot tell those apart.
+      expect(pullOptions.length).toBeGreaterThan(0);
+
+      const missing = pullOptions
+        .filter((option) => recommendedPullSchedule(option.value) === null)
+        .map((option) => option.value);
       expect(missing).toEqual([]);
     });
   });

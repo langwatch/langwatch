@@ -15,7 +15,7 @@ import {
   suiteRunInputSchema,
   suiteRunStateInputSchema,
   suiteSchema,
-  SuiteFolderMembershipManagedError,
+  SuiteTestSuiteMembershipManagedError,
   SuiteNameTakenError,
   SuiteNotFoundError,
   SuiteScopeEmptyError,
@@ -41,8 +41,8 @@ import type { AgentService } from "@langwatch/agent-contract";
 import type { PromptService } from "@langwatch/prompt-contract";
 import {
   jsonValueSchema,
-  ScenarioFolderNotFoundError,
-  type ScenarioFolder,
+  ScenarioTestSuiteNotFoundError,
+  type ScenarioTestSuite,
   type ScenarioService,
 } from "@langwatch/scenario-contract";
 import type { SuiteExecutionPort } from "../ports/suite-execution.port";
@@ -90,11 +90,11 @@ export class SuiteService extends SuiteServiceContract {
     const suite = await this.options.repository.tryFindById(parsed);
     if (suite) return suite;
 
-    const folder = await this.options.scenarios.tryGetFolder({
-      folderId: parsed.id,
+    const testSuite = await this.options.scenarios.tryGetTestSuite({
+      testSuiteId: parsed.id,
       projectId: parsed.projectId,
     });
-    return folder ? SuiteService.folderToSuite(folder) : null;
+    return testSuite ? SuiteService.testSuiteToSuite(testSuite) : null;
   }
 
   async create(input: CreateSuiteCommand): Promise<Suite> {
@@ -111,11 +111,11 @@ export class SuiteService extends SuiteServiceContract {
   async update(input: UpdateSuiteCommand): Promise<Suite> {
     const parsed = updateSuiteCommandSchema.parse(input);
     const existing = await this.get({ id: parsed.id, projectId: parsed.projectId });
-    if (existing.kind === "folder") {
+    if (existing.kind === "test_suite") {
       if (parsed.scope !== void 0) throw new SuiteScopeNotAllowedError();
-      if (parsed.scenarioIds !== void 0) throw new SuiteFolderMembershipManagedError();
+      if (parsed.scenarioIds !== void 0) throw new SuiteTestSuiteMembershipManagedError();
 
-      return this.updateFolder(parsed);
+      return this.updateTestSuite(parsed);
     }
 
     const slug = parsed.name === undefined ? undefined : SuiteService.slugify(parsed.name);
@@ -155,8 +155,8 @@ export class SuiteService extends SuiteServiceContract {
 
   async archive(input: SuiteIdInput): Promise<Suite> {
     const suite = await this.get(input);
-    if (suite.kind === "folder") {
-      return this.archiveFolder(suite);
+    if (suite.kind === "test_suite") {
+      return this.archiveTestSuite(suite);
     }
 
     const archivedSlug = suite.slug.endsWith(archivedSlugSuffix)
@@ -241,6 +241,7 @@ export class SuiteService extends SuiteServiceContract {
       batchRunId: parsed.batchRunId,
       parameters: parsed.parameters,
       note: parsed.note,
+      actor: parsed.actor,
     });
   }
 
@@ -266,6 +267,7 @@ export class SuiteService extends SuiteServiceContract {
       batchRunId: parsed.batchRunId,
       parameters: parsed.parameters,
       note: parsed.note,
+      actor: parsed.actor,
     });
     return { ...result, suiteId: suite.id };
   }
@@ -315,10 +317,10 @@ export class SuiteService extends SuiteServiceContract {
     };
   }
 
-  private async updateFolder(input: UpdateSuiteCommand): Promise<Suite> {
+  private async updateTestSuite(input: UpdateSuiteCommand): Promise<Suite> {
     try {
-      const folder = await this.options.scenarios.updateFolder({
-        folderId: input.id,
+      const testSuite = await this.options.scenarios.updateTestSuite({
+        testSuiteId: input.id,
         projectId: input.projectId,
         name: input.name,
         description: input.description,
@@ -328,24 +330,24 @@ export class SuiteService extends SuiteServiceContract {
         simulatorModel: input.simulatorModel,
         judgeModel: input.judgeModel,
       });
-      return SuiteService.folderToSuite(folder);
+      return SuiteService.testSuiteToSuite(testSuite);
     } catch (error) {
-      if (error instanceof ScenarioFolderNotFoundError) {
+      if (error instanceof ScenarioTestSuiteNotFoundError) {
         throw new SuiteNotFoundError(input.id);
       }
       throw error;
     }
   }
 
-  private async archiveFolder(suite: Suite): Promise<Suite> {
+  private async archiveTestSuite(suite: Suite): Promise<Suite> {
     try {
-      const folder = await this.options.scenarios.archiveFolder({
-        folderId: suite.id,
+      const testSuite = await this.options.scenarios.archiveTestSuite({
+        testSuiteId: suite.id,
         projectId: suite.projectId,
       });
-      return SuiteService.folderToSuite(folder);
+      return SuiteService.testSuiteToSuite(testSuite);
     } catch (error) {
-      if (error instanceof ScenarioFolderNotFoundError) {
+      if (error instanceof ScenarioTestSuiteNotFoundError) {
         throw new SuiteNotFoundError(suite.id);
       }
       throw error;
@@ -357,15 +359,15 @@ export class SuiteService extends SuiteServiceContract {
     scopeIsDynamic: boolean;
     projectId: string;
   }): Promise<string[]> {
-    if (input.suite.kind === "folder") {
+    if (input.suite.kind === "test_suite") {
       try {
-        const definition = await this.options.scenarios.getFolderRunDefinition({
-          folderId: input.suite.id,
+        const definition = await this.options.scenarios.getTestSuiteRunDefinition({
+          testSuiteId: input.suite.id,
           projectId: input.projectId,
         });
         return definition.scenarioIds;
       } catch (error) {
-        if (error instanceof ScenarioFolderNotFoundError) {
+        if (error instanceof ScenarioTestSuiteNotFoundError) {
           throw new SuiteNotFoundError(input.suite.id);
         }
         throw error;
@@ -476,6 +478,10 @@ export class SuiteService extends SuiteServiceContract {
       case "http":
       case "code":
       case "workflow":
+      // A connected target points at an Agent row like the other three. Its
+      // reference id may also read `<name>@<environment>`, which the run
+      // resolves to an agent id before membership is read.
+      case "connected":
         return true;
       case "prompt":
         return false;
@@ -486,7 +492,7 @@ export class SuiteService extends SuiteServiceContract {
     }
   }
 
-  private static folderToSuite(folder: ScenarioFolder): Suite {
-    return suiteSchema.parse(folder);
+  private static testSuiteToSuite(testSuite: ScenarioTestSuite): Suite {
+    return suiteSchema.parse(testSuite);
   }
 }

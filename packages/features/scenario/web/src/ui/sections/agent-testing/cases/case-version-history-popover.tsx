@@ -40,14 +40,11 @@ export function CaseVersionHistoryPopover({
     >
       <Popover.Trigger asChild>
         <Button
-          position="absolute"
-          top={3}
-          right={11}
           size="xs"
           variant="ghost"
           fontSize="12px"
           color={FG_MUTED}
-          title="Every version of this test case"
+          title="Every version of this scenario"
           data-testid="case-modal-history"
         >
           <History size={12} />v{version} · History
@@ -60,13 +57,7 @@ export function CaseVersionHistoryPopover({
         </Popover.Header>
         <Popover.CloseTrigger />
         <Popover.Body paddingTop={0}>
-          {open && (
-            <ScenarioVersionList
-              scenarioId={scenarioId}
-              markVersion={null}
-              isCompact
-            />
-          )}
+          {open && <ScenarioVersionList scenarioId={scenarioId} markVersion={null} isCompact />}
         </Popover.Body>
       </Popover.Content>
     </Popover.Root>

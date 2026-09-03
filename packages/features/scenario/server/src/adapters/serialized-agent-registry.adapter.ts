@@ -12,6 +12,7 @@ import type { RunParameterValues } from "@langwatch/scenario-contract";
 import { SerializedCodeAgentAdapter } from "./serialized-code-agent.adapter";
 import { SerializedHttpAgentAdapter } from "./serialized-http-agent.adapter";
 import { SerializedPromptConfigAdapter } from "./serialized-prompt-config.adapter";
+import { SerializedConnectedAgentAdapter } from "./serialized-connected-agent.adapter";
 import { SerializedWorkflowAgentAdapter } from "./serialized-workflow-agent.adapter";
 import type { LiteLLMParams, TargetAdapterData } from "@langwatch/scenario-contract";
 import type { ScenarioHttpPort } from "../ports/scenario-http.port";
@@ -82,6 +83,17 @@ export class SerializedAgentRegistryAdapter {
           nlpServiceUrl: input.nlpServiceUrl,
           projectApiKey: input.projectApiKey,
           parameters: input.parameters,
+        });
+      }
+      case "connected": {
+        if (!input.projectApiKey) {
+          throw new Error("Connected adapter requires projectApiKey");
+        }
+        return SerializedConnectedAgentAdapter.create({
+          config: adapterData,
+          projectApiKey: input.projectApiKey,
+          parameters: input.parameters,
+          logger: input.logger,
         });
       }
     }

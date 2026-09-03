@@ -4,20 +4,21 @@ Feature: Scenario tests for skills quality assurance
   We want every skill to have scenario tests proving it works
   So that we can compound improvements with confidence and catch regressions
 
-  # All `@unimplemented` scenarios in this file describe live Claude
-  # Code-driven scenario tests under `skills/_tests/*.scenario.test.ts`
-  # (e.g. `tracing.scenario.test.ts`, `evaluations.scenario.test.ts`,
+  # The scenarios in this file describe live Claude Code-driven scenario
+  # tests under `skills/_tests/*.scenario.test.ts` (e.g.
+  # `tracing.scenario.test.ts`, `evaluations.scenario.test.ts`,
   # `level-up.scenario.test.ts`, `agent-performance.scenario.test.ts`,
-  # `prompts*.scenario.test.ts`, `scenarios.scenario.test.ts`). The
-  # tests exist and are skipped in CI (`it.skipIf(isCI)`) — they
-  # spawn an actual Claude Code agent against a fixture codebase.
+  # `prompts*.scenario.test.ts`, `scenarios.scenario.test.ts`). The tests
+  # spawn an actual Claude Code agent against a fixture codebase, so they
+  # are skipped in CI (`it.skipIf(isCI)`) and run on a developer machine.
   #
-  # The `check-feature-parity` script's DEFAULT_TEST_ROOTS does not
-  # include `skills/_tests/`, so JSDoc `@scenario` annotations in
-  # those files would not currently bind. Expanding the test roots
-  # is the right structural fix for this domain — tracked outside
-  # this PR. Until then, scenarios stay `@unimplemented` (with this
-  # justifying note) rather than being orphaned.
+  # `skills/_tests` is one of the parity checker's test roots, so a
+  # `@scenario` annotation in those files binds the scenario it names.
+  #
+  # What we ship in a skill is instructions, so the outcome a scenario
+  # here observes is what the coding agent does after reading them: the
+  # commands it runs and the code it writes. Naming them is the behavior,
+  # not an implementation detail of the test.
 
   Background:
     Given scenario tests live in skills/_tests/
@@ -164,6 +165,26 @@ Feature: Scenario tests for skills quality assurance
     And the agent keeps the existing session authentication in place for normal traffic
     And the agent attempts to register the endpoint with `langwatch agent create --type http`
     And the agent does not claim a suite run succeeded when the platform is unreachable
+
+  @connect-agent @integration
+  Scenario: Connect-agent skill decorates the agent function instead of registering a URL
+    Given the fixture "python-fastapi-chat" is copied to a temp directory
+    And the skill "connect-agent" is loaded
+    When Claude Code receives "connect my agent to LangWatch simulations"
+    Then the agent adds langwatch.connect_agent to the function that runs the agent
+    And the agent reads the agent row back with `langwatch agent list` or `langwatch agent get`
+    And no `langwatch agent create` command runs
+    And the agent does not claim the agent is online without reading its status
+
+  @scenarios @connect-agent @integration
+  Scenario: The scenarios skill proposes scenarios from the levers of a connected agent
+    Given the fixture "python-connected-agent" runs and is online as a connected agent
+    And the skill "scenarios" is loaded
+    When Claude Code receives "add scenario tests for my connected agent on the platform"
+    Then the agent reads the run parameters the agent declares with `langwatch agent get` or `langwatch agent list`
+    And the agent creates the scenarios with `langwatch scenario create` and writes no test files
+    And at least one scenario depends on the customer plan and the plan travels as `--param plan=` or a `?plan=` target suffix
+    And the agent names the comparison run across the model options
 
   # ──────────────────────────────────────────────────
   # Prompts skill tests

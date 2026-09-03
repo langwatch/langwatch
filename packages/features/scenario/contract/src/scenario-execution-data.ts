@@ -114,6 +114,12 @@ export const HttpAgentDataSchema = z.object({
   auth: AuthConfigSchema.optional(),
   bodyTemplate: z.string().optional(),
   outputPath: z.string().optional(),
+  /**
+   * JSONPath of the value the endpoint returns for the conversation. What it
+   * matches is held per thread and rendered as `{{ session }}` on the next
+   * turn of the same thread.
+   */
+  sessionPath: z.string().optional(),
   /** Maps agent input field identifiers to scenario data sources or static values. */
   scenarioMappings: z.record(z.string(), FieldMappingSchema).optional(),
   /**
@@ -167,6 +173,17 @@ export const CodeAgentDataSchema = z.object({
    * leaves every turn doing its own work.
    */
   sandboxApiKey: z.string().optional(),
+  /**
+   * Wall-clock budget for the agent's Python, in milliseconds, sent to the
+   * engine as the code node's `timeout_ms` parameter.
+   *
+   * It can only SHORTEN the run: the code executor clamps every per-node
+   * request to the operator's ceiling
+   * (`NLPGO_ENGINE_CODE_BLOCK_TIMEOUT_SECONDS`, 600s when unset), so a value
+   * above that ceiling is silently ignored. Absent leaves the engine on the
+   * operator default.
+   */
+  timeoutMs: z.number().int().positive().optional(),
 });
 export type CodeAgentData = z.infer<typeof CodeAgentDataSchema>;
 
@@ -210,12 +227,31 @@ export const WorkflowAgentDataSchema = z.object({
 });
 export type WorkflowAgentData = z.infer<typeof WorkflowAgentDataSchema>;
 
+/**
+ * Pre-fetched connected agent configuration for serialized execution.
+ *
+ * The child reaches the agent through the relay route with the project key,
+ * so all it needs is the agent id, where the platform is, and the per-call
+ * budget the agent declared. The parameters the agent declares travel with
+ * the job so a typed value is sent as its declared type.
+ */
+export const ConnectedAgentDataSchema = z.object({
+  type: z.literal("connected"),
+  agentId: z.string(),
+  /** The platform's own address, the origin the relay route is posted to. */
+  endpoint: z.string(),
+  /** Per-call budget in milliseconds, already capped by the platform. */
+  timeoutMs: z.number().int().positive(),
+});
+export type ConnectedAgentData = z.infer<typeof ConnectedAgentDataSchema>;
+
 /** Union type for all supported target adapter data */
 export const TargetAdapterDataSchema = z.discriminatedUnion("type", [
   PromptConfigDataSchema,
   HttpAgentDataSchema,
   CodeAgentDataSchema,
   WorkflowAgentDataSchema,
+  ConnectedAgentDataSchema,
 ]);
 export type TargetAdapterData = z.infer<typeof TargetAdapterDataSchema>;
 
@@ -277,7 +313,7 @@ export type TelemetryConfig = z.infer<typeof TelemetryConfigSchema>;
 
 /** Target configuration - what to test against */
 export const TargetConfigSchema = z.object({
-  type: z.enum(["prompt", "http", "code", "workflow"]),
+  type: z.enum(["prompt", "http", "code", "workflow", "connected"]),
   referenceId: z.string(),
 });
 export type TargetConfig = z.infer<typeof TargetConfigSchema>;
@@ -285,6 +321,19 @@ export type TargetConfig = z.infer<typeof TargetConfigSchema>;
 // ============================================================================
 // Result Types
 // ============================================================================
+
+/**
+ * The connected agent instance that answered a run.
+ *
+ * The runner writes it on its stdout result line, so the parent parses it
+ * against this schema before it narrows the value: a line carrying no label,
+ * or a label that is not text, is not an instance.
+ */
+export const ScenarioAgentInstanceSchema = z.object({
+  hostname: z.string(),
+  label: z.string().nullable(),
+});
+export type ScenarioAgentInstance = z.infer<typeof ScenarioAgentInstanceSchema>;
 
 /** Result of scenario execution */
 export const ScenarioExecutionResultSchema = z.object({
@@ -294,12 +343,24 @@ export const ScenarioExecutionResultSchema = z.object({
   error: z.string().optional(),
   /** When true, the job was cancelled by user (not a crash/error). */
   cancelled: z.boolean().optional(),
+  /** The connected agent instance that answered the run, when one did. */
+  agentInstance: ScenarioAgentInstanceSchema.optional(),
 });
 export type ScenarioExecutionResult = z.infer<typeof ScenarioExecutionResultSchema>;
 
 // ============================================================================
 // Child Process Types (for OTEL isolation)
 // ============================================================================
+
+/**
+ * A run whose conversation is written down in advance. The user sends one
+ * message, the agent answers, and the run succeeds when the answer arrives.
+ */
+export const ScriptedRunSchema = z.object({
+  kind: z.literal("agent_test"),
+  userMessage: z.string().min(1),
+});
+export type ScriptedRun = z.infer<typeof ScriptedRunSchema>;
 
 /**
  * Complete data package for child process execution.
@@ -362,14 +423,20 @@ export const ChildProcessJobDataSchema = z
      * the scenario SDK's default applies.
      */
     traceWaitTimeoutMs: z.number().optional(),
+    /**
+     * A fixed conversation for the run. Present on an agent test run only:
+     * the user's messages are written down, no simulator plays the person and
+     * no judge decides, so the run needs no model at all.
+     */
+    script: ScriptedRunSchema.optional(),
   })
   .superRefine((data, ctx) => {
+    if (data.script) return;
     if (!data.simulatorModelParams && !data.modelParams) {
       ctx.addIssue({
         code: z.ZodIssueCode.custom,
         path: ["simulatorModelParams"],
-        message:
-          "No model params for the user simulator, and no modelParams to fall back to",
+        message: "No model params for the user simulator, and no modelParams to fall back to",
       });
     }
     if (!data.judgeModelParams && !data.modelParams) {

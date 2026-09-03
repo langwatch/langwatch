@@ -4,6 +4,7 @@
 
 **Status:** Superseded by
 [`feature-flag/adrs/001`](../../../packages/features/feature-flag/adrs/001-feature-flag-service-boundary.md)
+— amended 2026-08-20 and 2026-08-31 before it was, see below
 
 This ADR introduced registered SYSTEM and PRODUCT flags, with PostHog handling
 product targeting and a separate local path for operational switches. That
@@ -13,4 +14,242 @@ environment reads and browser overrides.
 The current decision is owned beside the singular `feature-flag` feature. It
 keeps the useful in-code registry and operator controls, removes PostHog from
 resolution, parses environment overrides once at boot, and exposes one
-composed service for backend, transport and browser callers.
+composed service for backend, transport and browser callers. Everything below
+is the record of how this document got there.
+
+PR #7194 deleted `FeatureFlagServicePostHog` and the PostHog branch of `featureFlagService.isEnabled`. **Both scopes now resolve identically**, and PostHog is not consulted for any flag:
+
+```text
+SYSTEM and PRODUCT:  env override -> FEATURE_FLAG_FORCE_ENABLE -> postgres store (targeting rules, then row value) -> registry default
+```
+
+Three consequences the rest of this document predates:
+
+- **Targeting is scope-independent.** `FeatureFlagStorePostgres.get` evaluates `rules` against the caller's `{ projectId, organizationId }` without reading `scope`, so a SYSTEM flag takes per-project and per-org rules exactly like a PRODUCT one. The claim below that "SYSTEM flags ignore `projectId` / `organizationId`" no longer holds.
+- **Scope is now a classification, not a resolver switch.** It survives because `/ops/feature-flags` groups and badges by it, and because it records who owns the lever: SYSTEM means the internal flag store is the only administration point (usually paired with `envOverridable: false`). It no longer implies anything about *how* the value is fetched.
+- **A SYSTEM-scoped flag exposed to the frontend is a legitimate shape.** `FeatureFlagKey` is the union of all registered keys regardless of scope, so the `featureFlag.isEnabled` router's cast is safe either way. The Langy family relies on this: internal levers that gate a product surface. A guard added in #7357 asserted the opposite — that every frontend-exposed flag must be PRODUCT — and went red on `main` when #7424 landed a SYSTEM flag in `FRONTEND_FEATURE_FLAGS` (issue #7511); it was removed rather than extended, because the premise was inherited from this ADR after the code beneath it had changed.
+
+Sections below describing a PostHog path (Resolution order, Architecture Flow, Targeting via personProperties, PostHog local evaluation) are retained as history of the 2026-05 design and are **not** the current behaviour. `POSTHOG_FEATURE_FLAGS_KEY` no longer affects flag resolution; PostHog remains in the product for analytics and error capture only.
+
+## Amendment (2026-08-31): targeting by organization age ("New users")
+
+A rollout aimed at new signups cannot be written as a list of organization ids
+— the organizations it is for do not exist yet, and re-editing the list on
+every signup is not a rollout. A rule may therefore name a date instead:
+
+```json
+{ "match": { "organizationCreatedAfter": "2026-06-01" }, "enabled": true }
+```
+
+It matches every organization created **on or after** that instant, and nobody
+else: organizations created before it are left on whatever the rest of the
+rules and the flag's own value already said. `/ops/feature-flags`
+writes it as the **New users** scope in the targeting-rules dialog, where the
+field beside the picker becomes a date.
+
+Two properties are load-bearing:
+
+- **It fails closed.** A read whose organization creation date is unknown — an
+  opted-out organization scope, a failed lookup — matches no age rule, and
+  neither does a stored date that cannot be parsed. Treating an unreadable
+  condition as *no* condition would turn one bad rule into a fleet-wide
+  switch, since a rule with no conditions matches everyone.
+- **No call site carries the date.** `FeatureFlagStorePostgres` resolves the
+  organization's `createdAt` itself, lazily, and only for a flag whose own
+  rules ask for it (`rulesTargetOrganizationAge`), memoised per organization
+  for ten minutes. A creation date never changes, and a flag with no age rule
+  — every kill switch on the per-event hot path — reads exactly what it read
+  before, with no extra query.
+
+## Context
+
+We need feature flags to control UI features, enable gradual rollouts, and provide kill switches for the LangWatch platform. The system must support flexible targeting at multiple levels:
+
+- **User-level**: Flags for specific users (beta testers, internal team)
+- **Project-level**: Flags for specific projects
+- **Organization-level**: Flags for entire organizations
+
+Previous approaches using email-based checks (e.g., `email?.endsWith("@langwatch.ai")`) were inflexible. The original 2026-01-29 design routed every flag through PostHog with Redis caching. After a 2026-05 incident where event-sourcing kill switches generated ~50 k/day PostHog `/flags` calls (per-tenant cache fragmentation in the per-component killSwitch wrapper), we split the system in two:
+
+- **SYSTEM** scope: backend kill switches and pipeline toggles. Resolved locally; never reach PostHog.
+- **PRODUCT** scope: UI features and A/B tests. Still go through PostHog for user targeting; postgres acts as a self-hosted and emergency-override fallback.
+
+## Decision
+
+Every flag is registered in code (`src/server/featureFlag/registry.ts`) with a SYSTEM or PRODUCT scope. The resolver picks one of two paths based on the registered scope.
+
+### Resolution order
+
+```
+SYSTEM:   env override -> postgres store -> registry default
+PRODUCT:  env override -> PostHog -> postgres store (fallback) -> registry default
+```
+
+PostHog is **never** called on the SYSTEM path. PRODUCT keeps PostHog as the source of truth and uses postgres only when PostHog is unconfigured (self-hosted installs) or unreachable.
+
+### Why split the scopes
+
+- SYSTEM flags are checked on hot paths (per event, per span, per trace). Routing them through PostHog cost ~50 k/day in extra requests for zero targeting benefit; they're cluster-wide booleans.
+- PRODUCT flags benefit from PostHog's user/A-B targeting and gradual rollout features.
+- Operators get one Ops UI (`/ops/feature-flags`) for both kinds; toggling a SYSTEM flag from the UI propagates cluster-wide within `KILL_SWITCH_CACHE_TTL_MS` (60 s) without a redeploy.
+
+## Registry
+
+`src/server/featureFlag/registry.ts` exports:
+
+- `FEATURE_FLAGS`: array of registered explicit flags (key, scope, defaultValue, description, optional `legacyEnvVar`).
+- `FEATURE_FLAG_FAMILIES`: array of prefix+suffix patterns for dynamically-named flags (e.g. event-sourcing kill switches).
+- `FeatureFlagKey`: TypeScript union of every registered explicit key plus the `es-*-killswitch` template literal that matches the family. **Required on every call to `featureFlagService.isEnabled`**; unregistered string literals fail at compile time.
+
+### Adding a new flag
+
+1. Add a `FEATURE_FLAGS` entry with `scope: "SYSTEM" | "PRODUCT"`, `defaultValue`, `description`. For SYSTEM flags migrated from an existing env variable, set `legacyEnvVar` so the old name keeps working.
+2. Call `featureFlagService.isEnabled("your_new_flag_key", { distinctId, projectId, organizationId, defaultValue?, cacheTtlMs? })`. The key is type-checked against `FeatureFlagKey` via the shared `FeatureFlagServiceInterface`, so unregistered keys fail at compile time even when the service is dependency-injected. `projectId` and `organizationId` are required: a rule that names a scope the read left out can never match, so an omitted field would turn a rollout into a silent no-op. A caller with no such scope passes `NOT_TARGETED` (`src/server/featureFlag/targeting.ts`).
+3. Flip from `/ops/feature-flags` at runtime without a redeploy. For PRODUCT flags, prefer flipping in PostHog directly so user targeting rules apply.
+
+### Adding a new family
+
+Family entries cover dynamically-generated key shapes. Today the only family is `es-<aggregate>-<componentType>-<componentName>-killswitch`, generated by `src/server/event-sourcing/utils/killSwitch.ts` for every projection / mapProjection / command in a pipeline. The Ops UI walks the pipeline registry on render so all generated kill switches appear as togglable rows even when no postgres override exists.
+
+## Storage
+
+| Layer | Backend | TTL | Purpose |
+|-------|---------|-----|---------|
+| In-process | `Map` | 5 s | Absorbs per-event reactor reads on the hot path |
+| Shared | Redis (via `TtlCache`) | 60 s | Cross-pod cache sharing |
+| Source of truth | Prisma `FeatureFlag` table | n/a | Operator-set overrides only; absence = registry default |
+
+The `FeatureFlag` table is cluster-wide (no `projectId` column); it's exempted from `dbMultiTenancyProtection` in `EXEMPT_MODELS` because it does not represent project-scoped data.
+
+## Architecture Flow
+
+```
+Component
+    |
+    v
+useFeatureFlag (React Query, 5 s staleTime)        UI-only path
+    |
+    v
+tRPC: featureFlag.isEnabled                        client to server bridge
+    |
+    v
+FeatureFlagService                                 env override
+    |
+    +-- SYSTEM --> FeatureFlagStorePostgres (memory + Redis + Prisma)
+    |
+    +-- PRODUCT --> FeatureFlagServicePostHog (Redis cache + PostHog)
+                       |
+                       v
+                    fallback to FeatureFlagStorePostgres on PostHog error
+```
+
+## Targeting
+
+Rules on a flag row name a project, an organization, or an organization
+creation date (see the 2026-08-31 amendment). The read states both ids, so a
+rule written for either one can match:
+
+```typescript
+await featureFlagService.isEnabled("release_ui_simulations_menu_enabled", {
+  distinctId: userId,
+  projectId: "proj_123",
+  organizationId: "org_456",
+  defaultValue: false,
+});
+```
+
+Both fields are required. A surface that has no such scope states the opt-out instead, and no rule naming that scope can match it:
+
+```typescript
+await featureFlagService.isEnabled("release_ui_ai_governance_enabled", {
+  distinctId: userId,
+  projectId: NOT_TARGETED, // an organization page holds no project
+  organizationId: "org_456",
+  defaultValue: false,
+});
+```
+
+The same rule holds on the client: `useFeatureFlag(flag, { projectId, organizationId, enabled? })` requires both ids. `undefined` is legal for an id that is still loading, and pairs with `enabled: false`. The tRPC input carries both fields as required and uses `null` for "no such scope", because JSON has no `undefined`.
+
+The server never derives one id from the other. A read that wants the organization of a project resolves it at the call site (`resolveOrganizationId`), so the context stays explicit.
+
+## Environment Overrides
+
+Flags can be force-enabled/disabled via env:
+
+- `RELEASE_UI_SIMULATIONS_MENU_ENABLED=1`: force enable
+- `RELEASE_UI_SIMULATIONS_MENU_ENABLED=0`: force disable
+- `FEATURE_FLAG_FORCE_ENABLE=flag_a,flag_b`: comma-separated force-enable list
+
+`legacyEnvVar` on a registry entry lets a flag honor an additional, differently-named env variable for back-compat (e.g. `ops_es_causality_loop_guard_disabled` also accepts `LANGWATCH_DISABLE_CAUSALITY_LOOP_GUARD`).
+
+Env overrides beat both postgres and PostHog.
+
+## PostHog local evaluation
+
+When `POSTHOG_FEATURE_FLAGS_KEY` is set, `posthog-node` initialises with `personalApiKey` + `featureFlagsPollingInterval` (default 5 min). The SDK polls flag definitions in the background and resolves `isFeatureEnabled` in-process; no `/flags` request per call.
+
+The env var accepts either a Feature Flags Secure key (`phs_*`, current PostHog recommendation, scoped to flag evaluation only) or a legacy Personal API key (`phx_*`, kept for backward compatibility).
+
+PostHog bills each local-evaluation poll as 10 feature-flag requests. At the default 5 min interval:
+
+- 12 polls/hour × 24 × 30 ≈ **8.6 k poll requests / server / month** (HTTP)
+- × 10 billing multiplier ≈ **86 k billable units / server / month**
+
+Set `POSTHOG_FEATURE_FLAGS_POLLING_INTERVAL_MS` to lower the poll interval if you need PRODUCT-flag changes to propagate faster than 5 min.
+
+## Flag naming convention
+
+Pattern: `{type}_{area}_{feature}_{descriptor}`
+
+| Type | Purpose |
+|------|---------|
+| `release` | New feature rollout |
+| `experiment` | A/B test |
+| `permission` | Access control |
+| `ops` | Operational / kill switch (typically SYSTEM scope) |
+
+| Area | System part |
+|------|-------------|
+| `ui` | Frontend / UI features |
+| `api` | API endpoints |
+| `es` | Event sourcing |
+| `worker` | Background workers |
+
+Examples:
+- `release_ui_simulations_menu_enabled` (PRODUCT): UI feature rollout
+- `ops_es_causality_loop_guard_disabled` (SYSTEM): emergency kill switch
+- `es-trace-projection-traceSummary-killswitch` (SYSTEM via family): auto-generated per-component kill switch
+
+## Default Value Strategy
+
+The `isEnabled` method accepts a `defaultValue` parameter (overridden by registry default when a key is registered):
+
+| Default | Use case |
+|---------|----------|
+| `false` (fail-closed) | New features, experimental UI, paid features |
+| `true` (fail-open) | Kill switches that disable functionality when enabled |
+
+Registry default wins for registered flags. The `defaultValue` argument is only consulted for unregistered keys passing through the legacy PostHog/memory path.
+
+## Trade-offs
+
+**Why a registry instead of pure PostHog:**
+- Hot-path SYSTEM flags don't cost PostHog requests.
+- Operators can flip kill switches from the Ops UI on self-hosted installs without PostHog configured.
+- Type-checked keys (`FeatureFlagKey`) catch typos at compile time.
+
+**Why families for `es-*-killswitch`:**
+- ~10s of pipeline components × dozens of tenants = unmanageable to register each explicit key.
+- One family entry covers the entire generated key shape, the pipeline registry enumerates the live set for the Ops UI.
+
+**Trade-offs accepted:**
+- SYSTEM flag changes propagate cluster-wide within the cache TTL (max 60 s) rather than instantly.
+- Adding a new flag requires a code change (the registry entry), not just a PostHog dashboard edit. This is intentional: it keeps the SYSTEM-vs-PRODUCT scope decision visible in code review.
+
+## References
+
+- PostHog feature flags: https://posthog.com/docs/feature-flags
+- tRPC: https://trpc.io/
+- React Query: https://tanstack.com/query
+- specs/ops/internal-feature-flags.feature: behavioural contract

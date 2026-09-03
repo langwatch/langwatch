@@ -7,3 +7,7 @@ export * from "./agent.service";
 export * from "./config";
 export * from "./fields";
 export * from "./http-node";
+export * from "./connected-agent.constants";
+export * from "./connected-agent.dispatch";
+export * from "./connected-agent.errors";
+export * from "./connected-agent.protocol";

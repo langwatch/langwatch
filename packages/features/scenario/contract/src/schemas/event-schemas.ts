@@ -4,6 +4,8 @@
  */
 import { EventType } from "@ag-ui/core";
 import { z } from "zod";
+import { runParameterValuesSchema } from "../scenario.parameters";
+import { runActorLabelSchema } from "../run-actor";
 import { scenarioMessageSchema } from "../scenario-message.schema";
 import { ScenarioEventType, ScenarioRunStatus, Verdict } from "../scenario-run";
 
@@ -55,7 +57,22 @@ const baseScenarioEventSchema = baseEventSchema.extend({
  */
 export const langwatchMetadataSchema = z.object({
   targetReferenceId: z.string(),
-  targetType: z.enum(["prompt", "http", "code", "workflow"]),
+  targetType: z.enum(["prompt", "http", "code", "workflow", "connected"]),
+  /**
+   * The key the target folds under: the reference id alone, or the reference
+   * id and a hash of the target's parameter overrides when it carries any.
+   * Stamped at queue time. Absent on runs recorded before targets carried
+   * parameters, which read as the reference id alone.
+   *
+   * @see specs/features/agent-testing/results-atoms.feature
+   */
+  targetKey: z.string().optional(),
+  /**
+   * The parameter overrides of this target alone, so a reader can name the
+   * variant. Absent when the target carries none. The merged values the run
+   * resolved sit beside the namespace under `parameters`, as they always did.
+   */
+  targetParameters: runParameterValuesSchema.optional(),
   simulationSuiteId: z.string().optional(),
   /**
    * The version of the scenario at the moment the run was queued. A later
@@ -65,6 +82,76 @@ export const langwatchMetadataSchema = z.object({
    * @see specs/scenarios/scenario-version-on-runs.feature
    */
   scenarioVersion: z.number().int().optional(),
+  /**
+   * The simulation models the run plan was CONFIGURED with, stamped at queue
+   * time. Absent when the plan names none and the project default is used,
+   * and absent on runs recorded before this was stamped. Both read back as
+   * "this configuration named no model", which is what a person chose.
+   *
+   * Not the model the run resolved to: the same choice has to key the same
+   * way after a project default changes.
+   *
+   * @see specs/scenarios/run-configuration-on-runs.feature
+   */
+  simulatorModel: z.string().optional(),
+  judgeModel: z.string().optional(),
+  /**
+   * The simulation models the run RESOLVED, stamped at queue time: the run
+   * plan's choice, else the case's own choice, else the project default for
+   * that role.
+   *
+   * This is what a person reads back off the run. The project default changes
+   * over time, so a run that recorded only the configured value cannot say
+   * which model judged it a month later.
+   *
+   * Absent when the project had no model set for the role, and absent on runs
+   * recorded before this was stamped. Both read the same way.
+   *
+   * @see specs/scenarios/resolved-run-models-on-runs.feature
+   */
+  resolvedSimulatorModel: z.string().optional(),
+  resolvedJudgeModel: z.string().optional(),
+  /**
+   * Who started the run: the platform user id, and the surface that person
+   * acted through. Stamped at queue time, and absent whenever the caller
+   * named no person, which is every project-key and SDK run.
+   *
+   * The id and not a name, so a run still points at the right person after
+   * they rename themselves.
+   *
+   * @see specs/scenarios/run-actor-on-runs.feature
+   */
+  actorId: z.string().optional(),
+  actorLabel: runActorLabelSchema.optional(),
+  /**
+   * The connected agent instance that served the run, recorded when the run
+   * finished. Absent for every other kind of target, and for a run recorded
+   * before instances were.
+   *
+   * @see specs/scenarios/served-agent-instance-on-runs.feature
+   */
+  agentInstance: z.object({ hostname: z.string(), label: z.string().nullable() }).optional(),
+});
+
+/**
+ * One participant of a run, as the code that pushed the run names it.
+ *
+ * The SDK reports every agent it wired into the run: the agent under test,
+ * the user simulator and the judge. Only the `agent` role names what the run
+ * was pointed at, so a run pushed from code can say which agent it tested
+ * without the platform holding a target for it.
+ *
+ * `name` is the adapter's own name, or its class name when it was given none,
+ * for example "AgnoAgentAdapter".
+ *
+ * It sits beside `name` and `description` on the metadata rather than inside
+ * the reserved `langwatch` namespace, which only the platform writes.
+ *
+ * @see specs/features/agent-testing/results-atoms.feature
+ */
+export const scenarioAgentSchema = z.object({
+  name: z.string(),
+  role: z.enum(["agent", "user", "judge"]),
 });
 
 /**
@@ -97,6 +184,8 @@ export const scenarioRunStartedSchema = baseScenarioEventSchema.extend({
         .trim()
         .transform((note) => (note === "" ? undefined : note))
         .optional(),
+      /** Who took part in the run. See {@link scenarioAgentSchema}. */
+      agents: z.array(scenarioAgentSchema).optional(),
       langwatch: langwatchMetadataSchema.optional(),
     })
     .passthrough(),
@@ -169,10 +258,7 @@ const inputAudioContentPartSchema = z.object({
 const scenarioAudioMessageSchema = z.object({
   role: z.string().optional(),
   content: z.array(
-    z.union([
-      z.object({ type: z.literal("text"), text: z.string() }),
-      inputAudioContentPartSchema,
-    ]),
+    z.union([z.object({ type: z.literal("text"), text: z.string() }), inputAudioContentPartSchema]),
   ),
 });
 
@@ -185,15 +271,7 @@ const scenarioAudioMessageSchema = z.object({
  */
 const agUiMessageSchema = z.looseObject({
   id: z.string(),
-  role: z.enum([
-    "developer",
-    "system",
-    "assistant",
-    "user",
-    "tool",
-    "activity",
-    "reasoning",
-  ]),
+  role: z.enum(["developer", "system", "assistant", "user", "tool", "activity", "reasoning"]),
   content: z.unknown().optional(),
   toolCalls: z
     .array(
@@ -224,6 +302,87 @@ const agUiMessageSchema = z.looseObject({
 });
 
 /**
+ * An Anthropic `text` block. `citations` is carried through because zod drops
+ * every key a schema does not declare: a block that cites the documents it
+ * answered from would otherwise reach the transcript without them.
+ */
+const anthropicTextBlockSchema = z.object({
+  type: z.literal("text"),
+  text: z.string(),
+  citations: z.array(z.unknown()).nullish(),
+});
+
+const anthropicToolUseBlockSchema = z.object({
+  type: z.literal("tool_use"),
+  id: z.string(),
+  name: z.string(),
+  input: z.unknown(),
+});
+
+const anthropicToolResultBlockSchema = z.object({
+  type: z.literal("tool_result"),
+  tool_use_id: z.string(),
+  content: z.union([z.string(), z.array(z.unknown())]).optional(),
+  is_error: z.boolean().optional(),
+});
+
+const anthropicThinkingBlockSchema = z.object({
+  type: z.literal("thinking"),
+  thinking: z.string(),
+  signature: z.string().optional(),
+});
+
+const anthropicRedactedThinkingBlockSchema = z.object({
+  type: z.literal("redacted_thinking"),
+  data: z.string(),
+});
+
+/**
+ * A message in the Anthropic Messages API shape: an assistant turn made of
+ * `thinking`, `text` and `tool_use` blocks, or a user turn that carries the
+ * `tool_result` blocks answering those calls. An adapter that returns the
+ * response of the Anthropic SDK, or the transcript of Claude Code, sends its
+ * snapshots in this shape, and the transcript renderer already reads
+ * `tool_use` and `tool_result` blocks.
+ *
+ * Neither the AG-UI message boundary nor the LangWatch `scenarioMessageSchema`
+ * accepts a `tool_use` or `thinking` block, so every snapshot after the first
+ * tool call was 400-rejected and the run kept only the turns before it. This
+ * member sits before `scenarioMessageSchema` in the union on purpose: its `tool_result`
+ * part carries `toolCallId` and `result`, so it would validate an Anthropic
+ * `tool_result` block and strip its `tool_use_id` and `content`. The refine
+ * keeps this member to messages that actually carry an Anthropic-only block,
+ * so a plain text array keeps validating through the members that came before.
+ * A text block with `citations` counts as one: no schema before this member
+ * declares that field, so a cited turn routed to them would reach the
+ * transcript with its citations stripped.
+ */
+const scenarioAnthropicMessageSchema = z.object({
+  role: z.string().optional(),
+  content: z
+    .array(
+      z.union([
+        anthropicTextBlockSchema,
+        anthropicToolUseBlockSchema,
+        anthropicToolResultBlockSchema,
+        anthropicThinkingBlockSchema,
+        anthropicRedactedThinkingBlockSchema,
+      ]),
+    )
+    .refine(
+      (blocks) =>
+        blocks.some(
+          (block) =>
+            block.type !== "text" || (block.citations !== undefined && block.citations !== null),
+        ),
+      {
+        message:
+          "An Anthropic message carries at least one non-text block, or a text block with citations",
+      },
+    ),
+});
+
+/**
  * Scenario Message Snapshot Event Schema
  * Captures the conversation state at a specific point during scenario execution.
  * Includes searchable_content and payload for full message functionality.
@@ -232,7 +391,12 @@ export const scenarioMessageSnapshotSchema = baseScenarioEventSchema.extend({
   type: z.literal(ScenarioEventType.MESSAGE_SNAPSHOT),
   messages: z.array(
     z.intersection(
-      z.union([agUiMessageSchema, scenarioMessageSchema, scenarioAudioMessageSchema]),
+      z.union([
+        agUiMessageSchema,
+        scenarioAnthropicMessageSchema,
+        scenarioMessageSchema,
+        scenarioAudioMessageSchema,
+      ]),
       z.object({
         id: z.string().optional(),
         trace_id: z.string().optional(),

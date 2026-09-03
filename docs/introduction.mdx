@@ -1,6 +1,6 @@
 ---
 title: "LangWatch: The Complete LLMOps Platform"
-description: "Accelerate your agent development lifecycle with comprehensive observability, evaluations and agent simulations. Open-source platform, with over 3k stars on GitHub."
+description: "Accelerate your agent development lifecycle with comprehensive observability, evaluations and agent testing. Open-source platform, with over 3k stars on GitHub."
 sidebarTitle: Introduction
 keywords: langwatch, llm, ai, observability, evaluation, prompt optimization, llmops, open-source, github
 ---
@@ -15,6 +15,7 @@ import AgentReportNotice from "/snippets/agent-report-notice.mdx";
   />
 </Frame>
 
+
 ## Quick Start
 
 The fastest way to set up your agent with LangWatch and get started is by using LangWatch Skills via a coding assistant. If your agent is already set up, check out the skills to monitor performance and improve your agent.
@@ -25,7 +26,7 @@ The fastest way to set up your agent with LangWatch and get started is by using 
     icon="terminal"
     href="/skills/directory"
   >
-    Tracing, evaluations, agent simulations, prompt management and more
+    Tracing, evaluations, agent testing, prompt management and more
   </Card>
   <Card
     title="My agent is already set up"
@@ -37,8 +38,7 @@ The fastest way to set up your agent with LangWatch and get started is by using 
 </CardGroup>
 
 <Tip>
-  **Don't have an agent yet?** Use [Better Agents](/better-agents/overview) to scaffold a
-  new agent project.
+  **Don't have an agent yet?** Use [Better Agents](/better-agents/overview) to scaffold a new agent project.
 </Tip>
 
 ## What is LangWatch?
@@ -52,42 +52,12 @@ LangWatch provides the missing operations platform for AI applications. Every LL
 ## What LangWatch Does
 
 <CardGroup cols={2}>
-  <Card
-    title="Observability"
-    description="Track every LLM call, tool usage, and user interaction with detailed traces."
-    icon="chart-network"
-    href="/observability/overview"
-  />
-  <Card
-    title="Evaluations"
-    description="Test quality with experiments, monitor production, guard against harm."
-    icon="square-check"
-    href="/evaluations/overview"
-  />
-  <Card
-    title="Agent Simulations"
-    description="Validate agent behavior with realistic multi-turn conversations."
-    icon="masks-theater"
-    href="/agent-simulations/introduction"
-  />
-  <Card
-    title="Prompt Management"
-    description="Version, test, and optimize prompts collaboratively."
-    icon="code"
-    href="/prompt-management/overview"
-  />
-  <Card
-    title="AI Gateway"
-    description="Governed, observable, sub-millisecond-overhead OpenAI- and Anthropic-compatible endpoint for every LLM call in your org. Personal IDE keys, budgets, routing policies, anomaly detection."
-    icon="route"
-    href="/ai-gateway/overview"
-  />
-  <Card
-    title="AI Governance"
-    description="One control plane above the gateway: per-user workspaces, ingestion sources, anomaly rules, OCSF/SIEM export, compliance architecture. The admin home for rolling LangWatch out company-wide."
-    icon="shield-halved"
-    href="/ai-governance/overview"
-  />
+  <Card title="Observability" description="Track every LLM call, tool usage, and user interaction with detailed traces." icon="chart-network" href="/observability/overview" />
+  <Card title="Evaluations" description="Test quality with experiments, monitor production, guard against harm." icon="square-check" href="/evaluations/overview" />
+  <Card title="Agent Testing" description="Test agent behavior in multi-turn conversations with a simulated user." icon="masks-theater" href="/agent-testing/overview" />
+  <Card title="Prompt Management" description="Version, test, and optimize prompts collaboratively." icon="code" href="/prompt-management/overview" />
+  <Card title="AI Gateway" description="Governed, observable, sub-millisecond-overhead OpenAI- and Anthropic-compatible endpoint for every LLM call in your org. Personal IDE keys, budgets, routing policies, anomaly detection." icon="route" href="/ai-gateway/overview" />
+  <Card title="AI Governance" description="One control plane above the gateway: per-user workspaces, ingestion sources, anomaly rules, OCSF/SIEM export, compliance architecture. The admin home for rolling LangWatch out company-wide." icon="shield-halved" href="/ai-governance/overview" />
 </CardGroup>
 
 ## Where to Start?

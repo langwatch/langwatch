@@ -1,25 +1,27 @@
 /**
- * The run plans of the open project, read from the three places runs land:
- * the test suites, the external sets a code run writes into, and the internal
- * set that holds the one-off runs.
+ * The run plans of the open project, read from the two places a plan lives:
+ * the stored run plans, and the external sets a code run writes into.
+ *
+ * A test suite is a group of scenarios, so it is never a row of the Test Runs
+ * list. Its rows are read all the same, because a plan whose scope names test
+ * suites reads them by name.
  *
  * @see specs/features/agent-testing/results-tabs.feature
  */
 
 import { useMemo } from "react";
-import { getOnPlatformSetId } from "@langwatch/scenario-contract";
 import type { Period } from "@langwatch/analytics-web/components/PeriodSelector";
 import { useOrganizationTeamProject } from "../../use-organization-team-project";
 import { api } from "../../scenario-api";
-import { buildRunPlans, type RunPlan, type RunPlanLastRun } from "./run-plans";
+import { buildRunPlans, type RunPlan, toRunPlanSuites } from "./run-plans";
 
 export type UseRunPlansResult = {
   plans: RunPlan[];
   isLoading: boolean;
   /**
-   * False while the project holds no run plan at all: no suite, no external
-   * run set and no one-off run. The table shows its first-use empty state
-   * from this, not from whether a plan has ever run.
+   * False while the project holds no run plan at all: no stored plan and no
+   * external run set. The table shows its first-use empty state from this, not
+   * from whether a plan has ever run.
    */
   hasAnyPlans: boolean;
 };
@@ -30,10 +32,10 @@ export function useRunPlans({ period }: { period: Period }): UseRunPlansResult {
   const startDate = period.startDate.getTime();
   const endDate = period.endDate.getTime();
 
-  // Both kinds: a folder reads as a run plan of its own in the Test Runs
-  // list, next to the hand-assembled custom plans.
+  // Both kinds: the run plan rows are the plans, and the test suites are read only
+  // for the names a plan's scope may point at.
   const { data: suites, isLoading: isSuitesLoading } = api.suites.getAll.useQuery(
-    { projectId, kinds: ["custom", "folder"] },
+    { projectId, kinds: ["run_plan", "test_suite"] },
     { enabled: !!project },
   );
 
@@ -48,49 +50,24 @@ export function useRunPlans({ period }: { period: Period }): UseRunPlansResult {
       { enabled: !!project },
     );
 
-  // The internal set has no summary query of its own, so its newest batch is
-  // read straight from the batch history. One batch is all a row shows.
-  const { data: oneOffHistory, isLoading: isOneOffLoading } =
-    api.scenarios.getScenarioSetBatchHistory.useQuery(
-      {
-        projectId,
-        scenarioSetId: getOnPlatformSetId(projectId),
-        limit: 1,
-        startDate,
-        endDate,
-      },
-      { enabled: !!project },
-    );
-
-  const oneOffLastRun = useMemo<RunPlanLastRun | null>(() => {
-    const newest = oneOffHistory?.batches[0];
-    if (!newest) return null;
-    return {
-      passedCount: newest.passCount,
-      failedCount: newest.failCount,
-      settledCount: newest.settledCount,
-      lastRunTimestamp: newest.lastRunAt,
-    };
-  }, [oneOffHistory]);
+  const storedPlans = useMemo(() => toRunPlanSuites(suites ?? []), [suites]);
 
   const plans = useMemo(
     () =>
       buildRunPlans({
-        projectId,
-        suites: suites ?? [],
+        plans: storedPlans,
+        suiteNames: new Map((suites ?? []).map((suite) => [suite.id, suite.name])),
         suiteSummaries: suiteSummaries ?? {},
         externalSets: externalSets ?? [],
-        oneOffLastRun,
       }),
-    [projectId, suites, suiteSummaries, externalSets, oneOffLastRun],
+    [storedPlans, suites, suiteSummaries, externalSets],
   );
 
-  const hasAnyPlans =
-    (suites?.length ?? 0) > 0 || (externalSets?.length ?? 0) > 0 || oneOffLastRun !== null;
+  const hasAnyPlans = storedPlans.length > 0 || (externalSets?.length ?? 0) > 0;
 
   return {
     plans,
-    isLoading: isSuitesLoading || isExternalLoading || isOneOffLoading,
+    isLoading: isSuitesLoading || isExternalLoading,
     hasAnyPlans,
   };
 }

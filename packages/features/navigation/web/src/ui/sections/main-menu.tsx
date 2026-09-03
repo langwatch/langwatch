@@ -1,5 +1,5 @@
 /**
- * The project column's entries: Home, Observe, Test, Build, Govern.
+ * The project column's entries: Home, Observe, Test and Build.
  *
  * Moved from `platform/app/src/components/MainMenu.tsx`. What travelled is the
  * SECTIONS — the list the product sidebar renders — and the two width
@@ -41,20 +41,18 @@ import { projectScopedDestination } from "../../model/project-scoped-nav";
 import { CollapsibleMenuGroup } from "../blocks/collapsible-menu-group";
 import { SideMenuLink } from "../blocks/side-menu-link";
 import { SidebarSection } from "../blocks/sidebar-section";
-import { GovernSection } from "./govern-section";
 
 export { MENU_WIDTH_COMPACT, MENU_WIDTH_EXPANDED } from "../../model/menu-widths";
 
 /**
- * The project navigation sections, so the product sidebar renders exactly the
- * list the chrome that came before it did.
+ * The project navigation sections the LLM Ops sidebar renders. The Govern group
+ * is gone because the product switcher replaces it, and the Ops group because
+ * the settings menu holds the operations pages.
  */
 export const MainMenuSections = function MainMenuSections({
   showExpanded,
-  shouldIncludeGovernSection = true,
 }: {
   showExpanded: boolean;
-  shouldIncludeGovernSection?: boolean;
 }) {
   const host = useNavigationHost();
   const project = host.project();
@@ -84,8 +82,6 @@ export const MainMenuSections = function MainMenuSections({
       <ObserveSection {...sectionProps} codingAgentLinks={codingAgentLinks} />
       <TestSection {...sectionProps} pendingAnnotationCount={pendingItemsCount.data} />
       <BuildSection {...sectionProps} canSeeAutomations={host.hasPermission("triggers:view")} />
-
-      {shouldIncludeGovernSection && <GovernSection showExpanded={showExpanded} />}
     </>
   );
 };
@@ -111,8 +107,7 @@ function useCodingAgentLinks(): CodingAgentLinks {
   const host = useNavigationHost();
   const project = host.project();
   const codingAgentPagesEnabled = host.featureFlag("release_ui_ai_governance_enabled").enabled;
-  const canSeeCodingAgentActivity =
-    codingAgentPagesEnabled && host.hasPermission("traces:view");
+  const canSeeCodingAgentActivity = codingAgentPagesEnabled && host.hasPermission("traces:view");
   const now = new Date();
 
   return {
@@ -254,11 +249,7 @@ function TestSection({
           showLabel={showExpanded}
         />
       ) : (
-        <SimulationsMenuGroup
-          project={project}
-          pathname={pathname}
-          showExpanded={showExpanded}
-        />
+        <SimulationsMenuGroup project={project} pathname={pathname} showExpanded={showExpanded} />
       )}
 
       <PageMenuLink
@@ -290,12 +281,7 @@ function BuildSection({
   canSeeAutomations,
 }: ProjectSectionProps & { canSeeAutomations: boolean }) {
   return (
-    <SidebarSection
-      id="library"
-      label="Build"
-      showExpanded={showExpanded}
-      defaultExpanded={false}
-    >
+    <SidebarSection id="library" label="Build" showExpanded={showExpanded} defaultExpanded={false}>
       <PageMenuLink
         path={projectNavItems.prompts.path}
         icon={featureIcons.prompts.icon}

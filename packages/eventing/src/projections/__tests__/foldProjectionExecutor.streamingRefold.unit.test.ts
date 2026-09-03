@@ -102,13 +102,9 @@ describe("FoldProjectionExecutor streaming store-miss re-fold", () => {
         const loader = pagedLoaderFrom(history);
         const { foldDef, store } = makeFold(loader);
         // 2 events per page → 3 loader calls ([e1,e2] | [e3,e4] | [e5]).
-        const executor = new FoldProjectionExecutor(2);
+        const executor = new FoldProjectionExecutor({ refoldPageSize: 2 });
 
-        const result = (await executor.execute(
-          foldDef,
-          history[4]!,
-          context,
-        )) as CountState;
+        const result = (await executor.execute(foldDef, history[4]!, context)) as CountState;
 
         expect(result.ids).toEqual(["e1", "e2", "e3", "e4", "e5"]);
         expect(loader).toHaveBeenCalledTimes(3);
@@ -127,13 +123,9 @@ describe("FoldProjectionExecutor streaming store-miss re-fold", () => {
         const history = [ev("e1", 1), ev("e2", 2, "K"), ev("e3", 3, "K")];
         const loader = pagedLoaderFrom(history);
         const { foldDef } = makeFold(loader);
-        const executor = new FoldProjectionExecutor(2);
+        const executor = new FoldProjectionExecutor({ refoldPageSize: 2 });
 
-        const result = (await executor.execute(
-          foldDef,
-          history[2]!,
-          context,
-        )) as CountState;
+        const result = (await executor.execute(foldDef, history[2]!, context)) as CountState;
 
         expect(result.ids).toEqual(["e1", "e2"]);
       });
@@ -145,13 +137,9 @@ describe("FoldProjectionExecutor streaming store-miss re-fold", () => {
         const delivered = ev("e2", 2); // persisted but lagging the event-log read
         const loader = pagedLoaderFrom(history);
         const { foldDef } = makeFold(loader);
-        const executor = new FoldProjectionExecutor(2);
+        const executor = new FoldProjectionExecutor({ refoldPageSize: 2 });
 
-        const result = (await executor.execute(
-          foldDef,
-          delivered,
-          context,
-        )) as CountState;
+        const result = (await executor.execute(foldDef, delivered, context)) as CountState;
 
         expect(result.ids).toEqual(["e1", "e2"]);
       });
@@ -161,7 +149,7 @@ describe("FoldProjectionExecutor streaming store-miss re-fold", () => {
       it("falls through to plain init+apply of the delivered event", async () => {
         const loader = pagedLoaderFrom([]);
         const { foldDef, store } = makeFold(loader);
-        const executor = new FoldProjectionExecutor(2);
+        const executor = new FoldProjectionExecutor({ refoldPageSize: 2 });
         const e1 = ev("e1", 1);
 
         const result = (await executor.execute(foldDef, e1, context)) as CountState;

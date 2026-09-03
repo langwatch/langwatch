@@ -1,6 +1,7 @@
 import {
   GOVERNANCE_INGESTION_SOURCE_TYPES,
   GovernanceValidationError,
+  isPushSourceType,
   IngestionSourceCapReachedError,
   IngestionSourceNotFoundError,
   NON_ENTERPRISE_INGESTION_SOURCE_CAP,
@@ -122,7 +123,13 @@ export class IngestionSourceService {
       organizationId: input.organizationId,
       kind: PROJECT_KIND.INTERNAL_GOVERNANCE,
     });
-    const ingestSecret = this.secrets.generate();
+    // Only a push source has a secret at all: a pull-mode or pure-S3 source
+    // authenticates outbound, so a minted secret would be stored and shown
+    // without ever authenticating anything. The empty hash is the sentinel for
+    // "there is no secret here", which is what the ingest door reads.
+    const ingestSecret = isPushSourceType({ sourceType: input.sourceType })
+      ? this.secrets.generate()
+      : null;
     const requestedParserConfig = {
       ...(input.pullConfig ?? {}),
       ...(input.parserConfig ?? {}),
@@ -140,7 +147,7 @@ export class IngestionSourceService {
       sourceType: input.sourceType,
       name: input.name,
       description: input.description ?? null,
-      ingestSecretHash: this.secrets.hash(ingestSecret),
+      ingestSecretHash: ingestSecret === null ? "" : this.secrets.hash(ingestSecret),
       parserConfig,
       pullSchedule: input.pullSchedule ?? null,
       status: "awaiting_first_event",
@@ -222,6 +229,12 @@ export class IngestionSourceService {
     organizationId: string;
   }): Promise<CreatedGovernanceIngestionSource> {
     const existing = await this.getById({ id, organizationId });
+    if (!isPushSourceType({ sourceType: existing.sourceType })) {
+      throw new GovernanceValidationError(
+        "Only push-mode sources have an ingest secret to rotate.",
+        { formErrors: ["Only push-mode sources have an ingest secret to rotate."] },
+      );
+    }
     const ingestSecret = this.secrets.generate();
     const parserConfig = this.credentials.tryEncryptParserConfig({
       ...existing.parserConfig,

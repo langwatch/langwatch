@@ -30,6 +30,10 @@
       "types": "./src/testing/index.tsx",
       "default": "./src/testing/index.tsx"
     },
+    "./avatar": {
+      "types": "./src/components/avatar.tsx",
+      "default": "./src/components/avatar.tsx"
+    },
     "./checkbox": {
       "types": "./src/components/checkbox.tsx",
       "default": "./src/components/checkbox.tsx"
@@ -65,6 +69,10 @@
     "./drawer": {
       "types": "./src/components/drawer.tsx",
       "default": "./src/components/drawer.tsx"
+    },
+    "./first-grapheme": {
+      "types": "./src/first-grapheme.ts",
+      "default": "./src/first-grapheme.ts"
     },
     "./field-info-tooltip": {
       "types": "./src/components/field-info-tooltip.tsx",

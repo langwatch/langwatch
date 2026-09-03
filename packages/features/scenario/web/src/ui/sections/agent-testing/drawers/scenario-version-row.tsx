@@ -1,24 +1,20 @@
 /**
- * One version in the history of a test case: who saved it, when, what changed,
+ * One version in the history of a scenario: who saved it, when, what changed,
  * and what it held.
  *
  * @see specs/features/agent-testing/case-version-history.feature
  * @see specs/scenarios/scenario-version-restore.feature
  */
 
-import {
-  Badge,
-  Box,
-  Button,
-  HStack,
-  Spinner,
-  Text,
-  VStack,
-} from "@chakra-ui/react";
+import { Badge, Box, Button, HStack, Spinner, Text, VStack } from "@chakra-ui/react";
 import { useOrganizationTeamProject } from "../../../../behavior/use-organization-team-project";
 import { api } from "../../../../behavior/scenario-api";
 import { formatTimeAgo } from "@langwatch/workflow-web/utils/formatTimeAgo";
-import { authorOf, changeLineOf, type VersionEntry } from "../../../../model/agent-testing/drawers/scenario-versions";
+import {
+  authorOf,
+  changeLineOf,
+  type VersionEntry,
+} from "../../../../model/agent-testing/drawers/scenario-versions";
 import type { VersionRestore } from "../../../../behavior/agent-testing/drawers/use-version-restore";
 
 export type ScenarioVersionRowProps = {
@@ -32,13 +28,7 @@ export type ScenarioVersionRowProps = {
   restore: VersionRestore;
 };
 
-function VersionField({
-  label,
-  value,
-}: {
-  label: string;
-  value: string | null | undefined;
-}) {
+function VersionField({ label, value }: { label: string; value: string | null | undefined }) {
   if (!value) return null;
 
   return (
@@ -74,13 +64,7 @@ function VersionCriteria({ criteria }: { criteria: string[] }) {
 }
 
 /** What one version held, read-only. */
-function VersionContent({
-  scenarioId,
-  version,
-}: {
-  scenarioId: string;
-  version: number;
-}) {
+function VersionContent({ scenarioId, version }: { scenarioId: string; version: number }) {
   const { project } = useOrganizationTeamProject();
   const { data, isLoading } = api.scenarios.getVersion.useQuery(
     { projectId: project?.id ?? "", scenarioId, version },
@@ -99,12 +83,7 @@ function VersionContent({
   const fields = data.fields;
 
   return (
-    <VStack
-      align="stretch"
-      gap={2}
-      paddingBottom={3}
-      data-testid={`version-content-${version}`}
-    >
+    <VStack align="stretch" gap={2} paddingBottom={3} data-testid={`version-content-${version}`}>
       <VersionField label="Name" value={fields.name} />
       <VersionField label="Situation" value={fields.situation} />
       <VersionCriteria criteria={fields.criteria ?? []} />
@@ -122,10 +101,7 @@ function VersionSummary({
   isMarked,
   isOpen,
   onToggleOpen,
-}: Pick<
-  ScenarioVersionRowProps,
-  "entry" | "isCurrent" | "isMarked" | "isOpen" | "onToggleOpen"
->) {
+}: Pick<ScenarioVersionRowProps, "entry" | "isCurrent" | "isMarked" | "isOpen" | "onToggleOpen">) {
   const author = authorOf(entry);
 
   return (
@@ -161,18 +137,14 @@ function VersionSummary({
         )}
       </HStack>
       <Text color="fg.muted" fontSize="xs" lineClamp={2}>
-        {changeLineOf(entry)} ·{" "}
-        {formatTimeAgo(new Date(entry.createdAt).getTime())}
+        {changeLineOf(entry)} · {formatTimeAgo(new Date(entry.createdAt).getTime())}
       </Text>
     </VStack>
   );
 }
 
 /** The restore control, and the confirmation it asks for first. */
-function RestoreControls({
-  entry,
-  restore,
-}: Pick<ScenarioVersionRowProps, "entry" | "restore">) {
+function RestoreControls({ entry, restore }: Pick<ScenarioVersionRowProps, "entry" | "restore">) {
   const isRestoring = restore.isRestoringVersion(entry.version);
 
   if (restore.confirmingVersion !== entry.version) {
@@ -199,12 +171,7 @@ function RestoreControls({
       >
         Restore v{entry.version}
       </Button>
-      <Button
-        size="xs"
-        variant="ghost"
-        disabled={isRestoring}
-        onClick={restore.cancel}
-      >
+      <Button size="xs" variant="ghost" disabled={isRestoring} onClick={restore.cancel}>
         Cancel
       </Button>
     </>

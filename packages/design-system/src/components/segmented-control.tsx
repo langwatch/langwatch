@@ -14,9 +14,7 @@ export interface SegmentedControlProps extends SegmentGroup.RootProps {
 }
 
 function normalize(items: Array<string | Item>): Item[] {
-  return items.map((item) =>
-    typeof item === "string" ? { value: item, label: item } : item,
-  );
+  return items.map((item) => (typeof item === "string" ? { value: item, label: item } : item));
 }
 
 export const SegmentedControl = React.forwardRef<HTMLDivElement, SegmentedControlProps>(
@@ -28,7 +26,12 @@ export const SegmentedControl = React.forwardRef<HTMLDivElement, SegmentedContro
       <SegmentGroup.Root ref={ref} {...rest}>
         <SegmentGroup.Indicator />
         {data.map((item) => (
-          <SegmentGroup.Item key={item.value} value={item.value} disabled={item.disabled}>
+          <SegmentGroup.Item
+            key={item.value}
+            value={item.value}
+            disabled={item.disabled}
+            cursor={item.disabled ? "not-allowed" : "pointer"}
+          >
             <SegmentGroup.ItemText>{item.label}</SegmentGroup.ItemText>
             <SegmentGroup.ItemHiddenInput />
           </SegmentGroup.Item>

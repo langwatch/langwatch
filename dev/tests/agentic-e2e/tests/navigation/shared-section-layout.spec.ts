@@ -10,6 +10,10 @@ interface SectionCase {
   screenshot: string;
 }
 
+// AI Gateway and AI Governance list their sections in the product sidebar
+// of the navigation shell now, so their in-page section-nav rail stands
+// down to avoid the duplicate. Automations still lists page-local
+// destinations, so its rail keeps rendering in every mode.
 const sections: SectionCase[] = [
   {
     name: "Automations",
@@ -17,20 +21,6 @@ const sections: SectionCase[] = [
     sectionLabel: "Automations",
     pageHeading: "Overview",
     screenshot: "automations-shared-layout.png",
-  },
-  {
-    name: "AI Gateway",
-    path: () => "/gateway/virtual-keys",
-    sectionLabel: "AI Gateway",
-    pageHeading: "Virtual Keys",
-    screenshot: "gateway-shared-layout.png",
-  },
-  {
-    name: "AI Governance",
-    path: () => "/governance",
-    sectionLabel: "AI Governance",
-    pageHeading: "AI Governance",
-    screenshot: "governance-shared-layout.png",
   },
 ];
 

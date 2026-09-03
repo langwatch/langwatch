@@ -137,6 +137,28 @@ Feature: The identity storage adapter - one adapter, two branches, Account retir
     And a from-scratch replay reproduces the Identifier row and never touches the credential row
 
   @unit
+  Scenario: A sign-in that echoes the account's own provider back is served, not refused
+    Given a finalized user "sam" with an Auth0 account on the identity branch
+    When the sign-in token refresh restates "sam"'s provider alongside the new tokens
+    Then the tokens are written to the AccountCredential row
+    And the restated provider changes nothing
+    And "sam" is signed in
+
+  @unit
+  Scenario: A sign-in that changes the account's provider is still refused
+    Given a finalized user "sam" with an Auth0 account on the identity branch
+    When an account update names a different provider than the row holds
+    Then the update is refused
+    And the refusal names the offending column
+
+  @unit
+  Scenario: A refused account operation is logged before it reaches the customer
+    Given a finalized user "sam" on the identity branch
+    When better-auth issues an account operation the branch cannot serve
+    Then the refusal is logged at error with the shape that caused it
+    And the customer sees the sign-in error page
+
+  @unit
   Scenario: Bridge mirroring keeps the fail-closed direction safe
     Given a finalized user "sam" changes their password on the identity branch
     And the Account bridge table still exists

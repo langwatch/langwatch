@@ -25,6 +25,13 @@ const (
 	ReasonNonRetryable   Reason = "non_retryable"
 	ReasonChainExhausted Reason = "chain_exhausted"
 	ReasonContextDone    Reason = "context_done"
+	// ReasonNotDialed is a terminal outcome decided before the upstream was
+	// contacted — a credential that cannot authenticate, a slot that does not
+	// serve the requested model. Like ReasonContextDone it ends the walk and
+	// tells the breaker nothing, because nothing was learned about the slot's
+	// health. Distinct from ReasonNonRetryable, which means the upstream
+	// ANSWERED terminally and so proves the slot alive.
+	ReasonNotDialed Reason = "not_dialed"
 )
 
 // ErrNoAttempts marks a Walk that ended without a single attempt being made
@@ -132,8 +139,11 @@ func recordBreaker(breaker BreakerChecker, slotID string, reason Reason) {
 	switch {
 	case breakerFailureReasons[reason]:
 		breaker.RecordFailure(slotID)
-	case reason == ReasonContextDone:
-		// Nothing to record.
+	case reason == ReasonContextDone, reason == ReasonNotDialed:
+		// Nothing to record. The caller abandoned the request, or the outcome
+		// was decided before the upstream was contacted; either way the slot
+		// neither answered nor failed to. Crediting a success here would erase
+		// legitimate failure counts and force an open breaker closed.
 	default:
 		breaker.RecordSuccess(slotID)
 	}

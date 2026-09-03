@@ -38,16 +38,17 @@ export interface ScenarioPickerScenario {
   id: string;
   name: string;
   labels: string[];
+  /** The test suite the scenario is filed in, when the project uses them. */
+  testSuiteId?: string | null;
 }
 
-/**
- * What the group of scenarios filed in no test suite reads as.
- *
- * Distinct from `UNFILED_GROUP_NAME` ("Unfiled test cases") in the agent-testing
- * cases list: this is the picker's own wording. The constant was dropped when
- * this component moved out of `platform/app`, leaving two importers pointing at
- * a symbol that existed in no build; restored here with its copy unchanged.
- */
+/** One test suite, so the list can be read under the suite names. */
+export interface ScenarioPickerTestSuite {
+  id: string;
+  name: string;
+}
+
+/** What the group of scenarios filed in no test suite reads as. */
 export const PICKER_UNFILED_GROUP_NAME = "No test suite";
 
 export interface ScenarioPickerProps {
@@ -81,6 +82,64 @@ export interface ScenarioPickerProps {
   archivedIds?: { id: string; name: string }[];
   /** Handler to remove an archived scenario. */
   onRemoveArchived?: (id: string) => void;
+  /**
+   * The test suites the scenarios are filed in. When any is given the list reads
+   * under the suite names; an empty list keeps the flat list.
+   */
+  testSuites?: ScenarioPickerTestSuite[];
+}
+
+/** One scenario of the list: the checkbox, the name and the labels. */
+function ScenarioPickerRow({
+  scenario,
+  checked,
+  onToggle,
+}: {
+  scenario: ScenarioPickerScenario;
+  checked: boolean;
+  onToggle: (id: string) => void;
+}) {
+  return (
+    <HStack gap={2} paddingY={1} cursor="pointer">
+      <Checkbox checked={checked} onCheckedChange={() => onToggle(scenario.id)} flex={1}>
+        <HStack gap={2} flex={1}>
+          <Text fontSize="sm" flex={1}>
+            {scenario.name}
+          </Text>
+          <ScenarioLabels labels={scenario.labels} />
+        </HStack>
+      </Checkbox>
+    </HStack>
+  );
+}
+
+/** The scenarios under their suite name, unfiled last. Empty groups are left out. */
+function groupScenariosByTestSuite(
+  scenarios: ScenarioPickerScenario[],
+  testSuites: ScenarioPickerTestSuite[],
+): { id: string; name: string; scenarios: ScenarioPickerScenario[] }[] {
+  const groups: { id: string; name: string; scenarios: ScenarioPickerScenario[] }[] = [];
+
+  for (const testSuite of testSuites) {
+    const held = scenarios.filter((scenario) => scenario.testSuiteId === testSuite.id);
+    if (held.length > 0) {
+      groups.push({ id: testSuite.id, name: testSuite.name, scenarios: held });
+    }
+  }
+
+  const testSuiteIds = new Set(testSuites.map((testSuite) => testSuite.id));
+  const unfiled = scenarios.filter(
+    (scenario) => !scenario.testSuiteId || !testSuiteIds.has(scenario.testSuiteId),
+  );
+  if (unfiled.length > 0) {
+    groups.push({
+      id: "__unfiled__",
+      name: PICKER_UNFILED_GROUP_NAME,
+      scenarios: unfiled,
+    });
+  }
+
+  return groups;
 }
 
 export function ScenarioPicker({
@@ -99,7 +158,11 @@ export function ScenarioPicker({
   hasError,
   archivedIds = [],
   onRemoveArchived,
+  testSuites,
 }: ScenarioPickerProps) {
+  const groups =
+    testSuites && testSuites.length > 0 ? groupScenariosByTestSuite(scenarios, testSuites) : null;
+
   return (
     <Box
       border="1px solid"
@@ -146,9 +209,7 @@ export function ScenarioPicker({
               size="sm"
               cursor="pointer"
               variant={activeLabelFilter === label ? "solid" : "outline"}
-              onClick={() =>
-                onLabelFilterChange(activeLabelFilter === label ? null : label)
-              }
+              onClick={() => onLabelFilterChange(activeLabelFilter === label ? null : label)}
             >
               {label}
             </Badge>
@@ -158,22 +219,36 @@ export function ScenarioPicker({
 
       {/* Scenario list */}
       <VStack maxHeight="200px" overflow="auto" paddingX={3} gap={1} align="stretch">
-        {scenarios.map((scenario) => (
-          <HStack key={scenario.id} gap={2} paddingY={1} cursor="pointer">
-            <Checkbox
-              checked={selectedIds.includes(scenario.id)}
-              onCheckedChange={() => onToggle(scenario.id)}
-              flex={1}
-            >
-              <HStack gap={2} flex={1}>
-                <Text fontSize="sm" flex={1}>
-                  {scenario.name}
+        {groups
+          ? groups.map((group) => (
+              <VStack key={group.id} gap={1} align="stretch">
+                <Text
+                  fontSize="xs"
+                  fontWeight="bold"
+                  textTransform="uppercase"
+                  color="fg.muted"
+                  paddingTop={1}
+                >
+                  {group.name}
                 </Text>
-                <ScenarioLabels labels={scenario.labels} />
-              </HStack>
-            </Checkbox>
-          </HStack>
-        ))}
+                {group.scenarios.map((scenario) => (
+                  <ScenarioPickerRow
+                    key={scenario.id}
+                    scenario={scenario}
+                    checked={selectedIds.includes(scenario.id)}
+                    onToggle={onToggle}
+                  />
+                ))}
+              </VStack>
+            ))
+          : scenarios.map((scenario) => (
+              <ScenarioPickerRow
+                key={scenario.id}
+                scenario={scenario}
+                checked={selectedIds.includes(scenario.id)}
+                onToggle={onToggle}
+              />
+            ))}
       </VStack>
 
       {/* Archived scenarios warning */}

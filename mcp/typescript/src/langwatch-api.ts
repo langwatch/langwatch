@@ -79,25 +79,48 @@ export interface PromptSummary {
   version?: number;
 }
 
-export interface PromptVersion {
-  version?: number;
-  commitMessage?: string;
-  model?: string;
-  messages?: Array<{ role: string; content: string }>;
+export interface PromptTag {
+  name: string;
+  versionId: string;
 }
 
-export interface PromptDetailResponse extends PromptSummary {
-  versions?: PromptVersion[];
+export type PromptFieldList = Array<{ identifier: string; type: string }>;
+
+/**
+ * A single versioned prompt payload. `GET /api/prompts/:id` returns the
+ * requested version's data flattened to the top level (merged with the base
+ * prompt data), and `GET /api/prompts/:id/versions` returns an array of
+ * entries in this same shape — there is no nested `versions` array on the
+ * detail response.
+ */
+export interface PromptVersion {
+  versionId?: string;
+  version?: number;
+  commitMessage?: string | null;
   model?: string;
+  /** Legacy single-text prompt body. */
+  prompt?: string;
   messages?: Array<{ role: string; content: string }>;
-  prompt?: Array<{ role: string; content: string }>;
+  temperature?: number;
+  maxTokens?: number;
+  responseFormat?: Record<string, unknown> | null;
+  /** Runtime parameters: an object map of name -> JSON value, not an array. */
+  parameters?: Record<string, unknown>;
+  inputs?: PromptFieldList;
+  outputs?: PromptFieldList;
+  /** All tags on the prompt; each names the version it currently points to. */
+  tags?: PromptTag[];
 }
+
+export interface PromptDetailResponse extends PromptSummary, PromptVersion {}
 
 export interface PromptMutationResponse {
   id?: string;
   handle?: string;
   name?: string;
   latestVersionNumber?: number;
+  versionId?: string;
+  tags?: string[];
 }
 
 // --- HTTP client ---
@@ -150,10 +173,12 @@ interface ParsedErrorBody {
 const VALID_FAULTS: readonly HandledErrorFault[] = ["customer", "platform", "provider"];
 
 /**
- * Parses an error response body as a handled-error envelope. Accepts both the
- * clean framework shape (`{ code, message?, tips?, docsUrl?, fault?, ... }`)
- * and the legacy non-framework one (`{ error: "<code>", message }`). Returns
- * an empty object when the body is not a recognizable error envelope.
+ * Parses an error response body as a handled-error envelope. Accepts three
+ * shapes: the canonical v1 envelope
+ * (`{ error: { type, code, message, meta?, trace_id } }`), the clean framework
+ * shape (`{ code, message?, tips?, docsUrl?, fault?, ... }`) and the legacy
+ * non-framework one (`{ error: "<code>", message }`). Returns an empty object
+ * when the body is not a recognizable error envelope.
  */
 function parseErrorBody(responseBody: string): ParsedErrorBody {
   try {
@@ -161,7 +186,16 @@ function parseErrorBody(responseBody: string): ParsedErrorBody {
     if (typeof parsed !== "object" || parsed === null || Array.isArray(parsed)) {
       return {};
     }
-    const body = parsed as Record<string, unknown>;
+    const envelope = parsed as Record<string, unknown>;
+    // The canonical v1 envelope nests everything under `error`. Read the
+    // nested object as the body so one parser serves both generations.
+    const nested =
+      typeof envelope.error === "object" &&
+      envelope.error !== null &&
+      !Array.isArray(envelope.error)
+        ? (envelope.error as Record<string, unknown>)
+        : null;
+    const body = nested ?? envelope;
     // `code` is the domain discriminant. The `error` fallback reads the
     // legacy envelope some non-framework families still send; the framework's
     // own unversioned union envelope, which used `error` for the HTTP status
@@ -185,8 +219,7 @@ function parseErrorBody(responseBody: string): ParsedErrorBody {
       ? (body.fault as HandledErrorFault)
       : undefined;
     const reasons =
-      Array.isArray(body.reasons) &&
-      body.reasons.every((r) => !!r && typeof r === "object")
+      Array.isArray(body.reasons) && body.reasons.every((r) => !!r && typeof r === "object")
         ? (body.reasons as SerializedReason[])
         : undefined;
     return { code, message, tips, docsUrl, fault, reasons };
@@ -257,9 +290,7 @@ export async function makeRequest(
   if (!response.ok) {
     const responseBody = await response.text();
     const parsed = parseErrorBody(responseBody);
-    const lines = [
-      `LangWatch API error ${response.status}: ${parsed.message ?? responseBody}`,
-    ];
+    const lines = [`LangWatch API error ${response.status}: ${parsed.message ?? responseBody}`];
     const reasonLines = (parsed.reasons ?? [])
       .map(describeReason)
       .filter((line): line is string => line !== null);
@@ -362,6 +393,13 @@ export async function getPrompt(
     "GET",
     `/api/prompts/${encodeURIComponent(idOrHandle)}${query}`,
   ) as Promise<PromptDetailResponse>;
+}
+
+/** Lists all versions of a prompt (versioned data only). */
+export async function getPromptVersions(idOrHandle: string): Promise<PromptVersion[]> {
+  return makeRequest("GET", `/api/prompts/${encodeURIComponent(idOrHandle)}/versions`) as Promise<
+    PromptVersion[]
+  >;
 }
 
 /** Creates a new prompt. */

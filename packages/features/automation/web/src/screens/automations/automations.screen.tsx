@@ -353,7 +353,10 @@ export function AutomationsPage({ section = "overview" }: { section?: Automation
 
   const FilterValue = ({ children }: { children: React.ReactNode }) => {
     return (
-      <Box padding={1} borderRightRadius="md">
+      // minWidth 0 opts out of the flex child's min-width: auto, so a long
+      // unbreakable value (a monitor id) clamps inside the chip instead of
+      // widening it past its border.
+      <Box padding={1} borderRightRadius="md" minWidth={0} overflow="hidden">
         <ClampedText lineClamp={1}>{children}</ClampedText>
       </Box>
     );
@@ -551,24 +554,26 @@ export function AutomationsPage({ section = "overview" }: { section?: Automation
                       <Table.Root variant="line" width="full">
                         <Table.Header>
                           <Table.Row>
-                            <Table.ColumnHeader>Name</Table.ColumnHeader>
-                            <Table.ColumnHeader>Watches</Table.ColumnHeader>
-                            <Table.ColumnHeader whiteSpace="nowrap">Fires when</Table.ColumnHeader>
-                            <Table.ColumnHeader>Notifies</Table.ColumnHeader>
-                            <Table.ColumnHeader whiteSpace="nowrap">
+                            <Table.ColumnHeader width="20%">Name</Table.ColumnHeader>
+                            <Table.ColumnHeader width="20%">Watches</Table.ColumnHeader>
+                            <Table.ColumnHeader width="14%" whiteSpace="nowrap">
+                              Fires when
+                            </Table.ColumnHeader>
+                            <Table.ColumnHeader width="14%">Notifies</Table.ColumnHeader>
+                            <Table.ColumnHeader width="12%" whiteSpace="nowrap">
                               <MetricHeader
                                 label="Last fired"
                                 help="When this alert last crossed its threshold and notified you."
                               />
                             </Table.ColumnHeader>
-                            <Table.ColumnHeader whiteSpace="nowrap">
+                            <Table.ColumnHeader width="9%" whiteSpace="nowrap">
                               <MetricHeader
                                 label="Status"
                                 help="Firing while the metric is past its threshold, back to OK when it recovers."
                               />
                             </Table.ColumnHeader>
-                            <Table.ColumnHeader>Active</Table.ColumnHeader>
-                            <Table.ColumnHeader />
+                            <Table.ColumnHeader width="6%">Active</Table.ColumnHeader>
+                            <Table.ColumnHeader width="5%" />
                           </Table.Row>
                         </Table.Header>
                         <Table.Body>
@@ -696,21 +701,23 @@ export function AutomationsPage({ section = "overview" }: { section?: Automation
                       <Table.Root variant="line" width="full">
                         <Table.Header>
                           <Table.Row>
-                            <Table.ColumnHeader>Name</Table.ColumnHeader>
-                            <Table.ColumnHeader>Sends</Table.ColumnHeader>
-                            <Table.ColumnHeader whiteSpace="nowrap">Schedule</Table.ColumnHeader>
-                            <Table.ColumnHeader whiteSpace="nowrap">
+                            <Table.ColumnHeader width="20%">Name</Table.ColumnHeader>
+                            <Table.ColumnHeader width="18%">Sends</Table.ColumnHeader>
+                            <Table.ColumnHeader width="18%" whiteSpace="nowrap">
+                              Schedule
+                            </Table.ColumnHeader>
+                            <Table.ColumnHeader width="12%" whiteSpace="nowrap">
                               <MetricHeader
                                 label="Next run"
                                 help="When this next goes out, straight from the scheduler. A paused schedule has no next run."
                               />
                             </Table.ColumnHeader>
-                            <Table.ColumnHeader whiteSpace="nowrap">
+                            <Table.ColumnHeader width="12%" whiteSpace="nowrap">
                               <MetricHeader label="Last run" help="The last time this was sent." />
                             </Table.ColumnHeader>
-                            <Table.ColumnHeader>Delivery</Table.ColumnHeader>
-                            <Table.ColumnHeader>Active</Table.ColumnHeader>
-                            <Table.ColumnHeader />
+                            <Table.ColumnHeader width="9%">Delivery</Table.ColumnHeader>
+                            <Table.ColumnHeader width="6%">Active</Table.ColumnHeader>
+                            <Table.ColumnHeader width="5%" />
                           </Table.Row>
                         </Table.Header>
                         <Table.Body>
@@ -739,7 +746,12 @@ export function AutomationsPage({ section = "overview" }: { section?: Automation
                                     graphNameById={graphNameById}
                                   />
                                 </Table.Cell>
-                                <Table.Cell whiteSpace="nowrap">
+                                {/* No nowrap here: a cadence plus an IANA zone
+                                    ("Weekly · Monday 09:00 Europe/Amsterdam") is far
+                                    wider than this column, and under a fixed layout a
+                                    nowrap cell prints straight over its neighbour
+                                    instead of widening. */}
+                                <Table.Cell>
                                   <Text textStyle="sm">
                                     {schedule?.cron
                                       ? describeSchedule(schedule.cron, schedule.timezone ?? "UTC")
@@ -788,23 +800,23 @@ export function AutomationsPage({ section = "overview" }: { section?: Automation
                       <Table.Root variant="line" width="full">
                         <Table.Header>
                           <Table.Row>
-                            <Table.ColumnHeader>Name</Table.ColumnHeader>
-                            <Table.ColumnHeader>Acts on</Table.ColumnHeader>
-                            <Table.ColumnHeader>Then</Table.ColumnHeader>
-                            <Table.ColumnHeader whiteSpace="nowrap">
+                            <Table.ColumnHeader width="24%">Name</Table.ColumnHeader>
+                            <Table.ColumnHeader width="25%">Acts on</Table.ColumnHeader>
+                            <Table.ColumnHeader width="17%">Then</Table.ColumnHeader>
+                            <Table.ColumnHeader width="13%" whiteSpace="nowrap">
                               <MetricHeader
                                 label="Last fired"
                                 help="When this automation last matched a trace and ran its action. Automations on a digest schedule also show when the next bundled send is due."
                               />
                             </Table.ColumnHeader>
-                            <Table.ColumnHeader whiteSpace="nowrap">
+                            <Table.ColumnHeader width="10%" whiteSpace="nowrap">
                               <MetricHeader
                                 label="Fires (30d)"
                                 help="Times this automation fired in the last 30 days."
                               />
                             </Table.ColumnHeader>
-                            <Table.ColumnHeader>Active</Table.ColumnHeader>
-                            <Table.ColumnHeader />
+                            <Table.ColumnHeader width="6%">Active</Table.ColumnHeader>
+                            <Table.ColumnHeader width="5%" />
                           </Table.Row>
                         </Table.Header>
                         <Table.Body>
@@ -814,8 +826,8 @@ export function AutomationsPage({ section = "overview" }: { section?: Automation
                             return (
                               <Table.Row {...sharedRowProps(trigger)}>
                                 <Table.Cell fontWeight="medium">{trigger.name}</Table.Cell>
-                                <Table.Cell maxWidth="360px">
-                                  <VStack gap={2} align="stretch">
+                                <Table.Cell>
+                                  <VStack gap={2} align="stretch" minWidth={0}>
                                     {applyChecks(
                                       trigger.checks?.filter(
                                         (check): check is Monitor => !!check,
@@ -825,14 +837,17 @@ export function AutomationsPage({ section = "overview" }: { section?: Automation
                                     {trigger.filterQuery ? (
                                       // ADR-043: a trace-subject automation shows
                                       // its search query.
-                                      <Code
-                                        size="sm"
-                                        variant="surface"
-                                        whiteSpace="pre-wrap"
-                                        wordBreak="break-word"
-                                      >
-                                        {trigger.filterQuery}
-                                      </Code>
+                                      <ClampedText lineClamp={2}>
+                                        <Code
+                                          size="sm"
+                                          variant="surface"
+                                          display="block"
+                                          minWidth={0}
+                                          wordBreak="break-word"
+                                        >
+                                          {trigger.filterQuery}
+                                        </Code>
+                                      </ClampedText>
                                     ) : trigger.filters &&
                                       typeof trigger.filters === "string" &&
                                       trigger.filters !== "{}" ? (
@@ -841,13 +856,22 @@ export function AutomationsPage({ section = "overview" }: { section?: Automation
                                   </VStack>
                                 </Table.Cell>
                                 <Table.Cell>
-                                  <VStack align="start" gap={0}>
+                                  <VStack align="start" gap={0} minWidth={0}>
                                     <Text textStyle="sm" fontWeight="medium">
                                       {triggerActionName(trigger.action)}
                                     </Text>
-                                    <Box textStyle="xs" color="fg.muted">
+                                    {/* Clamped, so it needs a reveal: the destination
+                                        (a long email, a webhook URL) is the whole
+                                        point of the cell. */}
+                                    <ClampedText
+                                      textStyle="xs"
+                                      color="fg.muted"
+                                      width="full"
+                                      lineClamp={2}
+                                      overflowWrap="anywhere"
+                                    >
                                       {actionItems(trigger.action, actionParams)}
-                                    </Box>
+                                    </ClampedText>
                                   </VStack>
                                 </Table.Cell>
                                 <Table.Cell whiteSpace="nowrap">

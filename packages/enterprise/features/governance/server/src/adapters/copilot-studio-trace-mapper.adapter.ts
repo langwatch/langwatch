@@ -802,23 +802,12 @@ export class CopilotStudioTraceMapper {
     group: ConversationGroup;
     turn: Turn;
     traceId: string;
-    parentSpanId: string;
+    spanId: string;
     threadId: string;
-    spanSeed: string;
     skipped: number;
     conversationEndMs: number;
   }): OtlpJsonSpan {
-    const {
-      origin,
-      group,
-      turn,
-      traceId,
-      parentSpanId,
-      threadId,
-      spanSeed,
-      skipped,
-      conversationEndMs,
-    } = params;
+    const { origin, group, turn, traceId, spanId, threadId, skipped, conversationEndMs } = params;
     const attrs: OtlpJsonAttr[] = [
       ConversationTraceAssembly.stringAttr({ key: "langwatch.span.type", value: "llm" }),
       ...CopilotStudioTraceMapper.conversationAttrs({
@@ -862,8 +851,7 @@ export class CopilotStudioTraceMapper {
     }
     return {
       traceId,
-      spanId: ConversationTraceAssembly.hashId(`${spanSeed}:${turn.seedActivityId}`, 16),
-      parentSpanId,
+      spanId,
       name: COPILOT_TURN_SPAN_NAME,
       kind: 1,
       startTimeUnixNano: ConversationTraceAssembly.msToNano(turn.startMs),
@@ -923,87 +911,16 @@ export class CopilotStudioTraceMapper {
    * chain span per conversation gives the fold one place to read, and it carries
    * the arc: the first thing asked and the last thing answered.
    */
-  private static conversationSpan(params: {
-    origin: RoutingOrigin;
-    group: ConversationGroup;
-    turns: Turn[];
-    traceId: string;
-    spanId: string;
-    threadId: string;
-    skipped: number;
-    conversationEndMs: number;
-    /**
-     * The span's own bounds, which are NOT the conversation's.
-     *
-     * `conversationEndMs` answers "when did this conversation happen", and is
-     * what decides whether the agent was edited afterwards — a question about
-     * turns. These two answer "what time range does this span have to cover",
-     * and a tool call hanging under a turn can start before the first turn or
-     * end after the last, so they take the extremes across every span emitted
-     * under this one. A parent that does not contain its children is a trace
-     * the explorer renders wrong.
-     */
-    spanStartMs: number;
-    spanEndMs: number;
-  }): OtlpJsonSpan {
-    const {
-      origin,
-      group,
-      turns,
-      traceId,
-      spanId,
-      threadId,
-      skipped,
-      conversationEndMs,
-      spanStartMs,
-      spanEndMs,
-    } = params;
-
-    const firstQuestion = turns.find((turn) => turn.question !== null)?.question;
-    const lastAnswer = [...turns].reverse().find((turn) => turn.answer !== null)?.answer;
-
-    const attributes: OtlpJsonAttr[] = [
-      ConversationTraceAssembly.stringAttr({ key: "langwatch.span.type", value: "chain" }),
-      ...CopilotStudioTraceMapper.conversationAttrs({
-        origin,
-        group,
-        endMs: conversationEndMs,
-        skipped,
-        threadId,
-      }),
-    ];
-    if (firstQuestion) {
-      attributes.push(
-        ConversationTraceAssembly.stringAttr({
-          key: "langwatch.input",
-          value: CopilotStudioTraceMapper.chatValue("user", firstQuestion),
-        }),
-      );
-    }
-    if (lastAnswer) {
-      attributes.push(
-        ConversationTraceAssembly.stringAttr({
-          key: "langwatch.output",
-          value: CopilotStudioTraceMapper.chatValue("assistant", lastAnswer),
-        }),
-      );
-    }
-
-    return {
-      traceId,
-      spanId,
-      name: COPILOT_CONVERSATION_SPAN_NAME,
-      kind: 1,
-      startTimeUnixNano: ConversationTraceAssembly.msToNano(spanStartMs),
-      endTimeUnixNano: ConversationTraceAssembly.msToNano(spanEndMs),
-      attributes,
-      status: { code: 1 },
-    };
-  }
-
   /**
-   * Every span one conversation contributes: the chain span its turns hang
-   * under, one span per turn, and one per tool call.
+   * Every span one conversation contributes: one root span per turn, and one
+   * per tool call.
+   *
+   * Each turn is its own TRACE, and every turn in one conversation shares a
+   * threadId so the Conversation view groups them — the same shape the Genie
+   * mapper already produces. A conversation used to be one trace with a chain
+   * span over its turns, which made the trace list one row per conversation
+   * however long it ran, and folded every turn's input and output into
+   * whichever the fold read last.
    *
    * Empty when the group produced no turns — a row of pure bookkeeping routes
    * nothing rather than routing an empty conversation.
@@ -1016,91 +933,72 @@ export class CopilotStudioTraceMapper {
     const { turns, skipped } = CopilotStudioTraceMapper.turnsOf(group.activities);
     if (turns.length === 0) return [];
 
-    const seeds: ConversationSeeds = {
-      // A Copilot trace is the whole conversation, so the conversation key
-      // alone names it — unlike Genie, where a trace is one question.
-      trace: [group.key],
-      thread: [group.key],
-      span: [group.key],
-    };
-    const identity = ConversationTraceAssembly.deriveConversationIdentity(origin, seeds);
+    const calls = CopilotStudioTraceMapper.toolCallsOf(group.activities);
     const conversationEndMs = turns.reduce(
       (latest, turn) => Math.max(latest, turn.endMs),
       turns[0]!.startMs,
     );
 
-    // Read before the root span is built, because the root has to cover them: a
-    // call hanging under a turn can start before the first turn began or run
-    // past the last one's end.
-    const calls = CopilotStudioTraceMapper.toolCallsOf(group.activities);
-    const spanStartMs = calls.reduce(
-      (earliest, call) => Math.min(earliest, call.startMs),
-      turns[0]!.startMs,
-    );
-    const spanEndMs = calls.reduce(
-      (latest, call) => Math.max(latest, call.endMs),
-      conversationEndMs,
-    );
+    // The trace and span seeds name the TURN; only the thread seed names the
+    // conversation, which is what groups the turns back together.
+    const turnIdentities = turns.map((turn) => {
+      const seeds: ConversationSeeds = {
+        trace: [group.key, turn.seedActivityId],
+        thread: [group.key],
+        span: [group.key, turn.seedActivityId],
+      };
+      return {
+        turn,
+        identity: ConversationTraceAssembly.deriveConversationIdentity(origin, seeds),
+      };
+    });
 
-    const spans: OtlpJsonSpan[] = [
-      CopilotStudioTraceMapper.conversationSpan({
-        origin,
-        group,
-        turns,
-        traceId: identity.traceId,
-        spanId: identity.rootSpanId,
-        threadId: identity.threadId,
-        skipped,
-        conversationEndMs,
-        spanStartMs,
-        spanEndMs,
-      }),
-    ];
+    const spans: OtlpJsonSpan[] = [];
 
-    for (const turn of turns) {
+    for (const { turn, identity } of turnIdentities) {
       spans.push(
         CopilotStudioTraceMapper.turnSpan({
           origin,
           group,
           turn,
           traceId: identity.traceId,
-          parentSpanId: identity.rootSpanId,
+          spanId: identity.rootSpanId,
           threadId: identity.threadId,
-          spanSeed: identity.spanSeed,
           skipped,
           conversationEndMs,
         }),
       );
     }
 
-    spans.push(...CopilotStudioTraceMapper.toolSpansOf({ origin, calls, turns, identity }));
+    spans.push(...CopilotStudioTraceMapper.toolSpansOf({ origin, calls, turnIdentities }));
 
     return spans;
   }
 
   /**
-   * One span per tool call, each hanging off the turn it falls inside by time.
-   * A call that predates every turn hangs off the first one rather than being
-   * dropped.
+   * One span per tool call, each hanging under the turn it falls inside by
+   * time — and therefore inside that turn's own trace. A call that predates
+   * every turn hangs off the first one rather than being dropped.
    */
   private static toolSpansOf(params: {
     origin: RoutingOrigin;
     calls: ToolCall[];
-    turns: Turn[];
-    identity: ReturnType<typeof ConversationTraceAssembly.deriveConversationIdentity>;
+    turnIdentities: {
+      turn: Turn;
+      identity: ReturnType<typeof ConversationTraceAssembly.deriveConversationIdentity>;
+    }[];
   }): OtlpJsonSpan[] {
-    const { origin, calls, turns, identity } = params;
+    const { origin, calls, turnIdentities } = params;
     return calls.map((call) => {
-      const parent = [...turns].reverse().find((turn) => turn.startMs <= call.startMs) ?? turns[0]!;
+      const parent =
+        [...turnIdentities].reverse().find(({ turn }) => turn.startMs <= call.startMs) ??
+        turnIdentities[0]!;
       return CopilotStudioTraceMapper.toolSpan({
         origin,
         call,
-        traceId: identity.traceId,
-        parentSpanId: ConversationTraceAssembly.hashId(
-          `${identity.spanSeed}:${parent.seedActivityId}`,
-          16,
-        ),
-        spanSeed: identity.spanSeed,
+        traceId: parent.identity.traceId,
+        parentSpanId: parent.identity.rootSpanId,
+        spanSeed: parent.identity.spanSeed,
       });
     });
   }

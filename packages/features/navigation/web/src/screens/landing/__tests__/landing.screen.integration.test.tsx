@@ -1,9 +1,9 @@
 /**
  * @vitest-environment jsdom
  *
- * The "/" landing seam: in a new navigation mode the per-org product
- * memory decides ahead of the server resolver, and in legacy mode the
- * current resolveHomeDestination path runs unchanged.
+ * The "/" landing seam: the per-org product memory decides ahead of the
+ * server home resolver, and re-renders during the in-flight navigation
+ * never restart the same replace.
  *
  * MOVED from `platform/app/src/pages/__tests__/index.landing.integration.test.tsx`.
  * The three mocks that named that application's modules — its router, its
@@ -17,15 +17,10 @@ import { render, waitFor } from "@testing-library/react";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
 const replaceMock = vi.fn();
-let mockMode: "legacy" | "product-switcher" = "product-switcher";
 let mockResolveHome: {
   data?: { destination: string; isOverride: boolean } & Record<string, unknown>;
   isError: boolean;
 } = { isError: false };
-
-vi.mock("../../../behavior/use-navigation-mode", () => ({
-  useNavigationMode: () => ({ status: "ready", mode: mockMode }),
-}));
 
 vi.mock("../../../behavior/use-reachable-products", () => ({
   useReachableProducts: () => ({
@@ -68,7 +63,6 @@ function renderLanding() {
 beforeEach(() => {
   localStorage.clear();
   replaceMock.mockClear();
-  mockMode = "product-switcher";
   mockResolveHome = {
     data: {
       destination: "/demo",
@@ -81,8 +75,8 @@ beforeEach(() => {
 });
 
 describe("the root landing", () => {
-  describe("when a new mode remembers a product", () => {
-    /** @scenario The root address opens the remembered product in a new mode */
+  describe("when the device remembers a product", () => {
+    /** @scenario The root address opens the remembered product */
     it("opens the remembered product ahead of the server resolver", async () => {
       writeLastVisitedProduct({ organizationId: "org_1", productId: "gateway" });
       renderLanding();
@@ -114,7 +108,6 @@ describe("the root landing", () => {
   describe("when the landing page re-renders while the navigation is in flight", () => {
     /** @scenario The landing redirect navigates once per destination */
     it("navigates once per destination", async () => {
-      mockMode = "legacy";
       const { rerender } = renderLanding();
 
       await waitFor(() => {
@@ -139,19 +132,6 @@ describe("the root landing", () => {
       );
 
       expect(replaceMock).toHaveBeenCalledTimes(1);
-    });
-  });
-
-  describe("when the device is in legacy mode", () => {
-    /** @scenario The root address keeps its current behavior in legacy mode */
-    it("resolves through the current home resolution, ignoring the memory", async () => {
-      mockMode = "legacy";
-      writeLastVisitedProduct({ organizationId: "org_1", productId: "governance" });
-      renderLanding();
-
-      await waitFor(() => {
-        expect(replaceMock).toHaveBeenCalledWith("/demo");
-      });
     });
   });
 });

@@ -8,6 +8,7 @@ export * from "./coding-agent-trace-pull-request";
 export * from "./coding-agent-projection-persistence";
 export * from "./telemetry";
 export * from "./telemetry/coding-agent-normalization";
+export * from "./telemetry/session-context";
 // Temporary test/pure-derivation compatibility exports; production app paths
 // use CodingAgentService methods and do not depend on these directly.
 export * from "./coding-agent-log-content";

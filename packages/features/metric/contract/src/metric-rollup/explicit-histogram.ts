@@ -1,11 +1,8 @@
-import type {
-  CanonicalMetricDataPoint,
-  MetricRollupRow,
-} from "../schemas/metric-processing/metric-data-point";
+import type { MetricRollupRow } from "../schemas/metric-processing/metric-data-point";
 import { type BucketEntry, extendExtrema, resetOrGap } from "./rollup-row";
-import { bigint, previousPoint, startsNewSequence } from "./sequence";
+import { bigint, type MetricRollupSourcePoint, previousPoint, startsNewSequence } from "./sequence";
 
-function commonExplicitBounds(points: CanonicalMetricDataPoint[]): number[] {
+function commonExplicitBounds(points: MetricRollupSourcePoint[]): number[] {
   if (points.length === 0) return [];
   let common = new Set(points[0]!.explicitBounds);
   for (const point of points.slice(1)) {
@@ -24,7 +21,7 @@ function coarsenExplicit({
   point,
   targetBounds,
 }: {
-  point: CanonicalMetricDataPoint;
+  point: MetricRollupSourcePoint;
   targetBounds: number[];
 }): bigint[] {
   const sourceCounts = point.bucketCounts.map(bigint);
@@ -50,10 +47,10 @@ function usablePredecessor({
   all,
   index,
 }: {
-  point: CanonicalMetricDataPoint;
-  all: CanonicalMetricDataPoint[];
+  point: MetricRollupSourcePoint;
+  all: MetricRollupSourcePoint[];
   index: number;
-}): CanonicalMetricDataPoint | undefined {
+}): MetricRollupSourcePoint | undefined {
   if (point.aggregationTemporality !== "cumulative") return undefined;
   const previous = previousPoint(all, index);
   if (previous?.metricKind !== "histogram") return undefined;
@@ -66,9 +63,9 @@ function usablePredecessors({
   all,
 }: {
   entries: BucketEntry[];
-  all: CanonicalMetricDataPoint[];
-}): CanonicalMetricDataPoint[] {
-  const predecessors: CanonicalMetricDataPoint[] = [];
+  all: MetricRollupSourcePoint[];
+}): MetricRollupSourcePoint[] {
+  const predecessors: MetricRollupSourcePoint[] = [];
   for (const { point, index } of entries) {
     const previous = usablePredecessor({ point, all, index });
     if (previous) predecessors.push(previous);
@@ -83,9 +80,9 @@ function differenceHistogramPoint({
   all,
   bounds,
 }: {
-  point: CanonicalMetricDataPoint;
+  point: MetricRollupSourcePoint;
   index: number;
-  all: CanonicalMetricDataPoint[];
+  all: MetricRollupSourcePoint[];
   bounds: number[];
 }): { counts: bigint[]; count: bigint; sum: number | null } | null {
   const previous = usablePredecessor({ point, all, index });
@@ -113,7 +110,7 @@ function buildHistogramRow({
 }: {
   row: MetricRollupRow;
   entries: BucketEntry[];
-  all: CanonicalMetricDataPoint[];
+  all: MetricRollupSourcePoint[];
 }): void {
   // Cumulative points are subtracted only after both sides have been coarsened
   // onto the same exactly mergeable boundary set, so each usable predecessor

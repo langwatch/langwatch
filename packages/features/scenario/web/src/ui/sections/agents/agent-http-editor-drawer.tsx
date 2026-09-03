@@ -4,6 +4,7 @@ import {
   type RenderAgentVariablesInput,
   type RenderScenarioMappingsInput,
 } from "@langwatch/agent-web/screens/agent-management";
+import { AgentTestPanel } from "./agent-test-panel";
 import {
   agentInputBindingSchema,
   FIELD_TYPES,
@@ -17,9 +18,18 @@ import { computeBestMatchMappings } from "@langwatch/scenario-contract";
 import { useCallback, useMemo } from "react";
 import { z } from "zod";
 import { ScenarioInputMappingSection } from "../../elements/suites/scenario-input-mapping-section";
-import { type AvailableSource, type FieldMapping, VariablesSection } from "@langwatch/prompt-web/surfaces/variables";
+import {
+  type AvailableSource,
+  type FieldMapping,
+  VariablesSection,
+} from "@langwatch/prompt-web/surfaces/variables";
 import { showErrorToast } from "../../../behavior/errors";
-import { getComplexProps, getFlowCallbacks, useDrawer, useDrawerParams } from "@langwatch/ui-drawer";
+import {
+  getComplexProps,
+  getFlowCallbacks,
+  useDrawer,
+  useDrawerParams,
+} from "@langwatch/ui-drawer";
 import { useOrganizationTeamProject } from "../../../behavior/use-organization-team-project";
 import { explainExecutionStateError } from "@langwatch/workflow-web/optimization_studio/utils/executionStateError";
 import { api } from "../../../behavior/scenario-api";
@@ -133,6 +143,10 @@ class PlatformAgentHttpEditorPresentation extends AgentHttpEditorPresentationPor
 
   showSaveError(input: { error: unknown; fallbackTitle: string }) {
     showErrorToast(input);
+  }
+
+  renderTestPanel({ agentId, projectId }: { agentId: string; projectId: string }) {
+    return <AgentTestPanel agentId={agentId} projectId={projectId} />;
   }
 }
 

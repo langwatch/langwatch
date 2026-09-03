@@ -13,8 +13,7 @@ import { useCallback, useEffect, useMemo, useRef } from "react";
 import type { Period } from "@langwatch/analytics-web/components/PeriodSelector";
 import { ShadowDivider } from "../../elements/shadow-divider";
 import { HandledErrorAlert } from "../../../behavior/errors";
-import { LangyContextTarget } from "@langwatch/langy-web";
-import { scenarioContextChip } from "@langwatch/langy-web";
+import { LangyContextTarget, scenarioContextChip } from "@langwatch/langy-web";
 import { useDrawer } from "@langwatch/ui-drawer";
 import { useOrganizationTeamProject } from "../../../behavior/use-organization-team-project";
 import { useSimulationUpdateListener } from "../../../behavior/use-simulation-update-listener";
@@ -28,15 +27,11 @@ import {
   RunRow,
   type RunHistoryFilterValues,
   type ScenarioRunContextRenderer,
-} from "@langwatch/suite-web";
-import {
   availableGroupByOptions,
   computeBatchRunSummary,
   computeGroupSummary,
   groupRunsByBatchId,
   groupRunsByScenarioId,
-} from "@langwatch/suite-web";
-import {
   ScenarioTabConnectedBadge,
   useAutoExpansion,
   useRunHistoryStore,
@@ -45,11 +40,7 @@ import {
 import { useSuiteRunFreshness } from "../../../behavior/suites/use-suite-run-freshness";
 import { usePrefetchRunState } from "../../../behavior/suites/use-prefetch-run-state";
 
-const renderScenarioContext: ScenarioRunContextRenderer = ({
-  scenarioRunId,
-  name,
-  children,
-}) => (
+const renderScenarioContext: ScenarioRunContextRenderer = ({ scenarioRunId, name, children }) => (
   <LangyContextTarget target={scenarioContextChip({ scenarioId: scenarioRunId, name })}>
     {children}
   </LangyContextTarget>
@@ -121,8 +112,7 @@ export function ExternalSetDetailPanel({
     },
   );
 
-  const runData =
-    runDataResult && "runs" in runDataResult ? runDataResult.runs : undefined;
+  const runData = runDataResult && "runs" in runDataResult ? runDataResult.runs : undefined;
 
   useSuiteRunFreshness({
     scenarioSetId,
@@ -172,8 +162,7 @@ export function ExternalSetDetailPanel({
       runs = runs.filter((r) => r.status === ScenarioRunStatus.SUCCESS);
     } else if (filters.passFailStatus === "fail") {
       runs = runs.filter(
-        (r) =>
-          r.status === ScenarioRunStatus.ERROR || r.status === ScenarioRunStatus.FAILED,
+        (r) => r.status === ScenarioRunStatus.ERROR || r.status === ScenarioRunStatus.FAILED,
       );
     } else if (filters.passFailStatus === "stalled") {
       runs = runs.filter((r) => r.status === ScenarioRunStatus.STALLED);
@@ -353,9 +342,7 @@ export function ExternalSetDetailPanel({
                 <FlaskConical size={28} />
               </EmptyState.Indicator>
               <EmptyState.Title>No runs yet</EmptyState.Title>
-              <EmptyState.Description>
-                No run data found for this set.
-              </EmptyState.Description>
+              <EmptyState.Description>No run data found for this set.</EmptyState.Description>
             </EmptyState.Content>
           </EmptyState.Root>
         )}

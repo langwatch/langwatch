@@ -2,13 +2,14 @@
  * What the moved simulation, scenario and Agent Testing modules do with a
  * failure.
  *
- * `platform/app/src/features/errors` is the APPLICATION's — a code-keyed
- * presentation registry, the toaster that renders it and the form binder that
- * places a rejection on the field it belongs to. None of it may be imported
- * from a feature-web package, and none of it is copied here: the words a
- * customer reads are the application's to decide, which is exactly what
- * `ScenarioHostPort.failed` hands back to it. The workflow family wrote the
- * same seam for the same reason, and this is that shape against this host.
+ * The code-keyed presentation registry is NOT here and is not copied here: it
+ * is `@langwatch/handled-error/presentation`, one module for the whole
+ * platform, and every surface that needs the words for a code reads it there —
+ * the same way the trace family does. What lives in this file is the rest of
+ * the seam: the toaster, which reports through `ScenarioHostPort.failed` so
+ * the application still owns where a failure appears, the form binder that
+ * places a rejection on the field it belongs to, and the two panels that
+ * render one inline.
  *
  * The names below are the ones twenty-six moved files import, kept letter for
  * letter so none of those files needed an edit beyond the module path.
@@ -16,13 +17,15 @@
  * WHAT IS NARROWER THAN THE APPLICATION'S, named rather than hidden:
  * `applyHandledErrorToForm` places a validation refusal on the fields the
  * server named in `meta.fieldErrors`, but the SENTENCE it places is the generic
- * one — the registry that knows better lives in the application. A refusal
- * still lands where the reader is looking, which is the property the helper
- * exists for.
+ * one, because a field-level rejection carries its own text and the registry
+ * describes the code, not the field. A refusal still lands where the reader is
+ * looking, which is the property the helper exists for.
  */
 
 import { Alert, Box, Button, HStack, Text, VStack } from "@chakra-ui/react";
 import type { ReactNode } from "react";
+
+import { explainAnyError, UNKNOWN_ERROR_PRESENTATION } from "@langwatch/handled-error/presentation";
 
 import {
   useScenarioHost,
@@ -33,28 +36,11 @@ import {
 /**
  * The generic line, shared by every slot below so the two never disagree.
  *
- * Word for word the application registry's `UNKNOWN_ERROR_PRESENTATION`
- * description, because a failure that reads one way inside a run board and
+ * Read off the registry's own `UNKNOWN_ERROR_PRESENTATION` rather than typed
+ * again here, because a failure that reads one way inside a run board and
  * another way on the page next to it is two products.
  */
-export const UNKNOWN_ERROR_DESCRIPTION = "We've been notified. Try again in a moment.";
-
-export type ErrorExplanation = {
-  title: string;
-  description: string;
-  code?: string;
-  /**
-   * Whether the failure carries a CODE — not whether this package has the words
-   * for it. The code-keyed registry is the application's and did not travel.
-   */
-  isRegistered?: boolean;
-};
-
-export const UNKNOWN_ERROR_PRESENTATION: ErrorExplanation = {
-  title: "Something went wrong",
-  description: UNKNOWN_ERROR_DESCRIPTION,
-  isRegistered: false,
-};
+export const UNKNOWN_ERROR_DESCRIPTION = UNKNOWN_ERROR_PRESENTATION.description;
 
 export type HandledErrorShape = {
   code: string;
@@ -84,46 +70,24 @@ export function readHandledError(error: unknown): HandledErrorShape | null {
   };
 }
 
-/** The whole explanation as one string, for slots that can only take text. */
+/**
+ * The whole explanation as one string, for slots that can only take text.
+ *
+ * Registered copy beats the caller's headline, because it describes the actual
+ * failure; the degraded form does not, since a caller's own title at least
+ * names the action that failed.
+ */
 export function describeError({
-  error: _error,
+  error,
   fallbackTitle,
 }: {
   error: unknown;
   fallbackTitle?: string;
 }): string {
-  return `${fallbackTitle ?? UNKNOWN_ERROR_PRESENTATION.title}. ${UNKNOWN_ERROR_DESCRIPTION}`;
+  const explanation = explainAnyError(error);
+  const title = explanation.isRegistered ? explanation.title : (fallbackTitle ?? explanation.title);
+  return explanation.description ? `${title}. ${explanation.description}` : title;
 }
-
-/**
- * The code a failure carries, from either shape it arrives in.
- *
- * A tRPC failure wraps the payload in `data.error`; a handled error serialized
- * in the browser IS the payload. Both are read, because the caller does not
- * always know which it has.
- */
-function codeOf(error: unknown): string | null {
-  const handled = readHandledError(error);
-  if (handled) return handled.code;
-  if (isRecord(error) && typeof error.code === "string") return error.code;
-  return null;
-}
-
-/**
- * What a customer reads for a failure, as much of it as this package can say.
- *
- * WHAT IS LOST, named rather than hidden: the registry's specific title and
- * description for a code it lists. A caller's `fallbackTitle` carries the
- * weight instead, which is why every call site passes one.
- */
-export function explainAnyError(error: unknown): ErrorExplanation {
-  const code = codeOf(error);
-  if (code === null) return UNKNOWN_ERROR_PRESENTATION;
-  return { ...UNKNOWN_ERROR_PRESENTATION, code, isRegistered: true };
-}
-
-export const explainSerializedError = explainAnyError;
-export const explainHandledError = explainAnyError;
 
 export type ShowErrorToastOptions = {
   error?: unknown;
@@ -307,7 +271,7 @@ export function HandledErrorState({
     >
       {icon && <Box color="fg.muted">{icon}</Box>}
       <Text fontSize="lg" fontWeight="semibold">
-        {fallbackTitle ?? explanation.title}
+        {explanation.isRegistered ? explanation.title : (fallbackTitle ?? explanation.title)}
       </Text>
       <Text color="fg.muted" textAlign="center" maxWidth="480px">
         {explanation.description}
@@ -332,7 +296,9 @@ export function HandledErrorAlert({
     <Alert.Root status="error">
       <Alert.Indicator />
       <Alert.Content>
-        <Alert.Title>{fallbackTitle ?? explanation.title}</Alert.Title>
+        <Alert.Title>
+          {explanation.isRegistered ? explanation.title : (fallbackTitle ?? explanation.title)}
+        </Alert.Title>
         <Alert.Description>{explanation.description}</Alert.Description>
       </Alert.Content>
       {onRetry && (

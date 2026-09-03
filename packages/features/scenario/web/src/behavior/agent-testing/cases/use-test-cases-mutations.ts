@@ -1,9 +1,9 @@
 /**
- * Every write the Test cases tab makes, and the dialog state each write needs
+ * Every write the Scenarios tab makes, and the dialog state each write needs
  * to close itself when it lands.
  *
  * @see specs/features/agent-testing/cases-table.feature
- * @see specs/suites/suite-folders.feature
+ * @see specs/suites/test-suites.feature
  */
 
 import { useCallback, useState } from "react";
@@ -11,7 +11,7 @@ import { toaster } from "@langwatch/design-system/toaster";
 import { showErrorToast } from "../../errors";
 import { api } from "../../scenario-api";
 import type { AgentTestingSelection } from "../use-agent-testing-routing";
-import type { TestCase, TestSuiteEntry } from "../../../model/agent-testing/cases/test-cases";
+import type { TestCase } from "../../../model/agent-testing/cases/test-cases";
 
 function toastOnError(fallbackTitle: string) {
   return (error: unknown) => showErrorToast({ error, fallbackTitle });
@@ -22,18 +22,14 @@ function useCasesInvalidate(projectId: string): () => void {
   const utils = api.useUtils();
   return useCallback(() => {
     void utils.scenarios.getAll.invalidate({ projectId });
-    void utils.suites.folders.getAll.invalidate({ projectId });
+    void utils.suites.testSuites.getAll.invalidate({ projectId });
   }, [utils, projectId]);
 }
 
 export type SuiteMutations = {
-  /** The suite the edit dialog is open on, if any. */
-  suiteToRename: TestSuiteEntry | null;
-  setSuiteToRename: (suite: TestSuiteEntry | null) => void;
   isArchiving: boolean;
-  isRenaming: boolean;
   createSuite: (name: string) => void;
-  renameSuite: (name: string) => void;
+  renameSuite: (input: { suiteId: string; name: string }) => void;
   archiveSuite: (suiteId: string) => void;
 };
 
@@ -48,56 +44,55 @@ export function useSuiteMutations({
   selectSuite: (selection: AgentTestingSelection) => void;
 }): SuiteMutations {
   const invalidate = useCasesInvalidate(projectId);
-  const [suiteToRename, setSuiteToRename] = useState<TestSuiteEntry | null>(
-    null,
-  );
 
-  const create = api.suites.folders.create.useMutation({
-    onSuccess: (folder) => {
+  const create = api.suites.testSuites.create.useMutation({
+    onSuccess: (testSuite) => {
       invalidate();
-      selectSuite({ kind: "suite", slug: folder.slug });
+      selectSuite({ kind: "suite", slug: testSuite.slug });
     },
     onError: toastOnError("Couldn't create the test suite"),
   });
 
-  const rename = api.suites.folders.rename.useMutation({
-    onSuccess: () => {
+  const rename = api.suites.testSuites.rename.useMutation({
+    onSuccess: (testSuite) => {
       invalidate();
-      setSuiteToRename(null);
+      // A rename moves the slug, so the address of the open suite moves with
+      // it. Without this the page would hold a slug nothing answers to.
+      if (testSuite.id === selectedSuiteId) {
+        selectSuite({ kind: "suite", slug: testSuite.slug });
+      }
     },
     onError: toastOnError("Couldn't rename the test suite"),
   });
 
-  const archive = api.suites.folders.archive.useMutation({
+  const archive = api.suites.testSuites.archive.useMutation({
     onSuccess: (_result, variables) => {
       invalidate();
-      if (variables.folderId === selectedSuiteId) selectSuite({ kind: "all" });
+      // The suite the address named is gone, so the tab falls back to the
+      // first suite that is left.
+      if (variables.testSuiteId === selectedSuiteId) {
+        selectSuite({ kind: "suite", slug: null });
+      }
     },
     onError: toastOnError("Couldn't archive the test suite"),
   });
 
   return {
-    suiteToRename,
-    setSuiteToRename,
     isArchiving: archive.isPending,
-    isRenaming: rename.isPending,
     createSuite: (name) => create.mutate({ projectId, name }),
-    renameSuite: (name) => {
-      if (!suiteToRename) return;
-      rename.mutate({ projectId, folderId: suiteToRename.id, name });
-    },
-    archiveSuite: (suiteId) => archive.mutate({ projectId, folderId: suiteId }),
+    renameSuite: ({ suiteId, name }) => rename.mutate({ projectId, testSuiteId: suiteId, name }),
+    archiveSuite: (suiteId) => archive.mutate({ projectId, testSuiteId: suiteId }),
   };
 }
 
 export type CaseMutations = {
-  /** The case the archive dialog is open on, if any. */
+  /** The scenario the archive dialog is open on, if any. */
   caseToArchive: TestCase | null;
   setCaseToArchive: (testCase: TestCase | null) => void;
   isArchiving: boolean;
   archiveCase: () => void;
   duplicateCase: (testCase: TestCase) => void;
-  moveCaseToSuite: (testCase: TestCase, suiteId: string | null) => void;
+  moveCaseToSuite: (testCase: TestCase, suiteId: string) => void;
 };
 
 export function useCaseMutations(projectId: string): CaseMutations {
@@ -109,20 +104,20 @@ export function useCaseMutations(projectId: string): CaseMutations {
       invalidate();
       setCaseToArchive(null);
     },
-    onError: toastOnError("Couldn't archive the test case"),
+    onError: toastOnError("Couldn't archive the scenario"),
   });
 
   const duplicate = api.scenarios.duplicate.useMutation({
     onSuccess: () => {
       invalidate();
-      toaster.create({ title: "Test case duplicated", type: "success" });
+      toaster.create({ title: "Scenario duplicated", type: "success" });
     },
-    onError: toastOnError("Couldn't duplicate the test case"),
+    onError: toastOnError("Couldn't duplicate the scenario"),
   });
 
-  const move = api.scenarios.moveToFolder.useMutation({
+  const move = api.scenarios.moveToTestSuite.useMutation({
     onSuccess: invalidate,
-    onError: toastOnError("Couldn't move the test case"),
+    onError: toastOnError("Couldn't move the scenario"),
   });
 
   return {
@@ -133,9 +128,8 @@ export function useCaseMutations(projectId: string): CaseMutations {
       if (!caseToArchive) return;
       archive.mutate({ projectId, id: caseToArchive.id });
     },
-    duplicateCase: (testCase) =>
-      duplicate.mutate({ projectId, scenarioId: testCase.id }),
+    duplicateCase: (testCase) => duplicate.mutate({ projectId, scenarioId: testCase.id }),
     moveCaseToSuite: (testCase, suiteId) =>
-      move.mutate({ projectId, scenarioId: testCase.id, folderId: suiteId }),
+      move.mutate({ projectId, scenarioId: testCase.id, testSuiteId: suiteId }),
   };
 }

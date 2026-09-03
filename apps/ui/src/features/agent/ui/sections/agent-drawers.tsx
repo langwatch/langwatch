@@ -21,6 +21,10 @@
  * states the rule and the reasoning. This family writes the address and owns
  * nothing else about them; the caller's own `onSelect` still fires alongside,
  * which is what the flows that pass one act on.
+ *
+ * "Connect from Code" is the same shape: the card is the package's, the address
+ * it opens (`agentConnectFromCode`) is this application's, so it arrives as a
+ * callback rather than as a name the package would have to know.
  */
 
 import {
@@ -68,6 +72,7 @@ function AgentTypeSelectorFromAddress(props: AgentTypeSelectorProps) {
       onGoBack={goBack}
       canGoBack={canGoBack}
       onSelect={handleSelect}
+      onConnectFromCode={() => openDrawer("agentConnectFromCode")}
     />
   );
 }

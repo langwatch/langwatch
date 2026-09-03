@@ -12,10 +12,7 @@ export interface DrawerContentProps extends ChakraDrawer.ContentProps {
 }
 
 export const DrawerContent = React.forwardRef<HTMLDivElement, DrawerContentProps>(
-  function DrawerContent(
-    { portalled = true, portalRef, offset, marginTop, ...contentProps },
-    ref,
-  ) {
+  function DrawerContent({ portalled = true, portalRef, offset, marginTop, ...contentProps }, ref) {
     const context = React.useContext(DrawerOffsetContext);
     return (
       <Portal disabled={!portalled} container={portalRef}>
@@ -40,20 +37,33 @@ export const DrawerCloseTrigger = React.forwardRef<
   ChakraDrawer.CloseTriggerProps
 >(function DrawerCloseTrigger(props, ref) {
   return (
-    <ChakraDrawer.CloseTrigger
-      position="absolute"
-      top="2"
-      insetEnd="2"
-      {...props}
-      asChild
-    >
+    <ChakraDrawer.CloseTrigger position="absolute" top="2" insetEnd="2" {...props} asChild>
       <CloseButton ref={ref} size="sm" />
     </ChakraDrawer.CloseTrigger>
   );
 });
 
+/**
+ * The width steps this product adds on top of Chakra's own, named in
+ * `system/drawer.recipe.ts`.
+ *
+ * Chakra generates the type of `size` from its OWN recipe, so a step the
+ * product adds is unknown to it however the recipe is registered. The wrapper
+ * carries the product's list and hands the name down, which is why a drawer
+ * sets a width by name here and never with a maxWidth of its own.
+ */
+export type AppDrawerSize = NonNullable<ChakraDrawer.RootProps["size"]> | "2xl";
+
+export interface DrawerRootProps extends Omit<ChakraDrawer.RootProps, "size"> {
+  size?: AppDrawerSize;
+}
+
+export const DrawerRoot = function DrawerRoot({ size, ...props }: DrawerRootProps) {
+  return <ChakraDrawer.Root size={size as ChakraDrawer.RootProps["size"]} {...props} />;
+};
+
 export const Drawer = {
-  Root: ChakraDrawer.Root,
+  Root: DrawerRoot,
   CloseTrigger: DrawerCloseTrigger,
   Trigger: ChakraDrawer.Trigger,
   Content: DrawerContent,

@@ -4,7 +4,7 @@
  * The platform reads the author of a version row from the surface header on
  * the request, so the write commands go through a client that declares it.
  * Without that header a command-line edit is recorded as an anonymous API
- * save, and the case's history says the wrong thing.
+ * save, and the scenario's history says the wrong thing.
  *
  * Spec: specs/features/scenario-cli.feature
  */
@@ -70,7 +70,7 @@ describe("the scenarios service the command line writes through", () => {
         criteria: [],
         labels: [],
         parameters: [],
-        folderId: null,
+        testSuiteId: null,
       },
     });
     vi.spyOn(console, "log").mockImplementation(noop);

@@ -36,7 +36,7 @@
  * is not.
  *
  * Run:  pnpm generate:langy-skills
- * Pinned by: src/shared/langy/__tests__/langy-skills.unit.test.ts, which re-derives
+ * Pinned by: src/model/shared/langy/__tests__/langy-skills.unit.test.ts, which re-derives
  * from disk and fails if the committed catalogue has drifted from the image.
  */
 import fs from "node:fs";
@@ -49,7 +49,7 @@ const REPO_ROOT = path.resolve(__dirname, "../../../../..");
 const DOCKERFILE = path.join(REPO_ROOT, "infra/docker/Dockerfile.langyagent");
 const OUT = path.join(
   REPO_ROOT,
-  "packages/features/langy/web/src/shared/langy/langySkills.generated.json",
+  "packages/features/langy/web/src/model/shared/langy/langySkills.generated.json",
 );
 
 /**

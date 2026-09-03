@@ -154,9 +154,7 @@ export class OpsService extends OpsServiceContract {
     return this.scheduler.listPausedSchedules(input);
   }
 
-  listSchedulerActions(
-    input: ListSchedulerActionsInput,
-  ): Promise<SchedulerAuditEntryView[]> {
+  listSchedulerActions(input: ListSchedulerActionsInput): Promise<SchedulerAuditEntryView[]> {
     return this.scheduler.listRecentActions(input);
   }
 
@@ -184,10 +182,7 @@ export class OpsService extends OpsServiceContract {
     return this.queues.getGroups(input);
   }
 
-  tryGetQueueGroup(input: {
-    queueName: string;
-    groupId: string;
-  }): Promise<GroupInfo | null> {
+  tryGetQueueGroup(input: { queueName: string; groupId: string }): Promise<GroupInfo | null> {
     return this.queues.tryGetGroupDetail(input);
   }
 
@@ -220,12 +215,14 @@ export class OpsService extends OpsServiceContract {
   unblockQueueGroup(input: {
     queueName: string;
     groupId: string;
+    requestedBy: string;
   }): Promise<{ wasBlocked: boolean }> {
     return this.queues.unblockGroup(input);
   }
 
   unblockAllQueueGroups(input: {
     queueName: string;
+    requestedBy: string;
   }): Promise<{ unblockedCount: number }> {
     return this.queues.unblockAll(input);
   }
@@ -233,6 +230,7 @@ export class OpsService extends OpsServiceContract {
   drainQueueGroup(input: {
     queueName: string;
     groupId: string;
+    requestedBy: string;
   }): Promise<{ jobsRemoved: number }> {
     return this.queues.drainGroup(input);
   }
@@ -273,6 +271,7 @@ export class OpsService extends OpsServiceContract {
     queueName: string;
     tenantId: string;
     groupIdContains?: string;
+    requestedBy: string;
   }): Promise<{ groupsDrained: number; jobsDrained: number }> {
     return this.queues.drainTenant(input);
   }
@@ -280,6 +279,7 @@ export class OpsService extends OpsServiceContract {
   moveQueueGroupToDlq(input: {
     queueName: string;
     groupId: string;
+    requestedBy: string;
   }): Promise<{ jobsMoved: number }> {
     return this.queues.moveToDlq(input);
   }
@@ -288,6 +288,7 @@ export class OpsService extends OpsServiceContract {
     queueName: string;
     pipelineFilter?: string;
     errorFilter?: string;
+    requestedBy: string;
   }): Promise<{ movedCount: number; jobsMoved: number }> {
     return this.queues.moveAllBlockedToDlq(input);
   }
@@ -359,9 +360,7 @@ export class OpsService extends OpsServiceContract {
     return this.queues.scanQueues(input);
   }
 
-  tryReconcileQueuePending(input: {
-    queueName: string;
-  }): Promise<OpsQueueReconcileResult | null> {
+  tryReconcileQueuePending(input: { queueName: string }): Promise<OpsQueueReconcileResult | null> {
     return this.queues.tryReconcilePending(input);
   }
 

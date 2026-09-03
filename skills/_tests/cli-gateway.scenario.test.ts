@@ -192,7 +192,7 @@ Explore the CLI via \`--help\`. In order:
 1. \`langwatch --help\` — top-level command inventory.
 2. \`langwatch virtual-keys --help\` (alias \`vk\`) — VK subcommands.
 3. \`langwatch gateway-budgets --help\` — budget subcommands.
-4. \`langwatch gateway-providers --help\` — provider-binding subcommands.
+4. \`langwatch model-provider --help\` — the providers a key may dispatch to.
 
 Your goal: report back which top-level command groups are available and what the \`virtual-keys create\` accepts as options.
 `,
@@ -209,8 +209,8 @@ Your goal: report back which top-level command groups are available and what the
           scenario.judgeAgent({
             model: judgeModel,
             criteria: [
-              "Agent discovered the three gateway command groups: virtual-keys, gateway-budgets, gateway-providers",
-              "Agent reported back the options available on `virtual-keys create` (at minimum --name, --provider)",
+              "Agent discovered the three gateway command groups: virtual-keys, gateway-budgets, model-provider",
+              "Agent reported back the options available on `virtual-keys create` (at minimum --name, --scope, --providers-allowed)",
               "Agent did NOT invoke any command that mutated state",
             ],
           }),
@@ -231,7 +231,7 @@ Your goal: report back which top-level command groups are available and what the
 
             expect(allText).toMatch(/virtual-keys.*--help|--help.*virtual-keys/);
             expect(allText).toMatch(/gateway-budgets/);
-            expect(allText).toMatch(/gateway-providers/);
+            expect(allText).toMatch(/model-provider/);
           },
           scenario.judge(),
         ],

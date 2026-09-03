@@ -55,10 +55,6 @@ export {
   type NavigationUser,
 } from "../../model/navigation-host";
 export {
-  resolveHomeDestination,
-  type LastVisitedHomeKind,
-} from "../../model/resolve-home-destination";
-export {
   PRODUCTS,
   productById,
   productFromPathname,

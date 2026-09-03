@@ -1,71 +1,33 @@
 /**
- * The one case editor of the Agent Testing page.
+ * The page-level bridge for the Agent Testing scenario editor drawer.
  *
- * It is mounted by the page rather than by a tab, so a case opened from the
- * table, from a run row or from the run drawer all land in the same dialog.
- * Save and Run saves first and then opens the run dialog for what it saved.
+ * The drawer itself is URL routed and lives in `drawerRegistry`. This shell
+ * registers the flow callback the drawer calls on save, and mounts the run
+ * dialog that Save & Run opens on the same page. It renders no chrome of its
+ * own; the drawer is drawn by `<CurrentDrawer />`.
  *
  * @see specs/features/agent-testing/cases-table.feature
+ * @see dev/docs/best_practices/drawers.md
  */
 
-import { useCallback, useMemo, useState } from "react";
-import { toaster } from "@langwatch/design-system/toaster";
+import { useCallback, useState, useEffect } from "react";
 import type { Scenario } from "../../../../model/prisma-types";
 import { useOrganizationTeamProject } from "../../../../behavior/use-organization-team-project";
 import { readScenarioTarget } from "../../use-scenario-target";
-import { api } from "../../../../behavior/scenario-api";
 import { RunDialog } from "../run/run-dialog";
 import type { RunDialogSubject } from "../run/run-dialog-types";
-import { useAgentTestingStore } from "../use-agent-testing-store";
-import { CaseModal } from "./case-modal";
-import type { TestSuiteEntry } from "../../../../model/agent-testing/cases/test-cases";
-import { useCaseEditor } from "./use-case-editor";
 import { useRunStartedHandler } from "./use-case-run-actions";
+import { setFlowCallbacks } from "@langwatch/ui-drawer";
+import { CASE_EDITOR_DRAWER } from "./agent-testing-case-editor-drawer";
 
-/**
- * The suites the editor can file a case under. The rail reads the same list,
- * so this is the cached copy rather than a second read.
- */
-function useEditorSuites(projectId: string): TestSuiteEntry[] {
-  const { data: folders } = api.suites.folders.getAll.useQuery(
-    { projectId },
-    { enabled: !!projectId },
-  );
+export function AgentTestingCaseEditor() {
+  const { project } = useOrganizationTeamProject();
+  const projectId = project?.id ?? "";
+  const onRunStarted = useRunStartedHandler();
+  const [runSubject, setRunSubject] = useState<RunDialogSubject | null>(null);
 
-  return useMemo<TestSuiteEntry[]>(
-    () =>
-      (folders ?? []).map((folder) => ({
-        id: folder.id,
-        name: folder.name,
-        slug: folder.slug,
-        caseCount: 0,
-      })),
-    [folders],
-  );
-}
-
-/** What a saved case does: say so, close, and run when Save and Run asked. */
-function useOnCaseSaved({
-  projectId,
-  isEditingStoredCase,
-  closeCaseEditor,
-  setRunSubject,
-}: {
-  projectId: string;
-  isEditingStoredCase: boolean;
-  closeCaseEditor: () => void;
-  setRunSubject: (subject: RunDialogSubject) => void;
-}) {
-  return useCallback(
-    (
-      saved: Scenario,
-      { shouldRunAfterSave }: { shouldRunAfterSave: boolean },
-    ) => {
-      toaster.create({
-        title: isEditingStoredCase ? "Test case updated" : "Test case created",
-        type: "success",
-      });
-      closeCaseEditor();
+  const handleSaved = useCallback(
+    (saved: Scenario, { shouldRunAfterSave }: { shouldRunAfterSave: boolean }) => {
       if (!shouldRunAfterSave) return;
       setRunSubject({
         kind: "case",
@@ -74,52 +36,24 @@ function useOnCaseSaved({
         initialTarget: readScenarioTarget({ projectId, scenarioId: saved.id }),
       });
     },
-    [isEditingStoredCase, closeCaseEditor, projectId, setRunSubject],
+    [projectId],
   );
-}
 
-export function AgentTestingCaseEditor() {
-  const { project } = useOrganizationTeamProject();
-  const projectId = project?.id ?? "";
-  const caseEditor = useAgentTestingStore((state) => state.caseEditor);
-  const closeCaseEditor = useAgentTestingStore(
-    (state) => state.closeCaseEditor,
-  );
-  const onRunStarted = useRunStartedHandler({ projectId });
-  const [runSubject, setRunSubject] = useState<RunDialogSubject | null>(null);
-  const suites = useEditorSuites(projectId);
-
-  const onSaved = useOnCaseSaved({
-    projectId,
-    isEditingStoredCase: !!caseEditor.scenarioId,
-    closeCaseEditor,
-    setRunSubject,
-  });
-
-  const editor = useCaseEditor({
-    open: caseEditor.open,
-    projectId,
-    scenarioId: caseEditor.scenarioId,
-    folderId: caseEditor.folderId,
-    onSaved,
-  });
+  // The registration belongs to this component, which stands for as long as
+  // the page does. Save & Run opens the run drawer, and closing that drawer
+  // clears the callbacks of the flows that ran through it; without
+  // `keepOnClose` this one would go with them and the next Save & Run would
+  // only save.
+  useEffect(() => {
+    setFlowCallbacks(CASE_EDITOR_DRAWER, { onSaved: handleSaved }, { keepOnClose: true });
+    return () => setFlowCallbacks(CASE_EDITOR_DRAWER, {});
+  }, [handleSaved]);
 
   return (
-    <>
-      <CaseModal
-        open={caseEditor.open}
-        scenarioId={caseEditor.scenarioId}
-        suites={suites}
-        editor={editor}
-        onClose={closeCaseEditor}
-        openHistoryOnOpen={caseEditor.showHistory}
-      />
-
-      <RunDialog
-        subject={runSubject}
-        onClose={() => setRunSubject(null)}
-        onRunStarted={onRunStarted}
-      />
-    </>
+    <RunDialog
+      subject={runSubject}
+      onClose={() => setRunSubject(null)}
+      onRunStarted={onRunStarted}
+    />
   );
 }

@@ -97,6 +97,27 @@ export function applyDevTunnel({
 }
 
 /**
+ * The heartbeat: config with `devTunnel.heartbeatAt` refreshed and everything
+ * else untouched. Returns null when the config carries no `devTunnel` (the
+ * session's write-back is gone, e.g. someone restored the agent in the UI),
+ * so the caller skips the PATCH instead of recreating the marker.
+ */
+export function touchDevTunnel({
+  config,
+  heartbeatAt = new Date().toISOString(),
+}: {
+  config: Record<string, unknown>;
+  heartbeatAt?: string;
+}): Record<string, unknown> | null {
+  const stash = config.devTunnel;
+  if (!stash || typeof stash !== "object") return null;
+  return {
+    ...config,
+    devTunnel: { ...(stash as Record<string, unknown>), heartbeatAt },
+  };
+}
+
+/**
  * The restore: config with the previous URL back in place, the `devTunnel`
  * stash dropped, and the dev-secret header row removed. Returns null when the
  * config carries no `devTunnel`, meaning nothing to restore, so the caller can skip
@@ -122,9 +143,16 @@ export function restoreDevTunnel({
 }
 
 /**
- * The project simulations page, derived from the agent's `platformUrl`
+ * The project testing page, derived from the agent's `platformUrl`
  * (`https://…/<project-slug>/agents?…`): same origin, same project slug,
  * `/simulations` path.
+ *
+ * Two interfaces show the same runs, and which one a project reads is decided
+ * by a release rule the CLI cannot read. `/simulations` is the address that
+ * opens in both: a project on Agent Testing is sent to
+ * `/agent-testing/results`, and a project kept on the Simulations pages
+ * renders them. Naming `/agent-testing` here would answer "this page does not
+ * exist" to everyone kept on the older interface.
  */
 export function deriveSimulationsUrl(
   platformUrl: string | undefined,

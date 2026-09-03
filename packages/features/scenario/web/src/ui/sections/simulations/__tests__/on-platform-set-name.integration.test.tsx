@@ -5,7 +5,7 @@
  * reads with a friendly name, and v1 keeps the name it shows today while the
  * v2 surface renames it on its own side.
  *
- * @see specs/suites/one-off-runs-surface.feature
+ * @see specs/suites/internal-run-set-surface.feature
  */
 import { ChakraProvider, defaultSystem } from "@chakra-ui/react";
 import { ON_PLATFORM_DISPLAY_NAME } from "@langwatch/scenario-contract";

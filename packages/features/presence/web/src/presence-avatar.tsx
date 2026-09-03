@@ -1,5 +1,6 @@
-import { Avatar, type AvatarRootProps, Box } from "@chakra-ui/react";
+import { Box } from "@chakra-ui/react";
 import { useState } from "react";
+import { Avatar, type AvatarRootProps } from "@langwatch/design-system/avatar";
 import { Tooltip } from "@langwatch/design-system/tooltip";
 import type { PresenceSession } from "@langwatch/presence-contract";
 import { presenceDisplayName, presenceSessionColor } from "./presence-user-color";
@@ -51,10 +52,7 @@ export function PresenceAvatar({
   if (!showTooltip) return avatar;
 
   return (
-    <Tooltip
-      content={describePresence(session, displayName)}
-      positioning={{ placement: "top" }}
-    >
+    <Tooltip content={describePresence(session, displayName)} positioning={{ placement: "top" }}>
       <Box display="inline-flex">{avatar}</Box>
     </Tooltip>
   );

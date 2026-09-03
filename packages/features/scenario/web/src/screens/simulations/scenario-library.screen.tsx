@@ -10,26 +10,30 @@ import {
   ScenarioLabelFilter as LabelFilterDropdown,
   ScenarioWelcomeModal,
   ScenarioWelcomeScreen,
-  useNewScenarioFlow,
-  useScenarioLabelFilter as useLabelFilter,
-  useScenarioSelection,
 } from "../../index";
+import { ReturnToNewSimulationsBanner } from "../../ui/elements/suites/return-to-new-simulations-banner";
+import { useAgentTestingRedirect } from "../../behavior/suites/use-agent-testing-redirect";
+import { PageLayout } from "@langwatch/design-system/page-layout";
+import { HandledErrorAlert, showErrorToast } from "../../behavior/errors";
+import type { Scenario } from "../../model/prisma-types";
+import { useScenarioLabelFilter as useLabelFilter } from "../../behavior/use-scenario-label-filter";
+import { useNewScenarioFlow } from "../../behavior/use-new-scenario-flow";
+import { useScenarioSelection } from "../../behavior/use-scenario-selection";
+import { useDrawer } from "@langwatch/ui-drawer";
+import { useOrganizationTeamProject } from "../../behavior/use-organization-team-project";
+import { usePreloadDrawer } from "../../behavior/use-preload-drawer";
+import { api } from "../../behavior/scenario-api";
 import { Plus } from "lucide-react";
 import { useCallback, useMemo, useState } from "react";
 import { DashboardLayout } from "../../ui/sections/dashboard-layout";
 import { ScenarioCreateModal } from "../../ui/sections/scenarios/scenario-create-modal";
 import { ScenarioTable } from "../../ui/elements/scenarios/scenario-table";
-import { PageLayout } from "@langwatch/design-system/page-layout";
-import { HandledErrorAlert, showErrorToast } from "../../behavior/errors";
-import type { Scenario } from "../../model/prisma-types";
-import { useDrawer } from "@langwatch/ui-drawer";
-import { useOrganizationTeamProject } from "../../behavior/use-organization-team-project";
-import { usePreloadDrawer } from "../../behavior/use-preload-drawer";
-import { api } from "../../behavior/scenario-api";
 
 function ScenarioLibraryPage() {
   const { project } = useOrganizationTeamProject();
   const { openDrawer } = useDrawer();
+  // A project that reads Agent Testing keeps its scenarios there.
+  const { deciding } = useAgentTestingRedirect({ segments: ["scenarios"] });
   // Every row here opens the scenario editor, which is a separate download.
   // Fetch it while the person reads the list, so the click opens the editor
   // rather than a spinner.
@@ -48,10 +52,7 @@ function ScenarioLibraryPage() {
     data: scenarios,
     isLoading,
     error,
-  } = api.scenarios.getAll.useQuery(
-    { projectId: project?.id ?? "" },
-    { enabled: !!project },
-  );
+  } = api.scenarios.getAll.useQuery({ projectId: project?.id ?? "" }, { enabled: !!project });
 
   const handleArchiveSuccess = useCallback(() => {
     void utils.scenarios.getAll.invalidate();
@@ -152,16 +153,20 @@ function ScenarioLibraryPage() {
       .map((s) => ({ id: s.id, name: s.name }));
   }, [archiveTarget, scenarios, selectedIds]);
 
+  if (deciding) return null;
+
   return (
     <DashboardLayout>
       <PageLayout.Header>
         <HStack justify="space-between" align="center" w="full">
           <PageLayout.Heading>Scenario Library</PageLayout.Heading>
           <Spacer />
+          <ReturnToNewSimulationsBanner target="scenarios" />
           <LabelFilterDropdown
             allLabels={allLabels}
             activeLabels={activeLabels}
             onToggle={handleLabelToggle}
+            triggerSize="header"
           />
           <PageLayout.HeaderButton onClick={handleNewScenario}>
             <Plus size={16} /> New Scenario
@@ -192,10 +197,7 @@ function ScenarioLibraryPage() {
 
         {scenarios && scenarios.length > 0 && (
           <>
-            <BatchActionBar
-              selectedCount={selectionCount}
-              onArchive={handleArchiveBatch}
-            />
+            <BatchActionBar selectedCount={selectionCount} onArchive={handleArchiveBatch} />
             <ScenarioTable
               scenarios={scenarios}
               columnFilters={columnFilters}
@@ -229,7 +231,6 @@ function ScenarioLibraryPage() {
     </DashboardLayout>
   );
 }
-
 
 /**
  * The guard is the ROUTE's, and it did not travel.

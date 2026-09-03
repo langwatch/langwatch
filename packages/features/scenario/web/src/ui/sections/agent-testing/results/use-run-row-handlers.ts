@@ -1,6 +1,6 @@
 /**
  * What one result row reaches: the name of the target it ran against, the run
- * drawer, and the editor of the test case behind it.
+ * drawer, and the editor of the scenario behind it.
  *
  * @see specs/features/agent-testing/results-tabs.feature
  */
@@ -9,16 +9,11 @@ import { useCallback } from "react";
 import { useDrawer } from "@langwatch/ui-drawer";
 import { useTargetNameMap } from "../../../../behavior/use-target-name-map";
 import type { ScenarioRunData } from "@langwatch/scenario-contract";
-import { useAgentTestingStore } from "../use-agent-testing-store";
+import { CASE_EDITOR_DRAWER } from "../cases/drawer-keys";
 
-export function useRunRowHandlers({
-  scenarioSetId,
-}: {
-  scenarioSetId: string;
-}) {
+export function useRunRowHandlers({ scenarioSetId }: { scenarioSetId: string }) {
   const { openDrawer } = useDrawer();
   const targetNameMap = useTargetNameMap();
-  const openCaseEditor = useAgentTestingStore((state) => state.openCaseEditor);
 
   const resolveTargetName = useCallback(
     (scenarioRun: ScenarioRunData): string | null => {
@@ -45,8 +40,8 @@ export function useRunRowHandlers({
 
   const handleEditCase = useCallback(
     (scenarioRun: ScenarioRunData) =>
-      openCaseEditor({ scenarioId: scenarioRun.scenarioId }),
-    [openCaseEditor],
+      openDrawer(CASE_EDITOR_DRAWER, { scenarioId: scenarioRun.scenarioId }),
+    [openDrawer],
   );
 
   return { resolveTargetName, handleScenarioRunClick, handleEditCase };

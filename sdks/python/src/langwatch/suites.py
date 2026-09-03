@@ -6,6 +6,7 @@ Uses httpx via the generated REST API client for HTTP transport.
 """
 
 import urllib.parse
+import warnings
 from typing import Any, Dict, Optional
 
 import httpx
@@ -65,10 +66,19 @@ class SuitesFacade:
     """
     Facade for managing LangWatch suites via REST API.
 
+    Deprecated. A suite was two things at once: the test suite the scenarios
+    are filed in and the configuration a run executes under. Those are now
+    ``langwatch.test_suites`` and ``langwatch.run_plans``.
+
     Provides list, get, create, update, run, and delete operations.
     """
 
     def __init__(self, rest_api_client: LangWatchRestApiClient) -> None:
+        warnings.warn(
+            "langwatch.suites is deprecated; use langwatch.run_plans and langwatch.test_suites",
+            DeprecationWarning,
+            stacklevel=2,
+        )
         self._client = rest_api_client
 
     @classmethod

@@ -172,7 +172,7 @@ describe("CLI error propagation across commands", () => {
 
   describe("agent create", () => {
     it("surfaces a 409 conflict body to the user", async () => {
-      pushResponse("POST", "/api/agents", {
+      pushResponse("POST", "/api/v1/agents", {
         status: 409,
         body: {
           error: "Conflict",

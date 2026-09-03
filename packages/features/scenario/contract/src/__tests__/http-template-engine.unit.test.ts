@@ -299,6 +299,53 @@ describe("trace variables in the template context", () => {
     });
   });
 
+  describe("given a session that names another host", () => {
+    /** @scenario "The held session cannot decide the host a turn is sent to" */
+    it("refuses to render the url", () => {
+      expect(() =>
+        renderUrlTemplate({
+          template: "https://{{ session }}/chat",
+          context: buildTemplateContext({
+            input: inputWith("hi"),
+            session: "attacker.example.com",
+          }),
+        }),
+      ).toThrow(/host/);
+    });
+
+    /** @scenario "The held session cannot decide the host a turn is sent to" */
+    it("refuses when a mapping carries the session under another name", () => {
+      // A mapping may alias the session to any identifier, so blanking the
+      // `session` key alone leaves the same agent-controlled value in the
+      // context under the alias.
+      expect(() =>
+        renderUrlTemplate({
+          template: "https://{{ host }}/chat",
+          context: buildTemplateContext({
+            input: inputWith("hi"),
+            session: "attacker.example.com",
+            scenarioMappings: {
+              host: { type: "source", sourceId: "scenario", path: ["session"] },
+            },
+          }),
+        }),
+      ).toThrow(/host/);
+    });
+
+    /** @scenario "The held session cannot decide the host a turn is sent to" */
+    it("still renders a session inside the path", () => {
+      const url = renderUrlTemplate({
+        template: "https://api.example.com/chat/{{ session }}",
+        context: buildTemplateContext({
+          input: inputWith("hi"),
+          session: "thread-7",
+        }),
+      });
+
+      expect(url).toBe("https://api.example.com/chat/thread-7");
+    });
+  });
+
   describe("given a data mapping named traceId", () => {
     it("keeps the mapping, so an existing target is unchanged", () => {
       const context = buildTemplateContext({
@@ -441,6 +488,103 @@ describe("header template rendering", () => {
       expect(thrown).toBeInstanceOf(TemplateRenderError);
       expect((thrown as TemplateRenderError).field).toBe("headers");
       expect((thrown as TemplateRenderError).message).toContain('header "X-Broken"');
+    });
+  });
+});
+
+describe("buildTemplateContext session", () => {
+  describe("when no session is held for the thread", () => {
+    /** @scenario "An HTTP agent renders an empty session on the first turn" */
+    it("renders session as an empty string in the body, the url and a header", () => {
+      const context = buildTemplateContext({ input: inputWith("hi") });
+
+      expect(renderBodyTemplate({ template: '{"s": "{{ session }}"}', context })).toBe('{"s": ""}');
+      expect(
+        renderUrlTemplate({
+          template: "https://a.test/{{ session }}",
+          context,
+        }),
+      ).toBe("https://a.test/");
+      expect(
+        renderHeaderTemplate({
+          template: "{{ session }}",
+          context,
+          headerKey: "X-Session",
+        }),
+      ).toBe("");
+    });
+  });
+
+  describe("when a string session is held", () => {
+    it("renders it as a scalar, escaped in the body and encoded in the url", () => {
+      const context = buildTemplateContext({
+        input: inputWith("hi"),
+        session: 'conv "1"/x',
+      });
+
+      expect(renderBodyTemplate({ template: '{"s": "{{ session }}"}', context })).toBe(
+        '{"s": "conv \\"1\\"/x"}',
+      );
+      expect(
+        renderUrlTemplate({
+          template: "https://a.test/{{ session }}",
+          context,
+        }),
+      ).toBe("https://a.test/conv%20%221%22%2Fx");
+    });
+  });
+
+  describe("when a structured session is held", () => {
+    /** @scenario "A structured session renders as raw JSON in the body" */
+    it("renders it as raw JSON in the body", () => {
+      const context = buildTemplateContext({
+        input: inputWith("hi"),
+        session: { step: 2, seen: ["a"] },
+      });
+
+      const body = renderBodyTemplate({
+        template: '{"state": {{ session }}}',
+        context,
+      });
+
+      expect(JSON.parse(body)).toEqual({ state: { step: 2, seen: ["a"] } });
+    });
+
+    /** @scenario "A body template gives an object session a JSON value for the first turn" */
+    it("renders the default filter's value on the first turn and raw JSON after it", () => {
+      const template = '{"state": {{ session | default: "null" }}}';
+
+      const first = renderBodyTemplate({
+        template,
+        context: buildTemplateContext({ input: inputWith("hi") }),
+      });
+      const later = renderBodyTemplate({
+        template,
+        context: buildTemplateContext({
+          input: inputWith("hi"),
+          session: { step: 2 },
+        }),
+      });
+
+      expect(JSON.parse(first)).toEqual({ state: null });
+      expect(JSON.parse(later)).toEqual({ state: { step: 2 } });
+    });
+
+    it("renders a data mapping of the session the same way", () => {
+      const context = buildTemplateContext({
+        input: inputWith("hi"),
+        session: { step: 2 },
+        scenarioMappings: {
+          memory: { type: "source", sourceId: "scenario", path: ["session"] },
+        },
+      });
+
+      const body = renderBodyTemplate({
+        template: '{"memory": {{ memory }}}',
+        context,
+      });
+
+      expect(JSON.parse(body)).toEqual({ memory: { step: 2 } });
     });
   });
 });

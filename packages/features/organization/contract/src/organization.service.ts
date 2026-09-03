@@ -68,6 +68,17 @@ export abstract class OrganizationService {
     userId: string;
     includeDeactivated?: boolean;
   }): Promise<boolean>;
+  /**
+   * Which of the named organizations this person belongs to, in one read.
+   *
+   * Input order is kept and a non-membership is absent, so a caller can map
+   * its own list without the answer becoming a membership oracle for the
+   * organizations it is not in.
+   */
+  abstract memberOrganizationIds(input: {
+    userId: string;
+    organizationIds: string[];
+  }): Promise<string[]>;
   /** Returns the oldest team or throws OrganizationHasNoTeamError. */
   abstract getOldestTeamId(input: GetOldestTeamInput): Promise<string>;
 

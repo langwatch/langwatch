@@ -58,9 +58,7 @@ export const buildUIMappings = (
  */
 export const scrollToTargetColumn = (targetId: string) => {
   // Find the target column header by data attribute
-  const targetHeader = document.querySelector(
-    `[data-target-column="${targetId}"]`,
-  );
+  const targetHeader = document.querySelector(`[data-target-column="${targetId}"]`);
   if (!targetHeader) return;
 
   // Find the scrollable container by traversing up to find scrollable element
@@ -170,8 +168,7 @@ export const useOpenTargetEditor = () => {
             updateTarget,
             setTargetMapping,
             removeTargetMapping,
-            getActiveDatasetId: () =>
-              useEvaluationsV3Store.getState().activeDatasetId,
+            getActiveDatasetId: () => useEvaluationsV3Store.getState().activeDatasetId,
             getDatasets: () => useEvaluationsV3Store.getState().datasets,
           }),
         );
@@ -225,10 +222,7 @@ export const useOpenTargetEditor = () => {
               // open, and a live read would then write the mapping into the
               // wrong dataset's bucket instead of the one this drawer opened
               // against.
-              onInputMappingsChange: (
-                identifier: string,
-                mapping: UIFieldMapping | undefined,
-              ) => {
+              onInputMappingsChange: (identifier: string, mapping: UIFieldMapping | undefined) => {
                 if (mapping) {
                   setTargetMapping(
                     target.id,
@@ -254,6 +248,44 @@ export const useOpenTargetEditor = () => {
             requestAnimationFrame(() => {
               scrollToTargetColumn(target.id);
             });
+          } else if (agent?.type === "connected") {
+            // A connected agent is registered from the customer's own code,
+            // so there is nothing here to edit: the drawer reads what the
+            // function declares, and the column maps its inputs to the
+            // dataset the same way every other target does.
+            const availableSources = buildAvailableSources();
+            const uiMappings = buildUIMappings(target, activeDatasetId);
+
+            setFlowCallbacks("agentConnectedDetail", {
+              // See the workflow-agent branch above for why this captures
+              // activeDatasetId/isDatasetSource instead of reading the store
+              // live: this drawer isn't modal either.
+              onInputMappingsChange: (identifier: string, mapping: UIFieldMapping | undefined) => {
+                if (mapping) {
+                  setTargetMapping(
+                    target.id,
+                    activeDatasetId,
+                    identifier,
+                    convertFromUIMapping(mapping, isDatasetSource),
+                  );
+                } else {
+                  removeTargetMapping(target.id, activeDatasetId, identifier);
+                }
+              },
+            });
+
+            openDrawer("agentConnectedDetail", {
+              availableSources,
+              inputMappings: uiMappings,
+              urlParams: {
+                targetId: target.id,
+                agentId: target.dbAgentId ?? "",
+              },
+            });
+
+            requestAnimationFrame(() => {
+              scrollToTargetColumn(target.id);
+            });
           } else if (agent?.type === "http") {
             // HTTP agent - open HTTP editor drawer
             const availableSources = buildAvailableSources();
@@ -264,10 +296,7 @@ export const useOpenTargetEditor = () => {
               // See the workflow-agent branch above for why this captures
               // activeDatasetId/isDatasetSource instead of reading the store
               // live: this drawer isn't modal either.
-              onInputMappingsChange: (
-                identifier: string,
-                mapping: UIFieldMapping | undefined,
-              ) => {
+              onInputMappingsChange: (identifier: string, mapping: UIFieldMapping | undefined) => {
                 if (mapping) {
                   setTargetMapping(
                     target.id,
@@ -304,10 +333,7 @@ export const useOpenTargetEditor = () => {
             // activeDatasetId/isDatasetSource instead of reading the store
             // live: this drawer isn't modal either.
             setFlowCallbacks("agentCodeEditor", {
-              onInputMappingsChange: (
-                identifier: string,
-                mapping: UIFieldMapping | undefined,
-              ) => {
+              onInputMappingsChange: (identifier: string, mapping: UIFieldMapping | undefined) => {
                 if (mapping) {
                   setTargetMapping(
                     target.id,
@@ -349,8 +375,7 @@ export const useOpenTargetEditor = () => {
         if (targetComparison) {
           const activeDataset = datasets.find((d) => d.id === activeDatasetId);
           const datasetColumns =
-            activeDataset?.columns.map((c) => ({ id: c.id, name: c.name })) ??
-            [];
+            activeDataset?.columns.map((c) => ({ id: c.id, name: c.name })) ?? [];
           const variantOptions = targets.filter(
             (t) => t.type !== "evaluator" && t.id !== target.id,
           );
@@ -399,10 +424,7 @@ export const useOpenTargetEditor = () => {
         // See the workflow-agent branch above for why this captures
         // activeDatasetId/isDatasetSource instead of reading the store live:
         // this drawer isn't modal either.
-        const handleMappingChange = (
-          identifier: string,
-          mapping: UIFieldMapping | undefined,
-        ) => {
+        const handleMappingChange = (identifier: string, mapping: UIFieldMapping | undefined) => {
           if (mapping) {
             setTargetMapping(
               target.id,

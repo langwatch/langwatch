@@ -38,10 +38,8 @@ import type {
   CodingAgentUsageTotals,
   CodingAgentUsageTotalsInput,
 } from "@langwatch/coding-agent-contract";
-import {
-  GithubPullRequestNotMappedError,
-  type GithubService,
-} from "@langwatch/github-contract";
+import { GithubPullRequestNotMappedError, type GithubService } from "@langwatch/github-contract";
+import type { CodingAgentScopeCaller } from "#ports/coding-agent-caller-scope.port";
 
 /**
  * The caller's permission cut over an organization: which of its projects they
@@ -85,7 +83,7 @@ export interface CodingAgentScopePorts {
    * read.
    */
   resolveCallerProjectScope(input: {
-    userId: string;
+    caller: CodingAgentScopeCaller;
     organizationId: string;
   }): Promise<CodingAgentCallerScope>;
 }
@@ -129,9 +127,7 @@ export class CodingAgentApp {
   }
 
   /** The Sessions screen's display projection for one project. */
-  listForProject(
-    input: CodingAgentSessionsListInput,
-  ): Promise<CodingAgentSessionListRow[]> {
+  listForProject(input: CodingAgentSessionsListInput): Promise<CodingAgentSessionListRow[]> {
     return this.dependencies.codingAgents.listForProject(input);
   }
 
@@ -164,7 +160,7 @@ export class CodingAgentApp {
   ): Promise<{ usage: CodingAgentPullRequestUsage; organizationId: string }> {
     const organizationId = await this.requireOrganizationFor(pullRequest);
     const scope = await this.dependencies.scope.resolveCallerProjectScope({
-      userId: by.id,
+      caller: { kind: "user", userId: by.id },
       organizationId,
     });
     const usage = await this.dependencies.codingAgents.getPullRequestUsage({
@@ -177,6 +173,41 @@ export class CodingAgentApp {
     return { usage, organizationId };
   }
 
+  /**
+   * The same rollup, asked at the ORGANIZATION rather than through a project.
+   *
+   * The organization arrives from the credential itself, so there is no
+   * project id anywhere in the request and none to resolve one from. That is
+   * the whole difference: `getPullRequestUsage` recovers an organization
+   * through a project the caller named, which a key that is already
+   * organization-scoped makes an unnecessary indirection.
+   *
+   * The caller is a credential rather than a person here, so the cut is the
+   * KEY's — its bindings, and its holder's where it has one. A service key
+   * owns nobody, and reads with its bindings alone.
+   */
+  async getOrganizationPullRequestUsage(
+    pullRequest: {
+      organizationId: string;
+      repositoryHost: string;
+      repositoryFullName: string;
+      prNumber: number;
+    },
+    by: CodingAgentScopeCaller,
+  ): Promise<CodingAgentPullRequestUsage> {
+    const scope = await this.dependencies.scope.resolveCallerProjectScope({
+      caller: by,
+      organizationId: pullRequest.organizationId,
+    });
+    return this.dependencies.codingAgents.getPullRequestUsage({
+      organizationId: pullRequest.organizationId,
+      repositoryHost: pullRequest.repositoryHost,
+      repositoryFullName: pullRequest.repositoryFullName,
+      prNumber: pullRequest.prNumber,
+      ...scope,
+    });
+  }
+
   /** One pull request in full: totals, contributors, models and sessions. */
   async getPullRequestDetail(
     pullRequest: CodingAgentPullRequestRef,
@@ -184,7 +215,7 @@ export class CodingAgentApp {
   ): Promise<CodingAgentPullRequestDetail> {
     const organizationId = await this.requireOrganizationFor(pullRequest);
     const scope = await this.dependencies.scope.resolveCallerProjectScope({
-      userId: by.id,
+      caller: { kind: "user", userId: by.id },
       organizationId,
     });
     return this.dependencies.codingAgents.getPullRequestDetail({
@@ -215,7 +246,7 @@ export class CodingAgentApp {
     );
     const scope = organizationId
       ? await this.dependencies.scope.resolveCallerProjectScope({
-          userId: by.id,
+          caller: { kind: "user", userId: by.id },
           organizationId,
         })
       : emptyCallerScope();
@@ -232,13 +263,10 @@ export class CodingAgentApp {
    * it is not — null unless this instance actually has a GitHub App to install,
    * so the page never offers a link that leads nowhere.
    */
-  async githubConnection(
-    organizationId: string | undefined,
-  ): Promise<CodingAgentGithubConnection> {
+  async githubConnection(organizationId: string | undefined): Promise<CodingAgentGithubConnection> {
     if (!organizationId) return { connected: false, installUrl: null };
 
-    const installations =
-      await this.dependencies.github.getAllForOrganization(organizationId);
+    const installations = await this.dependencies.github.getAllForOrganization(organizationId);
     const installable =
       this.dependencies.github.configured &&
       Boolean(this.dependencies.github.getAppConfig().appSlug);
@@ -257,9 +285,7 @@ export class CodingAgentApp {
    * organization": the caller asked about a pull request, and what they can do
    * about it is the same either way.
    */
-  private async requireOrganizationFor(
-    pullRequest: CodingAgentPullRequestRef,
-  ): Promise<string> {
+  private async requireOrganizationFor(pullRequest: CodingAgentPullRequestRef): Promise<string> {
     const organizationId = await this.dependencies.scope.tryResolveOrganizationForProject(
       pullRequest.projectId,
     );

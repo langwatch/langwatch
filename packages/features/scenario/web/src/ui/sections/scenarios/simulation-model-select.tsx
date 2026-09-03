@@ -2,8 +2,10 @@ import { Text, VStack } from "@chakra-ui/react";
 import { useMemo } from "react";
 import { useOrganizationTeamProject } from "../../../behavior/use-organization-team-project";
 import { api } from "../../../behavior/scenario-api";
-import { buildCustomModelDisplayNames } from "@langwatch/model-provider-contract";
-import { LATEST_ALIAS_PROVIDERS } from "@langwatch/model-provider-contract";
+import {
+  buildCustomModelDisplayNames,
+  LATEST_ALIAS_PROVIDERS,
+} from "@langwatch/model-provider-contract";
 import { modelSelectorOptions } from "@langwatch/model-provider-web/components/ModelSelector";
 import {
   INHERIT_SENTINEL,
@@ -96,9 +98,7 @@ export function SimulationModelSelect({
         options={options}
         size={size}
         onChange={(model) => onChange(model === INHERIT_SENTINEL ? null : model)}
-        inheritOption={
-          inheritModel ? { model: inheritModel, label: "Default model" } : undefined
-        }
+        inheritOption={inheritModel ? { model: inheritModel, label: "Default model" } : undefined}
         displayNames={displayNames}
       />
     </VStack>

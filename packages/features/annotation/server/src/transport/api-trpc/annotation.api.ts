@@ -43,6 +43,7 @@ import {
   annotationApiOptimizedQueuesInputSchema,
   annotationApiProjectScopeSchema,
   annotationApiQueueBySlugOrIdInputSchema,
+  annotationApiQueueListInputSchema,
   annotationApiQueueConfigurationInputSchema,
   annotationApiUpdateInputSchema,
   resolveAnnotationSuggestionTarget,
@@ -135,7 +136,9 @@ export type AnnotationQueueStore = Readonly<{
     }>,
   ): Promise<AnnotationQueueRecord>;
   /** The project's queues, newest first, for the picker. */
-  listQueues(input: Readonly<{ projectId: string }>): Promise<AnnotationQueueListEntry[]>;
+  listQueues(
+    input: Readonly<{ projectId: string; reachableOnly?: boolean; userId?: string }>,
+  ): Promise<AnnotationQueueListEntry[]>;
   /** One queue by slug or id, with its members and score types. */
   findQueue(
     input: Readonly<{
@@ -188,6 +191,11 @@ export type AnnotationQueueStore = Readonly<{
       userId: string;
       status: AnnotationQueueItemStatus;
       queueId?: string;
+      /**
+       * The reviewer's own pick of queues, applied LAST so it can only cut
+       * into what the reach clauses already allow.
+       */
+      pickedQueueIds?: readonly string[];
       includeMemberQueues: boolean;
       startDate?: Date;
       endDate?: Date;
@@ -656,8 +664,13 @@ export class AnnotationTrpcApi {
         return ports.queues(ctx).createQueue(queue);
       }),
 
-      getQueues: policy("annotations:view")(procedure.input(annotationApiProjectScopeSchema)).query(
-        async ({ ctx, input }) => ports.queues(ctx).listQueues({ projectId: input.projectId }),
+      getQueues: policy("annotations:view")(
+        procedure.input(annotationApiQueueListInputSchema),
+      ).query(async ({ ctx, input }) =>
+        ports.queues(ctx).listQueues({
+          projectId: input.projectId,
+          ...(input.reachableOnly === true ? { reachableOnly: true, userId: ctx.actor().id } : {}),
+        }),
       ),
 
       getQueueItems: policy("annotations:view")(
@@ -803,6 +816,9 @@ export class AnnotationTrpcApi {
                 ? "completed"
                 : "all",
           queueId: input.queueId,
+          ...(input.queueIds && input.queueIds.length > 0
+            ? { pickedQueueIds: input.queueIds }
+            : {}),
           includeMemberQueues: input.showQueueAndUser === true,
           startDate: input.startDate,
           endDate: input.endDate,

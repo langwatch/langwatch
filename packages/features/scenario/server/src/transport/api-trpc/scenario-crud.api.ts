@@ -37,8 +37,8 @@ const createScenarioSchema = projectSchema.extend({
   // Turn config (ADR-015); null clears back to SDK default.
   maxTurns: z.number().int().min(1).max(100).nullish(),
   minTurns: z.number().int().min(0).max(100).nullish(),
-  // The folder (test suite) this case is filed in; absent or null = unfiled.
-  folderId: z.string().nullish(),
+  // The test suite (test suite) this case is filed in; absent or null = unfiled.
+  testSuiteId: z.string().nullish(),
 });
 
 const updateScenarioSchema = projectSchema.extend({
@@ -52,8 +52,8 @@ const updateScenarioSchema = projectSchema.extend({
   parameters: scenarioParameterDefinitionsSchema.optional(),
   maxTurns: z.number().int().min(1).max(100).nullish(),
   minTurns: z.number().int().min(0).max(100).nullish(),
-  // Absent = keep the current folder; null = unfile; a folder id = move.
-  folderId: z.string().nullish(),
+  // Absent = keep the current test suite; null = unfile; a test suite id = move.
+  testSuiteId: z.string().nullish(),
   // The version the editor loaded. When sent, a save against any other
   // version is refused with scenario_stale_version instead of overwriting
   // the newer save. Absent = save over whatever is there.
@@ -171,12 +171,12 @@ export function createScenarioCrudRouter<
       }
     }),
 
-    moveToFolder: policy("scenarios:manage")(
+    moveToTestSuite: policy("scenarios:manage")(
       procedure.input(
         projectSchema.extend({
           scenarioId: z.string(),
-          // A folder id files the case there; null unfiles it.
-          folderId: z.string().nullable(),
+          // A test suite id files the case there; null unfiles it.
+          testSuiteId: z.string().nullable(),
         }),
       ),
     ).mutation(async ({ ctx, input }) => {
@@ -184,16 +184,16 @@ export function createScenarioCrudRouter<
         {
           projectId: input.projectId,
           scenarioId: input.scenarioId,
-          folderId: input.folderId,
+          testSuiteId: input.testSuiteId,
         },
-        "Moving scenario to folder",
+        "Moving scenario to testSuite",
       );
 
       try {
-        return await ctx.app.scenarios.moveToFolder({
+        return await ctx.app.scenarios.moveToTestSuite({
           scenarioId: input.scenarioId,
           projectId: input.projectId,
-          folderId: input.folderId,
+          testSuiteId: input.testSuiteId,
         });
       } catch (error) {
         if (error instanceof ScenarioNotFoundError) {

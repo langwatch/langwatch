@@ -1,5 +1,5 @@
-import { Avatar, type AvatarRootProps } from "@chakra-ui/react";
 import { useState } from "react";
+import { Avatar, type AvatarRootProps } from "@langwatch/design-system/avatar";
 
 /**
  * Canonical person avatar: renders the uploaded/SSO `image` when present and
@@ -27,9 +27,7 @@ export function UserAvatar({
 
   return (
     <Avatar.Root {...rootProps}>
-      {showImage ? (
-        <Avatar.Image src={image!} onError={() => setBrokenImageUrl(image!)} />
-      ) : null}
+      {showImage ? <Avatar.Image src={image!} onError={() => setBrokenImageUrl(image!)} /> : null}
       <Avatar.Fallback name={name ?? undefined} />
     </Avatar.Root>
   );

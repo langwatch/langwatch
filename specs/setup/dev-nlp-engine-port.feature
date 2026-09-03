@@ -52,6 +52,21 @@ Feature: The NLP engine `pnpm dev` starts is the one the app talks to
     And it says nothing
 
   @unit
+  Scenario: An overlay that clears the address is not read past
+    Given .env pins the NLP address
+    And the haven overlay assigns it an empty value
+    When the launcher resolves the NLP address
+    Then it leaves the address unset for the launcher to derive from the port
+    And it does not fall back to the address in the plain env file
+
+  @unit
+  Scenario: An overlay that clears the address drops one exported for a single run
+    Given an NLP address exported into the shell
+    And the haven overlay assigns it an empty value
+    When the launcher resolves the NLP address
+    Then it leaves the address unset, because the file beats the exported value
+
+  @unit
   Scenario: A commented-out pin is not an address
     Given .env has its NLP address commented out
     When the launcher resolves the NLP address

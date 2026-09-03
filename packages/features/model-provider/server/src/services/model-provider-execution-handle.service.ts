@@ -1,6 +1,7 @@
 import { createOpenAICompatible } from "@ai-sdk/openai-compatible";
 import type { LanguageModel } from "ai";
 import {
+  expandLatestAlias,
   isCodexModel,
   ModelNotConfiguredError,
   ModelProviderDisabledError,
@@ -150,8 +151,9 @@ async function resolveModel({
   modelProviders: Record<string, LegacyModelProviderExecution>;
   modelProviderService: ModelProviderService;
 }): Promise<string> {
-  // 1. Explicit model always wins.
-  if (explicit) return explicit;
+  // 1. Explicit model always wins. A latest alias resolves to the concrete
+  //    model here so the provider lookup below reads the real prefix.
+  if (explicit) return expandLatestAlias(explicit);
 
   // 2. Cascade-resolved default for the given feature key. Throws
   //    ModelNotConfiguredError when nothing is set at any scope —
@@ -247,9 +249,7 @@ async function resolveModel({
  * one that drifts answers with a handle pointing at nothing.
  */
 export class ModelProviderExecutionHandleService {
-  static create(
-    options: ModelProviderExecutionHandleOptions,
-  ): ModelProviderExecutionHandleService {
+  static create(options: ModelProviderExecutionHandleOptions): ModelProviderExecutionHandleService {
     return new ModelProviderExecutionHandleService(options);
   }
 

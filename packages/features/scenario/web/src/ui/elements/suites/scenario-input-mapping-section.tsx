@@ -22,18 +22,22 @@ import {
   type Variable,
   VariablesSection,
 } from "@langwatch/prompt-web/surfaces/variables";
+import { fromOutputFieldState, resolveOutputField, toOutputFieldState } from "@langwatch/suite-web";
 
-/** The three scenario fields shown as input mapping rows. */
+/** The scenario fields shown as input mapping rows. */
 const SCENARIO_FIELDS: Variable[] = [
   { identifier: "input", type: "str" },
   { identifier: "messages", type: "str" },
   { identifier: "threadId", type: "str" },
+  { identifier: "session", type: "str" },
 ];
 
 const SCENARIO_INPUT_INFO: Record<string, string> = {
   input: "The latest message from the simulated user",
   messages: "Full conversation history as a JSON string",
   threadId: "Unique identifier for the conversation thread",
+  session:
+    "The value the agent returned as session on the previous turn of this conversation, empty on the first turn",
 };
 
 /** The single scenario output field. */
@@ -61,9 +65,7 @@ export type ScenarioInputMappingSectionProps = {
   onOutputFieldChange?: (field: string | undefined) => void;
 };
 
-function invertMappings(
-  stored: Record<string, FieldMapping>,
-): Record<string, FieldMapping> {
+function invertMappings(stored: Record<string, FieldMapping>): Record<string, FieldMapping> {
   const display: Record<string, FieldMapping> = {};
   for (const [agentInput, mapping] of Object.entries(stored)) {
     if (mapping.type === "source" && mapping.path[0]) {
@@ -148,26 +150,23 @@ export function ScenarioInputMappingSection({
   const valueMappings = useMemo(
     () =>
       Object.entries(mappings).filter(
-        (entry): entry is [string, { type: "value"; value: string }] =>
-          entry[1].type === "value",
+        (entry): entry is [string, { type: "value"; value: string }] => entry[1].type === "value",
       ),
     [mappings],
   );
 
-  const agentOutputSource = useMemo(
-    () => buildAgentOutputSource(outputs ?? []),
-    [outputs],
-  );
+  const agentOutputSource = useMemo(() => buildAgentOutputSource(outputs ?? []), [outputs]);
 
   const hasOutputs = (outputs ?? []).length > 0;
-  const autoOutputLabel = outputs?.[0]?.identifier ?? "output";
-  // undefined = not yet set (auto-populate), "" = explicitly cleared, string = user selection
-  const selectedOutput = outputField === undefined ? autoOutputLabel : outputField;
-  const hasOutputMapping = selectedOutput !== "" && hasOutputs;
+  const selectedOutput = resolveOutputField({
+    state: toOutputFieldState(outputField),
+    firstDeclaredOutput: outputs?.[0]?.identifier,
+  });
+  const hasOutputMapping = selectedOutput !== null && hasOutputs;
 
   const outputDisplayMappings = useMemo<Record<string, FieldMapping>>(
     () =>
-      hasOutputMapping
+      hasOutputMapping && selectedOutput !== null
         ? {
             output: {
               type: "source",
@@ -196,12 +195,10 @@ export function ScenarioInputMappingSection({
     _scenarioField: string,
     displayMapping: FieldMapping | undefined,
   ) => {
-    if (displayMapping?.type === "source" && displayMapping.path[0]) {
-      onOutputFieldChange?.(displayMapping.path[0]);
-    } else {
-      // Empty string signals "explicitly cleared" vs undefined which means "not yet set"
-      onOutputFieldChange?.("");
-    }
+    const selected = displayMapping?.type === "source" && displayMapping.path[0];
+    onOutputFieldChange?.(
+      fromOutputFieldState(selected ? { kind: "set", value: selected } : { kind: "cleared" }),
+    );
   };
 
   const handleDisplayMappingChange = (
@@ -238,13 +235,9 @@ export function ScenarioInputMappingSection({
           Scenario Mappings
         </Text>
         <Text fontSize="xs" color="fg.muted">
-          Configure how this agent connects to the scenario framework. When run as a
-          scenario target, these mappings control which data flows in and out.{" "}
-          <Link
-            href="https://docs.langwatch.ai/features/scenarios"
-            target="_blank"
-            color="blue.fg"
-          >
+          Configure how this agent connects to the scenario framework. When run as a scenario
+          target, these mappings control which data flows in and out.{" "}
+          <Link href="https://docs.langwatch.ai/features/scenarios" target="_blank" color="blue.fg">
             Learn more
           </Link>
         </Text>

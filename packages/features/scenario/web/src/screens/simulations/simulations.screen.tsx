@@ -11,23 +11,30 @@
  *   /simulations/:externalSetSlug/:batchId    → External set + batch highlight
  *
  * Everything that is not one of those shapes is REDIRECTED rather than rendered
- * as an external set that does not exist — see `resolveSimulationsRedirect` for
+ * as an external set that does not exist: see `resolveSimulationsRedirect` for
  * the rules (the scenario library, the legacy /suites URLs, and the old
  * per-run URL that now opens a drawer).
+ *
+ * A project that reads Agent Testing is sent there for every one of these
+ * addresses, so a saved link and a link an older SDK printed both land on the
+ * page the project uses. See `useAgentTestingRedirect`.
  */
 
 import { useEffect } from "react";
 import SimulationsPage from "../../ui/sections/suites/simulations-page";
 import { resolveSimulationsRedirect } from "../../behavior/suites/use-suite-routing";
 import { useRouter } from "../../behavior/next-router";
+import { useAgentTestingRedirect } from "../../behavior/suites/use-agent-testing-redirect";
 
 function SimulationsRoutePage() {
   const router = useRouter();
   const pathSegments = Array.isArray(router.query.path) ? router.query.path : [];
   const projectSlug = router.query.project as string | undefined;
 
+  const { deciding } = useAgentTestingRedirect({ segments: pathSegments });
+
   const redirect =
-    router.isReady && projectSlug
+    !deciding && router.isReady && projectSlug
       ? resolveSimulationsRedirect({
           projectSlug,
           segments: pathSegments,
@@ -39,12 +46,11 @@ function SimulationsRoutePage() {
     if (redirect) void router.replace(redirect);
   }, [redirect]); // eslint-disable-line react-hooks/exhaustive-deps
 
-  // Don't render the wrong page for a frame while the redirect is in flight.
-  if (redirect) return null;
+  // Don't render the wrong page for a frame while a redirect is in flight.
+  if (deciding || redirect) return null;
 
   return <SimulationsPage />;
 }
-
 
 /**
  * The guard is the ROUTE's, and it did not travel.

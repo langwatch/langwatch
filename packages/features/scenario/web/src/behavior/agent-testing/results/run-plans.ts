@@ -1,32 +1,28 @@
 /**
  * The run plans of a project, and the small numbers their rows read.
  *
- * A run plan is anything a person can open to read runs: a test suite, an
- * external set that a code run writes into, or the one-off runs of the
- * project. All three are addressed by a slug and all three point at one
- * scenario set, so the rest of the Results tab reads one shape.
+ * A run plan is anything a person can open to read runs: a stored plan, or an
+ * external set that a code run writes into. Both are addressed by a slug and
+ * both point at one scenario set, so the rest of the Results tab reads one
+ * shape. A test suite is a group of scenarios and never a row of this list;
+ * the plans that run it are.
  *
  * Everything here is pure, so the list rules can be read and tested without a
  * router or a query.
  *
  * @see specs/features/agent-testing/results-tabs.feature
- * @see specs/suites/one-off-runs-surface.feature
  */
 
-import {
-  type ExternalSetSummary,
-  getOnPlatformSetId,
-  isOnPlatformSet,
-  type ScenarioRunData,
-  type SuiteRunSummary,
-} from "@langwatch/scenario-contract";
-import { getSuiteSetId } from "@langwatch/suite-contract";
 import type { RunGroupSummary } from "@langwatch/suite-web";
 import { EXTERNAL_SET_PREFIX, isExternalSetSelection } from "../../suites/use-suite-routing";
-import { ONE_OFF_RUNS_PLAN_SLUG, RESULTS_SEGMENT } from "../use-agent-testing-routing";
-
-/** What the one-off run plan reads as in the v2 interface. */
-export const ONE_OFF_RUNS_DISPLAY_NAME = "One-off runs";
+import { isOnPlatformSet } from "@langwatch/scenario-contract";
+import type {
+  ExternalSetSummary,
+  ScenarioRunData,
+  SuiteRunSummary,
+} from "@langwatch/scenario-contract";
+import { parseSuiteScope, getSuiteSetId } from "@langwatch/suite-contract";
+import { RESULTS_SEGMENT } from "../use-agent-testing-routing";
 
 /**
  * The label the command line puts on the throwaway suite it makes for
@@ -35,7 +31,30 @@ export const ONE_OFF_RUNS_DISPLAY_NAME = "One-off runs";
  */
 export const CLI_EPHEMERAL_LABEL = "cli-ephemeral";
 
-export type RunPlanKind = "suite" | "external" | "one-off";
+/** The suite fields the run plan rule reads. */
+export type StoredSuite = { kind?: string | null; labels: string[] };
+
+/**
+ * The suites of a project that are run plans.
+ *
+ * A test suite is a group of scenarios and never a row of the Test Runs list,
+ * and the throwaway suites `scenario run` makes are deleted again. Every
+ * surface that counts or lists run plans reads this one rule, so the number
+ * beside the Results tab can never disagree with the rows under it.
+ */
+export function toRunPlanSuites<T extends StoredSuite>(suites: T[]): T[] {
+  return suites.filter(
+    (suite) => suite.kind !== "test_suite" && !suite.labels.includes(CLI_EPHEMERAL_LABEL),
+  );
+}
+
+export type RunPlanKind = "suite" | "external";
+
+/**
+ * What a plan covers, as one word. The Scope column draws a mark for it, so a
+ * plan that runs a suite is told from one that runs a label at a glance.
+ */
+export type RunPlanScopeKind = "all" | "test_suites" | "labels" | "scenarios" | "external";
 
 /** How the last run of a plan went, in the shape every source can supply. */
 export type RunPlanLastRun = {
@@ -52,24 +71,30 @@ export type RunPlan = {
   name: string;
   kind: RunPlanKind;
   scenarioSetId: string;
-  /** The suite the plan was made from, when it is one. */
+  /** The stored plan row this was made from, and null for a set that runs from code. */
   suiteId: string | null;
-  /** How many test cases the plan holds, or null when only the code that ran knows. */
+  /** How many scenarios the plan holds, or null when only the code that ran knows. */
   caseCount: number | null;
   lastRun: RunPlanLastRun | null;
+  /**
+   * What the plan covers, in words, for the Scope column.
+   *
+   * Resolved when the plans are built, because a scope naming other suites can
+   * only be read as names while the whole suite list is in hand.
+   */
+  scopeLabel: string;
+  /** What kind of scope that is, which is the mark drawn beside the label. */
+  scopeKind: RunPlanScopeKind;
 };
 
 /**
  * The line under the name of a run plan, which says what the plan covers.
  *
- * A test suite runs the cases filed under it. An external set runs whatever
- * the code that pushed it ran. One-off runs is not a plan at all: it is where
- * a single case lands when it is run on its own.
+ * An external set runs whatever the code that pushed it ran.
  */
 export function planScopeNote(kind: RunPlanKind): string {
   if (kind === "external") return "External set · runs from code";
-  if (kind === "one-off") return "Single test cases, run one at a time";
-  return "Test suite";
+  return "Run plan";
 }
 
 /** The suite fields a run plan is built from. */
@@ -79,9 +104,69 @@ export type RunPlanSuite = {
   slug: string;
   scenarioIds: string[];
   labels: string[];
+  /** The stored scope rule, as it crosses the wire: unparsed JSON. */
+  scope?: unknown;
 };
 
+/**
+ * What a run plan covers, in words.
+ *
+ * The plan reads its stored rule, with the suites of a `test_suites` scope named
+ * rather than counted, because "Checkout, Refunds" answers the question and
+ * "2 suites" does not.
+ *
+ * @see specs/features/agent-testing/results-tabs.feature
+ */
+export function suiteScopeLabel({
+  suite,
+  suiteNames,
+}: {
+  suite: RunPlanSuite;
+  /** Every test suite of the project, keyed by id, for a scope naming them. */
+  suiteNames: ReadonlyMap<string, string>;
+}): string {
+  const scope = parseSuiteScope(suite.scope);
+  switch (scope.mode) {
+    case "all":
+      return "All scenarios";
+    case "test_suites": {
+      const named = scope.testSuiteIds
+        .map((id) => suiteNames.get(id))
+        .filter((name): name is string => !!name);
+      if (named.length === 0) return "No suite";
+      return named.join(", ");
+    }
+    case "labels": {
+      if (scope.labels.length === 0) return "No label";
+      return `Labelled ${scope.labels.join(", ")}`;
+    }
+    case "scenarios": {
+      const count = suite.scenarioIds.length;
+      return count === 1 ? "1 scenario" : `${count} scenarios`;
+    }
+  }
+}
+
+/** Which kind of scope a stored plan holds. */
+export function suiteScopeKind(suite: RunPlanSuite): RunPlanScopeKind {
+  return parseSuiteScope(suite.scope).mode;
+}
+
 /** The address segment an external set is opened by. */
+/**
+ * How a set that runs from code reads wherever a plan states its scope or its
+ * target. The code chose both, so both read the same way.
+ */
+export const CODE_RUN_LABEL = "From code";
+
+/**
+ * How the target of a run from code is named. The code pointed the run at its
+ * own agent, so the platform holds no target for it, and the run reads under
+ * the default target the same way a run without a set reads under the
+ * default set. Surfaces that list it mark it with the from-code badge.
+ */
+export const CODE_TARGET_NAME = "default";
+
 export function toExternalPlanSlug(scenarioSetId: string): string {
   return `${EXTERNAL_SET_PREFIX}${scenarioSetId}`;
 }
@@ -93,8 +178,9 @@ export function toExternalPlanSlug(scenarioSetId: string): string {
  * built on the server from ids. A reader of the v2 interface belongs on the
  * run of the plan that set is read as, not on the v1 page.
  *
- * Returns null for anything that is not a v1 run address, so the caller can
- * follow it as it stands.
+ * Returns null for anything that is not a v1 run address, and for the
+ * project's internal set, which the Results tab lists no plan for. The caller
+ * then follows the address as it stands.
  *
  * @see specs/features/agent-testing/page-structure.feature
  */
@@ -106,9 +192,8 @@ export function toAgentTestingRunPath(pathname: string): string | null {
   if (!projectSlug || !rawSetId || !batchRunId) return null;
 
   const scenarioSetId = decodeURIComponent(rawSetId);
-  const planSlug = isOnPlatformSet(scenarioSetId)
-    ? ONE_OFF_RUNS_PLAN_SLUG
-    : toExternalPlanSlug(scenarioSetId);
+  if (isOnPlatformSet(scenarioSetId)) return null;
+  const planSlug = toExternalPlanSlug(scenarioSetId);
 
   return `/${projectSlug}/agent-testing/${RESULTS_SEGMENT}/${planSlug}/${batchRunId}`;
 }
@@ -135,39 +220,40 @@ function byLastRunDesc(a: RunPlan, b: RunPlan): number {
 }
 
 /**
- * Every run plan of a project, one-off runs last.
+ * Every run plan of a project, newest run first.
  *
- * One-off runs are not a plan anyone wrote, so they sit under the plans that
- * were, however recently they ran.
+ * `suiteNames` carries every suite of the project, test suites included,
+ * because a plan whose scope names test suites reads them by name and those
+ * rows are not in `plans`.
  */
 export function buildRunPlans({
-  projectId,
-  suites,
+  plans,
+  suiteNames,
   suiteSummaries,
   externalSets,
-  oneOffLastRun,
 }: {
-  projectId: string;
-  suites: RunPlanSuite[];
+  /** The stored run plans, which are the plan rows and never the test suites. */
+  plans: RunPlanSuite[];
+  /** Every suite name of the project, keyed by id. */
+  suiteNames: ReadonlyMap<string, string>;
   /** Keyed by suite id, as suites.getSummaries returns them. */
   suiteSummaries: Record<string, SuiteRunSummary>;
   externalSets: ExternalSetSummary[];
-  oneOffLastRun: RunPlanLastRun | null;
 }): RunPlan[] {
-  const suitePlans: RunPlan[] = suites
-    .filter((suite) => !suite.labels.includes(CLI_EPHEMERAL_LABEL))
-    .map((suite) => {
-      const summary = suiteSummaries[suite.id];
-      return {
-        slug: suite.slug,
-        name: suite.name,
-        kind: "suite" as const,
-        scenarioSetId: getSuiteSetId(suite.id),
-        suiteId: suite.id,
-        caseCount: suite.scenarioIds.length,
-        lastRun: summary ? toLastRun(summary) : null,
-      };
-    });
+  const suitePlans: RunPlan[] = toRunPlanSuites(plans).map((suite) => {
+    const summary = suiteSummaries[suite.id];
+    return {
+      slug: suite.slug,
+      name: suite.name,
+      kind: "suite" as const,
+      scenarioSetId: getSuiteSetId(suite.id),
+      suiteId: suite.id,
+      caseCount: suite.scenarioIds.length,
+      lastRun: summary ? toLastRun(summary) : null,
+      scopeLabel: suiteScopeLabel({ suite, suiteNames }),
+      scopeKind: suiteScopeKind(suite),
+    };
+  });
 
   const externalPlans: RunPlan[] = externalSets.map((set) => ({
     slug: toExternalPlanSlug(set.scenarioSetId),
@@ -177,19 +263,11 @@ export function buildRunPlans({
     suiteId: null,
     caseCount: null,
     lastRun: toLastRun(set),
+    scopeLabel: CODE_RUN_LABEL,
+    scopeKind: "external" as const,
   }));
 
-  const oneOffPlan: RunPlan = {
-    slug: ONE_OFF_RUNS_PLAN_SLUG,
-    name: ONE_OFF_RUNS_DISPLAY_NAME,
-    kind: "one-off",
-    scenarioSetId: getOnPlatformSetId(projectId),
-    suiteId: null,
-    caseCount: null,
-    lastRun: oneOffLastRun,
-  };
-
-  return [...suitePlans, ...externalPlans].sort(byLastRunDesc).concat(oneOffPlan);
+  return [...suitePlans, ...externalPlans].sort(byLastRunDesc);
 }
 
 /**
@@ -199,26 +277,12 @@ export function buildRunPlans({
 export function resolveRunPlan({
   plans,
   planSlug,
-  projectId,
 }: {
   plans: RunPlan[];
   planSlug: string;
-  projectId: string;
 }): RunPlan | null {
   const known = plans.find((plan) => plan.slug === planSlug);
   if (known) return known;
-
-  if (planSlug === ONE_OFF_RUNS_PLAN_SLUG) {
-    return {
-      slug: ONE_OFF_RUNS_PLAN_SLUG,
-      name: ONE_OFF_RUNS_DISPLAY_NAME,
-      kind: "one-off",
-      scenarioSetId: getOnPlatformSetId(projectId),
-      suiteId: null,
-      caseCount: null,
-      lastRun: null,
-    };
-  }
 
   if (isExternalSetSelection(planSlug)) {
     const scenarioSetId = planSlug.slice(EXTERNAL_SET_PREFIX.length);
@@ -230,6 +294,8 @@ export function resolveRunPlan({
       suiteId: null,
       caseCount: null,
       lastRun: null,
+      scopeLabel: CODE_RUN_LABEL,
+      scopeKind: "external",
     };
   }
 
@@ -296,25 +362,10 @@ export function runOrdinal({
  */
 export function batchNote(scenarioRuns: ScenarioRunData[]): string | null {
   for (const run of scenarioRuns) {
-    // Run metadata is a loose record — a note is one agreed key in it, not a
-    // declared field — so it is read as one rather than assumed.
-    const raw = run.metadata?.note;
-    const note = typeof raw === "string" ? raw.trim() : "";
+    const note = run.metadata?.note?.trim();
     if (note) return note;
   }
   return null;
-}
-
-/**
- * What a one-off run reads as: the test case that ran. A one-off batch holds
- * one run, so its case names the batch.
- *
- * @see specs/suites/one-off-runs-surface.feature
- */
-export function oneOffRunTitle(scenarioRuns: ScenarioRunData[]): string | null {
-  const first = scenarioRuns[0];
-  if (!first) return null;
-  return first.name ?? first.scenarioId;
 }
 
 /** The window a run outside the current one needs, in days. */

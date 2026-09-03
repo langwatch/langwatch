@@ -2,10 +2,7 @@ import { describe, expect, it, vi } from "vitest";
 import type { GroupInfo, QueueInfo } from "@langwatch/ops-contract";
 import { QueueService } from "../../services/queue.service";
 import { NullQueueRepository } from "../queue.repository";
-import type {
-  DlqGroupInfo,
-  QueueRepository,
-} from "../queue.repository";
+import type { DlqGroupInfo, QueueRepository } from "../queue.repository";
 
 function createGroup(overrides: Partial<GroupInfo> = {}): GroupInfo {
   return {
@@ -85,6 +82,298 @@ describe("QueueService", () => {
       await expect(
         service.tryGetGroupDetail({ queueName: "missing", groupId: "group" }),
       ).resolves.toBeNull();
+    });
+  });
+
+  describe("operator-action audit", () => {
+    /**
+     * These six acts wrote no audit row at all before this suite existed, and
+     * `QueueControlAction` had no name for any of them, so the gap could not
+     * be closed by accident. Each act is recorded when it changed something,
+     * with the metadata that is unrecoverable afterwards; the table at the end
+     * of this block covers the other half, that none of them records a no-op.
+     */
+    const auditedService = (overrides: Record<string, unknown>) => {
+      const repo = createMockRepo(overrides);
+      const append = vi.fn().mockResolvedValue(undefined);
+      return {
+        repo,
+        append,
+        service: QueueService.create({ repo, audit: { append } }),
+      };
+    };
+
+    describe("given a drain that removed jobs", () => {
+      describe("when the group is drained", () => {
+        /** @scenario "A drain records who emptied the group" */
+        it("records the actor, the group and the job count", async () => {
+          const { append, service } = auditedService({
+            drainGroup: vi.fn().mockResolvedValue({ jobsRemoved: 5 }),
+          });
+
+          await service.drainGroup({
+            queueName: "q1",
+            groupId: "g1",
+            requestedBy: "user_1",
+          });
+
+          expect(append).toHaveBeenCalledWith({
+            actorUserId: "user_1",
+            action: "queue_drain_group",
+            queueName: "q1",
+            metadata: { groupId: "g1", jobsRemoved: 5 },
+          });
+        });
+      });
+    });
+
+    describe("given a tenant drain", () => {
+      describe("when groups were drained", () => {
+        /** @scenario "A tenant drain records the filter that selected the groups" */
+        it("records the filter, because which groups is unrecoverable afterwards", async () => {
+          const { append, service } = auditedService({
+            drainTenant: vi.fn().mockResolvedValue({ groupsDrained: 3, jobsDrained: 12 }),
+          });
+
+          await service.drainTenant({
+            queueName: "q1",
+            tenantId: "t1",
+            groupIdContains: "ingest",
+            requestedBy: "user_1",
+          });
+
+          expect(append).toHaveBeenCalledWith({
+            actorUserId: "user_1",
+            action: "queue_drain_tenant",
+            queueName: "q1",
+            metadata: {
+              tenantId: "t1",
+              groupIdContains: "ingest",
+              groupsDrained: 3,
+              jobsDrained: 12,
+            },
+          });
+        });
+
+        it("records an absent filter as null rather than omitting it", async () => {
+          // An omitted key and "no filter was set" read the same in a JSON
+          // column, and they mean different things: one is a drain of
+          // everything, the other is a row written by an older build.
+          const { append, service } = auditedService({
+            drainTenant: vi.fn().mockResolvedValue({ groupsDrained: 1, jobsDrained: 2 }),
+          });
+
+          await service.drainTenant({
+            queueName: "q1",
+            tenantId: "t1",
+            requestedBy: "user_1",
+          });
+
+          expect(append.mock.calls[0]?.[0].metadata).toMatchObject({
+            groupIdContains: null,
+          });
+        });
+      });
+    });
+
+    describe("given a move to the dead-letter queue", () => {
+      describe("when jobs moved", () => {
+        /** @scenario "Moving a group to the dead-letter queue is recorded" */
+        it("records the actor and the group", async () => {
+          const { append, service } = auditedService({
+            moveToDlq: vi.fn().mockResolvedValue({ jobsMoved: 3 }),
+          });
+
+          await service.moveToDlq({
+            queueName: "q1",
+            groupId: "g1",
+            requestedBy: "user_1",
+          });
+
+          expect(append).toHaveBeenCalledWith({
+            actorUserId: "user_1",
+            action: "queue_move_group_to_dlq",
+            queueName: "q1",
+            metadata: { groupId: "g1", jobsMoved: 3 },
+          });
+        });
+      });
+    });
+
+    describe("given a bulk move of blocked groups", () => {
+      describe("when groups moved", () => {
+        it("records both filters that selected them", async () => {
+          const { append, service } = auditedService({
+            moveAllBlockedToDlq: vi.fn().mockResolvedValue({ movedCount: 2, jobsMoved: 9 }),
+          });
+
+          await service.moveAllBlockedToDlq({
+            queueName: "q1",
+            pipelineFilter: "ingest",
+            errorFilter: "Timeout",
+            requestedBy: "user_1",
+          });
+
+          expect(append).toHaveBeenCalledWith({
+            actorUserId: "user_1",
+            action: "queue_move_all_blocked_to_dlq",
+            queueName: "q1",
+            metadata: {
+              pipelineFilter: "ingest",
+              errorFilter: "Timeout",
+              movedCount: 2,
+              jobsMoved: 9,
+            },
+          });
+        });
+      });
+    });
+
+    describe("given an unblock", () => {
+      describe("when the group was blocked", () => {
+        /** @scenario "An unblock is recorded only when it changed something" */
+        it("records the act", async () => {
+          const { append, service } = auditedService({
+            unblockGroup: vi.fn().mockResolvedValue({ wasBlocked: true }),
+          });
+
+          await service.unblockGroup({
+            queueName: "q1",
+            groupId: "g1",
+            requestedBy: "user_1",
+          });
+
+          expect(append).toHaveBeenCalledWith({
+            actorUserId: "user_1",
+            action: "queue_unblock_group",
+            queueName: "q1",
+            metadata: { groupId: "g1", wasBlocked: true },
+          });
+        });
+      });
+
+      describe("when unblocking every group", () => {
+        it("records the count", async () => {
+          const { append, service } = auditedService({
+            unblockAll: vi.fn().mockResolvedValue({ unblockedCount: 7 }),
+          });
+
+          await service.unblockAll({ queueName: "q1", requestedBy: "user_1" });
+
+          expect(append).toHaveBeenCalledWith({
+            actorUserId: "user_1",
+            action: "queue_unblock_all",
+            queueName: "q1",
+            metadata: { unblockedCount: 7 },
+          });
+        });
+      });
+    });
+
+    /**
+     * One case per gate. Each act is gated on its own "did anything change"
+     * field, so making any single one of them append unconditionally fills the
+     * log with clicks while every other test in this file stays green. A
+     * seventh audited act arriving without its no-op case shows up here as a
+     * missing row rather than as an audit log nobody trusts.
+     */
+    const noOpActs: {
+      name: string;
+      unchanged: Record<string, unknown>;
+      act: (service: QueueService) => Promise<unknown>;
+    }[] = [
+      {
+        name: "drainGroup",
+        unchanged: { jobsRemoved: 0 },
+        act: (service) =>
+          service.drainGroup({
+            queueName: "q1",
+            groupId: "g1",
+            requestedBy: "user_1",
+          }),
+      },
+      {
+        name: "drainTenant",
+        unchanged: { groupsDrained: 0, jobsDrained: 0 },
+        act: (service) =>
+          service.drainTenant({
+            queueName: "q1",
+            tenantId: "t1",
+            requestedBy: "user_1",
+          }),
+      },
+      {
+        name: "moveToDlq",
+        unchanged: { jobsMoved: 0 },
+        act: (service) =>
+          service.moveToDlq({
+            queueName: "q1",
+            groupId: "g1",
+            requestedBy: "user_1",
+          }),
+      },
+      {
+        name: "moveAllBlockedToDlq",
+        unchanged: { movedCount: 0, jobsMoved: 0 },
+        act: (service) =>
+          service.moveAllBlockedToDlq({
+            queueName: "q1",
+            requestedBy: "user_1",
+          }),
+      },
+      {
+        name: "unblockGroup",
+        unchanged: { wasBlocked: false },
+        act: (service) =>
+          service.unblockGroup({
+            queueName: "q1",
+            groupId: "g1",
+            requestedBy: "user_1",
+          }),
+      },
+      {
+        name: "unblockAll",
+        unchanged: { unblockedCount: 0 },
+        act: (service) => service.unblockAll({ queueName: "q1", requestedBy: "user_1" }),
+      },
+    ];
+
+    describe.each(noOpActs)("given $name changed nothing", ({ name, unchanged, act }) => {
+      describe("when the act runs", () => {
+        it("writes no row, so the log carries acts and not clicks", async () => {
+          const { append, service } = auditedService({
+            [name]: vi.fn().mockResolvedValue(unchanged),
+          });
+
+          await act(service);
+
+          expect(append).not.toHaveBeenCalled();
+        });
+      });
+    });
+
+    describe("given the repository contract", () => {
+      describe("when an audited act runs", () => {
+        it("does not leak the actor into the repository call", async () => {
+          // requestedBy is an audit concern. The repository takes the same
+          // arguments it always did, so nothing downstream has to learn about
+          // it and the Redis layer stays unaware of who asked.
+          const { repo, service } = auditedService({
+            drainGroup: vi.fn().mockResolvedValue({ jobsRemoved: 1 }),
+          });
+
+          await service.drainGroup({
+            queueName: "q1",
+            groupId: "g1",
+            requestedBy: "user_1",
+          });
+
+          expect(repo.drainGroup).toHaveBeenCalledWith({
+            queueName: "q1",
+            groupId: "g1",
+          });
+        });
+      });
     });
   });
 
@@ -183,9 +472,7 @@ describe("QueueService", () => {
   });
 
   describe("getGroups()", () => {
-    const groups = Array.from({ length: 25 }, (_, i) =>
-      createGroup({ groupId: `g${i}` }),
-    );
+    const groups = Array.from({ length: 25 }, (_, i) => createGroup({ groupId: `g${i}` }));
     const queue: QueueInfo = {
       name: "q1",
       displayName: "q1",
@@ -452,6 +739,7 @@ describe("QueueService", () => {
         const result = await service.unblockGroup({
           queueName: "q1",
           groupId: "g1",
+          requestedBy: "user_1",
         });
 
         expect(result).toEqual({ wasBlocked: true });
@@ -472,6 +760,7 @@ describe("QueueService", () => {
         const result = await service.unblockGroup({
           queueName: "q1",
           groupId: "g1",
+          requestedBy: "user_1",
         });
 
         expect(result.wasBlocked).toBe(false);
@@ -490,6 +779,7 @@ describe("QueueService", () => {
         const result = await service.drainGroup({
           queueName: "q1",
           groupId: "g1",
+          requestedBy: "user_1",
         });
 
         expect(result).toEqual({ jobsRemoved: 5 });
@@ -512,6 +802,7 @@ describe("QueueService", () => {
         const result = await service.moveToDlq({
           queueName: "q1",
           groupId: "g1",
+          requestedBy: "user_1",
         });
 
         expect(result).toEqual({ jobsMoved: 3 });
@@ -531,7 +822,10 @@ describe("QueueService", () => {
         });
         const service = QueueService.create({ repo });
 
-        const result = await service.unblockAll({ queueName: "q1" });
+        const result = await service.unblockAll({
+          queueName: "q1",
+          requestedBy: "user_1",
+        });
 
         expect(result).toEqual({ unblockedCount: 7 });
         expect(repo.unblockAll).toHaveBeenCalledWith({ queueName: "q1" });
@@ -573,9 +867,7 @@ describe("QueueService", () => {
     describe("when blocked groups exist", () => {
       it("delegates to repo with count and filter", async () => {
         const repo = createMockRepo({
-          canaryUnblock: vi
-            .fn()
-            .mockResolvedValue({ unblockedCount: 2, groupIds: ["g1", "g2"] }),
+          canaryUnblock: vi.fn().mockResolvedValue({ unblockedCount: 2, groupIds: ["g1", "g2"] }),
         });
         const service = QueueService.create({ repo });
 
@@ -641,15 +933,14 @@ describe("QueueService", () => {
       /** @scenario drainTenant bulk-drains all groups for a tenantId */
       it("returns groupsDrained and jobsDrained from the repository", async () => {
         const repo = createMockRepo({
-          drainTenant: vi
-            .fn()
-            .mockResolvedValue({ groupsDrained: 1234, jobsDrained: 5678 }),
+          drainTenant: vi.fn().mockResolvedValue({ groupsDrained: 1234, jobsDrained: 5678 }),
         });
         const service = QueueService.create({ repo });
 
         const result = await service.drainTenant({
           queueName: "q1",
           tenantId: "project_X",
+          requestedBy: "user_1",
         });
 
         expect(result).toEqual({ groupsDrained: 1234, jobsDrained: 5678 });
@@ -673,6 +964,7 @@ describe("QueueService", () => {
         const result = await service.drainTenant({
           queueName: "q1",
           tenantId: "project_X",
+          requestedBy: "user_1",
         });
 
         expect(result).toEqual({ groupsDrained: 3, jobsDrained: 12 });
@@ -687,6 +979,7 @@ describe("QueueService", () => {
           queueName: "q1",
           tenantId: "project_X",
           groupIdContains: "/fold/traceSummary/",
+          requestedBy: "user_1",
         });
 
         expect(repo.drainTenant).toHaveBeenCalledWith({

@@ -4,7 +4,7 @@ import { useForm } from "react-hook-form";
 import { z } from "zod";
 import type { FieldMapping } from "@langwatch/scenario-contract";
 import {
-  CASES_SCOPE,
+  SCENARIOS_SCOPE,
   parseSuiteScope,
   type SuiteScope,
   type SuiteScopeMode,
@@ -51,11 +51,11 @@ export function useSuiteForm({
   agents,
   prompts,
   picksTargets = true,
-  defaultScope = CASES_SCOPE,
+  defaultScope = SCENARIOS_SCOPE,
 }: UseSuiteFormParams) {
   const form = useForm<z.input<typeof suiteFormSchema>, unknown, SuiteFormData>({
     defaultValues: { ...suiteFormDefaultValues, scope: defaultScope },
-    // The run plan editor picks no target and may cover its cases dynamically,
+    // The run plan editor picks no target and may cover its scenarios dynamically,
     // so it is held to the plan rules rather than the suite ones.
     resolver: zodResolver(picksTargets ? suiteFormSchema : planFormSchema),
     mode: "onSubmit",
@@ -68,7 +68,7 @@ export function useSuiteForm({
   // One list per dynamic mode, so somebody comparing two modes does not lose
   // the ticks they just made in the first. The stored shape holds only the
   // mode in force, so the memory has to live here.
-  const [rememberedFolderIds, setRememberedFolderIds] = useState<string[]>([]);
+  const [rememberedTestSuiteIds, setRememberedTestSuiteIds] = useState<string[]>([]);
   const [rememberedLabels, setRememberedLabels] = useState<string[]>([]);
 
   const selectedScenarioIds = form.watch("selectedScenarioIds");
@@ -103,18 +103,20 @@ export function useSuiteForm({
   );
 
   /**
-   * The cases the scope covers, from the lists the form already holds.
+   * The scenarios the scope covers, from the lists the form already holds.
    *
    * The same rule the run resolves against the database, read here against the
-   * project's active cases, so the count under the picker is what the run will
+   * project's active scenarios, so the count under the picker is what the run will
    * cover.
    */
   const scopedScenarioIds = useMemo(() => {
     const active = scenarios ?? [];
     if (scope.mode === "all") return active.map((scenario) => scenario.id);
-    if (scope.mode === "folders") {
+    if (scope.mode === "test_suites") {
       return active
-        .filter((scenario) => !!scenario.folderId && scope.folderIds.includes(scenario.folderId))
+        .filter(
+          (scenario) => !!scenario.testSuiteId && scope.testSuiteIds.includes(scenario.testSuiteId),
+        )
         .map((scenario) => scenario.id);
     }
     if (scope.mode === "labels") {
@@ -128,7 +130,7 @@ export function useSuiteForm({
   useEffect(() => {
     if (suite && isOpen) {
       const storedScope = parseSuiteScope(suite.scope);
-      setRememberedFolderIds(storedScope.mode === "folders" ? storedScope.folderIds : []);
+      setRememberedTestSuiteIds(storedScope.mode === "test_suites" ? storedScope.testSuiteIds : []);
       setRememberedLabels(storedScope.mode === "labels" ? storedScope.labels : []);
       form.reset({
         scope: storedScope,
@@ -146,7 +148,7 @@ export function useSuiteForm({
       setScenarioSearch("");
       setTargetSearch("");
       setActiveLabelFilter(null);
-      setRememberedFolderIds([]);
+      setRememberedTestSuiteIds([]);
       setRememberedLabels([]);
     }
     // Keyed on suite.id to avoid an infinite loop from an unstable suite reference.
@@ -160,18 +162,18 @@ export function useSuiteForm({
 
   /** Moves the plan to another mode, giving back what that mode last held. */
   const setScopeMode = (mode: SuiteScopeMode) => {
-    if (mode === "all" || mode === "cases") return writeScope({ mode });
-    if (mode === "folders") return writeScope({ mode, folderIds: rememberedFolderIds });
+    if (mode === "all" || mode === "scenarios") return writeScope({ mode });
+    if (mode === "test_suites") return writeScope({ mode, testSuiteIds: rememberedTestSuiteIds });
     writeScope({ mode, labels: rememberedLabels });
   };
 
-  const toggleScopeFolder = (folderId: string) => {
-    const current = scope.mode === "folders" ? scope.folderIds : [];
-    const next = current.includes(folderId)
-      ? current.filter((id) => id !== folderId)
-      : [...current, folderId];
-    setRememberedFolderIds(next);
-    writeScope({ mode: "folders", folderIds: next });
+  const toggleScopeTestSuite = (testSuiteId: string) => {
+    const current = scope.mode === "test_suites" ? scope.testSuiteIds : [];
+    const next = current.includes(testSuiteId)
+      ? current.filter((id) => id !== testSuiteId)
+      : [...current, testSuiteId];
+    setRememberedTestSuiteIds(next);
+    writeScope({ mode: "test_suites", testSuiteIds: next });
   };
 
   const toggleScopeLabel = (label: string) => {
@@ -288,7 +290,7 @@ export function useSuiteForm({
     scope,
     scopedScenarioIds,
     setScopeMode,
-    toggleScopeFolder,
+    toggleScopeTestSuite,
     toggleScopeLabel,
     selectedScenarioIds,
     selectedTargets,

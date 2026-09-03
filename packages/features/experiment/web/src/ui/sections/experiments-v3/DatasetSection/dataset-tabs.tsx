@@ -1,6 +1,7 @@
 import { Box, Button, HStack, Spacer, Text } from "@chakra-ui/react";
 import { generate } from "@langwatch/ksuid";
 import {
+  ArrowLeftRight,
   ChevronDown,
   Database,
   Download,
@@ -25,7 +26,9 @@ type DatasetTabsProps = {
 /**
  * Dataset tabs component for switching between multiple datasets.
  * - Clicking a tab switches to that dataset
- * - Dropdown menu only appears on the active/selected tab
+ * - Dropdown menu only appears on the active/selected tab, offering
+ *   Switch Dataset (the picker), Save as dataset (inline only) and
+ *   Remove from workbench
  * - Shows "Datasets" label with database icon
  */
 export function DatasetTabs({
@@ -34,19 +37,14 @@ export function DatasetTabs({
   onEditDataset,
   onSaveAsDataset,
 }: DatasetTabsProps) {
-  const {
-    datasets,
-    activeDatasetId,
-    setActiveDataset,
-    addDataset,
-    removeDataset,
-  } = useEvaluationsV3Store((state) => ({
-    datasets: state.datasets,
-    activeDatasetId: state.activeDatasetId,
-    setActiveDataset: state.setActiveDataset,
-    addDataset: state.addDataset,
-    removeDataset: state.removeDataset,
-  }));
+  const { datasets, activeDatasetId, setActiveDataset, addDataset, removeDataset } =
+    useEvaluationsV3Store((state) => ({
+      datasets: state.datasets,
+      activeDatasetId: state.activeDatasetId,
+      setActiveDataset: state.setActiveDataset,
+      addDataset: state.addDataset,
+      removeDataset: state.removeDataset,
+    }));
 
   // Get first dataset's columns to copy structure for new datasets
   const firstDatasetColumns = useMemo(() => {
@@ -93,13 +91,7 @@ export function DatasetTabs({
   };
 
   return (
-    <HStack
-      gap={2}
-      flexWrap="nowrap"
-      alignItems="center"
-      overflow="auto"
-      width="full"
-    >
+    <HStack gap={2} flexWrap="nowrap" alignItems="center" overflow="auto" width="full">
       <Text fontWeight="semibold" fontSize="sm" color="fg" paddingRight={2}>
         Datasets
       </Text>
@@ -111,6 +103,7 @@ export function DatasetTabs({
           dataset={dataset}
           isActive={dataset.id === activeDatasetId}
           onSelect={() => setActiveDataset(dataset.id)}
+          onSwitch={onSelectExisting}
           onRemove={() => handleRemoveDataset(dataset.id)}
           onSaveAs={() => onSaveAsDataset(dataset)}
           canRemove={datasets.length > 1}
@@ -177,6 +170,7 @@ type DatasetTabProps = {
   dataset: DatasetReference;
   isActive: boolean;
   onSelect: () => void;
+  onSwitch: () => void;
   onRemove: () => void;
   onSaveAs: () => void;
   canRemove: boolean;
@@ -186,6 +180,7 @@ function DatasetTab({
   dataset,
   isActive,
   onSelect,
+  onSwitch,
   onRemove,
   onSaveAs,
   canRemove,
@@ -206,10 +201,7 @@ function DatasetTab({
         data-testid={`dataset-tab-${dataset.id}`}
       >
         <HStack gap={1}>
-          <Database
-            size={12}
-            color={isSaved ? "var(--chakra-colors-blue-500)" : "currentColor"}
-          />
+          <Database size={12} color={isSaved ? "var(--chakra-colors-blue-500)" : "currentColor"} />
           <Text fontSize="12px" fontWeight="medium">
             {dataset.name}
           </Text>
@@ -246,6 +238,12 @@ function DatasetTab({
         </Button>
       </Menu.Trigger>
       <Menu.Content minWidth="180px">
+        <Menu.Item value="switch" onClick={onSwitch}>
+          <HStack gap={2}>
+            <ArrowLeftRight size={14} />
+            <Text>Switch Dataset</Text>
+          </HStack>
+        </Menu.Item>
         {dataset.type === "inline" && (
           <Menu.Item value="save" onClick={onSaveAs}>
             <HStack gap={2}>
@@ -254,9 +252,7 @@ function DatasetTab({
             </HStack>
           </Menu.Item>
         )}
-        {dataset.type === "inline" && (
-          <Box borderTopWidth="1px" borderColor="border" my={1} />
-        )}
+        {dataset.type === "inline" && <Box borderTopWidth="1px" borderColor="border" my={1} />}
         <Menu.Item value="remove" onClick={onRemove} disabled={!canRemove}>
           <HStack gap={2}>
             <Trash2 size={14} />

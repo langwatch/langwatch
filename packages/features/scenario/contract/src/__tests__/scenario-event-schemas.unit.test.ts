@@ -16,11 +16,7 @@
  * accepting every previously-valid shape.
  */
 import { describe, expect, it } from "vitest";
-import {
-  ScenarioEventType,
-  scenarioEventSchema,
-  scenarioMessageSnapshotSchema,
-} from "../index";
+import { ScenarioEventType, scenarioEventSchema, scenarioMessageSnapshotSchema } from "../index";
 
 const WAV_BASE64 = Buffer.from("fake-wav-bytes").toString("base64");
 
@@ -116,6 +112,218 @@ describe("scenarioMessageSnapshotSchema — regression: previously-valid shapes 
 });
 
 /**
+ * An adapter that returns Anthropic Messages API content as it is (the
+ * response of the Anthropic SDK, or the stream-json transcript of Claude Code)
+ * sends `tool_use`, `tool_result` and `thinking` blocks in its snapshots. The
+ * union used to refuse every such snapshot with 400, so a run kept only the
+ * turns before the first tool call.
+ * specs/scenarios/anthropic-transcript-on-the-wire.feature
+ */
+describe("given a MESSAGE_SNAPSHOT carrying Anthropic-format content blocks", () => {
+  function parseMessages(messages: unknown[]) {
+    const event = {
+      type: ScenarioEventType.MESSAGE_SNAPSHOT,
+      timestamp: Date.now(),
+      batchRunId: "batch-1",
+      scenarioId: "scenario-1",
+      scenarioRunId: "run-1",
+      scenarioSetId: "default",
+      messages,
+    };
+    return scenarioMessageSnapshotSchema.safeParse(event);
+  }
+
+  describe("when an assistant turn holds a tool_use block", () => {
+    /** @scenario "An assistant turn with Anthropic tool_use blocks validates on the wire" */
+    it("ACCEPTS the turn and keeps the id, name and input of the call", () => {
+      const parsed = parseMessages([
+        {
+          id: "msg-1",
+          role: "assistant",
+          content: [
+            { type: "text", text: "Reading the skill first." },
+            {
+              type: "tool_use",
+              id: "toolu_01",
+              name: "Bash",
+              input: { command: "cat .skills/scenarios/SKILL.md" },
+            },
+          ],
+        },
+      ]);
+      expect(parsed.success).toBe(true);
+      if (!parsed.success) return;
+      const content = parsed.data.messages[0]!.content as unknown[];
+      expect(content[1]).toEqual({
+        type: "tool_use",
+        id: "toolu_01",
+        name: "Bash",
+        input: { command: "cat .skills/scenarios/SKILL.md" },
+      });
+    });
+  });
+
+  describe("when a text block cites the documents it answered from", () => {
+    /** @scenario "A text block keeps the citations it carries" */
+    it("ACCEPTS the turn and keeps the citations of the block", () => {
+      const citations = [
+        {
+          type: "char_location",
+          cited_text: "Refunds take five working days.",
+          document_index: 0,
+          document_title: "Refund policy",
+          start_char_index: 0,
+          end_char_index: 31,
+        },
+      ];
+      // The tool_use block is what routes the turn to the Anthropic member of
+      // the union; the assertion is on the text block beside it.
+      const parsed = parseMessages([
+        {
+          id: "msg-4",
+          role: "assistant",
+          content: [
+            {
+              type: "text",
+              text: "Refunds take five working days.",
+              citations,
+            },
+            {
+              type: "tool_use",
+              id: "toolu_02",
+              name: "SearchPolicy",
+              input: { query: "refund" },
+            },
+          ],
+        },
+      ]);
+      expect(parsed.success).toBe(true);
+      if (!parsed.success) return;
+      const content = parsed.data.messages[0]!.content as unknown[];
+      expect(content[0]).toEqual({
+        type: "text",
+        text: "Refunds take five working days.",
+        citations,
+      });
+    });
+  });
+
+  describe("when a cited text block is the whole turn", () => {
+    /** @scenario "A text block keeps the citations it carries" */
+    it("ACCEPTS the turn and keeps the citations without a tool_use block beside them", () => {
+      const citations = [
+        {
+          type: "char_location",
+          cited_text: "Refunds take five working days.",
+          document_index: 0,
+          document_title: "Refund policy",
+          start_char_index: 0,
+          end_char_index: 31,
+        },
+      ];
+      const parsed = parseMessages([
+        {
+          id: "msg-5",
+          role: "assistant",
+          content: [
+            {
+              type: "text",
+              text: "Refunds take five working days.",
+              citations,
+            },
+          ],
+        },
+      ]);
+      expect(parsed.success).toBe(true);
+      if (!parsed.success) return;
+      const content = parsed.data.messages[0]!.content as unknown[];
+      expect(content[0]).toEqual({
+        type: "text",
+        text: "Refunds take five working days.",
+        citations,
+      });
+    });
+  });
+
+  describe("when a user turn holds a tool_result block", () => {
+    /** @scenario "A user turn with Anthropic tool_result blocks validates on the wire" */
+    it("ACCEPTS the turn and keeps the tool_use_id and content of the result", () => {
+      const parsed = parseMessages([
+        {
+          id: "msg-2",
+          role: "user",
+          content: [
+            {
+              type: "tool_result",
+              tool_use_id: "toolu_01",
+              content: "# Scenarios skill\n...",
+            },
+          ],
+        },
+      ]);
+      expect(parsed.success).toBe(true);
+      if (!parsed.success) return;
+      const content = parsed.data.messages[0]!.content as unknown[];
+      expect(content[0]).toEqual({
+        type: "tool_result",
+        tool_use_id: "toolu_01",
+        content: "# Scenarios skill\n...",
+      });
+    });
+  });
+
+  describe("when an assistant turn holds a thinking block", () => {
+    /** @scenario "Thinking blocks of an assistant turn validate on the wire" */
+    it("ACCEPTS the turn", () => {
+      const parsed = parseMessages([
+        {
+          id: "msg-3",
+          role: "assistant",
+          content: [
+            {
+              type: "thinking",
+              thinking: "The skill asks for a run plan.",
+              signature: "sig",
+            },
+            { type: "text", text: "Creating the run plan." },
+            {
+              type: "tool_use",
+              id: "toolu_02",
+              name: "Bash",
+              input: { command: "langwatch run-plan create" },
+            },
+          ],
+        },
+      ]);
+      expect(parsed.success).toBe(true);
+    });
+  });
+
+  describe("when a message holds text blocks only and top-level tool_calls", () => {
+    /** @scenario "A plain text array still validates through the members that came before" */
+    it("ACCEPTS the message through the tracer member and keeps its tool_calls", () => {
+      const parsed = parseMessages([
+        {
+          id: "msg-4",
+          role: "assistant",
+          content: [{ type: "text", text: "Looking that up." }],
+          tool_calls: [
+            {
+              id: "call_1",
+              type: "function",
+              function: { name: "lookup", arguments: "{}" },
+            },
+          ],
+        },
+      ]);
+      expect(parsed.success).toBe(true);
+      if (!parsed.success) return;
+      expect((parsed.data.messages[0] as { tool_calls?: unknown[] }).tool_calls).toHaveLength(1);
+    });
+  });
+});
+
+/**
  * Regression guard for the image/file attachment wire leg: the typescript
  * scenario SDK stopped JSON-stringifying array content, so the documented
  * multimodal shapes (scenario docs: multimodal-images, multimodal-files)
@@ -166,9 +374,7 @@ describe("given a MESSAGE_SNAPSHOT wire event carrying attachment content", () =
 
     /** @scenario "AI-SDK image parts with http(s) URLs validate and pass through unchanged" */
     it("ACCEPTS an external http URL image", () => {
-      const event = makeSnapshotEvent([
-        { type: "image", image: "https://example.com/cat.png" },
-      ]);
+      const event = makeSnapshotEvent([{ type: "image", image: "https://example.com/cat.png" }]);
 
       expect(scenarioEventSchema.safeParse(event).success).toBe(true);
     });
@@ -214,9 +420,7 @@ describe("given a MESSAGE_SNAPSHOT wire event carrying attachment content", () =
 
     /** @scenario "OpenAI file parts carrying only a provider file_id pass through unchanged" */
     it("ACCEPTS a part carrying only a provider file_id", () => {
-      const event = makeSnapshotEvent([
-        { type: "file", file: { file_id: "file-abc123" } },
-      ]);
+      const event = makeSnapshotEvent([{ type: "file", file: { file_id: "file-abc123" } }]);
 
       expect(scenarioEventSchema.safeParse(event).success).toBe(true);
     });

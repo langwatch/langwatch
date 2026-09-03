@@ -1,6 +1,9 @@
 import type { SearchFieldGroup } from "@langwatch/trace-contract";
 import type { SuggestionState } from "../../../../index";
-import { getFieldSuggestions, getValueSuggestions } from "../../../../model/explorer/search-bar/suggestion-items";
+import {
+  getFieldSuggestions,
+  getValueSuggestions,
+} from "../../../../model/explorer/search-bar/suggestion-items";
 
 /**
  * Single row in the dropdown. `value` is what lands in the editor;
@@ -20,9 +23,9 @@ export interface SuggestionRow {
   isPrefix?: boolean;
 }
 
-export interface SuggestionUIState {
+export interface SuggestionUIState<Row extends SuggestionRow = SuggestionRow> {
   state: SuggestionState;
-  items: SuggestionRow[];
+  items: Row[];
   /** Per-item occurrence counts when items come from a DB-backed facet. */
   itemCounts?: Record<string, number>;
   selectedIndex: number;
@@ -62,20 +65,20 @@ export function buildSuggestionUI({
   return { state, items, selectedIndex };
 }
 
-export function navigateSuggestion({
+export function navigateSuggestion<Row extends SuggestionRow>({
   ui,
   direction,
 }: {
-  ui: SuggestionUIState;
+  ui: SuggestionUIState<Row>;
   direction: "up" | "down";
-}): SuggestionUIState {
+}): SuggestionUIState<Row> {
   if (ui.items.length === 0) return ui;
   const delta = direction === "down" ? 1 : -1;
   const next = (ui.selectedIndex + delta + ui.items.length) % ui.items.length;
   return { ...ui, selectedIndex: next };
 }
 
-export function highlightedRow(ui: SuggestionUIState): SuggestionRow | null {
+export function highlightedRow<Row extends SuggestionRow>(ui: SuggestionUIState<Row>): Row | null {
   if (!ui.state.open || ui.items.length === 0) return null;
   return ui.items[ui.selectedIndex] ?? null;
 }

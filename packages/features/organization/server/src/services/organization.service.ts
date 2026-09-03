@@ -289,6 +289,18 @@ export class OrganizationService extends OrganizationServiceContract {
     }
   }
 
+  /**
+   * Which of the named organizations this person belongs to, resolved in one
+   * read rather than one per organization.
+   *
+   * The order the caller asked in is kept and a non-membership is absent, so
+   * a caller can map its own list without learning anything about the
+   * organizations it is not in.
+   */
+  memberOrganizationIds(input: { userId: string; organizationIds: string[] }): Promise<string[]> {
+    return this.teams.memberOrganizationIds(input);
+  }
+
   getOrganizationMembers(input: GetOrganizationMembersInput): Promise<string[]> {
     return this.teams.getOrganizationMembers(getOrganizationMembersInputSchema.parse(input));
   }

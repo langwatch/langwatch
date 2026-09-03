@@ -1,6 +1,6 @@
 import { Box, Button, Circle, HStack, Icon, IconButton, Spacer, Text } from "@chakra-ui/react";
 import { keyframes } from "@emotion/react";
-import { Swords, Trophy } from "lucide-react";
+import { Bot, Swords, Trophy } from "lucide-react";
 import { memo, useMemo, useState } from "react";
 import {
   LuArrowLeftRight,
@@ -29,6 +29,7 @@ import { TARGET_MISSING_MAPPING_TOOLTIP } from "../../../../model/experiments-v3
 import { useEvaluationsV3Store } from "../../../../behavior/experiments-v3/use-evaluations-v3-store";
 import { usePromptTemplateFields } from "../../../../behavior/experiments-v3/use-prompt-template-fields";
 import { useTargetName, useTargetNames } from "../../../../behavior/experiments-v3/use-target-name";
+import type { AgentTypeEnum } from "@langwatch/experiment-contract";
 import type { TargetConfig } from "../../../../model/experiments-v3/types";
 import { isComparisonEvaluator } from "../../../../model/experiments-v3/types";
 import {
@@ -43,6 +44,24 @@ import { toComparisonConfig } from "@langwatch/experiment-contract";
 import { disambiguateNames } from "@langwatch/experiment-contract";
 import { ComparisonScoreboard } from "../../../elements/experiments-v3/TargetSection/comparison-scoreboard";
 import { TargetSummary } from "./target-summary";
+
+/**
+ * The icon a column header shows per agent type.
+ *
+ * The map is keyed by the whole enum, so a new agent type does not compile
+ * until it names its icon here. A fallback would take its place in silence,
+ * which is how a connected agent first read as code.
+ */
+const AGENT_TYPE_ICONS: Record<
+  AgentTypeEnum,
+  { testId: string; icon: React.ComponentType<{ size?: number }> }
+> = {
+  code: { testId: "icon-code", icon: LuCode },
+  signature: { testId: "icon-code", icon: LuCode },
+  http: { testId: "icon-globe", icon: LuGlobe },
+  workflow: { testId: "icon-workflow", icon: LuWorkflow },
+  connected: { testId: "icon-connected", icon: Bot },
+};
 
 // Pulsing animation for missing mapping alert
 const pulseAnimation = keyframes`
@@ -312,29 +331,24 @@ export const TargetHeader = memo(function TargetHeader({
         </span>
       );
     }
-    // HTTP agents get a Globe icon
-    if (target.type === "agent" && target.agentType === "http") {
-      return (
-        <span data-testid="icon-globe">
-          <LuGlobe size={12} />
-        </span>
-      );
-    }
-    // A workflow-type agent (built in Studio, saved as an agent) or a
-    // directly-attached workflow target both run a whole Studio workflow, not
-    // a single code/signature node — give them their own icon so they don't
-    // read as raw code.
-    if (
-      target.type === "workflow" ||
-      (target.type === "agent" && target.agentType === "workflow")
-    ) {
+    // A workflow target runs a whole Studio workflow, not a single node, so
+    // it gets the workflow icon rather than reading as raw code.
+    if (target.type === "workflow") {
       return (
         <span data-testid="icon-workflow">
           <LuWorkflow size={12} />
         </span>
       );
     }
-    // Other agents (code, signature) get Code icon
+    if (target.type === "agent" && target.agentType) {
+      const { testId, icon: AgentIcon } = AGENT_TYPE_ICONS[target.agentType];
+      return (
+        <span data-testid={testId}>
+          <AgentIcon size={12} />
+        </span>
+      );
+    }
+    // An agent target that names no type is code, the oldest agent shape.
     return (
       <span data-testid="icon-code">
         <LuCode size={12} />

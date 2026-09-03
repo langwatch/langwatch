@@ -38,3 +38,44 @@ export {
   type AgentPlatformUrlBuilder,
   createAgentLegacyRestApp,
 } from "./transport/api-rest/agent-legacy.api";
+
+/**
+ * The connected-agent runtime of this process: the state store, the presence
+ * registry and the call dispatcher, composed once and built on first use
+ * (ADR-128).
+ *
+ * `installConnectedAgentRedis` is the composition root's, and is what makes
+ * the runtime shared between replicas; without it the process runs on a
+ * memory store and is correct only alone.
+ */
+export {
+  closeConnectedAgentRuntime,
+  type ConnectedAgentRuntime,
+  createConnectedAgentRuntime,
+  getConnectedAgentRuntime,
+  installConnectedAgentRedis,
+} from "./services/connected-agent-runtime.service";
+export {
+  type AgentStateStore,
+  createMemoryStateStore,
+  createRedisStateStore,
+  type Unsubscribe,
+} from "./adapters/connected-agent-state.adapter";
+export {
+  CallDispatcher,
+  type CallDispatcherOptions,
+  type DispatchParams,
+} from "./adapters/connected-agent-dispatch.adapter";
+export {
+  InstanceRegistry,
+  type InstanceMeta,
+  type LiveInstance,
+} from "./adapters/connected-agent-registry.adapter";
+export {
+  buildCallEnvelope,
+  jsonByteLength,
+  resultCapViolation,
+  type StoredCall,
+  type StoredResult,
+  type StoredResultError,
+} from "./adapters/connected-agent-envelope.adapter";

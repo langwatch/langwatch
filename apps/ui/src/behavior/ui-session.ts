@@ -262,10 +262,8 @@ export function useBrowserUiSession({
       uiScopeSelectionWrites({
         resolved,
         selection: memory.selection,
-        projectParam: route.projectParam,
-        lastVisitedHomeKind: memory.lastVisitedHomeKind,
       }),
-    [resolved, memory, route.projectParam],
+    [resolved, memory],
   );
 
   useEffect(() => {

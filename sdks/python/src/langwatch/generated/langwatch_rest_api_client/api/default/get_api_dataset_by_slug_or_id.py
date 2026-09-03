@@ -99,7 +99,7 @@ def _build_response(
 def sync_detailed(
     slug_or_id: str,
     *,
-    client: AuthenticatedClient | Client,
+    client: AuthenticatedClient,
 ) -> Response[
     GetApiDatasetBySlugOrIdResponse200
     | GetApiDatasetBySlugOrIdResponse400
@@ -135,7 +135,7 @@ def sync_detailed(
 def sync(
     slug_or_id: str,
     *,
-    client: AuthenticatedClient | Client,
+    client: AuthenticatedClient,
 ) -> (
     GetApiDatasetBySlugOrIdResponse200
     | GetApiDatasetBySlugOrIdResponse400
@@ -167,7 +167,7 @@ def sync(
 async def asyncio_detailed(
     slug_or_id: str,
     *,
-    client: AuthenticatedClient | Client,
+    client: AuthenticatedClient,
 ) -> Response[
     GetApiDatasetBySlugOrIdResponse200
     | GetApiDatasetBySlugOrIdResponse400
@@ -201,7 +201,7 @@ async def asyncio_detailed(
 async def asyncio(
     slug_or_id: str,
     *,
-    client: AuthenticatedClient | Client,
+    client: AuthenticatedClient,
 ) -> (
     GetApiDatasetBySlugOrIdResponse200
     | GetApiDatasetBySlugOrIdResponse400

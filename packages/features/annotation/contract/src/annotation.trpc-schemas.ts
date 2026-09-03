@@ -68,6 +68,21 @@ export const annotationApiAnnotationScopeSchema = z.object({
 export type AnnotationApiAnnotationScope = z.infer<typeof annotationApiAnnotationScopeSchema>;
 
 export const annotationApiProjectScopeSchema = z.object({ projectId: z.string() });
+
+/**
+ * A project scope that can also ask for only what this caller may already read.
+ *
+ * A picker built from every queue in the project offers ones the queue-item
+ * read narrows straight back out, so choosing one empties the list and looks
+ * broken. Callers that genuinely target any queue — adding a trace to one,
+ * inviting people to one — leave `reachableOnly` off, which is why it is
+ * opt-in rather than the default.
+ */
+export const annotationApiQueueListInputSchema = z.object({
+  projectId: z.string(),
+  reachableOnly: z.boolean().optional(),
+});
+export type AnnotationApiQueueListInput = z.infer<typeof annotationApiQueueListInputSchema>;
 export type AnnotationApiProjectScope = z.infer<typeof annotationApiProjectScopeSchema>;
 
 export const annotationApiListAllInputSchema = z.object({
@@ -129,6 +144,12 @@ export const annotationApiOptimizedQueuesInputSchema = z.object({
   pageSize: z.number(),
   pageOffset: z.number(),
   queueId: z.string().optional(),
+  /**
+   * Narrows the read to these queues. Only ever narrows: it is applied on top
+   * of the reach the caller already has, so a queue id from anywhere else can
+   * subtract rows but never add one.
+   */
+  queueIds: z.array(z.string()).optional(),
   showQueueAndUser: z.boolean().optional(),
   allQueueItems: z.boolean().optional(),
   // The list's date range. A queue item is dated by when it was queued, which

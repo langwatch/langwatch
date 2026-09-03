@@ -37,10 +37,10 @@ import { Tooltip } from "@langwatch/design-system/tooltip";
 import type { SimulationSuite } from "../../../model/prisma-types";
 import { useNow } from "../../../behavior/use-now";
 import type { ExternalSetSummary, SuiteRunSummary } from "@langwatch/scenario-contract";
+import { firstGrapheme } from "@langwatch/design-system/first-grapheme";
 import { formatTimeAgoCompact } from "@langwatch/workflow-web/utils/formatTimeAgo";
 import { SearchInput } from "@langwatch/design-system/search-input";
 import { ALL_RUNS_ID, toExternalSetSelection } from "../../../behavior/suites/use-suite-routing";
-import { VoiceAgentsCallout } from "./voice-agents-callout";
 
 export const SUITE_SIDEBAR_COLLAPSED_KEY = "suite-sidebar-collapsed" as const;
 
@@ -207,13 +207,7 @@ export function SuiteSidebar({
           !isCollapsed &&
           hasNoResults &&
           (suites.length > 0 || externalSets.length > 0) && (
-            <Text
-              fontSize="sm"
-              color="fg.muted"
-              paddingX={2}
-              paddingY={4}
-              textAlign="center"
-            >
+            <Text fontSize="sm" color="fg.muted" paddingX={2} paddingY={4} textAlign="center">
               No matching run plans
             </Text>
           )}
@@ -221,11 +215,7 @@ export function SuiteSidebar({
         {!isLoading &&
           filteredSuites.map((suite) =>
             isCollapsed ? (
-              <Tooltip
-                key={suite.id}
-                content={suite.name}
-                positioning={{ placement: "right" }}
-              >
+              <Tooltip key={suite.id} content={suite.name} positioning={{ placement: "right" }}>
                 <IconButton
                   aria-label={suite.name}
                   size="sm"
@@ -237,13 +227,11 @@ export function SuiteSidebar({
                     width="22px"
                     height="22px"
                     borderRadius="full"
-                    bg={
-                      suite.slug === selectedSuiteSlug ? "transparent" : "bg.emphasized"
-                    }
+                    bg={suite.slug === selectedSuiteSlug ? "transparent" : "bg.emphasized"}
                     fontSize="xs"
                     fontWeight="bold"
                   >
-                    {suite.name.charAt(0).toUpperCase()}
+                    {firstGrapheme(suite.name).toUpperCase()}
                   </Center>
                 </IconButton>
               </Tooltip>
@@ -298,9 +286,7 @@ export function SuiteSidebar({
                         ? "solid"
                         : "ghost"
                     }
-                    onClick={() =>
-                      onSelectSuite(toExternalSetSelection(extSet.scenarioSetId))
-                    }
+                    onClick={() => onSelectSuite(toExternalSetSelection(extSet.scenarioSetId))}
                   >
                     <Center
                       width="22px"
@@ -314,7 +300,7 @@ export function SuiteSidebar({
                       fontSize="xs"
                       fontWeight="bold"
                     >
-                      {extSet.scenarioSetId.charAt(0).toUpperCase()}
+                      {firstGrapheme(extSet.scenarioSetId).toUpperCase()}
                     </Center>
                   </IconButton>
                 </Tooltip>
@@ -323,26 +309,14 @@ export function SuiteSidebar({
                   key={extSet.scenarioSetId}
                   externalSet={extSet}
                   projectSlug={projectSlug}
-                  isSelected={
-                    selectedSuiteSlug === toExternalSetSelection(extSet.scenarioSetId)
-                  }
-                  onSelect={() =>
-                    onSelectSuite(toExternalSetSelection(extSet.scenarioSetId))
-                  }
+                  isSelected={selectedSuiteSlug === toExternalSetSelection(extSet.scenarioSetId)}
+                  onSelect={() => onSelectSuite(toExternalSetSelection(extSet.scenarioSetId))}
                 />
               ),
             )}
           </>
         )}
       </VStack>
-
-      {/*
-       * Voice agents announcement card — pinned just above the collapse
-       * toggle so it sits at the bottom of the sets/runs sidebar without
-       * stealing space from the list itself. Hidden when the sidebar is
-       * collapsed (no room for the copy at icon-rail width).
-       */}
-      {!isCollapsed && <VoiceAgentsCallout />}
 
       {/* Toggle button — always the same DOM node */}
       <ShadowDivider />

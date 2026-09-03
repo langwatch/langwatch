@@ -6,11 +6,15 @@
  * tab so the dialog and whatever it was about to run are still here on the
  * way back.
  *
+ * A development agent of another person is one of the cards, drawn disabled
+ * with the reason on hover, so the list reads the same for everyone on the
+ * project.
+ *
  * @see specs/features/agent-testing/run-dialog.feature
+ * @see specs/features/agents/connected-agents-ui.feature
  */
 
 import { chakra, VStack } from "@chakra-ui/react";
-import { ExternalLink } from "lucide-react";
 import type { TargetValue } from "../../scenarios/target-selector";
 import { useOrganizationTeamProject } from "../../../../behavior/use-organization-team-project";
 import { getRoutePath } from "@langwatch/workflow-web/utils/routes";
@@ -18,11 +22,7 @@ import { FieldLabel } from "../../../elements/agent-testing/shared/dialog-fields
 import { FG_MUTED } from "../../../../model/agent-testing/shared/design";
 import { RemoveBlockButton } from "../../../elements/agent-testing/shared/remove-block-button";
 import { type PromptEntry, PromptPicker } from "./prompt-picker";
-import {
-  AgentBlocks,
-  type RunDialogAgent,
-  SetupAgentBox,
-} from "./run-target-picker";
+import { AgentBlocks, type RunDialogAgent, SetupAgentBox } from "./run-target-picker";
 import type { RunDialogMode } from "./run-dialog-types";
 
 type TargetSectionProps = {
@@ -56,7 +56,6 @@ function ConfigureAgentsLink() {
       data-testid="run-dialog-configure-agents"
     >
       Configure
-      <ExternalLink size={11} />
     </chakra.a>
   );
 }
@@ -66,7 +65,7 @@ export function TargetSection(props: TargetSectionProps) {
   const { mode, agents, prompts, target, onSelect } = props;
 
   return (
-    <VStack align="stretch" gap={0}>
+    <VStack align="stretch" gap={0} data-testid="run-dialog-target-section">
       <FieldLabel>
         {mode === "prompts" ? "Prompt to be tested" : "Agent to be tested"}
         {mode === "prompts" ? (

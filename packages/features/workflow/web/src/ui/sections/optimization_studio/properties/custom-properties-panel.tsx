@@ -1,19 +1,16 @@
-import { Avatar, Badge, Button, HStack, Text, VStack } from "@chakra-ui/react";
+import { Badge, Button, HStack, Text, VStack } from "@chakra-ui/react";
 import type { Node } from "@xyflow/react";
 import { useUpdateNodeInternals } from "@xyflow/react";
 import { ExternalLink } from "react-feather";
 import { useShallow } from "zustand/react/shallow";
+import { Avatar } from "@langwatch/design-system/avatar";
 import { useOrganizationTeamProject } from "../../../../behavior/studio-host/use-organization-team-project";
 import { Link } from "../../../elements/studio-host/link";
 import { toaster } from "../../../../behavior/studio-host/toaster";
 import { formatTimeAgo } from "../../../../model/utils/format-time-ago";
 import { useComponentVersion } from "../../../../behavior/optimization_studio/use-component-version";
 import { useWorkflowStore } from "@langwatch/workflow-web";
-import {
-  getInputsOutputs,
-  parseStudioWorkflow,
-  type Custom,
-} from "@langwatch/workflow-contract";
+import { getInputsOutputs, parseStudioWorkflow, type Custom } from "@langwatch/workflow-contract";
 import { VersionBox } from "../history";
 import { BasePropertiesPanel } from "./base-properties-panel";
 
@@ -96,8 +93,7 @@ const CustomComponentInfo = ({ node }: { node: Node<Custom> }) => {
             ·
           </Text>
           <Text fontSize="12px" flexShrink={0}>
-            {currentVersion?.updatedAt &&
-              formatTimeAgo(currentVersion.updatedAt.getTime())}
+            {currentVersion?.updatedAt && formatTimeAgo(currentVersion.updatedAt.getTime())}
           </Text>
         </HStack>
       </VStack>

@@ -1,4 +1,7 @@
+import { HandledError } from "@langwatch/handled-error";
+import { ModelNotConfiguredError } from "@langwatch/model-provider-contract";
 import { createLogger } from "@langwatch/observability";
+import { resolveRunModels } from "@langwatch/scenario-contract";
 import type { TraceService } from "@langwatch/trace-contract";
 
 import type { ScenarioExecutionLookupService } from "./scenario-execution-lookup.service";
@@ -126,6 +129,7 @@ export class ScenarioPrefetchCompletionService {
       context: input.context,
       target: input.target,
       validated,
+      models,
       prepared,
       traceWaitTimeoutMs,
     });
@@ -217,6 +221,8 @@ export class ScenarioPrefetchCompletionService {
         return "Code agent";
       case "workflow":
         return "Workflow agent";
+      case "connected":
+        return "Connected agent";
       case "http":
         return "HTTP agent";
     }
@@ -249,25 +255,50 @@ export class ScenarioPrefetchCompletionService {
                 projectId: context.projectId,
               })
           : void 0;
-      const simulator =
-        lookups.suite?.simulatorModel ??
-        lookups.scenario.simulatorModel ??
-        (await this.options.lookups.resolveModel({
-          featureKey: "scenarios.user_simulator",
-          projectId: context.projectId,
-        }));
-      const judge =
-        lookups.suite?.judgeModel ??
-        lookups.scenario.judgeModel ??
-        (await this.options.lookups.resolveModel({
-          featureKey: "scenarios.judge",
-          projectId: context.projectId,
-        }));
-      return { success: true, adapter, simulator, judge };
+      // The plan's pick, else the case's, else the project default — and each
+      // answer expanded, because a `latest` alias is stored verbatim and no
+      // provider understands it as a model id.
+      const { simulatorModel, judgeModel } = await resolveRunModels({
+        plan: {
+          simulatorModel: lookups.suite?.simulatorModel,
+          judgeModel: lookups.suite?.judgeModel,
+        },
+        scenario: {
+          simulatorModel: lookups.scenario.simulatorModel,
+          judgeModel: lookups.scenario.judgeModel,
+        },
+        resolveFeatureModel: (featureKey) =>
+          this.options.lookups.resolveModel({ featureKey, projectId: context.projectId }),
+      });
+      return { success: true, adapter, simulator: simulatorModel, judge: judgeModel };
     } catch (error) {
-      const message =
-        error instanceof Error ? error.message : "No default model configured for this project";
-      return { success: false, result: { success: false, error: message } };
+      // A project with no model set for scenarios is the customer's to fix and
+      // carries its own remediation message, so it is named rather than left
+      // reasonless — otherwise the caller cannot tell it from a fault of ours.
+      //
+      // Any other failure here is ours. `error` reaches the customer as the
+      // reason a run was refused, so only a message LangWatch authored may go
+      // in it. A HandledError carries a customer-safe message by contract;
+      // everything else is logged and named in one sentence.
+      if (!(error instanceof HandledError)) {
+        logger.error(
+          { projectId: context.projectId, error },
+          "Model resolution failed for a scenario run",
+        );
+      }
+      return {
+        success: false,
+        result: {
+          success: false,
+          error:
+            error instanceof HandledError
+              ? error.message
+              : "The models this run needs could not be resolved",
+          ...(error instanceof ModelNotConfiguredError
+            ? { reason: "model_not_configured" as const }
+            : {}),
+        },
+      };
     }
   }
 
@@ -324,10 +355,11 @@ export class ScenarioPrefetchCompletionService {
     context: ScenarioExecutionPrefetchInput["context"];
     target: TargetConfig;
     validated: Extract<ValidatedLookups, { success: true }>;
+    models: Extract<ResolvedModels, { success: true }>;
     prepared: PreparedModels;
     traceWaitTimeoutMs: number | undefined;
   }): ScenarioExecutionPrefetchResult {
-    const { context, target, validated, prepared, traceWaitTimeoutMs } = input;
+    const { context, target, validated, models, prepared, traceWaitTimeoutMs } = input;
     const modelParams = prepared.adapter?.success ? prepared.adapter.params : void 0;
     if (!prepared.simulator.success || !prepared.judge.success) {
       throw new Error("Prepared model results were not validated");
@@ -351,6 +383,9 @@ export class ScenarioPrefetchCompletionService {
         endpoint: this.options.config.langwatchEndpoint,
         apiKey: validated.project.apiKey,
       },
+      // The names, not the params: the caller that queues the run records
+      // which models it ran on, and reads them back off the run a month later.
+      resolvedModels: { simulatorModel: models.simulator, judgeModel: models.judge },
     };
   }
 }

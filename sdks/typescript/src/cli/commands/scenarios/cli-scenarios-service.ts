@@ -8,7 +8,7 @@ import {
 /**
  * The scenarios API service for CLI commands. It declares the CLI surface on
  * every request, so a scenario save made from the command line is recorded
- * with the command line as its author in the case's version history.
+ * with the command line as its author in the scenario's version history.
  *
  * @see specs/scenarios/scenario-versioning.feature
  */

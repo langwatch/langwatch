@@ -37,6 +37,31 @@ import type {
 
 const logger = createLogger("langwatch:identity:storage-adapter");
 
+/**
+ * A refusal, logged on its way out.
+ *
+ * better-auth catches an adapter throw and turns it into a redirect carrying
+ * the error CODE and nothing else, so an unlogged refusal reaches the
+ * customer as a sign-in error page and leaves NOTHING behind to diagnose it
+ * with. That is not hypothetical: `identity_unsupported_storage_query` broke
+ * production sign-in and appeared zero times in the logs for the whole
+ * outage, while the detail naming the exact shape sat unread on the error's
+ * own `reasons`. It is logged at error because it is `fault: "platform"` —
+ * nothing the customer did caused it and nothing they can do fixes it.
+ *
+ * Returns the error so a caller can `throw refused(...)` and keep the throw
+ * visible at the site it happens.
+ */
+const refused = <T>(error: T): T => {
+  if (error instanceof IdentityUnsupportedStorageQueryError) {
+    logger.error(
+      { err: error, detail: error.reasons[0]?.message },
+      "the identity storage adapter refused a better-auth account operation; the sign-in or account write it belongs to fails",
+    );
+  }
+  return error;
+};
+
 /** The secret set the identity branch owns. Everything else on the `account`
  *  model is linkage, and linkage is a command rather than a column write. */
 const SECRET_FIELDS = [
@@ -52,6 +77,35 @@ const SECRET_FIELDS = [
 /** Written by the store itself, so an update naming it is not a linkage
  *  rewrite and does not have to refuse. */
 const UPDATE_PASSTHROUGH_FIELDS = ["createdAt", "updatedAt"] as const;
+
+/**
+ * Linkage columns better-auth RESTATES on an update it means as a secret
+ * write — accepted when the value it carries already matches the row, and
+ * refused when it differs.
+ *
+ * A restatement is not a rewrite. better-auth 1.7 rebuilt the sign-in token
+ * refresh (`oauth2/link-account`) to send `providerId` alongside the tokens,
+ * echoing back the value it just read; 1.6 sent `scope` and no linkage at
+ * all. Refusing the echo failed EVERY OAuth sign-in for a latched user, so
+ * the field alone cannot decide this — only the field and its value together
+ * can. Equality is what makes accepting it safe: a matching value writes
+ * nothing, and a differing one is a real rewrite and still refuses.
+ */
+const LINKAGE_RESTATEMENT_FIELDS = ["providerId", "issuer", "accountId", "userId"] as const;
+
+type LinkageRestatementField = (typeof LINKAGE_RESTATEMENT_FIELDS)[number];
+
+const isLinkageRestatementField = (field: string): field is LinkageRestatementField =>
+  LINKAGE_RESTATEMENT_FIELDS.some((known) => known === field);
+
+/**
+ * The value a row states for a linkage field, with `issuer` resolved the
+ * same way the served row resolves it — a row attached before the fact
+ * carried an issuer answers with the synthetic form better-auth minted, and
+ * that is the value better-auth is echoing back.
+ */
+const linkageValueOf = (row: IdentityAccountRow, field: LinkageRestatementField): string =>
+  field === "issuer" ? (row.issuer ?? issuerForProviderId(row.providerId)) : row[field];
 
 export interface IdentityStorageAdapterDeps {
   /**
@@ -201,10 +255,7 @@ function identityCustomAdapter({
 
     const toStorageKeys = (model: string, row: Row): Row =>
       Object.fromEntries(
-        Object.entries(row).map(([field, value]) => [
-          getFieldName({ model, field }),
-          value,
-        ]),
+        Object.entries(row).map(([field, value]) => [getFieldName({ model, field }), value]),
       );
 
     const canonicalWhere = (
@@ -233,8 +284,7 @@ function identityCustomAdapter({
         (candidate) =>
           candidate.field === "userId" &&
           (candidate.operator === undefined || candidate.operator === "eq") &&
-          (candidate.connector === undefined ||
-            candidate.connector.toUpperCase() === "AND"),
+          (candidate.connector === undefined || candidate.connector.toUpperCase() === "AND"),
       );
       return typeof clause?.value === "string" ? clause.value : null;
     };
@@ -258,8 +308,7 @@ function identityCustomAdapter({
         canonical.length === 1 &&
         clause !== undefined &&
         clause.field === "userId" &&
-        (clause.operator === undefined ||
-          clause.operator.toLowerCase() === "eq") &&
+        (clause.operator === undefined || clause.operator.toLowerCase() === "eq") &&
         typeof clause.value === "string"
       );
     };
@@ -272,18 +321,14 @@ function identityCustomAdapter({
         (candidate) =>
           candidate.field === "id" &&
           (candidate.operator === undefined || candidate.operator === "eq") &&
-          (candidate.connector === undefined ||
-            candidate.connector.toUpperCase() === "AND"),
+          (candidate.connector === undefined || candidate.connector.toUpperCase() === "AND"),
       );
       return typeof clause?.value === "string" ? clause.value : null;
     };
 
     const secretsOf = (row: Row): IdentityAccountSecrets =>
       Object.fromEntries(
-        SECRET_FIELDS.filter((field) => field in row).map((field) => [
-          field,
-          row[field] ?? null,
-        ]),
+        SECRET_FIELDS.filter((field) => field in row).map((field) => [field, row[field] ?? null]),
       );
 
     /**
@@ -295,16 +340,27 @@ function identityCustomAdapter({
     const secretsOfUpdate = (
       operation: string,
       update: Row,
+      rows: readonly IdentityAccountRow[],
     ): IdentityAccountSecrets => {
+      /** A linkage field whose value every named row already states — an
+       *  echo of what better-auth just read, which writes nothing. */
+      const restatesItself = (field: string): boolean =>
+        isLinkageRestatementField(field) &&
+        rows.length > 0 &&
+        rows.every((row) => linkageValueOf(row, field) === update[field]);
+
       const foreign = Object.keys(update).filter(
         (field) =>
           !SECRET_FIELDS.some((secret) => secret === field) &&
-          !UPDATE_PASSTHROUGH_FIELDS.some((passed) => passed === field),
+          !UPDATE_PASSTHROUGH_FIELDS.some((passed) => passed === field) &&
+          !restatesItself(field),
       );
       if (foreign.length > 0) {
-        throw new IdentityUnsupportedStorageQueryError(
-          `identity storage adapter: better-auth issued an account ${operation} that writes linkage columns (${foreign.sort().join(", ")}). ` +
-            "Linkage is event-truth on the identity branch, so it can only be stated as a command, never written as a column.",
+        throw refused(
+          new IdentityUnsupportedStorageQueryError(
+            `identity storage adapter: better-auth issued an account ${operation} that writes linkage columns (${foreign.sort().join(", ")}). ` +
+              "Linkage is event-truth on the identity branch, so it can only be stated as a command, never written as a column.",
+          ),
         );
       }
       return secretsOf(update);
@@ -334,9 +390,7 @@ function identityCustomAdapter({
       issuer: row.issuer ?? issuerForProviderId(row.providerId),
     });
 
-    const serveAccounts = async (
-      query: AccountQuery,
-    ): Promise<IdentityAccountRow[] | null> => {
+    const serveAccounts = async (query: AccountQuery): Promise<IdentityAccountRow[] | null> => {
       switch (query.kind) {
         case "byUser":
           return accounts.findByUser({ userId: query.userId });
@@ -424,9 +478,13 @@ function identityCustomAdapter({
         // operator has enrolled anyone.
         return null;
       }
-      const served = await serveAccounts(
-        parseAccountQuery({ operation, where: canonical }),
-      );
+      let query: AccountQuery;
+      try {
+        query = parseAccountQuery({ operation, where: canonical });
+      } catch (error) {
+        throw refused(error);
+      }
+      const served = await serveAccounts(query);
       return served === null ? null : served.map(withIssuer);
     };
 
@@ -458,9 +516,7 @@ function identityCustomAdapter({
      * it) and adopted rather than duplicated by the next attempt, because
      * the write is keyed by the id the ceremony pinned.
      */
-    const createOnIdentityBranch = async (
-      canonical: Row,
-    ): Promise<IdentityAccountRow | null> => {
+    const createOnIdentityBranch = async (canonical: Row): Promise<IdentityAccountRow | null> => {
       const { userId, providerId } = canonical;
       if (typeof userId !== "string" || typeof providerId !== "string") {
         return null;
@@ -554,9 +610,7 @@ function identityCustomAdapter({
      * user, an anonymous session — has no address to derive an identifier
      * from and takes the legacy branch, marker or not.
      */
-    const bearOnIdentityBranch = async (
-      canonical: Row,
-    ): Promise<Row | null> => {
+    const bearOnIdentityBranch = async (canonical: Row): Promise<Row | null> => {
       if (currentIdentityBirth() === undefined) return null;
       const { email, createdAt } = canonical;
       if (typeof email !== "string" || email.length === 0) {
@@ -569,8 +623,7 @@ function identityCustomAdapter({
       const born = await birth.bear({
         row: canonical,
         email,
-        createdAtMs:
-          createdAt instanceof Date ? createdAt.getTime() : Date.now(),
+        createdAtMs: createdAt instanceof Date ? createdAt.getTime() : Date.now(),
       });
       // From here the request's remaining routed writes are this user's, and
       // the gate — which cannot see a state row written moments ago on
@@ -628,10 +681,7 @@ function identityCustomAdapter({
         }
         if (modelOf(model) === "account") {
           const userId = canonical.userId;
-          if (
-            typeof userId === "string" &&
-            (await routesToIdentity({ userId }))
-          ) {
+          if (typeof userId === "string" && (await routesToIdentity({ userId }))) {
             const written = await createOnIdentityBranch(canonical);
             if (written) return toStorageKeys(model, { ...written }) as never;
           }
@@ -664,25 +714,14 @@ function identityCustomAdapter({
         }
         const found = await legacy.findOne<Row>({
           model,
-          where:
-            modelOf(model) === "user"
-              ? await resolveUserWhere(model, where)
-              : where,
+          where: modelOf(model) === "user" ? await resolveUserWhere(model, where) : where,
           select,
           join,
         });
         return found === null ? null : (toStorageKeys(model, found) as never);
       },
 
-      findMany: async ({
-        model,
-        where,
-        limit,
-        select,
-        sortBy,
-        offset,
-        join,
-      }) => {
+      findMany: async ({ model, where, limit, select, sortBy, offset, join }) => {
         if (modelOf(model) === "account") {
           const rows = await routeAccount({
             model,
@@ -699,9 +738,7 @@ function identityCustomAdapter({
                   "The identity branch serves a user's sign-in methods unordered and unpaged; teach it the ordering the caller needs rather than guessing one.",
               );
             }
-            return rows
-              .slice(0, limit)
-              .map((row) => toStorageKeys(model, { ...row })) as never;
+            return rows.slice(0, limit).map((row) => toStorageKeys(model, { ...row })) as never;
           }
         }
         const found = await legacy.findMany<Row>({
@@ -739,17 +776,12 @@ function identityCustomAdapter({
             if (first === undefined) return null;
             await applySecrets({
               rows: [first],
-              secrets: secretsOfUpdate(
-                "update",
-                toCanonicalKeys(model, update as Row),
-              ),
+              secrets: secretsOfUpdate("update", toCanonicalKeys(model, update as Row), [first]),
             });
             const [fresh] = await accounts.findByAccountIds({
               accountIds: [first.id],
             });
-            return fresh === undefined
-              ? null
-              : (toStorageKeys(model, { ...fresh }) as never);
+            return fresh === undefined ? null : (toStorageKeys(model, { ...fresh }) as never);
           }
         }
         if (modelOf(model) === "user") {
@@ -763,18 +795,14 @@ function identityCustomAdapter({
           // than written with an empty patch.
           if (Object.keys(remaining).length === 0) {
             const found = await legacy.findOne<Row>({ model, where });
-            return found === null
-              ? null
-              : (toStorageKeys(model, found) as never);
+            return found === null ? null : (toStorageKeys(model, found) as never);
           }
           const updated = await legacy.update<Row>({
             model,
             where,
             update: toCanonicalKeys(model, remaining),
           });
-          return updated === null
-            ? null
-            : (toStorageKeys(model, updated) as never);
+          return updated === null ? null : (toStorageKeys(model, updated) as never);
         }
         const row = await legacy.update<Row>({
           model,
@@ -794,10 +822,7 @@ function identityCustomAdapter({
           if (rows !== null) {
             await applySecrets({
               rows,
-              secrets: secretsOfUpdate(
-                "updateMany",
-                toCanonicalKeys(model, update),
-              ),
+              secrets: secretsOfUpdate("updateMany", toCanonicalKeys(model, update), rows),
             });
             return rows.length;
           }
@@ -953,7 +978,19 @@ async function surfaceHandledRefusals<T>(run: () => Promise<T>): Promise<T> {
 
 /** better-auth's status vocabulary, from ours. Anything unmapped is a 500,
  *  which is the honest answer for a status the library cannot name. */
-function httpStatusFor(httpStatus: number): "BAD_REQUEST" | "UNAUTHORIZED" | "FORBIDDEN" | "NOT_FOUND" | "CONFLICT" | "GONE" | "UNPROCESSABLE_ENTITY" | "TOO_MANY_REQUESTS" | "SERVICE_UNAVAILABLE" | "INTERNAL_SERVER_ERROR" {
+function httpStatusFor(
+  httpStatus: number,
+):
+  | "BAD_REQUEST"
+  | "UNAUTHORIZED"
+  | "FORBIDDEN"
+  | "NOT_FOUND"
+  | "CONFLICT"
+  | "GONE"
+  | "UNPROCESSABLE_ENTITY"
+  | "TOO_MANY_REQUESTS"
+  | "SERVICE_UNAVAILABLE"
+  | "INTERNAL_SERVER_ERROR" {
   switch (httpStatus) {
     case 400:
       return "BAD_REQUEST";

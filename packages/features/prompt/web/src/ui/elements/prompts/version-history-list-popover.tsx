@@ -1,5 +1,4 @@
 import {
-  Avatar,
   Box,
   type BoxProps,
   Button,
@@ -15,6 +14,7 @@ import { createLogger } from "@langwatch/observability";
 import { useCallback, useEffect, useState } from "react";
 import { LuChevronRight } from "react-icons/lu";
 import { HistoryIcon } from "@langwatch/model-provider-web/components/icons/History";
+import { Avatar } from "@langwatch/design-system/avatar";
 import { Popover } from "@langwatch/design-system/popover";
 import { toaster } from "@langwatch/workflow-web/studio-host/toaster";
 import { Tooltip } from "@langwatch/design-system/tooltip";
@@ -255,9 +255,7 @@ function VersionHistoryList({
       {versions.map((version, index) => {
         // If currentVersionId is provided, use it to determine which is current
         // Otherwise fall back to the first (latest) version
-        const isCurrent = currentVersionId
-          ? version.versionId === currentVersionId
-          : index === 0;
+        const isCurrent = currentVersionId ? version.versionId === currentVersionId : index === 0;
 
         return (
           <VersionHistoryItem
@@ -277,21 +275,10 @@ function VersionHistoryList({
 /**
  * Trigger button for the version history popover
  */
-function VersionHistoryTrigger({
-  onClick,
-  label,
-}: {
-  onClick?: () => void;
-  label?: string;
-}) {
+function VersionHistoryTrigger({ onClick, label }: { onClick?: () => void; label?: string }) {
   return (
     <Popover.Trigger asChild onClick={onClick}>
-      <Button
-        variant="ghost"
-        color="fg.muted"
-        minWidth={0}
-        data-testid="version-history-button"
-      >
+      <Button variant="ghost" color="fg.muted" minWidth={0} data-testid="version-history-button">
         <HistoryIcon size={16} />
         {label && <Text>{label}</Text>}
       </Button>

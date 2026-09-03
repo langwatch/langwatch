@@ -38,7 +38,7 @@ export type Scenario = {
   judgeModel: string | null;
   maxTurns: number | null;
   minTurns: number | null;
-  folderId: string | null;
+  testSuiteId: string | null;
   version: number;
   lastUpdatedById: string | null;
   archivedAt: Date | null;
@@ -46,7 +46,7 @@ export type Scenario = {
   updatedAt: Date;
 };
 
-/** A run plan or a folder — `kind` is which. */
+/** A run plan or a test suite — `kind` is which. */
 export type SimulationSuite = {
   id: string;
   projectId: string;

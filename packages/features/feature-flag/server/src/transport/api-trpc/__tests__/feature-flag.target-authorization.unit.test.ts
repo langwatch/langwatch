@@ -6,10 +6,7 @@
 import type { AuthzService } from "@langwatch/authz-contract";
 import { TrpcRootDefinition } from "@langwatch/api/trpc";
 import { beforeEach, describe, expect, it, vi } from "vitest";
-import {
-  FeatureFlagTrpcApi,
-  type FeatureFlagTrpcContext,
-} from "../feature-flag.api";
+import { FeatureFlagTrpcApi, type FeatureFlagTrpcContext } from "../feature-flag.api";
 import { MemoryFeatureFlagService } from "../../../testing";
 
 const USER_ID = "user_1";
@@ -32,8 +29,9 @@ function buildCaller() {
   featureFlags.setFlag(FLAG, true);
   const hasPermission = vi.fn(async (_check: PermissionCheck): Promise<boolean> => true);
   const getOrganizationId = vi.fn(async (_projectId: string): Promise<string> => ORGANIZATION_ID);
-  const isMember = vi.fn(
-    async (_input: { organizationId: string; userId: string }): Promise<boolean> => true,
+  const memberOrganizationIds = vi.fn(
+    async (input: { userId: string; organizationIds: string[] }): Promise<string[]> =>
+      input.organizationIds,
   );
   const permissions: Pick<AuthzService, "hasPermission"> = { hasPermission };
   const context: FeatureFlagTrpcContext = {
@@ -41,7 +39,7 @@ function buildCaller() {
       featureFlags,
       permissions,
       projects: { getOrganizationId },
-      organizations: { isMember },
+      organizations: { memberOrganizationIds },
     },
     actor: () => ({ id: USER_ID }),
   };

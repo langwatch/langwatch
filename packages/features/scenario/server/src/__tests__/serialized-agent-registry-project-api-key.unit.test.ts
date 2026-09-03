@@ -22,6 +22,7 @@
 import { AgentRole, type AgentInput } from "@langwatch/scenario";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
+import { guardAgainstGlobalFetch } from "./support/global-fetch-guard";
 import type {
   CodeAgentData,
   HttpAgentData,
@@ -30,8 +31,19 @@ import type {
 } from "@langwatch/scenario-contract";
 import { createAdapter } from "../index";
 
-const mockFetch = vi.fn();
-vi.stubGlobal("fetch", mockFetch);
+// The workflow and code adapters call undici's own fetch, so that export is
+// the interception point. Hoisted, because the vi.mock factory below is
+// hoisted above this file.
+const mockFetch = vi.hoisted(() => vi.fn());
+
+vi.mock("undici", async () => {
+  const actual = await vi.importActual<typeof import("undici")>("undici");
+  return { ...actual, fetch: mockFetch };
+});
+
+// Pointing the global fetch at the same mock would let a regression back to it
+// pass this suite.
+guardAgainstGlobalFetch();
 
 const scenarioConfig = {
   name: "Registry test scenario",

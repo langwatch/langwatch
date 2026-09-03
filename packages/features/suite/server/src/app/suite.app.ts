@@ -2,7 +2,7 @@
  * The suite feature's application: what both of its doors call.
  *
  * It holds every service the feature reaches — suites themselves, the scenario
- * folders that ARE suites of kind "folder", the project's owning organization,
+ * test suites that ARE suites of kind "test_suite", the project's owning organization,
  * and the run summaries the suite list renders — and it is the one typed thing
  * a transport is given. The `SuiteApplication` type it replaces described the
  * same four capabilities, but it was a bag: any door could reach into it and
@@ -11,12 +11,12 @@
  * What lives here as an operation is what both doors were assembling for
  * themselves:
  *
- *   - **a suite id might name a folder.** "Try the suite, fall back to the
- *     folder, and if neither is there it is not there" was written out twice,
+ *   - **a suite id might name a test suite.** "Try the suite, fall back to the
+ *     test suite, and if neither is there it is not there" was written out twice,
  *     once per door, and a third writing would have been a third chance to get
  *     the fallback order wrong.
- *   - **a folder is not a run plan.** An update that names a scope or a member
- *     list is refused for a folder and accepted for a suite. Both doors made
+ *   - **a test suite is not a run plan.** An update that names a scope or a member
+ *     list is refused for a test suite and accepted for a suite. Both doors made
  *     that decision, in two copies of the same three branches.
  *   - **resolving the project's organization.** Three call sites, three
  *     hand-built "Organization not found for project" refusals.
@@ -29,9 +29,9 @@ import { HandledError, ValidationError } from "@langwatch/handled-error";
 import type { ProjectService } from "@langwatch/project-contract";
 import { jsonValueSchema } from "@langwatch/scenario-contract";
 import type {
-  ScenarioFolder,
-  ScenarioFolderCreateInput,
-  ScenarioFolderIdInput,
+  ScenarioTestSuite,
+  ScenarioTestSuiteCreateInput,
+  ScenarioTestSuiteIdInput,
   ScenarioService,
   SimulationExternalSetSummary,
   SimulationProjectDateRangeInput,
@@ -73,13 +73,13 @@ export class OrganizationNotFoundForProjectError extends HandledError {
 }
 
 /**
- * What a lookup by id found. A folder IS a suite of kind "folder", but the two
+ * What a lookup by id found. A test suite IS a suite of kind "test_suite", but the two
  * are stored and shaped differently, so the application says which it found
  * and each door renders it the way its own wire contract always has.
  */
-export type SuiteOrFolder =
+export type SuiteOrTestSuite =
   | Readonly<{ kind: "suite"; suite: Suite }>
-  | Readonly<{ kind: "folder"; folder: ScenarioFolder }>;
+  | Readonly<{ kind: "test_suite"; testSuite: ScenarioTestSuite }>;
 
 /** What the process composes this feature's application from. */
 export interface SuiteAppDependencies {
@@ -103,32 +103,32 @@ export class SuiteApp {
     return this.dependencies.suites.list(input);
   }
 
-  /** The project's test-suite folders. */
-  listFolders(input: { projectId: string }): Promise<ScenarioFolder[]> {
-    return this.dependencies.scenarios.listFolders(input);
+  /** The project's test-suite testSuites. */
+  listTestSuites(input: { projectId: string }): Promise<ScenarioTestSuite[]> {
+    return this.dependencies.scenarios.listTestSuites(input);
   }
 
   /**
    * One suite by id, whichever kind it turns out to be.
    *
    * The fallback order is the decision: a run plan is looked up first and a
-   * folder second, so an id that names both — which cannot happen today, and
+   * test suite second, so an id that names both — which cannot happen today, and
    * would be a data fault if it ever did — resolves the same way at every
    * door. Refuses with {@link SuiteNotFoundError} when neither is there.
    */
-  async getByIdOrFolder(input: SuiteIdInput): Promise<SuiteOrFolder> {
+  async getByIdOrTestSuite(input: SuiteIdInput): Promise<SuiteOrTestSuite> {
     try {
       return { kind: "suite", suite: await this.dependencies.suites.get(input) };
     } catch (error) {
       if (!(error instanceof SuiteNotFoundError)) throw error;
     }
 
-    const folder = await this.dependencies.scenarios.tryGetFolder({
-      folderId: input.id,
+    const testSuite = await this.dependencies.scenarios.tryGetTestSuite({
+      testSuiteId: input.id,
       projectId: input.projectId,
     });
-    if (!folder) throw new SuiteNotFoundError(input.id);
-    return { kind: "folder", folder };
+    if (!testSuite) throw new SuiteNotFoundError(input.id);
+    return { kind: "test_suite", testSuite };
   }
 
   /** The names archived scenarios and targets had when a run referenced them. */
@@ -153,45 +153,48 @@ export class SuiteApp {
     return this.dependencies.suites.create(input);
   }
 
-  /** A new, empty test-suite folder. */
-  createFolder(input: ScenarioFolderCreateInput): Promise<ScenarioFolder> {
-    return this.dependencies.scenarios.createFolder(input);
+  /** A new, empty test-suite test suite. */
+  createTestSuite(input: ScenarioTestSuiteCreateInput): Promise<ScenarioTestSuite> {
+    return this.dependencies.scenarios.createTestSuite(input);
   }
 
   /**
    * Updates one suite, whichever kind it turns out to be.
    *
-   * A folder runs the test cases filed in it, so it takes no scope and no
+   * A test suite runs the test cases filed in it, so it takes no scope and no
    * member list; naming either is refused rather than silently dropped. Both
    * doors made that call for themselves, in two copies of the same three
    * branches, and the copies had to be read side by side to see they agreed.
    */
-  async update(input: UpdateSuiteCommand): Promise<SuiteOrFolder> {
-    const folder = await this.dependencies.scenarios.tryGetFolder({
-      folderId: input.id,
+  async update(input: UpdateSuiteCommand): Promise<SuiteOrTestSuite> {
+    const testSuite = await this.dependencies.scenarios.tryGetTestSuite({
+      testSuiteId: input.id,
       projectId: input.projectId,
     });
-    if (!folder) {
+    if (!testSuite) {
       return { kind: "suite", suite: await this.dependencies.suites.update(input) };
     }
 
     if (input.scope !== undefined) throw new SuiteScopeNotAllowedError();
     if (input.scenarioIds !== undefined) {
-      throw new ValidationError("A folder's scenarios are managed by filing scenarios into it", {
-        meta: {
-          fieldErrors: {
-            scenarioIds: ["A folder's scenarios are managed by filing scenarios into it"],
+      throw new ValidationError(
+        "A test suite's scenarios are managed by filing scenarios into it",
+        {
+          meta: {
+            fieldErrors: {
+              scenarioIds: ["A test suite's scenarios are managed by filing scenarios into it"],
+            },
           },
         },
-      });
+      );
     }
 
-    const updated = await this.dependencies.scenarios.updateFolder({
-      folderId: input.id,
+    const updated = await this.dependencies.scenarios.updateTestSuite({
+      testSuiteId: input.id,
       projectId: input.projectId,
       ...(input.name === undefined ? {} : { name: input.name }),
       ...(input.description === undefined ? {} : { description: input.description }),
-      // A folder stores its targets as opaque JSON, and a suite target carries
+      // A test suite stores its targets as opaque JSON, and a suite target carries
       // an `unknown` `runParameters`. Parsed rather than cast, because that is
       // the claim the scenario contract makes about what it is storing.
       ...(input.targets === undefined
@@ -202,7 +205,7 @@ export class SuiteApp {
       ...(input.simulatorModel === undefined ? {} : { simulatorModel: input.simulatorModel }),
       ...(input.judgeModel === undefined ? {} : { judgeModel: input.judgeModel }),
     });
-    return { kind: "folder", folder: updated };
+    return { kind: "test_suite", testSuite: updated };
   }
 
   /** Copies a run plan, leaving the source untouched. */
@@ -215,14 +218,14 @@ export class SuiteApp {
     return this.dependencies.suites.archive(input);
   }
 
-  /** Archives a folder, and every test case filed in it, in one transaction. */
-  archiveFolder(input: ScenarioFolderIdInput): Promise<ScenarioFolder> {
-    return this.dependencies.scenarios.archiveFolder(input);
+  /** Archives a test suite, and every test case filed in it, in one transaction. */
+  archiveTestSuite(input: ScenarioTestSuiteIdInput): Promise<ScenarioTestSuite> {
+    return this.dependencies.scenarios.archiveTestSuite(input);
   }
 
-  /** Renames a folder. */
-  renameFolder(input: ScenarioFolderIdInput & { name: string }): Promise<ScenarioFolder> {
-    return this.dependencies.scenarios.renameFolder(input);
+  /** Renames a test suite. */
+  renameTestSuite(input: ScenarioTestSuiteIdInput & { name: string }): Promise<ScenarioTestSuite> {
+    return this.dependencies.scenarios.renameTestSuite(input);
   }
 
   // -- runs ------------------------------------------------------------------

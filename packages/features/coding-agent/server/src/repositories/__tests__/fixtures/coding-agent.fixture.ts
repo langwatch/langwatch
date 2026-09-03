@@ -201,6 +201,12 @@ export class TestSessions extends CodingAgentSessionRepository {
   rows: CodingAgentSession[] = [];
   recentRowsByTenant = new Map<string, CodingAgentSession[]>();
   branchRows: CodingAgentSessionBranchRecord[] = [];
+  bySessionIdRows: CodingAgentSessionBranchRecord[] = [];
+  bySessionIdInputs: Array<{
+    tenantIds: string[];
+    sessionIds: string[];
+    startedAtFromMs: number;
+  }> = [];
   missWhenWindowed = false;
   findInputs: Array<{
     tenantId: string;
@@ -297,6 +303,15 @@ export class TestSessions extends CodingAgentSessionRepository {
     this.branchInputs.push(input);
     return this.branchRows;
   }
+
+  async listBySessionIds(input: {
+    tenantIds: string[];
+    sessionIds: string[];
+    startedAtFromMs: number;
+  }): Promise<CodingAgentSessionBranchRecord[]> {
+    this.bySessionIdInputs.push(input);
+    return this.bySessionIdRows;
+  }
 }
 
 export class TestTraceSessions extends CodingAgentTraceSessionRepository {
@@ -354,6 +369,10 @@ export class TestEvents extends CodingAgentSessionEventRepository {
     tenantId: string;
     sessionId: string;
     model: string;
+    repositoryHost: string;
+    repositoryOwner: string;
+    repositoryName: string;
+    branch: string;
     inputTokens: number;
     outputTokens: number;
     cacheReadTokens: number;
@@ -363,6 +382,15 @@ export class TestEvents extends CodingAgentSessionEventRepository {
   modelTotalInputs: Array<{
     tenantIds: string[];
     sessionIds: string[];
+    fromMs: number;
+  }> = [];
+  stampedSessions: Array<{ tenantId: string; sessionId: string }> = [];
+  stampedInputs: Array<{
+    tenantIds: string[];
+    repositoryHost: string;
+    repositoryOwner: string;
+    repositoryName: string;
+    branches: string[];
     fromMs: number;
   }> = [];
 
@@ -389,6 +417,10 @@ export class TestEvents extends CodingAgentSessionEventRepository {
       tenantId: string;
       sessionId: string;
       model: string;
+      repositoryHost: string;
+      repositoryOwner: string;
+      repositoryName: string;
+      branch: string;
       inputTokens: number;
       outputTokens: number;
       cacheReadTokens: number;
@@ -398,6 +430,18 @@ export class TestEvents extends CodingAgentSessionEventRepository {
   > {
     this.modelTotalInputs.push(input);
     return this.modelTotals;
+  }
+
+  async listSessionsByStampedBranch(input: {
+    tenantIds: string[];
+    repositoryHost: string;
+    repositoryOwner: string;
+    repositoryName: string;
+    branches: string[];
+    fromMs: number;
+  }): Promise<Array<{ tenantId: string; sessionId: string }>> {
+    this.stampedInputs.push(input);
+    return this.stampedSessions;
   }
 }
 

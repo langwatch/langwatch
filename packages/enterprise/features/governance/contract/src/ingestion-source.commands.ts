@@ -18,6 +18,35 @@ export const GOVERNANCE_INGESTION_SOURCE_TYPES = [
 export const governanceIngestionSourceTypeSchema = z.enum(GOVERNANCE_INGESTION_SOURCE_TYPES);
 export type GovernanceIngestionSourceType = z.infer<typeof governanceIngestionSourceTypeSchema>;
 
+/**
+ * The source types that receive inbound pushes, and therefore the only ones
+ * that have an ingest secret at all.
+ *
+ * A pull-mode or pure-S3 source authenticates OUTBOUND — it dials the vendor
+ * with the vendor's own credential and is never dialled back — so an `lw_is_*`
+ * secret minted for one was generated, hashed, stored and shown in a modal
+ * without ever authenticating anything. `s3_custom` is the exception, because
+ * it is told about new objects over the webhook callback path, and that path
+ * is authenticated by the ingest secret.
+ *
+ * The browser's own catalogue carries the same classification as
+ * `needsIngestSecret`, because a React bundle may not import this package's
+ * server half; `pushSourceTypeParity.unit.test.ts` is what keeps the two in
+ * step.
+ */
+const PUSH_SOURCE_TYPES: ReadonlySet<string> = new Set([
+  "otel_generic",
+  "claude_code",
+  "claude_cowork",
+  "workato",
+  // The webhook callback path, authenticated by the ingest secret.
+  "s3_custom",
+]);
+
+export function isPushSourceType({ sourceType }: { sourceType: string }): boolean {
+  return PUSH_SOURCE_TYPES.has(sourceType);
+}
+
 export const governanceIngestionSourceSchema = z
   .object({
     id: z.string(),
@@ -80,7 +109,12 @@ export type UpdateGovernanceIngestionSourceCommand = z.infer<
 export const createdGovernanceIngestionSourceSchema = z
   .object({
     source: governanceIngestionSourceSchema,
-    ingestSecret: z.string(),
+    /**
+     * The raw secret, exposed exactly once at creation and never persisted.
+     * Null for a source type that receives no inbound push and therefore has
+     * no secret to expose — see {@link isPushSourceType}.
+     */
+    ingestSecret: z.string().nullable(),
   })
   .strict();
 export type CreatedGovernanceIngestionSource = z.infer<

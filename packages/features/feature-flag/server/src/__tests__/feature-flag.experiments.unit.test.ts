@@ -16,7 +16,7 @@ import {
 import { describe, expect, it } from "vitest";
 import { createInMemoryFeatureFlagService } from "../testing";
 
-const FLAG = "release_ui_navigation_v2_enabled";
+const FLAG = "release_ui_agent_testing_v2_enabled";
 const NOT_AN_EXPERIMENT = "release_ui_ai_gateway_menu_enabled";
 const USER_ID = "user_1";
 const PROJECT_ID = "project_1";

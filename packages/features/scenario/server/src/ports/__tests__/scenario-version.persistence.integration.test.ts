@@ -18,7 +18,7 @@ import { randomUUID } from "node:crypto";
 import { afterAll, beforeAll, beforeEach, describe, expect, it } from "vitest";
 import { PrismaScenarioAdapter } from "../../index";
 import { ScenarioClockPort } from "../scenario-clock.port";
-import { ScenarioFolderIdPort, ScenarioIdPort } from "../scenario-id.port";
+import { ScenarioTestSuiteIdPort, ScenarioIdPort } from "../scenario-id.port";
 import { ScenarioSecretCipherPort } from "../scenario-secret-cipher.port";
 
 class AllowTestQueries extends PrismaQueryGuard {
@@ -33,9 +33,9 @@ class ScenarioIds extends ScenarioIdPort {
   }
 }
 
-class FolderIds extends ScenarioFolderIdPort {
+class TestSuiteIds extends ScenarioTestSuiteIdPort {
   next(): string {
-    return `folder_${randomUUID()}`;
+    return `test_suite_${randomUUID()}`;
   }
 }
 
@@ -145,7 +145,7 @@ describe.skipIf(!databaseUrl)("Scenario version persistence", () => {
       prisma: db,
       simulations: Object.create(SimulationService.prototype) as SimulationService,
       ids: new ScenarioIds(),
-      folderIds: new FolderIds(),
+      testSuiteIds: new TestSuiteIds(),
       clock: new TestClock(),
       secretCipher: new TestSecretCipher(),
     });
@@ -238,17 +238,17 @@ describe.skipIf(!databaseUrl)("Scenario version persistence", () => {
   });
 
   it("does not create versions for filing, refiling or unfiling", async () => {
-    const firstFolder = await scenarios.createFolder({ projectId, name: "Refunds" });
-    const secondFolder = await scenarios.createFolder({ projectId, name: "Checkout" });
+    const firstTestSuite = await scenarios.createTestSuite({ projectId, name: "Refunds" });
+    const secondTestSuite = await scenarios.createTestSuite({ projectId, name: "Checkout" });
     const scenario = await createScenario();
 
-    for (const folderId of [firstFolder.id, secondFolder.id, null]) {
-      await scenarios.moveToFolder({ projectId, scenarioId: scenario.id, folderId });
+    for (const testSuiteId of [firstTestSuite.id, secondTestSuite.id, null]) {
+      await scenarios.moveToTestSuite({ projectId, scenarioId: scenario.id, testSuiteId });
     }
 
     await expect(scenarios.getById({ id: scenario.id, projectId })).resolves.toMatchObject({
       version: 1,
-      folderId: null,
+      testSuiteId: null,
     });
     await expect(
       scenarios.listVersions({ projectId, scenarioId: scenario.id }),
@@ -345,14 +345,14 @@ describe.skipIf(!databaseUrl)("Scenario version persistence", () => {
   });
 
   it("starts a duplicate at v1 with its own history and the current content", async () => {
-    const folder = await scenarios.createFolder({ projectId, name: "Refunds" });
+    const testSuite = await scenarios.createTestSuite({ projectId, name: "Refunds" });
     const scenario = await scenarios.create({
       projectId,
       name: "Refund flow",
       situation: "situation v1",
       criteria: ["The agent helps"],
       labels: [],
-      folderId: folder.id,
+      testSuiteId: testSuite.id,
     });
     await scenarios.update({ id: scenario.id, projectId, situation: "edited before copy" });
 
@@ -370,7 +370,7 @@ describe.skipIf(!databaseUrl)("Scenario version persistence", () => {
     expect(duplicate).toMatchObject({
       name: "Refund flow (copy)",
       situation: "edited before copy",
-      folderId: folder.id,
+      testSuiteId: testSuite.id,
       version: 1,
     });
     expect(history).toMatchObject({
@@ -380,15 +380,15 @@ describe.skipIf(!databaseUrl)("Scenario version persistence", () => {
     expect(version.fields.situation).toBe("edited before copy");
   });
 
-  it("restores content forward, preserves its folder and can restore the prior content again", async () => {
-    const folder = await scenarios.createFolder({ projectId, name: "Refunds" });
+  it("restores content forward, preserves its test suite and can restore the prior content again", async () => {
+    const testSuite = await scenarios.createTestSuite({ projectId, name: "Refunds" });
     const scenario = await scenarios.create({
       projectId,
       name: "Refund flow",
       situation: "situation v1",
       criteria: [],
       labels: [],
-      folderId: folder.id,
+      testSuiteId: testSuite.id,
     });
     for (const version of [2, 3, 4, 5]) {
       await scenarios.update({
@@ -417,9 +417,17 @@ describe.skipIf(!databaseUrl)("Scenario version persistence", () => {
     });
     const history = await scenarios.listVersions({ projectId, scenarioId: scenario.id });
 
-    expect(restored).toMatchObject({ situation: "situation v2", folderId: folder.id, version: 6 });
+    expect(restored).toMatchObject({
+      situation: "situation v2",
+      testSuiteId: testSuite.id,
+      version: 6,
+    });
     expect(originalLatest.fields.situation).toBe("situation v5");
-    expect(undone).toMatchObject({ situation: "situation v5", folderId: folder.id, version: 7 });
+    expect(undone).toMatchObject({
+      situation: "situation v5",
+      testSuiteId: testSuite.id,
+      version: 7,
+    });
     expect(history.versions.slice(0, 2)).toMatchObject([
       { version: 7, changeDescription: "Restored from v5", authorLabel: "api" },
       {

@@ -224,6 +224,7 @@ type OrganizationContractService = Pick<
   // membership, asked by the feature-flag resolver before it widens a
   // project-scoped read into an organization-scoped one
   | "isMember"
+  | "memberOrganizationIds"
   // groups
   | "getBillingProfile"
   | "getTeam"
@@ -355,6 +356,17 @@ export class OrganizationApp {
    */
   isMember(input: { organizationId: string; userId: string }): Promise<boolean> {
     return this.dependencies.organizations.isMember(input);
+  }
+
+  /**
+   * Which of the named organizations this person belongs to.
+   *
+   * The batched form of the door above, for the feature-flag resolver: the
+   * workspace switcher asks a flag for every organization it lists, and one
+   * membership query per row is a query per row on a list page.
+   */
+  memberOrganizationIds(input: { userId: string; organizationIds: string[] }): Promise<string[]> {
+    return this.dependencies.organizations.memberOrganizationIds(input);
   }
 
   /** One organization with its members and each member's teams. */

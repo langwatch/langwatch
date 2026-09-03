@@ -8,10 +8,14 @@
 import { ChakraProvider, defaultSystem } from "@chakra-ui/react";
 import { act, cleanup, fireEvent, render, screen } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
-import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import { afterEach, beforeAll, beforeEach, describe, expect, it, vi } from "vitest";
 
 // The empty states carry the Setup via Agent menu, whose langy hooks need
 // app context these tests do not build; the control has its own tests.
+vi.mock("posthog-js", () => ({
+  default: { capture: vi.fn() },
+}));
+
 vi.mock("@langwatch/trace-web/components/SetupWithAgentButton", () => ({
   SetupWithAgentButton: () => null,
 }));
@@ -34,6 +38,11 @@ let capturedArchiveOnSuccess: (() => void) | undefined;
 
 vi.mock("../../../../behavior/scenario-api", () => ({
   api: {
+    featureFlag: {
+      isEnabled: {
+        useQuery: () => ({ data: { enabled: false }, isLoading: false }),
+      },
+    },
     useUtils: () => ({
       suites: {
         getAll: { invalidate: vi.fn() },
@@ -168,6 +177,14 @@ const Wrapper = ({ children }: { children: React.ReactNode }) => (
 );
 
 describe("All Runs default selection (Issue #1771)", () => {
+  let SimulationsPage: React.ComponentType;
+
+  // The page drags the whole suites graph behind it, and a cold transform of it
+  // costs more than a test's own budget. It is imported once for the file.
+  beforeAll(async () => {
+    SimulationsPage = (await import("../simulations-page")).default;
+  }, 60_000);
+
   beforeEach(() => {
     mockRouterQuery = { project: "my-project" };
     mockPush.mockClear();
@@ -185,9 +202,6 @@ describe("All Runs default selection (Issue #1771)", () => {
     it("selects 'All Runs' as the default sidebar item and displays the All Runs panel", async () => {
       mockRouterQuery = { project: "my-project" };
 
-      const { default: SimulationsPage } =
-        await import("../simulations-page");
-
       render(<SimulationsPage />, { wrapper: Wrapper });
 
       expect(screen.getByTestId("all-runs-panel")).toBeInTheDocument();
@@ -204,9 +218,6 @@ describe("All Runs default selection (Issue #1771)", () => {
         project: "my-project",
         path: ["run-plans", "my-suite"],
       };
-
-      const { default: SimulationsPage } =
-        await import("../simulations-page");
 
       render(<SimulationsPage />, { wrapper: Wrapper });
 

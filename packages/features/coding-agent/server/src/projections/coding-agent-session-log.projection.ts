@@ -3,6 +3,8 @@ import {
   LOGS_ONLY_AGENT_IDS,
   WRAPPER_TOOL_NAMES_BY_AGENT_ID,
   normalizeEventName,
+  SESSION_CONTEXT_ATTR,
+  SESSION_CONTEXT_EVENT,
   SESSION_NAME_FACT_KEY,
   SESSION_TITLE_FACT_KEY,
   SESSION_TITLE_FALLBACK_FACT_KEY,
@@ -35,13 +37,9 @@ const CLAUDE = {
 } as const;
 const CODEX = { EVENT: { TURN_TTFT: "turn_ttft" } } as const;
 const LANGWATCH = {
-  EVENT: { SESSION_CONTEXT: "session_context" },
+  EVENT: { SESSION_CONTEXT: SESSION_CONTEXT_EVENT },
   ATTR: {
-    REPOSITORY_HOST: "vcs.repository.host",
-    REPOSITORY_OWNER: "vcs.repository.owner",
-    REPOSITORY_NAME: "vcs.repository.name",
-    BRANCH: "vcs.ref.head.name",
-    WORKTREE: "vcs.worktree.name",
+    ...SESSION_CONTEXT_ATTR,
     TITLE: SESSION_TITLE_FACT_KEY,
     TITLE_FALLBACK: SESSION_TITLE_FALLBACK_FACT_KEY,
     NAME: SESSION_NAME_FACT_KEY,
@@ -152,12 +150,14 @@ export class CodingAgentSessionLogProjection {
         });
 
       case LANGWATCH.EVENT.SESSION_CONTEXT: {
-        // Repository identity and worktree are once-set: a session is one
-        // checkout, so the first answer stands. The branch is the exception:
-        // it moves during a session, and the branch a session ENDS on is the
-        // one its pull request comes from. Every branch it passed through joins
-        // the set as well, because a session that moves on has still driven the
-        // branch it left, and the pull request it opened there.
+        // Everything here is present tense, last write wins: a resumed session
+        // moves between branches, worktrees and even repositories, and the row
+        // answers where it is NOW. Per-branch history lives on the fact rows
+        // (the contribute command stamps each one with the context active when
+        // it happened), so nothing is lost by letting the scalars move. Every
+        // branch the session passed through also joins the set, because a
+        // session that moves on has still driven the branch it left, and the
+        // pull request it opened there.
         const branch = this.stateProjection.string(attrs[LANGWATCH.ATTR.BRANCH]);
         // Two titles can ride the record. The context title is the codex
         // harvest's prompt-derived name (codex withholds prompt text from its
@@ -177,16 +177,16 @@ export class CodingAgentSessionLogProjection {
         return {
           ...named,
           repositoryHost:
-            base.repositoryHost ??
-            this.stateProjection.string(attrs[LANGWATCH.ATTR.REPOSITORY_HOST]),
+            this.stateProjection.string(attrs[LANGWATCH.ATTR.REPOSITORY_HOST]) ??
+            base.repositoryHost,
           repositoryOwner:
-            base.repositoryOwner ??
-            this.stateProjection.string(attrs[LANGWATCH.ATTR.REPOSITORY_OWNER]),
+            this.stateProjection.string(attrs[LANGWATCH.ATTR.REPOSITORY_OWNER]) ??
+            base.repositoryOwner,
           repositoryName:
-            base.repositoryName ??
-            this.stateProjection.string(attrs[LANGWATCH.ATTR.REPOSITORY_NAME]),
+            this.stateProjection.string(attrs[LANGWATCH.ATTR.REPOSITORY_NAME]) ??
+            base.repositoryName,
           gitWorktree:
-            base.gitWorktree ?? this.stateProjection.string(attrs[LANGWATCH.ATTR.WORKTREE]),
+            this.stateProjection.string(attrs[LANGWATCH.ATTR.WORKTREE]) ?? base.gitWorktree,
           gitBranch: branch ?? base.gitBranch,
           gitBranches:
             branch !== null

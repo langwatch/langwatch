@@ -71,7 +71,6 @@ export {
 export {
   broadcastUiScopeWrite,
   readUiScopeMemory,
-  UI_LAST_VISITED_HOME_KIND_KEY,
   UI_SELECTED_ORGANIZATION_ID_KEY,
   UI_SELECTED_PROJECT_SLUG_KEY,
   UI_SELECTED_TEAM_ID_KEY,

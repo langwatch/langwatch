@@ -102,6 +102,10 @@ describe("Coding Agent pull-request usage", () => {
         tenantId: "project-1",
         sessionId: "in-pr",
         model: "claude-3",
+        repositoryHost: "",
+        repositoryOwner: "",
+        repositoryName: "",
+        branch: "",
         inputTokens: 10,
         outputTokens: 20,
         cacheReadTokens: 30,
@@ -112,6 +116,10 @@ describe("Coding Agent pull-request usage", () => {
         tenantId: "project-2",
         sessionId: "unpriced",
         model: "gpt-4",
+        repositoryHost: "",
+        repositoryOwner: "",
+        repositoryName: "",
+        branch: "",
         inputTokens: 1,
         outputTokens: 2,
         cacheReadTokens: 0,
@@ -177,10 +185,14 @@ describe("Coding Agent pull-request usage", () => {
         tokensKnown: true,
       }),
     ]);
+    // Every candidate the repository read returned, not only the ones the
+    // tenure rule attaches: the proportional split needs a session's WHOLE
+    // event history to size the share, including the tokens it spent
+    // elsewhere, so the fact read runs before attribution rather than after.
     expect(events.modelTotalInputs).toEqual([
       {
         tenantIds: ["project-1", "project-2"],
-        sessionIds: ["in-pr", "unpriced"],
+        sessionIds: ["in-pr", "unpriced", "after-merge"],
         fromMs: TEST_NOW_MS - USAGE_SESSION_WINDOW_MS,
       },
     ]);

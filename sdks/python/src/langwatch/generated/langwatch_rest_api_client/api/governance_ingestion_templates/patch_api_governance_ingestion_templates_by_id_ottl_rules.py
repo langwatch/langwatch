@@ -121,7 +121,7 @@ def _build_response(
 def sync_detailed(
     id: str,
     *,
-    client: AuthenticatedClient | Client,
+    client: AuthenticatedClient,
 ) -> Response[
     PatchApiGovernanceIngestionTemplatesByIdOttlRulesResponse200
     | PatchApiGovernanceIngestionTemplatesByIdOttlRulesResponse400
@@ -161,7 +161,7 @@ def sync_detailed(
 def sync(
     id: str,
     *,
-    client: AuthenticatedClient | Client,
+    client: AuthenticatedClient,
 ) -> (
     PatchApiGovernanceIngestionTemplatesByIdOttlRulesResponse200
     | PatchApiGovernanceIngestionTemplatesByIdOttlRulesResponse400
@@ -197,7 +197,7 @@ def sync(
 async def asyncio_detailed(
     id: str,
     *,
-    client: AuthenticatedClient | Client,
+    client: AuthenticatedClient,
 ) -> Response[
     PatchApiGovernanceIngestionTemplatesByIdOttlRulesResponse200
     | PatchApiGovernanceIngestionTemplatesByIdOttlRulesResponse400
@@ -235,7 +235,7 @@ async def asyncio_detailed(
 async def asyncio(
     id: str,
     *,
-    client: AuthenticatedClient | Client,
+    client: AuthenticatedClient,
 ) -> (
     PatchApiGovernanceIngestionTemplatesByIdOttlRulesResponse200
     | PatchApiGovernanceIngestionTemplatesByIdOttlRulesResponse400

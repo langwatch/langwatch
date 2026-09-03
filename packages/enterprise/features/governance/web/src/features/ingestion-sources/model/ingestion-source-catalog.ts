@@ -166,6 +166,49 @@ export const SOURCE_TYPE_LABEL: Record<SourceType, string> = Object.fromEntries(
   SOURCE_TYPE_OPTIONS.map((o) => [o.value, o.label]),
 ) as Record<SourceType, string>;
 
+export const PROTOCOL_LABEL: Record<SourceMode, string> = {
+  push: "OTel push",
+  pull: "API pull",
+  s3: "S3 pull",
+};
+
+export function modeForSourceType({ sourceType }: { sourceType: SourceType }): SourceMode {
+  return SOURCE_TYPE_OPTIONS.find((o) => o.value === sourceType)?.mode ?? "pull";
+}
+
+export function needsIngestSecret({ sourceType }: { sourceType: SourceType }): boolean {
+  const opt = SOURCE_TYPE_OPTIONS.find((o) => o.value === sourceType);
+  if (!opt) return true;
+  return opt.mode === "push" || sourceType === "s3_custom";
+}
+
+// Compile-time guard: routing runs inside `writePulledEvents`
+// (`pullers/pullerWorker.ts:325`), which nothing on the push path ever calls.
+// A push-mode entry claiming `routesConversations` would put a picker in the
+// drawer that changes nothing a customer can observe, so it stops the build
+// here rather than shipping a dead control. Bracketed so the `never` case
+// does not go vacuously true.
+type PushTypeClaimingConversations = Extract<
+  (typeof SOURCE_TYPE_OPTIONS)[number],
+  { mode: "push"; routesConversations: true }
+>;
+const _noPushTypeRoutesConversations: [PushTypeClaimingConversations] extends [never]
+  ? true
+  : never = true;
+void _noPushTypeRoutesConversations;
+
+/**
+ * Whether a source of this type produces conversations that land in a trace
+ * destination — and therefore whether the drawers should offer a destination
+ * picker at all.
+ *
+ * Today the answer is Genie alone, because the worker routes only events
+ * whose action is `genie_query` (`pullers/genieTraceMapper.ts:239`). That gate
+ * lives in server code this bundle must not import, so the two are kept in
+ * step by declaration plus test rather than by a shared constant — see
+ * `__tests__/conversationRoutingSourceTypes.unit.test.ts`. An adapter that
+ * starts emitting conversations must flip its entry here in the same change.
+ */
 export function routesConversations(sourceType: SourceType): boolean {
   const option = SOURCE_TYPE_OPTIONS.find((candidate) => candidate.value === sourceType);
   return option?.routesConversations === true;

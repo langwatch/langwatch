@@ -14,6 +14,9 @@ import { commandValidationError, reportCommandError } from "./errorOutput";
 /** The value types a run parameter may hold once read off the command line. */
 export type RunParameterValue = string | number | boolean;
 
+/** The type a parameter declares, which settles how its flag value is read. */
+export type RunParameterType = "string" | "number" | "boolean";
+
 /** The flag every run command reads its parameter values from. */
 export const PARAM_FLAG = "--param";
 
@@ -87,8 +90,30 @@ export const parseKeyValueFlags = ({
  * The round-trip check is what keeps `007`, `1.50` and a twenty-digit account
  * number as text: they are identifiers that merely look numeric, and handing
  * the run a number would change the value it was given.
+ *
+ * A declared type settles the guess: a string parameter keeps "007" as text,
+ * a number parameter reads "5" as 5 (and "007" as 7), and a boolean one reads
+ * `true` and `false`. Text that cannot be read as the declared type stays
+ * text, and the platform refuses it by name.
  */
-export const coerceParameterValue = (value: string): RunParameterValue => {
+export const coerceParameterValue = ({
+  value,
+  type,
+}: {
+  value: string;
+  /** The type the target declares for this name, when it declares one. */
+  type?: RunParameterType;
+}): RunParameterValue => {
+  if (type === "string") return value;
+  if (type === "number") {
+    const asNumber = Number(value);
+    return value.trim() !== "" && Number.isFinite(asNumber) ? asNumber : value;
+  }
+  if (type === "boolean") {
+    if (value === "true") return true;
+    if (value === "false") return false;
+    return value;
+  }
   if (value === "true") return true;
   if (value === "false") return false;
   const asNumber = Number(value);
@@ -105,8 +130,11 @@ export const coerceParameterValue = (value: string): RunParameterValue => {
  */
 export const parseRunParameterFlags = ({
   pairs,
+  types,
 }: {
   pairs: string[] | undefined;
+  /** The declared type of each name, when the target declares any. */
+  types?: ReadonlyMap<string, RunParameterType>;
 }): Record<string, RunParameterValue> | undefined => {
   if (pairs === undefined || pairs.length === 0) return undefined;
   // A Map for the same reason as above: assigning `__proto__` on an object
@@ -116,7 +144,7 @@ export const parseRunParameterFlags = ({
   const parsed = new Map<string, RunParameterValue>();
   for (const pair of pairs) {
     const { key, value } = splitPair({ pair, flag: PARAM_FLAG });
-    parsed.set(key, coerceParameterValue(value));
+    parsed.set(key, coerceParameterValue({ value, type: types?.get(key) }));
   }
   return Object.fromEntries(parsed);
 };

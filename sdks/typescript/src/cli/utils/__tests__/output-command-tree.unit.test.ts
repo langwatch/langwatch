@@ -55,6 +55,9 @@ describe("the real command tree", () => {
       ["analytics", "query"],
       ["trigger", "delete"],
       ["secret", "update"],
+      ["run-plan", "run"],
+      ["test-suite", "run"],
+      ["scenario", "run"],
     ];
 
     it.each(wired)(
@@ -70,14 +73,9 @@ describe("the real command tree", () => {
   });
 
   describe("when a command still prints its own output", () => {
-    // The commands that legitimately still print their own output because a
-    // format-blind port cannot serve them: a raw byte stream, and the two
-    // human-interactive `--wait` polls whose completion has no structured payload.
-    const unmigrated = [
-      ["dataset", "download"],
-      ["suite", "run"],
-      ["scenario", "run"],
-    ];
+    // The command that legitimately still prints its own output because a
+    // format-blind port cannot serve it: a raw byte stream.
+    const unmigrated = [["dataset", "download"]];
 
     it.each(unmigrated)("leaves `%s %s` unmarked", async (group, name) => {
       const { buildProgram } = await import("../../program.js");
@@ -154,10 +152,6 @@ describe("the real command tree", () => {
       // Raw byte stream / file destination: the payload is not a document.
       ["dataset download", "streams raw bytes to a file or stdout"],
       ["trace export", "writes its own jsonl/csv/json, to a file when asked"],
-
-      // Human-interactive `--wait` polls: no structured completion payload.
-      ["suite run", "human-interactive --wait poll"],
-      ["scenario run", "human-interactive --wait poll"],
 
       // A live session that runs until Ctrl-C: it produces status prose and
       // exits via process.exit, never a result document.

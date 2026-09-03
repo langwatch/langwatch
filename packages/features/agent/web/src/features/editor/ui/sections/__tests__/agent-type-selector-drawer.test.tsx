@@ -27,7 +27,7 @@ describe("AgentTypeSelectorDrawer", () => {
   it("renders the available agent types", () => {
     renderDrawer();
 
-    expect(screen.getByText("Choose Agent Type")).toBeTruthy();
+    expect(screen.getByText("Choose Agent Connection Type")).toBeTruthy();
     expect(screen.getByText("Code Agent")).toBeTruthy();
     expect(screen.getByText("Workflow Agent")).toBeTruthy();
     expect(screen.getByText("HTTP Agent")).toBeTruthy();

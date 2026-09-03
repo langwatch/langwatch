@@ -10,8 +10,9 @@ import {
 } from "@langwatch/api/rest";
 import { createLogger } from "@langwatch/observability";
 import {
-  ScenarioFolderNotFoundError,
-  type ScenarioFolder,
+  ScenarioTestSuiteNotFoundError,
+  type ScenarioTestSuite,
+  runActorFromRequest,
   runNoteSchema,
   runParameterValuesSchema,
 } from "@langwatch/scenario-contract";
@@ -19,18 +20,61 @@ import {
   isSuiteKind,
   type Suite,
   SuiteExecutionError,
+  type SuiteKind,
   SuiteNotFoundError,
-  suiteScopeSchema,
+  type SuiteScope,
   suiteTargetSchema,
 } from "@langwatch/suite-contract";
 import { describeRoute, resolver } from "hono-openapi";
 import { z } from "zod";
-import {
-  OrganizationNotFoundForProjectError,
-  type SuiteApp,
-} from "#app/suite.app";
+import { OrganizationNotFoundForProjectError, type SuiteApp } from "#app/suite.app";
 
 const logger = createLogger("langwatch:api:suites");
+
+/**
+ * What a run plan covers, in the words this family was published with.
+ *
+ * The domain calls these modes `test_suites` and `scenarios`. This family was
+ * published with `folders` and `cases`, so it answers and accepts those and
+ * maps at the boundary through {@link toDomainScope} and {@link toWireScope}.
+ * An integrator sees no change.
+ */
+const wireScopeSchema = z
+  .discriminatedUnion("mode", [
+    z.object({ mode: z.literal("all") }),
+    z.object({ mode: z.literal("folders"), folderIds: z.array(z.string()) }),
+    z.object({ mode: z.literal("labels"), labels: z.array(z.string()) }),
+    z.object({ mode: z.literal("cases") }),
+  ])
+  .describe(
+    "What the run plan covers: all (every active scenario), folders (the scenarios filed in the named test suites), labels (the scenarios carrying any of the labels), or cases (the scenarioIds below). A dynamic scope is resolved again at every run, so a scenario written later runs without editing the plan.",
+  );
+
+type WireScope = z.infer<typeof wireScopeSchema>;
+
+/** A scope this family accepted, as the domain reads it. */
+function toDomainScope(scope: WireScope): SuiteScope {
+  if (scope.mode === "folders") {
+    return { mode: "test_suites", testSuiteIds: scope.folderIds };
+  }
+  if (scope.mode === "cases") return { mode: "scenarios" };
+  return scope;
+}
+
+/** A stored scope, in the words this family answers with. */
+function toWireScope(scope: SuiteScope): WireScope {
+  if (scope.mode === "test_suites") {
+    return { mode: "folders", folderIds: scope.testSuiteIds };
+  }
+  if (scope.mode === "scenarios") return { mode: "cases" };
+  return scope;
+}
+
+/** The suite kinds this family answers with, by the kind the row holds. */
+const WIRE_KINDS = {
+  test_suite: "folder",
+  run_plan: "custom",
+} as const satisfies Record<SuiteKind, "folder" | "custom">;
 
 const suiteResponseSchema = z.object({
   id: z.string(),
@@ -43,7 +87,7 @@ const suiteResponseSchema = z.object({
     ),
   description: z.string().nullable(),
   scenarioIds: z.array(z.string()),
-  scope: suiteScopeSchema.nullable(),
+  scope: wireScopeSchema.nullable(),
   targets: z.array(suiteTargetSchema),
   repeatCount: z.number(),
   labels: z.array(z.string()),
@@ -64,29 +108,29 @@ type CreateSuiteBody = {
 };
 
 /**
- * A folder is created empty by definition, so a scope, a member list and a
+ * A test suite is created empty by definition, so a scope, a member list and a
  * target list are refused rather than silently dropped.
  */
-function refuseFolderExtras(body: CreateSuiteBody, ctx: z.RefinementCtx): void {
+function refuseTestSuiteExtras(body: CreateSuiteBody, ctx: z.RefinementCtx): void {
   if (body.scope) {
     ctx.addIssue({
       code: z.ZodIssueCode.custom,
       path: ["scope"],
-      message: "A test suite runs the test cases filed in it, so it takes no scope",
+      message: "A test suite runs the scenarios filed in it, so it takes no scope",
     });
   }
   if (body.scenarioIds.length > 0) {
     ctx.addIssue({
       code: z.ZodIssueCode.custom,
       path: ["scenarioIds"],
-      message: "A folder is created empty; file scenarios into it after creating it",
+      message: "A test suite is created empty; file scenarios into it after creating it",
     });
   }
   if (body.targets.length > 0) {
     ctx.addIssue({
       code: z.ZodIssueCode.custom,
       path: ["targets"],
-      message: "A folder gets its targets when a run is started",
+      message: "A test suite gets its targets when a run is started",
     });
   }
 }
@@ -131,14 +175,14 @@ const createSuiteInputSchema = z
       ),
     description: z.string().optional(),
     scenarioIds: z.array(z.string()).default([]),
-    scope: suiteScopeSchema.optional(),
+    scope: wireScopeSchema.optional(),
     targets: z.array(suiteTargetSchema).default([]),
     repeatCount: z.number().int().min(1).max(100).default(1),
     labels: z.array(z.string()).default([]),
   })
   .superRefine((body, ctx) => {
     if (body.kind === "folder") {
-      refuseFolderExtras(body, ctx);
+      refuseTestSuiteExtras(body, ctx);
       return;
     }
     refusePlanGaps(body, ctx);
@@ -149,14 +193,14 @@ const listSuitesQuerySchema = z.object({
     .enum(["custom", "folder"])
     .default("custom")
     .describe(
-      "Which kind of suite to list. Defaults to custom, so callers that predate folders keep seeing exactly the run plans they always did.",
+      "Which kind of suite to list. Defaults to custom, so callers that predate test suites keep seeing exactly the run plans they always did.",
     ),
 });
 
 const updateSuiteInputSchema = z.object({
   name: z.string().min(1).optional(),
   description: z.string().nullable().optional(),
-  scope: suiteScopeSchema.optional(),
+  scope: wireScopeSchema.optional(),
   scenarioIds: z.array(z.string()).min(1).optional(),
   targets: z.array(suiteTargetSchema).min(1).optional(),
   repeatCount: z.number().int().min(1).max(100).optional(),
@@ -199,10 +243,10 @@ function toSuiteResponse(suite: Suite) {
     id: suite.id,
     name: suite.name,
     slug: suite.slug,
-    kind: isSuiteKind(suite.kind) ? suite.kind : "custom",
+    kind: WIRE_KINDS[isSuiteKind(suite.kind) ? suite.kind : "run_plan"],
     description: suite.description,
     scenarioIds: suite.scenarioIds,
-    scope: suite.scope,
+    scope: suite.scope ? toWireScope(suite.scope) : null,
     targets: suite.targets,
     repeatCount: suite.repeatCount,
     labels: suite.labels,
@@ -211,35 +255,35 @@ function toSuiteResponse(suite: Suite) {
   };
 }
 
-function toFolderResponse(folder: ScenarioFolder) {
-  const targets = z.array(suiteTargetSchema).parse(folder.targets);
+function toTestSuiteResponse(testSuite: ScenarioTestSuite) {
+  const targets = z.array(suiteTargetSchema).parse(testSuite.targets);
 
   return {
-    id: folder.id,
-    name: folder.name,
-    slug: folder.slug,
+    id: testSuite.id,
+    name: testSuite.name,
+    slug: testSuite.slug,
     kind: "folder" as const,
-    description: folder.description,
-    scenarioIds: folder.scenarioIds,
+    description: testSuite.description,
+    scenarioIds: testSuite.scenarioIds,
     scope: null,
     targets,
-    repeatCount: folder.repeatCount,
-    labels: folder.labels,
-    createdAt: folder.createdAt.toISOString(),
-    updatedAt: folder.updatedAt.toISOString(),
+    repeatCount: testSuite.repeatCount,
+    labels: testSuite.labels,
+    createdAt: testSuite.createdAt.toISOString(),
+    updatedAt: testSuite.updatedAt.toISOString(),
   };
 }
 
 /**
  * REST for suites — the run plans a project assembles by hand, and the test
- * suite folders scenarios are filed into. One family serves both kinds: `kind`
+ * suites scenarios are filed into. One family serves both kinds: `kind`
  * on the request picks which, and a lookup by id tries a suite first and falls
- * back to a folder, exactly as it did in the application.
+ * back to a test suite, exactly as it did in the application.
  *
  * The application arrives as a per-request provider rather than off the Hono
  * context, so the family can be mounted into any process that has one and
  * built with none by the OpenAPI generator. It is the SAME {@link SuiteApp}
- * the tRPC surface is given, so the suite-or-folder fallback, the folder
+ * the tRPC surface is given, so the suite-or-test-suite fallback, the test suite
  * update rules and the project's organization are decided once rather than
  * once per door.
  */
@@ -257,7 +301,7 @@ export function createSuiteRestApp(options: {
     "/",
     describeRoute({
       description:
-        "List all non-archived suites for the project. By default only custom run plans are returned; pass kind=folder for test suite folders.",
+        "List all non-archived suites for the project. By default only custom run plans are returned; pass kind=folder for test suites.",
       responses: {
         ...baseResponses,
         200: {
@@ -278,7 +322,7 @@ export function createSuiteRestApp(options: {
 
       const listed =
         kind === "folder"
-          ? (await suites().listFolders({ projectId: project.id })).map(toFolderResponse)
+          ? (await suites().listTestSuites({ projectId: project.id })).map(toTestSuiteResponse)
           : (await suites().list({ projectId: project.id })).map(toSuiteResponse);
 
       return c.json(
@@ -321,18 +365,20 @@ export function createSuiteRestApp(options: {
       const { id } = c.req.param();
       logger.info({ projectId: project.id, suiteId: id }, "Getting suite");
 
-      // The "try the run plan, fall back to the folder" order is the
+      // The "try the run plan, fall back to the test suite" order is the
       // application's; this door only decides how it words the miss.
       let found;
       try {
-        found = await suites().getByIdOrFolder({ id, projectId: project.id });
+        found = await suites().getByIdOrTestSuite({ id, projectId: project.id });
       } catch (error) {
         if (!(error instanceof SuiteNotFoundError)) throw error;
         return c.json({ error: "Suite not found" }, 404);
       }
 
       const body =
-        found.kind === "folder" ? toFolderResponse(found.folder) : toSuiteResponse(found.suite);
+        found.kind === "test_suite"
+          ? toTestSuiteResponse(found.testSuite)
+          : toSuiteResponse(found.suite);
 
       return c.json({
         ...body,
@@ -373,11 +419,11 @@ export function createSuiteRestApp(options: {
       const body = c.req.valid("json");
       logger.info({ projectId: project.id, kind: body.kind }, "Creating suite");
 
-      const { kind, ...definition } = body;
+      const { kind, scope, ...definition } = body;
       const suite =
         kind === "folder"
-          ? toFolderResponse(
-              await suites().createFolder({
+          ? toTestSuiteResponse(
+              await suites().createTestSuite({
                 projectId: project.id,
                 name: definition.name,
               }),
@@ -385,6 +431,7 @@ export function createSuiteRestApp(options: {
           : toSuiteResponse(
               await suites().create({
                 ...definition,
+                ...(scope ? { scope: toDomainScope(scope) } : {}),
                 projectId: project.id,
               }),
             );
@@ -432,19 +479,25 @@ export function createSuiteRestApp(options: {
       const body = c.req.valid("json");
       logger.info({ projectId: project.id, suiteId: id }, "Updating suite");
 
-      // Whether this id names a folder, and what a folder refuses, is the
+      // Whether this id names a test suite, and what a test suite refuses, is the
       // application's decision — the same one the tRPC surface makes.
       let updated;
       try {
-        updated = await suites().update({ id, projectId: project.id, ...body });
+        const { scope, ...fields } = body;
+        updated = await suites().update({
+          id,
+          projectId: project.id,
+          ...fields,
+          ...(scope ? { scope: toDomainScope(scope) } : {}),
+        });
       } catch (error) {
         if (!(error instanceof SuiteNotFoundError)) throw error;
         return c.json({ error: "Suite not found" }, 404);
       }
 
       const response =
-        updated.kind === "folder"
-          ? toFolderResponse(updated.folder)
+        updated.kind === "test_suite"
+          ? toTestSuiteResponse(updated.testSuite)
           : toSuiteResponse(updated.suite);
 
       return c.json({
@@ -558,6 +611,13 @@ export function createSuiteRestApp(options: {
           idempotencyKey,
           parameters: body.parameters,
           note: body.note,
+          // A project key belongs to no person, so it records no actor. A
+          // user-bound key records the person it belongs to, through the
+          // surface the request declared.
+          actor: runActorFromRequest({
+            userId: c.get("apiKeyUserId"),
+            surfaceHeader: c.req.header("X-LangWatch-Surface"),
+          }),
         });
 
         return c.json({
@@ -586,7 +646,7 @@ export function createSuiteRestApp(options: {
     "/:id",
     describeRoute({
       description:
-        "Archive (soft-delete) a suite. Archiving a folder also archives every test case filed in it, in one transaction.",
+        "Archive (soft-delete) a suite. Archiving a test suite also archives every scenario filed in it, in one transaction.",
       responses: {
         ...baseResponses,
         200: {
@@ -611,13 +671,13 @@ export function createSuiteRestApp(options: {
       logger.info({ projectId: project.id, suiteId: id }, "Archiving suite");
 
       try {
-        await suites().archiveFolder({
-          folderId: id,
+        await suites().archiveTestSuite({
+          testSuiteId: id,
           projectId: project.id,
         });
         return c.json({ id, archived: true });
       } catch (error) {
-        if (!(error instanceof ScenarioFolderNotFoundError)) throw error;
+        if (!(error instanceof ScenarioTestSuiteNotFoundError)) throw error;
       }
 
       try {

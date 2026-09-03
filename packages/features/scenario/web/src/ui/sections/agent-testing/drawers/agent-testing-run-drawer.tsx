@@ -3,21 +3,21 @@
  * use, wider, with the judge results beside the conversation when the screen
  * gives enough room and stacked under it when it does not.
  *
- * It can open before the run has an id: a one-off run opens the drawer the
- * moment it is queued, the batch is watched until the run appears, and the
+ * It can open before the run has an id: a run of one scenario opens the drawer
+ * the moment it is queued, the batch is watched until the run appears, and the
  * conversation then streams in live.
  *
  * @see specs/features/agent-testing/side-by-side-run-drawer.feature
- * @see specs/features/agent-testing/live-one-off-run.feature
+ * @see specs/features/agent-testing/live-single-scenario-run.feature
  * @see specs/scenarios/scenario-version-on-runs.feature
  */
 
-import { RunScenarioModal } from "../../scenarios/run-scenario-modal";
 import { Drawer } from "@langwatch/workflow-web/components/ui/drawer";
 import { useDrawer } from "@langwatch/ui-drawer";
 import { RunDrawerContent } from "./run-drawer-content";
 import { RunDrawerHeaderBand } from "./run-drawer-header-band";
-import { RunDrawerQueuedBody } from "./run-drawer-queued-body";
+import { RunDrawerErrorBody } from "./run-drawer-error-body";
+import { RunDrawerLoadingBody } from "./run-drawer-loading-body";
 import {
   type RunDrawerState,
   useRunDrawerState,
@@ -25,7 +25,11 @@ import {
   WIDE_DRAWER_MAX_WIDTH,
 } from "./use-run-drawer-state";
 
-/** The drawer once the run has state, and the queued read until it does. */
+/**
+ * The drawer body. A queued run draws the same as a running one, so the
+ * layout does not appear piece by piece while the reader waits: only a read
+ * that is still on its way, or one that failed, draws something else.
+ */
 function RunDrawerBody({
   state,
   stop,
@@ -33,15 +37,13 @@ function RunDrawerBody({
   state: RunDrawerState;
   stop: ReturnType<typeof useRunDrawerStop>;
 }) {
-  const { detail, scenarioState } = state;
+  const { detail } = state;
 
-  if (!scenarioState) {
-    return (
-      <RunDrawerQueuedBody
-        error={detail.runStateError}
-        scenarioId={state.knownScenarioId}
-      />
-    );
+  // While the read is on its way the drawer must not say "Queued": that is a
+  // status of the run, not a report on our own request.
+  if (state.isReadingRun) return <RunDrawerLoadingBody />;
+  if (state.readFailed) {
+    return <RunDrawerErrorBody error={detail.runStateError} />;
   }
 
   return (
@@ -55,52 +57,47 @@ function RunDrawerBody({
       overflow="hidden"
       bg={{ base: "bg.surface", _dark: "bg.panel" }}
     >
-      <RunDrawerHeaderBand
-        detail={detail}
-        scenarioVersion={state.scenarioVersion}
-        stop={stop}
-      />
+      <RunDrawerHeaderBand detail={detail} scenarioVersion={state.scenarioVersion} stop={stop} />
       <RunDrawerContent detail={detail} isSideBySide={state.isSideBySide} />
     </Drawer.Body>
   );
 }
 
+/**
+ * The header offers Edit Scenario alone, so the drawer starts no run of its
+ * own. A rerun goes through the run dialog, which is the one place a run plan
+ * name is resolved.
+ */
 export function AgentTestingRunDrawer({ open }: { open?: boolean }) {
   const { closeDrawer } = useDrawer();
   const state = useRunDrawerState({ open: !!open });
-  const { detail } = state;
   const stop = useRunDrawerStop({
     scenarioRunId: state.scenarioRunId,
     scenarioState: state.scenarioState,
   });
 
   return (
-    <>
-      <Drawer.Root
-        open={!!open}
-        onOpenChange={() => closeDrawer()}
-        placement="end"
-        size="lg"
+    <Drawer.Root
+      open={!!open}
+      // Only a close is a close. The handler is called on every change of the
+      // open state, so one that reads nothing closes the drawer the moment it
+      // is asked to open, and the run that opened it lands on a bare page.
+      onOpenChange={({ open: isOpen }) => {
+        if (!isOpen) closeDrawer();
+      }}
+      placement="end"
+      size="lg"
+    >
+      <Drawer.Content
+        bg="transparent"
+        paddingX={0}
+        maxWidth={WIDE_DRAWER_MAX_WIDTH}
+        overflow="hidden"
+        borderRadius="lg"
+        data-testid="agent-testing-run-drawer"
       >
-        <Drawer.Content
-          bg="transparent"
-          paddingX={0}
-          maxWidth={WIDE_DRAWER_MAX_WIDTH}
-          overflow="hidden"
-          borderRadius="lg"
-          data-testid="agent-testing-run-drawer"
-        >
-          <RunDrawerBody state={state} stop={stop} />
-        </Drawer.Content>
-      </Drawer.Root>
-
-      <RunScenarioModal
-        open={detail.runModalOpen}
-        onClose={() => detail.setRunModalOpen(false)}
-        onRun={detail.handleRunAgain}
-        initialTarget={detail.persistedTarget}
-        isLoading={detail.isRunning}
-      />
-    </>
+        <RunDrawerBody state={state} stop={stop} />
+      </Drawer.Content>
+    </Drawer.Root>
   );
 }

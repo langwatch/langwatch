@@ -33,7 +33,10 @@ import {
   type SectionNavItemData,
 } from "../../model/section-nav-items";
 import { isSettingsMenuItemActive, OPS_ATTENTION_HREF } from "../../model/settings-menu";
-import { SHELL_SIDEBAR_WIDTH_COMPACT, SHELL_SIDEBAR_WIDTH_EXPANDED } from "../../model/shell-layout";
+import {
+  SHELL_SIDEBAR_WIDTH_COMPACT,
+  SHELL_SIDEBAR_WIDTH_EXPANDED,
+} from "../../model/shell-layout";
 import { SideMenuDensityProvider } from "../elements/side-menu-density";
 import { SideMenuItem, SideMenuLink } from "../blocks/side-menu-link";
 import { SidebarSection } from "../blocks/sidebar-section";
@@ -125,7 +128,7 @@ function SidebarBottomBlock({
           showLabel={showExpanded}
         />
       )}
-      <SupportMenu showLabel={showExpanded} chatPlacement="in-menu" />
+      <SupportMenu showLabel={showExpanded} />
       <ThemeToggle showLabel={showExpanded} />
     </VStack>
   );
@@ -264,12 +267,7 @@ function ProductSidebarBody({
     return <SettingsMenuBody showExpanded={showExpanded} />;
   }
   if (surface === "me") {
-    return (
-      <PersonalSidebarLinks
-        showExpanded={showExpanded}
-        shouldIncludeGovernSection={false}
-      />
-    );
+    return <PersonalSidebarLinks showExpanded={showExpanded} />;
   }
   if (surface === "gateway") {
     return <SectionItemsNav items={gatewayNavItems} showExpanded={showExpanded} />;
@@ -277,9 +275,7 @@ function ProductSidebarBody({
   if (surface === "governance") {
     return <SectionItemsNav items={governanceNavItems} showExpanded={showExpanded} />;
   }
-  return (
-    <MainMenuSections showExpanded={showExpanded} shouldIncludeGovernSection={false} />
-  );
+  return <MainMenuSections showExpanded={showExpanded} />;
 }
 
 /**
@@ -389,9 +385,7 @@ export function ProductSidebar({
 }) {
   const [isHovered, setIsHovered] = useState(false);
   const showExpanded = !isCompact || isHovered;
-  const columnWidth = isCompact
-    ? SHELL_SIDEBAR_WIDTH_COMPACT
-    : SHELL_SIDEBAR_WIDTH_EXPANDED;
+  const columnWidth = isCompact ? SHELL_SIDEBAR_WIDTH_COMPACT : SHELL_SIDEBAR_WIDTH_EXPANDED;
   const fullHeight = `calc(100vh - ${APP_HEADER_HEIGHT}px)`;
 
   return (
@@ -411,9 +405,7 @@ export function ProductSidebar({
           zIndex={isCompact ? 100 : "auto"}
           top={0}
           left={0}
-          width={
-            showExpanded ? SHELL_SIDEBAR_WIDTH_EXPANDED : SHELL_SIDEBAR_WIDTH_COMPACT
-          }
+          width={showExpanded ? SHELL_SIDEBAR_WIDTH_EXPANDED : SHELL_SIDEBAR_WIDTH_COMPACT}
           height={fullHeight}
           background="bg.page"
           transition="width 0.15s ease-in-out"

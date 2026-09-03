@@ -1,5 +1,5 @@
 /**
- * The version history of a test case, as a drawer.
+ * The version history of a scenario, as a drawer.
  *
  * The Agent Testing case dialog reads the same history in a popover anchored
  * to its version chip; this drawer is what the v1 scenario form opens.
@@ -38,10 +38,7 @@ export function ScenarioVersionHistoryDrawer({ open }: { open?: boolean }) {
           <Drawer.CloseTrigger />
         </Drawer.Header>
         <Drawer.Body>
-          <ScenarioVersionList
-            scenarioId={scenarioId}
-            markVersion={markVersion}
-          />
+          <ScenarioVersionList scenarioId={scenarioId} markVersion={markVersion} />
         </Drawer.Body>
       </Drawer.Content>
     </Drawer.Root>

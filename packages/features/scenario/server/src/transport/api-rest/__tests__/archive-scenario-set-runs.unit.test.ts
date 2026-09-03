@@ -32,7 +32,6 @@ describe("archiveScenarioSetRuns()", () => {
       deleteRun: mockDeleteRun,
     } as unknown as Pick<SimulationService, "getRunIdsForSet" | "deleteRun">;
   });
-
   describe("when getRunIdsForSet returns N runs", () => {
     /** @scenario "Archiving one set leaves runs in other sets untouched" */
     it("dispatches deleteRun for each and returns archived=N, failed=0, scenarioSetId, hasMore=false", async () => {

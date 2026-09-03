@@ -165,6 +165,21 @@ describe("ScenarioFailureHandlerService", () => {
       });
     });
 
+    /** @scenario "A DNS failure on an agent with a dev tunnel names the dead tunnel" */
+    it("classifies a name-resolution failure the same way", async () => {
+      await handler.finishUnsuccessfulRun({
+        ...devTunnelParams,
+        error: "getaddrinfo EAI_FAIL gone.trycloudflare.com",
+      });
+
+      const finishRunCall = mockFinishRun.mock.calls[0];
+      if (!finishRunCall) throw new Error("finishRun was never called");
+      const { results } = finishRunCall[0] as { results: { error: string } };
+      expect(decodeScenarioError(results.error)?.code).toBe(
+        ScenarioInfraErrorCode.AgentDevTunnelUnreachable,
+      );
+    });
+
     it("classifies the tunnel edge's HTTP 530 answer the same way", async () => {
       await handler.finishUnsuccessfulRun({
         ...devTunnelParams,

@@ -1,8 +1,8 @@
 /**
  * Where the last resolved scope is remembered, and how.
  *
- * Three keys and a marker, written by whichever page resolved last and read by
- * whichever page names no project of its own. The names and the encoding are
+ * Three keys, written by whichever page resolved last and read by whichever
+ * page names no project of its own. The names and the encoding are
  * NOT free choices: the application still serves most of the product from the
  * same origin, its `useLocalStorage` reads these exact keys, and it stores a
  * string JSON-encoded — `"acme-app"`, quotes included. A scope written here in
@@ -19,7 +19,6 @@ import type { UiScopeSelectionWrite } from "./ui-scope-resolution";
 export const UI_SELECTED_ORGANIZATION_ID_KEY = "selectedOrganizationId";
 export const UI_SELECTED_TEAM_ID_KEY = "selectedTeamId";
 export const UI_SELECTED_PROJECT_SLUG_KEY = "selectedProjectSlug";
-export const UI_LAST_VISITED_HOME_KIND_KEY = "lastVisitedHomeKind";
 
 /** The event `usehooks-ts` broadcasts on every write, and listens for. */
 const SAME_DOCUMENT_STORAGE_EVENT = "local-storage";
@@ -28,18 +27,15 @@ const WRITE_KEYS: Record<UiScopeSelectionWrite["key"], string> = {
   organizationId: UI_SELECTED_ORGANIZATION_ID_KEY,
   teamId: UI_SELECTED_TEAM_ID_KEY,
   projectSlug: UI_SELECTED_PROJECT_SLUG_KEY,
-  lastVisitedHomeKind: UI_LAST_VISITED_HOME_KIND_KEY,
 };
 
 /** Everything one page remembers about where it was working. */
 export type UiScopeMemory = {
   readonly selection: UiScopeSelection;
-  readonly lastVisitedHomeKind: string;
 };
 
 const NOTHING_REMEMBERED: UiScopeMemory = {
   selection: { organizationId: "", teamId: "", projectSlug: "" },
-  lastVisitedHomeKind: "",
 };
 
 /** A JSON-encoded string, or "" for anything that is not one. */
@@ -61,7 +57,6 @@ export function readUiScopeMemory(storage: Storage): UiScopeMemory {
       teamId: readString(storage, UI_SELECTED_TEAM_ID_KEY),
       projectSlug: readString(storage, UI_SELECTED_PROJECT_SLUG_KEY),
     },
-    lastVisitedHomeKind: readString(storage, UI_LAST_VISITED_HOME_KIND_KEY),
   };
 }
 
@@ -111,7 +106,6 @@ class UiScopeMemoryStore {
       this.storage.getItem(UI_SELECTED_ORGANIZATION_ID_KEY),
       this.storage.getItem(UI_SELECTED_TEAM_ID_KEY),
       this.storage.getItem(UI_SELECTED_PROJECT_SLUG_KEY),
-      this.storage.getItem(UI_LAST_VISITED_HOME_KIND_KEY),
     ].join(" ");
     if (this.read && raw === this.raw) return this.cached;
     this.raw = raw;

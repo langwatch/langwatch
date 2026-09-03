@@ -44,8 +44,10 @@ export interface CodingAgentSessionEventsRepository {
   }>;
 
   /**
-   * What each model consumed, per session, across several tenants: the read
-   * behind a pull request's per-model breakdown.
+   * What each model consumed, per session and per stamped working context,
+   * across several tenants: the read behind a pull request's per-model
+   * breakdown AND the ratio that splits a session's cumulative totals across
+   * the pull requests it drove.
    *
    * Restricted to `model_call` rows, the one event kind that carries tokens and
    * cost; every other kind would contribute zeros under a model name of `""`.
@@ -58,13 +60,37 @@ export interface CodingAgentSessionEventsRepository {
     sessionIds: string[];
     fromMs: number;
   }): Promise<SessionModelTotalsRow[]>;
+
+  /**
+   * The sessions whose stamped fact rows name one repository's branches: the
+   * discovery read that finds a session for a pull request even after the
+   * session's own row moved on to another repository. Returns distinct
+   * (tenantId, sessionId) pairs only; the caller fetches the session rows.
+   */
+  listSessionsByStampedBranch(params: {
+    tenantIds: string[];
+    repositoryHost: string;
+    repositoryOwner: string;
+    repositoryName: string;
+    branches: string[];
+    fromMs: number;
+  }): Promise<Array<{ tenantId: string; sessionId: string }>>;
 }
 
-/** One (session, model) pair's totals. */
+/**
+ * One (session, model, working context) group's totals. The context fields are
+ * '' for rows written before the session declared where it was working (or
+ * before the stamp existed); those unstamped totals are priced under the
+ * legacy whole-session rule.
+ */
 export interface SessionModelTotalsRow {
   tenantId: string;
   sessionId: string;
   model: string;
+  repositoryHost: string;
+  repositoryOwner: string;
+  repositoryName: string;
+  branch: string;
   inputTokens: number;
   outputTokens: number;
   cacheReadTokens: number;
@@ -101,6 +127,10 @@ export class NullCodingAgentSessionEventsRepository implements CodingAgentSessio
   }
 
   async sumTokensByModelPerSession(): Promise<SessionModelTotalsRow[]> {
+    return [];
+  }
+
+  async listSessionsByStampedBranch(): Promise<Array<{ tenantId: string; sessionId: string }>> {
     return [];
   }
 }
@@ -147,6 +177,10 @@ interface ClickHouseWriteRecord {
   ToolResultBytes: number;
   PromptChars: number;
   TotalTokens: number;
+  RepositoryHost: string;
+  RepositoryOwner: string;
+  RepositoryName: string;
+  Branch: string;
   UpdatedAt: Date;
   _retention_days: number;
 }
@@ -158,7 +192,8 @@ const READ_COLUMNS = `
   CacheCreationTokens, CostUsd, DurationMs, TtftMs, Attempt, Speed, StopReason,
   PreTokens, PostTokens, CompactionTrigger, PrecomputeReuse, StatusCode,
   ErrorType, RateLimitCarrier, RetryDurationMs, ToolName, Success, Decision,
-  DecisionSource, ToolInputBytes, ToolResultBytes, PromptChars, TotalTokens
+  DecisionSource, ToolInputBytes, ToolResultBytes, PromptChars, TotalTokens,
+  RepositoryHost, RepositoryOwner, RepositoryName, Branch
 `;
 
 interface ClickHouseReadRow {
@@ -202,6 +237,10 @@ interface ClickHouseReadRow {
   ToolResultBytes: string;
   PromptChars: string;
   TotalTokens: string;
+  RepositoryHost: string;
+  RepositoryOwner: string;
+  RepositoryName: string;
+  Branch: string;
 }
 
 export class CodingAgentSessionEventsClickHouseRepository implements SessionEventsRepository {
@@ -400,6 +439,10 @@ export class CodingAgentSessionEventsClickHouseRepository implements SessionEven
           TenantId,
           SessionId,
           Model,
+          RepositoryHost,
+          RepositoryOwner,
+          RepositoryName,
+          Branch,
           sum(InputTokens) AS InputTokens,
           sum(OutputTokens) AS OutputTokens,
           sum(CacheReadTokens) AS CacheReadTokens,
@@ -410,6 +453,10 @@ export class CodingAgentSessionEventsClickHouseRepository implements SessionEven
             TenantId,
             SessionId,
             Model,
+            RepositoryHost,
+            RepositoryOwner,
+            RepositoryName,
+            Branch,
             InputTokens,
             OutputTokens,
             CacheReadTokens,
@@ -423,7 +470,7 @@ export class CodingAgentSessionEventsClickHouseRepository implements SessionEven
           ORDER BY TenantId, SessionId, TimeUnixMs, RecordId, UpdatedAt DESC
           LIMIT 1 BY TenantId, SessionId, TimeUnixMs, RecordId
         )
-        GROUP BY TenantId, SessionId, Model
+        GROUP BY TenantId, SessionId, Model, RepositoryHost, RepositoryOwner, RepositoryName, Branch
       `,
       query_params: {
         tenantIds,
@@ -439,6 +486,10 @@ export class CodingAgentSessionEventsClickHouseRepository implements SessionEven
       tenantId: row.TenantId,
       sessionId: row.SessionId,
       model: row.Model,
+      repositoryHost: row.RepositoryHost,
+      repositoryOwner: row.RepositoryOwner,
+      repositoryName: row.RepositoryName,
+      branch: row.Branch,
       inputTokens: Number(row.InputTokens),
       outputTokens: Number(row.OutputTokens),
       cacheReadTokens: Number(row.CacheReadTokens),
@@ -495,6 +546,10 @@ export class CodingAgentSessionEventsClickHouseRepository implements SessionEven
       ToolResultBytes: record.toolResultBytes,
       PromptChars: record.promptChars,
       TotalTokens: record.totalTokens,
+      RepositoryHost: record.repositoryHost,
+      RepositoryOwner: record.repositoryOwner,
+      RepositoryName: record.repositoryName,
+      Branch: record.branch,
       UpdatedAt: writtenAt,
       _retention_days: retentionDays,
     };
@@ -542,7 +597,77 @@ export class CodingAgentSessionEventsClickHouseRepository implements SessionEven
       toolResultBytes: Number(row.ToolResultBytes),
       promptChars: Number(row.PromptChars),
       totalTokens: Number(row.TotalTokens),
+      repositoryHost: row.RepositoryHost,
+      repositoryOwner: row.RepositoryOwner,
+      repositoryName: row.RepositoryName,
+      branch: row.Branch,
     };
+  }
+
+  async listSessionsByStampedBranch({
+    tenantIds,
+    repositoryHost,
+    repositoryOwner,
+    repositoryName,
+    branches,
+    fromMs,
+  }: {
+    tenantIds: string[];
+    repositoryHost: string;
+    repositoryOwner: string;
+    repositoryName: string;
+    branches: string[];
+    fromMs: number;
+  }): Promise<Array<{ tenantId: string; sessionId: string }>> {
+    if (tenantIds.length === 0 || branches.length === 0) return [];
+    for (const tenantId of tenantIds) {
+      EventUtils.validateTenantId(
+        { tenantId },
+        "CodingAgentSessionEventsClickHouseRepository.listSessionsByStampedBranch",
+      );
+    }
+
+    const groups = await groupTenantsByClient({
+      tenantIds,
+      clickHouse: this.clickHouse,
+    });
+    const pairs: Array<{ tenantId: string; sessionId: string }> = [];
+    for (const group of groups) {
+      // Distinct pairs only, so no dedup scope is needed: duplicate row
+      // versions collapse under the DISTINCT. Repository identity is
+      // case-folded on both sides for the same reason the session read folds
+      // it — a session stores the remote's casing verbatim while the mapping
+      // stores lower case. Branches stay case sensitive.
+      const result = await group.client.query({
+        query: `
+          SELECT DISTINCT TenantId, SessionId
+          FROM ${TABLE_NAME}
+          WHERE TenantId IN {tenantIds:Array(String)}
+            AND TimeUnixMs >= fromUnixTimestamp64Milli({fromMs:Int64})
+            AND lower(RepositoryHost) = {repositoryHost:String}
+            AND lower(RepositoryOwner) = {repositoryOwner:String}
+            AND lower(RepositoryName) = {repositoryName:String}
+            AND Branch IN {branches:Array(String)}
+        `,
+        query_params: {
+          tenantIds: group.tenantIds,
+          fromMs,
+          repositoryHost: repositoryHost.toLowerCase(),
+          repositoryOwner: repositoryOwner.toLowerCase(),
+          repositoryName: repositoryName.toLowerCase(),
+          branches,
+        },
+        format: "JSONEachRow",
+      });
+      const rows = await result.json<{ TenantId: string; SessionId: string }>();
+      pairs.push(
+        ...rows.map((row) => ({
+          tenantId: row.TenantId,
+          sessionId: row.SessionId,
+        })),
+      );
+    }
+    return pairs;
   }
 }
 
@@ -550,6 +675,10 @@ interface ClickHouseModelTotalsRow {
   TenantId: string;
   SessionId: string;
   Model: string;
+  RepositoryHost: string;
+  RepositoryOwner: string;
+  RepositoryName: string;
+  Branch: string;
   InputTokens: string;
   OutputTokens: string;
   CacheReadTokens: string;

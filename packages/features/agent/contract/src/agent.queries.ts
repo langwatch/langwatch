@@ -76,7 +76,7 @@ export const agentListViewSchema = z.object({
 export const archivedAgentViewSchema = z.object({
   id: z.string(),
   name: z.string(),
-  type: z.enum(["signature", "code", "workflow", "http"]),
+  type: z.enum(["signature", "code", "workflow", "http", "connected"]),
   archivedAt: z.date(),
 });
 

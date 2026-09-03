@@ -1,3 +1,5 @@
+import type { NextSpeaker } from "../elements/next-speaker";
+import { TypingBubble } from "../elements/typing-bubble";
 import { Box, HStack, Image, Text, VStack } from "@chakra-ui/react";
 import { type ReactNode, useEffect, useMemo, useRef } from "react";
 import { Settings } from "react-feather";
@@ -46,6 +48,8 @@ export interface ScenarioMessageRendererProps {
   variant: "grid" | "drawer";
   /** Project that owns the stored objects in this message thread. Forwarded to MediaPart for server-side probes. */
   projectId: string;
+  /** Whose message the run is waiting for, drawn as dots under the thread. */
+  typingRole?: NextSpeaker;
   renderBubble: (props: ScenarioBubbleProps) => ReactNode;
   renderInputOutput: (value: unknown) => ReactNode;
   getRoleVisuals: (role: "user" | "assistant") => ScenarioRoleVisuals;
@@ -62,6 +66,7 @@ export function ScenarioMessageRenderer({
   streamingMessages,
   variant,
   projectId,
+  typingRole,
   renderBubble,
   renderInputOutput,
   getRoleVisuals,
@@ -82,7 +87,7 @@ export function ScenarioMessageRenderer({
 
   useEffect(() => {
     endRef.current?.scrollIntoView({ behavior: "smooth" });
-  }, [items]);
+  }, [items, typingRole]);
 
   // Ordered list of audio-only item ids — the single source of ordering truth
   // for the sequential playback hook. Filters to audio media only (not video /
@@ -277,6 +282,9 @@ export function ScenarioMessageRenderer({
               {turn.items.map(renderItem)}
             </VStack>
           ))}
+      {typingRole ? (
+        <TypingBubble role={typingRole} size={smallerView ? "compact" : "regular"} />
+      ) : null}
       <div ref={endRef} />
     </VStack>
   );

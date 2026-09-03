@@ -8,6 +8,14 @@ export interface ScenarioRunStatusConfig {
   fgColor: string;
 }
 
+/**
+ * What every status of a scenario run reads as, everywhere it is drawn.
+ *
+ * Only a verdict carries a warm colour. A run that is queued or still going
+ * reads blue, the colour the product gives an in-progress evaluation, so a
+ * person scanning a list of runs sees red or amber only where something went
+ * wrong.
+ */
 export const SCENARIO_RUN_STATUS_CONFIG: Record<ScenarioRunStatus, ScenarioRunStatusConfig> = {
   [ScenarioRunStatus.SUCCESS]: {
     colorPalette: "green",
@@ -40,10 +48,10 @@ export const SCENARIO_RUN_STATUS_CONFIG: Record<ScenarioRunStatus, ScenarioRunSt
     fgColor: "yellow.500",
   },
   [ScenarioRunStatus.IN_PROGRESS]: {
-    colorPalette: "orange",
+    colorPalette: "blue",
     label: "running",
     isComplete: false,
-    fgColor: "orange.fg",
+    fgColor: "blue.fg",
   },
   [ScenarioRunStatus.PENDING]: {
     colorPalette: "gray",
@@ -58,10 +66,10 @@ export const SCENARIO_RUN_STATUS_CONFIG: Record<ScenarioRunStatus, ScenarioRunSt
     fgColor: "blue.fg",
   },
   [ScenarioRunStatus.RUNNING]: {
-    colorPalette: "orange",
+    colorPalette: "blue",
     label: "running",
     isComplete: false,
-    fgColor: "orange.fg",
+    fgColor: "blue.fg",
   },
 };
 

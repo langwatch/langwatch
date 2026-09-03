@@ -6,7 +6,7 @@
  * is beside it. Leaving the plan hands the title back to the page.
  *
  * Neither tab carries an action here. Every write entry sits in the section
- * header above the table it writes into: New test case beside the set it files
+ * header above the table it writes into: New scenario beside the set it files
  * into, New run plan beside the Test Runs list it adds to.
  *
  * @see specs/features/agent-testing/page-structure.feature
@@ -20,7 +20,7 @@ import type { OpenPlanTitle } from "./use-agent-testing-store";
 export type AgentTestingHeaderProps = {
   tab: AgentTestingTab;
   onTabChange: (tab: AgentTestingTab) => void;
-  /** How many test cases the project holds, beside the Test cases tab. */
+  /** How many scenarios the project holds, beside the Scenarios tab. */
   casesCount?: number;
   /** How many run plans the project holds, beside the Results tab. */
   plansCount?: number;
@@ -54,28 +54,33 @@ export function AgentTestingHeader({
   openPlan,
 }: AgentTestingHeaderProps) {
   return (
-    <PageLayout.Header height="auto" paddingX={5} alignItems="flex-end" gap={4}>
+    <PageLayout.Header>
       {/* The middle column takes the width of the tabs, so the tabs sit in the
           centre of the page and not in the centre of what is left of it. The
-          right column stays empty and balances the title on the left. */}
-      <Grid
-        width="full"
-        templateColumns="1fr auto 1fr"
-        alignItems="flex-end"
-        gap={4}
-      >
-        <GridItem paddingY={2} minWidth={0}>
-          {/* The title keeps the standard page heading size: every page title
-              in the product is the same size, by design-system rule. */}
+          right column stays empty and balances the title on the left. Every
+          page title in the product is the same size, so the header carries no
+          padding or alignment override of its own: the defaults set by
+          PageLayout.Header rule. */}
+      <Grid width="full" height="full" templateColumns="1fr auto 1fr" alignItems="center" gap={4}>
+        <GridItem minWidth={0}>
+          {/* The title stays on one line and gives space back with an
+              ellipsis; the note beside it reads in full, since it is the
+              shorter of the two and the one a person cannot guess. */}
           <HStack gap={2} minWidth={0} alignItems="baseline">
-            <PageLayout.Heading>
+            <PageLayout.Heading
+              truncate
+              minWidth={0}
+              title={openPlan?.name}
+              data-testid="agent-testing-title"
+            >
               {openPlan?.name ?? "Agent Testing"}
             </PageLayout.Heading>
             {openPlan ? (
               <Text
                 fontSize="11.5px"
                 color={FG_MUTED}
-                truncate
+                flexShrink={0}
+                whiteSpace="nowrap"
                 data-testid="agent-testing-title-note"
               >
                 {openPlan.note}
@@ -84,24 +89,20 @@ export function AgentTestingHeader({
           </HStack>
         </GridItem>
 
-        <GridItem>
+        {/* The tabs run the full height of the header, so the underline of
+            the selected one lands on the header's bottom border rather than
+            floating above it. */}
+        <GridItem alignSelf="stretch">
           <Tabs.Root
             value={tab}
             onValueChange={({ value }) => onTabChange(value as AgentTestingTab)}
             variant="line"
             size="sm"
+            height="full"
           >
-            <Tabs.List borderBottomWidth={0} gap={1}>
-              <AgentTestingTabTrigger
-                value="cases"
-                label="Test cases"
-                count={casesCount}
-              />
-              <AgentTestingTabTrigger
-                value="results"
-                label="Results"
-                count={plansCount}
-              />
+            <Tabs.List borderBottomWidth={0} gap={1} height="full" alignItems="stretch">
+              <AgentTestingTabTrigger value="cases" label="Scenarios" count={casesCount} />
+              <AgentTestingTabTrigger value="results" label="Results" count={plansCount} />
             </Tabs.List>
           </Tabs.Root>
         </GridItem>
@@ -124,6 +125,7 @@ function AgentTestingTabTrigger({
   return (
     <Tabs.Trigger
       value={value}
+      height="full"
       paddingX={3}
       gap={1.5}
       fontSize="13px"

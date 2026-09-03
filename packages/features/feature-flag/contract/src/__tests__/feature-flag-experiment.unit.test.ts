@@ -54,11 +54,11 @@ function decide(overrides: {
 
 describe("findExperimentDefinitionViolations", () => {
   const good = {
-    key: "release_ui_navigation_v2_enabled",
+    key: "release_ui_agent_testing_v2_enabled",
     scope: "PRODUCT" as const,
     experiment: EXPERIMENT,
   };
-  const browserVisibleKeys = ["release_ui_navigation_v2_enabled"];
+  const browserVisibleKeys = ["release_ui_agent_testing_v2_enabled"];
 
   function check(definition: {
     key: string;
@@ -86,7 +86,7 @@ describe("findExperimentDefinitionViolations", () => {
   describe("given a SYSTEM flag marked as an experiment", () => {
     it("reports it, because a kill switch is not a personal choice", () => {
       expect(check({ ...good, scope: "SYSTEM" })).toEqual([
-        "release_ui_navigation_v2_enabled: an experiment must be a PRODUCT flag, not SYSTEM",
+        "release_ui_agent_testing_v2_enabled: an experiment must be a PRODUCT flag, not SYSTEM",
       ]);
     });
   });
@@ -102,7 +102,7 @@ describe("findExperimentDefinitionViolations", () => {
   describe("given an experiment with no customer-facing copy", () => {
     it("reports it", () => {
       expect(check({ ...good, experiment: { ...EXPERIMENT, title: "   ", summary: "" } })).toEqual([
-        "release_ui_navigation_v2_enabled: an experiment needs a title and a summary",
+        "release_ui_agent_testing_v2_enabled: an experiment needs a title and a summary",
       ]);
     });
   });
@@ -112,7 +112,7 @@ describe("findExperimentDefinitionViolations", () => {
       const violations = findExperimentDefinitionViolations({
         definitions: [good, { ...good, key: "release_ui_ai_gateway_menu_enabled" }],
         browserVisibleKeys: [
-          "release_ui_navigation_v2_enabled",
+          "release_ui_agent_testing_v2_enabled",
           "release_ui_ai_gateway_menu_enabled",
         ],
       });
@@ -126,7 +126,7 @@ describe("findExperimentDefinitionViolations", () => {
   describe("given a catalogue version that cannot order anything", () => {
     it.each([0, -1, 1.5])("reports %s", (catalogueVersion) => {
       expect(check({ ...good, experiment: { ...EXPERIMENT, catalogueVersion } })).toEqual([
-        "release_ui_navigation_v2_enabled: catalogueVersion must be a positive integer",
+        "release_ui_agent_testing_v2_enabled: catalogueVersion must be a positive integer",
       ]);
     });
   });
@@ -146,7 +146,7 @@ describe("findExperimentDefinitionViolations", () => {
       });
 
       expect(violations).toEqual([
-        "release_ui_navigation_v2_enabled: an experiment must be a PRODUCT flag, not SYSTEM",
+        "release_ui_agent_testing_v2_enabled: an experiment must be a PRODUCT flag, not SYSTEM",
         "release_unlisted: an experiment must be listed in FRONTEND_FEATURE_FLAGS",
       ]);
     });

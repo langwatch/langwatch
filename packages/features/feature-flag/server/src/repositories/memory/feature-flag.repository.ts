@@ -15,6 +15,11 @@ type MemoryRecord = {
  */
 export class MemoryFeatureFlagRepository extends FeatureFlagRepository {
   private readonly records = new Map<string, MemoryRecord>();
+  private readonly organizations = new Map<string, Date>();
+  /** How many times an age rule sent this repository to the organizations. */
+  organizationReads = 0;
+  /** Set to make the next organization read fail, the way a blip does. */
+  private failNextOrganizationRead = false;
 
   private constructor(private readonly now: () => number) {
     super();
@@ -77,5 +82,30 @@ export class MemoryFeatureFlagRepository extends FeatureFlagRepository {
 
   async deleteByKey(key: string): Promise<void> {
     this.records.delete(key);
+  }
+
+  /** Seeds an organization a "new organizations" rule can be measured against. */
+  rememberOrganization({
+    organizationId,
+    createdAt,
+  }: {
+    organizationId: string;
+    createdAt: Date;
+  }): void {
+    this.organizations.set(organizationId, createdAt);
+  }
+
+  failNextOrganizationLookup(): void {
+    this.failNextOrganizationRead = true;
+  }
+
+  async tryFindOrganizationCreatedAt(organizationId: string): Promise<Date | null> {
+    this.organizationReads += 1;
+    if (this.failNextOrganizationRead) {
+      this.failNextOrganizationRead = false;
+      throw new Error("connection reset");
+    }
+
+    return this.organizations.get(organizationId) ?? null;
   }
 }

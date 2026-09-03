@@ -1,6 +1,7 @@
 import {
   Box,
   Button,
+  chakra,
   Field,
   Heading,
   HStack,
@@ -9,9 +10,11 @@ import {
   Text,
   VStack,
 } from "@chakra-ui/react";
+import { HelpCircle } from "lucide-react";
 import { useCallback, useEffect, useState } from "react";
 import { LuArrowLeft } from "react-icons/lu";
 import { CodeBlockEditor } from "@langwatch/workflow-web/components/blocks/CodeBlockEditor";
+import { AgentTestPanel } from "./agent-test-panel";
 import {
   CODE_OUTPUT_TYPES,
   type Output,
@@ -23,6 +26,7 @@ import {
   ScenarioInputMappingSection,
 } from "../../elements/suites/scenario-input-mapping-section";
 import { Drawer } from "@langwatch/workflow-web/components/ui/drawer";
+import { Tooltip } from "@langwatch/design-system/tooltip";
 import {
   type AvailableSource,
   type FieldMapping,
@@ -30,7 +34,12 @@ import {
   VariablesSection,
 } from "@langwatch/prompt-web/surfaces/variables";
 import { showErrorToast } from "../../../behavior/errors";
-import { getComplexProps, getFlowCallbacks, useDrawer, useDrawerParams } from "@langwatch/ui-drawer";
+import {
+  getComplexProps,
+  getFlowCallbacks,
+  useDrawer,
+  useDrawerParams,
+} from "@langwatch/ui-drawer";
 import { useOrganizationTeamProject } from "../../../behavior/use-organization-team-project";
 import { CodeEditorModal } from "@langwatch/workflow-web/optimization_studio/components/code/workflow-code-editor.transport";
 import type { CodeComponentConfig, Field as DSLField } from "@langwatch/workflow-contract";
@@ -389,7 +398,23 @@ export function AgentCodeEditorDrawer(props: AgentCodeEditorDrawerProps) {
                 {/* Code editor */}
                 <Box>
                   <Field.Root>
-                    <Field.Label>Python Code</Field.Label>
+                    <HStack gap={1}>
+                      <Field.Label>Python Code</Field.Label>
+                      <Tooltip
+                        content="Return a session key beside the outputs to keep a value for the conversation, such as a conversation id. Map an input to the scenario session to receive it on the next turn of the same conversation; it is None on the first turn."
+                        positioning={{ placement: "top" }}
+                        showArrow
+                      >
+                        <chakra.button
+                          type="button"
+                          aria-label="More about session keys"
+                          display="flex"
+                          color="fg.muted"
+                        >
+                          <HelpCircle width="14px" />
+                        </chakra.button>
+                      </Tooltip>
+                    </HStack>
                     <Text fontSize="sm" color="fg.muted" marginBottom={2}>
                       Define a Python class with a `__call__` method that takes inputs and returns
                       outputs.
@@ -443,6 +468,12 @@ export function AgentCodeEditorDrawer(props: AgentCodeEditorDrawerProps) {
                     onOutputFieldChange={handleScenarioOutputFieldChange}
                   />
                 </Box>
+
+                {agentId && project?.id ? (
+                  <Box paddingTop={4} borderTopWidth="1px" borderColor="border">
+                    <AgentTestPanel agentId={agentId} projectId={project.id} />
+                  </Box>
+                ) : null}
               </VStack>
             )}
           </Drawer.Body>

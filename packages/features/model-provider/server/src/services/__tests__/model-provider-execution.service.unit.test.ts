@@ -12,7 +12,10 @@
  */
 
 import { describe, expect, it } from "vitest";
-import { ModelRestrictedForExecutionError } from "@langwatch/model-provider-contract";
+import {
+  expandLatestAlias,
+  ModelRestrictedForExecutionError,
+} from "@langwatch/model-provider-contract";
 import { ModelProviderExecutionService } from "../model-provider-execution.service";
 
 function executionWith(providers: Record<string, unknown>, rowById?: unknown) {
@@ -101,6 +104,32 @@ describe("ModelProviderExecutionService.prepare", () => {
       await expect(prepare(service, "openai/gpt-5-mini")).resolves.toMatchObject({
         model: expect.stringContaining("gpt-5-mini"),
       });
+    });
+  });
+
+  describe("given a latest alias on a configured provider", () => {
+    /** @scenario "The LiteLLM params carry the concrete model for an alias" */
+    it("names the model the alias currently resolves to", async () => {
+      // The catalog decides what the alias means today, so the expectation
+      // reads the same resolver instead of pinning a model id that retires.
+      const resolved = expandLatestAlias("openai/latest-mini");
+      expect(resolved).not.toBe("openai/latest-mini");
+
+      const service = executionWith({
+        openai: { ...openai, models: [resolved.split("/")[1]] },
+      });
+
+      const prepared = await prepare(service, "openai/latest-mini");
+      expect(prepared.model).toBe(resolved);
+      expect(prepared.model).not.toContain("latest");
+    });
+
+    /** @scenario "A concrete model id is not rewritten" */
+    it("passes a concrete model id through unchanged", async () => {
+      const service = executionWith({ openai });
+
+      const prepared = await prepare(service, "openai/gpt-5-mini");
+      expect(prepared.model).toBe("openai/gpt-5-mini");
     });
   });
 });

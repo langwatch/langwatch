@@ -102,12 +102,12 @@ export class SuiteScopeNotAllowedError extends SuiteExecutionError {
   }
 }
 
-export class SuiteFolderMembershipManagedError extends ValidationError {
+export class SuiteTestSuiteMembershipManagedError extends ValidationError {
   constructor() {
-    const message = "A folder's scenarios are managed by filing scenarios into it";
+    const message = "A test suite's scenarios are managed by filing scenarios into it";
     super(message, {
       meta: { fieldErrors: { scenarioIds: [message] } },
     });
-    this.name = "SuiteFolderMembershipManagedError";
+    this.name = "SuiteTestSuiteMembershipManagedError";
   }
 }

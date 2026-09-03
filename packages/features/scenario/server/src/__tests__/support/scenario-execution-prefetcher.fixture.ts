@@ -51,7 +51,7 @@ export interface SuiteConfigFetcher {
     simulatorModel: string | null;
     judgeModel: string | null;
     targets?: Array<{
-      type: "prompt" | "http" | "code" | "workflow";
+      type: "prompt" | "http" | "code" | "workflow" | "connected";
       referenceId: string;
       scenarioMappings?: Record<
         string,
@@ -164,7 +164,7 @@ function scenarioService(deps: ScenarioPrefetchFixture): ScenarioService {
         judgeModel: null,
         maxTurns: null,
         minTurns: null,
-        folderId: null,
+        testSuiteId: null,
         version: 1,
         lastUpdatedById: null,
         archivedAt: null,
@@ -194,7 +194,7 @@ function suiteService(deps: ScenarioPrefetchFixture): SuiteService {
         labels: [],
         simulatorModel: value.simulatorModel,
         judgeModel: value.judgeModel,
-        kind: "custom",
+        kind: "run_plan",
         scope: null,
         archivedAt: null,
         createdAt: now,

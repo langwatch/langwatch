@@ -21,6 +21,8 @@ import type {
   AuthzCanAnyByIdsOutput,
   AuthzCanBatchByIdsInput,
   AuthzCanBatchByIdsOutput,
+  AuthzCanBatchPermissionsByIdsInput,
+  AuthzCanBatchPermissionsByIdsOutput,
   AuthzCheckByIdsInput,
   AuthzCheckByIdsOutput,
   AuthzCheckDetailedOutput,
@@ -97,6 +99,17 @@ export abstract class AuthzService {
   abstract canAnyByIds(args: AuthzCanAnyByIdsInput): Promise<AuthzCanAnyByIdsOutput>;
 
   abstract canBatchByIds(args: AuthzCanBatchByIdsInput): Promise<AuthzCanBatchByIdsOutput>;
+
+  /**
+   * MANY permissions across many scopes in one organization, still off ONE
+   * grant collection. `canBatchByIds` is this with a single permission; this
+   * exists because the api-key project ceiling asks two permissions of every
+   * project, and two single-permission batches would collect the same
+   * snapshot twice.
+   */
+  abstract canBatchPermissionsByIds(
+    args: AuthzCanBatchPermissionsByIdsInput,
+  ): Promise<AuthzCanBatchPermissionsByIdsOutput>;
 
   abstract tryResolveScope(args: AuthzResolveScopeInput): Promise<AuthzScopeRef | null>;
 

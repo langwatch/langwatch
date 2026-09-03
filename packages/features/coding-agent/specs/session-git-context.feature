@@ -45,13 +45,25 @@ Rule: The session context event joins the fold honestly
     When the contribution is dispatched
     Then no contribution reaches the session fold
 
-Rule: Git identity folds with honest semantics
+Rule: Git identity folds as the present tense, last write wins
+
+  # The session row answers where the session is NOW. A resumed session moves
+  # between branches, worktrees and even repositories, and per-branch history
+  # lives on the fact rows, so nothing is lost by letting the scalars move —
+  # while a row frozen on its first repository can never be found by the
+  # repository the session works in today.
 
   @unit
-  Scenario: Repository identity and worktree set once and do not move
+  Scenario: Repository identity and worktree follow the latest context event
     Given a session whose first context event names a repository and worktree
-    When a later context event names a different repository
-    Then the session keeps the first repository identity and worktree
+    When a later context event names a different repository and worktree
+    Then the session carries the later repository identity and worktree
+
+  @unit
+  Scenario: A context event that omits a field keeps the previous value
+    Given a session that declared a repository and worktree
+    When a later context event names only a branch
+    Then the session keeps the repository identity and worktree it had
 
   @unit
   Scenario: The branch follows the latest session context event
@@ -64,6 +76,72 @@ Rule: Git identity folds with honest semantics
     Given an admitted session context event
     When the session events fact table is projected
     Then no row is written for the context event
+
+Rule: Fact rows are stamped with the context declared before them
+
+  # The declaration itself becomes no row; instead it becomes the stamp on
+  # every row that follows it, which is what lets a session's cost split
+  # across the pull requests it drove. The stamp is applied where the
+  # pipeline already guarantees per-session ordering (the contribution
+  # command lane), so there is no re-fold and no read-time time matching.
+
+  @unit
+  Scenario: A model call after a declaration carries the declared context
+    Given a session that declared a repository and branch
+    When a model call is contributed after it
+    Then the stored fact row carries that repository and branch
+
+  @unit
+  Scenario: A model call before any declaration is stored unstamped
+    Given a session that has not declared a working context
+    When a model call is contributed
+    Then the stored fact row carries no repository and no branch
+
+  @unit
+  Scenario: A new declaration moves the stamp for the rows that follow
+    Given a session that declared one branch and then declared another
+    When model calls are contributed after each declaration
+    Then each fact row carries the branch declared before it
+
+  @unit
+  Scenario: A declaration with no branch stamps nothing
+    Given a session whose declaration names a repository but no branch
+    When a model call is contributed after it
+    Then the stored fact row carries no stamped context
+
+  # The stamp is a refinement of the record, never part of it, so a memo
+  # outage costs later rows their stamp and nothing else. Those rows fall
+  # back to the legacy whole-session rule.
+
+  @unit
+  Scenario: A record whose memo cannot be read is contributed unstamped
+    Given a memo that fails every read
+    When a model call is contributed
+    Then the record is still contributed, carrying no stamped context
+
+  @unit
+  Scenario: A declaration whose memo cannot be written is still contributed
+    Given a memo that fails every write
+    When a session declares its working context
+    Then the declaration is still contributed
+
+Rule: The memo that carries the stamp forgets on its own
+
+  # The memo holds one entry per live session. Redis expires them; the
+  # no-Redis fallback has to do it itself, or a long-running process grows
+  # one entry per session it ever saw.
+
+  @unit
+  Scenario: A memo entry is forgotten once its lifetime passes
+    Given a context written to the no-Redis memo
+    When its lifetime has passed
+    Then the memo answers nothing for that session
+
+  @unit
+  Scenario: The no-Redis memo stops growing at its bound
+    Given more sessions written to the no-Redis memo than it holds
+    When the oldest session's context is read
+    Then it has been evicted, and the newest sessions are still remembered
 
 Rule: A session remembers every branch it drove
 

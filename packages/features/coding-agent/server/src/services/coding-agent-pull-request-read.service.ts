@@ -28,6 +28,7 @@ import {
   type CodingAgentPersonalRepositoryGroup,
 } from "./coding-agent-personal-pull-request-values.service";
 import { CodingAgentPullRequestAssignmentService } from "./coding-agent-pull-request-assignment.service";
+import { CodingAgentPullRequestShareService } from "./coding-agent-pull-request-share.service";
 import {
   CodingAgentPullRequestUsageService,
   type CodingAgentModelUsage,
@@ -54,6 +55,7 @@ export class CodingAgentPullRequestReadService {
     billing: CodingAgentBillingPolicyPort;
     clock: CodingAgentClockPort;
     assignments: CodingAgentPullRequestAssignmentService;
+    shares: CodingAgentPullRequestShareService;
     usage: CodingAgentPullRequestUsageService;
     personalValues: CodingAgentPersonalPullRequestValuesService;
     sessionListPullRequests: CodingAgentSessionListPullRequestService;
@@ -71,15 +73,14 @@ export class CodingAgentPullRequestReadService {
       billing: CodingAgentBillingPolicyPort;
       clock: CodingAgentClockPort;
       assignments: CodingAgentPullRequestAssignmentService;
+      shares: CodingAgentPullRequestShareService;
       usage: CodingAgentPullRequestUsageService;
       personalValues: CodingAgentPersonalPullRequestValuesService;
       sessionListPullRequests: CodingAgentSessionListPullRequestService;
     },
   ) {}
 
-  async listForProject(input: {
-    projectId: string;
-  }): Promise<CodingAgentSessionListRow[]> {
+  async listForProject(input: { projectId: string }): Promise<CodingAgentSessionListRow[]> {
     const parsed = codingAgentSessionsListInputSchema.parse(input);
     const toMs = this.dependencies.clock.nowMs();
     const rows = await this.dependencies.sessionReads.listRecent({
@@ -198,11 +199,13 @@ export class CodingAgentPullRequestReadService {
         organizationId,
         repositoryHost: group.repositoryHost,
         repositoryFullName: group.repositoryFullName,
-        headBranches: [
-          ...new Set(group.sessions.flatMap((session) => session.headBranches)),
-        ],
+        headBranches: [...new Set(group.sessions.flatMap((session) => session.headBranches))],
       });
-      const assignments = this.dependencies.assignments.assignDrivingSessions({
+      // Discovery is personal: only the pull requests this project's own work
+      // touched become rows. Per branch, so a session that drove two pull
+      // requests surfaces both — each row then prices only its own share of
+      // the session.
+      const assignments = this.dependencies.assignments.assignDrivingSessionsPerBranch({
         sessions: group.sessions.map((session) => ({
           sessionId: session.sessionId,
           startedAtMs: session.startedAtMs,
@@ -211,9 +214,11 @@ export class CodingAgentPullRequestReadService {
         pullRequests: this.assignable(pullRequests),
       });
       const discovered = pullRequests.filter((pullRequest) =>
-        group.sessions.some(
-          (session) => assignments.get(session.sessionId) === pullRequest.prNumber,
-        ),
+        group.sessions.some((session) => {
+          const branchWinners = assignments.get(session.sessionId);
+          if (branchWinners === undefined) return false;
+          return [...branchWinners.values()].includes(pullRequest.prNumber);
+        }),
       );
       if (discovered.length > 0) {
         rows.push(
@@ -227,9 +232,7 @@ export class CodingAgentPullRequestReadService {
           })),
         );
       }
-      const unmatched = group.sessions.filter(
-        (session) => !assignments.has(session.sessionId),
-      );
+      const unmatched = group.sessions.filter((session) => !assignments.has(session.sessionId));
       if (unmatched.length === 0) continue;
       const repoCovered = await this.dependencies.github.coversRepository({
         organizationId,
@@ -279,35 +282,34 @@ export class CodingAgentPullRequestReadService {
       return { target, sessions: [], rows: [], modelBreakdown: [] };
     }
     const toMs = this.dependencies.clock.nowMs();
-    const sessions = await this.dependencies.sessions.listByRepositoryBranch({
+    const candidates = await this.candidateSessionsFor({
       tenantIds: query.permittedProjectIds,
       repositoryHost: target.repositoryHost,
       repositoryOwner,
       repositoryName,
       branches: [target.headBranch],
-      startedAtFromMs: toMs - USAGE_SESSION_WINDOW_MS,
+      fromMs: toMs - USAGE_SESSION_WINDOW_MS,
     });
-    const assignments = this.dependencies.assignments.assignDrivingSessions({
-      sessions: sessions.map((session) => ({
-        sessionId: session.sessionId,
-        startedAtMs: session.startedAtMs,
-        headBranches: this.dependencies.assignments.branchesOf(session),
-      })),
+    const modelTotals = await this.dependencies.sessionEvents.sumTokensByModelPerSession({
+      tenantIds: query.permittedProjectIds,
+      sessionIds: candidates.sessions.map((session) => session.sessionId),
+      fromMs: toMs - USAGE_SESSION_WINDOW_MS,
+    });
+    const attribution = this.dependencies.shares.attribute({
+      sessions: candidates.sessions,
+      rowMatchedSessionKeys: candidates.rowMatchedSessionKeys,
       pullRequests: this.assignable(siblings),
+      prNumber: target.prNumber,
+      repositoryHost: target.repositoryHost,
+      repositoryFullName: target.repositoryFullName,
+      modelTotals,
     });
-    const attached = sessions.filter(
-      (session) => assignments.get(session.sessionId) === target.prNumber,
-    );
+    const attached = attribution.sessions;
     const costProjects = new Set(query.costProjectIds);
     const nonBillableAgents = await this.nonBillableAgents(
       query.organizationId,
       attached.map((session) => session.agent),
     );
-    const modelTotals = await this.dependencies.sessionEvents.sumTokensByModelPerSession({
-      tenantIds: query.permittedProjectIds,
-      sessionIds: attached.map((session) => session.sessionId),
-      fromMs: toMs - USAGE_SESSION_WINDOW_MS,
-    });
     return {
       target,
       sessions: attached,
@@ -319,7 +321,7 @@ export class CodingAgentPullRequestReadService {
       ),
       modelBreakdown: this.dependencies.usage.modelUsage(
         attached,
-        modelTotals,
+        attribution.modelTotals,
         costProjects,
       ),
     };
@@ -340,38 +342,35 @@ export class CodingAgentPullRequestReadService {
     if (input.query.permittedProjectIds.length === 0) return [];
     const [repositoryOwner, repositoryName] = input.group.repositoryFullName.split("/");
     if (!repositoryOwner || !repositoryName) return [];
-    const sessions = await this.dependencies.sessions.listByRepositoryBranch({
+    const candidates = await this.candidateSessionsFor({
       tenantIds: input.query.permittedProjectIds,
       repositoryHost: input.group.repositoryHost,
       repositoryOwner,
       repositoryName,
-      branches: [
-        ...new Set(input.discovered.map((pullRequest) => pullRequest.headBranch)),
-      ],
-      startedAtFromMs: input.toMs - USAGE_SESSION_WINDOW_MS,
-    });
-    const assignments = this.dependencies.assignments.assignDrivingSessions({
-      sessions: sessions.map((session) => ({
-        sessionId: session.sessionId,
-        startedAtMs: session.startedAtMs,
-        headBranches: this.dependencies.assignments.branchesOf(session),
-      })),
-      pullRequests: this.assignable(input.pullRequests),
+      branches: [...new Set(input.discovered.map((pullRequest) => pullRequest.headBranch))],
+      fromMs: input.toMs - USAGE_SESSION_WINDOW_MS,
     });
     const nonBillableAgents = await this.nonBillableAgents(
       input.organizationId,
-      sessions.map((session) => session.agent),
+      candidates.sessions.map((session) => session.agent),
     );
     const modelTotals = await this.dependencies.sessionEvents.sumTokensByModelPerSession({
       tenantIds: input.query.permittedProjectIds,
-      sessionIds: sessions.map((session) => session.sessionId),
+      sessionIds: candidates.sessions.map((session) => session.sessionId),
       fromMs: input.toMs - USAGE_SESSION_WINDOW_MS,
     });
     const costProjects = new Set(input.query.costProjectIds);
     return input.discovered.map((pullRequest) => {
-      const attached = sessions.filter(
-        (session) => assignments.get(session.sessionId) === pullRequest.prNumber,
-      );
+      const attribution = this.dependencies.shares.attribute({
+        sessions: candidates.sessions,
+        rowMatchedSessionKeys: candidates.rowMatchedSessionKeys,
+        pullRequests: this.assignable(input.pullRequests),
+        prNumber: pullRequest.prNumber,
+        repositoryHost: input.group.repositoryHost,
+        repositoryFullName: input.group.repositoryFullName,
+        modelTotals,
+      });
+      const attached = attribution.sessions;
       const rows = this.dependencies.usage.groupedRows(
         attached,
         costProjects,
@@ -381,11 +380,18 @@ export class CodingAgentPullRequestReadService {
       return {
         ...this.pullRequestIdentity(pullRequest),
         title: pullRequest.title,
-        lastActivityAtMs: this.dependencies.usage.latestActivity(attached),
+        // Discovery runs on this project's own sessions, the share runs on
+        // the stamps, so a discovered pull request can end up with no session
+        // attached: every stamp of the session that found it landed on a
+        // neighbour. The row stays, reporting no tokens and no cost, and
+        // dates itself by the pull request rather than by the epoch.
+        lastActivityAtMs:
+          this.dependencies.usage.latestActivity(attached) ||
+          (pullRequest.prUpdatedAt ?? pullRequest.prCreatedAt).getTime(),
         ...this.dependencies.usage.totals(rows),
         modelBreakdown: this.dependencies.usage.modelUsage(
           attached,
-          modelTotals,
+          attribution.modelTotals,
           costProjects,
         ),
         contributorsSummary: this.dependencies.usage.contributorsSummary(
@@ -394,6 +400,82 @@ export class CodingAgentPullRequestReadService {
         ),
       };
     });
+  }
+
+  /**
+   * Every session that may have worked on one repository's branches, found two
+   * ways and merged: sessions whose own row matches (the legacy read), plus
+   * sessions whose STAMPED fact rows name the repository even though their row
+   * has since moved to another one — a resumed agent cycling between
+   * repositories is one session, and only its stamps remember everywhere it
+   * has been. The returned key set marks the row-matched ones, which are the
+   * only candidates the unstamped bucket may be priced under here.
+   */
+  private async candidateSessionsFor({
+    tenantIds,
+    repositoryHost,
+    repositoryOwner,
+    repositoryName,
+    branches,
+    fromMs,
+  }: {
+    tenantIds: string[];
+    repositoryHost: string;
+    repositoryOwner: string;
+    repositoryName: string;
+    branches: string[];
+    fromMs: number;
+  }): Promise<{
+    sessions: CodingAgentSessionBranchRecord[];
+    rowMatchedSessionKeys: ReadonlySet<string>;
+  }> {
+    // Independent reads, so they go together: the stamped one needs the
+    // row-matched keys only to subtract them, which happens after both land.
+    const [rowMatched, stamped] = await Promise.all([
+      this.dependencies.sessions.listByRepositoryBranch({
+        tenantIds,
+        repositoryHost,
+        repositoryOwner,
+        repositoryName,
+        branches,
+        startedAtFromMs: fromMs,
+      }),
+      this.dependencies.sessionEvents.listSessionsByStampedBranch({
+        tenantIds,
+        repositoryHost,
+        repositoryOwner,
+        repositoryName,
+        branches,
+        fromMs,
+      }),
+    ]);
+    const rowMatchedSessionKeys = new Set(
+      rowMatched.map(CodingAgentPullRequestShareService.sessionKey),
+    );
+
+    const missing = stamped.filter(
+      (pair) => !rowMatchedSessionKeys.has(CodingAgentPullRequestShareService.sessionKey(pair)),
+    );
+    if (missing.length === 0) {
+      return { sessions: rowMatched, rowMatchedSessionKeys };
+    }
+
+    const fetched = await this.dependencies.sessions.listBySessionIds({
+      tenantIds,
+      sessionIds: [...new Set(missing.map((pair) => pair.sessionId))],
+      startedAtFromMs: fromMs,
+    });
+    // The id read cannot scope per tenant, so a provider session id shared by
+    // two projects fetches both; keep only the (tenant, session) pairs the
+    // stamps actually named.
+    const missingKeys = new Set(missing.map(CodingAgentPullRequestShareService.sessionKey));
+    const stampedOnly = fetched.filter((session) =>
+      missingKeys.has(CodingAgentPullRequestShareService.sessionKey(session)),
+    );
+    return {
+      sessions: [...rowMatched, ...stampedOnly],
+      rowMatchedSessionKeys,
+    };
   }
 
   private async nonBillableAgents(
@@ -410,9 +492,7 @@ export class CodingAgentPullRequestReadService {
         }),
       })),
     );
-    return new Set(
-      answers.filter((answer) => answer.nonBillable).map((answer) => answer.agent),
-    );
+    return new Set(answers.filter((answer) => answer.nonBillable).map((answer) => answer.agent));
   }
 
   private assignable(pullRequests: readonly GithubPullRequest[]): Array<{

@@ -2796,13 +2796,23 @@ model Agent {
   copiedFromAgentId String?
   copiedFrom        Agent?    @relation("AgentCopies", fields: [copiedFromAgentId], references: [id], onDelete: Restrict, onUpdate: Restrict)
   copiedAgents      Agent[]   @relation("AgentCopies")
+  // Connected agents (ADR-128): the environment the SDK resolved, the scope of
+  // a development agent (a personal key's owner, or the host of a project key),
+  // the identity the SDK upserts by, and the last time an instance was seen.
+  environment       String?
+  ownerUserId       String?
+  hostLabel         String?
+  identityKey       String?
+  lastSeenAt        DateTime?
   archivedAt        DateTime?
   createdAt         DateTime  @default(now())
   updatedAt         DateTime  @default(now()) @updatedAt
 
+  @@unique([projectId, identityKey])
   @@index([projectId])
   @@index([workflowId])
   @@index([copiedFromAgentId])
+  @@index([projectId, lastSeenAt])
 }
 
 model Evaluator {
@@ -2857,14 +2867,14 @@ model Scenario {
   judgeModel      String?
   maxTurns        Int?
   minTurns        Int?
-  // The folder (a SimulationSuite with kind "folder") this scenario is filed
-  // in, or null for an unfiled scenario. This column is the source of truth
-  // for folder membership; the folder's scenarioIds is a denormalized copy
-  // kept in step transactionally by the canonical Scenario repository in
-  // @langwatch/scenario-server.
-  // See specs/suites/folder-membership-invariant.feature.
-  folderId        String?
-  folder          SimulationSuite? @relation("FolderScenarios", fields: [folderId], references: [id], onDelete: SetNull)
+  // The test suite (a SimulationSuite with kind "test_suite") this scenario is
+  // filed in, or null for an unfiled scenario. This column is the source of
+  // truth for test suite membership; the test suite's scenarioIds is a
+  // denormalized copy kept in step by reconcileTestSuiteMembership
+  // (server/suites/test-suite-membership.ts).
+  // See specs/suites/test-suite-membership-invariant.feature.
+  testSuiteId     String?
+  testSuite       SimulationSuite? @relation("TestSuiteScenarios", fields: [testSuiteId], references: [id], onDelete: SetNull)
   // Counts one up on every save of the editable fields. Each number has a
   // ScenarioVersion row holding the state as saved; the unique constraint
   // there is what keeps two concurrent saves from sharing a number. See
@@ -2878,7 +2888,7 @@ model Scenario {
   updatedAt       DateTime  @default(now()) @updatedAt
 
   @@index([projectId])
-  @@index([projectId, folderId])
+  @@index([projectId, testSuiteId])
 }
 
 // One saved state of a scenario's editable fields. Append-only: a restore
@@ -2937,19 +2947,19 @@ model SimulationSuite {
   // specs/suites/suite-model-selection.feature.
   simulatorModel String?
   judgeModel     String?
-  // "folder" | "custom" (see SUITE_KINDS in server/suites/types.ts). A folder
-  // is a suite that groups scenarios through Scenario.folderId; a custom suite
-  // is a hand-assembled run plan. String rather than a Prisma enum so a new
-  // kind needs no database migration.
-  kind            String     @default("custom")
+  // "test_suite" | "run_plan" (see SUITE_KINDS in server/suites/types.ts). A
+  // test suite groups scenarios through Scenario.testSuiteId; a run plan is
+  // hand-assembled. String rather than a Prisma enum so a new kind needs no
+  // database migration.
+  kind            String     @default("run_plan")
   // What the plan covers, as { mode } plus the mode's own field: "all",
-  // "folders" with folderIds, "labels" with labels, or "cases", which runs the
-  // stored scenarioIds. Null reads as "cases", so a plan written before scopes
-  // keeps the list it already held. A folder carries none: its members come
-  // from Scenario.folderId. See server/suites/scope.ts and
-  // specs/suites/run-plan-dynamic-scopes.feature.
+  // "test_suites" with testSuiteIds, "labels" with labels, or "scenarios",
+  // which runs the stored scenarioIds. Null reads as "scenarios", so a plan
+  // written before scopes keeps the list it already held. A test suite carries
+  // none: its members come from Scenario.testSuiteId. See
+  // server/suites/scope.ts and specs/suites/run-plan-dynamic-scopes.feature.
   scope           Json?
-  folderScenarios Scenario[] @relation("FolderScenarios")
+  testSuiteScenarios Scenario[] @relation("TestSuiteScenarios")
   archivedAt     DateTime?
   createdAt      DateTime  @default(now())
   updatedAt      DateTime  @default(now()) @updatedAt
@@ -3173,6 +3183,16 @@ model Grant {
   // here: an `@@index` for it would make the next `prisma migrate dev` drop
   // the partiality and rebuild it over every share-link row, which is the one
   // thing the WHERE clause exists to avoid.
+  //
+  // The API-key permission check's holder lookup - who else holds this key's
+  // private role - is served by "Grant_organizationId_roleKey_live_idx",
+  // partial on `WHERE "revokedAt" IS NULL`, from migration
+  // 20260831120000_grant_role_key_live_index. Partial for the same reason and
+  // undeclarable here for the same reason as the principal scan above: every
+  // read that decides access fences on the mark, and an `@@index` would strip
+  // the WHERE on the next `prisma migrate dev`. Without it the leading column
+  // selects the whole organization and the read degrades to a full scan on
+  // every check.
   //
   // "Grant_resource_terms_check" is an all-or-nothing CHECK over the tier's
   // four identity columns (token, permission, resourceKind, projectId), tied

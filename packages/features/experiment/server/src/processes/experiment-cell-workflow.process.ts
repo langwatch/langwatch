@@ -31,10 +31,7 @@ type HttpNodeData = {
 
 import type { Agent as TypedAgent } from "@langwatch/agent-contract";
 import { buildHttpNodeParameters } from "@langwatch/agent-contract";
-import {
-  AVAILABLE_EVALUATORS,
-  type EvaluatorTypes,
-} from "@langwatch/evaluator-contract";
+import { AVAILABLE_EVALUATORS, type EvaluatorTypes } from "@langwatch/evaluator-contract";
 import { buildWorkflowLlmConfig } from "@langwatch/workflow-contract";
 import type { VersionedPrompt } from "@langwatch/prompt-contract";
 import type { ChatMessage } from "@langwatch/trace-contract";
@@ -150,8 +147,7 @@ const datasetEdge = ({
   columnName: string;
   datasetColumns: Array<{ id: string; name: string; type: string }>;
 }): StudioEdge => {
-  const columnId =
-    datasetColumns.find((column) => column.name === columnName)?.id ?? columnName;
+  const columnId = datasetColumns.find((column) => column.name === columnName)?.id ?? columnName;
   return {
     id: `${entryNodeId}->${nodeId}.${inputField}`,
     source: entryNodeId,
@@ -193,9 +189,7 @@ export const buildEvaluatorCellWorkflow = ({
   const edges: StudioEdge[] = evaluatorConfigs.flatMap((evaluator) => {
     const evaluatorNodeId = evaluatorNodeIds[evaluator.id];
     if (!evaluatorNodeId) return [];
-    const mappings = datasetId
-      ? (evaluator.mappings[datasetId]?.[targetConfig.id] ?? {})
-      : {};
+    const mappings = datasetId ? (evaluator.mappings[datasetId]?.[targetConfig.id] ?? {}) : {};
 
     return Object.entries(mappings).flatMap(([inputField, mapping]) => {
       if (mapping.type !== "source" || mapping.source !== "dataset") return [];
@@ -261,10 +255,7 @@ const buildEntryNode = (
       dataset: {
         inline: {
           records: Object.fromEntries(
-            columns.map((col) => [
-              col.id,
-              [datasetEntry[col.name] ?? datasetEntry[col.id] ?? ""],
-            ]),
+            columns.map((col) => [col.id, [datasetEntry[col.name] ?? datasetEntry[col.id] ?? ""]]),
           ),
           columnTypes: columns.map((col) => ({
             name: col.name,
@@ -307,8 +298,7 @@ const buildTargetNode = (
     // Use local config if available, otherwise use loaded prompt
     if (targetConfig.localPromptConfig) {
       // Get name from loaded prompt if available, fall back to target ID
-      const name =
-        loadedData.prompt?.handle ?? loadedData.prompt?.name ?? targetConfig.id;
+      const name = loadedData.prompt?.handle ?? loadedData.prompt?.name ?? targetConfig.id;
       return {
         targetNode: buildSignatureNodeFromLocalConfig({
           nodeId: targetNodeId,
@@ -333,19 +323,12 @@ const buildTargetNode = (
         targetNodeId,
       };
     } else {
-      throw new Error(
-        `Prompt target ${targetConfig.id} has no local config and no loaded prompt`,
-      );
+      throw new Error(`Prompt target ${targetConfig.id} has no local config and no loaded prompt`);
     }
   } else if (targetConfig.type === "evaluator") {
     // Evaluator target - build evaluator node with target ID
     return {
-      targetNode: buildEvaluatorTargetNode(
-        targetNodeId,
-        targetConfig,
-        cell,
-        loadedEvaluators,
-      ),
+      targetNode: buildEvaluatorTargetNode(targetNodeId, targetConfig, cell, loadedEvaluators),
       targetNodeId,
     };
   } else {
@@ -354,12 +337,7 @@ const buildTargetNode = (
       switch (loadedData.agent.type) {
         case "http":
           return {
-            targetNode: buildHttpNodeFromAgent(
-              targetNodeId,
-              loadedData.agent,
-              targetConfig,
-              cell,
-            ),
+            targetNode: buildHttpNodeFromAgent(targetNodeId, loadedData.agent, targetConfig, cell),
             targetNodeId,
           };
         case "signature":
@@ -374,12 +352,7 @@ const buildTargetNode = (
           };
         case "code":
           return {
-            targetNode: buildCodeNodeFromAgent(
-              targetNodeId,
-              loadedData.agent,
-              targetConfig,
-              cell,
-            ),
+            targetNode: buildCodeNodeFromAgent(targetNodeId, loadedData.agent, targetConfig, cell),
             targetNodeId,
           };
         case "workflow":
@@ -392,6 +365,20 @@ const buildTargetNode = (
           throw new Error(
             `Workflow agent target ${targetConfig.id} has no loaded workflow — it must be dispatched to executeWorkflowCell, not buildTargetNode`,
           );
+        case "connected":
+          // A connected agent runs in the customer's own process, reached
+          // through the relay by the scenario runner. An experiment cell has
+          // no node that speaks that protocol.
+          throw new Error(
+            `Connected agent target ${targetConfig.id} cannot run inside an experiment workflow`,
+          );
+        default: {
+          // Every declared agent type is handled above, so the narrowing has
+          // nothing left here and `loadedData.agent` is itself `never`. The
+          // assignment is what makes a newly declared type fail the build.
+          const exhaustive: never = loadedData.agent;
+          throw new Error(`Unknown agent type: ${JSON.stringify(exhaustive)}`);
+        }
       }
     } else {
       throw new Error(`Agent target ${targetConfig.id} has no loaded agent`);
@@ -414,8 +401,7 @@ export const buildEvaluatorTargetNode = (
     ? loadedEvaluators?.get(targetConfig.targetEvaluatorId)
     : undefined;
   const dbConfig = dbEvaluator?.config as EvaluatorDbConfig | undefined;
-  const settings =
-    targetConfig.localEvaluatorConfig?.settings ?? dbConfig?.settings ?? {};
+  const settings = targetConfig.localEvaluatorConfig?.settings ?? dbConfig?.settings ?? {};
 
   // Build inputs with value mappings applied
   const inputs: Field[] = (targetConfig.inputs ?? []).map((input) => ({
@@ -435,8 +421,7 @@ export const buildEvaluatorTargetNode = (
   // and agents have dbAgentId
   if (!targetConfig.targetEvaluatorId) {
     throw new Error(
-      `Evaluator target "${nodeId}" has no evaluator ID. ` +
-        `targetEvaluatorId must be set.`,
+      `Evaluator target "${nodeId}" has no evaluator ID. ` + `targetEvaluatorId must be set.`,
     );
   }
 
@@ -596,11 +581,7 @@ const buildPromptIdentity = (identity: {
   };
 
   // versionMetadata requires all three fields; only emit it when complete.
-  if (
-    identity.versionId &&
-    identity.versionNumber != null &&
-    identity.versionCreatedAt != null
-  ) {
+  if (identity.versionId && identity.versionNumber != null && identity.versionCreatedAt != null) {
     return {
       ...base,
       versionMetadata: {
@@ -774,15 +755,15 @@ export const buildSignatureNodeFromAgent = (
  * so Workflow event enrichment can process them consistently.
  */
 const buildSignatureNodeParameters = (config: TypedAgent["config"]): Field[] => {
-  const baseParams = config.parameters ?? [];
+  // Only the studio node kinds carry node fields as parameters; a connected
+  // agent's parameters are run parameter declarations, never node fields.
+  const baseParams = ("sdk" in config ? [] : (config.parameters ?? [])) as Field[];
 
   // Start with existing parameters (may already have llm, instructions, messages)
   const resultParams: Field[] = [...baseParams];
 
   // Check if llm exists in parameters
-  const hasLlmInParams = resultParams.some(
-    (p) => p.identifier === "llm" && p.type === "llm",
-  );
+  const hasLlmInParams = resultParams.some((p) => p.identifier === "llm" && p.type === "llm");
 
   // Add top-level llm if not in parameters
   if (!hasLlmInParams && "llm" in config && config.llm) {
@@ -859,7 +840,9 @@ export const buildCodeNodeFromAgent = (
       name: agent.name,
       inputs,
       outputs,
-      parameters: config.parameters ?? [],
+      // The caller dispatched on `agent.type === "code"`, so the parameters
+      // are the code node's own fields.
+      parameters: ("sdk" in config ? [] : (config.parameters ?? [])) as Field[],
       cls: "Code",
     },
   };

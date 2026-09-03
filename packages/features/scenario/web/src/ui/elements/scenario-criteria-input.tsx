@@ -1,14 +1,15 @@
-import {
-  Button,
-  HStack,
-  IconButton,
-  Spacer,
-  Text,
-  Textarea,
-  VStack,
-} from "@chakra-ui/react";
+import { Button, HStack, IconButton, Spacer, Text, Textarea, VStack } from "@chakra-ui/react";
 import { Pencil, Plus, Trash2 } from "lucide-react";
 import { useEffect, useRef, useState } from "react";
+
+/**
+ * Where a criterion stops growing and starts scrolling.
+ *
+ * A criterion is one sentence, so the field follows it rather than holding a
+ * fixed box. Without a stop, one pasted paragraph would push the buttons under
+ * the list off the screen.
+ */
+const CRITERION_MAX_HEIGHT = "120px";
 
 type ScenarioCriteriaInputProps = {
   value: string[];
@@ -107,6 +108,7 @@ export function ScenarioCriteriaInput({
                 size="sm"
                 autoresize
                 rows={2}
+                maxHeight={CRITERION_MAX_HEIGHT}
                 autoFocus
               />
               <HStack gap={1}>
@@ -131,12 +133,7 @@ export function ScenarioCriteriaInput({
                 >
                   Cancel
                 </Button>
-                <Button
-                  type="button"
-                  size="xs"
-                  variant="outline"
-                  onClick={handleSaveEdit}
-                >
+                <Button type="button" size="xs" variant="outline" onClick={handleSaveEdit}>
                   Save
                 </Button>
               </HStack>
@@ -188,6 +185,7 @@ export function ScenarioCriteriaInput({
               _placeholder={{ color: "gray.400", fontStyle: "italic" }}
               autoresize
               rows={2}
+              maxHeight={CRITERION_MAX_HEIGHT}
             />
           </HStack>
           <HStack gap={1} justify="end">

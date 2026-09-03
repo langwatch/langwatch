@@ -11,7 +11,7 @@ import {
   isWithinRolloutPercentage,
 } from "../feature-flag-bucketing";
 
-const FLAG = "release_ui_navigation_v2_enabled";
+const FLAG = "release_ui_agent_testing_v2_enabled";
 const OTHER_FLAG = "release_ui_home_signal_focused_enabled";
 
 function subjects(count: number): string[] {

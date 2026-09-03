@@ -1,8 +1,4 @@
-import type {
-  AdminIdentity,
-  StartImpersonationInput,
-  StopImpersonationInput,
-} from "./admin";
+import type { AdminIdentity, StartImpersonationInput, StopImpersonationInput } from "./admin";
 import type {
   DeleteBlobInput,
   DeleteBlobResult,
@@ -53,10 +49,7 @@ export abstract class OpsService {
   abstract runBlobCleanup(input: RunBlobCleanupInput): Promise<BlobSweepReport>;
   abstract deleteBlob(input: DeleteBlobInput): Promise<DeleteBlobResult>;
   abstract listAnomalies(): Promise<Anomaly[]>;
-  abstract dismissAnomaly(input: {
-    tenantId: string;
-    kind: AnomalyKind;
-  }): Promise<boolean>;
+  abstract dismissAnomaly(input: { tenantId: string; kind: AnomalyKind }): Promise<boolean>;
   abstract listScheduledJobs(input: ListScheduledJobsInput): Promise<OpsScheduledJob[]>;
   abstract listPausedSchedules(
     input: ListPausedSchedulesInput,
@@ -94,13 +87,16 @@ export abstract class OpsService {
   abstract unblockQueueGroup(input: {
     queueName: string;
     groupId: string;
+    requestedBy: string;
   }): Promise<{ wasBlocked: boolean }>;
   abstract unblockAllQueueGroups(input: {
     queueName: string;
+    requestedBy: string;
   }): Promise<{ unblockedCount: number }>;
   abstract drainQueueGroup(input: {
     queueName: string;
     groupId: string;
+    requestedBy: string;
   }): Promise<{ jobsRemoved: number }>;
   abstract pauseQueuePipeline(input: { queueName: string; key: string }): Promise<void>;
   abstract unpauseQueuePipeline(input: { queueName: string; key: string }): Promise<void>;
@@ -110,28 +106,25 @@ export abstract class OpsService {
     jobId: string;
   }): Promise<{ wasBlocked: boolean }>;
   abstract listPausedQueueKeys(input: { queueName: string }): Promise<string[]>;
-  abstract pauseQueueTenant(input: {
-    queueName: string;
-    tenantId: string;
-  }): Promise<void>;
-  abstract unpauseQueueTenant(input: {
-    queueName: string;
-    tenantId: string;
-  }): Promise<void>;
+  abstract pauseQueueTenant(input: { queueName: string; tenantId: string }): Promise<void>;
+  abstract unpauseQueueTenant(input: { queueName: string; tenantId: string }): Promise<void>;
   abstract listPausedQueueTenants(input: { queueName: string }): Promise<string[]>;
   abstract drainQueueTenant(input: {
     queueName: string;
     tenantId: string;
     groupIdContains?: string;
+    requestedBy: string;
   }): Promise<{ groupsDrained: number; jobsDrained: number }>;
   abstract moveQueueGroupToDlq(input: {
     queueName: string;
     groupId: string;
+    requestedBy: string;
   }): Promise<{ jobsMoved: number }>;
   abstract moveAllBlockedQueueGroupsToDlq(input: {
     queueName: string;
     pipelineFilter?: string;
     errorFilter?: string;
+    requestedBy: string;
   }): Promise<{ movedCount: number; jobsMoved: number }>;
   abstract replayQueueGroupFromDlq(input: {
     queueName: string;

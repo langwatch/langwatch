@@ -75,6 +75,7 @@ import {
   loadExecutionData,
   type ExecutionDataServices,
 } from "../../services/experiment-execution-data.service";
+import { runResultsWriterFor } from "../../services/experiment-run-results-writer.service";
 import { createRunStateMirror } from "../../services/experiment-run-state-mirror.service";
 import { mapThrownErrorEvent } from "../../processes/experiment-result-mapping.process";
 import {
@@ -428,6 +429,23 @@ export function createExperimentV3RestApp<TSession extends ExperimentV3RestSessi
         progress,
       });
 
+      // The page saves these cells too, and it is the faster of the two. The
+      // server writes them so the board does not depend on the tab surviving:
+      // a background tab holds its save timer, and a dropped connection loses
+      // the cells the page was holding, while the run reads as complete.
+      const resultsWriter = runResultsWriterFor({
+        persistence: {
+          experiments: ports.experiments().experimentService,
+          actor: { userId: session.user.id, label: "user" },
+        },
+        projectId,
+        experimentId: request.experimentId,
+        scope: request.scope,
+        data: request.data,
+        datasetId: request.dataset_id,
+        parameters: request.parameters,
+      });
+
       return streamSSE(c, async (stream) => {
         try {
           const isFullRun = request.scope.type === "full";
@@ -456,13 +474,18 @@ export function createExperimentV3RestApp<TSession extends ExperimentV3RestSessi
           });
 
           for await (const event of orchestrator) {
-            // The store first, the customer second. The `execution_started`
-            // frame names the run, and the page hands that id to a poller as
-            // soon as it reads it, so a frame released before the store knows
-            // the run makes the first poll read 404 on a healthy run. Ordering
-            // it this way keeps the store a superset of what the page has seen.
-            // The mirror swallows its own failures, so a store outage still
-            // cannot stop the run.
+            // The board first, then the run store, then the customer. The cells
+            // go in before the run reports it ended, for the same reason the
+            // backend runner writes them first: a caller that reads "done" and
+            // then reads the workbench finds them there. The writer swallows
+            // its own failures, so a write that fails costs the page a refresh
+            // and never the run.
+            await resultsWriter?.record(event);
+            // The `execution_started` frame names the run, and the page hands
+            // that id to a poller as soon as it reads it, so a frame released
+            // before the store knows the run makes the first poll read 404 on a
+            // healthy run. Ordering it this way keeps the store a superset of
+            // what the page has seen. The mirror swallows its own failures too.
             await mirror.record(event);
             await stream.writeSSE({ data: JSON.stringify(event) });
 
@@ -1052,8 +1075,7 @@ export function createExperimentV3RestApp<TSession extends ExperimentV3RestSessi
           name: "experimentSlug",
           required: false,
           schema: { type: "string" },
-          description:
-            "Owning experiment. Required once the run has aged out of the status cache.",
+          description: "Owning experiment. Required once the run has aged out of the status cache.",
         },
       ],
       responses: {

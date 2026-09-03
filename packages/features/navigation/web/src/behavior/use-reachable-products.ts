@@ -9,9 +9,8 @@ import { PRODUCTS, type ProductId } from "../model/products";
  * `isLoading` covers the flag round-trips so landing decisions can wait
  * instead of resolving against a half-evaluated list.
  *
- * The product registry belongs to the new navigation modes, so a caller
- * that also runs in legacy mode passes `enabled: false` there. The flag
- * queries then never run and the legacy path keeps its request count.
+ * A caller that does not need the list passes `enabled: false`; the flag
+ * queries then never run and its request count is unchanged.
  */
 export function useReachableProducts({
   enabled = true,
@@ -25,16 +24,12 @@ export function useReachableProducts({
   const isOrganizationLoading = host.isLoading();
   const hasPermission = (permission: string) => host.hasPermission(permission);
 
-  // A legacy-mode caller asks for nothing. The platform hook expressed that by
+  // A disabled caller asks for nothing. The platform hook expressed that by
   // passing `enabled: false` down to the flag QUERIES so they never ran; the
   // host answers flags now, so the same property is "do not ask".
   const NOT_ASKED = { enabled: false, isLoading: false };
-  const gatewayFlag = enabled
-    ? host.featureFlag("release_ui_ai_gateway_menu_enabled")
-    : NOT_ASKED;
-  const governanceFlag = enabled
-    ? host.featureFlag("release_ui_ai_governance_enabled")
-    : NOT_ASKED;
+  const gatewayFlag = enabled ? host.featureFlag("release_ui_ai_gateway_menu_enabled") : NOT_ASKED;
+  const governanceFlag = enabled ? host.featureFlag("release_ui_ai_governance_enabled") : NOT_ASKED;
 
   const flagValues: Partial<Record<FrontendFeatureFlag, boolean>> = {
     release_ui_ai_gateway_menu_enabled: gatewayFlag.enabled,

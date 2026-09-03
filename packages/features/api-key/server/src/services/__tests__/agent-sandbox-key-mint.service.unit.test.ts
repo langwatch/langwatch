@@ -5,10 +5,7 @@
  * Spec: specs/agent-cache/agent-cache.feature
  */
 
-import {
-  AGENT_SANDBOX_API_KEY_NAME,
-  type ApiKeyService,
-} from "@langwatch/api-key-contract";
+import { AGENT_SANDBOX_API_KEY_NAME, type ApiKeyService } from "@langwatch/api-key-contract";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import {
   mintAgentSandboxApiKey,
@@ -31,9 +28,10 @@ describe("the agent sandbox key", () => {
     });
   });
 
-  describe("given a project that can mint a key", () => {
-    describe("when a run asks for one", () => {
-      it("asks for the manage grain and nothing else", async () => {
+  describe("given a project in a shared team", () => {
+    describe("when a run asks for a key", () => {
+      /** @scenario "A run in a shared project gets a key no user holds" */
+      it("asks for the manage grain and nothing else, owned by no user", async () => {
         await mintAgentSandboxApiKey({
           apiKeys,
           projectId: "project_1",
@@ -45,14 +43,13 @@ describe("the agent sandbox key", () => {
           name: AGENT_SANDBOX_API_KEY_NAME,
           isSystemManaged: true,
           userId: null,
+          createdByUserId: null,
           permissionMode: "restricted",
           // Written out rather than read from the constant the code itself
           // passes: a grain added to that list has to fail here, which is the
           // whole reason this assertion exists.
           permissions: ["agentCache:manage"],
-          bindings: [
-            { role: "CUSTOM", scopeType: "PROJECT", scopeId: "project_1" },
-          ],
+          bindings: [{ role: "CUSTOM", scopeType: "PROJECT", scopeId: "project_1" }],
         });
       });
 
@@ -63,13 +60,15 @@ describe("the agent sandbox key", () => {
           organizationId: "organization_1",
         });
 
-        const { expiresAt } = create.mock.calls[0]?.[0] as { expiresAt: Date };
+        const createCall = create.mock.calls[0];
+        if (!createCall) throw new Error("create was never called");
+        const { expiresAt } = createCall[0] as { expiresAt: Date };
         expect(expiresAt.getTime()).toBeGreaterThan(Date.now());
       });
     });
   });
 
-  describe("given a platform that cannot mint a key", () => {
+  describe("given a platform that holds no shared key and cannot mint one", () => {
     describe("when a run asks for one", () => {
       /** @scenario "A run whose key could not be minted still runs" */
       it("answers with no key rather than raising", async () => {

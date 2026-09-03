@@ -57,7 +57,14 @@ describe("resolveShellRoute", () => {
   });
 
   describe("given the settings detour", () => {
-    /** @scenario The internal ops pages take the settings detour */
+    /**
+     * Two specs name the same detour from different angles — the ops feature
+     * file calls it the detour, the modes file calls it the shell that draws
+     * around an ops page. One classifier decides both.
+     *
+     * @scenario The internal ops pages take the settings detour
+     * @scenario Internal ops pages render in the new settings shell
+     */
     it("is not a product, and carries organization scope", () => {
       for (const pathname of ["/settings/members", "/ops/backoffice/users"]) {
         expect(resolve(pathname)).toEqual({
@@ -83,9 +90,9 @@ describe("resolveShellRoute", () => {
     });
 
     it("keeps the settings detour out of the personal scope", () => {
-      expect(
-        resolve("/settings/members", { isPersonalScope: true }).isPersonalScopeRoute,
-      ).toBe(false);
+      expect(resolve("/settings/members", { isPersonalScope: true }).isPersonalScopeRoute).toBe(
+        false,
+      );
     });
   });
 

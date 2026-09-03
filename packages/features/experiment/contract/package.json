@@ -25,6 +25,7 @@
     "@langwatch/dataset-contract": "workspace:*",
     "@langwatch/evaluator-contract": "workspace:*",
     "@langwatch/handled-error": "workspace:*",
+    "@langwatch/scenario-contract": "workspace:*",
     "@langwatch/workflow-contract": "workspace:*",
     "zod": "^4.4.3"
   },

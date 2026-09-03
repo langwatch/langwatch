@@ -16,7 +16,7 @@ import {
 import { AgentService } from "@langwatch/agent-contract";
 import { PromptService } from "@langwatch/prompt-contract";
 import {
-  ScenarioFolderNotFoundError,
+  ScenarioTestSuiteNotFoundError,
   ScenarioService,
   scenarioSchema,
   type Scenario,
@@ -33,7 +33,7 @@ const suite = (overrides: Partial<Suite> = {}): Suite =>
     projectId: "project_1",
     name: "Critical path",
     slug: "critical-path",
-    kind: "custom",
+    kind: "run_plan",
     description: null,
     scenarioIds: ["scenario_1"],
     scope: null,
@@ -61,7 +61,7 @@ const scenario = (overrides: Partial<Scenario> = {}): Scenario =>
     judgeModel: null,
     maxTurns: null,
     minTurns: null,
-    folderId: null,
+    testSuiteId: null,
     version: 1,
     lastUpdatedById: null,
     archivedAt: null,
@@ -104,7 +104,7 @@ function serviceOptions(
 ): SuiteServiceOptions {
   return {
     repository: repo,
-    scenarios: mockScenarioService({ tryGetFolder: vi.fn().mockResolvedValue(null) }),
+    scenarios: mockScenarioService({ tryGetTestSuite: vi.fn().mockResolvedValue(null) }),
     agents: {} as AgentService,
     prompts: {} as PromptService,
     execution: new UnusedExecutionPort(),
@@ -277,16 +277,16 @@ describe("SuiteService", () => {
     expect(execute).not.toHaveBeenCalled();
   });
 
-  it("refuses a folder run without targets before resolving membership", async () => {
+  it("refuses a test suite run without targets before resolving membership", async () => {
     const scenarios = mockScenarioService({
-      getFolderRunDefinition: vi.fn(),
+      getTestSuiteRunDefinition: vi.fn(),
     });
     const service = SuiteService.create({
       ...serviceOptions(
         repository({
           tryFindById: vi
             .fn()
-            .mockResolvedValue(suite({ kind: "folder", scenarioIds: [], targets: [] })),
+            .mockResolvedValue(suite({ kind: "test_suite", scenarioIds: [], targets: [] })),
         }),
         { scenarios },
       ),
@@ -297,17 +297,17 @@ describe("SuiteService", () => {
         id: "suite_original",
         projectId: "project_1",
         organizationId: "org_1",
-        idempotencyKey: "folder-no-target",
+        idempotencyKey: "testSuite-no-target",
       }),
     ).rejects.toBeInstanceOf(SuiteTargetsRequiredError);
-    expect(scenarios.getFolderRunDefinition).not.toHaveBeenCalled();
+    expect(scenarios.getTestSuiteRunDefinition).not.toHaveBeenCalled();
   });
 
-  it("refuses a folder run when every filed scenario is archived", async () => {
+  it("refuses a test suite run when every filed scenario is archived", async () => {
     const execution = new CapturingExecutionPort();
     const scenarios = mockScenarioService({
-      getFolderRunDefinition: vi.fn().mockResolvedValue({
-        folder: suite({ kind: "folder", scenarioIds: [] }),
+      getTestSuiteRunDefinition: vi.fn().mockResolvedValue({
+        testSuite: suite({ kind: "test_suite", scenarioIds: [] }),
         scenarioIds: ["scenario_archived"],
       }),
       getReferenceStates: vi
@@ -320,7 +320,7 @@ describe("SuiteService", () => {
         repository({
           tryFindById: vi.fn().mockResolvedValue(
             suite({
-              kind: "folder",
+              kind: "test_suite",
               scenarioIds: [],
               targets: [{ type: "prompt", referenceId: "prompt_1" }],
             }),
@@ -336,7 +336,7 @@ describe("SuiteService", () => {
         id: "suite_original",
         projectId: "project_1",
         organizationId: "org_1",
-        idempotencyKey: "folder-all-archived",
+        idempotencyKey: "testSuite-all-archived",
       }),
     ).rejects.toBeInstanceOf(AllScenariosArchivedError);
     expect(execution.execute).not.toHaveBeenCalled();
@@ -344,7 +344,7 @@ describe("SuiteService", () => {
 
   const dynamicScopes: Array<{ scope: SuiteScope; membership: string[] }> = [
     { scope: { mode: "all" }, membership: ["scenario_2", "scenario_1"] },
-    { scope: { mode: "folders", folderIds: ["folder_1"] }, membership: ["scenario_1"] },
+    { scope: { mode: "test_suites", testSuiteIds: ["test_suite_1"] }, membership: ["scenario_1"] },
     { scope: { mode: "labels", labels: ["smoke"] }, membership: ["scenario_1"] },
   ];
 
@@ -373,7 +373,7 @@ describe("SuiteService", () => {
           repository({
             tryFindById: vi.fn().mockResolvedValue(
               suite({
-                kind: "custom",
+                kind: "run_plan",
                 scope,
                 scenarioIds: [],
                 targets: [{ type: "prompt", referenceId: "prompt_1" }],
@@ -718,17 +718,17 @@ describe("SuiteService", () => {
     );
   });
 
-  it("runs a folder through ScenarioService membership and reports archived cases", async () => {
+  it("runs a test suite through ScenarioService membership and reports archived cases", async () => {
     const execution = new CapturingExecutionPort();
-    const folder = suite({
-      id: "suite_folder",
-      kind: "folder",
+    const testSuite = suite({
+      id: "suite_test_suite",
+      kind: "test_suite",
       scenarioIds: [],
       targets: [{ type: "prompt", referenceId: "prompt_1" }],
     });
     const scenarios = mockScenarioService({
-      getFolderRunDefinition: vi.fn().mockResolvedValue({
-        folder,
+      getTestSuiteRunDefinition: vi.fn().mockResolvedValue({
+        testSuite,
         scenarioIds: ["scenario_1", "scenario_archived"],
       }),
       getReferenceStates: vi.fn().mockResolvedValue([
@@ -747,7 +747,7 @@ describe("SuiteService", () => {
       ]),
     });
     const service = SuiteService.create({
-      ...serviceOptions(repository({ tryFindById: vi.fn().mockResolvedValue(folder) }), {
+      ...serviceOptions(repository({ tryFindById: vi.fn().mockResolvedValue(testSuite) }), {
         scenarios,
         execution,
       }),
@@ -756,101 +756,101 @@ describe("SuiteService", () => {
     });
 
     const result = await service.run({
-      id: folder.id,
-      projectId: folder.projectId,
+      id: testSuite.id,
+      projectId: testSuite.projectId,
       organizationId: "org_1",
-      idempotencyKey: "folder-run-1",
+      idempotencyKey: "testSuite-run-1",
     });
 
     expect(result.skippedArchived.scenarios).toEqual(["scenario_archived"]);
     expect(execution.execute).toHaveBeenCalledWith(
       expect.objectContaining({
-        suiteId: folder.id,
+        suiteId: testSuite.id,
         activeScenarioIds: ["scenario_1"],
       }),
     );
-    expect(scenarios.getFolderRunDefinition).toHaveBeenCalledWith({
-      folderId: folder.id,
-      projectId: folder.projectId,
+    expect(scenarios.getTestSuiteRunDefinition).toHaveBeenCalledWith({
+      testSuiteId: testSuite.id,
+      projectId: testSuite.projectId,
     });
   });
 
-  it("loads a folder through ScenarioService when no custom suite exists", async () => {
-    const folder = suite({ id: "folder_1", kind: "folder", scenarioIds: [] });
-    const tryGetFolder = vi.fn().mockResolvedValue(folder);
+  it("loads a test suite through ScenarioService when no custom suite exists", async () => {
+    const testSuite = suite({ id: "test_suite_1", kind: "test_suite", scenarioIds: [] });
+    const tryGetTestSuite = vi.fn().mockResolvedValue(testSuite);
     const service = SuiteService.create(
       serviceOptions(repository({ tryFindById: vi.fn().mockResolvedValue(null) }), {
-        scenarios: mockScenarioService({ tryGetFolder }),
+        scenarios: mockScenarioService({ tryGetTestSuite }),
       }),
     );
 
-    await expect(service.get({ id: folder.id, projectId: folder.projectId })).resolves.toEqual(
-      folder,
-    );
-    expect(tryGetFolder).toHaveBeenCalledWith({
-      folderId: folder.id,
-      projectId: folder.projectId,
+    await expect(
+      service.get({ id: testSuite.id, projectId: testSuite.projectId }),
+    ).resolves.toEqual(testSuite);
+    expect(tryGetTestSuite).toHaveBeenCalledWith({
+      testSuiteId: testSuite.id,
+      projectId: testSuite.projectId,
     });
   });
 
-  it("keeps folder membership managed by ScenarioService and maps folder errors", async () => {
-    const folder = suite({ id: "folder_1", kind: "folder", scenarioIds: [] });
-    const updateFolder = vi.fn().mockResolvedValue(folder);
+  it("keeps test suite membership managed by ScenarioService and maps test suite errors", async () => {
+    const testSuite = suite({ id: "test_suite_1", kind: "test_suite", scenarioIds: [] });
+    const updateTestSuite = vi.fn().mockResolvedValue(testSuite);
     const scenarios = mockScenarioService({
-      tryGetFolder: vi.fn().mockResolvedValue(folder),
-      updateFolder,
+      tryGetTestSuite: vi.fn().mockResolvedValue(testSuite),
+      updateTestSuite,
     });
     const service = SuiteService.create(
-      serviceOptions(repository({ tryFindById: vi.fn().mockResolvedValue(folder) }), {
+      serviceOptions(repository({ tryFindById: vi.fn().mockResolvedValue(testSuite) }), {
         scenarios,
       }),
     );
 
     await expect(
-      service.update({ id: folder.id, projectId: folder.projectId, name: "Renamed" }),
-    ).resolves.toEqual(folder);
-    expect(updateFolder).toHaveBeenCalledWith({
-      folderId: folder.id,
-      projectId: folder.projectId,
+      service.update({ id: testSuite.id, projectId: testSuite.projectId, name: "Renamed" }),
+    ).resolves.toEqual(testSuite);
+    expect(updateTestSuite).toHaveBeenCalledWith({
+      testSuiteId: testSuite.id,
+      projectId: testSuite.projectId,
       name: "Renamed",
     });
     await expect(
       service.update({
-        id: folder.id,
-        projectId: folder.projectId,
+        id: testSuite.id,
+        projectId: testSuite.projectId,
         scope: { mode: "all" },
       }),
     ).rejects.toBeInstanceOf(SuiteScopeNotAllowedError);
     const missingService = SuiteService.create(
-      serviceOptions(repository({ tryFindById: vi.fn().mockResolvedValue(folder) }), {
+      serviceOptions(repository({ tryFindById: vi.fn().mockResolvedValue(testSuite) }), {
         scenarios: mockScenarioService({
-          tryGetFolder: vi.fn().mockResolvedValue(folder),
-          updateFolder: vi.fn().mockRejectedValue(new ScenarioFolderNotFoundError()),
+          tryGetTestSuite: vi.fn().mockResolvedValue(testSuite),
+          updateTestSuite: vi.fn().mockRejectedValue(new ScenarioTestSuiteNotFoundError()),
         }),
       }),
     );
     await expect(
-      missingService.update({ id: folder.id, projectId: folder.projectId, name: "Renamed" }),
+      missingService.update({ id: testSuite.id, projectId: testSuite.projectId, name: "Renamed" }),
     ).rejects.toBeInstanceOf(SuiteNotFoundError);
   });
 
-  it("maps a missing folder membership definition to SuiteNotFoundError", async () => {
-    const folder = suite({ id: "folder_1", kind: "folder", scenarioIds: [] });
+  it("maps a missing test suite membership definition to SuiteNotFoundError", async () => {
+    const testSuite = suite({ id: "test_suite_1", kind: "test_suite", scenarioIds: [] });
     const service = SuiteService.create({
-      ...serviceOptions(repository({ tryFindById: vi.fn().mockResolvedValue(folder) })),
+      ...serviceOptions(repository({ tryFindById: vi.fn().mockResolvedValue(testSuite) })),
       scenarios: mockScenarioService({
-        tryGetFolder: vi.fn().mockResolvedValue(folder),
-        getFolderRunDefinition: vi.fn().mockRejectedValue(new ScenarioFolderNotFoundError()),
+        tryGetTestSuite: vi.fn().mockResolvedValue(testSuite),
+        getTestSuiteRunDefinition: vi.fn().mockRejectedValue(new ScenarioTestSuiteNotFoundError()),
         getReferenceStates: vi.fn(),
       }),
     });
 
     await expect(
       service.run({
-        id: folder.id,
-        projectId: folder.projectId,
+        id: testSuite.id,
+        projectId: testSuite.projectId,
         organizationId: "org_1",
-        idempotencyKey: "missing-folder-run",
+        idempotencyKey: "missing-testSuite-run",
       }),
     ).rejects.toBeInstanceOf(SuiteNotFoundError);
   });

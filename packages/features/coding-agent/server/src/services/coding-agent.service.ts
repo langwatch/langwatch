@@ -31,6 +31,7 @@ import { CodingAgentTraceSessionRepository } from "../repositories/coding-agent-
 import { SessionMetricSeriesRepository } from "../repositories/session-metric-series.repository";
 import { CodingAgentPersonalPullRequestValuesService } from "./coding-agent-personal-pull-request-values.service";
 import { CodingAgentPullRequestAssignmentService } from "./coding-agent-pull-request-assignment.service";
+import { CodingAgentPullRequestShareService } from "./coding-agent-pull-request-share.service";
 import { CodingAgentPullRequestMappingBackfillService } from "./coding-agent-pull-request-mapping-backfill.service";
 import { CodingAgentPullRequestReadService } from "./coding-agent-pull-request-read.service";
 import { CodingAgentPullRequestUsageService } from "./coding-agent-pull-request-usage.service";
@@ -60,6 +61,7 @@ export class CodingAgentFeatureService extends CodingAgentServiceContract {
       clock: options.clock,
     });
     const assignments = CodingAgentPullRequestAssignmentService.create();
+    const shares = CodingAgentPullRequestShareService.create({ assignments });
     const usage = CodingAgentPullRequestUsageService.create();
     const personalValues = CodingAgentPersonalPullRequestValuesService.create({
       assignments,
@@ -83,6 +85,7 @@ export class CodingAgentFeatureService extends CodingAgentServiceContract {
       billing: options.billing,
       clock: options.clock,
       assignments,
+      shares,
       usage,
       personalValues,
       sessionListPullRequests,
@@ -119,9 +122,7 @@ export class CodingAgentFeatureService extends CodingAgentServiceContract {
     return this.collaborators.sessionReads.getSessionEvents(input);
   }
 
-  tryGetBySessionId(
-    input: CodingAgentSessionLookupInput,
-  ): Promise<CodingAgentSession | null> {
+  tryGetBySessionId(input: CodingAgentSessionLookupInput): Promise<CodingAgentSession | null> {
     return this.collaborators.sessionReads.tryGetBySessionId(input);
   }
 
@@ -135,9 +136,7 @@ export class CodingAgentFeatureService extends CodingAgentServiceContract {
     return this.collaborators.sessionReads.listRecent(input);
   }
 
-  backfillPullRequestMappings(
-    input: CodingAgentPullRequestMappingBackfillInput,
-  ): Promise<void> {
+  backfillPullRequestMappings(input: CodingAgentPullRequestMappingBackfillInput): Promise<void> {
     return this.collaborators.mappingBackfill.backfill(input);
   }
 
@@ -145,9 +144,7 @@ export class CodingAgentFeatureService extends CodingAgentServiceContract {
     return this.collaborators.sessionReads.getUsageTotals(input);
   }
 
-  listForProject(
-    input: CodingAgentSessionsListInput,
-  ): Promise<CodingAgentSessionListRow[]> {
+  listForProject(input: CodingAgentSessionsListInput): Promise<CodingAgentSessionListRow[]> {
     return this.collaborators.pullRequestReads.listForProject(input);
   }
 

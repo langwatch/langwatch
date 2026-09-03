@@ -3,16 +3,16 @@
  */
 
 import { type AgentInput, AgentRole } from "@langwatch/scenario";
-import { beforeEach, describe, expect, it, vi } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import type { WorkflowAgentData } from "@langwatch/scenario-contract";
+import { closeNlpFetchDispatchers } from "../adapters/nlp-fetch.adapter";
+import { guardAgainstGlobalFetch } from "./support/global-fetch-guard";
 
 vi.mock("@langwatch/observability/tracing", () => ({
-  injectTraceContextHeaders: vi.fn(
-    ({ headers }: { headers: Record<string, string> }) => ({
-      headers,
-      traceId: undefined,
-    }),
-  ),
+  injectTraceContextHeaders: vi.fn(({ headers }: { headers: Record<string, string> }) => ({
+    headers,
+    traceId: undefined,
+  })),
 }));
 
 import { injectTraceContextHeaders } from "@langwatch/observability/tracing";
@@ -20,9 +20,32 @@ import { SerializedWorkflowAgentAdapter } from "@langwatch/scenario-server";
 
 const mockInjectTraceContextHeaders = vi.mocked(injectTraceContextHeaders);
 
-// Mock global fetch
-const mockFetch = vi.fn();
-vi.stubGlobal("fetch", mockFetch);
+// The adapter calls undici's own fetch, so that export is the interception
+// point. Hoisted, because the vi.mock factory below is hoisted above this file.
+const mockFetch = vi.hoisted(() => vi.fn());
+
+// Undici's Agent does not read back the timeouts it was constructed with, so
+// the only way to assert on the dispatcher the adapter passes is to record the
+// constructor's arguments.
+const agentOptions = vi.hoisted(() => [] as Record<string, unknown>[]);
+
+vi.mock("undici", async () => {
+  const actual = await vi.importActual<typeof import("undici")>("undici");
+  return {
+    ...actual,
+    fetch: mockFetch,
+    Agent: class RecordingAgent extends actual.Agent {
+      constructor(opts?: Record<string, unknown>) {
+        agentOptions.push(opts ?? {});
+        super(opts);
+      }
+    },
+  };
+});
+
+// Pointing the global fetch at the same mock would let a regression back to it
+// pass this suite, which is how that bug reached production once already.
+guardAgainstGlobalFetch();
 
 describe("SerializedWorkflowAgentAdapter", () => {
   /** Minimal published workflow DSL with an entry node, a signature node, and an end node. */
@@ -104,8 +127,19 @@ describe("SerializedWorkflowAgentAdapter", () => {
     scenarioConfig: {} as AgentInput["scenarioConfig"],
   };
 
-  beforeEach(() => {
+  beforeEach(async () => {
     vi.clearAllMocks();
+    agentOptions.length = 0;
+    // createNlpFetchDispatcher now memoizes by timeoutMs at module scope
+    // (nlpgo/timeouts.ts). Without clearing the cache here, a dispatcher
+    // built by an earlier test for the same timeoutMs is returned again
+    // without touching the mocked undici.Agent constructor, so agentOptions
+    // stays empty and this test's assertions see stale/undefined values.
+    await closeNlpFetchDispatchers();
+    // Pin the timeout explicitly so the test doesn't rely on ambient env.
+    // Stubbed, not assigned: a raw assignment here outlives the file and
+    // reaches whatever else shares this vitest worker.
+    vi.stubEnv("NLPGO_ENGINE_CODE_BLOCK_TIMEOUT_SECONDS", "600");
     // clearAllMocks keeps implementations, so pin the no-active-context
     // default here; tests that need a trace context override it themselves.
     mockInjectTraceContextHeaders.mockImplementation(({ headers }) => ({
@@ -113,6 +147,10 @@ describe("SerializedWorkflowAgentAdapter", () => {
       traceId: undefined,
     }));
     mockFetch.mockResolvedValue(nlpResponse({ output: "Hi there!" }));
+  });
+
+  afterEach(() => {
+    vi.unstubAllEnvs();
   });
 
   describe("basic contract", () => {
@@ -513,6 +551,97 @@ describe("SerializedWorkflowAgentAdapter", () => {
 
       const fetchOptions = mockFetch.mock.calls[0]![1];
       expect(fetchOptions.signal).toBeInstanceOf(AbortSignal);
+    });
+  });
+
+  describe("the fetch deadline it arms", () => {
+    /** Never resolves; rejects only when the adapter's own timer aborts it. */
+    const abortAwareFetch = (signal: AbortSignal) =>
+      new Promise<Response>((_resolve, reject) => {
+        if (signal.aborted) {
+          reject(new DOMException("The operation was aborted.", "AbortError"));
+          return;
+        }
+        const onAbort = () => {
+          signal.removeEventListener("abort", onAbort);
+          reject(new DOMException("The operation was aborted.", "AbortError"));
+        };
+        signal.addEventListener("abort", onAbort);
+      });
+
+    /**
+     * Whether the adapter aborted its own fetch within `advanceMs` of virtual
+     * time. The deadline is not reported on a span or in the thrown message,
+     * so bracketing it from both sides is the only way to pin the value.
+     */
+    const abortsWithin = async (advanceMs: number): Promise<boolean> => {
+      mockFetch.mockImplementation(async (_url: string, opts: { signal: AbortSignal }) =>
+        abortAwareFetch(opts.signal),
+      );
+      vi.useFakeTimers();
+      let aborted = false;
+      try {
+        const adapter = new SerializedWorkflowAgentAdapter({
+          config: defaultConfig,
+          nlpServiceUrl,
+          projectApiKey: apiKey,
+        });
+        // Attach the rejection handler before advancing timers so the abort
+        // doesn't surface as an unhandled rejection. The promise stays pending
+        // forever when no abort fires, so it is deliberately not awaited.
+        void adapter.call(defaultInput).catch(() => {
+          aborted = true;
+        });
+        await vi.advanceTimersByTimeAsync(advanceMs);
+      } finally {
+        vi.useRealTimers();
+      }
+      return aborted;
+    };
+
+    afterEach(() => {
+      vi.unstubAllEnvs();
+    });
+
+    it("still holds the socket just under the 630s default deadline", async () => {
+      expect(await abortsWithin(629_999)).toBe(false);
+    });
+
+    it("aborts at the 630s default deadline (engine ceiling + headroom)", async () => {
+      // Regression guard for the production bug this adapter's own hardcoded
+      // 120_000 caused: a run the engine was still legitimately working on
+      // was cut off client-side.
+      expect(await abortsWithin(630_001)).toBe(true);
+    });
+
+    it("still holds the socket just under the 900s platform maximum when the engine ceiling is raised past it", async () => {
+      vi.stubEnv("NLPGO_ENGINE_CODE_BLOCK_TIMEOUT_SECONDS", "1200");
+
+      expect(await abortsWithin(899_999)).toBe(false);
+    });
+
+    it("aborts at the 900s platform maximum when the engine ceiling is raised past it", async () => {
+      vi.stubEnv("NLPGO_ENGINE_CODE_BLOCK_TIMEOUT_SECONDS", "1200");
+
+      expect(await abortsWithin(900_001)).toBe(true);
+    });
+
+    // The abort deadline is only one of the two clocks on this call: undici's
+    // own headersTimeout lives on the dispatcher and defaults to 300s, which no
+    // AbortSignal can raise. A run past 300s died with HeadersTimeoutError well
+    // inside the 630s abort, so the dispatcher must carry the same deadline.
+    it("passes a dispatcher whose headers timeout matches the 630s default deadline", async () => {
+      const adapter = new SerializedWorkflowAgentAdapter({
+        config: defaultConfig,
+        nlpServiceUrl,
+        projectApiKey: apiKey,
+      });
+      await adapter.call(defaultInput);
+
+      const fetchOptions = mockFetch.mock.calls[0]![1];
+      expect(fetchOptions.dispatcher).toBeDefined();
+      expect(agentOptions.at(-1)?.headersTimeout).toBe(630_000);
+      expect(agentOptions.at(-1)?.bodyTimeout).toBe(630_000);
     });
   });
 

@@ -6,15 +6,7 @@
  * Both paths use cursor-based pagination with Load More.
  */
 
-import {
-  Box,
-  Button,
-  EmptyState,
-  HStack,
-  Skeleton,
-  Text,
-  VStack,
-} from "@chakra-ui/react";
+import { Box, Button, EmptyState, HStack, Skeleton, Text, VStack } from "@chakra-ui/react";
 import { FlaskConical, RefreshCw } from "lucide-react";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import type { Period } from "@langwatch/analytics-web/components/PeriodSelector";
@@ -22,14 +14,12 @@ import { SetupWithAgentButton } from "@langwatch/trace-web/components/SetupWithA
 import { ShadowDivider } from "../../elements/shadow-divider";
 import { toaster } from "@langwatch/design-system/toaster";
 import { HandledErrorAlert, showErrorToast } from "../../../behavior/errors";
-import { LangyContextTarget } from "@langwatch/langy-web";
-import { scenarioContextChip } from "@langwatch/langy-web";
+import { LangyContextTarget, scenarioContextChip } from "@langwatch/langy-web";
 import { useDrawer } from "@langwatch/ui-drawer";
 import { useOrganizationTeamProject } from "../../../behavior/use-organization-team-project";
 import { useSimulationUpdateListener } from "../../../behavior/use-simulation-update-listener";
 import { useTargetNameMap } from "../../../behavior/use-target-name-map";
-import { isOnPlatformSet } from "@langwatch/scenario-contract";
-import { ScenarioRunStatus } from "@langwatch/scenario-contract";
+import { isOnPlatformSet, ScenarioRunStatus } from "@langwatch/scenario-contract";
 import type { ScenarioRunData } from "@langwatch/scenario-contract";
 import { isSuiteSetId } from "@langwatch/suite-contract";
 import { api } from "../../../behavior/scenario-api";
@@ -42,8 +32,6 @@ import {
   RunSummaryCounts,
   type RunHistoryFilterValues,
   type ScenarioRunContextRenderer,
-} from "@langwatch/suite-web";
-import {
   computeBatchRunSummary,
   computeGroupSummary,
   computeRunHistoryTotals,
@@ -51,19 +39,17 @@ import {
   groupRunsByScenarioId,
   groupRunsByTarget,
   resolveOriginLabel,
+  ScenarioRunExportDialog,
+  useAutoExpansion,
+  useRunHistoryStore,
+  useScrollToBatch,
 } from "@langwatch/suite-web";
-import { ScenarioRunExportDialog, useAutoExpansion } from "@langwatch/suite-web";
 import { useCancelScenarioRun } from "../../../behavior/suites/use-cancel-scenario-run";
 import { useExportScenarioRuns } from "../../../behavior/suites/use-export-scenario-runs";
 import { useRunHistoryPagination } from "../../../behavior/suites/use-run-history-pagination";
 import { usePrefetchRunState } from "../../../behavior/suites/use-prefetch-run-state";
-import { useRunHistoryStore, useScrollToBatch } from "@langwatch/suite-web";
 
-const renderScenarioContext: ScenarioRunContextRenderer = ({
-  scenarioRunId,
-  name,
-  children,
-}) => (
+const renderScenarioContext: ScenarioRunContextRenderer = ({ scenarioRunId, name, children }) => (
   <LangyContextTarget target={scenarioContextChip({ scenarioId: scenarioRunId, name })}>
     {children}
   </LangyContextTarget>
@@ -216,8 +202,7 @@ export function RunHistoryPanel({
       void refetch();
       toaster.create({ title: "Jobs cancelled", type: "success" });
     },
-    onCancelBatchError: (error) =>
-      showErrorToast({ error, fallbackTitle: "Couldn't cancel jobs" }),
+    onCancelBatchError: (error) => showErrorToast({ error, fallbackTitle: "Couldn't cancel jobs" }),
   });
 
   // Apply filters to raw runs
@@ -234,8 +219,7 @@ export function RunHistoryPanel({
       runs = runs.filter((r) => r.status === ScenarioRunStatus.SUCCESS);
     } else if (filters.passFailStatus === "fail") {
       runs = runs.filter(
-        (r) =>
-          r.status === ScenarioRunStatus.ERROR || r.status === ScenarioRunStatus.FAILED,
+        (r) => r.status === ScenarioRunStatus.ERROR || r.status === ScenarioRunStatus.FAILED,
       );
     } else if (filters.passFailStatus === "stalled") {
       runs = runs.filter((r) => r.status === ScenarioRunStatus.STALLED);
@@ -270,15 +254,10 @@ export function RunHistoryPanel({
     groups,
   });
 
-  const totals = useMemo(
-    () => computeRunHistoryTotals({ runs: filteredRuns }),
-    [filteredRuns],
-  );
+  const totals = useMemo(() => computeRunHistoryTotals({ runs: filteredRuns }), [filteredRuns]);
 
   const lastActivityTimestamp =
-    groupBy === "none"
-      ? (batchRuns[0]?.timestamp ?? null)
-      : (groups[0]?.timestamp ?? null);
+    groupBy === "none" ? (batchRuns[0]?.timestamp ?? null) : (groups[0]?.timestamp ?? null);
 
   // Notify parent when stats are ready
   useEffect(() => {
@@ -487,20 +466,11 @@ export function RunHistoryPanel({
             </EmptyState.Description>
             {/* Only when the project truly has nothing to run yet — a
                 filtered-empty list is a search miss, not a setup gap. */}
-            {!hasFiltersApplied ? (
-              <SetupWithAgentButton surface="simulationRuns" />
-            ) : null}
+            {!hasFiltersApplied ? <SetupWithAgentButton surface="simulationRuns" /> : null}
           </EmptyState.Content>
         </EmptyState.Root>
       ) : (
-        <VStack
-          ref={runListRef}
-          align="stretch"
-          gap={0}
-          flex={1}
-          minH={0}
-          overflow="auto"
-        >
+        <VStack ref={runListRef} align="stretch" gap={0} flex={1} minH={0} overflow="auto">
           {showInitPlaceholder && <RunRow loading />}
           {groupBy === "none"
             ? batchRuns.map((batchRun) => {
@@ -529,9 +499,7 @@ export function RunHistoryPanel({
                     viewMode={viewMode}
                     onCancelRun={
                       isPlatformManaged(batchRun.scenarioSetId ?? scenarioSetId)
-                        ? createCancelRunHandler(
-                            batchRun.scenarioSetId ?? scenarioSetId ?? "",
-                          )
+                        ? createCancelRunHandler(batchRun.scenarioSetId ?? scenarioSetId ?? "")
                         : undefined
                     }
                     onCancelAll={

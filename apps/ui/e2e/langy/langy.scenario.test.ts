@@ -45,9 +45,7 @@ async function deleteAllTestDatasets() {
         headers: { "X-Auth-Token": LW_KEY },
       });
       if (!res.ok) {
-        throw new Error(
-          `Failed deleting dataset ${d.id}: ${res.status} ${await res.text()}`,
-        );
+        throw new Error(`Failed deleting dataset ${d.id}: ${res.status} ${await res.text()}`);
       }
     }),
   );
@@ -61,11 +59,7 @@ async function deleteAllTestDatasets() {
  * agents, so a turn that says "run it" is answered with a question about what
  * to run it against rather than a run.
  */
-async function seedRunTargetPrompt({
-  handle,
-}: {
-  handle: string;
-}): Promise<void> {
+async function seedRunTargetPrompt({ handle }: { handle: string }): Promise<void> {
   // `request` backs off and retries a stack that refuses the connection while
   // it is still booting, which a bare fetch turns into a failed seed.
   const res = await request({
@@ -78,9 +72,7 @@ async function seedRunTargetPrompt({
   });
   // 409 is the prompt already being there, which is the state this wants.
   if (!res.ok && res.status !== 409) {
-    throw new Error(
-      `Seeding the run target prompt failed: ${res.status} ${await res.text()}`,
-    );
+    throw new Error(`Seeding the run target prompt failed: ${res.status} ${await res.text()}`);
   }
 }
 
@@ -97,8 +89,7 @@ describe("Langy via HTTP wrapper", () => {
       const result = await runScenarioAndLog({
         config: {
           name: "search recent traces",
-          description:
-            "The user is using LangWatch and wants to see recent trace activity.",
+          description: "The user is using LangWatch and wants to see recent trace activity.",
           agents: [
             langy,
             scenario.userSimulatorAgent({ model }),
@@ -111,11 +102,7 @@ describe("Langy via HTTP wrapper", () => {
               ],
             }),
           ],
-          script: [
-            scenario.user("show me recent traces"),
-            scenario.agent(),
-            scenario.judge(),
-          ],
+          script: [scenario.user("show me recent traces"), scenario.agent(), scenario.judge()],
         },
       });
       if (!result.success) console.log("JUDGE REASONING:", result.reasoning);
@@ -163,11 +150,7 @@ describe("Langy via HTTP wrapper", () => {
               ],
             }),
           ],
-          script: [
-            scenario.user("what's my average latency?"),
-            scenario.agent(),
-            scenario.judge(),
-          ],
+          script: [scenario.user("what's my average latency?"), scenario.agent(), scenario.judge()],
         },
       });
       if (!result.success) console.log("JUDGE REASONING:", result.reasoning);
@@ -191,11 +174,7 @@ describe("Langy via HTTP wrapper", () => {
               ],
             }),
           ],
-          script: [
-            scenario.user("what is my p95 latency?"),
-            scenario.agent(),
-            scenario.judge(),
-          ],
+          script: [scenario.user("what is my p95 latency?"), scenario.agent(), scenario.judge()],
         },
       });
       if (!result.success) console.log("JUDGE REASONING:", result.reasoning);
@@ -219,11 +198,7 @@ describe("Langy via HTTP wrapper", () => {
               ],
             }),
           ],
-          script: [
-            scenario.user("what's my eval pass rate?"),
-            scenario.agent(),
-            scenario.judge(),
-          ],
+          script: [scenario.user("what's my eval pass rate?"), scenario.agent(), scenario.judge()],
         },
       });
       if (!result.success) console.log("JUDGE REASONING:", result.reasoning);
@@ -318,9 +293,7 @@ describe("Langy via HTTP wrapper", () => {
             }),
           ],
           script: [
-            scenario.user(
-              "what's my trace volume this week and where can I see the trend?",
-            ),
+            scenario.user("what's my trace volume this week and where can I see the trend?"),
             scenario.agent(),
             scenario.judge(),
           ],
@@ -379,11 +352,7 @@ describe("Langy via HTTP wrapper", () => {
             ],
           }),
         ],
-        script: [
-          scenario.user("what evaluators do I have?"),
-          scenario.agent(),
-          scenario.judge(),
-        ],
+        script: [scenario.user("what evaluators do I have?"), scenario.agent(), scenario.judge()],
       });
       if (!result.success) console.log("JUDGE REASONING:", result.reasoning);
       expect(result.success).toBe(true);
@@ -475,11 +444,7 @@ describe("Langy via HTTP wrapper", () => {
             ],
           }),
         ],
-        script: [
-          scenario.user("what prompts do I have?"),
-          scenario.agent(),
-          scenario.judge(),
-        ],
+        script: [scenario.user("what prompts do I have?"), scenario.agent(), scenario.judge()],
       });
       if (!result.success) console.log("JUDGE REASONING:", result.reasoning);
       expect(result.success).toBe(true);
@@ -554,11 +519,7 @@ describe("Langy via HTTP wrapper", () => {
               ],
             }),
           ],
-          script: [
-            scenario.user("what workflows do I have?"),
-            scenario.agent(),
-            scenario.judge(),
-          ],
+          script: [scenario.user("what workflows do I have?"), scenario.agent(), scenario.judge()],
         },
       });
       if (!result.success) console.log("JUDGE REASONING:", result.reasoning);
@@ -582,11 +543,7 @@ describe("Langy via HTTP wrapper", () => {
               ],
             }),
           ],
-          script: [
-            scenario.user("show me my alert triggers"),
-            scenario.agent(),
-            scenario.judge(),
-          ],
+          script: [scenario.user("show me my alert triggers"), scenario.agent(), scenario.judge()],
         },
       });
       if (!result.success) console.log("JUDGE REASONING:", result.reasoning);
@@ -734,9 +691,7 @@ describe("Langy via HTTP wrapper", () => {
             }),
           ],
           script: [
-            scenario.user(
-              "create a basic customer-support scenario test for me",
-            ),
+            scenario.user("create a basic customer-support scenario test for me"),
             scenario.agent(),
             scenario.judge(),
           ],
@@ -789,7 +744,7 @@ describe("Langy via HTTP wrapper", () => {
       expect(newOnes.length).toBeGreaterThan(0);
     });
 
-    // `POST /api/agents` gates on `project:update`, and the project family is
+    // `POST /api/v1/agents` gates on `project:update`, and the project family is
     // read-only for Langy by policy: project writes are the credential surface
     // (`project:update` stores model-provider keys). Agents have no permission
     // family of their own, so there is no narrower grain the route could ask
@@ -897,7 +852,7 @@ describe("Langy via HTTP wrapper", () => {
         // allSettled and log, never throw: this is a finally block, so a throw
         // here REPLACES the assertion failure the test was about to report,
         // and one failed delete must not stop the rest of the sweep.
-        const leftover = (await listMonitors()).filter((m) => !beforeIds.has(m.id));
+        const leftoverMonitors = (await listMonitors()).filter((m) => !beforeIds.has(m.id));
         const monitorResults = await Promise.allSettled(
           leftoverMonitors.map((m) => deleteMonitor(m.id)),
         );
@@ -991,9 +946,7 @@ describe("Langy via HTTP wrapper", () => {
             }),
           ],
           script: [
-            scenario.user(
-              `rename my evaluator "${target.name}" to "${newName}"`,
-            ),
+            scenario.user(`rename my evaluator "${target.name}" to "${newName}"`),
             scenario.agent(),
             scenario.judge(),
           ],
@@ -1135,8 +1088,7 @@ describe("Langy via HTTP wrapper", () => {
       const result = await runScenarioAndLog({
         config: {
           name: "prompts surface location",
-          description:
-            "The user asks where to see/manage their prompts in the LangWatch UI.",
+          description: "The user asks where to see/manage their prompts in the LangWatch UI.",
           agents: [
             langy,
             scenario.userSimulatorAgent({ model }),
@@ -1166,8 +1118,7 @@ describe("Langy via HTTP wrapper", () => {
       const result = await runScenarioAndLog({
         config: {
           name: "datasets surface location",
-          description:
-            "The user asks where to browse their datasets in the UI.",
+          description: "The user asks where to browse their datasets in the UI.",
           agents: [
             langy,
             scenario.userSimulatorAgent({ model }),
@@ -1300,8 +1251,7 @@ describe("Langy via HTTP wrapper", () => {
       const result = await runScenarioAndLog({
         config: {
           name: "trace lookup drill-down",
-          description:
-            "Turn 1: ask for recent traces. Turn 2: 'tell me more about the first one'.",
+          description: "Turn 1: ask for recent traces. Turn 2: 'tell me more about the first one'.",
           agents: [
             langy,
             scenario.userSimulatorAgent({ model }),
@@ -1347,9 +1297,7 @@ describe("Langy via HTTP wrapper", () => {
         script: [
           scenario.user(`create a dataset "${datasetName}" with 2 example Q&A rows`),
           scenario.agent(),
-          scenario.user(
-            "add another row to it: 'What's the capital of Italy?' -> 'Rome'",
-          ),
+          scenario.user("add another row to it: 'What's the capital of Italy?' -> 'Rome'"),
           scenario.agent(),
           scenario.user("how many rows does it have now?"),
           scenario.agent(),
@@ -1454,8 +1402,7 @@ describe("Langy via HTTP wrapper", () => {
       const result = await runScenarioAndLog({
         config: {
           name: "out of scope",
-          description:
-            "The user asks Langy to write a haiku — completely unrelated to LangWatch.",
+          description: "The user asks Langy to write a haiku — completely unrelated to LangWatch.",
           agents: [
             langy,
             scenario.userSimulatorAgent({ model }),
@@ -1504,11 +1451,7 @@ describe("Langy via HTTP wrapper", () => {
               ],
             }),
           ],
-          script: [
-            scenario.user("show me my recent traces"),
-            scenario.agent(),
-            scenario.judge(),
-          ],
+          script: [scenario.user("show me my recent traces"), scenario.agent(), scenario.judge()],
         },
       });
       if (!result.success) console.log("JUDGE REASONING:", result.reasoning);
@@ -1603,11 +1546,7 @@ describe("Langy via HTTP wrapper", () => {
               ],
             }),
           ],
-          script: [
-            scenario.user("what's my average latency?"),
-            scenario.agent(),
-            scenario.judge(),
-          ],
+          script: [scenario.user("what's my average latency?"), scenario.agent(), scenario.judge()],
         },
       });
       if (!result.success) console.log("JUDGE REASONING:", result.reasoning);

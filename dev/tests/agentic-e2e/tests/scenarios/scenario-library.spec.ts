@@ -1,23 +1,21 @@
 import { test } from "@playwright/test";
 import {
   givenIAmLoggedIntoProject,
-  givenIAmOnTheScenariosListPage,
-  thenISeeTheScenariosListPage,
+  givenIAmOnTheScenariosPage,
+  givenICanWriteAScenario,
   thenISeeNewScenarioButton,
-  thenISeeEmptyState,
-  thenISeeScenarioTable,
+  thenISeeTheAgentTestingPage,
+  thenISeeTheScenariosPanel,
+  whenIOpenTheSimulationsScenariosAddress,
 } from "./steps";
 
 /**
- * Feature: Scenario Library
- * Source: specs/scenarios/scenario-library.feature
+ * Feature: Agent Testing page structure
+ * Source: specs/features/agent-testing/page-structure.feature
  *
  * As a LangWatch user
  * I want to browse and manage my scenarios
  * So that I can organize my behavioral test cases
- *
- * Note: Tests requiring seeded data (view scenarios in list, click to edit,
- * filter by label) are covered by the workflow test in scenario-editor.spec.ts
  */
 test.describe("Scenario Library", () => {
   test.beforeEach(async ({ page }) => {
@@ -25,28 +23,42 @@ test.describe("Scenario Library", () => {
   });
 
   /**
-   * Scenario: View scenarios list page
-   * Source: scenario-library.feature lines 13-17, 41-45
+   * Scenario: The page opens on the Scenarios tab
+   * Source: page-structure.feature
    *
-   * Verifies the scenarios page displays correctly with either
-   * empty state or existing scenarios table.
+   * The page reads its title and both tabs, and the scenarios panel shows
+   * one of its states: a day zero empty state, an empty suite, or the table.
    */
-  test("displays scenario library with new scenario button", async ({ page }) => {
-    await givenIAmOnTheScenariosListPage(page);
+  test("displays the scenarios tab with its panel", async ({ page }) => {
+    await givenIAmOnTheScenariosPage(page);
 
-    await thenISeeTheScenariosListPage(page);
+    await thenISeeTheAgentTestingPage(page);
+    await thenISeeTheScenariosPanel(page);
+  });
+
+  /**
+   * Scenario: A project with a suite offers New scenario
+   * Source: cases-table.feature
+   */
+  test("offers a New scenario button once a suite exists", async ({ page }) => {
+    await givenIAmOnTheScenariosPage(page);
+    await givenICanWriteAScenario(page);
+
     await thenISeeNewScenarioButton(page);
+  });
 
-    // Verify either welcome screen, empty state, or table is shown
-    const welcomeScreen = page.getByRole("heading", { name: /welcome to scenarios/i });
-    const emptyState = page.getByText("No scenarios yet");
-    const table = page.getByRole("table");
+  /**
+   * Scenario: A saved simulations address opens in Agent Testing when the flag is on
+   * Source: page-structure.feature
+   *
+   * The flag is on by default, so the address an older SDK or a bookmark
+   * still names lands on the Agent Testing page.
+   */
+  test("redirects a saved simulations address to Agent Testing", async ({
+    page,
+  }) => {
+    await whenIOpenTheSimulationsScenariosAddress(page);
 
-    // One of these should be visible
-    await welcomeScreen
-      .or(emptyState)
-      .or(table)
-      .first()
-      .waitFor({ state: "visible", timeout: 10000 });
+    await thenISeeTheAgentTestingPage(page);
   });
 });

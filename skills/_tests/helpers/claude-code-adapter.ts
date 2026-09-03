@@ -1,7 +1,7 @@
 import {
-  type AgentAdapter,
-  AgentRole,
-  type ScenarioExecutionStateLike,
+	type AgentAdapter,
+	AgentRole,
+	type ScenarioExecutionStateLike,
 } from "@langwatch/scenario";
 import chalk from "chalk";
 import { execSync, spawn } from "child_process";
@@ -20,40 +20,43 @@ const __dirname = path.dirname(__filename);
  */
 export const SKILL_TESTS_SET_ID = "skill-tests";
 
-const skillTestWorkRoot = path.resolve(__dirname, "../../../.claude/tmp/skill-tests");
+const skillTestWorkRoot = path.resolve(
+	__dirname,
+	"../../../.claude/tmp/skill-tests",
+);
 
 export function createSkillTestWorkDir(prefix: string): string {
-  fs.mkdirSync(skillTestWorkRoot, { recursive: true });
-  return fs.mkdtempSync(path.join(skillTestWorkRoot, prefix));
+	fs.mkdirSync(skillTestWorkRoot, { recursive: true });
+	return fs.mkdtempSync(path.join(skillTestWorkRoot, prefix));
 }
 
 export function removeSkillTestWorkDir(workingDirectory: string): void {
-  const resolvedDirectory = path.resolve(workingDirectory);
-  if (!resolvedDirectory.startsWith(`${skillTestWorkRoot}${path.sep}`)) {
-    throw new Error(`Test workspace must stay inside ${skillTestWorkRoot}`);
-  }
-  if (process.env.KEEP_SKILL_TEST_WORKDIR === "1") {
-    console.log(`[skill dogfood] preserved workdir: ${resolvedDirectory}`);
-    return;
-  }
+	const resolvedDirectory = path.resolve(workingDirectory);
+	if (!resolvedDirectory.startsWith(`${skillTestWorkRoot}${path.sep}`)) {
+		throw new Error(`Test workspace must stay inside ${skillTestWorkRoot}`);
+	}
+	if (process.env.KEEP_SKILL_TEST_WORKDIR === "1") {
+		console.log(`[skill dogfood] preserved workdir: ${resolvedDirectory}`);
+		return;
+	}
 
-  fs.rmSync(resolvedDirectory, { recursive: true, force: true });
+	fs.rmSync(resolvedDirectory, { recursive: true, force: true });
 }
 
 export function copyFixtureToWorkDir({
-  fixtureSubpath,
-  workingDirectory,
+	fixtureSubpath,
+	workingDirectory,
 }: {
-  fixtureSubpath: string;
-  workingDirectory: string;
+	fixtureSubpath: string;
+	workingDirectory: string;
 }): void {
-  const fixtureRoot = path.resolve(__dirname, "../fixtures");
-  const sourcePath = path.resolve(fixtureRoot, fixtureSubpath);
-  if (!sourcePath.startsWith(`${fixtureRoot}${path.sep}`)) {
-    throw new Error(`Fixture path must stay inside ${fixtureRoot}`);
-  }
+	const fixtureRoot = path.resolve(__dirname, "../fixtures");
+	const sourcePath = path.resolve(fixtureRoot, fixtureSubpath);
+	if (!sourcePath.startsWith(`${fixtureRoot}${path.sep}`)) {
+		throw new Error(`Fixture path must stay inside ${fixtureRoot}`);
+	}
 
-  fs.cpSync(sourcePath, workingDirectory, { recursive: true });
+	fs.cpSync(sourcePath, workingDirectory, { recursive: true });
 }
 
 /**
@@ -67,22 +70,30 @@ export function copyFixtureToWorkDir({
  * tests exercise the same self-contained markdown that real consumers receive.
  */
 export function installSkillToWorkDir({
-  workingDirectory,
-  skillSubpath,
-  installAs,
+	workingDirectory,
+	skillSubpath,
+	installAs,
 }: {
-  workingDirectory: string;
-  skillSubpath: string;
-  installAs?: string;
+	workingDirectory: string;
+	skillSubpath: string;
+	installAs?: string;
 }): void {
-  const sourcePath = path.resolve(__dirname, "../..", skillSubpath, "SKILL.mdx");
-  const skillName = installAs ?? path.basename(skillSubpath);
-  const skillDir = path.join(workingDirectory, ".skills", skillName);
-  fs.mkdirSync(skillDir, { recursive: true });
-  fs.writeFileSync(path.join(skillDir, "SKILL.md"), inlineMdx(sourcePath));
+	const sourcePath = path.resolve(
+		__dirname,
+		"../..",
+		skillSubpath,
+		"SKILL.mdx",
+	);
+	const skillName = installAs ?? path.basename(skillSubpath);
+	const skillDir = path.join(workingDirectory, ".skills", skillName);
+	fs.mkdirSync(skillDir, { recursive: true });
+	fs.writeFileSync(path.join(skillDir, "SKILL.md"), inlineMdx(sourcePath));
 }
 
-const cliDistPath = path.resolve(__dirname, "../../../sdks/typescript/dist/cli/index.js");
+const cliDistPath = path.resolve(
+	__dirname,
+	"../../../sdks/typescript/dist/cli/index.js",
+);
 
 /**
  * Sets up a local `langwatch` CLI wrapper in the temp folder's bin/ directory.
@@ -92,54 +103,56 @@ const cliDistPath = path.resolve(__dirname, "../../../sdks/typescript/dist/cli/i
  * the new CLI commands being available. This is non-optional.
  */
 export function setupLocalCli(workingDirectory: string): void {
-  if (!fs.existsSync(cliDistPath)) {
-    throw new Error(
-      `Local langwatch CLI not built at ${cliDistPath}. ` +
-        `Run \`pnpm build\` inside sdks/typescript/ before running scenario tests.`,
-    );
-  }
+	if (!fs.existsSync(cliDistPath)) {
+		throw new Error(
+			`Local langwatch CLI not built at ${cliDistPath}. ` +
+				`Run \`pnpm build\` inside sdks/typescript/ before running scenario tests.`,
+		);
+	}
 
-  const binDir = path.join(workingDirectory, "bin");
-  fs.mkdirSync(binDir, { recursive: true });
+	const binDir = path.join(workingDirectory, "bin");
+	fs.mkdirSync(binDir, { recursive: true });
 
-  const wrapperScript = `#!/usr/bin/env bash
+	const wrapperScript = `#!/usr/bin/env bash
 exec node "${cliDistPath}" "$@"
 `;
-  const wrapperPath = path.join(binDir, "langwatch");
-  fs.writeFileSync(wrapperPath, wrapperScript, { mode: 0o755 });
+	const wrapperPath = path.join(binDir, "langwatch");
+	fs.writeFileSync(wrapperPath, wrapperScript, { mode: 0o755 });
 }
 
 export function ensureClaudeSkillInstructions(workingDirectory: string): void {
-  const skillsDir = path.join(workingDirectory, ".skills");
-  if (!fs.existsSync(skillsDir)) return;
+	const skillsDir = path.join(workingDirectory, ".skills");
+	if (!fs.existsSync(skillsDir)) return;
 
-  const skillPaths = fs
-    .readdirSync(skillsDir, { withFileTypes: true })
-    .filter(
-      (entry) =>
-        entry.isDirectory() &&
-        fs.existsSync(path.join(skillsDir, entry.name, "SKILL.md")),
-    )
-    .map((entry) => `.skills/${entry.name}/SKILL.md`);
-  if (skillPaths.length === 0) return;
+	const skillPaths = fs
+		.readdirSync(skillsDir, { withFileTypes: true })
+		.filter(
+			(entry) =>
+				entry.isDirectory() &&
+				fs.existsSync(path.join(skillsDir, entry.name, "SKILL.md")),
+		)
+		.map((entry) => `.skills/${entry.name}/SKILL.md`);
+	if (skillPaths.length === 0) return;
 
-  const claudeMdPath = path.join(workingDirectory, "CLAUDE.md");
-  const existingInstructions = fs.existsSync(claudeMdPath)
-    ? fs.readFileSync(claudeMdPath, "utf8")
-    : "";
-  const missingSkillPaths = skillPaths.filter(
-    (skillPath) => !existingInstructions.includes(skillPath),
-  );
-  if (missingSkillPaths.length === 0) return;
+	const claudeMdPath = path.join(workingDirectory, "CLAUDE.md");
+	const existingInstructions = fs.existsSync(claudeMdPath)
+		? fs.readFileSync(claudeMdPath, "utf8")
+		: "";
+	const missingSkillPaths = skillPaths.filter(
+		(skillPath) => !existingInstructions.includes(skillPath),
+	);
+	if (missingSkillPaths.length === 0) return;
 
-  const separator =
-    existingInstructions.length > 0 && !existingInstructions.endsWith("\n") ? "\n" : "";
-  fs.appendFileSync(
-    claudeMdPath,
-    `${separator}Read and follow the instructions in ${missingSkillPaths.join(
-      " and ",
-    )} before doing anything else.\n`,
-  );
+	const separator =
+		existingInstructions.length > 0 && !existingInstructions.endsWith("\n")
+			? "\n"
+			: "";
+	fs.appendFileSync(
+		claudeMdPath,
+		`${separator}Read and follow the instructions in ${missingSkillPaths.join(
+			" and ",
+		)} before doing anything else.\n`,
+	);
 }
 
 /**
@@ -157,164 +170,470 @@ export function ensureClaudeSkillInstructions(workingDirectory: string): void {
  *   cold-start flows where the agent must discover keys from .env files.
  * @param omitEnvKeys - Additional variables to keep in the test process but
  *   remove from Claude Code, such as a provider key used only by the judge.
+ * @param extraEnv - Variables to add to the spawned Claude Code process,
+ *   such as LANGWATCH_CLI_CONFIG, which points the CLI at its own config
+ *   file so the `langwatch login` of the developer machine never reaches
+ *   a scenario that must start with no credential at all.
  */
 export function createClaudeCodeAgent({
-  workingDirectory,
-  skillPath,
-  cleanEnv,
-  omitEnvKeys = [],
+	workingDirectory,
+	skillPath,
+	cleanEnv,
+	omitEnvKeys = [],
+	extraEnv = {},
 }: {
-  workingDirectory: string;
-  skillPath?: string;
-  cleanEnv?: boolean;
-  omitEnvKeys?: string[];
+	workingDirectory: string;
+	skillPath?: string;
+	cleanEnv?: boolean;
+	omitEnvKeys?: string[];
+	extraEnv?: Record<string, string>;
 }): AgentAdapter {
-  setupLocalCli(workingDirectory);
-  if (skillPath) {
-    const skillName = path.basename(path.dirname(skillPath));
-    const skillDir = path.join(workingDirectory, ".skills", skillName);
-    fs.mkdirSync(skillDir, { recursive: true });
-    fs.copyFileSync(skillPath, path.join(skillDir, "SKILL.md"));
-  }
+	setupLocalCli(workingDirectory);
+	if (skillPath) {
+		const skillName = path.basename(path.dirname(skillPath));
+		const skillDir = path.join(workingDirectory, ".skills", skillName);
+		fs.mkdirSync(skillDir, { recursive: true });
+		fs.copyFileSync(skillPath, path.join(skillDir, "SKILL.md"));
+	}
 
-  // Claude Code does not auto-discover .skills/ in arbitrary directories.
-  // Preserve any existing CLAUDE.md and append only missing skill references.
-  ensureClaudeSkillInstructions(workingDirectory);
+	// Claude Code does not auto-discover .skills/ in arbitrary directories.
+	// Preserve any existing CLAUDE.md and append only missing skill references.
+	ensureClaudeSkillInstructions(workingDirectory);
 
-  return {
-    role: AgentRole.AGENT,
-    call: async (state) => {
-      // Render each turn as plain text. Anthropic-format messages can have
-      // `content` as an array of blocks (text, tool_use, tool_result, image,
-      // …). String-interpolating that array yields `[object Object]`, which
-      // the next Claude Code session then sees as the previous turn, making
-      // multi-turn scenarios appear garbled to the agent. Flatten content
-      // blocks down to readable text instead.
-      const renderContent = (content: unknown): string => {
-        if (typeof content === "string") return content;
-        if (!Array.isArray(content)) {
-          try {
-            return JSON.stringify(content);
-          } catch {
-            return String(content);
-          }
-        }
-        return content
-          .map((block: any) => {
-            if (block == null) return "";
-            if (typeof block === "string") return block;
-            switch (block.type) {
-              case "text":
-                return block.text ?? "";
-              case "tool_use": {
-                const input = block.input != null ? JSON.stringify(block.input) : "";
-                return `[tool_use ${block.name ?? "?"}(${input})]`;
-              }
-              case "tool_result": {
-                const inner =
-                  typeof block.content === "string"
-                    ? block.content
-                    : Array.isArray(block.content)
-                      ? renderContent(block.content)
-                      : JSON.stringify(block.content ?? "");
-                return `[tool_result] ${inner}`;
-              }
-              case "image":
-                return "[image omitted]";
-              default:
-                try {
-                  return JSON.stringify(block);
-                } catch {
-                  return String(block);
-                }
-            }
-          })
-          .filter(Boolean)
-          .join("\n");
-      };
+	return {
+		role: AgentRole.AGENT,
+		call: async (state) => {
+			// Render each turn as plain text. Anthropic-format messages can have
+			// `content` as an array of blocks (text, tool_use, tool_result, image,
+			// …). String-interpolating that array yields `[object Object]`, which
+			// the next Claude Code session then sees as the previous turn, making
+			// multi-turn scenarios appear garbled to the agent. Flatten content
+			// blocks down to readable text instead.
+			const renderContent = (content: unknown): string => {
+				if (typeof content === "string") return content;
+				if (!Array.isArray(content)) {
+					try {
+						return JSON.stringify(content);
+					} catch {
+						return String(content);
+					}
+				}
+				return content
+					.map((block: any) => {
+						if (block == null) return "";
+						if (typeof block === "string") return block;
+						switch (block.type) {
+							case "text":
+								return block.text ?? "";
+							case "tool-call":
+							case "tool_use": {
+								const input =
+									block.input != null ? JSON.stringify(block.input) : "";
+								const name = block.toolName ?? block.name ?? "?";
+								return `[tool_use ${name}(${input})]`;
+							}
+							case "tool-result": {
+								const value = block.output?.value ?? block.output;
+								const inner =
+									typeof value === "string" ? value : JSON.stringify(value);
+								return `[tool_result] ${inner}`;
+							}
+							case "tool_result": {
+								const inner =
+									typeof block.content === "string"
+										? block.content
+										: Array.isArray(block.content)
+											? renderContent(block.content)
+											: JSON.stringify(block.content ?? "");
+								return `[tool_result] ${inner}`;
+							}
+							case "image":
+								return "[image omitted]";
+							default:
+								try {
+									return JSON.stringify(block);
+								} catch {
+									return String(block);
+								}
+						}
+					})
+					.filter(Boolean)
+					.join("\n");
+			};
 
-      const formattedMessages = state.messages
-        .map((message) => `${message.role}: ${renderContent(message.content)}`)
-        .join("\n\n");
+			const formattedMessages = state.messages
+				.map((message) => `${message.role}: ${renderContent(message.content)}`)
+				.join("\n\n");
 
-      return new Promise<string>((resolve, reject) => {
-        const claudeBin =
-          process.env.CLAUDE_BIN || execSync("which claude", { encoding: "utf8" }).trim();
+			return new Promise<string>((resolve, reject) => {
+				const claudeBin =
+					process.env.CLAUDE_BIN ||
+					execSync("which claude", { encoding: "utf8" }).trim();
 
-        const args = [
-          "--output-format",
-          "stream-json",
-          "-p",
-          "--dangerously-skip-permissions",
-          "--verbose",
-          formattedMessages,
-        ];
+				// Pin the model. The user's default in ~/.claude/settings.json can be
+				// a more expensive tier, and these tests run many sub Claudes.
+				const args = [
+					"--model",
+					"opus",
+					"--output-format",
+					"stream-json",
+					"-p",
+					"--dangerously-skip-permissions",
+					"--verbose",
+					formattedMessages,
+				];
 
-        console.log(chalk.blue("Starting claude in:"), workingDirectory);
+				console.log(chalk.blue("Starting claude in:"), workingDirectory);
 
-        const omittedKeys = new Set(omitEnvKeys);
-        if (cleanEnv) {
-          omittedKeys.add("LANGWATCH_API_KEY");
-          omittedKeys.add("OPENAI_API_KEY");
-          omittedKeys.add("ANTHROPIC_API_KEY");
-        }
-        const envVars =
-          omittedKeys.size > 0
-            ? Object.fromEntries(
-                Object.entries(process.env).filter(([key]) => !omittedKeys.has(key)),
-              )
-            : process.env;
+				const omittedKeys = new Set(omitEnvKeys);
+				// The batch of the harness is not the batch of the agent. Several
+				// skills tell the agent to write scenario tests and run them, and
+				// those runs would otherwise join the batch this suite reports
+				// under and read as results of the suite itself.
+				omittedKeys.add("SCENARIO_BATCH_RUN_ID");
+				if (cleanEnv) {
+					omittedKeys.add("LANGWATCH_API_KEY");
+					omittedKeys.add("OPENAI_API_KEY");
+					omittedKeys.add("ANTHROPIC_API_KEY");
+				}
+				const envVars =
+					omittedKeys.size > 0
+						? Object.fromEntries(
+								Object.entries(process.env).filter(
+									([key]) => !omittedKeys.has(key),
+								),
+							)
+						: process.env;
 
-        // Prepend the local bin/ wrapper (created by setupLocalCli) so Claude
-        // uses the locally-built `langwatch` CLI with the latest commands.
-        const localBinDir = path.join(workingDirectory, "bin");
-        const pathPrefix = `${localBinDir}:${envVars.PATH ?? ""}`;
+				// Prepend the local bin/ wrapper (created by setupLocalCli) so Claude
+				// uses the locally-built `langwatch` CLI with the latest commands.
+				const localBinDir = path.join(workingDirectory, "bin");
+				const pathPrefix = `${localBinDir}:${envVars.PATH ?? ""}`;
 
-        const child = spawn(claudeBin, args, {
-          cwd: workingDirectory,
-          env: { ...envVars, FORCE_COLOR: "0", PATH: pathPrefix },
-          stdio: ["ignore", "pipe", "pipe"],
-        });
+				const child = spawn(claudeBin, args, {
+					cwd: workingDirectory,
+					env: {
+						...envVars,
+						...extraEnv,
+						FORCE_COLOR: "0",
+						PATH: pathPrefix,
+					},
+					stdio: ["ignore", "pipe", "pipe"],
+				});
 
-        let output = "";
+				let output = "";
 
-        child.stdout.on("data", (data: Buffer) => {
-          const text = data.toString();
-          console.log(chalk.cyan("Claude Code:"), text);
-          output += text;
-        });
+				child.stdout.on("data", (data: Buffer) => {
+					const text = data.toString();
+					console.log(chalk.cyan("Claude Code:"), text);
+					output += text;
+				});
 
-        child.stderr.on("data", (data: Buffer) => {
-          console.log(chalk.yellow("Claude Code stderr:"), data.toString());
-        });
+				child.stderr.on("data", (data: Buffer) => {
+					console.log(chalk.yellow("Claude Code stderr:"), data.toString());
+				});
 
-        child.on("close", (exitCode) => {
-          if (exitCode === 0) {
-            const messages: any = output
-              .split("\n")
-              .map((line) => {
-                try {
-                  return JSON.parse(line.trim());
-                } catch {
-                  return null;
-                }
-              })
-              .filter((message) => message !== null && "message" in message)
-              .map((message) => message.message);
-            console.log("messages", JSON.stringify(messages, undefined, 2));
+				child.on("close", (exitCode) => {
+					if (exitCode === 0) {
+						const rawMessages: any[] = output
+							.split("\n")
+							.map((line) => {
+								try {
+									return JSON.parse(line.trim());
+								} catch {
+									return null;
+								}
+							})
+							.filter((message) => message !== null && "message" in message)
+							.map((message) => message.message);
+						const messages = claudeCodeTranscriptToModelMessages(rawMessages);
+						// Roles and counts only. The messages carry tool results,
+						// which can hold file contents and keys, and this runs on
+						// a shared stdout.
+						console.log(
+							`[claude-code adapter] ${messages.length} message(s): ` +
+								messages.map((message) => message.role).join(", "),
+						);
 
-            resolve(messages);
-          } else {
-            reject(new Error(`Command failed with exit code ${exitCode}`));
-          }
-        });
+						resolve(messages as any);
+					} else {
+						reject(
+							new Error(
+								`Claude Code failed with exit code ${exitCode}` +
+									`${describeFailure(output)}`,
+							),
+						);
+					}
+				});
 
-        child.on("error", (err) => {
-          reject(err);
-        });
-      });
-    },
-  };
+				child.on("error", (err) => {
+					reject(err);
+				});
+			});
+		},
+	};
+}
+
+/**
+ * What the last line of the stream says about a failed run.
+ *
+ * Claude Code closes its stream with a result object that carries the reason
+ * it stopped. Without it the test reports only "exit code 1", which reads as a
+ * crash and sends the reader to the wrong place. The two that matter here are
+ * a refusal, which a red team scenario can meet because of the content it
+ * writes, and a rate limit, which means rerun the file later.
+ */
+function describeFailure(output: string): string {
+	for (const line of output.split("\n").reverse()) {
+		const text = line.trim();
+		if (!text.startsWith("{")) continue;
+		try {
+			const parsed = JSON.parse(text) as {
+				is_error?: boolean;
+				stop_reason?: string;
+				terminal_reason?: string;
+				result?: unknown;
+			};
+			if (!parsed.is_error) continue;
+			const reasons = [parsed.stop_reason, parsed.terminal_reason]
+				.filter(Boolean)
+				.join(", ");
+			const detail =
+				typeof parsed.result === "string" ? `: ${parsed.result.slice(0, 300)}` : "";
+			return reasons ? ` (${reasons})${detail}` : detail;
+		} catch {
+			continue;
+		}
+	}
+	return "";
+}
+
+type ModelMessage = {
+	role: "user" | "assistant" | "tool";
+	content: string | Record<string, unknown>[];
+};
+
+/**
+ * How much of one tool result may reach the conversation.
+ *
+ * The judge and the user simulator read the whole conversation on every
+ * step. A skill that exports traces puts hundreds of kilobytes into a
+ * single result, and a long run then goes past the context window of the
+ * judge model. The test then fails for a reason that has nothing to do
+ * with the skill. A result is the evidence the agent gathered, and what
+ * these tests read of it is short: command names, URLs and ids, which
+ * stand at the start of the output.
+ */
+const MAX_TOOL_RESULT_CHARS = 8000;
+
+/**
+ * How much of one tool call may reach the conversation.
+ *
+ * A call carries what the agent wrote: the dataset, the report, the test
+ * file. That is the work under judgement, so it keeps far more room than
+ * a result, and there are few such calls in a run.
+ */
+const MAX_TOOL_INPUT_CHARS = 30000;
+
+function truncateText({ text, limit }: { text: string; limit: number }): string {
+	if (text.length <= limit) return text;
+	const dropped = text.length - limit;
+	return `${text.slice(0, limit)}\n… [${dropped} more characters]`;
+}
+
+/**
+ * The call cap over the string fields of a tool call, structure kept.
+ *
+ * Nested objects and arrays are walked, not only the top level: a payload such
+ * as `{ body: { html } }` carries the same unbounded text a top-level field
+ * would, and it reaches every judge prompt the same way.
+ */
+function truncateToolInput(input: unknown): unknown {
+	if (typeof input === "string") {
+		return truncateText({ text: input, limit: MAX_TOOL_INPUT_CHARS });
+	}
+	if (Array.isArray(input)) return input.map((item) => truncateToolInput(item));
+	if (input == null || typeof input !== "object") return input;
+	return Object.fromEntries(
+		Object.entries(input as Record<string, unknown>).map(([key, value]) => [
+			key,
+			truncateToolInput(value),
+		]),
+	);
+}
+
+function toolResultText(content: unknown): string {
+	if (typeof content === "string") return content;
+	if (!Array.isArray(content)) return JSON.stringify(content ?? "");
+	return content
+		.map((block: any) =>
+			block?.type === "text" && typeof block.text === "string"
+				? block.text
+				: JSON.stringify(block),
+		)
+		.join("\n");
+}
+
+/**
+ * The blocks this converter reads. Anything else is a block Claude Code can
+ * write that the conversation has no part for, most often an `image` or a
+ * `document` a tool returned.
+ */
+const KNOWN_BLOCK_TYPES = new Set([
+	"text",
+	"thinking",
+	"redacted_thinking",
+	"tool_use",
+	"tool_result",
+]);
+
+/**
+ * What a block of any other type leaves in the conversation.
+ *
+ * The judge reads this transcript, so a block that silently disappeared would
+ * read as a turn the agent never took. A line naming the type keeps the turn
+ * whole and says what is not shown, which is the honest answer for a block the
+ * AI SDK message format cannot carry.
+ */
+function unsupportedBlockText(block: any): string {
+	return `[${String(block?.type ?? "unknown")} block, not shown in the transcript]`;
+}
+
+/** One assistant turn: the text it wrote, then the tool calls it made. */
+function assistantMessageFromBlocks({
+	content,
+	toolNamesByCallId,
+}: {
+	content: any[];
+	toolNamesByCallId: Map<string, string>;
+}): ModelMessage | null {
+	const texts: string[] = [];
+	const toolCalls: Record<string, unknown>[] = [];
+
+	for (const block of content) {
+		if (block?.type === "text" && typeof block.text === "string") {
+			texts.push(block.text);
+		} else if (block?.type === "tool_use") {
+			toolNamesByCallId.set(block.id, block.name);
+			toolCalls.push({
+				type: "tool-call",
+				toolCallId: block.id,
+				toolName: block.name,
+				input: truncateToolInput(block.input ?? {}),
+			});
+		} else if (!KNOWN_BLOCK_TYPES.has(block?.type)) {
+			texts.push(unsupportedBlockText(block));
+		}
+		// Thinking blocks are dropped: they are not part of the conversation.
+	}
+
+	if (texts.length === 0 && toolCalls.length === 0) return null;
+	return {
+		role: "assistant",
+		content: [{ type: "text", text: texts.join("\n") }, ...toolCalls],
+	};
+}
+
+/**
+ * One user turn: the tool results it answers with become a `tool` message, and
+ * whatever text it carries becomes a `user` message after it.
+ */
+function userMessagesFromBlocks({
+	content,
+	toolNamesByCallId,
+}: {
+	content: any[];
+	toolNamesByCallId: Map<string, string>;
+}): ModelMessage[] {
+	const messages: ModelMessage[] = [];
+
+	const toolResults = content
+		.filter((block: any) => block?.type === "tool_result")
+		.map((block: any) => ({
+			type: "tool-result",
+			toolCallId: block.tool_use_id,
+			toolName: toolNamesByCallId.get(block.tool_use_id) ?? "tool",
+			output: {
+				type: block.is_error ? "error-text" : "text",
+				value: truncateText({
+					text: toolResultText(block.content),
+					limit: MAX_TOOL_RESULT_CHARS,
+				}),
+			},
+		}));
+	if (toolResults.length > 0) {
+		messages.push({ role: "tool", content: toolResults });
+	}
+
+	const texts = content
+		.filter(
+			(block: any) =>
+				(block?.type === "text" && typeof block.text === "string") ||
+				!KNOWN_BLOCK_TYPES.has(block?.type),
+		)
+		.map((block: any) =>
+			block?.type === "text" ? block.text : unsupportedBlockText(block),
+		);
+	if (texts.length > 0) {
+		messages.push({ role: "user", content: texts.join("\n") });
+	}
+
+	return messages;
+}
+
+/**
+ * Converts the `claude -p --output-format stream-json` transcript into AI SDK
+ * model messages, the format `@langwatch/scenario` works with.
+ *
+ * Claude Code writes Anthropic-format messages: an assistant turn is an array
+ * of `thinking`, `text` and `tool_use` blocks, and each tool result comes back
+ * as a `user` message holding `tool_result` blocks. The scenario SDK passes an
+ * adapter's array return through as is, so those blocks reached the platform
+ * unchanged, where the scenario-events validator refused every snapshot that
+ * carried one. The run then kept only the last snapshot that validated: the
+ * user message and the first assistant text. The user simulator of the SDK
+ * also only summarizes `tool-call` and `tool-result` parts, not the Anthropic
+ * blocks.
+ *
+ * Each assistant turn becomes one text part (the text blocks joined, an empty
+ * string when the turn only called tools, so the AG-UI conversion keeps the
+ * `toolCalls` next to a string content) followed by one `tool-call` part per
+ * `tool_use` block. Each `tool_result` block becomes a `tool-result` part of a
+ * `tool` message, with the tool name looked up from the call it answers.
+ * Thinking blocks are dropped: they are not part of the conversation. A block
+ * of any other type, such as an `image` a tool returned, leaves a line naming
+ * its type rather than disappearing from the turn.
+ */
+export function claudeCodeTranscriptToModelMessages(
+	rawMessages: any[],
+): ModelMessage[] {
+	const toolNamesByCallId = new Map<string, string>();
+	const messages: ModelMessage[] = [];
+
+	for (const raw of rawMessages) {
+		if (!raw || typeof raw !== "object") continue;
+		const { role, content } = raw;
+
+		if (role !== "assistant" && role !== "user") continue;
+		if (typeof content === "string") {
+			messages.push({ role, content });
+			continue;
+		}
+		if (!Array.isArray(content)) continue;
+
+		if (role === "assistant") {
+			const message = assistantMessageFromBlocks({
+				content,
+				toolNamesByCallId,
+			});
+			if (message) messages.push(message);
+			continue;
+		}
+
+		messages.push(...userMessagesFromBlocks({ content, toolNamesByCallId }));
+	}
+
+	return messages;
 }
 
 /**
@@ -323,46 +642,85 @@ export function createClaudeCodeAgent({
  * a .skills/ directory file or explicit SKILL.md content references.
  */
 export function assertSkillWasRead(
-  state: ScenarioExecutionStateLike,
-  skillName: string,
+	state: ScenarioExecutionStateLike,
+	skillName: string,
 ): void {
-  const allContent = state.messages
-    .map((m) => (typeof m.content === "string" ? m.content : JSON.stringify(m.content)))
-    .join("\n");
+	const allContent = state.messages
+		.map((m) =>
+			typeof m.content === "string" ? m.content : JSON.stringify(m.content),
+		)
+		.join("\n");
 
-  const hasSkillRead =
-    allContent.includes("SKILL.md") ||
-    allContent.includes(`.skills/${skillName}`) ||
-    allContent.includes(`skills/${skillName}`);
+	const hasSkillRead =
+		allContent.includes("SKILL.md") ||
+		allContent.includes(`.skills/${skillName}`) ||
+		allContent.includes(`skills/${skillName}`);
 
-  if (!hasSkillRead) {
-    throw new Error(
-      `Expected agent to read the ${skillName} SKILL.md file, but found no evidence ` +
-        `of reading .skills/${skillName}/SKILL.md in the conversation. ` +
-        `The agent may have ignored the skill and hallucinated instructions.`,
-    );
-  }
+	if (!hasSkillRead) {
+		throw new Error(
+			`Expected agent to read the ${skillName} SKILL.md file, but found no evidence ` +
+				`of reading .skills/${skillName}/SKILL.md in the conversation. ` +
+				`The agent may have ignored the skill and hallucinated instructions.`,
+		);
+	}
 }
 
 /**
- * Fixes Anthropic tool use format in message state so it is compatible
- * with the Vercel AI SDK judge agent.
+ * The shell commands the agent ran, read from its Bash tool calls.
  *
- * Anthropic returns tool_use content blocks that the Vercel AI SDK does
- * not understand. This converts non-text blocks to text blocks containing
- * the JSON representation.
+ * A phrase in the transcript is not a command that ran: the skill text the
+ * agent read and its own explanation of what it did not do both quote
+ * commands. Reads the AI SDK `tool-call` parts the adapter emits, the
+ * Anthropic `tool_use` blocks of an unconverted transcript, and the JSON text
+ * `toolCallFix` leaves behind for either.
+ */
+export function bashCommands(state: ScenarioExecutionStateLike): string[] {
+	const commands: string[] = [];
+	for (const message of state.messages) {
+		if (!Array.isArray(message.content)) continue;
+		for (const block of message.content as any[]) {
+			let candidate: any = block;
+			if (
+				block?.type === "text" &&
+				typeof block.text === "string" &&
+				block.text.startsWith("{")
+			) {
+				try {
+					candidate = JSON.parse(block.text);
+				} catch {
+					continue;
+				}
+			}
+			const isBashCall =
+				(candidate?.type === "tool-call" && candidate.toolName === "Bash") ||
+				(candidate?.type === "tool_use" && candidate.name === "Bash");
+			if (isBashCall && typeof candidate.input?.command === "string") {
+				commands.push(candidate.input.command);
+			}
+		}
+	}
+	return commands;
+}
+
+/**
+ * Turns content parts the scenario SDK does not know into text parts holding
+ * their JSON, so a model call over the conversation never receives a part it
+ * cannot read. The AI SDK `tool-call` and `tool-result` parts stay as they
+ * are: the SDK summarizes them for the user simulator and the platform stores
+ * and renders them.
  */
 export function toolCallFix(state: ScenarioExecutionStateLike): void {
-  state.messages.forEach((message) => {
-    if (Array.isArray(message.content)) {
-      message.content.forEach((content, index) => {
-        if (content.type !== "text") {
-          (message.content as any)[index] = {
-            type: "text",
-            text: JSON.stringify(content),
-          };
-        }
-      });
-    }
-  });
+	const knownPartTypes = new Set(["text", "tool-call", "tool-result"]);
+	state.messages.forEach((message) => {
+		if (Array.isArray(message.content)) {
+			message.content.forEach((content, index) => {
+				if (!knownPartTypes.has(content.type)) {
+					(message.content as any)[index] = {
+						type: "text",
+						text: JSON.stringify(content),
+					};
+				}
+			});
+		}
+	});
 }

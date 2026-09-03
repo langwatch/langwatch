@@ -1,6 +1,6 @@
 import { Box, Button, Heading, HStack, Text, VStack } from "@chakra-ui/react";
 import { Drawer } from "@langwatch/design-system/drawer";
-import { ArrowLeft, Code, Globe, Workflow } from "lucide-react";
+import { ArrowLeft, Cable, Code, Globe, Workflow } from "lucide-react";
 
 export type AgentType = "code" | "workflow" | "http";
 
@@ -10,6 +10,12 @@ export type AgentTypeSelectorDrawerProps = {
   onGoBack?: () => void;
   canGoBack?: boolean;
   onSelect?: (type: AgentType) => void;
+  /**
+   * Where "Connect from Code" goes. The card is offered only when the caller
+   * hands one over: this package writes no addresses of its own, and the
+   * overlay that shows the snippet belongs to the composing application.
+   */
+  onConnectFromCode?: () => void;
 };
 
 const agentTypes: Array<{
@@ -44,6 +50,7 @@ export function AgentTypeSelectorDrawer({
   onGoBack,
   canGoBack = false,
   onSelect,
+  onConnectFromCode,
 }: AgentTypeSelectorDrawerProps) {
   return (
     <Drawer.Root
@@ -68,15 +75,17 @@ export function AgentTypeSelectorDrawer({
                 <ArrowLeft size={20} />
               </Button>
             )}
-            <Heading>Choose Agent Type</Heading>
+            <Heading>Choose Agent Connection Type</Heading>
           </HStack>
         </Drawer.Header>
         <Drawer.Body display="flex" flexDirection="column" overflow="hidden" padding={0}>
           <VStack gap={4} align="stretch" flex={1} overflow="hidden">
             <Text color="fg.muted" fontSize="sm" paddingX={6} paddingTop={4}>
-              Select the type of agent you want to create.
+              Select how you want to integrate your agent for testing.
             </Text>
+
             <VStack gap={3} align="stretch" paddingX={6} paddingBottom={4}>
+              {onConnectFromCode && <ConnectFromCodeCard onClick={onConnectFromCode} />}
               {agentTypes.map((agentType) => (
                 <AgentTypeCard
                   key={agentType.type}
@@ -96,6 +105,59 @@ export function AgentTypeSelectorDrawer({
     </Drawer.Root>
   );
 }
+
+/**
+ * The first choice of the flow: connect the agent the project already
+ * runs instead of writing one here. The green dot is the same one an
+ * online agent wears, since that is what the choice ends as. The copy
+ * follows the connect-your-agent docs page: a small connect function
+ * beside the service startup calls the agent that already exists.
+ */
+function ConnectFromCodeCard({ onClick }: { onClick: () => void }) {
+  return (
+    <Box
+      as="button"
+      onClick={onClick}
+      padding={4}
+      borderRadius="lg"
+      border="1px solid"
+      borderColor="border"
+      bg="bg.panel"
+      textAlign="left"
+      width="full"
+      _hover={{ borderColor: "green.muted", bg: "green.subtle" }}
+      transition="all 0.15s"
+      data-testid="agent-type-connected"
+      cursor="pointer"
+    >
+      <HStack gap={3} align="start">
+        <Box padding={1} borderRadius="md" bg="green.subtle" color="green.fg">
+          <Cable size={18} />
+        </Box>
+        <VStack align="start" gap={1} flex={1}>
+          <HStack gap={2}>
+            <Box
+              boxSize="8px"
+              borderRadius="full"
+              background="green.500"
+              data-testid="agent-type-connected-dot"
+            />
+            <Text fontWeight="500" fontSize="sm">
+              Connect from Code
+            </Text>
+          </HStack>
+          <Text fontSize="xs" color="fg.muted">
+            Setup your agent to connect automatically when it starts up
+          </Text>
+        </VStack>
+      </HStack>
+    </Box>
+  );
+}
+
+// ============================================================================
+// Agent Type Card Component
+// ============================================================================
 
 type AgentTypeCardProps = {
   type: AgentType;

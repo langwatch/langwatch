@@ -6,6 +6,14 @@ export const MAX_RUN_PARAMETER_BYTES = 16_384;
 export const MAX_PARAMETER_VALUE_LENGTH = 4096;
 export const MAX_PARAMETER_NAME_LENGTH = 64;
 export const MAX_PARAMETER_DESCRIPTION_LENGTH = 500;
+
+/** How many values a closed option list may hold. */
+export const MAX_PARAMETER_OPTIONS = 50;
+
+/** The value types a declaration can name. */
+export const SCENARIO_PARAMETER_TYPES = ["string", "number", "boolean"] as const;
+export type ScenarioParameterType = (typeof SCENARIO_PARAMETER_TYPES)[number];
+
 export const SCENARIO_PARAMETER_NAME_PATTERN = /^[A-Za-z_][A-Za-z0-9_]*$/;
 
 const reservedParameterNames = new Set(["__proto__", "constructor", "prototype"]);
@@ -24,6 +32,12 @@ const parameterValueSchema = z.union([
 ]);
 export type ScenarioParameterValue = z.infer<typeof parameterValueSchema>;
 
+/** What a secret parameter with a default value is refused with. */
+export const SECRET_PARAMETER_DEFAULT_MESSAGE = "A secret parameter cannot carry a default value";
+
+/** What a secret parameter with an option list is refused with. */
+export const SECRET_PARAMETER_OPTIONS_MESSAGE = "A secret parameter cannot list options";
+
 export const scenarioParameterDefinitionSchema = z
   .object({
     name: z
@@ -37,6 +51,26 @@ export const scenarioParameterDefinitionSchema = z
     description: z.string().max(MAX_PARAMETER_DESCRIPTION_LENGTH).optional(),
     defaultValue: parameterValueSchema.optional(),
     secret: z.boolean().optional(),
+    /**
+     * The value type. Absent on a declaration authored before types existed,
+     * which reads as text. A connected agent declares it from the function's
+     * own annotations.
+     */
+    type: z.enum(SCENARIO_PARAMETER_TYPES).optional(),
+    /**
+     * A closed list of the values the parameter accepts. A run that supplies a
+     * value outside the list is refused before anything is scheduled.
+     */
+    options: z
+      .array(parameterValueSchema)
+      .max(MAX_PARAMETER_OPTIONS, `A parameter can list at most ${MAX_PARAMETER_OPTIONS} options`)
+      .optional(),
+    /**
+     * Whether a run must supply a value. Declared by a connected agent whose
+     * function has no default for the parameter; the SDK refuses a call that
+     * carries none before the function runs.
+     */
+    required: z.boolean().optional(),
   })
   .strict();
 export type ScenarioParameterDefinition = z.infer<typeof scenarioParameterDefinitionSchema>;
@@ -54,7 +88,16 @@ export const scenarioParameterDefinitionsSchema = z
         context.addIssue({
           code: "custom",
           path: [index, "defaultValue"],
-          message: "A secret parameter cannot carry a default value",
+          message: SECRET_PARAMETER_DEFAULT_MESSAGE,
+        });
+      }
+      // An option list on a secret parameter is the same fault as a default:
+      // the credentials would sit in clear on the scenario row.
+      if (definition.secret === true && definition.options !== undefined) {
+        context.addIssue({
+          code: "custom",
+          path: [index, "options"],
+          message: SECRET_PARAMETER_OPTIONS_MESSAGE,
         });
       }
       if (names.has(definition.name)) {
@@ -114,6 +157,35 @@ export const runParameterValuesSchema = z.preprocess<
   return value;
 }, runParameterValuesObjectSchema);
 export type RunParameterValues = z.infer<typeof runParameterValuesSchema>;
+
+/**
+ * Reads parameter values back off the raw JSON a run stored them as.
+ *
+ * Tolerant on purpose: a value the current shape does not understand is
+ * dropped rather than taking the whole read down, the same way a stored scope
+ * that no longer parses still runs. A run that stored none reads as the empty
+ * string, and so does a run recorded before the field existed.
+ */
+export function parseRunParametersJson(raw: string): RunParameterValues {
+  if (raw === "") return {};
+  let parsed: unknown;
+  try {
+    parsed = JSON.parse(raw);
+  } catch {
+    return {};
+  }
+  if (typeof parsed !== "object" || parsed === null || Array.isArray(parsed)) {
+    return {};
+  }
+
+  const values: RunParameterValues = {};
+  for (const [name, value] of Object.entries(parsed)) {
+    if (typeof value === "string" || typeof value === "number" || typeof value === "boolean") {
+      values[name] = value;
+    }
+  }
+  return values;
+}
 
 export function parseScenarioParameterDefinitions(value: unknown): ScenarioParameterDefinition[] {
   if (value === null || value === undefined) return [];

@@ -1,13 +1,4 @@
-import {
-  Alert,
-  Button,
-  HStack,
-  Input,
-  List,
-  Spinner,
-  Text,
-  VStack,
-} from "@chakra-ui/react";
+import { Alert, Button, HStack, Input, List, Spinner, Text, VStack } from "@chakra-ui/react";
 import { useEffect, useRef, useState } from "react";
 import { AlertTriangle } from "react-feather";
 import { Dialog } from "@langwatch/workflow-web/components/ui/dialog";
@@ -152,11 +143,7 @@ export function CascadeArchiveDialog({
                           "Evaluators",
                           "will be archived",
                         )}
-                        {renderEntityList(
-                          relatedEntities.agents,
-                          "Agents",
-                          "will be archived",
-                        )}
+                        {renderEntityList(relatedEntities.agents, "Agents", "will be archived")}
                         {renderEntityList(
                           relatedEntities.monitors,
                           "Online Evaluations",
@@ -201,7 +188,6 @@ export function CascadeArchiveDialog({
         <Dialog.Footer>
           <Button
             variant="outline"
-            mr={3}
             onClick={(e) => {
               e.stopPropagation();
               onClose();
@@ -218,9 +204,7 @@ export function CascadeArchiveDialog({
                 onConfirm();
               }
             }}
-            disabled={
-              confirmationText.toLowerCase() !== "delete" || isLoading || isLoadingRelated
-            }
+            disabled={confirmationText.toLowerCase() !== "delete" || isLoading || isLoadingRelated}
             data-testid="cascade-archive-confirm-button"
           >
             {isLoading ? <Spinner size="sm" /> : "Delete"}

@@ -29,7 +29,9 @@ export {
   evaluateRules,
   featureFlagRuleSchema,
   featureFlagRulesSchema,
+  featureFlagRulesWriteSchema,
   parseRules,
+  readNeedsOrganizationAge,
   resolveEffectiveForListing,
 } from "./feature-flag-rules";
 export type {

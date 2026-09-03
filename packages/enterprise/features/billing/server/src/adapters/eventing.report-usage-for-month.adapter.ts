@@ -8,7 +8,7 @@ import {
 } from "@langwatch/enterprise-billing-contract";
 import type { BillingErrorReporter } from "../ports/error-reporter.port";
 import type {
-  BillingReportOrganization,
+  BillingReportOrganizationLookup,
   BillingReportOrganizationPort,
 } from "../ports/billing-report-organization.port";
 import type { BillingCheckpointPort } from "../ports/billing-checkpoint.port";
@@ -46,10 +46,20 @@ export const BILLING_ORG_CACHE_PREFIX = "ttlcache:billing:orgData:";
  * Structural, and deliberately narrow: the process owns whether this is
  * Redis-backed (shared across pods) or in-memory, and the command only reads
  * and writes one key per organization.
+ *
+ * The whole VERDICT is cached, not just a hit, so a skip costs the same as
+ * anything else on a second pass within the window. Worth knowing what that
+ * does and does not buy: the window is one minute and the dispatch driving
+ * this handler is suppressed to one per organization per five, so in the
+ * steady state the entry has expired before the next command arrives and the
+ * query runs regardless. What it saves is the bursts, where two commands for
+ * one organization land together — the grace window at the start of a month
+ * dispatches the previous month alongside the current one, and those carry
+ * different dedup keys, so both run.
  */
 export interface BillingOrganizationCache {
-  get(key: string): Promise<BillingReportOrganization | undefined>;
-  set(key: string, value: BillingReportOrganization): Promise<void>;
+  get(key: string): Promise<BillingReportOrganizationLookup | undefined>;
+  set(key: string, value: BillingReportOrganizationLookup): Promise<void>;
 }
 
 export interface ReportUsageForMonthCommandDeps {
@@ -137,18 +147,35 @@ export class EventingReportUsageForMonthAdapter implements CommandHandler<
     let shouldSelfDispatch: boolean;
     try {
       // 1. Skip conditions
-      let org = (await this.deps.organizationCache.get(organizationId)) ?? null;
-      if (!org) {
-        org = await this.deps.organizations.getOrganizationForBilling(organizationId);
-        if (org) {
-          await this.deps.organizationCache.set(organizationId, org);
-        }
+      let lookup = await this.deps.organizationCache.get(organizationId);
+      if (!lookup) {
+        lookup = await this.deps.organizations.getOrganizationForBilling(organizationId);
+        // The skip verdicts are cached too. Only a hit was cached before, so
+        // the organizations that reach this handler and can never do anything
+        // here were the only ones paying for the query every time.
+        await this.deps.organizationCache.set(organizationId, lookup);
       }
 
-      if (!org) {
-        logger.warn({ organizationId }, "organization not found or not SEAT_EVENT, skipping");
+      if (lookup.outcome === "not_found") {
+        logger.warn({ organizationId }, "organization not found, skipping");
         return [];
       }
+
+      if (lookup.outcome === "not_usage_billed") {
+        // Debug, like the two skips below it. A free or legacy plan reaching
+        // this handler is the system working: the dispatch is per active
+        // organization and takes no view on pricing, so every one of them
+        // arrives here and stops. Reporting that at warn put a permanent,
+        // recurring line in front of whoever greps for warnings during an
+        // incident.
+        logger.debug(
+          { organizationId },
+          "organization is not on usage-based pricing, skipping usage reporting",
+        );
+        return [];
+      }
+
+      const org = lookup.organization;
 
       if (!org.stripeCustomerId) {
         logger.debug({ organizationId }, "no Stripe customer ID, skipping usage reporting");

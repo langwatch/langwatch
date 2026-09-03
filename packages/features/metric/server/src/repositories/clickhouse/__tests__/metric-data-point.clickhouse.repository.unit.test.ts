@@ -72,6 +72,64 @@ function pointAt(overrides: Partial<CanonicalMetricDataPoint> = {}): CanonicalMe
   });
 }
 
+function isSuccessorRead(sql: string): boolean {
+  return sql.includes("{seriesIds:Array(String)}");
+}
+
+/** A stored row as {@link ROLLUP_SELECT} returns it. */
+function rollupSourceRow(from: CanonicalMetricDataPoint): Record<string, unknown> {
+  return {
+    TenantId: from.tenantId,
+    PointId: from.pointId,
+    SeriesId: from.seriesId,
+    MetricName: from.metricName,
+    MetricUnit: from.metricUnit,
+    MetricKind: from.metricKind,
+    AggregationTemporality: from.aggregationTemporality,
+    IsMonotonic: from.isMonotonic,
+    StartTimeUnixNano: from.startTimeUnixNano,
+    TimeUnixNano: from.timeUnixNano,
+    TimeUnixMs: from.timeUnixMs,
+    ValueType: from.valueType,
+    ValueInt: from.valueInt,
+    ValueDouble: from.valueDouble,
+    Count: from.count,
+    Sum: from.sum,
+    Min: from.min,
+    Max: from.max,
+    ExplicitBounds: from.explicitBounds,
+    BucketCounts: from.bucketCounts,
+    ExponentialScale: from.exponentialScale,
+    ExponentialZeroThreshold: from.exponentialZeroThreshold,
+    ZeroCount: from.zeroCount,
+    PositiveOffset: from.positiveOffset,
+    PositiveBucketCounts: from.positiveBucketCounts,
+    NegativeOffset: from.negativeOffset,
+    NegativeBucketCounts: from.negativeBucketCounts,
+  };
+}
+
+/**
+ * A reader whose bucket reads answer with the point just before the chunk,
+ * which is what a live series looks like: the near predecessor pass finds
+ * something, so nothing falls through to the retention-wide one.
+ */
+function readerWithPredecessor(): {
+  queries: string[];
+  client: MetricClickHouseClient;
+} {
+  const predecessor = pointAt({
+    timeUnixMs: base - METRIC_ROLLUP_INTERVAL_MS,
+    timeUnixNano: String(BigInt(base - METRIC_ROLLUP_INTERVAL_MS) * 1_000_000n),
+  });
+  const queries: string[] = [];
+  const query: MetricClickHouseClient["query"] = async ({ query: sql }) => {
+    queries.push(sql);
+    return response(isSuccessorRead(sql) ? [] : [rollupSourceRow(predecessor)]);
+  };
+  return { queries, client: client({ query }) };
+}
+
 describe("MetricDataPointClickHouseRepository", () => {
   /** @scenario "Valid OTLP points become canonical durable events" */
   it("writes raw data before its payload-free usage estimate", async () => {
@@ -196,7 +254,10 @@ describe("MetricDataPointClickHouseRepository", () => {
 
     await repositoryInstance.recomputeAffectedRollupsMany({ points });
 
-    expect(queries).toHaveLength(2);
+    // Successors, then the bucket's own rows with a near predecessor seek,
+    // then — because this table is empty and so no near seek resolves — the
+    // retention-wide seek for the buckets the near one left open.
+    expect(queries).toHaveLength(3);
     expect(queries[0]).toContain("LIMIT 1 BY SeriesId");
     expect(queries[0]).toContain("SeekTime > spans.SpanToTime");
     expect(queries[0]).not.toContain("CanonicalPayload");
@@ -301,12 +362,110 @@ describe("MetricDataPointClickHouseRepository", () => {
       retentionDays: 49,
     });
 
-    expect(bucketParams).toHaveLength(1);
+    // The near pass, then the wide one: this table is empty, so no bucket
+    // resolves a predecessor within the hour.
+    expect(bucketParams).toHaveLength(2);
     expect(Object.keys(bucketParams[0] ?? {}).sort()).toEqual(
-      ["bucketMs", "from0", "retentionMs", "series0", "tenantId"].sort(),
+      ["bucketMs", "from0", "lookbackFromMs", "lookbackToMs", "series0", "tenantId"].sort(),
     );
+    // The bucket end and both lookback bounds are the same arithmetic on
+    // either side of the wire, so they travel once as shared scalars.
     expect(bucketParams[0]?.bucketMs).toBe(METRIC_ROLLUP_INTERVAL_MS);
-    expect(bucketParams[0]?.retentionMs).toBe(49 * 24 * 60 * 60 * 1000);
+    expect(bucketParams[0]?.lookbackFromMs).toBe(60 * 60 * 1000);
+    expect(bucketParams[0]?.lookbackToMs).toBe(0);
+  });
+
+  /** @scenario "A rollup bucket read asks only for the columns a rollup uses" */
+  it("leaves behind every column the fold never reads", async () => {
+    let bucketRead: string | undefined;
+    const query: MetricClickHouseClient["query"] = async ({ query: sql }) => {
+      if (!isSuccessorRead(sql)) bucketRead ??= sql;
+      return response([]);
+    };
+
+    await repository(client({ query })).recomputeAffectedRollupsMany({
+      points: [pointAt({ timeUnixMs: base + 1 })],
+    });
+
+    // FINAL materialises every selected column for every row a granule
+    // covers, not for the rows returned, and this read returns on the order
+    // of a hundred rows out of millions scanned. Each column here was being
+    // decompressed millions of times and discarded; the server ran out of
+    // memory inside one of them by name (`while reading column
+    // PointAttributesJson`).
+    for (const column of [
+      "CanonicalPayload",
+      "PointAttributesJson",
+      "PointAttributeKeys",
+      "ResourceAttributesJson",
+      "ResourceAttributeKeys",
+      "ScopeAttributesJson",
+      "ScopeAttributeKeys",
+      "SummaryQuantilesJson",
+      "MetricDescription",
+      "Flags",
+      "_size_bytes",
+      "OccurredAt",
+      "AcceptedAt",
+    ]) {
+      expect(bucketRead).not.toContain(column);
+    }
+    // What a rollup is made of still arrives.
+    for (const column of [
+      "MetricKind",
+      "AggregationTemporality",
+      "ValueDouble",
+      "BucketCounts",
+      "ExplicitBounds",
+      "StartTimeUnixNano",
+    ]) {
+      expect(bucketRead).toContain(column);
+    }
+  });
+
+  /** @scenario "A rollup bucket read looks close before it looks far" */
+  it("does not widen to retention when the near seek resolves", async () => {
+    const { queries, client: reader } = readerWithPredecessor();
+
+    await repository(reader).recomputeAffectedRollupsMany({
+      points: [pointAt({ timeUnixMs: base + 1 })],
+      retentionDays: 49,
+    });
+
+    // Successors, then one bucket read. A live series never opens the
+    // partitions a retention-wide reverse seek would.
+    expect(queries).toHaveLength(2);
+  });
+
+  /** @scenario "A rollup bucket read looks close before it looks far" */
+  it("widens to the rest of retention only where the near seek found nothing", async () => {
+    const reads: { sql: string; params: Record<string, unknown> }[] = [];
+    const query: MetricClickHouseClient["query"] = async (request) => {
+      if (!isSuccessorRead(request.query)) {
+        reads.push({ sql: request.query, params: request.query_params ?? {} });
+      }
+      return response([]);
+    };
+
+    await repository(client({ query })).recomputeAffectedRollupsMany({
+      points: [pointAt({ timeUnixMs: base + 1 })],
+      retentionDays: 49,
+    });
+
+    expect(reads).toHaveLength(2);
+    const [near, far] = reads;
+    // The two windows abut and do not overlap, so together they are the one
+    // retention-wide window this replaced: no row is read twice and none is
+    // missed.
+    expect(near!.params.lookbackToMs).toBe(0);
+    expect(near!.params.lookbackFromMs).toBe(60 * 60 * 1000);
+    expect(far!.params.lookbackToMs).toBe(near!.params.lookbackFromMs);
+    expect(far!.params.lookbackFromMs).toBe(49 * 24 * 60 * 60 * 1000);
+    // The far pass is only ever looking for a predecessor: the bucket's own
+    // rows came back in the near pass, and asking again would double the
+    // statement to return what it just returned.
+    expect(far!.sql).not.toContain("UNION ALL");
+    expect(far!.sql).toContain("DESC LIMIT 1");
   });
 
   it("keeps bucket seek parameters under the client URL ceiling", async () => {

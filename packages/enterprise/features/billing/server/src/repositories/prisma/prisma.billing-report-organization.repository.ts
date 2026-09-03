@@ -3,7 +3,7 @@
 import { GROWTH_SEAT_PLAN_TYPES } from "@langwatch/enterprise-billing-contract";
 import type { PrismaClient } from "@langwatch/prisma-client/generated";
 import {
-  type BillingReportOrganization,
+  type BillingReportOrganizationLookup,
   BillingReportOrganizationPort,
 } from "../../ports/billing-report-organization.port";
 
@@ -24,7 +24,11 @@ export type BillingReportOrganizationDatabase = Pick<PrismaClient, "organization
  * optimisation:
  *
  *   - `pricingModel: SEAT_EVENT` is what makes a row reportable at all; an
- *     organization on any other model is skipped, not reported as zero.
+ *     organization on any other model is skipped, not reported as zero. It is
+ *     SELECTED rather than filtered on, so one query still answers both
+ *     questions: filtering made a non-usage-billed organization
+ *     indistinguishable from an absent row, and telling them apart afterwards
+ *     would have cost a second query on the path this read keeps cheap.
  *   - the subscription filter is `ACTIVE` and a growth-seat plan, because a
  *     cancelled or non-seat subscription cannot carry a meter event.
  *   - `take: 1` with `orderBy: startDate desc` reads the CURRENT one; the
@@ -48,11 +52,12 @@ export class PrismaBillingReportOrganizationRepository extends BillingReportOrga
 
   async getOrganizationForBilling(
     organizationId: string,
-  ): Promise<BillingReportOrganization | null> {
-    return this.prisma.organization.findFirst({
-      where: { id: organizationId, pricingModel: "SEAT_EVENT" },
+  ): Promise<BillingReportOrganizationLookup> {
+    const organization = await this.prisma.organization.findFirst({
+      where: { id: organizationId },
       select: {
         id: true,
+        pricingModel: true,
         stripeCustomerId: true,
         subscriptions: {
           where: {
@@ -65,5 +70,13 @@ export class PrismaBillingReportOrganizationRepository extends BillingReportOrga
         },
       },
     });
+
+    if (!organization) return { outcome: "not_found" };
+    if (organization.pricingModel !== "SEAT_EVENT") {
+      return { outcome: "not_usage_billed" };
+    }
+
+    const { pricingModel: _pricingModel, ...forBilling } = organization;
+    return { outcome: "usage_billed", organization: forBilling };
   }
 }

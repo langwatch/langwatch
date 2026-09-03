@@ -414,7 +414,7 @@ export const statusCommand = async (options?: RawOutputFlags): Promise<void> => 
     { key: "scenarios", fn: () => apiClient.GET("/api/scenarios") },
     { key: "suites", fn: () => fetchCount("/api/suites") },
     { key: "datasets", fn: () => apiClient.GET("/api/dataset") },
-    { key: "agents", fn: () => apiClient.GET("/api/agents") },
+    { key: "agents", fn: () => apiClient.GET("/api/v1/agents") },
     { key: "workflows", fn: () => apiClient.GET("/api/workflows") },
     { key: "dashboards", fn: () => apiClient.GET("/api/dashboards") },
     { key: "triggers", fn: () => fetchCount("/api/triggers") },

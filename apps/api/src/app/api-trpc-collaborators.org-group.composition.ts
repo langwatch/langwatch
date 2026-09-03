@@ -84,12 +84,17 @@ import {
   CodingAgentProjectionPersistenceAdapter,
   CodingAgentScopePermissionsPort,
   CodingAgentBillingPolicyPort,
+  type CodingAgentScopeCaller,
+  type CodingAgentScopePermission,
   type CodingAgentScopeProject,
   type CodingAgentTrpcPorts,
   type CodingAgentViewerVisibility,
 } from "@langwatch/coding-agent-server";
 import type { CodingAgentClickHousePort } from "@langwatch/coding-agent-server";
-import { ENTERPRISE_FEATURE_ERRORS, assertEnterprisePlanType } from "@langwatch/enterprise-plan-gate";
+import {
+  ENTERPRISE_FEATURE_ERRORS,
+  assertEnterprisePlanType,
+} from "@langwatch/enterprise-plan-gate";
 import type { PlanProvider } from "@langwatch/entitlement-contract";
 import type { GithubService } from "@langwatch/github-contract";
 import { HandledError } from "@langwatch/handled-error";
@@ -128,7 +133,10 @@ import type { AnyApiTrpcCollaborators } from "../app-trpc/app-trpc.collaborators
 import type { ApiTrpcFeatureApplication, ApiTrpcPortsContext } from "../app-trpc/app-trpc.context";
 import type { AnyAppOrgGroupTrpcPorts } from "../app-trpc/app-trpc.org-group";
 import type { EnterpriseTrpcMountPorts } from "../features/enterprise/enterprise-trpc.mount";
-import type { ProjectTrpcChecks, ProjectTrpcMountPorts } from "../features/project/project-trpc.mount";
+import type {
+  ProjectTrpcChecks,
+  ProjectTrpcMountPorts,
+} from "../features/project/project-trpc.mount";
 import { composeApiAutomationApp } from "./api-automation.composition";
 import { composeApiOrganizationInvites } from "./api-organization-invites.composition";
 import { signUpDataSchema } from "./api-trpc-collaborators.identity.composition";
@@ -297,9 +305,9 @@ export type ApiOrgGroupCollaboratorsOptions = Readonly<{
    * limiters would give one caller two budgets, which is the whole reason the
    * production composition holds a single one.
    */
-  rateLimit(input: Readonly<{ key: string; windowSeconds: number; max: number }>): Promise<
-    Readonly<{ allowed: boolean; resetAt: number }>
-  >;
+  rateLimit(
+    input: Readonly<{ key: string; windowSeconds: number; max: number }>,
+  ): Promise<Readonly<{ allowed: boolean; resetAt: number }>>;
   /** The signing key an unsubscribe link is minted and verified with. */
   unsubscribeSecret: string | undefined;
   /** The SAME Redis the worker spends the automation persist ceiling against. */
@@ -455,9 +463,7 @@ function organizationPorts(
         }).trpc
       : undefined);
   const refuseInvitations = (what: string): Promise<never> =>
-    Promise.reject(
-      new ApiCapabilityUnavailableError(`invitation service, so it cannot ${what}`),
-    );
+    Promise.reject(new ApiCapabilityUnavailableError(`invitation service, so it cannot ${what}`));
   const inviteports = invites?.ports;
 
   return {
@@ -475,12 +481,10 @@ function organizationPorts(
      */
     batchProjectPermissions: async (ctx, input) => {
       const userId = actorId(ctx);
-      const decisions = await mapWithConcurrency(
-        [...input.projectIds],
-        (projectId) =>
-          authz
-            .hasPermission({ userId, permission: input.permission, projectId })
-            .then((permitted) => [projectId, permitted] as const),
+      const decisions = await mapWithConcurrency([...input.projectIds], (projectId) =>
+        authz
+          .hasPermission({ userId, permission: input.permission, projectId })
+          .then((permitted) => [projectId, permitted] as const),
       );
       return new Map(decisions);
     },
@@ -587,13 +591,17 @@ function organizationPorts(
         ? inviteports.createInvites(ctx, input)
         : refuseInvitations("invite anybody to this organization"),
     revokeInvite: (ctx, input) =>
-      inviteports ? inviteports.revokeInvite(ctx, input) : refuseInvitations("revoke an invitation"),
+      inviteports
+        ? inviteports.revokeInvite(ctx, input)
+        : refuseInvitations("revoke an invitation"),
     assertInviteSendAllowed: (ctx, input) =>
       inviteports
         ? inviteports.assertInviteSendAllowed(ctx, input)
         : refuseInvitations("meter invitation sends"),
     resendInvite: (ctx, input) =>
-      inviteports ? inviteports.resendInvite(ctx, input) : refuseInvitations("resend an invitation"),
+      inviteports
+        ? inviteports.resendInvite(ctx, input)
+        : refuseInvitations("resend an invitation"),
     buildInviteAcceptUrl: (inviteCode) => buildInviteAcceptUrl(options.baseHost, inviteCode),
     listInvites: (ctx, input) =>
       inviteports
@@ -961,7 +969,7 @@ function composeCodingAgentApp(options: ApiOrgGroupCollaboratorsOptions): Coding
  * declares no Prisma dependency, and this is the connection every other row
  * read on this process already runs on.
  */
-class ApiCodingAgentScopeDirectory extends CodingAgentCallerScopeDirectoryPort {
+export class ApiCodingAgentScopeDirectory extends CodingAgentCallerScopeDirectoryPort {
   constructor(private readonly prisma: PrismaClient) {
     super();
   }
@@ -1001,25 +1009,56 @@ class ApiCodingAgentScopeDirectory extends CodingAgentCallerScopeDirectoryPort {
   }
 }
 
-/** The two permission cuts, over the ONE AuthZ service this process decides with. */
-class ApiCodingAgentScopePermissions extends CodingAgentScopePermissionsPort {
+/**
+ * The two permission cuts, over the ONE AuthZ service this process decides
+ * with, in ONE batched ask.
+ *
+ * `canBatchPermissionsByIds` collects the principal's grant snapshot once and
+ * decides every (project, permission) pair against it in memory. The previous
+ * shape asked per project per permission, which on a large organization is a
+ * database pass per project per permission: the fan-out exhausted the
+ * connection pool and turned the rollup into a 500.
+ *
+ * An API-key principal carries its own ceiling in the engine — the key's
+ * bindings intersected with its holder's, and the key's alone when it owns
+ * nobody — so a narrowed key is cut here exactly the way it is cut at every
+ * other door, without this composition restating the rule.
+ */
+export class ApiCodingAgentScopePermissions extends CodingAgentScopePermissionsPort {
   constructor(private readonly authz: AuthzService) {
     super();
   }
 
-  async permittedProjectIds(input: {
-    userId: string;
+  async projectCuts(input: {
+    caller: CodingAgentScopeCaller;
+    organizationId: string;
     projects: readonly CodingAgentScopeProject[];
-    permission: "traces:view" | "cost:view";
-  }): Promise<ReadonlySet<string>> {
-    const decisions = await mapWithConcurrency(
-      input.projects.map((project) => project.id),
-      (projectId) =>
-        this.authz
-          .hasPermission({ userId: input.userId, permission: input.permission, projectId })
-          .then((permitted) => [projectId, permitted] as const),
+    permissions: readonly CodingAgentScopePermission[];
+  }): Promise<ReadonlyMap<CodingAgentScopePermission, ReadonlySet<string>>> {
+    const { byPermission } = await this.authz.canBatchPermissionsByIds({
+      principal:
+        input.caller.kind === "user"
+          ? { type: "user", id: input.caller.userId }
+          : { type: "apiKey", id: input.caller.apiKeyId },
+      permissions: [...input.permissions],
+      organizationId: input.organizationId,
+      teams: [],
+      projects: input.projects.map((project) => ({
+        projectId: project.id,
+        teamId: project.teamId,
+      })),
+    });
+
+    return new Map(
+      input.permissions.map((permission) => [
+        permission,
+        new Set(
+          [...(byPermission.get(permission)?.projects ?? new Map())]
+            .filter(([, allowed]) => allowed)
+            .map(([projectId]) => projectId),
+        ),
+      ]),
     );
-    return new Set(decisions.filter(([, permitted]) => permitted).map(([id]) => id));
   }
 }
 

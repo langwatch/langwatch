@@ -32,7 +32,15 @@ type FeatureFlagApplication = Readonly<{
   permissions: Pick<AuthzService, "hasPermission">;
   projects: Readonly<{ getOrganizationId(projectId: string): Promise<string> }>;
   organizations: Readonly<{
-    isMember(input: { organizationId: string; userId: string }): Promise<boolean>;
+    /**
+     * Which of the named organizations this person belongs to, in one read.
+     *
+     * Asked as a batch rather than one `isMember` per organization: the
+     * workspace switcher and the product shell resolve a flag for every
+     * organization they list, and a membership query per row is a query per
+     * row on a list page.
+     */
+    memberOrganizationIds(input: { userId: string; organizationIds: string[] }): Promise<string[]>;
   }>;
 }>;
 
@@ -199,24 +207,30 @@ async function resolveForMemberOrganizations({
   organizationIds: string[];
 }): Promise<Record<string, boolean>> {
   const userId = ctx.actor().id;
+  if (organizationIds.length === 0) return {};
+
+  // One membership read for the whole list. Non-members are dropped rather
+  // than answered `false`, so the response cannot be read as a membership
+  // oracle for an organization the caller is not in.
+  const memberOf = await ctx.app.organizations.memberOrganizationIds({
+    userId,
+    organizationIds,
+  });
   const entries = await Promise.all(
-    organizationIds.map(async (organizationId) => {
-      const member = await ctx.app.organizations.isMember({ organizationId, userId });
-      if (!member) {
-        return void 0;
-      }
-
-      const enabled = await ctx.app.featureFlags.isEnabled(flag, {
-        kind: "organization",
-        userId,
-        organizationId,
-      });
-
-      return [organizationId, enabled] as const;
-    }),
+    memberOf.map(
+      async (organizationId) =>
+        [
+          organizationId,
+          await ctx.app.featureFlags.isEnabled(flag, {
+            kind: "organization",
+            userId,
+            organizationId,
+          }),
+        ] as const,
+    ),
   );
 
-  return Object.fromEntries(entries.filter((entry) => entry !== undefined));
+  return Object.fromEntries(entries);
 }
 
 /** Tenant policies are manager data; a viewer sees the entry without them. */

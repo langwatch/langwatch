@@ -25,7 +25,7 @@ export const createSuiteCommandSchema = suiteDefinitionFieldsSchema
     labels: suiteDefinitionFieldsSchema.shape.labels.default([]),
   })
   .superRefine((input, context) => {
-    const usesStoredCases = input.scope === void 0 || input.scope.mode === "cases";
+    const usesStoredCases = input.scope === void 0 || input.scope.mode === "scenarios";
     if (usesStoredCases && input.scenarioIds.length === 0) {
       context.addIssue({
         code: "custom",

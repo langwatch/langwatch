@@ -3,15 +3,15 @@
  * result row.
  *
  * The plan is run as its test suite, so the dialog offers the same targets and
- * the same remembered choice as running it from the rail. A single row is run
- * as a one-off, which is where a single case always lands.
+ * the same remembered choice as running it from the rail. A single row runs the
+ * one case it holds, which is an ordinary run plan of that case and its agent.
  *
  * @see specs/features/agent-testing/results-tabs.feature
  * @see specs/features/agent-testing/run-dialog.feature
+ * @see specs/suites/run-plan-identity-by-name.feature
  */
 
 import { useCallback, useState } from "react";
-import { parseSuiteTargets } from "@langwatch/suite-contract";
 import { useOrganizationTeamProject } from "../../../../behavior/use-organization-team-project";
 import { readScenarioTarget } from "../../use-scenario-target";
 import type { ScenarioRunData } from "@langwatch/scenario-contract";
@@ -19,6 +19,7 @@ import { api } from "../../../../behavior/scenario-api";
 import { useRunStartedHandler } from "../cases/use-case-run-actions";
 import type { RunDialogSubject } from "../run/run-dialog";
 import type { RunPlan } from "../../../../behavior/agent-testing/results/run-plans";
+import { storedPlanSubject } from "../run/plan-scope";
 
 export type RunPlanRunDialog = {
   subject: RunDialogSubject | null;
@@ -40,7 +41,7 @@ export function useRunPlanRunDialog({
   const { project } = useOrganizationTeamProject();
   const projectId = project?.id ?? "";
   const [subject, setSubject] = useState<RunDialogSubject | null>(null);
-  const onRunStarted = useRunStartedHandler({ projectId });
+  const onRunStarted = useRunStartedHandler();
 
   const suiteId = plan.kind === "suite" ? plan.suiteId : null;
   const { data: suite } = api.suites.getById.useQuery(
@@ -50,15 +51,7 @@ export function useRunPlanRunDialog({
 
   const runPlan = useCallback(() => {
     if (!suite) return;
-    const persisted = parseSuiteTargets(suite.targets)[0];
-    setSubject({
-      kind: "suite",
-      suiteId: suite.id,
-      name: suite.name,
-      scenarioIds: suite.scenarioIds,
-      initialTarget: persisted ? { type: persisted.type, id: persisted.referenceId } : null,
-      persistedTarget: persisted ?? null,
-    });
+    setSubject(storedPlanSubject(suite));
   }, [suite]);
 
   const rerunCase = useCallback(

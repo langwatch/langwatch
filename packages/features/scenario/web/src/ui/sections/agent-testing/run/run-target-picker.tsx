@@ -12,11 +12,15 @@ import { Check, Code, Globe, Plug, Workflow } from "lucide-react";
 import { agentHasDevTunnel } from "@langwatch/agent-web/surfaces/browser-port";
 import type { TargetValue } from "../../scenarios/target-selector";
 import { FG_MUTED, QUIET_BUTTON_SHADOW } from "../../../../model/agent-testing/shared/design";
+import { ownerOnlyCopy } from "../../../../behavior/scenarios/use-filtered-scenario-targets";
+import { Tooltip } from "@langwatch/design-system/tooltip";
+import type { ScenarioParameterDefinition } from "@langwatch/scenario-contract";
 
 const AGENT_ICONS = {
   http: Globe,
   code: Code,
   workflow: Workflow,
+  connected: Plug,
 } as const;
 
 /**
@@ -34,8 +38,22 @@ const AGENT_GRID_COLUMNS = "repeat(3, 1fr)";
 export type RunDialogAgent = {
   id: string;
   name: string;
-  type: "http" | "code" | "workflow";
+  type: "http" | "code" | "workflow" | "connected";
   config?: unknown;
+  /** The name with the environment of a connected agent, when it has one. */
+  label?: string;
+  /** The environment of a connected agent; nothing for the other kinds. */
+  environment?: string | null;
+  /** Whether a process is holding a connected agent right now. */
+  status?: "online" | "offline";
+  /** The owner of a personal development agent. */
+  owner?: { userId: string; name: string | null } | null;
+  /** False only for a development agent of another person. */
+  isRunnable?: boolean;
+  /** True when a development agent belongs to another person. */
+  isTeammateOwned?: boolean;
+  /** The parameters a connected agent declares. */
+  parameters?: ScenarioParameterDefinition[];
 };
 
 /** The agents of the project as cards, the selected one marked. */
@@ -49,11 +67,7 @@ export function AgentBlocks({
   onSelect: (target: NonNullable<TargetValue>) => void;
 }) {
   return (
-    <Grid
-      templateColumns={AGENT_GRID_COLUMNS}
-      gap={2}
-      data-testid="run-dialog-agents"
-    >
+    <Grid templateColumns={AGENT_GRID_COLUMNS} gap={2} data-testid="run-dialog-agents">
       {agents.map((agent) => (
         <AgentBlock
           key={agent.id}
@@ -63,6 +77,63 @@ export function AgentBlocks({
         />
       ))}
     </Grid>
+  );
+}
+
+/** What a card takes as its background under the pointer. */
+function cardHoverBackground({
+  isActive,
+  canRun,
+}: {
+  isActive: boolean;
+  canRun: boolean;
+}): string | undefined {
+  if (isActive) return "blue.subtle";
+  if (canRun) return "bg.muted/60";
+  return undefined;
+}
+
+/**
+ * The line under the name of an agent: the presence of a connected agent, or
+ * the local tunnel of the other kinds.
+ *
+ * The row keeps its height with or without the line, so the cards line up.
+ */
+function AgentReachLine({ agent }: { agent: RunDialogAgent }) {
+  const hasDevTunnel = agentHasDevTunnel(agent);
+  const isConnected = agent.type === "connected";
+  const isOnline = agent.status === "online";
+
+  return (
+    <HStack
+      gap={1.5}
+      marginTop={1}
+      minHeight="16px"
+      data-testid={hasDevTunnel ? `agent-dev-tunnel-${agent.id}` : undefined}
+    >
+      {isConnected && (
+        <>
+          <Box
+            boxSize="8px"
+            borderRadius="full"
+            flexShrink={0}
+            background={isOnline ? "green.500" : "fg.subtle"}
+            data-testid={`agent-presence-${agent.id}`}
+          />
+          <Text fontSize="11px" color={FG_MUTED} truncate>
+            {isOnline ? "Online" : "Offline"}
+          </Text>
+        </>
+      )}
+      {!isConnected && hasDevTunnel && (
+        <>
+          <Box boxSize="8px" borderRadius="full" flexShrink={0} background="orange.500" />
+          <Text fontSize="11px" color={FG_MUTED} truncate>
+            Local tunnel
+          </Text>
+        </>
+      )}
+    </HStack>
   );
 }
 
@@ -77,24 +148,31 @@ function AgentBlock({
   onSelect: (target: NonNullable<TargetValue>) => void;
 }) {
   const AgentIcon = AGENT_ICONS[agent.type];
-  const hasDevTunnel = agentHasDevTunnel(agent);
+  const canRun = agent.isRunnable !== false;
 
-  return (
+  const card = (
     <Box
       as="button"
       textAlign="left"
-      cursor="pointer"
+      cursor={canRun ? "pointer" : "not-allowed"}
+      opacity={canRun ? 1 : 0.5}
       borderWidth="1px"
       borderColor={isActive ? "blue.500" : "border"}
       background={isActive ? "blue.subtle" : undefined}
-      _hover={{ background: isActive ? "blue.subtle" : "bg.muted/60" }}
+      _hover={{ background: cardHoverBackground({ isActive, canRun }) }}
       borderRadius="xl"
       paddingX={3}
       paddingY={2.5}
       height={AGENT_CARD_HEIGHT}
-      onClick={() => onSelect({ type: agent.type, id: agent.id })}
+      // A grid item is as wide as its content unless told otherwise, so a
+      // long label would widen the column past the dialog instead of
+      // truncating.
+      minWidth={0}
+      width="100%"
+      onClick={() => canRun && onSelect({ type: agent.type, id: agent.id })}
       data-testid={`run-dialog-agent-${agent.id}`}
       aria-pressed={isActive}
+      aria-disabled={!canRun}
     >
       <HStack justify="space-between" align="start">
         <HStack
@@ -108,32 +186,24 @@ function AgentBlock({
         </HStack>
         {isActive && <Check size={14} color="var(--chakra-colors-blue-500)" />}
       </HStack>
-      <Text fontSize="12.5px" fontWeight="medium" truncate marginTop={3}>
-        {agent.name}
-      </Text>
-      {/* The row keeps its height with or without the line, so the cards
-          line up. */}
-      <HStack
-        gap={1.5}
-        marginTop={1}
-        minHeight="16px"
-        data-testid={hasDevTunnel ? `agent-dev-tunnel-${agent.id}` : undefined}
+      <Text
+        fontSize="12.5px"
+        fontWeight="medium"
+        truncate
+        marginTop={3}
+        title={agent.label ?? agent.name}
       >
-        {hasDevTunnel && (
-          <>
-            <Box
-              boxSize="8px"
-              borderRadius="full"
-              flexShrink={0}
-              background="orange.500"
-            />
-            <Text fontSize="11px" color={FG_MUTED} truncate>
-              Local tunnel
-            </Text>
-          </>
-        )}
-      </HStack>
+        {agent.label ?? agent.name}
+      </Text>
+      <AgentReachLine agent={agent} />
     </Box>
+  );
+
+  if (canRun) return card;
+  return (
+    <Tooltip content={ownerOnlyCopy(agent.owner?.name)}>
+      <Box minWidth={0}>{card}</Box>
+    </Tooltip>
   );
 }
 

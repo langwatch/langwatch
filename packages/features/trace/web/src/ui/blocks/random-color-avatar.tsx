@@ -1,4 +1,4 @@
-import type { AvatarRootProps } from "@chakra-ui/react";
+import type { AvatarRootProps } from "@langwatch/design-system/avatar";
 import { getColorForString } from "../../model/rotating-colors";
 import { UserAvatar } from "../elements/user-avatar";
 

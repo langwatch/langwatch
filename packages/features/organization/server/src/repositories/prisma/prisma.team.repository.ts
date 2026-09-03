@@ -30,10 +30,7 @@ export class PrismaTeamRepository extends TeamRepository {
     return new PrismaTeamRepository(database);
   }
 
-  async get(input: {
-    teamId: string;
-    organizationId: string;
-  }): Promise<OrganizationTeam> {
+  async get(input: { teamId: string; organizationId: string }): Promise<OrganizationTeam> {
     const team = await this.database.team.findFirst({
       where: {
         id: input.teamId,
@@ -63,10 +60,7 @@ export class PrismaTeamRepository extends TeamRepository {
     return team?.organizationId ?? null;
   }
 
-  async getBySlug(input: {
-    slug: string;
-    organizationId: string;
-  }): Promise<OrganizationTeam> {
+  async getBySlug(input: { slug: string; organizationId: string }): Promise<OrganizationTeam> {
     const team = await this.tryFindBySlug(input);
     if (!team) throw new TeamNotFoundError(input.slug);
     return team;
@@ -94,10 +88,7 @@ export class PrismaTeamRepository extends TeamRepository {
     };
   }
 
-  tryFindBySlug(input: {
-    slug: string;
-    organizationId: string;
-  }): Promise<OrganizationTeam | null> {
+  tryFindBySlug(input: { slug: string; organizationId: string }): Promise<OrganizationTeam | null> {
     return this.database.team.findFirst({
       where: {
         slug: input.slug,
@@ -118,10 +109,7 @@ export class PrismaTeamRepository extends TeamRepository {
         archivedAt: null,
         ...(input.visibleToUserId
           ? {
-              OR: [
-                { isPersonal: false },
-                { isPersonal: true, ownerUserId: input.visibleToUserId },
-              ],
+              OR: [{ isPersonal: false }, { isPersonal: true, ownerUserId: input.visibleToUserId }],
             }
           : {}),
       },
@@ -147,10 +135,7 @@ export class PrismaTeamRepository extends TeamRepository {
         select: teamSelect,
       });
     } catch (error) {
-      if (
-        error instanceof Prisma.PrismaClientKnownRequestError &&
-        error.code === "P2002"
-      ) {
+      if (error instanceof Prisma.PrismaClientKnownRequestError && error.code === "P2002") {
         throw new TeamSlugConflictError();
       }
       throw error;
@@ -174,10 +159,7 @@ export class PrismaTeamRepository extends TeamRepository {
     return this.get(input);
   }
 
-  async archive(input: {
-    teamId: string;
-    organizationId: string;
-  }): Promise<OrganizationTeam> {
+  async archive(input: { teamId: string; organizationId: string }): Promise<OrganizationTeam> {
     const result = await this.database.team.updateMany({
       where: {
         id: input.teamId,
@@ -213,6 +195,24 @@ export class PrismaTeamRepository extends TeamRepository {
     const missing = input.userIds.find((userId) => !found.has(userId));
     if (missing) throw new UserNotInOrganizationError(missing);
     return memberships.map(({ userId }) => userId);
+  }
+
+  async memberOrganizationIds(input: {
+    userId: string;
+    organizationIds: string[];
+    activeOnly?: boolean;
+  }): Promise<string[]> {
+    if (input.organizationIds.length === 0) return [];
+    const memberships = await this.database.organizationUser.findMany({
+      where: {
+        userId: input.userId,
+        organizationId: { in: input.organizationIds },
+        ...(input.activeOnly === false ? {} : { disabledAt: null }),
+      },
+      select: { organizationId: true },
+    });
+    const member = new Set(memberships.map(({ organizationId }) => organizationId));
+    return input.organizationIds.filter((organizationId) => member.has(organizationId));
   }
 
   async fenceMembershipChange(input: {

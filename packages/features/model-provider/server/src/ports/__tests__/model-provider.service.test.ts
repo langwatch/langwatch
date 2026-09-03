@@ -135,6 +135,10 @@ class Authorization extends AuthzService {
     return this.notUsed();
   }
 
+  canBatchPermissionsByIds(): Promise<never> {
+    return this.notUsed();
+  }
+
   checkDetailed(): Promise<never> {
     return this.notUsed();
   }
@@ -455,6 +459,10 @@ class Projects extends ProjectService {
 class Organizations extends OrganizationService {
   private notUsed(): never {
     throw new Error("Organization method is not used by this test");
+  }
+
+  memberOrganizationIds() {
+    return this.notUsed();
   }
 
   getSettings() {

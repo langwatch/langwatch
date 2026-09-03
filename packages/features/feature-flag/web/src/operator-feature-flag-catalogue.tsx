@@ -37,6 +37,13 @@ export interface FeatureFlagRuleEditorRule {
   organizationId: string;
   projectId: string;
   percentage: string;
+  /**
+   * "New organizations": an ISO date, and every organization created on or
+   * after it matches. An operator rolling out to new signups cannot write the
+   * ids of organizations that do not exist yet, so the rule names one date
+   * instead and every later signup matches it without another edit.
+   */
+  organizationCreatedAfter: string;
   enabled: boolean;
   preservedMatch: FeatureFlagRule["match"];
 }
@@ -50,6 +57,7 @@ export function rulesToEditor(rules: FeatureFlagRules): FeatureFlagRuleEditorRul
     organizationId: rule.match.organizationId ?? "",
     projectId: rule.match.projectId ?? "",
     percentage: rule.match.percentage?.toString() ?? "",
+    organizationCreatedAfter: rule.match.organizationCreatedAfter ?? "",
     enabled: rule.enabled,
     preservedMatch: { ...rule.match },
   }));
@@ -61,13 +69,16 @@ export function editorToRules(rules: FeatureFlagRuleEditorRule[]): FeatureFlagRu
     delete match.organizationId;
     delete match.projectId;
     delete match.percentage;
+    delete match.organizationCreatedAfter;
 
     const organizationId = rule.organizationId.trim();
     const projectId = rule.projectId.trim();
     const percentage = rule.percentage.trim();
+    const organizationCreatedAfter = rule.organizationCreatedAfter.trim();
     if (organizationId) match.organizationId = organizationId;
     if (projectId) match.projectId = projectId;
     if (percentage) match.percentage = Number(percentage);
+    if (organizationCreatedAfter) match.organizationCreatedAfter = organizationCreatedAfter;
 
     return { match, enabled: rule.enabled };
   });
@@ -201,7 +212,7 @@ function ScopeSection({
           <Table.Body>
             {rows.map((row) => (
               <FlagRow
-          sharedInstall={sharedInstall}
+                sharedInstall={sharedInstall}
                 key={row.key}
                 row={row}
                 canManage={canManage}
@@ -385,6 +396,12 @@ function FeatureFlagRulesDialog({
       setValidationError("A percentage must be a whole number from 0 to 100.");
       return;
     }
+    // A date nothing can read is a rule that never matches, which reads to the
+    // operator as a rollout that silently never started.
+    if (draft.some((rule) => !validCreatedAfter(rule.organizationCreatedAfter))) {
+      setValidationError("New organizations needs a date, for example 2026-09-01.");
+      return;
+    }
 
     setSaving(true);
     try {
@@ -487,6 +504,12 @@ function RuleEditorRow({
         onChange={(percentage) => onChange({ percentage })}
         type="number"
       />
+      <RuleInput
+        label="New organizations after"
+        value={rule.organizationCreatedAfter}
+        onChange={(organizationCreatedAfter) => onChange({ organizationCreatedAfter })}
+        type="date"
+      />
       <Field.Root flexBasis="100px">
         <Field.Label fontSize="xs">Enabled</Field.Label>
         <Switch
@@ -510,7 +533,7 @@ function RuleInput({
   label: string;
   value: string;
   onChange: (value: string) => void;
-  type?: "text" | "number";
+  type?: "text" | "number" | "date";
 }) {
   return (
     <Field.Root flex={1}>
@@ -530,9 +553,15 @@ function newEditorRule(): FeatureFlagRuleEditorRule {
     organizationId: "",
     projectId: "",
     percentage: "",
+    organizationCreatedAfter: "",
     enabled: true,
     preservedMatch: {},
   };
+}
+
+function validCreatedAfter(value: string): boolean {
+  if (!value.trim()) return true;
+  return !Number.isNaN(Date.parse(value));
 }
 
 function validPercentage(value: string): boolean {
@@ -553,11 +582,17 @@ function summarizeTargeting(rules: FeatureFlagRules, effective: boolean) {
   const organizationIds = new Set<string>();
   const projectIds = new Set<string>();
   let percentageRules = 0;
+  let newOrganizationRules = 0;
   let everyone = false;
 
   for (const rule of rules) {
     if (!rule.enabled) continue;
-    if (!rule.match.organizationId && !rule.match.projectId && !rule.match.percentage) {
+    if (
+      !rule.match.organizationId &&
+      !rule.match.projectId &&
+      !rule.match.percentage &&
+      !rule.match.organizationCreatedAfter
+    ) {
       everyone = true;
       break;
     }
@@ -565,12 +600,14 @@ function summarizeTargeting(rules: FeatureFlagRules, effective: boolean) {
     if (rule.match.organizationId) organizationIds.add(rule.match.organizationId);
     if (rule.match.projectId) projectIds.add(rule.match.projectId);
     if (rule.match.percentage) percentageRules += 1;
+    if (rule.match.organizationCreatedAfter) newOrganizationRules += 1;
   }
 
   const parts = [
     organizationIds.size ? `${organizationIds.size} organisation(s)` : "",
     projectIds.size ? `${projectIds.size} project(s)` : "",
     percentageRules ? `${percentageRules} percentage rollout(s)` : "",
+    newOrganizationRules ? "new organizations" : "",
   ].filter(Boolean);
   const partialEnabled = !effective && (everyone || parts.length > 0);
   if (effective) {

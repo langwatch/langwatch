@@ -14,7 +14,9 @@
  * The other three arrive with them because they are the same host and the same
  * package: the studio's agent picker and the Evaluations table open
  * `agentList`, the Experiments workbench opens `agentWorkflowTargetEditor`, and
- * Agent Testing opens `agentTestingPlanEditor`.
+ * Agent Testing opens `agentTestingCaseEditor`. The two connected-agent
+ * overlays arrive on the same host: the agents page opens
+ * `agentConnectedDetail`, and that drawer opens `agentConnectFromCode`.
  *
  * THE FIVE BELOW THEM WERE REGISTERED WITHOUT A HOST, AND THAT IS A CRASH
  * RATHER THAN A COSMETIC GAP. `scenarioRunDetail`, `scenarioEditor`,
@@ -40,9 +42,11 @@ import {
   AgentCodeEditorDrawerFromUrl,
   AgentHttpEditorDrawerFromUrl,
   AgentListDrawer as AgentList,
-  AgentTestingPlanEditorDrawer as AgentTestingPlanEditor,
+  AgentTestingCaseEditorDrawer as AgentTestingCaseEditor,
   AgentWorkflowEditorDrawer as AgentWorkflowEditor,
   AgentWorkflowTargetEditorDrawer as AgentWorkflowTargetEditor,
+  ConnectedAgentDrawer as ConnectedAgent,
+  ConnectFromCodeDrawer as ConnectFromCode,
   ScenarioFormDrawerFromUrl,
   ScenarioRunDetailDrawer as ScenarioRunDetail,
   ScenarioVersionHistoryDrawer as ScenarioVersionHistory,
@@ -68,13 +72,20 @@ export const AgentWorkflowTargetEditorDrawer = withScenarioDrawerHost(
 );
 
 /**
- * The run plan editor, which reads its own open state.
+ * The test-case editor, which reads its own open state.
  *
- * It is a centred dialog rather than a side drawer, and it asks the navigator
- * `drawerOpen("agentTestingPlanEditor")` instead of taking an `open` prop —
- * so it is the one entry here with nothing to coerce.
+ * It asks the navigator `drawerOpen("agentTestingCaseEditor")` rather than
+ * taking an `open` prop, so it is the one entry here with nothing to coerce.
  */
-export const AgentTestingPlanEditorDrawer = withScenarioDrawerHost(AgentTestingPlanEditor);
+export const AgentTestingCaseEditorDrawer = withScenarioDrawerHost(AgentTestingCaseEditor);
+
+/**
+ * The connected-agent pair. `agentConnectedDetail` reads the agent id off the
+ * address itself and takes no `open`, so it needs no coercion; the code-snippet
+ * drawer declares `open?: boolean` and takes the same one the editors take.
+ */
+export const ConnectedAgentDetailDrawer = withScenarioDrawerHost(ConnectedAgent);
+export const ConnectFromCodeDrawer = withScenarioDrawerHost(fromDrawerAddress(ConnectFromCode));
 
 /**
  * The five the family already served, now mounted in the host they read.

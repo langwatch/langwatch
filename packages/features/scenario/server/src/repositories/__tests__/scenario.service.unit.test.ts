@@ -1,14 +1,14 @@
 import {
-  ScenarioFolderNotFoundError,
+  ScenarioTestSuiteNotFoundError,
   ScenarioNotFoundError,
   type Scenario,
   type ScenarioCreateInput,
-  type ScenarioFolder,
-  type ScenarioFolderCreateInput,
-  type ScenarioFolderIdInput,
-  type ScenarioFolderRenameInput,
-  type ScenarioFolderRunDefinition,
-  type ScenarioFolderUpdateInput,
+  type ScenarioTestSuite,
+  type ScenarioTestSuiteCreateInput,
+  type ScenarioTestSuiteIdInput,
+  type ScenarioTestSuiteRenameInput,
+  type ScenarioTestSuiteRunDefinition,
+  type ScenarioTestSuiteUpdateInput,
   type ScenarioReferenceState,
   type ScenarioRunConfig,
   type ScenarioUpdateInput,
@@ -24,7 +24,7 @@ import { describe, expect, it } from "vitest";
 import { ScenarioRepository } from "../scenario.repository";
 import { ScenarioService } from "../../services/scenario.service";
 import { ScenarioClockPort } from "../../ports/scenario-clock.port";
-import { ScenarioFolderIdPort, ScenarioIdPort } from "../../ports/scenario-id.port";
+import { ScenarioTestSuiteIdPort, ScenarioIdPort } from "../../ports/scenario-id.port";
 import { ScenarioSecretCipherPort } from "../../ports/scenario-secret-cipher.port";
 
 const simulations = Object.create(SimulationService.prototype) as SimulationService;
@@ -38,7 +38,7 @@ class TestScenarioId extends ScenarioIdPort {
   }
 }
 
-class TestScenarioFolderId extends ScenarioFolderIdPort {
+class TestScenarioTestSuiteId extends ScenarioTestSuiteIdPort {
   constructor(private readonly value: string) {
     super();
   }
@@ -76,7 +76,7 @@ function serviceOptions(
     repository,
     simulations,
     ids: new TestScenarioId(id),
-    folderIds: new TestScenarioFolderId(`folder_${id}`),
+    testSuiteIds: new TestScenarioTestSuiteId(`test_suite_${id}`),
     clock,
     secretCipher: new TestScenarioSecretCipher(),
   };
@@ -84,7 +84,7 @@ function serviceOptions(
 
 class MemoryScenarioRepository extends ScenarioRepository {
   readonly rows = new Map<string, Scenario>();
-  readonly folders = new Map<string, ScenarioFolder>();
+  readonly testSuites = new Map<string, ScenarioTestSuite>();
 
   async create(
     input: ScenarioCreateInput & { id: string; actor: ScenarioActor },
@@ -97,7 +97,7 @@ class MemoryScenarioRepository extends ScenarioRepository {
       judgeModel: scenarioInput.judgeModel ?? null,
       maxTurns: scenarioInput.maxTurns ?? null,
       minTurns: scenarioInput.minTurns ?? null,
-      folderId: scenarioInput.folderId ?? null,
+      testSuiteId: scenarioInput.testSuiteId ?? null,
       version: 1,
       lastUpdatedById: scenarioInput.lastUpdatedById ?? null,
       archivedAt: null,
@@ -242,8 +242,10 @@ class MemoryScenarioRepository extends ScenarioRepository {
       .map(({ id, name }) => ({ id, name }));
   }
 
-  async createFolder(input: ScenarioFolderCreateInput & { id: string }): Promise<ScenarioFolder> {
-    const folder: ScenarioFolder = {
+  async createTestSuite(
+    input: ScenarioTestSuiteCreateInput & { id: string },
+  ): Promise<ScenarioTestSuite> {
+    const testSuite: ScenarioTestSuite = {
       id: input.id,
       projectId: input.projectId,
       name: input.name,
@@ -255,60 +257,63 @@ class MemoryScenarioRepository extends ScenarioRepository {
       labels: [],
       simulatorModel: null,
       judgeModel: null,
-      kind: "folder",
+      kind: "test_suite",
       scope: null,
       archivedAt: null,
       createdAt: new Date(0),
       updatedAt: new Date(0),
     };
-    this.folders.set(folder.id, folder);
-    return folder;
+    this.testSuites.set(testSuite.id, testSuite);
+    return testSuite;
   }
 
-  findFolders(input: { projectId: string }): Promise<ScenarioFolder[]> {
+  findTestSuites(input: { projectId: string }): Promise<ScenarioTestSuite[]> {
     return Promise.resolve(
-      [...this.folders.values()].filter(
-        (folder) => folder.projectId === input.projectId && folder.archivedAt === null,
+      [...this.testSuites.values()].filter(
+        (testSuite) => testSuite.projectId === input.projectId && testSuite.archivedAt === null,
       ),
     );
   }
 
-  tryFindFolder(input: ScenarioFolderIdInput): Promise<ScenarioFolder | null> {
-    const folder = this.folders.get(input.folderId);
+  tryFindTestSuite(input: ScenarioTestSuiteIdInput): Promise<ScenarioTestSuite | null> {
+    const testSuite = this.testSuites.get(input.testSuiteId);
     return Promise.resolve(
-      folder?.projectId === input.projectId && folder.archivedAt === null ? folder : null,
+      testSuite?.projectId === input.projectId && testSuite.archivedAt === null ? testSuite : null,
     );
   }
 
-  async renameFolder(input: ScenarioFolderRenameInput): Promise<ScenarioFolder> {
-    return this.updateFolder(input);
+  async renameTestSuite(input: ScenarioTestSuiteRenameInput): Promise<ScenarioTestSuite> {
+    return this.updateTestSuite(input);
   }
 
-  async updateFolder(input: ScenarioFolderUpdateInput): Promise<ScenarioFolder> {
-    const folder = await this.tryFindFolder(input);
-    if (!folder) throw new ScenarioFolderNotFoundError();
+  async updateTestSuite(input: ScenarioTestSuiteUpdateInput): Promise<ScenarioTestSuite> {
+    const testSuite = await this.tryFindTestSuite(input);
+    if (!testSuite) throw new ScenarioTestSuiteNotFoundError();
 
-    const { folderId: _, projectId: __, ...changes } = input;
-    const updated = { ...folder, ...changes, updatedAt: new Date(1) };
-    this.folders.set(updated.id, updated);
+    const { testSuiteId: _, projectId: __, ...changes } = input;
+    const updated = { ...testSuite, ...changes, updatedAt: new Date(1) };
+    this.testSuites.set(updated.id, updated);
     return updated;
   }
 
-  async getFolderRunDefinition(input: ScenarioFolderIdInput): Promise<ScenarioFolderRunDefinition> {
-    const folder = await this.tryFindFolder(input);
-    if (!folder) throw new ScenarioFolderNotFoundError();
+  async getTestSuiteRunDefinition(
+    input: ScenarioTestSuiteIdInput,
+  ): Promise<ScenarioTestSuiteRunDefinition> {
+    const testSuite = await this.tryFindTestSuite(input);
+    if (!testSuite) throw new ScenarioTestSuiteNotFoundError();
 
-    return { folder, scenarioIds: folder.scenarioIds };
+    return { testSuite, scenarioIds: testSuite.scenarioIds };
   }
 
-  async archiveFolder(
-    input: ScenarioFolderIdInput & { archivedAt: Date },
-  ): Promise<ScenarioFolder> {
-    const folder = this.folders.get(input.folderId);
-    if (!folder || folder.projectId !== input.projectId) throw new ScenarioFolderNotFoundError();
+  async archiveTestSuite(
+    input: ScenarioTestSuiteIdInput & { archivedAt: Date },
+  ): Promise<ScenarioTestSuite> {
+    const testSuite = this.testSuites.get(input.testSuiteId);
+    if (!testSuite || testSuite.projectId !== input.projectId)
+      throw new ScenarioTestSuiteNotFoundError();
 
-    const archived = { ...folder, archivedAt: folder.archivedAt ?? input.archivedAt };
-    this.folders.set(archived.id, archived);
+    const archived = { ...testSuite, archivedAt: testSuite.archivedAt ?? input.archivedAt };
+    this.testSuites.set(archived.id, archived);
     return archived;
   }
 }

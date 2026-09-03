@@ -1,12 +1,12 @@
 import type {
   Scenario,
   ScenarioCreateInput,
-  ScenarioFolder,
-  ScenarioFolderCreateInput,
-  ScenarioFolderIdInput,
-  ScenarioFolderRenameInput,
-  ScenarioFolderRunDefinition,
-  ScenarioFolderUpdateInput,
+  ScenarioTestSuite,
+  ScenarioTestSuiteCreateInput,
+  ScenarioTestSuiteIdInput,
+  ScenarioTestSuiteRenameInput,
+  ScenarioTestSuiteRunDefinition,
+  ScenarioTestSuiteUpdateInput,
   ScenarioReferenceState,
   ScenarioRunConfig,
   ScenarioUpdateInput,
@@ -59,15 +59,17 @@ export abstract class ScenarioRepository {
     ids: string[];
     projectId: string;
   }): Promise<{ id: string; name: string }[]>;
-  abstract createFolder(input: ScenarioFolderCreateInput & { id: string }): Promise<ScenarioFolder>;
-  abstract tryFindFolder(input: ScenarioFolderIdInput): Promise<ScenarioFolder | null>;
-  abstract findFolders(input: { projectId: string }): Promise<ScenarioFolder[]>;
-  abstract renameFolder(input: ScenarioFolderRenameInput): Promise<ScenarioFolder>;
-  abstract updateFolder(input: ScenarioFolderUpdateInput): Promise<ScenarioFolder>;
-  abstract getFolderRunDefinition(
-    input: ScenarioFolderIdInput,
-  ): Promise<ScenarioFolderRunDefinition>;
-  abstract archiveFolder(
-    input: ScenarioFolderIdInput & { archivedAt: Date },
-  ): Promise<ScenarioFolder>;
+  abstract createTestSuite(
+    input: ScenarioTestSuiteCreateInput & { id: string },
+  ): Promise<ScenarioTestSuite>;
+  abstract tryFindTestSuite(input: ScenarioTestSuiteIdInput): Promise<ScenarioTestSuite | null>;
+  abstract findTestSuites(input: { projectId: string }): Promise<ScenarioTestSuite[]>;
+  abstract renameTestSuite(input: ScenarioTestSuiteRenameInput): Promise<ScenarioTestSuite>;
+  abstract updateTestSuite(input: ScenarioTestSuiteUpdateInput): Promise<ScenarioTestSuite>;
+  abstract getTestSuiteRunDefinition(
+    input: ScenarioTestSuiteIdInput,
+  ): Promise<ScenarioTestSuiteRunDefinition>;
+  abstract archiveTestSuite(
+    input: ScenarioTestSuiteIdInput & { archivedAt: Date },
+  ): Promise<ScenarioTestSuite>;
 }

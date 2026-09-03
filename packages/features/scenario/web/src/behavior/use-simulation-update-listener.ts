@@ -3,17 +3,13 @@ import { useCallback, useEffect, useMemo, useRef } from "react";
 import {
   isScenarioTabNavigatePayload,
   type ScenarioTabNavigatePayload,
-} from "@langwatch/scenario-contract";
-import { DEFAULT_SET_ID } from "@langwatch/scenario-contract";
-import {
+  DEFAULT_SET_ID,
   isTerminalStatus,
   type ScenarioRunStatus,
-} from "@langwatch/scenario-contract";
-import { api } from "./scenario-api";
-import {
   type CompactStreamingEvent,
   isCompactStreamingEvent,
 } from "@langwatch/scenario-contract";
+import { api } from "./scenario-api";
 import { usePageVisibility } from "@langwatch/trace-web/hooks/usePageVisibility";
 import { useSSESubscription } from "@langwatch/trace-web/hooks/useSSESubscription";
 
@@ -84,8 +80,7 @@ export function useSimulationUpdateListener({
   const matchesFilter = useCallback(
     (payload: SimulationBroadcastPayload): boolean => {
       if (!filter) return true;
-      if (filter.scenarioRunId && payload.scenarioRunId !== filter.scenarioRunId)
-        return false;
+      if (filter.scenarioRunId && payload.scenarioRunId !== filter.scenarioRunId) return false;
       if (filter.batchRunId && payload.batchRunId !== filter.batchRunId) return false;
       if (
         filter.scenarioSetId &&
@@ -133,13 +128,7 @@ export function useSimulationUpdateListener({
    * non-terminal cached value, so a settled read is never downgraded.
    */
   const applyRunUpdate = useCallback(
-    async ({
-      scenarioRunId,
-      status,
-    }: {
-      scenarioRunId: string;
-      status: string | undefined;
-    }) => {
+    async ({ scenarioRunId, status }: { scenarioRunId: string; status: string | undefined }) => {
       await trpcUtils.scenarios.getRunState.invalidate({ scenarioRunId });
 
       if (!status || !isTerminalStatus(status as ScenarioRunStatus)) return;
@@ -147,7 +136,7 @@ export function useSimulationUpdateListener({
       trpcUtils.scenarios.getRunState.setData(
         { projectId, scenarioRunId },
         (previous: { status: ScenarioRunStatus } | undefined) =>
-        previous && !isTerminalStatus(previous.status)
+          previous && !isTerminalStatus(previous.status)
             ? { ...previous, status: status as ScenarioRunStatus }
             : previous,
       );
@@ -209,8 +198,7 @@ export function useSimulationUpdateListener({
         if (!data.event) return;
 
         try {
-          const parsed =
-            typeof data.event === "string" ? JSON.parse(data.event) : data.event;
+          const parsed = typeof data.event === "string" ? JSON.parse(data.event) : data.event;
 
           // Tab handoffs address a machine, not a run, so they are matched on
           // the tab key alone and never against the run/batch filter below.

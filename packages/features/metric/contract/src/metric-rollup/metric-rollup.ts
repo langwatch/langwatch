@@ -2,12 +2,15 @@ import { buildHistogramRow } from "./explicit-histogram";
 import { buildExponentialHistogramRow } from "./exponential-histogram";
 import { type BucketEntry, baseRow } from "./rollup-row";
 import { buildGaugeRow, buildSumRow } from "./scalar";
-import { comparePoints, floorBucket, type MetricSequencePoint, usesPredecessor } from "./sequence";
+import {
+  comparePoints,
+  floorBucket,
+  type MetricRollupSourcePoint,
+  type MetricSequencePoint,
+  usesPredecessor,
+} from "./sequence";
 import { buildSummaryRow } from "./summary";
-import type {
-  CanonicalMetricDataPoint,
-  MetricRollupRow,
-} from "../schemas/metric-processing/metric-data-point";
+import type { MetricRollupRow } from "../schemas/metric-processing/metric-data-point";
 
 const BUILDERS = {
   gauge: buildGaugeRow,
@@ -26,7 +29,7 @@ function buildMetricRollups({
   points,
   affectedBuckets,
 }: {
-  points: CanonicalMetricDataPoint[];
+  points: MetricRollupSourcePoint[];
   affectedBuckets?: ReadonlySet<number>;
 }): MetricRollupRow[] {
   const all = [...points].sort(comparePoints);

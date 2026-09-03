@@ -35,12 +35,16 @@
   "dependencies": {
     "@chakra-ui/react": "^3.36.0",
     "@copilotkit/runtime-client-gql": "1.8.13",
+    "@emotion/react": "^11.14.0",
     "@hookform/resolvers": "^5.4.0",
     "@langwatch/agent-contract": "workspace:*",
     "@langwatch/agent-web": "workspace:*",
     "@langwatch/analytics-web": "workspace:*",
     "@langwatch/authz-contract": "workspace:*",
     "@langwatch/design-system": "workspace:*",
+    "@langwatch/experiment-contract": "workspace:*",
+    "@langwatch/feature-flag-contract": "workspace:*",
+    "@langwatch/handled-error": "workspace:*",
     "@langwatch/ksuid": "^2.0.2",
     "@langwatch/langy-web": "workspace:*",
     "@langwatch/model-provider-contract": "workspace:*",
@@ -80,10 +84,10 @@
     "@types/react-dom": "^19.2.3",
     "jsdom": "^30.0.1",
     "react-dom": "^19.2.7",
+    "react-router": "^8.0.1",
     "typescript": "^7.0.2",
     "vite": "^8.1.2",
-    "vitest": "^4.1.9",
-    "react-router": "^8.0.1"
+    "vitest": "^4.1.9"
   },
   "peerDependencies": {
     "@chakra-ui/react": "^3.36.0",

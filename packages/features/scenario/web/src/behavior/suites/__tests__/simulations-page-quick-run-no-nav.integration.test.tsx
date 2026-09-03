@@ -12,10 +12,14 @@
 import { ChakraProvider, defaultSystem } from "@chakra-ui/react";
 import { cleanup, render, screen } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
-import { afterEach, describe, expect, it, vi } from "vitest";
+import { afterEach, beforeAll, describe, expect, it, vi } from "vitest";
 
 // The empty states carry the Setup via Agent menu, whose langy hooks need
 // app context these tests do not build; the control has its own tests.
+vi.mock("posthog-js", () => ({
+  default: { capture: vi.fn() },
+}));
+
 vi.mock("@langwatch/trace-web/components/SetupWithAgentButton", () => ({
   SetupWithAgentButton: () => null,
 }));
@@ -155,6 +159,11 @@ vi.mock("../../../ui/sections/suites/run-history-panel", () => ({
 
 vi.mock("../../scenario-api", () => ({
   api: {
+    featureFlag: {
+      isEnabled: {
+        useQuery: () => ({ data: { enabled: false }, isLoading: false }),
+      },
+    },
     useUtils: () => ({
       suites: {
         getAll: { invalidate: vi.fn() },
@@ -243,10 +252,9 @@ const Wrapper = ({ children }: { children: React.ReactNode }) => (
   <ChakraProvider value={defaultSystem}>{children}</ChakraProvider>
 );
 
-async function renderSimulationsPage() {
-  // Dynamic import ensures mocks are applied before the module is evaluated
-  const { default: SimulationsPage } =
-    await import("../../../ui/sections/suites/simulations-page");
+let SimulationsPage: React.ComponentType;
+
+function renderSimulationsPage() {
   render(<SimulationsPage />, { wrapper: Wrapper });
 }
 
@@ -255,6 +263,13 @@ async function renderSimulationsPage() {
 // ---------------------------------------------------------------------------
 
 describe("SimulationsPage quick-run no-navigation invariant (#3363)", () => {
+  // The page drags the whole suites graph behind it, and a cold transform of it
+  // costs more than a test's own budget, so it is imported once for the file.
+  // The import is dynamic so the mocks above are applied before it evaluates.
+  beforeAll(async () => {
+    SimulationsPage = (await import("../../../ui/sections/suites/simulations-page")).default;
+  }, 60_000);
+
   afterEach(() => {
     cleanup();
     vi.clearAllMocks();

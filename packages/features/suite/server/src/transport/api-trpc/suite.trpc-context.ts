@@ -2,7 +2,7 @@
  * The context and procedure surface every suite tRPC adapter shares.
  *
  * The suite surface reads across four capabilities — suites themselves,
- * scenario folders (a folder IS a suite of kind "folder", so `suites.getAll`
+ * scenario test suites (a test suite IS a suite of kind "test_suite", so `suites.getAll`
  * and `suites.getById` answer for both), the project's owning organization,
  * and the simulation run summaries the suite list renders — and reaches all
  * four through {@link SuiteApp}, which is what the four-key `SuiteApplication`
@@ -21,7 +21,16 @@ import type { SuiteApp } from "#app/suite.app";
  * family, holds {@link SuiteApp} directly. Both reach the same object; only the
  * path to it differs.
  */
-export type SuiteTrpcContext = Readonly<{ app: Readonly<{ suites: SuiteApp }> }>;
+export type SuiteTrpcContext = Readonly<{
+  app: Readonly<{ suites: SuiteApp }>;
+  /**
+   * The signed-in person this request is made by. Every run started here is
+   * recorded against them.
+   *
+   * @see specs/scenarios/run-actor-on-runs.feature
+   */
+  actor(): Readonly<{ id: string }>;
+}>;
 
 export type SuiteTrpcProcedures<
   TContext extends SuiteTrpcContext,

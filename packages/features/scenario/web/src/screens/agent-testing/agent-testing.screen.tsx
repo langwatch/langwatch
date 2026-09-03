@@ -8,7 +8,7 @@
  * The release flag sits OUTSIDE the permission guard, so the address reads as
  * "not found" for everyone while the flag is off, before any permission is
  * read. The flag alone grants nothing: a person without permission to read
- * test cases is still refused.
+ * scenarios is still refused.
  *
  * @see specs/features/agent-testing/page-structure.feature
  */
@@ -18,7 +18,6 @@ import { AgentTestingPage } from "../../ui/sections/agent-testing/agent-testing-
 function AgentTestingRoutePage() {
   return <AgentTestingPage />;
 }
-
 
 /**
  * The guard is the ROUTE's, and it did not travel.

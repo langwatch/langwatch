@@ -78,9 +78,17 @@ export const simulationsDrawers: UiDrawerRegistry = {
     factory: () => import("./ui/sections/simulations-drawers"),
     key: "AgentWorkflowTargetEditorDrawer",
   }),
-  agentTestingPlanEditor: lazyDrawer({
+  agentTestingCaseEditor: lazyDrawer({
     factory: () => import("./ui/sections/simulations-drawers"),
-    key: "AgentTestingPlanEditorDrawer",
+    key: "AgentTestingCaseEditorDrawer",
+  }),
+  agentConnectedDetail: lazyDrawer({
+    factory: () => import("./ui/sections/simulations-drawers"),
+    key: "ConnectedAgentDetailDrawer",
+  }),
+  agentConnectFromCode: lazyDrawer({
+    factory: () => import("./ui/sections/simulations-drawers"),
+    key: "ConnectFromCodeDrawer",
   }),
 };
 

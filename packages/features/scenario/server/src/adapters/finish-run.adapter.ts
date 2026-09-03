@@ -2,6 +2,7 @@ import type { Command, CommandHandler } from "@langwatch/eventing";
 import { createTenantId, defineCommandSchema, EventUtils } from "@langwatch/eventing";
 import { createLogger } from "@langwatch/observability";
 import { ScenarioRunStatus } from "@langwatch/scenario-contract";
+
 import { buildFailureResults } from "@langwatch/scenario-contract";
 import {
   SIMULATION_EVENT_VERSIONS,
@@ -68,6 +69,45 @@ function collectTraceIds(events: readonly SimulationProcessingEvent[]): string[]
 }
 
 /**
+ * Classifies results that carry a failure nobody wrote a reason for.
+ *
+ * A judge's results carry its own reasoning, which is prose about the
+ * conversation and must reach the customer verbatim. A run that failed
+ * before any judging reports the raw failure instead: as the reasoning
+ * itself, or with no reasoning at all. Those two shapes are what this
+ * rewrites, so the drawer renders a named error rather than a Node stack.
+ *
+ * Everything else is returned untouched: a passing verdict, results with no
+ * error, and any result whose reasoning says something the error does not.
+ */
+function classifyUnjudgedResults({
+  results,
+  cancelled,
+}: {
+  results: NonNullable<FinishRunCommandData["results"]>;
+  cancelled: boolean;
+}): NonNullable<FinishRunCommandData["results"]> {
+  const { error, reasoning, verdict } = results;
+  if (verdict === "success") return results;
+  if (error === undefined || error.trim().length === 0) return results;
+
+  const reasonIsTheFailure =
+    reasoning === undefined || reasoning.trim().length === 0 || reasoning.trim() === error.trim();
+  if (!reasonIsTheFailure) return results;
+
+  const classified = buildFailureResults({ cancelled, error });
+  return {
+    ...results,
+    // A cancelled run never reached a judgement, so a caller-supplied
+    // "failure" is not a verdict anyone decided. The other classifications
+    // keep the caller's verdict, which already says the run did not pass.
+    verdict: cancelled ? classified.verdict : results.verdict,
+    reasoning: classified.reasoning,
+    error: classified.error,
+  };
+}
+
+/**
  * Command handler for finishing a simulation run.
  *
  * Emits the RunFinished event with event-carried state (ECST): identity
@@ -104,15 +144,20 @@ export class FinishRunAdapter implements CommandHandler<
     // Infrastructure callers (stall watchdog, cancel-grace) supply a bare
     // `error` and no verdict; synthesize the same failure-results envelope
     // the in-process failure path writes, so the reason is recorded on the
-    // event rather than lost. A caller-supplied `results` always wins.
-    const results =
-      data.results ??
-      (data.error !== undefined
+    // event rather than lost. Caller-supplied `results` win, but a run that
+    // failed before any judging reports its raw failure as the reasoning, so
+    // those are classified on the way in rather than stored as a stack.
+    const results = data.results
+      ? classifyUnjudgedResults({
+          results: data.results,
+          cancelled: data.status === ScenarioRunStatus.CANCELLED,
+        })
+      : data.error !== undefined
         ? buildFailureResults({
             cancelled: data.status === ScenarioRunStatus.CANCELLED,
             error: data.error,
           })
-        : undefined);
+        : undefined;
 
     const eventData: SimulationRunFinishedEventData = {
       scenarioRunId,
