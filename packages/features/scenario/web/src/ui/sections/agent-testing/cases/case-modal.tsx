@@ -1,32 +1,34 @@
 /**
- * Write or edit one test case, in one dialog.
+ * Write or edit one scenario, in a right-side drawer.
  *
- * The dialog asks four questions: what the case is called, which suite it
+ * The drawer asks four questions: what the scenario is called, which suite it
  * belongs to, what the user is trying to do, and what the judge must check.
  * Everything else, the parameters, the turn limits and the model overrides,
  * waits behind a chip, so the four questions stay the whole form.
  *
+ * The drawer is URL routed. Save & Run leaves the drawer through the
+ * standard drawer navigation, and the page opens the run flow with the
+ * saved scenario.
+ *
  * @see specs/features/agent-testing/cases-table.feature
  * @see specs/features/agent-testing/case-version-history.feature
+ * @see dev/docs/best_practices/drawers.md
  */
 
-import { Dialog } from "@langwatch/workflow-web/components/ui/dialog";
-import {
-  CaseModalFields,
-  CaseModalFooter,
-  CaseModalHeader,
-} from "./case-modal-parts";
+import { Drawer } from "@langwatch/workflow-web/components/ui/drawer";
+import { CaseModalFields, CaseModalFooter, CaseModalHeader } from "./case-modal-parts";
+import { CASE_EDITOR_DRAWER_SIZE } from "./drawer-keys";
 import type { TestSuiteEntry } from "../../../../model/agent-testing/cases/test-cases";
 import type { CaseEditorState } from "./use-case-editor";
 
 export type CaseModalProps = {
   open: boolean;
-  /** The case being edited, or nothing for a new one. */
+  /** The scenario being edited, or nothing for a new one. */
   scenarioId: string | null;
   suites: TestSuiteEntry[];
   editor: CaseEditorState;
   onClose: () => void;
-  /** True when the dialog was opened from a History entry. */
+  /** True when the drawer was opened from a History entry. */
   openHistoryOnOpen?: boolean;
 };
 
@@ -39,12 +41,13 @@ export function CaseModal({
   openHistoryOnOpen,
 }: CaseModalProps) {
   return (
-    <Dialog.Root
+    <Drawer.Root
       open={open}
       onOpenChange={({ open: nextOpen }) => !nextOpen && onClose()}
-      placement="center"
+      placement="end"
+      size={CASE_EDITOR_DRAWER_SIZE}
     >
-      <Dialog.Content bg="bg.panel" maxWidth="640px" data-testid="case-modal">
+      <Drawer.Content bg="bg.panel" data-testid="case-modal">
         <CaseModalHeader
           isEditing={!!scenarioId}
           scenarioId={scenarioId}
@@ -52,17 +55,12 @@ export function CaseModal({
           openHistoryOnOpen={openHistoryOnOpen}
         />
 
-        <Dialog.Body
-          paddingX={5}
-          paddingY={4}
-          maxHeight="66vh"
-          overflowY="auto"
-        >
+        <Drawer.Body paddingX={5} paddingY={4} overflowY="auto">
           <CaseModalFields editor={editor} suites={suites} />
-        </Dialog.Body>
+        </Drawer.Body>
 
         <CaseModalFooter editor={editor} />
-      </Dialog.Content>
-    </Dialog.Root>
+      </Drawer.Content>
+    </Drawer.Root>
   );
 }

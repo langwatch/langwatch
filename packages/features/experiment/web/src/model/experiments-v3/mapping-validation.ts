@@ -5,10 +5,7 @@
  * Used to show validation alerts and highlight fields that need attention.
  */
 
-import {
-  AVAILABLE_EVALUATORS,
-  type EvaluatorTypes,
-} from "@langwatch/evaluator-contract";
+import { AVAILABLE_EVALUATORS, type EvaluatorTypes } from "@langwatch/evaluator-contract";
 import type { EvaluatorConfig, TargetConfig } from "./types";
 import { isGoldenFieldSatisfied } from "./types";
 import { extractVariablesFromBodyTemplate } from "./http-agent-utils";
@@ -54,9 +51,7 @@ export type PromptTemplateMessage = {
  * when the template is not loaded, and the target then has nothing that can be
  * proven required.
  */
-export type PromptTemplateFieldsLookup = (
-  target: TargetConfig,
-) => Set<string> | undefined;
+export type PromptTemplateFieldsLookup = (target: TargetConfig) => Set<string> | undefined;
 
 export type MappingValidationOptions = {
   promptTemplateFields?: PromptTemplateFieldsLookup;
@@ -124,9 +119,7 @@ export const getFieldsUsedByPromptTemplate = ({
   messages: PromptTemplateMessage[];
   declaredFieldIds: string[];
 }): Set<string> => {
-  const hasConversationTurn = messages.some(
-    (message) => message.role !== "system",
-  );
+  const hasConversationTurn = messages.some((message) => message.role !== "system");
   if (!hasConversationTurn) {
     return new Set(declaredFieldIds);
   }
@@ -168,9 +161,7 @@ const resolveUsedFields = (
     return {
       usedFields: getFieldsUsedByPromptTemplate({
         messages: target.localPromptConfig.messages,
-        declaredFieldIds: target.localPromptConfig.inputs.map(
-          (input) => input.identifier,
-        ),
+        declaredFieldIds: target.localPromptConfig.inputs.map((input) => input.identifier),
       }),
       isProven: true,
     };
@@ -243,9 +234,18 @@ export const getTargetMissingMappings = (
 
   // HTTP agents have special validation: all optional, but at least one required
   const isHttpAgent =
-    target.type === "agent" &&
-    "agentType" in target &&
-    target.agentType === "http";
+    target.type === "agent" && "agentType" in target && target.agentType === "http";
+
+  // A connected agent declares the turn it reads plus the parameters of its
+  // own function. Every parameter carries the function's default, so only the
+  // turn has to be mapped for the column to run.
+  const isConnectedAgent =
+    target.type === "agent" && "agentType" in target && target.agentType === "connected";
+  const optionalInputIds = new Set(
+    inputs
+      .filter((input) => "optional" in input && input.optional)
+      .map((input) => input.identifier),
+  );
 
   // Evaluator targets use requiredFields/optionalFields from AVAILABLE_EVALUATORS
   const isEvaluatorTarget = target.type === "evaluator";
@@ -254,9 +254,7 @@ export const getTargetMissingMappings = (
   // per-row mappings UI. Validate against the comparison config (Variants /
   // Golden) instead of walking the input field list — those rows are derived
   // from the variants at save time, so the user never has to fill them in.
-  const targetComparison = isEvaluatorTarget
-    ? toComparisonConfig(target)
-    : undefined;
+  const targetComparison = isEvaluatorTarget ? toComparisonConfig(target) : undefined;
   if (targetComparison) {
     // Filter empty slots, not just array length: a folded legacy pairwise
     // config keeps both variantA/variantB positions even when one is unset
@@ -310,9 +308,7 @@ export const getTargetMissingMappings = (
     }
 
     // Valid if no required fields are missing AND at least one field has a mapping (or no fields)
-    const isValid =
-      missingRequiredCount === 0 &&
-      (evaluatorInputs.length === 0 || hasAnyMapping);
+    const isValid = missingRequiredCount === 0 && (evaluatorInputs.length === 0 || hasAnyMapping);
 
     return {
       isValid,
@@ -323,20 +319,15 @@ export const getTargetMissingMappings = (
   if (isHttpAgent) {
     // Derive the effective variable set from the body template (source of truth).
     // Only fall back to persisted inputs when no body template is available.
-    const templateVars = extractVariablesFromBodyTemplate(
-      target.httpConfig?.bodyTemplate,
-    );
+    const templateVars = extractVariablesFromBodyTemplate(target.httpConfig?.bodyTemplate);
     const httpFieldIds = new Set(
-      templateVars.length > 0
-        ? templateVars
-        : inputs.map((input) => input.identifier),
+      templateVars.length > 0 ? templateVars : inputs.map((input) => input.identifier),
     );
 
     // HTTP agents: all fields are optional, but at least one must be mapped.
     // Check the value too — Object.keys includes keys with undefined values.
     const hasAtLeastOneMapping = Object.entries(datasetMappings).some(
-      ([fieldId, mapping]) =>
-        mapping !== undefined && httpFieldIds.has(fieldId),
+      ([fieldId, mapping]) => mapping !== undefined && httpFieldIds.has(fieldId),
     );
 
     for (const fieldId of httpFieldIds) {
@@ -370,6 +361,10 @@ export const getTargetMissingMappings = (
   for (const fieldId of usedFields) {
     // Skip if not in inputs list - user hasn't defined this variable
     if (!inputIds.has(fieldId)) continue;
+
+    // An unmapped parameter of a connected agent is not a gap: the function
+    // applies its own default for it.
+    if (isConnectedAgent && optionalInputIds.has(fieldId)) continue;
 
     const hasMapping = datasetMappings[fieldId] !== undefined;
 
@@ -457,9 +452,7 @@ const validateMappingsCore = (
   // Invalid if:
   // 1. Any required field is missing, OR
   // 2. ALL fields are empty (must have at least one mapping) - unless there are no fields
-  const isValid =
-    missingRequiredFields.length === 0 &&
-    (allFields.length === 0 || hasAnyMapping);
+  const isValid = missingRequiredFields.length === 0 && (allFields.length === 0 || hasAnyMapping);
 
   return {
     isValid,
@@ -500,9 +493,7 @@ const isDefinedOutsideTheCatalog = (evaluatorType: string): boolean =>
  * the mappings complete would let the row be queued against an evaluator that
  * is not there.
  */
-const unavailableEvaluatorResult = (
-  evaluatorType: string,
-): EvaluatorValidationResult => ({
+const unavailableEvaluatorResult = (evaluatorType: string): EvaluatorValidationResult => ({
   isValid: false,
   missingMappings: [
     {
@@ -570,8 +561,7 @@ export const getEvaluatorMissingMappings = (
   }
 
   // Get the evaluator definition to know which fields are required vs optional
-  const evaluatorDef =
-    AVAILABLE_EVALUATORS[evaluator.evaluatorType as EvaluatorTypes];
+  const evaluatorDef = AVAILABLE_EVALUATORS[evaluator.evaluatorType as EvaluatorTypes];
 
   if (!evaluatorDef && !isDefinedOutsideTheCatalog(evaluator.evaluatorType)) {
     return unavailableEvaluatorResult(evaluator.evaluatorType);
@@ -623,8 +613,7 @@ export const getEvaluatorMissingMappings = (
   // 1. Any required field is missing, OR
   // 2. ALL fields are empty (must have at least one mapping)
   const allFieldsCount = evaluator.inputs.length;
-  const isValid =
-    missingRequiredCount === 0 && (allFieldsCount === 0 || hasAnyMapping);
+  const isValid = missingRequiredCount === 0 && (allFieldsCount === 0 || hasAnyMapping);
 
   return {
     isValid,
@@ -645,11 +634,7 @@ export const evaluatorHasMissingMappings = (
   datasetId: string,
   targetId: string,
 ): boolean => {
-  const { isValid } = getEvaluatorMissingMappings(
-    evaluator,
-    datasetId,
-    targetId,
-  );
+  const { isValid } = getEvaluatorMissingMappings(evaluator, datasetId, targetId);
   return !isValid;
 };
 
@@ -695,11 +680,7 @@ export const validateWorkbench = ({
 
     // Check all evaluators for this target (evaluators apply to all targets)
     for (const evaluator of evaluators) {
-      const evalValidation = getEvaluatorMissingMappings(
-        evaluator,
-        activeDatasetId,
-        target.id,
-      );
+      const evalValidation = getEvaluatorMissingMappings(evaluator, activeDatasetId, target.id);
       if (!evalValidation.isValid) {
         return {
           isValid: false,

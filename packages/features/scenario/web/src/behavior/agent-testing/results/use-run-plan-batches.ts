@@ -45,15 +45,14 @@ export function useRunPlanBatches({
   // useRunHistoryPagination sends none: the pinned `period.endDate` would
   // hold the count at page load while the list keeps growing, and the run
   // numbers would stop matching the rows.
-  const { data: batchCount } =
-    api.scenarios.getScenarioSetBatchRunCount.useQuery(
-      {
-        projectId: project?.id ?? "",
-        scenarioSetId: plan.scenarioSetId,
-        startDate: startDateMs,
-      },
-      { enabled: !!project },
-    );
+  const { data: batchCount } = api.scenarios.getScenarioSetBatchRunCount.useQuery(
+    {
+      projectId: project?.id ?? "",
+      scenarioSetId: plan.scenarioSetId,
+      startDate: startDateMs,
+    },
+    { enabled: !!project },
+  );
 
   const batchRuns = useMemo(
     () => groupRunsByBatchId({ runs: pagination.allRuns }),
@@ -80,11 +79,9 @@ function findSelectedBatch({
 }
 
 export function useSelectedBatch({
-  plan,
   batches,
   batchRunId,
 }: {
-  plan: RunPlan;
   batches: RunPlanBatches;
   batchRunId: string | null;
 }) {
@@ -98,16 +95,12 @@ export function useSelectedBatch({
   );
 
   const summary = useMemo(
-    () =>
-      selectedBatch
-        ? computeBatchRunSummary({ batchRun: selectedBatch })
-        : null,
+    () => (selectedBatch ? computeBatchRunSummary({ batchRun: selectedBatch }) : null),
     [selectedBatch],
   );
 
   const iterationMap = useMemo(
-    () =>
-      computeIterationMap({ scenarioRuns: selectedBatch?.scenarioRuns ?? [] }),
+    () => computeIterationMap({ scenarioRuns: selectedBatch?.scenarioRuns ?? [] }),
     [selectedBatch],
   );
 
@@ -115,19 +108,19 @@ export function useSelectedBatch({
 
   return {
     selectedBatch,
+    // The address names a run the window does not hold: one that has not
+    // reported its first scenario yet, or one older than the window.
+    awaitedBatchRunId: batchRunId && !selectedBatch ? batchRunId : null,
     summary,
     iterationMap,
     title: selectedBatch
       ? runTitle({
-          plan,
-          batch: selectedBatch,
           index: Math.max(selectedIndex, 0),
           totalCount: totalBatchCount,
           loadedCount: batchRuns.length,
         })
       : null,
     note: selectedBatch ? batchNote(selectedBatch.scenarioRuns) : null,
-    isBatchRunning:
-      !!summary && summary.inProgressCount + summary.queuedCount > 0,
+    isBatchRunning: !!summary && summary.inProgressCount + summary.queuedCount > 0,
   };
 }

@@ -61,9 +61,7 @@ export const DrawerContent = React.forwardRef<HTMLDivElement, DrawerContentProps
     // and does NOT yield. Reactive, so closing the panel or switching layout
     // mid-drawer returns the drawer to the edge.
     // Spec: specs/langy/langy-panel-layout.feature
-    const isLangyDockedCompanion = useLangyStore(
-      (s) => s.isOpen && s.panelMode === "sidebar",
-    );
+    const isLangyDockedCompanion = useLangyStore((s) => s.isOpen && s.panelMode === "sidebar");
     const langyYieldMarginEnd = isLangyDockedCompanion
       ? `${8 + SIDEBAR_PANEL_WIDTH + LANGY_DOCK_GAP}px`
       : undefined;
@@ -74,9 +72,7 @@ export const DrawerContent = React.forwardRef<HTMLDivElement, DrawerContentProps
     // read as one clumsy jump.
     // FROZEN at mount: the drawer that triggered the dodge gets the delay; a
     // drawer opened later (panel already parked) enters normally.
-    const isLangyOpenFloating = useLangyStore(
-      (s) => s.isOpen && s.panelMode === "floating",
-    );
+    const isLangyOpenFloating = useLangyStore((s) => s.isOpen && s.panelMode === "floating");
     const [staggerBehindFloatingLangy] = React.useState(() => isLangyOpenFloating);
     const langyStaggerEnter = staggerBehindFloatingLangy
       ? {
@@ -124,13 +120,7 @@ export const DrawerCloseTrigger = React.forwardRef<
   ChakraDrawer.CloseTriggerProps
 >(function DrawerCloseTrigger(props, ref) {
   return (
-    <ChakraDrawer.CloseTrigger
-      position="absolute"
-      top="2"
-      insetEnd="2"
-      {...props}
-      asChild
-    >
+    <ChakraDrawer.CloseTrigger position="absolute" top="2" insetEnd="2" {...props} asChild>
       <CloseButton size="sm" ref={ref} />
     </ChakraDrawer.CloseTrigger>
   );
@@ -146,12 +136,19 @@ export const DrawerCloseTrigger = React.forwardRef<
  *
  * All defaults can be overridden by passing props explicitly.
  */
-export const DrawerRoot = function DrawerRoot(props: ChakraDrawer.RootProps) {
+export type AppDrawerSize = NonNullable<ChakraDrawer.RootProps["size"]> | "2xl";
+
+export interface DrawerRootProps extends Omit<ChakraDrawer.RootProps, "size"> {
+  size?: AppDrawerSize;
+}
+
+export const DrawerRoot = function DrawerRoot({ size, ...props }: DrawerRootProps) {
   return (
     <ChakraDrawer.Root
       modal={false}
       closeOnInteractOutside={false}
       preventScroll={false}
+      size={size as ChakraDrawer.RootProps["size"]}
       {...props}
     />
   );

@@ -21,6 +21,11 @@ export {
   type QueueSimulationRunCommandData,
 } from "./ports/suite-execution.port";
 export { SuiteExecutionService } from "./services/suite-execution.service";
+export {
+  assertConnectedAgentsRunnable,
+  type AgentOwnerNameReader,
+  type ConnectedTargetAgent,
+} from "./services/connected-target.service";
 export type { SuiteClickHouseClient } from "./ports/suite-clickhouse.port";
 export {
   CompleteSuiteRunItemCommand,
@@ -40,7 +45,10 @@ export {
   type StartSuiteRunCommandData,
 } from "@langwatch/suite-contract";
 export { SuiteTrpcApi } from "./transport/api-trpc/suite.api";
-export type { SuiteTrpcContext, SuiteTrpcProcedures } from "./transport/api-trpc/suite.trpc-context";
+export type {
+  SuiteTrpcContext,
+  SuiteTrpcProcedures,
+} from "./transport/api-trpc/suite.trpc-context";
 
 /**
  * The feature's application: the one object both of its doors call, and the
@@ -51,7 +59,7 @@ export {
   OrganizationNotFoundForProjectError,
   SuiteApp,
   type SuiteAppDependencies,
-  type SuiteOrFolder,
+  type SuiteOrTestSuite,
 } from "./app/suite.app";
 
 /**

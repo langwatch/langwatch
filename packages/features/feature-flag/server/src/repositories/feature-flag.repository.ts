@@ -28,4 +28,12 @@ export abstract class FeatureFlagRepository {
   }): Promise<void>;
 
   abstract deleteByKey(key: string): Promise<void>;
+
+  /**
+   * When an organization was created, for a rule that targets new signups by
+   * date. `null` when the organization is unknown, when the read failed, or
+   * when this repository has no organization table to ask — all three fail
+   * closed, because an age rule that cannot compare must not match.
+   */
+  abstract tryFindOrganizationCreatedAt(organizationId: string): Promise<Date | null>;
 }

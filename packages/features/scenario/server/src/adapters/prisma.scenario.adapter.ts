@@ -1,7 +1,7 @@
 import type { ScenarioService as ScenarioServiceContract } from "@langwatch/scenario-contract";
 import type { SimulationService } from "@langwatch/scenario-contract";
 import type { ScenarioClockPort } from "../ports/scenario-clock.port";
-import type { ScenarioFolderIdPort, ScenarioIdPort } from "../ports/scenario-id.port";
+import type { ScenarioTestSuiteIdPort, ScenarioIdPort } from "../ports/scenario-id.port";
 import type { ScenarioSecretCipherPort } from "../ports/scenario-secret-cipher.port";
 import { ScenarioService } from "../services/scenario.service";
 import { PrismaScenarioRepository } from "../repositories/prisma/scenario.repository";
@@ -12,7 +12,7 @@ export class PrismaScenarioAdapter {
     prisma: Parameters<typeof PrismaScenarioRepository.create>[0];
     simulations: SimulationService;
     ids: ScenarioIdPort;
-    folderIds: ScenarioFolderIdPort;
+    testSuiteIds: ScenarioTestSuiteIdPort;
     clock: ScenarioClockPort;
     secretCipher: ScenarioSecretCipherPort;
   }): ScenarioServiceContract {
@@ -20,7 +20,7 @@ export class PrismaScenarioAdapter {
       repository: PrismaScenarioRepository.create(options.prisma),
       simulations: options.simulations,
       ids: options.ids,
-      folderIds: options.folderIds,
+      testSuiteIds: options.testSuiteIds,
       clock: options.clock,
       secretCipher: options.secretCipher,
     });

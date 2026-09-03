@@ -1,5 +1,5 @@
 /**
- * The version history of a test case: every saved version, newest first, with
+ * The version history of a scenario: every saved version, newest first, with
  * who saved it, when, and which fields changed. An older version can be opened
  * read-only and restored; a restore writes the old content forward as a new
  * version, so nothing in the list is lost.
@@ -103,8 +103,7 @@ export function ScenarioVersionList({
         ))}
       </VStack>
       <Text color="fg.muted" fontSize="xs" paddingTop={4}>
-        A restore writes the old content forward as a new version, so nothing in
-        this list is lost.
+        A restore writes the old content forward as a new version, so nothing in this list is lost.
       </Text>
     </>
   );

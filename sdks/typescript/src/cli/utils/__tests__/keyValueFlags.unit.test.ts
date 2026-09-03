@@ -9,11 +9,7 @@
  */
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
 
-import {
-  coerceParameterValue,
-  parseKeyValueFlags,
-  parseRunParameterFlags,
-} from "../keyValueFlags";
+import { coerceParameterValue, parseKeyValueFlags, parseRunParameterFlags } from "../keyValueFlags";
 
 class ProcessExitError extends Error {
   constructor(public code: number) {
@@ -36,38 +32,72 @@ afterEach(() => {
 describe("coerceParameterValue()", () => {
   describe("given a value that is exactly true or false", () => {
     it("reads it as a boolean", () => {
-      expect(coerceParameterValue("true")).toBe(true);
-      expect(coerceParameterValue("false")).toBe(false);
+      expect(coerceParameterValue({ value: "true" })).toBe(true);
+      expect(coerceParameterValue({ value: "false" })).toBe(false);
     });
   });
 
   describe("given a value that only resembles a boolean", () => {
     it("keeps it as text", () => {
-      expect(coerceParameterValue("TRUE")).toBe("TRUE");
-      expect(coerceParameterValue("yes")).toBe("yes");
+      expect(coerceParameterValue({ value: "TRUE" })).toBe("TRUE");
+      expect(coerceParameterValue({ value: "yes" })).toBe("yes");
     });
   });
 
   describe("given a plain number", () => {
     it("reads it as a number", () => {
-      expect(coerceParameterValue("12")).toBe(12);
-      expect(coerceParameterValue("-3")).toBe(-3);
-      expect(coerceParameterValue("1.5")).toBe(1.5);
-      expect(coerceParameterValue("0")).toBe(0);
+      expect(coerceParameterValue({ value: "12" })).toBe(12);
+      expect(coerceParameterValue({ value: "-3" })).toBe(-3);
+      expect(coerceParameterValue({ value: "1.5" })).toBe(1.5);
+      expect(coerceParameterValue({ value: "0" })).toBe(0);
     });
   });
 
   describe("given an identifier that merely looks numeric", () => {
     it("keeps it as text, so the run receives what was typed", () => {
-      expect(coerceParameterValue("007")).toBe("007");
-      expect(coerceParameterValue("1.50")).toBe("1.50");
-      expect(coerceParameterValue("0x10")).toBe("0x10");
-      expect(coerceParameterValue("1e5")).toBe("1e5");
-      expect(coerceParameterValue("12345678901234567890")).toBe("12345678901234567890");
-      expect(coerceParameterValue(" 5")).toBe(" 5");
-      expect(coerceParameterValue("")).toBe("");
-      expect(coerceParameterValue("Infinity")).toBe("Infinity");
+      expect(coerceParameterValue({ value: "007" })).toBe("007");
+      expect(coerceParameterValue({ value: "1.50" })).toBe("1.50");
+      expect(coerceParameterValue({ value: "0x10" })).toBe("0x10");
+      expect(coerceParameterValue({ value: "1e5" })).toBe("1e5");
+      expect(coerceParameterValue({ value: "12345678901234567890" })).toBe("12345678901234567890");
+      expect(coerceParameterValue({ value: " 5" })).toBe(" 5");
+      expect(coerceParameterValue({ value: "" })).toBe("");
+      expect(coerceParameterValue({ value: "Infinity" })).toBe("Infinity");
     });
+  });
+
+  describe("given the declared type of the parameter", () => {
+    /** @scenario "A typed value reaches the run as the declared type" */
+    it("keeps a string parameter as text whatever it looks like", () => {
+      expect(coerceParameterValue({ value: "007", type: "string" })).toBe("007");
+      expect(coerceParameterValue({ value: "5", type: "string" })).toBe("5");
+      expect(coerceParameterValue({ value: "true", type: "string" })).toBe("true");
+    });
+
+    it("reads a number parameter as a number when it can", () => {
+      expect(coerceParameterValue({ value: "5", type: "number" })).toBe(5);
+      expect(coerceParameterValue({ value: "007", type: "number" })).toBe(7);
+      expect(coerceParameterValue({ value: "many", type: "number" })).toBe("many");
+    });
+
+    it("reads a boolean parameter as true or false when it can", () => {
+      expect(coerceParameterValue({ value: "true", type: "boolean" })).toBe(true);
+      expect(coerceParameterValue({ value: "yes", type: "boolean" })).toBe("yes");
+    });
+  });
+});
+
+describe("parseRunParameterFlags() with declared types", () => {
+  it("reads each flag as the type declared for its name", () => {
+    expect(
+      parseRunParameterFlags({
+        pairs: ["order_id=007", "seats=5", "other=7"],
+        types: new Map([
+          ["order_id", "string"],
+          ["seats", "number"],
+        ]),
+      }),
+    ).toEqual({ order_id: "007", seats: 5, other: 7 });
   });
 });
 
@@ -107,25 +137,21 @@ describe("parseRunParameterFlags()", () => {
 
   describe("given the same name twice", () => {
     it("keeps the last value, so an appended override wins", () => {
-      expect(
-        parseRunParameterFlags({ pairs: ["region=us-east", "region=eu-central"] }),
-      ).toEqual({ region: "eu-central" });
+      expect(parseRunParameterFlags({ pairs: ["region=us-east", "region=eu-central"] })).toEqual({
+        region: "eu-central",
+      });
     });
   });
 
   describe("given a pair with no equals sign", () => {
     it("ends the command instead of guessing what was meant", () => {
-      expect(() => parseRunParameterFlags({ pairs: ["region"] })).toThrow(
-        ProcessExitError,
-      );
+      expect(() => parseRunParameterFlags({ pairs: ["region"] })).toThrow(ProcessExitError);
     });
   });
 
   describe("given a pair with an empty name", () => {
     it("ends the command, since no scenario can declare a nameless parameter", () => {
-      expect(() => parseRunParameterFlags({ pairs: ["=eu-central"] })).toThrow(
-        ProcessExitError,
-      );
+      expect(() => parseRunParameterFlags({ pairs: ["=eu-central"] })).toThrow(ProcessExitError);
     });
   });
 });
@@ -144,9 +170,9 @@ describe("parseKeyValueFlags()", () => {
 
   describe("given a key containing a colon", () => {
     it("ends the command, since the pair would address a different key", () => {
-      expect(() =>
-        parseKeyValueFlags({ pairs: ["a:b=gold"], flag: "--metadata" }),
-      ).toThrow(ProcessExitError);
+      expect(() => parseKeyValueFlags({ pairs: ["a:b=gold"], flag: "--metadata" })).toThrow(
+        ProcessExitError,
+      );
     });
   });
 

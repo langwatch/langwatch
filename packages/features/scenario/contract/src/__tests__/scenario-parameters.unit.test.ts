@@ -14,6 +14,7 @@ import {
   MAX_RUN_PARAMETER_KEYS,
   MAX_SCENARIO_PARAMETER_DEFINITIONS,
   mergeRunParameters,
+  parseRunParametersJson,
   parseScenarioParameterDefinitions,
   partitionParameterDefinitions,
   runParameterValuesSchema,
@@ -44,10 +45,7 @@ describe("scenario run parameters", () => {
       /** @scenario "A parameter with no run-time value falls back to its default" */
       it("resolves the declared default", () => {
         const resolved = mergeRunParameters({
-          definitions: [
-            definition("region", "eu-central"),
-            definition("account_tier", "gold"),
-          ],
+          definitions: [definition("region", "eu-central"), definition("account_tier", "gold")],
           values: { account_tier: "platinum" },
         });
 
@@ -87,13 +85,7 @@ describe("scenario run parameters", () => {
     describe("when it is outside the identifier grammar", () => {
       /** @scenario "A parameter name outside the identifier grammar is rejected at save time" */
       it("rejects the declaration", () => {
-        for (const name of [
-          "account tier",
-          "account-tier",
-          "1region",
-          "params.region",
-          "",
-        ]) {
+        for (const name of ["account tier", "account-tier", "1region", "params.region", ""]) {
           const result = scenarioParameterDefinitionsSchema.safeParse([{ name }]);
           expect(result.success, `expected "${name}" to be rejected`).toBe(false);
         }
@@ -101,9 +93,7 @@ describe("scenario run parameters", () => {
 
       /** @scenario "A parameter name outside the identifier grammar is rejected at save time" */
       it("rejects a run value supplied under that name", () => {
-        expect(
-          runParameterValuesSchema.safeParse({ "account tier": "gold" }).success,
-        ).toBe(false);
+        expect(runParameterValuesSchema.safeParse({ "account tier": "gold" }).success).toBe(false);
       });
     });
 
@@ -132,15 +122,12 @@ describe("scenario run parameters", () => {
   describe("given more declarations than one scenario may carry", () => {
     /** @scenario "More than twenty definitions on one scenario are rejected at save time" */
     it("rejects the save", () => {
-      const tooMany = Array.from(
-        { length: MAX_SCENARIO_PARAMETER_DEFINITIONS + 1 },
-        (_, index) => definition(`p${index}`),
+      const tooMany = Array.from({ length: MAX_SCENARIO_PARAMETER_DEFINITIONS + 1 }, (_, index) =>
+        definition(`p${index}`),
       );
 
       expect(scenarioParameterDefinitionsSchema.safeParse(tooMany).success).toBe(false);
-      expect(
-        scenarioParameterDefinitionsSchema.safeParse(tooMany.slice(0, -1)).success,
-      ).toBe(true);
+      expect(scenarioParameterDefinitionsSchema.safeParse(tooMany.slice(0, -1)).success).toBe(true);
     });
   });
 
@@ -148,10 +135,7 @@ describe("scenario run parameters", () => {
     /** @scenario "A run-time payload over the size limits is rejected before scheduling" */
     it("rejects more names than a run may supply", () => {
       const tooManyKeys = Object.fromEntries(
-        Array.from({ length: MAX_RUN_PARAMETER_KEYS + 1 }, (_, index) => [
-          `p${index}`,
-          "x",
-        ]),
+        Array.from({ length: MAX_RUN_PARAMETER_KEYS + 1 }, (_, index) => [`p${index}`, "x"]),
       );
 
       expect(runParameterValuesSchema.safeParse(tooManyKeys).success).toBe(false);
@@ -164,17 +148,15 @@ describe("scenario run parameters", () => {
         Array.from({ length: 10 }, (_, index) => [`p${index}`, chunk]),
       );
 
-      expect(
-        new TextEncoder().encode(JSON.stringify(tooManyBytes)).length,
-      ).toBeGreaterThan(MAX_RUN_PARAMETER_BYTES);
+      expect(new TextEncoder().encode(JSON.stringify(tooManyBytes)).length).toBeGreaterThan(
+        MAX_RUN_PARAMETER_BYTES,
+      );
       expect(runParameterValuesSchema.safeParse(tooManyBytes).success).toBe(false);
     });
 
     /** @scenario "A run-time payload over the size limits is rejected before scheduling" */
     it("rejects a single value longer than one value may be", () => {
-      expect(runParameterValuesSchema.safeParse({ note: "x".repeat(4097) }).success).toBe(
-        false,
-      );
+      expect(runParameterValuesSchema.safeParse({ note: "x".repeat(4097) }).success).toBe(false);
     });
 
     it("accepts a payload inside every limit", () => {
@@ -191,9 +173,7 @@ describe("scenario run parameters", () => {
   describe("given a scenario's stored parameters column", () => {
     it("reads back the declarations it holds", () => {
       expect(
-        parseScenarioParameterDefinitions([
-          { name: "region", defaultValue: "eu-central" },
-        ]),
+        parseScenarioParameterDefinitions([{ name: "region", defaultValue: "eu-central" }]),
       ).toEqual([{ name: "region", defaultValue: "eu-central" }]);
     });
 
@@ -214,9 +194,7 @@ describe("scenario run parameters", () => {
     describe("when a scenario declares it", () => {
       it("refuses the declaration, naming what is not allowed", () => {
         for (const name of ["__proto__", "constructor", "prototype"]) {
-          const parsed = scenarioParameterDefinitionsSchema.safeParse([
-            definition(name, "gold"),
-          ]);
+          const parsed = scenarioParameterDefinitionsSchema.safeParse([definition(name, "gold")]);
 
           expect(parsed.success).toBe(false);
         }
@@ -244,10 +222,7 @@ describe("scenario run parameters", () => {
     describe("when a scenario stored before the guard still carries it", () => {
       it("leaves it out of the resolved record instead of touching a prototype", () => {
         const resolved = mergeRunParameters({
-          definitions: [
-            definition("__proto__", "gold"),
-            definition("region", "eu-central"),
-          ],
+          definitions: [definition("__proto__", "gold"), definition("region", "eu-central")],
         });
 
         expect(Object.keys(resolved)).toEqual(["region"]);
@@ -292,7 +267,18 @@ describe("scenario run parameters", () => {
       });
     });
 
-    describe("when it carries no default value", () => {
+    describe("when it also lists options", () => {
+      /** @scenario "A parameter declared secret cannot list options" */
+      it("rejects the declaration", () => {
+        const result = scenarioParameterDefinitionsSchema.safeParse([
+          { name: "api_token", secret: true, options: ["credential"] },
+        ]);
+
+        expect(result.success).toBe(false);
+      });
+    });
+
+    describe("when it carries no default value and no options", () => {
       it("accepts the declaration", () => {
         const result = scenarioParameterDefinitionsSchema.safeParse([
           { name: "api_token", secret: true, description: "The API token" },
@@ -330,6 +316,32 @@ describe("scenario run parameters", () => {
 
         expect(resolved).toEqual({ region: "us-east" });
       });
+    });
+  });
+});
+
+describe("parseRunParametersJson", () => {
+  describe("given the raw parameters a run stored", () => {
+    it("reads back strings, numbers and booleans", () => {
+      expect(
+        parseRunParametersJson(JSON.stringify({ region: "eu-central", seats: 12, trial: false })),
+      ).toEqual({ region: "eu-central", seats: 12, trial: false });
+    });
+
+    it("reads a run that stored none as no parameters", () => {
+      expect(parseRunParametersJson("")).toEqual({});
+    });
+
+    it("drops a value the current shape cannot carry", () => {
+      expect(parseRunParametersJson(JSON.stringify({ region: "eu", extra: { a: 1 } }))).toEqual({
+        region: "eu",
+      });
+    });
+
+    it("reads anything that is not an object as no parameters", () => {
+      expect(parseRunParametersJson("not json")).toEqual({});
+      expect(parseRunParametersJson("[1, 2]")).toEqual({});
+      expect(parseRunParametersJson("null")).toEqual({});
     });
   });
 });

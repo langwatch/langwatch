@@ -2,6 +2,7 @@ import { z } from "zod";
 import {
   MAX_PARAMETER_NAME_LENGTH,
   MAX_RUN_PARAMETER_KEYS,
+  runActorSchema,
   runNoteSchema,
   runParameterValuesSchema,
 } from "@langwatch/scenario-contract";
@@ -11,7 +12,16 @@ import { suiteScopeSchema } from "./suite.scope";
 export const RUN_ALL_SUITE_LABEL = "managed:run-all";
 export const RUN_ALL_SUITE_NAME = "All test cases";
 
-export const suiteTargetTypeSchema = z.enum(["prompt", "http", "code", "workflow"]);
+export const suiteTargetTypeSchema = z.enum([
+  "prompt",
+  "http",
+  "code",
+  "workflow",
+  // An agent the SDK registered from a decorated function in the customer's
+  // own code (ADR-128). Its reference id may also read `<name>@<environment>`,
+  // which the run resolves to an agent id before anything is scheduled.
+  "connected",
+]);
 export type SuiteTargetType = z.infer<typeof suiteTargetTypeSchema>;
 
 export const suiteFieldMappingSchema = z.discriminatedUnion("type", [
@@ -56,6 +66,9 @@ export function parseSuiteTargets(value: unknown): SuiteTarget[] {
 
 /** Keeps the authoring limit aligned with the established suite-run transport. */
 export const MAX_SUITE_REPEAT_COUNT = 5;
+
+/** The same limit under the name the run dialog and the plan editor read. */
+export const MAX_REPEAT_COUNT = MAX_SUITE_REPEAT_COUNT;
 
 export const suiteSchema = z
   .object({
@@ -115,6 +128,13 @@ export const suiteRunInputSchema = z
     batchRunId: z.string().min(1).optional(),
     parameters: suiteRunParametersSchema.optional(),
     note: runNoteSchema,
+    /**
+     * Who started the run. Every run of the batch records it. Absent when the
+     * surface names no person, and then the runs record no actor at all.
+     *
+     * @see specs/scenarios/run-actor-on-runs.feature
+     */
+    actor: runActorSchema.optional(),
   })
   .strict();
 export type SuiteRunInput = z.infer<typeof suiteRunInputSchema>;

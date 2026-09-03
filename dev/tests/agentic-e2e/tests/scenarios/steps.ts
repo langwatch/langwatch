@@ -1,17 +1,25 @@
 /**
- * Step definitions for Scenario feature tests
+ * Step definitions for the Agent Testing feature tests.
  *
- * These functions are named to match Gherkin language from feature files:
- * - specs/scenarios/scenario-editor.feature
- * - specs/scenarios/scenario-library.feature
- * - specs/scenarios/scenario-execution.feature
+ * These functions are named to match the Gherkin language of the feature files:
+ * - specs/features/agent-testing/page-structure.feature
+ * - specs/features/agent-testing/cases-table.feature
+ * - specs/features/agent-testing/run-dialog.feature
  *
- * Usage: Import and compose these steps in test files to create
- * readable tests that map directly to feature specifications.
+ * Usage: import and compose these steps in test files to create readable
+ * tests that map directly to the feature specifications.
+ *
+ * A fresh project starts at day zero: no agent, no test suite, no scenario.
+ * The steps that need one of them create it when it is missing, so the same
+ * test runs against an empty CI project and against a project that already
+ * holds data.
  */
 import { Page, expect } from "@playwright/test";
 
 import { getProjectSlug } from "../helpers";
+
+const E2E_AGENT_NAME = "E2E HTTP Agent";
+const E2E_SUITE_NAME = "E2E Suite";
 
 // =============================================================================
 // Background Steps
@@ -30,39 +38,122 @@ export async function givenIAmLoggedIntoProject(page: Page) {
 // =============================================================================
 
 /**
- * Given I am on the scenarios list page
- * When I am on the scenarios list page
+ * Given I am on the scenarios page
+ * The Scenarios tab of Agent Testing.
  */
-export async function givenIAmOnTheScenariosListPage(page: Page) {
+export async function givenIAmOnTheScenariosPage(page: Page) {
   const projectSlug = await getProjectSlug(page);
-  await page.goto(`/${projectSlug}/simulations/scenarios`);
-  await expect(page).toHaveURL(/simulations\/scenarios/);
-}
-
-/**
- * Given I am on the simulations page (Runs)
- */
-export async function givenIAmOnTheSimulationsPage(page: Page) {
-  const projectSlug = await getProjectSlug(page);
-  await page.goto(`/${projectSlug}/simulations`);
+  await page.goto(`/${projectSlug}/agent-testing`);
   await expect
     .poll(() => new URL(page.url()).pathname, { timeout: 10000 })
-    .toBe(`/${projectSlug}/simulations`);
+    .toBe(`/${projectSlug}/agent-testing`);
 }
 
 /**
- * Then I see the scenarios list page
+ * Given I am on the results page
+ * The Results tab of Agent Testing.
  */
-export async function thenISeeTheScenariosListPage(page: Page) {
-  await expect(page).toHaveURL(/simulations\/scenarios/);
-  await expect(page.getByRole("heading", { name: /scenario library/i })).toBeVisible();
+export async function givenIAmOnTheResultsPage(page: Page) {
+  const projectSlug = await getProjectSlug(page);
+  await page.goto(`/${projectSlug}/agent-testing/results`);
+  await expect
+    .poll(() => new URL(page.url()).pathname, { timeout: 10000 })
+    .toBe(`/${projectSlug}/agent-testing/results`);
 }
 
 /**
- * Then I see a "New Scenario" button
+ * When I open a saved simulations address
+ * The address an older SDK or a bookmark still names.
  */
-export async function thenISeeNewScenarioButton(page: Page) {
-  await expect(page.getByRole("button", { name: /new scenario/i })).toBeVisible();
+export async function whenIOpenTheSimulationsScenariosAddress(page: Page) {
+  const projectSlug = await getProjectSlug(page);
+  await page.goto(`/${projectSlug}/simulations/scenarios`);
+}
+
+/**
+ * Then I see the Agent Testing page
+ */
+export async function thenISeeTheAgentTestingPage(page: Page) {
+  await expect(page).toHaveURL(/\/agent-testing/);
+  await expect(page.getByTestId("agent-testing-title")).toHaveText(
+    /agent testing/i,
+  );
+  await expect(page.getByRole("tab", { name: /scenarios/i })).toBeVisible();
+  await expect(page.getByRole("tab", { name: /results/i })).toBeVisible();
+}
+
+/**
+ * Then I see the results tab
+ */
+export async function thenISeeTheResultsTab(page: Page) {
+  await expect(page.getByTestId("agent-testing-results-tab")).toBeVisible({
+    timeout: 15000,
+  });
+  const noRuns = page.getByText("No runs yet");
+  const plans = page.getByTestId("agent-testing-run-plans");
+  await noRuns.or(plans).first().waitFor({ state: "visible", timeout: 15000 });
+}
+
+// =============================================================================
+// Day zero: agent and test suite
+// =============================================================================
+
+/**
+ * Given the project has an agent
+ * A project with no agent reads "Setup agent" first. This creates an HTTP
+ * agent through the same drawer a person uses. The address does not have to
+ * answer: a run against it fails, and that is a result too.
+ */
+export async function givenTheProjectHasAnAgent(page: Page) {
+  const connectEmpty = page.getByTestId("agent-testing-connect-agent-empty");
+  const needsAgent = await connectEmpty
+    .waitFor({ state: "visible", timeout: 5000 })
+    .then(() => true)
+    .catch(() => false);
+  if (!needsAgent) return;
+
+  await connectEmpty.getByRole("button", { name: /setup agent/i }).click();
+  await page.getByTestId("agent-type-http").click();
+
+  const nameInput = page.getByTestId("agent-name-input");
+  await expect(nameInput).toBeVisible({ timeout: 10000 });
+  await nameInput.fill(E2E_AGENT_NAME);
+  await page.getByTestId("url-input").fill("http://127.0.0.1:9/e2e-agent");
+  await page.getByTestId("save-agent-button").click();
+
+  await expect(nameInput).not.toBeVisible({ timeout: 15000 });
+  await expect(connectEmpty).not.toBeVisible({ timeout: 15000 });
+}
+
+/**
+ * Given the project has a test suite
+ * Every scenario sits in a suite, so a project with none names one first.
+ */
+export async function givenTheProjectHasATestSuite(page: Page) {
+  const suiteEmpty = page.getByTestId("agent-testing-first-suite-empty");
+  const needsSuite = await suiteEmpty
+    .waitFor({ state: "visible", timeout: 5000 })
+    .then(() => true)
+    .catch(() => false);
+  if (!needsSuite) return;
+
+  await suiteEmpty.getByRole("button", { name: /new test suite/i }).click();
+  const dialog = page.getByTestId("agent-testing-suite-name-dialog");
+  await expect(dialog).toBeVisible();
+  await dialog.getByLabel("Test suite name").fill(E2E_SUITE_NAME);
+  await dialog.getByTestId("suite-name-confirm").click();
+
+  await expect(dialog).not.toBeVisible({ timeout: 10000 });
+  await expect(suiteEmpty).not.toBeVisible({ timeout: 15000 });
+}
+
+/**
+ * Given I can write a scenario
+ * The agent and the suite a scenario needs, in the order the page asks.
+ */
+export async function givenICanWriteAScenario(page: Page) {
+  await givenTheProjectHasAnAgent(page);
+  await givenTheProjectHasATestSuite(page);
 }
 
 // =============================================================================
@@ -70,167 +161,105 @@ export async function thenISeeNewScenarioButton(page: Page) {
 // =============================================================================
 
 /**
- * When I click "New Scenario"
- * Dismisses the AI-assist modal that now appears first.
+ * Then I see a "New scenario" button
  */
-export async function whenIClickNewScenario(page: Page) {
-  await page.getByRole("button", { name: /new scenario/i }).click();
-
-  // Step 1: Handle ScenarioWelcomeModal — shown when user has zero scenarios
-  // and has not previously dismissed the welcome screen (localStorage flag).
-  // This modal appears BEFORE the scenario creation modals in step 2.
-  const welcomeButton = page.getByRole("button", {
-    name: /create your first scenario/i,
-  });
-  const welcomeVisible = await welcomeButton
-    .waitFor({ state: "visible", timeout: 3000 })
-    .then(() => true)
-    .catch(() => false);
-  if (welcomeVisible) {
-    await welcomeButton.click();
-  }
-
-  // Step 2: Handle interstitial modals before the scenario form drawer opens.
-  //   1. ModelProviderRequiredModal ("Proceed anyway") — shown when no model
-  //      provider is configured (typical in CI).
-  //   2. AICreateModal ("I'll write it myself") — shown when a provider exists.
-  // Race both locators; whichever becomes visible first wins.
-  const dismissed = await Promise.race([
-    page
-      .getByRole("button", { name: /proceed anyway/i })
-      .waitFor({ state: "visible", timeout: 5000 })
-      .then(() => "proceed" as const)
-      .catch(() => null),
-    page
-      .getByRole("button", { name: /i'll write it myself/i })
-      .waitFor({ state: "visible", timeout: 5000 })
-      .then(() => "skip" as const)
-      .catch(() => null),
-  ]);
-
-  if (dismissed === "proceed") {
-    await page.getByRole("button", { name: /proceed anyway/i }).click();
-  } else if (dismissed === "skip") {
-    await page.getByRole("button", { name: /i'll write it myself/i }).click();
-  }
-  // If neither modal appeared the form drawer opened directly — no action needed.
+export async function thenISeeNewScenarioButton(page: Page) {
+  await expect(
+    page.getByRole("button", { name: /new scenario/i }).first(),
+  ).toBeVisible();
 }
 
 /**
- * Then I navigate to the scenario editor
+ * When I click "New scenario"
+ * The button sits in the panel header over a suite, or in the empty state of
+ * a project that holds no scenario yet.
+ */
+export async function whenIClickNewScenario(page: Page) {
+  await givenICanWriteAScenario(page);
+  await page.getByRole("button", { name: /new scenario/i }).first().click();
+}
+
+/** The Title field of the scenario editor drawer. */
+function titleField(page: Page) {
+  return page.getByLabel("Title").last();
+}
+
+/**
+ * Then I see the scenario editor
  * Then I see an empty scenario form
  */
 export async function thenISeeTheScenarioEditor(page: Page) {
-  // Chakra renders duplicate dialogs - use .last() for the visible one
   await expect(
-    page.getByRole("heading", { name: /create scenario/i }).last(),
+    page.getByRole("heading", { name: /^new scenario$/i }).last(),
   ).toBeVisible();
+  await expect(titleField(page)).toHaveValue("");
 }
 
 /**
- * Then I see the scenario form fields (Name, Situation, Criteria, Labels)
+ * Then I see the scenario form fields (Title, Situation, Criteria)
  */
 export async function thenISeeScenarioFormFields(page: Page) {
-  // Name field — SectionHeader renders as <p> not <label>, so there is no
-  // ARIA name association; match by placeholder instead. .last() picks the
-  // visible dialog when Chakra renders duplicates (same reason as the sibling
-  // fill/assert helpers in this file).
-  await expect(page.getByPlaceholder(/angry refund request/i).last()).toBeVisible();
-
-  // Situation field
-  await expect(
-    page.getByPlaceholder(/a frustrated premium subscriber/i).last(),
-  ).toBeVisible();
-
-  // Criteria field — CriteriaInput mounts the entry textarea only after the
-  // add button is clicked (isAddingNew), so assert the reveal control instead
-  // of the not-yet-rendered placeholder textarea.
-  await expect(page.getByRole("button", { name: /add.*criteria/i }).last()).toBeVisible();
+  await expect(titleField(page)).toBeVisible();
+  await expect(page.getByLabel("Situation").last()).toBeVisible();
+  await expect(page.getByLabel("Criteria").last()).toBeVisible();
 }
 
 /**
- * When I fill in "Name" with "<name>"
+ * When I fill in "Title" with "<title>"
  */
-export async function whenIFillInNameWith(page: Page, name: string) {
-  // SectionHeader is a <p> not <label> — no accessible name; use placeholder.
-  await page
-    .getByPlaceholder(/angry refund request/i)
-    .last()
-    .fill(name);
+export async function whenIFillInTitleWith(page: Page, title: string) {
+  await titleField(page).fill(title);
 }
 
 /**
  * When I fill in "Situation" with "<situation>"
  */
 export async function whenIFillInSituationWith(page: Page, situation: string) {
-  await page
-    .getByPlaceholder(/a frustrated premium subscriber/i)
-    .last()
-    .fill(situation);
+  await page.getByLabel("Situation").last().fill(situation);
 }
 
 /**
- * When I add criterion "<criterion>"
+ * When I write the criteria, one per line
  */
-export async function whenIAddCriterion(page: Page, criterion: string) {
-  // CriteriaInput hides the entry textarea behind an "Add ... criteria" button
-  // (label is "Add the first criteria" when empty, "Add criteria" otherwise);
-  // the textarea only mounts once adding starts (isAddingNew).
-  await page
-    .getByRole("button", { name: /add.*criteria/i })
-    .last()
-    .click();
-  const input = page.getByPlaceholder(/must apologize for the inconvenience/i).last();
-  await input.fill(criterion);
-  // Enter commits the new criterion (handleAddKeyDown → handleSaveNew).
-  await input.press("Enter");
+export async function whenIWriteCriteria(page: Page, criteria: string[]) {
+  await page.getByLabel("Criteria").last().fill(criteria.join("\n"));
 }
 
 /**
- * Then the criterion appears in the criteria list
+ * Then the criteria field holds every line
  */
-export async function thenCriterionAppearsInList(page: Page, criterion: string) {
-  // Committed criteria render as plain text within the criteria-list container
-  // (not as inputs). Scope to that container so we don't match the criterion
-  // text elsewhere on the page; .last() picks the visible Chakra dialog when
-  // duplicate dialogs are rendered.
-  const criteriaList = page.getByTestId("criteria-list").last();
-  await expect(criteriaList.getByText(criterion)).toBeVisible({ timeout: 5000 });
+export async function thenCriteriaFieldHolds(page: Page, criteria: string[]) {
+  await expect(page.getByLabel("Criteria").last()).toHaveValue(
+    criteria.join("\n"),
+  );
 }
 
 /**
  * When I click "Save"
- * Handles the "Save and Run" popover by clicking "Save without running"
+ * The drawer closes itself after the success toast.
  */
 export async function whenIClickSave(page: Page) {
-  const saveButton = page.getByRole("button", { name: /save and run/i }).last();
-  await saveButton.click();
+  await page.getByTestId("case-modal-save").last().click();
 
-  // Popover opens - click "Save without running"
-  const saveWithoutRunning = page.getByText("Save without running").last();
-  await expect(saveWithoutRunning).toBeVisible({ timeout: 5000 });
-  await saveWithoutRunning.click();
-
-  // Wait for save to complete, then let the drawer close itself.
-  // ScenarioFormDrawer calls onClose() automatically after the success toast,
-  // so clicking Close here would race the auto-close and cause flakiness.
-  const successToast = page.getByText(/scenario (created|updated)/i);
-  await expect(successToast).toBeVisible({ timeout: 10000 });
-
-  await expect(saveButton).not.toBeVisible({ timeout: 10000 });
+  await expect(page.getByText(/scenario (created|updated)/i)).toBeVisible({
+    timeout: 10000,
+  });
+  await expect(titleField(page)).not.toBeVisible({ timeout: 10000 });
 }
 
 /**
- * When I close the scenario editor
+ * When I click "Save & Run"
+ * Saves the scenario and opens the run dialog for it.
  */
-export async function whenICloseTheEditor(page: Page) {
-  const closeButton = page.getByRole("button", { name: "Close" }).last();
-  await closeButton.click();
+export async function whenIClickSaveAndRun(page: Page) {
+  await page.getByTestId("case-modal-save-and-run").last().click();
 
-  // Wait for dialog to close
-  await expect(
-    page.getByRole("heading", { name: /create scenario|edit scenario/i }).last(),
-  ).not.toBeVisible({ timeout: 5000 });
+  await expect(page.getByText(/scenario (created|updated)/i)).toBeVisible({
+    timeout: 10000,
+  });
+  await expect(page.getByTestId("run-case-dialog")).toBeVisible({
+    timeout: 15000,
+  });
 }
 
 // =============================================================================
@@ -238,181 +267,105 @@ export async function whenICloseTheEditor(page: Page) {
 // =============================================================================
 
 /**
- * When I click on "<name>" in the list
+ * When I click on "<title>" in the list
+ * A row click opens the scenario in the editor.
  */
-export async function whenIClickOnScenarioInList(page: Page, name: string) {
-  await page.getByText(name).click();
+export async function whenIClickOnScenarioInList(page: Page, title: string) {
+  await page.getByTestId(`case-row-${title}`).first().click();
+  await expect(
+    page.getByRole("heading", { name: /^edit scenario$/i }).last(),
+  ).toBeVisible();
 }
 
 /**
  * Then the form is populated with the existing data
  */
-export async function thenFormIsPopulatedWithName(page: Page, name: string) {
-  // SectionHeader is a <p> not <label> — no accessible name; use placeholder.
-  const nameField = page.getByPlaceholder(/angry refund request/i).last();
-  await expect(nameField).toHaveValue(name);
+export async function thenFormIsPopulatedWithTitle(page: Page, title: string) {
+  await expect(titleField(page)).toHaveValue(title);
 }
 
 /**
- * When I change the name to "<name>"
+ * When I change the title to "<title>"
  */
-export async function whenIChangeNameTo(page: Page, name: string) {
-  // SectionHeader is a <p> not <label> — no accessible name; use placeholder.
-  const nameField = page.getByPlaceholder(/angry refund request/i).last();
-  await nameField.clear();
-  await nameField.fill(name);
+export async function whenIChangeTitleTo(page: Page, title: string) {
+  const field = titleField(page);
+  await field.clear();
+  await field.fill(title);
 }
 
 // =============================================================================
-// Scenario Library - List Steps
+// Scenarios table
 // =============================================================================
 
 /**
- * Then "<name>" appears in the list
+ * Then "<title>" appears in the list
  */
-export async function thenScenarioAppearsInList(page: Page, name: string) {
-  await expect(page.getByText(name).first()).toBeVisible({ timeout: 10000 });
-}
-
-/**
- * Then I see the empty state
- */
-export async function thenISeeEmptyState(page: Page) {
-  await expect(page.getByText("No scenarios yet")).toBeVisible({ timeout: 10000 });
-}
-
-/**
- * Then I see the scenarios table
- */
-export async function thenISeeScenarioTable(page: Page) {
-  await expect(page.getByRole("table")).toBeVisible({ timeout: 10000 });
-}
-
-// =============================================================================
-// Scenario Execution Steps
-// =============================================================================
-
-/**
- * Then I see the simulations page content
- */
-export async function thenISeeSimulationsPageContent(page: Page) {
-  // The unified simulations page shows a "Simulations" heading
-  const simulationsHeading = page.getByRole("heading", { name: /^simulations$/i });
-
-  await expect(simulationsHeading).toBeVisible({ timeout: 15000 });
-}
-
-/**
- * When I click "Run" on a scenario
- */
-export async function whenIClickRunOnScenario(page: Page) {
-  await page.getByRole("button", { name: /^run$/i }).last().click();
-}
-
-/**
- * Then the run starts
- */
-export async function thenTheRunStarts(page: Page) {
-  // Look for running indicator or navigation to run page
-  const runningIndicator = page.getByText(/running|in progress/i);
-  const runPage = page.locator("[data-testid='run-visualization']");
-
-  await expect(runningIndicator.or(runPage).first()).toBeVisible({ timeout: 30000 });
-}
-
-/**
- * Then I see the conversation
- */
-export async function thenISeeTheConversation(page: Page) {
-  // Conversation messages appear in the run visualization
-  const messageContainer = page
-    .getByRole("log")
-    .or(page.locator("[data-testid='conversation']"));
-  await expect(messageContainer).toBeVisible({ timeout: 30000 });
-}
-
-/**
- * Then I see pass/fail status
- */
-export async function thenISeePassFailStatus(page: Page) {
-  const passStatus = page.getByText(/pass|passed/i);
-  const failStatus = page.getByText(/fail|failed/i);
-
-  await expect(passStatus.or(failStatus).first()).toBeVisible({ timeout: 30000 });
-}
-
-// =============================================================================
-// Run Again Steps
-// =============================================================================
-
-/**
- * Given I am viewing a scenario run
- * Navigates to the first available scenario run
- */
-export async function givenIAmViewingAScenarioRun(page: Page) {
-  await givenIAmOnTheSimulationsPage(page);
-
-  // Click on first simulation set
-  const firstSetCard = page.locator("[data-testid='simulation-set-card']").first();
-  if (await firstSetCard.isVisible({ timeout: 5000 }).catch(() => false)) {
-    await firstSetCard.click();
-    await expect(page).toHaveURL(/simulations\/[^/]+$/, { timeout: 10000 });
-
-    // Click on first batch run
-    const firstBatchCard = page.locator("[data-testid='batch-run-card']").first();
-    if (await firstBatchCard.isVisible({ timeout: 5000 }).catch(() => false)) {
-      await firstBatchCard.click();
-
-      // Click on first scenario run
-      const firstRunCard = page.locator("[data-testid='scenario-run-card']").first();
-      if (await firstRunCard.isVisible({ timeout: 5000 }).catch(() => false)) {
-        await firstRunCard.click();
-        await expect(page).toHaveURL(/simulations\/[^/]+\/[^/]+\/[^/]+/, {
-          timeout: 10000,
-        });
-      }
-    }
-  }
-}
-
-/**
- * When I click "Run Again"
- */
-export async function whenIClickRunAgain(page: Page) {
-  const runAgainButton = page.getByRole("button", { name: /run again/i });
-  await expect(runAgainButton).toBeVisible({ timeout: 10000 });
-  await runAgainButton.click();
-}
-
-/**
- * Then I see the target selection modal
- */
-export async function thenISeeTargetSelectionModal(page: Page) {
-  const modal = page
-    .getByRole("dialog")
-    .filter({ hasText: /select.*target|run.*scenario/i });
-  await expect(modal).toBeVisible({ timeout: 10000 });
-}
-
-/**
- * Then the new run is in the same scenario set
- * Verifies the URL contains the original setId after running again
- */
-export async function thenTheNewRunIsInSameScenarioSet(
-  page: Page,
-  expectedSetId: string,
-) {
-  // After run completes, URL should contain the same setId
-  await expect(page).toHaveURL(new RegExp(`simulations/${expectedSetId}/`), {
-    timeout: 60000,
+export async function thenScenarioAppearsInList(page: Page, title: string) {
+  await expect(page.getByTestId(`case-row-${title}`).first()).toBeVisible({
+    timeout: 10000,
   });
 }
 
 /**
- * Extract the scenario set ID from the current URL
+ * Then I see the scenarios panel
+ * One of: the day zero empty states, an empty suite, or the table of scenarios.
  */
-export function getScenarioSetIdFromUrl(page: Page): string {
-  const url = page.url();
-  const match = url.match(/simulations\/([^/]+)/);
-  return match?.[1] ?? "";
+export async function thenISeeTheScenariosPanel(page: Page) {
+  const states = [
+    "agent-testing-connect-agent-empty",
+    "agent-testing-first-suite-empty",
+    "agent-testing-first-case-empty",
+    "agent-testing-empty-suite",
+  ].map((testId) => page.getByTestId(testId));
+  const anyState = states.reduce((all, one) => all.or(one));
+  const rows = page.locator('[data-testid^="case-row-"]');
+  await anyState.or(rows).first().waitFor({ state: "visible", timeout: 15000 });
+}
+
+// =============================================================================
+// Run dialog and run drawer
+// =============================================================================
+
+/**
+ * When I pick the first agent and start the run
+ */
+export async function whenIStartTheRun(page: Page) {
+  const dialog = page.getByTestId("run-case-dialog");
+  const agentCard = dialog.locator('[data-testid^="run-dialog-agent-"]').first();
+  await expect(agentCard).toBeVisible({ timeout: 10000 });
+  if ((await agentCard.getAttribute("aria-pressed")) !== "true") {
+    await agentCard.click();
+  }
+  const run = dialog.getByTestId("run-dialog-run");
+  await expect(run).toBeEnabled({ timeout: 10000 });
+  await run.click();
+}
+
+/**
+ * Then the run is queued, or the dialog reads that no model provider is set up
+ * The platform refuses a run in a project without a model provider, and the
+ * dialog reads the notice in place of a queued run; that is what CI is. With a
+ * provider the run drawer opens on the run: queued, waiting for a verdict,
+ * judged, or failed to start, every one of them is the run being shown.
+ */
+export async function thenTheRunIsQueuedOrNeedsAProvider(page: Page) {
+  const drawer = page.getByTestId("agent-testing-run-drawer");
+  const notice = page.getByTestId("run-dialog-missing-provider");
+  await drawer.or(notice).first().waitFor({ state: "visible", timeout: 30000 });
+
+  if (await notice.isVisible()) {
+    await expect(notice).toContainText("No model provider is set up");
+    return;
+  }
+
+  const states = [
+    "wide-drawer-queued",
+    "run-verdict-pending",
+    "run-verdict-panel",
+    "run-verdict-error",
+  ].map((testId) => page.getByTestId(testId));
+  await states
+    .reduce((all, one) => all.or(one))
+    .first()
+    .waitFor({ state: "visible", timeout: 60000 });
 }

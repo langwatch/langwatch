@@ -7,14 +7,18 @@
 
 import { createLogger, type Logger } from "@langwatch/observability";
 import type { AgentInput } from "@langwatch/scenario";
-import { AgentAdapter, AgentRole } from "@langwatch/scenario";
+import { AgentRole } from "@langwatch/scenario";
 import { trace } from "@opentelemetry/api";
 import { generateText } from "ai";
 import { Liquid } from "liquidjs";
-import type { RunParameterValues } from "@langwatch/scenario-contract";
+import type {
+  LiteLLMParams,
+  PromptConfigData,
+  RunParameterValues,
+} from "@langwatch/scenario-contract";
 import { createModelFromParams } from "./litellm-model.adapter";
 import { PromptTemplateAdapter } from "./prompt-template.adapter";
-import type { LiteLLMParams, PromptConfigData } from "@langwatch/scenario-contract";
+import { SerializedAgentAdapter } from "./serialized-agent.adapter";
 
 // Shared Liquid engine instance for template interpolation
 const liquid = new Liquid();
@@ -23,7 +27,7 @@ const liquid = new Liquid();
  * Serialized prompt config adapter that uses pre-fetched configuration.
  * No database access required.
  */
-export class SerializedPromptConfigAdapter extends AgentAdapter {
+export class SerializedPromptConfigAdapter extends SerializedAgentAdapter {
   static create(options: {
     config: PromptConfigData;
     litellmParams: LiteLLMParams;

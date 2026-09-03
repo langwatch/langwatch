@@ -1,23 +1,12 @@
-import {
-  filterScenarioTargetAgents,
-  isScenarioAgentTarget,
-  ScenarioTargetSelector,
-  type ScenarioTarget,
-  type ScenarioTargetAgent,
-} from "../../../index";
+import { ScenarioTargetSelector, type ScenarioTarget } from "../../../index";
 import { agentHasDevTunnel } from "@langwatch/agent-web/surfaces/browser-port";
 import { useMemo } from "react";
+import { useSession } from "../../../behavior/auth-session";
 import { useOrganizationTeamProject } from "../../../behavior/use-organization-team-project";
 import { useAllPromptsForProject } from "../../../behavior/prompts/use-all-prompts-for-project";
 import { api } from "../../../behavior/scenario-api";
 
 export type TargetValue = ScenarioTarget;
-
-export { isScenarioAgentTarget as isAgentTarget };
-
-export function useFilteredAgents(agents: ScenarioTargetAgent[] | undefined, searchValue: string) {
-  return useMemo(() => filterScenarioTargetAgents(agents, searchValue), [agents, searchValue]);
-}
 
 export function TargetSelector({
   value,
@@ -34,6 +23,9 @@ export function TargetSelector({
 }) {
   const { project } = useOrganizationTeamProject();
   const { data: prompts } = useAllPromptsForProject();
+  // Read without requiring a session: the page is already behind the sign-in
+  // gate, and only a development agent's ownership depends on who is reading.
+  const { data: session } = useSession();
   const { data: agents } = api.agents.getAll.useQuery(
     { projectId: project?.id ?? "" },
     { enabled: !!project?.id },
@@ -46,6 +38,9 @@ export function TargetSelector({
         type: agent.type,
         updatedAt: agent.updatedAt,
         hasDevTunnel: agentHasDevTunnel(agent),
+        environment: agent.environment,
+        status: agent.status,
+        owner: agent.owner,
       })),
     [agents],
   );
@@ -59,6 +54,7 @@ export function TargetSelector({
       onCreateAgent={onCreateAgent}
       onCreatePrompt={onCreatePrompt}
       placeholder={placeholder}
+      viewerUserId={session?.user?.id ?? null}
     />
   );
 }

@@ -78,6 +78,10 @@ const memberBinding = (
 class MemoryTeams extends TeamRepository {
   fenced: unknown[] = [];
 
+  memberOrganizationIds(): Promise<string[]> {
+    throw new Error("not used by this test");
+  }
+
   get(): Promise<OrganizationTeam> {
     return Promise.resolve(team);
   }
@@ -287,9 +291,7 @@ describe("OrganizationService team membership", () => {
 
   it("counts members of an admin group when applying the last-admin guard", async () => {
     const groups = new MemoryGroups();
-    groups.members.set("group", [
-      { userId: "group_admin", name: null, email: null, image: null },
-    ]);
+    groups.members.set("group", [{ userId: "group_admin", name: null, email: null, image: null }]);
     const { service, teams, calls } = buildService({
       groups,
       accessBindings: [
@@ -304,9 +306,7 @@ describe("OrganizationService team membership", () => {
       actor: { type: "user", id: "group_admin" },
     });
     expect(teams.fenced).toHaveLength(1);
-    expect(calls.revoke).toHaveBeenCalledWith(
-      expect.objectContaining({ bindingIds: ["member"] }),
-    );
+    expect(calls.revoke).toHaveBeenCalledWith(expect.objectContaining({ bindingIds: ["member"] }));
   });
 
   it("refuses a bulk edit that would remove the team's last admin", async () => {

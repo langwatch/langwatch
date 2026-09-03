@@ -3,9 +3,11 @@ import { getSuiteSetId } from "@langwatch/suite-contract";
 import { createLogger } from "@langwatch/observability";
 import {
   generateBatchRunId,
+  type RunActor,
   type RunSecretCiphertext,
   type ScenarioRunConfig,
   type ScenarioService,
+  withActor,
   withNote,
 } from "@langwatch/scenario-contract";
 import {
@@ -32,6 +34,8 @@ export type SuiteExecutionRequest = {
   batchRunId?: string;
   parameters?: SuiteRunParameters;
   note?: string;
+  /** Who started the run; every run of the batch records it. */
+  actor?: RunActor;
 };
 
 /** One scenario, against one target, on one repeat. */
@@ -180,6 +184,7 @@ export class SuiteExecutionService extends SuiteExecutionPort {
               targetReferenceId: item.target.referenceId,
               targetType: item.target.type,
               scenarioVersion: input.scenarioVersions.get(item.scenarioId),
+              ...withActor(input.actor),
             },
             ...withNote(input.note),
             ...SuiteExecutionService.withParameters(parameters.get(item.scenarioId)),

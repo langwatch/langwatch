@@ -18,6 +18,7 @@ export * from "./behavior/find-match-cycling";
 export * from "./behavior/find-auto-focus-input";
 export * from "./behavior/find-scroll-trace-into-view";
 export * from "./ui/elements/find-match-highlight";
+export * from "./ui/elements/selection-action-bar";
 export * from "./ui/elements/find-match-counter";
 export * from "./ui/sections/trace-find-bar";
 export * from "./behavior/facet-constants";
@@ -67,7 +68,12 @@ export { MarkdownConfigurePopover } from "./ui/elements/markdown/markdown-config
 export { RenderedMarkdown } from "./ui/blocks/markdown/rendered-markdown";
 export { ShikiCodeBlock } from "./ui/elements/markdown/shiki-highlight";
 export { DEFAULT_MARKDOWN_CONFIG } from "./model/markdown/types";
-export type { MarkdownConfig, SpanDetailLevel, SpanLayout, SpanScope } from "./model/markdown/types";
+export type {
+  MarkdownConfig,
+  SpanDetailLevel,
+  SpanLayout,
+  SpanScope,
+} from "./model/markdown/types";
 export { FlameView } from "./ui/sections/flame/flame-view";
 export type { FlameViewProps, TraceFlameSpan } from "./behavior/flame/types";
 export * from "./ui/elements/scenario-role";

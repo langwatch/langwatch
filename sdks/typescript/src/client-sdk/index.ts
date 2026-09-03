@@ -58,10 +58,9 @@ export {
 export { EvaluatorsApiService, EvaluatorsApiError } from "./services/evaluators";
 export { ScenariosApiService, ScenariosApiError } from "./services/scenarios";
 export { SuitesApiService, SuitesApiError } from "./services/suites";
-export {
-  WorkflowsApiService,
-  WorkflowsApiError,
-} from "./services/workflows/workflows-api.service";
+export { RunPlansApiService, RunPlansApiError } from "./services/run-plans";
+export { TestSuitesApiService, TestSuitesApiError } from "./services/test-suites";
+export { WorkflowsApiService, WorkflowsApiError } from "./services/workflows/workflows-api.service";
 export { AgentsApiService, AgentsApiError } from "./services/agents/agents-api.service";
 export {
   AnnotationsApiService,
@@ -75,16 +74,11 @@ export {
   ModelProvidersApiService,
   ModelProvidersApiError,
 } from "./services/model-providers/model-providers-api.service";
-export {
-  AnalyticsApiService,
-  AnalyticsApiError,
-} from "./services/analytics/analytics-api.service";
+export { AnalyticsApiService, AnalyticsApiError } from "./services/analytics/analytics-api.service";
+export { QueryApiService, QueryApiError } from "./services/query/query-api.service";
 export { TriggersApiService, TriggersApiError } from "./services/triggers";
 export { GraphsApiService, GraphsApiError } from "./services/graphs";
-export {
-  SimulationRunsApiService,
-  SimulationRunsApiError,
-} from "./services/simulation-runs";
+export { SimulationRunsApiService, SimulationRunsApiError } from "./services/simulation-runs";
 export { TracesApiService, TracesApiError } from "./services/traces/traces-api.service";
 export { MonitorsApiService, MonitorsApiError } from "./services/monitors";
 export { SecretsApiService, SecretsApiError } from "./services/secrets";
@@ -100,10 +94,7 @@ export {
   SpendEventsApiService,
   SpendEventsApiError,
 } from "./services/spend-events/spend-events-api.service";
-export {
-  WebhooksApiService,
-  WebhooksApiError,
-} from "./services/webhooks/webhooks-api.service";
+export { WebhooksApiService, WebhooksApiError } from "./services/webhooks/webhooks-api.service";
 export { TeamsApiService, TeamsApiError } from "./services/teams/teams-api.service";
 export type {
   Team,
@@ -112,10 +103,7 @@ export type {
   ListTeamsResponse,
   ArchivedTeam,
 } from "./services/teams/teams-api.service";
-export {
-  ProjectsApiService,
-  ProjectsApiError,
-} from "./services/projects/projects-api.service";
+export { ProjectsApiService, ProjectsApiError } from "./services/projects/projects-api.service";
 export type {
   Project,
   PaginatedProjects,
@@ -131,12 +119,15 @@ import { EvaluationsFacade } from "./services/evaluations";
 import { EvaluatorsApiService } from "./services/evaluators";
 import { ScenariosApiService } from "./services/scenarios";
 import { SuitesApiService } from "./services/suites";
+import { RunPlansApiService } from "./services/run-plans";
+import { TestSuitesApiService } from "./services/test-suites";
 import { WorkflowsApiService } from "./services/workflows/workflows-api.service";
 import { AgentsApiService } from "./services/agents/agents-api.service";
 import { AnnotationsApiService } from "./services/annotations/annotations-api.service";
 import { DashboardsApiService } from "./services/dashboards/dashboards-api.service";
 import { ModelProvidersApiService } from "./services/model-providers/model-providers-api.service";
 import { AnalyticsApiService } from "./services/analytics/analytics-api.service";
+import { QueryApiService } from "./services/query/query-api.service";
 import { TriggersApiService } from "./services/triggers";
 import { GraphsApiService } from "./services/graphs";
 import { SimulationRunsApiService } from "./services/simulation-runs";
@@ -149,10 +140,7 @@ import { WebhooksApiService } from "./services/webhooks/webhooks-api.service";
 import { TeamsApiService } from "./services/teams/teams-api.service";
 import { ProjectsApiService } from "./services/projects/projects-api.service";
 import { type InternalConfig } from "./types";
-import {
-  createLangWatchApiClient,
-  type LangwatchApiClient,
-} from "../internal/api/client";
+import { createLangWatchApiClient, type LangwatchApiClient } from "../internal/api/client";
 import { type Logger, NoOpLogger } from "../logger";
 import { TracesFacade } from "./services/traces/facade";
 import { resolveEndpoint } from "@/internal/endpoint";
@@ -210,13 +198,20 @@ export class LangWatch {
 
   readonly evaluators: EvaluatorsApiService;
   readonly scenarios: ScenariosApiService;
+  /**
+   * @deprecated Use runPlans and testSuites; /api/suites is a frozen alias.
+   */
   readonly suites: SuitesApiService;
+  readonly runPlans: RunPlansApiService;
+  readonly testSuites: TestSuitesApiService;
   readonly workflows: WorkflowsApiService;
   readonly agents: AgentsApiService;
   readonly annotations: AnnotationsApiService;
   readonly dashboards: DashboardsApiService;
   readonly modelProviders: ModelProvidersApiService;
   readonly analytics: AnalyticsApiService;
+  /** The raw LangWatchQL door — run a governed SELECT or discover the analytics schema directly, outside a saved chart. */
+  readonly query: QueryApiService;
   readonly triggers: TriggersApiService;
   readonly graphs: GraphsApiService;
   readonly simulationRuns: SimulationRunsApiService;
@@ -231,8 +226,7 @@ export class LangWatch {
   #projects?: ProjectsApiService;
 
   constructor(options: LangWatchConstructorOptions = {}) {
-    const apiKey =
-      options.apiKey ?? scopedApiKey() ?? process.env.LANGWATCH_API_KEY ?? "";
+    const apiKey = options.apiKey ?? scopedApiKey() ?? process.env.LANGWATCH_API_KEY ?? "";
     const endpoint = resolveEndpoint(options.endpoint);
 
     this.config = this.#createInternalConfig({
@@ -271,12 +265,15 @@ export class LangWatch {
     this.evaluators = new EvaluatorsApiService(this.config);
     this.scenarios = new ScenariosApiService(this.config);
     this.suites = new SuitesApiService(this.config);
+    this.runPlans = new RunPlansApiService(this.config);
+    this.testSuites = new TestSuitesApiService(this.config);
     this.workflows = new WorkflowsApiService(this.config);
     this.agents = new AgentsApiService(this.config);
     this.annotations = new AnnotationsApiService(this.config);
     this.dashboards = new DashboardsApiService(this.config);
     this.modelProviders = new ModelProvidersApiService(this.config);
     this.analytics = new AnalyticsApiService(this.config);
+    this.query = new QueryApiService(this.config);
     this.triggers = new TriggersApiService(this.config);
     this.graphs = new GraphsApiService(this.config);
     this.simulationRuns = new SimulationRunsApiService(this.config);

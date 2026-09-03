@@ -19,7 +19,10 @@ import { useAgentTestingStore } from "../use-agent-testing-store";
 import { RunPlanResultsColumn } from "./run-plan-results-column";
 import { RunsSidebar } from "./runs-sidebar";
 import type { RunPlan } from "../../../../behavior/agent-testing/results/run-plans";
-import { useRunPlanBatches, useSelectedBatch } from "../../../../behavior/agent-testing/results/use-run-plan-batches";
+import {
+  useRunPlanBatches,
+  useSelectedBatch,
+} from "../../../../behavior/agent-testing/results/use-run-plan-batches";
 
 export type RunPlanDetailProps = {
   plan: RunPlan;
@@ -39,9 +42,7 @@ export function RunPlanDetail(props: RunPlanDetailProps) {
   const { plan } = props;
   const pendingRun = useAgentTestingStore((state) => state.pendingRun);
   const pendingBatchRunId =
-    pendingRun?.scenarioSetId === plan.scenarioSetId
-      ? pendingRun.batchRunId
-      : null;
+    pendingRun?.scenarioSetId === plan.scenarioSetId ? pendingRun.batchRunId : null;
 
   const batches = useRunPlanBatches({
     plan,
@@ -50,7 +51,6 @@ export function RunPlanDetail(props: RunPlanDetailProps) {
   });
 
   const selection = useSelectedBatch({
-    plan,
     batches,
     batchRunId: props.batchRunId,
   });
@@ -64,10 +64,9 @@ export function RunPlanDetail(props: RunPlanDetailProps) {
       data-testid="agent-testing-run-plan-detail"
     >
       <RunsSidebar
-        plan={plan}
         runs={batches}
         selectedBatchRunId={selection.selectedBatch?.batchRunId ?? null}
-        pendingBatchRunId={pendingBatchRunId}
+        pendingBatchRunId={pendingBatchRunId ?? selection.awaitedBatchRunId}
         onSelectRun={props.onSelectRun}
         onBack={props.onBack}
         periodControls={props}

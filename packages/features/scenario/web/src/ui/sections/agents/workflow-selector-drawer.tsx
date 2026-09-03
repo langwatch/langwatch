@@ -18,8 +18,7 @@ import { applyHandledErrorToForm, FormServerError, showErrorToast } from "../../
 import { getComplexProps, getFlowCallbacks, useDrawer } from "@langwatch/ui-drawer";
 import { useOrganizationTeamProject } from "../../../behavior/use-organization-team-project";
 import { EmojiPickerModal } from "@langwatch/workflow-web/optimization_studio/components/properties/modals/EmojiPickerModal";
-import { getRandomWorkflowIcon } from "@langwatch/workflow-web";
-import { blankTemplate } from "@langwatch/workflow-web";
+import { getRandomWorkflowIcon, blankTemplate } from "@langwatch/workflow-web";
 import type { StudioWorkflow } from "@langwatch/workflow-contract";
 import type { AgentWithFields } from "@langwatch/agent-contract";
 import { api } from "../../../behavior/scenario-api";

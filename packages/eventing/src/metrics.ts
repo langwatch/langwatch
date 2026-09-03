@@ -4,11 +4,7 @@ import { Counter, Histogram, register } from "prom-client";
 type CounterMetric = Counter<string>;
 type HistogramMetric = Histogram<string>;
 
-function counter(
-  name: string,
-  help: string,
-  labelNames: readonly string[],
-): CounterMetric {
+function counter(name: string, help: string, labelNames: readonly string[]): CounterMetric {
   return (
     (register.getSingleMetric(name) as CounterMetric | undefined) ??
     new Counter({ name, help, labelNames })
@@ -43,26 +39,25 @@ const commandTotal = counter("es_command_total", "Eventing commands processed", 
   "command_type",
   "status",
 ]);
-const commandDuration = histogram(
-  "es_command_duration_milliseconds",
-  "Eventing command duration",
-  ["pipeline_name", "command_type"],
-);
-const foldTotal = counter(
-  "es_fold_projection_total",
-  "Eventing ClickHouse fold executions",
-  ["pipeline_name", "projection_name", "status"],
-);
+const commandDuration = histogram("es_command_duration_milliseconds", "Eventing command duration", [
+  "pipeline_name",
+  "command_type",
+]);
+const foldTotal = counter("es_fold_projection_total", "Eventing ClickHouse fold executions", [
+  "pipeline_name",
+  "projection_name",
+  "status",
+]);
 const foldDuration = histogram(
   "es_fold_projection_duration_milliseconds",
   "Eventing ClickHouse fold duration",
   ["pipeline_name", "projection_name"],
 );
-const mapTotal = counter(
-  "es_map_projection_total",
-  "Eventing ClickHouse map executions",
-  ["pipeline_name", "projection_name", "status"],
-);
+const mapTotal = counter("es_map_projection_total", "Eventing ClickHouse map executions", [
+  "pipeline_name",
+  "projection_name",
+  "status",
+]);
 const mapDuration = histogram(
   "es_map_projection_duration_milliseconds",
   "Eventing ClickHouse map duration",
@@ -108,11 +103,10 @@ const foldRefoldTotal = counter("es_fold_refold_total", "Out-of-order fold repla
   "projection_name",
   "outcome",
 ]);
-const foldRefoldOnMissTotal = counter(
-  "es_fold_refold_on_miss_total",
-  "Store-miss fold replays",
-  ["projection_name", "outcome"],
-);
+const foldRefoldOnMissTotal = counter("es_fold_refold_on_miss_total", "Store-miss fold replays", [
+  "projection_name",
+  "outcome",
+]);
 const foldReadWindowFallbackTotal = counter(
   "es_fold_read_window_fallback_total",
   "Unwindowed retries after a fold read miss",
@@ -172,21 +166,21 @@ const foldPostStoreFailureTotal = counter(
   ["projection_name", "stage"],
 );
 
-const processManagerTotal = counter(
-  "es_process_manager_total",
-  "Process-manager evolutions",
-  ["process_name", "input_kind", "outcome"],
-);
+const processManagerTotal = counter("es_process_manager_total", "Process-manager evolutions", [
+  "process_name",
+  "input_kind",
+  "outcome",
+]);
 const processManagerDuration = histogram(
   "es_process_manager_duration_milliseconds",
   "Process-manager evolution duration",
   ["process_name", "input_kind"],
 );
-const processOutboxTotal = counter(
-  "es_process_outbox_total",
-  "Process-manager outbox attempts",
-  ["process_name", "intent_type", "status"],
-);
+const processOutboxTotal = counter("es_process_outbox_total", "Process-manager outbox attempts", [
+  "process_name",
+  "intent_type",
+  "status",
+]);
 const processOutboxStuckDrains = counter(
   "es_process_outbox_stuck_drains_total",
   "Abandoned process-manager outbox drains",
@@ -237,10 +231,7 @@ export const observeEsProjectionDuration = ({
   projectionKind: "fold" | "map" | "state";
   projectionName: string;
   durationMs: number;
-}) =>
-  projectionDuration
-    .labels(pipelineName, projectionKind, projectionName)
-    .observe(durationMs);
+}) => projectionDuration.labels(pipelineName, projectionKind, projectionName).observe(durationMs);
 export const incrementEsCommandTotal = (
   pipelineName: string,
   commandType: string,
@@ -341,8 +332,7 @@ export const observeEsReactorDuration = (
   pipelineName: string,
   subscriberName: string,
   durationMs: number,
-) =>
-  projectionSubscriberDuration.labels(pipelineName, subscriberName).observe(durationMs);
+) => projectionSubscriberDuration.labels(pipelineName, subscriberName).observe(durationMs);
 export const incrementEsReactorCollapsedTotal = (
   pipelineName: string,
   subscriberName: string,
@@ -376,9 +366,20 @@ export const incrementEsSubscriberEnqueueTotal = ({
   outcome: "filtered" | "staged" | "referenced" | "failed";
 }) => subscriberEnqueueTotal.labels(pipelineName, subscriberName, outcome).inc();
 
+/**
+ * `performed` — the aggregate's full history was re-read and replayed.
+ * `declined` — the projection set `refoldOnOutOfOrder: false`, so the batch was
+ * applied on top instead (the events are never lost; only the replay is skipped).
+ * `unavailable` — no eventLoader was wired, so a re-fold was impossible.
+ * `incomplete` — the history read did not account for the state's applied
+ * events even after retries (replica read lag), so the replay was abandoned
+ * and the batch applied on top of the loaded state instead. Counted in
+ * addition to `performed` (the attempt); a sustained rate means the event
+ * log replica lags further than the re-fold retries wait.
+ */
 export const incrementEsFoldRefoldTotal = (
   projectionName: string,
-  outcome: "performed" | "declined" | "unavailable",
+  outcome: "performed" | "declined" | "unavailable" | "incomplete",
 ) => foldRefoldTotal.labels(projectionName, outcome).inc();
 export const incrementEsFoldRefoldOnMissTotal = (
   projectionName: string,
@@ -401,10 +402,8 @@ export const observeEsFoldCacheGetDuration = (
   source: "redis" | "clickhouse",
   durationMs: number,
 ) => foldCacheGetDuration.labels(projectionName, source).observe(durationMs);
-export const observeEsFoldCacheStoreDuration = (
-  projectionName: string,
-  durationMs: number,
-) => foldCacheStoreDuration.labels(projectionName).observe(durationMs);
+export const observeEsFoldCacheStoreDuration = (projectionName: string, durationMs: number) =>
+  foldCacheStoreDuration.labels(projectionName).observe(durationMs);
 export const incrementEsFoldCacheRedisError = (
   projectionName: string,
   operation: "get" | "set" | "del",
@@ -415,10 +414,8 @@ export const incrementEsFoldDedupUnavailable = (
   projectionName: string,
   reason: "cache_miss" | "read_error" | "unreadable" | "legacy_entry",
 ) => foldDedupUnavailableTotal.labels(projectionName, reason).inc();
-export const incrementEsFoldDuplicateEventsSkipped = (
-  projectionName: string,
-  count = 1,
-) => foldDuplicateEventsSkippedTotal.labels(projectionName).inc(count);
+export const incrementEsFoldDuplicateEventsSkipped = (projectionName: string, count = 1) =>
+  foldDuplicateEventsSkippedTotal.labels(projectionName).inc(count);
 export const observeEsFoldBlindReapplyEvents = (projectionName: string, events: number) =>
   foldBlindReapplyEvents.labels(projectionName).observe(events);
 export const incrementEsFoldPostStoreFailure = ({
@@ -463,11 +460,8 @@ export const incrementEsProcessOutboxTotal = ({
   intentType: string;
   status: "dispatched" | "retried" | "dead" | "fenced" | "released";
 }) => processOutboxTotal.labels(processName, intentType, status).inc();
-export const incrementEsProcessOutboxStuckDrains = ({
-  processName,
-}: {
-  processName: string;
-}) => processOutboxStuckDrains.labels(processName).inc();
+export const incrementEsProcessOutboxStuckDrains = ({ processName }: { processName: string }) =>
+  processOutboxStuckDrains.labels(processName).inc();
 export const observeEsProcessOutboxDuration = ({
   processName,
   intentType,

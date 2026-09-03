@@ -1,5 +1,5 @@
 /**
- * Restoring an older version of a test case: the confirmation the reader gives
+ * Restoring an older version of a scenario: the confirmation the reader gives
  * first, and the write that follows.
  *
  * @see specs/scenarios/scenario-version-restore.feature
@@ -16,9 +16,7 @@ export type VersionRestore = ReturnType<typeof useVersionRestore>;
 export function useVersionRestore({ scenarioId }: { scenarioId: string }) {
   const { project } = useOrganizationTeamProject();
   const utils = api.useUtils();
-  const [confirmingVersion, setConfirmingVersion] = useState<number | null>(
-    null,
-  );
+  const [confirmingVersion, setConfirmingVersion] = useState<number | null>(null);
 
   const mutation = api.scenarios.restoreVersion.useMutation({
     onSuccess: (_result, variables) => {
@@ -31,8 +29,7 @@ export function useVersionRestore({ scenarioId }: { scenarioId: string }) {
         type: "success",
       });
     },
-    onError: (error) =>
-      showErrorToast({ error, fallbackTitle: "Couldn't restore this version" }),
+    onError: (error) => showErrorToast({ error, fallbackTitle: "Couldn't restore this version" }),
     onSettled: () => setConfirmingVersion(null),
   });
 

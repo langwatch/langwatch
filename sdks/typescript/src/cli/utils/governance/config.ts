@@ -74,6 +74,12 @@ export interface GovernanceConfig {
   cli_api_key_scope?: {
     kind: "organization" | "projects";
     project_ids: string[];
+    /**
+     * The permission slugs the key was minted with, so `whoami` can say what
+     * the key can do beside where it reaches. Absent when the login predates
+     * the field.
+     */
+    permissions?: string[];
   };
 
   /**

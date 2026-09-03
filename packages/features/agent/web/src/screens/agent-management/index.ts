@@ -54,6 +54,15 @@ export {
   type AgentTypeSelectorDrawerProps,
 } from "../../features/editor/ui/sections/agent-type-selector-drawer";
 export {
+  AgentCard,
+  AgentCardIcon,
+  AgentCardMenuTrigger,
+  AgentCardShell,
+  type AgentCardShellProps,
+  CARD_MENU_CLASS,
+} from "../../features/management/ui/blocks/agent-card";
+export { LocalTunnelBadge } from "../../ui/elements/local-tunnel-badge";
+export {
   AgentHttpEditorDrawer,
   type AgentHttpEditorDrawerProps,
 } from "../../features/http/ui/sections/agent-http-editor-drawer";

@@ -1,4 +1,4 @@
-import { HandledError, NotFoundError } from "@langwatch/handled-error";
+import { HandledError, NotFoundError, remediation } from "@langwatch/handled-error";
 
 export class ScenarioNotFoundError extends HandledError {
   declare readonly code: "scenario_not_found";
@@ -13,29 +13,29 @@ export class ScenarioNotFoundError extends HandledError {
   }
 }
 
-export class ScenarioFolderNotFoundError extends HandledError {
-  declare readonly code: "scenario_folder_not_found";
+export class ScenarioTestSuiteNotFoundError extends HandledError {
+  declare readonly code: "scenario_test_suite_not_found";
 
-  constructor(folderId?: string) {
-    super("scenario_folder_not_found", "Test suite folder not found", {
+  constructor(testSuiteId?: string) {
+    super("scenario_test_suite_not_found", "Test suite not found", {
       httpStatus: 404,
       fault: "customer",
-      meta: { folderId: folderId ?? null },
+      meta: { testSuiteId: testSuiteId ?? null },
     });
-    this.name = "ScenarioFolderNotFoundError";
+    this.name = "ScenarioTestSuiteNotFoundError";
   }
 }
 
-export class ScenarioFolderSlugUnavailableError extends HandledError {
+export class ScenarioTestSuiteSlugUnavailableError extends HandledError {
   declare readonly code: "scenario_folder_slug_unavailable";
 
-  constructor(folderName: string) {
-    super("scenario_folder_slug_unavailable", "Could not allocate a unique scenario folder slug.", {
+  constructor(testSuiteName: string) {
+    super("scenario_folder_slug_unavailable", "Could not allocate a unique test suite slug.", {
       httpStatus: 409,
       fault: "customer",
-      meta: { folderName },
+      meta: { testSuiteName },
     });
-    this.name = "ScenarioFolderSlugUnavailableError";
+    this.name = "ScenarioTestSuiteSlugUnavailableError";
   }
 }
 
@@ -60,5 +60,34 @@ export class ScenarioVersionNotFoundError extends NotFoundError {
       meta: { scenarioId, version },
     });
     this.name = "ScenarioVersionNotFoundError";
+  }
+}
+
+/**
+ * Refuses a run addressed to a set the platform owns.
+ *
+ * The internal namespace holds two kinds of address. `__internal__<suiteId>__
+ * suite` is a run plan's, and every read of that plan aggregates the runs
+ * stored there, so a one-off run written into it moves that plan's pass rate,
+ * cost and trend. `__internal__<projectId>__on-platform-scenarios` is the
+ * one-off bucket, and only the project's own.
+ *
+ * A set name outside the namespace is the customer's own and stays free.
+ *
+ * Tenancy is enforced elsewhere. This refusal is about not corrupting a plan
+ * the caller is otherwise entitled to read.
+ *
+ * @see specs/scenarios/reserved-set-write-guard.feature
+ */
+export class ScenarioReservedSetIdError extends HandledError {
+  declare readonly code: "scenario_reserved_set_id";
+
+  constructor() {
+    super("scenario_reserved_set_id", "This run cannot be recorded under a reserved set", {
+      httpStatus: 400,
+      fault: "customer",
+      ...remediation("scenario_reserved_set_id"),
+    });
+    this.name = "ScenarioReservedSetIdError";
   }
 }

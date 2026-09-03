@@ -33,7 +33,6 @@ import { isOnlineEvaluationsActivePath } from "../../model/navigation-active-sta
 import { useNavigationHost } from "../../model/navigation-host";
 import { isPathUnder } from "../../model/products";
 import { SideMenuLink } from "../blocks/side-menu-link";
-import { GovernSection } from "./govern-section";
 
 /**
  * The advanced features a reader turned on in their personal workspace.
@@ -50,10 +49,8 @@ interface PersonalWorkspaceFeatures {
 
 export const PersonalSidebarLinks = function PersonalSidebarLinks({
   showExpanded,
-  shouldIncludeGovernSection = true,
 }: {
   showExpanded: boolean;
-  shouldIncludeGovernSection?: boolean;
 }) {
   const host = useNavigationHost();
   const pathname = host.pathname();
@@ -105,7 +102,6 @@ export const PersonalSidebarLinks = function PersonalSidebarLinks({
         isActive={isPathUnder({ pathname, base: "/me/configure" })}
         showLabel={showExpanded}
       />
-      {shouldIncludeGovernSection && <GovernSection showExpanded={showExpanded} />}
     </>
   );
 };

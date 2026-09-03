@@ -1,5 +1,6 @@
 import {
   codeAgentConfigSchema,
+  connectedAgentConfigSchema,
   httpAgentConfigSchema,
   signatureAgentConfigSchema,
   workflowAgentConfigSchema,
@@ -29,12 +30,13 @@ const createAgentRequestVariants = [
     type: z.literal("http"),
     config: httpAgentConfigSchema,
   }),
+  createAgentRequestBaseSchema.extend({
+    type: z.literal("connected"),
+    config: connectedAgentConfigSchema,
+  }),
 ] as const;
 
-export const createAgentRequestSchema = z.discriminatedUnion(
-  "type",
-  createAgentRequestVariants,
-);
+export const createAgentRequestSchema = z.discriminatedUnion("type", createAgentRequestVariants);
 
 const createAgentCommandBaseSchema = z.object({
   id: z.string().optional(),
@@ -46,11 +48,12 @@ export const createAgentCommandSchema = z.discriminatedUnion("type", [
   createAgentCommandBaseSchema.merge(createAgentRequestVariants[1]),
   createAgentCommandBaseSchema.merge(createAgentRequestVariants[2]),
   createAgentCommandBaseSchema.merge(createAgentRequestVariants[3]),
+  createAgentCommandBaseSchema.merge(createAgentRequestVariants[4]),
 ]);
 
 export const updateAgentRequestSchema = z.object({
   name: z.string().min(1).max(255).optional(),
-  type: z.enum(["signature", "code", "workflow", "http"]).optional(),
+  type: z.enum(["signature", "code", "workflow", "http", "connected"]).optional(),
   config: z.record(z.string(), z.unknown()).optional(),
   workflowId: z.string().nullable().optional(),
 });

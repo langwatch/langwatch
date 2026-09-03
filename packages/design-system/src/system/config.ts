@@ -5,6 +5,7 @@
  */
 import { defineConfig, defineRecipe, defineSlotRecipe } from "@chakra-ui/react";
 import { colorSystem } from "../color-mode";
+import { drawerSlotRecipe } from "./drawer.recipe";
 
 // Inter font loaded via CSS @import in globals.scss (no more next/font/google)
 const interFontFamily = "'Inter', sans-serif";
@@ -1071,7 +1072,7 @@ export const designSystemConfig = defineConfig({
             borderColor: "border",
             borderRadius: "lg",
             boxShadow: "lg",
-            "& button:not([data-variant=ghost]):not([data-part])": {
+            "& button[data-variant=solid], & button[data-variant=outline]": {
               boxShadow: "md",
             },
             "& input, & textarea, & select": {
@@ -1173,35 +1174,7 @@ export const designSystemConfig = defineConfig({
           },
         },
       }),
-      drawer: defineSlotRecipe({
-        slots: ["content", "header"],
-        base: {
-          content: {
-            maxWidth: "70%",
-            background:
-              "color-mix(in srgb, var(--chakra-colors-bg-surface) var(--lw-panel-alpha, 80%), transparent)",
-            backdropFilter: "var(--lw-backdrop-blur, blur(25px))",
-            border: "1px solid",
-            borderColor: "border",
-            borderRadius: "lg",
-          },
-          header: {
-            paddingY: 4,
-            paddingRight: 12,
-          },
-        },
-        variants: {
-          size: {
-            span: { content: { maxWidth: "70%" } },
-            full: { content: { maxWidth: "100%" } },
-            eval: { content: { maxWidth: "1024px" } },
-            xl: { content: { maxWidth: "4xl" } },
-          },
-        },
-        defaultVariants: {
-          size: "xl",
-        },
-      }),
+      drawer: drawerSlotRecipe,
       /**
        * Light mode keeps Chakra's own filled toast: a solid status colour with
        * contrast text. On a light page a white card reads as dead, and the

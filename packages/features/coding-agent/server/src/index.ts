@@ -45,8 +45,11 @@ export {
   type CallerProjectScope,
   type CodingAgentCallerScopeDependencies,
 } from "./services/coding-agent-caller-scope.service";
+export { createCodingAgentV1RestApp } from "./transport/api-rest/coding-agent-v1.api";
 export {
   CodingAgentCallerScopeDirectoryPort,
+  type CodingAgentScopeCaller,
+  type CodingAgentScopePermission,
   CodingAgentScopePermissionsPort,
   type CodingAgentScopeProject,
 } from "./ports/coding-agent-caller-scope.port";

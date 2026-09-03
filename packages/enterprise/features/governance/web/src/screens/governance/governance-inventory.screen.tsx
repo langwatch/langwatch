@@ -17,8 +17,26 @@ import {
   Textarea,
   VStack,
 } from "@chakra-ui/react";
-import { groupForMode, isOttlEnabledSourceType, NON_ENTERPRISE_INGESTION_SOURCE_CAP, routesConversations, SOURCE_GROUP_META, SOURCE_TYPE_LABEL, SOURCE_TYPE_OPTIONS, type SourceGroup, type SourceType } from "../../features/ingestion-sources/model/ingestion-source-catalog";
-import { composerCadenceError, PULL_ADAPTER_FOR_SOURCE, PULL_SCHEDULE_DEFAULTS, recommendedPullSchedule } from "../../features/ingestion-sources/model/pull-cadence";
+import {
+  groupForMode,
+  isOttlEnabledSourceType,
+  modeForSourceType,
+  needsIngestSecret,
+  NON_ENTERPRISE_INGESTION_SOURCE_CAP,
+  PROTOCOL_LABEL,
+  routesConversations,
+  SOURCE_GROUP_META,
+  SOURCE_TYPE_LABEL,
+  SOURCE_TYPE_OPTIONS,
+  type SourceGroup,
+  type SourceType,
+} from "../../features/ingestion-sources/model/ingestion-source-catalog";
+import {
+  composerCadenceError,
+  PULL_ADAPTER_FOR_SOURCE,
+  PULL_SCHEDULE_DEFAULTS,
+  recommendedPullSchedule,
+} from "../../features/ingestion-sources/model/pull-cadence";
 import { AddIngestionSourceMenu } from "../../features/ingestion-sources/ui/elements/add-ingestion-source-menu";
 import { PullCadenceField } from "../../features/ingestion-sources/ui/elements/pull-cadence-field";
 import { TraceDestinationField } from "../../features/ingestion-sources/ui/elements/trace-destination-field";
@@ -41,13 +59,18 @@ import { SourceTypeIconGlyph } from "../../features/ingestion-sources/ui/element
 import GovernanceLayout from "../../ui/sections/governance-layout";
 import { ToolCatalogPanel } from "../../features/ai-tools/ui/sections/tool-catalog-panel";
 import { PermissionRequiredNotice } from "../../ui/elements/permission-required-notice";
-import { DialogBody, DialogCloseTrigger, DialogContent, DialogFooter, DialogHeader, DialogRoot, DialogTitle } from "@langwatch/design-system/dialog";
+import {
+  DialogBody,
+  DialogCloseTrigger,
+  DialogContent,
+  DialogFooter,
+  DialogHeader,
+  DialogRoot,
+  DialogTitle,
+} from "@langwatch/design-system/dialog";
 import { Drawer } from "@langwatch/design-system/drawer";
 import { Link } from "../../ui/elements/governance-link";
-import {
-  useGovernanceToaster,
-  type GovernanceToaster,
-} from "../../behavior/governance-feedback";
+import { useGovernanceToaster, type GovernanceToaster } from "../../behavior/governance-feedback";
 import { HandledErrorAlert } from "../../ui/elements/handled-error-alert";
 import { useShowErrorToast } from "../../behavior/governance-feedback";
 import { useGovernancePlan, useGovernanceScope } from "../../behavior/governance-session";
@@ -438,8 +461,13 @@ function useGroupedSources(sources: Source[] | undefined) {
       scheduled: [],
     };
     for (const s of sources ?? []) {
-      const meta = SOURCE_TYPE_OPTIONS.find((o) => o.value === s.sourceType);
-      out[groupForMode(meta?.mode ?? "push")].push(s);
+      out[
+        groupForMode(
+          modeForSourceType({
+            sourceType: (s.sourceType ?? "otel_generic") as SourceType,
+          }),
+        )
+      ].push(s);
     }
     return out;
   }, [sources]);
@@ -466,13 +494,17 @@ function useIngestionSourceMutations({
       void refetch();
       setComposing(false);
       setComposer(blankComposer());
-      setSecretModal({
-        title: "Source created - paste this secret upstream",
-        secret: data.ingestSecret,
-        sourceId: data.source.id,
-        sourceName: data.source.name,
-        sourceType: data.source.sourceType as SourceType,
-      });
+      if (data.ingestSecret) {
+        setSecretModal({
+          title: "Source created - paste this secret upstream",
+          secret: data.ingestSecret,
+          sourceId: data.source.id,
+          sourceName: data.source.name,
+          sourceType: data.source.sourceType as SourceType,
+        });
+      } else {
+        toaster.create({ title: "Source created", type: "success" });
+      }
     },
     onError: (e) => showErrorToast({ error: e, fallbackTitle: "Couldn't create the source" }),
   });
@@ -865,10 +897,13 @@ function SourceRow({
   const status = STATUS_META[source.status] ?? STATUS_META.awaiting_first_event!;
   const StatusIcon = status.icon;
   const typeLabel = SOURCE_TYPE_LABEL[source.sourceType as SourceType] ?? source.sourceType;
+  const mode = modeForSourceType({ sourceType: source.sourceType as SourceType });
+  const hasSecret = needsIngestSecret({ sourceType: source.sourceType as SourceType });
   return (
     <HStack borderWidth="1px" borderColor="border.muted" borderRadius="sm" padding={3} gap={3}>
       <VStack align="start" gap={0} flex={1} minWidth={0}>
         <HStack gap={2}>
+          <SourceTypeIconGlyph sourceType={source.sourceType as SourceType} size="16px" />
           <Link
             href={`/governance/inventory/${source.id}`}
             color="fg"
@@ -880,6 +915,9 @@ function SourceRow({
           </Link>
           <Badge size="sm" variant="surface">
             {typeLabel}
+          </Badge>
+          <Badge size="sm" variant="outline">
+            {PROTOCOL_LABEL[mode]}
           </Badge>
         </HStack>
         {source.description && (
@@ -911,15 +949,17 @@ function SourceRow({
           >
             <Pencil size={14} /> Edit
           </Button>
-          <Button
-            size="sm"
-            variant="ghost"
-            onClick={onRotate}
-            loading={isPendingRotate}
-            title="Mint a new ingestSecret (24h grace on the old one)"
-          >
-            <RotateCw size={14} /> Rotate secret
-          </Button>
+          {hasSecret && (
+            <Button
+              size="sm"
+              variant="ghost"
+              onClick={onRotate}
+              loading={isPendingRotate}
+              title="Mint a new ingestSecret (24h grace on the old one)"
+            >
+              <RotateCw size={14} /> Rotate secret
+            </Button>
+          )}
           <Button
             size="sm"
             variant="ghost"
@@ -3325,7 +3365,7 @@ function secretModalTargets(details: SecretDetails | null) {
       details?.sourceType === "otel_generic" ||
       details?.sourceType === "claude_cowork" ||
       details?.sourceType === "claude_code",
-    usesWebhookUrl: details?.sourceType === "workato",
+    usesWebhookUrl: details?.sourceType === "workato" || details?.sourceType === "s3_custom",
     isClaudeCode: details?.sourceType === "claude_code",
   };
 }

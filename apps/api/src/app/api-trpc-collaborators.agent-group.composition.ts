@@ -127,7 +127,7 @@ import {
   ScenarioExecutionPrefetcherService,
   ScenarioExecutionService,
   ScenarioFailureHandlerService,
-  ScenarioFolderIdPort,
+  ScenarioTestSuiteIdPort,
   ScenarioIdPort,
   ScenarioSecretCipherPort,
   ScenarioTabRegistryService,
@@ -433,7 +433,7 @@ export function composeApiAgentGroupCollaborators(
     prisma: options.prisma,
     simulations,
     ids: new KsuidScenarioId(),
-    folderIds: new NanoidScenarioFolderId(),
+    testSuiteIds: new NanoidScenarioTestSuiteId(),
     clock: new SystemScenarioClock(),
     secretCipher: new ApiScenarioSecretCipher(options.encryption),
   });
@@ -603,7 +603,7 @@ class KsuidScenarioId extends ScenarioIdPort {
 }
 
 /** The folder id, in the `suite_` format the other tier reads. */
-class NanoidScenarioFolderId extends ScenarioFolderIdPort {
+class NanoidScenarioTestSuiteId extends ScenarioTestSuiteIdPort {
   next(): string {
     return `suite_${nanoid()}`;
   }

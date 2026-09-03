@@ -1,13 +1,13 @@
 /**
- * The Run button at the end of a test case row.
+ * The Run button at the end of a scenario row.
  *
- * The button opens the run dialog for that case, with the agent of the last
+ * The button opens the run dialog for that scenario, with the agent of the last
  * run already chosen there. Confirming starts the run and leaves the person
  * where they are.
  *
  * @see specs/features/agent-testing/cases-table.feature
  * @see specs/features/agent-testing/run-dialog.feature
- * @see specs/features/agent-testing/live-one-off-run.feature
+ * @see specs/features/agent-testing/live-single-scenario-run.feature
  */
 
 import { Play } from "lucide-react";
@@ -15,20 +15,13 @@ import { SmallButton } from "../shared/small-button";
 
 export type RunCaseButtonProps = {
   caseName: string;
-  isRunning?: boolean;
   disabled?: boolean;
   onOpen: () => void;
 };
 
-export function RunCaseButton({
-  caseName,
-  isRunning = false,
-  disabled = false,
-  onOpen,
-}: RunCaseButtonProps) {
+export function RunCaseButton({ caseName, disabled = false, onOpen }: RunCaseButtonProps) {
   return (
     <SmallButton
-      loading={isRunning}
       disabled={disabled}
       aria-label={`Run ${caseName}`}
       onClick={(event) => {

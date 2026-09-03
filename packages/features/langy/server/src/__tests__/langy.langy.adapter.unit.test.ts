@@ -1,3 +1,4 @@
+import { EventEmitter } from "node:events";
 import type {
   LangyConversationCommands,
   LangyEventingPorts,
@@ -103,10 +104,12 @@ describe("PostgresLangyAdapter", () => {
         const instance = PostgresLangyAdapter.create({ database: undefined! });
         const service = instance.build(compositionOptions());
 
-        const app = LangyApp.create({ langy: service });
+        const app = LangyApp.create({ langy: service, redis: null, broadcast: testBroadcast() });
 
         expect(app.langyService).toBe(service);
-        expect(LangyApp.create({ langy: service }).langyService).toBe(app.langyService);
+        expect(
+          LangyApp.create({ langy: service, redis: null, broadcast: testBroadcast() }).langyService,
+        ).toBe(app.langyService);
         expect(instance.build(compositionOptions())).toBe(service);
       });
     });
@@ -178,4 +181,12 @@ function compositionOptions() {
     context: { render: vi.fn(() => null) },
     metrics: { count: vi.fn() },
   });
+}
+
+/** The live-edge collaborators the application takes; these suites never use them. */
+function testBroadcast() {
+  return {
+    getTenantEmitter: () => new EventEmitter(),
+    cleanupTenantEmitter: () => void 0,
+  };
 }

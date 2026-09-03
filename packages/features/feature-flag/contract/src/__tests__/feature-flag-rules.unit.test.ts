@@ -6,7 +6,7 @@ import {
   resolveEffectiveForListing,
 } from "../feature-flag-rules";
 
-const FLAG = "release_ui_navigation_v2_enabled";
+const FLAG = "release_ui_agent_testing_v2_enabled";
 
 describe("evaluateRules", () => {
   describe("when no rule matches", () => {

@@ -5,6 +5,7 @@
  * are sorted by last run date.
  *
  * @see specs/scenarios/internal-set-namespace.feature
+ * @see specs/suites/internal-run-set-surface.feature
  */
 import { describe, expect, it } from "vitest";
 import type { ScenarioSetData } from "@langwatch/scenario-contract";
@@ -31,12 +32,11 @@ describe("sortScenarioSets()", () => {
     ];
 
     describe("when sorting the sets", () => {
+      /** @scenario "The internal run set is pinned in the run set list" */
       it("pins internal set to the top of the list", () => {
         const sorted = sortScenarioSets(testSets);
 
-        expect(sorted[0]?.scenarioSetId).toBe(
-          "__internal__proj_abc123__on-platform-scenarios",
-        );
+        expect(sorted[0]?.scenarioSetId).toBe("__internal__proj_abc123__on-platform-scenarios");
       });
 
       it("sorts remaining sets by last run date (most recent first)", () => {
@@ -91,12 +91,8 @@ describe("sortScenarioSets()", () => {
       it("sorts internal sets by last run date (most recent first)", () => {
         const sorted = sortScenarioSets(testSets);
 
-        expect(sorted[0]?.scenarioSetId).toBe(
-          "__internal__proj_xyz__on-platform-scenarios",
-        );
-        expect(sorted[1]?.scenarioSetId).toBe(
-          "__internal__proj_abc123__on-platform-scenarios",
-        );
+        expect(sorted[0]?.scenarioSetId).toBe("__internal__proj_xyz__on-platform-scenarios");
+        expect(sorted[1]?.scenarioSetId).toBe("__internal__proj_abc123__on-platform-scenarios");
       });
     });
   });

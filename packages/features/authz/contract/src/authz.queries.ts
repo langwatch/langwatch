@@ -33,13 +33,9 @@ export type AuthzCheckDetailedOutput = z.infer<typeof authzCheckDetailedOutputSc
 export const authzEffectivePermissionsInputSchema = z
   .object({ principal: authzPrincipalRefSchema, scope: authzScopeRefSchema })
   .strict();
-export type AuthzEffectivePermissionsInput = z.infer<
-  typeof authzEffectivePermissionsInputSchema
->;
+export type AuthzEffectivePermissionsInput = z.infer<typeof authzEffectivePermissionsInputSchema>;
 export const authzEffectivePermissionsOutputSchema = z.array(authzPermissionSchema);
-export type AuthzEffectivePermissionsOutput = z.infer<
-  typeof authzEffectivePermissionsOutputSchema
->;
+export type AuthzEffectivePermissionsOutput = z.infer<typeof authzEffectivePermissionsOutputSchema>;
 
 export const authzScopeIdsSchema = z
   .object({
@@ -121,9 +117,38 @@ export const authzCanBatchByIdsOutputSchema = z
   .strict();
 export type AuthzCanBatchByIdsOutput = z.infer<typeof authzCanBatchByIdsOutputSchema>;
 
-export const authzExplainDecisionInputSchema = z
-  .object({ decision: authzDecisionSchema })
+export const authzCanBatchPermissionsByIdsInputSchema = z
+  .object({
+    principal: authzPrincipalRefSchema,
+    permissions: z.array(authzPermissionSchema).readonly(),
+    organizationId: z.string(),
+    teams: z.array(z.object({ teamId: z.string() }).strict()).readonly(),
+    projects: z
+      .array(z.object({ projectId: z.string(), teamId: z.string().optional() }).strict())
+      .readonly(),
+  })
   .strict();
+export type AuthzCanBatchPermissionsByIdsInput = z.infer<
+  typeof authzCanBatchPermissionsByIdsInputSchema
+>;
+
+export const authzCanBatchPermissionsByIdsOutputSchema = z
+  .object({
+    byPermission: z.map(
+      authzPermissionSchema,
+      z.object({
+        teams: z.map(z.string(), z.boolean()),
+        projects: z.map(z.string(), z.boolean()),
+      }),
+    ),
+    organizationRole: organizationRoleSchema.nullable(),
+  })
+  .strict();
+export type AuthzCanBatchPermissionsByIdsOutput = z.infer<
+  typeof authzCanBatchPermissionsByIdsOutputSchema
+>;
+
+export const authzExplainDecisionInputSchema = z.object({ decision: authzDecisionSchema }).strict();
 export type AuthzExplainDecisionInput = z.infer<typeof authzExplainDecisionInputSchema>;
 export const authzExplainDecisionOutputSchema = z.array(z.string());
 export type AuthzExplainDecisionOutput = z.infer<typeof authzExplainDecisionOutputSchema>;
@@ -144,9 +169,7 @@ export const authzGetProjectAnyDecisionInputSchema = z
     permissions: z.array(authzPermissionSchema).readonly(),
   })
   .strict();
-export type AuthzGetProjectAnyDecisionInput = z.infer<
-  typeof authzGetProjectAnyDecisionInputSchema
->;
+export type AuthzGetProjectAnyDecisionInput = z.infer<typeof authzGetProjectAnyDecisionInputSchema>;
 
 export const authzPermissionByIdsInputSchema = z
   .object({
@@ -158,8 +181,7 @@ export const authzPermissionByIdsInputSchema = z
   })
   .strict()
   .refine(
-    (value) =>
-      [value.projectId, value.teamId, value.organizationId].filter(Boolean).length === 1,
+    (value) => [value.projectId, value.teamId, value.organizationId].filter(Boolean).length === 1,
     { message: "exactly one scope id is required" },
   );
 export type AuthzPermissionByIdsInput = z.infer<typeof authzPermissionByIdsInputSchema>;
@@ -242,9 +264,7 @@ export const authzAccessGroupSchema = z
   .passthrough();
 export type AuthzAccessGroup = z.infer<typeof authzAccessGroupSchema>;
 
-export const authzAccessApiKeySchema = z
-  .object({ id: z.string(), name: z.string() })
-  .passthrough();
+export const authzAccessApiKeySchema = z.object({ id: z.string(), name: z.string() }).passthrough();
 export type AuthzAccessApiKey = z.infer<typeof authzAccessApiKeySchema>;
 
 export const authzCustomRoleSchema = z
@@ -335,16 +355,12 @@ export const authzListScopeBindingsInputSchema = z
     scopeIds: z.array(z.string()).readonly(),
   })
   .strict();
-export type AuthzListScopeBindingsInput = z.infer<
-  typeof authzListScopeBindingsInputSchema
->;
+export type AuthzListScopeBindingsInput = z.infer<typeof authzListScopeBindingsInputSchema>;
 
 export const authzListGroupBindingsInputSchema = z
   .object({ organizationId: z.string(), groupId: z.string() })
   .strict();
-export type AuthzListGroupBindingsInput = z.infer<
-  typeof authzListGroupBindingsInputSchema
->;
+export type AuthzListGroupBindingsInput = z.infer<typeof authzListGroupBindingsInputSchema>;
 
 export const authzListTeamMemberBindingsInputSchema = z
   .object({
@@ -370,16 +386,10 @@ export const authzTeamMemberBindingsOutputSchema = z.map(
   z.string(),
   z.array(authzTeamMemberBindingSchema),
 );
-export type AuthzTeamMemberBindingsOutput = z.infer<
-  typeof authzTeamMemberBindingsOutputSchema
->;
+export type AuthzTeamMemberBindingsOutput = z.infer<typeof authzTeamMemberBindingsOutputSchema>;
 
-export const authzBindingsForSynthesisOutputSchema = z.array(
-  authzBindingForSynthesisSchema,
-);
-export type AuthzBindingsForSynthesisOutput = z.infer<
-  typeof authzBindingsForSynthesisOutputSchema
->;
+export const authzBindingsForSynthesisOutputSchema = z.array(authzBindingForSynthesisSchema);
+export type AuthzBindingsForSynthesisOutput = z.infer<typeof authzBindingsForSynthesisOutputSchema>;
 
 export const authzCustomRolesOutputSchema = z.array(authzCustomRoleSchema);
 export type AuthzCustomRolesOutput = z.infer<typeof authzCustomRolesOutputSchema>;

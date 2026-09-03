@@ -13,23 +13,19 @@ import {
   applyRunEvent,
   emptyRunResultsDraft,
   generateHumanReadableId,
-  InvalidExperimentConfigurationError,
-  mergeRunResults,
-  planRunMerge,
-  runResultsAreEmpty,
-  StaleWorkbenchStateError,
   UNNAMED_FAILURE,
   type EvaluationV3Event,
   type ExecutionScope,
   type ExecutionSummary,
-  type ExperimentService,
-  type RunResultsDraft,
-  type WorkbenchActor,
 } from "@langwatch/experiment-contract";
 import { getRunUrl } from "../adapters/experiment-run-url.adapter";
 import type { ExperimentRunErrorReportingPort } from "../ports/experiment-run-error-reporting.port";
 import type { ExperimentRunProgressPort } from "../ports/experiment-run-progress.port";
 import { mapThrownErrorEvent } from "../processes/experiment-result-mapping.process";
+import {
+  persistRunResults,
+  type RunResultsPersistence,
+} from "./experiment-run-results-writer.service";
 import {
   countScopedCells,
   type OrchestratorInput,
@@ -37,21 +33,6 @@ import {
 } from "./experiment-run-orchestrator.service";
 
 const logger = createLogger("langwatch:experiment:polling-run");
-
-/**
- * Where a completed run writes its cells so an open page can show them.
- *
- * The workbench state is the canonical home of a run's cells: a browser run
- * autosaves them there, and a page that opens later reads them back. A backend
- * run has no page to stream to, so it writes them itself through the same
- * server-owned seam, which validates the state, advances the version and tells
- * the tenant the experiment moved.
- */
-export interface RunResultsPersistence {
-  experiments: ExperimentService;
-  /** Who the workbench write is attributed to in the version history. */
-  actor: WorkbenchActor;
-}
 
 export type StartPollingRunInput = Omit<OrchestratorInput, "runId" | "scope" | "experimentId"> & {
   experimentId: string;
@@ -74,98 +55,6 @@ export type StartPollingRunInput = Omit<OrchestratorInput, "runId" | "scope" | "
    * shows, so it leaves the saved state alone.
    */
   persistResults?: RunResultsPersistence;
-};
-
-/**
- * Writes a completed run's cells into the saved workbench state.
- *
- * Never throws: the cells are already stored, so a workbench that could not be
- * updated costs the open page a refresh, not the run. One retry covers the
- * concurrent write (a person typing in the same experiment), which is the same
- * answer the assistant's backend edits give a stale read.
- */
-const persistRunResults = async ({
-  persistence,
-  projectId,
-  experimentId,
-  runId,
-  scope,
-  draft,
-  errorReporting,
-  isRetry = false,
-}: {
-  persistence: RunResultsPersistence;
-  projectId: string;
-  experimentId: string;
-  runId: string;
-  scope: ExecutionScope;
-  draft: RunResultsDraft;
-  errorReporting?: ExperimentRunErrorReportingPort;
-  isRetry?: boolean;
-}): Promise<void> => {
-  if (runResultsAreEmpty(draft)) {
-    logger.info({ runId, experimentId }, "Run produced no cells to write into the workbench state");
-    return;
-  }
-
-  const plan = planRunMerge(scope);
-
-  try {
-    const current = await persistence.experiments.getWorkbenchState({
-      projectId,
-      id: experimentId,
-    });
-    if (!current.state) {
-      throw new InvalidExperimentConfigurationError(current.slug);
-    }
-
-    const saved = await persistence.experiments.recordWorkbenchRunResults({
-      projectId,
-      id: experimentId,
-      expectedVersion: current.version,
-      // The run names itself on the write. A page that started this run then
-      // reads the version bump as its own and adopts it, rather than standing
-      // down and asking the reader to reload over their unsaved edits.
-      actor: { ...persistence.actor, runId },
-      commitMessage: `Results from run ${runId}`,
-      results: mergeRunResults({ existing: current.state.results, draft, plan }),
-    });
-    logger.info(
-      {
-        runId,
-        experimentId,
-        version: saved.version,
-        targets: Object.keys(draft.targetOutputs).length,
-      },
-      "Wrote the run results into the workbench state",
-    );
-  } catch (error) {
-    if (error instanceof StaleWorkbenchStateError && !isRetry) {
-      logger.info(
-        { runId, experimentId },
-        "Workbench moved while the run was writing its results, retrying once",
-      );
-      await persistRunResults({
-        persistence,
-        projectId,
-        experimentId,
-        runId,
-        scope,
-        draft,
-        errorReporting,
-        isRetry: true,
-      });
-      return;
-    }
-
-    logger.error(
-      { error, runId, experimentId, projectId },
-      "Failed to write the run results into the workbench state",
-    );
-    errorReporting?.captureException(error, {
-      extra: { runId, experimentId, projectId },
-    });
-  }
 };
 
 /** Everything the orchestrator itself takes, minus what the runner decides. */

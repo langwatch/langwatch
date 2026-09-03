@@ -16,9 +16,21 @@
 import type { RunParameterValues, ScenarioParameterDefinition } from "@langwatch/scenario-contract";
 import {
   displayOptionalValue,
-  serializeOptionalScalarValue,
+  displayTypedValue,
+  serializeOptionalTypedScalarValue,
   serializeScalarValue,
 } from "@langwatch/design-system/json-value-text";
+
+/** The declared type of each named parameter, for reading typed values. */
+export function parameterTypes(
+  definitions: readonly ScenarioParameterDefinition[] | undefined,
+): Map<string, ScenarioParameterDefinition["type"]> {
+  return new Map(
+    (definitions ?? [])
+      .filter((definition) => definition.type !== undefined)
+      .map((definition) => [definition.name, definition.type]),
+  );
+}
 
 /**
  * The pairs a line holds, in the order they were written.
@@ -53,10 +65,16 @@ export function formatStoredParameterLine(values: RunParameterValues): string {
 }
 
 /** The line a set of declared parameters starts on: every default, in order. */
-export function formatParameterLine(definitions: ScenarioParameterDefinition[]): string {
+export function formatParameterLine(definitions: readonly ScenarioParameterDefinition[]): string {
   return definitions
     .filter((definition) => definition.secret !== true)
-    .map((definition) => `${definition.name}=${displayOptionalValue(definition.defaultValue)}`)
+    .map(
+      (definition) =>
+        `${definition.name}=${displayTypedValue({
+          value: definition.defaultValue,
+          type: definition.type,
+        })}`,
+    )
     .join(", ");
 }
 
@@ -67,20 +85,28 @@ export function formatParameterLine(definitions: ScenarioParameterDefinition[]):
  * A name is sent as it was written, declared or not, so a name no case
  * declares is refused by the server by name rather than dropped in silence.
  * A name left with an empty value is omitted, so the run falls back to the
- * default each case declares for it.
+ * default each case declares for it. A value is read as the type its
+ * declaration names, so "007" stays text for a string parameter.
  */
 export function toLineRunParameters({
   line,
   secretValues,
+  definitions,
 }: {
   line: string;
   /** The value typed for each secret parameter, keyed by name. */
   secretValues: Record<string, string>;
+  /** The declarations in scope, for the type each value is read as. */
+  definitions?: readonly ScenarioParameterDefinition[];
 }): RunParameterValues | undefined {
   const parameters: RunParameterValues = {};
+  const types = parameterTypes(definitions);
 
   for (const [name, raw] of parseParameterLine(line)) {
-    const value = serializeOptionalScalarValue(raw);
+    const value = serializeOptionalTypedScalarValue({
+      raw,
+      type: types.get(name),
+    });
     if (value === undefined) continue;
     parameters[name] = value;
   }
@@ -111,20 +137,42 @@ export function toParameterDefinitions({
   existing: ScenarioParameterDefinition[];
 }): ScenarioParameterDefinition[] {
   const secrets = existing.filter((definition) => definition.secret === true);
-  const described = new Map(
-    existing.map((definition) => [definition.name, definition.description]),
-  );
+  const secretNames = new Set(secrets.map((definition) => definition.name));
+  const known = new Map(existing.map((definition) => [definition.name, definition]));
 
-  const declared: ScenarioParameterDefinition[] = [];
-  for (const [name, raw] of parseParameterLine(line)) {
-    if (secrets.some((definition) => definition.name === name)) continue;
-    const description = described.get(name);
-    declared.push({
-      name,
-      ...(description ? { description } : {}),
-      ...(raw === "" ? {} : { defaultValue: serializeScalarValue(raw) }),
-    });
-  }
+  const declared = parseParameterLine(line)
+    .filter(([name]) => !secretNames.has(name))
+    .map(([name, raw]) => declarationOf({ name, raw, known: known.get(name) }));
 
   return [...declared, ...secrets];
+}
+
+/**
+ * One declaration read off the line. The line carries the name and the
+ * default alone; what else the case already said about the name, its
+ * description, type and options, stays.
+ */
+function declarationOf({
+  name,
+  raw,
+  known,
+}: {
+  name: string;
+  raw: string;
+  known: ScenarioParameterDefinition | undefined;
+}): ScenarioParameterDefinition {
+  const { description, type, options } = known ?? {};
+  const defaultValue =
+    raw === ""
+      ? undefined
+      : type
+        ? serializeOptionalTypedScalarValue({ raw, type })
+        : serializeScalarValue(raw);
+  return {
+    name,
+    ...(description ? { description } : {}),
+    ...(type ? { type } : {}),
+    ...(options ? { options } : {}),
+    ...(defaultValue === undefined ? {} : { defaultValue }),
+  };
 }

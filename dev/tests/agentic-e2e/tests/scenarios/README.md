@@ -1,25 +1,38 @@
-# Scenario Feature Tests
+# Agent Testing Feature Tests
 
-E2E tests for the Scenario feature (Library, Editor, Execution).
+E2E tests for the Agent Testing pages: the scenarios tab, the scenario editor
+and the run dialog.
 
 ## Source Feature Files
 
 These tests implement scenarios from:
-
-- `specs/scenarios/scenario-library.feature`
-- `specs/scenarios/scenario-editor.feature`
-- `specs/scenarios/scenario-execution.feature`
+- `specs/features/agent-testing/page-structure.feature`
+- `specs/features/agent-testing/cases-table.feature`
+- `specs/features/agent-testing/run-dialog.feature`
 
 ## Test Files
 
-| File                         | Feature   | Tests                                 |
-| ---------------------------- | --------- | ------------------------------------- |
-| `steps.ts`                   | -         | Shared Gherkin-style step definitions |
-| `scenario-library.spec.ts`   | Library   | Navigation, empty state               |
-| `scenario-editor.spec.ts`    | Editor    | Create, edit, workflow lifecycle      |
-| `scenario-execution.spec.ts` | Execution | Page loads, content display           |
+| File | Feature | Tests |
+|------|---------|-------|
+| `steps.ts` | - | Shared Gherkin-style step definitions |
+| `scenario-library.spec.ts` | Page structure | Title and tabs, the scenarios panel, the redirect from a saved `/simulations` address |
+| `scenario-editor.spec.ts` | Scenario editor | Create, edit, workflow lifecycle, criteria |
+| `scenario-execution.spec.ts` | Run dialog | Results tab, Save & Run |
 
 ## Architecture
+
+### Day zero
+
+A fresh project holds no agent, no test suite and no scenario. The page asks
+for them in that order: **Setup agent**, then **Name your first test suite**,
+then **New scenario**. The steps `givenTheProjectHasAnAgent` and
+`givenTheProjectHasATestSuite` create each one only when its empty state is on
+screen, so the same test runs against the empty CI project and against a
+project that already holds data.
+
+The agent the steps create is an HTTP agent with an address that does not
+answer. A run against it fails, and the run drawer shows that failure as a
+result, which is enough for the tests.
 
 ### Step Definitions (`steps.ts`)
 
@@ -27,160 +40,67 @@ All step functions follow Gherkin naming conventions:
 
 ```typescript
 // Given steps - set up preconditions
-export async function givenIAmOnTheScenariosListPage(page: Page) { ... }
-export async function givenIAmLoggedIntoProject(page: Page) { ... }
+export async function givenIAmOnTheScenariosPage(page: Page) { ... }
+export async function givenICanWriteAScenario(page: Page) { ... }
 
 // When steps - perform actions
 export async function whenIClickNewScenario(page: Page) { ... }
-export async function whenIFillInNameWith(page: Page, name: string) { ... }
+export async function whenIFillInTitleWith(page: Page, title: string) { ... }
 export async function whenIClickSave(page: Page) { ... }
 
 // Then steps - verify outcomes
 export async function thenISeeTheScenarioEditor(page: Page) { ... }
-export async function thenScenarioAppearsInList(page: Page, name: string) { ... }
+export async function thenScenarioAppearsInList(page: Page, title: string) { ... }
 ```
 
-### Chakra UI Considerations
+### Locators
 
-Chakra UI renders duplicate dialog elements for responsive design. Steps use `.last()` to target the visible (topmost) dialog:
-
-```typescript
-// Use .last() for elements inside dialogs
-await page.getByRole("textbox", { name: "Name" }).last().fill("...");
-await page.getByRole("button", { name: /save/i }).last().click();
-```
+The Agent Testing components carry `data-testid` attributes, and the editor
+fields carry `aria-label`s (`Title`, `Situation`, `Criteria`). Prefer those
+over text. Chakra renders duplicate dialog elements for responsive design, so
+steps use `.last()` for fields inside a drawer.
 
 ### Workflow Test Pattern
 
-The `scenario lifecycle` test combines multiple feature scenarios:
+The `scenario lifecycle` test combines several feature scenarios:
 
 ```
-┌─────────────────────────────────────────────────────────────────┐
-│  Workflow: scenario lifecycle                                   │
-├─────────────────────────────────────────────────────────────────┤
-│  1. Save new scenario        (scenario-editor.feature:30-39)    │
-│  2. Verify in list           (scenario-library.feature)         │
-│  3. Click to edit            (scenario-library.feature:34-38)   │
-│  4. Load existing data       (scenario-editor.feature:45-52)    │
-│  5. Update scenario          (scenario-editor.feature:54-59)    │
-│  6. Verify update in list    (scenario-library.feature)         │
-└─────────────────────────────────────────────────────────────────┘
+1. Save new scenario
+2. Verify in list
+3. Click the row to edit
+4. Load existing data
+5. Update the title
+6. Verify the update in the list
 ```
 
-This approach:
+This avoids seeded data and tests a real user journey in one self-contained
+test.
 
-- Avoids needing seeded data (no scenario API exists)
-- Tests a real user journey
-- Each step builds on the previous one
-- Single self-contained test
+### Runs without a model provider
+
+CI has no model provider. `Save & Run` opens the run dialog, the test picks
+the first agent and clicks Run, and the platform refuses the run: the dialog
+then reads "No model provider is set up" in place of a queued run. The
+execution test accepts that notice or the run drawer, and with a provider it
+waits for the run to show in the drawer.
 
 ## Adding New Tests
 
-### 1. Check the Feature File
-
-Look in `specs/scenarios/*.feature` for the scenario to implement:
-
-```gherkin
-@e2e
-Scenario: Filter scenarios by label
-  Given scenarios exist with various labels
-  When I select label "support" in the filter
-  Then I only see scenarios with the "support" label
-```
-
-### 2. Add Step Functions (if needed)
-
-Add to `steps.ts` using Gherkin naming:
-
-```typescript
-export async function whenISelectLabelFilter(page: Page, label: string) {
-  await page.getByRole("button", { name: /labels/i }).click();
-  await page.getByRole("checkbox", { name: new RegExp(label, "i") }).click();
-}
-
-export async function thenIOnlySeeScenariosWith(page: Page, label: string) {
-  const rows = page.getByRole("row").filter({ hasText: new RegExp(label, "i") });
-  await expect(rows.first()).toBeVisible();
-}
-```
-
-### 3. Write the Test
-
-Add to the appropriate `.spec.ts` file:
-
-```typescript
-/**
- * Scenario: Filter scenarios by label
- * Source: scenario-library.feature lines 51-55
- *
- * Note: Requires scenarios with labels to exist.
- * Consider adding to the workflow test or creating seeding support.
- */
-test("filter scenarios by label", async ({ page }) => {
-  await givenIAmOnTheScenariosListPage(page);
-  await whenISelectLabelFilter(page, "support");
-  await thenIOnlySeeScenariosWith(page, "support");
-});
-```
-
-### 4. Document the Mapping
-
-Add a doc comment linking to the feature file with line numbers.
-
-## Test Data Strategies
-
-### Option 1: Workflow Tests (Current)
-
-Combine create → use → verify into one test. Best when:
-
-- No API exists for creating test data
-- Testing a natural user flow
-- Data from one step is needed by the next
-
-### Option 2: API Seeding (Future)
-
-Create data via API in `beforeAll`. Best when:
-
-- API endpoints exist
-- Need isolation between tests
-- Testing specific scenarios in isolation
-
-### Option 3: Database Seeding (Future)
-
-Insert data directly via Prisma. Best when:
-
-- Need complex data setups
-- API doesn't support all fields
-- Performance is critical
+1. Find the scenario in `specs/features/agent-testing/*.feature`.
+2. Add step functions to `steps.ts` with Gherkin naming.
+3. Compose them in the matching `.spec.ts` file.
+4. Add a doc comment naming the feature file the test binds.
 
 ## Troubleshooting
 
 ### "strict mode violation: resolved to N elements"
+Chakra renders duplicates. Use `.first()` or `.last()`.
 
-Chakra renders duplicates. Use `.first()` or `.last()`:
+### Save does not close the drawer
+The drawer closes itself after the "Scenario created" or "Scenario updated"
+toast. Wait for the toast, then for the Title field to disappear, as
+`whenIClickSave` does.
 
-```typescript
-await page.getByRole("dialog").last().getByRole("button").click();
-```
-
-### Test timing out on save
-
-The "Save and Run" button opens a popover. Click "Save without running":
-
-```typescript
-await page
-  .getByRole("button", { name: /save and run/i })
-  .last()
-  .click();
-await page.getByText("Save without running").last().click();
-```
-
-### Element not found in dialog
-
-Wait for the dialog heading first:
-
-```typescript
-await expect(
-  page.getByRole("heading", { name: /create scenario/i }).last(),
-).toBeVisible();
-```
+### The test creates an agent or a suite that already exists
+The day zero steps act only when the matching empty state is visible. A
+project that already holds an agent and a suite skips both.

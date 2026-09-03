@@ -1,16 +1,6 @@
-import {
-  Box,
-  Button,
-  CodeBlock,
-  HStack,
-  Spacer,
-  Spinner,
-  Text,
-  VStack,
-} from "@chakra-ui/react";
+import { Box, Button, CodeBlock, HStack, Spacer, Spinner, Text, VStack } from "@chakra-ui/react";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { Check, ChevronLeft, ChevronRight } from "react-feather";
-import { LuPencil } from "react-icons/lu";
+import { Check, ChevronLeft, ChevronRight, Pencil } from "lucide-react";
 import AnnotationsLayout from "../../ui/sections/annotation-queue-layout";
 import { Checkbox } from "@langwatch/design-system/checkbox";
 import { useColorMode } from "@langwatch/design-system/color-mode";
@@ -106,9 +96,7 @@ function useQueueEnding({
   recordItemDone: () => void;
 }) {
   const [ending, setEnding] = useState<QueueEnding>("walking");
-  const noteHandoffOpened = useAnnotationQueueSessionStore(
-    (state) => state.noteHandoffOpened,
-  );
+  const noteHandoffOpened = useAnnotationQueueSessionStore((state) => state.noteHandoffOpened);
   const resetHandoff = useAnnotationQueueSessionStore((state) => state.resetHandoff);
   // The drawer is dismissed only once it has been seen open: the frame between
   // asking for it and the URL naming it would otherwise read as a dismissal.
@@ -265,8 +253,7 @@ function QueueWalker() {
 
   // The queue read already resolves each item's trace, so the thread the item
   // belongs to is known without waiting on a second round trip.
-  const currentTraceId =
-    currentQueueItem?.trace?.trace_id ?? currentQueueItem?.traceId ?? "";
+  const currentTraceId = currentQueueItem?.trace?.trace_id ?? currentQueueItem?.traceId ?? "";
   const conversationId = currentQueueItem?.trace?.metadata?.thread_id ?? null;
 
   // The conversation only reads back 90 days, so a thread older than that
@@ -287,13 +274,10 @@ function QueueWalker() {
   // A trace that belongs to no thread has no conversation to query, so it is
   // handed over as the conversation's only turn.
   const fallbackTrace = traceDetails.data ?? currentQueueItem?.trace ?? null;
-  const renderedConversationId =
-    threadResolvedEmpty && fallbackTrace ? null : conversationId;
+  const renderedConversationId = threadResolvedEmpty && fallbackTrace ? null : conversationId;
   const fallbackTurns = useMemo(
     () =>
-      renderedConversationId || !fallbackTrace
-        ? undefined
-        : [legacyTraceToTurn(fallbackTrace)],
+      renderedConversationId || !fallbackTrace ? undefined : [legacyTraceToTurn(fallbackTrace)],
     [renderedConversationId, fallbackTrace],
   );
 
@@ -344,8 +328,7 @@ function QueueWalker() {
   }, [walkedTraceId, noteWalked]);
 
   const openHandoffDrawer = useCallback(
-    (traceIds: string[]) =>
-      openDrawer("addDatasetRecord", { selectedTraceIds: traceIds }),
+    (traceIds: string[]) => openDrawer("addDatasetRecord", { selectedTraceIds: traceIds }),
     [openDrawer],
   );
 
@@ -393,14 +376,13 @@ function QueueWalker() {
   );
   const recordItemDone = useCallback(() => finishCurrentItem(), [finishCurrentItem]);
 
-  const { ending, finishLastItem, confirmEndWithoutDataset, keepSession } =
-    useQueueEnding({
-      handoffWanted,
-      traceIds: sessionIds,
-      isHandoffDrawerOpen: drawerOpen("addDatasetRecord"),
-      openHandoffDrawer,
-      recordItemDone,
-    });
+  const { ending, finishLastItem, confirmEndWithoutDataset, keepSession } = useQueueEnding({
+    handoffWanted,
+    traceIds: sessionIds,
+    isHandoffDrawerOpen: drawerOpen("addDatasetRecord"),
+    openHandoffDrawer,
+    recordItemDone,
+  });
 
   const deleteQueueItems = api.annotation.deleteQueueItems.useMutation();
   const removeQueueItems = deleteQueueItems.mutate;
@@ -420,13 +402,7 @@ function QueueWalker() {
           }),
       },
     );
-  }, [
-    projectId,
-    currentQueueItemId,
-    removeQueueItems,
-    advanceToNextItem,
-    refetchQueueItems,
-  ]);
+  }, [projectId, currentQueueItemId, removeQueueItems, advanceToNextItem, refetchQueueItems]);
 
   if (queuesLoading) {
     return <AnnotationsLayout />;
@@ -444,14 +420,7 @@ function QueueWalker() {
 
   return (
     <Box display="flex" flexDirection="column" width="full" height="full">
-      <VStack
-        height="100%"
-        width="full"
-        gap={0}
-        alignItems="stretch"
-        position="relative"
-        flex="1"
-      >
+      <VStack height="100%" width="full" gap={0} alignItems="stretch" position="relative" flex="1">
         {/*
           The conversation owns the scroll: this host is a non-scrolling
           column, so the turns scroll inside the view instead of the page
@@ -546,13 +515,7 @@ function QueueWalker() {
 
 /** What crowns a walk once the sitting has been answered for. */
 const AllTasksCompleteScreen = () => (
-  <VStack
-    height="100%"
-    width="full"
-    justify="center"
-    backgroundColor="bg.muted"
-    marginTop="-48px"
-  >
+  <VStack height="100%" width="full" justify="center" backgroundColor="bg.muted" marginTop="-48px">
     <TasksDone />
     <Text fontSize="xl" fontWeight="500">
       All tasks complete
@@ -619,8 +582,8 @@ const UnavailableTraceCard = ({
       This trace is no longer available
     </Text>
     <Text color="fg.muted" maxWidth="480px">
-      The trace behind this queue item cannot be found in this project, so there is
-      nothing here to review.
+      The trace behind this queue item cannot be found in this project, so there is nothing here to
+      review.
     </Text>
     <HStack gap={3}>
       {canRemove && (
@@ -671,9 +634,7 @@ const AnnotationQueuePicker = ({
   const { openDrawer } = useDrawer();
   const [isNavigating, setIsNavigating] = useState(false);
 
-  const currentQueueItemIndex = queueItems.findIndex(
-    (item) => item.id === currentQueueItem.id,
-  );
+  const currentQueueItemIndex = queueItems.findIndex((item) => item.id === currentQueueItem.id);
 
   // The navigating state is released a beat after the route resolves, so the
   // bar does not flicker back before the new item renders. The timer is held
@@ -779,7 +740,7 @@ const AnnotationQueuePicker = ({
             </Checkbox>
             {canEditTrace && (
               <Button variant="outline" disabled={isNavigating} onClick={editTrace}>
-                <LuPencil /> Edit trace
+                <Pencil /> Edit trace
               </Button>
             )}
             <Button
@@ -815,7 +776,6 @@ const AnnotationQueuePicker = ({
     </Box>
   );
 };
-
 
 /**
  * The walker, inside the trace host its conversation view asks for.

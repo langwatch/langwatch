@@ -15,25 +15,49 @@ const LEGACY_FIELD_NAMES: Record<string, string> = {
   thread_id: "threadId",
 };
 
-/** Resolves input mappings to the scalar values expected by agent adapters. */
+/**
+ * Resolves input mappings to the scalar values expected by agent adapters.
+ *
+ * Source resolution rules:
+ * - `sourceId: "scenario"`, `path: ["input"]` — last user message content
+ * - `sourceId: "scenario"`, `path: ["messages"]` — full messages array as JSON string
+ * - `sourceId: "scenario"`, `path: ["threadId"]` — thread ID, empty string if absent
+ * - `sourceId: "scenario"`, `path: ["session"]` — the session the agent last
+ *   returned for the thread: a string as it is, any other JSON value as JSON
+ *   text, empty string before the first answer
+ * - `type: "value"` — the literal value string
+ *
+ * @param fieldMappings - Map of input identifier → mapping definition
+ * @param agentInput - Runtime input provided by the scenario runner
+ * @param session - The session held for the thread, when the caller has one
+ * @returns Map of input identifier → resolved string value
+ */
 export function resolveFieldMappings({
   fieldMappings,
   agentInput,
+  session,
 }: {
   fieldMappings: Record<string, FieldMapping>;
   agentInput: ScenarioInput;
+  session?: unknown;
 }): Record<string, string> {
   const resolved: Record<string, string> = {};
 
   for (const [identifier, mapping] of Object.entries(fieldMappings)) {
-    resolved[identifier] = resolveMapping({ mapping, agentInput });
+    resolved[identifier] = resolveMapping({ mapping, agentInput, session });
   }
 
   return resolved;
 }
 
 /** Canonical scenario source fields a mapping can resolve to. */
-export type ScenarioSourceField = "input" | "messages" | "threadId";
+export type ScenarioSourceField = "input" | "messages" | "threadId" | "session";
+
+/** The session as template text: a string as it is, anything else as JSON. */
+export function sessionAsText(session: unknown): string {
+  if (session === undefined || session === null) return "";
+  return typeof session === "string" ? session : JSON.stringify(session);
+}
 
 /** Returns the supported scenario source behind a mapping, when it has one. */
 export function sourceFieldOf(mapping: FieldMapping): ScenarioSourceField | null {
@@ -42,15 +66,19 @@ export function sourceFieldOf(mapping: FieldMapping): ScenarioSourceField | null
   }
   const [rawField] = mapping.path;
   const field = LEGACY_FIELD_NAMES[rawField ?? ""] ?? rawField;
-  return field === "input" || field === "messages" || field === "threadId" ? field : null;
+  return field === "input" || field === "messages" || field === "threadId" || field === "session"
+    ? field
+    : null;
 }
 
 function resolveMapping({
   mapping,
   agentInput,
+  session,
 }: {
   mapping: FieldMapping;
   agentInput: ScenarioInput;
+  session: unknown;
 }): string {
   if (mapping.type === "value") {
     return mapping.value;
@@ -73,6 +101,10 @@ function resolveMapping({
 
   if (field === "threadId") {
     return agentInput.threadId ?? "";
+  }
+
+  if (field === "session") {
+    return sessionAsText(session);
   }
 
   return "";
@@ -124,15 +156,8 @@ const SCENARIO_FIELD_ALIASES: Record<string, string[]> = {
     "chat_history",
     "context",
   ],
-  threadId: [
-    "threadid",
-    "thread_id",
-    "thread",
-    "session_id",
-    "sessionid",
-    "session",
-    "conversation_id",
-  ],
+  threadId: ["threadid", "thread_id", "thread", "session_id", "sessionid", "conversation_id"],
+  session: ["session"],
 };
 
 /** Matches input identifiers to known scenario fields and aliases. */

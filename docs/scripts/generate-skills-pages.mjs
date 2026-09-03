@@ -31,6 +31,13 @@ const manifest = JSON.parse(
   fs.readFileSync(path.join(docsRoot, "skills", "skills-pages-manifest.json"), "utf8"),
 );
 
+// `--list-pages` prints the repo-relative pages this script writes. The
+// pre-commit hook stages them and CI checks them for staleness, so both read
+// the list from here instead of keeping their own copy that the manifest can
+// grow past. It returns instead of calling process.exit, which can truncate a
+// piped stdout before it drains.
+const listPages = process.argv.includes("--list-pages");
+
 // Escape text that lands in JSX text position so MDX cannot reinterpret it
 // as markup, expressions, or markdown emphasis.
 const escapeText = (s) =>
@@ -202,9 +209,20 @@ function renderAccordion(entry, open = false) {
   return lines.join("\n");
 }
 
+if (listPages) {
+  for (const pageFile of Object.keys(manifest)) console.log(`docs/${pageFile}`);
+}
+
 let failed = false;
-for (const [pageFile, sections] of Object.entries(manifest)) {
+for (const [pageFile, sections] of listPages ? [] : Object.entries(manifest)) {
   const pagePath = path.join(docsRoot, pageFile);
+  if (!fs.existsSync(pagePath)) {
+    // A manifest entry whose page is missing, which is what an uncommitted new
+    // page looks like to a fresh checkout. Name it rather than throwing ENOENT.
+    console.error(`ERROR: the manifest names docs/${pageFile}, which does not exist`);
+    failed = true;
+    continue;
+  }
   let content = fs.readFileSync(pagePath, "utf8");
   for (const [sectionId, entries] of Object.entries(sections)) {
     const start = `{/* lw-generated:${sectionId}:start */}`;

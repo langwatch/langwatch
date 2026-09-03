@@ -3,7 +3,7 @@ import type { TargetValue } from "./scenarios/target-selector";
 import { useOrganizationTeamProject } from "../../behavior/use-organization-team-project";
 
 interface PersistedTarget {
-  type: "prompt" | "http" | "code" | "workflow";
+  type: "prompt" | "http" | "code" | "workflow" | "connected";
   id: string;
   timestamp: number;
 }
@@ -36,9 +36,7 @@ export function readScenarioTarget({
   if (typeof window === "undefined") return null;
   if (!projectId || !scenarioId) return null;
   try {
-    const raw = localStorage.getItem(
-      scenarioTargetStorageKey({ projectId, scenarioId }),
-    );
+    const raw = localStorage.getItem(scenarioTargetStorageKey({ projectId, scenarioId }));
     if (!raw) return null;
     const parsed = JSON.parse(raw) as PersistedTarget | null;
     if (!parsed?.type || !parsed?.id) return null;
@@ -92,9 +90,7 @@ export function useScenarioTarget(scenarioId: string | undefined) {
   );
 
   const target: TargetValue =
-    persistedTarget && storageKey
-      ? { type: persistedTarget.type, id: persistedTarget.id }
-      : null;
+    persistedTarget && storageKey ? { type: persistedTarget.type, id: persistedTarget.id } : null;
 
   const setTarget = (newTarget: TargetValue) => {
     if (!storageKey) return;

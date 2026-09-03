@@ -1,5 +1,5 @@
 import type { SuiteRunParameters, SuiteRunResult, SuiteTarget } from "@langwatch/suite-contract";
-import type { ScenarioRunConfig } from "@langwatch/scenario-contract";
+import type { RunActor, ScenarioRunConfig } from "@langwatch/scenario-contract";
 import type { StartSuiteRunCommandData } from "@langwatch/suite-contract";
 
 export type QueueSimulationRunCommandData = {
@@ -11,7 +11,10 @@ export type QueueSimulationRunCommandData = {
   name?: string;
   metadata?: Record<string, unknown>;
   secretParameters?: Record<string, string>;
-  target?: { type: "prompt" | "http" | "code" | "workflow"; referenceId: string };
+  target?: {
+    type: "prompt" | "http" | "code" | "workflow" | "connected";
+    referenceId: string;
+  };
   occurredAt: number;
 };
 
@@ -35,6 +38,7 @@ export abstract class SuiteExecutionPort {
     batchRunId?: string;
     parameters?: SuiteRunParameters;
     note?: string;
+    actor?: RunActor;
   }): Promise<SuiteRunResult>;
 }
 

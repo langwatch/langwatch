@@ -16,9 +16,9 @@ import {
   GroupRow,
   RunHistoryFilters,
   type RunHistoryFilterValues,
+  computeGroupSummary,
 } from "@langwatch/suite-web";
 import type { RunGroup } from "@langwatch/suite-web";
-import { computeGroupSummary } from "@langwatch/suite-web";
 import { makeScenarioRunData } from "@langwatch/suite-web/testing";
 
 vi.mock("../use-prefetch-run-state", () => ({
@@ -128,9 +128,7 @@ describe("Group-by selector", () => {
       );
 
       // The scenario filter should still reflect "scen_1"
-      const scenarioSelect = screen.getByLabelText(
-        "Filter by scenario",
-      ) as HTMLSelectElement;
+      const scenarioSelect = screen.getByLabelText("Filter by scenario") as HTMLSelectElement;
       expect(scenarioSelect.value).toBe("scen_1");
 
       // Changing group-by should not trigger onFiltersChange

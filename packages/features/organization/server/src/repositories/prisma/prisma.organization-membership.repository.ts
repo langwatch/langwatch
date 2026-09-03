@@ -1,9 +1,6 @@
 import type { LedgerActor } from "@langwatch/actor";
 import { ledgerActorFor } from "@langwatch/actor";
-import type {
-  AuthzGrantsService,
-  AuthzLedgerBindingAttach,
-} from "@langwatch/authz-contract";
+import type { AuthzGrantsService, AuthzLedgerBindingAttach } from "@langwatch/authz-contract";
 import { NotFoundError, ValidationError } from "@langwatch/handled-error";
 import { generate } from "@langwatch/ksuid";
 import {
@@ -15,10 +12,8 @@ import {
 } from "@langwatch/organization-contract";
 import type { User } from "@langwatch/prisma-client/generated";
 import {
-  type Currency,
   type OrganizationIntent,
   OrganizationUserRole,
-  PricingModel,
   Prisma,
   type PrismaClient,
   RoleBindingScopeType,
@@ -354,21 +349,13 @@ export class PrismaOrganizationMembershipRepository implements OrganizationRepos
     return orgUser?.role ?? null;
   }
 
-
-
-
-
-
-  async tryFindPrimaryIntentById(
-    organizationId: string,
-  ): Promise<OrganizationIntent | null> {
+  async tryFindPrimaryIntentById(organizationId: string): Promise<OrganizationIntent | null> {
     const org = await this.prisma.organization.findUnique({
       where: { id: organizationId },
       select: { primaryIntent: true },
     });
     return org?.primaryIntent ?? null;
   }
-
 
   async createAndAssign(input: CreateAndAssignInput): Promise<CreateAndAssignResult> {
     const created = await this.prisma.$transaction(async (tx) => {
@@ -440,9 +427,7 @@ export class PrismaOrganizationMembershipRepository implements OrganizationRepos
     return created;
   }
 
-  async createForProvisioning(
-    input: CreateForProvisioningInput,
-  ): Promise<CreateAndAssignResult> {
+  async createForProvisioning(input: CreateForProvisioningInput): Promise<CreateAndAssignResult> {
     return await this.prisma.$transaction(async (tx) => {
       // Deterministic answer for the common case; the catch inside
       // `createProvisionedOrganization` still covers the race where two
@@ -618,11 +603,7 @@ export class PrismaOrganizationMembershipRepository implements OrganizationRepos
       include: {
         members: {
           ...(!includeDeactivated ? { where: { user: { deactivatedAt: null } } } : {}),
-          orderBy: [
-            { user: { name: "asc" } },
-            { user: { email: "asc" } },
-            { userId: "asc" },
-          ],
+          orderBy: [{ user: { name: "asc" } }, { user: { email: "asc" } }, { userId: "asc" }],
           include: {
             user: {
               include: {
@@ -738,11 +719,7 @@ export class PrismaOrganizationMembershipRepository implements OrganizationRepos
           updatedAt: true,
           user: { select: { id: true, name: true, email: true } },
         },
-        orderBy: [
-          { user: { name: "asc" } },
-          { user: { email: "asc" } },
-          { userId: "asc" },
-        ],
+        orderBy: [{ user: { name: "asc" } }, { user: { email: "asc" } }, { userId: "asc" }],
         skip: offset,
         take: limit,
       }),
@@ -955,10 +932,7 @@ export class PrismaOrganizationMembershipRepository implements OrganizationRepos
       throw new MemberNotFoundError(userId);
     }
 
-    if (
-      stillAMember.role === OrganizationUserRole.ADMIN &&
-      stillAMember.disabledAt === null
-    ) {
+    if (stillAMember.role === OrganizationUserRole.ADMIN && stillAMember.disabledAt === null) {
       const activeAdmins = await lockActiveAdmins({ tx, organizationId });
 
       if (activeAdmins.length <= 1) {
@@ -1165,13 +1139,9 @@ export class PrismaOrganizationMembershipRepository implements OrganizationRepos
           customRoleId: true,
         },
       });
-      const currentMembershipByTeamId = new Map(
-        currentMemberships.map((m) => [m.scopeId, m]),
-      );
+      const currentMembershipByTeamId = new Map(currentMemberships.map((m) => [m.scopeId, m]));
 
-      const dedupedTeamRoleUpdates = new Map(
-        effectiveTeamRoleUpdates.map((u) => [u.teamId, u]),
-      );
+      const dedupedTeamRoleUpdates = new Map(effectiveTeamRoleUpdates.map((u) => [u.teamId, u]));
 
       for (const [teamId, teamRoleUpdate] of dedupedTeamRoleUpdates.entries()) {
         const currentMembership = currentMembershipByTeamId.get(teamId);
@@ -1190,17 +1160,14 @@ export class PrismaOrganizationMembershipRepository implements OrganizationRepos
 
         const updateIsCustomRole = isCustomRole(teamRoleUpdate.role);
         if (updateIsCustomRole && !teamRoleUpdate.customRoleId) {
-          throw new ValidationError(
-            "Custom role ID is required for custom role updates",
-            {
-              meta: {
-                fieldErrors: {
-                  customRoleId: ["Pick which custom role to use."],
-                },
-                formErrors: ["Pick which custom role to use."],
+          throw new ValidationError("Custom role ID is required for custom role updates", {
+            meta: {
+              fieldErrors: {
+                customRoleId: ["Pick which custom role to use."],
               },
+              formErrors: ["Pick which custom role to use."],
             },
-          );
+          });
         }
 
         if (updateIsCustomRole && teamRoleUpdate.customRoleId) {
@@ -1208,10 +1175,7 @@ export class PrismaOrganizationMembershipRepository implements OrganizationRepos
             where: { id: teamRoleUpdate.customRoleId },
             select: { organizationId: true, kind: true },
           });
-          if (
-            customRole?.kind !== "custom" ||
-            customRole.organizationId !== organizationId
-          ) {
+          if (customRole?.kind !== "custom" || customRole.organizationId !== organizationId) {
             throw new NotFoundError(
               "custom_role_not_found",
               "CustomRole",
@@ -1225,8 +1189,7 @@ export class PrismaOrganizationMembershipRepository implements OrganizationRepos
           : (teamRoleUpdate.role as TeamUserRole);
         const shouldClearCustomRole = !updateIsCustomRole;
         const wouldDemoteAdmin =
-          currentMembership.role === TeamUserRole.ADMIN &&
-          nextRole !== TeamUserRole.ADMIN;
+          currentMembership.role === TeamUserRole.ADMIN && nextRole !== TeamUserRole.ADMIN;
 
         if (wouldDemoteAdmin) {
           const adminsAfter = await projectAdminUserIdsWithoutDirectRole({
@@ -1267,9 +1230,7 @@ export class PrismaOrganizationMembershipRepository implements OrganizationRepos
             scopeType: RoleBindingScopeType.TEAM,
             scopeId: teamId,
             role: nextRole,
-            customRoleId: shouldClearCustomRole
-              ? null
-              : (teamRoleUpdate.customRoleId ?? null),
+            customRoleId: shouldClearCustomRole ? null : (teamRoleUpdate.customRoleId ?? null),
           }),
         );
       }
@@ -1380,10 +1341,7 @@ export class PrismaOrganizationMembershipRepository implements OrganizationRepos
           where: { id: storedCustomRoleId },
           select: { organizationId: true, permissions: true, kind: true },
         });
-        if (
-          customRole?.kind !== "custom" ||
-          customRole.organizationId !== team.organizationId
-        ) {
+        if (customRole?.kind !== "custom" || customRole.organizationId !== team.organizationId) {
           throw new CustomRoleNotAssignableError(storedCustomRoleId);
         }
 
@@ -1546,16 +1504,8 @@ export class PrismaOrganizationMembershipRepository implements OrganizationRepos
   async getAuditLogs(
     filters: AuditLogFilters,
   ): Promise<{ auditLogs: EnrichedAuditLog[]; totalCount: number }> {
-    const {
-      organizationId,
-      projectId,
-      userId,
-      pageOffset,
-      pageSize,
-      action,
-      startDate,
-      endDate,
-    } = filters;
+    const { organizationId, projectId, userId, pageOffset, pageSize, action, startDate, endDate } =
+      filters;
 
     const orgUserIds = await this.prisma.organizationUser.findMany({
       where: { organizationId },
@@ -1637,9 +1587,7 @@ export class PrismaOrganizationMembershipRepository implements OrganizationRepos
     // userId is nullable post-consolidation (system-actor writes) — filter
     // null out before passing to the Prisma `IN` predicate, which rejects
     // null array members at runtime.
-    const userIds = [
-      ...new Set(rows.map((r) => r.userId).filter((id): id is string => !!id)),
-    ];
+    const userIds = [...new Set(rows.map((r) => r.userId).filter((id): id is string => !!id))];
     const projectIds = [
       ...new Set(rows.map((r) => r.projectId).filter((id): id is string => !!id)),
     ];

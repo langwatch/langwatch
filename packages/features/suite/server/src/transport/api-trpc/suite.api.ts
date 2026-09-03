@@ -1,12 +1,12 @@
 /**
  * Simulation suite configurations over the process's tRPC transport.
  *
- * CRUD, duplicate, archive and run, plus the folder sub-surface mounted at
- * `suites.folders.*`.
+ * CRUD, duplicate, archive and run, plus the test suite sub-surface mounted at
+ * `suites.testSuites.*`.
  *
  * Transport only: gates, input parsing and delegation to `SuiteApp`. The
- * decisions a suite id makes — try the run plan, fall back to the folder;
- * refuse a scope or a member list on a folder; resolve the project's
+ * decisions a suite id makes — try the run plan, fall back to the test suite;
+ * refuse a scope or a member list on a test suite; resolve the project's
  * organization — are the application's, and the REST family reaches the same
  * ones.
  */
@@ -18,7 +18,7 @@ import {
 import { SUITE_KINDS, tryExtractSuiteId } from "@langwatch/suite-contract";
 import type { AnyTRPCRootTypes, TRPCRootObject, TRPCRuntimeConfigOptions } from "@trpc/server";
 import { z } from "zod";
-import { createSuiteFolderRouter } from "./suite-folder.api";
+import { createTestSuiteRouter } from "./test-suite.api";
 import {
   createSuiteSchema,
   projectSchema,
@@ -42,7 +42,7 @@ export class SuiteTrpcApi {
     const { protected: procedure, policy } = procedures;
 
     return trpc.router({
-      folders: createSuiteFolderRouter(trpc, procedures),
+      testSuites: createTestSuiteRouter(trpc, procedures),
 
       create: policy("scenarios:manage")(procedure.input(createSuiteSchema)).mutation(
         async ({ ctx, input }) => {
@@ -51,7 +51,7 @@ export class SuiteTrpcApi {
       ),
 
       // The kinds default is "custom" inside the service: v1 callers name no
-      // kind and must never receive folder rows. v2 callers name what they want.
+      // kind and must never receive test suite rows. v2 callers name what they want.
       getAll: policy("scenarios:view")(
         procedure.input(
           projectSchema.extend({
@@ -59,17 +59,17 @@ export class SuiteTrpcApi {
           }),
         ),
       ).query(async ({ ctx, input }) => {
-        const kinds = input.kinds ?? ["custom"];
-        const [suites, folders] = await Promise.all([
-          kinds.includes("custom")
+        const kinds = input.kinds ?? ["run_plan"];
+        const [suites, testSuites] = await Promise.all([
+          kinds.includes("run_plan")
             ? ctx.app.suites.list({ projectId: input.projectId })
             : Promise.resolve([]),
-          kinds.includes("folder")
-            ? ctx.app.suites.listFolders({ projectId: input.projectId })
+          kinds.includes("test_suite")
+            ? ctx.app.suites.listTestSuites({ projectId: input.projectId })
             : Promise.resolve([]),
         ]);
 
-        return [...suites, ...folders].sort(
+        return [...suites, ...testSuites].sort(
           (left, right) => right.updatedAt.getTime() - left.updatedAt.getTime(),
         );
       }),
@@ -77,14 +77,14 @@ export class SuiteTrpcApi {
       getById: policy("scenarios:view")(
         procedure.input(projectSchema.extend({ id: z.string() })),
       ).query(async ({ ctx, input }) => {
-        const found = await ctx.app.suites.getByIdOrFolder(input);
-        return found.kind === "suite" ? found.suite : found.folder;
+        const found = await ctx.app.suites.getByIdOrTestSuite(input);
+        return found.kind === "suite" ? found.suite : found.testSuite;
       }),
 
       update: policy("scenarios:manage")(procedure.input(updateSuiteSchema)).mutation(
         async ({ ctx, input }) => {
           const updated = await ctx.app.suites.update(input);
-          return updated.kind === "suite" ? updated.suite : updated.folder;
+          return updated.kind === "suite" ? updated.suite : updated.testSuite;
         },
       ),
 
@@ -144,6 +144,9 @@ export class SuiteTrpcApi {
           batchRunId: input.batchRunId,
           parameters: input.parameters,
           note: input.note,
+          // A run started here was started by the signed-in person in front of
+          // the app, so the surface it records is "user".
+          actor: { id: ctx.actor().id, label: "user" },
         });
 
         return {
@@ -176,6 +179,7 @@ export class SuiteTrpcApi {
           targets: input.targets,
           parameters: input.parameters,
           note: input.note,
+          actor: { id: ctx.actor().id, label: "user" },
         });
         return {
           scheduled: true,

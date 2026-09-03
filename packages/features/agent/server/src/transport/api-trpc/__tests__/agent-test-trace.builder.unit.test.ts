@@ -113,7 +113,7 @@ describe("buildAgentTestTrace()", () => {
           type: "json",
           value: { error: "connect ECONNREFUSED 127.0.0.1:9" },
         });
-        expect(trace.span.output.value).not.toHaveProperty("status");
+        expect(trace.span.output?.value).not.toHaveProperty("status");
       });
 
       /** @scenario "Unreachable endpoint creates a trace" */

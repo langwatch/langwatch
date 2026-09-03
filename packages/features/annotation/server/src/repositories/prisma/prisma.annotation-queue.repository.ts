@@ -227,9 +227,31 @@ export function createPrismaAnnotationQueueStore(prisma: AnnotationQueueDatabase
       });
     },
 
-    listQueues({ projectId }: { projectId: string }) {
+    listQueues({
+      projectId,
+      reachableOnly,
+      userId,
+    }: {
+      projectId: string;
+      reachableOnly?: boolean;
+      userId?: string;
+    }) {
       return prisma.annotationQueue.findMany({
-        where: { projectId },
+        where: {
+          projectId,
+          // The same reach the queue-item read applies: the queues this caller
+          // belongs to, plus any holding an item assigned to them. Offering a
+          // queue the read narrows straight back out empties the list and
+          // reads as broken.
+          ...(reachableOnly === true && userId !== void 0
+            ? {
+                OR: [
+                  { members: { some: { userId } } },
+                  { AnnotationQueueItems: { some: { userId } } },
+                ],
+              }
+            : {}),
+        },
         select: {
           id: true,
           name: true,
@@ -399,6 +421,7 @@ export function createPrismaAnnotationQueueStore(prisma: AnnotationQueueDatabase
       userId,
       status,
       queueId,
+      pickedQueueIds,
       includeMemberQueues,
       startDate,
       endDate,
@@ -411,6 +434,7 @@ export function createPrismaAnnotationQueueStore(prisma: AnnotationQueueDatabase
       userId: string;
       status: "pending" | "completed" | "all";
       queueId?: string;
+      pickedQueueIds?: readonly string[];
       includeMemberQueues: boolean;
       startDate?: Date;
       endDate?: Date;
@@ -450,6 +474,12 @@ export function createPrismaAnnotationQueueStore(prisma: AnnotationQueueDatabase
         doneAt: status === "pending" ? null : status === "completed" ? { not: null } : void 0,
         ...queuedAtRangeFilter({ startDate, endDate }),
         ...scope,
+        // The reviewer's own pick, stacked onto the reach above rather than
+        // replacing it: a queue id from anywhere else can subtract rows but
+        // never add one.
+        ...(pickedQueueIds && pickedQueueIds.length > 0
+          ? { AND: [...scope.AND, { annotationQueueId: { in: [...pickedQueueIds] } }] }
+          : {}),
       };
 
       const totalCount = await prisma.annotationQueueItem.count({

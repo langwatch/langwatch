@@ -3,7 +3,7 @@
  *
  * The address holds everything a person can link to (tab, suite, plan, run,
  * period). This store holds what only this browser cares about: how the
- * results are drawn, whether the rail is folded, which folders are open, and
+ * results are drawn, whether the rail is folded, which test suites are open, and
  * the run that was just started but has no rows yet.
  *
  * The view mode is the exception: it is written to the address as `?view=` so
@@ -15,18 +15,14 @@
 import { create } from "zustand";
 import type { TargetValue } from "../scenarios/target-selector";
 
-export const AGENT_TESTING_RAIL_COLLAPSED_KEY =
-  "agent-testing-rail-collapsed" as const;
+export const AGENT_TESTING_RAIL_COLLAPSED_KEY = "agent-testing-rail-collapsed" as const;
 
 export type AgentTestingViewMode = "table" | "grid";
 
 const VIEW_MODES: readonly AgentTestingViewMode[] = ["table", "grid"];
 
 function isViewMode(value: unknown): value is AgentTestingViewMode {
-  return (
-    typeof value === "string" &&
-    (VIEW_MODES as readonly string[]).includes(value)
-  );
+  return typeof value === "string" && (VIEW_MODES as readonly string[]).includes(value);
 }
 
 /** Minimal router shape for address sync, so the store stays router agnostic. */
@@ -40,17 +36,6 @@ interface RouterLike {
 }
 
 type QueryLike = Record<string, string | string[] | undefined>;
-
-/** The case the editor dialog is open on, if any. */
-export type CaseEditorTarget = {
-  open: boolean;
-  /** The case being edited, or nothing for a new one. */
-  scenarioId: string | null;
-  /** The suite a new case starts in. */
-  folderId: string | null;
-  /** True when the case was opened to read its versions. */
-  showHistory: boolean;
-};
 
 /**
  * A run that was just started and has no rows yet. The set it belongs to
@@ -72,37 +57,27 @@ export type OpenPlanTitle = {
   note: string;
 };
 
-const CLOSED_CASE_EDITOR: CaseEditorTarget = {
-  open: false,
-  scenarioId: null,
-  folderId: null,
-  showHistory: false,
-};
-
 export interface AgentTestingState {
   viewMode: AgentTestingViewMode;
   railCollapsed: boolean;
-  expandedFolderIds: Set<string>;
+  expandedTestSuiteIds: Set<string>;
   /** The target the last run used, so the run dialog opens on it again. */
   lastRunTarget: TargetValue;
   pendingRun: PendingRun | null;
   /** The run whose cancel is in flight, so its button can say so. */
   cancellingJobId: string | null;
-  caseEditor: CaseEditorTarget;
   /** The run plan the page is open on, or nothing on the list itself. */
   openPlanTitle: OpenPlanTitle | null;
 
   setViewMode: (value: AgentTestingViewMode) => void;
   setRailCollapsed: (isCollapsed: boolean) => void;
   toggleRailCollapsed: () => void;
-  setFolderExpanded: (folderId: string, expanded: boolean) => void;
-  toggleFolder: (folderId: string) => void;
+  setTestSuiteExpanded: (testSuiteId: string, expanded: boolean) => void;
+  toggleTestSuite: (testSuiteId: string) => void;
   setLastRunTarget: (target: TargetValue) => void;
   setPendingRun: (run: PendingRun | null) => void;
   setCancellingJobId: (jobId: string | null) => void;
   setOpenPlanTitle: (title: OpenPlanTitle | null) => void;
-  openCaseEditor: (target: Partial<Omit<CaseEditorTarget, "open">>) => void;
-  closeCaseEditor: () => void;
 
   syncToUrl: (router: RouterLike) => void;
   hydrateFromUrl: (query: QueryLike) => void;
@@ -154,11 +129,10 @@ export function createAgentTestingStore() {
   return create<AgentTestingState>((set, get) => ({
     viewMode: "table",
     railCollapsed: readStoredRailCollapsed(),
-    expandedFolderIds: new Set<string>(),
+    expandedTestSuiteIds: new Set<string>(),
     lastRunTarget: null,
     pendingRun: null,
     cancellingJobId: null,
-    caseEditor: CLOSED_CASE_EDITOR,
     openPlanTitle: null,
 
     setViewMode: (value) => set({ viewMode: value }),
@@ -174,21 +148,21 @@ export function createAgentTestingStore() {
       set({ railCollapsed: next });
     },
 
-    setFolderExpanded: (folderId, expanded) => {
+    setTestSuiteExpanded: (testSuiteId, expanded) => {
       set((state) => {
-        const next = new Set(state.expandedFolderIds);
-        if (expanded) next.add(folderId);
-        else next.delete(folderId);
-        return { expandedFolderIds: next };
+        const next = new Set(state.expandedTestSuiteIds);
+        if (expanded) next.add(testSuiteId);
+        else next.delete(testSuiteId);
+        return { expandedTestSuiteIds: next };
       });
     },
 
-    toggleFolder: (folderId) => {
+    toggleTestSuite: (testSuiteId) => {
       set((state) => {
-        const next = new Set(state.expandedFolderIds);
-        if (next.has(folderId)) next.delete(folderId);
-        else next.add(folderId);
-        return { expandedFolderIds: next };
+        const next = new Set(state.expandedTestSuiteIds);
+        if (next.has(testSuiteId)) next.delete(testSuiteId);
+        else next.add(testSuiteId);
+        return { expandedTestSuiteIds: next };
       });
     },
 
@@ -199,15 +173,6 @@ export function createAgentTestingStore() {
     setCancellingJobId: (jobId) => set({ cancellingJobId: jobId }),
 
     setOpenPlanTitle: (title) => set({ openPlanTitle: title }),
-
-    openCaseEditor: ({
-      scenarioId = null,
-      folderId = null,
-      showHistory = false,
-    }) =>
-      set({ caseEditor: { open: true, scenarioId, folderId, showHistory } }),
-
-    closeCaseEditor: () => set({ caseEditor: CLOSED_CASE_EDITOR }),
 
     syncToUrl: (router) => {
       const { viewMode } = get();

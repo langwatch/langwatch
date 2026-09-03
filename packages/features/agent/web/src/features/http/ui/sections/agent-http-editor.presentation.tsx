@@ -21,6 +21,13 @@ export abstract class AgentHttpEditorPresentationPort {
 
   abstract renderVariables(input: RenderAgentVariablesInput): ReactNode;
 
+  /**
+   * The test panel shown below the form for a saved agent: send one turn and
+   * read the reply. The host renders it, because the panel runs against the
+   * host's scenario execution transport, which this package does not hold.
+   */
+  abstract renderTestPanel(input: { agentId: string; projectId: string }): ReactNode;
+
   abstract explainTestError(input: { errorCode?: string; error?: string }): {
     title: string;
     description?: string;

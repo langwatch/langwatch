@@ -9,6 +9,7 @@ import { SIMULATION_PROJECTION_VERSIONS } from "@langwatch/scenario-contract";
 import { simulationMessageSchema } from "@langwatch/scenario-contract";
 import type {
   SimulationMessageSnapshotEvent,
+  SimulationRunAgentInstanceRecordedEvent,
   SimulationRunCancelRequestedEvent,
   SimulationRunDeletedEvent,
   SimulationRunFinishedEvent,
@@ -20,6 +21,7 @@ import type {
 } from "@langwatch/scenario-contract";
 import {
   SimulationMessageSnapshotEventSchema,
+  SimulationRunAgentInstanceRecordedEventSchema,
   SimulationRunCancelRequestedEventSchema,
   SimulationRunDeletedEventSchema,
   SimulationRunFinishedEventSchema,
@@ -62,6 +64,51 @@ function storedMetadata(metadata: Record<string, unknown> | undefined): string |
   if (!metadata) return null;
   const { secretParameters: _secretParameters, ...rest } = metadata;
   return JSON.stringify(rest);
+}
+
+/**
+ * The stored metadata with the served instance written into its reserved
+ * `langwatch` namespace.
+ *
+ * The column holds the metadata as one JSON string, so the instance is
+ * merged into the object and written back. Metadata that does not parse as
+ * an object is replaced by one that holds the instance alone: the run's
+ * other metadata was already unreadable, and the instance is what this
+ * event records.
+ */
+export function withAgentInstance({
+  metadata,
+  agentInstance,
+}: {
+  metadata: string | null;
+  agentInstance: { hostname: string; label: string | null };
+}): string {
+  const current = parseMetadataObject(metadata);
+  const langwatch =
+    typeof current.langwatch === "object" &&
+    current.langwatch !== null &&
+    !Array.isArray(current.langwatch)
+      ? (current.langwatch as Record<string, unknown>)
+      : {};
+  return JSON.stringify({
+    ...current,
+    langwatch: { ...langwatch, agentInstance },
+  });
+}
+
+/** A parsed JSON value that is a plain object, not an array or a scalar. */
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return typeof value === "object" && value !== null && !Array.isArray(value);
+}
+
+function parseMetadataObject(metadata: string | null): Record<string, unknown> {
+  if (!metadata) return {};
+  try {
+    const parsed: unknown = JSON.parse(metadata);
+    return isRecord(parsed) ? parsed : {};
+  } catch {
+    return {};
+  }
 }
 
 /**
@@ -245,6 +292,7 @@ const simulationRunEvents = [
   SimulationRunFinishedEventSchema,
   SimulationRunMetricsComputedEventSchema,
   SimulationRunCancelRequestedEventSchema,
+  SimulationRunAgentInstanceRecordedEventSchema,
   SimulationRunDeletedEventSchema,
 ] as const;
 
@@ -637,6 +685,20 @@ export class SimulationRunStateFoldProjection
     return {
       ...state,
       CancellationRequestedAt: _event.occurredAt,
+    };
+  }
+
+  handleSimulationRunAgentInstanceRecorded(
+    event: SimulationRunAgentInstanceRecordedEvent,
+    state: SimulationRunStateData,
+  ): SimulationRunStateData {
+    return {
+      ...state,
+      ScenarioRunId: state.ScenarioRunId || event.data.scenarioRunId,
+      Metadata: withAgentInstance({
+        metadata: state.Metadata,
+        agentInstance: event.data.agentInstance,
+      }),
     };
   }
 

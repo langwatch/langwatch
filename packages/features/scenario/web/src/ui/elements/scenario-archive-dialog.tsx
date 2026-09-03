@@ -22,11 +22,7 @@ export function ScenarioArchiveDialog({
 
   return (
     <Dialog.Root open={open} onOpenChange={onClose} placement="center">
-      <Dialog.Content
-        bg="bg"
-        maxWidth="500px"
-        onClick={(event) => event.stopPropagation()}
-      >
+      <Dialog.Content bg="bg" maxWidth="500px" onClick={(event) => event.stopPropagation()}>
         <Dialog.CloseTrigger />
         <Dialog.Header>
           <Dialog.Title fontSize="md" fontWeight="500">
@@ -60,9 +56,8 @@ export function ScenarioArchiveDialog({
         <Dialog.Footer>
           <Button
             variant="outline"
-            mr={3}
-            onClick={(event) => {
-              event.stopPropagation();
+            onClick={(e) => {
+              e.stopPropagation();
               onClose();
             }}
             disabled={isLoading}

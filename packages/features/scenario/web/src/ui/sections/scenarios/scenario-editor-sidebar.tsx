@@ -5,7 +5,7 @@ import { ScenarioAIGeneration } from "./scenario-ai-generation";
 
 type ScenarioEditorSidebarProps = {
   form?: ScenarioFormController | null;
-  /** Agent Testing calls the thing being written a test case, not a scenario. */
+  /** Agent Testing writes the same guidance in its own, shorter register. */
   variant?: "agent-testing";
 };
 
@@ -22,7 +22,7 @@ export function ScenarioEditorSidebar({ form, variant }: ScenarioEditorSidebarPr
         <Card.Body>
           <VStack align="stretch" gap={3}>
             <Text fontWeight="semibold" fontSize="sm">
-              {isAgentTesting ? "Writing great test cases" : "Writing Great Scenarios"}
+              {isAgentTesting ? "Writing great scenarios" : "Writing Great Scenarios"}
             </Text>
 
             <VStack align="stretch" gap={3}>
@@ -100,7 +100,7 @@ export function ScenarioEditorSidebar({ form, variant }: ScenarioEditorSidebarPr
                   <Check size={14} />
                 </List.Indicator>
                 {isAgentTesting
-                  ? "Start with small test cases to validate quickly"
+                  ? "Start with small scenarios to validate quickly"
                   : "Start with small simulations to validate quickly"}
               </List.Item>
               <List.Item fontSize="xs" color="fg.muted">

@@ -18,6 +18,8 @@ import {
   COMPARISON_EVALUATOR_TYPE,
   comparisonDependencies,
   type ComparisonEvaluatorConfig,
+  CONNECTED_OUTPUT_FIELD,
+  connectedParameterDefinitions,
   disambiguateNames,
   type ESBatchEvaluationTarget,
   type EvaluationsV3State,
@@ -47,14 +49,14 @@ import {
   type StudioWorkflow,
   type WorkflowService,
 } from "@langwatch/workflow-contract";
-import type { Agent as TypedAgent } from "@langwatch/agent-contract";
+import type { Agent as TypedAgent, ConnectedAgentConfig } from "@langwatch/agent-contract";
 import {
   AVAILABLE_EVALUATORS,
   type EvaluatorTypes,
   type SingleEvaluationResult,
 } from "@langwatch/evaluator-contract";
 import type { VersionedPrompt } from "@langwatch/prompt-contract";
-import { generateOtelTraceId } from "@langwatch/trace-contract";
+import { generateOtelSpanId, generateOtelTraceId } from "@langwatch/trace-contract";
 import { EvaluatorNoInputsResolvedError } from "../experiment-execution.errors";
 import type { ExperimentEvaluationReportingPort } from "../ports/experiment-evaluation-reporting.port";
 import type { ExperimentModelCostPort } from "../ports/experiment-model-cost.port";
@@ -62,7 +64,31 @@ import type { ExperimentRunAbortPort } from "../ports/experiment-run-abort.port"
 import type { ExperimentSandboxCredentialPort } from "../ports/experiment-sandbox-credential.port";
 import type { ExperimentStudioDispatchPort } from "../ports/experiment-studio-dispatch.port";
 import { buildStripScoreEvaluatorIds } from "../processes/experiment-evaluator-score-filter.process";
-import { buildCellWorkflow, buildEvaluatorCellWorkflow } from "../processes/experiment-cell-workflow.process";
+import {
+  buildCellWorkflow,
+  buildEvaluatorCellWorkflow,
+} from "../processes/experiment-cell-workflow.process";
+import {
+  BUSY_RETRY_AFTER_MS,
+  DEFAULT_CALL_TIMEOUT_MS,
+  MAX_CALL_TIMEOUT_MS,
+} from "@langwatch/agent-contract";
+// The connected-agent relay of ADR-128. Its dispatcher, runtime and
+// refusal live in the Agent and Suite feature packages; a build without
+// them cannot run a connected column and says so here rather than
+// silently falling through to a Studio node.
+import type { CallOutcome, DispatchAgent, DispatchCall } from "@langwatch/agent-contract";
+import { AgentBusyError } from "@langwatch/agent-contract";
+import { getConnectedAgentRuntime } from "@langwatch/agent-server";
+import type { RunActor } from "@langwatch/scenario-contract";
+import { assertConnectedAgentsRunnable } from "@langwatch/suite-server";
+import {
+  buildConnectedCall,
+  CONNECTED_BUSY_RETRY_BUDGET_MS,
+  CONNECTED_REQUEST_SLACK_MS,
+  connectedCallFailure,
+  connectedOutputText,
+} from "../processes/experiment-connected-target.process";
 import {
   extractTargetOutput,
   mapNlpEvent,
@@ -144,15 +170,21 @@ export type OrchestratorInput = {
    * pairwise reads from these when the user re-runs only the pairwise
    * column on top of variants that already produced output in a prior run.
    */
-  seedTargetOutputs?: Record<
-    string,
-    { output: unknown; cost?: number; duration?: number }
-  >;
+  seedTargetOutputs?: Record<string, { output: unknown; cost?: number; duration?: number }>;
   /**
    * Board cells the run carries rather than produces, so the run holds the
    * whole board and not only the column that was clicked.
    */
   carriedOverCells?: CarriedOverCell[];
+  /**
+   * Who started the run, when a person did.
+   *
+   * Read for one decision: a personal development agent belongs to the person
+   * whose key registered it, and only that person may send a turn to the
+   * process on their machine. A run that names no person is refused by the
+   * same rule, exactly as a simulation is.
+   */
+  actor?: RunActor;
 };
 
 /**
@@ -177,8 +209,7 @@ export const resolveScopedRowIndices = ({
   const inRange = (i: number) => i >= 0 && i < rowCount;
   // A row named twice is still one row. Kept as-sent otherwise, so the run
   // covers the rows in the order the caller asked for.
-  const picked = (indices: number[]) =>
-    Array.from(new Set(indices.filter(inRange)));
+  const picked = (indices: number[]) => Array.from(new Set(indices.filter(inRange)));
 
   switch (scope.type) {
     case "full":
@@ -221,17 +252,11 @@ const resolveMappingDatasetId = (
  * Generates all cells to execute based on the scope.
  */
 export const generateCells = (
-  state: Pick<
-    EvaluationsV3State,
-    "datasets" | "activeDatasetId" | "targets" | "evaluators"
-  >,
+  state: Pick<EvaluationsV3State, "datasets" | "activeDatasetId" | "targets" | "evaluators">,
   datasetRows: Array<Record<string, unknown>>,
   scope: ExecutionScope,
   options: {
-    seedTargetOutputs?: Record<
-      string,
-      { output: unknown; cost?: number; duration?: number }
-    >;
+    seedTargetOutputs?: Record<string, { output: unknown; cost?: number; duration?: number }>;
   } = {},
 ): ExecutionCell[] => {
   const cells: ExecutionCell[] = [];
@@ -246,12 +271,9 @@ export const generateCells = (
     // — the same reason Phase 1 skips it (see the comparison-skip comment
     // below). Attaching it to a single-target cell here would silently
     // produce an empty input object rather than a real comparison run.
-    if (!targetConfig || !evaluatorConfig || isComparisonEvaluator(evaluatorConfig))
-      return cells;
+    if (!targetConfig || !evaluatorConfig || isComparisonEvaluator(evaluatorConfig)) return cells;
 
-    for (const [rowIndexStr, targetOutput] of Object.entries(
-      scope.precomputedTargetOutputs,
-    )) {
+    for (const [rowIndexStr, targetOutput] of Object.entries(scope.precomputedTargetOutputs)) {
       const rowIndex = Number(rowIndexStr);
       const datasetEntry = datasetRows[rowIndex];
       if (!datasetEntry) continue;
@@ -433,23 +455,12 @@ export const countScopedCells = ({
   scope,
   seedTargetOutputs,
 }: {
-  state: Pick<
-    EvaluationsV3State,
-    "datasets" | "activeDatasetId" | "targets" | "evaluators"
-  >;
+  state: Pick<EvaluationsV3State, "datasets" | "activeDatasetId" | "targets" | "evaluators">;
   datasetRows: Array<Record<string, unknown>>;
   scope: ExecutionScope;
-  seedTargetOutputs?: Record<
-    string,
-    { output: unknown; cost?: number; duration?: number }
-  >;
+  seedTargetOutputs?: Record<string, { output: unknown; cost?: number; duration?: number }>;
 }): number =>
-  generateCells(
-    state,
-    datasetRows,
-    scope,
-    seedTargetOutputs ? { seedTargetOutputs } : {},
-  ).length;
+  generateCells(state, datasetRows, scope, seedTargetOutputs ? { seedTargetOutputs } : {}).length;
 
 /**
  * Phase 2 cell generator for comparison evaluators — the one column-vs-column
@@ -577,15 +588,9 @@ export const generateComparisonCells = ({
   loadedEvaluators,
   scopedRowIndices,
 }: {
-  state: Pick<
-    EvaluationsV3State,
-    "datasets" | "activeDatasetId" | "targets" | "evaluators"
-  >;
+  state: Pick<EvaluationsV3State, "datasets" | "activeDatasetId" | "targets" | "evaluators">;
   datasetRows: Array<Record<string, unknown>>;
-  completedTargetOutputs: Map<
-    string,
-    { output: unknown; cost?: number; duration?: number }
-  >;
+  completedTargetOutputs: Map<string, { output: unknown; cost?: number; duration?: number }>;
   completedTargetEvaluatorScores?: Map<
     string,
     Array<{ name: string; score?: number; label?: string; passed?: boolean }>
@@ -824,9 +829,7 @@ export const generateComparisonCells = ({
    * comparison has no cell in the grid to report into and the log line above
    * is all there is.
    */
-  const anchorVariantId = (
-    cfg: ComparisonEvaluatorConfig,
-  ): string | undefined =>
+  const anchorVariantId = (cfg: ComparisonEvaluatorConfig): string | undefined =>
     (cfg.variants ?? []).find((id) => state.targets.some((t) => t.id === id));
 
   /** One error row per scoped row for a comparison that cannot be built. */
@@ -905,9 +908,7 @@ export const generateComparisonCells = ({
       }
     | { candidates?: never; missing: string[]; empty?: never }
     | { candidates?: never; missing?: never; empty: string[] } => {
-    const outputs = cfg.variants.map((id) =>
-      completedTargetOutputs.get(`${rowIndex}:${id}`),
-    );
+    const outputs = cfg.variants.map((id) => completedTargetOutputs.get(`${rowIndex}:${id}`));
 
     // Report the friendly display name (not the judge's collision-safe id) for
     // any variant we're waiting on — this list is only ever shown to the user.
@@ -1166,9 +1167,7 @@ export const generateComparisonCells = ({
         // what caused #5528's re-run regression for untouched legacy
         // pairwise experiments (the payload above was always the N-way
         // shape, dispatched to a judge that still expects the 2-slot one).
-        evaluatorType: legacyPairwise
-          ? LEGACY_PAIRWISE_EVALUATOR_TYPE
-          : COMPARISON_EVALUATOR_TYPE,
+        evaluatorType: legacyPairwise ? LEGACY_PAIRWISE_EVALUATOR_TYPE : COMPARISON_EVALUATOR_TYPE,
         comparison: cfg,
         inputs: target.inputs,
         mappings: perRowMappings,
@@ -1264,10 +1263,7 @@ async function* runOneCellEvaluator({
   // The dispatch decision. An evaluator whose every input resolved empty is
   // not run: it would score empty against empty and report that as a verdict.
   const evaluator = cell.evaluatorConfigs.find((e) => e.id === evaluatorId);
-  if (
-    evaluator &&
-    hasNoResolvedInputs({ cell, evaluator, inputs: evaluatorInputs })
-  ) {
+  if (evaluator && hasNoResolvedInputs({ cell, evaluator, inputs: evaluatorInputs })) {
     logger.info(
       {
         rowIndex: cell.rowIndex,
@@ -1367,10 +1363,7 @@ async function* runCellEvaluators({
 
   for (const [evaluatorId, evaluatorNodeId] of Object.entries(evaluatorNodeIds)) {
     if (isAborted && (await isAborted())) {
-      logger.debug(
-        { cell: cell.rowIndex, evaluatorId },
-        "Cell aborted before evaluator execution",
-      );
+      logger.debug({ cell: cell.rowIndex, evaluatorId }, "Cell aborted before evaluator execution");
       return;
     }
     try {
@@ -1413,9 +1406,10 @@ function runExecutesCode({
 /**
  * The credential every code node of this run authenticates with, or undefined.
  *
- * One key for the whole run: every row shares the cache entries the run
- * writes, and a key per row would leave a row of live credentials behind each
- * run. A run that cannot get one still runs, and every row does its own work.
+ * One key for the whole run, and the same key the project's other runs hold:
+ * every row shares the cache entries the run writes, and a key per row or per
+ * run would leave a ledger of live credentials behind. A run that cannot get
+ * one still runs, and every row does its own work.
  */
 async function mintRunSandboxApiKey({
   sandboxCredentials,
@@ -1716,9 +1710,7 @@ export async function* executeWorkflowCell({
     // Keep each node's display name so results show it (e.g. "Exact Match")
     // instead of the raw node id; these nodes have no DB evaluator to resolve.
     const evaluatorNodeNames = new Map(
-      workflowDsl.nodes
-        .filter((n) => n.type === "evaluator")
-        .map((n) => [n.id, n.data?.name]),
+      workflowDsl.nodes.filter((n) => n.type === "evaluator").map((n) => [n.id, n.data?.name]),
     );
 
     const rawEvent = {
@@ -1771,9 +1763,7 @@ export async function* executeWorkflowCell({
      * only `error_type`, yielding a `domainError` whose code came from one node
      * and whose message came from another.
      */
-    let targetFailure:
-      | { error?: string; errorType?: string; upstreamStatus?: number }
-      | undefined;
+    let targetFailure: { error?: string; errorType?: string; upstreamStatus?: number } | undefined;
     let durationMs: number | undefined;
     let finalTraceId = traceId;
     const evaluatorEvents: EvaluationV3Event[] = [];
@@ -1786,10 +1776,7 @@ export async function* executeWorkflowCell({
           targetOutputRecord = ex.result;
         }
         if (ex?.trace_id) finalTraceId = ex.trace_id;
-        if (
-          ex?.timestamps?.started_at !== undefined &&
-          ex?.timestamps?.finished_at !== undefined
-        ) {
+        if (ex?.timestamps?.started_at !== undefined && ex?.timestamps?.finished_at !== undefined) {
           durationMs = ex.timestamps.finished_at - ex.timestamps.started_at;
         }
         if (ex?.status === "error") {
@@ -1913,6 +1900,373 @@ export async function* executeWorkflowCell({
   }
 }
 
+/** One turn to a connected agent, as the cell executor asks for it. */
+export type ConnectedDispatch = (params: {
+  projectId: string;
+  agent: DispatchAgent;
+  call: DispatchCall;
+  signal: AbortSignal;
+}) => Promise<CallOutcome>;
+
+/** The runtime's own dispatcher, which is what a real run uses. */
+const relayDispatch: ConnectedDispatch = (params) =>
+  getConnectedAgentRuntime().dispatcher.dispatch(params);
+
+/**
+ * The agent as the dispatcher reads it, with the per-call budget capped the
+ * same way the relay route caps it. One agent, one contract: a column may not
+ * ask for a longer call than a REST caller can.
+ */
+const dispatchAgentOf = (agent: TypedAgent): DispatchAgent => {
+  const config = agent.config as ConnectedAgentConfig;
+  return {
+    id: agent.id,
+    name: agent.name,
+    environment: agent.environment ?? null,
+    timeoutMs: Math.min(config.timeoutMs ?? DEFAULT_CALL_TIMEOUT_MS, MAX_CALL_TIMEOUT_MS),
+    // A workbench row is a conversation of one turn, so there is nothing to
+    // pin: every row picks whichever instance is free.
+    isSticky: false,
+  };
+};
+
+/**
+ * The one turn a row sends: the mapped row as a single user message, in its
+ * own conversation and inside the trace of the cell.
+ */
+const connectedTurnParams = ({
+  cell,
+  projectId,
+  agent,
+  dispatchAgent,
+  traceId,
+}: {
+  cell: ExecutionCell;
+  projectId: string;
+  agent: TypedAgent;
+  dispatchAgent: ReturnType<typeof dispatchAgentOf>;
+  traceId: string;
+}): Omit<Parameters<ConnectedDispatch>[0], "signal"> => {
+  const { messages, params } = buildConnectedCall({
+    inputs: buildTargetInputs(cell),
+    definitions: connectedParameterDefinitions(agent.config),
+  });
+  return {
+    projectId,
+    agent: dispatchAgent,
+    call: {
+      // One row, one conversation. The cell's own trace id keeps it unique
+      // and ties the conversation to the row that started it.
+      threadId: `eval_v3_${cell.rowIndex}_${traceId}`,
+      messages,
+      newMessages: messages.slice(-1),
+      params,
+      session: undefined,
+      // The agent adopts this context, so the spans it records land in the
+      // cell's own trace and the row links straight to them.
+      traceparent: `00-${traceId}-${generateOtelSpanId()}-01`,
+      run: {},
+    },
+  };
+};
+
+/**
+ * What the cell shows when the turn did not answer.
+ *
+ * A named failure keeps its code, so the cell renders the copy of that code
+ * instead of a generic unknown error.
+ */
+const connectedFailureEvent = ({
+  cell,
+  projectId,
+  agentId,
+  error,
+  traceId,
+  duration,
+}: {
+  cell: ExecutionCell;
+  projectId: string;
+  agentId: string;
+  error: unknown;
+  traceId: string;
+  duration: number;
+}): EvaluationV3Event => {
+  logger.info(
+    {
+      error,
+      projectId,
+      agentId,
+      rowIndex: cell.rowIndex,
+      targetId: cell.targetId,
+    },
+    "Connected agent cell failed",
+  );
+  const failure = connectedCallFailure(error);
+  return {
+    type: "target_result",
+    rowIndex: cell.rowIndex,
+    targetId: cell.targetId,
+    output: undefined,
+    duration,
+    traceId,
+    error: failure.message,
+    ...(failure.domainError ? { domainError: failure.domainError } : {}),
+  };
+};
+
+/** What one connected agent cell needs to run. */
+interface ConnectedCellInput {
+  cell: ExecutionCell;
+  projectId: string;
+  agent: TypedAgent;
+  datasetColumns?: Array<{ id: string; name: string; type: string }>;
+  loadedEvaluators?: Map<string, { id: string; name: string; config: unknown }>;
+  resultMapperConfig?: ResultMapperConfig;
+  isAborted?: () => Promise<boolean>;
+  /** The dispatcher the turn goes through, replaceable in tests. */
+  dispatch?: ConnectedDispatch;
+  /** The wait between busy retries, replaceable in tests. */
+  sleep?: (ms: number) => Promise<void>;
+  /** The clock the retry budget reads, replaceable in tests. */
+  now?: () => number;
+  ports: ExperimentRunPorts;
+  workflows: WorkflowService;
+}
+
+/**
+ * Executes a single cell whose target is a connected agent.
+ *
+ * The agent runs in the customer's own process, so the engine has no node for
+ * it: the row is one turn through the relay dispatcher (ADR-128), sent from
+ * here and answered in place. The evaluators attached to the column then run
+ * exactly as they do for a workflow target, over the text the agent answered.
+ *
+ * Each row is its own conversation. A workbench row has no history to carry,
+ * so it sends one user message under its own thread id and keeps no session:
+ * what one row said can never reach another.
+ */
+export async function* executeConnectedCell(
+  input: ConnectedCellInput,
+): AsyncGenerator<EvaluationV3Event> {
+  const { cell, projectId, agent } = input;
+  const now = input.now ?? (() => Date.now());
+  const traceId = cell.traceId ?? generateOtelTraceId();
+  const startedAt = now();
+
+  yield {
+    type: "cell_started",
+    rowIndex: cell.rowIndex,
+    targetId: cell.targetId,
+  };
+
+  const turn = await connectedTurn({
+    input: { ...input, now },
+    traceId,
+    startedAt,
+  });
+
+  if (!turn.ok) {
+    yield connectedFailureEvent({
+      cell,
+      projectId,
+      agentId: agent.id,
+      error: turn.error,
+      traceId,
+      duration: now() - startedAt,
+    });
+    return;
+  }
+
+  const output = connectedOutputText(turn.outcome.output);
+
+  yield {
+    type: "target_result",
+    rowIndex: cell.rowIndex,
+    targetId: cell.targetId,
+    output,
+    // The whole cell, not only the call that answered: a row that waited out
+    // a busy agent took that time too, and a run comparison reads it.
+    duration: now() - startedAt,
+    traceId,
+  };
+
+  yield* gradeConnectedAnswer({ input, output, traceId });
+}
+
+/**
+ * The one turn the row sends, retried while the agent is busy.
+ *
+ * The refusal comes back rather than being thrown, so the caller renders it
+ * as the cell's own failure instead of ending the run.
+ */
+const connectedTurn = async ({
+  input,
+  traceId,
+  startedAt,
+}: {
+  input: ConnectedCellInput;
+  traceId: string;
+  startedAt: number;
+}): Promise<{ ok: true; outcome: CallOutcome } | { ok: false; error: unknown }> => {
+  const {
+    cell,
+    projectId,
+    agent,
+    isAborted,
+    dispatch = relayDispatch,
+    sleep = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms)),
+    now = () => Date.now(),
+  } = input;
+  const dispatchAgent = dispatchAgentOf(agent);
+  try {
+    const outcome = await dispatchWithBusyRetry({
+      dispatch,
+      sleep,
+      now,
+      isAborted,
+      budgetEndsAt: startedAt + CONNECTED_BUSY_RETRY_BUDGET_MS,
+      callTimeoutMs: dispatchAgent.timeoutMs + CONNECTED_REQUEST_SLACK_MS,
+      params: connectedTurnParams({
+        cell,
+        projectId,
+        agent,
+        dispatchAgent,
+        traceId,
+      }),
+    });
+    return { ok: true, outcome };
+  } catch (error) {
+    return { ok: false, error };
+  }
+};
+
+/**
+ * The evaluators of the column, over the answer the turn gave.
+ *
+ * They run through the same path a workflow target uses, so a connected
+ * column scores, costs and traces the way every other column does.
+ */
+async function* gradeConnectedAnswer({
+  input,
+  output,
+  traceId,
+}: {
+  input: ConnectedCellInput;
+  output: string;
+  traceId: string;
+}): AsyncGenerator<EvaluationV3Event> {
+  const {
+    cell,
+    projectId,
+    datasetColumns = [],
+    loadedEvaluators,
+    resultMapperConfig,
+    isAborted,
+    ports,
+    workflows,
+  } = input;
+  if (cell.evaluatorConfigs.length === 0) return;
+
+  const { workflow, evaluatorNodeIds } = buildEvaluatorCellWorkflow({
+    projectId,
+    cell,
+    datasetColumns,
+    loadedEvaluators,
+  });
+  yield* runCellEvaluators({
+    cell,
+    projectId,
+    workflow,
+    evaluatorNodeIds,
+    targetOutput: { [CONNECTED_OUTPUT_FIELD]: output },
+    traceId,
+    targetNodes: new Set([cell.targetId]),
+    config: resultMapperConfig ?? {},
+    isAborted,
+    ports,
+    workflows,
+  });
+}
+
+/**
+ * One turn, waiting out a busy agent.
+ *
+ * Every instance being full is a queue, not a failure: the platform says when
+ * to try again and the row waits, the same way a simulation turn does. The
+ * budget bounds it so a permanently full agent still fails the row rather
+ * than holding a slot of the run forever.
+ */
+const dispatchWithBusyRetry = async ({
+  dispatch,
+  params,
+  sleep,
+  now,
+  isAborted,
+  budgetEndsAt,
+  callTimeoutMs,
+}: {
+  dispatch: ConnectedDispatch;
+  params: Omit<Parameters<ConnectedDispatch>[0], "signal">;
+  sleep: (ms: number) => Promise<void>;
+  now: () => number;
+  isAborted?: () => Promise<boolean>;
+  budgetEndsAt: number;
+  callTimeoutMs: number;
+}): Promise<CallOutcome> => {
+  for (;;) {
+    try {
+      // Every attempt gets its own deadline. One shared signal would carry
+      // the time the earlier attempts and their waits already spent, so an
+      // agent that declares a timeout shorter than the retry budget would
+      // abort a later attempt the moment it starts.
+      return await dispatch({
+        ...params,
+        signal: AbortSignal.timeout(callTimeoutMs),
+      });
+    } catch (error) {
+      const waitMs = await busyWaitMs({ error, now, budgetEndsAt, isAborted });
+      if (waitMs === undefined) throw error;
+      await sleep(waitMs);
+    }
+  }
+};
+
+/**
+ * How long to wait before the next attempt, or nothing when the turn must
+ * fail now.
+ *
+ * It fails now for three reasons: the agent refused for a reason other than
+ * being busy, the retry budget is spent, or the run was stopped. A stopped run
+ * waits for nothing, so the row fails rather than holding a slot of the run
+ * for the rest of the budget.
+ */
+async function busyWaitMs({
+  error,
+  now,
+  budgetEndsAt,
+  isAborted,
+}: {
+  error: unknown;
+  now: () => number;
+  budgetEndsAt: number;
+  isAborted?: () => Promise<boolean>;
+}): Promise<number | undefined> {
+  const retryAfterMs = busyRetryAfterMs(error);
+  if (retryAfterMs === undefined || now() >= budgetEndsAt) return undefined;
+  if (isAborted && (await isAborted())) return undefined;
+
+  // Jitter spreads the retries of the rows that hit a full agent at once.
+  const jittered = retryAfterMs + Math.floor(Math.random() * retryAfterMs);
+  return Math.max(0, Math.min(jittered, budgetEndsAt - now()));
+}
+
+/** How long a busy agent asked to be left alone, or nothing if it is not busy. */
+const busyRetryAfterMs = (error: unknown): number | undefined => {
+  if (!(error instanceof AgentBusyError)) return undefined;
+  const declared = error.meta?.retryAfterMs;
+  return typeof declared === "number" && declared > 0 ? declared : BUSY_RETRY_AFTER_MS;
+};
+
 // Shared by the pairwise (#5100) and select-best (#5101) branches:
 // resolve `inputs.input` from the variant's dataset mapping, or fall back
 // to the dataset's `input` column. Kept as a mutating helper (rather than
@@ -2031,11 +2385,7 @@ export const buildEvaluatorInputs = (
     // additive — only fires for fields the primary read left undefined.
     const cellMappings = evaluator.mappings[datasetId]?.[cell.targetId] ?? {};
     for (const [field, mapping] of Object.entries(cellMappings)) {
-      if (
-        mapping.type === "value" &&
-        mapping.value !== undefined &&
-        inputs[field] === undefined
-      ) {
+      if (mapping.type === "value" && mapping.value !== undefined && inputs[field] === undefined) {
         inputs[field] = mapping.value;
       }
     }
@@ -2068,9 +2418,7 @@ export const NO_INPUTS_RESOLVED = "NoInputsResolved";
 
 /** A resolved value that carries nothing for the evaluator to read. */
 const isEmptyInputValue = (value: unknown): boolean =>
-  value === undefined ||
-  value === null ||
-  (typeof value === "string" && value.trim() === "");
+  value === undefined || value === null || (typeof value === "string" && value.trim() === "");
 
 /**
  * A type's fields from the catalog, required plus optional. Optional counts —
@@ -2079,10 +2427,7 @@ const isEmptyInputValue = (value: unknown): boolean =>
  */
 const catalogFields = (evaluatorType: string | undefined): string[] => {
   const definition = AVAILABLE_EVALUATORS[evaluatorType as EvaluatorTypes];
-  return [
-    ...(definition?.requiredFields ?? []),
-    ...(definition?.optionalFields ?? []),
-  ];
+  return [...(definition?.requiredFields ?? []), ...(definition?.optionalFields ?? [])];
 };
 
 /**
@@ -2097,14 +2442,10 @@ const declaredEvaluatorFields = (evaluator: EvaluatorConfig): string[] => {
 
 /** What the row calls the evaluator that could not run. */
 const evaluatorDisplayName = (evaluator: EvaluatorConfig): string =>
-  AVAILABLE_EVALUATORS[evaluator.evaluatorType as EvaluatorTypes]?.name ??
-  evaluator.evaluatorType;
+  AVAILABLE_EVALUATORS[evaluator.evaluatorType as EvaluatorTypes]?.name ?? evaluator.evaluatorType;
 
 /** DB evaluator rows a run has loaded, keyed by their own id. */
-type LoadedEvaluators = Map<
-  string,
-  { id: string; name: string; config: unknown }
->;
+type LoadedEvaluators = Map<string, { id: string; name: string; config: unknown }>;
 
 /**
  * The fields an evaluator COLUMN reads. Its own declared inputs when it has
@@ -2120,8 +2461,9 @@ const evaluatorTargetFields = ({
 }): string[] => {
   const declared = target.inputs?.map((field) => field.identifier) ?? [];
   if (declared.length > 0) return declared;
-  const dbConfig = loadedEvaluators?.get(target.targetEvaluatorId ?? "")
-    ?.config as { evaluatorType?: string } | undefined;
+  const dbConfig = loadedEvaluators?.get(target.targetEvaluatorId ?? "")?.config as
+    | { evaluatorType?: string }
+    | undefined;
   return catalogFields(dbConfig?.evaluatorType);
 };
 
@@ -2203,9 +2545,7 @@ export const hasNoResolvedInputs = ({
   inputs: Record<string, unknown>;
 }): boolean => {
   if (cell.comparison && toComparisonConfig(evaluator)) {
-    return !cell.comparison.candidates.some(
-      (candidate) => !isEmptyInputValue(candidate.output),
-    );
+    return !cell.comparison.candidates.some((candidate) => !isEmptyInputValue(candidate.output));
   }
 
   // An evaluator that declares no field reads nothing from the row, so there is
@@ -2238,9 +2578,7 @@ const noInputsResolvedResult = ({
       evaluator,
     )} received no input for this row. Map its fields in the evaluator settings, then run again.`,
     traceback: [],
-    domainError: new EvaluatorNoInputsResolvedError(
-      evaluatorDisplayName(evaluator),
-    ).serialize(),
+    domainError: new EvaluatorNoInputsResolvedError(evaluatorDisplayName(evaluator)).serialize(),
   },
 });
 
@@ -2322,8 +2660,7 @@ export const buildTargetMetadata = ({
       // recorded one is what feeds the leaderboard's self-preference check,
       // so it would report independence from a model that never judged.
       const settings =
-        (t.localEvaluatorConfig as { settings?: { model?: unknown } } | undefined)
-          ?.settings ??
+        (t.localEvaluatorConfig as { settings?: { model?: unknown } } | undefined)?.settings ??
         (
           loadedEvaluators?.get(t.targetEvaluatorId)?.config as
             | { settings?: { model?: unknown } }
@@ -2401,9 +2738,7 @@ export const buildTargetResultDispatch = ({
       targetId: event.targetId,
       entry: datasetEntry,
       predicted:
-        event.output === null || event.output === undefined
-          ? null
-          : { output: event.output },
+        event.output === null || event.output === undefined ? null : { output: event.output },
       cost: event.cost ?? null,
       duration: event.duration ?? null,
       error: event.error ?? null,
@@ -2514,9 +2849,7 @@ const carriedCellFields = (cell: CarriedOverCell) => ({
 const isStorableVerdict = (
   result: SingleEvaluationResult | undefined,
 ): result is SingleEvaluationResult =>
-  result?.status === "processed" ||
-  result?.status === "error" ||
-  result?.status === "skipped";
+  result?.status === "processed" || result?.status === "error" || result?.status === "skipped";
 
 /**
  * The target row a carried cell contributes, or null when it holds none.
@@ -2716,9 +3049,7 @@ const recordCarriedOverBoard = async ({
     cells,
     datasetRows,
     evaluatorNameFor: (evaluatorId) => {
-      const config = state.evaluators.find(
-        (evaluator) => evaluator.id === evaluatorId,
-      );
+      const config = state.evaluators.find((evaluator) => evaluator.id === evaluatorId);
       const dbEvaluator = config?.dbEvaluatorId
         ? loadedEvaluators?.get(config.dbEvaluatorId)
         : null;
@@ -2788,7 +3119,16 @@ export async function* runOrchestrator(
     carriedOverCells,
     ports,
     workflows,
+    actor,
   } = input;
+
+  // A personal development agent runs on one person's own machine, so only
+  // that person may send it a turn. Refused before any cell exists, the way a
+  // simulation refuses it when the run is scheduled.
+  await assertConnectedAgentsRunnable({
+    agents: [...loadedAgents.values()],
+    actor,
+  });
 
   const concurrency = requestedConcurrency ?? defaultConcurrency;
 
@@ -2966,9 +3306,7 @@ export async function* runOrchestrator(
           ? loadedEvaluators?.get(evaluatorConfig.dbEvaluatorId)
           : null;
         const name =
-          dbEval?.name ??
-          evaluatorConfig.evaluatorType?.split("/").pop() ??
-          evaluatorConfig.id;
+          dbEval?.name ?? evaluatorConfig.evaluatorType?.split("/").pop() ?? evaluatorConfig.id;
         const key = `${event.rowIndex}:${event.targetId}`;
         const arr = completedTargetEvaluatorScores.get(key) ?? [];
         arr.push({
@@ -2993,25 +3331,14 @@ export async function* runOrchestrator(
           evaluatorName: dbEvaluator?.name,
           traceId,
           status: evalResult.status,
-          score:
-            evalResult.status === "processed"
-              ? (evalResult.score ?? undefined)
-              : undefined,
-          passed:
-            evalResult.status === "processed"
-              ? (evalResult.passed ?? undefined)
-              : undefined,
+          score: evalResult.status === "processed" ? (evalResult.score ?? undefined) : undefined,
+          passed: evalResult.status === "processed" ? (evalResult.passed ?? undefined) : undefined,
           // For pairwise verdicts, langevals now returns the winner's
           // candidate id (or "tie") directly in `label`. No translation
           // needed here; SDK / REST / MCP consumers see the winner by id.
-          label:
-            evalResult.status === "processed"
-              ? (evalResult.label ?? undefined)
-              : undefined,
+          label: evalResult.status === "processed" ? (evalResult.label ?? undefined) : undefined,
           details:
-            evalResult.status === "processed"
-              ? (evalResult.details ?? undefined)
-              : undefined,
+            evalResult.status === "processed" ? (evalResult.details ?? undefined) : undefined,
           error: evalResult.status === "error" ? evalResult.details : undefined,
           occurredAt: Date.now(),
         });
@@ -3032,8 +3359,7 @@ export async function* runOrchestrator(
               runId,
               experimentId,
               event,
-              datasetEntry:
-                event.rowIndex !== undefined ? (datasetRows[event.rowIndex] ?? {}) : {},
+              datasetEntry: event.rowIndex !== undefined ? (datasetRows[event.rowIndex] ?? {}) : {},
               occurredAt: Date.now(),
             })
           : null;
@@ -3086,10 +3412,7 @@ export async function* runOrchestrator(
   let completedCells = 0;
   let aborted = false;
 
-  logger.info(
-    { runId, totalCells, concurrency, experimentId },
-    "Starting evaluation execution",
-  );
+  logger.info({ runId, totalCells, concurrency, experimentId }, "Starting evaluation execution");
 
   // Event queue for collecting results from parallel executions
   // Uses a resolver pattern to allow yielding events as they arrive
@@ -3184,15 +3507,21 @@ export async function* runOrchestrator(
             // target_result / evaluator_result events.
             const runsAsWorkflow =
               (cell.targetConfig.type === "workflow" ||
-                (cell.targetConfig.type === "agent" &&
-                  loadedData.agent?.type === "workflow")) &&
+                (cell.targetConfig.type === "agent" && loadedData.agent?.type === "workflow")) &&
               !!loadedData.workflow;
 
-            const cellEvents = runsAsWorkflow
-              ? executeWorkflowCell({
+            // A connected agent has no node in the engine: it runs in the
+            // customer's own process and is reached through the relay.
+            const connectedAgent =
+              cell.targetConfig.type === "agent" && loadedData.agent?.type === "connected"
+                ? loadedData.agent
+                : undefined;
+
+            const cellEvents = connectedAgent
+              ? executeConnectedCell({
                   cell,
                   projectId,
-                  workflowDsl: loadedData.workflow!.dsl,
+                  agent: connectedAgent,
                   datasetColumns,
                   loadedEvaluators,
                   resultMapperConfig,
@@ -3200,16 +3529,28 @@ export async function* runOrchestrator(
                   ports,
                   workflows,
                 })
-              : executeCell(
-                  cell,
-                  projectId,
-                  ports,
-                  datasetColumns,
-                  loadedData,
-                  workflows,
-                  resultMapperConfig,
-                  checkAbort,
-                );
+              : runsAsWorkflow
+                ? executeWorkflowCell({
+                    cell,
+                    projectId,
+                    workflowDsl: loadedData.workflow!.dsl,
+                    datasetColumns,
+                    loadedEvaluators,
+                    resultMapperConfig,
+                    isAborted: checkAbort,
+                    ports,
+                    workflows,
+                  })
+                : executeCell(
+                    cell,
+                    projectId,
+                    ports,
+                    datasetColumns,
+                    loadedData,
+                    workflows,
+                    resultMapperConfig,
+                    checkAbort,
+                  );
 
             // Execute cell and collect events
             let cellFailed = false;
@@ -3227,10 +3568,7 @@ export async function* runOrchestrator(
               await processEventForStorage(event);
 
               // Track failures
-              if (
-                event.type === "error" ||
-                (event.type === "target_result" && event.error)
-              ) {
+              if (event.type === "error" || (event.type === "target_result" && event.error)) {
                 cellFailed = true;
               }
 
@@ -3412,11 +3750,7 @@ export async function* runOrchestrator(
                 if (await ports.abort.isAborted(runId)) return;
 
                 const loadedData = {
-                  ...getLoadedDataForTarget(
-                    cell.targetConfig,
-                    loadedPrompts,
-                    loadedAgents,
-                  ),
+                  ...getLoadedDataForTarget(cell.targetConfig, loadedPrompts, loadedAgents),
                   evaluators: loadedEvaluators,
                   sandboxApiKey,
                 };

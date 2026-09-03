@@ -1,4 +1,4 @@
-import type { AppendStore, Event } from "@langwatch/eventing";
+import type { AppendStore } from "@langwatch/eventing";
 import { AbstractMapProjection, type MapEventHandlers } from "@langwatch/eventing";
 import { CODING_AGENT_MAP_COALESCE_MAX_BATCH } from "@langwatch/coding-agent-contract";
 import {
@@ -74,6 +74,18 @@ export interface CodingAgentSessionEventRecord {
   toolResultBytes: number;
   promptChars: number;
   totalTokens: number;
+  /**
+   * The working context active when the event happened, stamped onto the
+   * event by the contribute command from the session's last `session_context`
+   * declaration. '' on rows from before a declaration (or before the stamp
+   * existed), which the usage read prices under the legacy whole-session
+   * rule. This is what lets one session's cost split across every pull
+   * request it drove.
+   */
+  repositoryHost: string;
+  repositoryOwner: string;
+  repositoryName: string;
+  branch: string;
 }
 
 /**
@@ -151,7 +163,7 @@ export class CodingAgentSessionEventsMapProjection
     return new CodingAgentSessionEventsMapProjection(deps);
   }
 
-  static accepts(event: Event): boolean {
+  static accepts(event: { data?: unknown }): boolean {
     return (
       CodingAgentSessionEventsMapProjection.resolveEventKind(
         CodingAgentSessionEventsMapProjection.rawEventName(event),
@@ -222,6 +234,10 @@ export class CodingAgentSessionEventsMapProjection
       toolResultBytes: CodingAgentSessionEventsMapProjection.nat(facts.tool_result_size_bytes),
       promptChars: CodingAgentSessionEventsMapProjection.nat(facts.prompt_length),
       totalTokens: CodingAgentSessionEventsMapProjection.nat(facts.total_tokens),
+      repositoryHost: event.data.repositoryHost ?? "",
+      repositoryOwner: event.data.repositoryOwner ?? "",
+      repositoryName: event.data.repositoryName ?? "",
+      branch: event.data.branch ?? "",
     };
   }
 

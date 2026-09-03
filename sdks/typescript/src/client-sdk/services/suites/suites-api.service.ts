@@ -65,6 +65,9 @@ export class SuitesApiError extends Error {
   }
 }
 
+/**
+ * @deprecated Use runPlans and testSuites; /api/suites is a frozen alias.
+ */
 export class SuitesApiService {
   private readonly apiClient: LangwatchApiClient;
 

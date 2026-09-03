@@ -5,7 +5,7 @@
  * this is the second, byte for byte.
  */
 
-import { Avatar, type AvatarRootProps } from "@chakra-ui/react";
+import { Avatar, type AvatarRootProps } from "@langwatch/design-system/avatar";
 import { useState } from "react";
 
 /**
@@ -34,9 +34,7 @@ export function UserAvatar({
 
   return (
     <Avatar.Root {...rootProps}>
-      {showImage ? (
-        <Avatar.Image src={image!} onError={() => setBrokenImageUrl(image!)} />
-      ) : null}
+      {showImage ? <Avatar.Image src={image!} onError={() => setBrokenImageUrl(image!)} /> : null}
       <Avatar.Fallback name={name ?? undefined} />
     </Avatar.Root>
   );

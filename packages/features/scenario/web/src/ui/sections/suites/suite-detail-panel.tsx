@@ -21,8 +21,7 @@ import type { Period } from "@langwatch/analytics-web/components/PeriodSelector"
 import { SetupWithAgentButton } from "@langwatch/trace-web/components/SetupWithAgentButton";
 import type { SimulationSuite } from "../../../model/prisma-types";
 import { useNow } from "../../../behavior/use-now";
-import { getSuiteSetId } from "@langwatch/suite-contract";
-import { parseSuiteTargets } from "@langwatch/suite-contract";
+import { getSuiteSetId, parseSuiteTargets } from "@langwatch/suite-contract";
 import { formatTimeAgoCompact } from "@langwatch/workflow-web/utils/formatTimeAgo";
 import { RunHistoryPanel, type RunHistoryStats } from "./run-history-panel";
 

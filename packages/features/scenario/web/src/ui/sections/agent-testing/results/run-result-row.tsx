@@ -1,18 +1,12 @@
 /**
- * One row of the run results table: a test case and target pair, its verdict,
+ * One row of the run results table: a scenario and target pair, its verdict,
  * its evaluators, its duration and its cost.
  *
  * @see specs/features/agent-testing/results-tabs.feature
  */
 
 import { Box, Button, chakra, HStack, Spinner, Text } from "@chakra-ui/react";
-import {
-  MessageSquare,
-  MoreVertical,
-  Pencil,
-  Play,
-  Square,
-} from "lucide-react";
+import { MessageSquare, MoreVertical, Pencil, Play, Square } from "lucide-react";
 import { buildDisplayTitle } from "@langwatch/suite-web";
 import { isCancellableStatus } from "../../../../behavior/suites/use-cancel-scenario-run";
 import { Menu } from "@langwatch/design-system/menu";
@@ -86,7 +80,7 @@ function ResultRowActionsMenu({
               onRerunCase();
             }}
           >
-            <Play size={13} /> Rerun this test case
+            <Play size={13} /> Rerun this scenario
           </Menu.Item>
         )}
         {onEditCase && (
@@ -97,7 +91,7 @@ function ResultRowActionsMenu({
               onEditCase();
             }}
           >
-            <Pencil size={13} /> Edit test case
+            <Pencil size={13} /> Edit scenario
           </Menu.Item>
         )}
       </Menu.Content>
@@ -145,9 +139,7 @@ function RowMetrics({ scenarioRun }: { scenarioRun: ScenarioRunData }) {
 
   return (
     <ResultMetricsInline
-      durationInMs={
-        scenarioRun.durationInMs > 0 ? scenarioRun.durationInMs : null
-      }
+      durationInMs={scenarioRun.durationInMs > 0 ? scenarioRun.durationInMs : null}
       totalCost={scenarioRun.totalCost ?? null}
     />
   );
@@ -186,10 +178,7 @@ export function RunResultRow({
       data-testid={`run-result-row-${scenarioRun.scenarioRunId}`}
     >
       <Box paddingTop="1px">
-        <LastResultLabel
-          status={scenarioRun.status}
-          results={scenarioRun.results ?? undefined}
-        />
+        <LastResultLabel status={scenarioRun.status} results={scenarioRun.results ?? undefined} />
       </Box>
 
       <HStack gap={1.5} minWidth={0} flexWrap="wrap" paddingTop="1px">

@@ -153,9 +153,7 @@ export async function runUnifiedLoginFlow(
           const liveSet = new Set(liveKeys.map((k) => `${k.sourceType}:${k.lookupId}`));
           const reconciled: GovernanceConfig["default_personal_ingest_keys"] = {};
           let changed = false;
-          for (const [sourceType, entry] of Object.entries(
-            cfg.default_personal_ingest_keys,
-          )) {
+          for (const [sourceType, entry] of Object.entries(cfg.default_personal_ingest_keys)) {
             const lookupId = extractLookupIdFromToken(entry.secret ?? "");
             if (lookupId === undefined) {
               // Not a personal ik-lw- token: a credential the user placed
@@ -298,10 +296,7 @@ export async function runDeviceFlowLogin(
   return runUnifiedLoginFlow({ ...opts, kind: "device_session" });
 }
 
-function persistDeviceSession(
-  cfg: GovernanceConfig,
-  result: ExchangeDeviceSessionResult,
-): void {
+function persistDeviceSession(cfg: GovernanceConfig, result: ExchangeDeviceSessionResult): void {
   cfg.access_token = result.access_token;
   cfg.refresh_token = result.refresh_token;
   cfg.expires_at = Math.floor(Date.now() / 1000) + result.expires_in;
@@ -354,6 +349,9 @@ function persistDeviceSession(
       cfg.cli_api_key_scope = {
         kind: result.cli_api_key_scope.kind,
         project_ids: result.cli_api_key_scope.project_ids ?? [],
+        ...(Array.isArray(result.cli_api_key_scope.permissions)
+          ? { permissions: result.cli_api_key_scope.permissions }
+          : {}),
       };
     }
   }
@@ -395,9 +393,7 @@ function writeApiKeyToEnv(apiKey: string): EnvWriteResult {
   return { created: false, updated: found, path: envPath };
 }
 
-async function fetchBootstrapSafely(
-  cfg: GovernanceConfig,
-): Promise<CliBootstrapResponse | null> {
+async function fetchBootstrapSafely(cfg: GovernanceConfig): Promise<CliBootstrapResponse | null> {
   try {
     return await getCliBootstrap(cfg);
   } catch {

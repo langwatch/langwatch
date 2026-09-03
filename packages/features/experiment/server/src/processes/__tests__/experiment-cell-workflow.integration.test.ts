@@ -4,10 +4,7 @@ import type {
   LocalPromptConfig,
   TargetConfig,
 } from "@langwatch/experiment-contract";
-import {
-  LATEST_SPEC_VERSION,
-  type LlmPromptConfigComponent,
-} from "@langwatch/workflow-contract";
+import { LATEST_SPEC_VERSION, type LlmPromptConfigComponent } from "@langwatch/workflow-contract";
 import type { Agent as TypedAgent } from "@langwatch/agent-contract";
 import type { VersionedPrompt } from "@langwatch/prompt-contract";
 import type { ExecutionCell, WorkflowBuilderInput } from "@langwatch/experiment-contract";
@@ -94,9 +91,7 @@ describe("WorkflowBuilder", () => {
     ...overrides,
   });
 
-  const createBasicInput = (
-    overrides?: Partial<WorkflowBuilderInput>,
-  ): WorkflowBuilderInput => ({
+  const createBasicInput = (overrides?: Partial<WorkflowBuilderInput>): WorkflowBuilderInput => ({
     projectId: "test-project",
     cell: createBasicCell(),
     datasetColumns: [
@@ -112,11 +107,7 @@ describe("WorkflowBuilder", () => {
       const result = buildCellWorkflow(input, {});
 
       expect(result.workflow.nodes).toHaveLength(3);
-      expect(result.workflow.nodes.map((n) => n.type)).toEqual([
-        "entry",
-        "signature",
-        "evaluator",
-      ]);
+      expect(result.workflow.nodes.map((n) => n.type)).toEqual(["entry", "signature", "evaluator"]);
     });
 
     it("sets correct workflow metadata", () => {
@@ -245,9 +236,7 @@ describe("WorkflowBuilder", () => {
       const messagesParam = (node.data as LlmPromptConfigComponent).parameters.find(
         (p) => p.identifier === "messages",
       );
-      expect(messagesParam?.value).toEqual([
-        { role: "user", content: "Answer: {{input}}" },
-      ]);
+      expect(messagesParam?.value).toEqual([{ role: "user", content: "Answer: {{input}}" }]);
     });
 
     it("sets inputs and outputs", () => {
@@ -364,10 +353,7 @@ describe("WorkflowBuilder", () => {
       const node = buildEvaluatorNode(evaluator, "target-1.eval-1", "target-1", cell, 0);
 
       expect(node.data.inputs).toHaveLength(2);
-      expect(node.data.inputs?.map((i) => i.identifier)).toEqual([
-        "output",
-        "expected_output",
-      ]);
+      expect(node.data.inputs?.map((i) => i.identifier)).toEqual(["output", "expected_output"]);
     });
 
     it("sets standard evaluator outputs", () => {
@@ -376,11 +362,7 @@ describe("WorkflowBuilder", () => {
 
       const node = buildEvaluatorNode(evaluator, "target-1.eval-1", "target-1", cell, 0);
 
-      expect(node.data.outputs?.map((o) => o.identifier)).toEqual([
-        "passed",
-        "score",
-        "label",
-      ]);
+      expect(node.data.outputs?.map((o) => o.identifier)).toEqual(["passed", "score", "label"]);
     });
   });
 
@@ -392,14 +374,10 @@ describe("WorkflowBuilder", () => {
       const entryNode = result.workflow.nodes.find((n) => n.type === "entry");
       expect(entryNode?.data.outputs).toBeDefined();
 
-      const userInputOutput = entryNode?.data.outputs?.find(
-        (o) => o.identifier === "user_input",
-      );
+      const userInputOutput = entryNode?.data.outputs?.find((o) => o.identifier === "user_input");
       expect(userInputOutput?.value).toBe("What is 2+2?");
 
-      const expectedOutput = entryNode?.data.outputs?.find(
-        (o) => o.identifier === "expected",
-      );
+      const expectedOutput = entryNode?.data.outputs?.find((o) => o.identifier === "expected");
       expect(expectedOutput?.value).toBe("4");
     });
 
@@ -444,10 +422,7 @@ describe("WorkflowBuilder", () => {
 
       const evaluatorNodes = result.workflow.nodes.filter((n) => n.type === "evaluator");
       expect(evaluatorNodes).toHaveLength(2);
-      expect(evaluatorNodes.map((n) => n.id)).toEqual([
-        "target-1.eval-1",
-        "target-1.eval-2",
-      ]);
+      expect(evaluatorNodes.map((n) => n.id)).toEqual(["target-1.eval-1", "target-1.eval-2"]);
     });
   });
 
@@ -470,6 +445,11 @@ describe("WorkflowBuilder", () => {
       },
       workflowId: null,
       copiedFromAgentId: null,
+      environment: null,
+      ownerUserId: null,
+      hostLabel: null,
+      identityKey: null,
+      lastSeenAt: null,
       archivedAt: null,
       createdAt: new Date(),
       updatedAt: new Date(),

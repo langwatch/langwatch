@@ -6,9 +6,12 @@ import {
   generateBatchRunId,
   generateScenarioRunId,
   getOnPlatformSetId,
+  isInternalSetId,
   runNoteSchema,
   runParameterValuesSchema,
   ScenarioNotFoundError,
+  ScenarioReservedSetIdError,
+  type RunActor,
   type RunParameterValues,
 } from "@langwatch/scenario-contract";
 import {
@@ -50,6 +53,21 @@ const runScenarioSchema = projectSchema.extend({
   /** One short line describing why this run was started. */
   note: runNoteSchema,
 });
+
+/**
+ * Refuses a run addressed into a set the platform reserves for itself.
+ *
+ * The internal namespace holds this project's one-off bucket and every run
+ * plan's address. A run written into a plan's address is read back as that
+ * plan's own history, so it would move its pass rate, its cost and its trend;
+ * a run written into another project's one-off bucket is worse still. Only
+ * this project's own one-off address is writable here.
+ */
+function assertWritableSetId(params: { setId: string; projectId: string }): void {
+  if (!isInternalSetId(params.setId)) return;
+  if (params.setId === getOnPlatformSetId(params.projectId)) return;
+  throw new ScenarioReservedSetIdError();
+}
 
 /**
  * Resolves what the run reads as `params.NAME` and what it reads as
@@ -135,7 +153,9 @@ export function createSimulationRunnerRouter<
     run: policy("scenarios:manage")(procedure.input(runScenarioSchema)).mutation(
       async ({ ctx, input }) => {
         const setId = input.setId ?? getOnPlatformSetId(input.projectId);
+        assertWritableSetId({ setId, projectId: input.projectId });
         const batchRunId = input.batchRunId ?? generateBatchRunId();
+        const actor: RunActor = { id: ctx.actor().id, label: "user" };
 
         const { parameters, secretParameters, scenarioVersion } = await resolveParametersForRun({
           app: ctx.app.scenarios,
@@ -195,6 +215,8 @@ export function createSimulationRunnerRouter<
           secretParameters,
           note: input.note,
           scenarioVersion,
+          actor,
+          resolvedModels: prefetchResult.resolvedModels,
         });
 
         // No explicit job scheduling — the execution subscriber picks up the queued

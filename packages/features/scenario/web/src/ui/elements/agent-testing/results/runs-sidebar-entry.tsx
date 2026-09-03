@@ -3,18 +3,27 @@
  * with it, how long ago it started and how it went.
  *
  * A run that is still going reads its progress instead of a pass rate it does
- * not have yet.
+ * not have yet. A run against more than one target reads one rate per target
+ * once it settled, so the rail already says which did better.
  *
  * @see specs/features/agent-testing/results-tabs.feature
+ * @see specs/features/agent-testing/comparison-mode.feature
  * @see specs/suites/run-notes.feature
  */
 
-import { Box, HStack, Spinner, Text, VStack } from "@chakra-ui/react";
-import {
-  getPassRateGradientColor,
-  PassRateCircle,
-} from "@langwatch/design-system/pass-rate-indicator";
+import { Box, HStack, Spinner, Text, VisuallyHidden, VStack } from "@chakra-ui/react";
 import { FG_MUTED } from "../../../../model/agent-testing/shared/design";
+import { PassRateText } from "../shared/pass-rate-text";
+import { passRateColor } from "../shared/pass-rate-color";
+
+/** How one target of a comparison did, and the colour it reads in. */
+export type SidebarTargetRate = {
+  key: string;
+  color: string;
+  /** What the target is called, which is what a screen reader reads. */
+  label: string;
+  passRate: number | null;
+};
 
 export type RunsSidebarEntryProps = {
   title: string;
@@ -22,6 +31,11 @@ export type RunsSidebarEntryProps = {
   timeAgo: string;
   passRate: number | null;
   passedCount: number | null;
+  /**
+   * One rate per target, on a run against more than one. Such a run reads
+   * the rates side by side and no rate of the whole.
+   */
+  targetRates?: SidebarTargetRate[];
   isSelected: boolean;
   isPending?: boolean;
   /** True while the run still has cases to judge. */
@@ -33,42 +47,79 @@ export type RunsSidebarEntryProps = {
   testId: string;
 };
 
-/** One line, with the whole note on hover, so a long note never grows the entry. */
-function EntryNote({
-  note,
+/**
+ * How a comparison went: one rate per target, "62% vs 81% · 2 targets".
+ *
+ * The dot before each rate is the colour of the target, which is what tells
+ * the two rates apart; the rate itself reads in its own pass-rate colour, the
+ * same scale as everywhere else on the surface.
+ *
+ * Colour alone would leave a rate unnamed for a reader who cannot see it, so
+ * each rate carries the name of its target as accessible text.
+ */
+function ComparisonResult({
+  targetRates,
   testId,
-}: Pick<RunsSidebarEntryProps, "note" | "testId">) {
+}: {
+  targetRates: SidebarTargetRate[];
+  testId: string;
+}) {
+  return (
+    <HStack gap={1} flexWrap="wrap" data-testid={`${testId}-result`}>
+      {targetRates.map((target, index) => (
+        <HStack key={target.key} gap={1}>
+          {index > 0 ? (
+            <Text fontSize="10.5px" color={FG_MUTED}>
+              vs
+            </Text>
+          ) : null}
+          <Box
+            boxSize="6px"
+            borderRadius="full"
+            flexShrink={0}
+            backgroundColor={target.color}
+            data-testid={`${testId}-target-dot-${target.key}`}
+          />
+          <VisuallyHidden>{`${target.label}: `}</VisuallyHidden>
+          <PassRateText passRate={target.passRate} fontSize="10.5px" />
+        </HStack>
+      ))}
+      <Text fontSize="10.5px" color={FG_MUTED}>
+        · {targetRates.length} targets
+      </Text>
+    </HStack>
+  );
+}
+
+/** One line, with the whole note on hover, so a long note never grows the entry. */
+function EntryNote({ note, testId }: Pick<RunsSidebarEntryProps, "note" | "testId">) {
   if (!note) return null;
 
   return (
-    <Text
-      fontSize="10.5px"
-      color={FG_MUTED}
-      truncate
-      title={note}
-      data-testid={`${testId}-note`}
-    >
+    <Text fontSize="10.5px" color={FG_MUTED} truncate title={note} data-testid={`${testId}-note`}>
       {note}
     </Text>
   );
 }
 
-/** How the run went: the circle is the one place the outcome reads. */
+/**
+ * How the run went: the dot and the percentage beside it.
+ *
+ * Both take their colour from {@link passRateColor}, the one scale the whole
+ * surface reads, so a rate here cannot read green while the same rate reads
+ * amber in the plan table.
+ */
 function EntryResult({
   passRate,
   passedCount,
+  targetRates,
   isRunning,
   judgedCount,
   totalCount,
   testId,
 }: Pick<
   RunsSidebarEntryProps,
-  | "passRate"
-  | "passedCount"
-  | "isRunning"
-  | "judgedCount"
-  | "totalCount"
-  | "testId"
+  "passRate" | "passedCount" | "targetRates" | "isRunning" | "judgedCount" | "totalCount" | "testId"
 >) {
   if (isRunning && typeof totalCount === "number") {
     return (
@@ -78,18 +129,22 @@ function EntryResult({
     );
   }
 
+  if (targetRates && targetRates.length > 1) {
+    return <ComparisonResult targetRates={targetRates} testId={testId} />;
+  }
+
   if (passRate === null && passedCount === null) return null;
 
   return (
     <HStack gap={1} data-testid={`${testId}-result`}>
-      <PassRateCircle passRate={passRate} size="6px" />
-      <Text
-        fontSize="10.5px"
-        fontWeight="semibold"
-        color={getPassRateGradientColor(passRate)}
-      >
-        {passRate === null ? "-" : `${Math.round(passRate)}%`}
-      </Text>
+      <Box
+        boxSize="6px"
+        borderRadius="full"
+        flexShrink={0}
+        backgroundColor={passRateColor(passRate)}
+        data-testid={`${testId}-result-dot`}
+      />
+      <PassRateText passRate={passRate} fontSize="10.5px" />
       {passedCount !== null ? (
         <Text fontSize="10.5px" color={FG_MUTED}>
           · {passedCount} passed
@@ -106,10 +161,7 @@ function EntryTitleLine({
   isPending,
   isRunning,
   testId,
-}: Pick<
-  RunsSidebarEntryProps,
-  "title" | "timeAgo" | "isPending" | "isRunning" | "testId"
->) {
+}: Pick<RunsSidebarEntryProps, "title" | "timeAgo" | "isPending" | "isRunning" | "testId">) {
   return (
     <HStack gap={1.5} width="full" data-testid={`${testId}-title`}>
       {isPending || isRunning ? <Spinner size="xs" boxSize="11px" /> : null}
@@ -130,6 +182,7 @@ export function RunsSidebarEntry({
   timeAgo,
   passRate,
   passedCount,
+  targetRates,
   isSelected,
   isPending,
   isRunning,
@@ -167,6 +220,7 @@ export function RunsSidebarEntry({
       <EntryResult
         passRate={passRate}
         passedCount={passedCount}
+        targetRates={targetRates}
         isRunning={isRunning}
         judgedCount={judgedCount}
         totalCount={totalCount}

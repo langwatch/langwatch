@@ -31,10 +31,7 @@ import type {
 import type { ContentfulStatusCode } from "hono/utils/http-status";
 
 import { createBugReportsRestApp, type BugReportRestPorts } from "@langwatch/ops-server";
-import {
-  createUnsubscribeRestApp,
-  type UnsubscribeRestPorts,
-} from "@langwatch/automation-server";
+import { createUnsubscribeRestApp, type UnsubscribeRestPorts } from "@langwatch/automation-server";
 import {
   createLangyInternalRestApp,
   createLangyRelayRestApp,
@@ -86,6 +83,7 @@ import {
   type ApiLangWatchQLRestCollaborators,
   mountLangWatchQLRest,
 } from "../features/analytics/langwatch-ql-rest.mount";
+import { mountQueryRest } from "../features/analytics/query-rest.mount";
 import { mountOrganizationRest } from "../features/organization/organization-rest.mount";
 import { mountPromptsRest } from "../features/prompt/prompt-rest.mount";
 import type { ApiAuthoringRestComposition } from "../app/api-authoring-rest.composition";
@@ -568,6 +566,11 @@ export function createApiProcessRestFeatures(options: {
         dashboard: langWatchQL.dashboard,
         publicBaseUrl: ports.publicBaseUrl,
       }),
+      // The one door for raw LangWatchQL, off the same collaborators: the
+      // two cannot be composed apart, because a process serving saved charts
+      // against a runner this door does not reach would answer the same
+      // statement two ways.
+      mountQueryRest({ security, collaborators: langWatchQL.collaborators }),
     );
   }
 
@@ -614,9 +617,7 @@ export function createApiProcessRestFeatures(options: {
     features.push(mountDatasetGenerateRest({ security, ...authoring.datasetGenerate }));
   }
   if (authoring?.workflowStudio) {
-    features.push(
-      mountWorkflowStudioRest({ security, collaborators: authoring.workflowStudio }),
-    );
+    features.push(mountWorkflowStudioRest({ security, collaborators: authoring.workflowStudio }));
   }
   if (authoring?.scenarioGenerate) {
     features.push(mountScenarioGenerateRest({ security, ...authoring.scenarioGenerate }));
@@ -632,9 +633,7 @@ export function createApiProcessRestFeatures(options: {
   // siblings are not swallowed by that family's `:slug`.
   const experimentWorkbench = services.experimentWorkbench;
   if (experimentWorkbench) {
-    features.push(
-      ...mountExperimentV3Rest({ security, collaborators: experimentWorkbench }),
-    );
+    features.push(...mountExperimentV3Rest({ security, collaborators: experimentWorkbench }));
   }
 
   // The SDK's create-or-take door. `/api/experiment/init` is a literal path in

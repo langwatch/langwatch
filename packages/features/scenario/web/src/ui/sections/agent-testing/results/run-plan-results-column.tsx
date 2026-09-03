@@ -13,8 +13,12 @@ import { RunPlanResultsDialogs } from "./run-plan-results-dialogs";
 import { RunPlanRunResults } from "./run-plan-run-results";
 import { RUNS_SIDEBAR_WIDTH } from "./runs-sidebar";
 import type { RunPlan } from "../../../../behavior/agent-testing/results/run-plans";
-import type { RunPlanBatches, RunPlanSelection } from "../../../../behavior/agent-testing/results/use-run-plan-batches";
+import type {
+  RunPlanBatches,
+  RunPlanSelection,
+} from "../../../../behavior/agent-testing/results/use-run-plan-batches";
 import { useRunPlanResultsColumn } from "./use-run-plan-results-column";
+import { RunSettingsBlock } from "./run-settings-block";
 
 export type RunPlanResultsColumnProps = {
   plan: RunPlan;
@@ -39,7 +43,13 @@ export function RunPlanResultsColumn({
     exportRuns,
     isExportDisabled,
     run,
+    runSettings,
+    runStartedLabel,
+    runStartedByLabel,
+    isRunSettingsShown,
+    toggleRunSettings,
     runDialog,
+    targets,
   } = useRunPlanResultsColumn({ plan, batches, selection, periodControls });
 
   return (
@@ -51,21 +61,31 @@ export function RunPlanResultsColumn({
           viewMode={viewMode}
           onViewModeChange={onViewModeChange}
           onStopAll={
-            cancel.canStop && selection.isBatchRunning
-              ? cancel.handleCancelAll
-              : undefined
+            cancel.canStop && selection.isBatchRunning ? cancel.handleCancelAll : undefined
           }
           isStoppingAll={cancel.isCancellingBatch}
           onExport={exportRuns.openExportDialog}
           isExportDisabled={isExportDisabled}
           onEditPlan={onEditPlan}
           onRunPlan={canManage ? runDialog.runPlan : undefined}
+          isRunSettingsShown={isRunSettingsShown}
+          onToggleRunSettings={toggleRunSettings}
         />
+
+        {isRunSettingsShown && runSettings ? (
+          <RunSettingsBlock
+            settings={runSettings}
+            targets={targets}
+            startedLabel={runStartedLabel}
+            startedByLabel={runStartedByLabel}
+          />
+        ) : null}
 
         <RunPlanRunResults
           plan={plan}
           batches={batches}
           selection={selection}
+          targets={targets}
           cancel={cancel}
           viewMode={viewMode}
           periodControls={periodControls}

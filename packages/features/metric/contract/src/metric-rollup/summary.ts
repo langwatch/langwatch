@@ -1,9 +1,6 @@
-import type {
-  CanonicalMetricDataPoint,
-  MetricRollupRow,
-} from "../schemas/metric-processing/metric-data-point";
+import type { MetricRollupRow } from "../schemas/metric-processing/metric-data-point";
 import { type BucketEntry, resetOrGap } from "./rollup-row";
-import { bigint, previousPoint, startsNewSequence } from "./sequence";
+import { bigint, type MetricRollupSourcePoint, previousPoint, startsNewSequence } from "./sequence";
 
 /**
  * OTLP summaries are cumulative even though they carry no temporality field.
@@ -17,7 +14,7 @@ function buildSummaryRow({
 }: {
   row: MetricRollupRow;
   entries: BucketEntry[];
-  all: CanonicalMetricDataPoint[];
+  all: MetricRollupSourcePoint[];
 }): void {
   let count = 0n;
   let sum = 0;

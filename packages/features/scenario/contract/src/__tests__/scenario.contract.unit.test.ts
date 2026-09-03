@@ -16,9 +16,7 @@ describe("Scenario contract", () => {
   });
 
   it("refuses prototype-sensitive supplied parameter names", () => {
-    const parsed = runParameterValuesSchema.safeParse(
-      JSON.parse('{"__proto__":"unsafe"}'),
-    );
+    const parsed = runParameterValuesSchema.safeParse(JSON.parse('{"__proto__":"unsafe"}'));
 
     expect(parsed.success).toBe(false);
   });
@@ -42,7 +40,7 @@ describe("Scenario contract", () => {
       judgeModel: "openai/gpt-5-nano",
       maxTurns: 5,
       minTurns: 1,
-      folderId: null,
+      testSuiteId: null,
       version: 1,
       lastUpdatedById: null,
       archivedAt: null,

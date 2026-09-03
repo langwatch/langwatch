@@ -137,7 +137,7 @@ export const scenarioMoveInputSchema = scenarioIdInputSchema
   .omit({ id: true })
   .extend({
     scenarioId: z.string().min(1),
-    folderId: z.string().min(1).nullable(),
+    testSuiteId: z.string().min(1).nullable(),
   })
   .strict();
 export type ScenarioMoveInput = z.infer<typeof scenarioMoveInputSchema>;

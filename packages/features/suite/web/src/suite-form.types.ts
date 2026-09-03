@@ -1,7 +1,7 @@
 import type { UseFormReturn } from "react-hook-form";
 import { z } from "zod";
 import {
-  CASES_SCOPE,
+  SCENARIOS_SCOPE,
   type SuiteScope,
   suiteScopeSchema,
   suiteTargetSchema,
@@ -15,8 +15,8 @@ export const suiteFormSchema = z.object({
   description: z.string(),
   labels: z.array(z.string()),
   /**
-   * What the plan covers. `cases` is the explicit list below; the dynamic
-   * modes resolve against the project at run time, so a case added later is
+   * What the plan covers. `scenarios` is the explicit list below; the dynamic
+   * modes resolve against the project at run time, so a scenario added later is
    * covered without anyone editing the plan.
    */
   scope: suiteScopeSchema,
@@ -52,8 +52,8 @@ export type SuiteFormReturn = UseFormReturn<
  * The rules the Agent Testing run plan editor holds the same form to.
  *
  * It asks for no target: the run dialog is where an agent or a prompt is
- * chosen. It asks for a case list only from a plan that runs one, and for a
- * folder or label scope it asks that the scope name something.
+ * chosen. It asks for a scenario list only from a plan that runs one, and for a
+ * suite or label scope it asks that the scope name something.
  */
 export const planFormSchema = suiteFormSchema
   .extend({
@@ -62,8 +62,8 @@ export const planFormSchema = suiteFormSchema
   })
   .superRefine((data, ctx) => {
     const empty =
-      (data.scope.mode === "cases" && data.selectedScenarioIds.length === 0) ||
-      (data.scope.mode === "folders" && data.scope.folderIds.length === 0) ||
+      (data.scope.mode === "scenarios" && data.selectedScenarioIds.length === 0) ||
+      (data.scope.mode === "test_suites" && data.scope.testSuiteIds.length === 0) ||
       (data.scope.mode === "labels" && data.scope.labels.length === 0);
     if (empty) {
       ctx.addIssue({
@@ -78,8 +78,8 @@ export interface SuiteFormScenario {
   id: string;
   name: string;
   labels: string[];
-  /** The test suite the case is filed in, when the project uses them. */
-  folderId?: string | null;
+  /** The test suite the scenario is filed in, when the project uses them. */
+  testSuiteId?: string | null;
 }
 
 export interface SuiteFormAgent {
@@ -101,6 +101,8 @@ export interface SuiteFormAvailableTarget {
 
 export interface SuiteFormSuite {
   id: string;
+  /** "run_plan" or "test_suite"; a test suite carries no scope of its own. */
+  kind?: string | null;
   projectId?: string;
   slug?: string;
   archivedAt?: Date | null;
@@ -132,7 +134,7 @@ export interface UseSuiteFormParams {
 }
 
 export const suiteFormDefaultValues: SuiteFormData = {
-  scope: CASES_SCOPE,
+  scope: SCENARIOS_SCOPE,
   name: "",
   description: "",
   labels: [],

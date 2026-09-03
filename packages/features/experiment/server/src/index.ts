@@ -109,9 +109,15 @@ export {
 } from "./services/experiment-run-orchestrator.service";
 export {
   startPollingRun,
-  type RunResultsPersistence,
   type StartPollingRunInput,
 } from "./services/experiment-polling-run.service";
+export {
+  createRunResultsWriter,
+  persistRunResults,
+  runResultsWriterFor,
+  type RunResultsPersistence,
+  type RunResultsWriter,
+} from "./services/experiment-run-results-writer.service";
 export {
   buildStateFromWorkbench,
   planSavedRunCarryOver,

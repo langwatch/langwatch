@@ -385,7 +385,7 @@ describe("Langy current-surfaces coverage", () => {
           ],
         },
         label: "surfaces-simulation-run-outcome",
-        path: "/simulations",
+        path: "/agent-testing/results",
       });
       if (!result.success) console.log("JUDGE REASONING:", result.reasoning);
       expect(result.success).toBe(true);

@@ -29,9 +29,7 @@ export const AGENT_SANDBOX_KEY_TTL_MS = 12 * 60 * 60 * 1000;
  * would silently hand every sandbox in the product whatever a later
  * view-guarded route decides to answer.
  */
-export const AGENT_SANDBOX_PERMISSIONS: readonly string[] = [
-  "agentCache:manage",
-];
+export const AGENT_SANDBOX_PERMISSIONS: readonly string[] = ["agentCache:manage"];
 
 /**
  * Mint the credential a code agent's sandbox authenticates with.
@@ -58,10 +56,11 @@ export async function mintAgentSandboxApiKey({
     description:
       "Short-lived key for one code agent run. Reaches the project's agent " +
       "cache and nothing else, and expires by itself.",
-    // No owner: there is no person behind a run's sandbox, and a key with no
-    // owner has no user ceiling to clamp. The grains below are the whole
-    // ceiling instead.
+    // No owner and no creator: there is no person behind a run's sandbox, and
+    // a key with no owner has no user ceiling to clamp. The grains below are
+    // the whole ceiling instead.
     userId: null,
+    createdByUserId: null,
     organizationId,
     permissionMode: "restricted",
     permissions: [...AGENT_SANDBOX_PERMISSIONS],

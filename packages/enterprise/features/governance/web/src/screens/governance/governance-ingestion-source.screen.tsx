@@ -31,7 +31,15 @@ import { EnterpriseLockedSurface } from "../../ui/elements/enterprise-locked-sur
 import GovernanceLayout from "../../ui/sections/governance-layout";
 import { NotFoundScene } from "../../ui/elements/not-found-scene";
 import { PermissionRequiredNotice } from "../../ui/elements/permission-required-notice";
-import { DialogBody, DialogCloseTrigger, DialogContent, DialogFooter, DialogHeader, DialogRoot, DialogTitle } from "@langwatch/design-system/dialog";
+import {
+  DialogBody,
+  DialogCloseTrigger,
+  DialogContent,
+  DialogFooter,
+  DialogHeader,
+  DialogRoot,
+  DialogTitle,
+} from "@langwatch/design-system/dialog";
 import { Link } from "../../ui/elements/governance-link";
 import { ListTable } from "@langwatch/design-system/list-table";
 import { Pagination } from "@langwatch/design-system/pagination";
@@ -42,7 +50,14 @@ import { useGovernanceScope } from "../../behavior/governance-session";
 import { api, type RouterOutputs } from "../../behavior/governance-api";
 import { useGovernanceRouter } from "../../behavior/governance-router";
 import { formatTimeAgo } from "../../model/format-time-ago";
-import { type SourceEventsPager, useSourceEventsPager } from "../../features/source-events/behavior/use-source-events-pager";
+import {
+  needsIngestSecret,
+  type SourceType,
+} from "../../features/ingestion-sources/model/ingestion-source-catalog";
+import {
+  type SourceEventsPager,
+  useSourceEventsPager,
+} from "../../features/source-events/behavior/use-source-events-pager";
 import { type PageRequest } from "../../features/source-events/model/governance-events-pager";
 import { SourceEventsTable } from "../../features/source-events/ui/sections/source-events-table";
 import { useDestinationContext } from "./ingestion-source-forms";
@@ -154,15 +169,19 @@ function SourceDetailHeader({
           >
             <Pencil size={14} /> Edit
           </Button>
-          <Button
-            size="sm"
-            variant="outline"
-            onClick={onRotate}
-            loading={isRotating}
-            title="Mint a new ingestSecret (24h grace on the old one)"
-          >
-            <RotateCw size={14} /> Rotate secret
-          </Button>
+          {needsIngestSecret({
+            sourceType: source.sourceType as SourceType,
+          }) && (
+            <Button
+              size="sm"
+              variant="outline"
+              onClick={onRotate}
+              loading={isRotating}
+              title="Mint a new ingestSecret (24h grace on the old one)"
+            >
+              <RotateCw size={14} /> Rotate secret
+            </Button>
+          )}
           <Button
             size="sm"
             variant="ghost"
@@ -807,7 +826,7 @@ function SecretRevealModal({
   const webhookUrl = `${baseUrl}/api/ingest/webhook/${sourceId}`;
   const usesPushUrl =
     sourceType === "otel_generic" || sourceType === "claude_cowork" || sourceType === "claude_code";
-  const usesWebhookUrl = sourceType === "workato";
+  const usesWebhookUrl = sourceType === "workato" || sourceType === "s3_custom";
   const isClaudeCode = sourceType === "claude_code";
 
   // Claude Code's monitoring-usage doc requires CLAUDE_CODE_ENABLE_TELEMETRY=1

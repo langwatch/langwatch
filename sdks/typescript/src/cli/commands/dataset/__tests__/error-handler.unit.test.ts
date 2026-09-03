@@ -14,6 +14,7 @@ import {
   DatasetPlanLimitError,
 } from "@/client-sdk/services/datasets/errors";
 import { handleDatasetCommandError } from "../error-handler";
+import { setOutputFormat } from "../../../utils/outputScope";
 
 describe("handleDatasetCommandError", () => {
   let consoleErrorSpy: MockInstance<typeof console.error>;
@@ -61,6 +62,55 @@ describe("handleDatasetCommandError", () => {
       );
       expect(spinnerCalls.join("\n")).toContain("Not found");
       expect(spinnerCalls.join("\n")).toContain("my-ds");
+    });
+  });
+
+  describe("when the failure is rendered as the machine document", () => {
+    /** @scenario "A missing dataset is reported as not found, not as a network error" */
+    it("carries not_found at 404, never network_error", () => {
+      setOutputFormat("json");
+      const consoleLogSpy = vi
+        .spyOn(console, "log")
+        .mockImplementation(() => undefined);
+      try {
+        callHandler(new DatasetNotFoundError("my-ds"), "fetch dataset");
+      } finally {
+        setOutputFormat(undefined);
+      }
+      const doc = JSON.parse(String(consoleLogSpy.mock.calls[0]?.[0]));
+      expect(doc.error.code).toBe("not_found");
+      expect(doc.error.httpStatus).toBe(404);
+      expect(doc.error.suggestions.join(" ")).not.toContain("network");
+      consoleLogSpy.mockRestore();
+    });
+
+    /** @scenario "A dataset plan limit is reported with its own code" */
+    it("carries plan_limit_reached at 403 with the usage in meta", () => {
+      setOutputFormat("json");
+      const consoleLogSpy = vi
+        .spyOn(console, "log")
+        .mockImplementation(() => undefined);
+      try {
+        callHandler(
+          new DatasetPlanLimitError("Dataset limit reached for FREE plan", {
+            limitType: "datasets",
+            current: 3,
+            max: 3,
+          }),
+          "create dataset",
+        );
+      } finally {
+        setOutputFormat(undefined);
+      }
+      const doc = JSON.parse(String(consoleLogSpy.mock.calls[0]?.[0]));
+      expect(doc.error.code).toBe("plan_limit_reached");
+      expect(doc.error.httpStatus).toBe(403);
+      expect(doc.error.meta).toMatchObject({
+        limitType: "datasets",
+        current: 3,
+        max: 3,
+      });
+      consoleLogSpy.mockRestore();
     });
   });
 

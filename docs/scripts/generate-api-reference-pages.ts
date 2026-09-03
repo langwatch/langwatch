@@ -29,7 +29,7 @@ interface EndpointGroup {
   /**
    * `METHOD /path` keys, in the order a reader should meet them.
    *
-   * The default sort is CRUD-shaped — list, create, get, update, delete — which
+   * The default sort is CRUD-shaped (list, create, get, update, delete), which
    * is right for a resource but wrong for a family that is a sequence of steps.
    * A group whose overview describes a lifecycle sets this so the sidebar and
    * the prose agree; anything the list omits falls in behind, still sorted the
@@ -77,8 +77,8 @@ const UNDOCUMENTED_CALLER_IDENTITY =
 const UNDOCUMENTED_MODEL_DEFAULTS =
   "Not yet documented in the API reference: the default-model cascade routes have no reference pages yet.";
 
-const UNDOCUMENTED_LWQL_ANALYTICS_SQL =
-  "Not yet documented in the API reference: the LangWatchQL analytics SQL routes require the analytics:view permission and have no reference pages yet.";
+const UNDOCUMENTED_SAVED_WORKBENCH_CHARTS =
+  "Not yet documented in the API reference: the saved workbench chart routes require the analytics:view permission and have no reference pages yet.";
 
 /**
  * Spec paths that deliberately get no reference page, each with the reason it
@@ -86,7 +86,7 @@ const UNDOCUMENTED_LWQL_ANALYTICS_SQL =
  * entry, and the generator fails when one is owned by neither.
  */
 const SKIP_PATHS: Record<string, string> = {
-  "/": "Not an API route: the prompts app serves the spec's root path, so there is nothing to document.",
+  "/": "Not an API route: the prompts app serves the spec's root path, which has no content to document.",
   "/api/trace/search":
     "Retired surface, intentionally undocumented: superseded by /api/traces/search.",
   "/api/trace/{id}":
@@ -97,19 +97,18 @@ const SKIP_PATHS: Record<string, string> = {
   "/api/governance/ingestion-templates/admin": UNDOCUMENTED_INGESTION_TEMPLATES,
   "/api/governance/ingestion-templates/clone": UNDOCUMENTED_INGESTION_TEMPLATES,
   "/api/governance/ingestion-templates/{id}": UNDOCUMENTED_INGESTION_TEMPLATES,
-  "/api/governance/ingestion-templates/{id}/ottl-rules": UNDOCUMENTED_INGESTION_TEMPLATES,
+  "/api/governance/ingestion-templates/{id}/ottl-rules":
+    UNDOCUMENTED_INGESTION_TEMPLATES,
   "/api/me/project": UNDOCUMENTED_CALLER_IDENTITY,
   "/api/me/usage": UNDOCUMENTED_CALLER_IDENTITY,
   "/api/model-defaults": UNDOCUMENTED_MODEL_DEFAULTS,
   "/api/model-defaults/{id}": UNDOCUMENTED_MODEL_DEFAULTS,
-  "/api/v1/projects/{projectId}/analytics/query/clickhouse":
-    UNDOCUMENTED_LWQL_ANALYTICS_SQL,
-  "/api/v1/projects/{projectId}/analytics/schema": UNDOCUMENTED_LWQL_ANALYTICS_SQL,
-  "/api/v1/projects/{projectId}/analytics/charts": UNDOCUMENTED_LWQL_ANALYTICS_SQL,
+  "/api/v1/projects/{projectId}/analytics/charts":
+    UNDOCUMENTED_SAVED_WORKBENCH_CHARTS,
   "/api/v1/projects/{projectId}/analytics/charts/{chartId}":
-    UNDOCUMENTED_LWQL_ANALYTICS_SQL,
+    UNDOCUMENTED_SAVED_WORKBENCH_CHARTS,
   "/api/v1/projects/{projectId}/analytics/charts/{chartId}/placement":
-    UNDOCUMENTED_LWQL_ANALYTICS_SQL,
+    UNDOCUMENTED_SAVED_WORKBENCH_CHARTS,
 };
 
 const ENDPOINT_GROUPS: EndpointGroup[] = [
@@ -215,23 +214,37 @@ const ENDPOINT_GROUPS: EndpointGroup[] = [
       "Query simulation run results. List runs, get batch summaries, and retrieve individual run details.",
   },
   {
+    name: "Run Plans",
+    dirName: "run-plans",
+    pathPrefixes: ["/api/v1/run-plans"],
+    overviewDescription:
+      "Run agent tests. A run plan is identified by its name: a run started under a name joins that plan and replaces its configuration, or creates the plan when no plan holds that name. List, read, run and archive run plans.",
+  },
+  {
+    name: "Test Suites",
+    dirName: "test-suites",
+    pathPrefixes: ["/api/v1/test-suites"],
+    overviewDescription:
+      "Organise agent tests. A test suite groups scenarios; the targets a run goes against are sent with the run. Create, read, rename, archive and run test suites.",
+  },
+  {
     name: "Suites",
     dirName: "suites",
     pathPrefixes: ["/api/suites"],
     overviewDescription:
-      "Manage test suites (run plans) that group scenarios for batch execution. Create, update, duplicate, and trigger suite runs.",
+      "Deprecated. The /api/suites family is a frozen alias. New integrations use Run Plans and Test Suites.",
   },
   {
     name: "Agents",
     dirName: "agents",
-    pathPrefixes: ["/api/agents"],
+    pathPrefixes: ["/api/v1/agents"],
     overviewDescription:
       "Manage AI agent configurations. Create, update, and organize agents that are tracked and evaluated in LangWatch.",
   },
   {
     name: "Coding Agents",
     dirName: "coding-agents",
-    pathPrefixes: ["/api/coding-agent"],
+    pathPrefixes: ["/api/v1/coding-agent", "/api/coding-agent"],
     overviewDescription:
       "Read what a coding agent session did and what it cost. Walk one session's events call by call, with the tokens, cost and compactions of each, or roll a whole pull request up into sessions, tokens and cost per project, user and agent.",
   },
@@ -279,12 +292,20 @@ const ENDPOINT_GROUPS: EndpointGroup[] = [
     name: "Analytics",
     dirName: "analytics",
     pathPrefixes: ["/api/analytics"],
-    overviewDescription: "Query analytics timeseries data with metrics, aggregations, and filters.",
+    overviewDescription:
+      "Query analytics timeseries data with metrics, aggregations, and filters.",
+  },
+  {
+    name: "Query",
+    dirName: "query",
+    pathPrefixes: ["/api/v1/query"],
+    overviewDescription:
+      "Run a read-only LangWatchQL SELECT over your project's analytics datasets, or discover which datasets and columns your key can query.",
   },
   {
     name: "Secrets",
     dirName: "secrets",
-    pathPrefixes: ["/api/v1/secret"],
+    pathPrefixes: ["/api/secrets"],
     overviewDescription:
       "Manage project secrets used for external integrations. Values are encrypted at rest and never returned in API responses.",
   },
@@ -468,7 +489,11 @@ function slugify(text: string): string {
     .replace(/^-|-$/g, "");
 }
 
-function generateTitle(method: string, apiPath: string, op: OpenAPIOperation): string {
+function generateTitle(
+  method: string,
+  apiPath: string,
+  op: OpenAPIOperation,
+): string {
   if (op.summary) return op.summary;
 
   const desc = op.description ?? "";
@@ -491,7 +516,9 @@ function generateTitle(method: string, apiPath: string, op: OpenAPIOperation): s
 function getResourceName(apiPath: string): string {
   const parts = apiPath
     .split("/")
-    .filter((p) => !p.startsWith("{") && p !== "api" && p !== "v1" && p !== "v3")
+    .filter(
+      (p) => !p.startsWith("{") && p !== "api" && p !== "v1" && p !== "v3",
+    )
     .filter(Boolean);
   const last = parts[parts.length - 1] ?? "resource";
   return last
@@ -500,7 +527,11 @@ function getResourceName(apiPath: string): string {
     .join(" ");
 }
 
-function generateFileName(method: string, apiPath: string, op: OpenAPIOperation): string {
+function generateFileName(
+  method: string,
+  apiPath: string,
+  op: OpenAPIOperation,
+): string {
   if (op.summary) {
     const s = slugify(op.summary);
     return s.length > 40 ? s.substring(0, 40).replace(/-$/, "") : s;
@@ -615,7 +646,7 @@ function main() {
   const owners = resolveOwners(Object.keys(spec.paths));
 
   // A hand-written page is named as a string, so a rename or a typo would drop
-  // it out of the sidebar silently — the same failure this generator exists to
+  // it out of the sidebar silently: the same failure this generator exists to
   // prevent. Check every one of them against the filesystem up front.
   const declaredExtras = [
     ...INTRO_GROUP.pages,
@@ -712,9 +743,11 @@ function main() {
   }
   if (misownedOrder.length > 0) {
     const noun =
-      misownedOrder.length === 1 ? "key names an operation" : "keys name operations";
+      misownedOrder.length === 1
+        ? "key names an operation"
+        : "keys name operations";
     console.error(
-      `ERROR: ${misownedOrder.length} endpointOrder ${noun} the declaring group does not own, so the key sorts nothing:`,
+      `ERROR: ${misownedOrder.length} endpointOrder ${noun} the declaring group does not own, so the key sorts no entries:`,
     );
     for (const entry of misownedOrder.sort()) console.error(`  ${entry}`);
     console.error(
@@ -900,11 +933,18 @@ const BUILTIN_EVALUATOR_CATEGORIES: Record<string, string[]> = {
   ],
 };
 
-function buildBuiltInEvaluatorNav(): (string | { group: string; pages: string[] })[] {
+function buildBuiltInEvaluatorNav(): (
+  | string
+  | { group: string; pages: string[] }
+)[] {
   const p = (name: string) => `api-reference/evaluators/${name}`;
-  const pages: (string | { group: string; pages: string[] })[] = [p("overview")];
+  const pages: (string | { group: string; pages: string[] })[] = [
+    p("overview"),
+  ];
 
-  for (const [category, evaluators] of Object.entries(BUILTIN_EVALUATOR_CATEGORIES)) {
+  for (const [category, evaluators] of Object.entries(
+    BUILTIN_EVALUATOR_CATEGORIES,
+  )) {
     pages.push({
       group: category,
       pages: evaluators.map(p),

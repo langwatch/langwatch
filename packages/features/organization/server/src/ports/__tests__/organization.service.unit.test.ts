@@ -150,6 +150,9 @@ class UnusedTeams extends TeamRepository {
   getOrganizationMembers(): Promise<string[]> {
     throw new Error("not used by this test");
   }
+  memberOrganizationIds(): Promise<string[]> {
+    throw new Error("not used by this test");
+  }
   getById(): Promise<OrganizationTeam> {
     throw new Error("not used by this test");
   }
@@ -295,6 +298,10 @@ class MemoryTeams extends TeamRepository {
   member = true;
   activeMember = true;
   organizationMemberReads = 0;
+
+  memberOrganizationIds(): Promise<string[]> {
+    throw new Error("not used by this test");
+  }
 
   get(): Promise<OrganizationTeam> {
     return Promise.resolve(this.team);

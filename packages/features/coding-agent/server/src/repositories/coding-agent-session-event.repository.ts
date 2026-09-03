@@ -6,10 +6,7 @@ import type {
 
 /** Private persistence port for the ordered session event read model. */
 export abstract class CodingAgentSessionEventRepository {
-  abstract ensure(
-    records: CodingAgentSessionEventRecord[],
-    retentionDays: number,
-  ): Promise<void>;
+  abstract ensure(records: CodingAgentSessionEventRecord[], retentionDays: number): Promise<void>;
 
   abstract findBySessionId(input: {
     tenantId: string;
@@ -28,12 +25,37 @@ export abstract class CodingAgentSessionEventRepository {
     sessionIds: string[];
     fromMs: number;
   }): Promise<SessionModelTotalsRow[]>;
+
+  /**
+   * The sessions whose stamped fact rows name one repository's branches: the
+   * discovery read that finds a session for a pull request even after the
+   * session's own row moved on to another repository. Returns distinct
+   * (tenantId, sessionId) pairs only; the caller fetches the session rows.
+   */
+  abstract listSessionsByStampedBranch(input: {
+    tenantIds: string[];
+    repositoryHost: string;
+    repositoryOwner: string;
+    repositoryName: string;
+    branches: string[];
+    fromMs: number;
+  }): Promise<Array<{ tenantId: string; sessionId: string }>>;
 }
 
+/**
+ * One (session, model, working context) group's totals. The context fields are
+ * '' for rows written before the session declared where it was working (or
+ * before the stamp existed); those unstamped totals are priced under the
+ * legacy whole-session rule.
+ */
 export interface SessionModelTotalsRow {
   tenantId: string;
   sessionId: string;
   model: string;
+  repositoryHost: string;
+  repositoryOwner: string;
+  repositoryName: string;
+  branch: string;
   inputTokens: number;
   outputTokens: number;
   cacheReadTokens: number;
@@ -52,6 +74,10 @@ export class NullCodingAgentSessionEventRepository extends CodingAgentSessionEve
   }
 
   async sumTokensByModelPerSession(): Promise<SessionModelTotalsRow[]> {
+    return [];
+  }
+
+  async listSessionsByStampedBranch(): Promise<Array<{ tenantId: string; sessionId: string }>> {
     return [];
   }
 }

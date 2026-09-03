@@ -37,7 +37,6 @@ import {
 import { useEffect, type ComponentType } from "react";
 import type { UiPageLoader, UiPageLoaderRegistry } from "../../../../behavior/ui-page-loaders";
 import { useUiCapabilities } from "../../../../behavior/ui-capabilities";
-import { useRememberPersonalHome } from "../../../../behavior/ui-home-kind";
 import {
   UiPageForbidden,
   UiPageLoading,
@@ -82,33 +81,15 @@ function withDocumentTitle<P extends object>(
   return Titled;
 }
 
-/**
- * Marks the personal workspace as the last home this reader opened.
- *
- * `MyLayout` did this on every `/me/*` page and no others, so the marker rides
- * the five personal keys and neither project one — a reader on
- * `/:project/sessions` is on a project page, and the resolution layer already
- * leaves `"project"` behind for it.
- */
-function withPersonalHomeMarker<P extends object>(Page: ComponentType<P>): ComponentType<P> {
-  const Marked = (props: P) => {
-    useRememberPersonalHome();
-    return <Page {...props} />;
-  };
-  Marked.displayName = `withPersonalHomeMarker(${Page.displayName ?? Page.name ?? "Page"})`;
-  return Marked;
-}
-
 function personalWorkspacePage(
   screen: PersonalWorkspaceScreenName,
-  { title, isPersonalHome = true }: { title: string; isPersonalHome?: boolean },
+  { title }: { title: string },
 ): UiPageLoader {
   return async () => {
     const module = await personalWorkspaceScreens[screen]();
     const titled = withDocumentTitle(title, module.default as ComponentType);
-    const marked = isPersonalHome ? withPersonalHomeMarker(titled) : titled;
     const guarded = withUiPageGuard({ flags: [PERSONAL_WORKSPACE_FLAG], fallbacks: FALLBACKS })(
-      marked,
+      titled,
     );
     return { default: withPersonalWorkspaceHost(guarded) };
   };
@@ -156,10 +137,8 @@ export const personalWorkspacePageLoaders: UiPageLoaderRegistry = {
   }),
   "pages/[project]/sessions": personalWorkspacePage("projectSessions", {
     title: "Sessions · LangWatch",
-    isPersonalHome: false,
   }),
   "pages/[project]/pull-requests": personalWorkspacePage("projectPullRequests", {
     title: "Pull requests · LangWatch",
-    isPersonalHome: false,
   }),
 };

@@ -28,7 +28,7 @@ export const scenarioSchema = z
     judgeModel: z.string().nullable(),
     maxTurns: z.number().int().nullable(),
     minTurns: z.number().int().nullable(),
-    folderId: z.string().min(1).nullable().default(null),
+    testSuiteId: z.string().min(1).nullable().default(null),
     version: z.number().int().positive().default(1),
     lastUpdatedById: z.string().nullable(),
     archivedAt: z.date().nullable(),
@@ -38,8 +38,8 @@ export const scenarioSchema = z
   .strict();
 export type Scenario = z.infer<typeof scenarioSchema>;
 
-/** A Scenario-owned folder backed by a `SimulationSuite` row of kind `folder`. */
-export const scenarioFolderSchema = z
+/** A Scenario-owned test suite backed by a `SimulationSuite` row of kind `test suite`. */
+export const scenarioTestSuiteSchema = z
   .object({
     id: z.string().min(1),
     projectId: z.string().min(1),
@@ -52,31 +52,31 @@ export const scenarioFolderSchema = z
     labels: z.array(z.string()),
     simulatorModel: z.string().nullable(),
     judgeModel: z.string().nullable(),
-    kind: z.literal("folder"),
+    kind: z.literal("test_suite"),
     scope: jsonValueSchema.nullable(),
     archivedAt: z.date().nullable(),
     createdAt: z.date(),
     updatedAt: z.date(),
   })
   .strict();
-export type ScenarioFolder = z.infer<typeof scenarioFolderSchema>;
+export type ScenarioTestSuite = z.infer<typeof scenarioTestSuiteSchema>;
 
-export const scenarioFolderCreateInputSchema = z
+export const scenarioTestSuiteCreateInputSchema = z
   .object({ projectId: z.string().min(1), name: z.string().trim().min(1) })
   .strict();
-export type ScenarioFolderCreateInput = z.infer<typeof scenarioFolderCreateInputSchema>;
+export type ScenarioTestSuiteCreateInput = z.infer<typeof scenarioTestSuiteCreateInputSchema>;
 
-export const scenarioFolderIdInputSchema = z
-  .object({ projectId: z.string().min(1), folderId: z.string().min(1) })
+export const scenarioTestSuiteIdInputSchema = z
+  .object({ projectId: z.string().min(1), testSuiteId: z.string().min(1) })
   .strict();
-export type ScenarioFolderIdInput = z.infer<typeof scenarioFolderIdInputSchema>;
+export type ScenarioTestSuiteIdInput = z.infer<typeof scenarioTestSuiteIdInputSchema>;
 
-export const scenarioFolderRenameInputSchema = scenarioFolderIdInputSchema
+export const scenarioTestSuiteRenameInputSchema = scenarioTestSuiteIdInputSchema
   .extend({ name: z.string().trim().min(1) })
   .strict();
-export type ScenarioFolderRenameInput = z.infer<typeof scenarioFolderRenameInputSchema>;
+export type ScenarioTestSuiteRenameInput = z.infer<typeof scenarioTestSuiteRenameInputSchema>;
 
-export const scenarioFolderUpdateInputSchema = scenarioFolderIdInputSchema
+export const scenarioTestSuiteUpdateInputSchema = scenarioTestSuiteIdInputSchema
   .extend({
     name: z.string().trim().min(1).optional(),
     description: z.string().nullable().optional(),
@@ -87,10 +87,10 @@ export const scenarioFolderUpdateInputSchema = scenarioFolderIdInputSchema
     judgeModel: z.string().nullable().optional(),
   })
   .strict();
-export type ScenarioFolderUpdateInput = z.infer<typeof scenarioFolderUpdateInputSchema>;
+export type ScenarioTestSuiteUpdateInput = z.infer<typeof scenarioTestSuiteUpdateInputSchema>;
 
-export type ScenarioFolderRunDefinition = {
-  folder: ScenarioFolder;
+export type ScenarioTestSuiteRunDefinition = {
+  testSuite: ScenarioTestSuite;
   scenarioIds: string[];
 };
 
@@ -111,7 +111,7 @@ const scenarioFieldsSchema = z
     maxTurns: z.number().int().min(1).max(100).nullable().optional(),
     minTurns: z.number().int().min(0).max(100).nullable().optional(),
     lastUpdatedById: z.string().nullable().optional(),
-    folderId: z.string().min(1).nullable().optional(),
+    testSuiteId: z.string().min(1).nullable().optional(),
   })
   .strict();
 

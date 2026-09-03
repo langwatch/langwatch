@@ -21,8 +21,9 @@ export function useRunStateStream({
   projectId: string | undefined;
   isOpen: boolean;
 }) {
-  const { streamingMessages, handleStreamingEvent, clearCompleted } =
-    useSimulationStreamingState(scenarioRunId ?? undefined);
+  const { streamingMessages, handleStreamingEvent, clearCompleted } = useSimulationStreamingState(
+    scenarioRunId ?? undefined,
+  );
 
   const isWatching = !!projectId && !!scenarioRunId && isOpen;
 
@@ -36,20 +37,23 @@ export function useRunStateStream({
     onStreamingEvent: handleStreamingEvent,
   });
 
-  const { data: scenarioState, error: runStateError } =
-    api.scenarios.getRunState.useQuery(
-      { scenarioRunId: scenarioRunId ?? "", projectId: projectId ?? "" },
-      {
-        enabled: isWatching,
-        // Finished runs never change, so polling stops entirely. Live runs poll
-        // fast only while the event stream is down.
-        refetchInterval: (query) =>
-          getRunStatePollInterval({
-            status: query.state.data?.status,
-            sseConnected,
-          }),
-      },
-    );
+  const {
+    data: scenarioState,
+    error: runStateError,
+    isLoading: isRunStateLoading,
+  } = api.scenarios.getRunState.useQuery(
+    { scenarioRunId: scenarioRunId ?? "", projectId: projectId ?? "" },
+    {
+      enabled: isWatching,
+      // Finished runs never change, so polling stops entirely. Live runs poll
+      // fast only while the event stream is down.
+      refetchInterval: (query) =>
+        getRunStatePollInterval({
+          status: query.state.data?.status,
+          sseConnected,
+        }),
+    },
+  );
 
   // Clear streaming messages once server data includes them
   useEffect(() => {
@@ -62,5 +66,10 @@ export function useRunStateStream({
     }
   }, [scenarioState?.messages, clearCompleted]);
 
-  return { scenarioState, runStateError, streamingMessages };
+  return {
+    scenarioState,
+    runStateError,
+    streamingMessages,
+    isRunStateLoading: isWatching && isRunStateLoading,
+  };
 }

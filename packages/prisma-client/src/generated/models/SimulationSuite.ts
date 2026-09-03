@@ -289,7 +289,7 @@ export type SimulationSuiteWhereInput = {
   createdAt?: Prisma.DateTimeFilter<"SimulationSuite"> | Date | string
   updatedAt?: Prisma.DateTimeFilter<"SimulationSuite"> | Date | string
   project?: Prisma.XOR<Prisma.ProjectScalarRelationFilter, Prisma.ProjectWhereInput>
-  folderScenarios?: Prisma.ScenarioListRelationFilter
+  testSuiteScenarios?: Prisma.ScenarioListRelationFilter
 }
 
 export type SimulationSuiteOrderByWithRelationInput = {
@@ -310,7 +310,7 @@ export type SimulationSuiteOrderByWithRelationInput = {
   createdAt?: Prisma.SortOrder
   updatedAt?: Prisma.SortOrder
   project?: Prisma.ProjectOrderByWithRelationInput
-  folderScenarios?: Prisma.ScenarioOrderByRelationAggregateInput
+  testSuiteScenarios?: Prisma.ScenarioOrderByRelationAggregateInput
 }
 
 export type SimulationSuiteWhereUniqueInput = Prisma.AtLeast<{
@@ -335,7 +335,7 @@ export type SimulationSuiteWhereUniqueInput = Prisma.AtLeast<{
   createdAt?: Prisma.DateTimeFilter<"SimulationSuite"> | Date | string
   updatedAt?: Prisma.DateTimeFilter<"SimulationSuite"> | Date | string
   project?: Prisma.XOR<Prisma.ProjectScalarRelationFilter, Prisma.ProjectWhereInput>
-  folderScenarios?: Prisma.ScenarioListRelationFilter
+  testSuiteScenarios?: Prisma.ScenarioListRelationFilter
 }, "id" | "projectId_slug">
 
 export type SimulationSuiteOrderByWithAggregationInput = {
@@ -401,7 +401,7 @@ export type SimulationSuiteCreateInput = {
   createdAt?: Date | string
   updatedAt?: Date | string
   project: Prisma.ProjectCreateNestedOneWithoutSuiteConfigurationsInput
-  folderScenarios?: Prisma.ScenarioCreateNestedManyWithoutFolderInput
+  testSuiteScenarios?: Prisma.ScenarioCreateNestedManyWithoutTestSuiteInput
 }
 
 export type SimulationSuiteUncheckedCreateInput = {
@@ -421,7 +421,7 @@ export type SimulationSuiteUncheckedCreateInput = {
   archivedAt?: Date | string | null
   createdAt?: Date | string
   updatedAt?: Date | string
-  folderScenarios?: Prisma.ScenarioUncheckedCreateNestedManyWithoutFolderInput
+  testSuiteScenarios?: Prisma.ScenarioUncheckedCreateNestedManyWithoutTestSuiteInput
 }
 
 export type SimulationSuiteUpdateInput = {
@@ -441,7 +441,7 @@ export type SimulationSuiteUpdateInput = {
   createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   updatedAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   project?: Prisma.ProjectUpdateOneRequiredWithoutSuiteConfigurationsNestedInput
-  folderScenarios?: Prisma.ScenarioUpdateManyWithoutFolderNestedInput
+  testSuiteScenarios?: Prisma.ScenarioUpdateManyWithoutTestSuiteNestedInput
 }
 
 export type SimulationSuiteUncheckedUpdateInput = {
@@ -461,7 +461,7 @@ export type SimulationSuiteUncheckedUpdateInput = {
   archivedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
   createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   updatedAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
-  folderScenarios?: Prisma.ScenarioUncheckedUpdateManyWithoutFolderNestedInput
+  testSuiteScenarios?: Prisma.ScenarioUncheckedUpdateManyWithoutTestSuiteNestedInput
 }
 
 export type SimulationSuiteCreateManyInput = {
@@ -639,20 +639,20 @@ export type SimulationSuiteUncheckedUpdateManyWithoutProjectNestedInput = {
   deleteMany?: Prisma.SimulationSuiteScalarWhereInput | Prisma.SimulationSuiteScalarWhereInput[]
 }
 
-export type SimulationSuiteCreateNestedOneWithoutFolderScenariosInput = {
-  create?: Prisma.XOR<Prisma.SimulationSuiteCreateWithoutFolderScenariosInput, Prisma.SimulationSuiteUncheckedCreateWithoutFolderScenariosInput>
-  connectOrCreate?: Prisma.SimulationSuiteCreateOrConnectWithoutFolderScenariosInput
+export type SimulationSuiteCreateNestedOneWithoutTestSuiteScenariosInput = {
+  create?: Prisma.XOR<Prisma.SimulationSuiteCreateWithoutTestSuiteScenariosInput, Prisma.SimulationSuiteUncheckedCreateWithoutTestSuiteScenariosInput>
+  connectOrCreate?: Prisma.SimulationSuiteCreateOrConnectWithoutTestSuiteScenariosInput
   connect?: Prisma.SimulationSuiteWhereUniqueInput
 }
 
-export type SimulationSuiteUpdateOneWithoutFolderScenariosNestedInput = {
-  create?: Prisma.XOR<Prisma.SimulationSuiteCreateWithoutFolderScenariosInput, Prisma.SimulationSuiteUncheckedCreateWithoutFolderScenariosInput>
-  connectOrCreate?: Prisma.SimulationSuiteCreateOrConnectWithoutFolderScenariosInput
-  upsert?: Prisma.SimulationSuiteUpsertWithoutFolderScenariosInput
+export type SimulationSuiteUpdateOneWithoutTestSuiteScenariosNestedInput = {
+  create?: Prisma.XOR<Prisma.SimulationSuiteCreateWithoutTestSuiteScenariosInput, Prisma.SimulationSuiteUncheckedCreateWithoutTestSuiteScenariosInput>
+  connectOrCreate?: Prisma.SimulationSuiteCreateOrConnectWithoutTestSuiteScenariosInput
+  upsert?: Prisma.SimulationSuiteUpsertWithoutTestSuiteScenariosInput
   disconnect?: Prisma.SimulationSuiteWhereInput | boolean
   delete?: Prisma.SimulationSuiteWhereInput | boolean
   connect?: Prisma.SimulationSuiteWhereUniqueInput
-  update?: Prisma.XOR<Prisma.XOR<Prisma.SimulationSuiteUpdateToOneWithWhereWithoutFolderScenariosInput, Prisma.SimulationSuiteUpdateWithoutFolderScenariosInput>, Prisma.SimulationSuiteUncheckedUpdateWithoutFolderScenariosInput>
+  update?: Prisma.XOR<Prisma.XOR<Prisma.SimulationSuiteUpdateToOneWithWhereWithoutTestSuiteScenariosInput, Prisma.SimulationSuiteUpdateWithoutTestSuiteScenariosInput>, Prisma.SimulationSuiteUncheckedUpdateWithoutTestSuiteScenariosInput>
 }
 
 export type SimulationSuiteCreatescenarioIdsInput = {
@@ -689,7 +689,7 @@ export type SimulationSuiteCreateWithoutProjectInput = {
   archivedAt?: Date | string | null
   createdAt?: Date | string
   updatedAt?: Date | string
-  folderScenarios?: Prisma.ScenarioCreateNestedManyWithoutFolderInput
+  testSuiteScenarios?: Prisma.ScenarioCreateNestedManyWithoutTestSuiteInput
 }
 
 export type SimulationSuiteUncheckedCreateWithoutProjectInput = {
@@ -708,7 +708,7 @@ export type SimulationSuiteUncheckedCreateWithoutProjectInput = {
   archivedAt?: Date | string | null
   createdAt?: Date | string
   updatedAt?: Date | string
-  folderScenarios?: Prisma.ScenarioUncheckedCreateNestedManyWithoutFolderInput
+  testSuiteScenarios?: Prisma.ScenarioUncheckedCreateNestedManyWithoutTestSuiteInput
 }
 
 export type SimulationSuiteCreateOrConnectWithoutProjectInput = {
@@ -759,7 +759,7 @@ export type SimulationSuiteScalarWhereInput = {
   updatedAt?: Prisma.DateTimeFilter<"SimulationSuite"> | Date | string
 }
 
-export type SimulationSuiteCreateWithoutFolderScenariosInput = {
+export type SimulationSuiteCreateWithoutTestSuiteScenariosInput = {
   id?: string
   name: string
   slug: string
@@ -778,7 +778,7 @@ export type SimulationSuiteCreateWithoutFolderScenariosInput = {
   project: Prisma.ProjectCreateNestedOneWithoutSuiteConfigurationsInput
 }
 
-export type SimulationSuiteUncheckedCreateWithoutFolderScenariosInput = {
+export type SimulationSuiteUncheckedCreateWithoutTestSuiteScenariosInput = {
   id?: string
   projectId: string
   name: string
@@ -797,23 +797,23 @@ export type SimulationSuiteUncheckedCreateWithoutFolderScenariosInput = {
   updatedAt?: Date | string
 }
 
-export type SimulationSuiteCreateOrConnectWithoutFolderScenariosInput = {
+export type SimulationSuiteCreateOrConnectWithoutTestSuiteScenariosInput = {
   where: Prisma.SimulationSuiteWhereUniqueInput
-  create: Prisma.XOR<Prisma.SimulationSuiteCreateWithoutFolderScenariosInput, Prisma.SimulationSuiteUncheckedCreateWithoutFolderScenariosInput>
+  create: Prisma.XOR<Prisma.SimulationSuiteCreateWithoutTestSuiteScenariosInput, Prisma.SimulationSuiteUncheckedCreateWithoutTestSuiteScenariosInput>
 }
 
-export type SimulationSuiteUpsertWithoutFolderScenariosInput = {
-  update: Prisma.XOR<Prisma.SimulationSuiteUpdateWithoutFolderScenariosInput, Prisma.SimulationSuiteUncheckedUpdateWithoutFolderScenariosInput>
-  create: Prisma.XOR<Prisma.SimulationSuiteCreateWithoutFolderScenariosInput, Prisma.SimulationSuiteUncheckedCreateWithoutFolderScenariosInput>
+export type SimulationSuiteUpsertWithoutTestSuiteScenariosInput = {
+  update: Prisma.XOR<Prisma.SimulationSuiteUpdateWithoutTestSuiteScenariosInput, Prisma.SimulationSuiteUncheckedUpdateWithoutTestSuiteScenariosInput>
+  create: Prisma.XOR<Prisma.SimulationSuiteCreateWithoutTestSuiteScenariosInput, Prisma.SimulationSuiteUncheckedCreateWithoutTestSuiteScenariosInput>
   where?: Prisma.SimulationSuiteWhereInput
 }
 
-export type SimulationSuiteUpdateToOneWithWhereWithoutFolderScenariosInput = {
+export type SimulationSuiteUpdateToOneWithWhereWithoutTestSuiteScenariosInput = {
   where?: Prisma.SimulationSuiteWhereInput
-  data: Prisma.XOR<Prisma.SimulationSuiteUpdateWithoutFolderScenariosInput, Prisma.SimulationSuiteUncheckedUpdateWithoutFolderScenariosInput>
+  data: Prisma.XOR<Prisma.SimulationSuiteUpdateWithoutTestSuiteScenariosInput, Prisma.SimulationSuiteUncheckedUpdateWithoutTestSuiteScenariosInput>
 }
 
-export type SimulationSuiteUpdateWithoutFolderScenariosInput = {
+export type SimulationSuiteUpdateWithoutTestSuiteScenariosInput = {
   id?: Prisma.StringFieldUpdateOperationsInput | string
   name?: Prisma.StringFieldUpdateOperationsInput | string
   slug?: Prisma.StringFieldUpdateOperationsInput | string
@@ -832,7 +832,7 @@ export type SimulationSuiteUpdateWithoutFolderScenariosInput = {
   project?: Prisma.ProjectUpdateOneRequiredWithoutSuiteConfigurationsNestedInput
 }
 
-export type SimulationSuiteUncheckedUpdateWithoutFolderScenariosInput = {
+export type SimulationSuiteUncheckedUpdateWithoutTestSuiteScenariosInput = {
   id?: Prisma.StringFieldUpdateOperationsInput | string
   projectId?: Prisma.StringFieldUpdateOperationsInput | string
   name?: Prisma.StringFieldUpdateOperationsInput | string
@@ -885,7 +885,7 @@ export type SimulationSuiteUpdateWithoutProjectInput = {
   archivedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
   createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   updatedAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
-  folderScenarios?: Prisma.ScenarioUpdateManyWithoutFolderNestedInput
+  testSuiteScenarios?: Prisma.ScenarioUpdateManyWithoutTestSuiteNestedInput
 }
 
 export type SimulationSuiteUncheckedUpdateWithoutProjectInput = {
@@ -904,7 +904,7 @@ export type SimulationSuiteUncheckedUpdateWithoutProjectInput = {
   archivedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
   createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   updatedAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
-  folderScenarios?: Prisma.ScenarioUncheckedUpdateManyWithoutFolderNestedInput
+  testSuiteScenarios?: Prisma.ScenarioUncheckedUpdateManyWithoutTestSuiteNestedInput
 }
 
 export type SimulationSuiteUncheckedUpdateManyWithoutProjectInput = {
@@ -931,11 +931,11 @@ export type SimulationSuiteUncheckedUpdateManyWithoutProjectInput = {
  */
 
 export type SimulationSuiteCountOutputType = {
-  folderScenarios: number
+  testSuiteScenarios: number
 }
 
 export type SimulationSuiteCountOutputTypeSelect<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = {
-  folderScenarios?: boolean | SimulationSuiteCountOutputTypeCountFolderScenariosArgs
+  testSuiteScenarios?: boolean | SimulationSuiteCountOutputTypeCountTestSuiteScenariosArgs
 }
 
 /**
@@ -951,7 +951,7 @@ export type SimulationSuiteCountOutputTypeDefaultArgs<ExtArgs extends runtime.Ty
 /**
  * SimulationSuiteCountOutputType without action
  */
-export type SimulationSuiteCountOutputTypeCountFolderScenariosArgs<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = {
+export type SimulationSuiteCountOutputTypeCountTestSuiteScenariosArgs<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = {
   where?: Prisma.ScenarioWhereInput
 }
 
@@ -974,7 +974,7 @@ export type SimulationSuiteSelect<ExtArgs extends runtime.Types.Extensions.Inter
   createdAt?: boolean
   updatedAt?: boolean
   project?: boolean | Prisma.ProjectDefaultArgs<ExtArgs>
-  folderScenarios?: boolean | Prisma.SimulationSuite$folderScenariosArgs<ExtArgs>
+  testSuiteScenarios?: boolean | Prisma.SimulationSuite$testSuiteScenariosArgs<ExtArgs>
   _count?: boolean | Prisma.SimulationSuiteCountOutputTypeDefaultArgs<ExtArgs>
 }, ExtArgs["result"]["simulationSuite"]>
 
@@ -1040,7 +1040,7 @@ export type SimulationSuiteSelectScalar = {
 export type SimulationSuiteOmit<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = runtime.Types.Extensions.GetOmit<"id" | "projectId" | "name" | "slug" | "description" | "scenarioIds" | "targets" | "repeatCount" | "labels" | "simulatorModel" | "judgeModel" | "kind" | "scope" | "archivedAt" | "createdAt" | "updatedAt", ExtArgs["result"]["simulationSuite"]>
 export type SimulationSuiteInclude<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = {
   project?: boolean | Prisma.ProjectDefaultArgs<ExtArgs>
-  folderScenarios?: boolean | Prisma.SimulationSuite$folderScenariosArgs<ExtArgs>
+  testSuiteScenarios?: boolean | Prisma.SimulationSuite$testSuiteScenariosArgs<ExtArgs>
   _count?: boolean | Prisma.SimulationSuiteCountOutputTypeDefaultArgs<ExtArgs>
 }
 export type SimulationSuiteIncludeCreateManyAndReturn<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = {
@@ -1054,7 +1054,7 @@ export type $SimulationSuitePayload<ExtArgs extends runtime.Types.Extensions.Int
   name: "SimulationSuite"
   objects: {
     project: Prisma.$ProjectPayload<ExtArgs>
-    folderScenarios: Prisma.$ScenarioPayload<ExtArgs>[]
+    testSuiteScenarios: Prisma.$ScenarioPayload<ExtArgs>[]
   }
   scalars: runtime.Types.Extensions.GetPayloadResult<{
     id: string
@@ -1468,7 +1468,7 @@ readonly fields: SimulationSuiteFieldRefs;
 export interface Prisma__SimulationSuiteClient<T, Null = never, ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs, GlobalOmitOptions = {}> extends Prisma.PrismaPromise<T> {
   readonly [Symbol.toStringTag]: "PrismaPromise"
   project<T extends Prisma.ProjectDefaultArgs<ExtArgs> = {}>(args?: Prisma.Subset<T, Prisma.ProjectDefaultArgs<ExtArgs>>): Prisma.Prisma__ProjectClient<runtime.Types.Result.GetResult<Prisma.$ProjectPayload<ExtArgs>, T, "findUniqueOrThrow", GlobalOmitOptions> | Null, Null, ExtArgs, GlobalOmitOptions>
-  folderScenarios<T extends Prisma.SimulationSuite$folderScenariosArgs<ExtArgs> = {}>(args?: Prisma.Subset<T, Prisma.SimulationSuite$folderScenariosArgs<ExtArgs>>): Prisma.PrismaPromise<runtime.Types.Result.GetResult<Prisma.$ScenarioPayload<ExtArgs>, T, "findMany", GlobalOmitOptions> | Null>
+  testSuiteScenarios<T extends Prisma.SimulationSuite$testSuiteScenariosArgs<ExtArgs> = {}>(args?: Prisma.Subset<T, Prisma.SimulationSuite$testSuiteScenariosArgs<ExtArgs>>): Prisma.PrismaPromise<runtime.Types.Result.GetResult<Prisma.$ScenarioPayload<ExtArgs>, T, "findMany", GlobalOmitOptions> | Null>
   /**
    * Attaches callbacks for the resolution and/or rejection of the Promise.
    * @param onfulfilled The callback to execute when the Promise is resolved.
@@ -1915,9 +1915,9 @@ export type SimulationSuiteDeleteManyArgs<ExtArgs extends runtime.Types.Extensio
 }
 
 /**
- * SimulationSuite.folderScenarios
+ * SimulationSuite.testSuiteScenarios
  */
-export type SimulationSuite$folderScenariosArgs<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = {
+export type SimulationSuite$testSuiteScenariosArgs<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = {
   /**
    * Select specific fields to fetch from the Scenario
    */

@@ -94,6 +94,36 @@ describe("given a login that minted a user-scoped CLI key", () => {
       expect(result.stdout).toContain("Login key:    whole organization");
     });
 
+    /** @scenario "whoami states the login key's permissions" */
+    it("lists the permission slugs the key was minted with", async () => {
+      writeSession({
+        cli_api_key: LOGIN_KEY,
+        cli_api_key_scope: {
+          ...ORG_WIDE_SCOPE,
+          permissions: ["scenarios:manage", "prompts:view"],
+        },
+      });
+
+      const result = await run({ args: ["whoami"] });
+
+      expect(result.exitCode).toBe(0);
+      expect(result.stdout).toContain(
+        "Permissions:  prompts:view, scenarios:manage",
+      );
+    });
+
+    /** @scenario "whoami stays silent about permissions the login never recorded" */
+    it("prints no permissions line when the login predates the field", async () => {
+      loginWithOrgWideKey();
+
+      const result = await run({ args: ["whoami"] });
+
+      // The exit code first: an absence assertion on stdout also holds when
+      // the command failed and printed nothing at all.
+      expect(result.exitCode).toBe(0);
+      expect(result.stdout).not.toContain("Permissions:");
+    });
+
     it("counts the projects when the key covers a subset", async () => {
       writeSession({
         cli_api_key: LOGIN_KEY,

@@ -44,6 +44,7 @@
     "lucide-react": "^1.22.0",
     "motion": "^12.42.2",
     "react": "^19.2.7",
+    "react-hook-form": "^7.80.0",
     "zod": "^4.4.3"
   },
   "devDependencies": {

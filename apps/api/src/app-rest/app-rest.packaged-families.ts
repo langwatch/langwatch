@@ -36,7 +36,10 @@ import {
 import type { AuthzGrantsService, AuthzPermission, AuthzService } from "@langwatch/authz-contract";
 import { createRoleBindingsRestApp } from "@langwatch/authz-server";
 import type { CodingAgentApp, CodingAgentRestAuditPort } from "@langwatch/coding-agent-server";
-import { createCodingAgentRestApp } from "@langwatch/coding-agent-server";
+import {
+  createCodingAgentRestApp,
+  createCodingAgentV1RestApp,
+} from "@langwatch/coding-agent-server";
 import type { DashboardApp } from "@langwatch/dashboard-server";
 import { createDashboardsRestApp, createGraphsRestApp } from "@langwatch/dashboard-server";
 import type { DatasetApp, DatasetDirectUploadAuthorizer } from "@langwatch/dataset-server";
@@ -319,6 +322,7 @@ export type ApiPackagedRestFamilyName =
   | "agent-cache"
   | "agents"
   | "coding-agent"
+  | "coding-agent-v1"
   | "dashboards"
   | "dataset"
   | "evaluators"
@@ -403,6 +407,23 @@ export function mountApiPackagedRestFamilies(options: {
     codingAgents && codingAgentAudit
       ? () =>
           createCodingAgentRestApp({
+            security,
+            app: codingAgents,
+            audit: codingAgentAudit,
+          }).hono
+      : null,
+  );
+
+  // The same rollup asked at the ORGANIZATION: one route, its own base path,
+  // and an organization credential instead of a project one. A separate family
+  // because the scope a family authenticates at is the family's, not a route's
+  // — mounting an organization-keyed route inside the project family would
+  // make every route in it answer to two different credentials.
+  mount(
+    "coding-agent-v1",
+    codingAgents && codingAgentAudit
+      ? () =>
+          createCodingAgentV1RestApp({
             security,
             app: codingAgents,
             audit: codingAgentAudit,

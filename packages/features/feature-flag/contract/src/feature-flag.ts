@@ -176,13 +176,6 @@ export const FEATURE_FLAGS = [
       "Surfaces the AI Gateway menu in the project sidebar. On by default; operators can hide it per project with a targeting rule.",
   },
   {
-    key: "release_ui_navigation_v2_enabled",
-    scope: "PRODUCT",
-    defaultValue: false,
-    description:
-      "Unlocks the product-scoped navigation shells (spec: specs/navigation/navigation-modes.feature): a per-device mode picker in the avatar menu with legacy, product-switcher and icon-rail values. The flag only unlocks the picker; the device preference decides which shell renders, and flag off or mode legacy keeps the current chrome unchanged. Default off. Force-enable in dev via FEATURE_FLAG_FORCE_ENABLE=release_ui_navigation_v2_enabled.",
-  },
-  {
     key: "release_ui_beta_annotations_trained_enabled",
     scope: "PRODUCT",
     defaultValue: false,
@@ -372,9 +365,9 @@ export const FEATURE_FLAGS = [
   {
     key: "release_ui_agent_testing_v2_enabled",
     scope: "PRODUCT",
-    defaultValue: false,
+    defaultValue: true,
     description:
-      "Unlocks Agent Testing, the v2 interface for simulations (specs under specs/features/agent-testing/): one page with the test cases and the results in tabs, test suites as folders of test cases, run notes, test case versions, and a wider run drawer that puts the results beside the conversation. Flag off leaves the current Simulations pages and menu group exactly as they are; the flag only decides which interface renders, and the backend additions it uses are unflagged. Default off. Force-enable in dev via FEATURE_FLAG_FORCE_ENABLE=release_ui_agent_testing_v2_enabled.",
+      "Unlocks Agent Testing, the v2 interface for simulations (specs under specs/features/agent-testing/): one page with the scenarios and the results in tabs, test suites as folders of scenarios, run notes, scenario versions, and a wider run drawer that puts the results beside the conversation. Flag off leaves the Simulations pages and menu group exactly as they were; the flag only decides which interface renders, and the backend additions it uses are unflagged. Default on, so a self-hosted installation reads Agent Testing with no rule; a rule keeps a project or an organization on the Simulations pages. Every simulations address redirects to Agent Testing while the flag is on.",
   },
   {
     // D12 (ADR-117). Named `join_requests` rather than the usual

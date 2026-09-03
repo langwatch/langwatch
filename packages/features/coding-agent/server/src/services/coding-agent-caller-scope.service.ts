@@ -18,6 +18,7 @@
  */
 import type {
   CodingAgentCallerScopeDirectoryPort,
+  CodingAgentScopeCaller,
   CodingAgentScopePermissionsPort,
 } from "#ports/coding-agent-caller-scope.port";
 
@@ -60,16 +61,14 @@ export interface CodingAgentCallerScopeDependencies {
 
 /** Resolves one caller's reach across an organization's projects. */
 export class CodingAgentCallerScopeService {
-  static create(
-    dependencies: CodingAgentCallerScopeDependencies,
-  ): CodingAgentCallerScopeService {
+  static create(dependencies: CodingAgentCallerScopeDependencies): CodingAgentCallerScopeService {
     return new CodingAgentCallerScopeService(dependencies);
   }
 
   private constructor(private readonly dependencies: CodingAgentCallerScopeDependencies) {}
 
   async resolve(input: {
-    userId: string;
+    caller: CodingAgentScopeCaller;
     organizationId: string;
   }): Promise<CallerProjectScope> {
     const { directory, permissions } = this.dependencies;
@@ -80,11 +79,19 @@ export class CodingAgentCallerScopeService {
       return { permittedProjectIds: [], costProjectIds: [], projects: {} };
     }
 
-    const probe = { userId: input.userId, organizationId: input.organizationId, projects };
-    const [viewable, priceable] = await Promise.all([
-      permissions.permittedProjectIds({ ...probe, permission: "traces:view" }),
-      permissions.permittedProjectIds({ ...probe, permission: "cost:view" }),
-    ]);
+    // ONE ask for both cuts over every project: the decision is made off a
+    // single grant snapshot, so a large organization costs the same number of
+    // queries as a small one.
+    const cuts = await permissions.projectCuts({
+      caller: input.caller,
+      organizationId: input.organizationId,
+      projects,
+      permissions: ["traces:view", "cost:view"],
+    });
+    // A permission the batch did not answer for denies rather than passes:
+    // a short answer may only narrow the scope.
+    const viewable = cuts.get("traces:view") ?? new Set<string>();
+    const priceable = cuts.get("cost:view") ?? new Set<string>();
 
     const permitted = projects.filter((project) => viewable.has(project.id));
     const permittedProjectIds = permitted.map((project) => project.id);

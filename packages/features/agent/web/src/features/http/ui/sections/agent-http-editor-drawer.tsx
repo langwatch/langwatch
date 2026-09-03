@@ -421,6 +421,14 @@ export function AgentHttpEditorDrawer(props: AgentHttpEditorDrawerProps) {
                 onTest={handleTest}
                 presentation={props.presentation}
               />
+              {props.agentId && props.projectId ? (
+                <Box paddingX={6} paddingY={4} borderTopWidth="1px" borderColor="border">
+                  {props.presentation.renderTestPanel({
+                    agentId: props.agentId,
+                    projectId: props.projectId,
+                  })}
+                </Box>
+              ) : null}
             </VStack>
           )}
         </Drawer.Body>

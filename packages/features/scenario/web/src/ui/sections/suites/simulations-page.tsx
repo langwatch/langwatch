@@ -22,7 +22,14 @@ import {
   usePeriodSelector,
 } from "@langwatch/analytics-web/components/PeriodSelector";
 import { ExternalSetDetailPanel } from "./external-set-detail-panel";
+import { ReturnToNewSimulationsBanner } from "../../elements/suites/return-to-new-simulations-banner";
 import { RunHistoryPanel } from "./run-history-panel";
+import {
+  SuiteArchiveDialog,
+  SuiteContextMenu,
+  SuiteRunConfirmationDialog,
+  NowProvider,
+} from "@langwatch/suite-web";
 import { SuiteDetailPanel, SuiteEmptyState } from "./suite-detail-panel";
 import { SuiteSidebar } from "./suite-sidebar";
 import { useRunSuite } from "../../../behavior/suites/use-run-suite";
@@ -41,17 +48,10 @@ import { useOrganizationTeamProject } from "../../../behavior/use-organization-t
 import { usePreloadDrawer } from "../../../behavior/use-preload-drawer";
 import { useScenarioTabFollow } from "../../../behavior/use-scenario-tab-follow";
 import { useSimulationUpdateListener } from "../../../behavior/use-simulation-update-listener";
-import type { ScenarioTabNavigatePayload } from "@langwatch/scenario-contract";
-import type { SuiteRunSummary } from "@langwatch/scenario-contract";
+import type { ScenarioTabNavigatePayload, SuiteRunSummary } from "@langwatch/scenario-contract";
 import { api } from "../../../behavior/scenario-api";
 import { useRouter } from "../../../behavior/next-router";
 import { ScenarioWorkflowHostBridge } from "../workflow-host-bridge";
-import {
-  NowProvider,
-  SuiteArchiveDialog,
-  SuiteContextMenu,
-  SuiteRunConfirmationDialog,
-} from "@langwatch/suite-web";
 
 export default function SimulationsPage() {
   return (
@@ -126,10 +126,7 @@ function SimulationsBoard() {
     data: suites,
     isLoading,
     error,
-  } = api.suites.getAll.useQuery(
-    { projectId: project?.id ?? "" },
-    { enabled: !!project },
-  );
+  } = api.suites.getAll.useQuery({ projectId: project?.id ?? "" }, { enabled: !!project });
 
   const { data: externalSets, isLoading: isExternalSetsLoading } =
     api.scenarios.getExternalSetSummaries.useQuery(
@@ -224,8 +221,7 @@ function SimulationsBoard() {
     let lastRunTs: number | null = null;
     if (isExternalSetSelection(selectedSuiteSlug) && externalSets) {
       const setId = extractExternalSetId(selectedSuiteSlug);
-      lastRunTs =
-        externalSets.find((s) => s.scenarioSetId === setId)?.lastRunTimestamp ?? null;
+      lastRunTs = externalSets.find((s) => s.scenarioSetId === setId)?.lastRunTimestamp ?? null;
     } else if (selectedSuite && runSummaries) {
       lastRunTs = runSummaries.get(selectedSuite.id)?.lastRunTimestamp ?? null;
     }
@@ -374,6 +370,7 @@ function SimulationsBoard() {
             <HStack justify="space-between" align="center" w="full">
               <PageLayout.Heading>Simulations</PageLayout.Heading>
               <HStack>
+                <ReturnToNewSimulationsBanner target="runs" />
                 <PeriodSelector
                   period={period}
                   mode={mode}

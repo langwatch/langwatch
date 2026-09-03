@@ -23,10 +23,7 @@ vi.mock("../../next-router", () => ({
 
 import { useAgentTestingRouting } from "../use-agent-testing-routing";
 
-const openAt = (
-  asPath: string,
-  query: Record<string, string | string[] | undefined> = {},
-) => {
+const openAt = (asPath: string, query: Record<string, string | string[] | undefined> = {}) => {
   router.asPath = asPath;
   router.query = { project: "demo", ...query };
 };
@@ -52,11 +49,20 @@ describe("useAgentTestingRouting", () => {
   afterEach(cleanup);
 
   describe("given the page address", () => {
-    it("opens on the Test cases tab with every case", () => {
+    /** @scenario "An address that names no suite opens the first suite of the rail" */
+    it("opens on the Scenarios tab naming no suite, so the first one is opened", () => {
       const { result } = renderHook(() => useAgentTestingRouting());
 
       expect(result.current.tab).toBe("cases");
-      expect(result.current.selection).toEqual({ kind: "all" });
+      expect(result.current.selection).toEqual({ kind: "suite", slug: null });
+    });
+
+    it("writes the bare address back for a state that names no suite", () => {
+      const { result } = renderHook(() => useAgentTestingRouting());
+
+      result.current.selectSuite({ kind: "suite", slug: null });
+
+      expect(lastPush().address).toBe("/demo/agent-testing");
     });
 
     /** @scenario "The selected tab, suite and period are held in the address" */
@@ -106,9 +112,7 @@ describe("useAgentTestingRouting", () => {
       result.current.selectSuite({ kind: "suite", slug: "checkout" });
 
       expect(lastPush().address).toBe("/demo/agent-testing/suites/checkout");
-      expect(lastPush().route.pathname).toBe(
-        "/[project]/agent-testing/[[...path]]",
-      );
+      expect(lastPush().route.pathname).toBe("/[project]/agent-testing/[[...path]]");
     });
 
     /** @scenario "The selected tab, suite and period are held in the address" */
@@ -118,9 +122,7 @@ describe("useAgentTestingRouting", () => {
 
       result.current.selectSuite({ kind: "suite", slug: "checkout" });
 
-      expect(lastPush().address).toBe(
-        "/demo/agent-testing/suites/checkout?period=90d",
-      );
+      expect(lastPush().address).toBe("/demo/agent-testing/suites/checkout?period=90d");
     });
 
     it("leaves an open drawer behind", () => {
@@ -174,9 +176,22 @@ describe("useAgentTestingRouting", () => {
 
       result.current.selectRun("batch-2");
 
-      expect(lastPush().address).toBe(
-        "/demo/agent-testing/results/nightly/batch-2",
-      );
+      expect(lastPush().address).toBe("/demo/agent-testing/results/nightly/batch-2");
+    });
+  });
+
+  describe("when a run of another plan is chosen from the list", () => {
+    /** @scenario "Choosing a run inside an opened row lands on its plan at that run" */
+    it("names that plan and that run in one address change", () => {
+      openAt("/demo/agent-testing/results", { path: ["results"] });
+      const { result } = renderHook(() => useAgentTestingRouting());
+
+      result.current.selectPlanRun({
+        planSlug: "nightly",
+        batchRunId: "batch-2",
+      });
+
+      expect(lastPush().address).toBe("/demo/agent-testing/results/nightly/batch-2");
     });
   });
 });

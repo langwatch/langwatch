@@ -14,7 +14,7 @@
  * them is opened by name — the type selector leads to three of them, the studio
  * agent picker and the Evaluations table open `agentList`, the Experiments
  * target editor opens `agentWorkflowTargetEditor`, and Agent Testing opens
- * `agentTestingPlanEditor` — and none of them was exported, so the composing
+ * `agentTestingCaseEditor` — and none of them was exported, so the composing
  * application could not register the name and `CurrentDrawer` rendered null.
  * They are components here like the five above: what decides the boolean `open`
  * and which host they are mounted in is the application's, not this module's.
@@ -32,4 +32,6 @@ export {
 } from "../ui/sections/agents/drawer-from-url";
 export { AgentListDrawer } from "../ui/sections/agents/agent-list-drawer";
 export { AgentWorkflowTargetEditorDrawer } from "../ui/sections/agents/agent-workflow-target-editor-drawer";
-export { PlanModal as AgentTestingPlanEditorDrawer } from "../ui/sections/agent-testing/plan/plan-modal";
+export { AgentTestingCaseEditorDrawer } from "../ui/sections/agent-testing/cases/agent-testing-case-editor-drawer";
+export { ConnectedAgentDrawer } from "../ui/sections/agents/connected/connected-agent-drawer";
+export { ConnectFromCodeDrawer } from "../ui/sections/agents/connected/connect-from-code-drawer";

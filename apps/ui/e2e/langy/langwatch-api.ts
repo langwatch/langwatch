@@ -25,13 +25,7 @@ class LwHttpError extends Error {}
  * wait. Only timeouts and network errors retry — an HTTP error status is a
  * real answer and throws straight away.
  */
-async function lwFetch({
-  path,
-  init,
-}: {
-  path: string;
-  init: RequestInit;
-}): Promise<any> {
+async function lwFetch({ path, init }: { path: string; init: RequestInit }): Promise<any> {
   let lastError: unknown;
   for (let attempt = 0; attempt < 3; attempt++) {
     try {
@@ -95,7 +89,7 @@ export async function listDatasets(): Promise<
 }
 
 export async function listAgents(): Promise<Array<{ id: string; name: string }>> {
-  return toArray(await lwGet("/api/agents"));
+  return toArray(await lwGet("/api/v1/agents"));
 }
 
 export async function listEvaluators(): Promise<
@@ -146,9 +140,7 @@ export async function deleteEvaluator(id: string): Promise<void> {
     signal: AbortSignal.timeout(15_000),
   });
   if (response.ok || response.status === 404) return;
-  throw new Error(
-    `Failed to delete evaluator ${id}: ${response.status} ${response.statusText}.`,
-  );
+  throw new Error(`Failed to delete evaluator ${id}: ${response.status} ${response.statusText}.`);
 }
 
 /**
@@ -213,9 +205,7 @@ export async function listMonitors(): Promise<Array<{ id: string; name?: string 
  * The `evaluatorType` must be one the platform validates
  * (`langevals/exact_match` costs nothing and needs no model config).
  */
-export async function createEvaluator(
-  name: string,
-): Promise<{ id: string; name: string }> {
+export async function createEvaluator(name: string): Promise<{ id: string; name: string }> {
   return lwPost({
     path: "/api/evaluators",
     body: { name, config: { evaluatorType: "langevals/exact_match" } },

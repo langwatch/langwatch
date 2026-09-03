@@ -34,12 +34,10 @@ import { NavigationLink } from "../elements/navigation-link";
 import { UserAvatar } from "../elements/user-avatar";
 
 const NAVIGATION_MODE_LABELS: Record<NavigationMode, string> = {
-  legacy: "Old navigation",
   "product-switcher": "Product switcher",
   "icon-rail": "Icon rail",
 };
 
-/** The order the modes are offered in, oldest first. */
 const NAVIGATION_MODES = Object.keys(NAVIGATION_MODE_LABELS) as NavigationMode[];
 
 export function AppHeaderUserMenu() {
@@ -54,13 +52,12 @@ export function AppHeaderUserMenu() {
   // decided at the organization, so the entry and the page it opens agree.
   const governancePreviewEnabled = host.featureFlag("release_ui_ai_governance_enabled").enabled;
 
-  // The mode picker only appears once the v2 flag is on; the preference itself
-  // lives on the device (see navigation-mode.store).
-  const navigationV2Enabled = host.featureFlag("release_ui_navigation_v2_enabled").enabled;
+  // The navigation-mode preference lives on the device (see
+  // navigation-mode.store).
   const storedNavigationMode = useNavigationModeStore((s) => s.storedMode);
   const setStoredNavigationMode = useNavigationModeStore((s) => s.setStoredMode);
-  // With the flag on, a device that never picked runs the default mode. The
-  // label reports that, not the old chrome.
+  // A device that never picked runs the default mode; the picker reports that,
+  // not an empty choice.
   const currentNavigationMode = storedNavigationMode ?? DEFAULT_NAVIGATION_MODE;
 
   return (
@@ -105,10 +102,7 @@ export function AppHeaderUserMenu() {
                 <NavigationLink href="/settings">Settings</NavigationLink>
               </Menu.Item>
               {accountMenu?.experiments && (
-                <Menu.Item
-                  value="experiments"
-                  onSelect={accountMenu.experiments.open}
-                >
+                <Menu.Item value="experiments" onSelect={accountMenu.experiments.open}>
                   <HStack gap={2}>
                     <span>Experiments</span>
                     {accountMenu.experiments.hasUnseen && (
@@ -124,26 +118,24 @@ export function AppHeaderUserMenu() {
                   </HStack>
                 </Menu.Item>
               )}
-              {navigationV2Enabled && (
-                <Menu.Root positioning={{ placement: "right-start", gutter: 2 }}>
-                  <Menu.TriggerItem value="navigation-mode">
-                    <PanelsTopLeft size={14} />
-                    Navigation ({NAVIGATION_MODE_LABELS[currentNavigationMode]})
-                  </Menu.TriggerItem>
-                  <Menu.Content>
-                    <Menu.RadioItemGroup
-                      value={currentNavigationMode}
-                      onValueChange={(e) => setStoredNavigationMode(e.value as NavigationMode)}
-                    >
-                      {NAVIGATION_MODES.map((mode) => (
-                        <Menu.RadioItem key={mode} value={mode}>
-                          {NAVIGATION_MODE_LABELS[mode]}
-                        </Menu.RadioItem>
-                      ))}
-                    </Menu.RadioItemGroup>
-                  </Menu.Content>
-                </Menu.Root>
-              )}
+              <Menu.Root positioning={{ placement: "right-start", gutter: 2 }}>
+                <Menu.TriggerItem value="navigation-mode">
+                  <PanelsTopLeft size={14} />
+                  Navigation ({NAVIGATION_MODE_LABELS[currentNavigationMode]})
+                </Menu.TriggerItem>
+                <Menu.Content>
+                  <Menu.RadioItemGroup
+                    value={currentNavigationMode}
+                    onValueChange={(e) => setStoredNavigationMode(e.value as NavigationMode)}
+                  >
+                    {NAVIGATION_MODES.map((mode) => (
+                      <Menu.RadioItem key={mode} value={mode}>
+                        {NAVIGATION_MODE_LABELS[mode]}
+                      </Menu.RadioItem>
+                    ))}
+                  </Menu.RadioItemGroup>
+                </Menu.Content>
+              </Menu.Root>
               {accountMenu?.graphicsQuality && (
                 <Menu.Root positioning={{ placement: "right-start", gutter: 2 }}>
                   <Menu.TriggerItem value="reduced-graphics">
@@ -158,9 +150,7 @@ export function AppHeaderUserMenu() {
                       <Menu.RadioItem value="auto">
                         Auto — adapts to this device on its own
                       </Menu.RadioItem>
-                      <Menu.RadioItem value="on">
-                        On — always keep things responsive
-                      </Menu.RadioItem>
+                      <Menu.RadioItem value="on">On — always keep things responsive</Menu.RadioItem>
                       <Menu.RadioItem value="off">
                         Off — always show full decorative effects
                       </Menu.RadioItem>

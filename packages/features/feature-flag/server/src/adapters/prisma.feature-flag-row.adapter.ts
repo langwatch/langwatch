@@ -25,7 +25,20 @@ type FeatureFlagDelegate = {
   deleteMany: DelegateCall<unknown>;
 };
 
-export type FeatureFlagDatabase = { featureFlag: FeatureFlagDelegate };
+type OrganizationDelegate = {
+  findUnique: DelegateCall<{ createdAt: Date } | null>;
+};
+
+export type FeatureFlagDatabase = {
+  featureFlag: FeatureFlagDelegate;
+  /**
+   * Read only by a "new organizations" targeting rule, and optional so a
+   * caller that hands over the flag table alone still composes. A process
+   * that passes the whole client gets the lookup; one that does not answers
+   * "unknown", which matches no age rule.
+   */
+  organization?: OrganizationDelegate;
+};
 
 /**
  * The FeatureFlag table is cluster-wide and carries no project column, so
@@ -108,5 +121,14 @@ export class PrismaFeatureFlagRowAdapter extends FeatureFlagRepository {
 
   async deleteByKey(key: string): Promise<void> {
     await this.database.featureFlag.deleteMany({ where: { key } });
+  }
+
+  async tryFindOrganizationCreatedAt(organizationId: string): Promise<Date | null> {
+    const organization = await this.database.organization?.findUnique({
+      where: { id: organizationId },
+      select: { createdAt: true },
+    });
+
+    return organization?.createdAt ?? null;
   }
 }

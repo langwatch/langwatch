@@ -10,7 +10,6 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import {
   broadcastUiScopeWrite,
   readUiScopeMemory,
-  UI_LAST_VISITED_HOME_KIND_KEY,
   UI_SELECTED_ORGANIZATION_ID_KEY,
   UI_SELECTED_PROJECT_SLUG_KEY,
   UI_SELECTED_TEAM_ID_KEY,
@@ -30,7 +29,6 @@ describe("given the keys the application already writes", () => {
     expect(UI_SELECTED_ORGANIZATION_ID_KEY).toBe("selectedOrganizationId");
     expect(UI_SELECTED_TEAM_ID_KEY).toBe("selectedTeamId");
     expect(UI_SELECTED_PROJECT_SLUG_KEY).toBe("selectedProjectSlug");
-    expect(UI_LAST_VISITED_HOME_KIND_KEY).toBe("lastVisitedHomeKind");
   });
 });
 
@@ -40,7 +38,6 @@ describe("given a selection stored by the application", () => {
       window.localStorage.setItem(UI_SELECTED_ORGANIZATION_ID_KEY, JSON.stringify("org-acme"));
       window.localStorage.setItem(UI_SELECTED_TEAM_ID_KEY, JSON.stringify("team-shared"));
       window.localStorage.setItem(UI_SELECTED_PROJECT_SLUG_KEY, JSON.stringify("acme-app"));
-      window.localStorage.setItem(UI_LAST_VISITED_HOME_KIND_KEY, JSON.stringify("project"));
 
       expect(readUiScopeMemory(window.localStorage)).toEqual({
         selection: {
@@ -48,7 +45,6 @@ describe("given a selection stored by the application", () => {
           teamId: "team-shared",
           projectSlug: "acme-app",
         },
-        lastVisitedHomeKind: "project",
       });
     });
 
@@ -65,7 +61,6 @@ describe("given a selection stored by the application", () => {
     it("reads nothing when nothing was ever stored", () => {
       expect(readUiScopeMemory(window.localStorage)).toEqual({
         selection: { organizationId: "", teamId: "", projectSlug: "" },
-        lastVisitedHomeKind: "",
       });
     });
   });
@@ -79,7 +74,6 @@ describe("given a resolution that asked for its selection to be remembered", () 
           { key: "organizationId", value: "org-acme" },
           { key: "teamId", value: "team-shared" },
           { key: "projectSlug", value: "acme-app" },
-          { key: "lastVisitedHomeKind", value: "project" },
         ],
         storage: window.localStorage,
       });
@@ -87,7 +81,6 @@ describe("given a resolution that asked for its selection to be remembered", () 
       expect(window.localStorage.getItem(UI_SELECTED_ORGANIZATION_ID_KEY)).toBe('"org-acme"');
       expect(window.localStorage.getItem(UI_SELECTED_TEAM_ID_KEY)).toBe('"team-shared"');
       expect(window.localStorage.getItem(UI_SELECTED_PROJECT_SLUG_KEY)).toBe('"acme-app"');
-      expect(window.localStorage.getItem(UI_LAST_VISITED_HOME_KIND_KEY)).toBe('"project"');
     });
 
     it("tells the document about each key, so the application's readers see it without a reload", () => {

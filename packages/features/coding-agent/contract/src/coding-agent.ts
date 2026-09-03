@@ -167,6 +167,18 @@ export const codingAgentSessionEventSchema = z
     toolResultBytes: z.number(),
     promptChars: z.number(),
     totalTokens: z.number(),
+    /**
+     * The working context active when the event happened, stamped onto the
+     * event by the contribute command from the session's last `session_context`
+     * declaration. '' on rows from before a declaration (or before the stamp
+     * existed), which the usage read prices under the legacy whole-session
+     * rule. This is what lets one session's cost split across every pull
+     * request it drove.
+     */
+    repositoryHost: z.string(),
+    repositoryOwner: z.string(),
+    repositoryName: z.string(),
+    branch: z.string(),
   })
   .strict();
 
@@ -322,9 +334,7 @@ export const codingAgentSessionListRowSchema = z
   })
   .strict();
 
-export const codingAgentSessionsListInputSchema = z
-  .object({ projectId: z.string() })
-  .strict();
+export const codingAgentSessionsListInputSchema = z.object({ projectId: z.string() }).strict();
 
 export const codingAgentContributorProjectSchema = z
   .object({
@@ -510,57 +520,35 @@ export const codingAgentPersonalPullRequestUsageInputSchema = z
 
 export type CodingAgentSession = z.infer<typeof codingAgentSessionSchema>;
 export type CodingAgentSessionEvent = z.infer<typeof codingAgentSessionEventSchema>;
-export type CodingAgentSessionEventRecord = z.infer<
-  typeof codingAgentSessionEventRecordSchema
->;
-export type CodingAgentTraceSessionRecord = z.infer<
-  typeof codingAgentTraceSessionRecordSchema
->;
+export type CodingAgentSessionEventRecord = z.infer<typeof codingAgentSessionEventRecordSchema>;
+export type CodingAgentTraceSessionRecord = z.infer<typeof codingAgentTraceSessionRecordSchema>;
 export type CodingAgentSessionMetricSeriesRecord = z.infer<
   typeof codingAgentSessionMetricSeriesRecordSchema
 >;
-export type CodingAgentSessionBranchRecord = z.infer<
-  typeof codingAgentSessionBranchRecordSchema
->;
+export type CodingAgentSessionBranchRecord = z.infer<typeof codingAgentSessionBranchRecordSchema>;
 export type CodingAgentSessionCursor = z.infer<typeof codingAgentSessionCursorSchema>;
-export type CodingAgentSessionEventsInput = z.infer<
-  typeof codingAgentSessionEventsInputSchema
->;
-export type CodingAgentSessionLookupInput = z.infer<
-  typeof codingAgentSessionLookupInputSchema
->;
+export type CodingAgentSessionEventsInput = z.infer<typeof codingAgentSessionEventsInputSchema>;
+export type CodingAgentSessionLookupInput = z.infer<typeof codingAgentSessionLookupInputSchema>;
 export type CodingAgentTraceSessionLookupInput = z.infer<
   typeof codingAgentTraceSessionLookupInputSchema
 >;
-export type CodingAgentRecentSessionsInput = z.infer<
-  typeof codingAgentRecentSessionsInputSchema
->;
+export type CodingAgentRecentSessionsInput = z.infer<typeof codingAgentRecentSessionsInputSchema>;
 export type CodingAgentPullRequestMappingBackfillInput = z.infer<
   typeof codingAgentPullRequestMappingBackfillInputSchema
 >;
 export type CodingAgentUsageTotals = z.infer<typeof codingAgentUsageTotalsSchema>;
-export type CodingAgentUsageTotalsInput = z.infer<
-  typeof codingAgentUsageTotalsInputSchema
->;
+export type CodingAgentUsageTotalsInput = z.infer<typeof codingAgentUsageTotalsInputSchema>;
 export type CodingAgentSessionListRow = z.infer<typeof codingAgentSessionListRowSchema>;
-export type CodingAgentSessionsListInput = z.infer<
-  typeof codingAgentSessionsListInputSchema
->;
-export type CodingAgentContributorProject = z.infer<
-  typeof codingAgentContributorProjectSchema
->;
+export type CodingAgentSessionsListInput = z.infer<typeof codingAgentSessionsListInputSchema>;
+export type CodingAgentContributorProject = z.infer<typeof codingAgentContributorProjectSchema>;
 export type CodingAgentPullRequestUsageInput = z.infer<
   typeof codingAgentPullRequestUsageInputSchema
 >;
 export type CodingAgentPersonalPullRequestUsageInput = z.infer<
   typeof codingAgentPersonalPullRequestUsageInputSchema
 >;
-export type CodingAgentPullRequestUsage = z.infer<
-  typeof codingAgentPullRequestUsageSchema
->;
+export type CodingAgentPullRequestUsage = z.infer<typeof codingAgentPullRequestUsageSchema>;
 export type CodingAgentPersonalPullRequestUsage = z.infer<
   typeof codingAgentPersonalPullRequestUsageSchema
 >;
-export type CodingAgentPullRequestDetail = z.infer<
-  typeof codingAgentPullRequestDetailSchema
->;
+export type CodingAgentPullRequestDetail = z.infer<typeof codingAgentPullRequestDetailSchema>;

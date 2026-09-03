@@ -29,13 +29,9 @@ export function SuiteArchiveDialog({
   onConfirm: () => void;
   suiteName: string;
   isLoading?: boolean;
-  /**
-   * What the dialog asks, for a surface that calls the thing something else.
-   * The Test Runs rail archives a test suite, and a suite takes its test cases
-   * with it, so it says so rather than borrowing the run plan wording.
-   */
+  /** The question the dialog asks. A test suite asks about a test suite instead. */
   title?: string;
-  /** What archiving does, in the same surface's words as {@link title}. */
+  /** What happens on confirm. A test suite also archives the scenarios it holds. */
   description?: string;
 }) {
   return (
@@ -62,7 +58,6 @@ export function SuiteArchiveDialog({
         <Dialog.Footer>
           <Button
             variant="outline"
-            mr={3}
             onClick={(e) => {
               e.stopPropagation();
               onClose();

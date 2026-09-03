@@ -78,15 +78,5 @@ describe("given the personal-workspace pages this package now serves", () => {
       expect(module.default.displayName).toContain("withPersonalWorkspaceHost");
       expect(module.default.displayName).toContain("withUiPageGuard");
     });
-
-    it("marks the personal home on a /me page and not on a project one", async () => {
-      const personal = await personalWorkspacePageLoaders["pages/me/sessions"]!();
-      const project = await personalWorkspacePageLoaders["pages/[project]/sessions"]!();
-
-      // `MyLayout` wrote the marker on every /me page and no others; the scope
-      // resolution already leaves "project" behind for a project address.
-      expect(personal.default.displayName).toContain("withPersonalHomeMarker");
-      expect(project.default.displayName).not.toContain("withPersonalHomeMarker");
-    });
   });
 });

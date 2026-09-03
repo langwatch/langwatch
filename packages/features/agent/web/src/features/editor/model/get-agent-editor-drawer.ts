@@ -12,5 +12,9 @@ export function getAgentEditorDrawer(type: AgentType): AgentEditorDrawerName {
       return "agentWorkflowEditor";
     case "signature":
       throw new Error(`Unhandled agent type: ${type} — signature agents have no editor drawer`);
+    case "connected":
+      // Declared by the customer's own code and registered from it, so the
+      // platform shows a connected agent rather than editing it.
+      throw new Error(`Unhandled agent type: ${type} — connected agents are registered from code`);
   }
 }

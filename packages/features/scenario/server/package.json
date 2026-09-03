@@ -58,6 +58,7 @@
     "liquidjs": "^10.27.1",
     "nanoid": "^5.1.6",
     "papaparse": "^5.5.4",
+    "undici": "^8.5.0",
     "zod": "^4.4.3"
   },
   "devDependencies": {

@@ -27,13 +27,12 @@
 import * as ScenarioRunner from "@langwatch/scenario";
 import { type TracerProvider, trace } from "@opentelemetry/api";
 import type { Logger } from "@langwatch/observability";
+import { buildAgentTestRun } from "./agent-test-script.adapter";
 import { buildRemoteTraceRunConfig } from "./remote-trace-run.adapter";
 import { createAdapter } from "./serialized-agent-registry.adapter";
-import {
-  createJudgeModelFromParams,
-  createModelFromParams,
-} from "./litellm-model.adapter";
+import { createJudgeModelFromParams, createModelFromParams } from "./litellm-model.adapter";
 import { selectRoleModelParams } from "./scenario-role-model.adapter";
+import { SerializedConnectedAgentAdapter } from "./serialized-connected-agent.adapter";
 import type { ChildProcessJobData } from "@langwatch/scenario-contract";
 import type { ScenarioHttpPort } from "../ports/scenario-http.port";
 
@@ -65,6 +64,57 @@ export interface ScenarioChildExecutionResult {
   success: boolean;
   reasoning?: string;
   error?: string;
+  /**
+   * The connected agent instance that answered the run's turns, for the
+   * parent's record of which process served the run. Absent for every other
+   * kind of target.
+   */
+  agentInstance?: { hostname: string; label: string | null };
+}
+
+/**
+ * Who takes part in the run, and whether the conversation is written down.
+ *
+ * A scripted run (an agent test) carries its user's lines and decides its
+ * own verdict, so it builds no model. Every other run lets a user simulator
+ * play the person and a judge decide: both resolve their own models (run-plan
+ * or scenario override, else the DEFAULT-role scenarios.* defaults). A job
+ * queued before that split carried only modelParams, so both roles fall
+ * back to it, preserving the previous single-model behavior across a deploy.
+ */
+function buildRunCast({
+  jobData,
+  adapter,
+}: {
+  jobData: ChildProcessJobData;
+  adapter: ScenarioRunner.AgentAdapter;
+}): {
+  agents: ScenarioRunner.AgentAdapter[];
+  script?: ScenarioRunner.ScriptStep[];
+} {
+  if (jobData.script) {
+    return buildAgentTestRun({ adapter, script: jobData.script });
+  }
+  const { nlpServiceUrl, scenario } = jobData;
+  const roleModelParams = selectRoleModelParams(jobData);
+  const simulatorModel = createModelFromParams({
+    litellmParams: roleModelParams.simulator,
+    nlpServiceUrl,
+  });
+  const judgeModel = createJudgeModelFromParams({
+    litellmParams: roleModelParams.judge,
+    nlpServiceUrl,
+  });
+  return {
+    agents: [
+      adapter,
+      ScenarioRunner.userSimulatorAgent({ model: simulatorModel }),
+      ScenarioRunner.judgeAgent({
+        criteria: scenario.criteria,
+        model: judgeModel,
+      }),
+    ],
+  };
 }
 
 async function executeScenarioChildValue({
@@ -74,15 +124,8 @@ async function executeScenarioChildValue({
   jobData: ChildProcessJobData;
   runtime: ScenarioChildRuntime;
 }): Promise<ScenarioChildExecutionResult> {
-  const {
-    context,
-    scenario,
-    parameters,
-    adapterData,
-    modelParams,
-    nlpServiceUrl,
-    target,
-  } = jobData;
+  const { context, scenario, parameters, adapterData, modelParams, nlpServiceUrl, target } =
+    jobData;
 
   const { langwatchEndpoint, langwatchApiKey, logger } = runtime;
 
@@ -100,24 +143,7 @@ async function executeScenarioChildValue({
     httpPort: runtime.httpPort,
     logger,
   });
-  // The user-simulator and judge resolve their own models (run-plan /
-  // scenario override or the DEFAULT-role scenarios.* defaults). A job queued
-  // before that split carried only modelParams, so both roles fall back to it
-  // — preserving the previous single-model behavior across a deploy.
-  const roleModelParams = selectRoleModelParams(jobData);
-  const simulatorModel = createModelFromParams({
-    litellmParams: roleModelParams.simulator,
-    nlpServiceUrl,
-  });
-  const judgeModel = createJudgeModelFromParams({
-    litellmParams: roleModelParams.judge,
-    nlpServiceUrl,
-  });
-
-  const judgeAgent = ScenarioRunner.judgeAgent({
-    criteria: scenario.criteria,
-    model: judgeModel,
-  });
+  const cast = buildRunCast({ jobData, adapter });
 
   // Results are reported via LangWatch SDK automatically
   const result = await ScenarioRunner.run(
@@ -126,11 +152,8 @@ async function executeScenarioChildValue({
       name: scenario.name,
       description: scenario.situation,
       setId: context.setId,
-      agents: [
-        adapter,
-        ScenarioRunner.userSimulatorAgent({ model: simulatorModel }),
-        judgeAgent,
-      ],
+      agents: cast.agents,
+      ...(cast.script ? { script: cast.script } : {}),
       verbose: runtime.verbose,
       // An http target's own spans land in the trace each turn propagates,
       // so the judge fetches them back from the platform's trace API before
@@ -182,6 +205,11 @@ async function executeScenarioChildValue({
   if (result.reasoning) {
     outputResult.reasoning = result.reasoning;
   }
+  // The connected agent instance that answered the run's turns, for the
+  // parent's record of which process served the run.
+  if (adapter instanceof SerializedConnectedAgentAdapter && adapter.servedInstance) {
+    outputResult.agentInstance = adapter.servedInstance;
+  }
   return outputResult;
 }
 
@@ -198,17 +226,11 @@ async function flushScenarioOtelTracesValue(logger: Logger): Promise<void> {
     const concreteProvider = delegatedProvider(provider);
 
     // Try forceFlush first (preferred), then shutdown
-    if (
-      "forceFlush" in concreteProvider &&
-      typeof concreteProvider.forceFlush === "function"
-    ) {
+    if ("forceFlush" in concreteProvider && typeof concreteProvider.forceFlush === "function") {
       logger.debug("flushing otel traces");
       await concreteProvider.forceFlush();
       logger.debug("otel traces flushed");
-    } else if (
-      "shutdown" in concreteProvider &&
-      typeof concreteProvider.shutdown === "function"
-    ) {
+    } else if ("shutdown" in concreteProvider && typeof concreteProvider.shutdown === "function") {
       logger.debug("shutting down otel provider");
       await concreteProvider.shutdown();
       logger.debug("otel provider shutdown complete");
@@ -240,9 +262,7 @@ function formatScenarioChildErrorValue(error: unknown): string {
     seen.add(current);
     if (current instanceof Error) {
       const code = "code" in current ? current.code : void 0;
-      parts.push(
-        typeof code === "string" ? `${current.message} (${code})` : current.message,
-      );
+      parts.push(typeof code === "string" ? `${current.message} (${code})` : current.message);
       current = current.cause;
     } else {
       parts.push(String(current));

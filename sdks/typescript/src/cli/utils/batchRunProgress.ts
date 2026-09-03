@@ -12,8 +12,10 @@
  */
 
 /** What the run list gives us. Narrower than the endpoint's full response. */
-interface BatchRun {
+export interface BatchRun {
   batchRunId?: string;
+  scenarioRunId?: string;
+  scenarioId?: string;
   status?: string;
   results?: { verdict?: string | null } | null;
 }

@@ -47,7 +47,7 @@ export type ScenarioMinAggregateOutputType = {
   judgeModel: string | null
   maxTurns: number | null
   minTurns: number | null
-  folderId: string | null
+  testSuiteId: string | null
   version: number | null
   lastUpdatedById: string | null
   archivedAt: Date | null
@@ -64,7 +64,7 @@ export type ScenarioMaxAggregateOutputType = {
   judgeModel: string | null
   maxTurns: number | null
   minTurns: number | null
-  folderId: string | null
+  testSuiteId: string | null
   version: number | null
   lastUpdatedById: string | null
   archivedAt: Date | null
@@ -84,7 +84,7 @@ export type ScenarioCountAggregateOutputType = {
   judgeModel: number
   maxTurns: number
   minTurns: number
-  folderId: number
+  testSuiteId: number
   version: number
   lastUpdatedById: number
   archivedAt: number
@@ -115,7 +115,7 @@ export type ScenarioMinAggregateInputType = {
   judgeModel?: true
   maxTurns?: true
   minTurns?: true
-  folderId?: true
+  testSuiteId?: true
   version?: true
   lastUpdatedById?: true
   archivedAt?: true
@@ -132,7 +132,7 @@ export type ScenarioMaxAggregateInputType = {
   judgeModel?: true
   maxTurns?: true
   minTurns?: true
-  folderId?: true
+  testSuiteId?: true
   version?: true
   lastUpdatedById?: true
   archivedAt?: true
@@ -152,7 +152,7 @@ export type ScenarioCountAggregateInputType = {
   judgeModel?: true
   maxTurns?: true
   minTurns?: true
-  folderId?: true
+  testSuiteId?: true
   version?: true
   lastUpdatedById?: true
   archivedAt?: true
@@ -259,7 +259,7 @@ export type ScenarioGroupByOutputType = {
   judgeModel: string | null
   maxTurns: number | null
   minTurns: number | null
-  folderId: string | null
+  testSuiteId: string | null
   version: number
   lastUpdatedById: string | null
   archivedAt: Date | null
@@ -302,14 +302,14 @@ export type ScenarioWhereInput = {
   judgeModel?: Prisma.StringNullableFilter<"Scenario"> | string | null
   maxTurns?: Prisma.IntNullableFilter<"Scenario"> | number | null
   minTurns?: Prisma.IntNullableFilter<"Scenario"> | number | null
-  folderId?: Prisma.StringNullableFilter<"Scenario"> | string | null
+  testSuiteId?: Prisma.StringNullableFilter<"Scenario"> | string | null
   version?: Prisma.IntFilter<"Scenario"> | number
   lastUpdatedById?: Prisma.StringNullableFilter<"Scenario"> | string | null
   archivedAt?: Prisma.DateTimeNullableFilter<"Scenario"> | Date | string | null
   createdAt?: Prisma.DateTimeFilter<"Scenario"> | Date | string
   updatedAt?: Prisma.DateTimeFilter<"Scenario"> | Date | string
   project?: Prisma.XOR<Prisma.ProjectScalarRelationFilter, Prisma.ProjectWhereInput>
-  folder?: Prisma.XOR<Prisma.SimulationSuiteNullableScalarRelationFilter, Prisma.SimulationSuiteWhereInput> | null
+  testSuite?: Prisma.XOR<Prisma.SimulationSuiteNullableScalarRelationFilter, Prisma.SimulationSuiteWhereInput> | null
   versions?: Prisma.ScenarioVersionListRelationFilter
   lastUpdatedBy?: Prisma.XOR<Prisma.UserNullableScalarRelationFilter, Prisma.UserWhereInput> | null
 }
@@ -326,14 +326,14 @@ export type ScenarioOrderByWithRelationInput = {
   judgeModel?: Prisma.SortOrderInput | Prisma.SortOrder
   maxTurns?: Prisma.SortOrderInput | Prisma.SortOrder
   minTurns?: Prisma.SortOrderInput | Prisma.SortOrder
-  folderId?: Prisma.SortOrderInput | Prisma.SortOrder
+  testSuiteId?: Prisma.SortOrderInput | Prisma.SortOrder
   version?: Prisma.SortOrder
   lastUpdatedById?: Prisma.SortOrderInput | Prisma.SortOrder
   archivedAt?: Prisma.SortOrderInput | Prisma.SortOrder
   createdAt?: Prisma.SortOrder
   updatedAt?: Prisma.SortOrder
   project?: Prisma.ProjectOrderByWithRelationInput
-  folder?: Prisma.SimulationSuiteOrderByWithRelationInput
+  testSuite?: Prisma.SimulationSuiteOrderByWithRelationInput
   versions?: Prisma.ScenarioVersionOrderByRelationAggregateInput
   lastUpdatedBy?: Prisma.UserOrderByWithRelationInput
 }
@@ -353,14 +353,14 @@ export type ScenarioWhereUniqueInput = Prisma.AtLeast<{
   judgeModel?: Prisma.StringNullableFilter<"Scenario"> | string | null
   maxTurns?: Prisma.IntNullableFilter<"Scenario"> | number | null
   minTurns?: Prisma.IntNullableFilter<"Scenario"> | number | null
-  folderId?: Prisma.StringNullableFilter<"Scenario"> | string | null
+  testSuiteId?: Prisma.StringNullableFilter<"Scenario"> | string | null
   version?: Prisma.IntFilter<"Scenario"> | number
   lastUpdatedById?: Prisma.StringNullableFilter<"Scenario"> | string | null
   archivedAt?: Prisma.DateTimeNullableFilter<"Scenario"> | Date | string | null
   createdAt?: Prisma.DateTimeFilter<"Scenario"> | Date | string
   updatedAt?: Prisma.DateTimeFilter<"Scenario"> | Date | string
   project?: Prisma.XOR<Prisma.ProjectScalarRelationFilter, Prisma.ProjectWhereInput>
-  folder?: Prisma.XOR<Prisma.SimulationSuiteNullableScalarRelationFilter, Prisma.SimulationSuiteWhereInput> | null
+  testSuite?: Prisma.XOR<Prisma.SimulationSuiteNullableScalarRelationFilter, Prisma.SimulationSuiteWhereInput> | null
   versions?: Prisma.ScenarioVersionListRelationFilter
   lastUpdatedBy?: Prisma.XOR<Prisma.UserNullableScalarRelationFilter, Prisma.UserWhereInput> | null
 }, "id">
@@ -377,7 +377,7 @@ export type ScenarioOrderByWithAggregationInput = {
   judgeModel?: Prisma.SortOrderInput | Prisma.SortOrder
   maxTurns?: Prisma.SortOrderInput | Prisma.SortOrder
   minTurns?: Prisma.SortOrderInput | Prisma.SortOrder
-  folderId?: Prisma.SortOrderInput | Prisma.SortOrder
+  testSuiteId?: Prisma.SortOrderInput | Prisma.SortOrder
   version?: Prisma.SortOrder
   lastUpdatedById?: Prisma.SortOrderInput | Prisma.SortOrder
   archivedAt?: Prisma.SortOrderInput | Prisma.SortOrder
@@ -405,7 +405,7 @@ export type ScenarioScalarWhereWithAggregatesInput = {
   judgeModel?: Prisma.StringNullableWithAggregatesFilter<"Scenario"> | string | null
   maxTurns?: Prisma.IntNullableWithAggregatesFilter<"Scenario"> | number | null
   minTurns?: Prisma.IntNullableWithAggregatesFilter<"Scenario"> | number | null
-  folderId?: Prisma.StringNullableWithAggregatesFilter<"Scenario"> | string | null
+  testSuiteId?: Prisma.StringNullableWithAggregatesFilter<"Scenario"> | string | null
   version?: Prisma.IntWithAggregatesFilter<"Scenario"> | number
   lastUpdatedById?: Prisma.StringNullableWithAggregatesFilter<"Scenario"> | string | null
   archivedAt?: Prisma.DateTimeNullableWithAggregatesFilter<"Scenario"> | Date | string | null
@@ -429,7 +429,7 @@ export type ScenarioCreateInput = {
   createdAt?: Date | string
   updatedAt?: Date | string
   project: Prisma.ProjectCreateNestedOneWithoutScenariosInput
-  folder?: Prisma.SimulationSuiteCreateNestedOneWithoutFolderScenariosInput
+  testSuite?: Prisma.SimulationSuiteCreateNestedOneWithoutTestSuiteScenariosInput
   versions?: Prisma.ScenarioVersionCreateNestedManyWithoutScenarioInput
   lastUpdatedBy?: Prisma.UserCreateNestedOneWithoutScenariosInput
 }
@@ -446,7 +446,7 @@ export type ScenarioUncheckedCreateInput = {
   judgeModel?: string | null
   maxTurns?: number | null
   minTurns?: number | null
-  folderId?: string | null
+  testSuiteId?: string | null
   version?: number
   lastUpdatedById?: string | null
   archivedAt?: Date | string | null
@@ -471,7 +471,7 @@ export type ScenarioUpdateInput = {
   createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   updatedAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   project?: Prisma.ProjectUpdateOneRequiredWithoutScenariosNestedInput
-  folder?: Prisma.SimulationSuiteUpdateOneWithoutFolderScenariosNestedInput
+  testSuite?: Prisma.SimulationSuiteUpdateOneWithoutTestSuiteScenariosNestedInput
   versions?: Prisma.ScenarioVersionUpdateManyWithoutScenarioNestedInput
   lastUpdatedBy?: Prisma.UserUpdateOneWithoutScenariosNestedInput
 }
@@ -488,7 +488,7 @@ export type ScenarioUncheckedUpdateInput = {
   judgeModel?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   maxTurns?: Prisma.NullableIntFieldUpdateOperationsInput | number | null
   minTurns?: Prisma.NullableIntFieldUpdateOperationsInput | number | null
-  folderId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  testSuiteId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   version?: Prisma.IntFieldUpdateOperationsInput | number
   lastUpdatedById?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   archivedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
@@ -509,7 +509,7 @@ export type ScenarioCreateManyInput = {
   judgeModel?: string | null
   maxTurns?: number | null
   minTurns?: number | null
-  folderId?: string | null
+  testSuiteId?: string | null
   version?: number
   lastUpdatedById?: string | null
   archivedAt?: Date | string | null
@@ -546,7 +546,7 @@ export type ScenarioUncheckedUpdateManyInput = {
   judgeModel?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   maxTurns?: Prisma.NullableIntFieldUpdateOperationsInput | number | null
   minTurns?: Prisma.NullableIntFieldUpdateOperationsInput | number | null
-  folderId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  testSuiteId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   version?: Prisma.IntFieldUpdateOperationsInput | number
   lastUpdatedById?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   archivedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
@@ -576,7 +576,7 @@ export type ScenarioCountOrderByAggregateInput = {
   judgeModel?: Prisma.SortOrder
   maxTurns?: Prisma.SortOrder
   minTurns?: Prisma.SortOrder
-  folderId?: Prisma.SortOrder
+  testSuiteId?: Prisma.SortOrder
   version?: Prisma.SortOrder
   lastUpdatedById?: Prisma.SortOrder
   archivedAt?: Prisma.SortOrder
@@ -599,7 +599,7 @@ export type ScenarioMaxOrderByAggregateInput = {
   judgeModel?: Prisma.SortOrder
   maxTurns?: Prisma.SortOrder
   minTurns?: Prisma.SortOrder
-  folderId?: Prisma.SortOrder
+  testSuiteId?: Prisma.SortOrder
   version?: Prisma.SortOrder
   lastUpdatedById?: Prisma.SortOrder
   archivedAt?: Prisma.SortOrder
@@ -616,7 +616,7 @@ export type ScenarioMinOrderByAggregateInput = {
   judgeModel?: Prisma.SortOrder
   maxTurns?: Prisma.SortOrder
   minTurns?: Prisma.SortOrder
-  folderId?: Prisma.SortOrder
+  testSuiteId?: Prisma.SortOrder
   version?: Prisma.SortOrder
   lastUpdatedById?: Prisma.SortOrder
   archivedAt?: Prisma.SortOrder
@@ -751,45 +751,45 @@ export type ScenarioUpdateOneRequiredWithoutVersionsNestedInput = {
   update?: Prisma.XOR<Prisma.XOR<Prisma.ScenarioUpdateToOneWithWhereWithoutVersionsInput, Prisma.ScenarioUpdateWithoutVersionsInput>, Prisma.ScenarioUncheckedUpdateWithoutVersionsInput>
 }
 
-export type ScenarioCreateNestedManyWithoutFolderInput = {
-  create?: Prisma.XOR<Prisma.ScenarioCreateWithoutFolderInput, Prisma.ScenarioUncheckedCreateWithoutFolderInput> | Prisma.ScenarioCreateWithoutFolderInput[] | Prisma.ScenarioUncheckedCreateWithoutFolderInput[]
-  connectOrCreate?: Prisma.ScenarioCreateOrConnectWithoutFolderInput | Prisma.ScenarioCreateOrConnectWithoutFolderInput[]
-  createMany?: Prisma.ScenarioCreateManyFolderInputEnvelope
+export type ScenarioCreateNestedManyWithoutTestSuiteInput = {
+  create?: Prisma.XOR<Prisma.ScenarioCreateWithoutTestSuiteInput, Prisma.ScenarioUncheckedCreateWithoutTestSuiteInput> | Prisma.ScenarioCreateWithoutTestSuiteInput[] | Prisma.ScenarioUncheckedCreateWithoutTestSuiteInput[]
+  connectOrCreate?: Prisma.ScenarioCreateOrConnectWithoutTestSuiteInput | Prisma.ScenarioCreateOrConnectWithoutTestSuiteInput[]
+  createMany?: Prisma.ScenarioCreateManyTestSuiteInputEnvelope
   connect?: Prisma.ScenarioWhereUniqueInput | Prisma.ScenarioWhereUniqueInput[]
 }
 
-export type ScenarioUncheckedCreateNestedManyWithoutFolderInput = {
-  create?: Prisma.XOR<Prisma.ScenarioCreateWithoutFolderInput, Prisma.ScenarioUncheckedCreateWithoutFolderInput> | Prisma.ScenarioCreateWithoutFolderInput[] | Prisma.ScenarioUncheckedCreateWithoutFolderInput[]
-  connectOrCreate?: Prisma.ScenarioCreateOrConnectWithoutFolderInput | Prisma.ScenarioCreateOrConnectWithoutFolderInput[]
-  createMany?: Prisma.ScenarioCreateManyFolderInputEnvelope
+export type ScenarioUncheckedCreateNestedManyWithoutTestSuiteInput = {
+  create?: Prisma.XOR<Prisma.ScenarioCreateWithoutTestSuiteInput, Prisma.ScenarioUncheckedCreateWithoutTestSuiteInput> | Prisma.ScenarioCreateWithoutTestSuiteInput[] | Prisma.ScenarioUncheckedCreateWithoutTestSuiteInput[]
+  connectOrCreate?: Prisma.ScenarioCreateOrConnectWithoutTestSuiteInput | Prisma.ScenarioCreateOrConnectWithoutTestSuiteInput[]
+  createMany?: Prisma.ScenarioCreateManyTestSuiteInputEnvelope
   connect?: Prisma.ScenarioWhereUniqueInput | Prisma.ScenarioWhereUniqueInput[]
 }
 
-export type ScenarioUpdateManyWithoutFolderNestedInput = {
-  create?: Prisma.XOR<Prisma.ScenarioCreateWithoutFolderInput, Prisma.ScenarioUncheckedCreateWithoutFolderInput> | Prisma.ScenarioCreateWithoutFolderInput[] | Prisma.ScenarioUncheckedCreateWithoutFolderInput[]
-  connectOrCreate?: Prisma.ScenarioCreateOrConnectWithoutFolderInput | Prisma.ScenarioCreateOrConnectWithoutFolderInput[]
-  upsert?: Prisma.ScenarioUpsertWithWhereUniqueWithoutFolderInput | Prisma.ScenarioUpsertWithWhereUniqueWithoutFolderInput[]
-  createMany?: Prisma.ScenarioCreateManyFolderInputEnvelope
+export type ScenarioUpdateManyWithoutTestSuiteNestedInput = {
+  create?: Prisma.XOR<Prisma.ScenarioCreateWithoutTestSuiteInput, Prisma.ScenarioUncheckedCreateWithoutTestSuiteInput> | Prisma.ScenarioCreateWithoutTestSuiteInput[] | Prisma.ScenarioUncheckedCreateWithoutTestSuiteInput[]
+  connectOrCreate?: Prisma.ScenarioCreateOrConnectWithoutTestSuiteInput | Prisma.ScenarioCreateOrConnectWithoutTestSuiteInput[]
+  upsert?: Prisma.ScenarioUpsertWithWhereUniqueWithoutTestSuiteInput | Prisma.ScenarioUpsertWithWhereUniqueWithoutTestSuiteInput[]
+  createMany?: Prisma.ScenarioCreateManyTestSuiteInputEnvelope
   set?: Prisma.ScenarioWhereUniqueInput | Prisma.ScenarioWhereUniqueInput[]
   disconnect?: Prisma.ScenarioWhereUniqueInput | Prisma.ScenarioWhereUniqueInput[]
   delete?: Prisma.ScenarioWhereUniqueInput | Prisma.ScenarioWhereUniqueInput[]
   connect?: Prisma.ScenarioWhereUniqueInput | Prisma.ScenarioWhereUniqueInput[]
-  update?: Prisma.ScenarioUpdateWithWhereUniqueWithoutFolderInput | Prisma.ScenarioUpdateWithWhereUniqueWithoutFolderInput[]
-  updateMany?: Prisma.ScenarioUpdateManyWithWhereWithoutFolderInput | Prisma.ScenarioUpdateManyWithWhereWithoutFolderInput[]
+  update?: Prisma.ScenarioUpdateWithWhereUniqueWithoutTestSuiteInput | Prisma.ScenarioUpdateWithWhereUniqueWithoutTestSuiteInput[]
+  updateMany?: Prisma.ScenarioUpdateManyWithWhereWithoutTestSuiteInput | Prisma.ScenarioUpdateManyWithWhereWithoutTestSuiteInput[]
   deleteMany?: Prisma.ScenarioScalarWhereInput | Prisma.ScenarioScalarWhereInput[]
 }
 
-export type ScenarioUncheckedUpdateManyWithoutFolderNestedInput = {
-  create?: Prisma.XOR<Prisma.ScenarioCreateWithoutFolderInput, Prisma.ScenarioUncheckedCreateWithoutFolderInput> | Prisma.ScenarioCreateWithoutFolderInput[] | Prisma.ScenarioUncheckedCreateWithoutFolderInput[]
-  connectOrCreate?: Prisma.ScenarioCreateOrConnectWithoutFolderInput | Prisma.ScenarioCreateOrConnectWithoutFolderInput[]
-  upsert?: Prisma.ScenarioUpsertWithWhereUniqueWithoutFolderInput | Prisma.ScenarioUpsertWithWhereUniqueWithoutFolderInput[]
-  createMany?: Prisma.ScenarioCreateManyFolderInputEnvelope
+export type ScenarioUncheckedUpdateManyWithoutTestSuiteNestedInput = {
+  create?: Prisma.XOR<Prisma.ScenarioCreateWithoutTestSuiteInput, Prisma.ScenarioUncheckedCreateWithoutTestSuiteInput> | Prisma.ScenarioCreateWithoutTestSuiteInput[] | Prisma.ScenarioUncheckedCreateWithoutTestSuiteInput[]
+  connectOrCreate?: Prisma.ScenarioCreateOrConnectWithoutTestSuiteInput | Prisma.ScenarioCreateOrConnectWithoutTestSuiteInput[]
+  upsert?: Prisma.ScenarioUpsertWithWhereUniqueWithoutTestSuiteInput | Prisma.ScenarioUpsertWithWhereUniqueWithoutTestSuiteInput[]
+  createMany?: Prisma.ScenarioCreateManyTestSuiteInputEnvelope
   set?: Prisma.ScenarioWhereUniqueInput | Prisma.ScenarioWhereUniqueInput[]
   disconnect?: Prisma.ScenarioWhereUniqueInput | Prisma.ScenarioWhereUniqueInput[]
   delete?: Prisma.ScenarioWhereUniqueInput | Prisma.ScenarioWhereUniqueInput[]
   connect?: Prisma.ScenarioWhereUniqueInput | Prisma.ScenarioWhereUniqueInput[]
-  update?: Prisma.ScenarioUpdateWithWhereUniqueWithoutFolderInput | Prisma.ScenarioUpdateWithWhereUniqueWithoutFolderInput[]
-  updateMany?: Prisma.ScenarioUpdateManyWithWhereWithoutFolderInput | Prisma.ScenarioUpdateManyWithWhereWithoutFolderInput[]
+  update?: Prisma.ScenarioUpdateWithWhereUniqueWithoutTestSuiteInput | Prisma.ScenarioUpdateWithWhereUniqueWithoutTestSuiteInput[]
+  updateMany?: Prisma.ScenarioUpdateManyWithWhereWithoutTestSuiteInput | Prisma.ScenarioUpdateManyWithWhereWithoutTestSuiteInput[]
   deleteMany?: Prisma.ScenarioScalarWhereInput | Prisma.ScenarioScalarWhereInput[]
 }
 
@@ -809,7 +809,7 @@ export type ScenarioCreateWithoutLastUpdatedByInput = {
   createdAt?: Date | string
   updatedAt?: Date | string
   project: Prisma.ProjectCreateNestedOneWithoutScenariosInput
-  folder?: Prisma.SimulationSuiteCreateNestedOneWithoutFolderScenariosInput
+  testSuite?: Prisma.SimulationSuiteCreateNestedOneWithoutTestSuiteScenariosInput
   versions?: Prisma.ScenarioVersionCreateNestedManyWithoutScenarioInput
 }
 
@@ -825,7 +825,7 @@ export type ScenarioUncheckedCreateWithoutLastUpdatedByInput = {
   judgeModel?: string | null
   maxTurns?: number | null
   minTurns?: number | null
-  folderId?: string | null
+  testSuiteId?: string | null
   version?: number
   archivedAt?: Date | string | null
   createdAt?: Date | string
@@ -874,7 +874,7 @@ export type ScenarioScalarWhereInput = {
   judgeModel?: Prisma.StringNullableFilter<"Scenario"> | string | null
   maxTurns?: Prisma.IntNullableFilter<"Scenario"> | number | null
   minTurns?: Prisma.IntNullableFilter<"Scenario"> | number | null
-  folderId?: Prisma.StringNullableFilter<"Scenario"> | string | null
+  testSuiteId?: Prisma.StringNullableFilter<"Scenario"> | string | null
   version?: Prisma.IntFilter<"Scenario"> | number
   lastUpdatedById?: Prisma.StringNullableFilter<"Scenario"> | string | null
   archivedAt?: Prisma.DateTimeNullableFilter<"Scenario"> | Date | string | null
@@ -897,7 +897,7 @@ export type ScenarioCreateWithoutProjectInput = {
   archivedAt?: Date | string | null
   createdAt?: Date | string
   updatedAt?: Date | string
-  folder?: Prisma.SimulationSuiteCreateNestedOneWithoutFolderScenariosInput
+  testSuite?: Prisma.SimulationSuiteCreateNestedOneWithoutTestSuiteScenariosInput
   versions?: Prisma.ScenarioVersionCreateNestedManyWithoutScenarioInput
   lastUpdatedBy?: Prisma.UserCreateNestedOneWithoutScenariosInput
 }
@@ -913,7 +913,7 @@ export type ScenarioUncheckedCreateWithoutProjectInput = {
   judgeModel?: string | null
   maxTurns?: number | null
   minTurns?: number | null
-  folderId?: string | null
+  testSuiteId?: string | null
   version?: number
   lastUpdatedById?: string | null
   archivedAt?: Date | string | null
@@ -964,7 +964,7 @@ export type ScenarioCreateWithoutVersionsInput = {
   createdAt?: Date | string
   updatedAt?: Date | string
   project: Prisma.ProjectCreateNestedOneWithoutScenariosInput
-  folder?: Prisma.SimulationSuiteCreateNestedOneWithoutFolderScenariosInput
+  testSuite?: Prisma.SimulationSuiteCreateNestedOneWithoutTestSuiteScenariosInput
   lastUpdatedBy?: Prisma.UserCreateNestedOneWithoutScenariosInput
 }
 
@@ -980,7 +980,7 @@ export type ScenarioUncheckedCreateWithoutVersionsInput = {
   judgeModel?: string | null
   maxTurns?: number | null
   minTurns?: number | null
-  folderId?: string | null
+  testSuiteId?: string | null
   version?: number
   lastUpdatedById?: string | null
   archivedAt?: Date | string | null
@@ -1020,7 +1020,7 @@ export type ScenarioUpdateWithoutVersionsInput = {
   createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   updatedAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   project?: Prisma.ProjectUpdateOneRequiredWithoutScenariosNestedInput
-  folder?: Prisma.SimulationSuiteUpdateOneWithoutFolderScenariosNestedInput
+  testSuite?: Prisma.SimulationSuiteUpdateOneWithoutTestSuiteScenariosNestedInput
   lastUpdatedBy?: Prisma.UserUpdateOneWithoutScenariosNestedInput
 }
 
@@ -1036,7 +1036,7 @@ export type ScenarioUncheckedUpdateWithoutVersionsInput = {
   judgeModel?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   maxTurns?: Prisma.NullableIntFieldUpdateOperationsInput | number | null
   minTurns?: Prisma.NullableIntFieldUpdateOperationsInput | number | null
-  folderId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  testSuiteId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   version?: Prisma.IntFieldUpdateOperationsInput | number
   lastUpdatedById?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   archivedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
@@ -1044,7 +1044,7 @@ export type ScenarioUncheckedUpdateWithoutVersionsInput = {
   updatedAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
 }
 
-export type ScenarioCreateWithoutFolderInput = {
+export type ScenarioCreateWithoutTestSuiteInput = {
   id?: string
   name: string
   situation: string
@@ -1064,7 +1064,7 @@ export type ScenarioCreateWithoutFolderInput = {
   lastUpdatedBy?: Prisma.UserCreateNestedOneWithoutScenariosInput
 }
 
-export type ScenarioUncheckedCreateWithoutFolderInput = {
+export type ScenarioUncheckedCreateWithoutTestSuiteInput = {
   id?: string
   projectId: string
   name: string
@@ -1084,30 +1084,30 @@ export type ScenarioUncheckedCreateWithoutFolderInput = {
   versions?: Prisma.ScenarioVersionUncheckedCreateNestedManyWithoutScenarioInput
 }
 
-export type ScenarioCreateOrConnectWithoutFolderInput = {
+export type ScenarioCreateOrConnectWithoutTestSuiteInput = {
   where: Prisma.ScenarioWhereUniqueInput
-  create: Prisma.XOR<Prisma.ScenarioCreateWithoutFolderInput, Prisma.ScenarioUncheckedCreateWithoutFolderInput>
+  create: Prisma.XOR<Prisma.ScenarioCreateWithoutTestSuiteInput, Prisma.ScenarioUncheckedCreateWithoutTestSuiteInput>
 }
 
-export type ScenarioCreateManyFolderInputEnvelope = {
-  data: Prisma.ScenarioCreateManyFolderInput | Prisma.ScenarioCreateManyFolderInput[]
+export type ScenarioCreateManyTestSuiteInputEnvelope = {
+  data: Prisma.ScenarioCreateManyTestSuiteInput | Prisma.ScenarioCreateManyTestSuiteInput[]
   skipDuplicates?: boolean
 }
 
-export type ScenarioUpsertWithWhereUniqueWithoutFolderInput = {
+export type ScenarioUpsertWithWhereUniqueWithoutTestSuiteInput = {
   where: Prisma.ScenarioWhereUniqueInput
-  update: Prisma.XOR<Prisma.ScenarioUpdateWithoutFolderInput, Prisma.ScenarioUncheckedUpdateWithoutFolderInput>
-  create: Prisma.XOR<Prisma.ScenarioCreateWithoutFolderInput, Prisma.ScenarioUncheckedCreateWithoutFolderInput>
+  update: Prisma.XOR<Prisma.ScenarioUpdateWithoutTestSuiteInput, Prisma.ScenarioUncheckedUpdateWithoutTestSuiteInput>
+  create: Prisma.XOR<Prisma.ScenarioCreateWithoutTestSuiteInput, Prisma.ScenarioUncheckedCreateWithoutTestSuiteInput>
 }
 
-export type ScenarioUpdateWithWhereUniqueWithoutFolderInput = {
+export type ScenarioUpdateWithWhereUniqueWithoutTestSuiteInput = {
   where: Prisma.ScenarioWhereUniqueInput
-  data: Prisma.XOR<Prisma.ScenarioUpdateWithoutFolderInput, Prisma.ScenarioUncheckedUpdateWithoutFolderInput>
+  data: Prisma.XOR<Prisma.ScenarioUpdateWithoutTestSuiteInput, Prisma.ScenarioUncheckedUpdateWithoutTestSuiteInput>
 }
 
-export type ScenarioUpdateManyWithWhereWithoutFolderInput = {
+export type ScenarioUpdateManyWithWhereWithoutTestSuiteInput = {
   where: Prisma.ScenarioScalarWhereInput
-  data: Prisma.XOR<Prisma.ScenarioUpdateManyMutationInput, Prisma.ScenarioUncheckedUpdateManyWithoutFolderInput>
+  data: Prisma.XOR<Prisma.ScenarioUpdateManyMutationInput, Prisma.ScenarioUncheckedUpdateManyWithoutTestSuiteInput>
 }
 
 export type ScenarioCreateManyLastUpdatedByInput = {
@@ -1122,7 +1122,7 @@ export type ScenarioCreateManyLastUpdatedByInput = {
   judgeModel?: string | null
   maxTurns?: number | null
   minTurns?: number | null
-  folderId?: string | null
+  testSuiteId?: string | null
   version?: number
   archivedAt?: Date | string | null
   createdAt?: Date | string
@@ -1145,7 +1145,7 @@ export type ScenarioUpdateWithoutLastUpdatedByInput = {
   createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   updatedAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   project?: Prisma.ProjectUpdateOneRequiredWithoutScenariosNestedInput
-  folder?: Prisma.SimulationSuiteUpdateOneWithoutFolderScenariosNestedInput
+  testSuite?: Prisma.SimulationSuiteUpdateOneWithoutTestSuiteScenariosNestedInput
   versions?: Prisma.ScenarioVersionUpdateManyWithoutScenarioNestedInput
 }
 
@@ -1161,7 +1161,7 @@ export type ScenarioUncheckedUpdateWithoutLastUpdatedByInput = {
   judgeModel?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   maxTurns?: Prisma.NullableIntFieldUpdateOperationsInput | number | null
   minTurns?: Prisma.NullableIntFieldUpdateOperationsInput | number | null
-  folderId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  testSuiteId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   version?: Prisma.IntFieldUpdateOperationsInput | number
   archivedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
   createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
@@ -1181,7 +1181,7 @@ export type ScenarioUncheckedUpdateManyWithoutLastUpdatedByInput = {
   judgeModel?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   maxTurns?: Prisma.NullableIntFieldUpdateOperationsInput | number | null
   minTurns?: Prisma.NullableIntFieldUpdateOperationsInput | number | null
-  folderId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  testSuiteId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   version?: Prisma.IntFieldUpdateOperationsInput | number
   archivedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
   createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
@@ -1199,7 +1199,7 @@ export type ScenarioCreateManyProjectInput = {
   judgeModel?: string | null
   maxTurns?: number | null
   minTurns?: number | null
-  folderId?: string | null
+  testSuiteId?: string | null
   version?: number
   lastUpdatedById?: string | null
   archivedAt?: Date | string | null
@@ -1222,7 +1222,7 @@ export type ScenarioUpdateWithoutProjectInput = {
   archivedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
   createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   updatedAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
-  folder?: Prisma.SimulationSuiteUpdateOneWithoutFolderScenariosNestedInput
+  testSuite?: Prisma.SimulationSuiteUpdateOneWithoutTestSuiteScenariosNestedInput
   versions?: Prisma.ScenarioVersionUpdateManyWithoutScenarioNestedInput
   lastUpdatedBy?: Prisma.UserUpdateOneWithoutScenariosNestedInput
 }
@@ -1238,7 +1238,7 @@ export type ScenarioUncheckedUpdateWithoutProjectInput = {
   judgeModel?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   maxTurns?: Prisma.NullableIntFieldUpdateOperationsInput | number | null
   minTurns?: Prisma.NullableIntFieldUpdateOperationsInput | number | null
-  folderId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  testSuiteId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   version?: Prisma.IntFieldUpdateOperationsInput | number
   lastUpdatedById?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   archivedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
@@ -1258,7 +1258,7 @@ export type ScenarioUncheckedUpdateManyWithoutProjectInput = {
   judgeModel?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   maxTurns?: Prisma.NullableIntFieldUpdateOperationsInput | number | null
   minTurns?: Prisma.NullableIntFieldUpdateOperationsInput | number | null
-  folderId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  testSuiteId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   version?: Prisma.IntFieldUpdateOperationsInput | number
   lastUpdatedById?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   archivedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
@@ -1266,7 +1266,7 @@ export type ScenarioUncheckedUpdateManyWithoutProjectInput = {
   updatedAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
 }
 
-export type ScenarioCreateManyFolderInput = {
+export type ScenarioCreateManyTestSuiteInput = {
   id?: string
   projectId: string
   name: string
@@ -1285,7 +1285,7 @@ export type ScenarioCreateManyFolderInput = {
   updatedAt?: Date | string
 }
 
-export type ScenarioUpdateWithoutFolderInput = {
+export type ScenarioUpdateWithoutTestSuiteInput = {
   id?: Prisma.StringFieldUpdateOperationsInput | string
   name?: Prisma.StringFieldUpdateOperationsInput | string
   situation?: Prisma.StringFieldUpdateOperationsInput | string
@@ -1305,7 +1305,7 @@ export type ScenarioUpdateWithoutFolderInput = {
   lastUpdatedBy?: Prisma.UserUpdateOneWithoutScenariosNestedInput
 }
 
-export type ScenarioUncheckedUpdateWithoutFolderInput = {
+export type ScenarioUncheckedUpdateWithoutTestSuiteInput = {
   id?: Prisma.StringFieldUpdateOperationsInput | string
   projectId?: Prisma.StringFieldUpdateOperationsInput | string
   name?: Prisma.StringFieldUpdateOperationsInput | string
@@ -1325,7 +1325,7 @@ export type ScenarioUncheckedUpdateWithoutFolderInput = {
   versions?: Prisma.ScenarioVersionUncheckedUpdateManyWithoutScenarioNestedInput
 }
 
-export type ScenarioUncheckedUpdateManyWithoutFolderInput = {
+export type ScenarioUncheckedUpdateManyWithoutTestSuiteInput = {
   id?: Prisma.StringFieldUpdateOperationsInput | string
   projectId?: Prisma.StringFieldUpdateOperationsInput | string
   name?: Prisma.StringFieldUpdateOperationsInput | string
@@ -1387,14 +1387,14 @@ export type ScenarioSelect<ExtArgs extends runtime.Types.Extensions.InternalArgs
   judgeModel?: boolean
   maxTurns?: boolean
   minTurns?: boolean
-  folderId?: boolean
+  testSuiteId?: boolean
   version?: boolean
   lastUpdatedById?: boolean
   archivedAt?: boolean
   createdAt?: boolean
   updatedAt?: boolean
   project?: boolean | Prisma.ProjectDefaultArgs<ExtArgs>
-  folder?: boolean | Prisma.Scenario$folderArgs<ExtArgs>
+  testSuite?: boolean | Prisma.Scenario$testSuiteArgs<ExtArgs>
   versions?: boolean | Prisma.Scenario$versionsArgs<ExtArgs>
   lastUpdatedBy?: boolean | Prisma.Scenario$lastUpdatedByArgs<ExtArgs>
   _count?: boolean | Prisma.ScenarioCountOutputTypeDefaultArgs<ExtArgs>
@@ -1412,14 +1412,14 @@ export type ScenarioSelectCreateManyAndReturn<ExtArgs extends runtime.Types.Exte
   judgeModel?: boolean
   maxTurns?: boolean
   minTurns?: boolean
-  folderId?: boolean
+  testSuiteId?: boolean
   version?: boolean
   lastUpdatedById?: boolean
   archivedAt?: boolean
   createdAt?: boolean
   updatedAt?: boolean
   project?: boolean | Prisma.ProjectDefaultArgs<ExtArgs>
-  folder?: boolean | Prisma.Scenario$folderArgs<ExtArgs>
+  testSuite?: boolean | Prisma.Scenario$testSuiteArgs<ExtArgs>
   lastUpdatedBy?: boolean | Prisma.Scenario$lastUpdatedByArgs<ExtArgs>
 }, ExtArgs["result"]["scenario"]>
 
@@ -1435,14 +1435,14 @@ export type ScenarioSelectUpdateManyAndReturn<ExtArgs extends runtime.Types.Exte
   judgeModel?: boolean
   maxTurns?: boolean
   minTurns?: boolean
-  folderId?: boolean
+  testSuiteId?: boolean
   version?: boolean
   lastUpdatedById?: boolean
   archivedAt?: boolean
   createdAt?: boolean
   updatedAt?: boolean
   project?: boolean | Prisma.ProjectDefaultArgs<ExtArgs>
-  folder?: boolean | Prisma.Scenario$folderArgs<ExtArgs>
+  testSuite?: boolean | Prisma.Scenario$testSuiteArgs<ExtArgs>
   lastUpdatedBy?: boolean | Prisma.Scenario$lastUpdatedByArgs<ExtArgs>
 }, ExtArgs["result"]["scenario"]>
 
@@ -1458,7 +1458,7 @@ export type ScenarioSelectScalar = {
   judgeModel?: boolean
   maxTurns?: boolean
   minTurns?: boolean
-  folderId?: boolean
+  testSuiteId?: boolean
   version?: boolean
   lastUpdatedById?: boolean
   archivedAt?: boolean
@@ -1466,22 +1466,22 @@ export type ScenarioSelectScalar = {
   updatedAt?: boolean
 }
 
-export type ScenarioOmit<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = runtime.Types.Extensions.GetOmit<"id" | "projectId" | "name" | "situation" | "criteria" | "labels" | "parameters" | "simulatorModel" | "judgeModel" | "maxTurns" | "minTurns" | "folderId" | "version" | "lastUpdatedById" | "archivedAt" | "createdAt" | "updatedAt", ExtArgs["result"]["scenario"]>
+export type ScenarioOmit<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = runtime.Types.Extensions.GetOmit<"id" | "projectId" | "name" | "situation" | "criteria" | "labels" | "parameters" | "simulatorModel" | "judgeModel" | "maxTurns" | "minTurns" | "testSuiteId" | "version" | "lastUpdatedById" | "archivedAt" | "createdAt" | "updatedAt", ExtArgs["result"]["scenario"]>
 export type ScenarioInclude<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = {
   project?: boolean | Prisma.ProjectDefaultArgs<ExtArgs>
-  folder?: boolean | Prisma.Scenario$folderArgs<ExtArgs>
+  testSuite?: boolean | Prisma.Scenario$testSuiteArgs<ExtArgs>
   versions?: boolean | Prisma.Scenario$versionsArgs<ExtArgs>
   lastUpdatedBy?: boolean | Prisma.Scenario$lastUpdatedByArgs<ExtArgs>
   _count?: boolean | Prisma.ScenarioCountOutputTypeDefaultArgs<ExtArgs>
 }
 export type ScenarioIncludeCreateManyAndReturn<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = {
   project?: boolean | Prisma.ProjectDefaultArgs<ExtArgs>
-  folder?: boolean | Prisma.Scenario$folderArgs<ExtArgs>
+  testSuite?: boolean | Prisma.Scenario$testSuiteArgs<ExtArgs>
   lastUpdatedBy?: boolean | Prisma.Scenario$lastUpdatedByArgs<ExtArgs>
 }
 export type ScenarioIncludeUpdateManyAndReturn<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = {
   project?: boolean | Prisma.ProjectDefaultArgs<ExtArgs>
-  folder?: boolean | Prisma.Scenario$folderArgs<ExtArgs>
+  testSuite?: boolean | Prisma.Scenario$testSuiteArgs<ExtArgs>
   lastUpdatedBy?: boolean | Prisma.Scenario$lastUpdatedByArgs<ExtArgs>
 }
 
@@ -1489,7 +1489,7 @@ export type $ScenarioPayload<ExtArgs extends runtime.Types.Extensions.InternalAr
   name: "Scenario"
   objects: {
     project: Prisma.$ProjectPayload<ExtArgs>
-    folder: Prisma.$SimulationSuitePayload<ExtArgs> | null
+    testSuite: Prisma.$SimulationSuitePayload<ExtArgs> | null
     versions: Prisma.$ScenarioVersionPayload<ExtArgs>[]
     lastUpdatedBy: Prisma.$UserPayload<ExtArgs> | null
   }
@@ -1505,7 +1505,7 @@ export type $ScenarioPayload<ExtArgs extends runtime.Types.Extensions.InternalAr
     judgeModel: string | null
     maxTurns: number | null
     minTurns: number | null
-    folderId: string | null
+    testSuiteId: string | null
     version: number
     lastUpdatedById: string | null
     archivedAt: Date | null
@@ -1906,7 +1906,7 @@ readonly fields: ScenarioFieldRefs;
 export interface Prisma__ScenarioClient<T, Null = never, ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs, GlobalOmitOptions = {}> extends Prisma.PrismaPromise<T> {
   readonly [Symbol.toStringTag]: "PrismaPromise"
   project<T extends Prisma.ProjectDefaultArgs<ExtArgs> = {}>(args?: Prisma.Subset<T, Prisma.ProjectDefaultArgs<ExtArgs>>): Prisma.Prisma__ProjectClient<runtime.Types.Result.GetResult<Prisma.$ProjectPayload<ExtArgs>, T, "findUniqueOrThrow", GlobalOmitOptions> | Null, Null, ExtArgs, GlobalOmitOptions>
-  folder<T extends Prisma.Scenario$folderArgs<ExtArgs> = {}>(args?: Prisma.Subset<T, Prisma.Scenario$folderArgs<ExtArgs>>): Prisma.Prisma__SimulationSuiteClient<runtime.Types.Result.GetResult<Prisma.$SimulationSuitePayload<ExtArgs>, T, "findUniqueOrThrow", GlobalOmitOptions> | null, null, ExtArgs, GlobalOmitOptions>
+  testSuite<T extends Prisma.Scenario$testSuiteArgs<ExtArgs> = {}>(args?: Prisma.Subset<T, Prisma.Scenario$testSuiteArgs<ExtArgs>>): Prisma.Prisma__SimulationSuiteClient<runtime.Types.Result.GetResult<Prisma.$SimulationSuitePayload<ExtArgs>, T, "findUniqueOrThrow", GlobalOmitOptions> | null, null, ExtArgs, GlobalOmitOptions>
   versions<T extends Prisma.Scenario$versionsArgs<ExtArgs> = {}>(args?: Prisma.Subset<T, Prisma.Scenario$versionsArgs<ExtArgs>>): Prisma.PrismaPromise<runtime.Types.Result.GetResult<Prisma.$ScenarioVersionPayload<ExtArgs>, T, "findMany", GlobalOmitOptions> | Null>
   lastUpdatedBy<T extends Prisma.Scenario$lastUpdatedByArgs<ExtArgs> = {}>(args?: Prisma.Subset<T, Prisma.Scenario$lastUpdatedByArgs<ExtArgs>>): Prisma.Prisma__UserClient<runtime.Types.Result.GetResult<Prisma.$UserPayload<ExtArgs>, T, "findUniqueOrThrow", GlobalOmitOptions> | null, null, ExtArgs, GlobalOmitOptions>
   /**
@@ -1949,7 +1949,7 @@ export interface ScenarioFieldRefs {
   readonly judgeModel: Prisma.FieldRef<"Scenario", 'String'>
   readonly maxTurns: Prisma.FieldRef<"Scenario", 'Int'>
   readonly minTurns: Prisma.FieldRef<"Scenario", 'Int'>
-  readonly folderId: Prisma.FieldRef<"Scenario", 'String'>
+  readonly testSuiteId: Prisma.FieldRef<"Scenario", 'String'>
   readonly version: Prisma.FieldRef<"Scenario", 'Int'>
   readonly lastUpdatedById: Prisma.FieldRef<"Scenario", 'String'>
   readonly archivedAt: Prisma.FieldRef<"Scenario", 'DateTime'>
@@ -2356,9 +2356,9 @@ export type ScenarioDeleteManyArgs<ExtArgs extends runtime.Types.Extensions.Inte
 }
 
 /**
- * Scenario.folder
+ * Scenario.testSuite
  */
-export type Scenario$folderArgs<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = {
+export type Scenario$testSuiteArgs<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = {
   /**
    * Select specific fields to fetch from the SimulationSuite
    */

@@ -4,10 +4,10 @@ import {
   ScenarioService as ScenarioServiceContract,
   scenarioCreateInputSchema,
   scenarioDuplicateInputSchema,
-  scenarioFolderCreateInputSchema,
-  scenarioFolderIdInputSchema,
-  scenarioFolderRenameInputSchema,
-  scenarioFolderUpdateInputSchema,
+  scenarioTestSuiteCreateInputSchema,
+  scenarioTestSuiteIdInputSchema,
+  scenarioTestSuiteRenameInputSchema,
+  scenarioTestSuiteUpdateInputSchema,
   scenarioIdInputSchema,
   scenarioMoveInputSchema,
   scenarioParameterDefinitionsSchema,
@@ -18,12 +18,12 @@ import {
   scenarioVersionRestoreInputSchema,
   type Scenario,
   type ScenarioCreateInput,
-  type ScenarioFolder,
-  type ScenarioFolderCreateInput,
-  type ScenarioFolderIdInput,
-  type ScenarioFolderRenameInput,
-  type ScenarioFolderRunDefinition,
-  type ScenarioFolderUpdateInput,
+  type ScenarioTestSuite,
+  type ScenarioTestSuiteCreateInput,
+  type ScenarioTestSuiteIdInput,
+  type ScenarioTestSuiteRenameInput,
+  type ScenarioTestSuiteRunDefinition,
+  type ScenarioTestSuiteUpdateInput,
   type ScenarioIdInput,
   type ScenarioReferenceState,
   type ScenarioRunConfig,
@@ -47,7 +47,7 @@ import { createLogger } from "@langwatch/observability";
 import type { SimulationService } from "@langwatch/scenario-contract";
 import type { ScenarioRepository } from "../repositories/scenario.repository";
 import type { ScenarioClockPort } from "../ports/scenario-clock.port";
-import type { ScenarioFolderIdPort, ScenarioIdPort } from "../ports/scenario-id.port";
+import type { ScenarioTestSuiteIdPort, ScenarioIdPort } from "../ports/scenario-id.port";
 import type { ScenarioSecretCipherPort } from "../ports/scenario-secret-cipher.port";
 import { ScenarioRunSecretsService } from "./scenario-run-secrets.service";
 
@@ -65,7 +65,7 @@ export type ScenarioServiceOptions = {
   repository: ScenarioRepository;
   simulations: SimulationService;
   ids: ScenarioIdPort;
-  folderIds: ScenarioFolderIdPort;
+  testSuiteIds: ScenarioTestSuiteIdPort;
   clock: ScenarioClockPort;
   secretCipher: ScenarioSecretCipherPort;
 };
@@ -125,13 +125,13 @@ export class ScenarioService extends ScenarioServiceContract {
     });
   }
 
-  moveToFolder(input: ScenarioMoveInput): Promise<Scenario> {
+  moveToTestSuite(input: ScenarioMoveInput): Promise<Scenario> {
     const parsed = scenarioMoveInputSchema.parse(input);
 
     return this.update({
       id: parsed.scenarioId,
       projectId: parsed.projectId,
-      folderId: parsed.folderId,
+      testSuiteId: parsed.testSuiteId,
     });
   }
 
@@ -153,7 +153,7 @@ export class ScenarioService extends ScenarioServiceContract {
       judgeModel: original.judgeModel,
       maxTurns: original.maxTurns,
       minTurns: original.minTurns,
-      folderId: original.folderId,
+      testSuiteId: original.testSuiteId,
       lastUpdatedById: parsed.lastUpdatedById ?? null,
     });
   }
@@ -244,43 +244,47 @@ export class ScenarioService extends ScenarioServiceContract {
     return { archived: result.archived, failed };
   }
 
-  createFolder(input: ScenarioFolderCreateInput): Promise<ScenarioFolder> {
-    const parsed = scenarioFolderCreateInputSchema.parse(input);
+  createTestSuite(input: ScenarioTestSuiteCreateInput): Promise<ScenarioTestSuite> {
+    const parsed = scenarioTestSuiteCreateInputSchema.parse(input);
 
-    return this.options.repository.createFolder({
+    return this.options.repository.createTestSuite({
       ...parsed,
-      id: this.options.folderIds.next(),
+      id: this.options.testSuiteIds.next(),
     });
   }
 
-  tryGetFolder(input: ScenarioFolderIdInput): Promise<ScenarioFolder | null> {
-    return this.options.repository.tryFindFolder(scenarioFolderIdInputSchema.parse(input));
+  tryGetTestSuite(input: ScenarioTestSuiteIdInput): Promise<ScenarioTestSuite | null> {
+    return this.options.repository.tryFindTestSuite(scenarioTestSuiteIdInputSchema.parse(input));
   }
 
-  listFolders(input: { projectId: string }): Promise<ScenarioFolder[]> {
-    return this.options.repository.findFolders(
+  listTestSuites(input: { projectId: string }): Promise<ScenarioTestSuite[]> {
+    return this.options.repository.findTestSuites(
       scenarioIdInputSchema.pick({ projectId: true }).parse(input),
     );
   }
 
-  async renameFolder(input: ScenarioFolderRenameInput): Promise<ScenarioFolder> {
-    const parsed = scenarioFolderRenameInputSchema.parse(input);
+  async renameTestSuite(input: ScenarioTestSuiteRenameInput): Promise<ScenarioTestSuite> {
+    const parsed = scenarioTestSuiteRenameInputSchema.parse(input);
 
-    return this.options.repository.renameFolder(parsed);
+    return this.options.repository.renameTestSuite(parsed);
   }
 
-  updateFolder(input: ScenarioFolderUpdateInput): Promise<ScenarioFolder> {
-    return this.options.repository.updateFolder(scenarioFolderUpdateInputSchema.parse(input));
+  updateTestSuite(input: ScenarioTestSuiteUpdateInput): Promise<ScenarioTestSuite> {
+    return this.options.repository.updateTestSuite(scenarioTestSuiteUpdateInputSchema.parse(input));
   }
 
-  getFolderRunDefinition(input: ScenarioFolderIdInput): Promise<ScenarioFolderRunDefinition> {
-    return this.options.repository.getFolderRunDefinition(scenarioFolderIdInputSchema.parse(input));
+  getTestSuiteRunDefinition(
+    input: ScenarioTestSuiteIdInput,
+  ): Promise<ScenarioTestSuiteRunDefinition> {
+    return this.options.repository.getTestSuiteRunDefinition(
+      scenarioTestSuiteIdInputSchema.parse(input),
+    );
   }
 
-  async archiveFolder(input: ScenarioFolderIdInput): Promise<ScenarioFolder> {
-    const parsed = scenarioFolderIdInputSchema.parse(input);
+  async archiveTestSuite(input: ScenarioTestSuiteIdInput): Promise<ScenarioTestSuite> {
+    const parsed = scenarioTestSuiteIdInputSchema.parse(input);
 
-    return this.options.repository.archiveFolder({
+    return this.options.repository.archiveTestSuite({
       ...parsed,
       archivedAt: this.options.clock.now(),
     });

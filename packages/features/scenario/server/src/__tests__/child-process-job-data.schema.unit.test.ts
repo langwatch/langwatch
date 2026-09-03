@@ -18,10 +18,7 @@
  *   parse", "An older job payload shape still parses and runs")
  */
 import { describe, expect, it } from "vitest";
-import {
-  ChildProcessJobDataSchema,
-  type LiteLLMParams,
-} from "@langwatch/scenario-contract";
+import { ChildProcessJobDataSchema, type LiteLLMParams } from "@langwatch/scenario-contract";
 
 import { selectRoleModelParams } from "../index";
 
@@ -83,9 +80,31 @@ describe("ChildProcessJobDataSchema", () => {
       // adapter-role params to fall back to, neither can be built — that
       // must be caught here, not three call frames deeper as an
       // "undefined has no properties" crash.
-      expect(paths).toEqual(
-        expect.arrayContaining(["simulatorModelParams", "judgeModelParams"]),
-      );
+      expect(paths).toEqual(expect.arrayContaining(["simulatorModelParams", "judgeModelParams"]));
+    });
+  });
+
+  describe("given a payload that carries a script and no model params", () => {
+    /** @scenario "A child job with a script parses without model params" */
+    it("parses, because a scripted run builds no simulator and no judge", () => {
+      const result = ChildProcessJobDataSchema.safeParse({
+        ...basePayload,
+        script: { kind: "agent_test", userMessage: "ping" },
+      });
+      expect(result.success).toBe(true);
+      if (!result.success) return;
+      expect(result.data.script).toEqual({
+        kind: "agent_test",
+        userMessage: "ping",
+      });
+    });
+
+    it("still refuses a script with no message", () => {
+      const result = ChildProcessJobDataSchema.safeParse({
+        ...basePayload,
+        script: { kind: "agent_test", userMessage: "" },
+      });
+      expect(result.success).toBe(false);
     });
   });
 

@@ -36,8 +36,7 @@ export function parseEntityUrl(path: string, projectSlug: string): EntityMatch |
   // Trace deep link: /[project]/traces/[traceId] (current) or the legacy
   // /[project]/messages/[traceId]
   const traceMatch =
-    relativePath.match(/^\/traces\/([^/]+)$/) ??
-    relativePath.match(/^\/messages\/([^/]+)$/);
+    relativePath.match(/^\/traces\/([^/]+)$/) ?? relativePath.match(/^\/messages\/([^/]+)$/);
   if (traceMatch) {
     return {
       type: "trace",
@@ -111,6 +110,7 @@ const AGENT_EDITOR_DRAWERS = new Set([
   "agentCodeEditor",
   "agentHttpEditor",
   "agentWorkflowEditor",
+  "agentConnectedDetail",
 ]);
 
 /**
@@ -197,8 +197,7 @@ export function useActivityTracker() {
     if (!projectSlug) return;
 
     // Try path-based entity detection, then the drawer-based one
-    const entityMatch =
-      parseEntityUrl(url, projectSlug) ?? parseDrawerEntity(url, projectSlug);
+    const entityMatch = parseEntityUrl(url, projectSlug) ?? parseDrawerEntity(url, projectSlug);
 
     if (!entityMatch) {
       lastAddedRef.current = null; // Clear ref so revisits work
@@ -214,8 +213,7 @@ export function useActivityTracker() {
     let label = entityMatch.id;
     if (entityMatch.type === "trace") {
       // Truncate trace IDs for display
-      label =
-        entityMatch.id.length > 20 ? `${entityMatch.id.slice(0, 20)}...` : entityMatch.id;
+      label = entityMatch.id.length > 20 ? `${entityMatch.id.slice(0, 20)}...` : entityMatch.id;
     }
 
     addRecentItem({

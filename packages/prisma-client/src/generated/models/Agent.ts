@@ -31,6 +31,11 @@ export type AgentMinAggregateOutputType = {
   type: string | null
   workflowId: string | null
   copiedFromAgentId: string | null
+  environment: string | null
+  ownerUserId: string | null
+  hostLabel: string | null
+  identityKey: string | null
+  lastSeenAt: Date | null
   archivedAt: Date | null
   createdAt: Date | null
   updatedAt: Date | null
@@ -43,6 +48,11 @@ export type AgentMaxAggregateOutputType = {
   type: string | null
   workflowId: string | null
   copiedFromAgentId: string | null
+  environment: string | null
+  ownerUserId: string | null
+  hostLabel: string | null
+  identityKey: string | null
+  lastSeenAt: Date | null
   archivedAt: Date | null
   createdAt: Date | null
   updatedAt: Date | null
@@ -56,6 +66,11 @@ export type AgentCountAggregateOutputType = {
   config: number
   workflowId: number
   copiedFromAgentId: number
+  environment: number
+  ownerUserId: number
+  hostLabel: number
+  identityKey: number
+  lastSeenAt: number
   archivedAt: number
   createdAt: number
   updatedAt: number
@@ -70,6 +85,11 @@ export type AgentMinAggregateInputType = {
   type?: true
   workflowId?: true
   copiedFromAgentId?: true
+  environment?: true
+  ownerUserId?: true
+  hostLabel?: true
+  identityKey?: true
+  lastSeenAt?: true
   archivedAt?: true
   createdAt?: true
   updatedAt?: true
@@ -82,6 +102,11 @@ export type AgentMaxAggregateInputType = {
   type?: true
   workflowId?: true
   copiedFromAgentId?: true
+  environment?: true
+  ownerUserId?: true
+  hostLabel?: true
+  identityKey?: true
+  lastSeenAt?: true
   archivedAt?: true
   createdAt?: true
   updatedAt?: true
@@ -95,6 +120,11 @@ export type AgentCountAggregateInputType = {
   config?: true
   workflowId?: true
   copiedFromAgentId?: true
+  environment?: true
+  ownerUserId?: true
+  hostLabel?: true
+  identityKey?: true
+  lastSeenAt?: true
   archivedAt?: true
   createdAt?: true
   updatedAt?: true
@@ -181,6 +211,11 @@ export type AgentGroupByOutputType = {
   config: runtime.JsonValue
   workflowId: string | null
   copiedFromAgentId: string | null
+  environment: string | null
+  ownerUserId: string | null
+  hostLabel: string | null
+  identityKey: string | null
+  lastSeenAt: Date | null
   archivedAt: Date | null
   createdAt: Date
   updatedAt: Date
@@ -215,6 +250,11 @@ export type AgentWhereInput = {
   config?: Prisma.JsonFilter<"Agent">
   workflowId?: Prisma.StringNullableFilter<"Agent"> | string | null
   copiedFromAgentId?: Prisma.StringNullableFilter<"Agent"> | string | null
+  environment?: Prisma.StringNullableFilter<"Agent"> | string | null
+  ownerUserId?: Prisma.StringNullableFilter<"Agent"> | string | null
+  hostLabel?: Prisma.StringNullableFilter<"Agent"> | string | null
+  identityKey?: Prisma.StringNullableFilter<"Agent"> | string | null
+  lastSeenAt?: Prisma.DateTimeNullableFilter<"Agent"> | Date | string | null
   archivedAt?: Prisma.DateTimeNullableFilter<"Agent"> | Date | string | null
   createdAt?: Prisma.DateTimeFilter<"Agent"> | Date | string
   updatedAt?: Prisma.DateTimeFilter<"Agent"> | Date | string
@@ -232,6 +272,11 @@ export type AgentOrderByWithRelationInput = {
   config?: Prisma.SortOrder
   workflowId?: Prisma.SortOrderInput | Prisma.SortOrder
   copiedFromAgentId?: Prisma.SortOrderInput | Prisma.SortOrder
+  environment?: Prisma.SortOrderInput | Prisma.SortOrder
+  ownerUserId?: Prisma.SortOrderInput | Prisma.SortOrder
+  hostLabel?: Prisma.SortOrderInput | Prisma.SortOrder
+  identityKey?: Prisma.SortOrderInput | Prisma.SortOrder
+  lastSeenAt?: Prisma.SortOrderInput | Prisma.SortOrder
   archivedAt?: Prisma.SortOrderInput | Prisma.SortOrder
   createdAt?: Prisma.SortOrder
   updatedAt?: Prisma.SortOrder
@@ -243,6 +288,7 @@ export type AgentOrderByWithRelationInput = {
 
 export type AgentWhereUniqueInput = Prisma.AtLeast<{
   id?: string
+  projectId_identityKey?: Prisma.AgentProjectIdIdentityKeyCompoundUniqueInput
   AND?: Prisma.AgentWhereInput | Prisma.AgentWhereInput[]
   OR?: Prisma.AgentWhereInput[]
   NOT?: Prisma.AgentWhereInput | Prisma.AgentWhereInput[]
@@ -252,6 +298,11 @@ export type AgentWhereUniqueInput = Prisma.AtLeast<{
   config?: Prisma.JsonFilter<"Agent">
   workflowId?: Prisma.StringNullableFilter<"Agent"> | string | null
   copiedFromAgentId?: Prisma.StringNullableFilter<"Agent"> | string | null
+  environment?: Prisma.StringNullableFilter<"Agent"> | string | null
+  ownerUserId?: Prisma.StringNullableFilter<"Agent"> | string | null
+  hostLabel?: Prisma.StringNullableFilter<"Agent"> | string | null
+  identityKey?: Prisma.StringNullableFilter<"Agent"> | string | null
+  lastSeenAt?: Prisma.DateTimeNullableFilter<"Agent"> | Date | string | null
   archivedAt?: Prisma.DateTimeNullableFilter<"Agent"> | Date | string | null
   createdAt?: Prisma.DateTimeFilter<"Agent"> | Date | string
   updatedAt?: Prisma.DateTimeFilter<"Agent"> | Date | string
@@ -259,7 +310,7 @@ export type AgentWhereUniqueInput = Prisma.AtLeast<{
   workflow?: Prisma.XOR<Prisma.WorkflowNullableScalarRelationFilter, Prisma.WorkflowWhereInput> | null
   copiedFrom?: Prisma.XOR<Prisma.AgentNullableScalarRelationFilter, Prisma.AgentWhereInput> | null
   copiedAgents?: Prisma.AgentListRelationFilter
-}, "id">
+}, "id" | "projectId_identityKey">
 
 export type AgentOrderByWithAggregationInput = {
   id?: Prisma.SortOrder
@@ -269,6 +320,11 @@ export type AgentOrderByWithAggregationInput = {
   config?: Prisma.SortOrder
   workflowId?: Prisma.SortOrderInput | Prisma.SortOrder
   copiedFromAgentId?: Prisma.SortOrderInput | Prisma.SortOrder
+  environment?: Prisma.SortOrderInput | Prisma.SortOrder
+  ownerUserId?: Prisma.SortOrderInput | Prisma.SortOrder
+  hostLabel?: Prisma.SortOrderInput | Prisma.SortOrder
+  identityKey?: Prisma.SortOrderInput | Prisma.SortOrder
+  lastSeenAt?: Prisma.SortOrderInput | Prisma.SortOrder
   archivedAt?: Prisma.SortOrderInput | Prisma.SortOrder
   createdAt?: Prisma.SortOrder
   updatedAt?: Prisma.SortOrder
@@ -288,6 +344,11 @@ export type AgentScalarWhereWithAggregatesInput = {
   config?: Prisma.JsonWithAggregatesFilter<"Agent">
   workflowId?: Prisma.StringNullableWithAggregatesFilter<"Agent"> | string | null
   copiedFromAgentId?: Prisma.StringNullableWithAggregatesFilter<"Agent"> | string | null
+  environment?: Prisma.StringNullableWithAggregatesFilter<"Agent"> | string | null
+  ownerUserId?: Prisma.StringNullableWithAggregatesFilter<"Agent"> | string | null
+  hostLabel?: Prisma.StringNullableWithAggregatesFilter<"Agent"> | string | null
+  identityKey?: Prisma.StringNullableWithAggregatesFilter<"Agent"> | string | null
+  lastSeenAt?: Prisma.DateTimeNullableWithAggregatesFilter<"Agent"> | Date | string | null
   archivedAt?: Prisma.DateTimeNullableWithAggregatesFilter<"Agent"> | Date | string | null
   createdAt?: Prisma.DateTimeWithAggregatesFilter<"Agent"> | Date | string
   updatedAt?: Prisma.DateTimeWithAggregatesFilter<"Agent"> | Date | string
@@ -298,6 +359,11 @@ export type AgentCreateInput = {
   name: string
   type: string
   config: Prisma.JsonNullValueInput | runtime.InputJsonValue
+  environment?: string | null
+  ownerUserId?: string | null
+  hostLabel?: string | null
+  identityKey?: string | null
+  lastSeenAt?: Date | string | null
   archivedAt?: Date | string | null
   createdAt?: Date | string
   updatedAt?: Date | string
@@ -315,6 +381,11 @@ export type AgentUncheckedCreateInput = {
   config: Prisma.JsonNullValueInput | runtime.InputJsonValue
   workflowId?: string | null
   copiedFromAgentId?: string | null
+  environment?: string | null
+  ownerUserId?: string | null
+  hostLabel?: string | null
+  identityKey?: string | null
+  lastSeenAt?: Date | string | null
   archivedAt?: Date | string | null
   createdAt?: Date | string
   updatedAt?: Date | string
@@ -326,6 +397,11 @@ export type AgentUpdateInput = {
   name?: Prisma.StringFieldUpdateOperationsInput | string
   type?: Prisma.StringFieldUpdateOperationsInput | string
   config?: Prisma.JsonNullValueInput | runtime.InputJsonValue
+  environment?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  ownerUserId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  hostLabel?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  identityKey?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  lastSeenAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
   archivedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
   createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   updatedAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
@@ -343,6 +419,11 @@ export type AgentUncheckedUpdateInput = {
   config?: Prisma.JsonNullValueInput | runtime.InputJsonValue
   workflowId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   copiedFromAgentId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  environment?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  ownerUserId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  hostLabel?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  identityKey?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  lastSeenAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
   archivedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
   createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   updatedAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
@@ -357,6 +438,11 @@ export type AgentCreateManyInput = {
   config: Prisma.JsonNullValueInput | runtime.InputJsonValue
   workflowId?: string | null
   copiedFromAgentId?: string | null
+  environment?: string | null
+  ownerUserId?: string | null
+  hostLabel?: string | null
+  identityKey?: string | null
+  lastSeenAt?: Date | string | null
   archivedAt?: Date | string | null
   createdAt?: Date | string
   updatedAt?: Date | string
@@ -367,6 +453,11 @@ export type AgentUpdateManyMutationInput = {
   name?: Prisma.StringFieldUpdateOperationsInput | string
   type?: Prisma.StringFieldUpdateOperationsInput | string
   config?: Prisma.JsonNullValueInput | runtime.InputJsonValue
+  environment?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  ownerUserId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  hostLabel?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  identityKey?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  lastSeenAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
   archivedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
   createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   updatedAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
@@ -380,6 +471,11 @@ export type AgentUncheckedUpdateManyInput = {
   config?: Prisma.JsonNullValueInput | runtime.InputJsonValue
   workflowId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   copiedFromAgentId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  environment?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  ownerUserId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  hostLabel?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  identityKey?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  lastSeenAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
   archivedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
   createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   updatedAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
@@ -400,6 +496,11 @@ export type AgentNullableScalarRelationFilter = {
   isNot?: Prisma.AgentWhereInput | null
 }
 
+export type AgentProjectIdIdentityKeyCompoundUniqueInput = {
+  projectId: string
+  identityKey: string
+}
+
 export type AgentCountOrderByAggregateInput = {
   id?: Prisma.SortOrder
   projectId?: Prisma.SortOrder
@@ -408,6 +509,11 @@ export type AgentCountOrderByAggregateInput = {
   config?: Prisma.SortOrder
   workflowId?: Prisma.SortOrder
   copiedFromAgentId?: Prisma.SortOrder
+  environment?: Prisma.SortOrder
+  ownerUserId?: Prisma.SortOrder
+  hostLabel?: Prisma.SortOrder
+  identityKey?: Prisma.SortOrder
+  lastSeenAt?: Prisma.SortOrder
   archivedAt?: Prisma.SortOrder
   createdAt?: Prisma.SortOrder
   updatedAt?: Prisma.SortOrder
@@ -420,6 +526,11 @@ export type AgentMaxOrderByAggregateInput = {
   type?: Prisma.SortOrder
   workflowId?: Prisma.SortOrder
   copiedFromAgentId?: Prisma.SortOrder
+  environment?: Prisma.SortOrder
+  ownerUserId?: Prisma.SortOrder
+  hostLabel?: Prisma.SortOrder
+  identityKey?: Prisma.SortOrder
+  lastSeenAt?: Prisma.SortOrder
   archivedAt?: Prisma.SortOrder
   createdAt?: Prisma.SortOrder
   updatedAt?: Prisma.SortOrder
@@ -432,6 +543,11 @@ export type AgentMinOrderByAggregateInput = {
   type?: Prisma.SortOrder
   workflowId?: Prisma.SortOrder
   copiedFromAgentId?: Prisma.SortOrder
+  environment?: Prisma.SortOrder
+  ownerUserId?: Prisma.SortOrder
+  hostLabel?: Prisma.SortOrder
+  identityKey?: Prisma.SortOrder
+  lastSeenAt?: Prisma.SortOrder
   archivedAt?: Prisma.SortOrder
   createdAt?: Prisma.SortOrder
   updatedAt?: Prisma.SortOrder
@@ -584,6 +700,11 @@ export type AgentCreateWithoutProjectInput = {
   name: string
   type: string
   config: Prisma.JsonNullValueInput | runtime.InputJsonValue
+  environment?: string | null
+  ownerUserId?: string | null
+  hostLabel?: string | null
+  identityKey?: string | null
+  lastSeenAt?: Date | string | null
   archivedAt?: Date | string | null
   createdAt?: Date | string
   updatedAt?: Date | string
@@ -599,6 +720,11 @@ export type AgentUncheckedCreateWithoutProjectInput = {
   config: Prisma.JsonNullValueInput | runtime.InputJsonValue
   workflowId?: string | null
   copiedFromAgentId?: string | null
+  environment?: string | null
+  ownerUserId?: string | null
+  hostLabel?: string | null
+  identityKey?: string | null
+  lastSeenAt?: Date | string | null
   archivedAt?: Date | string | null
   createdAt?: Date | string
   updatedAt?: Date | string
@@ -642,6 +768,11 @@ export type AgentScalarWhereInput = {
   config?: Prisma.JsonFilter<"Agent">
   workflowId?: Prisma.StringNullableFilter<"Agent"> | string | null
   copiedFromAgentId?: Prisma.StringNullableFilter<"Agent"> | string | null
+  environment?: Prisma.StringNullableFilter<"Agent"> | string | null
+  ownerUserId?: Prisma.StringNullableFilter<"Agent"> | string | null
+  hostLabel?: Prisma.StringNullableFilter<"Agent"> | string | null
+  identityKey?: Prisma.StringNullableFilter<"Agent"> | string | null
+  lastSeenAt?: Prisma.DateTimeNullableFilter<"Agent"> | Date | string | null
   archivedAt?: Prisma.DateTimeNullableFilter<"Agent"> | Date | string | null
   createdAt?: Prisma.DateTimeFilter<"Agent"> | Date | string
   updatedAt?: Prisma.DateTimeFilter<"Agent"> | Date | string
@@ -652,6 +783,11 @@ export type AgentCreateWithoutWorkflowInput = {
   name: string
   type: string
   config: Prisma.JsonNullValueInput | runtime.InputJsonValue
+  environment?: string | null
+  ownerUserId?: string | null
+  hostLabel?: string | null
+  identityKey?: string | null
+  lastSeenAt?: Date | string | null
   archivedAt?: Date | string | null
   createdAt?: Date | string
   updatedAt?: Date | string
@@ -667,6 +803,11 @@ export type AgentUncheckedCreateWithoutWorkflowInput = {
   type: string
   config: Prisma.JsonNullValueInput | runtime.InputJsonValue
   copiedFromAgentId?: string | null
+  environment?: string | null
+  ownerUserId?: string | null
+  hostLabel?: string | null
+  identityKey?: string | null
+  lastSeenAt?: Date | string | null
   archivedAt?: Date | string | null
   createdAt?: Date | string
   updatedAt?: Date | string
@@ -704,6 +845,11 @@ export type AgentCreateWithoutCopiedAgentsInput = {
   name: string
   type: string
   config: Prisma.JsonNullValueInput | runtime.InputJsonValue
+  environment?: string | null
+  ownerUserId?: string | null
+  hostLabel?: string | null
+  identityKey?: string | null
+  lastSeenAt?: Date | string | null
   archivedAt?: Date | string | null
   createdAt?: Date | string
   updatedAt?: Date | string
@@ -720,6 +866,11 @@ export type AgentUncheckedCreateWithoutCopiedAgentsInput = {
   config: Prisma.JsonNullValueInput | runtime.InputJsonValue
   workflowId?: string | null
   copiedFromAgentId?: string | null
+  environment?: string | null
+  ownerUserId?: string | null
+  hostLabel?: string | null
+  identityKey?: string | null
+  lastSeenAt?: Date | string | null
   archivedAt?: Date | string | null
   createdAt?: Date | string
   updatedAt?: Date | string
@@ -735,6 +886,11 @@ export type AgentCreateWithoutCopiedFromInput = {
   name: string
   type: string
   config: Prisma.JsonNullValueInput | runtime.InputJsonValue
+  environment?: string | null
+  ownerUserId?: string | null
+  hostLabel?: string | null
+  identityKey?: string | null
+  lastSeenAt?: Date | string | null
   archivedAt?: Date | string | null
   createdAt?: Date | string
   updatedAt?: Date | string
@@ -750,6 +906,11 @@ export type AgentUncheckedCreateWithoutCopiedFromInput = {
   type: string
   config: Prisma.JsonNullValueInput | runtime.InputJsonValue
   workflowId?: string | null
+  environment?: string | null
+  ownerUserId?: string | null
+  hostLabel?: string | null
+  identityKey?: string | null
+  lastSeenAt?: Date | string | null
   archivedAt?: Date | string | null
   createdAt?: Date | string
   updatedAt?: Date | string
@@ -782,6 +943,11 @@ export type AgentUpdateWithoutCopiedAgentsInput = {
   name?: Prisma.StringFieldUpdateOperationsInput | string
   type?: Prisma.StringFieldUpdateOperationsInput | string
   config?: Prisma.JsonNullValueInput | runtime.InputJsonValue
+  environment?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  ownerUserId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  hostLabel?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  identityKey?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  lastSeenAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
   archivedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
   createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   updatedAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
@@ -798,6 +964,11 @@ export type AgentUncheckedUpdateWithoutCopiedAgentsInput = {
   config?: Prisma.JsonNullValueInput | runtime.InputJsonValue
   workflowId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   copiedFromAgentId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  environment?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  ownerUserId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  hostLabel?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  identityKey?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  lastSeenAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
   archivedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
   createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   updatedAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
@@ -826,6 +997,11 @@ export type AgentCreateManyProjectInput = {
   config: Prisma.JsonNullValueInput | runtime.InputJsonValue
   workflowId?: string | null
   copiedFromAgentId?: string | null
+  environment?: string | null
+  ownerUserId?: string | null
+  hostLabel?: string | null
+  identityKey?: string | null
+  lastSeenAt?: Date | string | null
   archivedAt?: Date | string | null
   createdAt?: Date | string
   updatedAt?: Date | string
@@ -836,6 +1012,11 @@ export type AgentUpdateWithoutProjectInput = {
   name?: Prisma.StringFieldUpdateOperationsInput | string
   type?: Prisma.StringFieldUpdateOperationsInput | string
   config?: Prisma.JsonNullValueInput | runtime.InputJsonValue
+  environment?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  ownerUserId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  hostLabel?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  identityKey?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  lastSeenAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
   archivedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
   createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   updatedAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
@@ -851,6 +1032,11 @@ export type AgentUncheckedUpdateWithoutProjectInput = {
   config?: Prisma.JsonNullValueInput | runtime.InputJsonValue
   workflowId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   copiedFromAgentId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  environment?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  ownerUserId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  hostLabel?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  identityKey?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  lastSeenAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
   archivedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
   createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   updatedAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
@@ -864,6 +1050,11 @@ export type AgentUncheckedUpdateManyWithoutProjectInput = {
   config?: Prisma.JsonNullValueInput | runtime.InputJsonValue
   workflowId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   copiedFromAgentId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  environment?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  ownerUserId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  hostLabel?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  identityKey?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  lastSeenAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
   archivedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
   createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   updatedAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
@@ -876,6 +1067,11 @@ export type AgentCreateManyWorkflowInput = {
   type: string
   config: Prisma.JsonNullValueInput | runtime.InputJsonValue
   copiedFromAgentId?: string | null
+  environment?: string | null
+  ownerUserId?: string | null
+  hostLabel?: string | null
+  identityKey?: string | null
+  lastSeenAt?: Date | string | null
   archivedAt?: Date | string | null
   createdAt?: Date | string
   updatedAt?: Date | string
@@ -886,6 +1082,11 @@ export type AgentUpdateWithoutWorkflowInput = {
   name?: Prisma.StringFieldUpdateOperationsInput | string
   type?: Prisma.StringFieldUpdateOperationsInput | string
   config?: Prisma.JsonNullValueInput | runtime.InputJsonValue
+  environment?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  ownerUserId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  hostLabel?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  identityKey?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  lastSeenAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
   archivedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
   createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   updatedAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
@@ -901,6 +1102,11 @@ export type AgentUncheckedUpdateWithoutWorkflowInput = {
   type?: Prisma.StringFieldUpdateOperationsInput | string
   config?: Prisma.JsonNullValueInput | runtime.InputJsonValue
   copiedFromAgentId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  environment?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  ownerUserId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  hostLabel?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  identityKey?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  lastSeenAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
   archivedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
   createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   updatedAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
@@ -914,6 +1120,11 @@ export type AgentUncheckedUpdateManyWithoutWorkflowInput = {
   type?: Prisma.StringFieldUpdateOperationsInput | string
   config?: Prisma.JsonNullValueInput | runtime.InputJsonValue
   copiedFromAgentId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  environment?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  ownerUserId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  hostLabel?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  identityKey?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  lastSeenAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
   archivedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
   createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   updatedAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
@@ -926,6 +1137,11 @@ export type AgentCreateManyCopiedFromInput = {
   type: string
   config: Prisma.JsonNullValueInput | runtime.InputJsonValue
   workflowId?: string | null
+  environment?: string | null
+  ownerUserId?: string | null
+  hostLabel?: string | null
+  identityKey?: string | null
+  lastSeenAt?: Date | string | null
   archivedAt?: Date | string | null
   createdAt?: Date | string
   updatedAt?: Date | string
@@ -936,6 +1152,11 @@ export type AgentUpdateWithoutCopiedFromInput = {
   name?: Prisma.StringFieldUpdateOperationsInput | string
   type?: Prisma.StringFieldUpdateOperationsInput | string
   config?: Prisma.JsonNullValueInput | runtime.InputJsonValue
+  environment?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  ownerUserId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  hostLabel?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  identityKey?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  lastSeenAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
   archivedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
   createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   updatedAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
@@ -951,6 +1172,11 @@ export type AgentUncheckedUpdateWithoutCopiedFromInput = {
   type?: Prisma.StringFieldUpdateOperationsInput | string
   config?: Prisma.JsonNullValueInput | runtime.InputJsonValue
   workflowId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  environment?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  ownerUserId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  hostLabel?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  identityKey?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  lastSeenAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
   archivedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
   createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   updatedAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
@@ -964,6 +1190,11 @@ export type AgentUncheckedUpdateManyWithoutCopiedFromInput = {
   type?: Prisma.StringFieldUpdateOperationsInput | string
   config?: Prisma.JsonNullValueInput | runtime.InputJsonValue
   workflowId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  environment?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  ownerUserId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  hostLabel?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  identityKey?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  lastSeenAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
   archivedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
   createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   updatedAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
@@ -1008,6 +1239,11 @@ export type AgentSelect<ExtArgs extends runtime.Types.Extensions.InternalArgs = 
   config?: boolean
   workflowId?: boolean
   copiedFromAgentId?: boolean
+  environment?: boolean
+  ownerUserId?: boolean
+  hostLabel?: boolean
+  identityKey?: boolean
+  lastSeenAt?: boolean
   archivedAt?: boolean
   createdAt?: boolean
   updatedAt?: boolean
@@ -1026,6 +1262,11 @@ export type AgentSelectCreateManyAndReturn<ExtArgs extends runtime.Types.Extensi
   config?: boolean
   workflowId?: boolean
   copiedFromAgentId?: boolean
+  environment?: boolean
+  ownerUserId?: boolean
+  hostLabel?: boolean
+  identityKey?: boolean
+  lastSeenAt?: boolean
   archivedAt?: boolean
   createdAt?: boolean
   updatedAt?: boolean
@@ -1042,6 +1283,11 @@ export type AgentSelectUpdateManyAndReturn<ExtArgs extends runtime.Types.Extensi
   config?: boolean
   workflowId?: boolean
   copiedFromAgentId?: boolean
+  environment?: boolean
+  ownerUserId?: boolean
+  hostLabel?: boolean
+  identityKey?: boolean
+  lastSeenAt?: boolean
   archivedAt?: boolean
   createdAt?: boolean
   updatedAt?: boolean
@@ -1058,12 +1304,17 @@ export type AgentSelectScalar = {
   config?: boolean
   workflowId?: boolean
   copiedFromAgentId?: boolean
+  environment?: boolean
+  ownerUserId?: boolean
+  hostLabel?: boolean
+  identityKey?: boolean
+  lastSeenAt?: boolean
   archivedAt?: boolean
   createdAt?: boolean
   updatedAt?: boolean
 }
 
-export type AgentOmit<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = runtime.Types.Extensions.GetOmit<"id" | "projectId" | "name" | "type" | "config" | "workflowId" | "copiedFromAgentId" | "archivedAt" | "createdAt" | "updatedAt", ExtArgs["result"]["agent"]>
+export type AgentOmit<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = runtime.Types.Extensions.GetOmit<"id" | "projectId" | "name" | "type" | "config" | "workflowId" | "copiedFromAgentId" | "environment" | "ownerUserId" | "hostLabel" | "identityKey" | "lastSeenAt" | "archivedAt" | "createdAt" | "updatedAt", ExtArgs["result"]["agent"]>
 export type AgentInclude<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = {
   project?: boolean | Prisma.ProjectDefaultArgs<ExtArgs>
   workflow?: boolean | Prisma.Agent$workflowArgs<ExtArgs>
@@ -1098,6 +1349,11 @@ export type $AgentPayload<ExtArgs extends runtime.Types.Extensions.InternalArgs 
     config: runtime.JsonValue
     workflowId: string | null
     copiedFromAgentId: string | null
+    environment: string | null
+    ownerUserId: string | null
+    hostLabel: string | null
+    identityKey: string | null
+    lastSeenAt: Date | null
     archivedAt: Date | null
     createdAt: Date
     updatedAt: Date
@@ -1535,6 +1791,11 @@ export interface AgentFieldRefs {
   readonly config: Prisma.FieldRef<"Agent", 'Json'>
   readonly workflowId: Prisma.FieldRef<"Agent", 'String'>
   readonly copiedFromAgentId: Prisma.FieldRef<"Agent", 'String'>
+  readonly environment: Prisma.FieldRef<"Agent", 'String'>
+  readonly ownerUserId: Prisma.FieldRef<"Agent", 'String'>
+  readonly hostLabel: Prisma.FieldRef<"Agent", 'String'>
+  readonly identityKey: Prisma.FieldRef<"Agent", 'String'>
+  readonly lastSeenAt: Prisma.FieldRef<"Agent", 'DateTime'>
   readonly archivedAt: Prisma.FieldRef<"Agent", 'DateTime'>
   readonly createdAt: Prisma.FieldRef<"Agent", 'DateTime'>
   readonly updatedAt: Prisma.FieldRef<"Agent", 'DateTime'>

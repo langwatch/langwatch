@@ -90,9 +90,22 @@ export const setComplexProps = (props: Record<string, unknown>): void => {
  * (e.g., onSelectPrompt callback that should work in promptList even when
  * opened from targetTypeSelector).
  *
- * Cleared automatically when closeDrawer() is called.
+ * Cleared automatically when closeDrawer() is called, except for the entries
+ * registered with `keepOnClose`.
  */
 let flowCallbacks: Record<string, Record<string, unknown>> = {};
+
+/**
+ * The drawers whose callbacks belong to a mounted component rather than to one
+ * drawer flow.
+ *
+ * A page-level component that registers a callback for its own drawer holds it
+ * for as long as it is mounted, and takes it back itself on unmount. Closing
+ * an unrelated drawer must not take it away: the component would never know,
+ * because nothing tells it, and the next time the drawer called that callback
+ * there would be nothing there.
+ */
+const keptOnClose = new Set<string>();
 
 /**
  * Set flow callbacks for a specific drawer type.
@@ -107,6 +120,14 @@ export const setFlowCallbacks = (
   drawer: DrawerType,
   // oxlint-disable-next-line no-explicit-any
   callbacks: Record<string, any>,
+  options?: {
+    /**
+     * True when a mounted component owns the registration, so that closing a
+     * drawer leaves it alone. The owner takes it back on unmount, by
+     * registering an empty set.
+     */
+    keepOnClose?: boolean;
+  },
 ) => {
   // Deliberately does NOT notify. Callers register callbacks BEFORE opening a
   // drawer (the URL change renders it) or, on the re-hydration path, right
@@ -116,6 +137,8 @@ export const setFlowCallbacks = (
   // CurrentDrawer — and cascade through the open drawer's subtree — every time
   // any unrelated flow registered a callback.
   flowCallbacks[drawer] = callbacks as Record<string, unknown>;
+  if (options?.keepOnClose) keptOnClose.add(drawer);
+  else keptOnClose.delete(drawer);
 };
 
 /**
@@ -128,10 +151,19 @@ export const getFlowCallbacks = (drawer: DrawerType): Record<string, any> | unde
 };
 
 /**
- * Clear all flow callbacks. Called automatically by closeDrawer().
+ * Clear the flow callbacks of the drawer flows. Called automatically by
+ * closeDrawer().
+ *
+ * What a mounted component registered with `keepOnClose` stays: it belongs to
+ * that component, which is still there and still expects to be called.
  */
 export const clearFlowCallbacks = () => {
-  flowCallbacks = {};
+  const kept: Record<string, Record<string, unknown>> = {};
+  for (const drawer of keptOnClose) {
+    const callbacks = flowCallbacks[drawer];
+    if (callbacks) kept[drawer] = callbacks;
+  }
+  flowCallbacks = kept;
 };
 
 /**
@@ -215,10 +247,7 @@ const openDrawerInLocation = (): DrawerType | undefined => {
  * This is useful when the callback is captured from a component that may not be
  * mounted.
  */
-export const navigateToDrawer = (
-  drawer: DrawerType,
-  options: { resetStack?: boolean } = {},
-) => {
+export const navigateToDrawer = (drawer: DrawerType, options: { resetStack?: boolean } = {}) => {
   // Reset stack if requested
   if (options.resetStack) {
     drawerStack = [{ drawer, params: {} }];
@@ -263,23 +292,15 @@ export const navigateToDrawer = (
 export const useUpdateDrawerParams = () => {
   const router = useDrawerRouter();
   return useCallback(
-    (
-      updates: Record<string, string | undefined>,
-      options: { push?: boolean } = {},
-    ) => {
+    (updates: Record<string, string | undefined>, options: { push?: boolean } = {}) => {
       const push = options.push ?? true;
       const { path, queryString, hash } = splitAsPath(router.asPath);
-      const parsed = qs.parse(queryString, URL_QS_PARSE_OPTIONS) as Record<
-        string,
-        unknown
-      >;
+      const parsed = qs.parse(queryString, URL_QS_PARSE_OPTIONS) as Record<string, unknown>;
       // `parsed.drawer` is whatever qs parsed out of the URL — for a malformed
       // query like `?drawer=foo` it's a string, not the object we mutate below.
       // Guard the shape so the mutation loop can't throw at runtime.
       const drawer =
-        parsed.drawer &&
-        typeof parsed.drawer === "object" &&
-        !Array.isArray(parsed.drawer)
+        parsed.drawer && typeof parsed.drawer === "object" && !Array.isArray(parsed.drawer)
           ? (parsed.drawer as Record<string, unknown>)
           : {};
       for (const [key, value] of Object.entries(updates)) {
@@ -378,8 +399,7 @@ function isUrlSerializable(value: unknown): boolean {
   // Arrays of primitives can be comma-serialized by qs
   if (Array.isArray(value)) {
     return value.every(
-      (item) =>
-        item === null || (typeof item !== "object" && typeof item !== "function"),
+      (item) => item === null || (typeof item !== "object" && typeof item !== "function"),
     );
   }
 
@@ -414,11 +434,7 @@ export const useDrawer = <R extends UiDrawerRegistry = UiDrawerRegistry>() => {
    * Used by goBack to restore previous drawer state.
    */
   const updateDrawerUrl = useCallback(
-    (
-      drawer: DrawerType,
-      props?: Record<string, unknown>,
-      options: { replace?: boolean } = {},
-    ) => {
+    (drawer: DrawerType, props?: Record<string, unknown>, options: { replace?: boolean } = {}) => {
       // Separate serializable props (for URL) from complex props (kept in memory)
       const serializableProps: Record<string, unknown> = {};
       const nonSerializableProps: Record<string, unknown> = {};
@@ -551,9 +567,7 @@ export const useDrawer = <R extends UiDrawerRegistry = UiDrawerRegistry>() => {
         // another trace in the table leaves trace → dataset → trace, and
         // closing that trace walks back into a dataset drawer the reader had
         // already left behind.
-        const existingIndex = drawerStack.findIndex(
-          (entry) => entry.drawer === effectiveDrawer,
-        );
+        const existingIndex = drawerStack.findIndex((entry) => entry.drawer === effectiveDrawer);
         if (existingIndex !== -1) drawerStack.length = existingIndex;
 
         drawerStack.push({ drawer: effectiveDrawer, params: allParams });
@@ -564,9 +578,7 @@ export const useDrawer = <R extends UiDrawerRegistry = UiDrawerRegistry>() => {
         .map(([k]) => k);
       if (badKeys.length > 0) {
         logger.warn(
-          `Non-serializable props passed to drawer "${effectiveDrawer}": ${badKeys.join(
-            ", ",
-          )}. ` +
+          `Non-serializable props passed to drawer "${effectiveDrawer}": ${badKeys.join(", ")}. ` +
             `Consider using setFlowCallbacks() for callbacks that need to persist across navigation.`,
         );
       }
@@ -591,9 +603,7 @@ export const useDrawer = <R extends UiDrawerRegistry = UiDrawerRegistry>() => {
     const { path, queryString: currentQs, hash } = splitAsPath(router.asPath);
     const parsedQuery = qs.parse(currentQs, URL_QS_PARSE_OPTIONS);
     const cleanQuery = Object.fromEntries(
-      Object.entries(parsedQuery).filter(
-        ([key]) => !key.startsWith("drawer") && key !== "span",
-      ),
+      Object.entries(parsedQuery).filter(([key]) => !key.startsWith("drawer") && key !== "span"),
     );
     const newQueryString = qs.stringify(cleanQuery, {
       allowDots: true,
@@ -655,6 +665,7 @@ export const useDrawer = <R extends UiDrawerRegistry = UiDrawerRegistry>() => {
       setFlowCallbacks: setFlowCallbacks as <T extends DrawerTypeOf<R>>(
         drawer: T,
         callbacks: DrawerCallbacksOf<R, T>,
+        options?: { keepOnClose?: boolean },
       ) => void,
       getFlowCallbacks: getFlowCallbacks as <T extends DrawerTypeOf<R>>(
         drawer: T,

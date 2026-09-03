@@ -161,11 +161,7 @@ describe("buildEvaluatorNode", () => {
 
     const node = buildEvaluatorNode(evaluator, "target-1.eval-1", "target-1", cell, 0);
 
-    expect(node.data.outputs?.map((o) => o.identifier)).toEqual([
-      "passed",
-      "score",
-      "label",
-    ]);
+    expect(node.data.outputs?.map((o) => o.identifier)).toEqual(["passed", "score", "label"]);
   });
 });
 
@@ -190,6 +186,11 @@ describe("buildSignatureNodeFromAgent", () => {
     } as SignatureComponentConfig,
     workflowId: null,
     copiedFromAgentId: null,
+    environment: null,
+    ownerUserId: null,
+    hostLabel: null,
+    identityKey: null,
+    lastSeenAt: null,
     archivedAt: null,
     createdAt: new Date(),
     updatedAt: new Date(),
@@ -224,6 +225,11 @@ describe("buildSignatureNodeFromAgent", () => {
     } as SignatureComponentConfig,
     workflowId: null,
     copiedFromAgentId: null,
+    environment: null,
+    ownerUserId: null,
+    hostLabel: null,
+    identityKey: null,
+    lastSeenAt: null,
     archivedAt: null,
     createdAt: new Date(),
     updatedAt: new Date(),
@@ -275,9 +281,7 @@ describe("buildSignatureNodeFromAgent", () => {
     const node = buildSignatureNodeFromAgent("target-1", agent, targetConfig, cell);
 
     // LLM config should be in parameters array
-    const llmParam = node.data.parameters?.find(
-      (p) => p.identifier === "llm" && p.type === "llm",
-    );
+    const llmParam = node.data.parameters?.find((p) => p.identifier === "llm" && p.type === "llm");
     expect(llmParam).toBeDefined();
     expect(llmParam?.value).toEqual({
       model: "openai/gpt-4o",
@@ -324,9 +328,7 @@ describe("buildSignatureNodeFromAgent", () => {
     const node = buildSignatureNodeFromAgent("target-1", agent, targetConfig, cell);
 
     // LLM config should still be from parameters array
-    const llmParam = node.data.parameters?.find(
-      (p) => p.identifier === "llm" && p.type === "llm",
-    );
+    const llmParam = node.data.parameters?.find((p) => p.identifier === "llm" && p.type === "llm");
     expect(llmParam).toBeDefined();
     expect(llmParam?.value).toEqual({
       model: "openai/gpt-4o-mini",
@@ -358,6 +360,11 @@ describe("buildHttpNodeFromAgent", () => {
     } as HttpComponentConfig,
     workflowId: null,
     copiedFromAgentId: null,
+    environment: null,
+    ownerUserId: null,
+    hostLabel: null,
+    identityKey: null,
+    lastSeenAt: null,
     archivedAt: null,
     createdAt: new Date(),
     updatedAt: new Date(),
@@ -450,9 +457,7 @@ describe("buildHttpNodeFromAgent", () => {
 
     expect(getParam("url")).toBe("https://api.example.com/chat");
     expect(getParam("method")).toBe("POST");
-    expect(getParam("body_template")).toBe(
-      '{"input": "{{input}}", "thread_id": "{{threadId}}"}',
-    );
+    expect(getParam("body_template")).toBe('{"input": "{{input}}", "thread_id": "{{threadId}}"}');
     expect(getParam("output_path")).toBe("$.response.content");
     expect(getParam("timeout_ms")).toBe(5000);
     expect(getParam("headers")).toEqual({ "X-Custom": "test-value" });
@@ -555,11 +560,7 @@ describe("buildEvaluatorTargetNode", () => {
 
     const node = buildEvaluatorTargetNode("target-eval-1", targetConfig, cell);
 
-    expect(node.data.outputs?.map((o) => o.identifier)).toEqual([
-      "passed",
-      "score",
-      "label",
-    ]);
+    expect(node.data.outputs?.map((o) => o.identifier)).toEqual(["passed", "score", "label"]);
     expect(node.data.outputs?.map((o) => o.type)).toEqual(["bool", "float", "str"]);
   });
 
@@ -621,12 +622,7 @@ describe("buildEvaluatorTargetNode", () => {
       ],
     ]);
 
-    const node = buildEvaluatorTargetNode(
-      "target-eval-1",
-      targetConfig,
-      cell,
-      loadedEvaluators,
-    );
+    const node = buildEvaluatorTargetNode("target-eval-1", targetConfig, cell, loadedEvaluators);
 
     // Settings should be converted to parameters
     const params = node.data.parameters ?? [];
@@ -664,12 +660,7 @@ describe("buildEvaluatorTargetNode", () => {
       ],
     ]);
 
-    const node = buildEvaluatorTargetNode(
-      "target-eval-1",
-      targetConfig,
-      cell,
-      loadedEvaluators,
-    );
+    const node = buildEvaluatorTargetNode("target-eval-1", targetConfig, cell, loadedEvaluators);
 
     expect(node.data.name).toBe("Sentiment Evaluator");
   });
@@ -786,9 +777,8 @@ describe("buildSignatureNodeFromPrompt", () => {
       });
 
     const messagesParameterOf = (node: ReturnType<typeof buildNodeWith>) =>
-      (node.data as LlmPromptConfigComponent).parameters?.find(
-        (p) => p.identifier === "messages",
-      )?.value;
+      (node.data as LlmPromptConfigComponent).parameters?.find((p) => p.identifier === "messages")
+        ?.value;
 
     it("keeps system text out of the forwarded template messages", () => {
       const node = buildNodeWith([
@@ -796,9 +786,7 @@ describe("buildSignatureNodeFromPrompt", () => {
         { role: "user", content: "{{input}}" },
       ]);
 
-      expect(messagesParameterOf(node)).toEqual([
-        { role: "user", content: "{{input}}" },
-      ]);
+      expect(messagesParameterOf(node)).toEqual([{ role: "user", content: "{{input}}" }]);
     });
 
     describe("when the prompt has no template messages of its own", () => {
@@ -808,9 +796,7 @@ describe("buildSignatureNodeFromPrompt", () => {
       // which produced requests with no user message at all — the
       // provider rejected every cell of the run.
       it("forwards an empty template list so the engine folds inputs into a user turn", () => {
-        const node = buildNodeWith([
-          { role: "system", content: "You are a support router." },
-        ]);
+        const node = buildNodeWith([{ role: "system", content: "You are a support router." }]);
 
         expect(messagesParameterOf(node)).toEqual([]);
       });
@@ -930,6 +916,11 @@ describe("buildCellWorkflow", () => {
         config: { name: "Custom", workflow_id: "wf_123" },
         workflowId: "wf_123",
         copiedFromAgentId: null,
+        environment: null,
+        ownerUserId: null,
+        hostLabel: null,
+        identityKey: null,
+        lastSeenAt: null,
         archivedAt: null,
         createdAt: new Date(),
         updatedAt: new Date(),

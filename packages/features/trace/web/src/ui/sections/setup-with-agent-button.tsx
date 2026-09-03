@@ -45,6 +45,14 @@ interface SurfaceSetup {
 }
 
 export const SETUP_SURFACES = {
+  connectedAgents: {
+    skill: "connect-agent",
+    trigger: "Connect my agent to LangWatch from code",
+    langyPrompt:
+      "Connect my agent to LangWatch from code. Connect to my repository, add the connect_agent decorator (Python) or the connectAgent wrapper (TypeScript) to the function that runs my agent, and open a pull request with the change.",
+    docsUrl: "https://docs.langwatch.ai/agent-testing/connect-your-agent",
+    docsLabel: "connect your agent guide",
+  },
   traces: {
     skill: "tracing",
     trigger: "Instrument my code with LangWatch",
@@ -72,8 +80,7 @@ export const SETUP_SURFACES = {
   evaluators: {
     skill: "online-evaluations",
     trigger: "Set up online evaluations for my agent",
-    langyPrompt:
-      "Help me create an evaluator for my agent and wire it into online evaluations.",
+    langyPrompt: "Help me create an evaluator for my agent and wire it into online evaluations.",
     docsUrl: "https://langwatch.ai/docs/evaluations/online-evaluation/overview",
     docsLabel: "online evaluations documentation",
   },
@@ -82,16 +89,16 @@ export const SETUP_SURFACES = {
     trigger: "Add scenario tests for my agent",
     langyPrompt:
       "Add scenario tests for my agent. Connect to my repository and open a pull request with the first simulation suite.",
-    docsUrl: "https://docs.langwatch.ai/agent-simulations/introduction",
-    docsLabel: "simulations documentation",
+    docsUrl: "https://docs.langwatch.ai/agent-testing/overview",
+    docsLabel: "agent testing documentation",
   },
   simulationRuns: {
     skill: "scenarios",
     trigger: "Add scenario tests for my agent",
     langyPrompt:
       "Add scenario tests for my agent. Connect to my repository and open a pull request with the first simulation suite.",
-    docsUrl: "https://docs.langwatch.ai/agent-simulations/introduction",
-    docsLabel: "simulations documentation",
+    docsUrl: "https://docs.langwatch.ai/agent-testing/overview",
+    docsLabel: "agent testing documentation",
   },
   prompts: {
     skill: "prompts",
@@ -283,12 +290,7 @@ export function AgentActionsMenu({
             paddingY={2}
             onClick={() => (langy.onAsk ?? askLangy)(langy.prompt)}
           >
-            <AgentMenuOption
-              icon={LuSparkles}
-              accent
-              label={langy.label}
-              hint={langy.hint}
-            />
+            <AgentMenuOption icon={LuSparkles} accent label={langy.label} hint={langy.hint} />
           </Menu.Item>
         ) : null}
         <Menu.Item value="docs" paddingY={2} asChild>

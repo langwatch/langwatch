@@ -12,18 +12,15 @@ import type { SuiteRailProps } from "./suite-rail";
 
 export type SuiteRailFooterProps = Pick<
   SuiteRailProps,
-  | "collapsed"
-  | "onToggleCollapsed"
-  | "period"
-  | "periodMode"
-  | "setPeriod"
-  | "setRelativePeriod"
+  "collapsed" | "onToggleCollapsed" | "period" | "periodMode" | "setPeriod" | "setRelativePeriod"
 >;
 
 export function SuiteRailFooter({
   collapsed,
   onToggleCollapsed,
   period,
+  periodMode,
+  setPeriod,
   setRelativePeriod,
 }: SuiteRailFooterProps) {
   return (
@@ -31,6 +28,8 @@ export function SuiteRailFooter({
       {!collapsed && (
         <AgentTestingPeriodPicker
           period={period}
+          periodMode={periodMode}
+          setPeriod={setPeriod}
           setRelativePeriod={setRelativePeriod}
           compact
         />

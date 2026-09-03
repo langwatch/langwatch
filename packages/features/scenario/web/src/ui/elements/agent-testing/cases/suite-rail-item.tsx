@@ -16,17 +16,13 @@ export type RailSectionHeadingProps = {
   spaced?: boolean;
 };
 
-export function RailSectionHeading({
-  label,
-  collapsed,
-  spaced,
-}: RailSectionHeadingProps) {
+export function RailSectionHeading({ label, collapsed, spaced }: RailSectionHeadingProps) {
   if (collapsed) return <Box height="8px" />;
 
   return (
     <Text
       paddingLeft="10px"
-      paddingTop={spaced ? 2 : 1.5}
+      paddingTop={spaced ? 4 : 1.5}
       paddingBottom={0.5}
       fontSize="10px"
       fontWeight="semibold"
@@ -41,7 +37,7 @@ export function RailSectionHeading({
 
 export type RailItemProps = {
   label: string;
-  /** Absent on the row that stands for every test case. */
+  /** The test suite icon of a test suite, or the code icon of an external set. */
   icon?: React.ReactNode;
   selected: boolean;
   collapsed: boolean;
@@ -54,14 +50,7 @@ export type RailItemProps = {
  * row menu is a sibling of it, so a keypress on the menu trigger opens the
  * menu instead of selecting the suite.
  */
-export function RailItem({
-  label,
-  icon,
-  selected,
-  collapsed,
-  onClick,
-  actions,
-}: RailItemProps) {
+export function RailItem({ label, icon, selected, collapsed, onClick, actions }: RailItemProps) {
   return (
     <HStack
       className="group"

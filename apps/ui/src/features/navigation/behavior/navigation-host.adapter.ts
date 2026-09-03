@@ -15,7 +15,6 @@
 
 import {
   NavigationHostPort,
-  type LastVisitedHomeKind,
   type NavigationAccountMenu,
   type NavigationDeployment,
   type NavigationFlagReading,
@@ -42,7 +41,6 @@ export type NavigationHostReadings = {
   currentUser: NavigationUser | undefined;
   organizationRole: string | undefined;
   rememberedProjectSlug: string;
-  lastVisitedHomeKind: LastVisitedHomeKind;
   waiting: ReactNode;
   notFound: ReactNode;
   pathname: string;
@@ -119,10 +117,6 @@ export class UiNavigationHost extends NavigationHostPort {
 
   rememberedProjectSlug(): string {
     return this.readings.rememberedProjectSlug;
-  }
-
-  lastVisitedHomeKind(): LastVisitedHomeKind {
-    return this.readings.lastVisitedHomeKind;
   }
 
   hasPermission(permission: string): boolean {

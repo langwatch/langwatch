@@ -70,7 +70,6 @@ export function DeleteConfirmationDialog({
         <Dialog.Footer>
           <Button
             variant="outline"
-            mr={3}
             onClick={(event) => {
               event.stopPropagation();
               onClose();

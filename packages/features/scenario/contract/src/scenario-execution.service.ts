@@ -1,4 +1,5 @@
 import type { RunParameterValues } from "./scenario.parameters";
+import type { ResolvedRunModels } from "./run-models";
 import type { RunSecretCiphertext } from "./run-secret-ciphertext";
 import type {
   ChildProcessJobData,
@@ -14,7 +15,7 @@ export interface ScenarioExecutionJob {
   setId: string;
   scenarioName?: string;
   target: {
-    type: "prompt" | "http" | "code" | "workflow";
+    type: "prompt" | "http" | "code" | "workflow" | "connected";
     referenceId: string;
   };
   parameters?: RunParameterValues;
@@ -26,6 +27,10 @@ export type ScenarioModelParametersFailureReason =
   | "provider_not_found"
   | "provider_not_enabled"
   | "missing_params"
+  // A project with no model set for a scenario feature key is the customer's
+  // to fix, so the refusal names it rather than leaving the caller unable to
+  // tell it from a fault of ours.
+  | "model_not_configured"
   | "preparation_error";
 
 export type ScenarioExecutionPrefetchResult =
@@ -33,6 +38,13 @@ export type ScenarioExecutionPrefetchResult =
       success: true;
       data: ChildProcessJobData;
       telemetry: { endpoint: string; apiKey: string };
+      /**
+       * The models this run resolved. A sibling of `data` rather than a member
+       * of it: the child process builds its models from the prepared params,
+       * so it needs no name, while the caller that queues the run records the
+       * names on it. Null for a run that resolves no model.
+       */
+      resolvedModels: ResolvedRunModels | null;
     }
   | {
       success: false;
@@ -77,7 +89,5 @@ export abstract class ScenarioExecutionService {
     input: ScenarioExecutionPrefetchInput,
   ): Promise<ScenarioExecutionPrefetchResult>;
   abstract prepare(input: ScenarioExecutionPrefetchInput): ScenarioExecutionPreparation;
-  abstract finishUnsuccessfulRun(
-    input: ScenarioUnsuccessfulExecutionInput,
-  ): Promise<void>;
+  abstract finishUnsuccessfulRun(input: ScenarioUnsuccessfulExecutionInput): Promise<void>;
 }

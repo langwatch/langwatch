@@ -87,11 +87,21 @@ export type ScenarioApiMap = {
     duplicate: M;
     archive: M;
     batchArchive: M;
-    moveToFolder: M;
+    moveToTestSuite: M;
     restoreVersion: M;
     run: M;
     cancelJob: M;
     cancelBatchRun: M;
+    /** The Results tab's fold: one row per group, over the whole window. */
+    getResultsOverview: Q;
+    /** The rows behind one opened group. */
+    getResultAtoms: Q;
+    /** The scenarios a run named that no stored scenario row matches. */
+    getCodeScenarios: QL;
+    /** The targets a run went against, as the runs themselves recorded them. */
+    getRunTargets: QL;
+    /** What the previous runs of this scope were configured with. */
+    getRunConfigurations: QL;
     /** The live board. One entry per simulation event on the project. */
     onSimulationUpdate: S;
     /** The tab follower: who else is watching this scenario run. */
@@ -109,7 +119,15 @@ export type ScenarioApiMap = {
     archive: M;
     run: M;
     runAll: M;
-    folders: {
+    /** Starts one run plan, which is a suite of the `run_plan` kind. */
+    runPlan: M;
+    /**
+     * The test suites of a project.
+     *
+     * `folders` until #7638 renamed the vocabulary — the segment is the
+     * server's mount point, so it is spelled the way the router mounts it.
+     */
+    testSuites: {
       getAll: QL;
       create: M;
       rename: M;
@@ -132,6 +150,10 @@ export type ScenarioApiMap = {
     update: { mutation: { input: UpdateAgentCommand; output: AgentApiUpdateOutput } };
     delete: M;
     cascadeArchive: M;
+    /** One scenario run against a saved agent, from the agents page. */
+    testRun: M;
+    /** One turn against a saved agent, from the editor's test panel. */
+    testTurn: M;
   };
   /**
    * What the reader may do here.
@@ -146,6 +168,25 @@ export type ScenarioApiMap = {
       query: {
         input: { projectId?: string; organizationId?: string };
         output: { permissions: string[] };
+      };
+    };
+  };
+  /**
+   * One browser-visible release flag, resolved for the reader.
+   *
+   * The Agent Testing rollout is read on the previous simulations screens, so
+   * the flag lands on this family's transport rather than on a second one:
+   * the two pages that read it are these.
+   */
+  featureFlag: {
+    isEnabled: {
+      query: {
+        input: {
+          flag: string;
+          projectId: string | null;
+          organizationId: string | null;
+        };
+        output: { enabled: boolean };
       };
     };
   };
@@ -196,6 +237,14 @@ export type ScenarioApiMap = {
         }>;
       };
     };
+    /**
+     * The organization's members, read only to put a name on a run's actor.
+     *
+     * Fired for one actor at a time and only when the run was started by
+     * someone other than the reader, which is why it is not folded into
+     * `getAll` above.
+     */
+    getOrganizationWithMembersAndTheirTeams: Q;
   };
   prompts: { getAllPromptsForProject: QL };
   traces: { getById: Q };

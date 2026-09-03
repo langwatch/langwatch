@@ -30,7 +30,6 @@ import {
   type NavigationTeam,
   type NavigationUser,
 } from "./model/navigation-host";
-import type { LastVisitedHomeKind } from "./model/resolve-home-destination";
 
 export type StubNavigationReadings = {
   organizations?: NavigationOrganization[];
@@ -44,7 +43,6 @@ export type StubNavigationReadings = {
   currentUser?: NavigationUser;
   organizationRole?: string;
   rememberedProjectSlug?: string;
-  lastVisitedHomeKind?: LastVisitedHomeKind;
   permissions?: readonly string[];
   flags?: Readonly<Record<string, NavigationFlagReading>>;
   waiting?: ReactNode;
@@ -143,10 +141,6 @@ export class StubNavigationHost extends NavigationHostPort {
 
   rememberedProjectSlug(): string {
     return this.readings.rememberedProjectSlug ?? "";
-  }
-
-  lastVisitedHomeKind(): LastVisitedHomeKind {
-    return this.readings.lastVisitedHomeKind ?? "";
   }
 
   hasPermission(permission: string): boolean {

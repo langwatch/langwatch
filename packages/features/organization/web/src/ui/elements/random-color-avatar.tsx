@@ -6,7 +6,7 @@
  * System's own `rotating-colors` rather than from a second copy of the palette.
  */
 
-import type { AvatarRootProps } from "@chakra-ui/react";
+import type { AvatarRootProps } from "@langwatch/design-system/avatar";
 import { getColorForString } from "@langwatch/design-system/rotating-colors";
 import { UserAvatar } from "./user-avatar";
 

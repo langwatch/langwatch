@@ -54,6 +54,14 @@ const PUBLIC_SURFACES = [
   // for a project app, so nothing else in the document looked wrong.
   { prefix: "/api/prompts", scheme: "project_api_key" },
   { prefix: "/api/evaluators", scheme: "project_api_key" },
+  // The two agent-testing v1 families. They are the first project-key
+  // families built on `@langwatch/api`, so they are pinned here to prove the
+  // framework's mounts reach the registry the stamping reads: a mount the
+  // registry never saw would leave the operation on the document default,
+  // which happens to be the right answer for a project app and would
+  // therefore look correct while nothing enforced it.
+  { prefix: "/api/v1/run-plans", scheme: "project_api_key" },
+  { prefix: "/api/v1/test-suites", scheme: "project_api_key" },
 ] as const;
 
 /** The first surface whose prefix the path starts with; order is longest-first. */
@@ -107,9 +115,7 @@ describe("credentialClassFor", () => {
           policy: requires("gatewaySpend:view"),
         }),
       ).toBe("organization_api_key");
-      expect(credentialClassFor({ scope: "service", policy: anyAuthenticated() })).toBe(
-        "internal",
-      );
+      expect(credentialClassFor({ scope: "service", policy: anyAuthenticated() })).toBe("internal");
     });
 
     it("says session when the handler authenticates a browser session", () => {
@@ -187,9 +193,7 @@ describe("credentialClassFor", () => {
     ] as const)(
       "a $scope app taking $credential publishes $expected",
       ({ scope, credential, expected }) => {
-        expect(credentialClassFor({ scope, policy: handlerManaged(credential) })).toBe(
-          expected,
-        );
+        expect(credentialClassFor({ scope, policy: handlerManaged(credential) })).toBe(expected);
       },
     );
   });
@@ -198,16 +202,7 @@ describe("credentialClassFor", () => {
 describe("isHttpMethod", () => {
   describe("given the members a Path Item can hold", () => {
     it("names the eight operations and nothing else", () => {
-      for (const method of [
-        "get",
-        "put",
-        "post",
-        "delete",
-        "options",
-        "head",
-        "patch",
-        "trace",
-      ]) {
+      for (const method of ["get", "put", "post", "delete", "options", "head", "patch", "trace"]) {
         expect(isHttpMethod(method)).toBe(true);
         expect(isHttpMethod(method.toUpperCase())).toBe(true);
       }
@@ -235,15 +230,11 @@ describe("documentedPathOf", () => {
       // unstamped: `{.+}` is matcher syntax, and carrying it through produced
       // a path no documented operation is keyed by.
       expect(documentedPathOf("/api/prompts/:id{.+}")).toBe("/api/prompts/{id}");
-      expect(documentedPathOf("/api/prompts/:id{.+?}/versions")).toBe(
-        "/api/prompts/{id}/versions",
-      );
+      expect(documentedPathOf("/api/prompts/:id{.+?}/versions")).toBe("/api/prompts/{id}/versions");
       expect(documentedPathOf("/api/prompts/:id{.+?}/versions/:versionId/restore")).toBe(
         "/api/prompts/{id}/versions/{versionId}/restore",
       );
-      expect(documentedPathOf("/api/evaluators/:idOrSlug{.+}")).toBe(
-        "/api/evaluators/{idOrSlug}",
-      );
+      expect(documentedPathOf("/api/evaluators/:idOrSlug{.+}")).toBe("/api/evaluators/{idOrSlug}");
     });
 
     it("consumes a quantifier inside the pattern rather than stopping at it", () => {
@@ -322,9 +313,7 @@ describe("the published API description", () => {
       // one an integrator would then fail on.
       const operations = publicOperations();
       const wrong = operations
-        .filter(
-          (op) => JSON.stringify(op.published) !== JSON.stringify([{ [op.scheme]: [] }]),
-        )
+        .filter((op) => JSON.stringify(op.published) !== JSON.stringify([{ [op.scheme]: [] }]))
         .map(
           (op) =>
             `${op.operationKey} published ${JSON.stringify(op.published)}, expected [{"${op.scheme}":[]}]`,

@@ -1,7 +1,7 @@
 /**
  * The parameter overrides of a run, as rows.
  *
- * The single line `name=value, name=value` is the small case. The moment a
+ * The single line `name=value, name=value` is the simple case. The moment a
  * value must be hidden the line cannot carry it, because a line shows what it
  * holds, so the block turns into one row per parameter: a key, a value, and a
  * lock that says the value is a credential.
@@ -12,9 +12,9 @@
  * @see specs/features/agent-testing/run-dialog.feature
  */
 
-import type { RunParameterValues } from "@langwatch/scenario-contract";
-import { serializeOptionalScalarValue } from "@langwatch/design-system/json-value-text";
-import { parseParameterLine } from "./parameter-line";
+import type { RunParameterValues, ScenarioParameterDefinition } from "@langwatch/scenario-contract";
+import { serializeOptionalTypedScalarValue } from "@langwatch/design-system/json-value-text";
+import { parameterTypes, parseParameterLine } from "./parameter-line";
 
 /** One parameter of the block, as the rows editor holds it. */
 export type ParameterRow = {
@@ -58,26 +58,30 @@ function namedRows(rows: ParameterRow[]): ParameterRow[] {
 
 /**
  * What the run sends: every named row, plus whatever was typed for the
- * secrets the cases declare.
+ * secrets the scenarios declare.
  *
- * A name is sent as it was written, declared or not, so a name no case
+ * A name is sent as it was written, declared or not, so a name no scenario
  * declares is refused by the server by name rather than dropped in silence.
  * A plain row left with an empty value is omitted, so the run falls back to
- * the default each case declares for it. A secret keeps whatever was typed as
+ * the default each scenario declares for it. A secret keeps whatever was typed as
  * text: a token of digits is still a token.
  */
 export function toRowsRunParameters({
   rows,
   secretValues,
+  definitions,
 }: {
   rows: ParameterRow[];
   /** The value typed for each declared secret parameter, keyed by name. */
   secretValues: Record<string, string>;
+  /** The declarations in scope, for the type each value is read as. */
+  definitions?: readonly ScenarioParameterDefinition[];
 }): RunParameterValues | undefined {
   const parameters: RunParameterValues = {};
+  const types = parameterTypes(definitions);
 
   for (const row of namedRows(rows)) {
-    const value = rowValueOf(row);
+    const value = rowValueOf(row, types.get(row.name));
     if (value !== undefined) parameters[row.name] = value;
   }
 
@@ -89,8 +93,10 @@ export function toRowsRunParameters({
 }
 
 /** What a row sends, or nothing when it was left empty. */
-function rowValueOf(row: ParameterRow) {
-  if (!row.secret) return serializeOptionalScalarValue(row.value);
+function rowValueOf(row: ParameterRow, type: ScenarioParameterDefinition["type"]) {
+  if (!row.secret) {
+    return serializeOptionalTypedScalarValue({ raw: row.value, type });
+  }
   return row.value === "" ? undefined : row.value;
 }
 
@@ -98,13 +104,24 @@ function rowValueOf(row: ParameterRow) {
  * What the suite is allowed to remember: the plain rows and their values.
  *
  * A row left with an empty value is dropped, the way the line drops one: the
- * run falls back to the default the cases declare for that name.
+ * run falls back to the default the scenarios declare for that name.
  */
-export function toStorableRowParameters(rows: ParameterRow[]): RunParameterValues | undefined {
+export function toStorableRowParameters({
+  rows,
+  definitions,
+}: {
+  rows: ParameterRow[];
+  /** The declarations in scope, for the type each value is read as. */
+  definitions?: readonly ScenarioParameterDefinition[];
+}): RunParameterValues | undefined {
   const parameters: RunParameterValues = {};
+  const types = parameterTypes(definitions);
   for (const row of namedRows(rows)) {
     if (row.secret) continue;
-    const value = serializeOptionalScalarValue(row.value);
+    const value = serializeOptionalTypedScalarValue({
+      raw: row.value,
+      type: types.get(row.name),
+    });
     if (value === undefined) continue;
     parameters[row.name] = value;
   }

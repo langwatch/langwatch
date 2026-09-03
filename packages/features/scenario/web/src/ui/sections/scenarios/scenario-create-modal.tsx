@@ -26,22 +26,22 @@ export interface ScenarioCreateModalProps {
   /** Called when modal is closed */
   onClose: () => void;
   /**
-   * The test suite the new case is filed in. Absent leaves the case unfiled,
+   * The test suite the new scenario is filed in. Absent leaves the scenario unfiled,
    * which is what every surface outside Agent Testing wants.
    */
-  folderId?: string | null;
+  testSuiteId?: string | null;
   /** Which editor the draft opens in. Absent opens the v1 editor. */
   variant?: ScenarioEditorVariant;
 }
 
 const MODAL_TITLE = "Create new scenario";
 /** What Agent Testing calls the same modal. */
-const AGENT_TESTING_MODAL_TITLE = "New test case";
+const AGENT_TESTING_MODAL_TITLE = "New scenario";
 const MODAL_PLACEHOLDER = "Explain your agent, its goals and what behavior you want to test.";
 const GENERATING_TEXT = "Drafting your scenario…";
-const AGENT_TESTING_GENERATING_TEXT = "Drafting your test case…";
+const AGENT_TESTING_GENERATING_TEXT = "Drafting your scenario…";
 const PROMPT_LABEL = "What should this simulation prove?";
-const AGENT_TESTING_PROMPT_LABEL = "What should this test case prove?";
+const AGENT_TESTING_PROMPT_LABEL = "What should this scenario prove?";
 
 const EXAMPLE_TEMPLATES: ExampleTemplate[] = [
   {
@@ -71,7 +71,7 @@ const EXAMPLE_TEMPLATES: ExampleTemplate[] = [
 export function ScenarioCreateModal({
   open,
   onClose,
-  folderId,
+  testSuiteId,
   variant,
 }: ScenarioCreateModalProps) {
   const { project } = useOrganizationTeamProject();
@@ -97,20 +97,20 @@ export function ScenarioCreateModal({
   const openEditorWithData = useCallback(
     (formData: Partial<ScenarioFormData>) => {
       const initialData: ScenarioInitialData = {
-        initialFormData: folderId ? { ...formData, folderId } : formData,
+        initialFormData: testSuiteId ? { ...formData, testSuiteId } : formData,
       };
       openDrawer(
         "scenarioEditor",
         {
           ...initialData,
-          ...(folderId ? { folderId } : {}),
+          ...(testSuiteId ? { testSuiteId } : {}),
           ...(variant ? { variant } : {}),
         },
         { resetStack: true },
       );
       onClose();
     },
-    [openDrawer, onClose, folderId, variant],
+    [openDrawer, onClose, testSuiteId, variant],
   );
 
   const handleGenerate = useCallback(

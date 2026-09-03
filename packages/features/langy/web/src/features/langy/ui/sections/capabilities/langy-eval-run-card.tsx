@@ -1,5 +1,5 @@
 /**
- * Evaluation-run capability card (`platform_run_experiment`, `platform_run_suite`,
+ * Evaluation-run capability card (`platform_run_experiment`, `platform_run_plan`,
  * `platform_experiment_results`, `platform_experiment_status`).
  *
  * Surfaces the outcome of a run — a status line plus any pass-rate / score the
@@ -60,9 +60,7 @@ function runDocument(output: unknown): Record<string, unknown> | null {
   const value = typeof output === "string" ? parseJson(output) : output;
   if (!value || typeof value !== "object" || Array.isArray(value)) return null;
   const document = value as Record<string, unknown>;
-  return RUN_FIELDS.some((field) => document[field] !== undefined)
-    ? document
-    : null;
+  return RUN_FIELDS.some((field) => document[field] !== undefined) ? document : null;
 }
 
 function parseJson(text: string): unknown {
@@ -92,9 +90,7 @@ function runLines(document: Record<string, unknown>): string[] {
       (item) => typeof (item as { passed?: unknown }).passed === "boolean",
     );
     if (scored.length > 0) {
-      const passed = scored.filter(
-        (item) => (item as { passed: boolean }).passed,
-      ).length;
+      const passed = scored.filter((item) => (item as { passed: boolean }).passed).length;
       lines.push(`${passed} of ${scored.length} evaluations passed`);
     }
   }

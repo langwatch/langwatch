@@ -4,6 +4,7 @@ import {
   DEV_SECRET_HEADER,
   deriveSimulationsUrl,
   restoreDevTunnel,
+  touchDevTunnel,
 } from "../dev/write-back";
 
 const TUNNEL_URL = "https://lively-otter.trycloudflare.com";
@@ -142,6 +143,42 @@ describe("restoreDevTunnel()", () => {
       });
 
       expect(restored).toBeNull();
+    });
+  });
+});
+
+describe("touchDevTunnel()", () => {
+  describe("when the agent carries a devTunnel stash", () => {
+    /** @scenario "Healthy checks refresh the tunnel heartbeat" */
+    it("refreshes heartbeatAt and keeps the rest of the stash", () => {
+      const touched = touchDevTunnel({
+        config: {
+          url: TUNNEL_URL,
+          devTunnel: {
+            previousUrl: "https://staging.example.com/agent",
+            connectedAt: "2026-08-15T10:00:00.000Z",
+            heartbeatAt: "2026-08-15T10:00:30.000Z",
+          },
+        },
+        heartbeatAt: "2026-08-15T10:01:00.000Z",
+      });
+
+      expect(touched?.url).toBe(TUNNEL_URL);
+      expect(touched?.devTunnel).toEqual({
+        previousUrl: "https://staging.example.com/agent",
+        connectedAt: "2026-08-15T10:00:00.000Z",
+        heartbeatAt: "2026-08-15T10:01:00.000Z",
+      });
+    });
+  });
+
+  describe("when the agent carries no devTunnel stash", () => {
+    it("returns null so the caller skips the PATCH", () => {
+      expect(
+        touchDevTunnel({
+          config: { url: "https://staging.example.com/agent" },
+        }),
+      ).toBeNull();
     });
   });
 });

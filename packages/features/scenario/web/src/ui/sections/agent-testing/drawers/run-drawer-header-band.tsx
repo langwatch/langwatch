@@ -1,14 +1,14 @@
 /**
  * The fixed band at the top of the run drawer: status, title, the version of
- * the case the run used, the actions, and the strip of chips under them.
+ * the scenario the run used, the actions, and the strip of chips under them.
  *
  * @see specs/features/agent-testing/side-by-side-run-drawer.feature
  * @see specs/scenarios/scenario-version-on-runs.feature
  */
 
 import type { SimulationRunStatus } from "@langwatch/scenario-contract";
-import { Button, Heading, HStack, VStack } from "@chakra-ui/react";
-import { Square } from "lucide-react";
+import { Button, Heading, HStack, VStack, Icon } from "@chakra-ui/react";
+import { Square, Edit2 } from "lucide-react";
 import { formatCost, formatLatency } from "@langwatch/design-system/metric-value-formatters";
 import {
   CopyIdChip,
@@ -21,7 +21,7 @@ import {
 import { Drawer } from "@langwatch/workflow-web/components/ui/drawer";
 import { Chip } from "@langwatch/trace-web/explorer/components/TraceDrawer/Chip";
 import { CaseVersionChip } from "../../../elements/agent-testing/shared/case-version-chip";
-import { useAgentTestingStore } from "../use-agent-testing-store";
+import { CASE_EDITOR_DRAWER } from "../cases/drawer-keys";
 import type {
   RunDetail,
   RunDrawerState,
@@ -29,10 +29,9 @@ import type {
   useRunDrawerStop,
 } from "./use-run-drawer-state";
 
-export type RunDrawerHeaderBandProps = Pick<
-  RunDrawerState,
-  "detail" | "scenarioVersion"
-> & { stop: ReturnType<typeof useRunDrawerStop> };
+export type RunDrawerHeaderBandProps = Pick<RunDrawerState, "detail" | "scenarioVersion"> & {
+  stop: ReturnType<typeof useRunDrawerStop>;
+};
 
 type SectionProps = {
   detail: RunDetail;
@@ -40,10 +39,10 @@ type SectionProps = {
 };
 
 /**
- * The status, the name of the run, and the version of the case it ran.
+ * The status, the name of the run, and the version of the scenario it ran.
  *
- * The version is a fact of this run, not a way into the history of the case:
- * the history belongs to the case, and the case dialog is where it reads.
+ * The version is a fact of this run, not a way into the history of the scenario:
+ * the history belongs to the scenario, and the scenario dialog is where it reads.
  */
 function HeadingRow({
   scenarioState,
@@ -78,11 +77,9 @@ function HeaderActions({
   stop: ReturnType<typeof useRunDrawerStop>;
 }) {
   const { scenarioData } = detail;
-  const openCaseEditor = useAgentTestingStore((state) => state.openCaseEditor);
   // Without a trace there is no conversation to reach, and a run that ends
   // before it answers has none worth opening.
-  const isTraceReachable =
-    !!detail.firstTraceId && !hasNoResults(scenarioState.status);
+  const isTraceReachable = !!detail.firstTraceId && !hasNoResults(scenarioState.status);
 
   const openThread = () =>
     detail.openDrawer("traceV2Details", {
@@ -90,26 +87,36 @@ function HeaderActions({
       mode: "conversation",
     });
 
+  const openCaseEditor = () =>
+    scenarioData &&
+    detail.openDrawer(CASE_EDITOR_DRAWER, {
+      scenarioId: scenarioData.id,
+    });
+
   return (
     <HStack gap={1} flexShrink={0}>
+      {scenarioData && (
+        <Button
+          size="sm"
+          variant="outline"
+          onClick={openCaseEditor}
+          data-testid="run-drawer-open-scenario"
+        >
+          <Icon as={Edit2} boxSize={3.5} />
+          Edit Scenario
+        </Button>
+      )}
       <ScenarioRunActions
         scenario={scenarioData}
         isRunning={detail.isRunning}
-        onRunAgain={detail.handleRunAgainClick}
-        onEditScenario={() =>
-          scenarioData && openCaseEditor({ scenarioId: scenarioData.id })
-        }
+        onRunAgain={null}
+        onEditScenario={null}
         onOpenThread={isTraceReachable ? openThread : null}
         onOpenInTraces={isTraceReachable ? detail.handleOpenInTraces : null}
         dejaViewHref={detail.dejaView.href ?? null}
       />
       {stop.canStop && (
-        <Button
-          size="xs"
-          variant="outline"
-          onClick={stop.handleStop}
-          data-testid="run-drawer-stop"
-        >
+        <Button size="xs" variant="outline" onClick={stop.handleStop} data-testid="run-drawer-stop">
           <Square size={12} />
           Stop
         </Button>
@@ -134,18 +141,13 @@ function ChipStrip({ detail, scenarioState }: SectionProps) {
         />
       )}
       {scenarioState.durationInMs > 0 && (
-        <Chip
-          label="Duration"
-          value={formatLatency(scenarioState.durationInMs)}
-        />
+        <Chip label="Duration" value={formatLatency(scenarioState.durationInMs)} />
       )}
       {scenarioState.totalCost != null && (
         <Chip label="Cost" value={formatCost(scenarioState.totalCost)} />
       )}
       {detail.timeAgo && <Chip label="Ran" value={detail.timeAgo} />}
-      {detail.scenarioData?.archivedAt && (
-        <Chip value="Archived" tone="yellow" />
-      )}
+      {detail.scenarioData?.archivedAt && <Chip value="Archived" tone="yellow" />}
       {detail.copyableIds?.map((id) => (
         <CopyIdChip key={id.label} label={id.label} value={id.value} />
       ))}
@@ -153,11 +155,7 @@ function ChipStrip({ detail, scenarioState }: SectionProps) {
   );
 }
 
-export function RunDrawerHeaderBand({
-  detail,
-  scenarioVersion,
-  stop,
-}: RunDrawerHeaderBandProps) {
+export function RunDrawerHeaderBand({ detail, scenarioVersion, stop }: RunDrawerHeaderBandProps) {
   const { scenarioState } = detail;
   if (!scenarioState) return null;
 
@@ -176,23 +174,13 @@ export function RunDrawerHeaderBand({
       borderColor="border"
       flexShrink={0}
     >
-      <HStack
-        w="100%"
-        justify="space-between"
-        gap={2.5}
-        minWidth={0}
-        paddingEnd={8}
-      >
+      <HStack w="100%" justify="space-between" gap={2.5} minWidth={0} paddingEnd={8}>
         <HeadingRow
           scenarioState={scenarioState}
           displayTitle={detail.displayTitle}
           scenarioVersion={scenarioVersion}
         />
-        <HeaderActions
-          detail={detail}
-          scenarioState={scenarioState}
-          stop={stop}
-        />
+        <HeaderActions detail={detail} scenarioState={scenarioState} stop={stop} />
       </HStack>
 
       <ChipStrip detail={detail} scenarioState={scenarioState} />

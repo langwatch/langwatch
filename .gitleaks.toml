@@ -246,3 +246,21 @@ regexes = [
 description = "Stand-in ingestion token in the ingest-key rotation test, issued by nobody"
 targetRules = ["generic-api-key"]
 regexes = ['''^ik-lw-fresh1234567890_secret$''']
+
+# `your-api-key`, the placeholder the published curl examples put in the
+# `X-Auth-Token` header. It is the instruction "paste your key here" written as
+# a value, and it is spelled the same way across `docs/` — the API-reference
+# pages, the prompt-management guides and the aggregated `docs/llms-full.txt`
+# that is generated from them. gitleaks' default `curl-auth-header` rule reads
+# any `-H "…-Token: <value>"` as a credential and cannot tell a placeholder from
+# a key.
+#
+# It is issued by nobody, authenticates against nothing, and there is nothing to
+# revoke. A real token pasted into one of these examples is still caught: the
+# allowlist is scoped by VALUE and ANCHORED, so it permits this exact string and
+# nothing that merely contains or extends it, and every other rule still applies
+# to these files.
+[[allowlists]]
+description = "Documented `your-api-key` placeholder in the docs curl examples, not a credential"
+targetRules = ["curl-auth-header"]
+regexes = ['''^your-api-key$''']

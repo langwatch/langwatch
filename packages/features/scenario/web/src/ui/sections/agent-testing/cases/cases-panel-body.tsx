@@ -1,13 +1,17 @@
 /**
- * What sits under the cases panel header: the skeleton, an empty state, or
- * the table with the last-run line beneath it.
+ * What sits under the scenarios panel header: the skeleton, an empty state, or the
+ * table of scenarios. The bulk selection action bar lives here too, so the
+ * selection state does not leak into the tab model.
  *
  * @see specs/features/agent-testing/cases-table.feature
  */
 
+import { useCallback, useState } from "react";
 import {
+  ConnectAgentEmptyState,
   ExternalSetEmptyState,
   FirstCaseEmptyState,
+  FirstSuiteEmptyState,
   NoCasesHereEmptyState,
 } from "../../../elements/agent-testing/cases/cases-empty-states";
 import type { CasesPanelProps } from "./cases-panel";
@@ -16,33 +20,102 @@ import {
   CasesTableSkeleton,
   ExternalCasesTable,
 } from "../../../elements/agent-testing/cases/cases-table";
-import { LastRunLine } from "./last-run-line";
+import { MoveToSuiteSelectionBar } from "./move-to-suite-selection-bar";
+import type { TestCase } from "../../../../model/agent-testing/cases/test-cases";
 
 export type CasesPanelBodyProps = CasesPanelProps & {
   /** True for a set that runs from code, which the platform cannot write. */
   isExternal: boolean;
-  caseCount: number;
 };
 
+function useCaseSelection({
+  cases,
+  onMoveToSuite,
+}: {
+  cases: TestCase[];
+  onMoveToSuite: (testCase: TestCase, suiteId: string) => void;
+}) {
+  const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
+
+  const toggleSelected = useCallback((scenarioId: string) => {
+    setSelectedIds((current) => {
+      const next = new Set(current);
+      if (next.has(scenarioId)) next.delete(scenarioId);
+      else next.add(scenarioId);
+      return next;
+    });
+  }, []);
+
+  const startMoveToSuite = useCallback((scenarioId: string) => {
+    setSelectedIds(new Set([scenarioId]));
+  }, []);
+
+  const clearSelection = useCallback(() => setSelectedIds(new Set()), []);
+
+  const handleMoveConfirm = useCallback(
+    (targetSuiteId: string) => {
+      for (const id of selectedIds) {
+        const testCase = cases.find((entry) => entry.id === id);
+        if (!testCase) continue;
+        onMoveToSuite(testCase, targetSuiteId);
+      }
+      clearSelection();
+    },
+    [selectedIds, cases, onMoveToSuite, clearSelection],
+  );
+
+  return {
+    selectedIds,
+    isSelectionMode: selectedIds.size > 0,
+    toggleSelected,
+    startMoveToSuite,
+    clearSelection,
+    handleMoveConfirm,
+  };
+}
+
+/**
+ * Day zero, in the order a person can act on it: an agent to test comes
+ * before a suite to file scenarios into, and a suite comes before a scenario.
+ */
+function DayZeroEmptyState(props: CasesPanelBodyProps) {
+  if (!props.hasAgent) {
+    return (
+      <ConnectAgentEmptyState canManage={props.canManage} onConnectAgent={props.onConnectAgent} />
+    );
+  }
+  return <FirstSuiteEmptyState canManage={props.canManage} onNewSuite={props.onNewSuite} />;
+}
+
 export function CasesPanelBody(props: CasesPanelBodyProps) {
+  const {
+    selectedIds,
+    isSelectionMode,
+    toggleSelected,
+    startMoveToSuite,
+    clearSelection,
+    handleMoveConfirm,
+  } = useCaseSelection({
+    cases: props.cases,
+    onMoveToSuite: props.onMoveToSuite,
+  });
+  const hasLastRunByCase = useCallback(
+    (scenarioId: string) => props.lastResults.has(scenarioId),
+    [props.lastResults],
+  );
+
   if (props.isLoading) return <CasesTableSkeleton />;
 
   if (props.isExternal) {
     if (props.externalCases.length === 0) return <ExternalSetEmptyState />;
-    return (
-      <ExternalCasesTable
-        cases={props.externalCases}
-        onRowClick={props.onOpenExternalCase}
-      />
-    );
+    return <ExternalCasesTable cases={props.externalCases} onRowClick={props.onOpenExternalCase} />;
   }
 
-  if (props.caseCount === 0) {
+  if (!props.suite) return <DayZeroEmptyState {...props} />;
+
+  if (props.cases.length === 0) {
     return props.projectHasNoCases ? (
-      <FirstCaseEmptyState
-        canManage={props.canManage}
-        onNewTestCase={props.onNewTestCase}
-      />
+      <FirstCaseEmptyState canManage={props.canManage} onNewTestCase={props.onNewTestCase} />
     ) : (
       <NoCasesHereEmptyState />
     );
@@ -51,27 +124,25 @@ export function CasesPanelBody(props: CasesPanelBodyProps) {
   return (
     <>
       <CasesTable
-        groups={props.groups}
-        showGroupHeadings={props.selection.kind === "all"}
-        lastResults={props.lastResults}
-        isLastResultsLoading={props.isLastResultsLoading}
-        suites={props.suites}
+        cases={props.cases}
         canManage={props.canManage}
-        runningCaseId={props.runningCaseId}
-        onSelectSuite={props.onSelectSuite}
+        isSelectionMode={isSelectionMode}
+        selectedIds={selectedIds}
+        hasLastRunByCase={hasLastRunByCase}
+        onToggleSelected={toggleSelected}
+        onStartMoveToSuite={startMoveToSuite}
         onRowClick={props.onRowClick}
         onRunCase={props.onRunCase}
         onEdit={props.onEdit}
-        onHistory={props.onHistory}
         onDuplicate={props.onDuplicate}
-        onMoveToSuite={props.onMoveToSuite}
-        onOpenLastRun={props.onOpenLastRun}
+        period={props.period}
         onArchive={props.onArchive}
       />
-      <LastRunLine
-        selection={props.selection}
-        groups={props.groups}
-        lastResults={props.lastResults}
+      <MoveToSuiteSelectionBar
+        selectedCount={selectedIds.size}
+        suites={props.suites}
+        onClear={clearSelection}
+        onConfirm={handleMoveConfirm}
       />
     </>
   );

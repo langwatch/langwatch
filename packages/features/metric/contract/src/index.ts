@@ -43,4 +43,8 @@ export {
 } from "./schemas/metric-processing/metric-data-point";
 export { affectedRollupBuckets, buildMetricRollups } from "./metric-rollup/metric-rollup";
 export { MAX_DENSE_BUCKET_SPAN } from "./metric-rollup/exponential-bucket";
-export { comparePoints, type MetricSequencePoint } from "./metric-rollup/sequence";
+export {
+  comparePoints,
+  type MetricRollupSourcePoint,
+  type MetricSequencePoint,
+} from "./metric-rollup/sequence";

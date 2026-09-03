@@ -14,10 +14,14 @@
 import { ChakraProvider, defaultSystem } from "@chakra-ui/react";
 import { cleanup, render, screen } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
-import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import { afterEach, beforeAll, beforeEach, describe, expect, it, vi } from "vitest";
 
 // The empty states carry the Setup via Agent menu, whose langy hooks need
 // app context these tests do not build; the control has its own tests.
+vi.mock("posthog-js", () => ({
+  default: { capture: vi.fn() },
+}));
+
 vi.mock("@langwatch/trace-web/components/SetupWithAgentButton", () => ({
   SetupWithAgentButton: () => null,
 }));
@@ -89,6 +93,11 @@ const mockSuites = [
 
 vi.mock("../../../../behavior/scenario-api", () => ({
   api: {
+    featureFlag: {
+      isEnabled: {
+        useQuery: () => ({ data: { enabled: false }, isLoading: false }),
+      },
+    },
     useUtils: () => ({
       suites: {
         getAll: { invalidate: vi.fn() },
@@ -202,13 +211,19 @@ const Wrapper = ({ children }: { children: React.ReactNode }) => (
   <ChakraProvider value={defaultSystem}>{children}</ChakraProvider>
 );
 
-async function renderSimulationsPage() {
-  const mod = await import("../simulations-page");
-  const SimulationsPage = mod.default;
+let SimulationsPage: React.ComponentType;
+
+function renderSimulationsPage() {
   return render(<SimulationsPage />, { wrapper: Wrapper });
 }
 
 describe("Simulation Page URL Routing", () => {
+  // The page drags the whole suites graph behind it, and a cold transform of it
+  // costs more than a test's own budget, so it is imported once for the file.
+  beforeAll(async () => {
+    SimulationsPage = (await import("../simulations-page")).default;
+  }, 60_000);
+
   beforeEach(() => {
     mockPush.mockClear();
     mockReplace.mockClear();

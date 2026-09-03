@@ -783,6 +783,58 @@ describe("simulationRunExecution process (runtime-built definition)", () => {
       expect(evolution.nextWakeAt).toBeNull();
     });
 
+    /** @scenario "An externally reported run quiet past the threshold is finished as stalled" */
+    it("finishes an externally reported run, which never sees a queued event", () => {
+      // A run reported from outside opens with STARTED: only the platform
+      // emits QUEUED, so handleRunQueued never stamps scenarioRunId. The
+      // wake must still decide the stall — requiring the id here is what
+      // left external runs IN_PROGRESS forever when their process died.
+      const externallyStarted = evolveEvent(
+        initialState,
+        makeEvent({
+          type: SIMULATION_RUN_EVENT_TYPES.STARTED,
+          occurredAt: 10_000,
+          data: { scenarioRunId: RUN_ID },
+        }),
+      );
+      expect(externallyStarted.state.scenarioRunId).toBe("");
+
+      const now = 10_000 + STALL_THRESHOLD_MS;
+      const evolution = evolveWake(externallyStarted.state, now, now);
+
+      expect(evolution.state.phase).toBe("terminal");
+      expect(evolution.nextWakeAt).toBeNull();
+      expect(evolution.intents).toEqual([
+        {
+          messageKey: intentKey(`finish:${RUN_ID}:stalled`),
+          intentType: "finish",
+          payload: {
+            scenarioRunId: RUN_ID,
+            projectId: PROJECT_ID,
+            status: ScenarioRunStatus.ERROR,
+            error: "stalled",
+          },
+        },
+      ]);
+    });
+
+    it("re-arms for an externally reported run that is still active", () => {
+      const externallyStarted = evolveEvent(
+        initialState,
+        makeEvent({
+          type: SIMULATION_RUN_EVENT_TYPES.STARTED,
+          occurredAt: 10_000,
+          data: { scenarioRunId: RUN_ID },
+        }),
+      );
+
+      const now = 10_000 + STALL_THRESHOLD_MS - 1;
+      const evolution = evolveWake(externallyStarted.state, now, now);
+
+      expect(evolution.intents).toEqual([]);
+      expect(evolution.nextWakeAt).toBe(10_000 + STALL_THRESHOLD_MS);
+    });
+
     it("clears itself for a terminal run", () => {
       const evolution = evolveWake(queuedState({ phase: "terminal" }), 5_000);
 

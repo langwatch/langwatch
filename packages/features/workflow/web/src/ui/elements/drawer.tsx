@@ -96,13 +96,7 @@ export const DrawerCloseTrigger = React.forwardRef<
   ChakraDrawer.CloseTriggerProps
 >(function DrawerCloseTrigger(props, ref) {
   return (
-    <ChakraDrawer.CloseTrigger
-      position="absolute"
-      top="2"
-      insetEnd="2"
-      {...props}
-      asChild
-    >
+    <ChakraDrawer.CloseTrigger position="absolute" top="2" insetEnd="2" {...props} asChild>
       <CloseButton size="sm" ref={ref} />
     </ChakraDrawer.CloseTrigger>
   );
@@ -117,13 +111,26 @@ export const DrawerCloseTrigger = React.forwardRef<
  * - `preventScroll={false}`: Default to allowing background scrolling.
  *
  * All defaults can be overridden by passing props explicitly.
+ *
+ * `size` is widened the way `@langwatch/design-system`'s drawer widens it:
+ * Chakra types `size` from its OWN recipe, so a width step the product adds
+ * in `system/drawer.recipe.ts` is unknown to it. The wrapper carries the
+ * product's list and hands the name down, which is why a drawer sets a width
+ * by name and never with a maxWidth of its own.
  */
-export const DrawerRoot = function DrawerRoot(props: ChakraDrawer.RootProps) {
+export type AppDrawerSize = NonNullable<ChakraDrawer.RootProps["size"]> | "2xl";
+
+export interface DrawerRootProps extends Omit<ChakraDrawer.RootProps, "size"> {
+  size?: AppDrawerSize;
+}
+
+export const DrawerRoot = function DrawerRoot({ size, ...props }: DrawerRootProps) {
   return (
     <ChakraDrawer.Root
       modal={false}
       closeOnInteractOutside={false}
       preventScroll={false}
+      size={size as ChakraDrawer.RootProps["size"]}
       {...props}
     />
   );

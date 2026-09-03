@@ -286,9 +286,7 @@ export interface OrganizationRepository {
    * slug is already claimed, so provisioning tools get a deterministic 409 on
    * the natural key.
    */
-  createForProvisioning(
-    input: CreateForProvisioningInput,
-  ): Promise<CreateAndAssignResult>;
+  createForProvisioning(input: CreateForProvisioningInput): Promise<CreateAndAssignResult>;
 
   /** Every organization on the instance, newest first. Instance-admin only. */
   findAllProvisioningSummaries(): Promise<OrganizationProvisioningSummary[]>;

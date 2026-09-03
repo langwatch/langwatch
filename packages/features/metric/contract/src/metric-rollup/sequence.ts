@@ -15,7 +15,7 @@ function bigint(value: string | null | undefined): bigint {
   }
 }
 
-function numberValue(point: CanonicalMetricDataPoint): number | null {
+function numberValue(point: MetricRollupSourcePoint): number | null {
   if (point.valueType === "double") return point.valueDouble;
   if (point.valueType === "int" && point.valueInt !== null) {
     const value = Number(point.valueInt);
@@ -43,6 +43,45 @@ export interface MetricSequencePoint {
   aggregationTemporality: CanonicalMetricDataPoint["aggregationTemporality"];
 }
 
+/**
+ * The fields the rollup fold actually reads, on top of the ordering fields a
+ * seek needs. Naming them is what lets the authoritative read stop asking for
+ * the rest: attributes, schema urls, scope identity, flags, quantiles and the
+ * accounting timestamps are stored on every point and read by none of the
+ * builders below, yet `FINAL` materialised all of them for every row a seek
+ * scanned — the megabytes-per-granule that pushed the reads over the server's
+ * memory cap (`while reading column PointAttributesJson`).
+ *
+ * `MetricRollupSourcePoint` stays assignable to this, so a caller holding a
+ * whole point still folds; the type only bounds what a caller *must* supply,
+ * and so what a read has to fetch.
+ */
+export type MetricRollupSourcePoint = MetricSequencePoint &
+  Pick<
+    CanonicalMetricDataPoint,
+    | "tenantId"
+    | "metricName"
+    | "metricUnit"
+    | "isMonotonic"
+    | "startTimeUnixNano"
+    | "valueType"
+    | "valueInt"
+    | "valueDouble"
+    | "count"
+    | "sum"
+    | "min"
+    | "max"
+    | "explicitBounds"
+    | "bucketCounts"
+    | "exponentialScale"
+    | "exponentialZeroThreshold"
+    | "zeroCount"
+    | "positiveOffset"
+    | "positiveBucketCounts"
+    | "negativeOffset"
+    | "negativeBucketCounts"
+  >;
+
 /** Mirrors the ClickHouse ORDER BY, which collates PointId by bytes. */
 function comparePoints(left: MetricSequencePoint, right: MetricSequencePoint): number {
   const leftNano = bigint(left.timeUnixNano);
@@ -53,15 +92,15 @@ function comparePoints(left: MetricSequencePoint, right: MetricSequencePoint): n
 }
 
 function isGap(
-  previous: CanonicalMetricDataPoint | undefined,
-  current: CanonicalMetricDataPoint,
+  previous: MetricRollupSourcePoint | undefined,
+  current: MetricRollupSourcePoint,
 ): boolean {
   return !!previous && current.timeUnixMs - previous.timeUnixMs > METRIC_ROLLUP_INTERVAL_MS * 2;
 }
 
 function startsNewSequence(
-  previous: CanonicalMetricDataPoint | undefined,
-  current: CanonicalMetricDataPoint,
+  previous: MetricRollupSourcePoint | undefined,
+  current: MetricRollupSourcePoint,
 ): boolean {
   return (
     !previous ||
@@ -82,9 +121,9 @@ function usesPredecessor(point: MetricSequencePoint): boolean {
 }
 
 function previousPoint(
-  all: CanonicalMetricDataPoint[],
+  all: MetricRollupSourcePoint[],
   index: number,
-): CanonicalMetricDataPoint | undefined {
+): MetricRollupSourcePoint | undefined {
   return index > 0 ? all[index - 1] : undefined;
 }
 

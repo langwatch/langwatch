@@ -51,13 +51,13 @@ import { getGroup, getMetric, type timeseriesSeriesInput } from "../../model/ana
 import { analyticsApi } from "../../behavior/analytics-api";
 import { buildMetadataFilterParams } from "../../model/metadata-filter-params";
 import type { RotatingColorSet } from "@langwatch/design-system/rotating-colors";
-import { uppercaseFirstLetter } from "../../model/string-casing";
 import type { Unpacked } from "../../model/analytics-value-types";
 import { Delayed } from "../elements/delayed";
 import { ChartErrorState } from "../elements/chart-error-state";
 import { ChartTooltip } from "../elements/chart-tooltip";
 import { formatChartDate } from "../../model/chart-date";
 import { SummaryMetric } from "../elements/summary-metric";
+import { formatSeriesGroupName, formatSingleSeriesName } from "../../model/series-group-name";
 
 type Series = Unpacked<z.infer<typeof timeseriesSeriesInput>["series"]> & {
   name: string;
@@ -514,21 +514,17 @@ const CustomGraph_ = React.memo(
       (aggKey: string) => {
         const { series, groupKey } = getSeries(seriesByKey, aggKey);
 
-        const group = input.groupBy && groupKey ? getGroup(input.groupBy) : undefined;
-        const displayGroupKey = groupKey || "unknown";
-        const groupName =
-          groupKey !== undefined
-            ? `${hideGroupLabel ? "" : group?.label.toLowerCase() + " "}${displayGroupKey}`
-            : "";
+        const groupName = formatSeriesGroupName({
+          groupBy: input.groupBy,
+          groupKey,
+          groupLabel: input.groupBy ? getGroup(input.groupBy)?.label : undefined,
+          hideGroupLabel,
+        });
+
         return input.series.length > 1
           ? (series?.name ?? aggKey) + (groupName ? ` (${groupName})` : "")
           : groupName
-            ? uppercaseFirstLetter(groupName)
-                .replace("Evaluation passed passed", "Evaluation Passed")
-                .replace("Evaluation passed failed", "Evaluation Failed")
-                .replace("Contains error", "Traces")
-                .replace(/^Evaluation label /i, "")
-                .replace(/^Thumbs up\/down /i, "")
+            ? formatSingleSeriesName(groupName)
             : (series?.name ?? aggKey);
       },
       [seriesByKey, input.groupBy, input.series.length, hideGroupLabel],

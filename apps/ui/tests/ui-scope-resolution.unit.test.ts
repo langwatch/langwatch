@@ -118,8 +118,6 @@ describe("given an organization whose personal workspace is listed first", () =>
         uiScopeSelectionWrites({
           resolved,
           selection: remembered,
-          projectParam: void 0,
-          lastVisitedHomeKind: "",
         }),
       ).toEqual([
         { key: "teamId", value: "team-shared" },
@@ -271,8 +269,6 @@ describe("given the personal-workspace pages", () => {
         uiScopeSelectionWrites({
           resolved: personal,
           selection: remembered,
-          projectParam: void 0,
-          lastVisitedHomeKind: "",
         }),
       ).toEqual([]);
       expect(resolve({ organizations, selection: remembered }).project?.slug).toBe("acme-app");
@@ -372,8 +368,6 @@ describe("given a member of one team in an organization that has several", () =>
         uiScopeSelectionWrites({
           resolved,
           selection: remembered,
-          projectParam: void 0,
-          lastVisitedHomeKind: "",
         }),
       ).toEqual([
         { key: "organizationId", value: "org-acme" },
@@ -477,40 +471,6 @@ describe("given the reserved top-level addresses that also bind the project segm
 
     expect(resolved.project?.slug).toBe("acme-app");
   });
-
-  it("does not count the visit as a project-home visit", () => {
-    const resolved = resolve({
-      route: { ...ORGANIZATION_SCOPED_PAGE, projectParam: "messages" },
-      organizations,
-      selection: remembered,
-    });
-
-    expect(
-      uiScopeSelectionWrites({
-        resolved,
-        selection: remembered,
-        projectParam: "messages",
-        lastVisitedHomeKind: "personal",
-      }),
-    ).toEqual([]);
-  });
-
-  it("counts a real project address as one", () => {
-    const resolved = resolve({
-      route: { ...ORGANIZATION_SCOPED_PAGE, projectParam: "acme-app" },
-      organizations,
-      selection: remembered,
-    });
-
-    expect(
-      uiScopeSelectionWrites({
-        resolved,
-        selection: remembered,
-        projectParam: "acme-app",
-        lastVisitedHomeKind: "personal",
-      }),
-    ).toEqual([{ key: "lastVisitedHomeKind", value: "project" }]);
-  });
 });
 
 describe("given the deployment's demo project", () => {
@@ -569,8 +529,6 @@ describe("given the deployment's demo project", () => {
       uiScopeSelectionWrites({
         resolved,
         selection: NOTHING_REMEMBERED,
-        projectParam: "demo-project-slug",
-        lastVisitedHomeKind: "",
       }),
     ).toEqual([]);
   });
@@ -614,8 +572,6 @@ describe("given the selection write-back", () => {
       uiScopeSelectionWrites({
         resolved: resolve({ organizations, selection: remembered }),
         selection: remembered,
-        projectParam: void 0,
-        lastVisitedHomeKind: "project",
       }),
     ).toEqual([]);
   });
@@ -626,20 +582,56 @@ describe("given the selection write-back", () => {
       organizations,
     });
 
-    // The organization and the home marker are still recorded: the reader did
-    // open a project page, and the private context resolves from its own
-    // address every time, so neither the team nor the project needs to be.
+    // The organization is still recorded: the private context resolves from
+    // its own address every time, so neither the team nor the project needs
+    // to be.
     expect(
       uiScopeSelectionWrites({
         resolved,
         selection: NOTHING_REMEMBERED,
-        projectParam: "personal-jane-abc123",
-        lastVisitedHomeKind: "",
       }),
-    ).toEqual([
-      { key: "organizationId", value: "org-acme" },
-      { key: "lastVisitedHomeKind", value: "project" },
-    ]);
+    ).toEqual([{ key: "organizationId", value: "org-acme" }]);
+  });
+});
+
+describe("given my current organization has no project and another of mine has one", () => {
+  const EMPTY_TEAM: UiScopeTeam = {
+    id: "team-empty",
+    slug: "empty-team",
+    isPersonal: false,
+    ownerUserId: null,
+    members: [{ userId: JANE }],
+    projects: [],
+  };
+  const organizations: readonly UiScopeOrganization[] = [
+    { id: "org-empty", slug: "empty-org", members: [{ role: "ADMIN" }], teams: [EMPTY_TEAM] },
+    { id: "org-other", slug: "other-org", members: [{ role: "ADMIN" }], teams: [SHARED_TEAM] },
+  ];
+  const remembered = { organizationId: "org-empty", teamId: "", projectSlug: "" };
+
+  describe("when the app resolves my context", () => {
+    /**
+     * The application used to teleport a member out of an empty organization
+     * and into another organization's project. The organization switch and
+     * the landing resolver own cross-organization destinations now, so the
+     * resolution answers the ambient organization and no project at all.
+     *
+     * @scenario A member kept in an empty organization stays put
+     */
+    it("keeps the empty organization and resolves no project of another one", () => {
+      const resolved = resolve({ organizations, selection: remembered });
+
+      expect(resolved.organization?.id).toBe("org-empty");
+      expect(resolved.project).toBeUndefined();
+    });
+
+    it("remembers nothing of the other organization either", () => {
+      const resolved = resolve({ organizations, selection: remembered });
+
+      expect(uiScopeSelectionWrites({ resolved, selection: remembered })).toEqual([
+        { key: "teamId", value: "team-empty" },
+      ]);
+    });
   });
 });
 

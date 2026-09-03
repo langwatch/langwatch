@@ -18,16 +18,15 @@ import {
 
 const assignments = CodingAgentPullRequestAssignmentService.create();
 const assignSessionsToPullRequests = assignments.assignSessions.bind(assignments);
-const assignDrivingSessionsToPullRequests =
-  assignments.assignDrivingSessions.bind(assignments);
+const assignDrivingSessionsToPullRequests = assignments.assignDrivingSessions.bind(assignments);
+const assignDrivingSessionsToPullRequestsPerBranch =
+  assignments.assignDrivingSessionsPerBranch.bind(assignments);
 const branchesOf = assignments.branchesOf.bind(assignments);
 
 const HOUR = 60 * 60 * 1000;
 const base = Date.UTC(2026, 0, 1);
 
-function session(
-  over: Partial<AssignableSession> & { sessionId: string },
-): AssignableSession {
+function session(over: Partial<AssignableSession> & { sessionId: string }): AssignableSession {
   return {
     startedAtMs: base,
     headBranch: "feat/linkage",
@@ -281,7 +280,8 @@ describe("assignDrivingSessionsToPullRequests", () => {
   });
 
   describe("given a session driving two branches that each have a live pull request", () => {
-    /** @scenario "A session that drove two pull requests counts toward only one of them" */
+    // The single-winner rule now prices only what has no finer record: the
+    // unstamped bucket. Stamped tokens split through the per-branch rule below.
     it("counts it toward the one it opened first and toward the other not at all", () => {
       const assignments = assignDrivingSessionsToPullRequests({
         sessions: [
@@ -390,13 +390,78 @@ describe("assignDrivingSessionsToPullRequests", () => {
   });
 });
 
+describe("assignDrivingSessionsToPullRequestsPerBranch", () => {
+  describe("given a session driving two branches that each have a live pull request", () => {
+    it("answers with each branch's own winner", () => {
+      const assignments = assignDrivingSessionsToPullRequestsPerBranch({
+        sessions: [
+          {
+            sessionId: "both",
+            startedAtMs: base,
+            headBranches: ["feat/first", "feat/second"],
+          },
+        ],
+        pullRequests: [
+          pullRequest({ prNumber: 9, headBranch: "feat/first" }),
+          pullRequest({ prNumber: 21, headBranch: "feat/second" }),
+        ],
+      });
+
+      const perBranch = assignments.get("both");
+      expect(perBranch?.get("feat/first")).toBe(9);
+      expect(perBranch?.get("feat/second")).toBe(21);
+    });
+  });
+
+  describe("given a recycled branch with an old and a new pull request", () => {
+    /** @scenario "Two pull requests on one branch split by era, not by double counting" */
+    it("answers with the branch's tenure winner alone", () => {
+      const assignments = assignDrivingSessionsToPullRequestsPerBranch({
+        sessions: [
+          {
+            sessionId: "later-era",
+            startedAtMs: base + 5 * HOUR,
+            headBranches: ["feat/linkage"],
+          },
+        ],
+        pullRequests: [
+          pullRequest({
+            prNumber: 9,
+            prCreatedAtMs: base,
+            prClosedAtMs: base + HOUR,
+            prMergedAtMs: base + HOUR,
+          }),
+          pullRequest({ prNumber: 21, prCreatedAtMs: base + 4 * HOUR }),
+        ],
+      });
+
+      expect(assignments.get("later-era")?.get("feat/linkage")).toBe(21);
+    });
+  });
+
+  describe("given a session whose branches map to no pull request", () => {
+    it("leaves the session out of the answer entirely", () => {
+      const assignments = assignDrivingSessionsToPullRequestsPerBranch({
+        sessions: [
+          {
+            sessionId: "unlinked",
+            startedAtMs: base,
+            headBranches: ["feat/nowhere"],
+          },
+        ],
+        pullRequests: [pullRequest({ prNumber: 7 })],
+      });
+
+      expect(assignments.has("unlinked")).toBe(false);
+    });
+  });
+});
+
 describe("branchesOf", () => {
   describe("given a row folded before the branch set existed", () => {
     /** @scenario "A session row from before the branch set column falls back to its one branch" */
     it("falls back to the one branch it does carry", () => {
-      expect(branchesOf({ gitBranch: "feat/only", gitBranches: [] })).toEqual([
-        "feat/only",
-      ]);
+      expect(branchesOf({ gitBranch: "feat/only", gitBranches: [] })).toEqual(["feat/only"]);
       // A row that names no branch at all drove none, and says so.
       expect(branchesOf({ gitBranch: "", gitBranches: [] })).toEqual([]);
     });

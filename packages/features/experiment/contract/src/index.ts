@@ -12,6 +12,7 @@ export * from "./experiment-run-eventing.events";
 export * from "./experiment.errors";
 export * from "./experiment.service";
 export * from "./human-readable-id";
+export * from "./workbench/connected-agent-target";
 export * from "./workbench/empty-row-detection";
 export * from "./workbench/execution-scope";
 export * from "./workbench/normalize-comparison";

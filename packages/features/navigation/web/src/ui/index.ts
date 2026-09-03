@@ -47,16 +47,9 @@ export {
   type NavigationTeam,
   type NavigationUser,
 } from "../model/navigation-host";
-export { useNavigationMode, type NavigationModeResolution } from "../behavior/use-navigation-mode";
+export { useNavigationMode } from "../behavior/use-navigation-mode";
 export { useNavigationTracking } from "../behavior/use-navigation-tracking";
-export {
-  isNavigationV2ShellRoute,
-  useNavigationV2ShellActive,
-} from "../behavior/use-navigation-shell-active";
-export {
-  projectSwitchHref,
-  useProjectPickGroups,
-} from "../behavior/use-project-pick-groups";
+export { projectSwitchHref, useProjectPickGroups } from "../behavior/use-project-pick-groups";
 export { useSettingsMenu } from "../behavior/use-settings-menu";
 export {
   settingsMenu,
@@ -67,11 +60,7 @@ export {
   type SettingsMenuGroup,
   type SettingsMenuItem,
 } from "../model/settings-menu";
-export {
-  featureIcons,
-  recentItemTypeToFeature,
-  type FeatureKey,
-} from "../model/feature-icons";
+export { featureIcons, recentItemTypeToFeature, type FeatureKey } from "../model/feature-icons";
 export { APP_HEADER_HEIGHT } from "../model/menu-widths";
 export {
   projectNavItems,
@@ -80,7 +69,10 @@ export {
   type ProjectNavItem,
 } from "../model/project-nav-items";
 export { useReachableProducts } from "../behavior/use-reachable-products";
-export { useLlmOpsProjectSlug, resolveLlmOpsProjectSlug } from "../behavior/use-llm-ops-project-slug";
+export {
+  useLlmOpsProjectSlug,
+  resolveLlmOpsProjectSlug,
+} from "../behavior/use-llm-ops-project-slug";
 export { useIsMobileViewport } from "../behavior/use-is-mobile-viewport";
 export { useVisibleSectionNavItems } from "../behavior/use-visible-section-nav-items";
 export { QUIET_SIDEBAR_CHIP } from "../model/quiet-chip-style";

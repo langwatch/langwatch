@@ -10,10 +10,14 @@
  */
 import { ChakraProvider, defaultSystem, Spinner } from "@chakra-ui/react";
 import { cleanup, render, screen } from "@testing-library/react";
-import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import { afterEach, beforeAll, beforeEach, describe, expect, it, vi } from "vitest";
 
 // The empty states carry the Setup via Agent menu, whose langy hooks need
 // app context these tests do not build; the control has its own tests.
+vi.mock("posthog-js", () => ({
+  default: { capture: vi.fn() },
+}));
+
 vi.mock("@langwatch/trace-web/components/SetupWithAgentButton", () => ({
   SetupWithAgentButton: () => null,
 }));
@@ -23,6 +27,11 @@ let allRunsPanelLoading = false;
 
 vi.mock("../../../../behavior/scenario-api", () => ({
   api: {
+    featureFlag: {
+      isEnabled: {
+        useQuery: () => ({ data: { enabled: false }, isLoading: false }),
+      },
+    },
     useUtils: () => ({
       suites: {
         getAll: { invalidate: vi.fn() },
@@ -122,8 +131,16 @@ async function importSuitesPage(): Promise<React.ComponentType> {
 describe("Single loading indicator on suites page (Issue #1904)", () => {
   let SuitesPage: React.ComponentType;
 
-  beforeEach(async () => {
+  // The page drags the whole suites graph behind it, so it is imported once for
+  // the file rather than once per test: a per-test import spends its whole hook
+  // budget on the transform.
+  beforeAll(async () => {
     SuitesPage = await importSuitesPage();
+    // The transform of that graph is the whole cost, and a cold run of this
+    // file alone spends more than the default hook budget on it.
+  }, 60_000);
+
+  beforeEach(() => {
     allRunsPanelLoading = false;
   });
 

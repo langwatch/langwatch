@@ -1,9 +1,12 @@
 import { HandledError, type HandledErrorOptions } from "@langwatch/handled-error";
 
+import type { ScenarioParameterValue } from "./scenario.parameters";
 import type { ScenarioContentField } from "./scenario-content-template";
 
 type ScenarioParameterErrorCode =
   | "scenario_parameter_missing"
+  | "scenario_parameter_option_invalid"
+  | "scenario_parameter_required"
   | "scenario_parameter_template_invalid"
   | "scenario_parameter_unknown"
   | "scenario_secret_parameter_conflict"
@@ -35,25 +38,98 @@ export class ScenarioParameterError extends HandledError {
 }
 
 /**
- * Thrown when a run supplies a value for a name no scenario in it declares.
+ * Thrown when a run supplies a value for a name nothing in it declares.
  *
- * Both lists are on `meta` because the run dialog renders them: the rejected
- * names so the customer can see their typo, and the declared ones so they can
- * see what they meant to type.
+ * A run reads two sets of declarations: what the scenarios in it declare, and
+ * what the agent it goes against declares on its own. A name in neither is
+ * refused, and the target is named because the same value can be right for
+ * one agent of the run and unknown to the next.
+ *
+ * All three go on `meta` because the run dialog renders them: the rejected
+ * names so the customer can see their typo, the declared ones so they can see
+ * what they meant to type, and the target the run was refused for.
  */
 export class ScenarioParameterUnknownError extends ScenarioParameterError {
   declare readonly code: "scenario_parameter_unknown";
 
-  constructor({ unknownKeys, declaredNames }: { unknownKeys: string[]; declaredNames: string[] }) {
+  constructor({
+    unknownKeys,
+    declaredNames,
+    targetLabel,
+  }: {
+    unknownKeys: string[];
+    declaredNames: string[];
+    /** The target the run was refused for, when the run names one. */
+    targetLabel?: string;
+  }) {
     super({
       message: `Unknown scenario parameters: ${unknownKeys.join(", ")}. Declared: ${
         declaredNames.length > 0 ? declaredNames.join(", ") : "none"
       }`,
       code: "scenario_parameter_unknown",
       httpStatus: 422,
-      meta: { unknownKeys, declaredNames },
+      meta: {
+        unknownKeys,
+        declaredNames,
+        ...(targetLabel ? { targetLabel } : {}),
+      },
     });
     this.name = "ScenarioParameterUnknownError";
+  }
+}
+
+/**
+ * Thrown when a run supplies a value outside the closed option list a
+ * parameter declares.
+ *
+ * The options are on `meta` because the run dialog renders them: the customer
+ * reads what the parameter accepts next to the value that was refused.
+ */
+export class ScenarioParameterOptionInvalidError extends ScenarioParameterError {
+  declare readonly code: "scenario_parameter_option_invalid";
+
+  constructor({
+    name,
+    value,
+    options,
+  }: {
+    name: string;
+    value: ScenarioParameterValue;
+    options: ScenarioParameterValue[];
+  }) {
+    super({
+      message: `The value of "${name}" is not one of its options: ${options
+        .map((option) => String(option))
+        .join(", ")}`,
+      code: "scenario_parameter_option_invalid",
+      httpStatus: 422,
+      meta: { name, value, options },
+    });
+    this.name = "ScenarioParameterOptionInvalidError";
+  }
+}
+
+/**
+ * Thrown when a parameter declared required resolved no value for the run.
+ *
+ * A connected agent declares one for every function parameter its own code
+ * gives no default. The SDK refuses a call that carries none, so the run
+ * would be queued only to fail on its first turn.
+ *
+ * The names are on `meta` because the run dialog renders them: the customer
+ * reads which values the run still needs.
+ */
+export class ScenarioParameterRequiredError extends ScenarioParameterError {
+  declare readonly code: "scenario_parameter_required";
+
+  constructor({ names }: { names: string[] }) {
+    super({
+      message: `No value for required scenario parameters: ${names.join(", ")}`,
+      code: "scenario_parameter_required",
+      httpStatus: 422,
+      meta: { names },
+    });
+    this.name = "ScenarioParameterRequiredError";
   }
 }
 

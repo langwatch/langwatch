@@ -1,12 +1,12 @@
 import type {
   Scenario,
   ScenarioCreateInput,
-  ScenarioFolder,
-  ScenarioFolderCreateInput,
-  ScenarioFolderIdInput,
-  ScenarioFolderRenameInput,
-  ScenarioFolderRunDefinition,
-  ScenarioFolderUpdateInput,
+  ScenarioTestSuite,
+  ScenarioTestSuiteCreateInput,
+  ScenarioTestSuiteIdInput,
+  ScenarioTestSuiteRenameInput,
+  ScenarioTestSuiteRunDefinition,
+  ScenarioTestSuiteUpdateInput,
   ScenarioIdInput,
   ScenarioReferenceState,
   ScenarioRunConfig,
@@ -62,7 +62,7 @@ export abstract class ScenarioService {
   abstract list(input: { projectId: string }): Promise<Scenario[]>;
   abstract count(input: { projectId: string }): Promise<number>;
   abstract update(input: ScenarioUpdateInput): Promise<Scenario>;
-  abstract moveToFolder(input: ScenarioMoveInput): Promise<Scenario>;
+  abstract moveToTestSuite(input: ScenarioMoveInput): Promise<Scenario>;
   abstract duplicate(input: ScenarioDuplicateInput): Promise<Scenario>;
   abstract listVersions(input: ScenarioVersionListInput): Promise<{
     versions: ScenarioVersionSummary[];
@@ -75,15 +75,15 @@ export abstract class ScenarioService {
     ids: string[];
     projectId: string;
   }): Promise<{ archived: string[]; failed: { id: string; error: string }[] }>;
-  abstract createFolder(input: ScenarioFolderCreateInput): Promise<ScenarioFolder>;
-  abstract tryGetFolder(input: ScenarioFolderIdInput): Promise<ScenarioFolder | null>;
-  abstract listFolders(input: { projectId: string }): Promise<ScenarioFolder[]>;
-  abstract renameFolder(input: ScenarioFolderRenameInput): Promise<ScenarioFolder>;
-  abstract updateFolder(input: ScenarioFolderUpdateInput): Promise<ScenarioFolder>;
-  abstract getFolderRunDefinition(
-    input: ScenarioFolderIdInput,
-  ): Promise<ScenarioFolderRunDefinition>;
-  abstract archiveFolder(input: ScenarioFolderIdInput): Promise<ScenarioFolder>;
+  abstract createTestSuite(input: ScenarioTestSuiteCreateInput): Promise<ScenarioTestSuite>;
+  abstract tryGetTestSuite(input: ScenarioTestSuiteIdInput): Promise<ScenarioTestSuite | null>;
+  abstract listTestSuites(input: { projectId: string }): Promise<ScenarioTestSuite[]>;
+  abstract renameTestSuite(input: ScenarioTestSuiteRenameInput): Promise<ScenarioTestSuite>;
+  abstract updateTestSuite(input: ScenarioTestSuiteUpdateInput): Promise<ScenarioTestSuite>;
+  abstract getTestSuiteRunDefinition(
+    input: ScenarioTestSuiteIdInput,
+  ): Promise<ScenarioTestSuiteRunDefinition>;
+  abstract archiveTestSuite(input: ScenarioTestSuiteIdInput): Promise<ScenarioTestSuite>;
   abstract getRunConfigs(input: { ids: string[]; projectId: string }): Promise<ScenarioRunConfig[]>;
   abstract getReferenceStates(input: {
     ids: string[];

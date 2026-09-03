@@ -1,13 +1,13 @@
 import chalk from "chalk";
 import { createSpinner } from "../../utils/spinner";
 import { ScenariosApiService } from "@/client-sdk/services/scenarios";
-import { SuitesApiService } from "@/client-sdk/services/suites";
+import { createCliTestSuitesService } from "../test-suites/cli-test-suites-service";
 import { resolveCredentials } from "../../utils/apiKey";
 import { formatTable } from "../../utils/formatting";
 import { failSpinner } from "../../utils/spinnerError";
 import type { CommandResult } from "../../utils/output";
 
-/** What the Folder column shows for a scenario filed nowhere. */
+/** What the Test suite column shows for a scenario filed nowhere. */
 const UNFILED = "unfiled";
 
 export const listScenariosCommand = async (): Promise<CommandResult | void> => {
@@ -19,12 +19,13 @@ export const listScenariosCommand = async (): Promise<CommandResult | void> => {
   try {
     const scenarios = await service.getAll();
 
-    // The scenario carries a folder id; the folder carries the name a person
-    // reads. A project that files nothing keeps the request it always made.
-    const folderNameById = new Map<string, string>();
-    if (scenarios.some((scenario) => scenario.folderId)) {
-      const folders = await new SuitesApiService().getAll({ kind: "folder" });
-      for (const folder of folders) folderNameById.set(folder.id, folder.name);
+    // The scenario carries a test suite id; the suite carries the name a
+    // person reads. A project that files nothing keeps the request it always
+    // made.
+    const testSuiteNameById = new Map<string, string>();
+    if (scenarios.some((scenario) => scenario.testSuiteId)) {
+      const suites = await createCliTestSuitesService().list();
+      for (const suite of suites) testSuiteNameById.set(suite.id, suite.name);
     }
 
     spinner.succeed(`Found ${scenarios.length} scenario${scenarios.length !== 1 ? "s" : ""}`);
@@ -49,8 +50,9 @@ export const listScenariosCommand = async (): Promise<CommandResult | void> => {
         const tableData = scenarios.map((scenario) => ({
           Name: scenario.name,
           ID: scenario.id,
-          Folder: scenario.folderId
-            ? (folderNameById.get(scenario.folderId) ?? scenario.folderId)
+          "Test suite": scenario.testSuiteId
+            ? (testSuiteNameById.get(scenario.testSuiteId) ??
+              scenario.testSuiteId)
             : chalk.gray(UNFILED),
           Labels: scenario.labels.length > 0 ? scenario.labels.join(", ") : chalk.gray("—"),
           Criteria: `${scenario.criteria.length}`,
@@ -58,7 +60,7 @@ export const listScenariosCommand = async (): Promise<CommandResult | void> => {
 
         formatTable({
           data: tableData,
-          headers: ["Name", "ID", "Folder", "Labels", "Criteria"],
+          headers: ["Name", "ID", "Test suite", "Labels", "Criteria"],
           colorMap: {
             Name: chalk.cyan,
             ID: chalk.green,

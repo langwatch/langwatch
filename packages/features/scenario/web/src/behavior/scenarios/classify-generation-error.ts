@@ -9,7 +9,7 @@
  * customer. The code was in our hands the whole time.
  *
  * So: the handled `code` picks the tier and the CTA, and the copy comes from
- * the code-keyed registry (`features/errors/logic/presentation.ts`). No copy is
+ * the code-keyed registry (`@langwatch/handled-error/presentation`). No copy is
  * authored here — a sentence written in this file is a sentence the registry
  * cannot keep consistent with the twenty other places the same code surfaces.
  */
@@ -17,8 +17,8 @@ import {
   type ErrorExplanation,
   explainAnyError,
   explainSerializedError,
-  readHandledError,
-} from "../errors";
+} from "@langwatch/handled-error/presentation";
+import { readHandledError } from "../errors";
 
 import { ScenarioGenerationError } from "../../index";
 
@@ -27,19 +27,10 @@ import { ScenarioGenerationError } from "../../index";
 // ─────────────────────────────────────────────────────────────────────────────
 
 /** How the failure is grouped — what kind of thing went wrong. */
-export type GenerationErrorTier =
-  | "config"
-  | "auth"
-  | "rate-limit"
-  | "timeout"
-  | "unknown";
+export type GenerationErrorTier = "config" | "auth" | "rate-limit" | "timeout" | "unknown";
 
 /** Which recovery actions the surface offers. */
-export type GenerationErrorCta =
-  | "configure"
-  | "configure-and-retry"
-  | "retry"
-  | "retry-or-skip";
+export type GenerationErrorCta = "configure" | "configure-and-retry" | "retry" | "retry-or-skip";
 
 export interface GenerationErrorClass {
   tier: GenerationErrorTier;

@@ -25,6 +25,7 @@
   },
   "dependencies": {
     "@langwatch/agent-contract": "workspace:*",
+    "@langwatch/agent-server": "workspace:*",
     "@langwatch/api": "workspace:*",
     "@langwatch/api-key-contract": "workspace:*",
     "@langwatch/authz-contract": "workspace:*",
@@ -40,6 +41,8 @@
     "@langwatch/observability": "workspace:*",
     "@langwatch/prisma-client": "workspace:*",
     "@langwatch/prompt-contract": "workspace:*",
+    "@langwatch/scenario-contract": "workspace:*",
+    "@langwatch/suite-server": "workspace:*",
     "@langwatch/trace-contract": "workspace:*",
     "@langwatch/workflow-contract": "workspace:*",
     "@opentelemetry/api": "^1.9.1",

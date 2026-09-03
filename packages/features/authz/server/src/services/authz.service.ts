@@ -432,9 +432,52 @@ export class AuthzService extends AuthzServiceContract {
     projects: Map<string, boolean>;
     organizationRole: OrganizationRoleOrNull;
   }> {
+    const { byPermission, organizationRole } = await this.canBatchPermissionsByIds({
+      principal,
+      permissions: [permission],
+      organizationId,
+      teams,
+      projects,
+    });
+    const decision = byPermission.get(permission) ?? {
+      teams: new Map<string, boolean>(),
+      projects: new Map<string, boolean>(),
+    };
+
+    return { ...decision, organizationRole };
+  }
+
+  /**
+   * MANY permissions across many scopes in one organization — and still ONE
+   * collection. `canBatchByIds` above is this with a single permission; this
+   * exists because the api-key project ceiling asks two permissions of every
+   * project, and two single-permission batches would collect the same
+   * snapshot twice. Deciding is pure, so permissions × scopes costs no
+   * further queries; each project's scope is resolved once, not once per
+   * permission, and only when the caller does not already know its team.
+   */
+  async canBatchPermissionsByIds({
+    principal,
+    permissions,
+    organizationId,
+    teams,
+    projects,
+  }: {
+    principal: AuthzPrincipalRef;
+    permissions: readonly AuthzPermission[];
+    organizationId: string;
+    teams: ReadonlyArray<{ teamId: string }>;
+    projects: ReadonlyArray<{ projectId: string; teamId?: string | undefined }>;
+  }): Promise<{
+    byPermission: Map<
+      AuthzPermission,
+      { teams: Map<string, boolean>; projects: Map<string, boolean> }
+    >;
+    organizationRole: OrganizationRoleOrNull;
+  }> {
     // The api-key owner ceiling, off the same snapshot as the key's grants —
-    // see `canAnyByIds`. Null for a user principal, so a no-op for the callers
-    // this has today.
+    // see `canAnyByIds`. Null for a user or service-key principal, and
+    // `decideWithCeiling` with a null ceiling is a plain decide.
     const pass = this.collector.beginPass();
     const [grants, ownerGrants] = await Promise.all([
       this.collector.collectGrants({
@@ -445,7 +488,7 @@ export class AuthzService extends AuthzServiceContract {
       this.snapshots.tryOwnerGrantsFor({ principal, organizationId, reader: pass }),
     ]);
     const demoProjectId = this.snapshots.tryDemoProjectId();
-    const allowedAt = (scope: AuthzScopeRef | null): boolean =>
+    const allowedAt = (permission: AuthzPermission, scope: AuthzScopeRef | null): boolean =>
       scope
         ? this.engine.decideWithCeiling({
             keyGrants: grants,
@@ -456,25 +499,32 @@ export class AuthzService extends AuthzServiceContract {
           }).allowed
         : false;
 
-    const resolvedProjects = await Promise.all(
-      projects.map(async ({ projectId, teamId }): Promise<[string, boolean]> => [
+    const projectScopes = await Promise.all(
+      projects.map(async ({ projectId, teamId }): Promise<[string, AuthzScopeRef | null]> => [
         projectId,
-        allowedAt(
-          teamId
-            ? { type: "project", id: projectId, teamId, organizationId }
-            : await this.collector.tryResolveScopeRef({ projectId }),
-        ),
+        teamId
+          ? { type: "project", id: projectId, teamId, organizationId }
+          : await this.collector.tryResolveScopeRef({ projectId }),
       ]),
     );
 
     return {
-      teams: new Map(
-        teams.map(({ teamId }) => [
-          teamId,
-          allowedAt({ type: "team", id: teamId, organizationId }),
+      byPermission: new Map(
+        permissions.map((permission) => [
+          permission,
+          {
+            teams: new Map(
+              teams.map(({ teamId }) => [
+                teamId,
+                allowedAt(permission, { type: "team", id: teamId, organizationId }),
+              ]),
+            ),
+            projects: new Map(
+              projectScopes.map(([projectId, scope]) => [projectId, allowedAt(permission, scope)]),
+            ),
+          },
         ]),
       ),
-      projects: new Map(resolvedProjects),
       organizationRole: grants.organizationRole,
     };
   }

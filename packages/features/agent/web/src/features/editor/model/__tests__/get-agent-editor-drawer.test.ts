@@ -9,5 +9,8 @@ describe("getAgentEditorDrawer", () => {
     expect(() => getAgentEditorDrawer("signature")).toThrow(
       "signature agents have no editor drawer",
     );
+    expect(() => getAgentEditorDrawer("connected")).toThrow(
+      "connected agents are registered from code",
+    );
   });
 });

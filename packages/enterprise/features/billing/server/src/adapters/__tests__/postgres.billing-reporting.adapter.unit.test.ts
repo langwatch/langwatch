@@ -27,10 +27,11 @@ describe("PostgresBillingReportingAdapter", () => {
      * Frozen twin: the App answers the same question through
      * `PrismaOrganizationRepository.getOrganizationForBilling`, and both graphs
      * report into ONE Stripe meter. Every predicate is LITERAL here because
-     * each one is part of the answer: a widened `pricingModel` reports an
-     * organization that is not billed per event, a widened subscription filter
-     * reports one whose subscription has ended, and either is a Stripe invoice
-     * nobody agreed to.
+     * each one is part of the answer: a widened subscription filter reports an
+     * organization whose subscription has ended, which is a Stripe invoice
+     * nobody agreed to. `pricingModel` is SELECTED rather than filtered on, so
+     * one query still tells an absent organization apart from one that simply
+     * does not buy usage — the difference between a warning and a routine skip.
      */
     /** @scenario "The worker reads a billable organization the way the App reads it" */
     it("asks for exactly the billable organization the App asks for", async () => {
@@ -41,9 +42,10 @@ describe("PostgresBillingReportingAdapter", () => {
         .organizations.getOrganizationForBilling(ORGANIZATION);
 
       expect(recording.organizationFindFirst).toHaveBeenCalledWith({
-        where: { id: ORGANIZATION, pricingModel: "SEAT_EVENT" },
+        where: { id: ORGANIZATION },
         select: {
           id: true,
+          pricingModel: true,
           stripeCustomerId: true,
           subscriptions: {
             where: {
@@ -66,14 +68,30 @@ describe("PostgresBillingReportingAdapter", () => {
     });
 
     /** @scenario "The worker reads a billable organization the way the App reads it" */
-    it("reports an organization on another pricing model as nothing to report", async () => {
+    it("names an absent organization apart from one that does not buy usage", async () => {
       const recording = recordingDatabase(null);
 
       expect(
         await PostgresBillingReportingAdapter.create({ database: recording.database })
           .build()
           .organizations.getOrganizationForBilling(ORGANIZATION),
-      ).toBeNull();
+      ).toEqual({ outcome: "not_found" });
+    });
+
+    /** @scenario "The worker reads a billable organization the way the App reads it" */
+    it("reports an organization on another pricing model as nothing to report", async () => {
+      const recording = recordingDatabase({
+        id: ORGANIZATION,
+        pricingModel: "FREE",
+        stripeCustomerId: "cus_1",
+        subscriptions: [],
+      });
+
+      expect(
+        await PostgresBillingReportingAdapter.create({ database: recording.database })
+          .build()
+          .organizations.getOrganizationForBilling(ORGANIZATION),
+      ).toEqual({ outcome: "not_usage_billed" });
     });
 
     /**

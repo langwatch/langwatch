@@ -322,22 +322,93 @@ Rule: The Pull Requests page prices each pull request's lifetime
 
   @unit
   Scenario: The personal page discovers pull requests from every branch a session drove
-    Given a session that drove two branches
+    Given a session that drove two branches, each with a live pull request
     When the personal pull requests are read
-    Then the pull requests of both branches are looked up
+    Then both pull requests become rows
 
-  # A session records one set of token and cost totals for its whole life and
-  # the per-call facts carry no branch, so there is nothing to divide between
-  # two pull requests. Counting the whole session toward each one would make a
-  # repository's pull requests sum to more than was ever spent. The sessions
-  # screen is where all of a session's pull requests are shown.
+Rule: A session's cost splits across the pull requests it drove, by the work stamped on each
+
+  # A session records one set of cumulative token and cost totals for its
+  # whole life; its per-call fact rows each carry the repository and branch
+  # that were active when the call happened. The fact rows set the RATIO, the
+  # cumulative totals stay the amount, and the buckets partition — so one
+  # session's shares never sum past its own total, and a repository's pull
+  # requests never sum to more than was ever spent.
 
   @unit
-  Scenario: A session that drove two pull requests counts toward only one of them
+  Scenario: A session that drove two pull requests splits its cost between them
     Given a session that drove two branches, each with a live pull request
-    When the tenure rule is asked
-    Then the session counts toward the pull request it opened first
-    And it counts toward the other one not at all
+    And its fact rows stamp a quarter of its tokens on one branch and the rest on the other
+    When each pull request's usage is read
+    Then the first reports a quarter of the session's totals
+    And the second reports the remaining three quarters
+
+  @unit
+  Scenario: Tokens stamped with no context follow the legacy whole-session rule
+    Given a session whose fact rows carry no stamped context
+    When its pull requests' usage is read
+    Then its whole total lands on the pull request it opened first
+    And the other pull requests report none of it
+
+  @unit
+  Scenario: A session with no fact rows at all keeps the legacy rule whole
+    Given a session that recorded totals but logged no per-call facts
+    When its pull requests' usage is read
+    Then its whole total lands on the pull request it opened first
+
+  @unit
+  Scenario: Tokens stamped on another repository stay out of this one
+    Given a session whose fact rows stamp work on two repositories
+    When one repository's pull request usage is read
+    Then only the tokens stamped on that repository count toward its pull request
+    And the other repository's tokens reduce the session's share rather than joining it
+
+  @unit
+  Scenario: A session found only by its stamps still counts toward the pull request
+    Given a session whose row moved on to another repository
+    And fact rows stamped on the pull request's own branch
+    When the pull request's usage is read
+    Then the session's stamped share is counted toward it
+
+  @unit
+  Scenario: The unstamped bucket is priced only where the session's row lives
+    Given a session whose row points at one repository and whose stamps name another
+    When the other repository's pull request usage is read
+    Then the session's unstamped tokens are not priced there
+
+  @unit
+  Scenario: Two pull requests on one branch split by era, not by double counting
+    Given a branch that hosted a merged pull request and later a new one
+    And a session whose fact rows stamp that branch
+    When both pull requests' usage is read
+    Then the stamped tokens count toward the branch's tenure winner only
+
+  @unit
+  Scenario: A session too small to divide is never counted twice
+    Given a session that spent one token, split evenly across two pull requests
+    When each pull request's usage is read
+    Then the two together report the one token, not one each
+
+  @unit
+  Scenario: A discovered pull request with no stamped work still dates itself
+    Given a session that drove two branches, each with a live pull request
+    And its fact rows stamp all of its tokens on one branch
+    When the personal pull requests are read
+    Then the other pull request is still a row, reporting no tokens and no cost
+    And that row is dated by the pull request itself rather than by the epoch
+
+  @unit
+  Scenario: A session that priced its calls without reporting tokens splits by cost
+    Given a session that drove two branches, each with a live pull request
+    And its fact rows report cost but no token counts
+    When each pull request's usage is read
+    Then each reports the share of the cost stamped on its branch
+
+  @unit
+  Scenario: The model breakdown reports only the pull request's own calls
+    Given a session that called two models, each stamped on a different pull request
+    When one pull request's usage is read
+    Then its model breakdown reports only the model stamped on it
 
   @unit
   Scenario: A viewer without a GitHub connection sees the connect invitation
@@ -927,3 +998,98 @@ Rule: The organization-wide usage read is RBAC-scoped and numbers only
     When the pull request usage is read for that workspace
     Then the refusal carries a named code saying the key is for a different workspace
     And nothing in the refusal says whose workspace it is
+
+# The question is organization-wide, so the v1 door authenticates at the
+# organization: an sk-lw organization key alone, with no project named
+# anywhere. The personal-workspace indirection on the legacy path existed only
+# to recover a calling user, which a user-bound key already carries — and a
+# service key, which carries none, is scoped by its own bindings instead.
+Rule: The v1 usage read needs only an organization credential
+
+  @integration
+  Scenario: An organization key reads pull request usage without naming a project
+    Given a user-bound organization API key
+    When the v1 pull request usage is read with no project id anywhere in the request
+    Then the answer is the caller's organization-wide rollup
+    And the read is recorded against the caller, the organization and the pull request
+
+  # A key can carry bindings NARROWER than its holder's own — that ceiling is
+  # the whole point of a restricted key — so the rollup intersects the
+  # holder's cut with the key's, the same key-plus-holder decision every
+  # other REST door asks.
+  @integration
+  Scenario: A narrowed key reads with its own scope, not its holder's
+    Given a holder who may view traces in two projects
+    And their organization key is bound to only one of them
+    When the v1 pull request usage is read with that key
+    Then only the bound project's rows appear
+    And the other project is absent from the whole answer
+
+  @integration
+  Scenario: A key whose binding lacks the cost grant reads tokens with no cost
+    Given an organization key bound to one project with a role that cannot price
+    When the v1 pull request usage is read with that key
+    Then the bound project's rows carry token counts
+    And every cost in the answer is absent
+
+  # An organization service key acts as nobody — it is the credential a
+  # continuous integration job holds, where there is no person to mint a key
+  # for — so its scope is its own bindings alone: the projects they grant
+  # traces:view appear, and cost only where they grant cost:view. The read is
+  # still recorded, attributed to the key identity rather than an invented
+  # person.
+  @integration
+  Scenario: An organization service key reads the rollup scoped by its own bindings
+    Given an organization API key created without a user, bound organization-wide
+    When the v1 pull request usage is read with that key
+    Then the answer covers every project the bindings may view
+    And the read is recorded against the key identity, the organization and the pull request
+
+  @integration
+  Scenario: A service key without the cost grant reads tokens with every cost null
+    Given a service key whose bindings grant viewing but not pricing
+    When the v1 pull request usage is read with that key
+    Then the rows carry token counts
+    And every cost in the answer is absent
+
+  @integration
+  Scenario: A service key bound to one project sees only that project's rows
+    Given a service key bound to one project of the organization
+    When the v1 pull request usage is read with that key
+    Then only the bound project's rows appear
+    And the other project is absent from the whole answer
+
+  # One collected grant snapshot decides every project. Deciding per project
+  # opened a database pass of several queries per project per permission, and
+  # a large organization's concurrent fan-out exhausted the connection pool —
+  # the rollup answered a ten-second 500 before it had even looked the pull
+  # request up.
+  @integration
+  Scenario: A large organization's rollup is decided from one grant snapshot
+    Given an organization on the authorization engine with dozens of projects
+    And an organization service key bound organization-wide
+    When the v1 pull request usage is read with that key
+    Then the answer covers every project of the organization
+    And the ceiling reads the same number of rows for dozens of projects as for a few
+    And the key's grants are collected once, not once per project
+
+  # A legacy project key carries no organization and no user, so it cannot
+  # authenticate at the organization door at all. The refusal names the
+  # credential class to swap, because the caller is holding a working key of
+  # the wrong family, not a typo.
+  @integration
+  Scenario: A legacy project key cannot reach the v1 usage read
+    Given a legacy project API key
+    When the v1 pull request usage is read
+    Then the refusal carries the credential class mismatch code
+    And the refusal names the organization key as the class this door needs
+
+  # The mapping is per organization, so another organization's key holds no
+  # question this instance can answer for that pull request — and learning
+  # whether the mapping exists elsewhere is not its to learn.
+  @integration
+  Scenario: An organization key from another organization learns nothing
+    Given a user-bound organization API key from a different organization
+    When the v1 pull request usage is read for a pull request mapped elsewhere
+    Then the caller receives the pull request not mapped failure
+    And nothing says the pull request is mapped for anyone else

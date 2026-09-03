@@ -4,15 +4,105 @@ import {
   availableGroupByOptions,
   computeBatchRunSummary,
   computeGroupSummary,
+  computeIterationMap,
   computeRunHistoryTotals,
   computeSuiteRunSummaries,
   getScenarioDisplayNames,
   groupRunsByBatchId,
   groupRunsByScenarioId,
   groupRunsByTarget,
+  groupRunsByTargetKey,
   resolveOriginLabel,
 } from "../run-history-transforms";
 import { makeBatchRun, makeScenarioRunData } from "./test-helpers";
+
+describe("groupRunsByTargetKey()", () => {
+  describe("when the same agent ran on two sets of parameters", () => {
+    /** @scenario "Runs are grouped by their target key" */
+    it("folds the runs into one group per key, and an old run under its reference id", () => {
+      const runs = [
+        makeScenarioRunData({
+          scenarioRunId: "r1",
+          metadata: {
+            langwatch: {
+              targetReferenceId: "agent_dev",
+              targetType: "http" as const,
+              targetKey: "agent_dev",
+            },
+          },
+        }),
+        makeScenarioRunData({
+          scenarioRunId: "r2",
+          metadata: {
+            langwatch: {
+              targetReferenceId: "agent_dev",
+              targetType: "http" as const,
+              targetKey: "agent_dev#0123abcd",
+              targetParameters: { model: "gpt-5-mini" },
+            },
+          },
+        }),
+        // Recorded before targets carried a key.
+        makeScenarioRunData({
+          scenarioRunId: "r3",
+          metadata: {
+            langwatch: {
+              targetReferenceId: "agent_dev",
+              targetType: "http" as const,
+            },
+          },
+        }),
+      ];
+
+      const groups = groupRunsByTargetKey({ runs });
+
+      expect(groups.map((group) => group.groupKey)).toEqual(["agent_dev", "agent_dev#0123abcd"]);
+      expect(groups[0]!.scenarioRuns.map((run) => run.scenarioRunId)).toEqual(["r1", "r3"]);
+      expect(groups[1]!.scenarioRuns.map((run) => run.scenarioRunId)).toEqual(["r2"]);
+      expect(groups[0]!.groupType).toBe("target");
+    });
+  });
+});
+
+describe("computeIterationMap() by target key", () => {
+  describe("when a scenario ran twice against a variant and once against the bare agent", () => {
+    /** @scenario "Iterations are counted per scenario and target key" */
+    it("numbers the runs of the variant and leaves the bare run unnumbered", () => {
+      const variant = {
+        targetReferenceId: "agent_dev",
+        targetType: "http" as const,
+        targetKey: "agent_dev#0123abcd",
+        targetParameters: { model: "gpt-5-mini" },
+      };
+      const runs = [
+        makeScenarioRunData({
+          scenarioRunId: "r1",
+          metadata: { langwatch: variant },
+        }),
+        makeScenarioRunData({
+          scenarioRunId: "r2",
+          metadata: { langwatch: variant },
+        }),
+        makeScenarioRunData({
+          scenarioRunId: "r3",
+          metadata: {
+            langwatch: {
+              targetReferenceId: "agent_dev",
+              targetType: "http" as const,
+              targetKey: "agent_dev",
+            },
+          },
+        }),
+      ];
+
+      const iterations = computeIterationMap({ scenarioRuns: runs });
+
+      expect(iterations.get("r1")).toBe(1);
+      expect(iterations.get("r2")).toBe(2);
+      expect(iterations.has("r3")).toBe(false);
+    });
+  });
+});
 
 describe("groupRunsByBatchId()", () => {
   describe("when given an empty array", () => {

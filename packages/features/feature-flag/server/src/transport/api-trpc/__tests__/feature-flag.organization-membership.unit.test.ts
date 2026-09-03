@@ -6,10 +6,7 @@
 import type { AuthzService } from "@langwatch/authz-contract";
 import { TrpcRootDefinition } from "@langwatch/api/trpc";
 import { beforeEach, describe, expect, it, vi } from "vitest";
-import {
-  FeatureFlagTrpcApi,
-  type FeatureFlagTrpcContext,
-} from "../feature-flag.api";
+import { FeatureFlagTrpcApi, type FeatureFlagTrpcContext } from "../feature-flag.api";
 import { MemoryFeatureFlagService } from "../../../testing";
 
 const USER_ID = "user_1";
@@ -32,14 +29,20 @@ function buildCaller(memberOf: Set<string>) {
   const featureFlags = MemoryFeatureFlagService.create();
   const hasPermission = vi.fn(async (_check: PermissionCheck): Promise<boolean> => true);
   const getOrganizationId = vi.fn(async (_projectId: string): Promise<string> => OWN_ORG_A);
-  const isMember = vi.fn(
+  // One read for the whole list, so the count of calls is what pins the fix:
+  // the mock filters the requested ids itself rather than answering one at a
+  // time.
+  const memberOrganizationIds = vi.fn(
     async ({
-      organizationId,
       userId,
+      organizationIds,
     }: {
-      organizationId: string;
       userId: string;
-    }): Promise<boolean> => userId === USER_ID && memberOf.has(organizationId),
+      organizationIds: string[];
+    }): Promise<string[]> =>
+      userId === USER_ID
+        ? organizationIds.filter((organizationId) => memberOf.has(organizationId))
+        : [],
   );
   const permissions: Pick<AuthzService, "hasPermission"> = { hasPermission };
   const context: FeatureFlagTrpcContext = {
@@ -47,7 +50,7 @@ function buildCaller(memberOf: Set<string>) {
       featureFlags,
       permissions,
       projects: { getOrganizationId },
-      organizations: { isMember },
+      organizations: { memberOrganizationIds },
     },
     actor: () => ({ id: USER_ID }),
   };
@@ -55,7 +58,7 @@ function buildCaller(memberOf: Set<string>) {
   return {
     caller: featureFlagRouter.createCaller(context),
     featureFlags,
-    isMember,
+    memberOrganizationIds,
   };
 }
 
@@ -144,14 +147,14 @@ describe("featureFlag organization membership", () => {
   });
 
   it("does no membership or flag work for an empty list", async () => {
-    const { caller, featureFlags, isMember } = buildCaller(new Set([OWN_ORG_A]));
+    const { caller, featureFlags, memberOrganizationIds } = buildCaller(new Set([OWN_ORG_A]));
     const isEnabled = vi.spyOn(featureFlags, "isEnabled");
 
     await expect(
       caller.isEnabledForAnyOrganization({ flag: FLAG, organizationIds: [] }),
     ).resolves.toEqual({ enabled: false });
 
-    expect(isMember).not.toHaveBeenCalled();
+    expect(memberOrganizationIds).not.toHaveBeenCalled();
     expect(isEnabled).not.toHaveBeenCalled();
   });
 });

@@ -1,27 +1,27 @@
 import { test } from "@playwright/test";
 import {
   givenIAmLoggedIntoProject,
-  givenIAmOnTheScenariosListPage,
+  givenIAmOnTheScenariosPage,
   whenIClickNewScenario,
   thenISeeTheScenarioEditor,
   thenISeeScenarioFormFields,
-  whenIFillInNameWith,
+  whenIFillInTitleWith,
   whenIFillInSituationWith,
-  whenIAddCriterion,
-  thenCriterionAppearsInList,
+  whenIWriteCriteria,
+  thenCriteriaFieldHolds,
   whenIClickSave,
   whenIClickOnScenarioInList,
-  thenFormIsPopulatedWithName,
-  whenIChangeNameTo,
+  thenFormIsPopulatedWithTitle,
+  whenIChangeTitleTo,
   thenScenarioAppearsInList,
 } from "./steps";
 
 /**
- * Feature: Scenario Editor
- * Source: specs/scenarios/scenario-editor.feature
+ * Feature: Scenario editor
+ * Source: specs/features/agent-testing/cases-table.feature
  *
  * As a LangWatch user
- * I want to create and edit scenario specifications
+ * I want to create and edit scenarios
  * So that I can define behavioral test cases for my agents
  */
 test.describe("Scenario Editor", () => {
@@ -37,35 +37,32 @@ test.describe("Scenario Editor", () => {
 
   /**
    * Scenario: Navigate to create form
-   * Source: scenario-editor.feature lines 14-18
    */
   test("navigate to create form", async ({ page }) => {
-    // Given I am on the scenarios list page
-    await givenIAmOnTheScenariosListPage(page);
+    // Given I am on the scenarios page
+    await givenIAmOnTheScenariosPage(page);
 
-    // When I click "New Scenario"
+    // When I click "New scenario"
     await whenIClickNewScenario(page);
 
-    // Then I navigate to the scenario editor
-    // And I see an empty scenario form
+    // Then I see an empty scenario form
     await thenISeeTheScenarioEditor(page);
   });
 
   /**
    * Scenario: View scenario form fields
-   * Source: scenario-editor.feature lines 20-28
    */
   test("view scenario form fields", async ({ page }) => {
-    // Given I am on the scenarios list page
-    await givenIAmOnTheScenariosListPage(page);
+    // Given I am on the scenarios page
+    await givenIAmOnTheScenariosPage(page);
 
-    // When I click "New Scenario"
+    // When I click "New scenario"
     await whenIClickNewScenario(page);
 
     // Then I see the scenario editor
     await thenISeeTheScenarioEditor(page);
 
-    // Then I see the following fields: Name, Situation, Criteria
+    // Then I see the following fields: Title, Situation, Criteria
     await thenISeeScenarioFormFields(page);
   });
 
@@ -74,28 +71,34 @@ test.describe("Scenario Editor", () => {
   // ===========================================================================
 
   /**
-   * Workflow test covering multiple feature scenarios:
-   * - scenario-editor.feature: "Save new scenario" (lines 30-39)
-   * - scenario-library.feature: "Click scenario row to edit" (lines 34-38)
-   * - scenario-editor.feature: "Load existing scenario for editing" (lines 45-52)
-   * - scenario-editor.feature: "Update scenario name" (lines 54-59)
+   * Workflow test covering several feature scenarios:
+   * - Save a new scenario
+   * - The scenario appears in the table
+   * - A row click opens the scenario in the editor
+   * - The editor holds the saved data
+   * - Update the title
    *
    * This combines scenarios that would otherwise require seeded data
    * into a single self-contained workflow test.
    */
-  test("scenario lifecycle: create, view in list, edit, and verify", async ({ page }) => {
+  test("scenario lifecycle: create, view in list, edit, and verify", async ({
+    page,
+  }) => {
+    const title = `Refund Request Test ${Date.now()}`;
+    const updatedTitle = `${title} (Updated)`;
+
     // -------------------------------------------------------------------------
     // Scenario: Save new scenario
     // -------------------------------------------------------------------------
 
-    // Given I am on the scenarios list page
-    await givenIAmOnTheScenariosListPage(page);
+    // Given I am on the scenarios page
+    await givenIAmOnTheScenariosPage(page);
 
-    // When I click "New Scenario"
+    // When I click "New scenario"
     await whenIClickNewScenario(page);
 
-    // And I fill in "Name" with "Refund Request Test"
-    await whenIFillInNameWith(page, "Refund Request Test");
+    // And I fill in "Title"
+    await whenIFillInTitleWith(page, title);
 
     // And I fill in "Situation" with "User requests a refund for a defective product"
     await whenIFillInSituationWith(
@@ -103,68 +106,61 @@ test.describe("Scenario Editor", () => {
       "User requests a refund for a defective product",
     );
 
-    // And I add criterion "Agent acknowledges the issue"
-    await whenIAddCriterion(page, "Agent acknowledges the issue");
+    // And I write the criterion "Agent acknowledges the issue"
+    await whenIWriteCriteria(page, ["Agent acknowledges the issue"]);
 
     // And I click "Save"
     await whenIClickSave(page);
 
-    // Then I navigate back to the scenarios list
-    await givenIAmOnTheScenariosListPage(page);
-
-    // And "Refund Request Test" appears in the list
-    await thenScenarioAppearsInList(page, "Refund Request Test");
+    // Then the scenario appears in the list
+    await thenScenarioAppearsInList(page, title);
 
     // -------------------------------------------------------------------------
-    // Scenario: Click scenario row to edit (from scenario-library.feature)
+    // Scenario: Click scenario row to edit
     // -------------------------------------------------------------------------
 
-    // When I click on "Refund Request Test" in the list
-    await whenIClickOnScenarioInList(page, "Refund Request Test");
+    // When I click on the scenario in the list
+    await whenIClickOnScenarioInList(page, title);
 
     // -------------------------------------------------------------------------
     // Scenario: Load existing scenario for editing
     // -------------------------------------------------------------------------
 
     // Then the form is populated with the existing data
-    await thenFormIsPopulatedWithName(page, "Refund Request Test");
+    await thenFormIsPopulatedWithTitle(page, title);
 
     // -------------------------------------------------------------------------
-    // Scenario: Update scenario name
+    // Scenario: Update scenario title
     // -------------------------------------------------------------------------
 
-    // When I change the name to "Refund Request (Updated)"
-    await whenIChangeNameTo(page, "Refund Request (Updated)");
+    // When I change the title
+    await whenIChangeTitleTo(page, updatedTitle);
 
     // And I click "Save"
     await whenIClickSave(page);
 
-    // Then I navigate back to the scenarios list
-    await givenIAmOnTheScenariosListPage(page);
-
-    // And I see the updated name in the list
-    await thenScenarioAppearsInList(page, "Refund Request (Updated)");
+    // Then I see the updated title in the list
+    await thenScenarioAppearsInList(page, updatedTitle);
   });
 
   // ===========================================================================
-  // Criteria Management
+  // Criteria
   // ===========================================================================
 
   /**
-   * Scenario: Add criterion to list
-   * Source: scenario-editor.feature lines 65-71
+   * Scenario: Criteria are written one per line
    */
-  test("add criterion to list", async ({ page }) => {
+  test("writes criteria one per line", async ({ page }) => {
     // Given I am on the scenario editor
-    await givenIAmOnTheScenariosListPage(page);
+    await givenIAmOnTheScenariosPage(page);
     await whenIClickNewScenario(page);
     await thenISeeTheScenarioEditor(page);
 
-    // When I type criterion "Agent must apologize"
-    // And I click the add button
-    await whenIAddCriterion(page, "Agent must apologize");
+    // When I write two criteria
+    const criteria = ["Agent must apologize", "Agent offers a refund"];
+    await whenIWriteCriteria(page, criteria);
 
-    // Then the criterion appears in the criteria list
-    await thenCriterionAppearsInList(page, "Agent must apologize");
+    // Then the criteria field holds both lines
+    await thenCriteriaFieldHolds(page, criteria);
   });
 });

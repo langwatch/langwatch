@@ -282,15 +282,11 @@ export class OrganizationMembershipService {
     const orgName = params.orgName ?? params.userDisplayName ?? "My Organization";
     const orgId = generate(ORGANIZATION_KSUID_RESOURCE).toString();
     const orgSlug =
-      slugify(orgName, { lower: true, strict: true }) +
-      "-" +
-      orgId.substring(orgId.length - 6);
+      slugify(orgName, { lower: true, strict: true }) + "-" + orgId.substring(orgId.length - 6);
 
     const teamId = generate(TEAM_KSUID_RESOURCE).toString();
     const teamSlug =
-      slugify(orgName, { lower: true, strict: true }) +
-      "-" +
-      teamId.substring(teamId.length - 6);
+      slugify(orgName, { lower: true, strict: true }) + "-" + teamId.substring(teamId.length - 6);
 
     const result = await this.repo.createAndAssign({
       userId: params.userId,
@@ -336,9 +332,7 @@ export class OrganizationMembershipService {
     const orgId = generate(ORGANIZATION_KSUID_RESOURCE).toString();
     const orgSlug =
       params.slug ??
-      slugify(params.name, { lower: true, strict: true }) +
-        "-" +
-        orgId.substring(orgId.length - 6);
+      slugify(params.name, { lower: true, strict: true }) + "-" + orgId.substring(orgId.length - 6);
 
     const teamId = generate(TEAM_KSUID_RESOURCE).toString();
     const teamSlug =
@@ -563,9 +557,7 @@ export class OrganizationMembershipService {
         // that refused without them must not report a limit of `undefined`
         // as if it were a number the customer could read.
         throw new MemberSeatLimitReachedError(
-          result.limitType !== undefined &&
-          result.current !== undefined &&
-          result.max !== undefined
+          result.limitType !== undefined && result.current !== undefined && result.max !== undefined
             ? {
                 meta: {
                   limitType: result.limitType,
@@ -731,12 +723,12 @@ export class OrganizationMembershipService {
     >((acc, update) => {
       if (update.userId !== userId) {
         throw new TeamRoleUpdateRejectedError("Team role update user must match target member", {
-            userId,
+          userId,
         });
       }
       if (!organizationTeamIdSet.has(update.teamId)) {
         throw new TeamRoleUpdateRejectedError("Team role update must belong to the organization", {
-            userId,
+          userId,
         });
       }
       acc.push({
@@ -782,7 +774,7 @@ export class OrganizationMembershipService {
     if (isCustomRole(role)) {
       if (!customRoleId) {
         throw new TeamRoleUpdateRejectedError("customRoleId is required when using a custom role", {
-            userId,
+          userId,
         });
       }
       await this.repo.updateTeamMemberRole({

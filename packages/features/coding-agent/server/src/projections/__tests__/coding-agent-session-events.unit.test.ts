@@ -99,6 +99,34 @@ describe("CodingAgentSessionEventsMapProjection", () => {
     });
   });
 
+  describe("when the contribution carries a stamped working context", () => {
+    it("copies the stamp onto the row", () => {
+      const event = logFactsEvent({ "event.name": "api_request" });
+      event.data.repositoryHost = "github.com";
+      event.data.repositoryOwner = "acme";
+      event.data.repositoryName = "widgets";
+      event.data.branch = "feat/split";
+
+      const row = makeProjection().mapCodingAgentSessionLogFactsContributed(event);
+
+      expect(row?.repositoryHost).toBe("github.com");
+      expect(row?.repositoryOwner).toBe("acme");
+      expect(row?.repositoryName).toBe("widgets");
+      expect(row?.branch).toBe("feat/split");
+    });
+
+    it("stores an unstamped contribution with empty context columns", () => {
+      const row = makeProjection().mapCodingAgentSessionLogFactsContributed(
+        logFactsEvent({ "event.name": "api_request" }),
+      );
+
+      expect(row?.repositoryHost).toBe("");
+      expect(row?.repositoryOwner).toBe("");
+      expect(row?.repositoryName).toBe("");
+      expect(row?.branch).toBe("");
+    });
+  });
+
   describe("when a compaction contribution arrives", () => {
     /** @scenario a compaction becomes one row with its before and after tokens */
     it("maps it to a compaction row with pre and post tokens and the trigger", () => {

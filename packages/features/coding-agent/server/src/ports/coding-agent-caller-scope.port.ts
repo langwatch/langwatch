@@ -41,19 +41,42 @@ export abstract class CodingAgentCallerScopeDirectoryPort {
   }): Promise<ReadonlyMap<string, string>>;
 }
 
+/** The two cuts a pull-request rollup is resolved over. */
+export type CodingAgentScopePermission = "traces:view" | "cost:view";
+
 /**
- * Which of a set of projects one caller holds a permission on, answered in a
- * fixed number of queries rather than one per project.
+ * Who a cross-project cut is resolved for.
  *
- * A batch rather than a probe per project on purpose: the two cuts below run
- * over every project in an organization, and a fan-out of individual decisions
- * is what starves the connection pool on a large tenant.
+ * A person reads with their own bindings. A CREDENTIAL reads with its own,
+ * and that is not the same reach: a key can carry bindings NARROWER than its
+ * holder's, which is the whole point of a restricted key, so a scope resolved
+ * from the holder alone would let a deliberately narrowed key read with the
+ * holder's full access. An organization SERVICE key owns no user at all - the
+ * credential a continuous-integration job holds - and reads with its bindings
+ * alone, which is what `userId: null` says.
+ */
+export type CodingAgentScopeCaller =
+  | { readonly kind: "user"; readonly userId: string }
+  | { readonly kind: "apiKey"; readonly apiKeyId: string; readonly userId: string | null };
+
+/**
+ * Which of a set of projects one caller holds each permission on, answered in
+ * a fixed number of queries rather than one per project.
+ *
+ * A batch rather than a probe per project on purpose, and ONE batch for both
+ * permissions rather than one each: the cuts run over every project in an
+ * organization, and a fan-out of individual decisions is what starves the
+ * connection pool on a large tenant. Two single-permission batches would
+ * collect the same grant snapshot twice for the same answer.
+ *
+ * Absent answers deny. A project the batch did not answer for is refused
+ * rather than assumed, so a short answer can only narrow the scope.
  */
 export abstract class CodingAgentScopePermissionsPort {
-  abstract permittedProjectIds(input: {
-    userId: string;
+  abstract projectCuts(input: {
+    caller: CodingAgentScopeCaller;
     organizationId: string;
     projects: readonly CodingAgentScopeProject[];
-    permission: "traces:view" | "cost:view";
-  }): Promise<ReadonlySet<string>>;
+    permissions: readonly CodingAgentScopePermission[];
+  }): Promise<ReadonlyMap<CodingAgentScopePermission, ReadonlySet<string>>>;
 }

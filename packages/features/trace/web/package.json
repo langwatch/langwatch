@@ -42,6 +42,22 @@
       "types": "./src/ui/sections/drawers.ts",
       "default": "./src/ui/sections/drawers.ts"
     },
+    "./explorer/components/SearchBar/SuggestionDropdown": {
+      "types": "./src/ui/sections/explorer/search-bar/suggestion-dropdown.tsx",
+      "default": "./src/ui/sections/explorer/search-bar/suggestion-dropdown.tsx"
+    },
+    "./explorer/components/SearchBar/getSuggestionState": {
+      "types": "./src/model/get-suggestion-state.ts",
+      "default": "./src/model/get-suggestion-state.ts"
+    },
+    "./explorer/components/SearchBar/suggestionItems": {
+      "types": "./src/model/explorer/search-bar/suggestion-items.ts",
+      "default": "./src/model/explorer/search-bar/suggestion-items.ts"
+    },
+    "./explorer/components/SearchBar/suggestionUI": {
+      "types": "./src/ui/sections/explorer/search-bar/suggestion-ui.ts",
+      "default": "./src/ui/sections/explorer/search-bar/suggestion-ui.ts"
+    },
     "./explorer/components/TraceDrawer/Chip": {
       "types": "./src/ui/elements/explorer/trace-drawer/chip.tsx",
       "default": "./src/ui/elements/explorer/trace-drawer/chip.tsx"

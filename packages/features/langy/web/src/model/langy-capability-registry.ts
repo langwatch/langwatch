@@ -45,11 +45,7 @@ import {
   cliVerbTone,
   type MeasuredCardKind,
 } from "@langwatch/langy-contract";
-import {
-  type CliCommand,
-  parseCliToolName,
-  type LangyFeatureMap,
-} from "./langy-feature-map";
+import { type CliCommand, parseCliToolName, type LangyFeatureMap } from "./langy-feature-map";
 import {
   CAPABILITY_CATALOG,
   type CapabilityBodyWidget,
@@ -144,9 +140,7 @@ const SURFACE_ROUTE_CONFIG: Record<CapabilitySurface, SurfaceRouteConfig> = {
   evaluations: {
     path: "online-evaluations",
     resourceHref: (base, resourceId) =>
-      `${base}?drawer.open=onlineEvaluation&drawer.monitorId=${encodeURIComponent(
-        resourceId,
-      )}`,
+      `${base}?drawer.open=onlineEvaluation&drawer.monitorId=${encodeURIComponent(resourceId)}`,
   },
   evaluators: {
     path: "evaluators",
@@ -154,9 +148,7 @@ const SURFACE_ROUTE_CONFIG: Record<CapabilitySurface, SurfaceRouteConfig> = {
     // an earlier cut deep-linked `evaluatorViewer`, which no drawer answers to,
     // so "open the evaluator" landed on the list with nothing open.
     resourceHref: (base, resourceId) =>
-      `${base}?drawer.open=evaluatorEditor&drawer.evaluatorId=${encodeURIComponent(
-        resourceId,
-      )}`,
+      `${base}?drawer.open=evaluatorEditor&drawer.evaluatorId=${encodeURIComponent(resourceId)}`,
   },
   datasets: { path: "datasets", resourceHref: nestedResourceHref },
   prompts: { path: "prompts" },
@@ -176,9 +168,7 @@ const SURFACE_ROUTE_CONFIG: Record<CapabilitySurface, SurfaceRouteConfig> = {
   scenarios: {
     path: "simulations/scenarios",
     resourceHref: (base, resourceId) =>
-      `${base}?drawer.open=scenarioEditor&drawer.scenarioId=${encodeURIComponent(
-        resourceId,
-      )}`,
+      `${base}?drawer.open=scenarioEditor&drawer.scenarioId=${encodeURIComponent(resourceId)}`,
   },
   agents: { path: "agents" },
   automations: { path: "automations" },
@@ -354,7 +344,8 @@ export const SURFACE_BY_FEATURE: Record<string, CapabilitySurface> = {
   "evaluations.online-evaluation": "evaluations",
   "agent-simulations.scenarios": "scenarios",
   "agent-simulations.runs": "simulations",
-  "agent-simulations.suites": "simulations",
+  "agent-simulations.test-suites": "simulations",
+  "agent-simulations.run-plans": "simulations",
   "prompt-management.prompts": "prompts",
   "library.agents": "agents",
   "library.workflows": "workflows",
@@ -463,9 +454,7 @@ export function resolveCliCapability(
   const render = cardKindFor(command);
   const tone = cliVerbTone(command.verb);
 
-  const entry = (CAPABILITY_CATALOG as Record<string, CapabilityCatalogEntry>)[
-    command.resource
-  ];
+  const entry = (CAPABILITY_CATALOG as Record<string, CapabilityCatalogEntry>)[command.resource];
   const body = bodyWidgetFor({ entry, render, verb: command.verb, tone });
 
   if (entry) {
@@ -580,9 +569,7 @@ export function resolveCapabilityProgress(
 ): CapabilityProgress | null {
   const cli = resolveCliCapability(rawName, featureMap);
   if (!cli) return null;
-  const noun = CLI_COLLECTION_VERBS.has(cli.command.verb)
-    ? cli.noun.plural
-    : cli.noun.singular;
+  const noun = CLI_COLLECTION_VERBS.has(cli.command.verb) ? cli.noun.plural : cli.noun.singular;
   return {
     surface: cli.surface,
     overline: capitalize(cli.noun.plural),

@@ -34,7 +34,11 @@ import type { SearchResult } from "./command-bar-types";
  * `dev/docs/plans/ownerless-ui-surfaces-census.md` as the one ownerless drawer
  * that never existed in the first place.
  */
-export type AgentEditorDrawerName = "agentCodeEditor" | "agentHttpEditor" | "agentWorkflowEditor";
+export type AgentEditorDrawerName =
+  | "agentCodeEditor"
+  | "agentHttpEditor"
+  | "agentWorkflowEditor"
+  | "agentConnectedDetail";
 
 export function agentEditorDrawerForType(type: AgentType): AgentEditorDrawerName | null {
   switch (type) {
@@ -44,6 +48,15 @@ export function agentEditorDrawerForType(type: AgentType): AgentEditorDrawerName
       return "agentHttpEditor";
     case "workflow":
       return "agentWorkflowEditor";
+    /**
+     * A connected agent has no editor — the SDK registered it from a decorated
+     * function, so there is nothing here to edit — but it does have a place to
+     * be looked at, which is the drawer the agents page itself opens for one.
+     * Sending the palette there is the same promise the three editors make:
+     * the hit you clicked is what fills the screen.
+     */
+    case "connected":
+      return "agentConnectedDetail";
     case "signature":
       return null;
   }
@@ -118,8 +131,7 @@ export const entityRegistry: EntityConfig[] = [
     type: "evaluator",
     icon: Percent,
     label: "Evaluator",
-    pathBuilder: (id, p) =>
-      `/${p}/evaluators?drawer.open=evaluatorEditor&drawer.evaluatorId=${id}`,
+    pathBuilder: (id, p) => `/${p}/evaluators?drawer.open=evaluatorEditor&drawer.evaluatorId=${id}`,
   },
   {
     prefix: "experiment_",

@@ -74,7 +74,11 @@ import {
   type SimulationScenarioSetRunsInput,
   type SimulationService,
   type SimulationSetData,
+  type ResolvedRunModels,
+  type RunActor,
+  withActor,
   withNote,
+  withResolvedModels,
 } from "@langwatch/scenario-contract";
 import type { UserFullProfile, UserProfilesInput, UserService } from "@langwatch/user-contract";
 import type { EventEmitter } from "node:events";
@@ -118,6 +122,14 @@ export interface QueueSimulationRunInput {
   secretParameters: RunSecretCiphertext;
   note: string | undefined;
   scenarioVersion: number | undefined;
+  /** Who started the run. Absent when the surface names no person. */
+  actor?: RunActor | undefined;
+  /**
+   * The models the validation prefetch resolved. Null when the run resolved
+   * none, which reads back the way every run recorded before this field
+   * existed reads back.
+   */
+  resolvedModels?: ResolvedRunModels | null;
 }
 
 export class ScenarioApp {
@@ -203,9 +215,9 @@ export class ScenarioApp {
     return this.dependencies.scenarios.batchArchive(input);
   }
 
-  /** Files one scenario in a folder, or unfiles it when `folderId` is null. */
-  moveToFolder(input: ScenarioMoveInput): Promise<Scenario> {
-    return this.dependencies.scenarios.moveToFolder(input);
+  /** Files one scenario in a test suite, or unfiles it when `testSuiteId` is null. */
+  moveToTestSuite(input: ScenarioMoveInput): Promise<Scenario> {
+    return this.dependencies.scenarios.moveToTestSuite(input);
   }
 
   /** Copies a scenario, attributed to the caller who asked for it. */
@@ -287,14 +299,15 @@ export class ScenarioApp {
   queueSimulationRun(input: QueueSimulationRunInput): Promise<void> {
     const secretParameterNames = Object.keys(input.secretParameters);
     const metadata = {
-      // The reserved namespace records the target this run was pointed at and
-      // the scenario version it was queued from, the same way a suite run does.
+      // The reserved namespace records the target this run was pointed at, the
+      // scenario version it was queued from, who started it and the models it
+      // resolved, the same way a suite run does.
       langwatch: {
         targetReferenceId: input.target.referenceId,
         targetType: input.target.type,
-        ...(input.scenarioVersion !== undefined
-          ? { scenarioVersion: input.scenarioVersion }
-          : {}),
+        ...(input.scenarioVersion !== undefined ? { scenarioVersion: input.scenarioVersion } : {}),
+        ...withActor(input.actor),
+        ...withResolvedModels(input.resolvedModels),
       },
       ...withNote(input.note),
       ...(Object.keys(input.parameters).length > 0 ? { parameters: input.parameters } : {}),

@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
-import { filterScenarioTargetAgents } from "../ui/elements/scenario-target-selector";
+import { scenarioAgentsOf } from "../behavior/scenarios/use-filtered-scenario-targets";
 
-describe("filterScenarioTargetAgents", () => {
+describe("scenarioAgentsOf", () => {
   it("keeps supported target types, orders newest first, and narrows by name", () => {
     const agents = [
       {
@@ -27,10 +27,10 @@ describe("filterScenarioTargetAgents", () => {
       },
     ];
 
-    expect(filterScenarioTargetAgents(agents, "checkout")).toEqual([
+    expect(scenarioAgentsOf({ agents, searchValue: "checkout" })).toEqual([
       expect.objectContaining({ id: "http", type: "http" }),
     ]);
-    expect(filterScenarioTargetAgents(agents, "").map((agent) => agent.id)).toEqual([
+    expect(scenarioAgentsOf({ agents, searchValue: "" }).map((agent) => agent.id)).toEqual([
       "http",
       "workflow",
     ]);

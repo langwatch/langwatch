@@ -78,7 +78,7 @@ import {
   runBlobCleanupOperatorInputSchema,
 } from "@langwatch/ops-contract";
 import {
-  featureFlagRulesSchema,
+  featureFlagRulesWriteSchema,
   operatorFeatureFlagCatalogueSchema,
 } from "@langwatch/feature-flag-contract";
 import {
@@ -426,21 +426,30 @@ export class OpsTrpcApi {
       unblockGroup: manage(procedure.input(opsQueueGroupInputSchema)).mutation(
         async ({ input, ctx }) => {
           const ops = ctx.app.ops.operations;
-          return ops.unblockQueueGroup(input);
+          return ops.unblockQueueGroup({
+            ...input,
+            requestedBy: ctx.actor().id,
+          });
         },
       ),
 
       unblockAll: manage(procedure.input(opsQueueNameInputSchema)).mutation(
         async ({ input, ctx }) => {
           const ops = ctx.app.ops.operations;
-          return ops.unblockAllQueueGroups(input);
+          return ops.unblockAllQueueGroups({
+            ...input,
+            requestedBy: ctx.actor().id,
+          });
         },
       ),
 
       drainGroup: manage(procedure.input(opsQueueGroupInputSchema)).mutation(
         async ({ input, ctx }) => {
           const ops = ctx.app.ops.operations;
-          return ops.drainQueueGroup(input);
+          return ops.drainQueueGroup({
+            ...input,
+            requestedBy: ctx.actor().id,
+          });
         },
       ),
 
@@ -482,7 +491,10 @@ export class OpsTrpcApi {
       drainTenant: manage(procedure.input(opsDrainQueueTenantInputSchema)).mutation(
         async ({ input, ctx }) => {
           const ops = ctx.app.ops.operations;
-          return ops.drainQueueTenant(input);
+          return ops.drainQueueTenant({
+            ...input,
+            requestedBy: ctx.actor().id,
+          });
         },
       ),
 
@@ -788,14 +800,20 @@ export class OpsTrpcApi {
       moveToDlq: manage(procedure.input(opsQueueGroupInputSchema)).mutation(
         async ({ input, ctx }) => {
           const ops = ctx.app.ops.operations;
-          return ops.moveQueueGroupToDlq(input);
+          return ops.moveQueueGroupToDlq({
+            ...input,
+            requestedBy: ctx.actor().id,
+          });
         },
       ),
 
       moveAllBlockedToDlq: manage(procedure.input(opsQueueFilterInputSchema)).mutation(
         async ({ input, ctx }) => {
           const ops = ctx.app.ops.operations;
-          return ops.moveAllBlockedQueueGroupsToDlq(input);
+          return ops.moveAllBlockedQueueGroupsToDlq({
+            ...input,
+            requestedBy: ctx.actor().id,
+          });
         },
       ),
 
@@ -938,23 +956,11 @@ export class OpsTrpcApi {
         procedure.input(
           opsFeatureFlagKeyInputSchema.extend({
             // Write-time only — the read path's `parseRules` must keep accepting
-            // whatever is already stored, so this refinement lives here and not
-            // on the shared schema. A blank id can never match any context
-            // (matching is exact string equality), so a rule carrying one is a
-            // dead rule the operator believes is live.
-            rules: featureFlagRulesSchema
-              .max(50)
-              .refine(
-                (rules) =>
-                  rules.every((rule) =>
-                    [rule.match.projectId, rule.match.organizationId].every(
-                      (id) => id === undefined || (id.length > 0 && id === id.trim()),
-                    ),
-                  ),
-                {
-                  message: "A targeting rule's project/organization id must not be blank or padded",
-                },
-              ),
+            // whatever is already stored, so the refinements live on their own
+            // schema. What they catch is a rule that cannot match anything and
+            // therefore silently does nothing: a blank or padded id, and a
+            // new-organizations date that cannot be read.
+            rules: featureFlagRulesWriteSchema,
           }),
         ),
       )

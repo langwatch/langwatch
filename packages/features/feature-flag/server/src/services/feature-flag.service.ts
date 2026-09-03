@@ -5,6 +5,7 @@ import {
   ruleContextForTarget,
   resolveExperimentDecision,
   resolveEffectiveForListing,
+  readNeedsOrganizationAge,
   type ExperimentCatalogueEntry,
   type ExperimentEvaluationTarget,
   type ExperimentTenantPolicy,
@@ -32,7 +33,24 @@ import type {
 import type { FeatureFlagRepository } from "../repositories/feature-flag.repository";
 import type { FeatureFlagRowStore } from "../stores/feature-flag-row.store";
 
+/**
+ * An organization's creation date never changes, so this window bounds how
+ * many rows a process holds rather than how stale an answer may be. It is
+ * deliberately longer than the flag row's own window: an operator editing an
+ * age rule must see the new rule within a cache window, but the dates it
+ * compares against are immutable history.
+ */
+const ORGANIZATION_CREATED_AT_TTL_MS = 10 * 60_000;
+const ORGANIZATION_CREATED_AT_MAX_KEYS = 10_000;
+
 export class FeatureFlagService extends FeatureFlagServiceContract {
+  // Creation dates of organizations named by an age rule, keyed by
+  // organization rather than by flag, and outliving a flag-row cache window.
+  private readonly organizationCreatedAt = new Map<
+    string,
+    { createdAt: Date | null; expiresAt: number }
+  >();
+
   private constructor(
     private readonly rows: FeatureFlagRowStore,
     private readonly repository: FeatureFlagRepository,
@@ -352,9 +370,93 @@ export class FeatureFlagService extends FeatureFlagServiceContract {
       return null;
     }
 
-    const ruleHit = evaluateRules(row.rules, context, flagKey);
+    const ruleHit = evaluateRules(
+      row.rules,
+      await this.withOrganizationAge(row.rules, context, flagKey),
+      flagKey,
+    );
 
     return ruleHit ?? row.enabled;
+  }
+
+  /**
+   * Fills in `organizationCreatedAt` for a read whose flag carries a "new
+   * organizations" rule, so no caller has to know the rule exists.
+   *
+   * Every flag read would otherwise have to carry the creation date, which
+   * means every call site — the per-event kill-switch path included — paying
+   * for a lookup no rule asks for. It is resolved here instead, only when
+   * this flag's own rules name it, and cached per organization. A flag with
+   * no age rule reads exactly what it read before.
+   */
+  private async withOrganizationAge(
+    rules: FeatureFlagRules,
+    context: RuleEvaluationContext,
+    flagKey: string,
+  ): Promise<RuleEvaluationContext> {
+    if (context.organizationCreatedAt !== undefined) return context;
+    if (!context.organizationId) return context;
+    if (!readNeedsOrganizationAge({ rules, ctx: context, flagKey })) return context;
+
+    return {
+      ...context,
+      organizationCreatedAt: await this.getOrganizationCreatedAt(context.organizationId),
+    };
+  }
+
+  /**
+   * Reads an organization's creation date, memoised per process. A failed
+   * read resolves to null, which matches no age rule — the same fail-closed
+   * choice the matcher makes for an unknown date, so a database blip cannot
+   * hand a rollout to organizations it excludes.
+   */
+  private async getOrganizationCreatedAt(organizationId: string): Promise<Date | null> {
+    const now = Date.now();
+    const cached = this.organizationCreatedAt.get(organizationId);
+    if (cached && cached.expiresAt > now) return cached.createdAt;
+
+    try {
+      const createdAt = await this.repository.tryFindOrganizationCreatedAt(organizationId);
+      this.rememberOrganizationCreatedAt({ organizationId, createdAt, now });
+      return createdAt;
+    } catch {
+      // Deliberately not cached: a failed read is a blip, not an answer, and
+      // caching it would extend one bad minute across the whole window.
+      return null;
+    }
+  }
+
+  private rememberOrganizationCreatedAt({
+    organizationId,
+    createdAt,
+    now,
+  }: {
+    organizationId: string;
+    createdAt: Date | null;
+    now: number;
+  }): void {
+    if (this.organizationCreatedAt.size >= ORGANIZATION_CREATED_AT_MAX_KEYS) {
+      this.evictOrganizationCreatedAt(now);
+    }
+    this.organizationCreatedAt.set(organizationId, {
+      createdAt,
+      expiresAt: now + ORGANIZATION_CREATED_AT_TTL_MS,
+    });
+  }
+
+  /**
+   * A Map iterates in insertion order, so the fallback drops the oldest entry
+   * rather than the least recently used one. That is the intended trade:
+   * tracking recency would mean writing to the map on every read, and the
+   * entry being protected is a date that is only worth one query anyway.
+   */
+  private evictOrganizationCreatedAt(now: number): void {
+    for (const [id, entry] of this.organizationCreatedAt) {
+      if (entry.expiresAt <= now) this.organizationCreatedAt.delete(id);
+    }
+    if (this.organizationCreatedAt.size < ORGANIZATION_CREATED_AT_MAX_KEYS) return;
+    const oldest = this.organizationCreatedAt.keys().next();
+    if (!oldest.done) this.organizationCreatedAt.delete(oldest.value);
   }
 
   async listOperatorCatalogue(): Promise<OperatorFeatureFlagCatalogue> {

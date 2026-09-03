@@ -17,12 +17,10 @@ import {
 } from "../support/test-scenario-http.port";
 
 vi.mock("@langwatch/observability/tracing", () => ({
-  injectTraceContextHeaders: vi.fn(
-    ({ headers }: { headers: Record<string, string> }) => ({
-      headers,
-      traceId: undefined,
-    }),
-  ),
+  injectTraceContextHeaders: vi.fn(({ headers }: { headers: Record<string, string> }) => ({
+    headers,
+    traceId: undefined,
+  })),
 }));
 
 const mockSsrfSafeFetch = mockScenarioHttpFetch;
@@ -56,8 +54,7 @@ function requestedUrl(): string {
 }
 
 function requestedHeaders(): Record<string, string> {
-  return (mockSsrfSafeFetch.mock.calls[0]![1] as { headers: Record<string, string> })
-    .headers;
+  return (mockSsrfSafeFetch.mock.calls[0]![1] as { headers: Record<string, string> }).headers;
 }
 
 function requestedBody(): string {
@@ -102,9 +99,7 @@ describe("SerializedHttpAgentAdapter secret references", () => {
 
       await adapter.call(input);
 
-      expect(requestedUrl()).toBe(
-        `https://api.example.com/eu-central?key=${SECRET_VALUE}`,
-      );
+      expect(requestedUrl()).toBe(`https://api.example.com/eu-central?key=${SECRET_VALUE}`);
     });
   });
 
@@ -143,9 +138,13 @@ describe("SerializedHttpAgentAdapter secret references", () => {
         new Error("connect failed for https://api.example.com/abcdef"),
       );
 
-      await expect(adapter.call(input)).rejects.toMatchObject({
-        message: "connect failed for https://api.example.com/[redacted]",
-      });
+      const thrown = (await adapter.call(input).catch((e: unknown) => e)) as Error;
+
+      // The transport wrapper restates the failure, so the assertion is on
+      // what the message carries: the redacted form, and neither secret.
+      expect(thrown.message).toContain("connect failed for https://api.example.com/[redacted]");
+      expect(thrown.message).not.toContain("abcdef");
+      expect(thrown.message).not.toContain("abc");
     });
   });
 
@@ -259,9 +258,7 @@ describe("SerializedHttpAgentAdapter secret references", () => {
 
       await adapter.call(input);
 
-      expect(requestedHeaders()["X-Agent-Key"]).toBe(
-        "x{% endraw %}{{ params.region }}{% raw %}",
-      );
+      expect(requestedHeaders()["X-Agent-Key"]).toBe("x{% endraw %}{{ params.region }}{% raw %}");
     });
 
     /** @scenario "A secret reference in a header value survives rendering byte for byte" */
@@ -351,9 +348,7 @@ describe("SerializedHttpAgentAdapter secret references", () => {
 
     /** @scenario "A resolved secret value is scrubbed from error messages" */
     it("scrubs the secret out of a transport failure and everything it was caused by", async () => {
-      const cause = new Error(
-        `connect ECONNREFUSED for https://api.example.com/${SECRET_VALUE}`,
-      );
+      const cause = new Error(`connect ECONNREFUSED for https://api.example.com/${SECRET_VALUE}`);
       mockSsrfSafeFetch.mockRejectedValue(new TypeError("fetch failed", { cause }));
 
       const adapter = createMockHttpAgentAdapter({
@@ -363,9 +358,7 @@ describe("SerializedHttpAgentAdapter secret references", () => {
       });
 
       await expect(adapter.call(input)).rejects.toThrow("fetch failed");
-      expect(cause.message).toBe(
-        "connect ECONNREFUSED for https://api.example.com/[redacted]",
-      );
+      expect(cause.message).toBe("connect ECONNREFUSED for https://api.example.com/[redacted]");
     });
   });
 
@@ -390,9 +383,9 @@ describe("SerializedHttpAgentAdapter secret references", () => {
     });
 
     /** @scenario "Plaintext auth without secret references behaves unchanged" */
-    it("rethrows an upstream failure untouched", async () => {
-      const thrown = new Error("fetch failed");
-      mockSsrfSafeFetch.mockRejectedValue(thrown);
+    it("leaves an upstream failure's own message untouched", async () => {
+      const raw = new Error("fetch failed");
+      mockSsrfSafeFetch.mockRejectedValue(raw);
 
       const adapter = createMockHttpAgentAdapter({
         config: config({
@@ -401,8 +394,13 @@ describe("SerializedHttpAgentAdapter secret references", () => {
         }),
       });
 
-      await expect(adapter.call(input)).rejects.toBe(thrown);
-      expect(thrown.message).toBe("fetch failed");
+      const thrown = (await adapter.call(input).catch((e: unknown) => e)) as Error;
+
+      // With no secrets configured there is nothing to rewrite: the raw error
+      // is carried as the cause, message and all.
+      expect(thrown.cause).toBe(raw);
+      expect(raw.message).toBe("fetch failed");
+      expect(thrown.message).toContain("fetch failed");
     });
   });
 });

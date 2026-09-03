@@ -2,6 +2,8 @@ export {
   createDesignSystem,
   designSystemConfig,
   type DesignSystemExtension,
+  DRAWER_SIZE_2XL_MAX_WIDTH,
+  drawerSlotRecipe,
   system,
 } from "./system";
 export { DesignSystemProvider, type DesignSystemProviderProps } from "./provider";

@@ -686,56 +686,127 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
-    "/api/agents": {
+    "/api/v1/agents/connect/register": {
         parameters: {
             query?: never;
             header?: never;
             path?: never;
             cookie?: never;
         };
-        /**
-         * @deprecated
-         * @description List all non-archived agents for the project (paginated)
-         */
-        get: operations["getApiAgents"];
+        get?: never;
         put?: never;
-        /**
-         * @deprecated
-         * @description Create a new agent
-         */
-        post: operations["postApiAgents"];
+        /** @description Register the connected agents of a process over HTTP, for a network that blocks WebSockets. The body is the register frame of the connect protocol. Answers with the registered frame and the instance token the poll and frames endpoints are addressed with, or with a refused frame. */
+        post: operations["registerConnectedAgentInstance"];
         delete?: never;
         options?: never;
         head?: never;
         patch?: never;
         trace?: never;
     };
-    "/api/agents/{id}": {
+    "/api/v1/agents/connect/poll": {
         parameters: {
             query?: never;
             header?: never;
             path?: never;
             cookie?: never;
         };
-        /**
-         * @deprecated
-         * @description Get an agent by its id
-         */
-        get: operations["getApiAgentsById"];
+        /** @description Wait for the next call and cancel frames of a registered instance, up to 25 seconds, then answer with what is waiting or with an empty list. Each poll refreshes the instance presence, so a process that polls reads Online. Addressed with the instance token in the X-Agent-Instance-Token header. */
+        get: operations["pollConnectedAgentInstance"];
         put?: never;
         post?: never;
-        /**
-         * @deprecated
-         * @description Archive an agent (soft-delete)
-         */
-        delete: operations["deleteApiAgentsById"];
+        delete?: never;
         options?: never;
         head?: never;
-        /**
-         * @deprecated
-         * @description Update an agent by its id
-         */
-        patch: operations["patchApiAgentsById"];
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/agents/connect/frames": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** @description Post the ack, result and deregister frames of a registered instance. Addressed with the instance token in the X-Agent-Instance-Token header. */
+        post: operations["postConnectedAgentFrames"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/agents": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** @description List the project's agents, paginated, with the presence and owner of each connected agent. Archived agents are left out. */
+        get: operations["listAgents"];
+        put?: never;
+        /** @description Create an agent from a name, a type and the configuration of that type. A connected agent is registered from code by the SDK and answers 422 agent_register_only here. */
+        post: operations["createAgent"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/agents/{id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** @description Read one agent with its presence, its owner and the run parameters it declares. An id the project does not hold answers 404 agent_not_found. */
+        get: operations["getAgent"];
+        /** @description Update an agent: any of name, type, configuration and workflow. The update is partial under PATCH and PUT alike. A connected agent takes no edit and answers 422 agent_register_only. */
+        put: operations["replaceAgent"];
+        post?: never;
+        /** @description Archive an agent. It leaves the list and its runs stay. A connected agent that registers again restores its row. */
+        delete: operations["archiveAgent"];
+        options?: never;
+        head?: never;
+        /** @description Update an agent: any of name, type, configuration and workflow. The update is partial under PATCH and PUT alike. A connected agent takes no edit and answers 422 agent_register_only. */
+        patch: operations["updateAgent"];
+        trace?: never;
+    };
+    "/api/v1/agents/{id}/test": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** @description Run one scripted scenario against an agent: the user sends "ping", the agent answers, and the run succeeds when the answer arrives. No model is used, and no scenario, run plan or test suite is added to the project. Answers at once with the run ids; the run itself is asynchronous. */
+        post: operations["testAgent"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/agents/{id}/call": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** @description Send one conversation turn to a connected agent and get its answer. The agent must be online: a process running the decorated function must be connected. */
+        post: operations["callConnectedAgent"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
         trace?: never;
     };
     "/api/api-keys": {
@@ -801,46 +872,6 @@ export interface paths {
         put?: never;
         /** @description Query analytics timeseries data with metrics, aggregations, and filters */
         post: operations["postApiAnalyticsTimeseries"];
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/api/v1/projects/{projectId}/analytics/query/clickhouse": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        get?: never;
-        put?: never;
-        /**
-         * Run LangWatchQL analytics SQL
-         * @description Executes one read-only ClickHouse SELECT over the LangWatchQL analytics datasets and returns typed columns, rows, execution statistics, truncation state and diagnostics. The query runs as a restricted database identity scoped to the authenticated project. Diagnostics are advisory and never reject a query. An empty diagnostics list means no known issue was detected. It is not proof that the answer is the one you meant.
-         */
-        post: operations["postApiV1ProjectsByProjectIdAnalyticsQueryClickhouse"];
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/api/v1/projects/{projectId}/analytics/schema": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        /**
-         * Discover the LangWatchQL analytics schema
-         * @description Lists the LangWatchQL analytics datasets this key may query, with each column's type, description, the permissions that unlock it, and whether this caller holds them — plus each dataset's grain, join keys, partition-pruning time column, freshness and a runnable example query.
-         */
-        get: operations["getApiV1ProjectsByProjectIdAnalyticsSchema"];
-        put?: never;
-        post?: never;
         delete?: never;
         options?: never;
         head?: never;
@@ -923,6 +954,54 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/query": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Run a LangWatchQL query
+         * @description Executes one read-only LangWatchQL SELECT over the analytics datasets and returns typed columns, rows, execution statistics, truncation state and diagnostics. The query runs as a restricted database identity scoped to the authenticated project.
+         *
+         *     Diagnostics are advisory and never reject a query. An empty diagnostics list means no known issue was detected. It is not proof that the answer is the one you meant.
+         *
+         *     The project is taken from the credential — no project id appears anywhere in the path or the body, and none can be sent to select another one.
+         *
+         *     Failures answer with their real HTTP status (a refused query is 403, not 200) and this API's canonical error envelope — the same `code` and `meta` every other REST family publishes.
+         */
+        post: operations["postApiV1Query"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/query/schema": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Discover the queryable LangWatchQL schema
+         * @description Lists the LangWatchQL analytics datasets this key may query, with each column's type, description, the permissions that unlock it, and whether this caller holds them — plus each dataset's grain, join keys, partition-pruning time column, freshness and a runnable example query.
+         *
+         *     Scoped to the credential's own project and its permissions: a column this key cannot read is listed with `available: false` rather than hidden, so a caller can see what a wider key would unlock.
+         */
+        get: operations["getApiV1QuerySchema"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/coding-agent/sessions/{sessionId}/events": {
         parameters: {
             query?: never;
@@ -952,9 +1031,29 @@ export interface paths {
         };
         /**
          * Get pull request coding agent usage
-         * @description Assistant usage for one pull request: sessions, tokens and cost, grouped by contributor and agent, plus per-model totals, over the pull request's whole lifetime rather than a time window. Every row and the totals split cost three ways: the part priced per token, the part a bundled subscription already covers, and the list-price total of both. Per-model totals carry the list price only. Cost is calculated from the tokens the agent reported and LangWatch's model prices, so it estimates spend rather than restating a provider invoice. Requires a personal-project API key; rows appear only for projects the calling user may view, and cost only for those they may price.
+         * @description Assistant usage for one pull request: sessions, tokens and cost, grouped by contributor and agent, plus per-model totals, over the pull request's whole lifetime rather than a time window. Every row and the totals split cost three ways: the part priced per token, the part a bundled subscription already covers, and the list-price total of both. Per-model totals carry the list price only. Cost is calculated from the tokens the agent reported and LangWatch's model prices, so it estimates spend rather than restating a provider invoice. Requires a personal-project API key; rows appear only for projects the calling user may view, and cost only for those they may price. Prefer `GET /api/v1/coding-agent/pull-request-usage`, which answers the same question with an organization API key alone and needs no X-Project-Id header.
          */
         get: operations["getApiCodingAgentPullRequestUsage"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/coding-agent/pull-request-usage": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Get pull request usage
+         * @description Assistant usage for one pull request: sessions, tokens and cost, grouped by contributor and agent, plus per-model totals, over the pull request's whole lifetime rather than a time window. Every row and the totals split cost three ways: the part priced per token, the part a bundled subscription already covers, and the list-price total of both. Per-model totals carry the list price only. Cost is calculated from the tokens the agent reported and LangWatch's model prices, so it estimates spend rather than restating a provider invoice. Authenticate with an organization API key and nothing else: no project id is sent anywhere. A key created for you reads with your own access; an organization service key, such as one a continuous integration job holds, reads with the access its bindings grant. Rows appear only for projects the key may view, and cost only for those it may price.
+         */
+        get: operations["getPullRequestUsage"];
         put?: never;
         post?: never;
         delete?: never;
@@ -2525,113 +2624,7 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
-    "/api/organization/2026-08-07/": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        /** @description Read the organization profile: name, slug, support contact, presence and trace sharing settings, and the S3 storage shape. The single sign-on fields and the S3 secret are never returned. */
-        get: operations["getOrganization_2026_08_07"];
-        put?: never;
-        post?: never;
-        delete?: never;
-        options?: never;
-        head?: never;
-        /** @description Update the organization profile. Partial: only the fields present are written, and the response is exactly what a subsequent GET returns. */
-        patch: operations["updateOrganization_2026_08_07"];
-        trace?: never;
-    };
-    "/api/organization/2026-08-07/members": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        /** @description List the organization's members with their organization role and disabled status. Disabled members are included only when includeDisabled=true. */
-        get: operations["listOrganizationMembers_2026_08_07"];
-        put?: never;
-        post?: never;
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/api/organization/2026-08-07/members/{userId}": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        /** @description Read one member, including the teams they reach through team-scoped role bindings. Personal workspaces are not listed: they are not access an administrator manages. */
-        get: operations["getOrganizationMember_2026_08_07"];
-        put?: never;
-        post?: never;
-        /** @description Remove a member from the organization and every team in it. The member the credential acts as cannot remove themselves. */
-        delete: operations["removeOrganizationMember_2026_08_07"];
-        options?: never;
-        head?: never;
-        /** @description Change a member's organization role, or disable / re-enable their membership. Send exactly one of role or disabled. Re-enabling consumes a seat, so it is checked against the plan. */
-        patch: operations["updateOrganizationMember_2026_08_07"];
-        trace?: never;
-    };
-    "/api/organization/2026-08-07/members/{userId}/access": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        /** @description The member's full access breakdown: organization role, group memberships with their bindings, and direct bindings, each with the permissions it grants and the scope it grants them on. */
-        get: operations["getOrganizationMemberAccess_2026_08_07"];
-        put?: never;
-        post?: never;
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/api/organization/2026-08-07/invites": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        /** @description List pending invites. Each carries its invite code and acceptance link, because a provisioning run with no email provider still has to hand the person something to open. */
-        get: operations["listOrganizationInvites_2026_08_07"];
-        put?: never;
-        /** @description Create up to 50 invites in one batch, each with team assignments that may carry a custom role. Validation is strict: a team or custom role that cannot be assigned refuses the batch rather than silently granting less than was asked. emailNotSent reports, per invite, whether the invite email could be delivered. */
-        post: operations["createOrganizationInvites_2026_08_07"];
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/api/organization/2026-08-07/invites/{id}": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        get?: never;
-        put?: never;
-        post?: never;
-        /** @description Revoke a pending invite. An invite id from another organization, or one already revoked, answers 404. */
-        delete: operations["revokeOrganizationInvite_2026_08_07"];
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/api/organization/latest/": {
+    "/api/organization": {
         parameters: {
             query?: never;
             header?: never;
@@ -2649,7 +2642,7 @@ export interface paths {
         patch: operations["updateOrganization"];
         trace?: never;
     };
-    "/api/organization/latest/members": {
+    "/api/organization/members": {
         parameters: {
             query?: never;
             header?: never;
@@ -2666,7 +2659,7 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
-    "/api/organization/latest/members/{userId}": {
+    "/api/organization/members/{userId}": {
         parameters: {
             query?: never;
             header?: never;
@@ -2685,7 +2678,7 @@ export interface paths {
         patch: operations["updateOrganizationMember"];
         trace?: never;
     };
-    "/api/organization/latest/members/{userId}/access": {
+    "/api/organization/members/{userId}/access": {
         parameters: {
             query?: never;
             header?: never;
@@ -2702,7 +2695,7 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
-    "/api/organization/latest/invites": {
+    "/api/organization/invites": {
         parameters: {
             query?: never;
             header?: never;
@@ -2720,7 +2713,7 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
-    "/api/organization/latest/invites/{id}": {
+    "/api/organization/invites/{id}": {
         parameters: {
             query?: never;
             header?: never;
@@ -2781,43 +2774,7 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
-    "/api/role-bindings/2026-08-07/": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        /** @description List the organization's role bindings, each naming its principal (user, group or API key), role and scope. Filter by principal or scope; totalCount counts the filtered set. */
-        get: operations["listRoleBindings_2026_08_07"];
-        put?: never;
-        /** @description Create a role binding for exactly one principal: a user, a group, or an API key. Every reference is checked against the caller's organization, and an identical binding answers 409 role_binding_already_exists. The response always carries the new binding's id; the names of its principal, role and scope may be absent on this response alone, and a follow-up read carries them. */
-        post: operations["createRoleBinding_2026_08_07"];
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/api/role-bindings/2026-08-07/{id}": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        get?: never;
-        put?: never;
-        post?: never;
-        /** @description Delete a role binding. An id that does not exist in the caller's organization answers 404 role_binding_not_found. */
-        delete: operations["deleteRoleBinding_2026_08_07"];
-        options?: never;
-        head?: never;
-        /** @description Change a binding's role (and custom role). The principal and scope are the binding's identity and do not change; create a new binding instead. */
-        patch: operations["updateRoleBinding_2026_08_07"];
-        trace?: never;
-    };
-    "/api/role-bindings/latest/": {
+    "/api/role-bindings": {
         parameters: {
             query?: never;
             header?: never;
@@ -2835,7 +2792,7 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
-    "/api/role-bindings/latest/{id}": {
+    "/api/role-bindings/{id}": {
         parameters: {
             query?: never;
             header?: never;
@@ -2853,61 +2810,7 @@ export interface paths {
         patch: operations["updateRoleBinding"];
         trace?: never;
     };
-    "/api/roles/2026-08-07/": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        /** @description List the organization's custom roles with their permission sets. */
-        get: operations["listRoles_2026_08_07"];
-        put?: never;
-        /** @description Create a custom role from resource:action permission keys. The name is unique within the organization; a taken name answers 409 custom_role_name_taken. */
-        post: operations["createRole_2026_08_07"];
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/api/roles/2026-08-07/permissions": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        /** @description The permission catalog custom roles are built from: every resource with its actions, annotated with whether the resource only takes effect at organization scope (such a permission cannot be granted by a team- or project-scoped binding). */
-        get: operations["listRolePermissions_2026_08_07"];
-        put?: never;
-        post?: never;
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/api/roles/2026-08-07/{id}": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        /** @description Read one custom role. An id from another organization answers 404 custom_role_not_found. */
-        get: operations["getRole_2026_08_07"];
-        put?: never;
-        post?: never;
-        /** @description Delete a custom role. A role that anything still holds, a legacy team assignment or a role binding, answers 409 custom_role_in_use with the counts in meta. */
-        delete: operations["deleteRole_2026_08_07"];
-        options?: never;
-        head?: never;
-        /** @description Update a custom role. Partial: only the fields present are written; a permissions list replaces the set outright. */
-        patch: operations["updateRole_2026_08_07"];
-        trace?: never;
-    };
-    "/api/roles/latest/": {
+    "/api/roles": {
         parameters: {
             query?: never;
             header?: never;
@@ -2925,7 +2828,7 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
-    "/api/roles/latest/permissions": {
+    "/api/roles/permissions": {
         parameters: {
             query?: never;
             header?: never;
@@ -2942,7 +2845,7 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
-    "/api/roles/latest/{id}": {
+    "/api/roles/{id}": {
         parameters: {
             query?: never;
             header?: never;
@@ -2961,42 +2864,7 @@ export interface paths {
         patch: operations["updateRole"];
         trace?: never;
     };
-    "/api/scim-tokens/2026-08-07/": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        /** @description List the organization's SCIM bearer tokens: id, description, creation time and last use. Token values and hashes are never returned; the value exists only in the create response, once. */
-        get: operations["listScimTokens_2026_08_07"];
-        put?: never;
-        /** @description Mint a SCIM bearer token for this organization's /api/scim/v2 endpoints. The token value is returned once, here, and never again; store it in the identity provider immediately. */
-        post: operations["createScimToken_2026_08_07"];
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/api/scim-tokens/2026-08-07/{id}": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        get?: never;
-        put?: never;
-        post?: never;
-        /** @description Revoke a SCIM token so it stops verifying immediately. An unknown or already-revoked id answers 404 scim_token_not_found. */
-        delete: operations["revokeScimToken_2026_08_07"];
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/api/scim-tokens/latest/": {
+    "/api/scim-tokens": {
         parameters: {
             query?: never;
             header?: never;
@@ -3014,7 +2882,7 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
-    "/api/scim-tokens/latest/{id}": {
+    "/api/scim-tokens/{id}": {
         parameters: {
             query?: never;
             header?: never;
@@ -3214,7 +3082,7 @@ export interface paths {
         put?: never;
         /** @description Create a new scenario event */
         post: operations["postApiScenarioEvents"];
-        /** @description Archive all simulation runs for a scenario set. Pass `scenarioSetId=default` to archive runs in the implicit default set; future SDK runs without an explicit setId will repopulate it. */
+        /** @description Archive simulation runs. Pass exactly one of `scenarioSetId` (archives every run in the set; `scenarioSetId=default` targets the implicit default set) or `scenarioRunId` (archives that one run). */
         delete: operations["deleteApiScenarioEvents"];
         options?: never;
         head?: never;
@@ -3272,7 +3140,8 @@ export interface paths {
         delete: operations["deleteApiScenariosById"];
         options?: never;
         head?: never;
-        patch?: never;
+        /** @description Update an existing scenario */
+        patch: operations["patchApiScenariosById"];
         trace?: never;
     };
     "/api/scenarios/{id}/versions": {
@@ -3401,183 +3270,38 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
-    "/api/secrets/2026-08-24/secrets.list": {
+    "/api/secrets": {
         parameters: {
             query?: never;
             header?: never;
             path?: never;
             cookie?: never;
         };
-        get?: never;
+        /** @description List all secrets for the project (values are never returned) */
+        get: operations["getApiSecrets"];
         put?: never;
-        /**
-         * List project secrets
-         * @description Lists metadata only. Secret values are never returned.
-         */
-        post: operations["listSecrets_2026_08_24"];
+        /** @description Create a new project secret. The value is encrypted at rest and never returned. */
+        post: operations["postApiSecrets"];
         delete?: never;
         options?: never;
         head?: never;
         patch?: never;
         trace?: never;
     };
-    "/api/secrets/2026-08-24/secrets.get": {
+    "/api/secrets/{id}": {
         parameters: {
             query?: never;
             header?: never;
             path?: never;
             cookie?: never;
         };
-        get?: never;
-        put?: never;
-        /** Get project-secret metadata */
-        post: operations["getSecret_2026_08_24"];
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/api/secrets/2026-08-24/secrets.create": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        get?: never;
-        put?: never;
-        /**
-         * Create a project secret
-         * @description Encrypts the value at rest and never returns it.
-         */
-        post: operations["createSecret_2026_08_24"];
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/api/secrets/2026-08-24/secrets.update": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        get?: never;
-        put?: never;
-        /** Replace a project secret value */
-        post: operations["updateSecret_2026_08_24"];
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/api/secrets/2026-08-24/secrets.delete": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        get?: never;
-        put?: never;
-        /** Delete a project secret */
-        post: operations["deleteSecret_2026_08_24"];
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/api/secrets/latest/secrets.list": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        get?: never;
-        put?: never;
-        /**
-         * List project secrets
-         * @description Lists metadata only. Secret values are never returned.
-         */
-        post: operations["listSecrets"];
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/api/secrets/latest/secrets.get": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        get?: never;
-        put?: never;
-        /** Get project-secret metadata */
-        post: operations["getSecret"];
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/api/secrets/latest/secrets.create": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        get?: never;
-        put?: never;
-        /**
-         * Create a project secret
-         * @description Encrypts the value at rest and never returns it.
-         */
-        post: operations["createSecret"];
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/api/secrets/latest/secrets.update": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        get?: never;
-        put?: never;
-        /** Replace a project secret value */
-        post: operations["updateSecret"];
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/api/secrets/latest/secrets.delete": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        get?: never;
-        put?: never;
-        /** Delete a project secret */
-        post: operations["deleteSecret"];
-        delete?: never;
+        /** @description Get a secret by its ID (value is never returned) */
+        get: operations["getApiSecretsById"];
+        /** @description Update a secret's value */
+        put: operations["putApiSecretsById"];
+        post?: never;
+        /** @description Delete a secret */
+        delete: operations["deleteApiSecretsById"];
         options?: never;
         head?: never;
         patch?: never;
@@ -3590,7 +3314,7 @@ export interface paths {
             path?: never;
             cookie?: never;
         };
-        /** @description List simulation runs, optionally filtered by scenarioSetId or batchRunId */
+        /** @description List simulation runs, optionally filtered by scenarioSetId or batchRunId. Set-level and unfiltered listings trim each run to its first few messages and report the trim as `messagesTruncated`; pass `include=messages` to read whole conversations, which caps the page at 20 runs, ending on a batch boundary. A batch-scoped listing always carries whole conversations. */
         get: operations["getApiSimulationRuns"];
         put?: never;
         post?: never;
@@ -3658,10 +3382,16 @@ export interface paths {
             path?: never;
             cookie?: never;
         };
-        /** @description List all non-archived suites for the project. By default only custom run plans are returned; pass kind=folder for test suite folders. */
+        /**
+         * @deprecated
+         * @description Deprecated: use /api/v1/run-plans and /api/v1/test-suites. List all non-archived suites for the project. By default only run plans are returned; pass kind=folder for test suites.
+         */
         get: operations["getApiSuites"];
         put?: never;
-        /** @description Create a new suite (run plan) */
+        /**
+         * @deprecated
+         * @description Deprecated: use /api/v1/run-plans and /api/v1/test-suites. Create a new suite (run plan).
+         */
         post: operations["postApiSuites"];
         delete?: never;
         options?: never;
@@ -3676,15 +3406,24 @@ export interface paths {
             path?: never;
             cookie?: never;
         };
-        /** @description Get a suite (run plan) by its ID */
+        /**
+         * @deprecated
+         * @description Deprecated: use /api/v1/run-plans and /api/v1/test-suites. Get a suite (run plan) by its ID.
+         */
         get: operations["getApiSuitesById"];
         put?: never;
         post?: never;
-        /** @description Archive (soft-delete) a suite. Archiving a folder also archives every test case filed in it, in one transaction. */
+        /**
+         * @deprecated
+         * @description Deprecated: use /api/v1/run-plans and /api/v1/test-suites. Archive (soft-delete) a suite. Archiving a folder also archives every scenario filed in it, in one transaction.
+         */
         delete: operations["deleteApiSuitesById"];
         options?: never;
         head?: never;
-        /** @description Update a suite (run plan) */
+        /**
+         * @deprecated
+         * @description Deprecated: use /api/v1/run-plans and /api/v1/test-suites. Update a suite (run plan).
+         */
         patch: operations["patchApiSuitesById"];
         trace?: never;
     };
@@ -3697,7 +3436,10 @@ export interface paths {
         };
         get?: never;
         put?: never;
-        /** @description Duplicate a suite (run plan) */
+        /**
+         * @deprecated
+         * @description Deprecated: use /api/v1/run-plans and /api/v1/test-suites. Duplicate a suite (run plan).
+         */
         post: operations["postApiSuitesByIdDuplicate"];
         delete?: never;
         options?: never;
@@ -3714,8 +3456,143 @@ export interface paths {
         };
         get?: never;
         put?: never;
-        /** @description Trigger a suite run. Schedules scenario executions for all active scenarios × targets × repeatCount. */
+        /**
+         * @deprecated
+         * @description Deprecated: use /api/v1/run-plans and /api/v1/test-suites. Trigger a suite run. Schedules scenario executions for all active scenarios x targets x repeatCount. When the id names a test suite, the targets, the repeat count and the models are read from the body.
+         */
         post: operations["postApiSuitesByIdRun"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/run-plans": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** @description List the project's run plans. Archived plans are left out unless includeArchived is set. Test suites are not run plans and are listed by the test suites family. */
+        get: operations["listRunPlans"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/run-plans/run": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** @description Run a configuration under a name. The name identifies the run plan: send a name already in use and that plan's configuration is replaced with this one, send a new name and the plan is created, send no name and one is derived from what the run covers and what it runs against. */
+        post: operations["runRunPlan"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/run-plans/{id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** @description Read one run plan. An id the project does not hold, and a test suite id, both answer 404 suite_not_found. */
+        get: operations["getRunPlan"];
+        put?: never;
+        post?: never;
+        /** @description Archive a run plan. The plan stops being listed and its run history is kept. The scenarios it referenced are left where they are. */
+        delete: operations["archiveRunPlan"];
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/run-plans/{id}/run": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Run a plan again
+         * @description Run a run plan again, with the configuration it already holds. To run a different configuration, post it to /run under the plan's name.
+         */
+        post: operations["rerunRunPlan"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/test-suites": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** @description List the project's test suites. Archived suites are left out unless includeArchived is set. Run plans are not test suites and are listed by the run plans family. */
+        get: operations["listTestSuites"];
+        put?: never;
+        /** @description Create a test suite. It starts empty: scenarios join it by being filed into it, and the targets a run goes against are sent with the run. */
+        post: operations["createTestSuite"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/test-suites/{id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Read one test suite
+         * @description Read one test suite with the scenarios filed in it, named. An id the project does not hold, and a run plan id, both answer 404 suite_not_found.
+         */
+        get: operations["getTestSuite"];
+        put?: never;
+        post?: never;
+        /** @description Archive a test suite. The scenarios filed in it are archived with it, in one step, because the suite is where they live. */
+        delete: operations["archiveTestSuite"];
+        options?: never;
+        head?: never;
+        /** @description Rename a test suite. The slug is kept, so links and run history stay where they are. */
+        patch: operations["renameTestSuite"];
+        trace?: never;
+    };
+    "/api/v1/test-suites/{id}/run": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Run a test suite
+         * @description Run every scenario filed in the test suite against the targets sent with the request. The run is filed under a run plan named after the suite and its targets unless a name is sent. A request that names no target answers 422 suite_targets_required.
+         */
+        post: operations["runTestSuite"];
         delete?: never;
         options?: never;
         head?: never;
@@ -5163,7 +5040,275 @@ export interface operations {
             };
         };
     };
-    getApiAgents: {
+    registerConnectedAgentInstance: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: {
+            content: {
+                "application/json": {
+                    /** @enum {number} */
+                    protocol: 1;
+                    /** @enum {string} */
+                    type: "register";
+                    sdk: {
+                        name: string;
+                        version: string;
+                        language: string;
+                    };
+                    instance: {
+                        id: string;
+                        hostname: string;
+                        username: string;
+                        pid: number;
+                        startedAt: string;
+                        label?: string;
+                        /** @default [] */
+                        inFlightCallIds?: string[];
+                        maxConcurrency?: number;
+                    };
+                    agents: {
+                        name: string;
+                        environment: string;
+                        /** @default {} */
+                        parameters?: {
+                            [key: string]: unknown;
+                        };
+                        concurrency?: number;
+                        timeoutMs?: number;
+                        sticky?: boolean;
+                    }[];
+                };
+            };
+        };
+        responses: {
+            /** @description The instance is registered */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        /** @description The registered frame, or the refused frame with its reason. */
+                        frame: {
+                            /** @constant */
+                            protocol: 1;
+                            /** @constant */
+                            type: "registered";
+                            agents: {
+                                name: string;
+                                environment: string;
+                                id: string;
+                                url: string;
+                                parameterNotes: string[];
+                            }[];
+                            heartbeatIntervalMs: number;
+                            instanceId: string;
+                        } | {
+                            /** @constant */
+                            protocol: 1;
+                            /** @constant */
+                            type: "refused";
+                            /** @enum {string} */
+                            code: "api_key_invalid" | "project_required" | "permission_denied" | "key_type_not_allowed" | "replica_count_unsupported" | "parameters_invalid" | "environment_invalid" | "protocol_invalid";
+                            message: string;
+                            meta?: {
+                                [key: string]: unknown;
+                            };
+                        };
+                        /** @description The token the poll and frames endpoints are addressed with, in the X-Agent-Instance-Token header. Present when the register was accepted. */
+                        instanceToken?: string;
+                    };
+                };
+            };
+            /** @description The API key is not valid: a refused frame */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description The key type or its permissions cannot connect an agent: a refused frame */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description The body is not a register frame, or an agent of it is not valid: a refused frame */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description The deployment runs several replicas without Redis: a refused frame */
+            503: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    pollConnectedAgentInstance: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description The frames waiting for the instance, possibly none */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        /** @description The call and cancel frames waiting for the instance; empty once the poll wait passes with none. */
+                        frames: ({
+                            /** @constant */
+                            protocol: 1;
+                            /** @constant */
+                            type: "call";
+                            callId: string;
+                            agentId: string;
+                            threadId: string;
+                            messages: ({
+                                role: string;
+                            } & {
+                                [key: string]: unknown;
+                            })[];
+                            newMessages: ({
+                                role: string;
+                            } & {
+                                [key: string]: unknown;
+                            })[];
+                            params: {
+                                [key: string]: string | number | boolean;
+                            };
+                            session?: unknown;
+                            traceparent: string | null;
+                            deadlineAt: number;
+                            run: {
+                                scenarioRunId?: string;
+                                scenarioName?: string;
+                                batchRunId?: string;
+                            };
+                        } | {
+                            /** @constant */
+                            protocol: 1;
+                            /** @constant */
+                            type: "cancel";
+                            callId: string;
+                        })[];
+                    };
+                };
+            };
+            /** @description The API key is not valid: a refused frame */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description The instance token is not known; register the instance again */
+            410: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    postConnectedAgentFrames: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: {
+            content: {
+                "application/json": {
+                    /** @description Ack, result and deregister frames, in order. */
+                    frames: ({
+                        /** @enum {number} */
+                        protocol: 1;
+                        /** @enum {string} */
+                        type: "ack";
+                        callId: string;
+                    } | {
+                        /** @enum {number} */
+                        protocol: 1;
+                        /** @enum {string} */
+                        type: "result";
+                        callId: string;
+                        output?: string | ({
+                            role: string;
+                        } & {
+                            [key: string]: unknown;
+                        }) | ({
+                            role: string;
+                        } & {
+                            [key: string]: unknown;
+                        })[];
+                        session?: unknown;
+                        error?: {
+                            code: string;
+                            message: string;
+                        };
+                    } | {
+                        /** @enum {number} */
+                        protocol: 1;
+                        /** @enum {string} */
+                        type: "deregister";
+                    })[];
+                };
+            };
+        };
+        responses: {
+            /** @description The frames were taken */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        /** @description How many frames were taken. */
+                        accepted: number;
+                    };
+                };
+            };
+            /** @description The API key is not valid: a refused frame */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description The instance token is not known; register the instance again */
+            410: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description A frame is not one the endpoint takes */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    listAgents: {
         parameters: {
             query?: {
                 page?: number;
@@ -5175,368 +5320,74 @@ export interface operations {
         };
         requestBody?: never;
         responses: {
-            /** @description Agents page */
+            /** @description Success */
             200: {
                 headers: {
                     [name: string]: unknown;
                 };
                 content: {
                     "application/json": {
-                        data: (({
+                        data: {
                             id: string;
                             name: string;
-                            /** Format: date-time */
-                            createdAt: string;
-                            /** Format: date-time */
-                            updatedAt: string;
-                            /** @constant */
-                            type: "signature";
+                            /**
+                             * @description The kind of agent. A connected agent is registered from code by the SDK and cannot be created or reconfigured through this API.
+                             * @enum {string}
+                             */
+                            type: "signature" | "code" | "workflow" | "http" | "connected";
                             config: {
-                                _library_ref?: string;
-                                name?: string;
+                                [key: string]: unknown;
+                            } | null;
+                            /** @description The environment a connected agent registered with, for example production or development. Null for every other kind. */
+                            environment: string | null;
+                            /** @description The user a personal development agent belongs to. Only that user can run simulations against it. Null when the agent is shared. */
+                            ownerUserId: string | null;
+                            /** @description The machine a development agent registered from with a project or service key. Null when the agent is personal or shared. */
+                            hostLabel: string | null;
+                            /** @description When an instance of a connected agent was last connected. Null for every other kind. */
+                            lastSeenAt: string | null;
+                            /** @description The run parameters a connected agent declares from its function signature: name, type, options, default and description. Empty for every other kind. */
+                            parameters: {
+                                name: string;
                                 description?: string;
-                                cls?: string;
-                                parameters?: {
-                                    identifier: string;
-                                    /** @enum {string} */
-                                    type: "str" | "image" | "float" | "int" | "bool" | "list" | "list[str]" | "list[float]" | "list[int]" | "list[bool]" | "dict" | "json_schema" | "chat_messages" | "signature" | "llm" | "prompting_technique" | "dataset" | "code";
-                                    optional?: boolean;
-                                    value?: unknown;
-                                    desc?: string;
-                                    prefix?: string;
-                                    hidden?: boolean;
-                                    json_schema?: {
-                                        [key: string]: unknown;
-                                    };
-                                }[];
-                                inputs?: {
-                                    identifier: string;
-                                    /** @enum {string} */
-                                    type: "str" | "image" | "float" | "int" | "bool" | "list" | "list[str]" | "list[float]" | "list[int]" | "list[bool]" | "dict" | "json_schema" | "chat_messages" | "signature" | "llm" | "prompting_technique" | "dataset" | "code";
-                                    optional?: boolean;
-                                    value?: unknown;
-                                    desc?: string;
-                                    prefix?: string;
-                                    hidden?: boolean;
-                                    json_schema?: {
-                                        [key: string]: unknown;
-                                    };
-                                }[];
-                                outputs?: {
-                                    identifier: string;
-                                    /** @enum {string} */
-                                    type: "str" | "image" | "float" | "int" | "bool" | "list" | "list[str]" | "list[float]" | "list[int]" | "list[bool]" | "dict" | "json_schema" | "chat_messages" | "signature" | "llm" | "prompting_technique" | "dataset" | "code";
-                                    optional?: boolean;
-                                    value?: unknown;
-                                    desc?: string;
-                                    prefix?: string;
-                                    hidden?: boolean;
-                                    json_schema?: {
-                                        [key: string]: unknown;
-                                    };
-                                }[];
-                                isCustom?: boolean;
-                                /** @constant */
-                                behave_as?: "evaluator";
-                                configId?: string;
-                                handle?: string | null;
-                                versionMetadata?: {
-                                    versionId: string;
-                                    versionNumber: number;
-                                    versionCreatedAt: string;
+                                defaultValue?: string | number | boolean;
+                                secret?: boolean;
+                                /** @enum {string} */
+                                type?: "string" | "number" | "boolean";
+                                options?: (string | number | boolean)[];
+                                required?: boolean;
+                            }[];
+                            /** @description The person a personal development agent belongs to. Null when the agent is shared or host-scoped. */
+                            owner: {
+                                userId: string;
+                                name: string | null;
+                            } | null;
+                            /**
+                             * @description online while at least one process running the connected agent is connected; offline otherwise, and always for every other kind.
+                             * @enum {string}
+                             */
+                            status: "online" | "offline";
+                            /** @description The processes currently connected for a connected agent: hostname, user, pid, SDK and how many calls each has in flight. Empty for every other kind. */
+                            instances: {
+                                instanceId: string;
+                                hostname: string;
+                                username: string;
+                                pid: number;
+                                label: string | null;
+                                sdk: {
+                                    name: string;
+                                    version: string;
+                                    language: string;
                                 };
-                                llm?: {
-                                    model: string;
-                                    temperature?: number;
-                                    max_tokens?: number;
-                                    top_p?: number;
-                                    frequency_penalty?: number;
-                                    presence_penalty?: number;
-                                    seed?: number;
-                                    top_k?: number;
-                                    min_p?: number;
-                                    repetition_penalty?: number;
-                                    reasoning?: string;
-                                    reasoning_effort?: string;
-                                    thinkingLevel?: string;
-                                    effort?: string;
-                                    verbosity?: string;
-                                    litellm_params?: {
-                                        [key: string]: string;
-                                    };
-                                };
-                                prompt?: string;
-                                messages?: {
-                                    /** @enum {string} */
-                                    role?: "system" | "user" | "assistant";
-                                    content?: string;
-                                }[];
-                                promptDraft?: boolean;
-                            };
-                        } | {
-                            id: string;
-                            name: string;
-                            /** Format: date-time */
+                                connectedAt: string;
+                                inflight: number;
+                                maxConcurrency: number;
+                            }[];
                             createdAt: string;
-                            /** Format: date-time */
                             updatedAt: string;
-                            /** @constant */
-                            type: "code";
-                            config: {
-                                _library_ref?: string;
-                                name?: string;
-                                description?: string;
-                                cls?: string;
-                                parameters: ({
-                                    /** @constant */
-                                    identifier: "code";
-                                    /** @constant */
-                                    type: "code";
-                                    value: string;
-                                    optional?: boolean;
-                                    desc?: string;
-                                    prefix?: string;
-                                    hidden?: boolean;
-                                } | {
-                                    identifier: string;
-                                    /** @enum {string} */
-                                    type: "str" | "image" | "float" | "int" | "bool" | "list" | "list[str]" | "list[float]" | "list[int]" | "list[bool]" | "dict" | "json_schema" | "chat_messages" | "signature" | "llm" | "prompting_technique" | "dataset" | "code";
-                                    optional?: boolean;
-                                    value?: unknown;
-                                    desc?: string;
-                                    prefix?: string;
-                                    hidden?: boolean;
-                                    json_schema?: {
-                                        [key: string]: unknown;
-                                    };
-                                })[];
-                                inputs?: {
-                                    identifier: string;
-                                    /** @enum {string} */
-                                    type: "str" | "image" | "float" | "int" | "bool" | "list" | "list[str]" | "list[float]" | "list[int]" | "list[bool]" | "dict" | "json_schema" | "chat_messages" | "signature" | "llm" | "prompting_technique" | "dataset" | "code";
-                                    optional?: boolean;
-                                    value?: unknown;
-                                    desc?: string;
-                                    prefix?: string;
-                                    hidden?: boolean;
-                                    json_schema?: {
-                                        [key: string]: unknown;
-                                    };
-                                }[];
-                                outputs?: {
-                                    identifier: string;
-                                    /** @enum {string} */
-                                    type: "str" | "image" | "float" | "int" | "bool" | "list" | "list[str]" | "list[float]" | "list[int]" | "list[bool]" | "dict" | "json_schema" | "chat_messages" | "signature" | "llm" | "prompting_technique" | "dataset" | "code";
-                                    optional?: boolean;
-                                    value?: unknown;
-                                    desc?: string;
-                                    prefix?: string;
-                                    hidden?: boolean;
-                                    json_schema?: {
-                                        [key: string]: unknown;
-                                    };
-                                }[];
-                                isCustom?: boolean;
-                                /** @constant */
-                                behave_as?: "evaluator";
-                                scenarioMappings?: {
-                                    [key: string]: {
-                                        /** @constant */
-                                        type: "source";
-                                        sourceId: string;
-                                        path: string[];
-                                    } | {
-                                        /** @constant */
-                                        type: "value";
-                                        value: string;
-                                    };
-                                };
-                                scenarioOutputField?: string;
-                            };
-                        } | {
-                            id: string;
-                            name: string;
-                            /** Format: date-time */
-                            createdAt: string;
-                            /** Format: date-time */
-                            updatedAt: string;
-                            /** @constant */
-                            type: "workflow";
-                            config: {
-                                _library_ref?: string;
-                                name?: string;
-                                description?: string;
-                                cls?: string;
-                                parameters?: {
-                                    identifier: string;
-                                    /** @enum {string} */
-                                    type: "str" | "image" | "float" | "int" | "bool" | "list" | "list[str]" | "list[float]" | "list[int]" | "list[bool]" | "dict" | "json_schema" | "chat_messages" | "signature" | "llm" | "prompting_technique" | "dataset" | "code";
-                                    optional?: boolean;
-                                    value?: unknown;
-                                    desc?: string;
-                                    prefix?: string;
-                                    hidden?: boolean;
-                                    json_schema?: {
-                                        [key: string]: unknown;
-                                    };
-                                }[];
-                                inputs?: {
-                                    identifier: string;
-                                    /** @enum {string} */
-                                    type: "str" | "image" | "float" | "int" | "bool" | "list" | "list[str]" | "list[float]" | "list[int]" | "list[bool]" | "dict" | "json_schema" | "chat_messages" | "signature" | "llm" | "prompting_technique" | "dataset" | "code";
-                                    optional?: boolean;
-                                    value?: unknown;
-                                    desc?: string;
-                                    prefix?: string;
-                                    hidden?: boolean;
-                                    json_schema?: {
-                                        [key: string]: unknown;
-                                    };
-                                }[];
-                                outputs?: {
-                                    identifier: string;
-                                    /** @enum {string} */
-                                    type: "str" | "image" | "float" | "int" | "bool" | "list" | "list[str]" | "list[float]" | "list[int]" | "list[bool]" | "dict" | "json_schema" | "chat_messages" | "signature" | "llm" | "prompting_technique" | "dataset" | "code";
-                                    optional?: boolean;
-                                    value?: unknown;
-                                    desc?: string;
-                                    prefix?: string;
-                                    hidden?: boolean;
-                                    json_schema?: {
-                                        [key: string]: unknown;
-                                    };
-                                }[];
-                                isCustom?: boolean;
-                                /** @constant */
-                                behave_as?: "evaluator";
-                                workflow_id?: string;
-                                publishedId?: string;
-                                version_id?: string;
-                                versions?: {
-                                    [key: string]: unknown;
-                                };
-                                scenarioMappings?: {
-                                    [key: string]: {
-                                        /** @constant */
-                                        type: "source";
-                                        sourceId: string;
-                                        path: string[];
-                                    } | {
-                                        /** @constant */
-                                        type: "value";
-                                        value: string;
-                                    };
-                                };
-                                scenarioOutputField?: string;
-                            };
-                        } | {
-                            id: string;
-                            name: string;
-                            /** Format: date-time */
-                            createdAt: string;
-                            /** Format: date-time */
-                            updatedAt: string;
-                            /** @constant */
-                            type: "http";
-                            config: {
-                                _library_ref?: string;
-                                name?: string;
-                                description?: string;
-                                cls?: string;
-                                parameters?: {
-                                    identifier: string;
-                                    /** @enum {string} */
-                                    type: "str" | "image" | "float" | "int" | "bool" | "list" | "list[str]" | "list[float]" | "list[int]" | "list[bool]" | "dict" | "json_schema" | "chat_messages" | "signature" | "llm" | "prompting_technique" | "dataset" | "code";
-                                    optional?: boolean;
-                                    value?: unknown;
-                                    desc?: string;
-                                    prefix?: string;
-                                    hidden?: boolean;
-                                    json_schema?: {
-                                        [key: string]: unknown;
-                                    };
-                                }[];
-                                inputs?: {
-                                    identifier: string;
-                                    /** @enum {string} */
-                                    type: "str" | "image" | "float" | "int" | "bool" | "list" | "list[str]" | "list[float]" | "list[int]" | "list[bool]" | "dict" | "json_schema" | "chat_messages" | "signature" | "llm" | "prompting_technique" | "dataset" | "code";
-                                    optional?: boolean;
-                                    value?: unknown;
-                                    desc?: string;
-                                    prefix?: string;
-                                    hidden?: boolean;
-                                    json_schema?: {
-                                        [key: string]: unknown;
-                                    };
-                                }[];
-                                outputs?: {
-                                    identifier: string;
-                                    /** @enum {string} */
-                                    type: "str" | "image" | "float" | "int" | "bool" | "list" | "list[str]" | "list[float]" | "list[int]" | "list[bool]" | "dict" | "json_schema" | "chat_messages" | "signature" | "llm" | "prompting_technique" | "dataset" | "code";
-                                    optional?: boolean;
-                                    value?: unknown;
-                                    desc?: string;
-                                    prefix?: string;
-                                    hidden?: boolean;
-                                    json_schema?: {
-                                        [key: string]: unknown;
-                                    };
-                                }[];
-                                isCustom?: boolean;
-                                /** @constant */
-                                behave_as?: "evaluator";
-                                url: string;
-                                /**
-                                 * @default POST
-                                 * @enum {string}
-                                 */
-                                method: "GET" | "POST" | "PUT" | "DELETE" | "PATCH";
-                                headers?: {
-                                    key: string;
-                                    value: string;
-                                }[];
-                                auth?: {
-                                    /** @constant */
-                                    type: "none";
-                                } | {
-                                    /** @constant */
-                                    type: "bearer";
-                                    token: string;
-                                } | {
-                                    /** @constant */
-                                    type: "api_key";
-                                    header: string;
-                                    value: string;
-                                } | {
-                                    /** @constant */
-                                    type: "basic";
-                                    username: string;
-                                    password: string;
-                                };
-                                bodyTemplate?: string;
-                                outputPath?: string;
-                                timeoutMs?: number;
-                                scenarioMappings?: {
-                                    [key: string]: {
-                                        /** @constant */
-                                        type: "source";
-                                        sourceId: string;
-                                        path: string[];
-                                    } | {
-                                        /** @constant */
-                                        type: "value";
-                                        value: string;
-                                    };
-                                };
-                                devTunnel?: {
-                                    previousUrl?: string;
-                                    connectedAt?: string;
-                                };
-                            };
-                        }) & {
                             /** Format: uri */
                             platformUrl: string;
-                        })[];
+                        }[];
                         pagination: {
                             page: number;
                             limit: number;
@@ -5548,7 +5399,7 @@ export interface operations {
             };
         };
     };
-    postApiAgents: {
+    createAgent: {
         parameters: {
             query?: never;
             header?: never;
@@ -5559,705 +5410,83 @@ export interface operations {
             content: {
                 "application/json": {
                     name: string;
-                    workflowId?: string;
-                    copiedFromAgentId?: string;
-                    /** @constant */
-                    type: "signature";
+                    /**
+                     * @description The kind of agent to write. A connected agent is registered from code by the SDK, so "connected" is refused with agent_register_only.
+                     * @enum {string}
+                     */
+                    type: "signature" | "code" | "workflow" | "http" | "connected";
                     config: {
-                        _library_ref?: string;
-                        name?: string;
-                        description?: string;
-                        cls?: string;
-                        parameters?: {
-                            identifier: string;
-                            /** @enum {string} */
-                            type: "str" | "image" | "float" | "int" | "bool" | "list" | "list[str]" | "list[float]" | "list[int]" | "list[bool]" | "dict" | "json_schema" | "chat_messages" | "signature" | "llm" | "prompting_technique" | "dataset" | "code";
-                            optional?: boolean;
-                            value?: unknown;
-                            desc?: string;
-                            prefix?: string;
-                            hidden?: boolean;
-                            json_schema?: {
-                                [key: string]: unknown;
-                            };
-                        }[];
-                        inputs?: {
-                            identifier: string;
-                            /** @enum {string} */
-                            type: "str" | "image" | "float" | "int" | "bool" | "list" | "list[str]" | "list[float]" | "list[int]" | "list[bool]" | "dict" | "json_schema" | "chat_messages" | "signature" | "llm" | "prompting_technique" | "dataset" | "code";
-                            optional?: boolean;
-                            value?: unknown;
-                            desc?: string;
-                            prefix?: string;
-                            hidden?: boolean;
-                            json_schema?: {
-                                [key: string]: unknown;
-                            };
-                        }[];
-                        outputs?: {
-                            identifier: string;
-                            /** @enum {string} */
-                            type: "str" | "image" | "float" | "int" | "bool" | "list" | "list[str]" | "list[float]" | "list[int]" | "list[bool]" | "dict" | "json_schema" | "chat_messages" | "signature" | "llm" | "prompting_technique" | "dataset" | "code";
-                            optional?: boolean;
-                            value?: unknown;
-                            desc?: string;
-                            prefix?: string;
-                            hidden?: boolean;
-                            json_schema?: {
-                                [key: string]: unknown;
-                            };
-                        }[];
-                        isCustom?: boolean;
-                        /** @constant */
-                        behave_as?: "evaluator";
-                        configId?: string;
-                        handle?: string | null;
-                        versionMetadata?: {
-                            versionId: string;
-                            versionNumber: number;
-                            versionCreatedAt: string;
-                        };
-                        llm?: {
-                            model: string;
-                            temperature?: number;
-                            max_tokens?: number;
-                            top_p?: number;
-                            frequency_penalty?: number;
-                            presence_penalty?: number;
-                            seed?: number;
-                            top_k?: number;
-                            min_p?: number;
-                            repetition_penalty?: number;
-                            reasoning?: string;
-                            reasoning_effort?: string;
-                            thinkingLevel?: string;
-                            effort?: string;
-                            verbosity?: string;
-                            litellm_params?: {
-                                [key: string]: string;
-                            };
-                        };
-                        prompt?: string;
-                        messages?: {
-                            /** @enum {string} */
-                            role?: "system" | "user" | "assistant";
-                            content?: string;
-                        }[];
-                        promptDraft?: boolean;
+                        [key: string]: unknown;
                     };
-                } | {
-                    name: string;
                     workflowId?: string;
-                    copiedFromAgentId?: string;
-                    /** @constant */
-                    type: "code";
-                    config: {
-                        _library_ref?: string;
-                        name?: string;
-                        description?: string;
-                        cls?: string;
-                        parameters: ({
-                            /** @constant */
-                            identifier: "code";
-                            /** @constant */
-                            type: "code";
-                            value: string;
-                            optional?: boolean;
-                            desc?: string;
-                            prefix?: string;
-                            hidden?: boolean;
-                        } | {
-                            identifier: string;
-                            /** @enum {string} */
-                            type: "str" | "image" | "float" | "int" | "bool" | "list" | "list[str]" | "list[float]" | "list[int]" | "list[bool]" | "dict" | "json_schema" | "chat_messages" | "signature" | "llm" | "prompting_technique" | "dataset" | "code";
-                            optional?: boolean;
-                            value?: unknown;
-                            desc?: string;
-                            prefix?: string;
-                            hidden?: boolean;
-                            json_schema?: {
-                                [key: string]: unknown;
-                            };
-                        })[];
-                        inputs?: {
-                            identifier: string;
-                            /** @enum {string} */
-                            type: "str" | "image" | "float" | "int" | "bool" | "list" | "list[str]" | "list[float]" | "list[int]" | "list[bool]" | "dict" | "json_schema" | "chat_messages" | "signature" | "llm" | "prompting_technique" | "dataset" | "code";
-                            optional?: boolean;
-                            value?: unknown;
-                            desc?: string;
-                            prefix?: string;
-                            hidden?: boolean;
-                            json_schema?: {
-                                [key: string]: unknown;
-                            };
-                        }[];
-                        outputs?: {
-                            identifier: string;
-                            /** @enum {string} */
-                            type: "str" | "image" | "float" | "int" | "bool" | "list" | "list[str]" | "list[float]" | "list[int]" | "list[bool]" | "dict" | "json_schema" | "chat_messages" | "signature" | "llm" | "prompting_technique" | "dataset" | "code";
-                            optional?: boolean;
-                            value?: unknown;
-                            desc?: string;
-                            prefix?: string;
-                            hidden?: boolean;
-                            json_schema?: {
-                                [key: string]: unknown;
-                            };
-                        }[];
-                        isCustom?: boolean;
-                        /** @constant */
-                        behave_as?: "evaluator";
-                        scenarioMappings?: {
-                            [key: string]: {
-                                /** @constant */
-                                type: "source";
-                                sourceId: string;
-                                path: string[];
-                            } | {
-                                /** @constant */
-                                type: "value";
-                                value: string;
-                            };
-                        };
-                        scenarioOutputField?: string;
-                    };
-                } | {
-                    name: string;
-                    workflowId?: string;
-                    copiedFromAgentId?: string;
-                    /** @constant */
-                    type: "workflow";
-                    config: {
-                        _library_ref?: string;
-                        name?: string;
-                        description?: string;
-                        cls?: string;
-                        parameters?: {
-                            identifier: string;
-                            /** @enum {string} */
-                            type: "str" | "image" | "float" | "int" | "bool" | "list" | "list[str]" | "list[float]" | "list[int]" | "list[bool]" | "dict" | "json_schema" | "chat_messages" | "signature" | "llm" | "prompting_technique" | "dataset" | "code";
-                            optional?: boolean;
-                            value?: unknown;
-                            desc?: string;
-                            prefix?: string;
-                            hidden?: boolean;
-                            json_schema?: {
-                                [key: string]: unknown;
-                            };
-                        }[];
-                        inputs?: {
-                            identifier: string;
-                            /** @enum {string} */
-                            type: "str" | "image" | "float" | "int" | "bool" | "list" | "list[str]" | "list[float]" | "list[int]" | "list[bool]" | "dict" | "json_schema" | "chat_messages" | "signature" | "llm" | "prompting_technique" | "dataset" | "code";
-                            optional?: boolean;
-                            value?: unknown;
-                            desc?: string;
-                            prefix?: string;
-                            hidden?: boolean;
-                            json_schema?: {
-                                [key: string]: unknown;
-                            };
-                        }[];
-                        outputs?: {
-                            identifier: string;
-                            /** @enum {string} */
-                            type: "str" | "image" | "float" | "int" | "bool" | "list" | "list[str]" | "list[float]" | "list[int]" | "list[bool]" | "dict" | "json_schema" | "chat_messages" | "signature" | "llm" | "prompting_technique" | "dataset" | "code";
-                            optional?: boolean;
-                            value?: unknown;
-                            desc?: string;
-                            prefix?: string;
-                            hidden?: boolean;
-                            json_schema?: {
-                                [key: string]: unknown;
-                            };
-                        }[];
-                        isCustom?: boolean;
-                        /** @constant */
-                        behave_as?: "evaluator";
-                        workflow_id?: string;
-                        publishedId?: string;
-                        version_id?: string;
-                        versions?: {
-                            [key: string]: unknown;
-                        };
-                        scenarioMappings?: {
-                            [key: string]: {
-                                /** @constant */
-                                type: "source";
-                                sourceId: string;
-                                path: string[];
-                            } | {
-                                /** @constant */
-                                type: "value";
-                                value: string;
-                            };
-                        };
-                        scenarioOutputField?: string;
-                    };
-                } | {
-                    name: string;
-                    workflowId?: string;
-                    copiedFromAgentId?: string;
-                    /** @constant */
-                    type: "http";
-                    config: {
-                        _library_ref?: string;
-                        name?: string;
-                        description?: string;
-                        cls?: string;
-                        parameters?: {
-                            identifier: string;
-                            /** @enum {string} */
-                            type: "str" | "image" | "float" | "int" | "bool" | "list" | "list[str]" | "list[float]" | "list[int]" | "list[bool]" | "dict" | "json_schema" | "chat_messages" | "signature" | "llm" | "prompting_technique" | "dataset" | "code";
-                            optional?: boolean;
-                            value?: unknown;
-                            desc?: string;
-                            prefix?: string;
-                            hidden?: boolean;
-                            json_schema?: {
-                                [key: string]: unknown;
-                            };
-                        }[];
-                        inputs?: {
-                            identifier: string;
-                            /** @enum {string} */
-                            type: "str" | "image" | "float" | "int" | "bool" | "list" | "list[str]" | "list[float]" | "list[int]" | "list[bool]" | "dict" | "json_schema" | "chat_messages" | "signature" | "llm" | "prompting_technique" | "dataset" | "code";
-                            optional?: boolean;
-                            value?: unknown;
-                            desc?: string;
-                            prefix?: string;
-                            hidden?: boolean;
-                            json_schema?: {
-                                [key: string]: unknown;
-                            };
-                        }[];
-                        outputs?: {
-                            identifier: string;
-                            /** @enum {string} */
-                            type: "str" | "image" | "float" | "int" | "bool" | "list" | "list[str]" | "list[float]" | "list[int]" | "list[bool]" | "dict" | "json_schema" | "chat_messages" | "signature" | "llm" | "prompting_technique" | "dataset" | "code";
-                            optional?: boolean;
-                            value?: unknown;
-                            desc?: string;
-                            prefix?: string;
-                            hidden?: boolean;
-                            json_schema?: {
-                                [key: string]: unknown;
-                            };
-                        }[];
-                        isCustom?: boolean;
-                        /** @constant */
-                        behave_as?: "evaluator";
-                        url: string;
-                        /**
-                         * @default POST
-                         * @enum {string}
-                         */
-                        method?: "GET" | "POST" | "PUT" | "DELETE" | "PATCH";
-                        headers?: {
-                            key: string;
-                            value: string;
-                        }[];
-                        auth?: {
-                            /** @constant */
-                            type: "none";
-                        } | {
-                            /** @constant */
-                            type: "bearer";
-                            token: string;
-                        } | {
-                            /** @constant */
-                            type: "api_key";
-                            header: string;
-                            value: string;
-                        } | {
-                            /** @constant */
-                            type: "basic";
-                            username: string;
-                            password: string;
-                        };
-                        bodyTemplate?: string;
-                        outputPath?: string;
-                        timeoutMs?: number;
-                        scenarioMappings?: {
-                            [key: string]: {
-                                /** @constant */
-                                type: "source";
-                                sourceId: string;
-                                path: string[];
-                            } | {
-                                /** @constant */
-                                type: "value";
-                                value: string;
-                            };
-                        };
-                        devTunnel?: {
-                            previousUrl?: string;
-                            connectedAt?: string;
-                        };
-                    };
                 };
             };
         };
         responses: {
-            /** @description Agent created */
+            /** @description Success */
             201: {
                 headers: {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": ({
+                    "application/json": {
                         id: string;
                         name: string;
-                        /** Format: date-time */
-                        createdAt: string;
-                        /** Format: date-time */
-                        updatedAt: string;
-                        /** @constant */
-                        type: "signature";
+                        /**
+                         * @description The kind of agent. A connected agent is registered from code by the SDK and cannot be created or reconfigured through this API.
+                         * @enum {string}
+                         */
+                        type: "signature" | "code" | "workflow" | "http" | "connected";
                         config: {
-                            _library_ref?: string;
-                            name?: string;
+                            [key: string]: unknown;
+                        } | null;
+                        /** @description The environment a connected agent registered with, for example production or development. Null for every other kind. */
+                        environment: string | null;
+                        /** @description The user a personal development agent belongs to. Only that user can run simulations against it. Null when the agent is shared. */
+                        ownerUserId: string | null;
+                        /** @description The machine a development agent registered from with a project or service key. Null when the agent is personal or shared. */
+                        hostLabel: string | null;
+                        /** @description When an instance of a connected agent was last connected. Null for every other kind. */
+                        lastSeenAt: string | null;
+                        /** @description The run parameters a connected agent declares from its function signature: name, type, options, default and description. Empty for every other kind. */
+                        parameters: {
+                            name: string;
                             description?: string;
-                            cls?: string;
-                            parameters?: {
-                                identifier: string;
-                                /** @enum {string} */
-                                type: "str" | "image" | "float" | "int" | "bool" | "list" | "list[str]" | "list[float]" | "list[int]" | "list[bool]" | "dict" | "json_schema" | "chat_messages" | "signature" | "llm" | "prompting_technique" | "dataset" | "code";
-                                optional?: boolean;
-                                value?: unknown;
-                                desc?: string;
-                                prefix?: string;
-                                hidden?: boolean;
-                                json_schema?: {
-                                    [key: string]: unknown;
-                                };
-                            }[];
-                            inputs?: {
-                                identifier: string;
-                                /** @enum {string} */
-                                type: "str" | "image" | "float" | "int" | "bool" | "list" | "list[str]" | "list[float]" | "list[int]" | "list[bool]" | "dict" | "json_schema" | "chat_messages" | "signature" | "llm" | "prompting_technique" | "dataset" | "code";
-                                optional?: boolean;
-                                value?: unknown;
-                                desc?: string;
-                                prefix?: string;
-                                hidden?: boolean;
-                                json_schema?: {
-                                    [key: string]: unknown;
-                                };
-                            }[];
-                            outputs?: {
-                                identifier: string;
-                                /** @enum {string} */
-                                type: "str" | "image" | "float" | "int" | "bool" | "list" | "list[str]" | "list[float]" | "list[int]" | "list[bool]" | "dict" | "json_schema" | "chat_messages" | "signature" | "llm" | "prompting_technique" | "dataset" | "code";
-                                optional?: boolean;
-                                value?: unknown;
-                                desc?: string;
-                                prefix?: string;
-                                hidden?: boolean;
-                                json_schema?: {
-                                    [key: string]: unknown;
-                                };
-                            }[];
-                            isCustom?: boolean;
-                            /** @constant */
-                            behave_as?: "evaluator";
-                            configId?: string;
-                            handle?: string | null;
-                            versionMetadata?: {
-                                versionId: string;
-                                versionNumber: number;
-                                versionCreatedAt: string;
+                            defaultValue?: string | number | boolean;
+                            secret?: boolean;
+                            /** @enum {string} */
+                            type?: "string" | "number" | "boolean";
+                            options?: (string | number | boolean)[];
+                            required?: boolean;
+                        }[];
+                        /** @description The person a personal development agent belongs to. Null when the agent is shared or host-scoped. */
+                        owner: {
+                            userId: string;
+                            name: string | null;
+                        } | null;
+                        /**
+                         * @description online while at least one process running the connected agent is connected; offline otherwise, and always for every other kind.
+                         * @enum {string}
+                         */
+                        status: "online" | "offline";
+                        /** @description The processes currently connected for a connected agent: hostname, user, pid, SDK and how many calls each has in flight. Empty for every other kind. */
+                        instances: {
+                            instanceId: string;
+                            hostname: string;
+                            username: string;
+                            pid: number;
+                            label: string | null;
+                            sdk: {
+                                name: string;
+                                version: string;
+                                language: string;
                             };
-                            llm?: {
-                                model: string;
-                                temperature?: number;
-                                max_tokens?: number;
-                                top_p?: number;
-                                frequency_penalty?: number;
-                                presence_penalty?: number;
-                                seed?: number;
-                                top_k?: number;
-                                min_p?: number;
-                                repetition_penalty?: number;
-                                reasoning?: string;
-                                reasoning_effort?: string;
-                                thinkingLevel?: string;
-                                effort?: string;
-                                verbosity?: string;
-                                litellm_params?: {
-                                    [key: string]: string;
-                                };
-                            };
-                            prompt?: string;
-                            messages?: {
-                                /** @enum {string} */
-                                role?: "system" | "user" | "assistant";
-                                content?: string;
-                            }[];
-                            promptDraft?: boolean;
-                        };
-                    } | {
-                        id: string;
-                        name: string;
-                        /** Format: date-time */
+                            connectedAt: string;
+                            inflight: number;
+                            maxConcurrency: number;
+                        }[];
                         createdAt: string;
-                        /** Format: date-time */
                         updatedAt: string;
-                        /** @constant */
-                        type: "code";
-                        config: {
-                            _library_ref?: string;
-                            name?: string;
-                            description?: string;
-                            cls?: string;
-                            parameters: ({
-                                /** @constant */
-                                identifier: "code";
-                                /** @constant */
-                                type: "code";
-                                value: string;
-                                optional?: boolean;
-                                desc?: string;
-                                prefix?: string;
-                                hidden?: boolean;
-                            } | {
-                                identifier: string;
-                                /** @enum {string} */
-                                type: "str" | "image" | "float" | "int" | "bool" | "list" | "list[str]" | "list[float]" | "list[int]" | "list[bool]" | "dict" | "json_schema" | "chat_messages" | "signature" | "llm" | "prompting_technique" | "dataset" | "code";
-                                optional?: boolean;
-                                value?: unknown;
-                                desc?: string;
-                                prefix?: string;
-                                hidden?: boolean;
-                                json_schema?: {
-                                    [key: string]: unknown;
-                                };
-                            })[];
-                            inputs?: {
-                                identifier: string;
-                                /** @enum {string} */
-                                type: "str" | "image" | "float" | "int" | "bool" | "list" | "list[str]" | "list[float]" | "list[int]" | "list[bool]" | "dict" | "json_schema" | "chat_messages" | "signature" | "llm" | "prompting_technique" | "dataset" | "code";
-                                optional?: boolean;
-                                value?: unknown;
-                                desc?: string;
-                                prefix?: string;
-                                hidden?: boolean;
-                                json_schema?: {
-                                    [key: string]: unknown;
-                                };
-                            }[];
-                            outputs?: {
-                                identifier: string;
-                                /** @enum {string} */
-                                type: "str" | "image" | "float" | "int" | "bool" | "list" | "list[str]" | "list[float]" | "list[int]" | "list[bool]" | "dict" | "json_schema" | "chat_messages" | "signature" | "llm" | "prompting_technique" | "dataset" | "code";
-                                optional?: boolean;
-                                value?: unknown;
-                                desc?: string;
-                                prefix?: string;
-                                hidden?: boolean;
-                                json_schema?: {
-                                    [key: string]: unknown;
-                                };
-                            }[];
-                            isCustom?: boolean;
-                            /** @constant */
-                            behave_as?: "evaluator";
-                            scenarioMappings?: {
-                                [key: string]: {
-                                    /** @constant */
-                                    type: "source";
-                                    sourceId: string;
-                                    path: string[];
-                                } | {
-                                    /** @constant */
-                                    type: "value";
-                                    value: string;
-                                };
-                            };
-                            scenarioOutputField?: string;
-                        };
-                    } | {
-                        id: string;
-                        name: string;
-                        /** Format: date-time */
-                        createdAt: string;
-                        /** Format: date-time */
-                        updatedAt: string;
-                        /** @constant */
-                        type: "workflow";
-                        config: {
-                            _library_ref?: string;
-                            name?: string;
-                            description?: string;
-                            cls?: string;
-                            parameters?: {
-                                identifier: string;
-                                /** @enum {string} */
-                                type: "str" | "image" | "float" | "int" | "bool" | "list" | "list[str]" | "list[float]" | "list[int]" | "list[bool]" | "dict" | "json_schema" | "chat_messages" | "signature" | "llm" | "prompting_technique" | "dataset" | "code";
-                                optional?: boolean;
-                                value?: unknown;
-                                desc?: string;
-                                prefix?: string;
-                                hidden?: boolean;
-                                json_schema?: {
-                                    [key: string]: unknown;
-                                };
-                            }[];
-                            inputs?: {
-                                identifier: string;
-                                /** @enum {string} */
-                                type: "str" | "image" | "float" | "int" | "bool" | "list" | "list[str]" | "list[float]" | "list[int]" | "list[bool]" | "dict" | "json_schema" | "chat_messages" | "signature" | "llm" | "prompting_technique" | "dataset" | "code";
-                                optional?: boolean;
-                                value?: unknown;
-                                desc?: string;
-                                prefix?: string;
-                                hidden?: boolean;
-                                json_schema?: {
-                                    [key: string]: unknown;
-                                };
-                            }[];
-                            outputs?: {
-                                identifier: string;
-                                /** @enum {string} */
-                                type: "str" | "image" | "float" | "int" | "bool" | "list" | "list[str]" | "list[float]" | "list[int]" | "list[bool]" | "dict" | "json_schema" | "chat_messages" | "signature" | "llm" | "prompting_technique" | "dataset" | "code";
-                                optional?: boolean;
-                                value?: unknown;
-                                desc?: string;
-                                prefix?: string;
-                                hidden?: boolean;
-                                json_schema?: {
-                                    [key: string]: unknown;
-                                };
-                            }[];
-                            isCustom?: boolean;
-                            /** @constant */
-                            behave_as?: "evaluator";
-                            workflow_id?: string;
-                            publishedId?: string;
-                            version_id?: string;
-                            versions?: {
-                                [key: string]: unknown;
-                            };
-                            scenarioMappings?: {
-                                [key: string]: {
-                                    /** @constant */
-                                    type: "source";
-                                    sourceId: string;
-                                    path: string[];
-                                } | {
-                                    /** @constant */
-                                    type: "value";
-                                    value: string;
-                                };
-                            };
-                            scenarioOutputField?: string;
-                        };
-                    } | {
-                        id: string;
-                        name: string;
-                        /** Format: date-time */
-                        createdAt: string;
-                        /** Format: date-time */
-                        updatedAt: string;
-                        /** @constant */
-                        type: "http";
-                        config: {
-                            _library_ref?: string;
-                            name?: string;
-                            description?: string;
-                            cls?: string;
-                            parameters?: {
-                                identifier: string;
-                                /** @enum {string} */
-                                type: "str" | "image" | "float" | "int" | "bool" | "list" | "list[str]" | "list[float]" | "list[int]" | "list[bool]" | "dict" | "json_schema" | "chat_messages" | "signature" | "llm" | "prompting_technique" | "dataset" | "code";
-                                optional?: boolean;
-                                value?: unknown;
-                                desc?: string;
-                                prefix?: string;
-                                hidden?: boolean;
-                                json_schema?: {
-                                    [key: string]: unknown;
-                                };
-                            }[];
-                            inputs?: {
-                                identifier: string;
-                                /** @enum {string} */
-                                type: "str" | "image" | "float" | "int" | "bool" | "list" | "list[str]" | "list[float]" | "list[int]" | "list[bool]" | "dict" | "json_schema" | "chat_messages" | "signature" | "llm" | "prompting_technique" | "dataset" | "code";
-                                optional?: boolean;
-                                value?: unknown;
-                                desc?: string;
-                                prefix?: string;
-                                hidden?: boolean;
-                                json_schema?: {
-                                    [key: string]: unknown;
-                                };
-                            }[];
-                            outputs?: {
-                                identifier: string;
-                                /** @enum {string} */
-                                type: "str" | "image" | "float" | "int" | "bool" | "list" | "list[str]" | "list[float]" | "list[int]" | "list[bool]" | "dict" | "json_schema" | "chat_messages" | "signature" | "llm" | "prompting_technique" | "dataset" | "code";
-                                optional?: boolean;
-                                value?: unknown;
-                                desc?: string;
-                                prefix?: string;
-                                hidden?: boolean;
-                                json_schema?: {
-                                    [key: string]: unknown;
-                                };
-                            }[];
-                            isCustom?: boolean;
-                            /** @constant */
-                            behave_as?: "evaluator";
-                            url: string;
-                            /**
-                             * @default POST
-                             * @enum {string}
-                             */
-                            method: "GET" | "POST" | "PUT" | "DELETE" | "PATCH";
-                            headers?: {
-                                key: string;
-                                value: string;
-                            }[];
-                            auth?: {
-                                /** @constant */
-                                type: "none";
-                            } | {
-                                /** @constant */
-                                type: "bearer";
-                                token: string;
-                            } | {
-                                /** @constant */
-                                type: "api_key";
-                                header: string;
-                                value: string;
-                            } | {
-                                /** @constant */
-                                type: "basic";
-                                username: string;
-                                password: string;
-                            };
-                            bodyTemplate?: string;
-                            outputPath?: string;
-                            timeoutMs?: number;
-                            scenarioMappings?: {
-                                [key: string]: {
-                                    /** @constant */
-                                    type: "source";
-                                    sourceId: string;
-                                    path: string[];
-                                } | {
-                                    /** @constant */
-                                    type: "value";
-                                    value: string;
-                                };
-                            };
-                            devTunnel?: {
-                                previousUrl?: string;
-                                connectedAt?: string;
-                            };
-                        };
-                    }) & {
                         /** Format: uri */
                         platformUrl: string;
                     };
@@ -6265,375 +5494,82 @@ export interface operations {
             };
         };
     };
-    getApiAgentsById: {
+    getAgent: {
         parameters: {
             query?: never;
             header?: never;
             path: {
+                /** @description The agent id. */
                 id: string;
             };
             cookie?: never;
         };
         requestBody?: never;
         responses: {
-            /** @description Agent */
+            /** @description Success */
             200: {
                 headers: {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": ({
+                    "application/json": {
                         id: string;
                         name: string;
-                        /** Format: date-time */
-                        createdAt: string;
-                        /** Format: date-time */
-                        updatedAt: string;
-                        /** @constant */
-                        type: "signature";
+                        /**
+                         * @description The kind of agent. A connected agent is registered from code by the SDK and cannot be created or reconfigured through this API.
+                         * @enum {string}
+                         */
+                        type: "signature" | "code" | "workflow" | "http" | "connected";
                         config: {
-                            _library_ref?: string;
-                            name?: string;
+                            [key: string]: unknown;
+                        } | null;
+                        /** @description The environment a connected agent registered with, for example production or development. Null for every other kind. */
+                        environment: string | null;
+                        /** @description The user a personal development agent belongs to. Only that user can run simulations against it. Null when the agent is shared. */
+                        ownerUserId: string | null;
+                        /** @description The machine a development agent registered from with a project or service key. Null when the agent is personal or shared. */
+                        hostLabel: string | null;
+                        /** @description When an instance of a connected agent was last connected. Null for every other kind. */
+                        lastSeenAt: string | null;
+                        /** @description The run parameters a connected agent declares from its function signature: name, type, options, default and description. Empty for every other kind. */
+                        parameters: {
+                            name: string;
                             description?: string;
-                            cls?: string;
-                            parameters?: {
-                                identifier: string;
-                                /** @enum {string} */
-                                type: "str" | "image" | "float" | "int" | "bool" | "list" | "list[str]" | "list[float]" | "list[int]" | "list[bool]" | "dict" | "json_schema" | "chat_messages" | "signature" | "llm" | "prompting_technique" | "dataset" | "code";
-                                optional?: boolean;
-                                value?: unknown;
-                                desc?: string;
-                                prefix?: string;
-                                hidden?: boolean;
-                                json_schema?: {
-                                    [key: string]: unknown;
-                                };
-                            }[];
-                            inputs?: {
-                                identifier: string;
-                                /** @enum {string} */
-                                type: "str" | "image" | "float" | "int" | "bool" | "list" | "list[str]" | "list[float]" | "list[int]" | "list[bool]" | "dict" | "json_schema" | "chat_messages" | "signature" | "llm" | "prompting_technique" | "dataset" | "code";
-                                optional?: boolean;
-                                value?: unknown;
-                                desc?: string;
-                                prefix?: string;
-                                hidden?: boolean;
-                                json_schema?: {
-                                    [key: string]: unknown;
-                                };
-                            }[];
-                            outputs?: {
-                                identifier: string;
-                                /** @enum {string} */
-                                type: "str" | "image" | "float" | "int" | "bool" | "list" | "list[str]" | "list[float]" | "list[int]" | "list[bool]" | "dict" | "json_schema" | "chat_messages" | "signature" | "llm" | "prompting_technique" | "dataset" | "code";
-                                optional?: boolean;
-                                value?: unknown;
-                                desc?: string;
-                                prefix?: string;
-                                hidden?: boolean;
-                                json_schema?: {
-                                    [key: string]: unknown;
-                                };
-                            }[];
-                            isCustom?: boolean;
-                            /** @constant */
-                            behave_as?: "evaluator";
-                            configId?: string;
-                            handle?: string | null;
-                            versionMetadata?: {
-                                versionId: string;
-                                versionNumber: number;
-                                versionCreatedAt: string;
+                            defaultValue?: string | number | boolean;
+                            secret?: boolean;
+                            /** @enum {string} */
+                            type?: "string" | "number" | "boolean";
+                            options?: (string | number | boolean)[];
+                            required?: boolean;
+                        }[];
+                        /** @description The person a personal development agent belongs to. Null when the agent is shared or host-scoped. */
+                        owner: {
+                            userId: string;
+                            name: string | null;
+                        } | null;
+                        /**
+                         * @description online while at least one process running the connected agent is connected; offline otherwise, and always for every other kind.
+                         * @enum {string}
+                         */
+                        status: "online" | "offline";
+                        /** @description The processes currently connected for a connected agent: hostname, user, pid, SDK and how many calls each has in flight. Empty for every other kind. */
+                        instances: {
+                            instanceId: string;
+                            hostname: string;
+                            username: string;
+                            pid: number;
+                            label: string | null;
+                            sdk: {
+                                name: string;
+                                version: string;
+                                language: string;
                             };
-                            llm?: {
-                                model: string;
-                                temperature?: number;
-                                max_tokens?: number;
-                                top_p?: number;
-                                frequency_penalty?: number;
-                                presence_penalty?: number;
-                                seed?: number;
-                                top_k?: number;
-                                min_p?: number;
-                                repetition_penalty?: number;
-                                reasoning?: string;
-                                reasoning_effort?: string;
-                                thinkingLevel?: string;
-                                effort?: string;
-                                verbosity?: string;
-                                litellm_params?: {
-                                    [key: string]: string;
-                                };
-                            };
-                            prompt?: string;
-                            messages?: {
-                                /** @enum {string} */
-                                role?: "system" | "user" | "assistant";
-                                content?: string;
-                            }[];
-                            promptDraft?: boolean;
-                        };
-                    } | {
-                        id: string;
-                        name: string;
-                        /** Format: date-time */
+                            connectedAt: string;
+                            inflight: number;
+                            maxConcurrency: number;
+                        }[];
                         createdAt: string;
-                        /** Format: date-time */
                         updatedAt: string;
-                        /** @constant */
-                        type: "code";
-                        config: {
-                            _library_ref?: string;
-                            name?: string;
-                            description?: string;
-                            cls?: string;
-                            parameters: ({
-                                /** @constant */
-                                identifier: "code";
-                                /** @constant */
-                                type: "code";
-                                value: string;
-                                optional?: boolean;
-                                desc?: string;
-                                prefix?: string;
-                                hidden?: boolean;
-                            } | {
-                                identifier: string;
-                                /** @enum {string} */
-                                type: "str" | "image" | "float" | "int" | "bool" | "list" | "list[str]" | "list[float]" | "list[int]" | "list[bool]" | "dict" | "json_schema" | "chat_messages" | "signature" | "llm" | "prompting_technique" | "dataset" | "code";
-                                optional?: boolean;
-                                value?: unknown;
-                                desc?: string;
-                                prefix?: string;
-                                hidden?: boolean;
-                                json_schema?: {
-                                    [key: string]: unknown;
-                                };
-                            })[];
-                            inputs?: {
-                                identifier: string;
-                                /** @enum {string} */
-                                type: "str" | "image" | "float" | "int" | "bool" | "list" | "list[str]" | "list[float]" | "list[int]" | "list[bool]" | "dict" | "json_schema" | "chat_messages" | "signature" | "llm" | "prompting_technique" | "dataset" | "code";
-                                optional?: boolean;
-                                value?: unknown;
-                                desc?: string;
-                                prefix?: string;
-                                hidden?: boolean;
-                                json_schema?: {
-                                    [key: string]: unknown;
-                                };
-                            }[];
-                            outputs?: {
-                                identifier: string;
-                                /** @enum {string} */
-                                type: "str" | "image" | "float" | "int" | "bool" | "list" | "list[str]" | "list[float]" | "list[int]" | "list[bool]" | "dict" | "json_schema" | "chat_messages" | "signature" | "llm" | "prompting_technique" | "dataset" | "code";
-                                optional?: boolean;
-                                value?: unknown;
-                                desc?: string;
-                                prefix?: string;
-                                hidden?: boolean;
-                                json_schema?: {
-                                    [key: string]: unknown;
-                                };
-                            }[];
-                            isCustom?: boolean;
-                            /** @constant */
-                            behave_as?: "evaluator";
-                            scenarioMappings?: {
-                                [key: string]: {
-                                    /** @constant */
-                                    type: "source";
-                                    sourceId: string;
-                                    path: string[];
-                                } | {
-                                    /** @constant */
-                                    type: "value";
-                                    value: string;
-                                };
-                            };
-                            scenarioOutputField?: string;
-                        };
-                    } | {
-                        id: string;
-                        name: string;
-                        /** Format: date-time */
-                        createdAt: string;
-                        /** Format: date-time */
-                        updatedAt: string;
-                        /** @constant */
-                        type: "workflow";
-                        config: {
-                            _library_ref?: string;
-                            name?: string;
-                            description?: string;
-                            cls?: string;
-                            parameters?: {
-                                identifier: string;
-                                /** @enum {string} */
-                                type: "str" | "image" | "float" | "int" | "bool" | "list" | "list[str]" | "list[float]" | "list[int]" | "list[bool]" | "dict" | "json_schema" | "chat_messages" | "signature" | "llm" | "prompting_technique" | "dataset" | "code";
-                                optional?: boolean;
-                                value?: unknown;
-                                desc?: string;
-                                prefix?: string;
-                                hidden?: boolean;
-                                json_schema?: {
-                                    [key: string]: unknown;
-                                };
-                            }[];
-                            inputs?: {
-                                identifier: string;
-                                /** @enum {string} */
-                                type: "str" | "image" | "float" | "int" | "bool" | "list" | "list[str]" | "list[float]" | "list[int]" | "list[bool]" | "dict" | "json_schema" | "chat_messages" | "signature" | "llm" | "prompting_technique" | "dataset" | "code";
-                                optional?: boolean;
-                                value?: unknown;
-                                desc?: string;
-                                prefix?: string;
-                                hidden?: boolean;
-                                json_schema?: {
-                                    [key: string]: unknown;
-                                };
-                            }[];
-                            outputs?: {
-                                identifier: string;
-                                /** @enum {string} */
-                                type: "str" | "image" | "float" | "int" | "bool" | "list" | "list[str]" | "list[float]" | "list[int]" | "list[bool]" | "dict" | "json_schema" | "chat_messages" | "signature" | "llm" | "prompting_technique" | "dataset" | "code";
-                                optional?: boolean;
-                                value?: unknown;
-                                desc?: string;
-                                prefix?: string;
-                                hidden?: boolean;
-                                json_schema?: {
-                                    [key: string]: unknown;
-                                };
-                            }[];
-                            isCustom?: boolean;
-                            /** @constant */
-                            behave_as?: "evaluator";
-                            workflow_id?: string;
-                            publishedId?: string;
-                            version_id?: string;
-                            versions?: {
-                                [key: string]: unknown;
-                            };
-                            scenarioMappings?: {
-                                [key: string]: {
-                                    /** @constant */
-                                    type: "source";
-                                    sourceId: string;
-                                    path: string[];
-                                } | {
-                                    /** @constant */
-                                    type: "value";
-                                    value: string;
-                                };
-                            };
-                            scenarioOutputField?: string;
-                        };
-                    } | {
-                        id: string;
-                        name: string;
-                        /** Format: date-time */
-                        createdAt: string;
-                        /** Format: date-time */
-                        updatedAt: string;
-                        /** @constant */
-                        type: "http";
-                        config: {
-                            _library_ref?: string;
-                            name?: string;
-                            description?: string;
-                            cls?: string;
-                            parameters?: {
-                                identifier: string;
-                                /** @enum {string} */
-                                type: "str" | "image" | "float" | "int" | "bool" | "list" | "list[str]" | "list[float]" | "list[int]" | "list[bool]" | "dict" | "json_schema" | "chat_messages" | "signature" | "llm" | "prompting_technique" | "dataset" | "code";
-                                optional?: boolean;
-                                value?: unknown;
-                                desc?: string;
-                                prefix?: string;
-                                hidden?: boolean;
-                                json_schema?: {
-                                    [key: string]: unknown;
-                                };
-                            }[];
-                            inputs?: {
-                                identifier: string;
-                                /** @enum {string} */
-                                type: "str" | "image" | "float" | "int" | "bool" | "list" | "list[str]" | "list[float]" | "list[int]" | "list[bool]" | "dict" | "json_schema" | "chat_messages" | "signature" | "llm" | "prompting_technique" | "dataset" | "code";
-                                optional?: boolean;
-                                value?: unknown;
-                                desc?: string;
-                                prefix?: string;
-                                hidden?: boolean;
-                                json_schema?: {
-                                    [key: string]: unknown;
-                                };
-                            }[];
-                            outputs?: {
-                                identifier: string;
-                                /** @enum {string} */
-                                type: "str" | "image" | "float" | "int" | "bool" | "list" | "list[str]" | "list[float]" | "list[int]" | "list[bool]" | "dict" | "json_schema" | "chat_messages" | "signature" | "llm" | "prompting_technique" | "dataset" | "code";
-                                optional?: boolean;
-                                value?: unknown;
-                                desc?: string;
-                                prefix?: string;
-                                hidden?: boolean;
-                                json_schema?: {
-                                    [key: string]: unknown;
-                                };
-                            }[];
-                            isCustom?: boolean;
-                            /** @constant */
-                            behave_as?: "evaluator";
-                            url: string;
-                            /**
-                             * @default POST
-                             * @enum {string}
-                             */
-                            method: "GET" | "POST" | "PUT" | "DELETE" | "PATCH";
-                            headers?: {
-                                key: string;
-                                value: string;
-                            }[];
-                            auth?: {
-                                /** @constant */
-                                type: "none";
-                            } | {
-                                /** @constant */
-                                type: "bearer";
-                                token: string;
-                            } | {
-                                /** @constant */
-                                type: "api_key";
-                                header: string;
-                                value: string;
-                            } | {
-                                /** @constant */
-                                type: "basic";
-                                username: string;
-                                password: string;
-                            };
-                            bodyTemplate?: string;
-                            outputPath?: string;
-                            timeoutMs?: number;
-                            scenarioMappings?: {
-                                [key: string]: {
-                                    /** @constant */
-                                    type: "source";
-                                    sourceId: string;
-                                    path: string[];
-                                } | {
-                                    /** @constant */
-                                    type: "value";
-                                    value: string;
-                                };
-                            };
-                            devTunnel?: {
-                                previousUrl?: string;
-                                connectedAt?: string;
-                            };
-                        };
-                    }) & {
                         /** Format: uri */
                         platformUrl: string;
                     };
@@ -6641,18 +5577,117 @@ export interface operations {
             };
         };
     };
-    deleteApiAgentsById: {
+    replaceAgent: {
         parameters: {
             query?: never;
             header?: never;
             path: {
+                /** @description The agent id. */
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": {
+                    name?: string;
+                    /**
+                     * @description The kind of agent to write. A connected agent is registered from code by the SDK, so "connected" is refused with agent_register_only.
+                     * @enum {string}
+                     */
+                    type?: "signature" | "code" | "workflow" | "http" | "connected";
+                    config?: {
+                        [key: string]: unknown;
+                    };
+                    workflowId?: string | null;
+                };
+            };
+        };
+        responses: {
+            /** @description Success */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        id: string;
+                        name: string;
+                        /**
+                         * @description The kind of agent. A connected agent is registered from code by the SDK and cannot be created or reconfigured through this API.
+                         * @enum {string}
+                         */
+                        type: "signature" | "code" | "workflow" | "http" | "connected";
+                        config: {
+                            [key: string]: unknown;
+                        } | null;
+                        /** @description The environment a connected agent registered with, for example production or development. Null for every other kind. */
+                        environment: string | null;
+                        /** @description The user a personal development agent belongs to. Only that user can run simulations against it. Null when the agent is shared. */
+                        ownerUserId: string | null;
+                        /** @description The machine a development agent registered from with a project or service key. Null when the agent is personal or shared. */
+                        hostLabel: string | null;
+                        /** @description When an instance of a connected agent was last connected. Null for every other kind. */
+                        lastSeenAt: string | null;
+                        /** @description The run parameters a connected agent declares from its function signature: name, type, options, default and description. Empty for every other kind. */
+                        parameters: {
+                            name: string;
+                            description?: string;
+                            defaultValue?: string | number | boolean;
+                            secret?: boolean;
+                            /** @enum {string} */
+                            type?: "string" | "number" | "boolean";
+                            options?: (string | number | boolean)[];
+                            required?: boolean;
+                        }[];
+                        /** @description The person a personal development agent belongs to. Null when the agent is shared or host-scoped. */
+                        owner: {
+                            userId: string;
+                            name: string | null;
+                        } | null;
+                        /**
+                         * @description online while at least one process running the connected agent is connected; offline otherwise, and always for every other kind.
+                         * @enum {string}
+                         */
+                        status: "online" | "offline";
+                        /** @description The processes currently connected for a connected agent: hostname, user, pid, SDK and how many calls each has in flight. Empty for every other kind. */
+                        instances: {
+                            instanceId: string;
+                            hostname: string;
+                            username: string;
+                            pid: number;
+                            label: string | null;
+                            sdk: {
+                                name: string;
+                                version: string;
+                                language: string;
+                            };
+                            connectedAt: string;
+                            inflight: number;
+                            maxConcurrency: number;
+                        }[];
+                        createdAt: string;
+                        updatedAt: string;
+                        /** Format: uri */
+                        platformUrl: string;
+                    };
+                };
+            };
+        };
+    };
+    archiveAgent: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description The agent id. */
                 id: string;
             };
             cookie?: never;
         };
         requestBody?: never;
         responses: {
-            /** @description Agent archived */
+            /** @description Success */
             200: {
                 headers: {
                     [name: string]: unknown;
@@ -6662,19 +5697,19 @@ export interface operations {
                         id: string;
                         name: string;
                         /** @enum {string} */
-                        type: "signature" | "code" | "workflow" | "http";
-                        /** Format: date-time */
-                        archivedAt: string;
+                        type: "signature" | "code" | "workflow" | "http" | "connected";
+                        archivedAt: string | null;
                     };
                 };
             };
         };
     };
-    patchApiAgentsById: {
+    updateAgent: {
         parameters: {
             query?: never;
             header?: never;
             path: {
+                /** @description The agent id. */
                 id: string;
             };
             cookie?: never;
@@ -6683,8 +5718,11 @@ export interface operations {
             content: {
                 "application/json": {
                     name?: string;
-                    /** @enum {string} */
-                    type?: "signature" | "code" | "workflow" | "http";
+                    /**
+                     * @description The kind of agent to write. A connected agent is registered from code by the SDK, so "connected" is refused with agent_register_only.
+                     * @enum {string}
+                     */
+                    type?: "signature" | "code" | "workflow" | "http" | "connected";
                     config?: {
                         [key: string]: unknown;
                     };
@@ -6693,368 +5731,222 @@ export interface operations {
             };
         };
         responses: {
-            /** @description Agent updated */
+            /** @description Success */
             200: {
                 headers: {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": ({
+                    "application/json": {
                         id: string;
                         name: string;
-                        /** Format: date-time */
-                        createdAt: string;
-                        /** Format: date-time */
-                        updatedAt: string;
-                        /** @constant */
-                        type: "signature";
+                        /**
+                         * @description The kind of agent. A connected agent is registered from code by the SDK and cannot be created or reconfigured through this API.
+                         * @enum {string}
+                         */
+                        type: "signature" | "code" | "workflow" | "http" | "connected";
                         config: {
-                            _library_ref?: string;
-                            name?: string;
+                            [key: string]: unknown;
+                        } | null;
+                        /** @description The environment a connected agent registered with, for example production or development. Null for every other kind. */
+                        environment: string | null;
+                        /** @description The user a personal development agent belongs to. Only that user can run simulations against it. Null when the agent is shared. */
+                        ownerUserId: string | null;
+                        /** @description The machine a development agent registered from with a project or service key. Null when the agent is personal or shared. */
+                        hostLabel: string | null;
+                        /** @description When an instance of a connected agent was last connected. Null for every other kind. */
+                        lastSeenAt: string | null;
+                        /** @description The run parameters a connected agent declares from its function signature: name, type, options, default and description. Empty for every other kind. */
+                        parameters: {
+                            name: string;
                             description?: string;
-                            cls?: string;
-                            parameters?: {
-                                identifier: string;
-                                /** @enum {string} */
-                                type: "str" | "image" | "float" | "int" | "bool" | "list" | "list[str]" | "list[float]" | "list[int]" | "list[bool]" | "dict" | "json_schema" | "chat_messages" | "signature" | "llm" | "prompting_technique" | "dataset" | "code";
-                                optional?: boolean;
-                                value?: unknown;
-                                desc?: string;
-                                prefix?: string;
-                                hidden?: boolean;
-                                json_schema?: {
-                                    [key: string]: unknown;
-                                };
-                            }[];
-                            inputs?: {
-                                identifier: string;
-                                /** @enum {string} */
-                                type: "str" | "image" | "float" | "int" | "bool" | "list" | "list[str]" | "list[float]" | "list[int]" | "list[bool]" | "dict" | "json_schema" | "chat_messages" | "signature" | "llm" | "prompting_technique" | "dataset" | "code";
-                                optional?: boolean;
-                                value?: unknown;
-                                desc?: string;
-                                prefix?: string;
-                                hidden?: boolean;
-                                json_schema?: {
-                                    [key: string]: unknown;
-                                };
-                            }[];
-                            outputs?: {
-                                identifier: string;
-                                /** @enum {string} */
-                                type: "str" | "image" | "float" | "int" | "bool" | "list" | "list[str]" | "list[float]" | "list[int]" | "list[bool]" | "dict" | "json_schema" | "chat_messages" | "signature" | "llm" | "prompting_technique" | "dataset" | "code";
-                                optional?: boolean;
-                                value?: unknown;
-                                desc?: string;
-                                prefix?: string;
-                                hidden?: boolean;
-                                json_schema?: {
-                                    [key: string]: unknown;
-                                };
-                            }[];
-                            isCustom?: boolean;
-                            /** @constant */
-                            behave_as?: "evaluator";
-                            configId?: string;
-                            handle?: string | null;
-                            versionMetadata?: {
-                                versionId: string;
-                                versionNumber: number;
-                                versionCreatedAt: string;
+                            defaultValue?: string | number | boolean;
+                            secret?: boolean;
+                            /** @enum {string} */
+                            type?: "string" | "number" | "boolean";
+                            options?: (string | number | boolean)[];
+                            required?: boolean;
+                        }[];
+                        /** @description The person a personal development agent belongs to. Null when the agent is shared or host-scoped. */
+                        owner: {
+                            userId: string;
+                            name: string | null;
+                        } | null;
+                        /**
+                         * @description online while at least one process running the connected agent is connected; offline otherwise, and always for every other kind.
+                         * @enum {string}
+                         */
+                        status: "online" | "offline";
+                        /** @description The processes currently connected for a connected agent: hostname, user, pid, SDK and how many calls each has in flight. Empty for every other kind. */
+                        instances: {
+                            instanceId: string;
+                            hostname: string;
+                            username: string;
+                            pid: number;
+                            label: string | null;
+                            sdk: {
+                                name: string;
+                                version: string;
+                                language: string;
                             };
-                            llm?: {
-                                model: string;
-                                temperature?: number;
-                                max_tokens?: number;
-                                top_p?: number;
-                                frequency_penalty?: number;
-                                presence_penalty?: number;
-                                seed?: number;
-                                top_k?: number;
-                                min_p?: number;
-                                repetition_penalty?: number;
-                                reasoning?: string;
-                                reasoning_effort?: string;
-                                thinkingLevel?: string;
-                                effort?: string;
-                                verbosity?: string;
-                                litellm_params?: {
-                                    [key: string]: string;
-                                };
-                            };
-                            prompt?: string;
-                            messages?: {
-                                /** @enum {string} */
-                                role?: "system" | "user" | "assistant";
-                                content?: string;
-                            }[];
-                            promptDraft?: boolean;
-                        };
-                    } | {
-                        id: string;
-                        name: string;
-                        /** Format: date-time */
+                            connectedAt: string;
+                            inflight: number;
+                            maxConcurrency: number;
+                        }[];
                         createdAt: string;
-                        /** Format: date-time */
                         updatedAt: string;
-                        /** @constant */
-                        type: "code";
-                        config: {
-                            _library_ref?: string;
-                            name?: string;
-                            description?: string;
-                            cls?: string;
-                            parameters: ({
-                                /** @constant */
-                                identifier: "code";
-                                /** @constant */
-                                type: "code";
-                                value: string;
-                                optional?: boolean;
-                                desc?: string;
-                                prefix?: string;
-                                hidden?: boolean;
-                            } | {
-                                identifier: string;
-                                /** @enum {string} */
-                                type: "str" | "image" | "float" | "int" | "bool" | "list" | "list[str]" | "list[float]" | "list[int]" | "list[bool]" | "dict" | "json_schema" | "chat_messages" | "signature" | "llm" | "prompting_technique" | "dataset" | "code";
-                                optional?: boolean;
-                                value?: unknown;
-                                desc?: string;
-                                prefix?: string;
-                                hidden?: boolean;
-                                json_schema?: {
-                                    [key: string]: unknown;
-                                };
-                            })[];
-                            inputs?: {
-                                identifier: string;
-                                /** @enum {string} */
-                                type: "str" | "image" | "float" | "int" | "bool" | "list" | "list[str]" | "list[float]" | "list[int]" | "list[bool]" | "dict" | "json_schema" | "chat_messages" | "signature" | "llm" | "prompting_technique" | "dataset" | "code";
-                                optional?: boolean;
-                                value?: unknown;
-                                desc?: string;
-                                prefix?: string;
-                                hidden?: boolean;
-                                json_schema?: {
-                                    [key: string]: unknown;
-                                };
-                            }[];
-                            outputs?: {
-                                identifier: string;
-                                /** @enum {string} */
-                                type: "str" | "image" | "float" | "int" | "bool" | "list" | "list[str]" | "list[float]" | "list[int]" | "list[bool]" | "dict" | "json_schema" | "chat_messages" | "signature" | "llm" | "prompting_technique" | "dataset" | "code";
-                                optional?: boolean;
-                                value?: unknown;
-                                desc?: string;
-                                prefix?: string;
-                                hidden?: boolean;
-                                json_schema?: {
-                                    [key: string]: unknown;
-                                };
-                            }[];
-                            isCustom?: boolean;
-                            /** @constant */
-                            behave_as?: "evaluator";
-                            scenarioMappings?: {
-                                [key: string]: {
-                                    /** @constant */
-                                    type: "source";
-                                    sourceId: string;
-                                    path: string[];
-                                } | {
-                                    /** @constant */
-                                    type: "value";
-                                    value: string;
-                                };
-                            };
-                            scenarioOutputField?: string;
-                        };
-                    } | {
-                        id: string;
-                        name: string;
-                        /** Format: date-time */
-                        createdAt: string;
-                        /** Format: date-time */
-                        updatedAt: string;
-                        /** @constant */
-                        type: "workflow";
-                        config: {
-                            _library_ref?: string;
-                            name?: string;
-                            description?: string;
-                            cls?: string;
-                            parameters?: {
-                                identifier: string;
-                                /** @enum {string} */
-                                type: "str" | "image" | "float" | "int" | "bool" | "list" | "list[str]" | "list[float]" | "list[int]" | "list[bool]" | "dict" | "json_schema" | "chat_messages" | "signature" | "llm" | "prompting_technique" | "dataset" | "code";
-                                optional?: boolean;
-                                value?: unknown;
-                                desc?: string;
-                                prefix?: string;
-                                hidden?: boolean;
-                                json_schema?: {
-                                    [key: string]: unknown;
-                                };
-                            }[];
-                            inputs?: {
-                                identifier: string;
-                                /** @enum {string} */
-                                type: "str" | "image" | "float" | "int" | "bool" | "list" | "list[str]" | "list[float]" | "list[int]" | "list[bool]" | "dict" | "json_schema" | "chat_messages" | "signature" | "llm" | "prompting_technique" | "dataset" | "code";
-                                optional?: boolean;
-                                value?: unknown;
-                                desc?: string;
-                                prefix?: string;
-                                hidden?: boolean;
-                                json_schema?: {
-                                    [key: string]: unknown;
-                                };
-                            }[];
-                            outputs?: {
-                                identifier: string;
-                                /** @enum {string} */
-                                type: "str" | "image" | "float" | "int" | "bool" | "list" | "list[str]" | "list[float]" | "list[int]" | "list[bool]" | "dict" | "json_schema" | "chat_messages" | "signature" | "llm" | "prompting_technique" | "dataset" | "code";
-                                optional?: boolean;
-                                value?: unknown;
-                                desc?: string;
-                                prefix?: string;
-                                hidden?: boolean;
-                                json_schema?: {
-                                    [key: string]: unknown;
-                                };
-                            }[];
-                            isCustom?: boolean;
-                            /** @constant */
-                            behave_as?: "evaluator";
-                            workflow_id?: string;
-                            publishedId?: string;
-                            version_id?: string;
-                            versions?: {
-                                [key: string]: unknown;
-                            };
-                            scenarioMappings?: {
-                                [key: string]: {
-                                    /** @constant */
-                                    type: "source";
-                                    sourceId: string;
-                                    path: string[];
-                                } | {
-                                    /** @constant */
-                                    type: "value";
-                                    value: string;
-                                };
-                            };
-                            scenarioOutputField?: string;
-                        };
-                    } | {
-                        id: string;
-                        name: string;
-                        /** Format: date-time */
-                        createdAt: string;
-                        /** Format: date-time */
-                        updatedAt: string;
-                        /** @constant */
-                        type: "http";
-                        config: {
-                            _library_ref?: string;
-                            name?: string;
-                            description?: string;
-                            cls?: string;
-                            parameters?: {
-                                identifier: string;
-                                /** @enum {string} */
-                                type: "str" | "image" | "float" | "int" | "bool" | "list" | "list[str]" | "list[float]" | "list[int]" | "list[bool]" | "dict" | "json_schema" | "chat_messages" | "signature" | "llm" | "prompting_technique" | "dataset" | "code";
-                                optional?: boolean;
-                                value?: unknown;
-                                desc?: string;
-                                prefix?: string;
-                                hidden?: boolean;
-                                json_schema?: {
-                                    [key: string]: unknown;
-                                };
-                            }[];
-                            inputs?: {
-                                identifier: string;
-                                /** @enum {string} */
-                                type: "str" | "image" | "float" | "int" | "bool" | "list" | "list[str]" | "list[float]" | "list[int]" | "list[bool]" | "dict" | "json_schema" | "chat_messages" | "signature" | "llm" | "prompting_technique" | "dataset" | "code";
-                                optional?: boolean;
-                                value?: unknown;
-                                desc?: string;
-                                prefix?: string;
-                                hidden?: boolean;
-                                json_schema?: {
-                                    [key: string]: unknown;
-                                };
-                            }[];
-                            outputs?: {
-                                identifier: string;
-                                /** @enum {string} */
-                                type: "str" | "image" | "float" | "int" | "bool" | "list" | "list[str]" | "list[float]" | "list[int]" | "list[bool]" | "dict" | "json_schema" | "chat_messages" | "signature" | "llm" | "prompting_technique" | "dataset" | "code";
-                                optional?: boolean;
-                                value?: unknown;
-                                desc?: string;
-                                prefix?: string;
-                                hidden?: boolean;
-                                json_schema?: {
-                                    [key: string]: unknown;
-                                };
-                            }[];
-                            isCustom?: boolean;
-                            /** @constant */
-                            behave_as?: "evaluator";
-                            url: string;
-                            /**
-                             * @default POST
-                             * @enum {string}
-                             */
-                            method: "GET" | "POST" | "PUT" | "DELETE" | "PATCH";
-                            headers?: {
-                                key: string;
-                                value: string;
-                            }[];
-                            auth?: {
-                                /** @constant */
-                                type: "none";
-                            } | {
-                                /** @constant */
-                                type: "bearer";
-                                token: string;
-                            } | {
-                                /** @constant */
-                                type: "api_key";
-                                header: string;
-                                value: string;
-                            } | {
-                                /** @constant */
-                                type: "basic";
-                                username: string;
-                                password: string;
-                            };
-                            bodyTemplate?: string;
-                            outputPath?: string;
-                            timeoutMs?: number;
-                            scenarioMappings?: {
-                                [key: string]: {
-                                    /** @constant */
-                                    type: "source";
-                                    sourceId: string;
-                                    path: string[];
-                                } | {
-                                    /** @constant */
-                                    type: "value";
-                                    value: string;
-                                };
-                            };
-                            devTunnel?: {
-                                previousUrl?: string;
-                                connectedAt?: string;
-                            };
-                        };
-                    }) & {
                         /** Format: uri */
                         platformUrl: string;
                     };
                 };
+            };
+        };
+    };
+    testAgent: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description The agent id. */
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Success */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        /** @description The run to follow; open it in the simulations run drawer. */
+                        scenarioRunId: string;
+                        /** @description The batch the run belongs to. */
+                        batchRunId: string;
+                        /** @description The internal set that holds agent test runs. */
+                        setId: string;
+                    };
+                };
+            };
+            /** @description The agent is a personal development agent of someone else */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description No agent with that id in this project */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description The agent cannot be tested as it is set up */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    callConnectedAgent: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description The connected agent id. */
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": {
+                    /** @description The whole conversation so far, OpenAI style. */
+                    messages: ({
+                        role: string;
+                    } & {
+                        [key: string]: unknown;
+                    })[];
+                    /** @description The messages added since the agent's last turn. Defaults to the last message. */
+                    newMessages?: ({
+                        role: string;
+                    } & {
+                        [key: string]: unknown;
+                    })[];
+                    /** @description The conversation id. Turns of one conversation share it; a new id starts a new one. */
+                    threadId?: string;
+                    /** @description Run parameter values by name, as JSON scalars. */
+                    params?: {
+                        [key: string]: string | number | boolean;
+                    };
+                    /** @description The session the agent returned on its previous turn of this conversation, echoed back as is. */
+                    session?: unknown;
+                    /** @description The W3C trace context the agent adopts, so its spans join this turn's trace. */
+                    traceparent?: string;
+                    /** @description The simulation run this turn belongs to, if any. */
+                    run?: {
+                        scenarioRunId?: string;
+                        scenarioName?: string;
+                        batchRunId?: string;
+                    };
+                };
+            };
+        };
+        responses: {
+            /** @description Success */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        /** @description What the function answered: text, one message, or a list of messages. */
+                        output: string | ({
+                            role: string;
+                        } & {
+                            [key: string]: unknown;
+                        }) | ({
+                            role: string;
+                        } & {
+                            [key: string]: unknown;
+                        })[];
+                        /** @description The agent's per-conversation memory, to send on the next turn. */
+                        session?: unknown;
+                        instance: {
+                            hostname: string;
+                            label: string | null;
+                        };
+                        durationMs: number;
+                    };
+                };
+            };
+            /** @description No connected agent with that id in this project */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Every instance is busy; Retry-After says when to try again */
+            429: {
+                headers: {
+                    /** @description How many seconds to wait before the turn is sent again. Rounded up from the wait the platform picked. */
+                    "Retry-After"?: string;
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description No instance of the agent is connected */
+            503: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
             };
         };
     };
@@ -7113,10 +6005,7 @@ export interface operations {
                     /** @description Human-readable name for this key */
                     name: string;
                     description?: string;
-                    /**
-                     * Format: date-time
-                     * @description ISO 8601 timestamp after which the key stops working
-                     */
+                    /** @description ISO 8601 timestamp after which the key stops working */
                     expiresAt?: string;
                     /** @description Organization admins only: the member who owns the key and whose access caps it. Defaults to the caller. */
                     assignedToUserId?: string;
@@ -7453,7 +6342,196 @@ export interface operations {
                     query?: string;
                     /** @default {} */
                     filters?: {
-                        [key: string]: string[] | {
+                        "topics.topics"?: string[] | {
+                            [key: string]: string[];
+                        } | {
+                            [key: string]: {
+                                [key: string]: string[];
+                            };
+                        };
+                        "topics.subtopics"?: string[] | {
+                            [key: string]: string[];
+                        } | {
+                            [key: string]: {
+                                [key: string]: string[];
+                            };
+                        };
+                        "metadata.user_id"?: string[] | {
+                            [key: string]: string[];
+                        } | {
+                            [key: string]: {
+                                [key: string]: string[];
+                            };
+                        };
+                        "metadata.thread_id"?: string[] | {
+                            [key: string]: string[];
+                        } | {
+                            [key: string]: {
+                                [key: string]: string[];
+                            };
+                        };
+                        "metadata.customer_id"?: string[] | {
+                            [key: string]: string[];
+                        } | {
+                            [key: string]: {
+                                [key: string]: string[];
+                            };
+                        };
+                        "metadata.labels"?: string[] | {
+                            [key: string]: string[];
+                        } | {
+                            [key: string]: {
+                                [key: string]: string[];
+                            };
+                        };
+                        "metadata.key"?: string[] | {
+                            [key: string]: string[];
+                        } | {
+                            [key: string]: {
+                                [key: string]: string[];
+                            };
+                        };
+                        "metadata.value"?: string[] | {
+                            [key: string]: string[];
+                        } | {
+                            [key: string]: {
+                                [key: string]: string[];
+                            };
+                        };
+                        "metadata.prompt_ids"?: string[] | {
+                            [key: string]: string[];
+                        } | {
+                            [key: string]: {
+                                [key: string]: string[];
+                            };
+                        };
+                        "traces.origin"?: string[] | {
+                            [key: string]: string[];
+                        } | {
+                            [key: string]: {
+                                [key: string]: string[];
+                            };
+                        };
+                        "traces.error"?: string[] | {
+                            [key: string]: string[];
+                        } | {
+                            [key: string]: {
+                                [key: string]: string[];
+                            };
+                        };
+                        "traces.name"?: string[] | {
+                            [key: string]: string[];
+                        } | {
+                            [key: string]: {
+                                [key: string]: string[];
+                            };
+                        };
+                        "spans.type"?: string[] | {
+                            [key: string]: string[];
+                        } | {
+                            [key: string]: {
+                                [key: string]: string[];
+                            };
+                        };
+                        "spans.model"?: string[] | {
+                            [key: string]: string[];
+                        } | {
+                            [key: string]: {
+                                [key: string]: string[];
+                            };
+                        };
+                        "evaluations.evaluator_id"?: string[] | {
+                            [key: string]: string[];
+                        } | {
+                            [key: string]: {
+                                [key: string]: string[];
+                            };
+                        };
+                        "evaluations.evaluator_id.guardrails_only"?: string[] | {
+                            [key: string]: string[];
+                        } | {
+                            [key: string]: {
+                                [key: string]: string[];
+                            };
+                        };
+                        "evaluations.evaluator_id.has_passed"?: string[] | {
+                            [key: string]: string[];
+                        } | {
+                            [key: string]: {
+                                [key: string]: string[];
+                            };
+                        };
+                        "evaluations.evaluator_id.has_score"?: string[] | {
+                            [key: string]: string[];
+                        } | {
+                            [key: string]: {
+                                [key: string]: string[];
+                            };
+                        };
+                        "evaluations.evaluator_id.has_label"?: string[] | {
+                            [key: string]: string[];
+                        } | {
+                            [key: string]: {
+                                [key: string]: string[];
+                            };
+                        };
+                        "evaluations.passed"?: string[] | {
+                            [key: string]: string[];
+                        } | {
+                            [key: string]: {
+                                [key: string]: string[];
+                            };
+                        };
+                        "evaluations.score"?: string[] | {
+                            [key: string]: string[];
+                        } | {
+                            [key: string]: {
+                                [key: string]: string[];
+                            };
+                        };
+                        "evaluations.state"?: string[] | {
+                            [key: string]: string[];
+                        } | {
+                            [key: string]: {
+                                [key: string]: string[];
+                            };
+                        };
+                        "evaluations.label"?: string[] | {
+                            [key: string]: string[];
+                        } | {
+                            [key: string]: {
+                                [key: string]: string[];
+                            };
+                        };
+                        "events.event_type"?: string[] | {
+                            [key: string]: string[];
+                        } | {
+                            [key: string]: {
+                                [key: string]: string[];
+                            };
+                        };
+                        "events.metrics.key"?: string[] | {
+                            [key: string]: string[];
+                        } | {
+                            [key: string]: {
+                                [key: string]: string[];
+                            };
+                        };
+                        "events.metrics.value"?: string[] | {
+                            [key: string]: string[];
+                        } | {
+                            [key: string]: {
+                                [key: string]: string[];
+                            };
+                        };
+                        "events.event_details.key"?: string[] | {
+                            [key: string]: string[];
+                        } | {
+                            [key: string]: {
+                                [key: string]: string[];
+                            };
+                        };
+                        "annotations.hasAnnotation"?: string[] | {
                             [key: string]: string[];
                         } | {
                             [key: string]: {
@@ -7477,7 +6555,196 @@ export interface operations {
                             aggregation: "sum" | "avg" | "min" | "max";
                         };
                         filters?: {
-                            [key: string]: string[] | {
+                            "topics.topics"?: string[] | {
+                                [key: string]: string[];
+                            } | {
+                                [key: string]: {
+                                    [key: string]: string[];
+                                };
+                            };
+                            "topics.subtopics"?: string[] | {
+                                [key: string]: string[];
+                            } | {
+                                [key: string]: {
+                                    [key: string]: string[];
+                                };
+                            };
+                            "metadata.user_id"?: string[] | {
+                                [key: string]: string[];
+                            } | {
+                                [key: string]: {
+                                    [key: string]: string[];
+                                };
+                            };
+                            "metadata.thread_id"?: string[] | {
+                                [key: string]: string[];
+                            } | {
+                                [key: string]: {
+                                    [key: string]: string[];
+                                };
+                            };
+                            "metadata.customer_id"?: string[] | {
+                                [key: string]: string[];
+                            } | {
+                                [key: string]: {
+                                    [key: string]: string[];
+                                };
+                            };
+                            "metadata.labels"?: string[] | {
+                                [key: string]: string[];
+                            } | {
+                                [key: string]: {
+                                    [key: string]: string[];
+                                };
+                            };
+                            "metadata.key"?: string[] | {
+                                [key: string]: string[];
+                            } | {
+                                [key: string]: {
+                                    [key: string]: string[];
+                                };
+                            };
+                            "metadata.value"?: string[] | {
+                                [key: string]: string[];
+                            } | {
+                                [key: string]: {
+                                    [key: string]: string[];
+                                };
+                            };
+                            "metadata.prompt_ids"?: string[] | {
+                                [key: string]: string[];
+                            } | {
+                                [key: string]: {
+                                    [key: string]: string[];
+                                };
+                            };
+                            "traces.origin"?: string[] | {
+                                [key: string]: string[];
+                            } | {
+                                [key: string]: {
+                                    [key: string]: string[];
+                                };
+                            };
+                            "traces.error"?: string[] | {
+                                [key: string]: string[];
+                            } | {
+                                [key: string]: {
+                                    [key: string]: string[];
+                                };
+                            };
+                            "traces.name"?: string[] | {
+                                [key: string]: string[];
+                            } | {
+                                [key: string]: {
+                                    [key: string]: string[];
+                                };
+                            };
+                            "spans.type"?: string[] | {
+                                [key: string]: string[];
+                            } | {
+                                [key: string]: {
+                                    [key: string]: string[];
+                                };
+                            };
+                            "spans.model"?: string[] | {
+                                [key: string]: string[];
+                            } | {
+                                [key: string]: {
+                                    [key: string]: string[];
+                                };
+                            };
+                            "evaluations.evaluator_id"?: string[] | {
+                                [key: string]: string[];
+                            } | {
+                                [key: string]: {
+                                    [key: string]: string[];
+                                };
+                            };
+                            "evaluations.evaluator_id.guardrails_only"?: string[] | {
+                                [key: string]: string[];
+                            } | {
+                                [key: string]: {
+                                    [key: string]: string[];
+                                };
+                            };
+                            "evaluations.evaluator_id.has_passed"?: string[] | {
+                                [key: string]: string[];
+                            } | {
+                                [key: string]: {
+                                    [key: string]: string[];
+                                };
+                            };
+                            "evaluations.evaluator_id.has_score"?: string[] | {
+                                [key: string]: string[];
+                            } | {
+                                [key: string]: {
+                                    [key: string]: string[];
+                                };
+                            };
+                            "evaluations.evaluator_id.has_label"?: string[] | {
+                                [key: string]: string[];
+                            } | {
+                                [key: string]: {
+                                    [key: string]: string[];
+                                };
+                            };
+                            "evaluations.passed"?: string[] | {
+                                [key: string]: string[];
+                            } | {
+                                [key: string]: {
+                                    [key: string]: string[];
+                                };
+                            };
+                            "evaluations.score"?: string[] | {
+                                [key: string]: string[];
+                            } | {
+                                [key: string]: {
+                                    [key: string]: string[];
+                                };
+                            };
+                            "evaluations.state"?: string[] | {
+                                [key: string]: string[];
+                            } | {
+                                [key: string]: {
+                                    [key: string]: string[];
+                                };
+                            };
+                            "evaluations.label"?: string[] | {
+                                [key: string]: string[];
+                            } | {
+                                [key: string]: {
+                                    [key: string]: string[];
+                                };
+                            };
+                            "events.event_type"?: string[] | {
+                                [key: string]: string[];
+                            } | {
+                                [key: string]: {
+                                    [key: string]: string[];
+                                };
+                            };
+                            "events.metrics.key"?: string[] | {
+                                [key: string]: string[];
+                            } | {
+                                [key: string]: {
+                                    [key: string]: string[];
+                                };
+                            };
+                            "events.metrics.value"?: string[] | {
+                                [key: string]: string[];
+                            } | {
+                                [key: string]: {
+                                    [key: string]: string[];
+                                };
+                            };
+                            "events.event_details.key"?: string[] | {
+                                [key: string]: string[];
+                            } | {
+                                [key: string]: {
+                                    [key: string]: string[];
+                                };
+                            };
+                            "annotations.hasAnnotation"?: string[] | {
                                 [key: string]: string[];
                             } | {
                                 [key: string]: {
@@ -7557,290 +6824,6 @@ export interface operations {
                     "application/json": {
                         error: string;
                         message?: string;
-                    };
-                };
-            };
-        };
-    };
-    postApiV1ProjectsByProjectIdAnalyticsQueryClickhouse: {
-        parameters: {
-            query?: never;
-            header?: never;
-            path: {
-                projectId: string;
-            };
-            cookie?: never;
-        };
-        requestBody: {
-            content: {
-                "application/json": {
-                    sql: string;
-                    parameters?: {
-                        [key: string]: string | number | boolean | null;
-                    };
-                    timeWindow?: {
-                        start: string | number;
-                        end: string | number;
-                    };
-                    granularitySeconds?: 1 | 60 | 3600;
-                };
-            };
-        };
-        responses: {
-            /** @description The query ran, and the result is scoped to the caller's project */
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": {
-                        columns: {
-                            name: string;
-                            type: string;
-                        }[];
-                        rows: {
-                            [key: string]: unknown;
-                        }[];
-                        statistics: {
-                            elapsedMs: number;
-                            rowsRead: number;
-                            bytesRead: number;
-                            rowsReturned: number;
-                        };
-                        truncated: boolean;
-                        followsTimeWindow: boolean;
-                        followsGranularity: boolean;
-                        granularitySeconds?: number;
-                        coarsenedFromSeconds?: number;
-                        diagnostics: {
-                            /** @enum {string} */
-                            code: "RESULT_TRUNCATED" | "POSSIBLE_FANOUT" | "UNBOUNDED_TIME_RANGE" | "MISSING_TIME_BUCKETS" | "INCOMPLETE_COMPARISON_PERIOD";
-                            message: string;
-                            meta?: {
-                                [key: string]: unknown;
-                            };
-                        }[];
-                    };
-                };
-            };
-            /** @description Bad Request */
-            400: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": {
-                        error: {
-                            type: string;
-                            code: string;
-                            message: string;
-                            meta?: {
-                                [key: string]: unknown;
-                            };
-                            trace_id?: string;
-                            span_id?: string;
-                        };
-                    };
-                };
-            };
-            /** @description Unauthorized */
-            401: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": {
-                        error: {
-                            type: string;
-                            code: string;
-                            message: string;
-                            meta?: {
-                                [key: string]: unknown;
-                            };
-                            trace_id?: string;
-                            span_id?: string;
-                        };
-                    };
-                };
-            };
-            /** @description Forbidden */
-            403: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": {
-                        error: {
-                            type: string;
-                            code: string;
-                            message: string;
-                            meta?: {
-                                [key: string]: unknown;
-                            };
-                            trace_id?: string;
-                            span_id?: string;
-                        };
-                    };
-                };
-            };
-            /** @description Unprocessable Entity */
-            422: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": {
-                        error: {
-                            type: string;
-                            code: string;
-                            message: string;
-                            meta?: {
-                                [key: string]: unknown;
-                            };
-                            trace_id?: string;
-                            span_id?: string;
-                        };
-                    };
-                };
-            };
-            /** @description Internal Server Error */
-            500: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": {
-                        error: {
-                            type: string;
-                            code: string;
-                            message: string;
-                            meta?: {
-                                [key: string]: unknown;
-                            };
-                            trace_id?: string;
-                            span_id?: string;
-                        };
-                    };
-                };
-            };
-        };
-    };
-    getApiV1ProjectsByProjectIdAnalyticsSchema: {
-        parameters: {
-            query?: never;
-            header?: never;
-            path: {
-                projectId: string;
-            };
-            cookie?: never;
-        };
-        requestBody?: never;
-        responses: {
-            /** @description The LangWatchQL schema, scoped to the caller's permissions */
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": {
-                        database: string;
-                        datasets: {
-                            name: string;
-                            description: string;
-                            grain: string;
-                            joinKeys: string[];
-                            timeColumn: string;
-                            freshness: string;
-                            columns: {
-                                name: string;
-                                type: string;
-                                description: string;
-                                unit: ("ms" | "USD" | "tokens" | "tokens/s") | null;
-                                gates: ("input" | "output" | "costs")[];
-                                available: boolean;
-                            }[];
-                            exampleSql: string;
-                        }[];
-                    };
-                };
-            };
-            /** @description Bad Request */
-            400: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": {
-                        error: {
-                            type: string;
-                            code: string;
-                            message: string;
-                            meta?: {
-                                [key: string]: unknown;
-                            };
-                            trace_id?: string;
-                            span_id?: string;
-                        };
-                    };
-                };
-            };
-            /** @description Unauthorized */
-            401: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": {
-                        error: {
-                            type: string;
-                            code: string;
-                            message: string;
-                            meta?: {
-                                [key: string]: unknown;
-                            };
-                            trace_id?: string;
-                            span_id?: string;
-                        };
-                    };
-                };
-            };
-            /** @description Forbidden */
-            403: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": {
-                        error: {
-                            type: string;
-                            code: string;
-                            message: string;
-                            meta?: {
-                                [key: string]: unknown;
-                            };
-                            trace_id?: string;
-                            span_id?: string;
-                        };
-                    };
-                };
-            };
-            /** @description Internal Server Error */
-            500: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": {
-                        error: {
-                            type: string;
-                            code: string;
-                            message: string;
-                            meta?: {
-                                [key: string]: unknown;
-                            };
-                            trace_id?: string;
-                            span_id?: string;
-                        };
                     };
                 };
             };
@@ -7984,7 +6967,7 @@ export interface operations {
             content: {
                 "application/json": {
                     name: string;
-                    definition: unknown;
+                    definition?: unknown;
                 };
             };
         };
@@ -8792,6 +7775,287 @@ export interface operations {
             };
         };
     };
+    postApiV1Query: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": {
+                    sql: string;
+                    parameters?: {
+                        [key: string]: string | number | boolean | null;
+                    };
+                    timeWindow?: {
+                        start: string | number;
+                        end: string | number;
+                    };
+                    granularitySeconds?: 1 | 60 | 3600;
+                };
+            };
+        };
+        responses: {
+            /** @description The query ran. Columns, rows, execution statistics, truncation state and diagnostics, scoped to the caller's project. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        columns: {
+                            name: string;
+                            type: string;
+                        }[];
+                        rows: {
+                            [key: string]: unknown;
+                        }[];
+                        statistics: {
+                            elapsedMs: number;
+                            rowsRead: number;
+                            bytesRead: number;
+                            rowsReturned: number;
+                        };
+                        truncated: boolean;
+                        followsTimeWindow: boolean;
+                        followsGranularity: boolean;
+                        granularitySeconds?: number;
+                        coarsenedFromSeconds?: number;
+                        diagnostics: {
+                            /** @enum {string} */
+                            code: "RESULT_TRUNCATED" | "POSSIBLE_FANOUT" | "UNBOUNDED_TIME_RANGE" | "MISSING_TIME_BUCKETS" | "INCOMPLETE_COMPARISON_PERIOD";
+                            message: string;
+                            meta?: {
+                                [key: string]: unknown;
+                            };
+                        }[];
+                    };
+                };
+            };
+            /** @description Bad Request */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        error: {
+                            type: string;
+                            code: string;
+                            message: string;
+                            meta?: {
+                                [key: string]: unknown;
+                            };
+                            trace_id?: string;
+                            span_id?: string;
+                        };
+                    };
+                };
+            };
+            /** @description Unauthorized */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        error: {
+                            type: string;
+                            code: string;
+                            message: string;
+                            meta?: {
+                                [key: string]: unknown;
+                            };
+                            trace_id?: string;
+                            span_id?: string;
+                        };
+                    };
+                };
+            };
+            /** @description Forbidden */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        error: {
+                            type: string;
+                            code: string;
+                            message: string;
+                            meta?: {
+                                [key: string]: unknown;
+                            };
+                            trace_id?: string;
+                            span_id?: string;
+                        };
+                    };
+                };
+            };
+            /** @description Unprocessable Entity */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        error: {
+                            type: string;
+                            code: string;
+                            message: string;
+                            meta?: {
+                                [key: string]: unknown;
+                            };
+                            trace_id?: string;
+                            span_id?: string;
+                        };
+                    };
+                };
+            };
+            /** @description Internal Server Error */
+            500: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        error: {
+                            type: string;
+                            code: string;
+                            message: string;
+                            meta?: {
+                                [key: string]: unknown;
+                            };
+                            trace_id?: string;
+                            span_id?: string;
+                        };
+                    };
+                };
+            };
+        };
+    };
+    getApiV1QuerySchema: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description The datasets and columns this key may query, with the permissions that unlock each one. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        database: string;
+                        datasets: {
+                            name: string;
+                            description: string;
+                            grain: string;
+                            joinKeys: string[];
+                            timeColumn: string;
+                            freshness: string;
+                            columns: {
+                                name: string;
+                                type: string;
+                                description: string;
+                                /** @enum {string|null} */
+                                unit: "ms" | "USD" | "tokens" | "tokens/s" | null;
+                                gates: ("input" | "output" | "costs")[];
+                                available: boolean;
+                            }[];
+                            exampleSql: string;
+                        }[];
+                    };
+                };
+            };
+            /** @description Bad Request */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        error: {
+                            type: string;
+                            code: string;
+                            message: string;
+                            meta?: {
+                                [key: string]: unknown;
+                            };
+                            trace_id?: string;
+                            span_id?: string;
+                        };
+                    };
+                };
+            };
+            /** @description Unauthorized */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        error: {
+                            type: string;
+                            code: string;
+                            message: string;
+                            meta?: {
+                                [key: string]: unknown;
+                            };
+                            trace_id?: string;
+                            span_id?: string;
+                        };
+                    };
+                };
+            };
+            /** @description Forbidden */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        error: {
+                            type: string;
+                            code: string;
+                            message: string;
+                            meta?: {
+                                [key: string]: unknown;
+                            };
+                            trace_id?: string;
+                            span_id?: string;
+                        };
+                    };
+                };
+            };
+            /** @description Internal Server Error */
+            500: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        error: {
+                            type: string;
+                            code: string;
+                            message: string;
+                            meta?: {
+                                [key: string]: unknown;
+                            };
+                            trace_id?: string;
+                            span_id?: string;
+                        };
+                    };
+                };
+            };
+        };
+    };
     getApiCodingAgentSessionsBySessionIdEvents: {
         parameters: {
             query?: {
@@ -9038,6 +8302,85 @@ export interface operations {
                     "application/json": {
                         error: string;
                         message?: string;
+                    };
+                };
+            };
+        };
+    };
+    getPullRequestUsage: {
+        parameters: {
+            query: {
+                /** @description The repository as "owner/name". */
+                repository: string;
+                /** @description The pull request number. */
+                pullRequest: number;
+                /** @description The GitHub host. Defaults to this instance's configured GitHub host, which is github.com unless an operator named a GitHub Enterprise Server. */
+                host?: string;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Success */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        pullRequest: {
+                            repositoryHost: string;
+                            repositoryFullName: string;
+                            prNumber: number;
+                            headBranch: string;
+                            htmlUrl: string;
+                            state: string;
+                            isDraft: boolean;
+                            authorLogin: string | null;
+                            prCreatedAtMs: number;
+                            prClosedAtMs: number | null;
+                            prMergedAtMs: number | null;
+                        };
+                        rows: {
+                            projectId: string;
+                            projectSlug: string;
+                            contributorLabel: string;
+                            contributorIsProject: boolean;
+                            agent: string;
+                            models: string[];
+                            sessionsCount: number;
+                            inputTokens: number;
+                            outputTokens: number;
+                            cacheReadTokens: number;
+                            cacheCreationTokens: number;
+                            totalTokens: number;
+                            costUsd: number | null;
+                            billedCostUsd: number | null;
+                            nonBilledCostUsd: number | null;
+                        }[];
+                        totals: {
+                            sessionsCount: number;
+                            inputTokens: number;
+                            outputTokens: number;
+                            cacheReadTokens: number;
+                            cacheCreationTokens: number;
+                            totalTokens: number;
+                            costUsd: number | null;
+                            billedCostUsd: number | null;
+                            nonBilledCostUsd: number | null;
+                        };
+                        modelBreakdown: {
+                            model: string;
+                            inputTokens: number;
+                            outputTokens: number;
+                            cacheReadTokens: number;
+                            cacheCreationTokens: number;
+                            totalTokens: number;
+                            costUsd: number | null;
+                            tokensKnown: boolean;
+                        }[];
                     };
                 };
             };
@@ -9305,19 +8648,7 @@ export interface operations {
         };
         requestBody: {
             content: {
-                "application/json": {
-                    /**
-                     * @example [
-                     *       {
-                     *         "input": "hi",
-                     *         "output": "Hello, how can I help you today?"
-                     *       }
-                     *     ]
-                     */
-                    entries: {
-                        [key: string]: unknown;
-                    }[];
-                };
+                "application/json": components["schemas"]["DatasetPostEntries"];
             };
         };
         responses: never;
@@ -9347,9 +8678,7 @@ export interface operations {
                             entry: {
                                 [key: string]: unknown;
                             };
-                            /** Format: date-time */
                             createdAt: string;
-                            /** Format: date-time */
                             updatedAt: string;
                         }[];
                     };
@@ -9498,9 +8827,7 @@ export interface operations {
                         } | null;
                         workflowId: string | null;
                         copiedFromEvaluatorId: string | null;
-                        /** Format: date-time */
                         createdAt: string;
-                        /** Format: date-time */
                         updatedAt: string;
                         fields: {
                             identifier: string;
@@ -9604,9 +8931,7 @@ export interface operations {
                         } | null;
                         workflowId: string | null;
                         copiedFromEvaluatorId: string | null;
-                        /** Format: date-time */
                         createdAt: string;
-                        /** Format: date-time */
                         updatedAt: string;
                         fields: {
                             identifier: string;
@@ -9703,9 +9028,7 @@ export interface operations {
                         } | null;
                         workflowId: string | null;
                         copiedFromEvaluatorId: string | null;
-                        /** Format: date-time */
                         createdAt: string;
-                        /** Format: date-time */
                         updatedAt: string;
                         fields: {
                             identifier: string;
@@ -9823,9 +9146,7 @@ export interface operations {
                         } | null;
                         workflowId: string | null;
                         copiedFromEvaluatorId: string | null;
-                        /** Format: date-time */
                         createdAt: string;
-                        /** Format: date-time */
                         updatedAt: string;
                         fields: {
                             identifier: string;
@@ -12082,8 +11403,197 @@ export interface operations {
                     endDate: number;
                     query?: string;
                     /** @default {} */
-                    filters: {
-                        [key: string]: string[] | {
+                    filters?: {
+                        "topics.topics": string[] | {
+                            [key: string]: string[];
+                        } | {
+                            [key: string]: {
+                                [key: string]: string[];
+                            };
+                        };
+                        "topics.subtopics": string[] | {
+                            [key: string]: string[];
+                        } | {
+                            [key: string]: {
+                                [key: string]: string[];
+                            };
+                        };
+                        "metadata.user_id": string[] | {
+                            [key: string]: string[];
+                        } | {
+                            [key: string]: {
+                                [key: string]: string[];
+                            };
+                        };
+                        "metadata.thread_id": string[] | {
+                            [key: string]: string[];
+                        } | {
+                            [key: string]: {
+                                [key: string]: string[];
+                            };
+                        };
+                        "metadata.customer_id": string[] | {
+                            [key: string]: string[];
+                        } | {
+                            [key: string]: {
+                                [key: string]: string[];
+                            };
+                        };
+                        "metadata.labels": string[] | {
+                            [key: string]: string[];
+                        } | {
+                            [key: string]: {
+                                [key: string]: string[];
+                            };
+                        };
+                        "metadata.key": string[] | {
+                            [key: string]: string[];
+                        } | {
+                            [key: string]: {
+                                [key: string]: string[];
+                            };
+                        };
+                        "metadata.value": string[] | {
+                            [key: string]: string[];
+                        } | {
+                            [key: string]: {
+                                [key: string]: string[];
+                            };
+                        };
+                        "metadata.prompt_ids": string[] | {
+                            [key: string]: string[];
+                        } | {
+                            [key: string]: {
+                                [key: string]: string[];
+                            };
+                        };
+                        "traces.origin": string[] | {
+                            [key: string]: string[];
+                        } | {
+                            [key: string]: {
+                                [key: string]: string[];
+                            };
+                        };
+                        "traces.error": string[] | {
+                            [key: string]: string[];
+                        } | {
+                            [key: string]: {
+                                [key: string]: string[];
+                            };
+                        };
+                        "traces.name": string[] | {
+                            [key: string]: string[];
+                        } | {
+                            [key: string]: {
+                                [key: string]: string[];
+                            };
+                        };
+                        "spans.type": string[] | {
+                            [key: string]: string[];
+                        } | {
+                            [key: string]: {
+                                [key: string]: string[];
+                            };
+                        };
+                        "spans.model": string[] | {
+                            [key: string]: string[];
+                        } | {
+                            [key: string]: {
+                                [key: string]: string[];
+                            };
+                        };
+                        "evaluations.evaluator_id": string[] | {
+                            [key: string]: string[];
+                        } | {
+                            [key: string]: {
+                                [key: string]: string[];
+                            };
+                        };
+                        "evaluations.evaluator_id.guardrails_only": string[] | {
+                            [key: string]: string[];
+                        } | {
+                            [key: string]: {
+                                [key: string]: string[];
+                            };
+                        };
+                        "evaluations.evaluator_id.has_passed": string[] | {
+                            [key: string]: string[];
+                        } | {
+                            [key: string]: {
+                                [key: string]: string[];
+                            };
+                        };
+                        "evaluations.evaluator_id.has_score": string[] | {
+                            [key: string]: string[];
+                        } | {
+                            [key: string]: {
+                                [key: string]: string[];
+                            };
+                        };
+                        "evaluations.evaluator_id.has_label": string[] | {
+                            [key: string]: string[];
+                        } | {
+                            [key: string]: {
+                                [key: string]: string[];
+                            };
+                        };
+                        "evaluations.passed": string[] | {
+                            [key: string]: string[];
+                        } | {
+                            [key: string]: {
+                                [key: string]: string[];
+                            };
+                        };
+                        "evaluations.score": string[] | {
+                            [key: string]: string[];
+                        } | {
+                            [key: string]: {
+                                [key: string]: string[];
+                            };
+                        };
+                        "evaluations.state": string[] | {
+                            [key: string]: string[];
+                        } | {
+                            [key: string]: {
+                                [key: string]: string[];
+                            };
+                        };
+                        "evaluations.label": string[] | {
+                            [key: string]: string[];
+                        } | {
+                            [key: string]: {
+                                [key: string]: string[];
+                            };
+                        };
+                        "events.event_type": string[] | {
+                            [key: string]: string[];
+                        } | {
+                            [key: string]: {
+                                [key: string]: string[];
+                            };
+                        };
+                        "events.metrics.key": string[] | {
+                            [key: string]: string[];
+                        } | {
+                            [key: string]: {
+                                [key: string]: string[];
+                            };
+                        };
+                        "events.metrics.value": string[] | {
+                            [key: string]: string[];
+                        } | {
+                            [key: string]: {
+                                [key: string]: string[];
+                            };
+                        };
+                        "events.event_details.key": string[] | {
+                            [key: string]: string[];
+                        } | {
+                            [key: string]: {
+                                [key: string]: string[];
+                            };
+                        };
+                        "annotations.hasAnnotation": string[] | {
                             [key: string]: string[];
                         } | {
                             [key: string]: {
@@ -12107,7 +11617,196 @@ export interface operations {
                             aggregation: "sum" | "avg" | "min" | "max";
                         };
                         filters?: {
-                            [key: string]: string[] | {
+                            "topics.topics": string[] | {
+                                [key: string]: string[];
+                            } | {
+                                [key: string]: {
+                                    [key: string]: string[];
+                                };
+                            };
+                            "topics.subtopics": string[] | {
+                                [key: string]: string[];
+                            } | {
+                                [key: string]: {
+                                    [key: string]: string[];
+                                };
+                            };
+                            "metadata.user_id": string[] | {
+                                [key: string]: string[];
+                            } | {
+                                [key: string]: {
+                                    [key: string]: string[];
+                                };
+                            };
+                            "metadata.thread_id": string[] | {
+                                [key: string]: string[];
+                            } | {
+                                [key: string]: {
+                                    [key: string]: string[];
+                                };
+                            };
+                            "metadata.customer_id": string[] | {
+                                [key: string]: string[];
+                            } | {
+                                [key: string]: {
+                                    [key: string]: string[];
+                                };
+                            };
+                            "metadata.labels": string[] | {
+                                [key: string]: string[];
+                            } | {
+                                [key: string]: {
+                                    [key: string]: string[];
+                                };
+                            };
+                            "metadata.key": string[] | {
+                                [key: string]: string[];
+                            } | {
+                                [key: string]: {
+                                    [key: string]: string[];
+                                };
+                            };
+                            "metadata.value": string[] | {
+                                [key: string]: string[];
+                            } | {
+                                [key: string]: {
+                                    [key: string]: string[];
+                                };
+                            };
+                            "metadata.prompt_ids": string[] | {
+                                [key: string]: string[];
+                            } | {
+                                [key: string]: {
+                                    [key: string]: string[];
+                                };
+                            };
+                            "traces.origin": string[] | {
+                                [key: string]: string[];
+                            } | {
+                                [key: string]: {
+                                    [key: string]: string[];
+                                };
+                            };
+                            "traces.error": string[] | {
+                                [key: string]: string[];
+                            } | {
+                                [key: string]: {
+                                    [key: string]: string[];
+                                };
+                            };
+                            "traces.name": string[] | {
+                                [key: string]: string[];
+                            } | {
+                                [key: string]: {
+                                    [key: string]: string[];
+                                };
+                            };
+                            "spans.type": string[] | {
+                                [key: string]: string[];
+                            } | {
+                                [key: string]: {
+                                    [key: string]: string[];
+                                };
+                            };
+                            "spans.model": string[] | {
+                                [key: string]: string[];
+                            } | {
+                                [key: string]: {
+                                    [key: string]: string[];
+                                };
+                            };
+                            "evaluations.evaluator_id": string[] | {
+                                [key: string]: string[];
+                            } | {
+                                [key: string]: {
+                                    [key: string]: string[];
+                                };
+                            };
+                            "evaluations.evaluator_id.guardrails_only": string[] | {
+                                [key: string]: string[];
+                            } | {
+                                [key: string]: {
+                                    [key: string]: string[];
+                                };
+                            };
+                            "evaluations.evaluator_id.has_passed": string[] | {
+                                [key: string]: string[];
+                            } | {
+                                [key: string]: {
+                                    [key: string]: string[];
+                                };
+                            };
+                            "evaluations.evaluator_id.has_score": string[] | {
+                                [key: string]: string[];
+                            } | {
+                                [key: string]: {
+                                    [key: string]: string[];
+                                };
+                            };
+                            "evaluations.evaluator_id.has_label": string[] | {
+                                [key: string]: string[];
+                            } | {
+                                [key: string]: {
+                                    [key: string]: string[];
+                                };
+                            };
+                            "evaluations.passed": string[] | {
+                                [key: string]: string[];
+                            } | {
+                                [key: string]: {
+                                    [key: string]: string[];
+                                };
+                            };
+                            "evaluations.score": string[] | {
+                                [key: string]: string[];
+                            } | {
+                                [key: string]: {
+                                    [key: string]: string[];
+                                };
+                            };
+                            "evaluations.state": string[] | {
+                                [key: string]: string[];
+                            } | {
+                                [key: string]: {
+                                    [key: string]: string[];
+                                };
+                            };
+                            "evaluations.label": string[] | {
+                                [key: string]: string[];
+                            } | {
+                                [key: string]: {
+                                    [key: string]: string[];
+                                };
+                            };
+                            "events.event_type": string[] | {
+                                [key: string]: string[];
+                            } | {
+                                [key: string]: {
+                                    [key: string]: string[];
+                                };
+                            };
+                            "events.metrics.key": string[] | {
+                                [key: string]: string[];
+                            } | {
+                                [key: string]: {
+                                    [key: string]: string[];
+                                };
+                            };
+                            "events.metrics.value": string[] | {
+                                [key: string]: string[];
+                            } | {
+                                [key: string]: {
+                                    [key: string]: string[];
+                                };
+                            };
+                            "events.event_details.key": string[] | {
+                                [key: string]: string[];
+                            } | {
+                                [key: string]: {
+                                    [key: string]: string[];
+                                };
+                            };
+                            "annotations.hasAnnotation": string[] | {
                                 [key: string]: string[];
                             } | {
                                 [key: string]: {
@@ -12637,8 +12336,197 @@ export interface operations {
                      * @description Which traces the trigger fires on. An empty object fires on all of them.
                      * @default {}
                      */
-                    filters: {
-                        [key: string]: string[] | {
+                    filters?: {
+                        "topics.topics": string[] | {
+                            [key: string]: string[];
+                        } | {
+                            [key: string]: {
+                                [key: string]: string[];
+                            };
+                        };
+                        "topics.subtopics": string[] | {
+                            [key: string]: string[];
+                        } | {
+                            [key: string]: {
+                                [key: string]: string[];
+                            };
+                        };
+                        "metadata.user_id": string[] | {
+                            [key: string]: string[];
+                        } | {
+                            [key: string]: {
+                                [key: string]: string[];
+                            };
+                        };
+                        "metadata.thread_id": string[] | {
+                            [key: string]: string[];
+                        } | {
+                            [key: string]: {
+                                [key: string]: string[];
+                            };
+                        };
+                        "metadata.customer_id": string[] | {
+                            [key: string]: string[];
+                        } | {
+                            [key: string]: {
+                                [key: string]: string[];
+                            };
+                        };
+                        "metadata.labels": string[] | {
+                            [key: string]: string[];
+                        } | {
+                            [key: string]: {
+                                [key: string]: string[];
+                            };
+                        };
+                        "metadata.key": string[] | {
+                            [key: string]: string[];
+                        } | {
+                            [key: string]: {
+                                [key: string]: string[];
+                            };
+                        };
+                        "metadata.value": string[] | {
+                            [key: string]: string[];
+                        } | {
+                            [key: string]: {
+                                [key: string]: string[];
+                            };
+                        };
+                        "metadata.prompt_ids": string[] | {
+                            [key: string]: string[];
+                        } | {
+                            [key: string]: {
+                                [key: string]: string[];
+                            };
+                        };
+                        "traces.origin": string[] | {
+                            [key: string]: string[];
+                        } | {
+                            [key: string]: {
+                                [key: string]: string[];
+                            };
+                        };
+                        "traces.error": string[] | {
+                            [key: string]: string[];
+                        } | {
+                            [key: string]: {
+                                [key: string]: string[];
+                            };
+                        };
+                        "traces.name": string[] | {
+                            [key: string]: string[];
+                        } | {
+                            [key: string]: {
+                                [key: string]: string[];
+                            };
+                        };
+                        "spans.type": string[] | {
+                            [key: string]: string[];
+                        } | {
+                            [key: string]: {
+                                [key: string]: string[];
+                            };
+                        };
+                        "spans.model": string[] | {
+                            [key: string]: string[];
+                        } | {
+                            [key: string]: {
+                                [key: string]: string[];
+                            };
+                        };
+                        "evaluations.evaluator_id": string[] | {
+                            [key: string]: string[];
+                        } | {
+                            [key: string]: {
+                                [key: string]: string[];
+                            };
+                        };
+                        "evaluations.evaluator_id.guardrails_only": string[] | {
+                            [key: string]: string[];
+                        } | {
+                            [key: string]: {
+                                [key: string]: string[];
+                            };
+                        };
+                        "evaluations.evaluator_id.has_passed": string[] | {
+                            [key: string]: string[];
+                        } | {
+                            [key: string]: {
+                                [key: string]: string[];
+                            };
+                        };
+                        "evaluations.evaluator_id.has_score": string[] | {
+                            [key: string]: string[];
+                        } | {
+                            [key: string]: {
+                                [key: string]: string[];
+                            };
+                        };
+                        "evaluations.evaluator_id.has_label": string[] | {
+                            [key: string]: string[];
+                        } | {
+                            [key: string]: {
+                                [key: string]: string[];
+                            };
+                        };
+                        "evaluations.passed": string[] | {
+                            [key: string]: string[];
+                        } | {
+                            [key: string]: {
+                                [key: string]: string[];
+                            };
+                        };
+                        "evaluations.score": string[] | {
+                            [key: string]: string[];
+                        } | {
+                            [key: string]: {
+                                [key: string]: string[];
+                            };
+                        };
+                        "evaluations.state": string[] | {
+                            [key: string]: string[];
+                        } | {
+                            [key: string]: {
+                                [key: string]: string[];
+                            };
+                        };
+                        "evaluations.label": string[] | {
+                            [key: string]: string[];
+                        } | {
+                            [key: string]: {
+                                [key: string]: string[];
+                            };
+                        };
+                        "events.event_type": string[] | {
+                            [key: string]: string[];
+                        } | {
+                            [key: string]: {
+                                [key: string]: string[];
+                            };
+                        };
+                        "events.metrics.key": string[] | {
+                            [key: string]: string[];
+                        } | {
+                            [key: string]: {
+                                [key: string]: string[];
+                            };
+                        };
+                        "events.metrics.value": string[] | {
+                            [key: string]: string[];
+                        } | {
+                            [key: string]: {
+                                [key: string]: string[];
+                            };
+                        };
+                        "events.event_details.key": string[] | {
+                            [key: string]: string[];
+                        } | {
+                            [key: string]: {
+                                [key: string]: string[];
+                            };
+                        };
+                        "annotations.hasAnnotation": string[] | {
                             [key: string]: string[];
                         } | {
                             [key: string]: {
@@ -12956,15 +12844,20 @@ export interface operations {
                             routing_policy_id: string | null;
                             /** @enum {string} */
                             routing_mode: "none" | "fallback_all" | "policy";
-                            config: unknown;
+                            config?: unknown;
                             revision: string;
                             /** Format: date-time */
                             created_at: string;
                             /** Format: date-time */
                             updated_at: string;
+                            /** Format: date-time */
                             last_used_at: string | null;
+                            /** Format: date-time */
                             revoked_at: string | null;
-                            /** @description When the key stops serving, or null for a key that never expires. Requests presented after this moment are refused with `virtual_key_expired`. `status` stays `active` past the date on purpose: the three status values are what clients switch on, and the key stays editable so the date can be extended. */
+                            /**
+                             * Format: date-time
+                             * @description When the key stops serving, or null for a key that never expires. Requests presented after this moment are refused with `virtual_key_expired`. `status` stays `active` past the date on purpose: the three status values are what clients switch on, and the key stays editable so the date can be extended.
+                             */
                             expires_at: string | null;
                         }[];
                         /** @description Pass back as `cursor` for the next page. Null means the walk is exhausted; a full page does NOT mean there is more. */
@@ -13079,10 +12972,7 @@ export interface operations {
                     routing_policy_id?: string | null;
                     /** @enum {string} */
                     routing_mode?: "none" | "fallback_all" | "policy";
-                    /**
-                     * Format: date-time
-                     * @description When the key stops serving. Omit it and the key never expires. A date that has already passed is refused with `virtual_key_expiry_in_past`, rather than writing a key that is dead on arrival.
-                     */
+                    /** @description When the key stops serving. Omit it and the key never expires. A date that has already passed is refused with `virtual_key_expiry_in_past`, rather than writing a key that is dead on arrival. */
                     expires_at?: string;
                     budget?: {
                         limit_usd: number | string;
@@ -13152,6 +13042,11 @@ export interface operations {
                             /** @default null */
                             maxOpenSessions?: number | null;
                         };
+                        /**
+                         * @default {
+                         *       "tags": []
+                         *     }
+                         */
                         metadata?: {
                             label?: string;
                             /** @default [] */
@@ -13204,15 +13099,20 @@ export interface operations {
                             routing_policy_id: string | null;
                             /** @enum {string} */
                             routing_mode: "none" | "fallback_all" | "policy";
-                            config: unknown;
+                            config?: unknown;
                             revision: string;
                             /** Format: date-time */
                             created_at: string;
                             /** Format: date-time */
                             updated_at: string;
+                            /** Format: date-time */
                             last_used_at: string | null;
+                            /** Format: date-time */
                             revoked_at: string | null;
-                            /** @description When the key stops serving, or null for a key that never expires. Requests presented after this moment are refused with `virtual_key_expired`. `status` stays `active` past the date on purpose: the three status values are what clients switch on, and the key stays editable so the date can be extended. */
+                            /**
+                             * Format: date-time
+                             * @description When the key stops serving, or null for a key that never expires. Requests presented after this moment are refused with `virtual_key_expired`. `status` stays `active` past the date on purpose: the three status values are what clients switch on, and the key stays editable so the date can be extended.
+                             */
                             expires_at: string | null;
                         };
                         secret: string;
@@ -13366,15 +13266,20 @@ export interface operations {
                             routing_policy_id: string | null;
                             /** @enum {string} */
                             routing_mode: "none" | "fallback_all" | "policy";
-                            config: unknown;
+                            config?: unknown;
                             revision: string;
                             /** Format: date-time */
                             created_at: string;
                             /** Format: date-time */
                             updated_at: string;
+                            /** Format: date-time */
                             last_used_at: string | null;
+                            /** Format: date-time */
                             revoked_at: string | null;
-                            /** @description When the key stops serving, or null for a key that never expires. Requests presented after this moment are refused with `virtual_key_expired`. `status` stays `active` past the date on purpose: the three status values are what clients switch on, and the key stays editable so the date can be extended. */
+                            /**
+                             * Format: date-time
+                             * @description When the key stops serving, or null for a key that never expires. Requests presented after this moment are refused with `virtual_key_expired`. `status` stays `active` past the date on purpose: the three status values are what clients switch on, and the key stays editable so the date can be extended.
+                             */
                             expires_at: string | null;
                         };
                     };
@@ -13576,6 +13481,11 @@ export interface operations {
                             /** @default null */
                             maxOpenSessions?: number | null;
                         };
+                        /**
+                         * @default {
+                         *       "tags": []
+                         *     }
+                         */
                         metadata?: {
                             label?: string;
                             /** @default [] */
@@ -13624,15 +13534,20 @@ export interface operations {
                             routing_policy_id: string | null;
                             /** @enum {string} */
                             routing_mode: "none" | "fallback_all" | "policy";
-                            config: unknown;
+                            config?: unknown;
                             revision: string;
                             /** Format: date-time */
                             created_at: string;
                             /** Format: date-time */
                             updated_at: string;
+                            /** Format: date-time */
                             last_used_at: string | null;
+                            /** Format: date-time */
                             revoked_at: string | null;
-                            /** @description When the key stops serving, or null for a key that never expires. Requests presented after this moment are refused with `virtual_key_expired`. `status` stays `active` past the date on purpose: the three status values are what clients switch on, and the key stays editable so the date can be extended. */
+                            /**
+                             * Format: date-time
+                             * @description When the key stops serving, or null for a key that never expires. Requests presented after this moment are refused with `virtual_key_expired`. `status` stays `active` past the date on purpose: the three status values are what clients switch on, and the key stays editable so the date can be extended.
+                             */
                             expires_at: string | null;
                         };
                     };
@@ -13919,15 +13834,20 @@ export interface operations {
                             routing_policy_id: string | null;
                             /** @enum {string} */
                             routing_mode: "none" | "fallback_all" | "policy";
-                            config: unknown;
+                            config?: unknown;
                             revision: string;
                             /** Format: date-time */
                             created_at: string;
                             /** Format: date-time */
                             updated_at: string;
+                            /** Format: date-time */
                             last_used_at: string | null;
+                            /** Format: date-time */
                             revoked_at: string | null;
-                            /** @description When the key stops serving, or null for a key that never expires. Requests presented after this moment are refused with `virtual_key_expired`. `status` stays `active` past the date on purpose: the three status values are what clients switch on, and the key stays editable so the date can be extended. */
+                            /**
+                             * Format: date-time
+                             * @description When the key stops serving, or null for a key that never expires. Requests presented after this moment are refused with `virtual_key_expired`. `status` stays `active` past the date on purpose: the three status values are what clients switch on, and the key stays editable so the date can be extended.
+                             */
                             expires_at: string | null;
                         };
                         secret: string;
@@ -14068,15 +13988,20 @@ export interface operations {
                             routing_policy_id: string | null;
                             /** @enum {string} */
                             routing_mode: "none" | "fallback_all" | "policy";
-                            config: unknown;
+                            config?: unknown;
                             revision: string;
                             /** Format: date-time */
                             created_at: string;
                             /** Format: date-time */
                             updated_at: string;
+                            /** Format: date-time */
                             last_used_at: string | null;
+                            /** Format: date-time */
                             revoked_at: string | null;
-                            /** @description When the key stops serving, or null for a key that never expires. Requests presented after this moment are refused with `virtual_key_expired`. `status` stays `active` past the date on purpose: the three status values are what clients switch on, and the key stays editable so the date can be extended. */
+                            /**
+                             * Format: date-time
+                             * @description When the key stops serving, or null for a key that never expires. Requests presented after this moment are refused with `virtual_key_expired`. `status` stays `active` past the date on purpose: the three status values are what clients switch on, and the key stays editable so the date can be extended.
+                             */
                             expires_at: string | null;
                         };
                     };
@@ -14209,15 +14134,20 @@ export interface operations {
                             routing_policy_id: string | null;
                             /** @enum {string} */
                             routing_mode: "none" | "fallback_all" | "policy";
-                            config: unknown;
+                            config?: unknown;
                             revision: string;
                             /** Format: date-time */
                             created_at: string;
                             /** Format: date-time */
                             updated_at: string;
+                            /** Format: date-time */
                             last_used_at: string | null;
+                            /** Format: date-time */
                             revoked_at: string | null;
-                            /** @description When the key stops serving, or null for a key that never expires. Requests presented after this moment are refused with `virtual_key_expired`. `status` stays `active` past the date on purpose: the three status values are what clients switch on, and the key stays editable so the date can be extended. */
+                            /**
+                             * Format: date-time
+                             * @description When the key stops serving, or null for a key that never expires. Requests presented after this moment are refused with `virtual_key_expired`. `status` stays `active` past the date on purpose: the three status values are what clients switch on, and the key stays editable so the date can be extended.
+                             */
                             expires_at: string | null;
                         };
                     };
@@ -14350,15 +14280,20 @@ export interface operations {
                             routing_policy_id: string | null;
                             /** @enum {string} */
                             routing_mode: "none" | "fallback_all" | "policy";
-                            config: unknown;
+                            config?: unknown;
                             revision: string;
                             /** Format: date-time */
                             created_at: string;
                             /** Format: date-time */
                             updated_at: string;
+                            /** Format: date-time */
                             last_used_at: string | null;
+                            /** Format: date-time */
                             revoked_at: string | null;
-                            /** @description When the key stops serving, or null for a key that never expires. Requests presented after this moment are refused with `virtual_key_expired`. `status` stays `active` past the date on purpose: the three status values are what clients switch on, and the key stays editable so the date can be extended. */
+                            /**
+                             * Format: date-time
+                             * @description When the key stops serving, or null for a key that never expires. Requests presented after this moment are refused with `virtual_key_expired`. `status` stays `active` past the date on purpose: the three status values are what clients switch on, and the key stays editable so the date can be extended.
+                             */
                             expires_at: string | null;
                         };
                     };
@@ -17940,14 +17875,12 @@ export interface operations {
                         /** @enum {string} */
                         scope: "ORGANIZATION" | "PROJECT";
                         name: string;
-                        /** Format: date-time */
                         updatedAt: string;
                         projectId: string;
                         organizationId: string;
                         versionId: string;
                         authorId?: string | null;
                         version: number;
-                        /** Format: date-time */
                         createdAt: string;
                         commitMessage?: string | null;
                         prompt: string;
@@ -18145,14 +18078,12 @@ export interface operations {
                         /** @enum {string} */
                         scope: "ORGANIZATION" | "PROJECT";
                         name: string;
-                        /** Format: date-time */
                         updatedAt: string;
                         projectId: string;
                         organizationId: string;
                         versionId: string;
                         authorId?: string | null;
                         version: number;
-                        /** Format: date-time */
                         createdAt: string;
                         commitMessage?: string | null;
                         prompt: string;
@@ -18326,7 +18257,6 @@ export interface operations {
                         configId: string;
                         versionId: string;
                         tag: string;
-                        /** Format: date-time */
                         updatedAt: string;
                     };
                 };
@@ -18411,7 +18341,6 @@ export interface operations {
                     "application/json": {
                         id: string;
                         name: string;
-                        /** Format: date-time */
                         createdAt: string;
                     }[];
                 };
@@ -18490,7 +18419,6 @@ export interface operations {
                     "application/json": {
                         id: string;
                         name: string;
-                        /** Format: date-time */
                         createdAt: string;
                     };
                 };
@@ -18571,7 +18499,6 @@ export interface operations {
                     "application/json": {
                         id: string;
                         name: string;
-                        /** Format: date-time */
                         createdAt: string;
                     };
                 };
@@ -18717,14 +18644,12 @@ export interface operations {
                         /** @enum {string} */
                         scope: "ORGANIZATION" | "PROJECT";
                         name: string;
-                        /** Format: date-time */
                         updatedAt: string;
                         projectId: string;
                         organizationId: string;
                         versionId: string;
                         authorId?: string | null;
                         version: number;
-                        /** Format: date-time */
                         createdAt: string;
                         commitMessage?: string | null;
                         prompt: string;
@@ -18893,14 +18818,12 @@ export interface operations {
                         /** @enum {string} */
                         scope: "ORGANIZATION" | "PROJECT";
                         name: string;
-                        /** Format: date-time */
                         updatedAt: string;
                         projectId: string;
                         organizationId: string;
                         versionId: string;
                         authorId?: string | null;
                         version: number;
-                        /** Format: date-time */
                         createdAt: string;
                         commitMessage?: string | null;
                         prompt: string;
@@ -19074,14 +18997,12 @@ export interface operations {
                         /** @enum {string} */
                         scope: "ORGANIZATION" | "PROJECT";
                         name: string;
-                        /** Format: date-time */
                         updatedAt: string;
                         projectId: string;
                         organizationId: string;
                         versionId: string;
                         authorId?: string | null;
                         version: number;
-                        /** Format: date-time */
                         createdAt: string;
                         commitMessage?: string | null;
                         prompt: string;
@@ -19290,14 +19211,12 @@ export interface operations {
                         /** @enum {string} */
                         scope: "ORGANIZATION" | "PROJECT";
                         name: string;
-                        /** Format: date-time */
                         updatedAt: string;
                         projectId: string;
                         organizationId: string;
                         versionId: string;
                         authorId?: string | null;
                         version: number;
-                        /** Format: date-time */
                         createdAt: string;
                         commitMessage?: string | null;
                         prompt: string;
@@ -19656,14 +19575,12 @@ export interface operations {
                             /** @enum {string} */
                             scope: "ORGANIZATION" | "PROJECT";
                             name: string;
-                            /** Format: date-time */
                             updatedAt: string;
                             projectId: string;
                             organizationId: string;
                             versionId: string;
                             authorId?: string | null;
                             version: number;
-                            /** Format: date-time */
                             createdAt: string;
                             commitMessage?: string | null;
                             prompt: string;
@@ -20248,7 +20165,7 @@ export interface operations {
                             customKeys: {
                                 [key: string]: unknown;
                             } | null;
-                            deploymentMapping: unknown | null;
+                            deploymentMapping?: null;
                             models?: string[] | null;
                             embeddingsModels?: string[] | null;
                             customModels?: {
@@ -20385,7 +20302,7 @@ export interface operations {
                             customKeys: {
                                 [key: string]: unknown;
                             } | null;
-                            deploymentMapping: unknown | null;
+                            deploymentMapping?: null;
                             models?: string[] | null;
                             embeddingsModels?: string[] | null;
                             customModels?: {
@@ -20490,9 +20407,9 @@ export interface operations {
                         sample: number;
                         level: string;
                         evaluatorId: string | null;
-                        preconditions: unknown;
-                        parameters: unknown;
-                        mappings: unknown | null;
+                        preconditions?: unknown;
+                        parameters?: unknown;
+                        mappings?: null;
                         threadIdleTimeout: number | null;
                         createdAt: string;
                         updatedAt: string;
@@ -20624,9 +20541,9 @@ export interface operations {
                         sample: number;
                         level: string;
                         evaluatorId: string | null;
-                        preconditions: unknown;
-                        parameters: unknown;
-                        mappings: unknown | null;
+                        preconditions?: unknown;
+                        parameters?: unknown;
+                        mappings?: null;
                         threadIdleTimeout: number | null;
                         createdAt: string;
                         updatedAt: string;
@@ -20713,9 +20630,9 @@ export interface operations {
                         sample: number;
                         level: string;
                         evaluatorId: string | null;
-                        preconditions: unknown;
-                        parameters: unknown;
-                        mappings: unknown | null;
+                        preconditions?: unknown;
+                        parameters?: unknown;
+                        mappings?: null;
                         threadIdleTimeout: number | null;
                         createdAt: string;
                         updatedAt: string;
@@ -20938,9 +20855,9 @@ export interface operations {
                         sample: number;
                         level: string;
                         evaluatorId: string | null;
-                        preconditions: unknown;
-                        parameters: unknown;
-                        mappings: unknown | null;
+                        preconditions?: unknown;
+                        parameters?: unknown;
+                        mappings?: null;
                         threadIdleTimeout: number | null;
                         createdAt: string;
                         updatedAt: string;
@@ -21102,426 +21019,6 @@ export interface operations {
             };
         };
     };
-    getOrganization_2026_08_07: {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        requestBody?: never;
-        responses: {
-            /** @description Success */
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": {
-                        id: string;
-                        name: string;
-                        slug: string;
-                        supportContact: string | null;
-                        presenceEnabled: boolean;
-                        traceSharingEnabled: boolean;
-                        primaryIntent: ("AGENT_GOVERNANCE" | "LLM_OPS") | null;
-                        s3Endpoint: string | null;
-                        s3AccessKeyId: string | null;
-                        s3Bucket: string | null;
-                        /** Format: date-time */
-                        createdAt: string;
-                        /** Format: date-time */
-                        updatedAt: string;
-                    };
-                };
-            };
-        };
-    };
-    updateOrganization_2026_08_07: {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        requestBody: {
-            content: {
-                "application/json": {
-                    name?: string;
-                    supportContact?: string | null;
-                    presenceEnabled?: boolean;
-                    traceSharingEnabled?: boolean;
-                    primaryIntent?: ("AGENT_GOVERNANCE" | "LLM_OPS") | null;
-                    s3Endpoint?: string | null;
-                    s3AccessKeyId?: string | null;
-                    s3SecretAccessKey?: string | null;
-                    s3Bucket?: string | null;
-                };
-            };
-        };
-        responses: {
-            /** @description Success */
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": {
-                        id: string;
-                        name: string;
-                        slug: string;
-                        supportContact: string | null;
-                        presenceEnabled: boolean;
-                        traceSharingEnabled: boolean;
-                        primaryIntent: ("AGENT_GOVERNANCE" | "LLM_OPS") | null;
-                        s3Endpoint: string | null;
-                        s3AccessKeyId: string | null;
-                        s3Bucket: string | null;
-                        /** Format: date-time */
-                        createdAt: string;
-                        /** Format: date-time */
-                        updatedAt: string;
-                    };
-                };
-            };
-        };
-    };
-    listOrganizationMembers_2026_08_07: {
-        parameters: {
-            query?: {
-                includeDisabled?: "true" | "false";
-                offset?: number;
-                limit?: number;
-            };
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        requestBody?: never;
-        responses: {
-            /** @description Success */
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": {
-                        members: {
-                            userId: string;
-                            /** @enum {string} */
-                            role: "ADMIN" | "MEMBER" | "EXTERNAL";
-                            disabled: boolean;
-                            disabledAt: string | null;
-                            /** Format: date-time */
-                            createdAt: string;
-                            /** Format: date-time */
-                            updatedAt: string;
-                            user: {
-                                id: string;
-                                name: string | null;
-                                email: string | null;
-                            };
-                        }[];
-                        totalCount: number;
-                    };
-                };
-            };
-        };
-    };
-    getOrganizationMember_2026_08_07: {
-        parameters: {
-            query?: never;
-            header?: never;
-            path: {
-                userId: string;
-            };
-            cookie?: never;
-        };
-        requestBody?: never;
-        responses: {
-            /** @description Success */
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": {
-                        userId: string;
-                        /** @enum {string} */
-                        role: "ADMIN" | "MEMBER" | "EXTERNAL";
-                        disabled: boolean;
-                        disabledAt: string | null;
-                        /** Format: date-time */
-                        createdAt: string;
-                        /** Format: date-time */
-                        updatedAt: string;
-                        user: {
-                            id: string;
-                            name: string | null;
-                            email: string | null;
-                        };
-                        teams: {
-                            teamId: string;
-                            teamName: string;
-                            /** @enum {string} */
-                            role: "ADMIN" | "MEMBER" | "VIEWER" | "CUSTOM";
-                            customRoleId: string | null;
-                            customRoleName: string | null;
-                        }[];
-                    };
-                };
-            };
-        };
-    };
-    removeOrganizationMember_2026_08_07: {
-        parameters: {
-            query?: never;
-            header?: never;
-            path: {
-                userId: string;
-            };
-            cookie?: never;
-        };
-        requestBody?: never;
-        responses: {
-            /** @description Success */
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": {
-                        /** @constant */
-                        success: true;
-                    };
-                };
-            };
-        };
-    };
-    updateOrganizationMember_2026_08_07: {
-        parameters: {
-            query?: never;
-            header?: never;
-            path: {
-                userId: string;
-            };
-            cookie?: never;
-        };
-        requestBody: {
-            content: {
-                "application/json": {
-                    /** @enum {string} */
-                    role?: "ADMIN" | "MEMBER" | "EXTERNAL";
-                    disabled?: boolean;
-                };
-            };
-        };
-        responses: {
-            /** @description Success */
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": {
-                        userId: string;
-                        /** @enum {string} */
-                        role: "ADMIN" | "MEMBER" | "EXTERNAL";
-                        disabled: boolean;
-                        disabledAt: string | null;
-                        /** Format: date-time */
-                        createdAt: string;
-                        /** Format: date-time */
-                        updatedAt: string;
-                        user: {
-                            id: string;
-                            name: string | null;
-                            email: string | null;
-                        };
-                        teamsLeftWithoutAdmin?: {
-                            id: string;
-                            name: string;
-                        }[];
-                    };
-                };
-            };
-        };
-    };
-    getOrganizationMemberAccess_2026_08_07: {
-        parameters: {
-            query?: never;
-            header?: never;
-            path: {
-                userId: string;
-            };
-            cookie?: never;
-        };
-        requestBody?: never;
-        responses: {
-            /** @description Success */
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": {
-                        user: {
-                            id: string;
-                            name: string | null;
-                            email: string | null;
-                            orgRole: string;
-                            orgRolePermissions: string[];
-                        };
-                        groups: {
-                            id: string;
-                            name: string;
-                            slug: string;
-                            scimSource: string | null;
-                            bindings: {
-                                id: string;
-                                role: string;
-                                customRoleName: string | null;
-                                /** @enum {string} */
-                                scopeType: "ORGANIZATION" | "TEAM" | "PROJECT";
-                                scopeId: string;
-                                scopeName: string | null;
-                                permissions: string[];
-                            }[];
-                        }[];
-                        directBindings: {
-                            id: string;
-                            role: string;
-                            customRoleName: string | null;
-                            /** @enum {string} */
-                            scopeType: "ORGANIZATION" | "TEAM" | "PROJECT";
-                            scopeId: string;
-                            scopeName: string | null;
-                            permissions: string[];
-                        }[];
-                    };
-                };
-            };
-        };
-    };
-    listOrganizationInvites_2026_08_07: {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        requestBody?: never;
-        responses: {
-            /** @description Success */
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": {
-                        invites: {
-                            id: string;
-                            email: string;
-                            /** @enum {string} */
-                            role: "ADMIN" | "MEMBER" | "EXTERNAL";
-                            status: string;
-                            expiration: string | null;
-                            inviteCode: string;
-                            inviteUrl: string;
-                            teams: {
-                                teamId: string;
-                                role: string;
-                                customRoleId: string | null;
-                            }[];
-                            /** Format: date-time */
-                            createdAt: string;
-                        }[];
-                    };
-                };
-            };
-        };
-    };
-    createOrganizationInvites_2026_08_07: {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        requestBody: {
-            content: {
-                "application/json": {
-                    invites: {
-                        /** Format: email */
-                        email: string;
-                        /** @enum {string} */
-                        role: "ADMIN" | "MEMBER" | "EXTERNAL";
-                        teams: {
-                            teamId: string;
-                            /** @enum {string} */
-                            role: "ADMIN" | "MEMBER" | "VIEWER" | "CUSTOM";
-                            customRoleId?: string;
-                        }[];
-                    }[];
-                };
-            };
-        };
-        responses: {
-            /** @description Success */
-            201: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": {
-                        invites: {
-                            id: string;
-                            email: string;
-                            /** @enum {string} */
-                            role: "ADMIN" | "MEMBER" | "EXTERNAL";
-                            status: string;
-                            expiration: string | null;
-                            inviteCode: string;
-                            inviteUrl: string;
-                            teams: {
-                                teamId: string;
-                                role: string;
-                                customRoleId: string | null;
-                            }[];
-                            /** Format: date-time */
-                            createdAt: string;
-                            emailNotSent: boolean;
-                        }[];
-                    };
-                };
-            };
-        };
-    };
-    revokeOrganizationInvite_2026_08_07: {
-        parameters: {
-            query?: never;
-            header?: never;
-            path: {
-                id: string;
-            };
-            cookie?: never;
-        };
-        requestBody?: never;
-        responses: {
-            /** @description Success */
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": {
-                        /** @constant */
-                        success: true;
-                    };
-                };
-            };
-        };
-    };
     getOrganization: {
         parameters: {
             query?: never;
@@ -21544,13 +21041,12 @@ export interface operations {
                         supportContact: string | null;
                         presenceEnabled: boolean;
                         traceSharingEnabled: boolean;
-                        primaryIntent: ("AGENT_GOVERNANCE" | "LLM_OPS") | null;
+                        /** @enum {string|null} */
+                        primaryIntent: "AGENT_GOVERNANCE" | "LLM_OPS" | null;
                         s3Endpoint: string | null;
                         s3AccessKeyId: string | null;
                         s3Bucket: string | null;
-                        /** Format: date-time */
                         createdAt: string;
-                        /** Format: date-time */
                         updatedAt: string;
                     };
                 };
@@ -21571,7 +21067,8 @@ export interface operations {
                     supportContact?: string | null;
                     presenceEnabled?: boolean;
                     traceSharingEnabled?: boolean;
-                    primaryIntent?: ("AGENT_GOVERNANCE" | "LLM_OPS") | null;
+                    /** @enum {string|null} */
+                    primaryIntent?: "AGENT_GOVERNANCE" | "LLM_OPS" | null;
                     s3Endpoint?: string | null;
                     s3AccessKeyId?: string | null;
                     s3SecretAccessKey?: string | null;
@@ -21593,13 +21090,12 @@ export interface operations {
                         supportContact: string | null;
                         presenceEnabled: boolean;
                         traceSharingEnabled: boolean;
-                        primaryIntent: ("AGENT_GOVERNANCE" | "LLM_OPS") | null;
+                        /** @enum {string|null} */
+                        primaryIntent: "AGENT_GOVERNANCE" | "LLM_OPS" | null;
                         s3Endpoint: string | null;
                         s3AccessKeyId: string | null;
                         s3Bucket: string | null;
-                        /** Format: date-time */
                         createdAt: string;
-                        /** Format: date-time */
                         updatedAt: string;
                     };
                 };
@@ -21632,9 +21128,7 @@ export interface operations {
                             role: "ADMIN" | "MEMBER" | "EXTERNAL";
                             disabled: boolean;
                             disabledAt: string | null;
-                            /** Format: date-time */
                             createdAt: string;
-                            /** Format: date-time */
                             updatedAt: string;
                             user: {
                                 id: string;
@@ -21671,9 +21165,7 @@ export interface operations {
                         role: "ADMIN" | "MEMBER" | "EXTERNAL";
                         disabled: boolean;
                         disabledAt: string | null;
-                        /** Format: date-time */
                         createdAt: string;
-                        /** Format: date-time */
                         updatedAt: string;
                         user: {
                             id: string;
@@ -21749,9 +21241,7 @@ export interface operations {
                         role: "ADMIN" | "MEMBER" | "EXTERNAL";
                         disabled: boolean;
                         disabledAt: string | null;
-                        /** Format: date-time */
                         createdAt: string;
-                        /** Format: date-time */
                         updatedAt: string;
                         user: {
                             id: string;
@@ -21853,7 +21343,6 @@ export interface operations {
                                 role: string;
                                 customRoleId: string | null;
                             }[];
-                            /** Format: date-time */
                             createdAt: string;
                         }[];
                     };
@@ -21908,7 +21397,6 @@ export interface operations {
                                 role: string;
                                 customRoleId: string | null;
                             }[];
-                            /** Format: date-time */
                             createdAt: string;
                             emailNotSent: boolean;
                         }[];
@@ -22149,181 +21637,6 @@ export interface operations {
             };
         };
     };
-    listRoleBindings_2026_08_07: {
-        parameters: {
-            query?: {
-                userId?: string;
-                groupId?: string;
-                apiKeyId?: string;
-                scopeType?: "ORGANIZATION" | "TEAM" | "PROJECT";
-                scopeId?: string;
-                offset?: number;
-                limit?: number;
-            };
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        requestBody?: never;
-        responses: {
-            /** @description Success */
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": {
-                        bindings: {
-                            id: string;
-                            principal: {
-                                /** @enum {string} */
-                                type: "user" | "group" | "apiKey";
-                                id: string;
-                                name: string | null;
-                            };
-                            /** @enum {string} */
-                            role: "ADMIN" | "MEMBER" | "VIEWER" | "CUSTOM";
-                            customRoleId: string | null;
-                            customRoleName: string | null;
-                            /** @enum {string} */
-                            scopeType: "ORGANIZATION" | "TEAM" | "PROJECT";
-                            scopeId: string;
-                            scopeName: string | null;
-                            /** Format: date-time */
-                            createdAt: string;
-                        }[];
-                        totalCount: number;
-                    };
-                };
-            };
-        };
-    };
-    createRoleBinding_2026_08_07: {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        requestBody: {
-            content: {
-                "application/json": {
-                    userId?: string;
-                    groupId?: string;
-                    apiKeyId?: string;
-                    /** @enum {string} */
-                    role: "ADMIN" | "MEMBER" | "VIEWER" | "CUSTOM";
-                    customRoleId?: string;
-                    /** @enum {string} */
-                    scopeType: "ORGANIZATION" | "TEAM" | "PROJECT";
-                    scopeId: string;
-                };
-            };
-        };
-        responses: {
-            /** @description Success */
-            201: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": {
-                        id: string;
-                        principal: {
-                            /** @enum {string} */
-                            type: "user" | "group" | "apiKey";
-                            id: string;
-                            name: string | null;
-                        };
-                        /** @enum {string} */
-                        role: "ADMIN" | "MEMBER" | "VIEWER" | "CUSTOM";
-                        customRoleId: string | null;
-                        customRoleName: string | null;
-                        /** @enum {string} */
-                        scopeType: "ORGANIZATION" | "TEAM" | "PROJECT";
-                        scopeId: string;
-                        scopeName: string | null;
-                        /** Format: date-time */
-                        createdAt: string;
-                        hasLegacyAccessNotice?: boolean;
-                    };
-                };
-            };
-        };
-    };
-    deleteRoleBinding_2026_08_07: {
-        parameters: {
-            query?: never;
-            header?: never;
-            path: {
-                id: string;
-            };
-            cookie?: never;
-        };
-        requestBody?: never;
-        responses: {
-            /** @description Success */
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": {
-                        /** @constant */
-                        success: true;
-                    };
-                };
-            };
-        };
-    };
-    updateRoleBinding_2026_08_07: {
-        parameters: {
-            query?: never;
-            header?: never;
-            path: {
-                id: string;
-            };
-            cookie?: never;
-        };
-        requestBody: {
-            content: {
-                "application/json": {
-                    /** @enum {string} */
-                    role: "ADMIN" | "MEMBER" | "VIEWER" | "CUSTOM";
-                    customRoleId?: string;
-                };
-            };
-        };
-        responses: {
-            /** @description Success */
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": {
-                        id: string;
-                        principal: {
-                            /** @enum {string} */
-                            type: "user" | "group" | "apiKey";
-                            id: string;
-                            name: string | null;
-                        };
-                        /** @enum {string} */
-                        role: "ADMIN" | "MEMBER" | "VIEWER" | "CUSTOM";
-                        customRoleId: string | null;
-                        customRoleName: string | null;
-                        /** @enum {string} */
-                        scopeType: "ORGANIZATION" | "TEAM" | "PROJECT";
-                        scopeId: string;
-                        scopeName: string | null;
-                        /** Format: date-time */
-                        createdAt: string;
-                    };
-                };
-            };
-        };
-    };
     listRoleBindings: {
         parameters: {
             query?: {
@@ -22364,7 +21677,6 @@ export interface operations {
                             scopeType: "ORGANIZATION" | "TEAM" | "PROJECT";
                             scopeId: string;
                             scopeName: string | null;
-                            /** Format: date-time */
                             createdAt: string;
                         }[];
                         totalCount: number;
@@ -22418,7 +21730,6 @@ export interface operations {
                         scopeType: "ORGANIZATION" | "TEAM" | "PROJECT";
                         scopeId: string;
                         scopeName: string | null;
-                        /** Format: date-time */
                         createdAt: string;
                         hasLegacyAccessNotice?: boolean;
                     };
@@ -22492,199 +21803,7 @@ export interface operations {
                         scopeType: "ORGANIZATION" | "TEAM" | "PROJECT";
                         scopeId: string;
                         scopeName: string | null;
-                        /** Format: date-time */
                         createdAt: string;
-                    };
-                };
-            };
-        };
-    };
-    listRoles_2026_08_07: {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        requestBody?: never;
-        responses: {
-            /** @description Success */
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": {
-                        roles: {
-                            id: string;
-                            name: string;
-                            description: string | null;
-                            permissions: string[];
-                            /** Format: date-time */
-                            createdAt: string;
-                            /** Format: date-time */
-                            updatedAt: string;
-                        }[];
-                    };
-                };
-            };
-        };
-    };
-    createRole_2026_08_07: {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        requestBody: {
-            content: {
-                "application/json": {
-                    name: string;
-                    description?: string;
-                    permissions: string[];
-                };
-            };
-        };
-        responses: {
-            /** @description Success */
-            201: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": {
-                        id: string;
-                        name: string;
-                        description: string | null;
-                        permissions: string[];
-                        /** Format: date-time */
-                        createdAt: string;
-                        /** Format: date-time */
-                        updatedAt: string;
-                    };
-                };
-            };
-        };
-    };
-    listRolePermissions_2026_08_07: {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        requestBody?: never;
-        responses: {
-            /** @description Success */
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": {
-                        resources: {
-                            resource: string;
-                            organizationExclusive: boolean;
-                            actions: string[];
-                            permissions: string[];
-                        }[];
-                        actions: string[];
-                    };
-                };
-            };
-        };
-    };
-    getRole_2026_08_07: {
-        parameters: {
-            query?: never;
-            header?: never;
-            path: {
-                id: string;
-            };
-            cookie?: never;
-        };
-        requestBody?: never;
-        responses: {
-            /** @description Success */
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": {
-                        id: string;
-                        name: string;
-                        description: string | null;
-                        permissions: string[];
-                        /** Format: date-time */
-                        createdAt: string;
-                        /** Format: date-time */
-                        updatedAt: string;
-                    };
-                };
-            };
-        };
-    };
-    deleteRole_2026_08_07: {
-        parameters: {
-            query?: never;
-            header?: never;
-            path: {
-                id: string;
-            };
-            cookie?: never;
-        };
-        requestBody?: never;
-        responses: {
-            /** @description Success */
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": {
-                        /** @constant */
-                        success: true;
-                    };
-                };
-            };
-        };
-    };
-    updateRole_2026_08_07: {
-        parameters: {
-            query?: never;
-            header?: never;
-            path: {
-                id: string;
-            };
-            cookie?: never;
-        };
-        requestBody: {
-            content: {
-                "application/json": {
-                    name?: string;
-                    description?: string | null;
-                    permissions?: string[];
-                };
-            };
-        };
-        responses: {
-            /** @description Success */
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": {
-                        id: string;
-                        name: string;
-                        description: string | null;
-                        permissions: string[];
-                        /** Format: date-time */
-                        createdAt: string;
-                        /** Format: date-time */
-                        updatedAt: string;
                     };
                 };
             };
@@ -22711,9 +21830,7 @@ export interface operations {
                             name: string;
                             description: string | null;
                             permissions: string[];
-                            /** Format: date-time */
                             createdAt: string;
-                            /** Format: date-time */
                             updatedAt: string;
                         }[];
                     };
@@ -22749,9 +21866,7 @@ export interface operations {
                         name: string;
                         description: string | null;
                         permissions: string[];
-                        /** Format: date-time */
                         createdAt: string;
-                        /** Format: date-time */
                         updatedAt: string;
                     };
                 };
@@ -22808,9 +21923,7 @@ export interface operations {
                         name: string;
                         description: string | null;
                         permissions: string[];
-                        /** Format: date-time */
                         createdAt: string;
-                        /** Format: date-time */
                         updatedAt: string;
                     };
                 };
@@ -22872,93 +21985,8 @@ export interface operations {
                         name: string;
                         description: string | null;
                         permissions: string[];
-                        /** Format: date-time */
                         createdAt: string;
-                        /** Format: date-time */
                         updatedAt: string;
-                    };
-                };
-            };
-        };
-    };
-    listScimTokens_2026_08_07: {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        requestBody?: never;
-        responses: {
-            /** @description Success */
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": {
-                        tokens: {
-                            id: string;
-                            description: string | null;
-                            /** Format: date-time */
-                            createdAt: string;
-                            lastUsedAt: string | null;
-                        }[];
-                    };
-                };
-            };
-        };
-    };
-    createScimToken_2026_08_07: {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        requestBody: {
-            content: {
-                "application/json": {
-                    description?: string;
-                };
-            };
-        };
-        responses: {
-            /** @description Success */
-            201: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": {
-                        id: string;
-                        token: string;
-                        description: string | null;
-                    };
-                };
-            };
-        };
-    };
-    revokeScimToken_2026_08_07: {
-        parameters: {
-            query?: never;
-            header?: never;
-            path: {
-                id: string;
-            };
-            cookie?: never;
-        };
-        requestBody?: never;
-        responses: {
-            /** @description Success */
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": {
-                        /** @constant */
-                        success: true;
                     };
                 };
             };
@@ -24333,12 +23361,32 @@ export interface operations {
                         name?: string;
                         description?: string;
                         note?: string;
+                        agents?: {
+                            name: string;
+                            /** @enum {string} */
+                            role: "agent" | "user" | "judge";
+                        }[];
                         langwatch?: {
                             targetReferenceId: string;
                             /** @enum {string} */
-                            targetType: "prompt" | "http" | "code" | "workflow";
+                            targetType: "prompt" | "http" | "code" | "workflow" | "connected";
+                            targetKey?: string;
+                            targetParameters?: {
+                                [key: string]: string | number | boolean;
+                            };
                             simulationSuiteId?: string;
                             scenarioVersion?: number;
+                            simulatorModel?: string;
+                            judgeModel?: string;
+                            resolvedSimulatorModel?: string;
+                            resolvedJudgeModel?: string;
+                            actorId?: string;
+                            /** @enum {string} */
+                            actorLabel?: "user" | "api" | "cli";
+                            agentInstance?: {
+                                hostname: string;
+                                label: string | null;
+                            };
                         };
                     } & {
                         [key: string]: unknown;
@@ -24368,43 +23416,141 @@ export interface operations {
                     type: "SCENARIO_MESSAGE_SNAPSHOT";
                     timestamp: number;
                     rawEvent?: unknown;
-                    batchRunId: string;
-                    scenarioId: string;
-                    scenarioRunId: string;
-                    /** @default default */
-                    scenarioSetId?: string;
                     messages: ((({
                         id: string;
-                        /** @enum {string} */
-                        role: "developer" | "system" | "assistant" | "user" | "tool" | "activity" | "reasoning";
-                        content?: unknown;
-                        toolCalls?: ({
-                            id?: string;
-                            function?: {
-                                name?: string;
-                                arguments?: string;
-                            } & {
-                                [key: string]: unknown;
+                        /** @constant */
+                        role: "developer";
+                        content: string;
+                        name?: string;
+                        encryptedValue?: string;
+                    } | {
+                        id: string;
+                        /** @constant */
+                        role: "system";
+                        content: string;
+                        name?: string;
+                        encryptedValue?: string;
+                    } | {
+                        id: string;
+                        /** @constant */
+                        role: "assistant";
+                        content?: string;
+                        name?: string;
+                        encryptedValue?: string;
+                        toolCalls?: {
+                            id: string;
+                            /** @constant */
+                            type: "function";
+                            function: {
+                                name: string;
+                                arguments: string;
                             };
-                        } & {
-                            [key: string]: unknown;
-                        })[];
-                        tool_calls?: ({
-                            id?: string;
-                            function?: {
-                                name?: string;
-                                arguments?: string;
-                            } & {
-                                [key: string]: unknown;
+                            encryptedValue?: string;
+                        }[];
+                    } | {
+                        id: string;
+                        /** @constant */
+                        role: "user";
+                        content: string | ({
+                            /** @constant */
+                            type: "text";
+                            text: string;
+                        } | {
+                            /** @constant */
+                            type: "image";
+                            source: {
+                                /** @constant */
+                                type: "data";
+                                value: string;
+                                mimeType: string;
+                            } | {
+                                /** @constant */
+                                type: "url";
+                                value: string;
+                                mimeType?: string;
                             };
-                        } & {
-                            [key: string]: unknown;
+                            metadata?: unknown;
+                        } | {
+                            /** @constant */
+                            type: "audio";
+                            source: {
+                                /** @constant */
+                                type: "data";
+                                value: string;
+                                mimeType: string;
+                            } | {
+                                /** @constant */
+                                type: "url";
+                                value: string;
+                                mimeType?: string;
+                            };
+                            metadata?: unknown;
+                        } | {
+                            /** @constant */
+                            type: "video";
+                            source: {
+                                /** @constant */
+                                type: "data";
+                                value: string;
+                                mimeType: string;
+                            } | {
+                                /** @constant */
+                                type: "url";
+                                value: string;
+                                mimeType?: string;
+                            };
+                            metadata?: unknown;
+                        } | {
+                            /** @constant */
+                            type: "document";
+                            source: {
+                                /** @constant */
+                                type: "data";
+                                value: string;
+                                mimeType: string;
+                            } | {
+                                /** @constant */
+                                type: "url";
+                                value: string;
+                                mimeType?: string;
+                            };
+                            metadata?: unknown;
+                        } | {
+                            /** @constant */
+                            type: "binary";
+                            mimeType: string;
+                            id?: string;
+                            url?: string;
+                            data?: string;
+                            filename?: string;
                         })[];
-                    } & {
-                        [key: string]: unknown;
+                        name?: string;
+                        encryptedValue?: string;
+                    } | {
+                        id: string;
+                        content: string;
+                        /** @constant */
+                        role: "tool";
+                        toolCallId: string;
+                        error?: string;
+                        encryptedValue?: string;
+                    } | {
+                        id: string;
+                        /** @constant */
+                        role: "activity";
+                        activityType: string;
+                        content: {
+                            [key: string]: unknown;
+                        };
+                    } | {
+                        id: string;
+                        /** @constant */
+                        role: "reasoning";
+                        content: string;
+                        encryptedValue?: string;
                     }) | {
                         role?: "system" | "developer" | "user" | "assistant" | "function" | "tool" | "unknown";
-                        content?: (string | ({
+                        content?: string | ({
                             /** @constant */
                             type: "text";
                             text?: string;
@@ -24476,7 +23622,7 @@ export interface operations {
                                 file_id?: string;
                                 filename?: string;
                             };
-                        })[]) | null;
+                        })[] | null;
                         parts?: ({
                             /** @constant */
                             type: "text";
@@ -24586,6 +23732,11 @@ export interface operations {
                         id?: string;
                         trace_id?: string;
                     })[];
+                    batchRunId: string;
+                    scenarioId: string;
+                    scenarioRunId: string;
+                    /** @default default */
+                    scenarioSetId?: string;
                 } | {
                     /** @constant */
                     type: "SCENARIO_TEXT_MESSAGE_START";
@@ -24732,8 +23883,9 @@ export interface operations {
     };
     deleteApiScenarioEvents: {
         parameters: {
-            query: {
-                scenarioSetId: string;
+            query?: {
+                scenarioSetId?: string;
+                scenarioRunId?: string;
             };
             header?: never;
             path?: never;
@@ -24752,10 +23904,14 @@ export interface operations {
                         failed: number;
                         scenarioSetId: string;
                         hasMore: boolean;
+                    } | {
+                        archived: number;
+                        failed: number;
+                        scenarioRunId: string;
                     };
                 };
             };
-            /** @description Missing or invalid scenarioSetId */
+            /** @description Bad Request */
             400: {
                 headers: {
                     [name: string]: unknown;
@@ -24763,6 +23919,7 @@ export interface operations {
                 content: {
                     "application/json": {
                         error: string;
+                        message?: string;
                     };
                 };
             };
@@ -24778,7 +23935,18 @@ export interface operations {
                     };
                 };
             };
-            /** @description Unprocessable Entity */
+            /** @description Scenario run not found in this project */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        error: string;
+                    };
+                };
+            };
+            /** @description Missing or invalid scope parameter */
             422: {
                 headers: {
                     [name: string]: unknown;
@@ -24786,7 +23954,6 @@ export interface operations {
                 content: {
                     "application/json": {
                         error: string;
-                        message?: string;
                     };
                 };
             };
@@ -24909,9 +24076,21 @@ export interface operations {
                             description?: string;
                             defaultValue?: string | number | boolean;
                             secret?: boolean;
+                            /** @enum {string} */
+                            type?: "string" | "number" | "boolean";
+                            options?: (string | number | boolean)[];
+                            required?: boolean;
                         }[];
-                        /** @description The test suite (folder) this scenario is filed in, or null when unfiled. */
-                        folderId: string | null;
+                        /** @description The model that plays the user, or null for the project default. Absent on servers that predate model overrides on this family. */
+                        simulatorModel?: string | null;
+                        /** @description The model that judges the run, or null for the project default. Absent on servers that predate model overrides on this family. */
+                        judgeModel?: string | null;
+                        /** @description The most conversation turns a run of this scenario takes, or null for the default. Absent on servers that predate turn limits on this family. */
+                        maxTurns?: number | null;
+                        /** @description The fewest conversation turns before the judge may end a run, or null for the default. Absent on servers that predate turn limits on this family. */
+                        minTurns?: number | null;
+                        /** @description The test suite this scenario is filed in, or null when unfiled. Absent on servers that predate test suites. */
+                        testSuiteId?: string | null;
                         /** Format: uri */
                         platformUrl: string;
                     }[];
@@ -24989,9 +24168,21 @@ export interface operations {
                         description?: string;
                         defaultValue?: string | number | boolean;
                         secret?: boolean;
+                        /** @enum {string} */
+                        type?: "string" | "number" | "boolean";
+                        options?: (string | number | boolean)[];
+                        required?: boolean;
                     }[];
-                    /** @description The test suite (folder) to file this scenario in. It must name a non-archived folder of the same project. null unfiles the scenario. */
-                    folderId?: string | null;
+                    /** @description Model for the simulated user, e.g. openai/gpt-5-mini. Null uses the project default. */
+                    simulatorModel?: string | null;
+                    /** @description Model for the judge, e.g. openai/gpt-5-mini. Null uses the project default. */
+                    judgeModel?: string | null;
+                    /** @description Maximum conversation turns for a run of this scenario. Null uses the default. */
+                    maxTurns?: number | null;
+                    /** @description Minimum conversation turns before the judge may end the run. Null uses the default. */
+                    minTurns?: number | null;
+                    /** @description The test suite to file this scenario in. It must name a non-archived test suite of the same project. null files the scenario into the project's Default test suite. */
+                    testSuiteId?: string | null;
                 };
             };
         };
@@ -25013,9 +24204,21 @@ export interface operations {
                             description?: string;
                             defaultValue?: string | number | boolean;
                             secret?: boolean;
+                            /** @enum {string} */
+                            type?: "string" | "number" | "boolean";
+                            options?: (string | number | boolean)[];
+                            required?: boolean;
                         }[];
-                        /** @description The test suite (folder) this scenario is filed in, or null when unfiled. */
-                        folderId: string | null;
+                        /** @description The model that plays the user, or null for the project default. Absent on servers that predate model overrides on this family. */
+                        simulatorModel?: string | null;
+                        /** @description The model that judges the run, or null for the project default. Absent on servers that predate model overrides on this family. */
+                        judgeModel?: string | null;
+                        /** @description The most conversation turns a run of this scenario takes, or null for the default. Absent on servers that predate turn limits on this family. */
+                        maxTurns?: number | null;
+                        /** @description The fewest conversation turns before the judge may end a run, or null for the default. Absent on servers that predate turn limits on this family. */
+                        minTurns?: number | null;
+                        /** @description The test suite this scenario is filed in, or null when unfiled. Absent on servers that predate test suites. */
+                        testSuiteId?: string | null;
                         /** Format: uri */
                         platformUrl: string;
                     };
@@ -25099,9 +24302,21 @@ export interface operations {
                             description?: string;
                             defaultValue?: string | number | boolean;
                             secret?: boolean;
+                            /** @enum {string} */
+                            type?: "string" | "number" | "boolean";
+                            options?: (string | number | boolean)[];
+                            required?: boolean;
                         }[];
-                        /** @description The test suite (folder) this scenario is filed in, or null when unfiled. */
-                        folderId: string | null;
+                        /** @description The model that plays the user, or null for the project default. Absent on servers that predate model overrides on this family. */
+                        simulatorModel?: string | null;
+                        /** @description The model that judges the run, or null for the project default. Absent on servers that predate model overrides on this family. */
+                        judgeModel?: string | null;
+                        /** @description The most conversation turns a run of this scenario takes, or null for the default. Absent on servers that predate turn limits on this family. */
+                        maxTurns?: number | null;
+                        /** @description The fewest conversation turns before the judge may end a run, or null for the default. Absent on servers that predate turn limits on this family. */
+                        minTurns?: number | null;
+                        /** @description The test suite this scenario is filed in, or null when unfiled. Absent on servers that predate test suites. */
+                        testSuiteId?: string | null;
                         /** Format: uri */
                         platformUrl: string;
                     };
@@ -25191,9 +24406,21 @@ export interface operations {
                         description?: string;
                         defaultValue?: string | number | boolean;
                         secret?: boolean;
+                        /** @enum {string} */
+                        type?: "string" | "number" | "boolean";
+                        options?: (string | number | boolean)[];
+                        required?: boolean;
                     }[];
-                    /** @description The test suite (folder) to file this scenario in. It must name a non-archived folder of the same project. null unfiles the scenario. */
-                    folderId?: string | null;
+                    /** @description Model for the simulated user, e.g. openai/gpt-5-mini. Null uses the project default. */
+                    simulatorModel?: string | null;
+                    /** @description Model for the judge, e.g. openai/gpt-5-mini. Null uses the project default. */
+                    judgeModel?: string | null;
+                    /** @description Maximum conversation turns for a run of this scenario. Null uses the default. */
+                    maxTurns?: number | null;
+                    /** @description Minimum conversation turns before the judge may end the run. Null uses the default. */
+                    minTurns?: number | null;
+                    /** @description The test suite to file this scenario in. It must name a non-archived test suite of the same project. null files the scenario into the project's Default test suite. */
+                    testSuiteId?: string | null;
                 };
             };
         };
@@ -25215,9 +24442,21 @@ export interface operations {
                             description?: string;
                             defaultValue?: string | number | boolean;
                             secret?: boolean;
+                            /** @enum {string} */
+                            type?: "string" | "number" | "boolean";
+                            options?: (string | number | boolean)[];
+                            required?: boolean;
                         }[];
-                        /** @description The test suite (folder) this scenario is filed in, or null when unfiled. */
-                        folderId: string | null;
+                        /** @description The model that plays the user, or null for the project default. Absent on servers that predate model overrides on this family. */
+                        simulatorModel?: string | null;
+                        /** @description The model that judges the run, or null for the project default. Absent on servers that predate model overrides on this family. */
+                        judgeModel?: string | null;
+                        /** @description The most conversation turns a run of this scenario takes, or null for the default. Absent on servers that predate turn limits on this family. */
+                        maxTurns?: number | null;
+                        /** @description The fewest conversation turns before the judge may end a run, or null for the default. Absent on servers that predate turn limits on this family. */
+                        minTurns?: number | null;
+                        /** @description The test suite this scenario is filed in, or null when unfiled. Absent on servers that predate test suites. */
+                        testSuiteId?: string | null;
                         /** Format: uri */
                         platformUrl: string;
                     };
@@ -25370,6 +24609,146 @@ export interface operations {
             };
         };
     };
+    patchApiScenariosById: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": {
+                    name?: string;
+                    situation?: string;
+                    criteria?: string[];
+                    labels?: string[];
+                    /** @description The parameters this scenario declares by name, each with an optional description and default. A run supplies values for these names, readable from the scenario's own text as params.NAME. A parameter marked secret carries no default: its value is supplied per run, encrypted, delivered to the target as secrets.NAME, and never readable from the scenario's own text. */
+                    parameters?: {
+                        name: string;
+                        description?: string;
+                        defaultValue?: string | number | boolean;
+                        secret?: boolean;
+                        /** @enum {string} */
+                        type?: "string" | "number" | "boolean";
+                        options?: (string | number | boolean)[];
+                        required?: boolean;
+                    }[];
+                    /** @description Model for the simulated user, e.g. openai/gpt-5-mini. Null uses the project default. */
+                    simulatorModel?: string | null;
+                    /** @description Model for the judge, e.g. openai/gpt-5-mini. Null uses the project default. */
+                    judgeModel?: string | null;
+                    /** @description Maximum conversation turns for a run of this scenario. Null uses the default. */
+                    maxTurns?: number | null;
+                    /** @description Minimum conversation turns before the judge may end the run. Null uses the default. */
+                    minTurns?: number | null;
+                    /** @description The test suite to file this scenario in. It must name a non-archived test suite of the same project. null files the scenario into the project's Default test suite. */
+                    testSuiteId?: string | null;
+                };
+            };
+        };
+        responses: {
+            /** @description Scenario updated */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        id: string;
+                        name: string;
+                        situation: string;
+                        criteria: string[];
+                        labels: string[];
+                        parameters: {
+                            name: string;
+                            description?: string;
+                            defaultValue?: string | number | boolean;
+                            secret?: boolean;
+                            /** @enum {string} */
+                            type?: "string" | "number" | "boolean";
+                            options?: (string | number | boolean)[];
+                            required?: boolean;
+                        }[];
+                        /** @description The model that plays the user, or null for the project default. Absent on servers that predate model overrides on this family. */
+                        simulatorModel?: string | null;
+                        /** @description The model that judges the run, or null for the project default. Absent on servers that predate model overrides on this family. */
+                        judgeModel?: string | null;
+                        /** @description The most conversation turns a run of this scenario takes, or null for the default. Absent on servers that predate turn limits on this family. */
+                        maxTurns?: number | null;
+                        /** @description The fewest conversation turns before the judge may end a run, or null for the default. Absent on servers that predate turn limits on this family. */
+                        minTurns?: number | null;
+                        /** @description The test suite this scenario is filed in, or null when unfiled. Absent on servers that predate test suites. */
+                        testSuiteId?: string | null;
+                        /** Format: uri */
+                        platformUrl: string;
+                    };
+                };
+            };
+            /** @description Bad Request */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        error: string;
+                        message?: string;
+                    };
+                };
+            };
+            /** @description Unauthorized */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        error: string;
+                        message?: string;
+                    };
+                };
+            };
+            /** @description Scenario not found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        error: string;
+                        message?: string;
+                    };
+                };
+            };
+            /** @description Unprocessable Entity */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        error: string;
+                        message?: string;
+                    };
+                };
+            };
+            /** @description Internal Server Error */
+            500: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        error: string;
+                        message?: string;
+                    };
+                };
+            };
+        };
+    };
     getApiScenariosByIdVersions: {
         parameters: {
             query?: {
@@ -25395,7 +24774,7 @@ export interface operations {
                         versions: {
                             /** @description The version number, counting from 1. */
                             version: number;
-                            /** @description Which surface wrote the version: user, api, cli or langy. Null on the synthesized Created entry of a case saved before versions were recorded. */
+                            /** @description Which surface wrote the version: user, api, cli or langy. Null on the synthesized Created entry of a scenario saved before versions were recorded. */
                             authorLabel: string | null;
                             /** @description The user who saved the version. Null when the save came from an API key. */
                             authorId: string | null;
@@ -25404,7 +24783,7 @@ export interface operations {
                             changedFields: string[];
                             /** @description When the version was written, in ISO 8601. */
                             createdAt: string;
-                            /** @description True on the Created entry a case saved before versions were recorded shows. It has no stored snapshot, so it cannot be read back. */
+                            /** @description True on the Created entry a scenario saved before versions were recorded shows. It has no stored snapshot, so it cannot be read back. */
                             isSynthesized: boolean;
                         }[];
                         /** @description Pass as cursor to read the page below this one. Null on the last page. */
@@ -25495,7 +24874,7 @@ export interface operations {
                     "application/json": {
                         /** @description The version number, counting from 1. */
                         version: number;
-                        /** @description Which surface wrote the version: user, api, cli or langy. Null on the synthesized Created entry of a case saved before versions were recorded. */
+                        /** @description Which surface wrote the version: user, api, cli or langy. Null on the synthesized Created entry of a scenario saved before versions were recorded. */
                         authorLabel: string | null;
                         /** @description The user who saved the version. Null when the save came from an API key. */
                         authorId: string | null;
@@ -25504,11 +24883,11 @@ export interface operations {
                         changedFields: string[];
                         /** @description When the version was written, in ISO 8601. */
                         createdAt: string;
-                        /** @description True on the Created entry a case saved before versions were recorded shows. It has no stored snapshot, so it cannot be read back. */
+                        /** @description True on the Created entry a scenario saved before versions were recorded shows. It has no stored snapshot, so it cannot be read back. */
                         isSynthesized: boolean;
                         /** @description The shape the snapshot was written in. */
                         schemaVersion: number;
-                        /** @description The editable content of the case as this version saved it. */
+                        /** @description The editable content of the scenario as this version saved it. */
                         snapshot: {
                             name: string;
                             situation: string;
@@ -25519,6 +24898,10 @@ export interface operations {
                                 description?: string;
                                 defaultValue?: string | number | boolean;
                                 secret?: boolean;
+                                /** @enum {string} */
+                                type?: "string" | "number" | "boolean";
+                                options?: (string | number | boolean)[];
+                                required?: boolean;
                             }[];
                             simulatorModel: string | null;
                             judgeModel: string | null;
@@ -25946,20 +25329,14 @@ export interface operations {
             };
         };
     };
-    listSecrets_2026_08_24: {
+    getApiSecrets: {
         parameters: {
             query?: never;
             header?: never;
             path?: never;
             cookie?: never;
         };
-        requestBody: {
-            content: {
-                "application/json": {
-                    projectId: string;
-                };
-            };
-        };
+        requestBody?: never;
         responses: {
             /** @description Success */
             200: {
@@ -25971,51 +25348,62 @@ export interface operations {
                         id: string;
                         projectId: string;
                         name: string;
-                        /** Format: date-time */
                         createdAt: string;
-                        /** Format: date-time */
                         updatedAt: string;
                     }[];
                 };
             };
-        };
-    };
-    getSecret_2026_08_24: {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        requestBody: {
-            content: {
-                "application/json": {
-                    projectId: string;
-                    id: string;
-                };
-            };
-        };
-        responses: {
-            /** @description Success */
-            200: {
+            /** @description Bad Request */
+            400: {
                 headers: {
                     [name: string]: unknown;
                 };
                 content: {
                     "application/json": {
-                        id: string;
-                        projectId: string;
-                        name: string;
-                        /** Format: date-time */
-                        createdAt: string;
-                        /** Format: date-time */
-                        updatedAt: string;
+                        error: string;
+                        message?: string;
+                    };
+                };
+            };
+            /** @description Unauthorized */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        error: string;
+                        message?: string;
+                    };
+                };
+            };
+            /** @description Unprocessable Entity */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        error: string;
+                        message?: string;
+                    };
+                };
+            };
+            /** @description Internal Server Error */
+            500: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        error: string;
+                        message?: string;
                     };
                 };
             };
         };
     };
-    createSecret_2026_08_24: {
+    postApiSecrets: {
         parameters: {
             query?: never;
             header?: never;
@@ -26025,13 +25413,100 @@ export interface operations {
         requestBody: {
             content: {
                 "application/json": {
-                    projectId: string;
                     name: string;
                     value: string;
                 };
             };
         };
         responses: {
+            /** @description Secret created */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        id: string;
+                        projectId: string;
+                        name: string;
+                        createdAt: string;
+                        updatedAt: string;
+                    };
+                };
+            };
+            /** @description Bad Request */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        error: string;
+                        message?: string;
+                    };
+                };
+            };
+            /** @description Unauthorized */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        error: string;
+                        message?: string;
+                    };
+                };
+            };
+            /** @description Secret with this name already exists */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        error: string;
+                        message?: string;
+                    };
+                };
+            };
+            /** @description Unprocessable Entity */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        error: string;
+                        message?: string;
+                    };
+                };
+            };
+            /** @description Internal Server Error */
+            500: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        error: string;
+                        message?: string;
+                    };
+                };
+            };
+        };
+    };
+    getApiSecretsById: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
             /** @description Success */
             200: {
                 headers: {
@@ -26042,33 +25517,91 @@ export interface operations {
                         id: string;
                         projectId: string;
                         name: string;
-                        /** Format: date-time */
                         createdAt: string;
-                        /** Format: date-time */
                         updatedAt: string;
+                    };
+                };
+            };
+            /** @description Bad Request */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        error: string;
+                        message?: string;
+                    };
+                };
+            };
+            /** @description Unauthorized */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        error: string;
+                        message?: string;
+                    };
+                };
+            };
+            /** @description Secret not found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        error: string;
+                        message?: string;
+                    };
+                };
+            };
+            /** @description Unprocessable Entity */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        error: string;
+                        message?: string;
+                    };
+                };
+            };
+            /** @description Internal Server Error */
+            500: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        error: string;
+                        message?: string;
                     };
                 };
             };
         };
     };
-    updateSecret_2026_08_24: {
+    putApiSecretsById: {
         parameters: {
             query?: never;
             header?: never;
-            path?: never;
+            path: {
+                id: string;
+            };
             cookie?: never;
         };
         requestBody: {
             content: {
                 "application/json": {
-                    projectId: string;
-                    id: string;
                     value: string;
                 };
             };
         };
         responses: {
-            /** @description Success */
+            /** @description Secret updated */
             200: {
                 headers: {
                     [name: string]: unknown;
@@ -26078,32 +25611,85 @@ export interface operations {
                         id: string;
                         projectId: string;
                         name: string;
-                        /** Format: date-time */
                         createdAt: string;
-                        /** Format: date-time */
                         updatedAt: string;
+                    };
+                };
+            };
+            /** @description Bad Request */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        error: string;
+                        message?: string;
+                    };
+                };
+            };
+            /** @description Unauthorized */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        error: string;
+                        message?: string;
+                    };
+                };
+            };
+            /** @description Secret not found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        error: string;
+                        message?: string;
+                    };
+                };
+            };
+            /** @description Unprocessable Entity */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        error: string;
+                        message?: string;
+                    };
+                };
+            };
+            /** @description Internal Server Error */
+            500: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        error: string;
+                        message?: string;
                     };
                 };
             };
         };
     };
-    deleteSecret_2026_08_24: {
+    deleteApiSecretsById: {
         parameters: {
             query?: never;
             header?: never;
-            path?: never;
+            path: {
+                id: string;
+            };
             cookie?: never;
         };
-        requestBody: {
-            content: {
-                "application/json": {
-                    projectId: string;
-                    id: string;
-                };
-            };
-        };
+        requestBody?: never;
         responses: {
-            /** @description Success */
+            /** @description Secret deleted */
             200: {
                 headers: {
                     [name: string]: unknown;
@@ -26111,180 +25697,67 @@ export interface operations {
                 content: {
                     "application/json": {
                         id: string;
-                        /** @constant */
-                        deleted: true;
+                        deleted: boolean;
                     };
                 };
             };
-        };
-    };
-    listSecrets: {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        requestBody: {
-            content: {
-                "application/json": {
-                    projectId: string;
-                };
-            };
-        };
-        responses: {
-            /** @description Success */
-            200: {
+            /** @description Bad Request */
+            400: {
                 headers: {
                     [name: string]: unknown;
                 };
                 content: {
                     "application/json": {
-                        id: string;
-                        projectId: string;
-                        name: string;
-                        /** Format: date-time */
-                        createdAt: string;
-                        /** Format: date-time */
-                        updatedAt: string;
-                    }[];
-                };
-            };
-        };
-    };
-    getSecret: {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        requestBody: {
-            content: {
-                "application/json": {
-                    projectId: string;
-                    id: string;
-                };
-            };
-        };
-        responses: {
-            /** @description Success */
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": {
-                        id: string;
-                        projectId: string;
-                        name: string;
-                        /** Format: date-time */
-                        createdAt: string;
-                        /** Format: date-time */
-                        updatedAt: string;
+                        error: string;
+                        message?: string;
                     };
                 };
             };
-        };
-    };
-    createSecret: {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        requestBody: {
-            content: {
-                "application/json": {
-                    projectId: string;
-                    name: string;
-                    value: string;
-                };
-            };
-        };
-        responses: {
-            /** @description Success */
-            200: {
+            /** @description Unauthorized */
+            401: {
                 headers: {
                     [name: string]: unknown;
                 };
                 content: {
                     "application/json": {
-                        id: string;
-                        projectId: string;
-                        name: string;
-                        /** Format: date-time */
-                        createdAt: string;
-                        /** Format: date-time */
-                        updatedAt: string;
+                        error: string;
+                        message?: string;
                     };
                 };
             };
-        };
-    };
-    updateSecret: {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        requestBody: {
-            content: {
-                "application/json": {
-                    projectId: string;
-                    id: string;
-                    value: string;
-                };
-            };
-        };
-        responses: {
-            /** @description Success */
-            200: {
+            /** @description Secret not found */
+            404: {
                 headers: {
                     [name: string]: unknown;
                 };
                 content: {
                     "application/json": {
-                        id: string;
-                        projectId: string;
-                        name: string;
-                        /** Format: date-time */
-                        createdAt: string;
-                        /** Format: date-time */
-                        updatedAt: string;
+                        error: string;
+                        message?: string;
                     };
                 };
             };
-        };
-    };
-    deleteSecret: {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        requestBody: {
-            content: {
-                "application/json": {
-                    projectId: string;
-                    id: string;
-                };
-            };
-        };
-        responses: {
-            /** @description Success */
-            200: {
+            /** @description Unprocessable Entity */
+            422: {
                 headers: {
                     [name: string]: unknown;
                 };
                 content: {
                     "application/json": {
-                        id: string;
-                        /** @constant */
-                        deleted: true;
+                        error: string;
+                        message?: string;
+                    };
+                };
+            };
+            /** @description Internal Server Error */
+            500: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        error: string;
+                        message?: string;
                     };
                 };
             };
@@ -26297,6 +25770,8 @@ export interface operations {
                 batchRunId?: string;
                 limit?: number;
                 cursor?: string;
+                /** @description Pass `messages` to read whole conversations instead of the first few messages of each run. The page size is capped at 20 runs when set, and ends on a batch boundary. */
+                include?: "messages";
             };
             header?: never;
             path?: never;
@@ -26329,14 +25804,16 @@ export interface operations {
                                 role: string;
                                 content: string;
                             }[];
+                            /** @description True when `messages` holds only the first few messages of a longer conversation. Pass `include=messages` to read them all. */
+                            messagesTruncated?: boolean;
                             timestamp: number;
                             updatedAt: number;
                             durationInMs: number;
                             totalCost?: number;
-                            /** @description One short line saying why the run was started, as given when it was queued. Null on a run started without one. */
-                            note: string | null;
-                            /** @description The version of the scenario at the moment the run was queued. Null on runs recorded before versions existed. */
-                            scenarioVersion: number | null;
+                            /** @description One short line saying why the run was started, as given when it was queued. Null on a run started without one. Absent on servers that predate run notes. */
+                            note?: string | null;
+                            /** @description The version of the scenario at the moment the run was queued. Null on runs recorded before versions existed. Absent on servers that predate scenario versions. */
+                            scenarioVersion?: number | null;
                             /** Format: uri */
                             platformUrl: string;
                         }[];
@@ -26430,14 +25907,16 @@ export interface operations {
                             role: string;
                             content: string;
                         }[];
+                        /** @description True when `messages` holds only the first few messages of a longer conversation. Pass `include=messages` to read them all. */
+                        messagesTruncated?: boolean;
                         timestamp: number;
                         updatedAt: number;
                         durationInMs: number;
                         totalCost?: number;
-                        /** @description One short line saying why the run was started, as given when it was queued. Null on a run started without one. */
-                        note: string | null;
-                        /** @description The version of the scenario at the moment the run was queued. Null on runs recorded before versions existed. */
-                        scenarioVersion: number | null;
+                        /** @description One short line saying why the run was started, as given when it was queued. Null on a run started without one. Absent on servers that predate run notes. */
+                        note?: string | null;
+                        /** @description The version of the scenario at the moment the run was queued. Null on runs recorded before versions existed. Absent on servers that predate scenario versions. */
+                        scenarioVersion?: number | null;
                         /** Format: uri */
                         platformUrl: string;
                     };
@@ -26543,8 +26022,8 @@ export interface operations {
                             allCompletedAt: number | null;
                             /** @description True when every run of the batch reached a terminal status. */
                             isComplete: boolean;
-                            /** @description One short line saying why the batch was run, as given when it was queued. Null on a batch run without one. */
-                            note: string | null;
+                            /** @description One short line saying why the batch was run, as given when it was queued. Null on a batch run without one. Absent on servers that predate run notes. */
+                            note?: string | null;
                         }[];
                         hasMore?: boolean;
                         nextCursor?: string;
@@ -26636,8 +26115,8 @@ export interface operations {
                         allCompletedAt: number | null;
                         /** @description True when every run of the batch reached a terminal status. */
                         isComplete: boolean;
-                        /** @description One short line saying why the batch was run, as given when it was queued. Null on a batch run without one. */
-                        note: string | null;
+                        /** @description One short line saying why the batch was run, as given when it was queued. Null on a batch run without one. Absent on servers that predate run notes. */
+                        note?: string | null;
                     };
                 };
             };
@@ -26706,7 +26185,7 @@ export interface operations {
     getApiSuites: {
         parameters: {
             query?: {
-                /** @description Which kind of suite to list. Defaults to custom, so callers that predate folders keep seeing exactly the run plans they always did. */
+                /** @description Which kind of suite to list. Defaults to custom, so callers that predate test suites keep seeing exactly the run plans they always did. */
                 kind?: "custom" | "folder";
             };
             header?: never;
@@ -26726,14 +26205,14 @@ export interface operations {
                         name: string;
                         slug: string;
                         /**
-                         * @description custom is a hand-assembled run plan; folder is a test suite that groups scenarios filed into it.
+                         * @description custom is a hand-assembled run plan; folder is a test suite that groups scenarios filed into it. Absent on servers that predate test suites.
                          * @enum {string}
                          */
-                        kind: "custom" | "folder";
+                        kind?: "custom" | "folder";
                         description: string | null;
                         scenarioIds: string[];
-                        /** @description What the run plan covers: all (every active test case), folders (the cases filed in the named test suites), labels (the cases carrying any of the labels), or cases (the scenarioIds below). A dynamic scope is resolved again at every run, so a test case written later runs without editing the plan. */
-                        scope: {
+                        /** @description What the run plan covers: all (every active scenario), folders (the scenarios filed in the named test suites), labels (the scenarios carrying any of the labels), or cases (the scenarioIds below). A dynamic scope is resolved again at every run, so a scenario written later runs without editing the plan. */
+                        scope?: {
                             /** @constant */
                             mode: "all";
                         } | {
@@ -26749,9 +26228,17 @@ export interface operations {
                             mode: "cases";
                         } | null;
                         targets: {
-                            /** @enum {string} */
-                            type: "prompt" | "http" | "code" | "workflow";
+                            /**
+                             * @description What kind of thing the scenarios run against. A connected agent is one registered from code with the SDK.
+                             * @enum {string}
+                             */
+                            type: "prompt" | "http" | "code" | "workflow" | "connected";
+                            /** @description The id of the prompt, agent or workflow to run against. A connected target may also say <name>@<environment>, for example support-agent@production, which resolves to the agent id. */
                             referenceId: string;
+                            /** @description Parameter values this target alone runs with, by name. They are merged over the run-level parameters and the target wins, so two targets may name the same agent with different values: that is how one run compares one agent on two models, and the results show one column for each target. */
+                            runParameters?: {
+                                [key: string]: string | number | boolean;
+                            };
                         }[];
                         repeatCount: number;
                         labels: string[];
@@ -26832,7 +26319,7 @@ export interface operations {
                     description?: string;
                     /** @default [] */
                     scenarioIds?: string[];
-                    /** @description What the run plan covers: all (every active test case), folders (the cases filed in the named test suites), labels (the cases carrying any of the labels), or cases (the scenarioIds below). A dynamic scope is resolved again at every run, so a test case written later runs without editing the plan. */
+                    /** @description What the run plan covers: all (every active scenario), folders (the scenarios filed in the named test suites), labels (the scenarios carrying any of the labels), or cases (the scenarioIds below). A dynamic scope is resolved again at every run, so a scenario written later runs without editing the plan. */
                     scope?: {
                         /** @constant */
                         mode: "all";
@@ -26850,9 +26337,17 @@ export interface operations {
                     };
                     /** @default [] */
                     targets?: {
-                        /** @enum {string} */
-                        type: "prompt" | "http" | "code" | "workflow";
+                        /**
+                         * @description What kind of thing the scenarios run against. A connected agent is one registered from code with the SDK.
+                         * @enum {string}
+                         */
+                        type: "prompt" | "http" | "code" | "workflow" | "connected";
+                        /** @description The id of the prompt, agent or workflow to run against. A connected target may also say <name>@<environment>, for example support-agent@production, which resolves to the agent id. */
                         referenceId: string;
+                        /** @description Parameter values this target alone runs with, by name. They are merged over the run-level parameters and the target wins, so two targets may name the same agent with different values: that is how one run compares one agent on two models, and the results show one column for each target. */
+                        runParameters?: {
+                            [key: string]: string | number | boolean;
+                        };
                     }[];
                     /** @default 1 */
                     repeatCount?: number;
@@ -26873,14 +26368,14 @@ export interface operations {
                         name: string;
                         slug: string;
                         /**
-                         * @description custom is a hand-assembled run plan; folder is a test suite that groups scenarios filed into it.
+                         * @description custom is a hand-assembled run plan; folder is a test suite that groups scenarios filed into it. Absent on servers that predate test suites.
                          * @enum {string}
                          */
-                        kind: "custom" | "folder";
+                        kind?: "custom" | "folder";
                         description: string | null;
                         scenarioIds: string[];
-                        /** @description What the run plan covers: all (every active test case), folders (the cases filed in the named test suites), labels (the cases carrying any of the labels), or cases (the scenarioIds below). A dynamic scope is resolved again at every run, so a test case written later runs without editing the plan. */
-                        scope: {
+                        /** @description What the run plan covers: all (every active scenario), folders (the scenarios filed in the named test suites), labels (the scenarios carrying any of the labels), or cases (the scenarioIds below). A dynamic scope is resolved again at every run, so a scenario written later runs without editing the plan. */
+                        scope?: {
                             /** @constant */
                             mode: "all";
                         } | {
@@ -26896,9 +26391,17 @@ export interface operations {
                             mode: "cases";
                         } | null;
                         targets: {
-                            /** @enum {string} */
-                            type: "prompt" | "http" | "code" | "workflow";
+                            /**
+                             * @description What kind of thing the scenarios run against. A connected agent is one registered from code with the SDK.
+                             * @enum {string}
+                             */
+                            type: "prompt" | "http" | "code" | "workflow" | "connected";
+                            /** @description The id of the prompt, agent or workflow to run against. A connected target may also say <name>@<environment>, for example support-agent@production, which resolves to the agent id. */
                             referenceId: string;
+                            /** @description Parameter values this target alone runs with, by name. They are merged over the run-level parameters and the target wins, so two targets may name the same agent with different values: that is how one run compares one agent on two models, and the results show one column for each target. */
+                            runParameters?: {
+                                [key: string]: string | number | boolean;
+                            };
                         }[];
                         repeatCount: number;
                         labels: string[];
@@ -26981,14 +26484,14 @@ export interface operations {
                         name: string;
                         slug: string;
                         /**
-                         * @description custom is a hand-assembled run plan; folder is a test suite that groups scenarios filed into it.
+                         * @description custom is a hand-assembled run plan; folder is a test suite that groups scenarios filed into it. Absent on servers that predate test suites.
                          * @enum {string}
                          */
-                        kind: "custom" | "folder";
+                        kind?: "custom" | "folder";
                         description: string | null;
                         scenarioIds: string[];
-                        /** @description What the run plan covers: all (every active test case), folders (the cases filed in the named test suites), labels (the cases carrying any of the labels), or cases (the scenarioIds below). A dynamic scope is resolved again at every run, so a test case written later runs without editing the plan. */
-                        scope: {
+                        /** @description What the run plan covers: all (every active scenario), folders (the scenarios filed in the named test suites), labels (the scenarios carrying any of the labels), or cases (the scenarioIds below). A dynamic scope is resolved again at every run, so a scenario written later runs without editing the plan. */
+                        scope?: {
                             /** @constant */
                             mode: "all";
                         } | {
@@ -27004,9 +26507,17 @@ export interface operations {
                             mode: "cases";
                         } | null;
                         targets: {
-                            /** @enum {string} */
-                            type: "prompt" | "http" | "code" | "workflow";
+                            /**
+                             * @description What kind of thing the scenarios run against. A connected agent is one registered from code with the SDK.
+                             * @enum {string}
+                             */
+                            type: "prompt" | "http" | "code" | "workflow" | "connected";
+                            /** @description The id of the prompt, agent or workflow to run against. A connected target may also say <name>@<environment>, for example support-agent@production, which resolves to the agent id. */
                             referenceId: string;
+                            /** @description Parameter values this target alone runs with, by name. They are merged over the run-level parameters and the target wins, so two targets may name the same agent with different values: that is how one run compares one agent on two models, and the results show one column for each target. */
+                            runParameters?: {
+                                [key: string]: string | number | boolean;
+                            };
                         }[];
                         repeatCount: number;
                         labels: string[];
@@ -27050,6 +26561,8 @@ export interface operations {
                     "application/json": {
                         error: string;
                         message?: string;
+                        /** @description The domain error code, when the refusal names one. */
+                        code?: string;
                     };
                 };
             };
@@ -27135,6 +26648,8 @@ export interface operations {
                     "application/json": {
                         error: string;
                         message?: string;
+                        /** @description The domain error code, when the refusal names one. */
+                        code?: string;
                     };
                 };
             };
@@ -27178,7 +26693,7 @@ export interface operations {
                 "application/json": {
                     name?: string;
                     description?: string | null;
-                    /** @description What the run plan covers: all (every active test case), folders (the cases filed in the named test suites), labels (the cases carrying any of the labels), or cases (the scenarioIds below). A dynamic scope is resolved again at every run, so a test case written later runs without editing the plan. */
+                    /** @description What the run plan covers: all (every active scenario), folders (the scenarios filed in the named test suites), labels (the scenarios carrying any of the labels), or cases (the scenarioIds below). A dynamic scope is resolved again at every run, so a scenario written later runs without editing the plan. */
                     scope?: {
                         /** @constant */
                         mode: "all";
@@ -27196,9 +26711,17 @@ export interface operations {
                     };
                     scenarioIds?: string[];
                     targets?: {
-                        /** @enum {string} */
-                        type: "prompt" | "http" | "code" | "workflow";
+                        /**
+                         * @description What kind of thing the scenarios run against. A connected agent is one registered from code with the SDK.
+                         * @enum {string}
+                         */
+                        type: "prompt" | "http" | "code" | "workflow" | "connected";
+                        /** @description The id of the prompt, agent or workflow to run against. A connected target may also say <name>@<environment>, for example support-agent@production, which resolves to the agent id. */
                         referenceId: string;
+                        /** @description Parameter values this target alone runs with, by name. They are merged over the run-level parameters and the target wins, so two targets may name the same agent with different values: that is how one run compares one agent on two models, and the results show one column for each target. */
+                        runParameters?: {
+                            [key: string]: string | number | boolean;
+                        };
                     }[];
                     repeatCount?: number;
                     labels?: string[];
@@ -27217,14 +26740,14 @@ export interface operations {
                         name: string;
                         slug: string;
                         /**
-                         * @description custom is a hand-assembled run plan; folder is a test suite that groups scenarios filed into it.
+                         * @description custom is a hand-assembled run plan; folder is a test suite that groups scenarios filed into it. Absent on servers that predate test suites.
                          * @enum {string}
                          */
-                        kind: "custom" | "folder";
+                        kind?: "custom" | "folder";
                         description: string | null;
                         scenarioIds: string[];
-                        /** @description What the run plan covers: all (every active test case), folders (the cases filed in the named test suites), labels (the cases carrying any of the labels), or cases (the scenarioIds below). A dynamic scope is resolved again at every run, so a test case written later runs without editing the plan. */
-                        scope: {
+                        /** @description What the run plan covers: all (every active scenario), folders (the scenarios filed in the named test suites), labels (the scenarios carrying any of the labels), or cases (the scenarioIds below). A dynamic scope is resolved again at every run, so a scenario written later runs without editing the plan. */
+                        scope?: {
                             /** @constant */
                             mode: "all";
                         } | {
@@ -27240,9 +26763,17 @@ export interface operations {
                             mode: "cases";
                         } | null;
                         targets: {
-                            /** @enum {string} */
-                            type: "prompt" | "http" | "code" | "workflow";
+                            /**
+                             * @description What kind of thing the scenarios run against. A connected agent is one registered from code with the SDK.
+                             * @enum {string}
+                             */
+                            type: "prompt" | "http" | "code" | "workflow" | "connected";
+                            /** @description The id of the prompt, agent or workflow to run against. A connected target may also say <name>@<environment>, for example support-agent@production, which resolves to the agent id. */
                             referenceId: string;
+                            /** @description Parameter values this target alone runs with, by name. They are merged over the run-level parameters and the target wins, so two targets may name the same agent with different values: that is how one run compares one agent on two models, and the results show one column for each target. */
+                            runParameters?: {
+                                [key: string]: string | number | boolean;
+                            };
                         }[];
                         repeatCount: number;
                         labels: string[];
@@ -27286,6 +26817,8 @@ export interface operations {
                     "application/json": {
                         error: string;
                         message?: string;
+                        /** @description The domain error code, when the refusal names one. */
+                        code?: string;
                     };
                 };
             };
@@ -27337,14 +26870,14 @@ export interface operations {
                         name: string;
                         slug: string;
                         /**
-                         * @description custom is a hand-assembled run plan; folder is a test suite that groups scenarios filed into it.
+                         * @description custom is a hand-assembled run plan; folder is a test suite that groups scenarios filed into it. Absent on servers that predate test suites.
                          * @enum {string}
                          */
-                        kind: "custom" | "folder";
+                        kind?: "custom" | "folder";
                         description: string | null;
                         scenarioIds: string[];
-                        /** @description What the run plan covers: all (every active test case), folders (the cases filed in the named test suites), labels (the cases carrying any of the labels), or cases (the scenarioIds below). A dynamic scope is resolved again at every run, so a test case written later runs without editing the plan. */
-                        scope: {
+                        /** @description What the run plan covers: all (every active scenario), folders (the scenarios filed in the named test suites), labels (the scenarios carrying any of the labels), or cases (the scenarioIds below). A dynamic scope is resolved again at every run, so a scenario written later runs without editing the plan. */
+                        scope?: {
                             /** @constant */
                             mode: "all";
                         } | {
@@ -27360,9 +26893,17 @@ export interface operations {
                             mode: "cases";
                         } | null;
                         targets: {
-                            /** @enum {string} */
-                            type: "prompt" | "http" | "code" | "workflow";
+                            /**
+                             * @description What kind of thing the scenarios run against. A connected agent is one registered from code with the SDK.
+                             * @enum {string}
+                             */
+                            type: "prompt" | "http" | "code" | "workflow" | "connected";
+                            /** @description The id of the prompt, agent or workflow to run against. A connected target may also say <name>@<environment>, for example support-agent@production, which resolves to the agent id. */
                             referenceId: string;
+                            /** @description Parameter values this target alone runs with, by name. They are merged over the run-level parameters and the target wins, so two targets may name the same agent with different values: that is how one run compares one agent on two models, and the results show one column for each target. */
+                            runParameters?: {
+                                [key: string]: string | number | boolean;
+                            };
                         }[];
                         repeatCount: number;
                         labels: string[];
@@ -27406,6 +26947,8 @@ export interface operations {
                     "application/json": {
                         error: string;
                         message?: string;
+                        /** @description The domain error code, when the refusal names one. */
+                        code?: string;
                     };
                 };
             };
@@ -27448,6 +26991,28 @@ export interface operations {
             content: {
                 "application/json": {
                     idempotencyKey?: string;
+                    /** @description The run plan this run joins or creates. Used only when the id names a test suite; derived from the suite name and the targets when absent. */
+                    name?: string;
+                    /** @description The prompts, agents or workflows the run goes against. Used only when the id names a test suite, which stores no target of its own. */
+                    targets?: {
+                        /**
+                         * @description What kind of thing the scenarios run against. A connected agent is one registered from code with the SDK.
+                         * @enum {string}
+                         */
+                        type: "prompt" | "http" | "code" | "workflow" | "connected";
+                        /** @description The id of the prompt, agent or workflow to run against. A connected target may also say <name>@<environment>, for example support-agent@production, which resolves to the agent id. */
+                        referenceId: string;
+                        /** @description Parameter values this target alone runs with, by name. They are merged over the run-level parameters and the target wins, so two targets may name the same agent with different values: that is how one run compares one agent on two models, and the results show one column for each target. */
+                        runParameters?: {
+                            [key: string]: string | number | boolean;
+                        };
+                    }[];
+                    /** @description How many times each scenario and target pairing runs, between 1 and 5. Used only when the id names a test suite. */
+                    repeatCount?: number;
+                    /** @description The model that plays the user for every scenario in the run. Used only when the id names a test suite. */
+                    simulatorModel?: string | null;
+                    /** @description The model that judges every scenario in the run. Used only when the id names a test suite. */
+                    judgeModel?: string | null;
                     /** @description Constant values applied to every scenario in the run, e.g. a fixture id or a tenant. A value supplied here overrides the scenario's own default for that name. */
                     parameters?: {
                         [key: string]: string | number | boolean;
@@ -27477,9 +27042,17 @@ export interface operations {
                             scenarioRunId: string;
                             scenarioId: string;
                             target: {
-                                /** @enum {string} */
-                                type: "prompt" | "http" | "code" | "workflow";
+                                /**
+                                 * @description What kind of thing the scenarios run against. A connected agent is one registered from code with the SDK.
+                                 * @enum {string}
+                                 */
+                                type: "prompt" | "http" | "code" | "workflow" | "connected";
+                                /** @description The id of the prompt, agent or workflow to run against. A connected target may also say <name>@<environment>, for example support-agent@production, which resolves to the agent id. */
                                 referenceId: string;
+                                /** @description Parameter values this target alone runs with, by name. They are merged over the run-level parameters and the target wins, so two targets may name the same agent with different values: that is how one run compares one agent on two models, and the results show one column for each target. */
+                                runParameters?: {
+                                    [key: string]: string | number | boolean;
+                                };
                             };
                             name: string | null;
                         }[];
@@ -27519,6 +27092,8 @@ export interface operations {
                     "application/json": {
                         error: string;
                         message?: string;
+                        /** @description The domain error code, when the refusal names one. */
+                        code?: string;
                     };
                 };
             };
@@ -27543,6 +27118,748 @@ export interface operations {
                     "application/json": {
                         error: string;
                         message?: string;
+                    };
+                };
+            };
+        };
+    };
+    listRunPlans: {
+        parameters: {
+            query?: {
+                /** @description Include archived run plans in the list. true, 1, yes for yes; false, 0, no or omitted for no. */
+                includeArchived?: string;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Success */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        /** @description The run plan id. */
+                        id: string;
+                        /** @description The run plan name. This is the plan's identity: a run started under this name joins this plan. */
+                        name: string;
+                        /** @description The plan's address in the platform. It is kept when the plan is renamed, so run history never moves. */
+                        slug: string;
+                        /** @description What the run plan covers: all (every active scenario), test_suites (the scenarios filed in the named test suites), labels (the scenarios carrying any of the labels), or scenarios (the scenarioIds sent with the configuration). A dynamic scope is resolved again at every run, so a scenario written later runs without editing the plan. */
+                        scope: {
+                            /** @constant */
+                            mode: "all";
+                        } | {
+                            /** @constant */
+                            mode: "test_suites";
+                            testSuiteIds: string[];
+                        } | {
+                            /** @constant */
+                            mode: "labels";
+                            labels: string[];
+                        } | {
+                            /** @constant */
+                            mode: "scenarios";
+                        };
+                        /** @description The scenarios the last run of this plan covered. */
+                        scenarioIds: string[];
+                        /** @description What the plan runs against, in the order the results show. A target carrying runParameters runs with those values. */
+                        targets: {
+                            /**
+                             * @description What kind of thing the scenarios run against. A connected agent is one registered from code with the SDK.
+                             * @enum {string}
+                             */
+                            type: "prompt" | "http" | "code" | "workflow" | "connected";
+                            /** @description The id of the prompt, agent or workflow to run against. A connected target may also say <name>@<environment>, for example support-agent@production, which resolves to the agent id. */
+                            referenceId: string;
+                            /** @description Parameter values this target alone runs with, by name. They are merged over the run-level parameters and the target wins, so two targets may name the same agent with different values: that is how one run compares one agent on two models, and the results show one column for each target. */
+                            runParameters?: {
+                                [key: string]: string | number | boolean;
+                            };
+                        }[];
+                        /** @description How many times each scenario and target pairing runs. */
+                        repeatCount: number;
+                        /** @description The model that plays the user, or null for the scenario or project default. */
+                        simulatorModel: string | null;
+                        /** @description The model that judges the run, or null for the scenario or project default. */
+                        judgeModel: string | null;
+                        /** @description The labels the plan carries. */
+                        labels: string[];
+                        /** @description When the plan was archived, or null while it is active. */
+                        archivedAt: string | null;
+                        /** @description When the plan was created. */
+                        createdAt: string;
+                        /** @description When the plan was last written. */
+                        updatedAt: string;
+                        /**
+                         * Format: uri
+                         * @description Where to open this run plan in the LangWatch platform.
+                         */
+                        platformUrl: string;
+                    }[];
+                };
+            };
+        };
+    };
+    runRunPlan: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": {
+                    /** @description The run plan this run joins or creates. A run plan is identified by its name, so sending the same name again replaces that plan's configuration with this one. Leave it out and the name is derived from what the run covers and what it runs against. Up to 200 characters. */
+                    name?: string;
+                    /** @description What this run covers and what it runs against. Written onto the run plan the name resolves. */
+                    config: {
+                        /** @description What the run plan covers: all (every active scenario), test_suites (the scenarios filed in the named test suites), labels (the scenarios carrying any of the labels), or scenarios (the scenarioIds sent with the configuration). A dynamic scope is resolved again at every run, so a scenario written later runs without editing the plan. */
+                        scope: {
+                            /** @constant */
+                            mode: "all";
+                        } | {
+                            /** @constant */
+                            mode: "test_suites";
+                            testSuiteIds: string[];
+                        } | {
+                            /** @constant */
+                            mode: "labels";
+                            labels: string[];
+                        } | {
+                            /** @constant */
+                            mode: "scenarios";
+                        };
+                        /** @description The prompts, agents or workflows every scenario runs against. Every target runs every scenario, so naming more than one compares them in the same run. */
+                        targets: {
+                            /**
+                             * @description What kind of thing the scenarios run against. A connected agent is one registered from code with the SDK.
+                             * @enum {string}
+                             */
+                            type: "prompt" | "http" | "code" | "workflow" | "connected";
+                            /** @description The id of the prompt, agent or workflow to run against. A connected target may also say <name>@<environment>, for example support-agent@production, which resolves to the agent id. */
+                            referenceId: string;
+                            /** @description Parameter values this target alone runs with, by name. They are merged over the run-level parameters and the target wins, so two targets may name the same agent with different values: that is how one run compares one agent on two models, and the results show one column for each target. */
+                            runParameters?: {
+                                [key: string]: string | number | boolean;
+                            };
+                        }[];
+                        /** @description How many times each scenario and target pairing runs. Between 1 and 5; defaults to 1. */
+                        repeatCount?: number;
+                        /** @description The model that plays the user for every scenario in the run. Overrides each scenario's own choice. Leave it out for the scenario or project default. */
+                        simulatorModel?: string | null;
+                        /** @description The model that judges every scenario in the run. Overrides each scenario's own choice. Leave it out for the scenario or project default. */
+                        judgeModel?: string | null;
+                        /** @description The scenarios a test_suites or scenarios scope covers. Read by a scenarios scope alone; a scope that states a rule resolves its own list at run time. */
+                        scenarioIds?: string[];
+                    };
+                    /** @description Repeat the same key to make a retry join the batch the first call started instead of running everything again. Defaults to a new key per call. */
+                    idempotencyKey?: string;
+                    /** @description Constant values applied to every scenario in the run, e.g. a fixture id or a tenant. A value supplied here overrides the scenario's own default for that name, and a target that names the same parameter in its runParameters overrides it for that target. */
+                    parameters?: {
+                        [key: string]: string | number | boolean;
+                    };
+                    /** @description One short line describing why this batch was run, e.g. a commit hash or what you changed. It is stored on every run of the batch and shown beside the run in the platform. Up to 200 characters. */
+                    note?: string;
+                };
+            };
+        };
+        responses: {
+            /** @description Success */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        /** @description True once the runs are queued. */
+                        scheduled: boolean;
+                        /** @description The id of this batch. Every run started here carries it. */
+                        batchRunId: string;
+                        /** @description The result set the batch is filed under in the platform. */
+                        setId: string;
+                        /** @description How many runs were queued. */
+                        jobCount: number;
+                        /** @description What the run left out, and why. */
+                        skippedArchived: {
+                            /** @description Scenarios left out because they are archived. */
+                            scenarios: string[];
+                            /** @description Targets left out because they are archived. */
+                            targets: string[];
+                        };
+                        /** @description Every run this call queued. */
+                        items: {
+                            /** @description The id of this single run. */
+                            scenarioRunId: string;
+                            /** @description The scenario that was run. */
+                            scenarioId: string;
+                            /** @description What it was run against. */
+                            target: {
+                                /**
+                                 * @description What kind of thing the scenarios run against. A connected agent is one registered from code with the SDK.
+                                 * @enum {string}
+                                 */
+                                type: "prompt" | "http" | "code" | "workflow" | "connected";
+                                /** @description The id of the prompt, agent or workflow to run against. A connected target may also say <name>@<environment>, for example support-agent@production, which resolves to the agent id. */
+                                referenceId: string;
+                                /** @description Parameter values this target alone runs with, by name. They are merged over the run-level parameters and the target wins, so two targets may name the same agent with different values: that is how one run compares one agent on two models, and the results show one column for each target. */
+                                runParameters?: {
+                                    [key: string]: string | number | boolean;
+                                };
+                            };
+                            /** @description The scenario name, when known. */
+                            name: string | null;
+                        }[];
+                        /** @description The run plan this run was filed under. */
+                        runPlanId: string;
+                        /** @description The name that plan answers to. */
+                        planName: string;
+                        /** @description True when this run created the plan, false when it joined a plan already there. */
+                        created: boolean;
+                        /**
+                         * Format: uri
+                         * @description Where to watch this run in the LangWatch platform.
+                         */
+                        platformUrl: string;
+                    };
+                };
+            };
+        };
+    };
+    getRunPlan: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description The run plan id. */
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Success */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        /** @description The run plan id. */
+                        id: string;
+                        /** @description The run plan name. This is the plan's identity: a run started under this name joins this plan. */
+                        name: string;
+                        /** @description The plan's address in the platform. It is kept when the plan is renamed, so run history never moves. */
+                        slug: string;
+                        /** @description What the run plan covers: all (every active scenario), test_suites (the scenarios filed in the named test suites), labels (the scenarios carrying any of the labels), or scenarios (the scenarioIds sent with the configuration). A dynamic scope is resolved again at every run, so a scenario written later runs without editing the plan. */
+                        scope: {
+                            /** @constant */
+                            mode: "all";
+                        } | {
+                            /** @constant */
+                            mode: "test_suites";
+                            testSuiteIds: string[];
+                        } | {
+                            /** @constant */
+                            mode: "labels";
+                            labels: string[];
+                        } | {
+                            /** @constant */
+                            mode: "scenarios";
+                        };
+                        /** @description The scenarios the last run of this plan covered. */
+                        scenarioIds: string[];
+                        /** @description What the plan runs against, in the order the results show. A target carrying runParameters runs with those values. */
+                        targets: {
+                            /**
+                             * @description What kind of thing the scenarios run against. A connected agent is one registered from code with the SDK.
+                             * @enum {string}
+                             */
+                            type: "prompt" | "http" | "code" | "workflow" | "connected";
+                            /** @description The id of the prompt, agent or workflow to run against. A connected target may also say <name>@<environment>, for example support-agent@production, which resolves to the agent id. */
+                            referenceId: string;
+                            /** @description Parameter values this target alone runs with, by name. They are merged over the run-level parameters and the target wins, so two targets may name the same agent with different values: that is how one run compares one agent on two models, and the results show one column for each target. */
+                            runParameters?: {
+                                [key: string]: string | number | boolean;
+                            };
+                        }[];
+                        /** @description How many times each scenario and target pairing runs. */
+                        repeatCount: number;
+                        /** @description The model that plays the user, or null for the scenario or project default. */
+                        simulatorModel: string | null;
+                        /** @description The model that judges the run, or null for the scenario or project default. */
+                        judgeModel: string | null;
+                        /** @description The labels the plan carries. */
+                        labels: string[];
+                        /** @description When the plan was archived, or null while it is active. */
+                        archivedAt: string | null;
+                        /** @description When the plan was created. */
+                        createdAt: string;
+                        /** @description When the plan was last written. */
+                        updatedAt: string;
+                        /**
+                         * Format: uri
+                         * @description Where to open this run plan in the LangWatch platform.
+                         */
+                        platformUrl: string;
+                    };
+                };
+            };
+        };
+    };
+    archiveRunPlan: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description The run plan id. */
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Success */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        /** @description The run plan that was archived. */
+                        id: string;
+                        /**
+                         * @description Always true once the plan is archived.
+                         * @constant
+                         */
+                        archived: true;
+                    };
+                };
+            };
+        };
+    };
+    rerunRunPlan: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description The run plan id. */
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": {
+                    /** @description Repeat the same key to make a retry join the batch the first call started instead of running everything again. Defaults to a new key per call. */
+                    idempotencyKey?: string;
+                    /** @description Constant values applied to every scenario in the run, e.g. a fixture id or a tenant. A value supplied here overrides the scenario's own default for that name, and a target that names the same parameter in its runParameters overrides it for that target. */
+                    parameters?: {
+                        [key: string]: string | number | boolean;
+                    };
+                    /** @description One short line describing why this batch was run, e.g. a commit hash or what you changed. It is stored on every run of the batch and shown beside the run in the platform. Up to 200 characters. */
+                    note?: string;
+                };
+            };
+        };
+        responses: {
+            /** @description Success */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        /** @description True once the runs are queued. */
+                        scheduled: boolean;
+                        /** @description The id of this batch. Every run started here carries it. */
+                        batchRunId: string;
+                        /** @description The result set the batch is filed under in the platform. */
+                        setId: string;
+                        /** @description How many runs were queued. */
+                        jobCount: number;
+                        /** @description What the run left out, and why. */
+                        skippedArchived: {
+                            /** @description Scenarios left out because they are archived. */
+                            scenarios: string[];
+                            /** @description Targets left out because they are archived. */
+                            targets: string[];
+                        };
+                        /** @description Every run this call queued. */
+                        items: {
+                            /** @description The id of this single run. */
+                            scenarioRunId: string;
+                            /** @description The scenario that was run. */
+                            scenarioId: string;
+                            /** @description What it was run against. */
+                            target: {
+                                /**
+                                 * @description What kind of thing the scenarios run against. A connected agent is one registered from code with the SDK.
+                                 * @enum {string}
+                                 */
+                                type: "prompt" | "http" | "code" | "workflow" | "connected";
+                                /** @description The id of the prompt, agent or workflow to run against. A connected target may also say <name>@<environment>, for example support-agent@production, which resolves to the agent id. */
+                                referenceId: string;
+                                /** @description Parameter values this target alone runs with, by name. They are merged over the run-level parameters and the target wins, so two targets may name the same agent with different values: that is how one run compares one agent on two models, and the results show one column for each target. */
+                                runParameters?: {
+                                    [key: string]: string | number | boolean;
+                                };
+                            };
+                            /** @description The scenario name, when known. */
+                            name: string | null;
+                        }[];
+                        /** @description The run plan this run was filed under. */
+                        runPlanId: string;
+                        /** @description The name that plan answers to. */
+                        planName: string;
+                        /** @description True when this run created the plan, false when it joined a plan already there. */
+                        created: boolean;
+                        /**
+                         * Format: uri
+                         * @description Where to watch this run in the LangWatch platform.
+                         */
+                        platformUrl: string;
+                    };
+                };
+            };
+        };
+    };
+    listTestSuites: {
+        parameters: {
+            query?: {
+                /** @description Include archived test suites in the list. true, 1, yes for yes; false, 0, no or omitted for no. */
+                includeArchived?: string;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Success */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        /** @description The test suite id. */
+                        id: string;
+                        /** @description The test suite name. */
+                        name: string;
+                        /** @description The suite's address in the platform. It is kept when the suite is renamed. */
+                        slug: string;
+                        /** @description The scenarios filed in this suite, in the order it shows them. */
+                        scenarioIds: string[];
+                        /** @description How many scenarios are filed in it. */
+                        scenarioCount: number;
+                        /** @description When the suite was archived, or null while it is active. */
+                        archivedAt: string | null;
+                        /** @description When the suite was created. */
+                        createdAt: string;
+                        /** @description When the suite was last written. */
+                        updatedAt: string;
+                        /**
+                         * Format: uri
+                         * @description Where to open this test suite in the LangWatch platform.
+                         */
+                        platformUrl: string;
+                    }[];
+                };
+            };
+        };
+    };
+    createTestSuite: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": {
+                    /** @description The test suite name, as it reads in the platform. */
+                    name: string;
+                };
+            };
+        };
+        responses: {
+            /** @description Success */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        /** @description The test suite id. */
+                        id: string;
+                        /** @description The test suite name. */
+                        name: string;
+                        /** @description The suite's address in the platform. It is kept when the suite is renamed. */
+                        slug: string;
+                        /** @description The scenarios filed in this suite, in the order it shows them. */
+                        scenarioIds: string[];
+                        /** @description How many scenarios are filed in it. */
+                        scenarioCount: number;
+                        /** @description When the suite was archived, or null while it is active. */
+                        archivedAt: string | null;
+                        /** @description When the suite was created. */
+                        createdAt: string;
+                        /** @description When the suite was last written. */
+                        updatedAt: string;
+                        /**
+                         * Format: uri
+                         * @description Where to open this test suite in the LangWatch platform.
+                         */
+                        platformUrl: string;
+                    };
+                };
+            };
+        };
+    };
+    getTestSuite: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description The test suite id. */
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Success */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        /** @description The test suite id. */
+                        id: string;
+                        /** @description The test suite name. */
+                        name: string;
+                        /** @description The suite's address in the platform. It is kept when the suite is renamed. */
+                        slug: string;
+                        /** @description The scenarios filed in this suite, in the order it shows them. */
+                        scenarioIds: string[];
+                        /** @description How many scenarios are filed in it. */
+                        scenarioCount: number;
+                        /** @description When the suite was archived, or null while it is active. */
+                        archivedAt: string | null;
+                        /** @description When the suite was created. */
+                        createdAt: string;
+                        /** @description When the suite was last written. */
+                        updatedAt: string;
+                        /**
+                         * Format: uri
+                         * @description Where to open this test suite in the LangWatch platform.
+                         */
+                        platformUrl: string;
+                        /** @description The active scenarios filed in this suite. An archived scenario is left out. */
+                        scenarios: {
+                            /** @description The scenario id. */
+                            id: string;
+                            /** @description The scenario name. */
+                            name: string;
+                        }[];
+                    };
+                };
+            };
+        };
+    };
+    archiveTestSuite: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description The test suite id. */
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Success */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        /** @description The test suite that was archived. */
+                        id: string;
+                        /**
+                         * @description Always true once the suite is archived.
+                         * @constant
+                         */
+                        archived: true;
+                    };
+                };
+            };
+        };
+    };
+    renameTestSuite: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description The test suite id. */
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": {
+                    /** @description The test suite name, as it reads in the platform. */
+                    name: string;
+                };
+            };
+        };
+        responses: {
+            /** @description Success */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        /** @description The test suite id. */
+                        id: string;
+                        /** @description The test suite name. */
+                        name: string;
+                        /** @description The suite's address in the platform. It is kept when the suite is renamed. */
+                        slug: string;
+                        /** @description The scenarios filed in this suite, in the order it shows them. */
+                        scenarioIds: string[];
+                        /** @description How many scenarios are filed in it. */
+                        scenarioCount: number;
+                        /** @description When the suite was archived, or null while it is active. */
+                        archivedAt: string | null;
+                        /** @description When the suite was created. */
+                        createdAt: string;
+                        /** @description When the suite was last written. */
+                        updatedAt: string;
+                        /**
+                         * Format: uri
+                         * @description Where to open this test suite in the LangWatch platform.
+                         */
+                        platformUrl: string;
+                    };
+                };
+            };
+        };
+    };
+    runTestSuite: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description The test suite id. */
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": {
+                    /** @description The prompts, agents or workflows the suite runs against. A test suite stores none of its own, so a run states them. Every target runs every scenario, so naming more than one compares them in the same run. */
+                    targets: {
+                        /**
+                         * @description What kind of thing the scenarios run against. A connected agent is one registered from code with the SDK.
+                         * @enum {string}
+                         */
+                        type: "prompt" | "http" | "code" | "workflow" | "connected";
+                        /** @description The id of the prompt, agent or workflow to run against. A connected target may also say <name>@<environment>, for example support-agent@production, which resolves to the agent id. */
+                        referenceId: string;
+                        /** @description Parameter values this target alone runs with, by name. They are merged over the run-level parameters and the target wins, so two targets may name the same agent with different values: that is how one run compares one agent on two models, and the results show one column for each target. */
+                        runParameters?: {
+                            [key: string]: string | number | boolean;
+                        };
+                    }[];
+                    /** @description The run plan this run joins or creates. Leave it out and the name is derived from the suite name and the targets. */
+                    name?: string;
+                    /** @description How many times each scenario and target pairing runs. Between 1 and 5; defaults to 1. */
+                    repeatCount?: number;
+                    /** @description The model that plays the user for every scenario in this run. Leave it out for the scenario or project default. */
+                    simulatorModel?: string | null;
+                    /** @description The model that judges every scenario in this run. Leave it out for the scenario or project default. */
+                    judgeModel?: string | null;
+                    /** @description Repeat the same key to make a retry join the batch the first call started instead of running everything again. Defaults to a new key per call. */
+                    idempotencyKey?: string;
+                    /** @description Constant values applied to every scenario in the run, e.g. a fixture id or a tenant. A value supplied here overrides the scenario's own default for that name, and a target that names the same parameter in its runParameters overrides it for that target. */
+                    parameters?: {
+                        [key: string]: string | number | boolean;
+                    };
+                    /** @description One short line describing why this batch was run, e.g. a commit hash or what you changed. It is stored on every run of the batch and shown beside the run in the platform. Up to 200 characters. */
+                    note?: string;
+                };
+            };
+        };
+        responses: {
+            /** @description Success */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        /** @description True once the runs are queued. */
+                        scheduled: boolean;
+                        /** @description The id of this batch. Every run started here carries it. */
+                        batchRunId: string;
+                        /** @description The result set the batch is filed under in the platform. */
+                        setId: string;
+                        /** @description How many runs were queued. */
+                        jobCount: number;
+                        /** @description What the run left out, and why. */
+                        skippedArchived: {
+                            /** @description Scenarios left out because they are archived. */
+                            scenarios: string[];
+                            /** @description Targets left out because they are archived. */
+                            targets: string[];
+                        };
+                        /** @description Every run this call queued. */
+                        items: {
+                            /** @description The id of this single run. */
+                            scenarioRunId: string;
+                            /** @description The scenario that was run. */
+                            scenarioId: string;
+                            /** @description What it was run against. */
+                            target: {
+                                /**
+                                 * @description What kind of thing the scenarios run against. A connected agent is one registered from code with the SDK.
+                                 * @enum {string}
+                                 */
+                                type: "prompt" | "http" | "code" | "workflow" | "connected";
+                                /** @description The id of the prompt, agent or workflow to run against. A connected target may also say <name>@<environment>, for example support-agent@production, which resolves to the agent id. */
+                                referenceId: string;
+                                /** @description Parameter values this target alone runs with, by name. They are merged over the run-level parameters and the target wins, so two targets may name the same agent with different values: that is how one run compares one agent on two models, and the results show one column for each target. */
+                                runParameters?: {
+                                    [key: string]: string | number | boolean;
+                                };
+                            };
+                            /** @description The scenario name, when known. */
+                            name: string | null;
+                        }[];
+                        /** @description The run plan this run was filed under. */
+                        runPlanId: string;
+                        /** @description The name that plan answers to. */
+                        planName: string;
+                        /** @description True when this run created the plan, false when it joined a plan already there. */
+                        created: boolean;
+                        /**
+                         * Format: uri
+                         * @description Where to watch this run in the LangWatch platform.
+                         */
+                        platformUrl: string;
                     };
                 };
             };
@@ -27863,7 +28180,196 @@ export interface operations {
                     query?: string;
                     /** @default {} */
                     filters?: {
-                        [key: string]: string[] | {
+                        "topics.topics"?: string[] | {
+                            [key: string]: string[];
+                        } | {
+                            [key: string]: {
+                                [key: string]: string[];
+                            };
+                        };
+                        "topics.subtopics"?: string[] | {
+                            [key: string]: string[];
+                        } | {
+                            [key: string]: {
+                                [key: string]: string[];
+                            };
+                        };
+                        "metadata.user_id"?: string[] | {
+                            [key: string]: string[];
+                        } | {
+                            [key: string]: {
+                                [key: string]: string[];
+                            };
+                        };
+                        "metadata.thread_id"?: string[] | {
+                            [key: string]: string[];
+                        } | {
+                            [key: string]: {
+                                [key: string]: string[];
+                            };
+                        };
+                        "metadata.customer_id"?: string[] | {
+                            [key: string]: string[];
+                        } | {
+                            [key: string]: {
+                                [key: string]: string[];
+                            };
+                        };
+                        "metadata.labels"?: string[] | {
+                            [key: string]: string[];
+                        } | {
+                            [key: string]: {
+                                [key: string]: string[];
+                            };
+                        };
+                        "metadata.key"?: string[] | {
+                            [key: string]: string[];
+                        } | {
+                            [key: string]: {
+                                [key: string]: string[];
+                            };
+                        };
+                        "metadata.value"?: string[] | {
+                            [key: string]: string[];
+                        } | {
+                            [key: string]: {
+                                [key: string]: string[];
+                            };
+                        };
+                        "metadata.prompt_ids"?: string[] | {
+                            [key: string]: string[];
+                        } | {
+                            [key: string]: {
+                                [key: string]: string[];
+                            };
+                        };
+                        "traces.origin"?: string[] | {
+                            [key: string]: string[];
+                        } | {
+                            [key: string]: {
+                                [key: string]: string[];
+                            };
+                        };
+                        "traces.error"?: string[] | {
+                            [key: string]: string[];
+                        } | {
+                            [key: string]: {
+                                [key: string]: string[];
+                            };
+                        };
+                        "traces.name"?: string[] | {
+                            [key: string]: string[];
+                        } | {
+                            [key: string]: {
+                                [key: string]: string[];
+                            };
+                        };
+                        "spans.type"?: string[] | {
+                            [key: string]: string[];
+                        } | {
+                            [key: string]: {
+                                [key: string]: string[];
+                            };
+                        };
+                        "spans.model"?: string[] | {
+                            [key: string]: string[];
+                        } | {
+                            [key: string]: {
+                                [key: string]: string[];
+                            };
+                        };
+                        "evaluations.evaluator_id"?: string[] | {
+                            [key: string]: string[];
+                        } | {
+                            [key: string]: {
+                                [key: string]: string[];
+                            };
+                        };
+                        "evaluations.evaluator_id.guardrails_only"?: string[] | {
+                            [key: string]: string[];
+                        } | {
+                            [key: string]: {
+                                [key: string]: string[];
+                            };
+                        };
+                        "evaluations.evaluator_id.has_passed"?: string[] | {
+                            [key: string]: string[];
+                        } | {
+                            [key: string]: {
+                                [key: string]: string[];
+                            };
+                        };
+                        "evaluations.evaluator_id.has_score"?: string[] | {
+                            [key: string]: string[];
+                        } | {
+                            [key: string]: {
+                                [key: string]: string[];
+                            };
+                        };
+                        "evaluations.evaluator_id.has_label"?: string[] | {
+                            [key: string]: string[];
+                        } | {
+                            [key: string]: {
+                                [key: string]: string[];
+                            };
+                        };
+                        "evaluations.passed"?: string[] | {
+                            [key: string]: string[];
+                        } | {
+                            [key: string]: {
+                                [key: string]: string[];
+                            };
+                        };
+                        "evaluations.score"?: string[] | {
+                            [key: string]: string[];
+                        } | {
+                            [key: string]: {
+                                [key: string]: string[];
+                            };
+                        };
+                        "evaluations.state"?: string[] | {
+                            [key: string]: string[];
+                        } | {
+                            [key: string]: {
+                                [key: string]: string[];
+                            };
+                        };
+                        "evaluations.label"?: string[] | {
+                            [key: string]: string[];
+                        } | {
+                            [key: string]: {
+                                [key: string]: string[];
+                            };
+                        };
+                        "events.event_type"?: string[] | {
+                            [key: string]: string[];
+                        } | {
+                            [key: string]: {
+                                [key: string]: string[];
+                            };
+                        };
+                        "events.metrics.key"?: string[] | {
+                            [key: string]: string[];
+                        } | {
+                            [key: string]: {
+                                [key: string]: string[];
+                            };
+                        };
+                        "events.metrics.value"?: string[] | {
+                            [key: string]: string[];
+                        } | {
+                            [key: string]: {
+                                [key: string]: string[];
+                            };
+                        };
+                        "events.event_details.key"?: string[] | {
+                            [key: string]: string[];
+                        } | {
+                            [key: string]: {
+                                [key: string]: string[];
+                            };
+                        };
+                        "annotations.hasAnnotation"?: string[] | {
                             [key: string]: string[];
                         } | {
                             [key: string]: {
@@ -28307,7 +28813,8 @@ export interface operations {
                         };
                         active: boolean;
                         message: string | null;
-                        alertType: ("CRITICAL" | "WARNING" | "INFO") | null;
+                        /** @enum {string|null} */
+                        alertType: "CRITICAL" | "WARNING" | "INFO" | null;
                         createdAt: string;
                         updatedAt: string;
                         /** Format: uri */
@@ -28411,7 +28918,8 @@ export interface operations {
                         };
                         active: boolean;
                         message: string | null;
-                        alertType: ("CRITICAL" | "WARNING" | "INFO") | null;
+                        /** @enum {string|null} */
+                        alertType: "CRITICAL" | "WARNING" | "INFO" | null;
                         createdAt: string;
                         updatedAt: string;
                         /** Format: uri */
@@ -28499,7 +29007,8 @@ export interface operations {
                         };
                         active: boolean;
                         message: string | null;
-                        alertType: ("CRITICAL" | "WARNING" | "INFO") | null;
+                        /** @enum {string|null} */
+                        alertType: "CRITICAL" | "WARNING" | "INFO" | null;
                         createdAt: string;
                         updatedAt: string;
                         /** Format: uri */
@@ -28669,7 +29178,8 @@ export interface operations {
                     name?: string;
                     active?: boolean;
                     message?: string | null;
-                    alertType?: ("CRITICAL" | "WARNING" | "INFO") | null;
+                    /** @enum {string|null} */
+                    alertType?: "CRITICAL" | "WARNING" | "INFO" | null;
                     filters?: {
                         [key: string]: unknown;
                     };
@@ -28699,7 +29209,8 @@ export interface operations {
                         };
                         active: boolean;
                         message: string | null;
-                        alertType: ("CRITICAL" | "WARNING" | "INFO") | null;
+                        /** @enum {string|null} */
+                        alertType: "CRITICAL" | "WARNING" | "INFO" | null;
                         createdAt: string;
                         updatedAt: string;
                         /** Format: uri */

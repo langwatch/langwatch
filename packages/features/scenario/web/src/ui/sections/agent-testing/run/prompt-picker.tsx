@@ -1,5 +1,5 @@
 /**
- * The prompts of the project, grouped under their handle folders the way the
+ * The prompts of the project, grouped under their handle test suites the way the
  * prompt list shows them.
  *
  * @see specs/features/agent-testing/run-dialog.feature
@@ -19,19 +19,17 @@ export type PromptEntry = {
 
 type PromptSelect = (target: NonNullable<TargetValue>) => void;
 
-/** The folder a prompt files under: its handle prefix, "default" when none. */
-export function groupPromptsByFolder(
+/** The test suite a prompt files under: its handle prefix, "default" when none. */
+export function groupPromptsByTestSuite(
   prompts: PromptEntry[],
-): { folder: string; prompts: PromptEntry[] }[] {
+): { testSuite: string; prompts: PromptEntry[] }[] {
   const groups = new Map<string, PromptEntry[]>();
   for (const prompt of prompts) {
     const handle = prompt.handle ?? prompt.id;
-    const folder = handle.includes("/")
-      ? (handle.split("/")[0] ?? "default")
-      : "default";
-    const held = groups.get(folder);
+    const testSuite = handle.includes("/") ? (handle.split("/")[0] ?? "default") : "default";
+    const held = groups.get(testSuite);
     if (held) held.push(prompt);
-    else groups.set(folder, [prompt]);
+    else groups.set(testSuite, [prompt]);
   }
   return [...groups.entries()]
     .sort((a, b) => {
@@ -39,7 +37,7 @@ export function groupPromptsByFolder(
       if (b[0] === "default") return -1;
       return a[0].localeCompare(b[0]);
     })
-    .map(([folder, held]) => ({ folder, prompts: held }));
+    .map(([testSuite, held]) => ({ testSuite, prompts: held }));
 }
 
 /** One prompt row: its handle, its version, and a tick when it is chosen. */
@@ -84,25 +82,25 @@ function PromptRow({
   );
 }
 
-/** One folder of prompts, headed by its name unless it is the default one. */
-function PromptFolderGroup({
-  folder,
+/** One test suite of prompts, headed by its name unless it is the default one. */
+function PromptTestSuiteGroup({
+  testSuite,
   prompts,
   selected,
   onSelect,
 }: {
-  folder: string;
+  testSuite: string;
   prompts: PromptEntry[];
   selected: TargetValue;
   onSelect: PromptSelect;
 }) {
   return (
     <VStack align="stretch" gap={1.5}>
-      {folder !== "default" && (
+      {testSuite !== "default" && (
         <HStack gap={1.5} paddingX={1} marginBottom={-0.5}>
           <Folder size={11} color="var(--chakra-colors-fg-muted)" />
           <Text fontSize="11px" fontWeight="semibold" color={FG_MUTED}>
-            {folder}
+            {testSuite}
           </Text>
         </HStack>
       )}
@@ -118,7 +116,7 @@ function PromptFolderGroup({
   );
 }
 
-/** The prompts under their folders, the way the prompt list shows them. */
+/** The prompts under their test suites, the way the prompt list shows them. */
 export function PromptPicker({
   prompts,
   selected,
@@ -128,7 +126,7 @@ export function PromptPicker({
   selected: TargetValue;
   onSelect: PromptSelect;
 }) {
-  const groups = groupPromptsByFolder(prompts);
+  const groups = groupPromptsByTestSuite(prompts);
 
   return (
     <VStack
@@ -143,9 +141,9 @@ export function PromptPicker({
       data-testid="run-dialog-prompts"
     >
       {groups.map((group) => (
-        <PromptFolderGroup
-          key={group.folder}
-          folder={group.folder}
+        <PromptTestSuiteGroup
+          key={group.testSuite}
+          testSuite={group.testSuite}
           prompts={group.prompts}
           selected={selected}
           onSelect={onSelect}

@@ -2575,6 +2575,9 @@ importers:
 
   packages/features/agent/contract:
     dependencies:
+      '@langwatch/handled-error':
+        specifier: workspace:*
+        version: link:../../../handled-error
       zod:
         specifier: ^4.4.3
         version: 4.4.3
@@ -2603,6 +2606,9 @@ importers:
       '@langwatch/prisma-client':
         specifier: workspace:*
         version: link:../../../prisma-client
+      '@langwatch/redis-client':
+        specifier: workspace:*
+        version: link:../../../redis-client
       '@langwatch/trace-contract':
         specifier: workspace:*
         version: link:../../trace/contract
@@ -3072,6 +3078,9 @@ importers:
       react:
         specifier: ^19.2.7
         version: 19.2.8
+      react-hook-form:
+        specifier: ^7.80.0
+        version: 7.80.0(react@19.2.8)
       zod:
         specifier: ^4.4.3
         version: 4.4.3
@@ -4801,6 +4810,9 @@ importers:
       '@langwatch/handled-error':
         specifier: workspace:*
         version: link:../../../handled-error
+      '@langwatch/scenario-contract':
+        specifier: workspace:*
+        version: link:../../scenario/contract
       '@langwatch/workflow-contract':
         specifier: workspace:*
         version: link:../../workflow/contract
@@ -4820,6 +4832,9 @@ importers:
       '@langwatch/agent-contract':
         specifier: workspace:*
         version: link:../../agent/contract
+      '@langwatch/agent-server':
+        specifier: workspace:*
+        version: link:../../agent/server
       '@langwatch/api':
         specifier: workspace:*
         version: link:../../../api
@@ -4865,6 +4880,12 @@ importers:
       '@langwatch/prompt-contract':
         specifier: workspace:*
         version: link:../../prompt/contract
+      '@langwatch/scenario-contract':
+        specifier: workspace:*
+        version: link:../../scenario/contract
+      '@langwatch/suite-server':
+        specifier: workspace:*
+        version: link:../../suite/server
       '@langwatch/trace-contract':
         specifier: workspace:*
         version: link:../../trace/contract
@@ -7482,6 +7503,9 @@ importers:
       '@langwatch/ksuid':
         specifier: ^2.0.2
         version: 2.0.2(patch_hash=edd8defd29b1ef2b8aae1ae6d2c0d68b69a8789e0018817b024fb88ff9f36980)
+      '@langwatch/model-provider-contract':
+        specifier: workspace:*
+        version: link:../../model-provider/contract
       liquidjs:
         specifier: '>=10.26.0 <11'
         version: 10.27.1
@@ -7588,6 +7612,9 @@ importers:
       papaparse:
         specifier: ^5.5.4
         version: 5.5.4
+      undici:
+        specifier: '>=8.9.0 <9'
+        version: 8.10.0
       zod:
         specifier: ^4.4.3
         version: 4.4.3
@@ -7622,6 +7649,9 @@ importers:
       '@copilotkit/runtime-client-gql':
         specifier: 1.8.13
         version: 1.8.13(encoding@0.1.13)(graphql@16.14.2)(react@19.2.8)
+      '@emotion/react':
+        specifier: ^11.14.0
+        version: 11.14.0(@types/react@19.2.18)(react@19.2.8)
       '@hookform/resolvers':
         specifier: ^5.4.0
         version: 5.4.0(react-hook-form@7.80.0(react@19.2.8))
@@ -7640,6 +7670,15 @@ importers:
       '@langwatch/design-system':
         specifier: workspace:*
         version: link:../../../design-system
+      '@langwatch/experiment-contract':
+        specifier: workspace:*
+        version: link:../../experiment/contract
+      '@langwatch/feature-flag-contract':
+        specifier: workspace:*
+        version: link:../../feature-flag/contract
+      '@langwatch/handled-error':
+        specifier: workspace:*
+        version: link:../../../handled-error
       '@langwatch/ksuid':
         specifier: ^2.0.2
         version: 2.0.2(patch_hash=edd8defd29b1ef2b8aae1ae6d2c0d68b69a8789e0018817b024fb88ff9f36980)
@@ -7798,6 +7837,9 @@ importers:
       '@langwatch/secret-contract':
         specifier: workspace:*
         version: link:../contract
+      '@trpc/server':
+        specifier: 11.18.0
+        version: 11.18.0(typescript@7.0.2)
       zod:
         specifier: ^4.4.3
         version: 4.4.3
@@ -8085,6 +8127,9 @@ importers:
       '@langwatch/handled-error':
         specifier: workspace:*
         version: link:../../../handled-error
+      '@langwatch/model-provider-contract':
+        specifier: workspace:*
+        version: link:../../model-provider/contract
       '@langwatch/observability':
         specifier: workspace:*
         version: link:../../../observability
@@ -9887,6 +9932,9 @@ importers:
       prompts:
         specifier: ^2.4.2
         version: 2.4.2
+      ws:
+        specifier: ^8.21.0
+        version: 8.21.3(bufferutil@4.1.0)
       xksuid:
         specifier: ^0.0.4
         version: 0.0.4
@@ -9927,6 +9975,9 @@ importers:
       '@types/prompts':
         specifier: ^2.4.9
         version: 2.4.9
+      '@types/ws':
+        specifier: ^8.18.1
+        version: 8.18.1
       '@vercel/otel':
         specifier: ^1.13.0
         version: 1.14.2(@opentelemetry/api-logs@0.221.0)(@opentelemetry/api@1.9.1)(@opentelemetry/instrumentation@0.221.0(@opentelemetry/api@1.9.1))(@opentelemetry/resources@2.10.0(@opentelemetry/api@1.9.1))(@opentelemetry/sdk-logs@0.221.0(@opentelemetry/api@1.9.1))(@opentelemetry/sdk-metrics@2.10.0(@opentelemetry/api@1.9.1))(@opentelemetry/sdk-trace-base@2.10.0(@opentelemetry/api@1.9.1))

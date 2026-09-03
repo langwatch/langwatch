@@ -12,6 +12,8 @@ import type { CodingAgentCostEstimatorPort } from "../ports/coding-agent-cost-es
 import type { CodingAgentCostMetricsPort } from "../ports/coding-agent-cost-metrics.port";
 import type { CodingAgentProjectActivityPort } from "../ports/coding-agent-project-activity.port";
 import type { CodingAgentPullRequestMappingPort } from "../ports/coding-agent-pull-request-mapping.port";
+import type { CodingAgentSessionContextMemoPort } from "../ports/coding-agent-session-context.port";
+import { RedisSessionContextMemoAdapter } from "./redis.session-context-memo.adapter";
 import { createCodingAgentCostDriftSubscriber } from "../subscribers/coding-agent-cost-drift.subscriber";
 import { EventingContributeLogFactsAdapter } from "./eventing.contribute-log-facts.adapter";
 import { EventingContributeMetricFactsAdapter } from "./eventing.contribute-metric-facts.adapter";
@@ -46,6 +48,12 @@ export interface CodingAgentProcessingPipelineDeps {
   clock: CodingAgentClockPort;
   redis: Redis | Cluster;
   defaultRetentionDays: number;
+  /**
+   * The "context the session last declared" store the log-facts command stamps
+   * fact rows from. Defaults to the Redis memo over this pipeline's own Redis,
+   * which is the only shape a real process has; a test passes the in-memory one.
+   */
+  sessionContextMemo?: CodingAgentSessionContextMemoPort;
   /** Typed process configuration for the Redis fold-cache consistency TTL. */
   foldCacheTtlSeconds?: number;
   /**
@@ -151,9 +159,16 @@ export class EventingCodingAgentProcessingAdapter {
       .withCommand("contributeSpanFacts", EventingContributeSpanFactsAdapter, {
         coalesceMaxBatch: CODING_AGENT_CONTRIBUTION_COALESCE_MAX_BATCH,
       })
-      .withCommand("contributeLogFacts", EventingContributeLogFactsAdapter, {
-        coalesceMaxBatch: CODING_AGENT_CONTRIBUTION_COALESCE_MAX_BATCH,
-      })
+      // An instance rather than a class: the log-facts command carries the
+      // session-context memo it stamps row-bearing contributions from.
+      .withCommandInstance(
+        "contributeLogFacts",
+        EventingContributeLogFactsAdapter,
+        EventingContributeLogFactsAdapter.create({
+          contextMemo: deps.sessionContextMemo ?? RedisSessionContextMemoAdapter.create(deps.redis),
+        }),
+        { coalesceMaxBatch: CODING_AGENT_CONTRIBUTION_COALESCE_MAX_BATCH },
+      )
       .withCommand("contributeMetricFacts", EventingContributeMetricFactsAdapter, {
         coalesceMaxBatch: CODING_AGENT_CONTRIBUTION_COALESCE_MAX_BATCH,
       });

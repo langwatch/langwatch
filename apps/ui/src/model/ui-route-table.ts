@@ -221,6 +221,12 @@ export const uiRouteTable: readonly UiRouteDescriptor[] = [
     page: "pages/onboarding/welcome",
   },
 
+  // CLI device-flow approval (RFC 8628 user-facing screen). Top level, like
+  // /onboarding: it is a confirm-a-code screen, not a page of the app, so it
+  // carries neither the chrome nor the Langy panel.
+  // Spec: specs/langy/langy-mount-scope.feature
+  { path: "/cli/auth", page: "pages/cli/auth" },
+
   // Everything behind a session, wrapped in the application chrome. The
   // layout route mounts the navigation host and the header ONCE, above the
   // two Langy groups, so a screen this package serves gets the project
@@ -434,12 +440,6 @@ export const uiRouteTable: readonly UiRouteDescriptor[] = [
             // budget-exceeded → request flow Ariana caught in dogfood.
             path: "/me/budget/request",
             page: "pages/me/budget/request",
-          },
-
-          // CLI device-flow approval (RFC 8628 user-facing screen)
-          {
-            path: "/cli/auth",
-            page: "pages/cli/auth",
           },
 
           // AI Gateway: org-scoped admin pages live under /gateway/** at the top

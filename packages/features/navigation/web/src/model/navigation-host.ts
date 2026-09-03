@@ -13,7 +13,6 @@
  */
 
 import { createContext, useContext, type ReactNode } from "react";
-import type { LastVisitedHomeKind } from "./resolve-home-destination";
 
 /** A project as the switcher and the landing redirect need to know it. */
 export type NavigationProject = {
@@ -275,13 +274,6 @@ export abstract class NavigationHostPort {
    * The application shell's own scope memory, not a key this package writes.
    */
   abstract rememberedProjectSlug(): string;
-
-  /**
-   * Which KIND of home the reader last sat on: "project", "personal", or ""
-   * before either. Written by the application on each visit and read here, so
-   * `/` sticks both ways.
-   */
-  abstract lastVisitedHomeKind(): LastVisitedHomeKind;
 
   /** Fail-closed grant check. */
   abstract hasPermission(permission: string): boolean;

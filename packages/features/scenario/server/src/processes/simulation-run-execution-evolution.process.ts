@@ -250,9 +250,22 @@ export const simulationRunExecutionWake: WakeHandler<
   SimulationRunExecutionProcessState,
   SimulationRunExecutionIntents
 > = (state, ctx) => {
-  if (state.scenarioRunId === "" || state.phase === "terminal") {
-    // A wake for a process that never initialized (or is done) decides
-    // nothing and must clear itself, or the wake worker re-finds it forever.
+  if (state.phase === "terminal") {
+    return { state, nextWakeAt: null, intents: [] };
+  }
+
+  // A wake for a process no event ever touched decides nothing and must
+  // clear itself, or the wake worker re-finds it forever.
+  //
+  // `scenarioRunId` alone does not mean untouched: only handleRunQueued
+  // stamps it, and QUEUED is platform-only. A run reported from outside
+  // (an SDK batch on a customer machine) opens with STARTED, so its
+  // process carries real activity while the id stays blank — and the
+  // stall decision below needs nothing from state, the finish intent is
+  // built from the process key and project the wake carries. Requiring
+  // the id here disarmed the watchdog for every externally reported run,
+  // which then read IN_PROGRESS forever when its process died.
+  if (state.scenarioRunId === "" && state.lastActivityAtMs === 0) {
     return { state, nextWakeAt: null, intents: [] };
   }
 

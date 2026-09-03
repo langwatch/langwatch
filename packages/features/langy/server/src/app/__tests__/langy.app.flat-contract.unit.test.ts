@@ -5,6 +5,7 @@
  * hop through `langy.conversations` would be recorded as `conversations`
  * rather than passing silently.
  */
+import { EventEmitter } from "node:events";
 import type { LangyService } from "@langwatch/langy-contract";
 import { describe, expect, it } from "vitest";
 import { LangyApp } from "../langy.app";
@@ -41,7 +42,7 @@ describe("LangyApp", () => {
       /** @scenario "application transports use the flat contract" */
       it("calls the matching flat service method and reaches no subordinate property", async () => {
         const { service, reached } = recordingLangyService();
-        const app = LangyApp.create({ langy: service });
+        const app = LangyApp.create({ langy: service, redis: null, broadcast: testBroadcast() });
 
         await app.listPage({ projectId: "project_1", userId: "user_1", limit: 10 });
         await app.eventsAfter({ ...CONVERSATION, after: undefined! });
@@ -55,7 +56,7 @@ describe("LangyApp", () => {
       /** @scenario "transports share one Langy capability" */
       it("delegates to the one instance it was composed with", async () => {
         const { service, reached } = recordingLangyService();
-        const app = LangyApp.create({ langy: service });
+        const app = LangyApp.create({ langy: service, redis: null, broadcast: testBroadcast() });
 
         expect(app.langyService).toBe(service);
 
@@ -66,3 +67,11 @@ describe("LangyApp", () => {
     });
   });
 });
+
+/** The live-edge collaborators the application takes; these suites never use them. */
+function testBroadcast() {
+  return {
+    getTenantEmitter: () => new EventEmitter(),
+    cleanupTenantEmitter: () => void 0,
+  };
+}

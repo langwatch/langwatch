@@ -308,8 +308,7 @@ export function resolveUiScope({
 export type UiScopeSelectionWrite =
   | { readonly key: "organizationId"; readonly value: string }
   | { readonly key: "teamId"; readonly value: string }
-  | { readonly key: "projectSlug"; readonly value: string }
-  | { readonly key: "lastVisitedHomeKind"; readonly value: "project" | "personal" };
+  | { readonly key: "projectSlug"; readonly value: string };
 
 /**
  * What the resolution should leave behind for the next page.
@@ -323,13 +322,9 @@ export type UiScopeSelectionWrite =
 export function uiScopeSelectionWrites({
   resolved,
   selection,
-  projectParam,
-  lastVisitedHomeKind,
 }: {
   resolved: UiResolvedScope;
   selection: UiScopeSelection;
-  projectParam: string | undefined;
-  lastVisitedHomeKind: string;
 }): UiScopeSelectionWrite[] {
   // The demo project is a visitor's context, not the caller's own work.
   if (resolved.isDemo) return [];
@@ -353,16 +348,6 @@ export function uiScopeSelectionWrites({
     if (project && project.slug !== selection.projectSlug) {
       writes.push({ key: "projectSlug", value: project.slug });
     }
-  }
-
-  // Visiting an actual project page marks the implicit home preference as
-  // "project". Gated on the URL actually carrying a project slug: a project
-  // also resolves from the persisted selection on pages that name none, and
-  // marking "project" there would clobber the personal-home marker. The
-  // VALIDATED slug, so reserved addresses like /messages do not count as
-  // project visits either.
-  if (project && !!projectSlugAddressedBy(projectParam) && lastVisitedHomeKind !== "project") {
-    writes.push({ key: "lastVisitedHomeKind", value: "project" });
   }
 
   return writes;
