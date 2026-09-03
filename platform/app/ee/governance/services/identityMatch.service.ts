@@ -37,7 +37,7 @@ import {
   IdentityAlreadyLinkedError,
   IdentityErasedError,
   IdentityMatchSuggestionNotFoundError,
-  isExclusionViolation,
+  isOpenLinkViolation,
 } from "./identityMatch.errors";
 import {
   decideMatch,
@@ -240,8 +240,8 @@ export class IdentityMatchService {
    * Opens one proven link, reporting 1 or 0 rather than throwing on the single
    * failure that is not one.
    *
-   * A concurrent pass beating this one to the same link raises the exclusion
-   * violation, which is the rule holding rather than breaking. Ending the whole
+   * A concurrent pass beating this one to the same link trips the one-open-
+   * link index, which is the rule holding rather than breaking. Ending the whole
    * pass there would leave everybody after this person unmatched until the next
    * night.
    */
@@ -263,11 +263,11 @@ export class IdentityMatchService {
     // `findMatchable` already excludes erased people, so this asks the same
     // question again at the last possible moment rather than a new one.
     //
-    // It matters more here than anywhere else in the pass: the exclusion
-    // constraint catches a re-link only for somebody who already had a link,
-    // because the erasure leaves that row open and overlapping. A person who
-    // never had one — most of them — has nothing in the database that would
-    // refuse the row, so this read is the only thing standing between an
+    // It matters more here than anywhere else in the pass: the one-open-link
+    // index catches a re-link only for somebody who already had a link,
+    // because the erasure leaves that row open and holding the slot. A person
+    // who never had one — most of them — has nothing in the database that
+    // would refuse the row, so this read is the only thing standing between an
     // erasure and a fresh link naming the account it just removed.
     const person = await this.discoveredPeople.findById(this.prisma, {
       id: discoveredPersonId,
@@ -295,7 +295,7 @@ export class IdentityMatchService {
       });
       return 1;
     } catch (error) {
-      if (!isExclusionViolation(error)) throw error;
+      if (!isOpenLinkViolation(error)) throw error;
       logger.info(
         { organizationId, discoveredPersonId },
         "A concurrent pass had already opened this link; leaving it as it is",
@@ -380,9 +380,9 @@ export class IdentityMatchService {
       });
     } catch (error) {
       // Two reviewers confirming at once: the read above passed for both and
-      // the exclusion constraint refused the second. Same sentence either way —
-      // the check and the constraint hold one rule between them.
-      if (isExclusionViolation(error)) {
+      // the one-open-link index refused the second. Same sentence either way —
+      // the check and the index hold one rule between them.
+      if (isOpenLinkViolation(error)) {
         throw new IdentityAlreadyLinkedError(suggestion.discoveredPersonId);
       }
       throw error;

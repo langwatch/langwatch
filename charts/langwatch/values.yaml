@@ -1812,11 +1812,8 @@ postgresql:
 
   # Connection string to use for PostgreSQL when running in `chartManaged: false` mode
   #
-  # The instance must allow `CREATE EXTENSION btree_gist` and the migration user
-  # must be allowed to run it. It comes with postgresql-contrib, so the
-  # chart-managed instance above already has it; on a managed provider, check the
-  # extension allow-list before pointing this at it. Migrations fail with an
-  # explicit message rather than half-applying when it is missing.
+  # No extensions are required: any plain PostgreSQL the migration user can
+  # run DDL on will do, managed providers included.
   external:
     connectionString:
       ## @param postgresql.external.connectionString.value [string] External PostgreSQL connection string.

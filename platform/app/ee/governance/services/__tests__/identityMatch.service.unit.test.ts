@@ -9,7 +9,7 @@
  * The repositories are doubles rather than a database, because what is under
  * test is the orchestration: which read filters which population, and which
  * write follows which decision. The database's half of the rules
- * (`IdentityMatch`'s overlap constraint) has its own integration test, and the
+ * (`IdentityMatch`'s one-open-link index) has its own integration test, and the
  * evidence rules have their own unit test — this is the seam between them.
  *
  * Spec: specs/governance/governance-identity-match-engine.feature
@@ -68,8 +68,8 @@ const build = ({
    * People the pass read as live and who were erased before it got to writing
    * them: `findMatchable` hands them over, `findById` reports them erased.
    *
-   * The one shape the exclusion constraint cannot catch, because a person who
-   * never held a link has no row for a new one to overlap.
+   * The one shape the one-open-link index cannot catch, because a person who
+   * never held a link has no open row for a new one to collide with.
    */
   erasedMidPass?: Person[];
   openLinks?: { discoveredPersonId: string; userId: string | null }[];
@@ -319,14 +319,16 @@ describe("Feature: linking provider-named people to accounts on proof", () => {
 
   describe("given a concurrent pass that opened the same link first", () => {
     it("carries on with the rest of the organization rather than ending the pass", async () => {
-      // The exclusion constraint refusing the second write is the rule holding.
+      // The one-open-link index refusing the second write is the rule holding.
       // Ending the pass there would leave everybody after this person unmatched
-      // until the next night.
+      // until the next night. Prisma reports the index as P2002 with the
+      // SQLSTATE underneath, which is the shape faked here.
       const { service } = build({
         people: [person()],
         emails: [{ userId: "user_42", email: "m.silva@acme.test" }],
-        openThrows: Object.assign(new Error("conflicting key value"), {
-          code: "23P01",
+        openThrows: Object.assign(new Error("Unique constraint failed"), {
+          code: "P2002",
+          meta: { code: "23505" },
         }),
       });
 
@@ -335,7 +337,7 @@ describe("Feature: linking provider-named people to accounts on proof", () => {
       ).resolves.toEqual({ linked: 0, suspended: 0, unproven: 0 });
     });
 
-    it("still raises anything that is not the overlap rule", async () => {
+    it("still raises anything that is not the open-link rule", async () => {
       const { service } = build({
         people: [person()],
         emails: [{ userId: "user_42", email: "m.silva@acme.test" }],
@@ -394,14 +396,15 @@ describe("Feature: turning a suggestion into a link", () => {
 
   describe("given two reviewers confirming at the same instant", () => {
     it("tells the loser the person is already linked, not that something unknown happened", async () => {
-      // Both reads pass; the exclusion constraint refuses the second write. The
-      // check and the constraint hold one rule between them, so they say one
-      // sentence.
+      // Both reads pass; the one-open-link index refuses the second write. The
+      // check and the index hold one rule between them, so they say one
+      // sentence. Faked here as the bare SQLSTATE, the shape a raw driver
+      // error carries when Prisma's wrapper is absent.
       const { service } = build({
         people: [person()],
         suggestions: [suggestion],
-        openThrows: Object.assign(new Error("conflicting key value"), {
-          code: "23P01",
+        openThrows: Object.assign(new Error("duplicate key value"), {
+          code: "23505",
         }),
       });
 

@@ -11,30 +11,12 @@
 -- that key would miss an erased person's data entirely.
 -- "GovernanceTenantHistory" is the durable translation instead.
 --
--- FIRST EXTENSION IN THIS REPO. None of the 297 migrations before this one ran
--- a CREATE EXTENSION. "IdentityMatch" needs btree_gist to hold "no two links
--- for one person may overlap in time" as a database guarantee rather than an
--- application convention. The guard below fails the whole migration with an
--- actionable message when the extension is unavailable, rather than
--- half-applying and leaving the constraint off - a missing overlap guard is
--- invisible until two links match one spend date and the read picks one.
--- Self-host documentation and the Helm chart state the requirement.
--- Availability must be confirmed per managed-Postgres provider; Azure Database
--- for PostgreSQL in particular is unverified.
-
--- +-------------------------------------------------------------------------+
--- | btree_gist availability guard                                            |
--- +-------------------------------------------------------------------------+
-DO $$
-BEGIN
-  IF NOT EXISTS (SELECT 1 FROM pg_available_extensions WHERE name = 'btree_gist') THEN
-    RAISE EXCEPTION
-      'btree_gist is not available on this PostgreSQL server, so the governance identity tables cannot be created. It ships with the standard contrib package. Install the server''s contrib/extension package (postgresql-contrib on Debian/Ubuntu, postgresqlNN-contrib on RHEL), or enable btree_gist in your managed provider''s allowed-extensions list, then re-run the migration.';
-  END IF;
-END
-$$;
-
-CREATE EXTENSION IF NOT EXISTS btree_gist;
+-- NO EXTENSIONS. An earlier draft held "no two links for one person may
+-- overlap in time" with a btree_gist exclusion constraint - the first
+-- CREATE EXTENSION in this repo, and a new requirement on every self-hosted
+-- and managed Postgres. Nothing here ever writes "validTo", so the only
+-- overlap that can occur is a second OPEN link, and a plain partial unique
+-- index holds that rule with no extension at all (ADR-128 §7).
 
 -- +-------------------------------------------------------------------------+
 -- | DiscoveredPerson - the unit of erasure                                   |
@@ -118,25 +100,24 @@ CREATE INDEX "IdentityMatch_organizationId_discoveredPersonId_idx" ON "IdentityM
 -- Offboarding and the erasure walk both ask "which links does this user hold".
 CREATE INDEX "IdentityMatch_organizationId_userId_idx" ON "IdentityMatch"("organizationId", "userId");
 
--- A zero-width range (validFrom = validTo) is EMPTY, and an empty range
--- overlaps nothing - not even itself - so it slips past the exclusion
--- constraint below entirely and files a link against no time at all. An
--- inverted range raises a raw type error (SQLSTATE 22000) that no layer maps.
--- One named CHECK rejects both, in the database.
+-- A zero-width "link" (validFrom = validTo) has "validTo" set, so the
+-- one-open-link index below cannot see it: it would file a person against no
+-- time at all and read as if the link had never been made. An inverted range
+-- raises a raw type error (SQLSTATE 22000) that no layer maps. One named
+-- CHECK rejects both, in the database.
 ALTER TABLE "IdentityMatch" ADD CONSTRAINT "IdentityMatch_valid_range_check"
     CHECK ("validTo" IS NULL OR "validTo" > "validFrom");
 
--- At most one link per discovered person may cover any given instant. Two OPEN
--- rows both range to infinity, so this rejects the second with SQLSTATE 23P01;
--- a closed row overlapping an open one is rejected the same way. NO partial
--- unique index is added on top: it would be strictly redundant, and would make
--- the common race surface as 23505 instead - two error codes for one rule, and
--- the application would have to handle both to say one sentence.
-ALTER TABLE "IdentityMatch" ADD CONSTRAINT "IdentityMatch_no_overlap"
-    EXCLUDE USING gist (
-        "discoveredPersonId" WITH =,
-        tsrange("validFrom", COALESCE("validTo", 'infinity')) WITH &&
-    );
+-- At most one OPEN link ("validTo" IS NULL) per discovered person; a second
+-- one is rejected with SQLSTATE 23505. This deliberately says nothing about
+-- CLOSED links overlapping in time: nothing in the product writes "validTo"
+-- yet, so no closed row can exist, and the general overlap rule it replaces
+-- (an EXCLUDE USING gist constraint) bought that unreachable guarantee at the
+-- price of a btree_gist extension requirement on every Postgres. Revisit when
+-- closing links ships (ADR-128 §7).
+CREATE UNIQUE INDEX "IdentityMatch_one_open_link_key"
+    ON "IdentityMatch"("discoveredPersonId")
+    WHERE "validTo" IS NULL;
 
 -- +-------------------------------------------------------------------------+
 -- | GovernanceTenantHistory - org to every tenant it ever wrote under         |
@@ -217,5 +198,3 @@ CREATE INDEX "ErasedIdentifierSuppression_organizationId_idx" ON "ErasedIdentifi
 --   DROP TABLE "IdentityMatch";
 --   DROP TABLE "DiscoveredAgent";
 --   DROP TABLE "DiscoveredPerson";
---   -- btree_gist is left installed: other schema objects may come to depend
---   -- on it, and DROP EXTENSION would take them with it.

@@ -320,8 +320,8 @@ export class IdentityMatchRepository {
   /**
    * Opens a link, recording what proved it and from when.
    *
-   * No upsert and no catch: the exclusion constraint refuses a second link
-   * overlapping an open one with SQLSTATE 23P01, and that refusal is the
+   * No upsert and no catch: the one-open-link index refuses a second open
+   * link for the same person with SQLSTATE 23505, and that refusal is the
    * database holding a rule the application would otherwise have to remember.
    * The caller maps it; swallowing it here would let a race quietly re-point
    * somebody's spend.

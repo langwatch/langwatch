@@ -33,12 +33,12 @@ export class IdentityMatchSuggestionNotFoundError extends NotFoundError {
 /**
  * The person already holds an open link.
  *
- * Raised on the read that finds the link, and again from SQLSTATE 23P01 when
- * two confirmations race past that read — the exclusion constraint on
- * `IdentityMatch` is what actually holds the rule, and it deserves the same
- * sentence as the check that usually gets there first. `fault` stays customer:
- * clicking a stale queue entry is an ordinary thing for a person to do, not an
- * incident.
+ * Raised on the read that finds the link, and again from SQLSTATE 23505 when
+ * two confirmations race past that read — the partial unique index on
+ * `IdentityMatch` (one open link per person) is what actually holds the rule,
+ * and it deserves the same sentence as the check that usually gets there
+ * first. `fault` stays customer: clicking a stale queue entry is an ordinary
+ * thing for a person to do, not an incident.
  */
 export class IdentityAlreadyLinkedError extends HandledError {
   declare readonly code: "identity_already_linked";
@@ -85,33 +85,38 @@ export class IdentityErasedError extends HandledError {
   }
 }
 
-/**
- * Postgres' exclusion-violation code.
- *
- * The repo maps Prisma's `P2002` and, before this, no exclusion violation
- * anywhere — so an overlap raised by the database arrived as a generic unknown
- * error with a trace id, for a situation the customer can act on in one click.
- */
-const EXCLUSION_VIOLATION = "23P01";
+/** Postgres' unique-violation code, raised by the one-open-link index. */
+const UNIQUE_VIOLATION = "23505";
 
 /**
- * Whether a thrown value is the overlap constraint refusing a second open link.
- *
- * Reads the driver's own code off whichever shape carried it: Prisma surfaces a
- * raw constraint violation as a `PrismaClientUnknownRequestError` whose SQLSTATE
- * lives in the message rather than in a field, so a structural check alone
- * misses it. Both are checked, and neither is a `String(err).includes` over the
- * whole message — that would also match an error whose *payload* happened to
- * contain the digits.
+ * Prisma's own code for the same refusal: the client wraps a unique violation
+ * as a `PrismaClientKnownRequestError` with `code: "P2002"` and buries the
+ * SQLSTATE underneath. `IdentityMatch` has no other unique rule a write could
+ * trip (the primary key is a fresh nanoid), so `P2002` on these writes means
+ * the one-open-link index and nothing else.
  */
-export function isExclusionViolation(error: unknown): boolean {
+const PRISMA_UNIQUE_VIOLATION = "P2002";
+
+/**
+ * Whether a thrown value is the one-open-link index refusing a second open
+ * link.
+ *
+ * Reads the code off whichever shape carried it: Prisma's `P2002` wrapper, a
+ * raw driver error's SQLSTATE in `code` or `meta.code`, or — for the wrapper
+ * shapes whose SQLSTATE lives only in the message — a word-bounded match on
+ * the message. Never a `String(err).includes` over the whole message: that
+ * would also match an error whose *payload* happened to contain the digits.
+ */
+export function isOpenLinkViolation(error: unknown): boolean {
   if (typeof error !== "object" || error === null) return false;
-  if ((error as { code?: unknown }).code === EXCLUSION_VIOLATION) return true;
+  const code = (error as { code?: unknown }).code;
+  if (code === UNIQUE_VIOLATION || code === PRISMA_UNIQUE_VIOLATION)
+    return true;
   const meta = (error as { meta?: { code?: unknown } }).meta;
-  if (meta?.code === EXCLUSION_VIOLATION) return true;
+  if (meta?.code === UNIQUE_VIOLATION) return true;
   const message = (error as { message?: unknown }).message;
   return (
     typeof message === "string" &&
-    new RegExp(`\\b${EXCLUSION_VIOLATION}\\b`).test(message)
+    new RegExp(`\\b${UNIQUE_VIOLATION}\\b`).test(message)
   );
 }

@@ -5133,18 +5133,18 @@ model IdentityMatch {
   validTo            DateTime?
   createdAt          DateTime  @default(now())
 
-  // Overlap guard, and the ONLY uniqueness rule here: no two rows for the same
-  // discoveredPersonId may have overlapping validity ranges. Raw SQL in the
-  // migration, because Prisma cannot express an exclusion constraint:
-  //   EXCLUDE USING gist ("discoveredPersonId" WITH =,
-  //     tsrange("validFrom", COALESCE("validTo", 'infinity')) WITH &&)
-  // Two OPEN rows both range to infinity, so they overlap and the constraint
-  // rejects the second - which is why NO partial unique index is added on top
-  // (ADR-128 §7's ruling, applied here for the same reason: a redundant index
-  // would make the common race surface as 23505 instead of 23P01, two error
-  // codes for one rule). Proved on Postgres 16.14.
-  // A CHECK rejects zero-width and inverted ranges, which an exclusion
-  // constraint cannot see: an empty range overlaps nothing, not even itself.
+  // One-open-link guard, and the ONLY uniqueness rule here: at most one row
+  // per discoveredPersonId may be open (validTo IS NULL). Raw SQL in the
+  // migration, because Prisma cannot express a partial unique index:
+  //   CREATE UNIQUE INDEX "IdentityMatch_one_open_link_key"
+  //     ON "IdentityMatch"("discoveredPersonId") WHERE "validTo" IS NULL
+  // A second open row is rejected with SQLSTATE 23505. Closed rows are outside
+  // the index on purpose: nothing writes validTo yet, so the general overlap
+  // rule this replaces (a btree_gist EXCLUDE constraint) guarded a case that
+  // cannot occur, at the price of an extension requirement on every Postgres
+  // (ADR-128 §7). Revisit when closing links ships.
+  // A CHECK rejects zero-width and inverted ranges, which the partial index
+  // cannot see: a zero-width row has validTo set and so counts as closed.
   @@index([organizationId, discoveredPersonId])
   // Offboarding and the erasure walk both ask "which links does this user hold".
   @@index([organizationId, userId])
