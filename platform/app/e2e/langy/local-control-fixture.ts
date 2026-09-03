@@ -1282,9 +1282,14 @@ export async function readAgent(name: string): Promise<{
   name: string;
   parameters?: unknown;
 } | null> {
-  const apiKey = process.env.LANGWATCH_API_KEY ?? (await getCliApiKey());
+  // The demo registers with the key this fixture minted, and that key owns
+  // the agent it creates: a connection made with a project key is a different
+  // identity and a different row. Reading with the project key from the
+  // environment would find that other row, which no run of this suite ever
+  // touches, and report the parameters it had months ago.
+  const apiKey = await getCliApiKey();
   const response = await fetch(`${APP_BASE}/api/v1/agents`, {
-    headers: { "X-Auth-Token": apiKey },
+    headers: { "X-Auth-Token": apiKey, "X-Project-Id": PROJECT_ID },
   });
   if (!response.ok) return null;
   const body = (await response.json()) as unknown;
@@ -1293,10 +1298,21 @@ export async function readAgent(name: string): Promise<{
     : ((body as { agents?: unknown[]; data?: unknown[] }).agents ??
       (body as { data?: unknown[] }).data ??
       []);
+  const named = (
+    rows as Array<{
+      id: string;
+      name: string;
+      parameters?: unknown;
+      lastSeenAt?: string;
+    }>
+  ).filter((agent) => agent.name === name);
+  // A folder shared from another machine leaves its own row behind, so the
+  // newest connection is the one this run is asserting about.
   return (
-    (rows as Array<{ id: string; name: string; parameters?: unknown }>).find(
-      (agent) => agent.name === name,
-    ) ?? null
+    named.sort(
+      (left, right) =>
+        Date.parse(right.lastSeenAt ?? "") - Date.parse(left.lastSeenAt ?? ""),
+    )[0] ?? null
   );
 }
 
