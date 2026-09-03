@@ -38,12 +38,11 @@ function IOActionSlot({
       ref={elementRef}
       align="center"
       flexShrink={0}
-      paddingLeft={2}
+      paddingLeft={hidden ? 0 : 2}
       {...(hidden
         ? {
             width: 0,
             minWidth: 0,
-            paddingLeft: 0,
             overflow: "hidden",
             visibility: "hidden",
           }

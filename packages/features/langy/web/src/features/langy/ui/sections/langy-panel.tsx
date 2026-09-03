@@ -2240,7 +2240,7 @@ function LangyPanel({
         // isn't enough: the drawer portal is later in the DOM and would win the
         // paint on a tie.
         zIndex={isDrawerCompanion ? 1600 : 1200}
-        background="bg.surface"
+        background={isDrawerCompanion ? "bg.surface/80" : "bg.surface"}
         borderStyle="solid"
         // The brand's workhorse hairline (white/10 on dark, a warm paper line on
         // light) — `border.muted` was too faint to hold a floating card's edge.
@@ -2349,7 +2349,6 @@ function LangyPanel({
               top: "8px",
               right: "8px",
               bottom: "8px",
-              background: "bg.surface/80",
               backdropFilter: "blur(25px)",
               borderWidth: "1px",
               borderColor: "border",
