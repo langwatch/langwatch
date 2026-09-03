@@ -88,7 +88,7 @@ for by every reader and by the next person to hit that throw in production.
 
 If we can name the cause and the caller can act on it, it is a `HandledError`
 with a stable `code`, a customer-safe `message`, a correct `fault`, and an entry
-in `apps/ui/src/model/errors/presentation.ts` keyed by that code.
+in `packages/handled-error/src/presentation.ts` keyed by that code.
 Add the code to `features/errors/logic/codes.ts` (sorted) in the same change.
 
 A plain `Error` subclass forces every transport to re-derive the status. The

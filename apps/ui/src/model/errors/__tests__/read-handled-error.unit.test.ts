@@ -12,7 +12,7 @@ import {
   readErrorTraceId,
   readHandledError,
   safeProse,
-} from "../read-handled-error";
+} from "@langwatch/handled-error/read-handled-error";
 
 const trpcError = (error: unknown, traceId?: string) => ({
   data: { error, ...(traceId ? { traceId } : {}) },

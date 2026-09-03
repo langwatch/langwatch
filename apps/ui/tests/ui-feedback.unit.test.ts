@@ -17,8 +17,8 @@ import {
   resolveUiFailureCopy,
   type UiToaster,
 } from "../src/behavior/ui-feedback";
-import { APP_ERROR_CODES } from "../src/model/errors/codes";
-import { UNKNOWN_ERROR_PRESENTATION } from "../src/model/errors/presentation";
+import { APP_ERROR_CODES } from "@langwatch/handled-error/app-codes";
+import { UNKNOWN_ERROR_PRESENTATION } from "@langwatch/handled-error/presentation";
 
 type RecordedToast = Parameters<UiToaster["create"]>[0];
 

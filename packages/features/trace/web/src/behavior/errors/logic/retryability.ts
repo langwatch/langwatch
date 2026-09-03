@@ -1,5 +1,5 @@
-import type { AppErrorCode } from "../../../model/errors/codes";
-import { readHandledError } from "./read-handled-error";
+import type { AppErrorCode } from "@langwatch/handled-error/app-codes";
+import { readHandledError } from "@langwatch/handled-error/read-handled-error";
 
 /**
  * Handled failures where trying again cannot change the answer.

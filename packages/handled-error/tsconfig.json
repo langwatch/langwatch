@@ -1,9 +1,14 @@
 {
   "compilerOptions": {
-    "target": "es2020",
+    "target": "es2022",
     "module": "preserve",
     "moduleResolution": "bundler",
-    "lib": ["es2020"],
+    // `dom` for the `URL` parser the docs-origin allowlist in
+    // `read-handled-error` is built on, and `es2022` for `Object.hasOwn`, which
+    // is how the presentation registry looks a code up without inheriting from
+    // the prototype chain. Both are universal JavaScript rather than a browser
+    // affordance; this package still imports nothing from either runtime.
+    "lib": ["es2022", "dom"],
     "strict": true,
     "noUncheckedIndexedAccess": true,
     "incremental": true,

@@ -32,7 +32,7 @@
  */
 import { describe, expect, it } from "vitest";
 
-import { readHandledError } from "../read-handled-error";
+import { readHandledError } from "@langwatch/handled-error/read-handled-error";
 
 const trpcError = (error: unknown) => ({ data: { error } });
 

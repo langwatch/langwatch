@@ -29,8 +29,8 @@
 import type { HandledErrorFault } from "@langwatch/handled-error";
 import type { PromptPlaygroundChatAvailability } from "@langwatch/prompt-web/screens/prompt-studio";
 
-import { explainHandledError } from "../../../model/errors/presentation";
-import type { HandledErrorShape } from "../../../model/errors/read-handled-error";
+import { explainHandledError } from "@langwatch/handled-error/presentation";
+import type { HandledErrorShape } from "@langwatch/handled-error/read-handled-error";
 
 const CHAT_UNAVAILABLE: HandledErrorShape = {
   code: "prompt_playground_chat_unavailable",

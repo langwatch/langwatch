@@ -6,13 +6,13 @@
 import { goErrorCodes, nodeErrorCodes } from "@langwatch/handled-error";
 import { describe, expect, it } from "vitest";
 
-import { APP_ERROR_CODES } from "../codes";
+import { APP_ERROR_CODES } from "@langwatch/handled-error/app-codes";
 import {
   explainHandledError,
   explainSerializedError,
   UNKNOWN_ERROR_PRESENTATION,
-} from "../presentation";
-import type { HandledErrorShape } from "../read-handled-error";
+} from "@langwatch/handled-error/presentation";
+import type { HandledErrorShape } from "@langwatch/handled-error/read-handled-error";
 
 /** Every code the registry must cover — app + generated Go + generated node. */
 const ALL_CODES = [

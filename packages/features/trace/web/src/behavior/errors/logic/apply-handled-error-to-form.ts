@@ -5,7 +5,7 @@ type FormErrorTarget<TFieldValues extends FieldValues> = {
   setError: UseFormSetError<TFieldValues>;
 };
 
-import { readHandledError, safeProse } from "./read-handled-error";
+import { readHandledError, safeProse } from "@langwatch/handled-error/read-handled-error";
 
 /**
  * The key under `errors.root` this module writes form-level complaints to.

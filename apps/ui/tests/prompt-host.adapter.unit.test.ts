@@ -24,7 +24,7 @@
 
 import { describe, expect, it, vi } from "vitest";
 import { UiPromptHost } from "../src/features/prompt/behavior/prompt-host.adapter";
-import { explainHandledError } from "../src/model/errors/presentation";
+import { explainHandledError } from "@langwatch/handled-error/presentation";
 import { promptPlaygroundChatAvailability } from "../src/features/prompt/model/prompt-playground-chat-availability";
 
 function hostWith(query: Record<string, string | undefined>) {

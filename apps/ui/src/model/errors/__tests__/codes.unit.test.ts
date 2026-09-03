@@ -22,7 +22,7 @@ import { join } from "node:path";
 import { fileURLToPath } from "node:url";
 import { describe, expect, it } from "vitest";
 
-import { APP_ERROR_CODES } from "../codes";
+import { APP_ERROR_CODES } from "@langwatch/handled-error/app-codes";
 
 const PACKAGE_ROOT = fileURLToPath(new URL("../../../../", import.meta.url));
 

@@ -2,8 +2,8 @@ import {
   type ErrorExplanation,
   explainHandledError,
   explainUnhandledError,
-} from "./presentation";
-import { readEnvelopeTraceId, readHandledError } from "./read-handled-error";
+} from "@langwatch/handled-error/presentation";
+import { readEnvelopeTraceId, readHandledError } from "@langwatch/handled-error/read-handled-error";
 
 /** Everything a surface needs to render an error, resolved once. */
 export interface ResolvedErrorCopy {

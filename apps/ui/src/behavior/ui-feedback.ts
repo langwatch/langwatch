@@ -8,7 +8,7 @@
  * code slug, so a screen that toasted `error.message` would print
  * `validation_error` at the customer.
  *
- * The words themselves come from `../model/errors/presentation`, the code-keyed
+ * The words themselves come from `@langwatch/handled-error/presentation`, the code-keyed
  * registry (ADR-045, amendment 2026-07-21). This module used to carry a
  * four-entry copy table of its own because the registry had not moved yet; it
  * has, so the table is gone and every enumerated code — app, Go and node alike
@@ -29,8 +29,8 @@ import {
   explainHandledError,
   explainUnhandledError,
   UNKNOWN_ERROR_PRESENTATION,
-} from "../model/errors/presentation";
-import { readEnvelopeTraceId, readHandledError } from "../model/errors/read-handled-error";
+} from "@langwatch/handled-error/presentation";
+import { readEnvelopeTraceId, readHandledError } from "@langwatch/handled-error/read-handled-error";
 import { UiFeedbackPort, type UiFailureNotice, type UiSuccessNotice } from "./ui-capabilities";
 
 /** How long a failure stays up: long enough to read it and copy the error id. */

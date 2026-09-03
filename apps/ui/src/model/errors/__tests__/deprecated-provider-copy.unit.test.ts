@@ -12,8 +12,8 @@
  */
 import { describe, expect, it } from "vitest";
 import { modelProviders, providerDeprecation } from "@langwatch/model-provider-contract";
-import { explainHandledError } from "../presentation";
-import type { HandledErrorShape } from "../read-handled-error";
+import { explainHandledError } from "@langwatch/handled-error/presentation";
+import type { HandledErrorShape } from "@langwatch/handled-error/read-handled-error";
 
 /**
  * The payload as the client reads it off the wire — every field the shape

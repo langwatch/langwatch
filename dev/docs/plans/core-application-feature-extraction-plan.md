@@ -13953,3 +13953,170 @@ are server-side type bugs, not map entries, and each wants its own test.
   own pass rather than a footnote in this one.
 - **It did not paper over `annotation`'s `traces.getById`.** The honest type
   fails the build, and that failure is the report.
+
+## The error registry has one home: `@langwatch/handled-error`, 2026-09-03
+
+The debt the docs-helper lane recorded and left — *"`@langwatch/trace-web` still
+carries its own copy of `read-handled-error`, `presentation.ts` and `codes.ts`.
+That is a second duplication, larger than this one, and it is not this lane's"*
+— is closed. It was 4,653 lines of second copy, and it had already drifted.
+
+### What was duplicated, and how far apart the two copies had got
+
+Three files existed twice: `apps/ui/src/model/errors/{codes,presentation,read-handled-error}.ts`
+and `packages/features/trace/web/src/{model/errors/codes.ts,behavior/errors/logic/{presentation,read-handled-error}.ts}`.
+The trace copy was a snapshot, not a fork with a reason, and the diff says so:
+
+| Direction | Codes | Consequence while it stood |
+| --- | --- | --- |
+| In `apps/ui`, absent from `trace-web` | `avatar_not_found`, `forbidden`, `prompt_playground_chat_unavailable`, `service_unavailable` | Four codes with copy in the application resolved to the generic unknown line on every trace surface |
+| In `trace-web`, absent from `apps/ui` | `evaluation_not_found`, `malformed_custom_role_permissions` | Dead copy. Nothing in the repository declares `malformed_custom_role_permissions` at all, and `evaluation_not_found` is declared by `EvaluationNotFoundError extends **Error**` (`packages/features/evaluation/contract/src/evaluation.errors.ts:2`), which never reaches the handled channel — which is also why `codes.unit.test.ts` never demanded it |
+
+`read-handled-error` had drifted the same way: the trace copy still read **two**
+boundaries, so the third shape the studio needs — a serialised payload riding on
+an event with no transport envelope, added in "the offered action" lane — was
+absent there. The registry drift is the visible half; this one is the half that
+silently downgraded a named failure to "unknown" on a trace screen.
+
+### The home, and why it is not the application
+
+`@langwatch/handled-error`. It already holds the two other enumerated code lists
+(`codes.generated.ts` — the Go and node codes) and the other code-keyed registry
+(`remediation.ts` — `tips` and `docsUrl`), and it was **already a dependency of
+both** `apps/ui` and `@langwatch/trace-web`, so nothing gained a package edge it
+did not have. The three files are subpath exports, deliberately NOT barrel
+exports: `@langwatch/handled-error` is imported by ~80 packages and by
+`mcp/typescript`, and none of them should pull 3,734 lines of browser copy off
+`index.ts`.
+
+This follows the docs-helper lane's ruling rather than departing from it. Five
+copies of `docs-url.ts` collapsed into `@langwatch/config`, "rather than a web
+package because a web package another web package imports is the shape none of
+the five families would accept". The same reasoning names this package: the app
+cannot be the home, because `trace-web` may not import `apps/ui`; a web package
+cannot be the home for the same reason inverted; so it is the platform module
+that already owns the error contract the registry is keyed by.
+
+| File | Change |
+| --- | --- |
+| `packages/handled-error/src/app-codes.ts` | **Moved** from `apps/ui/src/model/errors/codes.ts`, 462 lines. Named `app-codes` so it cannot be misread as `codes.generated`; `APP_ERROR_CODES` / `AppErrorCode` unchanged |
+| `packages/handled-error/src/presentation.ts` | **Moved**, 3,734 lines. Its two cross-package type imports become relative (`./codes.generated`, `./serialized-handled-error`) |
+| `packages/handled-error/src/read-handled-error.ts` | **Moved**, 531 lines — the three-boundary reader, with the docs-origin allowlist intact |
+| `packages/handled-error/package.json` | `./app-codes`, `./presentation`, `./read-handled-error` subpath exports; `@langwatch/config` as a workspace dependency, for the docs-origin allowlist the reader builds |
+| `packages/handled-error/tsconfig.json` | `es2020` → `es2022` and `lib: ["es2022", "dom"]`: `Object.hasOwn` is how the registry looks a code up without the prototype chain, and `URL` is what the docs-origin allowlist parses with. Both are universal JavaScript; the package still imports nothing from either runtime |
+| `packages/features/trace/web/src/{model/errors/codes.ts,behavior/errors/logic/{presentation,read-handled-error}.ts}` | **Deleted** — 4,653 lines |
+| `apps/ui/src/behavior/ui-feedback.ts`, `apps/ui/src/features/prompt/model/prompt-playground-chat-availability.ts` | Import the three by package specifier |
+| six `apps/ui/src/model/errors/__tests__/*.ts`, `apps/ui/tests/{ui-feedback,prompt-host.adapter}.unit.test.ts` | Same, for their subjects |
+| `packages/features/trace/web/src/behavior/errors/logic/{retryability,resolve-error-copy,apply-handled-error-to-form}.ts`, `.../ui/sections/errors/index.ts`, `.../ui/sections/explorer/search-bar/error-banner-detail.tsx` | Same. `resolveErrorCopy`, `showErrorToast`, `applyHandledErrorToForm` and `retryability` STAY in `trace-web` — they have no counterpart in `apps/ui`, which composes `ui-feedback.ts` instead |
+| root `package.json` | `packages/handled-error/src` added to `lint:oxlint` and `lint:fix`. Without it the move would have carried the registry out of the oxlint architecture sweep, which walks `apps` but not this package — a guard going quiet because its subject moved |
+| `CLAUDE.md`, `dev/docs/best_practices/error-handling.md`, `dev/docs/best_practices/feature-cleanup-review.md` | The nine path references that name where a code and its copy go |
+
+### Both guards stayed where they are, and both still bite
+
+The eight suites under `apps/ui/src/model/errors/__tests__/` did NOT move with
+their subjects. Three of them — `codes.unit.test.ts`, `no-raw-error-toasts.unit.test.ts`,
+`handled-error-messages.unit.test.ts` — are repository-wide walkers whose `ROOTS`
+are `apps/ui/src`, `apps/api/src`, `apps/worker/src` and `packages/`; their home
+is the application gate, not any one module's directory, and every root they
+walk is unchanged by this move. The other five read their subject through an
+import, which a package specifier satisfies exactly as a relative path did.
+
+Two properties were checked rather than assumed:
+
+- **The scan cannot be poisoned by its own subject.** `declaredCodes()` only
+  reads files containing the literal `@langwatch/handled-error`, and all three
+  moved files now import their siblings relatively — `grep -c` returns 0 on each.
+  None of the six `CODE_PATTERNS` matches anything in them either, before or
+  after. The `packages/` root the guard already walked now contains the list it
+  checks, and finds nothing new in it.
+- **The exhaustive-registry typecheck still fires.** Deleting the
+  `avatar_not_found` entry from `presentation.ts` (leaving the code in the list)
+  fails **both** typechecks with `TS2741` at `packages/handled-error/src/presentation.ts:3484`
+  — `packages/handled-error` reports it directly, `apps/ui` as
+  `../../packages/handled-error/src/presentation.ts:3484`. Restored byte-identical
+  (`diff` clean) and both green again.
+
+### Judgment calls
+
+- **Subpath exports, not the barrel.** A server process importing
+  `@langwatch/handled-error` for `HandledError` must not acquire the customer
+  copy registry as a side effect. `index.ts` is untouched, so no existing
+  consumer's import graph changed at all.
+- **`presentation.ts` moved too, though it is app-level product copy.** The
+  brief's condition for leaving it in `trace-web` was that it not also be in
+  `apps/ui`; it was, near-identically, so the condition fails and a second home
+  is exactly the drift recorded above. The alternative — `trace-web` reaching
+  its copy through a host port, as `prompt-web` does for one string — is the
+  right shape for one sentence and the wrong one for 493 registry entries.
+- **The two `trace-web`-only codes were dropped, not merged in.** Adding them to
+  `APP_ERROR_CODES` would fail `codes.unit.test.ts`'s orphan check, correctly:
+  nothing raises either on the handled channel. `remediation.ts:354` still
+  carries tips for `evaluation_not_found`, which no `HandledError` declares —
+  named here, not fixed, because closing it means promoting
+  `EvaluationNotFoundError` to a `NotFoundError` in a contract package this lane
+  does not own.
+- **`app-codes.ts`, not `codes.ts`.** The only rename in the move, and it is to
+  stop `codes.ts` and `codes.generated.ts` sitting beside each other reading as
+  the same thing at a glance.
+- **The lint scope was widened rather than the finding recorded.** One line in
+  each of two scripts, and `oxlint --quiet` over `packages/handled-error/src` is
+  clean, so it costs nothing and keeps the registry inside the `langwatch/*`
+  rules it was under while it lived in `apps`.
+
+### Gates
+
+`apps/ui`: `vitest run src/model/errors tests` — **98 files / 1034 tests**,
+identical to HEAD; `pnpm typecheck` — 0 errors. `@langwatch/trace-web`:
+`pnpm test:unit` — **234 files / 1836 tests**, identical to HEAD; `pnpm typecheck`
+— 0 errors. `@langwatch/handled-error`: `pnpm test` — 3 files / 64 tests;
+`pnpm typecheck` — 0 errors. All five were green at HEAD before the move, and the
+counts are unchanged after it.
+
+`oxlint --quiet` with `.oxlintrc.architecture.json`: clean over
+`packages/handled-error/src`, `apps/ui/src/model`, `apps/ui/src/behavior`,
+`apps/ui/src/features/prompt/model` and
+`packages/features/trace/web/src/{behavior/errors,ui/sections/errors}`. The two
+trees that report are pre-existing and untouched by this lane: `apps/ui/tests`
+(5 errors, all identical at HEAD — `ui-feedback.unit.test.ts:234` is byte-identical
+to `git show HEAD:`) and `.../explorer/search-bar` (4 `package-boundaries`, none
+in `error-banner-detail.tsx`).
+
+`oxfmt --check`: the three moved files and every `apps/ui` file are clean. Four
+`trace-web` files report — `apply-handled-error-to-form.ts`,
+`resolve-error-copy.ts`, `ui/sections/errors/index.ts`,
+`explorer/search-bar/error-banner-detail.tsx` — and all four report identically
+when their `git show HEAD:` copies are checked in isolation. Pre-existing debt in
+that family, not this diff.
+
+`pnpm --filter @langwatch/architecture-lint lint`: red at HEAD and still red —
+**2,167 violations**, 791 of them `ui-screen-closure`. This lane's delta is
+**+11 / −3** inside that one class. `ui-screen-closure`'s portability test admits
+only `@langwatch/design-system` and `@langwatch/*-contract`, so **every**
+framework-free platform module a web package shares reports as "a first-party
+implementation package": `@langwatch/config/docs-url` does, five times, from the
+lane three commits ago that chose it. Worth naming as a rule gap — a shared home
+that is not a `-contract` package is unreachable from web code by that test, and
+the only shapes it leaves are duplication or a port per string. It is not a
+reason to keep a third copy of the registry.
+
+`pnpm install --filter "@langwatch/handled-error..." --offline` for the one new
+workspace edge; `pnpm-lock.yaml` +28 / −16, no network.
+
+### What this lane did NOT do
+
+- **Nothing under `platform/` was created, edited or read.** Nothing was staged
+  or committed.
+- **The eight error suites were not moved to `packages/handled-error`.** That
+  package declares no vitest config, so its `vitest run` takes the defaults —
+  the pool and worker-count shape `dev/docs` warns about — and three of the eight
+  are repo-wide walkers that belong to the application gate. The other five are
+  colocation debt this records rather than pays.
+- **`@langwatch/trace-web`'s four remaining error modules stay.** `resolveErrorCopy`,
+  `showErrorToast`, `applyHandledErrorToForm` and `retryability` exist only
+  there; `apps/ui` answers the same needs through `behavior/ui-feedback.ts`.
+  Whether those two shapes should also be one is a separate question with a real
+  design in it, not a copy to delete.
+- **The stale prose references to `platform/app/src/features/errors/logic/presentation.ts`**
+  in eight web, server and contract packages were left alone. They are comments naming a
+  tree that has been deleted for days; correcting them is a sweep, and it belongs
+  to whoever owns those files.

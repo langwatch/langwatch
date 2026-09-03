@@ -1,12 +1,11 @@
+import type { GoErrorCode, NodeErrorCode } from "./codes.generated";
 import type {
-  GoErrorCode,
   HandledErrorFault,
-  NodeErrorCode,
   SerializedHandledError,
   SerializedReason,
-} from "@langwatch/handled-error";
+} from "./serialized-handled-error";
 
-import type { AppErrorCode } from "./codes";
+import type { AppErrorCode } from "./app-codes";
 import {
   type HandledErrorShape,
   handledShapeFromSerialized,
@@ -37,7 +36,7 @@ import {
  *     "This search took too long" is the same fact, told to a customer.
  *
  * `tips` and `docsUrl` are NOT here — they ride on the error itself from the
- * server's remediation registry (`@langwatch/handled-error`)
+ * server's remediation registry (`./remediation`)
  * because agents driving the API and CLI need them without a UI.
  */
 export interface ErrorPresentation {
