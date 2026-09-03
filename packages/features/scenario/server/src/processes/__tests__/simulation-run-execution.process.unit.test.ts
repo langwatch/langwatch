@@ -190,6 +190,7 @@ function collectKeys(value: unknown, into: Set<string> = new Set()): Set<string>
 describe("simulationRunExecution process (runtime-built definition)", () => {
   describe("when a run is queued", () => {
     /** @scenario "Process manager dispatches execute intent on queued event" */
+    /** @scenario "Simulation execution remains durable" */
     it("opens the process in queued phase and emits the execute intent", () => {
       const evolution = evolveEvent(
         initialState,
@@ -341,6 +342,7 @@ describe("simulationRunExecution process (runtime-built definition)", () => {
       ]);
     });
 
+    /** @scenario "Simulation execution remains durable" */
     it("is a no-op when the queued event is redelivered", () => {
       const first = evolveEvent(
         initialState,
@@ -665,6 +667,7 @@ describe("simulationRunExecution process (runtime-built definition)", () => {
       });
     });
 
+    /** @scenario "Simulation execution remains durable" */
     it("mints the same finish messageKey as the cancel-requested path (outbox dedup contract)", () => {
       const cancelWhileQueued = evolveEvent(
         queuedState(),

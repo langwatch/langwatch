@@ -69,7 +69,7 @@ afterEach(() => {
 describe("the LangWatchQL result table", () => {
   describe("given a result whose columns arrive in a defined order with ClickHouse types", () => {
     describe("when the table renders", () => {
-      /** @scenario "Columns come from the response in backend order and expose ClickHouse types" */
+      /** @scenario "Table order and scale are stable" */
       it("lays the columns out in exactly the response's order", () => {
         renderTable(
           lwqlResult({
@@ -90,7 +90,7 @@ describe("the LangWatchQL result table", () => {
         ]);
       });
 
-      /** @scenario "Columns come from the response in backend order and expose ClickHouse types" */
+      /** @scenario "Table order and scale are stable" */
       it("shows each ClickHouse type without the member opening anything", () => {
         renderTable(
           lwqlResult({
@@ -130,7 +130,7 @@ describe("the LangWatchQL result table", () => {
       });
 
     describe("when the member scrolls and navigates the table", () => {
-      /** @scenario "A 10,000-row result stays usable in a semantic virtualized table" */
+      /** @scenario "Table order and scale are stable" */
       it("materializes only a bounded window of the ten thousand rows", () => {
         renderTable(atCeiling());
 
@@ -141,7 +141,7 @@ describe("the LangWatchQL result table", () => {
         expect(rendered[0]).toBe(0);
       });
 
-      /** @scenario "A 10,000-row result stays usable in a semantic virtualized table" */
+      /** @scenario "Table order and scale are stable" */
       it("moves the window to the rows the member scrolled to", () => {
         renderTable(atCeiling());
         const before = renderedRowIndexes();
@@ -157,7 +157,7 @@ describe("the LangWatchQL result table", () => {
         expect(after[0]).toBeGreaterThan(before.at(-1) ?? 0);
       });
 
-      /** @scenario "A 10,000-row result stays usable in a semantic virtualized table" */
+      /** @scenario "Table order and scale are stable" */
       it("stays a semantic table with headers that hold their place while scrolling", () => {
         renderTable(atCeiling());
 
@@ -173,7 +173,7 @@ describe("the LangWatchQL result table", () => {
         }
       });
 
-      /** @scenario "A 10,000-row result stays usable in a semantic virtualized table" */
+      /** @scenario "Table order and scale are stable" */
       it("keeps a wide result scrolling inside its own container", () => {
         renderTable(atCeiling());
 
@@ -199,14 +199,14 @@ describe("the LangWatchQL result table", () => {
       });
 
     describe("when those cells render", () => {
-      /** @scenario "Structured values render bounded, readable, and copyable" */
+      /** @scenario "Cell formatting is lossless and distinguishes absence" */
       it("shows a bounded readable representation in the cell", () => {
         renderTable(structured());
 
         expect(screen.getByText(JSON.stringify(nested))).toBeInTheDocument();
       });
 
-      /** @scenario "Structured values render bounded, readable, and copyable" */
+      /** @scenario "Cell formatting is lossless and distinguishes absence" */
       it("expands to the whole value and copies it in full", async () => {
         const writeText = vi.fn().mockResolvedValue(undefined);
         Object.defineProperty(navigator, "clipboard", {
@@ -290,7 +290,7 @@ describe("the LangWatchQL result table", () => {
 
   describe("given a result whose columns list the same name twice", () => {
     describe("when the table renders", () => {
-      /** @scenario "Duplicate result column names are surfaced, not silently merged" */
+      /** @scenario "Duplicate columns, truncation, statistics, and diagnostics are honest" */
       it("warns that the repeated name carries one value per row", () => {
         renderTable(
           lwqlResult({
@@ -307,7 +307,7 @@ describe("the LangWatchQL result table", () => {
         expect(warning).toHaveTextContent("one value per name");
       });
 
-      /** @scenario "Duplicate result column names are surfaced, not silently merged" */
+      /** @scenario "Duplicate columns, truncation, statistics, and diagnostics are honest" */
       it("says nothing when every column name is distinct", () => {
         renderTable(lwqlResult());
 
@@ -318,7 +318,7 @@ describe("the LangWatchQL result table", () => {
 
   describe("given a query that matched no rows", () => {
     describe("when the table renders", () => {
-      /** @scenario "The table has intentional loading, empty, error, stale, and truncated states" */
+      /** @scenario "A result opens in a native table with deliberate states" */
       it("says the query matched nothing rather than showing a blank grid", () => {
         renderTable(
           lwqlResult({

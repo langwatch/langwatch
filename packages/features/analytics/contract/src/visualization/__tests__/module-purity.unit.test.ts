@@ -91,7 +91,7 @@ const sourceFiles = () =>
 describe("the Vega-Lite validator and policy modules", () => {
   describe("given the modules are imported outside a browser", () => {
     describe("when the policy runs", () => {
-      /** @scenario "Policy modules stay pure and server-import-safe" */
+      /** @scenario "Vega dependencies and browser runtime stay behind the lazy boundary" */
       it("evaluates no React, DOM, or browser-only Vega module", () => {
         expect(typeof window).toBe("undefined");
         expect(typeof document).toBe("undefined");
@@ -168,7 +168,7 @@ describe("the Vega-Lite validator and policy modules", () => {
   });
   describe("given the guard's own pattern", () => {
     describe("when it is shown each import form", () => {
-      /** @scenario "Policy modules stay pure and server-import-safe" */
+      /** @scenario "Vega dependencies and browser runtime stay behind the lazy boundary" */
       it("catches every value import and admits every type-only one", () => {
         // The guard exists to keep a browser runtime out of the policy, and a
         // type-only import brings none — it is erased before anything runs.

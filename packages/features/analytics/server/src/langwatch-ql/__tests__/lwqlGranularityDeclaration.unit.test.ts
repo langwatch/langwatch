@@ -120,6 +120,7 @@ describe("assertLangWatchQLGranularityDeclaration (save-time rules)", () => {
     ).toThrow(LangWatchQLGranularityRequiresTimeWindowError);
   });
 
+  /** @scenario "A granularity declared alongside a mistyped period bound is refused at save" */
   it("tells a mistyped bound apart from an absent one in the copy", () => {
     // Both bounds are declared here. Telling the author to declare
     // period_start sends them looking for a line already on screen; what

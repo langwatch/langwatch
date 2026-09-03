@@ -30,6 +30,7 @@ function triggersById(triggers: AutomationActivityTrigger[]) {
 }
 
 describe("toAutomationActivityEntries", () => {
+  /** @scenario "History distinguishes what kind of thing happened" */
   it("labels trace matches, reports, and alert recoveries without losing deleted automations", () => {
     const entries = toAutomationActivityEntries({
       fires: [
@@ -71,6 +72,7 @@ describe("toAutomationActivityEntries", () => {
     expect(entries[1]?.at.toISOString()).toBe("2026-07-11T10:00:00.000Z");
   });
 
+  /** @scenario "History distinguishes what kind of thing happened" */
   it("keeps an unresolved graph alert as its opening moment only", () => {
     const entries = toAutomationActivityEntries({
       fires: [makeFire({ customGraphId: "graph-1" })],

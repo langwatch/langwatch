@@ -258,7 +258,6 @@ afterEach(cleanup);
 
 describe("given the annotations list shows rows", () => {
   /** @scenario "Row actions use an overflow menu" */
-  /** @scenario "Every row carries an overflow menu" */
   it("ends every row with an actions menu that does not open the row", async () => {
     const { host } = renderQueuePage();
 
@@ -269,7 +268,7 @@ describe("given the annotations list shows rows", () => {
     expect(host.queries).toEqual([]);
   });
 
-  /** @scenario "View trace opens the trace drawer with the row's timestamp" */
+  /** @scenario "Row actions use an overflow menu" */
   it("writes the trace drawer address with the partition hint", async () => {
     const { host } = renderQueuePage();
 
@@ -283,7 +282,7 @@ describe("given the annotations list shows rows", () => {
     });
   });
 
-  /** @scenario "Add to dataset from a row opens the drawer for that one trace" */
+  /** @scenario "Row actions use an overflow menu" */
   it("adds only that row's trace to a dataset", async () => {
     setItems([
       { id: "item-1", traceId: "trace-1" },
@@ -302,7 +301,7 @@ describe("given the annotations list shows rows", () => {
     );
   });
 
-  /** @scenario "Remove from queue takes that one item out" */
+  /** @scenario "Row actions use an overflow menu" */
   it("removes only that queue item", async () => {
     setItems([
       { id: "item-1", traceId: "trace-1" },
@@ -320,7 +319,6 @@ describe("given the annotations list shows rows", () => {
   });
 
   /** @scenario "Row navigation follows review state" */
-  /** @scenario "A pending queue item opens the annotation flow" */
   it("takes a waiting row to the annotation flow", () => {
     const { host } = renderQueuePage();
 
@@ -331,7 +329,7 @@ describe("given the annotations list shows rows", () => {
     ]);
   });
 
-  /** @scenario "A finished queue item opens the trace drawer" */
+  /** @scenario "Row navigation follows review state" */
   it("takes a finished row to the trace drawer", () => {
     setItems([{ id: "item-1", traceId: "trace-1", doneAt: new Date("2026-08-03") }]);
     const { host } = renderQueuePage();
@@ -346,7 +344,7 @@ describe("given the annotations list shows rows", () => {
     });
   });
 
-  /** @scenario "Input and output stay behind the redaction marker" */
+  /** @scenario "Score and content columns follow project and privacy state" */
   it("shows the content when a privacy rule lets the reader read it", () => {
     renderQueuePage();
 
@@ -355,7 +353,7 @@ describe("given the annotations list shows rows", () => {
     expect(screen.queryByText("Redacted")).not.toBeInTheDocument();
   });
 
-  /** @scenario "Input and output stay behind the redaction marker" */
+  /** @scenario "Score and content columns follow project and privacy state" */
   it("hides the content behind the marker when a privacy rule does not", () => {
     mocks.redaction = {
       isRedacted: { input: true, output: true },
@@ -371,7 +369,6 @@ describe("given the annotations list shows rows", () => {
   });
 
   /** @scenario "Dates and compact annotation summaries match the page" */
-  /** @scenario "A queue page dates a row by when it was queued" */
   it("titles the date column by when the row was queued", () => {
     renderQueuePage();
 
@@ -379,7 +376,7 @@ describe("given the annotations list shows rows", () => {
     expect(columnHeaders()).not.toContain("Date annotated");
   });
 
-  /** @scenario "A queue page filters by status" */
+  /** @scenario "Queue pages filter and date their queue items" */
   it("offers pending, completed and all", async () => {
     renderQueuePage();
 
@@ -390,7 +387,7 @@ describe("given the annotations list shows rows", () => {
     expect(screen.getByText("All")).toBeInTheDocument();
   });
 
-  /** @scenario "A queue page header offers no queue actions" */
+  /** @scenario "Queue edits begin at the queue entry" */
   it("leaves editing the queue to the sidebar", () => {
     renderQueuePage({ view: "queue", queueId: "queue-1" });
 
@@ -411,7 +408,6 @@ describe("given the annotations list shows rows", () => {
   });
 
   /** @scenario "Queue pages filter and date their queue items" */
-  /** @scenario "A queue page lists every pending item until a range is picked" */
   it("asks for no date range and lists work queued long ago", () => {
     renderQueuePage();
 
@@ -430,7 +426,7 @@ describe("given the annotations list shows rows", () => {
       expect(screen.getByTestId("period-picker")).toHaveTextContent("Last 30 days");
     });
 
-    /** @scenario "A queue page can be put back to All time" */
+    /** @scenario "Queue pages filter and date their queue items" */
     it("takes the range back off when All time is picked", () => {
       const { host } = renderQueuePage(
         {},
@@ -449,7 +445,6 @@ describe("given the annotations list shows rows", () => {
   });
 
   /** @scenario "Export describes the visible list" */
-  /** @scenario "A queue page exports the rows on screen" */
   it("exports the rows on screen with the table's own columns", () => {
     mocks.scoreTypes = [{ id: "score-1", name: "Helpfulness", active: true }];
     setItems([
@@ -491,7 +486,7 @@ describe("given the annotations list shows rows", () => {
 });
 
 describe("given a row carries comments", () => {
-  /** @scenario "Comments are a count chip that opens on hover" */
+  /** @scenario "Dates and compact annotation summaries match the page" */
   it("counts the comments and lists them on hover", async () => {
     setItems([
       {
@@ -519,7 +514,7 @@ describe("given a row carries comments", () => {
     expect(screen.getByText("Bo")).toBeInTheDocument();
   });
 
-  /** @scenario "Comments are a count chip that opens on hover" */
+  /** @scenario "Dates and compact annotation summaries match the page" */
   it("names the part of the trace each comment was left on", async () => {
     setItems([
       {
@@ -555,7 +550,7 @@ describe("given a row carries comments", () => {
     expect(screen.queryByText("Trace")).not.toBeInTheDocument();
   });
 
-  /** @scenario "A row with no comments shows no chip" */
+  /** @scenario "Dates and compact annotation summaries match the page" */
   it("shows no chip when nothing was said", () => {
     setItems([{ id: "item-1", traceId: "trace-1", annotations: [annotation()] }]);
     renderQueuePage();
@@ -566,7 +561,6 @@ describe("given a row carries comments", () => {
 
 describe("given the project collects scores", () => {
   /** @scenario "Score and content columns follow project and privacy state" */
-  /** @scenario "One column per active score type" */
   it("adds one column per active score type and one cell per row", () => {
     mocks.scoreTypes = [
       { id: "score-1", name: "Helpfulness", active: true },
@@ -582,7 +576,7 @@ describe("given the project collects scores", () => {
     expect(screen.getAllByRole("row")[1]!.children).toHaveLength(headers.length);
   });
 
-  /** @scenario "Score types that are all inactive add no columns" */
+  /** @scenario "Score and content columns follow project and privacy state" */
   it("adds no score column when none is active", () => {
     mocks.scoreTypes = [
       { id: "score-1", name: "Retired", active: false },
@@ -597,7 +591,7 @@ describe("given the project collects scores", () => {
 });
 
 describe("given a row carries suggestions", () => {
-  /** @scenario "Suggestions are a count chip that opens on hover" */
+  /** @scenario "Dates and compact annotation summaries match the page" */
   it("counts the suggestions and lists them with their authors on hover", async () => {
     setItems([
       {
@@ -633,7 +627,7 @@ describe("given a row carries suggestions", () => {
     expect(screen.getByText("Span span-abc123 · Output")).toBeInTheDocument();
   });
 
-  /** @scenario "A row with no suggestions shows no chip" */
+  /** @scenario "Dates and compact annotation summaries match the page" */
   it("shows no chip when nothing was suggested", () => {
     setItems([
       {
@@ -650,7 +644,7 @@ describe("given a row carries suggestions", () => {
 });
 
 describe("given the all annotations page", () => {
-  /** @scenario "The all annotations page dates a row by its newest annotation" */
+  /** @scenario "Dates and compact annotation summaries match the page" */
   it("dates a row by its newest annotation", () => {
     renderAllPage([
       {
@@ -669,7 +663,6 @@ describe("given the all annotations page", () => {
   });
 
   /** @scenario "All annotations keeps its independent date range and pages grouped rows" */
-  /** @scenario "The all annotations page keeps its own date range" */
   it("names its own window and offers no All time choice", () => {
     renderAllPage([{ traceId: "trace-1", annotations: [] }]);
 
@@ -677,14 +670,14 @@ describe("given the all annotations page", () => {
     expect(screen.queryByRole("button", { name: "All time" })).not.toBeInTheDocument();
   });
 
-  /** @scenario "The all annotations page has no status filter" */
+  /** @scenario "All annotations keeps its independent date range and pages grouped rows" */
   it("offers no status filter", () => {
     renderAllPage([{ traceId: "trace-1", annotations: [] }]);
 
     expect(screen.queryByRole("button", { name: /Status/ })).not.toBeInTheDocument();
   });
 
-  /** @scenario "A row on the all annotations page opens the trace drawer" */
+  /** @scenario "Row navigation follows review state" */
   it("opens the trace drawer on a row click", () => {
     const { host } = renderAllPage([{ traceId: "trace-1", annotations: [] }]);
 
@@ -697,7 +690,7 @@ describe("given the all annotations page", () => {
     });
   });
 
-  /** @scenario "A row with no queue item behind it is never removed from a queue" */
+  /** @scenario "Row actions use an overflow menu" */
   it("offers no remove-from-queue in the row menu", async () => {
     renderAllPage([{ traceId: "trace-1", annotations: [] }]);
 
@@ -707,7 +700,7 @@ describe("given the all annotations page", () => {
     expect(screen.queryByText("Remove from queue")).not.toBeInTheDocument();
   });
 
-  /** @scenario "Only one page of grouped annotations is shown at a time" */
+  /** @scenario "All annotations keeps its independent date range and pages grouped rows" */
   it("shows one page of grouped annotations at a time", () => {
     const groups = Array.from({ length: 30 }, (_, index) => ({
       traceId: `trace-${index}`,

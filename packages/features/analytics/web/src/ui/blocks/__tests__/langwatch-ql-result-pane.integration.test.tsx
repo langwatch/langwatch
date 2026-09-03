@@ -144,7 +144,7 @@ function renderedCopy(error: unknown) {
 describe("the LangWatchQL result pane", () => {
   describe("given a result the member has since edited away from", () => {
     describe("when the pane renders", () => {
-      /** @scenario "A stale result stays labelled as belonging to the previous submission" */
+      /** @scenario "A result opens in a native table with deliberate states" */
       it("labels the result as the previous submission's", () => {
         renderPane(
           stateWith({
@@ -176,7 +176,7 @@ describe("the LangWatchQL result pane", () => {
 
   describe("given a later submission that was cancelled before it answered", () => {
     describe("when the pane renders", () => {
-      /** @scenario "A stale result stays labelled as belonging to the previous submission" */
+      /** @scenario "A result opens in a native table with deliberate states" */
       it("keeps labelling the visible result even though the draft matches the last submission", () => {
         renderPane(
           stateWith({
@@ -198,7 +198,7 @@ describe("the LangWatchQL result pane", () => {
 
   describe("given a later submission that failed after an earlier one succeeded", () => {
     describe("when the pane renders", () => {
-      /** @scenario "A stale result stays labelled as belonging to the previous submission" */
+      /** @scenario "A result opens in a native table with deliberate states" */
       it("shows the failure and stops showing any result as current", () => {
         const error = handledErrorEnvelope({
           code: "lwql_not_permitted",
@@ -219,7 +219,7 @@ describe("the LangWatchQL result pane", () => {
 
   describe("given the backend refused the statement as unparseable", () => {
     describe("when the pane renders the failure", () => {
-      /** @scenario "A statement the validator cannot parse renders registry copy at its location" */
+      /** @scenario "Backend failures keep their code-specific presentation" */
       it("reads the registry copy and names the line and column", () => {
         const error = handledErrorEnvelope({
           code: "lwql_unparseable",
@@ -244,7 +244,7 @@ describe("the LangWatchQL result pane", () => {
         expect(screen.getByText("line 3 : 12")).toBeInTheDocument();
       });
 
-      /** @scenario "A statement the validator cannot parse renders registry copy at its location" */
+      /** @scenario "Backend failures keep their code-specific presentation" */
       it("still reads the full registry copy when the refusal carries no location", () => {
         const error = handledErrorEnvelope({
           code: "lwql_unparseable",
@@ -276,7 +276,7 @@ describe("the LangWatchQL result pane", () => {
 
   describe("given the policy refused the statement", () => {
     describe("when the pane renders the failure", () => {
-      /** @scenario "A statement the policy refuses names what to change" */
+      /** @scenario "Backend failures keep their code-specific presentation" */
       it("reads the registry copy and preserves the rules the response named", () => {
         const error = handledErrorEnvelope({
           code: "lwql_not_permitted",
@@ -314,7 +314,7 @@ describe("the LangWatchQL result pane", () => {
 
   describe("given the deployment has no LangWatchQL identity provisioned", () => {
     describe("when the member runs a query", () => {
-      /** @scenario "An unprovisioned deployment renders the unavailable state on query" */
+      /** @scenario "Backend failures keep their code-specific presentation" */
       it("renders the unavailable presentation and offers no retry", () => {
         const error = handledErrorEnvelope({
           code: "lwql_unavailable",
@@ -377,7 +377,7 @@ describe("the LangWatchQL result pane", () => {
 
   describe("given the member's first query succeeds", () => {
     describe("when the result renders", () => {
-      /** @scenario "The first successful result opens in Table mode" */
+      /** @scenario "A result opens in a native table with deliberate states" */
       it("opens in Table mode with Chart offered beside it", () => {
         renderPane(
           stateWith({
@@ -424,7 +424,7 @@ describe("the LangWatchQL result pane", () => {
 
   describe("given a successful result", () => {
     describe("when the member switches to Chart mode and back", () => {
-      /** @scenario "Switching between Table and Chart never reruns SQL" */
+      /** @scenario "View changes and specification edits do not rerun SQL" */
       it("issues no request at all", async () => {
         const fetchSpy = vi
           .spyOn(globalThis, "fetch")
@@ -448,7 +448,7 @@ describe("the LangWatchQL result pane", () => {
     });
 
     describe("when the result pane renders", () => {
-      /** @scenario "Result statistics render beneath the result" */
+      /** @scenario "Duplicate columns, truncation, statistics, and diagnostics are honest" */
       it("shows rows returned, elapsed time, rows read, and bytes read", () => {
         renderPane(
           stateWith({
@@ -481,7 +481,7 @@ describe("the LangWatchQL result pane", () => {
 
   describe("given a successful result and a chart area", () => {
     describe("when the member walks the three views", () => {
-      /** @scenario "The result offers Table, Chart, and Specification readings" */
+      /** @scenario "View changes and specification edits do not rerun SQL" */
       it("offers Table, Chart, and Specification over the same result", async () => {
         renderPane(
           stateWith({
@@ -506,7 +506,7 @@ describe("the LangWatchQL result pane", () => {
 
   describe("given each way a submission can settle", () => {
     describe("when the result header renders", () => {
-      /** @scenario "The visible answer wears a state chip naming where it stands" */
+      /** @scenario "A result opens in a native table with deliberate states" */
       it("labels current, partial, stale, refused, and timed out answers", () => {
         const chip = () => screen.getByTestId("lwql-result-chip").textContent;
 
@@ -611,7 +611,7 @@ describe("the LangWatchQL result pane", () => {
       });
 
     describe("when the truncated state renders", () => {
-      /** @scenario "The truncation banner tells the truth about how much arrived" */
+      /** @scenario "Duplicate columns, truncation, statistics, and diagnostics are honest" */
       it("cites the rows that actually arrived", () => {
         renderPane(stateWith({ answer: { kind: "result", result: truncatedResult() } }));
 
@@ -620,7 +620,7 @@ describe("the LangWatchQL result pane", () => {
         );
       });
 
-      /** @scenario "The truncation banner tells the truth about how much arrived" */
+      /** @scenario "Duplicate columns, truncation, statistics, and diagnostics are honest" */
       it("never claims a row limit that was not the cause", () => {
         renderPane(stateWith({ answer: { kind: "result", result: truncatedResult() } }));
 
@@ -631,7 +631,7 @@ describe("the LangWatchQL result pane", () => {
         expect(pane.textContent).not.toContain("10000");
       });
 
-      /** @scenario "The table has intentional loading, empty, error, stale, and truncated states" */
+      /** @scenario "A result opens in a native table with deliberate states" */
       it("marks the result as partial rather than showing it as whole", () => {
         renderPane(stateWith({ answer: { kind: "result", result: truncatedResult() } }));
 
@@ -642,7 +642,7 @@ describe("the LangWatchQL result pane", () => {
 
   describe("given a query is in flight", () => {
     describe("when the pane renders", () => {
-      /** @scenario "The table has intentional loading, empty, error, stale, and truncated states" */
+      /** @scenario "A result opens in a native table with deliberate states" */
       it("says the query is running rather than showing an empty table", () => {
         renderPane(stateWith({ answer: null, isInFlight: true }));
 
@@ -656,7 +656,7 @@ describe("the LangWatchQL result pane", () => {
 
   describe("given a query that returned zero rows", () => {
     describe("when the pane renders", () => {
-      /** @scenario "The table has intentional loading, empty, error, stale, and truncated states" */
+      /** @scenario "A result opens in a native table with deliberate states" */
       it("says the query matched nothing and still reports what it cost", () => {
         renderPane(
           stateWith({
@@ -697,7 +697,7 @@ describe("the LangWatchQL result pane", () => {
       lwqlResult({ truncated: true, diagnostics: everyDiagnostic });
 
     describe("when the member views the result as a table and as a chart", () => {
-      /** @scenario "Backend diagnostics stay visible in both result modes" */
+      /** @scenario "Duplicate columns, truncation, statistics, and diagnostics are honest" */
       it("displays every diagnostic unchanged in both modes", async () => {
         renderPane(
           stateWith({ answer: { kind: "result", result: withDiagnostics() } }),
@@ -723,7 +723,7 @@ describe("the LangWatchQL result pane", () => {
         expect(messagesOnScreen()).toHaveLength(everyDiagnostic.length);
       });
 
-      /** @scenario "Backend diagnostics stay visible in both result modes" */
+      /** @scenario "Duplicate columns, truncation, statistics, and diagnostics are honest" */
       it("keeps the truncation diagnostic more prominent than the rest in both modes", async () => {
         renderPane(
           stateWith({ answer: { kind: "result", result: withDiagnostics() } }),

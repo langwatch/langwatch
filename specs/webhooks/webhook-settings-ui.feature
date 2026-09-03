@@ -132,6 +132,12 @@ Feature: Webhook settings and the billing events ledger
       Then the response maps virtual key ids to their names
 
     @unit
+    Scenario: Unknown project tenants do not resolve virtual-key names
+      Given the project resolves to no organization
+      Then the response carries no virtual key names
+      And no name resolution is attempted
+
+    @unit
     Scenario: The ledger requires the gateway usage view scope
       Given a member without gateway usage view
       Then the list query is rejected before any read

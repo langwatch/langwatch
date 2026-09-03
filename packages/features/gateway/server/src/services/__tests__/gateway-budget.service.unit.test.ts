@@ -104,6 +104,52 @@ const baseCheck = {
 };
 
 describe("GatewayService.check", () => {
+  describe("given an applicable budget filtered to one provider", () => {
+    describe("when the Gateway checks a request dispatched to another provider", () => {
+      /** @scenario "Provider-filtered budgets only apply to their provider" */
+      it("leaves that budget out of the scopes it answers with", async () => {
+        const filtered = stubBudget({ providerKey: "mp_openai" } as Partial<GatewayBudget>);
+        const sut = serviceOver(mockPrismaWithBudgets([filtered]));
+
+        const forItsOwnProvider = await sut.check({
+          ...baseCheck,
+          projectedCostUsd: 1,
+          providerKey: "mp_openai",
+        } as never);
+        const forAnother = await sut.check({
+          ...baseCheck,
+          projectedCostUsd: 1,
+          providerKey: "mp_anthropic",
+        } as never);
+
+        expect(forItsOwnProvider.scopes).toHaveLength(1);
+        expect(forItsOwnProvider.scopes[0]).toMatchObject({ scopeId: "project_01" });
+        expect(forAnother.scopes).toEqual([]);
+      });
+
+      /** @scenario "Provider-filtered budgets only apply to their provider" */
+      it("refuses to attribute a dispatch that named no provider to a filtered budget", async () => {
+        const sut = serviceOver(
+          mockPrismaWithBudgets([
+            stubBudget({ providerKey: "mp_openai" } as Partial<GatewayBudget>),
+            stubBudget({
+              id: "b_02",
+              providerKey: null,
+              limitUsd: new Prisma.Decimal("50.00"),
+            } as Partial<GatewayBudget>),
+          ]),
+        );
+
+        const result = await sut.check({ ...baseCheck, projectedCostUsd: 1 } as never);
+
+        // Only the unfiltered budget answers: attributing an unattributed
+        // dispatch to the OpenAI-filtered one would be a guess.
+        expect(result.scopes).toHaveLength(1);
+        expect(result.scopes[0]!.limitUsd).toBe("50.000000");
+      });
+    });
+  });
+
   describe("when no budgets are applicable", () => {
     it("returns allow with empty warnings / blockedBy", async () => {
       const sut = serviceOver(mockPrismaWithBudgets([]));
@@ -144,6 +190,7 @@ describe("GatewayService.check", () => {
 
   describe("when projected spend reaches the hard limit on a BLOCK budget", () => {
     /** @scenario Hard-block budget returns 402 when spent >= limit */
+    /** @scenario "A projected request reaches a hard budget limit" */
     it("returns hard_block with a descriptive reason", async () => {
       const sut = serviceOver(
         mockPrismaWithBudgets([stubBudget({ spentUsd: new Prisma.Decimal("95.00") })]),

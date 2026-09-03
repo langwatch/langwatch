@@ -65,6 +65,7 @@ function sample(): CanonicalLogRecord {
 describe("ClickHouseLogProcessingAdapter", () => {
   describe("given a process holding only a tenant-keyed ClickHouse client", () => {
     /** @scenario "The processing pipeline composes from one tenant-keyed client" */
+    /** @scenario "Valid OTLP logs become canonical durable events" */
     it("builds the log-processing pipeline from that client alone", () => {
       const pipeline = ClickHouseLogProcessingAdapter.create({
         resolveClient: async () => client(),

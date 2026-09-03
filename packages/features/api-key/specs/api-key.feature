@@ -32,6 +32,13 @@ Feature: API key lifecycle
     And a newer concurrent key is not revoked
 
   @unit
+  Scenario: The API-key transport moves without changing who may call it
+    Given the API-key procedures are owned by the API-key package
+    When the process mounts them on its own tRPC root
+    Then the browser calls the same procedure names as before
+    And every procedure declares the same access decision it declared before
+
+  @unit
   Scenario: An API-key binding identifier is minted by the feature
     When a key's grant needs an AuthZ binding identifier
     Then the feature package mints it

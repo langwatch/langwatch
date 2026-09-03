@@ -23,7 +23,7 @@ const WIDE_DECIMAL = "12345678901234567890.123456789";
 describe("a LangWatchQL result value", () => {
   describe("given the six ways a cell can hold nothing, zero, or a non-finite number", () => {
     describe("when each is formatted", () => {
-      /** @scenario "Nothing coerces distinct emptiness and non-finite values together" */
+      /** @scenario "Cell formatting is lossless and distinguishes absence" */
       it("renders every one of them differently from the others", () => {
         const row = {
           nullValue: null,
@@ -56,7 +56,7 @@ describe("a LangWatchQL result value", () => {
         });
       });
 
-      /** @scenario "Nothing coerces distinct emptiness and non-finite values together" */
+      /** @scenario "Cell formatting is lossless and distinguishes absence" */
       it("keeps the kinds apart, not only the words", () => {
         const row = {
           nullValue: null,
@@ -77,13 +77,13 @@ describe("a LangWatchQL result value", () => {
         expect(kinds).toEqual(["missing", "null", "scalar", "emptyString", "nan", "infinity"]);
       });
 
-      /** @scenario "Nothing coerces distinct emptiness and non-finite values together" */
+      /** @scenario "Cell formatting is lossless and distinguishes absence" */
       it("tells negative infinity from positive infinity", () => {
         expect(lwqlCellText(describeLangWatchQLValue(Number.NEGATIVE_INFINITY))).toBe("-Infinity");
         expect(lwqlCellText(describeLangWatchQLValue(Number.POSITIVE_INFINITY))).toBe("Infinity");
       });
 
-      /** @scenario "Nothing coerces distinct emptiness and non-finite values together" */
+      /** @scenario "Cell formatting is lossless and distinguishes absence" */
       it("reports a key that is present but undefined the same way as an absent one", () => {
         expect(readLangWatchQLCell({ row: { value: undefined }, column: "value" }).kind).toBe(
           "missing",
@@ -94,7 +94,7 @@ describe("a LangWatchQL result value", () => {
 
   describe("given a 64-bit integer and a high-precision decimal that arrived as digit strings", () => {
     describe("when they are formatted and copied", () => {
-      /** @scenario "Wide integers and decimals keep every digit" */
+      /** @scenario "Cell formatting is lossless and distinguishes absence" */
       it("shows and copies the exact digits the response carried", () => {
         const integerCell = describeLangWatchQLValue(WIDE_INTEGER);
         const decimalCell = describeLangWatchQLValue(WIDE_DECIMAL);
@@ -118,7 +118,7 @@ describe("a LangWatchQL result value", () => {
         expect(String(Number(WIDE_DECIMAL))).not.toBe(WIDE_DECIMAL);
       });
 
-      /** @scenario "Wide integers and decimals keep every digit" */
+      /** @scenario "Cell formatting is lossless and distinguishes absence" */
       it("leaves an ordinary number readable without grouping separators", () => {
         // `toLocaleString` would make this "1,234,567" — digits the value does
         // not have, in a cell a member may be reading as data.
@@ -129,7 +129,7 @@ describe("a LangWatchQL result value", () => {
 
   describe("given a cell holding an array, a map, or a nested object", () => {
     describe("when it is formatted", () => {
-      /** @scenario "Structured values render bounded, readable, and copyable" */
+      /** @scenario "Cell formatting is lossless and distinguishes absence" */
       it("previews it as JSON and offers the whole value for copying", () => {
         const value = { latency: [1, 2, 3], tags: { env: "prod" } };
         const cell = describeLangWatchQLValue(value);
@@ -139,7 +139,7 @@ describe("a LangWatchQL result value", () => {
         expect(lwqlCellCopyText(cell)).toBe(JSON.stringify(value));
       });
 
-      /** @scenario "Structured values render bounded, readable, and copyable" */
+      /** @scenario "Cell formatting is lossless and distinguishes absence" */
       it("bounds the preview of a large structure while copying all of it", () => {
         const value = Array.from({ length: 500 }, (_, index) => index);
         const cell = describeLangWatchQLValue(value);
@@ -153,7 +153,7 @@ describe("a LangWatchQL result value", () => {
         expect(cell.copy.length).toBeGreaterThan(LWQL_VALUE_PREVIEW_LIMIT);
       });
 
-      /** @scenario "Structured values render bounded, readable, and copyable" */
+      /** @scenario "Cell formatting is lossless and distinguishes absence" */
       it("bounds a long string the same way and still copies it whole", () => {
         const value = "x".repeat(LWQL_VALUE_PREVIEW_LIMIT + 50);
         const cell = describeLangWatchQLValue(value);
@@ -168,7 +168,7 @@ describe("a LangWatchQL result value", () => {
 
   describe("given a result whose columns list the same name twice", () => {
     describe("when the duplicates are looked for", () => {
-      /** @scenario "Duplicate result column names are surfaced, not silently merged" */
+      /** @scenario "Duplicate columns, truncation, statistics, and diagnostics are honest" */
       it("names each repeated column once, in the order it first appeared", () => {
         expect(
           duplicateLangWatchQLColumnNames([
@@ -181,7 +181,7 @@ describe("a LangWatchQL result value", () => {
         ).toEqual(["total", "day"]);
       });
 
-      /** @scenario "Duplicate result column names are surfaced, not silently merged" */
+      /** @scenario "Duplicate columns, truncation, statistics, and diagnostics are honest" */
       it("finds none when every name is distinct", () => {
         expect(
           duplicateLangWatchQLColumnNames([

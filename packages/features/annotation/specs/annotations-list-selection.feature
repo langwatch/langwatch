@@ -89,6 +89,12 @@ Feature: Annotations list
       And it shows one page of grouped annotations at a time
 
     @integration
+    Scenario: The header controls sit outside the sideways-scrolling region
+      When a list with more columns than fit renders
+      Then only the table scrolls sideways
+      And the status filter, the period picker and the export control are outside that region
+
+    @integration
     Scenario: Export describes the visible list
       When the user exports a queue page
       Then the CSV has one line per row on screen and the shown columns

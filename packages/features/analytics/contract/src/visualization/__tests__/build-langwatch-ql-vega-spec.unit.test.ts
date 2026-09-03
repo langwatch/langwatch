@@ -51,7 +51,7 @@ const build = (
 describe("building the specification the chart runtime is given", () => {
   describe("given a validated specification and the registered datasets", () => {
     describe("when the specification is built", () => {
-      /** @scenario "Caller-supplied datasets and inline values are rejected" */
+      /** @scenario "Data and runtime escape hatches are rejected" */
       it("injects the registered rows and discards any datasets the caller wrote", () => {
         const { spec, datasetNames } = build(callerSuppliedDatasets);
         const datasets = objectOf(spec.datasets);
@@ -69,7 +69,7 @@ describe("building the specification the chart runtime is given", () => {
         }
       });
 
-      /** @scenario "Spec-controlled runtime options are rejected" */
+      /** @scenario "Data and runtime escape hatches are rejected" */
       it("hands the runtime no usermeta, which is where a spec would replace the loader", () => {
         // vega-embed reads `usermeta.embedOptions` off the specification and
         // lets a `loader` found there stand in for the one it was passed — the
@@ -83,7 +83,7 @@ describe("building the specification the chart runtime is given", () => {
         expect(JSON.stringify(spec)).not.toContain("embedOptions");
       });
 
-      /** @scenario "The renderer contract accepts multiple registered named datasets" */
+      /** @scenario "The adversarial corpus and multi-dataset renderer contract stay covered" */
       it("injects every registered dataset the specification reads, by name", () => {
         const { spec, datasetNames } = build(lookupBetweenRegisteredDatasets, {
           query_result: QUERY_ROWS,
@@ -115,7 +115,7 @@ describe("building the specification the chart runtime is given", () => {
         expect(spec).not.toBe(barOverQueryResult);
       });
 
-      /** @scenario "The chart follows LangWatch theming in light and dark modes" */
+      /** @scenario "Chart mode preserves data and offers an accessible table fallback" */
       it("lets the member restyle, and not change the background or the font", () => {
         const { spec } = build({
           ...barOverQueryResult,

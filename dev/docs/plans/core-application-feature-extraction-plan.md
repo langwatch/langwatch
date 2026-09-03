@@ -16866,3 +16866,163 @@ Two, one per repair, each run on its own:
   The change is intact and green there; nothing was staged or committed from here.
   The two `auth`-contract files were left uncommitted, as this lane's brief says.
 - **Nothing under `platform/` was created, edited or read.**
+
+## The Zod branch the last ledger deferred, taken, 2026-09-03
+
+The strict-schema sweep above closed its findings by naming one it would not
+take: "**`handledErrorMiddleware` was not given the Zod branch the REST boundary
+has.** That is the one change that would turn this whole class from 500s into
+400s, and it is a deliberate decision about every tRPC procedure at once, not a
+repair." This is that decision, taken, plus the copy defect the same section
+reported beside it.
+
+### What was actually broken, and what was not
+
+The customer-facing half was already right, which is exactly why this survived a
+migration and a sweep. `createTrpcErrorFormatter` recognises a Zod failure
+**structurally** and promotes it to a `ValidationError`, so `data.error` on the
+wire already said `validation_error` with the issues in `meta`. Nothing a person
+read was wrong.
+
+What was wrong was everything downstream of the transport code, and none of it
+has a customer to complain about it:
+
+```
+  service: schema.parse(row)  ──▶ ZodError
+                                    │
+       ┌────────────────────────────┴────────────────────────────┐
+       │                                                         │
+   REST door                                              tRPC door (before)
+   errors.ts:254                                          trpc-runtime-policy.ts
+   isZodLikeError → ValidationError                          HandledError?  no
+       │                                                      translated?   no
+       │                                                      return result ──┐
+   422  code: validation_error                                                │
+                                                        TRPCError stays INTERNAL_SERVER_ERROR
+                                                                 │
+                                    ┌────────────────────────────┼───────────────────────┐
+                              span status ERROR          log level "error"        capture(error)
+                            (counts against every       (5xx error budget)     (paged as a bug)
+                             span-status SLO)
+                                                                 │
+                                                    formatter still writes
+                                                    data.error.code = validation_error
+                                                    ← the customer's copy was fine all along
+```
+
+So the same throw was a 422 through Hono and a 500 through tRPC, while
+`data.error.httpStatus` said 422 on both. `handleTrpcCallLogging` reports an
+exception only for `resolvedStatus >= 500 && !handledCause`, so **every customer
+typo that reached a `.parse` inside a service arrived in the exception reporter
+as a bug**, and `recordSpanError` marked the span ERROR because the cause was
+not handled.
+
+### The branch
+
+`handledErrorMiddleware` now has the arm the REST door has had all along, in the
+same shape: matched by shape rather than by class (this workspace resolves two
+zod majors), promoted with `ValidationError.fromZodError` — the same promotion
+the formatter performs, so the serialised payload on the wire is byte for byte
+what it already was. Only `data.code` and the HTTP status move, 500 → 422 /
+`UNPROCESSABLE_CONTENT`, and with them the log level (`error` → `warn`), the
+span status (ERROR → UNSET, because the fault is the customer's) and the
+exception reporter (called → not called).
+
+Two things the branch deliberately does not do. It does not take
+`validation.message`: zod's `message` is the whole issue array as JSON, and that
+string is what the span and the log record carry, so the TRPCError is minted
+with the code — which is the wire message either way since #5984. And it cannot
+re-code a procedure's own `.input()` rejection, because tRPC appends the input
+parser at `.input()` and the policy chain is applied after it: a parse failure
+there never reaches this middleware, and stays `BAD_REQUEST`. Only a `.parse`
+**inside** the call is in scope, which is the defect class the sweep found.
+
+### The second half: the copy for a refusal with no field
+
+The same sweep reported that `unrecognized_keys` "can never map onto form fields
+the way `error-handling.md` prescribes; it shows the customer internal wire
+identifiers they did not type." It is the one zod issue whose message is built
+from the SCHEMA's identifiers rather than from the customer's input, and it
+carries an empty `path`, so `flatten()` files it under `formErrors` where
+`USER_VISIBLE_FIELDS` — the guard that exists to stop precisely this leak on the
+`fieldErrors` side — never sees it. Editing any saved automation read:
+
+> Unrecognized keys: "action", "triggerKind", "customGraphId"
+
+Three internal command-schema keys, off a form that shows none of them.
+
+The fix is a recogniser, not a deletion. `formErrors` is also where LangWatch's
+**own** form-level complaints live — the governance services put their whole
+sentence there deliberately (`ai-tools.api.ts:127`, `anomaly-rules.api.ts:137`,
+`ingestion-source.service.ts`, `unsupportedGovernanceValue`), and
+`prisma.organization-membership.repository.ts:1200` reads "Pick which custom
+role to use." Dropping the slot would have taken all of that with it. So
+`ZOD_KEY_PROSE` matches zod's own opening — v3 `Unrecognized key(s) in object:
+'a', 'b'`, v4 `Unrecognized keys: "a", "b"` — and that entry alone falls through
+to the generic line.
+
+### File → change
+
+| File | Change |
+| --- | --- |
+| `packages/api/src/trpc/trpc-runtime-policy.ts` | `handledErrorMiddleware` gains the `isZodLikeError` arm (`:379`), promoting with `ValidationError.fromZodError` (`:383`) and minting the TRPCError with the code as its message. Docblock states why a `.input()` rejection is out of scope |
+| `packages/handled-error/src/presentation.ts` | `validation_error`'s `describe` skips a `formErrors` entry matching `ZOD_KEY_PROSE` (`:2769`); the recogniser and its reasoning at `:3577`. Every other form-level complaint still renders |
+| `packages/api/src/trpc/__tests__/zod-at-the-boundaries.integration.test.ts` | **New.** 7 tests. Both doors are the real ones: `fetchRequestHandler` over a root built with the real `createTrpcErrorFormatter` and wrapped in the first three middlewares `declaredPolicy` applies, and a Hono app with the real `createErrorHandler`. The same `ZodError` instance is thrown at both |
+| `apps/ui/src/model/errors/__tests__/presentation.unit.test.ts` | +3 tests. The `unrecognized_keys` meta is produced by a **real strict parse**, not by typing zod's sentence out, so a zod release that rewords it reopens the leak loudly. One test pins that an authored form-level complaint still renders |
+| `specs/errors/handled-error-surfaces.feature` | +6 scenarios in two sections: five `@integration` for the boundary, one `@unit` for the copy |
+
+### Gates
+
+- `@langwatch/api`: `pnpm test` — **30 files / 366 tests** (was 29 / 359). `pnpm typecheck` — 0 errors.
+- `apps/api`: `vitest run src/app-trpc` — 3 files / 40 tests. Whole package `pnpm test` — **111 files / 1147 tests**, all green. `tsc --noEmit` — 0 errors.
+- `apps/ui`: `vitest run src/model/errors` — **8 files / 226 tests** (was 8 / 223). `tsc --noEmit` — 0 errors (the package tsconfig `include`s `src/**/*.ts`, so the test file is checked).
+- `@langwatch/handled-error`: `pnpm test` — 3 files / 64 tests. `pnpm typecheck` — 0 errors.
+- Feature parity: `specs/errors/handled-error-surfaces.feature` → **21/34 bound**, was 15/28. All six new scenarios bind; the thirteen unbound are the pre-existing ones, untouched.
+- `oxlint` over the four touched files: clean. `oxfmt`: clean.
+
+### The sabotage
+
+Three, one per claim, each run on its own:
+
+1. The `isZodLikeError` arm disabled → **5 of 7 failed** in the boundary test:
+   `expected 500 to be 422` on the tRPC door, on the cross-boundary agreement
+   for both issue kinds, and `expected [ …(1) ] to deeply equal []` on the
+   exception reporter. The 2 survivors are the right ones — the `fieldErrors`
+   test, which the formatter's own promotion already satisfies, and the
+   unnamed-failure test, which must not move.
+2. The `ZOD_KEY_PROSE` filter removed → **exactly 1 failed**, with the
+   production string in the diff: `expected 'Unrecognized keys: "action",
+   "trigger…' to be 'Some of the values aren't valid.'`
+3. The `formErrors` fall-through deleted outright — the blunt version of the
+   same fix → **exactly the other 1 failed**: `expected 'Some of the values
+   aren't valid.' to be 'Pick which custom role to use.'` That is the governance
+   copy the recogniser exists to preserve.
+
+### What this pass did NOT do
+
+- **`apps/api/src/api.application.ts` has a SECOND copy of this gap, and it was
+  not touched.** `createProtectedProcedure` (`:560`) is a hand-written
+  translation predating the packaged spine, and its `HandledError.isHandled`
+  check (`:576`) has exactly the shortfall just fixed — a bare `ZodError` there
+  still answers INTERNAL_SERVER_ERROR and still reaches `logger.error`. It
+  serves the `agents` and `secrets` namespaces only (`:430`, `:433`); every
+  packaged surface goes through `buildFeatureRouters` and the spine. That file
+  is outside this lane's brief, so it is reported rather than changed — but the
+  claim "the two doors now agree" is true for the spine and not yet for those
+  two namespaces.
+- **Three sibling renderers of `formErrors` were left alone.**
+  `packages/features/auth/web/src/model/front-door-error-copy.ts:288` repeats
+  the same fall-through, and the two `apply-handled-error-to-form.ts` copies
+  (auth and trace `web`) map `formErrors` onto a form-level slot. None gained
+  new exposure here — the formatter already delivered this payload before the
+  branch existed — but the recogniser lives in one of the four places that read
+  the slot. They are `packages/features/*/web`, another lane's tree.
+- **`codeEvaluatorConfigSchema` is still reported, not repaired**, and is now
+  correctly channelled: the sweep's reason for leaving the schema alone was that
+  "the channel is the bug", and the channel is fixed. Omitting `type` on an
+  update to a stored code evaluator now answers `validation_error` at 422 rather
+  than a 500.
+- **No datastore test.** Both doors are exercised in-process; nothing here
+  reaches Postgres, ClickHouse or Redis.
+- **Nothing under `platform/` was created, edited or read**, and nothing was
+  staged or committed.

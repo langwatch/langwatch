@@ -13,6 +13,7 @@ Feature: Workflow agent as an experiment target
     Then each row executes the agent's workflow
     And no row shows a code validation error
 
+  @unit
   Scenario: The target column shows a workflow icon
     Given the workflow agent is added as a target in the Experiments Workbench
     Then the target column shows a workflow icon, not a code icon

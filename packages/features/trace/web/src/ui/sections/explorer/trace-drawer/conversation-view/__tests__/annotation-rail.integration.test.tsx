@@ -248,7 +248,7 @@ const isCounted = () =>
 
 describe("given a queue being walked", () => {
   describe("when the reviewer annotates one of the conversation's turns", () => {
-    /** @scenario "Annotating a turn counts its trace into the session" */
+    /** @scenario "Reviewing and explicitly selecting traces builds the dataset set" */
     it("counts that turn's trace into the sitting", () => {
       useAnnotationQueueSessionStore.getState().setActive(true);
 
@@ -257,7 +257,7 @@ describe("given a queue being walked", () => {
       expect(isCounted()).toBe(true);
     });
 
-    /** @scenario "A turn is counted in or out by hand" */
+    /** @scenario "Reviewing and explicitly selecting traces builds the dataset set" */
     it("leaves a turn the reviewer had already dropped out of it", () => {
       useAnnotationQueueSessionStore.getState().setActive(true);
       useAnnotationQueueSessionStore.getState().toggle(TRACE_ID);
@@ -272,7 +272,7 @@ describe("given a queue being walked", () => {
 
 describe("given a conversation read outside a queue", () => {
   describe("when the reviewer annotates a turn", () => {
-    /** @scenario "Session marks belong to the sitting" */
+    /** @scenario "Leaving clears the session selection" */
     it("counts nothing into a sitting that is not happening", () => {
       saveFromTheRail();
 

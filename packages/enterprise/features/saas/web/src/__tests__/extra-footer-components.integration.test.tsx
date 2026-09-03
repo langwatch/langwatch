@@ -28,6 +28,7 @@ describe("ExtraFooterComponents", () => {
     vi.clearAllMocks();
   });
 
+  /** @scenario "Delayed analytics globals are used" */
   it("tracks delayed gtag and Reo globals", async () => {
     const identifyPostHog = vi.fn();
     render(

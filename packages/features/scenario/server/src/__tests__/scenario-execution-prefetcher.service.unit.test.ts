@@ -172,6 +172,7 @@ describe("prefetchWithFixture", () => {
     };
 
     describe("when the scenario and project resolve", () => {
+      /** @scenario "A worker prepares a run through canonical services" */
       it("announces the labels and api key the child environment needs", async () => {
         const deps = createMockDeps({
           scenarioFetcher: {
@@ -367,6 +368,7 @@ describe("prefetchWithFixture", () => {
         });
 
         /** @scenario "A prompt without a model resolves the agent-under-test default" */
+        /** @scenario "A worker prepares a run through canonical services" */
         it("prepares model params exactly three times — agent, simulator, and judge", async () => {
           const deps = createMockDeps({
             promptFetcher: {

@@ -245,7 +245,7 @@ afterEach(() => {
 
 describe("given a reviewer walking their annotation queue", () => {
   describe("given the open item's trace belongs to a thread", () => {
-    /** @scenario "A queued trace is read as the whole thread it belongs to" */
+    /** @scenario "The current turn is focused in its conversation" */
     it("reads the thread named by the queue item as the conversation", () => {
       renderPage();
 
@@ -253,14 +253,14 @@ describe("given a reviewer walking their annotation queue", () => {
       expect(conversationProps().conversationId).toBe("thread-7");
     });
 
-    /** @scenario "A queued trace is read as the whole thread it belongs to" */
+    /** @scenario "The current turn is focused in its conversation" */
     it("marks the item's own trace as the turn under review", () => {
       renderPage();
 
       expect(conversationProps().currentTraceId).toBe("trace-1");
     });
 
-    /** @scenario "A queued trace is read as the whole thread it belongs to" */
+    /** @scenario "The current turn is focused in its conversation" */
     it("leaves the turns to the thread, handing over none of its own", () => {
       renderPage();
 
@@ -274,7 +274,7 @@ describe("given a reviewer walking their annotation queue", () => {
       expect(conversationProps().defaultExpandAll).toBe(true);
     });
 
-    /** @scenario "Suggesting is offered on the turn being read" */
+    /** @scenario "Annotation suggestions use the conversation correction editor" */
     it("leaves correcting a turn to the conversation, holding no editor of its own", () => {
       renderPage();
 
@@ -288,14 +288,14 @@ describe("given a reviewer walking their annotation queue", () => {
     // conversation's own doing. The page's part is naming which turn, which is
     // what these bind.
 
-    /** @scenario "Opening a queue item scrolls its turn into view" */
+    /** @scenario "The current turn is focused in its conversation" */
     it("names the item's own turn as the one to land on", () => {
       renderPage();
 
       expect(conversationProps().focusTraceId).toBe("trace-1");
     });
 
-    /** @scenario "Moving to the next item moves the focus" */
+    /** @scenario "The current turn is focused in its conversation" */
     it("moves the focus to the next item's turn", () => {
       setThreadQueue({ threadId: "thread-7" });
       const view = renderPage();
@@ -309,7 +309,7 @@ describe("given a reviewer walking their annotation queue", () => {
   });
 
   describe("given the walk collects traces for a dataset", () => {
-    /** @scenario "A turn is counted in or out by hand" */
+    /** @scenario "Reviewing and explicitly selecting traces builds the dataset set" */
     it("gives every turn its own way in and out of the sitting's set", () => {
       renderPage();
 
@@ -318,7 +318,7 @@ describe("given a reviewer walking their annotation queue", () => {
   });
 
   describe("given the thread is older than the window the conversation reads", () => {
-    /** @scenario "A trace whose thread is older than the conversation window is read on its own" */
+    /** @scenario "A single or unavailable conversation still shows the queued trace" */
     it("renders the item's own trace as the turn under review", () => {
       mocks.conversationTurns = { items: [] };
       renderPage();
@@ -329,7 +329,7 @@ describe("given a reviewer walking their annotation queue", () => {
       ]);
     });
 
-    /** @scenario "A trace whose thread is older than the conversation window is read on its own" */
+    /** @scenario "A single or unavailable conversation still shows the queued trace" */
     it("waits for the conversation to answer before standing in for it", () => {
       mocks.conversationTurns = undefined;
       mocks.conversationTurnsLoading = true;
@@ -360,7 +360,7 @@ describe("given a reviewer walking their annotation queue", () => {
       setQueue({});
     });
 
-    /** @scenario "A trace with no thread is still read as a conversation" */
+    /** @scenario "A single or unavailable conversation still shows the queued trace" */
     it("hands the trace over as the conversation's only turn", () => {
       renderPage();
 
@@ -375,7 +375,7 @@ describe("given a reviewer walking their annotation queue", () => {
       ]);
     });
 
-    /** @scenario "A trace with no thread is still read as a conversation" */
+    /** @scenario "A single or unavailable conversation still shows the queued trace" */
     it("interrupts the reading with no integration hint about thread ids", () => {
       renderPage();
 

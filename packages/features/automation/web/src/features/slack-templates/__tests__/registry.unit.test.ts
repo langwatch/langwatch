@@ -84,6 +84,7 @@ describe("slack Block Kit template registry", () => {
 
   describe("when filtering options for a report draft", () => {
     describe("when the report sends matching traces", () => {
+      /** @scenario "A report is offered only layouts that fit its source" */
       it("offers only layouts that render the traces", () => {
         const options = templateOptionsFor({
           cadence: "immediate",
@@ -99,6 +100,7 @@ describe("slack Block Kit template registry", () => {
     });
 
     describe("when the report sends a custom graph", () => {
+      /** @scenario "A report is offered only layouts that fit its source" */
       it("offers only chart layouts — a table of traces has no rows to show", () => {
         const options = templateOptionsFor({
           cadence: "immediate",
@@ -110,6 +112,7 @@ describe("slack Block Kit template registry", () => {
     });
 
     describe("when the report sends a dashboard", () => {
+      /** @scenario "A dashboard report needs no layout choice" */
       it("offers no layouts at all — the panels map straight to the message", () => {
         expect(
           templateOptionsFor({
@@ -236,6 +239,7 @@ describe("slack Block Kit template registry", () => {
     });
 
     describe("when the draft is a report", () => {
+      /** @scenario "Changing the report's source moves the author to a layout that fits" */
       it("picks the layout that fits what the report sends", () => {
         const pick = (reportSource: "traceQuery" | "customGraph" | "dashboard") =>
           pickDefaultSlackBlockKitTemplateId({
@@ -271,6 +275,7 @@ describe("slack Block Kit template registry", () => {
     });
 
     describe("when a report's content has no ungated way to render it", () => {
+      /** @scenario "Changing the report's source moves the author to a layout that fits" */
       it("still defaults to the layout that shows the data", () => {
         // A chart report's default HAS to be a chart — there is no non-gated
         // chart block. New Slack connections are bot-only (webhooks are

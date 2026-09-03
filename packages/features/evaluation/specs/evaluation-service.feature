@@ -42,6 +42,13 @@ Feature: Evaluation service boundary
     And neither constructs ClickHouse or execution dependencies per request
 
   @unit
+  Scenario: The evaluation transport moves without changing who may call it
+    Given the evaluation procedures are owned by the Evaluation package
+    When the process mounts them on its own tRPC root
+    Then the browser calls the same procedure names as before
+    And every procedure declares the same access decision it declared before
+
+  @unit
   Scenario: An evaluator run reports its duration and its outcome
     Given a process composed the evaluator runtime's telemetry
     When an evaluation finishes

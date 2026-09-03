@@ -157,7 +157,57 @@ describe("PrismaGatewayCacheRuleRepository", () => {
     });
   });
 
+  describe("when a rule is created", () => {
+    /** @scenario "A cache-rule mutation refreshes the Gateway configuration atomically" */
+    it("writes the row, the revision bump and the audit row in one transaction", async () => {
+      const { database, calls } = recordingDatabase();
+      const ports = recordingPorts();
+      const repository = PrismaGatewayCacheRuleRepository.create({
+        database,
+        changes: ports.changesPort,
+        audit: ports.auditPort,
+      });
+
+      await repository.create({
+        organizationId: "org_01",
+        name: "enterprise-force",
+        matchers: { vk_tags: ["tier=enterprise"] },
+        action: { mode: "force", ttl: 600 },
+        actorUserId: "usr_01",
+      });
+
+      expect(calls.create).toHaveLength(1);
+      expect(ports.changes).toEqual([{ kind: "CACHE_RULE_CREATED", inTransaction: true }]);
+      expect(ports.audits).toEqual([{ action: "gateway.cache_rule.created", inTransaction: true }]);
+    });
+  });
+
+  describe("when a rule is updated", () => {
+    /** @scenario "A cache-rule mutation refreshes the Gateway configuration atomically" */
+    it("writes the row, the revision bump and the audit row in one transaction", async () => {
+      const { database, calls } = recordingDatabase();
+      const ports = recordingPorts();
+      const repository = PrismaGatewayCacheRuleRepository.create({
+        database,
+        changes: ports.changesPort,
+        audit: ports.auditPort,
+      });
+
+      await repository.update({
+        id: "rule_01",
+        organizationId: "org_01",
+        name: "renamed",
+        actorUserId: "usr_01",
+      });
+
+      expect(calls.update).toHaveLength(1);
+      expect(ports.changes).toEqual([{ kind: "CACHE_RULE_UPDATED", inTransaction: true }]);
+      expect(ports.audits).toEqual([{ action: "gateway.cache_rule.updated", inTransaction: true }]);
+    });
+  });
+
   describe("when a rule is archived", () => {
+    /** @scenario "A cache-rule mutation refreshes the Gateway configuration atomically" */
     it("stamps archivedAt and raises the revision and the audit row in the same transaction", async () => {
       const { database, calls } = recordingDatabase();
       const ports = recordingPorts();

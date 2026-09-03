@@ -30,6 +30,13 @@ Feature: Agents package boundary
     And no generated Prisma type crosses the repository boundary
 
   @unit @agents
+  Scenario: A created agent is validated, persisted and returned resolved
+    Given a create command whose config matches its declared agent type
+    When AgentService handles it
+    Then the repository is asked to persist it exactly once
+    And the agent comes back with its input and output fields resolved from that config
+
+  @unit @agents
   Scenario: Invalid config is rejected before persistence
     Given a create or update command whose config does not match its agent type
     When AgentService handles the command

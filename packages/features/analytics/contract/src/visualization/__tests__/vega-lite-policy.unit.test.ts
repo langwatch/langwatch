@@ -47,7 +47,7 @@ const bar = (extra: Record<string, unknown>) => ({
 describe("the LangWatchQL Vega-Lite policy", () => {
   describe("given a spec that names a data source", () => {
     describe("when the name is not registered", () => {
-      /** @scenario "Every data source must resolve to a registered named dataset" */
+      /** @scenario "Policy validates names, fields, transforms, and complexity" */
       it("names the unknown dataset and the registered ones", () => {
         const errors = refusals({
           $schema: S,
@@ -83,7 +83,7 @@ describe("the LangWatchQL Vega-Lite policy", () => {
 
   describe("given a spec that carries its own data", () => {
     describe("when it is validated", () => {
-      /** @scenario "Caller-supplied datasets and inline values are rejected" */
+      /** @scenario "Data and runtime escape hatches are rejected" */
       it("refuses a top-level datasets property and inline values before Vega sees them", () => {
         expect(refusalRules(bar({ datasets: { smuggled: [{ model: "a" }] } }))).toContain(
           "data.caller-datasets",
@@ -102,7 +102,7 @@ describe("the LangWatchQL Vega-Lite policy", () => {
 
   describe("given a spec carrying a resource-loading path", () => {
     describe("when the path is buried in the composition tree", () => {
-      /** @scenario "Every resource-loading path is rejected recursively" */
+      /** @scenario "Data and runtime escape hatches are rejected" */
       it("refuses URL data, URL lookups, image marks, and URL encodings at any depth", () => {
         const nested = (leaf: Record<string, unknown>) => ({
           $schema: S,
@@ -183,7 +183,7 @@ describe("the LangWatchQL Vega-Lite policy", () => {
 
   describe("given a spec that reaches for the chart runtime's own options", () => {
     describe("when it is validated", () => {
-      /** @scenario "Spec-controlled runtime options are rejected" */
+      /** @scenario "Data and runtime escape hatches are rejected" */
       it("refuses usermeta embed options while leaving other usermeta alone", () => {
         const errors = refusals(
           bar({
@@ -205,7 +205,7 @@ describe("the LangWatchQL Vega-Lite policy", () => {
 
   describe("given a lookup transform", () => {
     describe("when it names another dataset", () => {
-      /** @scenario "Lookup is admitted only between registered datasets within limits" */
+      /** @scenario "Policy validates names, fields, transforms, and complexity" */
       it("admits a registered source within limits and refuses every other source", () => {
         expect(validate(lookupBetweenRegisteredDatasets).ok).toBe(true);
 
@@ -250,7 +250,7 @@ describe("the LangWatchQL Vega-Lite policy", () => {
 
   describe("given a transform or expression outside the allowlist", () => {
     describe("when it is validated", () => {
-      /** @scenario "Unknown transforms and expression features fail closed" */
+      /** @scenario "Policy validates names, fields, transforms, and complexity" */
       it("refuses unreviewed transforms and unreviewed expression identifiers", () => {
         for (const unreviewed of [
           { sample: 500 },
@@ -281,7 +281,7 @@ describe("the LangWatchQL Vega-Lite policy", () => {
         }
       });
 
-      /** @scenario "Unknown transforms and expression features fail closed" */
+      /** @scenario "Policy validates names, fields, transforms, and complexity" */
       it("screens every expression-bearing key, wherever the evaluator reads one", () => {
         // Each of these is handed to the same evaluator as a `calculate`, so
         // each has to be screened by it. A key left off the screened set is not

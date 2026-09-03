@@ -21,6 +21,7 @@ describe("gateway contract", () => {
     ).toBe(false);
   });
 
+  /** @scenario "A projected request reaches a hard budget limit" */
   it("locks the compatibility response fields", () => {
     const result = {
       decision: "hard_block" as const,

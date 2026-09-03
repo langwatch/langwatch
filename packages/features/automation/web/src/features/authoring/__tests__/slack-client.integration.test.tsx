@@ -197,6 +197,7 @@ describe("SlackConfigForm authoring tiers", () => {
     const reportCtx = () => makeCtx({ sourceKind: "report", reportSourceKind: "traceQuery" });
     const layoutFor = (id: string) => SLACK_BLOCK_KIT_TEMPLATES.find((opt) => opt.id === id)!;
 
+    /** @scenario "Changing the report's source moves the author to a layout that fits" */
     it("seeds the layout that matches what the report sends", () => {
       const onChangeSpy = vi.fn();
       renderForm({ ctx: reportCtx(), onChangeSpy });
@@ -210,6 +211,7 @@ describe("SlackConfigForm authoring tiers", () => {
       });
     });
 
+    /** @scenario "Changing the report's source moves the author to a layout that fits" */
     it("stores the seeded layout, so the message sent is the one shown", () => {
       const seeded: SlackSlice = {
         ...slackClient.initialSlice(),
@@ -298,6 +300,7 @@ describe("SlackConfigForm delivery method", () => {
   });
 
   describe("given a bot draft whose token is already stored", () => {
+    /** @scenario "Editing a bot automation without re-entering the token" */
     it("offers to keep the saved token without retyping", () => {
       renderForm({ initial: botSlice({ botTokenAlreadySet: true }) });
 
@@ -667,6 +670,7 @@ describe("Slack client slice contract", () => {
     });
 
     describe("when the channel is set but no token exists yet", () => {
+      /** @scenario "A bot automation is incomplete without a token and channel" */
       it("reports the config as incomplete", () => {
         expect(slackClient.isComplete(botSlice({ botTokenAlreadySet: false }))).toBe(false);
       });
@@ -684,6 +688,7 @@ describe("Slack client slice contract", () => {
     });
 
     describe("when the stored token is left untouched on edit", () => {
+      /** @scenario "Editing a bot automation without re-entering the token" */
       it("sends the keep sentinel so the server keeps the stored token", () => {
         const params = slackClient.toActionParams(
           botSlice({ botToken: "", botTokenAlreadySet: true }),

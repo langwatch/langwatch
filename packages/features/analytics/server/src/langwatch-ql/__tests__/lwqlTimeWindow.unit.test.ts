@@ -63,14 +63,14 @@ describe("given an instant to hand the database", () => {
   pinTimezone(NON_UTC_ZONE);
 
   describe("when it is formatted as a bound parameter", () => {
-    /** @scenario "The injected window is a UTC ClickHouse date-time, not an ISO-8601 instant" */
+    /** @scenario "Reserved period parameters are filled only when declared" */
     it("spells it as a space-separated UTC date-time with no zone designator", () => {
       expect(formatLangWatchQLDateTimeParameter(new Date("2026-02-20T12:34:56.000Z"))).toBe(
         "2026-02-20 12:34:56",
       );
     });
 
-    /** @scenario "The injected window is a UTC ClickHouse date-time, not an ISO-8601 instant" */
+    /** @scenario "Reserved period parameters are filled only when declared" */
     it("reads the instant in UTC rather than in whatever zone the process runs in", () => {
       // 2026-02-21 01:30 UTC is 2026-02-20 22:30 in the pinned zone, so the
       // hour AND the calendar day differ. Reading the local getters would spell
@@ -85,7 +85,7 @@ describe("given an instant to hand the database", () => {
       expect(formatLangWatchQLDateTimeParameter(acrossMidnight)).not.toContain("Z");
     });
 
-    /** @scenario "The injected window is a UTC ClickHouse date-time, not an ISO-8601 instant" */
+    /** @scenario "Reserved period parameters are filled only when declared" */
     it("truncates below the second and pads every field to its width", () => {
       expect(formatLangWatchQLDateTimeParameter(new Date("2026-02-03T04:05:06.789Z"))).toBe(
         "2026-02-03 04:05:06",
@@ -100,7 +100,7 @@ describe("given an instant to hand the database", () => {
 
 describe("given a declared parameter type", () => {
   describe("when it is measured against what may carry an instant", () => {
-    /** @scenario "A reserved period parameter declared as anything but a date-time is refused" */
+    /** @scenario "Reserved parameter misuse is refused before execution" */
     it("accepts the date-time spellings and nothing else", () => {
       for (const type of ["DateTime", "DateTime('UTC')", "DateTime64(3)", "DateTime64(3, 'UTC')"]) {
         expect(isLangWatchQLDateTimeParameterType(type), type).toBe(true);
@@ -110,7 +110,7 @@ describe("given a declared parameter type", () => {
       }
     });
 
-    /** @scenario "A reserved period parameter declared as anything but a date-time is refused" */
+    /** @scenario "Reserved parameter misuse is refused before execution" */
     it("refuses a zone other than UTC, which would silently shift the window", () => {
       // The injected value is a UTC wall clock with no zone designator, so a
       // declaration read in another zone moves every boundary by that zone's
@@ -129,7 +129,7 @@ describe("given a declared parameter type", () => {
 
 describe("given a statement and the window a surface is showing", () => {
   describe("when the statement declares both reserved names", () => {
-    /** @scenario "A statement declaring the reserved period parameters is given the surface's window" */
+    /** @scenario "Reserved period parameters are filled only when declared" */
     it("binds each to its end of the window, and says the statement follows it", () => {
       const resolved = resolveLangWatchQLTimeWindow({
         declared: PERIOD,
@@ -160,7 +160,7 @@ describe("given a statement and the window a surface is showing", () => {
   });
 
   describe("when the statement declares only one of them", () => {
-    /** @scenario "A statement declaring only one reserved period parameter is given that one" */
+    /** @scenario "Reserved period parameters are filled only when declared" */
     it("binds the one it declared and sends no value for the other", () => {
       const resolved = resolveLangWatchQLTimeWindow({
         declared: [{ name: "period_start", type: "DateTime" }],
@@ -175,7 +175,7 @@ describe("given a statement and the window a surface is showing", () => {
   });
 
   describe("when the statement declares neither", () => {
-    /** @scenario "A statement with no period parameters runs, and says so" */
+    /** @scenario "A statement without a period reports that fact" */
     it("injects nothing and reports that it does not follow the period", () => {
       const resolved = resolveLangWatchQLTimeWindow({
         declared: [{ name: "name", type: "String" }],
@@ -251,7 +251,7 @@ describe("given a statement and the window a surface is showing", () => {
 
 describe("given a request that reaches for a name the surface owns", () => {
   describe("when it carries a value for a reserved name", () => {
-    /** @scenario "A caller that supplies a reserved period parameter itself is refused" */
+    /** @scenario "Reserved parameter misuse is refused before execution" */
     it("refuses, naming what it may not set", () => {
       const run = () =>
         resolveLangWatchQLTimeWindow({
@@ -264,7 +264,7 @@ describe("given a request that reaches for a name the surface owns", () => {
       expect(metaOf(run)).toEqual({ parameters: ["period_start"] });
     });
 
-    /** @scenario "A caller that supplies a reserved period parameter itself is refused" */
+    /** @scenario "Reserved parameter misuse is refused before execution" */
     it("refuses even when the statement never declared it", () => {
       expect(
         codeOf(() =>
@@ -278,7 +278,7 @@ describe("given a request that reaches for a name the surface owns", () => {
   });
 
   describe("when a reserved name is declared as something other than a date-time", () => {
-    /** @scenario "A reserved period parameter declared as anything but a date-time is refused" */
+    /** @scenario "Reserved parameter misuse is refused before execution" */
     it("refuses, naming the declaration to rewrite", () => {
       const run = () =>
         resolveLangWatchQLTimeWindow({

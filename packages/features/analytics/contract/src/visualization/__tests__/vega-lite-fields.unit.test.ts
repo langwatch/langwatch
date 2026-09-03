@@ -28,7 +28,7 @@ const bar = (extra: Record<string, unknown>) => ({
 describe("field reference validation", () => {
   describe("given a spec whose branches read different registered datasets", () => {
     describe("when a field reference does not exist in the dataset feeding its branch", () => {
-      /** @scenario "Field references are validated against the dataset that feeds them" */
+      /** @scenario "Policy validates names, fields, transforms, and complexity" */
       it("names the dataset, lists its columns, and still recognizes transform-created fields", () => {
         const refused = validate({
           $schema: S,

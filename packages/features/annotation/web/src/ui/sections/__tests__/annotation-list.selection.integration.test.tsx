@@ -248,7 +248,6 @@ afterEach(cleanup);
 
 describe("given the annotations list shows rows", () => {
   /** @scenario "Rows are selected independently" */
-  /** @scenario "Every row carries a checkbox in a leading column" */
   it("puts a checkbox on every row and a select-all in the header", () => {
     renderInbox();
 
@@ -262,7 +261,7 @@ describe("given the annotations list shows rows", () => {
     expect(firstCell).toBe(firstCell?.parentElement?.firstElementChild);
   });
 
-  /** @scenario "The selection bar is hidden while nothing is selected" */
+  /** @scenario "A changed result set clears selection" */
   it("hides the selection bar until something is picked", () => {
     renderInbox();
 
@@ -270,7 +269,7 @@ describe("given the annotations list shows rows", () => {
   });
 
   describe("when the user ticks a row checkbox", () => {
-    /** @scenario "Ticking a row checkbox does not open the row" */
+    /** @scenario "Rows are selected independently" */
     it("selects the row without navigating away", () => {
       const { host } = renderInbox();
 
@@ -283,7 +282,7 @@ describe("given the annotations list shows rows", () => {
   });
 
   describe("when the user ticks the header checkbox", () => {
-    /** @scenario "The header checkbox selects every row on the page" */
+    /** @scenario "Rows are selected independently" */
     it("selects every row on the page", () => {
       renderInbox();
 
@@ -295,7 +294,7 @@ describe("given the annotations list shows rows", () => {
       expect(selectionBar()).toHaveTextContent("3 selected");
     });
 
-    /** @scenario "The header checkbox clears a fully selected page" */
+    /** @scenario "Rows are selected independently" */
     it("clears the page when everything is already selected", () => {
       renderInbox();
 
@@ -308,7 +307,7 @@ describe("given the annotations list shows rows", () => {
   });
 
   describe("when two rows were queued for the same trace", () => {
-    /** @scenario "Two rows queued for the same trace are picked separately" */
+    /** @scenario "Rows are selected independently" */
     it("counts both rows", () => {
       setItems([
         { id: "item-1", traceId: "trace-1", doneAt: null },
@@ -323,7 +322,6 @@ describe("given the annotations list shows rows", () => {
     });
 
     /** @scenario "Dataset hand-off deduplicates selected traces" */
-    /** @scenario "Add to dataset counts a trace shared by two rows once" */
     it("hands the shared trace to the dataset once", async () => {
       setItems([
         { id: "item-1", traceId: "trace-1", doneAt: null },
@@ -344,7 +342,7 @@ describe("given the annotations list shows rows", () => {
   });
 
   describe("when the reviewer moves to another page", () => {
-    /** @scenario "Moving to another page clears the selection" */
+    /** @scenario "A changed result set clears selection" */
     it("drops the selection", () => {
       const view = renderInbox();
 
@@ -359,7 +357,6 @@ describe("given the annotations list shows rows", () => {
 
   describe("when the reviewer switches the status filter", () => {
     /** @scenario "A changed result set clears selection" */
-    /** @scenario "Changing the status filter clears the selection" */
     it("drops the selection", async () => {
       const user = userEvent.setup({ pointerEventsCheck: 0 });
       renderInbox();
@@ -376,7 +373,7 @@ describe("given the annotations list shows rows", () => {
 });
 
 describe("given rows are selected", () => {
-  /** @scenario "The selection bar appears with the count and the actions" */
+  /** @scenario "Dataset hand-off deduplicates selected traces" */
   it("shows the count and offers Add to dataset", () => {
     renderInbox();
 
@@ -387,7 +384,7 @@ describe("given rows are selected", () => {
     expect(screen.getAllByRole("button", { name: /Add to dataset/ }).length).toBeGreaterThan(0);
   });
 
-  /** @scenario "The selection bar offers to remove the selected items from the queue" */
+  /** @scenario "Queue removal is available only for queue items" */
   it("offers to remove the picked items from the queue", () => {
     renderInbox();
 
@@ -397,7 +394,7 @@ describe("given rows are selected", () => {
   });
 
   describe("when the user clicks Add to dataset", () => {
-    /** @scenario "Add to dataset opens the dataset drawer with the selected traces" */
+    /** @scenario "Dataset hand-off deduplicates selected traces" */
     it("writes the dataset drawer address with the selected trace ids", async () => {
       const { host } = renderInbox();
 
@@ -416,7 +413,6 @@ describe("given rows are selected", () => {
 
   describe("when the user removes the selection from the queue", () => {
     /** @scenario "Queue removal is available only for queue items" */
-    /** @scenario "Removing the selection takes exactly those queue items out" */
     it("removes exactly the picked queue items and clears the selection", () => {
       renderInbox();
 
@@ -440,7 +436,7 @@ describe("given rows are selected", () => {
 });
 
 describe("given rows on the all annotations page are selected", () => {
-  /** @scenario "The all annotations page never offers to remove from a queue" */
+  /** @scenario "Queue removal is available only for queue items" */
   it("offers no remove-from-queue action", () => {
     renderAllAnnotations();
 
@@ -450,7 +446,7 @@ describe("given rows on the all annotations page are selected", () => {
     expect(selectionBar()).not.toHaveTextContent("Remove from queue");
   });
 
-  /** @scenario "The all annotations page offers to add the selection to a queue" */
+  /** @scenario "Queue actions respect the page's queue context" */
   it("offers to add the selection to a queue", () => {
     renderAllAnnotations();
 
@@ -461,7 +457,7 @@ describe("given rows on the all annotations page are selected", () => {
   });
 
   describe("when the user chooses to add the selection to a queue", () => {
-    /** @scenario "The all annotations page offers to add the selection to a queue" */
+    /** @scenario "Queue actions respect the page's queue context" */
     it("opens the queue dialog with nothing preselected", () => {
       renderAllAnnotations();
 
@@ -472,7 +468,7 @@ describe("given rows on the all annotations page are selected", () => {
       expect(pickedAnnotators()).toBeEmptyDOMElement();
     });
 
-    /** @scenario "The all annotations page offers to add the selection to a queue" */
+    /** @scenario "Queue actions respect the page's queue context" */
     it("sends the selected traces to the chosen queue", () => {
       renderAllAnnotations();
 
@@ -506,7 +502,6 @@ describe("given rows on the all annotations page are selected", () => {
 
 describe("given rows on a queue page are selected", () => {
   /** @scenario "Queue actions respect the page's queue context" */
-  /** @scenario "A queue page offers to move the selection instead" */
   it("offers to move the selection and not to add it", () => {
     renderQueuePage();
 
@@ -516,7 +511,7 @@ describe("given rows on a queue page are selected", () => {
     expect(selectionBar()).not.toHaveTextContent("Add to queue");
   });
 
-  /** @scenario "A queue page offers to move the selection instead" */
+  /** @scenario "Queue actions respect the page's queue context" */
   it("opens the queue dialog on the queue this page is", () => {
     renderQueuePage();
 
@@ -527,7 +522,7 @@ describe("given rows on a queue page are selected", () => {
   });
 
   describe("when the user deselects this queue, picks another and confirms", () => {
-    /** @scenario "Moving the selection re-queues it and leaves this queue" */
+    /** @scenario "Queue actions respect the page's queue context" */
     it("queues the traces elsewhere and takes their items off this queue", () => {
       renderQueuePage();
 
@@ -549,7 +544,7 @@ describe("given rows on a queue page are selected", () => {
   });
 
   describe("when the user keeps this queue selected and adds another", () => {
-    /** @scenario "Keeping this queue selected adds without removing" */
+    /** @scenario "Queue actions respect the page's queue context" */
     it("queues the traces elsewhere and leaves their items on this queue", () => {
       renderQueuePage();
 

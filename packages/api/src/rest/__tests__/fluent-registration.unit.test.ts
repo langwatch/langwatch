@@ -26,6 +26,7 @@ async function jsonBody(res: Response): Promise<unknown> {
 // ---------------------------------------------------------------------------
 
 describe("a registered endpoint", () => {
+  /** @scenario "A handler is given input only when input was declared" */
   it("serves POST /api/{service}/{version}{path} with context and validated input", async () => {
     const seen: unknown[] = [];
     const app = buildTestService()
@@ -85,14 +86,14 @@ describe("a registered endpoint", () => {
 });
 
 describe("an endpoint that declares no input", () => {
+  /** @scenario "A handler is given input only when input was declared" */
   it("installs no input validation: bodyless and empty-object POSTs both succeed", async () => {
+    // Declared with no input parameter, which is all the type allows here; the
+    // spy still records everything the framework actually passed.
+    const handler = vi.fn(async () => ({ pong: true }));
     const app = buildTestService()
-      .registerRoute(
-        "post",
-        "/things.ping",
-        "2026-08-07",
-        async () => ({ pong: true }),
-        (b) => b.withOutput(z.object({ pong: z.boolean() })),
+      .registerRoute("post", "/things.ping", "2026-08-07", handler, (b) =>
+        b.withOutput(z.object({ pong: z.boolean() })),
       )
       .build();
 
@@ -107,6 +108,13 @@ describe("an endpoint that declares no input", () => {
       body: "{}",
     });
     expect(empty.status).toBe(200);
+
+    // No declared schema, so there is nothing to hand the handler: not the body
+    // it was posted, not an empty object standing in for one.
+    expect(handler.mock.calls.map((call) => (call as unknown[])[1])).toEqual([
+      void 0,
+      void 0,
+    ]);
   });
 });
 
@@ -404,6 +412,7 @@ describe("provide", () => {
     expect(await jsonBody(response)).toEqual(runtimeApp);
   });
 
+  /** @scenario "The context exposes the application the composition root supplied" */
   it("exposes the process app directly on the handler context", async () => {
     const runtimeApp = { things: { marker: "one-process-app" } };
     const app = createService<unknown, typeof runtimeApp>({
@@ -416,7 +425,11 @@ describe("provide", () => {
         "post",
         "/things.app",
         "2025-03-15",
-        async (context) => context.app.things,
+        async (context) => {
+          // @ts-expect-error — the composed app exposes `things` and nothing else
+          void context.app.widgets;
+          return context.app.things;
+        },
         (builder) => builder.withOutput(z.object({ marker: z.string() })),
       )
       .build();
@@ -1168,6 +1181,7 @@ describe("error handling", () => {
     });
   });
 
+  /** @scenario "The transport owns the failure" */
   it("serializes a HandledError", async () => {
     const app = buildTestService()
       .registerRoute(
@@ -1193,6 +1207,7 @@ describe("error handling", () => {
     expect(body.meta.id).toBe("123");
   });
 
+  /** @scenario "The transport owns the failure" */
   it("does not let an impostor choose its own status", async () => {
     const app = buildTestService()
       .registerRoute(

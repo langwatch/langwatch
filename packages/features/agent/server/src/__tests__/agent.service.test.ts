@@ -49,7 +49,7 @@ function setup() {
 }
 
 describe("Agents service", () => {
-  /** @scenario The RPC API owns the canonical Agent operations */
+  /** @scenario A created agent is validated, persisted and returned resolved */
   it("validates, persists, and enriches a created agent", async () => {
     const { service, create } = setup();
     const agent = await service.create({

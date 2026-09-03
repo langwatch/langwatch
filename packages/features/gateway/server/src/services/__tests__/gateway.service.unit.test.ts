@@ -275,6 +275,92 @@ function serviceFor(result: GatewayBudgetCheckResult): {
   };
 }
 
+/** A service whose cache-rule and guardrail catalogues actually answer. */
+function serviceOverCatalogues({
+  cacheRules,
+  guardrails,
+}: {
+  cacheRules: unknown[];
+  guardrails: Array<{ id: string }>;
+}): GatewayService {
+  const projects = new TestProjectService();
+  const cacheRuleRepository = new EmptyCacheRuleRepository();
+  const guardrailRepository = new EmptyGuardrailRepository();
+  cacheRuleRepository.listEnabledForOrganization = (async () => cacheRules) as never;
+  guardrailRepository.listBundleEntries = (async () => guardrails) as never;
+
+  return GatewayService.create({
+    repository: new FakeBudgetRepository({
+      decision: "allow",
+      warnings: [],
+      blockReason: null,
+      blockedBy: [],
+      scopes: [],
+    }),
+    projects,
+    cacheRules: GatewayCacheRulePersistence.create(cacheRuleRepository),
+    guardrails: GatewayGuardrailCatalogue.create({
+      repository: guardrailRepository,
+      evaluators: new UnusedEvaluatorService(),
+      monitors: new UnusedMonitorService(),
+      projects,
+      audit: new NullGatewayAuditPort(),
+    }),
+  });
+}
+
+describe("GatewayService configuration bundle", () => {
+  describe("given an organization with enabled rules and a virtual key on a trace project", () => {
+    describe("when the Gateway materialises its configuration bundle", () => {
+      /** @scenario "A configuration bundle includes only eligible persistence records" */
+      it("takes the enabled rules the catalogue answers with and drops attachments the project has not got", async () => {
+        const service = serviceOverCatalogues({
+          cacheRules: [{ id: "rule_enabled" }],
+          guardrails: [{ id: "guardrail_present" }],
+        });
+
+        const bundle = await service.loadConfigurationPersistence({
+          organizationId: "org_1",
+          traceProjectId: "project_1",
+          guardrailAttachments: [
+            { direction: "input", guardrailIds: ["guardrail_present", "guardrail_absent"] },
+            { direction: "output", guardrailIds: ["guardrail_absent"] },
+          ],
+        });
+
+        expect(bundle.cacheRules).toEqual([{ id: "rule_enabled" }]);
+        expect(bundle.guardrails).toEqual([{ id: "guardrail_present" }]);
+        // The output attachment named only a guardrail this project's
+        // catalogue does not hold, so it leaves the bundle entirely rather
+        // than travelling as an empty direction the gateway would enforce.
+        expect(bundle.attachments).toEqual([
+          { direction: "input", guardrailIds: ["guardrail_present"] },
+        ]);
+      });
+
+      /** @scenario "A configuration bundle includes only eligible persistence records" */
+      it("asks no project catalogue and attaches no guardrail when the key targets no trace project", async () => {
+        const service = serviceOverCatalogues({
+          cacheRules: [{ id: "rule_enabled" }],
+          guardrails: [{ id: "guardrail_present" }],
+        });
+
+        const bundle = await service.loadConfigurationPersistence({
+          organizationId: "org_1",
+          traceProjectId: null,
+          guardrailAttachments: [
+            { direction: "input", guardrailIds: ["guardrail_present"] },
+          ],
+        });
+
+        expect(bundle.cacheRules).toEqual([{ id: "rule_enabled" }]);
+        expect(bundle.guardrails).toEqual([]);
+        expect(bundle.attachments).toEqual([]);
+      });
+    });
+  });
+});
+
 describe("GatewayService budget decisions", () => {
   it("forwards the canonical budget check with Project-owned tenant ids", async () => {
     const { service, repository } = serviceFor({

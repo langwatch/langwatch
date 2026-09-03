@@ -58,6 +58,7 @@ const config: ScenarioChildProcessConfig = {
 };
 
 describe("Scenario child environment isolation", () => {
+  /** @scenario "A child receives only its project's telemetry" */
   it("does not inherit parent telemetry, trace context or Node preloads", () => {
     for (const key of parentKeys) setParentEnvironment(key, `parent-${key}`);
 
@@ -78,6 +79,7 @@ describe("Scenario child environment isolation", () => {
     expect(environment.LANGWATCH_ENDPOINT).toBe("https://project-a.test");
   });
 
+  /** @scenario "A child receives only its project's telemetry" */
   it("keeps tenant telemetry and resource attributes separate between children", () => {
     const first = buildChildEnvironment({
       config,

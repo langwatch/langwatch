@@ -115,7 +115,7 @@ afterEach(() => cleanup());
 describe("LangWatchQL chart mode in real Chromium", () => {
   describe("given a successful categorical LangWatchQL result", () => {
     describe("when the member provides a valid bar specification over the query result dataset", () => {
-      /** @scenario "A categorical LangWatchQL result renders as a chart in a real browser" */
+      /** @scenario "Chart mode preserves data and offers an accessible table fallback" */
       it("draws one bar per category from the registered dataset, sized by its value", async () => {
         const { rerender } = render(
           <ChakraProvider value={defaultSystem}>

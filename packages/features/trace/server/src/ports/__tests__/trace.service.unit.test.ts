@@ -186,6 +186,62 @@ describe("TraceService span-tree read", () => {
     expect(summaryReader.calls).toEqual([{ tenantId: "project_1", traceId: "trace_1" }]);
   });
 
+  describe("given a trace that belongs to another project", () => {
+    describe("when this project reads its span tree", () => {
+      /** @scenario "A trace read is tenant scoped" */
+      it("reads nothing back and offers no cursor to page on with", async () => {
+        class TenantKeyedRepository extends TraceRepository {
+          readonly seen: string[] = [];
+
+          findEvaluationSpans(): Promise<[]> {
+            return Promise.resolve([]);
+          }
+
+          findEvaluationEvents(): Promise<[]> {
+            return Promise.resolve([]);
+          }
+
+          async tryFindIngestLag(): Promise<null> {
+            return null;
+          }
+
+          async findSummaryPage(input: { tenantId: string }): Promise<TraceSpanPage> {
+            this.seen.push(input.tenantId);
+            const rows = input.tenantId === "project_1" ? [record(node)] : [];
+            return { rows, hasMore: rows.length > 0 };
+          }
+
+          async findSummarySince(): Promise<TraceSpanSummaryRecord[]> {
+            return [];
+          }
+        }
+
+        const repository = new TenantKeyedRepository();
+        const traceService = TraceService.create({
+          repository,
+          modelProviders: new TestModelProviderService(),
+          queryFieldValues: new EmptyQueryFieldValues(),
+          queryClassification: new TestTraceQueryClassification(),
+          summaryReader: new CapturingSummaryReader(),
+          ...traceReadPorts(),
+        });
+
+        await expect(
+          traceService.getSpanTreePage({
+            projectId: "project_2",
+            traceId: "trace_1",
+            limit: 1,
+            canSeeCosts: true,
+          }),
+        ).resolves.toEqual({ nodes: [], nextCursor: null });
+        // The read is scoped by the caller's project, not by the trace id: a
+        // trace id alone is not unique across tenants.
+        expect(repository.seen).toEqual(["project_2"]);
+      });
+    });
+  });
+
+  /** @scenario "A span tree is read page by page with the live response shape" */
   it("returns the complete characterized page and cursor", async () => {
     await expect(
       service().getSpanTreePage({
@@ -200,6 +256,7 @@ describe("TraceService span-tree read", () => {
     });
   });
 
+  /** @scenario "A tree cost is withheld for a restricted viewer" */
   it("redacts cost without changing the rest of the node", async () => {
     const result = await service().getSpanTreePage({
       projectId: "project_1",
@@ -210,6 +267,7 @@ describe("TraceService span-tree read", () => {
     expect(result.nodes[0]).toEqual({ ...node, cost: null });
   });
 
+  /** @scenario "A span tree is read page by page with the live response shape" */
   it("preserves the live empty-page response when no spans are found", async () => {
     await expect(
       service([]).getSpanTreePage({
@@ -261,6 +319,7 @@ describe("TraceService span-tree read", () => {
     ).rejects.toThrow("span-summary page reported hasMore without any rows to key the cursor from");
   });
 
+  /** @scenario "Cost fallback remains owned by one canonical implementation" */
   it("computes a missing cost through the full Model Provider service", async () => {
     const result = await TraceService.create({
       repository: new FakeTraceRepository([record({ ...node, cost: null })]),
@@ -279,6 +338,7 @@ describe("TraceService span-tree read", () => {
     expect(result.nodes[0]).toEqual({ ...node, cost: 0.12 });
   });
 
+  /** @scenario "A live waterfall receives row-version updates" */
   it("preserves every live delta node field while pricing and gating costs", async () => {
     const priced = await TraceService.create({
       repository: new FakeTraceRepository([record({ ...node, cost: null })]),
@@ -307,6 +367,7 @@ describe("TraceService span-tree read", () => {
 });
 
 describe("TraceService query field catalogue", () => {
+  /** @scenario "AI query prompts include live categorical examples" */
   it("merges live values before static values and degrades one failed facet", async () => {
     const fieldValues = new CharacterizedQueryFieldValues();
     const catalogue = await service([], fieldValues).buildQueryFieldCatalogue({

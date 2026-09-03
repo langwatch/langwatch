@@ -420,6 +420,7 @@ describe("withCache", () => {
     expect(handler).toHaveBeenCalledTimes(2);
   });
 
+  /** @scenario "Answering requires an output schema" */
   it("refuses the registration when no output is declared: unvalidated bytes may not be cached", () => {
     const service = createService({
       name: "things",

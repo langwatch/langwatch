@@ -27,7 +27,7 @@ import {
 describe("mapping the LangWatchQL schema response", () => {
   describe("given a response with datasets, columns, types, units and documentation", () => {
     describe("when it is mapped for the browser and the editor", () => {
-      /** @scenario "The live schema response drives the browser and completion model" */
+      /** @scenario "Schema documentation and completion use the live response" */
       it("carries every dataset and column from the response and invents none", () => {
         const model = lwqlSchemaModel(SCHEMA_RESPONSE);
 
@@ -56,7 +56,7 @@ describe("mapping the LangWatchQL schema response", () => {
         });
       });
 
-      /** @scenario "The live schema response drives the browser and completion model" */
+      /** @scenario "Schema documentation and completion use the live response" */
       it("offers nothing at all for a response that carries nothing", () => {
         const model = lwqlSchemaModel({
           database: "analytics",
@@ -68,7 +68,7 @@ describe("mapping the LangWatchQL schema response", () => {
         expect(lwqlHoverFor({ model, identifier: "analytics.traces_daily" })).toBeUndefined();
       });
 
-      /** @scenario "The live schema response drives the browser and completion model" */
+      /** @scenario "Schema documentation and completion use the live response" */
       it("suggests only names the response carried, and no withheld column", () => {
         const model = lwqlSchemaModel(SCHEMA_RESPONSE);
         const items = lwqlCompletionItems(model);

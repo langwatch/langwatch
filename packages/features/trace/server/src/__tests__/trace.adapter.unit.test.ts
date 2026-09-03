@@ -104,6 +104,7 @@ describe("ClickHouseTraceAdapter", () => {
     expect(calls.every((call) => Boolean(call.sql))).toBe(true);
   });
 
+  /** @scenario "A span tree is read page by page with the live response shape" */
   it("preserves the full node wire shape while pricing a missing stored cost", async () => {
     const calls: Array<{ tenantId: string; sql: string }> = [];
     const modelProviders = new TestModelProviderService(0.47);
@@ -327,6 +328,7 @@ describe("ClickHouseTraceSpanRepository page parity", () => {
     ]);
   });
 
+  /** @scenario "A stale occurrence timestamp still reads the trace" */
   it("retries an empty first hinted page without the occurrence bound", async () => {
     const calls: string[] = [];
     const repository = ClickHouseTraceSpanRepository.create({
@@ -374,6 +376,7 @@ describe("ClickHouseTraceSpanRepository page parity", () => {
     expect(page.rows).toHaveLength(1);
   });
 
+  /** @scenario "A stale occurrence timestamp still reads the trace" */
   it("treats an empty cursor page as the end without an unbounded retry", async () => {
     let queryCount = 0;
     const repository = ClickHouseTraceSpanRepository.create({
@@ -397,6 +400,7 @@ describe("ClickHouseTraceSpanRepository page parity", () => {
     expect(queryCount).toBe(1);
   });
 
+  /** @scenario "A live waterfall receives row-version updates" */
   it("uses the live row-version delta query without an occurrence window", async () => {
     const calls: Array<{
       sql: string;

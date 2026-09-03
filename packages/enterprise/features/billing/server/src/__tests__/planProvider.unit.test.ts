@@ -192,6 +192,7 @@ describe("createSaaSPlanProvider", () => {
 
     describe("when active subscription exists", () => {
       /** @scenario Only non-null overrides replace plan defaults */
+      /** @scenario "Resolve a portable SaaS plan" */
       it("returns plan limits with custom overrides", async () => {
         const subscription = {
           plan: PlanTypes.LAUNCH,

@@ -399,7 +399,7 @@ describe("codingAgentSpanFactsDispatch", () => {
     //
     // NB: the parity checker only reads an annotation whose line ends in `*/`,
     // so this stays a one-line JSDoc with the prose above it.
-    /** @scenario work queued before the relevance rule existed still reaches the same outcome */
+    /** @scenario an event the subscriber declines is still completed quietly */
     it("is ignored without decoding it", async () => {
       const { subscriber, dispatched } = makeSubscriber();
 
@@ -1170,7 +1170,7 @@ describe("codingAgentSpanFactsDispatch", () => {
 
   describe("given a staged payload this build cannot read", () => {
     describe("when the type belongs to a newer build", () => {
-      /** @scenario a staged shape from a newer build is refused, never quietly completed */
+      /** @scenario work a build cannot read fails loudly, never half-processed */
       it("throws into the queue's retry rather than completing the job", async () => {
         const { subscriber, dispatched } = makeSubscriber();
 
@@ -1193,7 +1193,7 @@ describe("codingAgentSpanFactsDispatch", () => {
        * for a body it cannot read, so without this the job completes silently
        * on a payload no build here produced.
        */
-      /** @scenario a staged shape from a newer build is refused, never quietly completed */
+      /** @scenario work a build cannot read fails loudly, never half-processed */
       it("throws instead of letting the name gate decline it", async () => {
         const { subscriber, dispatched } = makeSubscriber();
         const { data: _dropped, ...envelope } = rawSpanEvent({
@@ -1211,7 +1211,7 @@ describe("codingAgentSpanFactsDispatch", () => {
        * `typeof [] === "object"`, so an array body reaches the gate, has no
        * `name`, and is declined as an ordinary span unless it is refused here.
        */
-      /** @scenario a staged shape from a newer build is refused, never quietly completed */
+      /** @scenario work a build cannot read fails loudly, never half-processed */
       it("refuses an array in place of the span object", async () => {
         const { subscriber, dispatched } = makeSubscriber();
         const { data: _dropped, ...envelope } = rawSpanEvent({

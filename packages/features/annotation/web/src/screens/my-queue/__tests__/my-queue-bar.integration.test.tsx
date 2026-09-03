@@ -281,7 +281,7 @@ afterEach(() => {
 
 describe("given a reviewer walking their annotation queue", () => {
   describe("when the queue item page renders", () => {
-    /** @scenario "The queue bar labels its navigation and actions in words" */
+    /** @scenario "The queue bar has one labelled forward action" */
     it("names every action on the bar in words", () => {
       renderPage();
 
@@ -291,7 +291,7 @@ describe("given a reviewer walking their annotation queue", () => {
       expect(datasetCheckbox()).toBeInTheDocument();
     });
 
-    /** @scenario "The queue bar shows my position in the queue" */
+    /** @scenario "The final action is explicit" */
     it("shows the position in the queue", () => {
       renderPage();
 
@@ -300,7 +300,7 @@ describe("given a reviewer walking their annotation queue", () => {
   });
 
   describe("when the reviewer chooses Next with items left after this one", () => {
-    /** @scenario "Next finishes the item and moves on" */
+    /** @scenario "The queue bar has one labelled forward action" */
     it("records the item as done and moves on to the next one", async () => {
       const user = userEvent.setup();
       marksItemsDone();
@@ -319,7 +319,7 @@ describe("given a reviewer walking their annotation queue", () => {
       );
     });
 
-    /** @scenario "Next finishes the item and moves on" */
+    /** @scenario "The queue bar has one labelled forward action" */
     it("offers no second way forward", () => {
       renderPage();
 
@@ -329,7 +329,7 @@ describe("given a reviewer walking their annotation queue", () => {
   });
 
   describe("given the last item of the queue is open", () => {
-    /** @scenario "The last item's primary action reads Done" */
+    /** @scenario "The final action is explicit" */
     it("reads Done instead of Next", () => {
       setItems([{ id: "item-1", traceId: "trace-1", doneAt: null }]);
       renderPage();
@@ -357,7 +357,7 @@ describe("given a reviewer walking their annotation queue", () => {
   });
 
   describe("when the reviewer chooses Edit trace", () => {
-    /** @scenario "Edit trace opens the trace drawer already in annotation mode" */
+    /** @scenario "Edit trace uses the trace drawer in annotation mode" */
     it("opens the trace drawer on that trace, already editing", async () => {
       const user = userEvent.setup();
       renderPage();
@@ -371,7 +371,7 @@ describe("given a reviewer walking their annotation queue", () => {
       });
     });
 
-    /** @scenario "Edit trace opens the trace drawer already in annotation mode" */
+    /** @scenario "Edit trace uses the trace drawer in annotation mode" */
     it("leaves the drawer state to the link, so the two cannot disagree", async () => {
       const user = userEvent.setup();
       renderPage();
@@ -392,7 +392,7 @@ describe("given a reviewer walking their annotation queue", () => {
         useDrawerStore.getState().setViewModeTransient("conversation");
       });
 
-      /** @scenario "Edit trace falls back from the conversation tab to the summary tab" */
+      /** @scenario "Edit trace uses the trace drawer in annotation mode" */
       it("opens the drawer on the summary tab instead", async () => {
         const user = userEvent.setup();
         renderPage();
@@ -404,7 +404,7 @@ describe("given a reviewer walking their annotation queue", () => {
         expect(useDrawerStore.getState().viewMode).toBe("summary");
       });
 
-      /** @scenario "Edit trace falls back from the conversation tab to the summary tab" */
+      /** @scenario "Edit trace uses the trace drawer in annotation mode" */
       it("leaves the tab the reader gets elsewhere unchanged", async () => {
         const user = userEvent.setup();
         renderPage();
@@ -417,7 +417,7 @@ describe("given a reviewer walking their annotation queue", () => {
   });
 
   describe("when turns are counted into the session", () => {
-    /** @scenario "The turn under review is counted from the start" */
+    /** @scenario "Reviewing and explicitly selecting traces builds the dataset set" */
     it("counts the open item's own trace before anything is annotated", () => {
       renderPage();
 
@@ -425,7 +425,7 @@ describe("given a reviewer walking their annotation queue", () => {
       expect(datasetCheckbox("Add to dataset at the end (1 trace)")).toBeInTheDocument();
     });
 
-    /** @scenario "The turn under review is counted from the start" */
+    /** @scenario "Reviewing and explicitly selecting traces builds the dataset set" */
     it("leaves a turn the reviewer unticked out when the walk returns to it", () => {
       const view = renderPage();
       toggleTurn("trace-1");
@@ -439,7 +439,7 @@ describe("given a reviewer walking their annotation queue", () => {
       expect(datasetCheckbox("Add to dataset at the end (1 trace)")).toBeInTheDocument();
     });
 
-    /** @scenario "Annotating a turn counts its trace into the session" */
+    /** @scenario "Reviewing and explicitly selecting traces builds the dataset set" */
     it("counts an annotated turn's trace on the bar's dataset toggle", () => {
       renderPage();
       expect(datasetCheckbox("Add to dataset at the end (1 trace)")).toBeInTheDocument();
@@ -449,7 +449,7 @@ describe("given a reviewer walking their annotation queue", () => {
       expect(datasetCheckbox("Add to dataset at the end (2 traces)")).toBeInTheDocument();
     });
 
-    /** @scenario "A turn is counted in or out by hand" */
+    /** @scenario "Reviewing and explicitly selecting traces builds the dataset set" */
     it("counts a turn in by hand, and an untick wins over the annotation", () => {
       renderPage();
 
@@ -465,7 +465,7 @@ describe("given a reviewer walking their annotation queue", () => {
       expect(datasetCheckbox("Add to dataset at the end (1 trace)")).toBeInTheDocument();
     });
 
-    /** @scenario "The dataset toggle carries the live count in traces" */
+    /** @scenario "The dataset toggle reports usable selections" */
     it("carries the live count in traces on the toggle", () => {
       renderPage();
 
@@ -479,7 +479,7 @@ describe("given a reviewer walking their annotation queue", () => {
       expect(datasetCheckbox("Add to dataset at the end (1 trace)")).toBeInTheDocument();
     });
 
-    /** @scenario "An empty session disables the dataset toggle" */
+    /** @scenario "The dataset toggle reports usable selections" */
     it("disables the dataset toggle once nothing is counted any more", async () => {
       const user = userEvent.setup();
       renderPage();
@@ -494,7 +494,7 @@ describe("given a reviewer walking their annotation queue", () => {
       expect(toggle).not.toBeChecked();
     });
 
-    /** @scenario "Session marks belong to the sitting" */
+    /** @scenario "Leaving clears the session selection" */
     it("drops the sitting's count on the way out of the queue", () => {
       const { unmount } = renderPage();
       annotateTurn("trace-2");
@@ -512,7 +512,7 @@ describe("given a reviewer walking their annotation queue", () => {
       marksItemsDone();
     });
 
-    /** @scenario "Finishing the last item opens the hand-off over the conversation" */
+    /** @scenario "A selected hand-off remains over the conversation until it resolves" */
     it("opens the hand-off over the conversation, and does not celebrate yet", async () => {
       const user = userEvent.setup();
       setItems([{ id: "item-1", traceId: "trace-1", doneAt: null }]);
@@ -535,7 +535,7 @@ describe("given a reviewer walking their annotation queue", () => {
       expect(mocks.markDone).not.toHaveBeenCalled();
     });
 
-    /** @scenario "Traces counted earlier in the walk are part of the hand-off" */
+    /** @scenario "A selected hand-off remains over the conversation until it resolves" */
     it("includes a trace counted earlier in the walk", async () => {
       const user = userEvent.setup();
       setItems([
@@ -558,7 +558,7 @@ describe("given a reviewer walking their annotation queue", () => {
       });
     });
 
-    /** @scenario "Finishing with the dataset toggle off celebrates directly" */
+    /** @scenario "Completing or confirming without a dataset ends the session" */
     it("records the item as done and celebrates when the toggle is off", async () => {
       const user = userEvent.setup();
       setItems([{ id: "item-1", traceId: "trace-1", doneAt: null }]);
@@ -577,7 +577,7 @@ describe("given a reviewer walking their annotation queue", () => {
   });
 
   describe("given the hand-off drawer is open for the session's traces", () => {
-    /** @scenario "The celebration shows once the records are added" */
+    /** @scenario "Completing or confirming without a dataset ends the session" */
     it("records the item as done, celebrates and clears the sitting's set", async () => {
       const { view } = await finishQueueWithHandoff({ traceIds: ["trace-1"] });
 
@@ -592,7 +592,7 @@ describe("given a reviewer walking their annotation queue", () => {
       expect(session().marks).toEqual({});
     });
 
-    /** @scenario "Closing the hand-off without adding asks before ending the session" */
+    /** @scenario "Completing or confirming without a dataset ends the session" */
     it("asks before ending the session, and confirming records it done and celebrates", async () => {
       const { user, view } = await finishQueueWithHandoff({
         traceIds: ["trace-1"],
@@ -613,7 +613,7 @@ describe("given a reviewer walking their annotation queue", () => {
       );
     });
 
-    /** @scenario "Cancelling the question lands back on the conversation, nothing finished" */
+    /** @scenario "Cancelling a hand-off leaves the final item and selections intact" */
     it("lands back on the conversation with nothing finished and every trace counted", async () => {
       const { user, view } = await finishQueueWithHandoff({
         traceIds: ["trace-1", "trace-2"],
@@ -633,7 +633,7 @@ describe("given a reviewer walking their annotation queue", () => {
       expect(session().marks).toEqual({ "trace-1": "auto", "trace-2": "auto" });
     });
 
-    /** @scenario "Cancelling the question lands back on the conversation, nothing finished" */
+    /** @scenario "Cancelling a hand-off leaves the final item and selections intact" */
     it("offers the hand-off again after the question was cancelled", async () => {
       const { user, view } = await finishQueueWithHandoff({
         traceIds: ["trace-1"],
@@ -653,7 +653,7 @@ describe("given a reviewer walking their annotation queue", () => {
   });
 
   describe("when the reviewer opens a queue with nothing left in it", () => {
-    /** @scenario "An item whose trace is gone does not hold the finished queue back" */
+    /** @scenario "An unavailable trace can be skipped or removed" */
     it("celebrates, since a fresh sitting has counted nothing", async () => {
       setItems([]);
       renderPage();
@@ -676,7 +676,7 @@ describe("given a reviewer walking their annotation queue", () => {
       ]);
     });
 
-    /** @scenario "An item whose trace is gone says so and offers a way on" */
+    /** @scenario "An unavailable trace can be skipped or removed" */
     it("says the trace is no longer available and offers a way on", () => {
       renderPage();
 
@@ -687,7 +687,7 @@ describe("given a reviewer walking their annotation queue", () => {
       expect(screen.getByRole("button", { name: "Skip" })).toBeInTheDocument();
     });
 
-    /** @scenario "An item whose trace is gone says so and offers a way on" */
+    /** @scenario "An unavailable trace can be skipped or removed" */
     it("keeps the queue navigation and drops everything that acts on the trace", () => {
       renderPage();
 
@@ -704,7 +704,7 @@ describe("given a reviewer walking their annotation queue", () => {
       ).not.toBeInTheDocument();
     });
 
-    /** @scenario "An item whose trace is gone says so and offers a way on" */
+    /** @scenario "An unavailable trace can be skipped or removed" */
     it("moves on from the bar without finishing anything", async () => {
       const user = userEvent.setup();
       renderPage();
@@ -719,7 +719,7 @@ describe("given a reviewer walking their annotation queue", () => {
       expect(mocks.markDone).not.toHaveBeenCalled();
     });
 
-    /** @scenario "Removing an item whose trace is gone takes it out of the queue" */
+    /** @scenario "An unavailable trace can be skipped or removed" */
     it("removes the item and moves on to the next one", async () => {
       const user = userEvent.setup();
       mocks.deleteQueueItems.mockImplementation(
@@ -742,7 +742,7 @@ describe("given a reviewer walking their annotation queue", () => {
       await waitFor(() => expect(mocks.invalidateQueues).toHaveBeenCalled());
     });
 
-    /** @scenario "Skipping an item whose trace is gone leaves it in the queue" */
+    /** @scenario "An unavailable trace can be skipped or removed" */
     it("moves on without taking the item out of the queue", async () => {
       const user = userEvent.setup();
       renderPage();
@@ -757,7 +757,7 @@ describe("given a reviewer walking their annotation queue", () => {
       expect(mocks.deleteQueueItems).not.toHaveBeenCalled();
     });
 
-    /** @scenario "An item whose trace is gone says so and offers a way on" */
+    /** @scenario "An unavailable trace can be skipped or removed" */
     it("offers no removal to a reviewer who may not update annotations", () => {
       mocks.canUpdateAnnotations = false;
       renderPage();
@@ -781,7 +781,7 @@ describe("given a reviewer walking their annotation queue", () => {
       ]);
     });
 
-    /** @scenario "An item whose trace is gone does not hold the finished queue back" */
+    /** @scenario "An unavailable trace can be skipped or removed" */
     it("reads as a finished queue", async () => {
       renderPage();
 
@@ -790,7 +790,7 @@ describe("given a reviewer walking their annotation queue", () => {
   });
 
   describe("when the reviewer leaves right after moving to the next item", () => {
-    /** @scenario "Leaving mid-navigation leaves nothing pending behind" */
+    /** @scenario "Navigation does not leave work after the page" */
     it("clears the settle timer it armed", async () => {
       const armTimer = vi.spyOn(globalThis, "setTimeout");
       const cancelTimer = vi.spyOn(globalThis, "clearTimeout");

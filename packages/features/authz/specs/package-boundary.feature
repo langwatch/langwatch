@@ -43,6 +43,19 @@ Feature: AuthZ package boundary
     And both concrete service classes expose static create
     And collector, listing, cache, gate and ledger details are not public services
 
+  @unit @observability
+  Scenario: A process with no metric registry composes AuthZ
+    Given a process composes the AuthZ adapter and gives it no metrics port
+    When it builds the feature
+    Then it receives the AuthZ service, the grants service, the migration and the pipeline
+    And nothing is dispatched and no audit row is written by the build itself
+
+  @unit @observability
+  Scenario: A process with a metric registry counts through its own port
+    Given a process composes the AuthZ adapter with its own metrics port
+    When it builds the feature
+    Then AuthZ resolves its counters from that port rather than from a registry of its own
+
   @architecture @persistence
   Scenario: Persistence stays behind the server package
     Given AuthZ reads or writes authorization state

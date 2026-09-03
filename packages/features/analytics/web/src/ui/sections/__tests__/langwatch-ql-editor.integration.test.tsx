@@ -159,7 +159,7 @@ async function renderEditor({
 describe("the LangWatchQL editor", () => {
   describe("given the schema endpoint answered for this member", () => {
     describe("when the member invokes completion or hovers an identifier", () => {
-      /** @scenario "Monaco assistance derives from the same schema response" */
+      /** @scenario "Schema documentation and completion use the live response" */
       it("offers the schema the response carried, plus the SQL language and nothing else", async () => {
         await renderEditor();
 
@@ -181,7 +181,7 @@ describe("the LangWatchQL editor", () => {
         expect(suggestions.find((item) => item.label === "latency_ms")?.detail).toBe("Float64");
       });
 
-      /** @scenario "Typing a keyword offers the keyword" */
+      /** @scenario "Schema documentation and completion use the live response" */
       it("offers SELECT to a member who has typed nothing schema-shaped", async () => {
         await renderEditor();
 
@@ -199,7 +199,7 @@ describe("the LangWatchQL editor", () => {
         expect(select?.sortText).toBe("0 SELECT");
       });
 
-      /** @scenario "Monaco assistance derives from the same schema response" */
+      /** @scenario "Schema documentation and completion use the live response" */
       it("answers a hover with that column's own type and description", async () => {
         await renderEditor();
 
@@ -217,7 +217,7 @@ describe("the LangWatchQL editor", () => {
     });
 
     describe("when a refusal names a line and column", () => {
-      /** @scenario "A statement the validator cannot parse renders registry copy at its location" */
+      /** @scenario "Backend failures keep their code-specific presentation" */
       it("marks that position in the editor", async () => {
         await renderEditor({
           markers: [

@@ -450,6 +450,7 @@ describe("filterBlockKit", () => {
   // and the other three stay gated — dropped by default, sanitised-and-kept only
   // when the caller confirms the surface renders them (`allowGatedBlocks`).
   describe("when modern blocks are present with default options", () => {
+    /** @scenario "An automation delivers through an incoming webhook" */
     it("keeps card (delivery-verified) but drops the still-gated alert / data_visualization / data_table", () => {
       const blocks = filterBlockKit([
         { type: "alert", level: "error", text: { type: "mrkdwn", text: "x" } },
@@ -471,6 +472,7 @@ describe("filterBlockKit", () => {
   });
 
   describe("when a template's gated hero is filtered but a fallback follows", () => {
+    /** @scenario "An automation delivers through an incoming webhook" */
     it("degrades to the allowlisted fallback so the message is never empty", () => {
       const blocks = filterBlockKit([
         {

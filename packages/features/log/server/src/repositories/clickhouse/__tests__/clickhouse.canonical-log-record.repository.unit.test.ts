@@ -75,6 +75,7 @@ function record(): CanonicalLogRecord {
 }
 
 describe("ClickHouseCanonicalLogRecordRepository", () => {
+  /** @scenario "Valid OTLP logs become canonical durable events" */
   it("writes the authoritative row before the payload-free usage estimate", async () => {
     const insert = vi.fn<(args: { table: string; values: unknown[] }) => Promise<void>>(
       async () => undefined,

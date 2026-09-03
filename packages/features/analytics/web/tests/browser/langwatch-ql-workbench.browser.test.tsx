@@ -221,7 +221,7 @@ afterEach(() => cleanup());
 describe("the LangWatchQL workbench in real Chromium", () => {
   describe("given an authorized member with a live LangWatchQL schema", () => {
     describe("when the member types a statement, runs it, and waits", () => {
-      /** @scenario "A LangWatchQL query flows from editor to native table in a real browser" */
+      /** @scenario "A real browser carries a query from editor to native table" */
       it("shows the returned rows in the native result table beside the run statistics", async () => {
         renderWorkbench();
 
@@ -260,7 +260,7 @@ describe("the LangWatchQL workbench in real Chromium", () => {
         ]);
       });
 
-      /** @scenario "A LangWatchQL query flows from editor to native table in a real browser" */
+      /** @scenario "A real browser carries a query from editor to native table" */
       it("windows the rows against the measured viewport and moves that window when the member scrolls", async () => {
         renderWorkbench();
 

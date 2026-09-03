@@ -100,6 +100,13 @@ Feature: Internal ops navigation in the new navigation modes
     When the landing memory reads the address
     Then it resolves to no product
 
+  @unit
+  Scenario: The internal ops pages take the settings detour
+    Given a settings address or an internal ops address
+    When the chrome resolves which product and scope that address belongs to
+    Then it resolves as a settings route carrying organization scope
+    And it belongs to no product
+
   @integration
   Scenario: The current chrome keeps its ops section unchanged
     Given my device is on the legacy mode

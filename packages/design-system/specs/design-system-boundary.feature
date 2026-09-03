@@ -64,3 +64,28 @@ Feature: Design system foundations and boundary
     Given the user prefers reduced motion
     When color mode or graphics quality changes
     Then decorative transitions and animation are disabled
+
+  @unit
+  Scenario: Shared table headers retain their type-specific visual cues
+    Given a column whose type the design system draws an icon for
+    When a table header renders that column
+    Then the icon and its colour are the ones mapped to that type
+
+  @unit
+  Scenario: New column types retain a readable generic icon
+    Given a column whose type the design system has no icon for
+    When a table header renders that column
+    Then a neutral text icon is drawn rather than nothing
+
+  @unit
+  Scenario: Collapsed virtualized cells expand only beyond the configured limit
+    Given the collapsed cell length the design system treats as fitting
+    When a value exactly that long, and a value one character longer, are measured
+    Then only the longer value is reported as likely to overflow
+
+  @unit
+  Scenario: Line breaks account for their rendered line height without DOM measurement
+    Given a value carrying a line break
+    When it is measured against a width and a per-line cost
+    Then the line break is charged that cost, so the answer changes at the boundary
+    And nothing is measured in the DOM to reach it

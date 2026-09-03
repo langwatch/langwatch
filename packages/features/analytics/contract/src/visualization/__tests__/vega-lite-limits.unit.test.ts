@@ -170,7 +170,7 @@ describe("the LangWatchQL complexity ceilings", () => {
         });
       });
 
-      /** @scenario "Every named complexity limit refuses just past its ceiling" */
+      /** @scenario "Policy validates names, fields, transforms, and complexity" */
       it("admits the one on the ceiling and refuses the one past it, naming the limit", () => {
         // The generated pairs really are one step apart on the axis each
         // ceiling measures, checked with measurements of this file's own.

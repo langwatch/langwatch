@@ -142,6 +142,13 @@ Feature: Share a trace behind a secret, scoped, expiring link
       When the sharer revokes the link
       Then opening the link afterwards is denied
 
+    @unit
+    Scenario: Active shares own their pin annotation
+      Given a trace held out of retention because it is shared
+      When someone unpins that trace by hand while a share is still active
+      Then the unpin is refused
+      And no retention pin is removed
+
   Rule: The plan visibility window and content redaction still apply to shared views
 
     @integration

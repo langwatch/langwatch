@@ -118,7 +118,6 @@ describe("given the Inbox address", () => {
     });
 
     /** @scenario "Exactly one list entry is active" */
-    /** @scenario "The open top-level list is the highlighted sidebar entry" */
     it("marks the Inbox entry in the sidebar and nothing else", () => {
       renderWithAnnotationHost(<AnnotationsScreen view="inbox" />);
 
@@ -167,7 +166,7 @@ describe("given the Inbox address", () => {
 
 describe("given a queue page", () => {
   describe("when the sidebar renders beside it", () => {
-    /** @scenario "The open queue is the highlighted sidebar entry" */
+    /** @scenario "Exactly one list entry is active" */
     it("highlights that queue and no other", () => {
       mocks.badges = [
         { id: "q1", name: "Support reviews", slug: "support-reviews", pendingCount: 3 },
@@ -188,7 +187,6 @@ describe("given a queue page", () => {
     });
 
     /** @scenario "Queue edits begin at the queue entry" */
-    /** @scenario "Every queue in the sidebar carries its own actions menu" */
     it("gives each queue an action that edits that queue", () => {
       mocks.badges = [
         { id: "q1", name: "Support reviews", slug: "support-reviews", pendingCount: 3 },

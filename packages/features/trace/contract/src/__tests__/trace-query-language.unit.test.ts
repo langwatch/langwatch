@@ -250,6 +250,7 @@ describe("parse operator matrix", () => {
       expect(tag.expression.range.max).toBe(10);
     });
 
+    /** @scenario "Browser editing uses the canonical language locally" */
     it("normalises `1.00` → `1` on round-trip — liqe collapses trailing zeros", () => {
       // Encoded so future-us notice if liqe's number formatting ever changes.
       expect(serialize(parse("cost:[0.01 TO 1.00]"))).toBe("cost:[0.01 TO 1]");
@@ -268,6 +269,7 @@ describe("parse operator matrix", () => {
       expect(tag.expression.value).toBe("gpt-4 turbo");
     });
 
+    /** @scenario "Browser editing uses the canonical language locally" */
     it("keeps parens + whitespace inside quoted values through serialize() (regression)", () => {
       // The post-serialise normaliser collapses whitespace hugging parens
       // (a clause-removal tidy-up); it must NOT reach inside quoted literals.

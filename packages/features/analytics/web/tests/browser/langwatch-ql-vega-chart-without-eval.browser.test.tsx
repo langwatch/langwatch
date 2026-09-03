@@ -151,7 +151,7 @@ afterEach(() => cleanup());
 describe("the LangWatchQL chart on a page that forbids string evaluation", () => {
   describe("given the workbench served under a policy without unsafe-eval", () => {
     describe("when a valid specification renders as a chart", () => {
-      /** @scenario "The chart renders under a CSP that forbids eval" */
+      /** @scenario "The chart renders under CSP without eval" */
       it("draws through Vega's expression interpreter, while the same specification with the interpreter disabled is refused", async () => {
         // The control differs from the shipped path by exactly one option, and
         // this is the shipped value of it.

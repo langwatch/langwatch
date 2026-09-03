@@ -77,6 +77,7 @@ describe("SlackBlockKitTemplatePicker", () => {
   });
 
   describe("given a webhook connection", () => {
+    /** @scenario "The richer templates are offered only for a bot connection" */
     it("renders a template that needs a Slack app but blocks selecting it", () => {
       const onSelect = vi.fn();
       renderPicker({ deliveryMethod: "webhook", onSelect });
@@ -92,6 +93,7 @@ describe("SlackBlockKitTemplatePicker", () => {
       expect(onSelect).not.toHaveBeenCalled();
     });
 
+    /** @scenario "The richer templates are offered only for a bot connection" */
     it("keeps a non-gated template selectable", () => {
       renderPicker({ deliveryMethod: "webhook" });
 
@@ -100,6 +102,7 @@ describe("SlackBlockKitTemplatePicker", () => {
   });
 
   describe("given a bot connection", () => {
+    /** @scenario "The richer templates are offered only for a bot connection" */
     it("lets the author select a template that needs a Slack app", () => {
       const onSelect = vi.fn();
       renderPicker({ deliveryMethod: "bot", onSelect });

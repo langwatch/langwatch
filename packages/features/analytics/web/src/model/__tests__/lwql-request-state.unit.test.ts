@@ -77,7 +77,7 @@ function controllerWith(draft: {
 describe("the LangWatchQL request machine", () => {
   describe("given a draft statement and parameters", () => {
     describe("when the member runs the query and it succeeds", () => {
-      /** @scenario "Run query submits the draft and becomes Reload on success" */
+      /** @scenario "Run and Reload preserve the intended snapshot" */
       it("submits that exact draft and the action then reads Reload", async () => {
         const { calls, controller } = controllerWith({
           sql: "SELECT trace_id FROM analytics.traces_daily",
@@ -109,7 +109,7 @@ describe("the LangWatchQL request machine", () => {
     });
 
     describe("when the member edits the SQL after a successful result", () => {
-      /** @scenario "Editing SQL or parameters marks the result stale and restores Run query" */
+      /** @scenario "Run and Reload preserve the intended snapshot" */
       it("marks the visible result stale and the action reads Run query again", async () => {
         const { calls, controller } = controllerWith({ sql: "SELECT 1" });
 
@@ -128,7 +128,7 @@ describe("the LangWatchQL request machine", () => {
     });
 
     describe("when the member edits the parameters after a successful result", () => {
-      /** @scenario "Editing SQL or parameters marks the result stale and restores Run query" */
+      /** @scenario "Run and Reload preserve the intended snapshot" */
       it("marks the visible result stale and the action reads Run query again", async () => {
         const { calls, controller } = controllerWith({
           sql: "SELECT 1",
@@ -192,7 +192,7 @@ describe("the LangWatchQL request machine", () => {
     });
 
     describe("when the workbench is disposed before the second submission answers", () => {
-      /** @scenario "A stale result stays labelled as belonging to the previous submission" */
+      /** @scenario "Requests are manual, single-flight, and cancellation-safe" */
       it("leaves the earlier result stale rather than crediting it to the abandoned request", async () => {
         const { calls, controller } = controllerWith({ sql: "SELECT 1" });
 
@@ -221,7 +221,7 @@ describe("the LangWatchQL request machine", () => {
     });
 
     describe("when a later submission fails after an earlier one succeeded", () => {
-      /** @scenario "Editing SQL or parameters marks the result stale and restores Run query" */
+      /** @scenario "Run and Reload preserve the intended snapshot" */
       it("replaces the visible result with the failure, credited to the request that failed", async () => {
         const { calls, controller } = controllerWith({ sql: "SELECT 1" });
 
@@ -255,7 +255,7 @@ describe("the LangWatchQL request machine", () => {
 
   describe("given a submitted snapshot the draft has moved away from", () => {
     describe("when the member reloads", () => {
-      /** @scenario "Reload reruns the submitted snapshot exactly" */
+      /** @scenario "Run and Reload preserve the intended snapshot" */
       it("sends the submitted SQL and parameters, not the draft", async () => {
         const { calls, controller } = controllerWith({
           sql: "SELECT trace_id FROM analytics.traces_daily",
@@ -287,7 +287,7 @@ describe("the LangWatchQL request machine", () => {
 
   describe("given a LangWatchQL query already in flight", () => {
     describe("when the member tries to run or reload again", () => {
-      /** @scenario "Duplicate submissions are prevented while a request is in flight" */
+      /** @scenario "Requests are manual, single-flight, and cancellation-safe" */
       it("issues no second request until the first settles", async () => {
         const { calls, controller } = controllerWith({ sql: "SELECT 1" });
 
@@ -310,7 +310,7 @@ describe("the LangWatchQL request machine", () => {
     });
 
     describe("when the member leaves the workbench", () => {
-      /** @scenario "An aborted request never updates the result pane" */
+      /** @scenario "Requests are manual, single-flight, and cancellation-safe" */
       it("aborts the request and drops an answer that arrives afterwards", async () => {
         const { calls, controller } = controllerWith({ sql: "SELECT 1" });
 
@@ -329,7 +329,7 @@ describe("the LangWatchQL request machine", () => {
     });
 
     describe("when the member cancels the run", () => {
-      /** @scenario "Cancelling an in-flight run keeps the previous result" */
+      /** @scenario "Requests are manual, single-flight, and cancellation-safe" */
       it("abandons the request and keeps the previous result on screen", async () => {
         const { calls, controller } = controllerWith({ sql: "SELECT 1" });
 
@@ -367,7 +367,7 @@ describe("the LangWatchQL request machine", () => {
     });
 
     describe("when a cancelled request rejects after the fact", () => {
-      /** @scenario "An aborted request never updates the result pane" */
+      /** @scenario "Requests are manual, single-flight, and cancellation-safe" */
       it("leaves the previously visible result exactly as it was", async () => {
         const { calls, controller } = controllerWith({ sql: "SELECT 1" });
 
@@ -388,7 +388,7 @@ describe("the LangWatchQL request machine", () => {
 
   describe("given a draft whose SQL the backend would reject", () => {
     describe("when the member runs the query", () => {
-      /** @scenario "The frontend does not implement a second SQL validator" */
+      /** @scenario "The browser submits exact SQL and does not validate a second language" */
       it("submits the statement unmodified and surfaces the backend's refusal", async () => {
         const rejected = "  DROP TABLE traces;;  SELECT 1 -- trailing\n";
         const { calls, controller } = controllerWith({ sql: rejected });

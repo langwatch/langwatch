@@ -412,7 +412,6 @@ const LEGACY_INERT: string[] = [
   // @unimplemented tag, and park only any remaining rollout scenarios.
   "packages/features/stored-object/specs/stored-objects.feature",
   "packages/group-queue/specs/payload-envelope.feature",
-  "packages/group-queue/specs/work-conserving-fair-dispatch.feature",
   "specs/automations/dispatch-error-contract.feature",
   "specs/billing/global-projections.feature",
   "specs/trace-processing/oversized-attribute-value-preview.feature",

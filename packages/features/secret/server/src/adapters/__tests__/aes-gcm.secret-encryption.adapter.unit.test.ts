@@ -35,18 +35,24 @@ describe("AesGcmSecretEncryptionAdapter", () => {
   });
 
   describe("given a value written by this cipher", () => {
+    /** @scenario "Encrypted keys are decrypted on read" */
     it("reads it back unchanged", () => {
       const encrypted = cipher().encrypt("sk-live-abc123");
 
       expect(cipher().decrypt(encrypted)).toBe("sk-live-abc123");
     });
 
+    /** @scenario "New model provider keys are encrypted on save" */
     it("writes the three-part hex format the stored column holds", () => {
-      const [iv, payload, authTag] = cipher().encrypt("value").split(":");
+      const stored = cipher().encrypt('{"OPENAI_API_KEY":"sk-live-abc123"}');
+      const [iv, payload, authTag] = stored.split(":");
 
       expect(iv).toMatch(/^[0-9a-f]{24}$/);
       expect(payload).toMatch(/^[0-9a-f]+$/);
       expect(authTag).toMatch(/^[0-9a-f]{32}$/);
+      // A reader that still expects the legacy plaintext column would parse
+      // this as JSON; it must fail rather than half-succeed.
+      expect(() => JSON.parse(stored)).toThrow();
     });
 
     it("never writes the same ciphertext twice, so equal secrets do not look equal", () => {
@@ -57,6 +63,7 @@ describe("AesGcmSecretEncryptionAdapter", () => {
       expect(first.split(":")[0]).not.toBe(second.split(":")[0]);
     });
 
+    /** @scenario "New model provider keys are encrypted on save" */
     it("keeps the plaintext out of what it stores", () => {
       expect(cipher().encrypt("sk-live-abc123")).not.toContain("sk-live-abc123");
     });

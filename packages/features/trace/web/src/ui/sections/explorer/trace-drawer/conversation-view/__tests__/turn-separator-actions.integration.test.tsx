@@ -328,7 +328,7 @@ describe("given the turn's own trace is already being corrected", () => {
 
 describe("given a queue being walked", () => {
   describe("when the reviewer reads a turn separator", () => {
-    /** @scenario "The session checkbox leads the separator" */
+    /** @scenario "Reviewing and explicitly selecting traces builds the dataset set" */
     it("puts the session tick at the left end, ahead of the ledger", () => {
       renderTurn({ showSessionCheckbox: true });
 
@@ -344,7 +344,7 @@ describe("given a queue being walked", () => {
   });
 
   describe("when the reviewer ticks a turn", () => {
-    /** @scenario "A turn is counted in or out by hand" */
+    /** @scenario "Reviewing and explicitly selecting traces builds the dataset set" */
     it("counts that turn's trace into the sitting", async () => {
       renderTurn({ showSessionCheckbox: true });
 
@@ -355,7 +355,7 @@ describe("given a queue being walked", () => {
       ).toBe(true);
     });
 
-    /** @scenario "A counted turn's separator reads as counted" */
+    /** @scenario "Reviewing and explicitly selecting traces builds the dataset set" */
     it("reads the separator the way the turn under review reads", async () => {
       renderTurn({ showSessionCheckbox: true });
       expect(separator()).toHaveAttribute("data-highlighted", "false");
@@ -388,7 +388,7 @@ describe("given a queue being walked", () => {
   });
 
   describe("when a turn was already counted in", () => {
-    /** @scenario "Annotating a turn counts its trace into the session" */
+    /** @scenario "Reviewing and explicitly selecting traces builds the dataset set" */
     it("reads as ticked", () => {
       useAnnotationQueueSessionStore.getState().noteAnnotationSaved(TRACE_ID);
 

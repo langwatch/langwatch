@@ -22,7 +22,7 @@ beforeEach(() => {
 
 describe("given a sitting at the queue", () => {
   describe("when the walk brings the reviewer to a turn", () => {
-    /** @scenario "The turn under review is counted from the start" */
+    /** @scenario "Reviewing and explicitly selecting traces builds the dataset set" */
     it("counts that turn's trace into the sitting", () => {
       state().setActive(true);
       state().noteWalked("trace-1");
@@ -55,7 +55,7 @@ describe("given a sitting at the queue", () => {
   });
 
   describe("when a turn is annotated", () => {
-    /** @scenario "Annotating a turn counts its trace into the session" */
+    /** @scenario "Reviewing and explicitly selecting traces builds the dataset set" */
     it("counts its trace into the sitting", () => {
       state().setActive(true);
       state().noteAnnotationSaved("trace-1");
@@ -66,7 +66,7 @@ describe("given a sitting at the queue", () => {
   });
 
   describe("when the reviewer ticks a turn they only read", () => {
-    /** @scenario "A turn is counted in or out by hand" */
+    /** @scenario "Reviewing and explicitly selecting traces builds the dataset set" */
     it("counts it in", () => {
       state().toggle("trace-2");
 
@@ -76,7 +76,7 @@ describe("given a sitting at the queue", () => {
   });
 
   describe("when the reviewer unticks a turn they annotated", () => {
-    /** @scenario "A turn is counted in or out by hand" */
+    /** @scenario "Reviewing and explicitly selecting traces builds the dataset set" */
     it("takes it back out and keeps it out when annotated again", () => {
       state().noteAnnotationSaved("trace-3");
       state().toggle("trace-3");
@@ -103,7 +103,7 @@ describe("given a sitting at the queue", () => {
 
 describe("given a sitting that counted two turns", () => {
   describe("when the queue is left", () => {
-    /** @scenario "Session marks belong to the sitting" */
+    /** @scenario "Leaving clears the session selection" */
     it("counts nothing any more", () => {
       state().setActive(true);
       state().noteAnnotationSaved("trace-5");

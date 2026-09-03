@@ -525,6 +525,7 @@ describe("ExperimentService", () => {
     expect(restored.state?.results?.runId).toBe("run_1");
   });
 
+  /** @scenario "DSPy steps use the Experiment service" */
   it("owns DSPy step writes and reads", async () => {
     const { service } = build();
     await service.upsertDspyStep(dspyStep);
@@ -545,6 +546,7 @@ describe("ExperimentService", () => {
     ).resolves.toHaveLength(1);
   });
 
+  /** @scenario "DSPy steps use the Experiment service" */
   it("throws the Experiment DSPy error when a step is absent", async () => {
     await expect(
       build().service.getDspyStep({
@@ -603,6 +605,63 @@ describe("ExperimentService", () => {
     expect(execution.completeExperimentRun).toHaveBeenCalledWith(complete);
   });
 
+  describe("given a project that holds no such experiment", () => {
+    describe("when a required read asks for it", () => {
+      /** @scenario "Required reads throw on absence" */
+      it("throws the Experiment's own not-found error instead of returning null", async () => {
+        const { service } = build();
+
+        await expect(
+          service.getById({ projectId: "project_1", id: "missing" }),
+        ).rejects.toBeInstanceOf(ExperimentNotFoundError);
+        await expect(
+          service.getBySlug({ projectId: "project_1", slug: "missing" }),
+        ).rejects.toBeInstanceOf(ExperimentNotFoundError);
+      });
+
+      /** @scenario "Required reads throw on absence" */
+      it("throws only for absence, and returns the row when the project holds it", async () => {
+        const { repository, service } = build();
+        repository.values.push(row());
+
+        await expect(service.getById({ projectId: "project_1", id: "experiment_1" })).resolves
+          .toMatchObject({ id: "experiment_1" });
+      });
+    });
+  });
+
+  describe("given an experiment that has already been archived", () => {
+    describe("when a save is attempted against it", () => {
+      /** @scenario "Archived experiments cannot be resurrected" */
+      it("refuses the write and leaves the row archived", async () => {
+        const { repository, service } = build();
+        repository.values.push(row({ archivedAt: new Date(0) }));
+        repository.states.set("project_1:experiment_1", {
+          slug: "draft",
+          workflowId: null,
+          archived: true,
+        });
+
+        await expect(
+          service.save({
+            id: "experiment_1",
+            projectId: "project_1",
+            name: "Draft",
+            type: "EVALUATIONS_V3",
+            requestedSlug: "draft",
+            slugMode: "preserve-existing",
+            workflowId: null,
+            workbenchState: null,
+          }),
+        ).rejects.toBeInstanceOf(ExperimentNotFoundError);
+        expect(
+          await repository.tryGetRowState({ projectId: "project_1", id: "experiment_1" }),
+        ).toMatchObject({ archived: true });
+      });
+    });
+  });
+
+  /** @scenario "Slugs remain unique inside a project" */
   it("deduplicates slugs inside a project", async () => {
     const { repository, service } = build();
     repository.values.push(row());
@@ -619,6 +678,7 @@ describe("ExperimentService", () => {
     expect(saved.slug).toBe("draft-2");
   });
 
+  /** @scenario "Archive does not cross persistence boundaries" */
   it("archives only the Experiment row", async () => {
     const { repository, service } = build();
     repository.states.set("project_1:experiment_1", {

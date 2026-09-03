@@ -52,6 +52,11 @@ Feature: LangWatchQL query workbench
       When the member runs it
       Then the statement is sent unmodified and the backend's coded refusal is what the member sees
 
+    @integration
+    Scenario: The schema browser names the reserved period parameters where SQL is written
+      When the member reads the schema browser
+      Then it names period_start and period_end and the half-open interval they describe
+
   Rule: Request state distinguishes draft, submitted, and visible result
 
     @unit
@@ -60,6 +65,14 @@ Feature: LangWatchQL query workbench
       When the member runs it successfully and later edits the draft
       Then the successful outcome owns an immutable submitted snapshot, editing marks it stale, and the action returns to Run query
       And Reload reruns the submitted snapshot rather than the edited draft
+
+    @unit
+    Scenario: Named scalar parameters accompany the SQL without rewriting it
+      Given a draft using parameter placeholders and named scalar values
+      When the member runs the query
+      Then the request carries the SQL unmodified and the parameters as named scalars
+      And only the request shape is validated locally, so a row left unnamed or holding
+        the wrong kind of value says so and holds Run query back rather than being sent
 
     @unit
     Scenario: Requests are manual, single-flight, and cancellation-safe
@@ -85,6 +98,13 @@ Feature: LangWatchQL query workbench
       Given SQL declares neither reserved period parameter
       When the member runs it with a selected or one-off window
       Then it executes unchanged and reports that it does not follow the page period
+
+    @unit
+    Scenario: A period-aware statement run with no window names what is unset
+      Given SQL declaring the reserved period parameters and no window at all
+      When the declaration is resolved
+      Then the statement still reports that it follows the period
+      And the declared reserved names are reported as awaited rather than refused
 
     @integration
     Scenario: The step a statement declares is offered as a control, not as a parameter to fill in
@@ -119,6 +139,55 @@ Feature: LangWatchQL query workbench
       When the member clears the step and runs the query
       Then the request carries no granularity field at all
       And it is not sent as a present field holding no value
+
+  Rule: The declared granularity step is resolved, never invented
+
+    The workbench-facing half of this contract is above. These are the
+    resolver's own decisions, which every surface that runs a declared
+    statement inherits.
+
+    @unit
+    Scenario: A statement declaring the granularity parameter runs at the step the workbench supplies
+      Given SQL declaring period_granularity_seconds as UInt32 alongside both period bounds
+      And the surface supplies an offered step
+      When the declaration is resolved
+      Then the statement is bound with that step
+      And the resolution says it follows the granularity
+
+    @unit
+    Scenario: The resolver reports an unfilled declared granularity rather than inventing a step
+      Given SQL declaring period_granularity_seconds as UInt32 and no step supplied
+      When the declaration is resolved on its own
+      Then the resolution still says the statement follows the granularity
+      And it carries no granularity value, since inventing one would change what a
+        member's chart shows without them asking
+
+    @unit
+    Scenario: The granularity parameter declared as anything but UInt32 is refused
+      Given SQL declaring period_granularity_seconds as any other ClickHouse type
+      When the statement is resolved, at save or at run
+      Then it is refused as a wrong granularity declaration
+      And the refusal blames the declared type rather than the step
+
+    @unit
+    Scenario: A zero or fractional step is refused as a wrong declaration
+      Given SQL declaring period_granularity_seconds as UInt32
+      When the surface supplies a step that is zero, negative, or fractional
+      Then the run is refused as a wrong granularity declaration
+      And the refusal describes the step rather than claiming the declaration is mistyped
+
+    @unit
+    Scenario: A granularity declared alongside a mistyped period bound is refused at save
+      Given SQL declaring period_granularity_seconds and a period bound declared as a non-date-time
+      When the statement is validated
+      Then it is refused because granularity requires well-typed period parameters
+      And the refusal distinguishes the mistyped bound from an absent one
+
+    @unit
+    Scenario: A window too wide for even the coarsest offered step is refused everywhere
+      Given a statement declaring granularity over a period no offered step can bucket
+      When the run is resolved on a surface that would otherwise coarsen
+      Then it is refused as too fine for the period rather than coarsened
 
   Rule: Results preserve transport fields, ordering, and readable states
 

@@ -31,7 +31,7 @@ const scan = (rows: readonly Record<string, unknown>[], fields: string[]) =>
 
 describe("scanning the values a chart will encode", () => {
   describe("given rows holding zero, null, missing, NaN and infinity", () => {
-    /** @scenario "Values Vega cannot represent faithfully produce a warning, not a zero" */
+    /** @scenario "Chart failures are explicit and do not discard the table" */
     it("leaves zero, null and missing alone and warns about the rest", () => {
       const result = scan(
         [
@@ -71,7 +71,7 @@ describe("scanning the values a chart will encode", () => {
   });
 
   describe("given a wide integer column", () => {
-    /** @scenario "Values Vega cannot represent faithfully produce a warning, not a zero" */
+    /** @scenario "Chart failures are explicit and do not discard the table" */
     it("warns when a value has more digits than a chart can plot exactly", () => {
       const result = scan(
         [
@@ -106,7 +106,7 @@ describe("scanning the values a chart will encode", () => {
   });
 
   describe("given encoded columns with nothing in them", () => {
-    /** @scenario "Chart failures are distinct intentional states, never a blank chart" */
+    /** @scenario "Chart failures are explicit and do not discard the table" */
     it("reports that there is nothing to draw", () => {
       expect(scan([{ model: null }, { model: "" }, {}], ["model"]).allEncodedValuesEmpty).toBe(
         true,

@@ -100,6 +100,7 @@ describe("modern REST", () => {
     ).toThrow(/static lower-kebab segments/);
   });
 
+  /** @scenario "A handler receives validated input and returns a value" */
   it("captures schemas before deriving the handler input and output", async () => {
     const app = service()
       .get("/items/:id", "2026-08-07", (endpoint) =>
@@ -119,6 +120,7 @@ describe("modern REST", () => {
     await expect(response.json()).resolves.toEqual({ id: "item_1", reveal: true });
   });
 
+  /** @scenario "A handler receives validated input and returns a value" */
   it("validates one merged request, output, and the JSON body limit", async () => {
     let calls = 0;
     const app = service()
@@ -383,6 +385,7 @@ describe("modern REST", () => {
     expect(operation?.responses).toHaveProperty("200");
   });
 
+  /** @scenario "Authorization is decided after the input is validated" */
   it("rejects a validated project target before permissions, limits, and the handler", async () => {
     let permissionCalls = 0;
     let limitCalls = 0;
@@ -414,7 +417,10 @@ describe("modern REST", () => {
       .withoutResourceLimit("no resource ceiling for this probe")
       .get("/target", "2026-08-07", (endpoint) =>
         endpoint
-          .withInput(z.object({ projectId: z.string() }))
+          // `.trim()` makes the validated value differ from the raw one, so the
+          // padded request below can only be accepted if the scope check reads
+          // the post-validation input.
+          .withInput(z.object({ projectId: z.string().trim() }))
           .withOutput(z.object({ ok: z.boolean() }))
           .withPermissionScope("projectId")
           .handle(async () => {
@@ -427,6 +433,11 @@ describe("modern REST", () => {
 
     expect(response.status).toBe(403);
     expect([permissionCalls, limitCalls, handlerCalls]).toEqual([0, 0, 0]);
+
+    const padded = await app.request("/api/v1/project/target?projectId=%20project_a%20");
+
+    expect(padded.status).toBe(200);
+    expect(handlerCalls).toBe(1);
   });
 
   it("keeps a versioned createService family off the public REST mount", async () => {

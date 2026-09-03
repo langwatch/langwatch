@@ -231,6 +231,7 @@ describe("ReportUsageForMonthCommand", () => {
   // ========================================================================
 
   describe("given org with billable events and active subscription", () => {
+    /** @scenario "Report metered usage through an injected provider" */
     it("reports delta, updates checkpoint, and self-dispatches", async () => {
       mockOrganizations.getOrganizationForBilling.mockResolvedValue(makeOrg());
       mockBillingCheckpoints.tryGetCheckpoint.mockResolvedValue({
@@ -313,6 +314,7 @@ describe("ReportUsageForMonthCommand", () => {
   // ========================================================================
 
   describe("given pending checkpoint (crash recovery)", () => {
+    /** @scenario "Report metered usage through an injected provider" */
     it("uses pending value with same idempotency key", async () => {
       mockOrganizations.getOrganizationForBilling.mockResolvedValue(makeOrg());
       mockBillingCheckpoints.tryGetCheckpoint.mockResolvedValue({
@@ -349,6 +351,7 @@ describe("ReportUsageForMonthCommand", () => {
   // ========================================================================
 
   describe("given permanent Stripe rejection", () => {
+    /** @scenario "Report metered usage through an injected provider" */
     it("clears pending, increments failures, does NOT self-dispatch", async () => {
       mockOrganizations.getOrganizationForBilling.mockResolvedValue(makeOrg());
       mockBillingCheckpoints.tryGetCheckpoint.mockResolvedValue({

@@ -100,7 +100,7 @@ const tint = () => document.querySelector('[data-focused-turn="true"]') as HTMLE
 afterEach(cleanup);
 
 describe("given the turn under review carries annotations in the rail beside it", () => {
-  /** @scenario "The tint hugs the turn and leaves the rail out" */
+  /** @scenario "The current turn is focused in its conversation" */
   it("wraps the turn with breathing room of its own and leaves the rail out", () => {
     renderRow({ isFocused: true });
 

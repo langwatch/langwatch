@@ -43,11 +43,30 @@ Feature: Walking an annotation queue into a dataset
       Then that trace is shown as a single-turn conversation
 
     @integration
+    Scenario: Messages arrive expanded so the whole output can be read
+      When I open a queue item
+      Then the conversation's messages are already expanded
+      And nothing is cut off mid-answer for the reviewer to unfold by hand
+
+    @integration
     Scenario: Edit trace uses the trace drawer in annotation mode
       Given I may update annotations
       When I choose "Edit trace"
       Then the drawer opens for the queued trace in annotation mode
       And it avoids a duplicate conversation tab when the queue already shows it
+
+    @integration
+    Scenario: A reviewer who cannot update annotations is offered no correction
+      Given I may work my queue but not update its annotations
+      When I open a queue item
+      Then no way to edit the trace is offered, on the bar or on a turn
+      And the rest of the bar still works
+
+    @integration
+    Scenario: Picking another turn opens that turn's trace in the drawer
+      Given the open queue item's thread has more than one turn
+      When I pick one of the other turns
+      Then that turn's trace opens in the trace drawer over the queue
 
     @integration
     Scenario: Annotation suggestions use the conversation correction editor

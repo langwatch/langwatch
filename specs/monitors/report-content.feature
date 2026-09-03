@@ -47,11 +47,13 @@ Feature: What a scheduled report actually sends
 
   Rule: The message layout follows the report's source — the author never picks a layout that cannot render
 
+    @unit
     Scenario: A dashboard report needs no layout choice
       Given the author is configuring a dashboard report
       Then no message layout is offered to choose from
       And the dashboard's panels map straight to the message
 
+    @unit
     Scenario Outline: A report is offered only layouts that fit its source
       Given the author is configuring a <source> report
       Then the layouts offered all render <fits>
@@ -62,6 +64,7 @@ Feature: What a scheduled report actually sends
         | custom-graph | a chart             | table-of-traces |
         | trace-query  | the matching traces | chart           |
 
+    @unit
     Scenario: Changing the report's source moves the author to a layout that fits
       Given the author picked a chart layout for a custom-graph report
       When they change the source to matching traces

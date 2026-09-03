@@ -709,3 +709,519 @@ recovered is another lane's.
 2. **Two governance wiring gaps, not test gaps.** `SsrfSafeAnomalyAlertHttpAdapter` and
    `startSpendSpikeAnomalyWorker` have no callers anywhere in `apps/` or `packages/`. The whole
    spend-spike anomaly delivery path describes behaviour no process currently starts.
+   **Closed** — see "Spend-spike anomaly wiring ledger" at the end of this file.
+
+
+---
+
+## Lane 5 ledger — 2026-09-03
+
+All 352 unknown annotations were resolved except the seven that sit in files other
+lanes hold open. The `352 unknown annotation(s)` line falls to seven, and every scenario
+written to give an annotation a home was tagged and bound in the same pass, so the unbound
+count fell rather than rose.
+
+### Gate, before and after
+
+```
+before  Enforced: 1376 file(s) · Legacy: 15 file(s) · Inert: 380 file(s)
+        FAIL: 4628 unbound scenario(s) in enforced files, 352 unknown annotation(s),
+              17 file(s) enforce no scenario at all
+
+after   Enforced: 1378 file(s) · Legacy: 15 file(s) · Inert: 367 file(s)
+        FAIL: 4586 unbound scenario(s) in enforced files, 7 unknown annotation(s),
+              5 file(s) enforce no scenario at all
+```
+
+Unbound fell by 42 — 29 in `analytics-lwql-workbench.feature` (5 of 34 bound before, 43 of 43
+after) and 13 in `annotation-queue-workflow.feature` (1 of 15 before, 17 of 18 after). Enforced
+files rose by two, which are this lane's two new spec files. The fatal-inert count moved for
+reasons outside this lane as well: other lanes were landing in the same tree.
+
+### Counts by cause and outcome
+
+| Cause | Annotations | Repointed | Kept, scenario written or restored | Held by another lane |
+| --- | --- | --- | --- | --- |
+| **A1** `94b95128a0` — LWQL workbench collapsed 86 scenarios to 34 | 157 | 148 | 9 | — |
+| **A2** `a380067e78` — annotation queue and list specs collapsed | 119 | 114 | 5 | — |
+| **A3** `df4f775bd2` — LWQL granularity and run-by-chart-id contract | 13 | 2 | 9 | 2 |
+| **A4** `e49da577ab` — work-conserving override counting | 9 | — | 9 | — |
+| **A5** `d7c18dd45e` — eventing and group-queue package move | 6 | 4 | 2 | — |
+| **B** — title never existed in any `.feature` | 48 | 1 | 42 | 5 |
+| **Total** | **352** | **269** | **76** | **7** |
+
+Fourteen of the A2 repoints landed on a title the same test already carried, so the now-duplicate
+JSDoc line was deleted rather than left twice: 255 repointed annotations survive, 14 are gone,
+76 keep their original title, 7 are untouched. Nothing was deleted because the behaviour was
+dropped — every unknown annotation in this lane names behaviour a live test still asserts.
+
+### The two big collapses: repointed, not deleted
+
+A1 and A2 are the same shape. The `.feature` file moved into its owning package and was
+rewritten narrower in the same commit, so several old scenarios fold into one new one. That is
+the case the census said is fine to bind many-to-one, and it is what happened: 80 distinct LWQL
+titles onto 34 scenarios, 85 annotation-UI titles onto 33 across two files. Ten broader scenarios
+absorbed most of it — `Requests are manual, single-flight, and cancellation-safe` (11 tests),
+`Chart mode preserves data and offers an accessible table fallback` (13),
+`Reserved period parameters are filled only when declared` (13),
+`Policy validates names, fields, transforms, and complexity` (7),
+`Reviewing and explicitly selecting traces builds the dataset set` (11),
+`An unavailable trace can be skipped or removed` (9).
+
+Where the collapse dropped a clause outright and the test still proves it, the scenario was
+written back rather than stretched onto a neighbour. Nine in LWQL and five in the annotation
+files:
+
+| Scenario written back | Where | Tests it binds |
+| --- | --- | --- |
+| `Named scalar parameters accompany the SQL without rewriting it` | `analytics-lwql-workbench.feature` | 3 — the parameter form validates the request shape, and nothing is sent while a row is unsendable |
+| `The schema browser names the reserved period parameters where SQL is written` | same | 1 |
+| `A period-aware statement run with no window names what is unset` | same | 1 — the resolver defers the declared names rather than refusing |
+| `A reviewer who cannot update annotations is offered no correction` | `annotation-queue-workflow.feature` | 2 |
+| `Picking another turn opens that turn's trace in the drawer` | same | 1 |
+| `Messages arrive expanded so the whole output can be read` | same | 1 |
+| `The header controls sit outside the sideways-scrolling region` | `annotations-list-selection.feature` | 1 |
+
+### Three contracts a branch race deleted, restored
+
+A3, A4 and A5's tail are not collapses. In each case a feature branch landed a contract and a
+package-move branch, cut before it, deleted or rewrote the file it lived in. The merge kept the
+move. The code shipped, the tests shipped, the spec sentences did not.
+
+- **LWQL granularity resolution** (`df4f775bd2`, 13 annotations). The workbench-facing half
+  survived into `packages/features/analytics/specs/analytics-lwql-workbench.feature`; the
+  resolver's own half did not. A new `Rule: The declared granularity step is resolved, never
+  invented` restores six scenarios there — the supplied step, the unfilled declaration that must
+  not be invented, the non-`UInt32` declaration, the malformed step, the mistyped period bound at
+  save, and the window no offered step can bucket. `A caller that supplies
+  period_granularity_seconds itself is refused` was repointed instead, onto the surviving
+  `Reserved parameter misuse is refused before execution`, which already names that case.
+- **Running a saved chart by id** (same commit, 3 annotations). Restored into
+  `specs/analytics/lwql-saved-charts.feature`, which had kept only the dashboard-widget half.
+- **Work-conserving override counting** (`e49da577ab`, 9 annotations). The whole
+  `Rule: An operator can tell whether the override is actually filling slots` was restored to
+  `packages/group-queue/specs/work-conserving-fair-dispatch.feature`, and that file left
+  `LEGACY_INERT` — it now enforces two scenarios, both bound, where before it enforced none.
+- **Post-event work** (`d7c18dd45e`, 2 annotations). `A failing relevance guard never drops a
+  side effect` reads as the opposite of the surviving `A failing relevance guard is reported as a
+  publish failure`, and both are true: the publisher reports the loss, and the projection router,
+  which dispatches after a fold has already committed, cannot report one and so must not create
+  one. Both scenarios now stand, with a comment saying which path each names.
+  `A registration keeps its queue identity across the vocabulary change` was restored beside it.
+- The other four A5 annotations repointed cleanly: `packages/eventing/specs/subscriber-staging-cost.feature`
+  had rewritten `a staged shape from a newer build is refused, never quietly completed` as
+  `work a build cannot read fails loudly, never half-processed`, and `work queued before the
+  relevance rule existed still reaches the same outcome` as `an event the subscriber declines is
+  still completed quietly`.
+
+### Cause B: the inverse gap
+
+Forty-eight annotations named a title no `.feature` ever carried. One was drift (an Agents
+service test naming an RPC scenario; repointed onto a new service-level scenario). Five are in
+another lane's files. The remaining 42 are tests written ahead of any spec — overwhelmingly the
+extraction-era composition tests — and every one of them proves live behaviour, so each got a
+spec sentence rather than a deleted annotation.
+
+| Where the scenarios were written | Scenarios | Annotations | What they say |
+| --- | --- | --- | --- |
+| `specs/worker/worker-capability-mount.feature` | 12 | 14 | The worker's tenancy graph is its own client's or nothing; one model gateway over that graph, or none, with each refusal naming its own precondition |
+| `specs/server/api-process-trpc-record.feature` *(new)* | 7 | 7 | The tRPC collaborator record is complete or unmounted, answers on the root the process serves, and refuses by name for a capability the deployment did not compose |
+| `packages/features/trace/specs/span-storage-read.feature` *(new)* | 5 | 8 | A referenced span is read back inside its own partition window, without the nested columns; a miss is a miss, a refusal is reported |
+| `packages/design-system/specs/design-system-boundary.feature` | 4 | 4 | Column-type icons, and the overflow measurement that decides whether a collapsed cell expands |
+| `packages/features/authz/specs/package-boundary.feature` | 2 | 2 | AuthZ composes with or without a metrics port, and counts through the port it was given |
+| `packages/features/api-key/specs/api-key.feature`, `evaluation-service.feature` | 2 | 3 | The two transports moved without changing who may call them — the twin of the Role scenario the same tests were copied from |
+| `packages/features/share/specs/share.feature` | 1 | 1 | An active share owns its pin annotation, so a manual unpin is refused |
+| `specs/navigation/ops-navigation-v2.feature` | 1 | 1 | Settings and internal ops addresses resolve as a settings route with organization scope and no product |
+| `specs/webhooks/webhook-settings-ui.feature` | 1 | 1 | A project resolving to no organization resolves no virtual-key names |
+| `packages/features/agent/specs/package-boundary.feature` | 1 | 1 | A created agent is validated, persisted once, and returned with its fields resolved |
+
+Fifty-three scenarios were written or restored in total, across 15 existing feature files and
+two new ones. Every one is bound by the annotation that asked for it, so none of them adds to
+the unbound count.
+
+### The seven left
+
+They are in files other lanes hold open, and each is a real gap for that lane rather than
+something this one could bind:
+
+| Annotation | File | Lane |
+| --- | --- | --- |
+| `A strict feature declares its layout version` (a one-word drift from `A strict feature declares the initial layout version`), `Central subjects make broad feature ownership explicit` | `packages/architecture-lint/tests/feature-package-boundaries.test.ts` | the `@unimplemented` architecture-spec lane |
+| `audit rows are identical apart from metadata.surface` | `packages/enterprise/features/governance/server/src/app/__tests__/governance.app.unit.test.ts` | enterprise governance |
+| `A moved family reports a failure through its host, not the toaster`, `A moved family does not carry a toaster of its own` | `apps/ui/src/model/errors/__tests__/no-raw-error-toasts.unit.test.ts` | error presentation |
+| `The refusal names the reserved parameter the caller actually supplied` ×2 | `apps/ui/src/model/errors/__tests__/presentation.unit.test.ts` | error presentation |
+
+The last pair is the closest to this lane's work — it is the client copy for the LWQL reserved
+parameter refusal — and the granularity Rule restored above is where its scenario would sit if
+that lane would rather bind than write one.
+
+### One scenario still unbound where the lane touched
+
+`annotation-queue-workflow.feature` reports 17 of 18 bound. `Queue mutations are limited to the
+reviewer's reachable items` was unbound before this lane and stays unbound: no test in the
+annotation package tries to finish or remove a teammate's item, and inventing a binding for it
+was not this lane's work.
+
+### Verification
+
+Package suites, run one at a time, all green:
+
+```
+@langwatch/analytics-contract    21 files, 115 tests
+@langwatch/analytics-server      30 files (1 skipped), 744 tests (8 skipped)
+@langwatch/analytics-web         34 files, 274 tests
+@langwatch/annotation-web        16 files, 200 tests
+@langwatch/coding-agent-server   22 files, 289 tests
+@langwatch/trace-web            234 files, 1836 tests
+@langwatch/agent-server           5 files, 62 tests
+```
+
+`oxlint` on the touched files reports one pre-existing warning, an unused `url` binding in a
+`langwatch-ql-workbench.integration.test.tsx` helper this lane never edited.
+
+## Spend-spike anomaly wiring ledger — 2026-09-03
+
+Closes finding 2 of the Lane 2 and 3 ledger: `SsrfSafeAnomalyAlertHttpAdapter` and
+`startSpendSpikeAnomalyWorker` had zero callers in `apps/` or `packages/`, so
+`governance.feature`'s "Anomaly delivery delegates network safety" described a delivery path no
+process started.
+
+### How the platform ran it
+
+`platform/app/src/server/workers/startWorkers.ts` had a `bootSpendSpikeAnomalyWorker` that lazily
+imported `@ee/governance/services/spendSpikeAnomalyWorker`, called `startSpendSpikeAnomalyWorker()`
+and pushed the handle's `stop()` onto the process's shutdown list. It was a **scheduler** — a
+`setTimeout` loop, five seconds to the first tick and five minutes between ticks — replacing the
+deleted BullMQ `anomalyDetectionQueue`/`anomalyDetectionWorker` pair. It claimed no queue key then
+and claims none now, so `apps/worker/src/features/job-registry.json` needed no entry and none was
+added.
+
+The platform's root also built the evaluator over `prisma` alone
+(`SpendSpikeAnomalyEvaluator.create(prisma)`): no spend reader and no dispatcher. So a fired alert
+recorded `detail.dispatch: "log_only"` and an admin who had configured a webhook was paged by
+nothing. That, not the loop, is the half that was missing.
+
+### What was composed
+
+The evaluator rides the **`governance-events`** installer rather than declaring one of its own —
+the arrangement the scheduled-report calendar already has on Automation's installer, and for the
+same mechanical reason: `worker-feature-catalogue.unit.test.ts` requires every catalogue feature to
+own at least one pipeline in the frozen registry, and a scheduler owns none.
+
+```
+WorkerProductionComposition.create
+  └─ GovernanceEventsWorkerFeatureInstaller.create({ …, anomalySchedule })
+       install()  → anomalySchedule.start()
+       close()    → anomalySchedule.stop()
+
+createWorkerGovernanceAnomalySchedule
+  ├─ database                  the one Prisma client this process opened
+  ├─ AppGovernanceKpisAdapter  the tenant-keyed ClickHouse client, the same
+  │                            `governance_kpis` adapter the trace roll-up writes
+  └─ SsrfSafeAnomalyAlertHttpAdapter
+       └─ webhookUrlValidator(false)          the shared strict address policy
+            └─ WorkerAnomalyAlertTransportPort
+                 └─ FencedAnomalyAlertTransport  fetchValidatedDestination,
+                                                 followRedirects: false,
+                                                 TLS = deployment.saas
+```
+
+The address policy is `webhookUrlValidator(false)` — the one every customer-supplied webhook
+destination in this process is judged by — rather than a second hand-rolled
+`createSsrfUrlValidator` call. The escape hatch is not passed, on the same grounds the automations
+channel never passes it.
+
+### Absence leg deleted
+
+`SpendSpikeAnomalyWorkerDependencies.spend` was optional. The evaluator's
+`"Spend storage is not configured"` skip is the leg it fed, and a worker that took it would evaluate
+every rule, skip every one and log a healthy tick — indistinguishable from a fleet where nothing
+spikes. It is now required; the worker holds the ClickHouse client already. The inert
+`reportFailure?` hook went with it: nothing passed it, this process has no error tracker, and the
+log line is the whole record — the same call `WorkerGovernanceIngestionPullHost.capture` makes.
+
+### Files
+
+| File | Change |
+| --- | --- |
+| `apps/worker/src/app/worker-governance-anomaly.composition.ts` | new — the schedule, the transport port and the production fenced transport |
+| `apps/worker/src/app/worker-production.composition.ts` | anchored — import, and `anomalySchedule:` on the governance-events installer |
+| `apps/worker/src/features/governance/governance-events-worker-feature.installer.ts` | `anomalySchedule` started on install, stopped on close |
+| `apps/worker/src/app/__tests__/worker-governance-anomaly.composition.unit.test.ts` | new — four tests |
+| `packages/enterprise/composition/worker/src/governance/spend-spike-anomaly.worker.ts` | `spend` required, `reportFailure` deleted |
+| `packages/enterprise/composition/worker/src/index.ts` | re-exports the scheduler beside the ingestion host |
+| `packages/enterprise/features/governance/specs/governance.feature` | `@integration` on "Anomaly delivery delegates network safety" |
+
+### Sabotage
+
+Both mutations were applied, run and reverted.
+
+| Mutation | Result |
+| --- | --- |
+| `webhookUrlValidator(false)` → `(true)` | ✗ `expected [ { hostname: '127.0.0.1', …(2) } ] to have a length of +0 but got 1` — the loopback destination reaches the transport |
+| `anomalySchedule:` renamed off the installer call | ✗ `expected "vi.fn()" to be called 1 times, but got 0 times` — the production root starts no evaluator |
+
+### Gate
+
+```
+apps/worker            vitest run src/app   36 files, 309 tests, green
+apps/worker            typecheck            green (it checks tests too)
+enterprise-worker      test / typecheck     3 tests, green
+governance server      test / typecheck     593 passed, 14 skipped, green
+oxlint (touched)       no new warning; 7 pre-existing unused imports in
+                       worker-production.composition.ts, untouched by this lane
+oxfmt --check          6 files, correct
+check:feature-parity   packages/enterprise/features/governance/specs/governance.feature
+                       11/11 scenarios bound, ✓ all bound (was 10/11 unbound-eligible)
+```
+
+The first `vitest run src/app` had `worker-capability-mount.composition.unit.test.ts` time out at
+10 s on a cold 367 s run. It passes alone and passed on the 194 s re-run of the whole directory; it
+is the load flake, not this change.
+
+---
+
+## Lane 6 ledger — 2026-09-03
+
+Seventeen of the lane's eighteen files landed. The eighteenth,
+`web-composition.feature`, is the file-level DECISION and was deliberately left
+untagged — see "The decision, not taken" below. **75 scenarios newly bound**,
+and every file this lane touched reports `✓ all bound`.
+
+The lane's brief was the WRITE scenarios — behaviour live in the tree with no
+test — plus the one RETIRE and the one DECISION. Where a lane-6 file also held
+a scenario an existing test already covered near-verbatim, it was annotated in
+the same pass rather than left as a second visit.
+
+| Feature file | Scenarios bound | Tests carrying them |
+| --- | --- | --- |
+| `specs/agents/http-agent-trace-emission.feature` | 10 of 11 (10 new) | **new** `agent/server/src/transport/api-trpc/__tests__/agent-test-trace.builder.unit.test.ts` (7 its), **new** `.../__tests__/http-proxy-trace-gate.unit.test.ts` (4 its), plus 5 annotations on `.../__tests__/agent-test-tracing.unit.test.ts` |
+| `specs/monitors/report-content.feature` | 8 of 9 (3 new) | `automation/web/src/features/slack-templates/__tests__/registry.unit.test.ts`, `automation/web/src/features/authoring/__tests__/slack-client.integration.test.tsx` |
+| `specs/monitors/slack-bot-delivery.feature` | 6 of 7 (6 new) | **new** `automation/server/src/adapters/__tests__/slack-web-api.delivery.adapter.unit.test.ts` (4 its), **new** `.../__tests__/slack-provider.adapter.unit.test.ts` (6 its), plus annotations on `automation/contract/.../block-kit-allowlist.unit.test.ts`, `automation/web/.../template-picker.integration.test.tsx`, `.../slack-client.integration.test.tsx` |
+| `specs/monitors/automation-alert-firing.feature` | 5 of 5 (5 new) | **new** `automation/server/src/adapters/__tests__/record-trigger-match.command.unit.test.ts` (3 its), plus 6 annotations on `analytics/server/src/services/__tests__/legacy-filter-matching.unit.test.ts` |
+| `specs/model-providers/encrypt-custom-keys.feature` | 6 of 6 (5 new) | **new** `apps/api/src/tasks/model-provider-migrate/__tests__/model-provider-keys-migration.unit.test.ts` (4 its), plus annotations on `secret/server/.../aes-gcm.secret-encryption.adapter.unit.test.ts` and `model-provider/server/.../encrypted.model-provider-credential.adapter.unit.test.ts` |
+| `specs/automations/automations-list.feature` | 2 of 10 (2 new) | **new** `automation/server/src/repositories/prisma/__tests__/prisma.trigger-fire-history.repository.unit.test.ts` (2 its), plus annotations on `automation/web/src/features/overview/__tests__/automation-history.unit.test.ts` |
+| `specs/agents/workflow-agent-as-target.feature` | 1 of 5 (1 new) | **new** `experiment/web/src/ui/sections/experiments-v3/TargetSection/__tests__/target-header-workflow-icon.integration.test.tsx` (2 its) |
+| `packages/features/log/specs/log-processing.feature` | 6 of 6 (6 new) | **new** `log/server/src/adapters/__tests__/record-canonical-log.command.unit.test.ts` (3 its), 1 new it in `log/server/src/services/__tests__/log-request-collection.service.unit.test.ts`, plus annotations on `canonical-log.integration.test.ts`, `clickhouse.log-processing.adapter.unit.test.ts`, `clickhouse.canonical-log-record.repository.unit.test.ts` |
+| `packages/features/langy/specs/langy.feature` | 5 of 9 (5 new; S2 retired) | 3 new its in `langy/server/src/__tests__/langy.langy.adapter.unit.test.ts`, **new** `langy/server/src/app/__tests__/langy.app.flat-contract.unit.test.ts` (2 its), plus annotations on `langy-feedback-prompt.policy.unit.test.ts` and `langy.service.unit.test.ts` |
+| `packages/features/gateway/specs/gateway-budget-service.feature` | 4 of 5 (4 new) | 2 new its in `gateway/server/src/services/__tests__/gateway-budget.service.unit.test.ts`, 2 new its in `.../prisma.gateway-cache-rule.repository.unit.test.ts`, 2 new its in `.../gateway.service.unit.test.ts`, plus an annotation on `gateway/contract/.../gateway.contract.unit.test.ts` |
+| `packages/features/trace/specs/trace-read-service.feature` | 7 of 10 (7 new) | 1 new it in `trace/server/src/ports/__tests__/trace.service.unit.test.ts`, plus annotations there and on `trace/server/src/__tests__/trace.adapter.unit.test.ts` and `trace/web/src/ui/sections/__tests__/trace-find-bar.integration.test.tsx` |
+| `packages/features/trace/specs/trace-query-language.feature` | 3 of 3 (3 new) | `trace/contract/.../trace-query-language.unit.test.ts`, `.../trace-query-evaluator-group.unit.test.ts`, `trace/server/src/ports/__tests__/trace.service.unit.test.ts` |
+| `packages/features/scenario/specs/scenario-execution.feature` | 5 of 5 (5 new) | **new** `scenario/server/src/adapters/__tests__/scenario-child-otel-flush.unit.test.ts` (4 its), plus 10 annotations across the prefetcher, processor, job-data-schema, child-isolation and run-execution-process suites |
+| `packages/features/experiment/specs/experiment-service.feature` | 5 of 6 (5 new) | 3 new its in `experiment/server/src/repositories/__tests__/experiment.service.unit.test.ts`, plus 4 annotations there |
+| `packages/features/user/specs/user.feature` | 3 of 4 (2 new) | **new** `user/server/src/transport/api-trpc/__tests__/user-deactivation.unit.test.ts` (1 it), plus annotations on `user/server/src/ports/__tests__/user.service.unit.test.ts` |
+| `packages/enterprise/features/billing/specs/billing.feature` | 3 of 3 (3 new) | **new** `billing/web/src/__tests__/browser-pricing-boundary.unit.test.ts` (4 its), plus annotations on `planProvider.unit.test.ts` and `reportUsageForMonth.command.unit.test.ts` |
+| `packages/enterprise/features/managed-provider/specs/managed-providers.feature` | 3 of 3 (3 new) | **new** `managed-provider/server/src/adapters/__tests__/aws-sts.aws-sts.adapter.unit.test.ts` (2 its), 2 new its in `.../__tests__/managed-provider.service.unit.test.ts` |
+| `packages/enterprise/composition/web/specs/web-composition.feature` | **decision, not bound** | — |
+
+Thirteen new test files, sixty-one new `it()`s, and forty-eight `@scenario`
+annotations on tests that already covered their scenario.
+
+### Gate, before and after
+
+```
+before  Enforced: 1376 file(s) · Legacy: 15 file(s) · Inert: 380 file(s)
+        FAIL: 4628 unbound scenario(s) in enforced files, 352 unknown annotation(s),
+              17 file(s) enforce no scenario at all
+
+after   Enforced: 1378 file(s) · Legacy: 15 file(s) · Inert: 364 file(s)
+        FAIL: 4586 unbound scenario(s) in enforced files, 7 unknown annotation(s),
+              2 file(s) enforce no scenario at all
+```
+
+Fifteen fatal-inert files cleared by this lane. The two that remain are
+`web-composition.feature` (this lane's DECISION, below) and
+`gateway-realtime-session-reconciliation.feature`, which lane 1 skipped and
+which is not this lane's. The unknown-annotation collapse from 352 to 7 is
+lane 5 landing in the same tree, not this lane — none of the seven that remain
+name a test this lane touched, and every `@scenario` written here names a title
+the checker resolved.
+
+### The retire
+
+`packages/features/langy/specs/langy.feature` scenario 2, *"relay preserves the
+event wire contract"*, is **deleted**. Its Then — "the frame is handed to the
+relay repository unchanged" — names two things removed together in
+`c4ded22900`: the `abstract relay(frame)` member and
+`packages/features/langy/server/src/repositories/langy.repository.ts` (the whole
+45-line file). `git log -S "abstract relay(" -- packages/features/langy` returns
+only `3f986b6225` (introduction) and `c4ded22900` (removal), and
+`packages/features/langy/contract/src/langy.service.ts:220-226` documents the
+removal by name. The surviving relay is `LangyService.openRelayConnection()`,
+whose `LangyRelayConnection.handle(raw)` **routes** frames to buffers and
+durable commands rather than forwarding them unchanged — a different behaviour,
+already covered by `langyTurnRelay.unit.test.ts` and the contract's
+`it("rejects unknown relay fields at the wire boundary")`. Rewording the
+scenario to describe routing would have duplicated those; deleting it is
+honest.
+
+### The decision, not taken
+
+`@langwatch/enterprise-web` **has no dependents**, verified two ways:
+
+- `grep -rn '"@langwatch/enterprise-web"' --include=package.json .` matches only
+  the package's own `name` field at
+  `packages/enterprise/composition/web/package.json:2`. Every other hit of
+  `grep -rn "enterprise-web" --include=package.json` is
+  `@langwatch/enterprise-web**hook**-{contract,server}`, a different package.
+- `EnterpriseWebComposition` is imported by exactly one file in the repository:
+  its own test, `packages/enterprise/composition/web/tests/web-composition.unit.test.ts`.
+
+Both readings, recorded rather than decided:
+
+**Retire it.** Nothing composes it. `apps/ui` never builds an
+`EnterpriseWebComposition`, so the class is a shell whose only caller is its own
+test, and binding its two scenarios ratifies dead code. The whole package is
+seven files: `src/index.ts` (23 lines), a spec, a test, an ADR, a manifest and a
+tsconfig.
+
+**Keep it.** `packages/architecture-lint/src/workspace.ts:34` lists
+`{ role: "web", name: "@langwatch/enterprise-web" }` in
+`ENTERPRISE_COMPOSITION_PACKAGES` — the api/worker/web triad the lint enforces —
+and `packages/architecture-lint/tests/application-workspace-boundaries.test.ts:79,256`
+names it in fixtures. Deleting the package changes a lint invariant and two
+architecture fixtures, not just seven files. Its own ADR
+(`composition/web/adrs/001-web-composition-boundary.md`) says the shell is
+deliberately React-free: it is the reserved seat `apps/ui` composes when the
+first Enterprise web feature ships, and the two scenarios describe the seat's
+contract rather than code in use.
+
+Deciding needs the answer to a question outside this lane: is an Enterprise web
+feature planned? Until then the file stays fatal-inert on purpose, which is a
+louder marker than `LEGACY_INERT` would be.
+
+### The three defects, re-checked
+
+Two were already fixed before this lane started, as the brief said; both were
+verified against the tree rather than taken on trust, and the census text above
+is now wrong on both counts:
+
+1. **"Scheduled reports cannot fire on this branch" — FALSE, and it was false
+   when written.** `dispatchScheduledReport` is called at
+   `apps/worker/src/app/worker-report-schedule.composition.ts:331`
+   (`handler: (fire) => dispatchScheduledReport({ deps, fire })`, imported at
+   `:13`); `ReportScheduleService.create` is at `:283`, `loadReportCharts` at
+   `:297-298`, and `createWorkerReportSchedule` is mounted from
+   `apps/worker/src/app/worker-production.composition.ts:1113`. Only
+   `reportWindowMs` is genuinely unreferenced outside the service, and it is an
+   internal helper at `report-dispatch.service.ts:101`, not the firing path.
+   `report-content.feature`'s five `@unit` scenarios were already bound to
+   `report-dispatch.service.unit.test.ts`, which is why the file never appeared
+   on the fatal list.
+2. **"`encrypt-custom-keys` repository invariant violated" — FALSE, already
+   remediated.** `apps/api/src/app/api-trpc-collaborators.product.composition.ts:819-820`
+   now reads through `this.modelProviders.hasEnabledProvider({ projectId })` on
+   `ApiModelProviderEvidencePort`; the `findFirst` lives inside
+   `packages/features/model-provider/server/src/repositories/prisma/prisma.model-provider-evidence.repository.ts:42`
+   with `select: { id: true }` — an identifier, never a credential — and honours
+   the org-scope cascade at `:45`. No `prisma.modelProvider.*` call remains in
+   `apps/api` outside the migration task itself. Scenario 6 was already bound at
+   `apps/api/src/app/__tests__/api-trpc-collaborators.product.integration.test.ts:829`.
+3. `governance.feature` S2's inverted `feature.json` claim belongs to the
+   sibling lane and was not touched here.
+
+### A defect this lane found
+
+**`http-agent-trace-emission.feature` scenario 4 describes behaviour that does
+not exist.** *"Invalid JSON body creates a trace … the error message indicates
+invalid JSON"* has no implementation anywhere:
+`buildHttpNodeParameters` (`packages/features/agent/contract/src/http-node.ts:14-60`)
+does not validate the template, and the Go engine codes refused destinations and
+endpoint answers, not a body parse
+(`services/nlpgo/app/engine/http_node_errors_test.go`). It is the one scenario in
+that file left untagged. It is a WRITE for the *product*, not for a test: either
+the executor learns to name an unrenderable body, or the scenario goes.
+
+### Where a test was tightened rather than trusted
+
+Six scenarios named a clause the matching test did not assert. Each was closed
+with the smallest honest assertion:
+
+- **log** — "each accepted record has a deterministic 64-hex record ID" asserted
+  only determinism. `canonical-log.integration.test.ts` now pins
+  `/^[0-9a-f]{64}$/` as well.
+- **encrypt-custom-keys** — "the encrypted string is not valid JSON" was
+  asserted nowhere. The AES-GCM suite now encrypts a real `customKeys` object
+  and requires `JSON.parse` of the stored value to throw, so a reader still
+  expecting the legacy plaintext column fails loudly rather than half-succeeding.
+- **gateway** — "its row mutation, Gateway change event, and audit record use
+  one persistence transaction" was proven for archive only. Create and update
+  now assert the same `inTransaction: true` triple.
+- **trace** — "a trace read is tenant scoped" had no test that ever passed a
+  foreign tenant; the existing fake *asserted* `tenantId === "project_1"`
+  instead of exercising a mismatch. A tenant-keyed repository now answers
+  `project_2` with an empty page and a null cursor, and records which tenant the
+  read was scoped by.
+- **automations-list** — "history never exposes trace content" was true only by
+  reading `mapFire`. The repository suite now drives both read paths over a row
+  that carries `traceId: "trace_secret_1"` and requires the mapped view to hold
+  neither the property nor the string.
+- **slack** — "the token is stored encrypted, never in plaintext" needed a
+  cipher double that does not spell its own input. The stand-in hex-encodes, so
+  the assertion that the plaintext is absent from the persisted row cannot pass
+  on a fake that still contains it.
+
+The billing browser-boundary guard was checked the same way, by making it fail:
+a throwaway `src/model/__sabotage.ts` importing `stripe` turned the suite red
+with `src/model/__sabotage.ts imports stripe`, and was removed.
+
+### Left untagged on purpose
+
+| Scenario | Why |
+| --- | --- |
+| `http-agent-trace-emission` 4 (invalid JSON body) | No implementation. See "A defect this lane found". |
+| `workflow-agent-as-target` 1, 3, 4, 5 | 1 needs `runsAsWorkflow` / `getLoadedDataForTarget`, both unexported locals inside `runOrchestrator`; 4's execution half needs `buildTargetInputs`, also unexported. 3's drawer lives in `scenario/web`, not `experiment/web`, and its "Open Workflow" affordance has no such literal text — it is `data-testid="open-workflow-link"`, so the spec sentence needs amending before a test can honestly key on it. 5's `handleSwitchTarget` / `addOrReplaceTarget` are unexported members of `evaluations-v3-table.tsx`. Each is a refactor before it is a test. |
+| `automations-list` 1-6, 10 | Seven React cell components (`ReportRunCells`, `LastFiredCell`, `FiringStatus`, `EmptyHint`) that need a Chakra `Table` harness. Straightforward, but it is a rendering lane rather than a WRITE lane, and the file is no longer fatal. |
+| `automations-list` 7 (recent activity across everything) | `toAutomationActivityEntries` is covered, but the day grouping the scenario names lives inside the `AutomationHistory` component and needs a render. |
+| `report-content` 9 (preview renders against report data) | `previewContext` is inline in `automation-drawer.tsx:513-522` and not exported; a test either renders the whole drawer or the code needs an extraction first. |
+| `slack-bot-delivery` 7 (guided to create a Slack app) | The link, the manifest copy and the two scopes are rendered by `slack.client.tsx:876-911`; the only test near it asserts the manifest shape, not the guidance the author reads. |
+| `langy` 3 (owns its subordinate subjects) | An ownership claim no test or lint expresses — `specs/dependencies/singular-feature-ownership.feature`'s Examples table does not list langy. |
+| `langy` 6, 7, 8 | Each ends with a clause asserting something "remains in the application" that no longer does: the tool-narrator adapter, the capability hydrators, the SPA-link builder and `buildSurfaceHref`/`buildResourceHref` have all moved **into** `langy/web`. What genuinely remains in `apps/ui` is routing and the host adapter. Reword before tagging — this is the census's "five scenarios describe code that moved", and it is three of them. |
+| `gateway-budget-service` 3 (the process owns one budget decision service) | Its "API, CLI, and Gateway routes" clause is false today: `apps/api/src/app/api-production.composition.ts:2300` passes `budgets: undefined`, so `governance-cli.api.ts:466-467` short-circuits to `{ok:true}` and the CLI leg holds no service at all. Binding it as written would assert a wiring the tree does not have. |
+| `trace-read-service` 6 (full compatibility routes wait for complete characterization) | The Then names `platform/`, which is gone; all four route families now live in `trace/server/src/transport/**` after `a98cfaf487`, and the owning ADR (`trace/adrs/001-trace-read-boundary.md:86-92`) is stale in the same way. Amend the spec and the ADR together. |
+| `trace-read-service` 7 (storage vs projected summary distinctions) | Thens 1-3 are covered by `trace-legacy-summary-mapping.service.unit.test.ts:232`; Then 4 — no substitution among `trace_summaries` / `trace_analytics` / timeseries — is asserted only incidentally. A per-read table-isolation test is the missing piece. |
+| `trace-read-service` 9 (browser presentation stays transport-neutral) | The toolkit is covered; the two negative Thens ("does not fetch, authorize, or reshape") are architecture claims whose only enforcement is the repo-wide `feature-package-boundaries` lint, held by another lane. |
+| `experiment-service` 6 (batch-result presentation) | Needs rewording, and the census hint is confirmed: `apps/ui/src/features/experiments/index.ts:10-15` states the family has "NO API BINDING OF ITS OWN, and that absence is the design", and `grep refetchInterval\|poll apps/ui/src/features/experiments` returns nothing — polling moved into `experiment/web`. The sentence "the app keeps … polling" is false. |
+| `user` 2 (changing an email refreshes authenticated identity) | Its second clause, "browser sessions are revoked", has **no code path**. `UserService.updateProfile` normalizes the address and stops; every `revokeOtherBrowserSessions` call in `user.api.ts` (`:679`, `:762`, `:793`) is on a credential or password flow. Either the email change learns to revoke, or the clause goes — not a binding either way. |
+| `web-composition` 1-2 | The DECISION. See above. |
+
+### Riders bound without their own assertion
+
+Four scenarios carry a clause the test cannot express, and were bound on the
+behaviour the test does prove. Named here so nobody mistakes the binding for
+coverage:
+
+- `log-processing` 3 — "the retry can persist the record without creating a
+  second logical record". What is proven is that the retry mints an identical
+  tenant-scoped idempotency key, which is the mechanism the eventing dedup
+  relies on; the dedup itself is `@langwatch/eventing`'s, not Log's.
+- `langy` 1 — "a public or internal adapter handles a Langy request". The
+  adapter's memoization and `LangyApp.langyService` identity are proven; that
+  the two REST doors and the tRPC router reach that same instance is an
+  `apps/api` composition claim, in another lane's file.
+- `langy` 5 — "it does not reach through a subordinate capability property".
+  Proven twice over: the built service's prototype surface names none of
+  `conversations` / `turns` / `messages` / `credentials`, and `LangyApp`'s
+  forwarders are driven through a Proxy that would record such a hop. The
+  subordinate repositories remain reachable at runtime as TypeScript-private
+  instance fields — privacy there is compile-time, and no test can assert it.
+- `automations-list` 9 — "gated by a weaker permission than trace content". The
+  mapped row is proven to carry no trace id; the permission comparison itself is
+  a route-level claim (`automation.api.ts:576` `policy("triggers:view")`).
+
+### Package suites run
+
+Each touched package's own script, one at a time, all green:
+`enterprise-managed-provider-server`, `enterprise-billing-server`,
+`enterprise-billing-web`, `log-server`, `langy-server`, `agent-server`,
+`trace-contract`, `trace-server`, `trace-web`, `experiment-server`,
+`experiment-web`, `analytics-server`, `automation-contract`,
+`automation-server`, `automation-web`, `secret-server`,
+`model-provider-server`, `gateway-contract`, `gateway-server`, `user-server`,
+and the new `apps/api` task suite.
+
+`scenario-server` is the one exception: `cancellation-channel.integration.test.ts`
+and `scenario-tab-registry.integration.test.ts` both fail with their own
+environment guards — "Scenario cancellation integration tests require Redis" and
+"These tests need a real Redis; run them through the integration suite". Neither
+file was touched by this lane; the other 63 files and all 827 tests pass.

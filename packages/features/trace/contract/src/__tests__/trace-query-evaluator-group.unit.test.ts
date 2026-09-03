@@ -96,6 +96,7 @@ describe("toggleEvaluatorSubFilterInQuery", () => {
       "(evaluator:Y AND evaluatorVerdict:fail) AND (evaluator:X AND evaluatorVerdict:pass)";
 
     describe("when evaluator X gains a label", () => {
+      /** @scenario "Evaluator conditions stay scoped to one evaluator" */
       it("scopes the label to X's group and leaves Y untouched", () => {
         const out = toggleLabel(base, "toxic");
         const groupY = readEvaluatorGroup(out, "Y");

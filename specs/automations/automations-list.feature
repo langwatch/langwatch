@@ -56,6 +56,7 @@ Feature: Seeing what your automations are doing
       And each entry names the automation and when it happened
       And entries are grouped by day
 
+    @unit
     Scenario: History distinguishes what kind of thing happened
       Given an alert that started firing and later recovered
       And a report that was sent on schedule
@@ -63,6 +64,7 @@ Feature: Seeing what your automations are doing
       Then the alert's start and its recovery read differently
       And the report reads as having been sent
 
+    @unit
     Scenario: History never exposes trace content
       Given automations that fired on specific traces
       When I look at the history

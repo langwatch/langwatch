@@ -287,6 +287,7 @@ describe("LegacyFilterMatchingService.matchesTraceFilters", () => {
       expect(SUBJECT.matchesTraceFilters({ traceData: data, filters: filters })).toBe(false);
     });
 
+    /** @scenario "An automation does not fire when its condition is unmet" */
     it("does not match an all-unevaluable filter set", () => {
       const data = makeTraceData();
       const filters: TriggerFilters = {
@@ -315,6 +316,7 @@ describe("LegacyFilterMatchingService.matchesTraceFilters", () => {
     };
 
     describe("given a thumbs-down automation filter", () => {
+      /** @scenario "A thumbs-down automation stays quiet for a trace with no feedback" */
       it("does not match when there is no thumbs_up_down event", () => {
         const data = makeEventData(null);
         expect(
@@ -325,6 +327,7 @@ describe("LegacyFilterMatchingService.matchesTraceFilters", () => {
         ).toBe(false);
       });
 
+      /** @scenario "A thumbs-down automation stays quiet for a thumbs-up trace" */
       it("does not match an up-vote (vote 1)", () => {
         const data = makeEventData([
           {
@@ -341,6 +344,7 @@ describe("LegacyFilterMatchingService.matchesTraceFilters", () => {
         ).toBe(false);
       });
 
+      /** @scenario "A thumbs-down automation stays quiet for a thumbs-up trace" */
       it("does not match a neutral vote (vote 0)", () => {
         const data = makeEventData([
           {
@@ -357,6 +361,7 @@ describe("LegacyFilterMatchingService.matchesTraceFilters", () => {
         ).toBe(false);
       });
 
+      /** @scenario "A thumbs-down automation fires on a real thumbs-down trace" */
       it("matches a down-vote (vote -1)", () => {
         const data = makeEventData([
           {
@@ -375,6 +380,7 @@ describe("LegacyFilterMatchingService.matchesTraceFilters", () => {
     });
 
     describe("given a trace-origin filter combined with an unmet down-vote condition", () => {
+      /** @scenario "An automation does not fire when its condition is unmet" */
       it("does not match when the origin matches but there is no down-vote", () => {
         const data = makeEventData(null);
         const filters: TriggerFilters = {

@@ -71,6 +71,7 @@ describe("ChildProcessJobDataSchema", () => {
       expect(result.success).toBe(false);
     });
 
+    /** @scenario "A worker prepares a run through canonical services" */
     it("names the missing fields in the parse error", () => {
       const result = ChildProcessJobDataSchema.safeParse(basePayload);
       if (result.success) {

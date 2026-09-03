@@ -247,7 +247,7 @@ beforeEach(() => {
 describe("the LangWatchQL workbench", () => {
   describe("given an authorized member with a live LangWatchQL schema", () => {
     describe("when the workbench opens", () => {
-      /** @scenario "An authorized member opens Custom query and sees only their live LangWatchQL schema" */
+      /** @scenario "Organization rules and project permissions govern access" */
       it("names the editor and lists exactly the datasets the endpoint returned", async () => {
         await renderWorkbench();
 
@@ -289,7 +289,7 @@ describe("the LangWatchQL workbench", () => {
     });
 
     describe("when time passes and the member keeps typing after a result", () => {
-      /** @scenario "Reload is manual only" */
+      /** @scenario "Requests are manual, single-flight, and cancellation-safe" */
       it("issues no request that the member did not ask for", async () => {
         const editor = await renderWorkbench();
         typeSql(editor, SQL);
@@ -309,7 +309,7 @@ describe("the LangWatchQL workbench", () => {
     });
 
     describe("when the member opens Chart mode on a successful result", () => {
-      /** @scenario "Switching between Table and Chart never reruns SQL" */
+      /** @scenario "View changes and specification edits do not rerun SQL" */
       it("feeds the chart the submitted result and its query, and sends nothing", async () => {
         const editor = await renderWorkbench();
         typeSql(editor, SQL);
@@ -394,7 +394,7 @@ describe("the LangWatchQL workbench", () => {
     });
 
     describe("when a query is refused between two runs of a chart the member wrote", () => {
-      /** @scenario "A new result reshapes the starter specification until it is edited" */
+      /** @scenario "Starter specifications follow new data until the member edits them" */
       it("still has their specification once the query succeeds again", async () => {
         const editor = await renderWorkbench();
         typeSql(editor, SQL);
@@ -467,7 +467,7 @@ describe("the LangWatchQL workbench", () => {
     });
 
     describe("when the backend refuses the submission for missing parameters", () => {
-      /** @scenario "A missing bound parameter is reported against the parameter editor" */
+      /** @scenario "Backend failures keep their code-specific presentation" */
       it("keeps the form open under the refusal and closes it once it clears", async () => {
         harness.mutation.mockRejectedValue(
           handledErrorEnvelope({
@@ -498,7 +498,7 @@ describe("the LangWatchQL workbench", () => {
         await waitFor(() => expect(toggle).toHaveAttribute("aria-expanded", "false"));
       });
 
-      /** @scenario "A missing bound parameter is reported against the parameter editor" */
+      /** @scenario "Backend failures keep their code-specific presentation" */
       it("lists the missing names at the parameter editor", async () => {
         harness.mutation.mockRejectedValue(
           handledErrorEnvelope({
@@ -834,7 +834,7 @@ describe("the LangWatchQL workbench", () => {
     });
 
     describe("when the workbench opens on a page whose period selector names a window", () => {
-      /** @scenario "The workbench fills the period parameters from the page's period selector" */
+      /** @scenario "Reserved period parameters are filled only when declared" */
       it("shows that window in the spelling the database is bound with", async () => {
         await renderWorkbench();
 
@@ -842,7 +842,7 @@ describe("the LangWatchQL workbench", () => {
         expect(screen.getByLabelText("period_end")).toHaveValue("2026-02-27 00:00:00");
       });
 
-      /** @scenario "The workbench fills the period parameters from the page's period selector" */
+      /** @scenario "Reserved period parameters are filled only when declared" */
       it("shows a different window when the page carries a different period", async () => {
         await renderWorkbench({
           startDate: "2026-03-01T00:00:00.000Z",
@@ -855,7 +855,7 @@ describe("the LangWatchQL workbench", () => {
     });
 
     describe("when the member overrides the window for one query", () => {
-      /** @scenario "A one-off window override is what runs, and survives a re-run" */
+      /** @scenario "Reserved period parameters are filled only when declared" */
       it("sends the override on every run, and never as a named parameter", async () => {
         const editor = await renderWorkbench();
         typeSql(editor, SQL);
@@ -878,7 +878,7 @@ describe("the LangWatchQL workbench", () => {
         }
       });
 
-      /** @scenario "A one-off window override is what runs, and survives a re-run" */
+      /** @scenario "Reserved period parameters are filled only when declared" */
       it("goes back to the page's period when the override is dropped", async () => {
         const editor = await renderWorkbench();
         typeSql(editor, SQL);
@@ -941,7 +941,7 @@ describe("the LangWatchQL workbench", () => {
     });
 
     describe("when the answer's statement declared no time-window parameters", () => {
-      /** @scenario "A statement with no period parameters runs, and says so" */
+      /** @scenario "A statement without a period reports that fact" */
       it("says the query does not follow the page's period", async () => {
         harness.mutation.mockResolvedValue(lwqlResult({ followsTimeWindow: false }));
 
@@ -955,7 +955,7 @@ describe("the LangWatchQL workbench", () => {
         );
       });
 
-      /** @scenario "A statement with no period parameters runs, and says so" */
+      /** @scenario "A statement without a period reports that fact" */
       it("says nothing of the kind when the statement did follow it", async () => {
         const editor = await renderWorkbench();
         typeSql(editor, SQL);
@@ -967,7 +967,7 @@ describe("the LangWatchQL workbench", () => {
     });
 
     describe("when the backend refuses a request that set a reserved parameter itself", () => {
-      /** @scenario "A caller that supplies a reserved period parameter itself is refused" */
+      /** @scenario "Reserved parameter misuse is refused before execution" */
       it("says which rows to remove, at the form that holds them", async () => {
         harness.mutation.mockRejectedValue(
           handledErrorEnvelope({

@@ -60,6 +60,7 @@ async function prepare(logRecords: unknown[], scopeName?: string) {
 }
 
 describe("canonical log preparation", () => {
+  /** @scenario "Valid OTLP logs become canonical durable events" */
   it("preserves typed OTLP values and produces a deterministic content id", async () => {
     const log = {
       traceId: "00112233445566778899aabbccddeeff",
@@ -98,6 +99,7 @@ describe("canonical log preparation", () => {
       correlationTraceId: log.traceId,
       timeUnixNano: log.timeUnixNano,
     });
+    expect(first.accepted[0]!.record.recordId).toMatch(/^[0-9a-f]{64}$/);
     expect(first.accepted[0]!.record.recordId).toBe(second.accepted[0]!.record.recordId);
     expect(JSON.parse(first.accepted[0]!.record.bodyJson)).toEqual({
       type: "kvlist",
@@ -232,6 +234,7 @@ describe("canonical log preparation", () => {
     expect(result.accepted[0]!.normalized.attributes["event.name"]).toBe("codex.user_prompt");
   });
 
+  /** @scenario "Invalid log siblings use partial success" */
   it("isolates malformed and oversized siblings as partial success", async () => {
     const result = await prepare([
       { body: { stringValue: "accepted" } },

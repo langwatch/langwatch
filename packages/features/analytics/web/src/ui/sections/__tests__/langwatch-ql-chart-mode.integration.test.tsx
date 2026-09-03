@@ -206,7 +206,7 @@ describe("chart mode", () => {
     });
 
     describe("when the member edits the specification", () => {
-      /** @scenario "Editing the chart specification never reruns SQL" */
+      /** @scenario "View changes and specification edits do not rerun SQL" */
       it("revalidates and redraws without issuing a single request", async () => {
         const { rerender } = withChakra(<ChartModeHost result={RESULT} />);
         await waitFor(() => expect(vega.state.embeds).toBe(1));
@@ -232,7 +232,7 @@ describe("chart mode", () => {
         expect(requests).toEqual([]);
       });
 
-      /** @scenario "Editing the chart specification never reruns SQL" */
+      /** @scenario "View changes and specification edits do not rerun SQL" */
       it("reports what is wrong as it is typed, and keeps reporting nothing when it is fixed", async () => {
         const { rerender } = withChakra(<ChartModeHost result={RESULT} view="specification" />);
         const editor = await findEditor();
@@ -273,7 +273,7 @@ describe("chart mode", () => {
         expect(requests).toEqual([]);
       });
 
-      /** @scenario "The workbench ships no polling, browser-side persistence, export, or agent surface" */
+      /** @scenario "The workbench has no unsolicited work or hidden client persistence" */
       it("writes the specification nowhere: it lives as long as the result is on screen", async () => {
         const { unmount } = withChakra(<ChartModeHost result={RESULT} view="specification" />);
         const editor = await findEditor();
@@ -303,7 +303,7 @@ describe("chart mode", () => {
     });
 
     describe("when the member reads the specification view's policy panel", () => {
-      /** @scenario "The specification view names what the chart policy accepts" */
+      /** @scenario "View changes and specification edits do not rerun SQL" */
       it("says where the specification stands and what the policy accepts", async () => {
         withChakra(<ChartModeHost result={RESULT} view="specification" />);
 
@@ -325,7 +325,7 @@ describe("chart mode", () => {
     });
 
     describe("when a new query returns a result with different columns", () => {
-      /** @scenario "A new result reshapes the starter specification until it is edited" */
+      /** @scenario "Starter specifications follow new data until the member edits them" */
       it("redraws from a starter specification over the new columns", async () => {
         const { rerender } = withChakra(<ChartModeHost result={RESULT} />);
         await waitFor(() => expect(vega.state.embeds).toBe(1));
@@ -351,7 +351,7 @@ describe("chart mode", () => {
         expect(starter.encoding.y.field).toBe("latency_ms");
       });
 
-      /** @scenario "A new result reshapes the starter specification until it is edited" */
+      /** @scenario "Starter specifications follow new data until the member edits them" */
       it("never replaces a specification the member has edited", async () => {
         const { rerender } = withChakra(<ChartModeHost result={RESULT} view="specification" />);
         const editor = await findEditor();
@@ -379,7 +379,7 @@ describe("chart mode", () => {
     });
 
     describe("when a Reload returns different rows", () => {
-      /** @scenario "A data-only Reload updates the chart through the live view" */
+      /** @scenario "Chart mode preserves data and offers an accessible table fallback" */
       it("feeds them to the running chart rather than rebuilding it", async () => {
         const { rerender } = withChakra(<ChartModeHost result={RESULT} />);
         await waitFor(() => expect(vega.state.embeds).toBe(1));

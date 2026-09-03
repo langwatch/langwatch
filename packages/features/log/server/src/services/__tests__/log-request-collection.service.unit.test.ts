@@ -123,7 +123,57 @@ function logRequest() {
   } as any;
 }
 
+/** A plain OTLP log: no wire ids, and no provider the pipeline can synthesize from. */
+function uncorrelatedLogRequest() {
+  return {
+    resourceLogs: [
+      {
+        resource: { attributes: [] },
+        scopeLogs: [
+          {
+            scope: { name: "com.example.service" },
+            logRecords: [
+              {
+                timeUnixNano: "1700000000000000000",
+                severityNumber: 9,
+                severityText: "INFO",
+                body: { stringValue: "a log with nothing to correlate" },
+                attributes: [],
+              },
+            ],
+          },
+        ],
+      },
+    ],
+  } as any;
+}
+
 describe("LogRequestCollectionService", () => {
+  describe("given a canonical log carrying no valid correlation ids", () => {
+    describe("when the pipeline processes it", () => {
+      /** @scenario "An uncorrelated log does not call Trace" */
+      it("stores the record and asks Trace for nothing", async () => {
+        const { service, records, recordLogRecords, recordLogContributions } = makeService();
+
+        const result = await service.handleOtlpLogRequest({
+          ...args,
+          logRequest: uncorrelatedLogRequest(),
+        });
+
+        expect(result).toEqual({
+          outcome: "collected",
+          acceptedLogRecords: 1,
+          rejectedLogRecords: 0,
+        });
+        expect(recordLogRecords).toHaveBeenCalledTimes(1);
+        expect(records).toHaveLength(1);
+        expect(records[0]).toMatchObject({ correlationSource: "none" });
+        expect(recordLogContributions).not.toHaveBeenCalled();
+      });
+    });
+  });
+
+  /** @scenario "A correlated log contributes to Trace without sharing ownership" */
   it("stores the canonical record then emits a compact trace contribution", async () => {
     const { service, records, contributions } = makeService();
     const result = await service.handleOtlpLogRequest({
@@ -152,6 +202,7 @@ describe("LogRequestCollectionService", () => {
     expect(JSON.stringify(contributions[0]).length).toBeLessThan(records[0]!.canonicalSizeBytes);
   });
 
+  /** @scenario "Trace contribution is best effort" */
   it("keeps a correlated log accepted when its trace contribution cannot be queued", async () => {
     const { service } = makeService({ contributionFails: true });
 

@@ -149,6 +149,7 @@ describe("UserService", () => {
     expect(repository.setPasskeyNudgeDismissedAt).toHaveBeenCalledWith("user-1", new Date(42));
   });
 
+  /** @scenario "Deactivating a user invalidates every session family" */
   it("marks a user deactivated", async () => {
     const { service, repository } = createService();
     await service.deactivate({ id: "user-1" });
@@ -195,6 +196,7 @@ describe("UserService", () => {
   });
 
   /** @scenario "Uploading a photo stores it and sets it as the user's avatar" */
+  /** @scenario "Uploading an avatar uses the personal workspace" */
   it("stores avatars through the injected storage capability", async () => {
     const { service, repository, avatarStorage } = createService();
     await expect(

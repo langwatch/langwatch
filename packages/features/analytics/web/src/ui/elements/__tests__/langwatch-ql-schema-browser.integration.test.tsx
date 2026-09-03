@@ -51,7 +51,7 @@ function expand(datasetName: string) {
 describe("the LangWatchQL schema browser", () => {
   describe("given the schema endpoint answered for this member", () => {
     describe("when the browser renders", () => {
-      /** @scenario "An authorized member opens Custom query and sees only their live LangWatchQL schema" */
+      /** @scenario "Organization rules and project permissions govern access" */
       it("lists exactly the datasets the response returned", () => {
         renderBrowser();
 
@@ -65,7 +65,7 @@ describe("the LangWatchQL schema browser", () => {
     });
 
     describe("when the member expands a dataset", () => {
-      /** @scenario "A dataset's documentation is browsable" */
+      /** @scenario "Schema documentation and completion use the live response" */
       it("shows its description, grain, freshness, time column, join keys and example query", () => {
         renderBrowser();
         expand("analytics.traces_daily");
@@ -82,7 +82,7 @@ describe("the LangWatchQL schema browser", () => {
         ).toBeInTheDocument();
       });
 
-      /** @scenario "A dataset's documentation is browsable" */
+      /** @scenario "Schema documentation and completion use the live response" */
       it("shows each column with its type, description and unit", () => {
         renderBrowser();
         expand("analytics.traces_daily");
@@ -98,7 +98,7 @@ describe("the LangWatchQL schema browser", () => {
         expect(within(column).getByText("ms")).toBeInTheDocument();
       });
 
-      /** @scenario "Unavailable columns are visibly disabled without exposing hidden values" */
+      /** @scenario "Gated schema fields remain safe and useful" */
       it("disables a withheld column and offers no way to put it in a query", () => {
         renderBrowser();
         expand("analytics.traces_daily");
@@ -119,7 +119,7 @@ describe("the LangWatchQL schema browser", () => {
     });
 
     describe("when the member picks something to write into the editor", () => {
-      /** @scenario "The member inserts schema elements into the editor" */
+      /** @scenario "Gated schema fields remain safe and useful" */
       it("inserts the column name or the example query", () => {
         const { onInsert } = renderBrowser();
 
@@ -138,7 +138,7 @@ describe("the LangWatchQL schema browser", () => {
     });
 
     describe("when the member searches the browser", () => {
-      /** @scenario "A search narrows the schema browser" */
+      /** @scenario "Schema documentation and completion use the live response" */
       it("leaves only the datasets and columns that match", () => {
         renderBrowser();
 

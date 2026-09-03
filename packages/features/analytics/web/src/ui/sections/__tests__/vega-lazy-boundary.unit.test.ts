@@ -180,7 +180,7 @@ const featureSourceFiles = (directory: string): string[] =>
 describe("where the Vega runtime can be reached from", () => {
   describe("given the workbench's own modules", () => {
     describe("when their static import graphs are walked", () => {
-      /** @scenario "Vega loads lazily from Chart mode only" */
+      /** @scenario "Vega dependencies and browser runtime stay behind the lazy boundary" */
       it("reaches Vega from each deferred module, and from nothing that is not behind one", () => {
         const behindABoundary = new Set<string>();
         for (const { deferred } of LAZY_BOUNDARIES) {
@@ -200,7 +200,7 @@ describe("where the Vega runtime can be reached from", () => {
         expect(leaks.map((file) => file.replace(PACKAGE_SRC_DIR, ""))).toEqual([]);
       });
 
-      /** @scenario "Each lazy Vega wrapper defers its own module, in Chart mode and on the dashboard widget" */
+      /** @scenario "Vega dependencies and browser runtime stay behind the lazy boundary" */
       it.each(LAZY_BOUNDARIES.map((boundary) => [boundary.wrapper, boundary]))(
         "keeps %s free of everything it defers",
         (_name, { wrapper, deferred, specifier }) => {

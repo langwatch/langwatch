@@ -28,6 +28,7 @@ function service(
 }
 
 describe("LangyFeedbackPromptPolicy", () => {
+  /** @scenario "feedback prompt keeps its existing cadence" */
   it("does not ask before two assistant answers", async () => {
     await expect(
       service(memoryRedis()).shouldAsk({
@@ -48,6 +49,7 @@ describe("LangyFeedbackPromptPolicy", () => {
     ).resolves.toBe(true);
   });
 
+  /** @scenario "feedback prompt keeps its existing cadence" */
   it("keeps a user quiet for three days after the card is shown", async () => {
     const redis = memoryRedis();
     await service(redis).markShown({ userId: "u1", conversationId: "c1" });
@@ -67,6 +69,7 @@ describe("LangyFeedbackPromptPolicy", () => {
     ).resolves.toBe(true);
   });
 
+  /** @scenario "feedback prompt keeps its existing cadence" */
   it("allows one long-conversation exception in another conversation", async () => {
     const redis = memoryRedis();
     await service(redis).markShown({ userId: "u1", conversationId: "c1" });
@@ -87,6 +90,7 @@ describe("LangyFeedbackPromptPolicy", () => {
     ).resolves.toBe(false);
   });
 
+  /** @scenario "feedback prompt is safe when Redis is unavailable" */
   it("fails closed on reads and keeps writes best-effort", async () => {
     const broken: LangyFeedbackPromptRedis = {
       get: async () => {
@@ -108,6 +112,7 @@ describe("LangyFeedbackPromptPolicy", () => {
     ).resolves.toBeUndefined();
   });
 
+  /** @scenario "feedback prompt is safe when Redis is unavailable" */
   it("fails closed when Redis is not configured", async () => {
     await expect(
       service(null).shouldAsk({
@@ -133,6 +138,7 @@ describe("LangyFeedbackPromptPolicy", () => {
     ).resolves.toBe(true);
   });
 
+  /** @scenario "feedback prompt keeps its existing cadence" */
   it("treats corrupt records as absent and writes a thirty-day ttl", async () => {
     const redis = memoryRedis();
     redis.store.set("langy:feedback:last-asked:u1", "not-json{");

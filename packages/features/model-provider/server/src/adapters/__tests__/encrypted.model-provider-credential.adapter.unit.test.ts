@@ -58,6 +58,7 @@ describe("readCustomKeys", () => {
   });
 
   describe("given a column that holds an encrypted bag", () => {
+    /** @scenario "Encrypted keys are decrypted on read" */
     it("reads the keys back", () => {
       const stored = encrypt(JSON.stringify({ OPENAI_API_KEY: "sk-secret" }));
 
@@ -150,6 +151,7 @@ describe("EncryptedModelProviderCredentialAdapter", () => {
   const codec = EncryptedModelProviderCredentialAdapter.create({ cipher });
 
   describe("given a bag to store", () => {
+    /** @scenario "Encrypted keys are decrypted on read" */
     it("writes it through the cipher and reads the same bag back", () => {
       const encoded = codec.encode({ OPENAI_API_KEY: "sk-secret" });
 
@@ -160,12 +162,14 @@ describe("EncryptedModelProviderCredentialAdapter", () => {
       expect(codec.tryDecode(encoded)).toEqual({ OPENAI_API_KEY: "sk-secret" });
     });
 
+    /** @scenario "Null customKeys are handled gracefully" */
     it("writes null as null rather than as encrypted emptiness", () => {
       expect(codec.encode(null)).toBeNull();
     });
   });
 
   describe("given a column that cannot be read", () => {
+    /** @scenario "Null customKeys are handled gracefully" */
     it("decodes to null rather than to an empty bag", () => {
       expect(codec.tryDecode("not-a-value-this-cipher-can-decrypt")).toBeNull();
     });

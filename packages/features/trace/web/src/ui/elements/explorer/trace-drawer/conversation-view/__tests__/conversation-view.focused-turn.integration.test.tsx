@@ -143,7 +143,7 @@ describe("given a queue item opened on a thread of several turns", () => {
   beforeEach(useFakeClocks);
   afterEach(() => vi.useRealTimers());
 
-  /** @scenario "Opening a queue item scrolls its turn into view" */
+  /** @scenario "The current turn is focused in its conversation" */
   it("scrolls the conversation to the item's own turn, and blinks it", () => {
     renderView({ focusTraceId: "trace-2" });
 
@@ -156,7 +156,7 @@ describe("given a queue item opened on a thread of several turns", () => {
     expect(blinkingTurns()[0]).toHaveTextContent("trace-2");
   });
 
-  /** @scenario "The scroll waits a beat so the conversation is seen first" */
+  /** @scenario "The current turn is focused in its conversation" */
   it("rests where it loaded, then carries the reader and blinks together", () => {
     renderView({ focusTraceId: "trace-2" });
 
@@ -171,7 +171,7 @@ describe("given a queue item opened on a thread of several turns", () => {
     expect(blinkingTurns()).toHaveLength(1);
   });
 
-  /** @scenario "The turn under review keeps a distinct background" */
+  /** @scenario "The current turn is focused in its conversation" */
   it("tints that turn and no other", () => {
     renderView({ focusTraceId: "trace-2" });
 
@@ -180,7 +180,7 @@ describe("given a queue item opened on a thread of several turns", () => {
     expect(frames[0]).toHaveTextContent("trace-2");
   });
 
-  /** @scenario "Moving to the next item moves the focus" */
+  /** @scenario "The current turn is focused in its conversation" */
   it("moves the tint when the reader is moved to the next item", () => {
     const view = renderView({ focusTraceId: "trace-2" });
 
@@ -228,7 +228,7 @@ describe("given the thread is still laying out when the reader arrives", () => {
   // The turns above the one under review (their annotation cards especially)
   // measure in after the first paint and push it further down, so a single
   // scroll lands short of where the turn ends up.
-  /** @scenario "Opening a queue item scrolls its turn into view" */
+  /** @scenario "The current turn is focused in its conversation" */
   it("keeps centering until the turn stops moving, then lets go", () => {
     mockOffsetTop = 100;
     renderView({ focusTraceId: "trace-2" });
@@ -253,7 +253,7 @@ describe("given the thread is still laying out when the reader arrives", () => {
 });
 
 describe("given a queue item whose thread is that one trace", () => {
-  /** @scenario "The only turn of a conversation is not tinted" */
+  /** @scenario "The current turn is focused in its conversation" */
   it("leaves the turn plain, having nothing to tell it apart from", () => {
     mocks.turns = [mocks.thread[0]!];
 
@@ -274,7 +274,7 @@ describe("given a conversation read with no turn under review", () => {
 });
 
 describe("given a conversation read while a queue is being walked", () => {
-  /** @scenario "A turn is counted in or out by hand" */
+  /** @scenario "Reviewing and explicitly selecting traces builds the dataset set" */
   it("offers every turn a session tick", () => {
     renderView({ showSessionCheckboxes: true });
 

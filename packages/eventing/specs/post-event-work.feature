@@ -43,6 +43,25 @@ Feature: Post-event work
     Then the guard failure is reported
     And no subscriber work is counted as queued
 
+  # The publisher above reports the loss. The projection router, which
+  # dispatches after a fold has already committed, takes the other side of the
+  # same trade: it cannot report a loss to anyone, so it must not create one.
+  @unit
+  Scenario: A failing relevance guard never drops a side effect
+    Given a subscriber whose relevance guard throws
+    When the projection router dispatches an applied event to it
+    Then the subscriber's work is enqueued anyway rather than dropped
+
+  # Subscribers were called reactors. The vocabulary changed; the queue names
+  # and the job registry keys did not, so work staged by the old build still
+  # finds its handler on the new one.
+  @unit
+  Scenario: A registration keeps its queue identity across the vocabulary change
+    Given a side effect registered as a subscriber under a parent projection
+    When its subscriber queues are initialized
+    Then the job registry key and the group key still name the old registration
+    And the group key names the parent projection as well as the tenant
+
   @unit
   Scenario: An event subscriber receives no projection state
     Given an event subscriber for an accepted event

@@ -10,6 +10,7 @@ import { buildTraceTestContext, sanitizeHeadersForTrace } from "../agent-test-tr
 
 describe("sanitizeHeadersForTrace()", () => {
   describe("when Authorization header contains a bearer token", () => {
+    /** @scenario "Bearer token is redacted in trace" */
     it("redacts the token value", () => {
       const headers: Record<string, string> = {
         Authorization: "Bearer super-secret-token-123",
@@ -24,6 +25,7 @@ describe("sanitizeHeadersForTrace()", () => {
   });
 
   describe("when Authorization header contains basic auth", () => {
+    /** @scenario "Basic auth credentials are redacted in trace" */
     it("redacts the encoded credentials", () => {
       const encoded = Buffer.from("user:pass").toString("base64");
       const headers: Record<string, string> = {
@@ -37,6 +39,7 @@ describe("sanitizeHeadersForTrace()", () => {
   });
 
   describe("when a custom auth header is present", () => {
+    /** @scenario "API key is redacted in trace" */
     it("redacts the custom header value", () => {
       const headers: Record<string, string> = {
         "X-API-Key": "secret-key-456",
@@ -54,6 +57,7 @@ describe("sanitizeHeadersForTrace()", () => {
   });
 
   describe("when Authorization header uses non-standard casing", () => {
+    /** @scenario "Bearer token is redacted in trace" */
     it("redacts the token regardless of case", () => {
       const headers: Record<string, string> = {
         authorization: "Bearer case-insensitive-token",
@@ -68,6 +72,7 @@ describe("sanitizeHeadersForTrace()", () => {
   });
 
   describe("when custom auth header uses non-standard casing", () => {
+    /** @scenario "API key is redacted in trace" */
     it("redacts the header regardless of case", () => {
       const headers: Record<string, string> = {
         "x-api-key": "secret-key-789",

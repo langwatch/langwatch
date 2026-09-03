@@ -142,7 +142,7 @@ function codeOf(payload: unknown): string {
 describe("the Custom query page", () => {
   describe("given a deployment with no LangWatchQL provisioning", () => {
     describe("when the member looks for the surface", () => {
-      /** @scenario "The workbench is unreachable while LangWatchQL is not provisioned" */
+      /** @scenario "An unavailable or disabled deployment does not expose the workbench" */
       it("offers no navigation entry", () => {
         harness.available = false;
         harness.reason = "unprovisioned";
@@ -151,7 +151,7 @@ describe("the Custom query page", () => {
         expect(screen.queryByRole("link", { name: "Custom query" })).not.toBeInTheDocument();
       });
 
-      /** @scenario "The workbench is unreachable while LangWatchQL is not provisioned" */
+      /** @scenario "An unavailable or disabled deployment does not expose the workbench" */
       it("renders the backend's unavailable state instead of the workbench", async () => {
         harness.available = false;
         harness.reason = "unprovisioned";
@@ -167,7 +167,7 @@ describe("the Custom query page", () => {
 
   describe("given a project whose feature switch is off", () => {
     describe("when the member opens the route directly", () => {
-      /** @scenario "The whole surface stays dark until the experimental feature switch is on" */
+      /** @scenario "An unavailable or disabled deployment does not expose the workbench" */
       it("says the switch is off rather than blaming the deployment", async () => {
         harness.available = false;
         harness.reason = "disabled";
@@ -210,7 +210,7 @@ describe("the Custom query page", () => {
 
   describe("given an authorized member on a provisioned deployment", () => {
     describe("when they open the page", () => {
-      /** @scenario "An authorized member opens Custom query and sees only their live LangWatchQL schema" */
+      /** @scenario "Organization rules and project permissions govern access" */
       it("names the page and identifies the editor as LangWatchQL ClickHouse SQL", async () => {
         renderPage();
 
@@ -219,7 +219,7 @@ describe("the Custom query page", () => {
         expect(screen.getByTestId("lwql-workbench")).toBeInTheDocument();
       });
 
-      /** @scenario "The workbench is unreachable while LangWatchQL is not provisioned" */
+      /** @scenario "An unavailable or disabled deployment does not expose the workbench" */
       it("offers the navigation entry only once the backend says it is available", () => {
         renderMenuLink();
 

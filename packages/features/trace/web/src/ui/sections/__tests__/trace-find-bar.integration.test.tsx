@@ -46,6 +46,7 @@ describe("TraceFindBar", () => {
     useFindStore.getState().open();
   });
 
+  /** @scenario "Loaded-trace find remains a browser-owned presentation behaviour" */
   it("searches loaded rows and cycles to the matching row", () => {
     const { container } = renderFindBar();
 
@@ -59,6 +60,7 @@ describe("TraceFindBar", () => {
     );
   });
 
+  /** @scenario "Loaded-trace find remains a browser-owned presentation behaviour" */
   it("closes on Escape and keeps the keyboard hint as a named render port", () => {
     renderFindBar();
 

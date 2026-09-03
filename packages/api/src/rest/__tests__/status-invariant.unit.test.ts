@@ -153,6 +153,7 @@ describe("endpoint success status", () => {
   });
 
   describe("given a required output schema", () => {
+    /** @scenario "The transport owns the response" */
     it("always answers 200, never 204", async () => {
       const app = buildTestService()
         .registerRoute(
@@ -214,6 +215,7 @@ describe("endpoint success status", () => {
   });
 
   describe("given no output schema at all", () => {
+    /** @scenario "Answering requires an output schema" */
     it("refuses the REST route at registration", () => {
       const service = buildTestService();
 
@@ -227,6 +229,7 @@ describe("endpoint success status", () => {
       ).toThrow(/must declare an output schema/);
     });
 
+    /** @scenario "The transport owns the response" */
     it("refuses a hand-built response from a schema-backed route", async () => {
       const app = buildTestService()
         .registerRoute(
@@ -244,6 +247,7 @@ describe("endpoint success status", () => {
       expect(await res.text()).not.toContain("not validated");
     });
 
+    /** @scenario "The transport owns the response" */
     it("refuses a raw Response from a handler that declared an output", async () => {
       const app = buildTestService()
         .registerRoute(
@@ -264,6 +268,10 @@ describe("endpoint success status", () => {
       });
 
       expect(res.status).toBe(500);
+      // The handler named a status, a body and a content type; the transport
+      // kept all three for itself.
+      expect(res.headers.get("content-type")).toContain("application/json");
+      expect(await res.text()).not.toContain("raw bytes");
     });
   });
 });

@@ -48,6 +48,7 @@ function service(prompt: LangyFeedbackPromptPolicy) {
 
 describe("LangyService", () => {
   describe("when a conversation has enough assistant answers to ask", () => {
+    /** @scenario "feedback prompt keeps its existing cadence" */
     it("owns the feedback cadence on the flat service boundary", async () => {
       const prompt = feedbackPrompt();
       const langy = service(prompt.service);

@@ -14,7 +14,7 @@ import { LangWatchQLVegaLoadBlockedError } from "../no-network-vega-loader";
 
 describe("the refusals the chart layer raises", () => {
   describe("given a failure from inside the chart runtime", () => {
-    /** @scenario "Chart failures are distinct intentional states, never a blank chart" */
+    /** @scenario "Chart failures are explicit and do not discard the table" */
     it("carries the reason under the render.failure rule", () => {
       const failure = lwqlRenderFailure(new Error("Unrecognized signal name"));
 
@@ -31,7 +31,7 @@ describe("the refusals the chart layer raises", () => {
       expect(failure.message.length).toBeGreaterThan(0);
     });
 
-    /** @scenario "A repository-owned loader refuses all network and file loading" */
+    /** @scenario "No renderer path performs network or file loading" */
     it("keeps a blocked load's own detail rather than flattening it", () => {
       const blocked = new LangWatchQLVegaLoadBlockedError({
         reference: "https://example.test/secret?token=abc",
@@ -47,7 +47,7 @@ describe("the refusals the chart layer raises", () => {
   });
 
   describe("given every encoded value is empty", () => {
-    /** @scenario "Chart failures are distinct intentional states, never a blank chart" */
+    /** @scenario "Chart failures are explicit and do not discard the table" */
     it("names the columns under the encoding.empty rule", () => {
       const failure = lwqlEmptyEncodingFailure({
         fieldsByDataset: { query_result: ["model", "total"] },

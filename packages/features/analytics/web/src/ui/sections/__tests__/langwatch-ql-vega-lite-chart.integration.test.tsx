@@ -210,8 +210,8 @@ afterEach(() => {
 describe("the LangWatchQL Vega-Lite chart", () => {
   describe("given a valid specification over the query result", () => {
     describe("when it renders", () => {
-      /** @scenario "No embed actions are exposed" */
-      /** @scenario "A repository-owned loader refuses all network and file loading" */
+      /** @scenario "Chart controls expose no unsafe embed actions" */
+      /** @scenario "No renderer path performs network or file loading" */
       it("embeds with no actions, an interpreter, and the repository's own loader", async () => {
         withChakra(chart());
 
@@ -235,7 +235,7 @@ describe("the LangWatchQL Vega-Lite chart", () => {
       // The half of the scenario that lives outside a browser: the chart is
       // given a container-sized specification and tooltips are on. Whether the
       // pixels reflow and the tooltip appears is proven in a real browser.
-      /** @scenario "A time-bucketed multi-series result renders responsively with tooltips" */
+      /** @scenario "Chart mode preserves data and offers an accessible table fallback" */
       it("asks for a container-sized chart with tooltips enabled", async () => {
         withChakra(chart());
 
@@ -255,7 +255,7 @@ describe("the LangWatchQL Vega-Lite chart", () => {
         });
       });
 
-      /** @scenario "The chart is accessible and does not trap focus" */
+      /** @scenario "Chart mode preserves data and offers an accessible table fallback" */
       it("carries an accessible name and description, and takes no focus", async () => {
         withChakra(chart({ ariaLabel: "Chart of the result of run 4" }));
 
@@ -270,7 +270,7 @@ describe("the LangWatchQL Vega-Lite chart", () => {
     });
 
     describe("when only the rows change", () => {
-      /** @scenario "A data-only Reload updates the chart through the live view" */
+      /** @scenario "Chart mode preserves data and offers an accessible table fallback" */
       it("feeds the running view instead of building a new one", async () => {
         const first = { query_result: ROWS };
         const { rerender } = withChakra(
@@ -312,7 +312,7 @@ describe("the LangWatchQL Vega-Lite chart", () => {
     });
 
     describe("when the specification, the colour mode, or the container changes", () => {
-      /** @scenario "Spec, size, and color-mode changes update the chart and unmount finalizes it" */
+      /** @scenario "Chart mode preserves data and offers an accessible table fallback" */
       it("rebuilds the view for a new specification and finalizes the old one", async () => {
         const { rerender } = withChakra(chart());
         await waitFor(() => expect(vega.state.calls).toHaveLength(1));
@@ -329,7 +329,7 @@ describe("the LangWatchQL Vega-Lite chart", () => {
         expect(vega.state.finalized).toBe(1);
       });
 
-      /** @scenario "The chart follows LangWatch theming in light and dark modes" */
+      /** @scenario "Chart mode preserves data and offers an accessible table fallback" */
       it("rebuilds with a dark configuration when the colour mode flips", async () => {
         const { rerender } = withChakra(chart());
         await waitFor(() => expect(vega.state.calls).toHaveLength(1));
@@ -347,7 +347,7 @@ describe("the LangWatchQL Vega-Lite chart", () => {
         expect(vega.state.calls[1]!.options.tooltip).toEqual({ theme: "dark" });
       });
 
-      /** @scenario "Spec, size, and color-mode changes update the chart and unmount finalizes it" */
+      /** @scenario "Chart mode preserves data and offers an accessible table fallback" */
       it("resizes the running view when its container changes size", async () => {
         const observers: (() => void)[] = [];
         vi.stubGlobal(
@@ -368,7 +368,7 @@ describe("the LangWatchQL Vega-Lite chart", () => {
         expect(vega.state.resizes).toBe(1);
       });
 
-      /** @scenario "Spec, size, and color-mode changes update the chart and unmount finalizes it" */
+      /** @scenario "Chart mode preserves data and offers an accessible table fallback" */
       it("finalizes the view when the chart unmounts", async () => {
         const { unmount } = withChakra(chart());
         await waitFor(() => expect(vega.state.calls).toHaveLength(1));
@@ -381,7 +381,7 @@ describe("the LangWatchQL Vega-Lite chart", () => {
   });
 
   describe("given values a chart cannot place on an axis", () => {
-    /** @scenario "Values Vega cannot represent faithfully produce a warning, not a zero" */
+    /** @scenario "Chart failures are explicit and do not discard the table" */
     it("draws the chart and warns rather than turning them into zero", async () => {
       withChakra(
         chart({
@@ -412,7 +412,7 @@ describe("the LangWatchQL Vega-Lite chart", () => {
   });
 
   describe("given a chart that cannot be drawn", () => {
-    /** @scenario "Chart failures are distinct intentional states, never a blank chart" */
+    /** @scenario "Chart failures are explicit and do not discard the table" */
     it("renders a distinct, named state for each cause and never a blank chart", async () => {
       const cases: { name: string; element: ReactElement; code: string }[] = [
         {
@@ -472,7 +472,7 @@ describe("the LangWatchQL Vega-Lite chart", () => {
       expect(vega.state.calls).toHaveLength(0);
     });
 
-    /** @scenario "Chart failures are distinct intentional states, never a blank chart" */
+    /** @scenario "Chart failures are explicit and do not discard the table" */
     it("names a failure from inside the chart runtime", async () => {
       vega.state.failWith = new Error("Unrecognized signal name: bogus");
       withChakra(chart());
@@ -484,7 +484,7 @@ describe("the LangWatchQL Vega-Lite chart", () => {
       );
     });
 
-    /** @scenario "Chart failures are distinct intentional states, never a blank chart" */
+    /** @scenario "Chart failures are explicit and do not discard the table" */
     it("names a failure raised while the specification is being built", async () => {
       // A build throw is synchronous, so it lands before `embed` has a
       // rejection handler. Unguarded it escapes the effect and the panel sits
@@ -500,7 +500,7 @@ describe("the LangWatchQL Vega-Lite chart", () => {
       expect(vega.state.calls).toHaveLength(0);
     });
 
-    /** @scenario "Chart failures are distinct intentional states, never a blank chart" */
+    /** @scenario "Chart failures are explicit and do not discard the table" */
     it("draws again once the specification that failed is changed", async () => {
       vega.state.failWith = new Error("Unrecognized signal name: bogus");
       const { rerender } = withChakra(chart());
@@ -520,7 +520,7 @@ describe("the LangWatchQL Vega-Lite chart", () => {
       await screen.findByRole("img");
     });
 
-    /** @scenario "A repository-owned loader refuses all network and file loading" */
+    /** @scenario "No renderer path performs network or file loading" */
     it("names a refused resource load without repeating its credentials", async () => {
       vega.state.failWith = new LangWatchQLVegaLoadBlockedError({
         reference: "https://example.test/rows.json?token=secret-value",
@@ -533,7 +533,7 @@ describe("the LangWatchQL Vega-Lite chart", () => {
       expect(screen.getByTestId("lwql-chart-failure").textContent).not.toContain("secret-value");
     });
 
-    /** @scenario "A chart over too much data refuses clearly and leaves the table available" */
+    /** @scenario "Chart failures are explicit and do not discard the table" */
     it("refuses a result past the row ceiling, naming the limit it crossed", async () => {
       const tooMany: LangWatchQLDataset = Array.from({ length: 10_001 }, (_, index) => ({
         model: `m${index}`,

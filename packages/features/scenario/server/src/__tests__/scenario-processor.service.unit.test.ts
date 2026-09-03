@@ -261,6 +261,7 @@ describe("ScenarioProcessorService", () => {
     });
   });
 
+  /** @scenario "Child startup overlaps slow preparation" */
   it("boots the isolated child while target and model prefetch continue", async () => {
     const fixture = processorFixture();
     const result = deferred<ScenarioExecutionPrefetchResult>();
@@ -317,6 +318,7 @@ describe("ScenarioProcessorService", () => {
     expect(session.execute).toHaveBeenCalledTimes(1);
   });
 
+  /** @scenario "Child startup overlaps slow preparation" */
   it("aborts an early child when preparation fails", async () => {
     const fixture = processorFixture();
     const result = deferred<ScenarioExecutionPrefetchResult>();
@@ -382,6 +384,7 @@ describe("ScenarioProcessorService", () => {
     expect(session.execute).not.toHaveBeenCalled();
   });
 
+  /** @scenario "Child startup overlaps slow preparation" */
   it("aborts an early child when cancellation arrives during preparation", async () => {
     const fixture = processorFixture();
     const result = deferred<ScenarioExecutionPrefetchResult>();

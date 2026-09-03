@@ -161,7 +161,7 @@ describe("resolveLangWatchQLGranularity", () => {
         timeWindow: WINDOW,
       });
 
-    /** @scenario "A caller that supplies period_granularity_seconds itself is refused" */
+    /** @scenario "Reserved parameter misuse is refused before execution" */
     it("is refused by this resolver even when called on its own", () => {
       expect(codeOf(suppliesGranularity)).toBe("lwql_reserved_parameter_supplied");
     });
