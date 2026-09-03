@@ -6,12 +6,12 @@ sidebarTitle: CI smoke test
 
 Goal: catch misconfigurations in the gateway BEFORE they surface during an on-call incident. This recipe provisions a temporary virtual key, calls `/v1/chat/completions`, verifies the response and its trace headers, and cleans up, all from a CI job using only the `langwatch` CLI and `curl`.
 
-<Info>Runtime: typically 3–8 seconds wall-clock. One gateway request + two REST round-trips.</Info>
+<Info>Runtime: typically 3 to 8 seconds wall-clock. One gateway request + two REST round-trips.</Info>
 
 ## What it validates
 
 - The public REST API at `/api/gateway/v1/*` is reachable with the CI token.
-- A ModelProvider scoped at ORG/TEAM/PROJECT is healthy (reaches actual upstream) via its Advanced (Gateway) tab settings.
+- A ModelProvider scoped at ORG/TEAM/PROJECT is healthy (reaches actual upstream) via its Advanced (Gateway) settings.
 - VK creation + secret reveal flow works at the requested scope.
 - VK resolves end-to-end against the gateway data plane.
 - Response carries `X-LangWatch-Trace-Id`, `X-LangWatch-Span-Id`, `X-LangWatch-Gateway-Request-Id`, and `traceparent`.
@@ -21,7 +21,7 @@ Goal: catch misconfigurations in the gateway BEFORE they surface during an on-ca
 
 - A CI-scoped API token stored in `CI_LANGWATCH_TOKEN` with scopes `virtualKeys:create`, `virtualKeys:delete`, `modelProviders:view` (all at the same ORGANIZATION the CI VK is created in).
 - A `CI_ORG_SLUG` env var naming the org scope (e.g. `acme`). The CI VK lives at this ORG scope so its eligible-MP set is the union of every ModelProvider visible from the org.
-- At least one healthy ModelProvider configured under **Settings → Model Providers** at ORG, TEAM, or PROJECT scope. Set the rate-limit / fallback fields on its Advanced (Gateway) tab if you want CI to exercise them.
+- At least one healthy ModelProvider configured under **Settings → Model Providers** at ORG, TEAM, or PROJECT scope. Set the rate-limit / fallback fields in its Advanced (Gateway) section if you want CI to exercise them.
 - `jq` available on the runner.
 
 ## The script

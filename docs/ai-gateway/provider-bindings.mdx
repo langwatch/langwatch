@@ -1,11 +1,11 @@
 ---
 title: Gateway provider settings
-description: Gateway-specific settings (Fallback priority, Provider config (JSON)) now live on each ModelProvider's Advanced (Gateway) section.
+description: Gateway-specific settings (Fallback priority, Provider config (JSON)) now live in each model provider's Advanced (Gateway) section.
 sidebarTitle: Gateway provider settings
 ---
 
 <Note>
-**Renamed in v1.** What used to be called a "provider binding" (`GatewayProviderCredential`) is gone. Gateway-only settings now live directly on the **ModelProvider** record itself, on the **Advanced (Gateway)** tab of the ModelProvider editor.
+**Renamed in v1.** What used to be called a "provider binding" (`GatewayProviderCredential`) is gone. Gateway-only settings now live directly on the **ModelProvider** record itself, in the **Advanced (Gateway)** section of the model provider drawer.
 
 There is no separate gateway-binding entity to create, list, edit, or disable. One ModelProvider = one gateway-eligible credential. Virtual keys reference ModelProviders directly.
 </Note>
@@ -23,8 +23,8 @@ Folding the gateway-specific fields onto the ModelProvider itself collapses the 
 | `GatewayProviderCredential` row | (deleted, fields folded onto `ModelProvider`) |
 | Bound to a project | Lives at any of `ORGANIZATION`, `TEAM`, `PROJECT` scope (see [Scope](#scope)) |
 | `slot` (free-form label) | Removed. VKs now reference ModelProviders by id directly; the routing policy carries the ordered list |
-| `rate_limit.rpm`, `.tpm`, `.rpd` | The same inputs are on the **ModelProvider → Advanced (Gateway)** tab. The gateway does not read them. See [Rate limits](/ai-gateway/rate-limits) for the limits it does enforce |
-| `fallback_priority_global` | Same field, on the **Advanced (Gateway)** tab. Default-policy ordering uses this then `createdAt` |
+| `rate_limit.rpm`, `.tpm`, `.rpd` | The same inputs are in the **Advanced (Gateway)** section. The gateway does not read them. See [Rate limits](/ai-gateway/rate-limits) for the limits it does enforce |
+| `fallback_priority_global` | Same field, in the **Advanced (Gateway)** section. Default-policy ordering uses this then `createdAt` |
 | `provider_credential_id` (VK reference) | VKs reference `model_provider_id` directly |
 
 For the new wire shape of the bundle a VK resolves to, see the [`/config/:vk_id` contract](/ai-gateway/api/management#config-vk-id) and the `vk-config-bundle.feature` spec.
@@ -33,8 +33,8 @@ For the new wire shape of the bundle a VK resolves to, see the [`/config/:vk_id`
 
 1. Open **Settings → Model Providers**.
 2. Pick (or create) the provider you want gateway traffic to use.
-3. Switch to the **Advanced (Gateway)** tab inside the editor drawer.
-4. Fill in the gateway-only fields, **Fallback priority** and **Provider config (JSON)**. The provider credential itself (API key, region, endpoint) stays on the **Basic** tab and is reused by both the gateway and the rest of LangWatch.
+3. Scroll to **Advanced (Gateway)** at the bottom of the drawer and expand it. It is collapsed by default.
+4. Fill in the gateway-only fields, **Fallback priority** and **Provider config (JSON)**. The provider credential itself (API key, region, endpoint) stays in the fields above the section and is reused by both the gateway and the rest of LangWatch.
 5. Save. The new settings reach the gateway within ~30 s via the `/changes` long-poll.
 
 ## Scope
@@ -49,11 +49,11 @@ ModelProviders live at one of three scopes:
 
 A VK's eligible-provider set is the union of every ModelProvider whose scope is at or above one of the VK's scopes (see [vk-scope-inheritance.feature](https://github.com/langwatch/langwatch/blob/main/specs/ai-gateway/governance/vk-scope-inheritance.feature) for the full cascade).
 
-## Fields on the Advanced (Gateway) tab
+## Fields in the Advanced (Gateway) section
 
 ### Rate limits (RPM, TPM, RPD)
 
-The tab has an input for each of the three, and the value you save is stored on the row. The gateway does not enforce any of them: the config bundle it reads carries no rate limit on a provider, and its limiter counts requests per virtual key. Set a ceiling on the key instead. See [Rate limits](/ai-gateway/rate-limits).
+The section has an input for each of the three, and the value you save is stored on the row. The gateway does not enforce any of them: the config bundle it reads carries no rate limit on a provider, and its limiter counts requests per virtual key. Set a ceiling on the key instead. See [Rate limits](/ai-gateway/rate-limits).
 
 ### Fallback priority (global)
 
@@ -65,7 +65,7 @@ Free-form JSON merged onto the ModelProvider's basic config at gateway-dispatch 
 
 ### Read-only diagnostic block
 
-The **Advanced (Gateway)** tab also surfaces health status, circuit-breaker state, and the last `disabledAt` timestamp. These are populated by the gateway; the operator can't write them directly.
+The **Advanced (Gateway)** section also shows health status, circuit-breaker state, and the last `disabledAt` timestamp. These are populated by the gateway; the operator can't write them directly.
 
 ## Multiple deployments of the same provider
 
@@ -75,5 +75,5 @@ Create a second ModelProvider row of the same family (e.g. two OpenAI rows for `
 
 - [Virtual keys](/ai-gateway/virtual-keys): multi-scope semantics and how a VK's eligible-provider set is computed.
 - [Concepts](/ai-gateway/concepts): mental model for the gateway primitives.
-- [RBAC](/ai-gateway/rbac): `modelProviders:manage` gates the **Advanced (Gateway)** tab; the old `gatewayProviders:*` resource is retired.
+- [RBAC](/ai-gateway/rbac): `modelProviders:manage` gates the **Advanced (Gateway)** section; the old `gatewayProviders:*` resource is retired.
 - [Rate limits](/ai-gateway/rate-limits): RPM and RPD on a virtual key, which is where the gateway enforces them.

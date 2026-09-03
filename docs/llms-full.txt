@@ -2267,7 +2267,7 @@ curl -sS https://app.langwatch.ai/api/gateway/v1/budgets \
   -d '{ "scope": {...}, "name": "customer-acme", "window": "month", "limit_usd": "250" }'
 ```
 
-- Send the same key and the same body again within **24 hours** and you get the original response back, with `X-Idempotent-Replay: true`. Nothing is created twice.
+- Send the same key and the same body again within **24 hours** and you get the original response back, with `X-Idempotent-Replay: true`. The server creates the resource once.
 - Send the same key with a **different** body and the request is refused: `409` with `error.code = "idempotency_error"`. The key already stands for a different request.
 - Retry while the first attempt is still running and you also get `409 idempotency_error`, so two racing retries cannot both create.
 - Only successful outcomes are stored. If the create failed, a retry runs it again for real.
@@ -2439,8 +2439,8 @@ Body (only `name` is required):
 ```
 
 - `scopes` defaults to the calling project. Team- and org-scoped keys need a scoped API key holding `virtualKeys:manage` at each requested scope; legacy project keys can only mint keys for their own project.
-- An org- or team-scoped key also needs a place for its traces and spend to land, and has to say where: pass `trace_project_id` (requires `virtualKeys:manage` on that project; it is a destination, not a scope, and grants no access to the key). Without it, and without exactly one project scope naming a live project to take it from, creation refuses with `gateway_trace_project_ambiguous`. The same refusal covers a key scoped to several projects at once. An organization with no other live projects is exempt and the key gets its oldest live governance project, because there is nothing else to name; one with no governance project either refuses with `trace_project_required`. A `trace_project_id` that names a project this organization does not have refuses with `gateway_trace_project_unknown` rather than quietly resolving to somewhere else.
-- `trace_project_id` is decided once, when the key is written, and stored on it. Changing what the key is scoped to therefore never moves where its traces and spend land; send `trace_project_id` on the update to move it, validated the same way create validates it. Sending it as explicit `null` does not clear it: it asks for the destination to be worked out again from what the key is now, under the same rules create uses, so it lands on the key's single project scope when exactly one names a live project, falls back to the organization's oldest live governance project when there are no other live projects to choose from, and is refused with `gateway_trace_project_ambiguous` when nothing selects a destination and the organization has live projects that could have been named. A key written before this was stored, in an organization that had no governance project to give it, can carry `null`: its traces are dropped and no budget counts its spend, so give it a `trace_project_id`.
+- An org- or team-scoped key also needs a place for its traces and spend to land, and has to say where: pass `trace_project_id` (requires `virtualKeys:manage` on that project; it is a destination, not a scope, and grants no access to the key). Without it, and without exactly one project scope naming a live project to take it from, creation refuses with `gateway_trace_project_ambiguous`. The same refusal covers a key scoped to several projects at once. An organization with no other live projects is exempt and the key gets its oldest live governance project, because no other project can be named; one with no governance project either refuses with `trace_project_required`. A `trace_project_id` that names a project this organization does not have refuses with `gateway_trace_project_unknown` rather than quietly resolving to somewhere else.
+- `trace_project_id` is decided once, when the key is written, and stored on it. Changing what the key is scoped to therefore never moves where its traces and spend land; send `trace_project_id` on the update to move it, validated the same way create validates it. Sending it as explicit `null` does not clear it: it asks for the destination to be worked out again from what the key is now, under the same rules create uses, so it lands on the key's single project scope when exactly one names a live project, falls back to the organization's oldest live governance project when there are no other live projects to choose from, and is refused with `gateway_trace_project_ambiguous` when no scope selects a destination and the organization has live projects that could have been named. A key written before this was stored, in an organization that had no governance project to give it, can carry `null`: its traces are dropped and no budget counts its spend, so give it a `trace_project_id`.
 - `trace_project_archived` says the project the key traces into has been deleted. The key goes on sending its traces there, so the data stays whole and reappears if the project is restored, and traffic is never refused for it. Point the key somewhere else if that is not what you want.
 - `budget` creates a budget atomically with the key and manages exactly that row on later updates: the key can never exist without the cap you asked for. Windows: `day`, `week`, `month`.
 - `routing_mode` is one of `none` (default: no silent failover), `fallback_all`, or `policy` (requires `routing_policy_id`).
@@ -2641,7 +2641,7 @@ Soft archive: preserves ledger history, stops enforcement on new requests. Retur
 
 ## Provider bindings
 
-Provider credentials, rate limits, and fallback priority live on the platform-wide ModelProvider: use `/api/gateway-platform/v1/model-providers` or the Advanced (Gateway) tab in the dashboard. Budgets reference providers by ModelProvider id in `provider_key`. The `/providers` routes on this API answer `410`.
+Provider credentials, rate limits, and fallback priority live on the platform-wide ModelProvider: use `/api/gateway-platform/v1/model-providers` or the Advanced (Gateway) section in the dashboard. Budgets reference providers by ModelProvider id in `provider_key`. The `/providers` routes on this API answer `410`.
 
 ## Cache rules
 
@@ -5053,12 +5053,12 @@ sidebarTitle: CI smoke test
 
 Goal: catch misconfigurations in the gateway BEFORE they surface during an on-call incident. This recipe provisions a temporary virtual key, calls `/v1/chat/completions`, verifies the response and its trace headers, and cleans up, all from a CI job using only the `langwatch` CLI and `curl`.
 
-<Info>Runtime: typically 3–8 seconds wall-clock. One gateway request + two REST round-trips.</Info>
+<Info>Runtime: typically 3 to 8 seconds wall-clock. One gateway request + two REST round-trips.</Info>
 
 ## What it validates
 
 - The public REST API at `/api/gateway/v1/*` is reachable with the CI token.
-- A ModelProvider scoped at ORG/TEAM/PROJECT is healthy (reaches actual upstream) via its Advanced (Gateway) tab settings.
+- A ModelProvider scoped at ORG/TEAM/PROJECT is healthy (reaches actual upstream) via its Advanced (Gateway) settings.
 - VK creation + secret reveal flow works at the requested scope.
 - VK resolves end-to-end against the gateway data plane.
 - Response carries `X-LangWatch-Trace-Id`, `X-LangWatch-Span-Id`, `X-LangWatch-Gateway-Request-Id`, and `traceparent`.
@@ -5068,7 +5068,7 @@ Goal: catch misconfigurations in the gateway BEFORE they surface during an on-ca
 
 - A CI-scoped API token stored in `CI_LANGWATCH_TOKEN` with scopes `virtualKeys:create`, `virtualKeys:delete`, `modelProviders:view` (all at the same ORGANIZATION the CI VK is created in).
 - A `CI_ORG_SLUG` env var naming the org scope (e.g. `acme`). The CI VK lives at this ORG scope so its eligible-MP set is the union of every ModelProvider visible from the org.
-- At least one healthy ModelProvider configured under **Settings → Model Providers** at ORG, TEAM, or PROJECT scope. Set the rate-limit / fallback fields on its Advanced (Gateway) tab if you want CI to exercise them.
+- At least one healthy ModelProvider configured under **Settings → Model Providers** at ORG, TEAM, or PROJECT scope. Set the rate-limit / fallback fields in its Advanced (Gateway) section if you want CI to exercise them.
 - `jq` available on the runner.
 
 ## The script
@@ -6382,7 +6382,7 @@ For this walkthrough, assume **per-customer** model. Note that `principal` budge
 
 ## Step 2: Configure the upstream ModelProvider once
 
-Your LangWatch org owns a single ModelProvider row per upstream (OpenAI, Anthropic) at ORGANIZATION scope. End-users never see these. Configure them under **Settings → Model Providers → Add Model Provider** (Scope = Organization), then open each row's **Advanced (Gateway)** tab and set the per-credential gateway caps:
+Your LangWatch org owns a single ModelProvider row per upstream (OpenAI, Anthropic) at ORGANIZATION scope. End-users never see these. Configure them under **Settings → Model Providers → Add Model Provider** (Scope = Organization), then expand each row's **Advanced (Gateway)** section and set the per-credential gateway caps:
 
 | Field | Suggested value |
 |---|---|
@@ -6437,7 +6437,7 @@ export async function provisionCustomer(customerId: string, planLimitUsd: string
 }
 ```
 
-To also cap each **end user inside** the tenant (their seats, their agents' users), add one attributed-user template on the key; it covers every current and future end user with lazy per-user buckets, nothing to provision per user:
+To also cap each **end user inside** the tenant (their seats, their agents' users), add one attributed-user template on the key; it covers every current and future end user with lazy per-user buckets, and you provision no bucket per user:
 
 ```ts
 await fetch(`${LW}/budgets`, {
@@ -8003,7 +8003,7 @@ Closed SaaS (Cowork / Copilot / Workato / OpenAI / Claude / S3)
 | `RoutingPolicy` | Provider chain template | Org-scoped; hierarchical via `scope`+`scopeId` |
 | `VirtualKey` | The actual credential issued to a caller | `organizationId` + `VirtualKeyScope[]` (multi-scope at ORG/TEAM/PROJECT); references RoutingPolicy; optional `principalUserId` for personal VKs |
 | `VirtualKeyScope` | One scope row per VK (1:N) | Cascade upward to derive eligible ModelProviders |
-| `ModelProvider` | Upstream LLM API key (basic creds) + Gateway-only fields (RPM/TPM/RPD, fallback priority, providerConfig) on the **Advanced (Gateway)** tab | Scoped to ORGANIZATION/TEAM/PROJECT; one record per credential, no separate gateway binding |
+| `ModelProvider` | Upstream LLM API key (basic creds) + Gateway-only fields (RPM/TPM/RPD, fallback priority, providerConfig) in the **Advanced (Gateway)** section | Scoped to ORGANIZATION/TEAM/PROJECT; one record per credential, no separate gateway binding |
 | `GatewayBudget` | Spend limit | Scope = ORG / TEAM / PROJECT / VK / PRINCIPAL |
 | `IngestionSource` | Per-platform fleet config | Org-scoped; carries ingestSecret + parserConfig |
 
@@ -10070,12 +10070,12 @@ Every block emits:
 
 ---
 title: Gateway provider settings
-description: Gateway-specific settings (Fallback priority, Provider config (JSON)) now live on each ModelProvider's Advanced (Gateway) section.
+description: Gateway-specific settings (Fallback priority, Provider config (JSON)) now live in each model provider's Advanced (Gateway) section.
 sidebarTitle: Gateway provider settings
 ---
 
 <Note>
-**Renamed in v1.** What used to be called a "provider binding" (`GatewayProviderCredential`) is gone. Gateway-only settings now live directly on the **ModelProvider** record itself, on the **Advanced (Gateway)** tab of the ModelProvider editor.
+**Renamed in v1.** What used to be called a "provider binding" (`GatewayProviderCredential`) is gone. Gateway-only settings now live directly on the **ModelProvider** record itself, in the **Advanced (Gateway)** section of the model provider drawer.
 
 There is no separate gateway-binding entity to create, list, edit, or disable. One ModelProvider = one gateway-eligible credential. Virtual keys reference ModelProviders directly.
 </Note>
@@ -10093,8 +10093,8 @@ Folding the gateway-specific fields onto the ModelProvider itself collapses the 
 | `GatewayProviderCredential` row | (deleted, fields folded onto `ModelProvider`) |
 | Bound to a project | Lives at any of `ORGANIZATION`, `TEAM`, `PROJECT` scope (see [Scope](#scope)) |
 | `slot` (free-form label) | Removed. VKs now reference ModelProviders by id directly; the routing policy carries the ordered list |
-| `rate_limit.rpm`, `.tpm`, `.rpd` | The same inputs are on the **ModelProvider → Advanced (Gateway)** tab. The gateway does not read them. See [Rate limits](/ai-gateway/rate-limits) for the limits it does enforce |
-| `fallback_priority_global` | Same field, on the **Advanced (Gateway)** tab. Default-policy ordering uses this then `createdAt` |
+| `rate_limit.rpm`, `.tpm`, `.rpd` | The same inputs are in the **Advanced (Gateway)** section. The gateway does not read them. See [Rate limits](/ai-gateway/rate-limits) for the limits it does enforce |
+| `fallback_priority_global` | Same field, in the **Advanced (Gateway)** section. Default-policy ordering uses this then `createdAt` |
 | `provider_credential_id` (VK reference) | VKs reference `model_provider_id` directly |
 
 For the new wire shape of the bundle a VK resolves to, see the [`/config/:vk_id` contract](/ai-gateway/api/management#config-vk-id) and the `vk-config-bundle.feature` spec.
@@ -10103,8 +10103,8 @@ For the new wire shape of the bundle a VK resolves to, see the [`/config/:vk_id`
 
 1. Open **Settings → Model Providers**.
 2. Pick (or create) the provider you want gateway traffic to use.
-3. Switch to the **Advanced (Gateway)** tab inside the editor drawer.
-4. Fill in the gateway-only fields, **Fallback priority** and **Provider config (JSON)**. The provider credential itself (API key, region, endpoint) stays on the **Basic** tab and is reused by both the gateway and the rest of LangWatch.
+3. Scroll to **Advanced (Gateway)** at the bottom of the drawer and expand it. It is collapsed by default.
+4. Fill in the gateway-only fields, **Fallback priority** and **Provider config (JSON)**. The provider credential itself (API key, region, endpoint) stays in the fields above the section and is reused by both the gateway and the rest of LangWatch.
 5. Save. The new settings reach the gateway within ~30 s via the `/changes` long-poll.
 
 ## Scope
@@ -10119,11 +10119,11 @@ ModelProviders live at one of three scopes:
 
 A VK's eligible-provider set is the union of every ModelProvider whose scope is at or above one of the VK's scopes (see [vk-scope-inheritance.feature](https://github.com/langwatch/langwatch/blob/main/specs/ai-gateway/governance/vk-scope-inheritance.feature) for the full cascade).
 
-## Fields on the Advanced (Gateway) tab
+## Fields in the Advanced (Gateway) section
 
 ### Rate limits (RPM, TPM, RPD)
 
-The tab has an input for each of the three, and the value you save is stored on the row. The gateway does not enforce any of them: the config bundle it reads carries no rate limit on a provider, and its limiter counts requests per virtual key. Set a ceiling on the key instead. See [Rate limits](/ai-gateway/rate-limits).
+The section has an input for each of the three, and the value you save is stored on the row. The gateway does not enforce any of them: the config bundle it reads carries no rate limit on a provider, and its limiter counts requests per virtual key. Set a ceiling on the key instead. See [Rate limits](/ai-gateway/rate-limits).
 
 ### Fallback priority (global)
 
@@ -10135,7 +10135,7 @@ Free-form JSON merged onto the ModelProvider's basic config at gateway-dispatch 
 
 ### Read-only diagnostic block
 
-The **Advanced (Gateway)** tab also surfaces health status, circuit-breaker state, and the last `disabledAt` timestamp. These are populated by the gateway; the operator can't write them directly.
+The **Advanced (Gateway)** section also shows health status, circuit-breaker state, and the last `disabledAt` timestamp. These are populated by the gateway; the operator can't write them directly.
 
 ## Multiple deployments of the same provider
 
@@ -10145,7 +10145,7 @@ Create a second ModelProvider row of the same family (e.g. two OpenAI rows for `
 
 - [Virtual keys](/ai-gateway/virtual-keys): multi-scope semantics and how a VK's eligible-provider set is computed.
 - [Concepts](/ai-gateway/concepts): mental model for the gateway primitives.
-- [RBAC](/ai-gateway/rbac): `modelProviders:manage` gates the **Advanced (Gateway)** tab; the old `gatewayProviders:*` resource is retired.
+- [RBAC](/ai-gateway/rbac): `modelProviders:manage` gates the **Advanced (Gateway)** section; the old `gatewayProviders:*` resource is retired.
 - [Rate limits](/ai-gateway/rate-limits): RPM and RPD on a virtual key, which is where the gateway enforces them.
 
 ---

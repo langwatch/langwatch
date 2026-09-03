@@ -419,7 +419,7 @@ For agents: if anything in these docs is wrong, confusing, or fails when you try
 
 - [Virtual Keys](https://langwatch.ai/docs/ai-gateway/virtual-keys.md): Create, scope, rotate, disable and revoke the keys your applications use to call the LangWatch AI Gateway.
 - [Budgets](https://langwatch.ai/docs/ai-gateway/budgets.md): Spend caps in USD on an organization, a team, a project, a virtual key, a person, a group or an end user, enforced by the LangWatch AI Gateway before the request reaches the provider.
-- [Gateway provider settings](https://langwatch.ai/docs/ai-gateway/provider-bindings.md): Gateway-specific settings (Fallback priority, Provider config (JSON)) now live on each ModelProvider's Advanced (Gateway) section.
+- [Gateway provider settings](https://langwatch.ai/docs/ai-gateway/provider-bindings.md): Gateway-specific settings (Fallback priority, Provider config (JSON)) now live in each model provider's Advanced (Gateway) section.
 - [Rate limits](https://langwatch.ai/docs/ai-gateway/rate-limits.md): Requests per minute and requests per day on a virtual key, enforced by each LangWatch AI Gateway replica.
 - [RBAC](https://langwatch.ai/docs/ai-gateway/rbac.md): The permissions that gate the LangWatch AI Gateway, the resources they cover and what each built-in role holds.
 

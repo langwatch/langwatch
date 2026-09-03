@@ -40,7 +40,7 @@ For this walkthrough, assume **per-customer** model. Note that `principal` budge
 
 ## Step 2: Configure the upstream ModelProvider once
 
-Your LangWatch org owns a single ModelProvider row per upstream (OpenAI, Anthropic) at ORGANIZATION scope. End-users never see these. Configure them under **Settings → Model Providers → Add Model Provider** (Scope = Organization), then open each row's **Advanced (Gateway)** tab and set the per-credential gateway caps:
+Your LangWatch org owns a single ModelProvider row per upstream (OpenAI, Anthropic) at ORGANIZATION scope. End-users never see these. Configure them under **Settings → Model Providers → Add Model Provider** (Scope = Organization), then expand each row's **Advanced (Gateway)** section and set the per-credential gateway caps:
 
 | Field | Suggested value |
 |---|---|
@@ -95,7 +95,7 @@ export async function provisionCustomer(customerId: string, planLimitUsd: string
 }
 ```
 
-To also cap each **end user inside** the tenant (their seats, their agents' users), add one attributed-user template on the key; it covers every current and future end user with lazy per-user buckets, nothing to provision per user:
+To also cap each **end user inside** the tenant (their seats, their agents' users), add one attributed-user template on the key; it covers every current and future end user with lazy per-user buckets, and you provision no bucket per user:
 
 ```ts
 await fetch(`${LW}/budgets`, {
