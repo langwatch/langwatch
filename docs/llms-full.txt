@@ -665,7 +665,7 @@ Data retention sets how long LangWatch keeps your event data before deleting it 
 You can tighten or extend retention per scope: the organization, a team, or a single project.
 
 <Note>
-  Configuring data retention requires an **Enterprise plan**. On other plans, every project uses the platform default window. See the [pricing page](/pricing) for how extended retention is billed.
+  Paid plans configure data retention. On the Free plan every project uses the platform default window of 49 days. See the [pricing page](/pricing) for the window each plan can set and how extended retention is billed.
 </Note>
 
 ## How it works
@@ -678,7 +678,7 @@ Retention is configured with **retention policies**. Each policy has two parts:
   - **Project**: overrides both the team and organization defaults for that project only.
 - **Retention period**: how long data is kept before deletion.
 
-Retention periods range from a few weeks up to several years, set in weeks, months, or years. Periods always round to whole weeks, because deletion is partition-aligned (see [How deletion works](#how-deletion-works)).
+Paid plans set 35 or 63 days. Enterprise plans set any whole number of weeks from 49 days up, to several years. Periods always round to whole weeks, because deletion is partition-aligned (see [How deletion works](#how-deletion-works)).
 
 <Note>
   When you retain data longer than your plan's included window, the additional storage is billed at **€3 per extra GB**. You only pay for what you store.
@@ -698,7 +698,7 @@ To add a scoped policy:
     Pick the organization, a team, or a single project. A more specific scope overrides the broader defaults.
   </Step>
   <Step title="Pick a retention period">
-    Choose one of the preset windows or enter a custom value in weeks, months, or years.
+    Choose one of the preset windows. Enterprise plans also enter a custom value in weeks, months, or years.
   </Step>
   <Step title="Create">
     Click **Create** to save the policy.
@@ -734,6 +734,8 @@ Retention policies are customer-shrinkable to weeks and can rewrite existing dat
 ## Self-hosted and hybrid instances
 
 Data Retention works the same way on self-hosted deployments, with deletion running against your own storage. Make sure the LangWatch service has permission to delete objects from the storage bucket it manages.
+
+Without a license, a self-hosted deployment keeps the platform default of 49 days and cannot add a policy. An Enterprise license opens the same windows as the Enterprise plan. See [Editions and licensing](/self-hosting/licensing).
 
 If you use versioned object storage, removing an object leaves earlier versions and delete markers in place. Clean these up manually or with a storage lifecycle rule. See the [self-hosting docs](/self-hosting/overview) for setup details.
 
@@ -73089,7 +73091,7 @@ Retention is set in whole weeks.
 
 Windows longer than 63 days are available on **Enterprise plans**. Extended storage is priced from **€3 per GB** and configured as part of your agreement, so you only pay for the additional storage you actually use.
 
-Self-hosted deployments keep the same 49-day default. An Enterprise license unlocks the same windows as the Enterprise plan, and a platform administrator can then keep data indefinitely. See [Editions and licensing](/self-hosting/licensing).
+Self-hosted deployments keep the same 49-day default. An Enterprise license opens the same windows as the Enterprise plan, and a platform administrator can then keep data indefinitely. See [Editions and licensing](/self-hosting/licensing).
 
 <Note>
   To extend retention beyond 63 days, reach out to your contact or [enterprise@langwatch.ai](mailto:enterprise@langwatch.ai).
