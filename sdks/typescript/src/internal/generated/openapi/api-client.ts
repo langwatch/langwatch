@@ -2325,6 +2325,108 @@ export interface paths {
         patch: operations["patchApiGraphsById"];
         trace?: never;
     };
+    "/api/v1/langy/control/connect/register": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** @description Share a folder over HTTP, for a network that blocks WebSockets. The body is the register frame of the control protocol. Answers with the registered frame and the instance token the poll and frames endpoints are addressed with, or with a refused frame. */
+        post: operations["registerLangyControlSession"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/langy/control/connect/poll": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** @description Wait for the next frames of a shared folder, then answer with what is waiting or with an empty list. Each poll is also the folder's heartbeat, so a command line that polls reads connected. Addressed with the instance token in the X-Agent-Instance-Token header. */
+        get: operations["pollLangyControlSession"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/langy/control/connect/frames": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** @description Post the frames the command line has for the platform: the acknowledgement of a call, its result, a permission the developer has to answer first, and the deregister that ends the share. */
+        post: operations["postLangyControlFrames"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/langy/control/requests": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** @description List the open requests Langy made for a folder of mine in this project. Only the person Langy asked ever sees a request, and each one expires fifteen minutes after it was made. */
+        get: operations["listLangyControlRequests"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/langy/control/requests/{id}/approve": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** @description Approve one request and share the current folder with the conversation that asked. Answers with a Langy session key scoped to that conversation, which is never shown again. A request is single use: a second approval is refused. */
+        post: operations["approveLangyControlRequest"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/langy/control/requests/{id}/cancel": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** @description Refuse one request from the terminal. The card in the chat reads that sharing was cancelled, and Langy's next turn offers the choice again. */
+        post: operations["cancelLangyControlRequest"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/me/usage": {
         parameters: {
             query?: never;
@@ -17686,6 +17788,486 @@ export interface operations {
             };
         };
     };
+    registerLangyControlSession: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: {
+            content: {
+                "application/json": {
+                    /** @enum {number} */
+                    protocol: 1;
+                    /** @enum {string} */
+                    type: "register";
+                    cli: {
+                        name: string;
+                        version: string;
+                    };
+                    instance: {
+                        id: string;
+                        hostname: string;
+                        username: string;
+                        pid: number;
+                        startedAt: string;
+                        /** @default [] */
+                        inFlightCallIds?: string[];
+                    };
+                    workspace: {
+                        root: string;
+                        name: string;
+                        gitBranch?: string;
+                        gitRemote?: string;
+                        gitDirty?: boolean;
+                        os: string;
+                        nodeVersion?: string;
+                        pythonVersion?: string;
+                        ghAuthenticated?: boolean;
+                        packageManager?: string;
+                    };
+                };
+            };
+        };
+        responses: {
+            /** @description The folder is shared */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        /** @description The registered frame, or the refused frame with its reason. */
+                        frame: {
+                            /** @constant */
+                            protocol: 1;
+                            /** @constant */
+                            type: "registered";
+                            instanceId: string;
+                            heartbeatIntervalMs: number;
+                            conversation: {
+                                id: string;
+                                title: string;
+                                url: string;
+                            };
+                            policy: {
+                                skipPermissions: boolean;
+                            };
+                        } | {
+                            /** @constant */
+                            protocol: 1;
+                            /** @constant */
+                            type: "refused";
+                            /** @enum {string} */
+                            code: "api_key_invalid" | "key_type_not_allowed" | "conversation_mismatch" | "workspace_already_connected" | "replica_count_unsupported" | "protocol_invalid";
+                            message: string;
+                        };
+                        /** @description The token the poll and frames endpoints are addressed with, in the X-Agent-Instance-Token header. Present when the register was accepted. */
+                        instanceToken?: string;
+                    };
+                };
+            };
+            /** @description The session key is not valid: a refused frame */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description The key is not a Langy session key, or it controls no conversation: a refused frame */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description The body is not a register frame */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    pollLangyControlSession: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description The frames waiting for the folder, possibly none */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        /** @description The frames waiting for the folder; empty once the poll wait passes with none. */
+                        frames: ({
+                            /** @constant */
+                            protocol: 1;
+                            /** @constant */
+                            type: "registered";
+                            instanceId: string;
+                            heartbeatIntervalMs: number;
+                            conversation: {
+                                id: string;
+                                title: string;
+                                url: string;
+                            };
+                            policy: {
+                                skipPermissions: boolean;
+                            };
+                        } | {
+                            /** @constant */
+                            protocol: 1;
+                            /** @constant */
+                            type: "refused";
+                            /** @enum {string} */
+                            code: "api_key_invalid" | "key_type_not_allowed" | "conversation_mismatch" | "workspace_already_connected" | "replica_count_unsupported" | "protocol_invalid";
+                            message: string;
+                        } | {
+                            /** @constant */
+                            protocol: 1;
+                            /** @constant */
+                            type: "call";
+                            call: {
+                                callId: string;
+                                conversationId: string;
+                                turnId: string;
+                                deadlineAt: number;
+                            } & ({
+                                /** @constant */
+                                tool: "local_read";
+                                params: {
+                                    path: string;
+                                    offset?: number;
+                                    limit?: number;
+                                };
+                            } | {
+                                /** @constant */
+                                tool: "local_write";
+                                params: {
+                                    path: string;
+                                    content: string;
+                                };
+                            } | {
+                                /** @constant */
+                                tool: "local_edit";
+                                params: {
+                                    path: string;
+                                    edits: {
+                                        oldText: string;
+                                        newText: string;
+                                    }[];
+                                };
+                            } | {
+                                /** @constant */
+                                tool: "local_bash";
+                                params: {
+                                    command: string;
+                                    timeout?: number;
+                                    background?: boolean;
+                                };
+                            } | {
+                                /** @constant */
+                                tool: "local_grep";
+                                params: {
+                                    pattern: string;
+                                    path?: string;
+                                    glob?: string;
+                                    ignoreCase?: boolean;
+                                    literal?: boolean;
+                                    context?: number;
+                                    limit?: number;
+                                };
+                            } | {
+                                /** @constant */
+                                tool: "local_find";
+                                params: {
+                                    pattern: string;
+                                    path?: string;
+                                    limit?: number;
+                                };
+                            } | {
+                                /** @constant */
+                                tool: "local_ls";
+                                params: {
+                                    path?: string;
+                                    limit?: number;
+                                };
+                            });
+                        } | {
+                            /** @constant */
+                            protocol: 1;
+                            /** @constant */
+                            type: "cancel";
+                            callId: string;
+                        } | {
+                            /** @constant */
+                            protocol: 1;
+                            /** @constant */
+                            type: "permission";
+                            callId: string;
+                            /** @enum {string} */
+                            decision: "allow_once" | "allow_pattern" | "deny" | "expired";
+                        } | {
+                            /** @constant */
+                            protocol: 1;
+                            /** @constant */
+                            type: "policy";
+                            skipPermissions: boolean;
+                        } | {
+                            /** @constant */
+                            protocol: 1;
+                            /** @constant */
+                            type: "disconnect";
+                            reason: string;
+                        })[];
+                    };
+                };
+            };
+            /** @description The instance token is not known; share the folder again */
+            410: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    postLangyControlFrames: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: {
+            content: {
+                "application/json": {
+                    /** @description Ack, result, permission_required and deregister frames, in order. */
+                    frames: ({
+                        /** @enum {number} */
+                        protocol: 1;
+                        /** @enum {string} */
+                        type: "register";
+                        cli: {
+                            name: string;
+                            version: string;
+                        };
+                        instance: {
+                            id: string;
+                            hostname: string;
+                            username: string;
+                            pid: number;
+                            startedAt: string;
+                            /** @default [] */
+                            inFlightCallIds?: string[];
+                        };
+                        workspace: {
+                            root: string;
+                            name: string;
+                            gitBranch?: string;
+                            gitRemote?: string;
+                            gitDirty?: boolean;
+                            os: string;
+                            nodeVersion?: string;
+                            pythonVersion?: string;
+                            ghAuthenticated?: boolean;
+                            packageManager?: string;
+                        };
+                    } | {
+                        /** @enum {number} */
+                        protocol: 1;
+                        /** @enum {string} */
+                        type: "ack";
+                        callId: string;
+                    } | {
+                        /** @enum {number} */
+                        protocol: 1;
+                        /** @enum {string} */
+                        type: "result";
+                        callId: string;
+                        ok: boolean;
+                        text?: string;
+                        output?: {
+                            exitCode: number | null;
+                            stdout: string;
+                            stderr: string;
+                            truncated: boolean;
+                            logPath?: string;
+                            pid?: number;
+                            durationMs: number;
+                        };
+                        error?: {
+                            /** @enum {string} */
+                            code: "path_refused" | "command_refused" | "permission_denied" | "permission_expired" | "cancelled" | "timeout" | "exec_failed" | "not_found";
+                            message: string;
+                        };
+                    } | {
+                        /** @enum {number} */
+                        protocol: 1;
+                        /** @enum {string} */
+                        type: "permission_required";
+                        callId: string;
+                        summary: string;
+                        pattern: string;
+                        reason: string;
+                        skipOffered: boolean;
+                    } | {
+                        /** @enum {number} */
+                        protocol: 1;
+                        /** @enum {string} */
+                        type: "deregister";
+                    })[];
+                };
+            };
+        };
+        responses: {
+            /** @description The frames were taken */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        /** @description How many frames were taken. */
+                        accepted: number;
+                    };
+                };
+            };
+            /** @description The instance token is not known; share the folder again */
+            410: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description The body is not a list of frames */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    listLangyControlRequests: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Success */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        requests: {
+                            id: string;
+                            conversationId: string;
+                            conversationTitle: string;
+                            conversationUrl: string;
+                            projectId: string;
+                            projectName: string;
+                            createdAt: string;
+                            expiresAt: string;
+                        }[];
+                    };
+                };
+            };
+        };
+    };
+    approveLangyControlRequest: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description The control request id. */
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": {
+                    workspace: {
+                        root: string;
+                        name: string;
+                        gitBranch?: string;
+                        gitRemote?: string;
+                        gitDirty?: boolean;
+                        os: string;
+                        nodeVersion?: string;
+                        pythonVersion?: string;
+                        ghAuthenticated?: boolean;
+                        packageManager?: string;
+                    };
+                };
+            };
+        };
+        responses: {
+            /** @description Success */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        sessionKey: string;
+                        endpoint: string;
+                        conversation: {
+                            id: string;
+                            title: string;
+                            url: string;
+                        };
+                    };
+                };
+            };
+        };
+    };
+    cancelLangyControlRequest: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description The control request id. */
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Success */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        /** @description The request that was cancelled. */
+                        id: string;
+                        /**
+                         * @description Always true once the request is gone.
+                         * @constant
+                         */
+                        cancelled: true;
+                    };
+                };
+            };
+        };
+    };
     getApiMeUsage: {
         parameters: {
             query?: {
@@ -23549,6 +24131,35 @@ export interface operations {
                         content: string;
                         encryptedValue?: string;
                     }) | {
+                        role?: string;
+                        content: ({
+                            /** @constant */
+                            type: "text";
+                            text: string;
+                            citations?: unknown[] | null;
+                        } | {
+                            /** @constant */
+                            type: "tool_use";
+                            id: string;
+                            name: string;
+                            input?: unknown;
+                        } | {
+                            /** @constant */
+                            type: "tool_result";
+                            tool_use_id: string;
+                            content?: string | unknown[];
+                            is_error?: boolean;
+                        } | {
+                            /** @constant */
+                            type: "thinking";
+                            thinking: string;
+                            signature?: string;
+                        } | {
+                            /** @constant */
+                            type: "redacted_thinking";
+                            data: string;
+                        })[];
+                    } | {
                         role?: "system" | "developer" | "user" | "assistant" | "function" | "tool" | "unknown";
                         content?: string | ({
                             /** @constant */
