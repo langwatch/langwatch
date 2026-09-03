@@ -1,5 +1,5 @@
-import { existsSync, readFileSync } from "node:fs";
-import { relative, sep } from "node:path";
+import { existsSync, readFileSync, statSync } from "node:fs";
+import { dirname, join, relative, resolve, sep } from "node:path";
 import ts from "typescript";
 import { walkFiles } from "./files";
 import type { ArchitectureViolation, ClassifiedPackage, FeatureCatalogueEntry } from "./types";
@@ -257,19 +257,248 @@ function lintServer(pkg: ClassifiedPackage): ArchitectureViolation[] {
 }
 
 const PRIVATE_SERVER_EXPORT = /(?:^|\/)(?:projections|repositories|stores)(?:\/|$)/;
+const SOURCE_FILE_EXTENSIONS = [".ts", ".tsx"] as const;
 
-function lintPrivateServerExports(pkg: ClassifiedPackage): ArchitectureViolation[] {
-  const file = `${pkg.root}/src/index.ts`;
-  if (!existsSync(file)) return [];
-  const source = readFileSync(file, "utf8");
-  const sourceFile = ts.createSourceFile(
+/**
+ * `export` / `import` targets from a package.json manifest field
+ * (`exports` or `imports`), flattened across every condition. A leaf may be a
+ * bare string or a nested `{ types, import, default, ... }` object, and only
+ * the first string found under a key is needed here — every branch of a
+ * condition points at the same source file on disk.
+ */
+function firstManifestTarget(value: unknown): string | undefined {
+  if (typeof value === "string") return value;
+  if (!value || typeof value !== "object" || Array.isArray(value)) return void 0;
+  for (const nested of Object.values(value as Record<string, unknown>)) {
+    const found = firstManifestTarget(nested);
+    if (found) return found;
+  }
+  return void 0;
+}
+
+function manifestTargets(value: unknown): string[] {
+  if (typeof value === "string") return [value];
+  if (!value || typeof value !== "object" || Array.isArray(value)) return [];
+  return Object.values(value as Record<string, unknown>).flatMap(manifestTargets);
+}
+
+/** Every entrypoint a consumer can import: the package.json `exports` map, plus `src/index.ts` always. */
+function packageEntrypoints(pkg: ClassifiedPackage): string[] {
+  const targets = new Set<string>(["src/index.ts"]);
+  for (const target of manifestTargets(pkg.manifest.exports)) {
+    if (SOURCE_FILE_EXTENSIONS.some((extension) => target.endsWith(extension))) {
+      targets.add(target.replace(/^\.\//, ""));
+    }
+  }
+  return [...targets].map((target) => `${pkg.root}/${target}`);
+}
+
+const packageImportsCache = new Map<string, Record<string, unknown> | undefined>();
+
+/** The package's `imports` field (self-referencing aliases such as `#app/*`), read once per package. */
+function packageImportsMap(pkg: ClassifiedPackage): Record<string, unknown> | undefined {
+  if (packageImportsCache.has(pkg.manifestPath)) return packageImportsCache.get(pkg.manifestPath);
+  let map: Record<string, unknown> | undefined;
+  try {
+    const raw = JSON.parse(readFileSync(pkg.manifestPath, "utf8")) as { imports?: unknown };
+    if (raw.imports && typeof raw.imports === "object" && !Array.isArray(raw.imports)) {
+      map = raw.imports as Record<string, unknown>;
+    }
+  } catch {
+    map = void 0;
+  }
+  packageImportsCache.set(pkg.manifestPath, map);
+  return map;
+}
+
+function resolveImportsAlias(specifier: string, pkg: ClassifiedPackage): string | undefined {
+  const importsMap = packageImportsMap(pkg);
+  if (!importsMap) return void 0;
+  for (const [key, value] of Object.entries(importsMap)) {
+    const targetPattern = firstManifestTarget(value);
+    if (!targetPattern) continue;
+    if (key.endsWith("*")) {
+      const prefix = key.slice(0, -1);
+      if (!specifier.startsWith(prefix)) continue;
+      const captured = specifier.slice(prefix.length);
+      return join(pkg.root, targetPattern.replace("*", captured));
+    }
+    if (key === specifier) return join(pkg.root, targetPattern);
+  }
+  return void 0;
+}
+
+/** Resolves a relative or `#`-aliased specifier to the file it loads, or `undefined` for anything else (bare package specifiers are out of scope: they cannot name this package's own private directories). */
+function resolveSpecifier(fromFile: string, specifier: string, pkg: ClassifiedPackage): string | undefined {
+  let base: string | undefined;
+  if (specifier.startsWith(".")) {
+    base = resolve(dirname(fromFile), specifier);
+  } else if (specifier.startsWith("#")) {
+    base = resolveImportsAlias(specifier, pkg);
+  }
+  if (!base) return void 0;
+  for (const candidate of [base, ...SOURCE_FILE_EXTENSIONS.map((ext) => `${base}${ext}`), join(base, "index.ts")]) {
+    if (existsSync(candidate) && statSync(candidate).isFile()) return candidate;
+  }
+  return void 0;
+}
+
+function isPrivateServerPath(pkg: ClassifiedPackage, file: string): boolean {
+  return PRIVATE_SERVER_EXPORT.test(workspacePath(`${pkg.root}/src`, file));
+}
+
+function exportName(element: ts.ExportSpecifier): string {
+  return element.propertyName?.text ?? element.name.text;
+}
+
+function declaresValue(statement: ts.Statement, name: string): boolean {
+  if (ts.isClassDeclaration(statement) && statement.name?.text === name) return true;
+  if (ts.isFunctionDeclaration(statement) && statement.name?.text === name) return true;
+  if (ts.isEnumDeclaration(statement) && statement.name.text === name) return true;
+  if (ts.isVariableStatement(statement)) {
+    return statement.declarationList.declarations.some(
+      (declaration) => ts.isIdentifier(declaration.name) && declaration.name.text === name,
+    );
+  }
+  return false;
+}
+
+function isExportedValueDeclaration(statement: ts.Statement): boolean {
+  if (
+    !ts.isClassDeclaration(statement) &&
+    !ts.isFunctionDeclaration(statement) &&
+    !ts.isVariableStatement(statement) &&
+    !ts.isEnumDeclaration(statement)
+  ) {
+    return false;
+  }
+  return (
+    ts.canHaveModifiers(statement) &&
+    (ts.getModifiers(statement)?.some((modifier) => modifier.kind === ts.SyntaxKind.ExportKeyword) ??
+      false)
+  );
+}
+
+function parseModule(file: string): ts.SourceFile {
+  return ts.createSourceFile(
     file,
-    source,
+    readFileSync(file, "utf8"),
     ts.ScriptTarget.Latest,
     true,
     ts.ScriptKind.TS,
   );
-  const privateImports = new Set<string>();
+}
+
+/**
+ * Follows one binding (`name`, exported by `file`, one way or another) back
+ * to the file that actually declares it — through local declarations,
+ * `import { name } from "./elsewhere"`, and `export { name } from
+ * "./elsewhere"` chains — and reports whether that file lives under a
+ * feature server's private directories.
+ */
+function resolveBindingOrigin(
+  file: string,
+  name: string,
+  pkg: ClassifiedPackage,
+  visited: Set<string>,
+): boolean {
+  const key = `${file}::${name}`;
+  if (visited.has(key)) return false;
+  visited.add(key);
+  if (!existsSync(file)) return false;
+  const sourceFile = parseModule(file);
+
+  for (const statement of sourceFile.statements) {
+    if (declaresValue(statement, name)) return isPrivateServerPath(pkg, file);
+  }
+
+  for (const statement of sourceFile.statements) {
+    if (!ts.isImportDeclaration(statement)) continue;
+    if (statement.importClause?.isTypeOnly) continue;
+    if (!ts.isStringLiteral(statement.moduleSpecifier)) continue;
+    const clause = statement.importClause;
+    if (!clause) continue;
+    if (clause.name?.text === name) {
+      const target = resolveSpecifier(file, statement.moduleSpecifier.text, pkg);
+      if (target && resolveBindingOrigin(target, "default", pkg, visited)) return true;
+    }
+    if (clause.namedBindings && !ts.isNamespaceImport(clause.namedBindings)) {
+      for (const element of clause.namedBindings.elements) {
+        if (element.isTypeOnly || element.name.text !== name) continue;
+        const target = resolveSpecifier(file, statement.moduleSpecifier.text, pkg);
+        const imported = element.propertyName?.text ?? element.name.text;
+        if (target && resolveBindingOrigin(target, imported, pkg, visited)) return true;
+      }
+    }
+  }
+
+  for (const statement of sourceFile.statements) {
+    if (!ts.isExportDeclaration(statement) || statement.isTypeOnly) continue;
+    if (!statement.moduleSpecifier || !ts.isStringLiteral(statement.moduleSpecifier)) continue;
+    const target = resolveSpecifier(file, statement.moduleSpecifier.text, pkg);
+    if (!target) continue;
+    if (statement.exportClause && ts.isNamedExports(statement.exportClause)) {
+      for (const element of statement.exportClause.elements) {
+        if (element.isTypeOnly || element.name.text !== name) continue;
+        if (resolveBindingOrigin(target, exportName(element), pkg, visited)) return true;
+      }
+    } else if (!statement.exportClause) {
+      // `export * from "./elsewhere"` may forward the name; best-effort probe.
+      if (resolveBindingOrigin(target, name, pkg, visited)) return true;
+    }
+  }
+
+  return false;
+}
+
+/**
+ * Whether `file`, followed through its own exports (`export *`, named
+ * re-exports, and locally declared values), ultimately exposes any value
+ * declared under a feature server's private directories.
+ */
+function fileExposesPrivateValue(
+  file: string,
+  pkg: ClassifiedPackage,
+  visited: Set<string>,
+): boolean {
+  if (visited.has(file)) return false;
+  visited.add(file);
+  if (!existsSync(file)) return false;
+  const sourceFile = parseModule(file);
+
+  for (const statement of sourceFile.statements) {
+    if (ts.isExportDeclaration(statement)) {
+      if (statement.isTypeOnly) continue;
+      if (statement.moduleSpecifier && ts.isStringLiteral(statement.moduleSpecifier)) {
+        const target = resolveSpecifier(file, statement.moduleSpecifier.text, pkg);
+        if (!target) continue;
+        if (!statement.exportClause || ts.isNamespaceExport(statement.exportClause)) {
+          if (fileExposesPrivateValue(target, pkg, visited)) return true;
+        } else if (ts.isNamedExports(statement.exportClause)) {
+          for (const element of statement.exportClause.elements) {
+            if (element.isTypeOnly) continue;
+            if (resolveBindingOrigin(target, exportName(element), pkg, new Set())) return true;
+          }
+        }
+      } else if (statement.exportClause && ts.isNamedExports(statement.exportClause)) {
+        for (const element of statement.exportClause.elements) {
+          if (element.isTypeOnly) continue;
+          if (resolveBindingOrigin(file, exportName(element), pkg, new Set())) return true;
+        }
+      }
+    } else if (isExportedValueDeclaration(statement) && isPrivateServerPath(pkg, file)) {
+      return true;
+    }
+  }
+  return false;
+}
+
+function lintPrivateServerExportsForEntry(
+  pkg: ClassifiedPackage,
+  file: string,
+): ArchitectureViolation[] {
+  if (!existsSync(file)) return [];
+  const sourceFile = parseModule(file);
   const violations: ArchitectureViolation[] = [];
   const add = (node: ts.Node, specifier?: string): void => {
     violations.push({
@@ -285,39 +514,43 @@ function lintPrivateServerExports(pkg: ClassifiedPackage): ArchitectureViolation
   };
 
   for (const statement of sourceFile.statements) {
-    if (
-      ts.isImportDeclaration(statement) &&
-      ts.isStringLiteral(statement.moduleSpecifier) &&
-      PRIVATE_SERVER_EXPORT.test(statement.moduleSpecifier.text)
-    ) {
-      const clause = statement.importClause;
-      if (clause?.name) privateImports.add(clause.name.text);
-      if (clause?.namedBindings) {
-        if (ts.isNamespaceImport(clause.namedBindings)) {
-          privateImports.add(clause.namedBindings.name.text);
-        } else {
-          for (const element of clause.namedBindings.elements) {
-            privateImports.add(element.name.text);
+    if (!ts.isExportDeclaration(statement) || statement.isTypeOnly) continue;
+
+    if (statement.moduleSpecifier && ts.isStringLiteral(statement.moduleSpecifier)) {
+      const specifierText = statement.moduleSpecifier.text;
+      if (PRIVATE_SERVER_EXPORT.test(specifierText)) {
+        add(statement, specifierText);
+        continue;
+      }
+      const target = resolveSpecifier(file, specifierText, pkg);
+      if (!target) continue;
+      if (!statement.exportClause || ts.isNamespaceExport(statement.exportClause)) {
+        if (fileExposesPrivateValue(target, pkg, new Set())) add(statement, specifierText);
+      } else if (ts.isNamedExports(statement.exportClause)) {
+        for (const element of statement.exportClause.elements) {
+          if (element.isTypeOnly) continue;
+          if (resolveBindingOrigin(target, exportName(element), pkg, new Set())) {
+            add(element, specifierText);
           }
         }
       }
       continue;
     }
-    if (!ts.isExportDeclaration(statement)) continue;
-    if (
-      statement.moduleSpecifier &&
-      ts.isStringLiteral(statement.moduleSpecifier) &&
-      PRIVATE_SERVER_EXPORT.test(statement.moduleSpecifier.text)
-    ) {
-      add(statement, statement.moduleSpecifier.text);
-      continue;
-    }
+
     if (statement.exportClause && ts.isNamedExports(statement.exportClause)) {
       for (const element of statement.exportClause.elements) {
-        const local = element.propertyName?.text ?? element.name.text;
-        if (privateImports.has(local)) add(element);
+        if (element.isTypeOnly) continue;
+        if (resolveBindingOrigin(file, exportName(element), pkg, new Set())) add(element);
       }
     }
+  }
+  return violations;
+}
+
+function lintPrivateServerExports(pkg: ClassifiedPackage): ArchitectureViolation[] {
+  const violations: ArchitectureViolation[] = [];
+  for (const file of packageEntrypoints(pkg)) {
+    violations.push(...lintPrivateServerExportsForEntry(pkg, file));
   }
   return violations;
 }

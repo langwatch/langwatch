@@ -5,8 +5,8 @@ import ts from "typescript";
 import type { ArchitectureViolation } from "./types";
 import { walkFiles } from "./files";
 
-const REVIEW_LINE_COUNT = 30;
-const MAX_COMMENT_BLOCK_LINES = 60;
+const REVIEW_LINE_COUNT = 4;
+const MAX_COMMENT_BLOCK_LINES = 5;
 const SOURCE_WHITESPACE = new Set([" ", "\t", "\r", "\n"]);
 
 const SOURCE_EXTENSIONS = new Set([
@@ -72,6 +72,21 @@ function marksLicenseHeader(source: string): boolean {
   const header = source.split("\n", 80).join("\n").toLowerCase();
   if (header.includes("spdx-license-identifier")) return true;
   return header.includes("copyright") && /\blicen[cs](?:e|ed)\b/.test(header);
+}
+
+const DIRECTIVE_LINE = /^(?:\/\/|\/\*\*?|\*\/?|\*)?\s*(?:eslint-|oxlint-|@ts-)/;
+
+/**
+ * A block is exempt when it is only lint/type-checker directives, or when it
+ * carries a `@scenario` annotation binding a spec scenario to its test.
+ */
+function isExemptBlock(text: string): boolean {
+  if (/@scenario\b/.test(text)) return true;
+  const lines = text
+    .split(/\r?\n/)
+    .map((line) => line.trim())
+    .filter((line) => line.length > 0 && line !== "/*" && line !== "*/" && line !== "/**");
+  return lines.length > 0 && lines.every((line) => DIRECTIVE_LINE.test(line));
 }
 
 function mayContainReviewBlock(source: string): boolean {
@@ -337,7 +352,10 @@ export function lintCommentBlocks(
     const source = readFileSync(file, "utf8");
     if (marksGeneratedHeader(source) || marksLicenseHeader(source)) continue;
     if (!mayContainReviewBlock(source)) continue;
+    const rawLines = source.split(/\r?\n/);
     for (const block of collectBlocks(file, source)) {
+      const blockText = rawLines.slice(block.line - 1, block.line - 1 + block.lines).join("\n");
+      if (isExemptBlock(blockText)) continue;
       if (block.lines > MAX_COMMENT_BLOCK_LINES) {
         violations.push({
           policy: "comment-block-size",

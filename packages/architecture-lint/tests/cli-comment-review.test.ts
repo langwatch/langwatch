@@ -22,8 +22,8 @@ function writeFixture(root: string, file: string, source: string): void {
 describe("comment-block review CLI", () => {
   it("reports the review queue and only fails hard comment blocks", () => {
     const root = mkdtempSync(join(tmpdir(), "comment-review-cli-"));
-    writeFixture(root, "src/review.ts", lineComments(30));
-    writeFixture(root, "src/hard.ts", lineComments(61));
+    writeFixture(root, "src/review.ts", lineComments(5));
+    writeFixture(root, "src/hard.ts", lineComments(6));
 
     const result = spawnSync(
       tsx,

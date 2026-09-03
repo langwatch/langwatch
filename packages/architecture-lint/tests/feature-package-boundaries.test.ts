@@ -415,6 +415,125 @@ describe("feature package boundary lint", () => {
     expect(policies()).toContain("private-runtime-export");
   });
 
+  /** @scenario A repository reached through a star-exported adapter is still private */
+  it("rejects a repository reached through a star-exported adapter chain", () => {
+    featurePackage({
+      feature: "agent",
+      role: "server",
+      source: 'export * from "./adapters/agent.adapter";',
+    });
+    write(
+      "packages/features/agent/server/src/adapters/agent.adapter.ts",
+      'export * from "../repositories/agent.repository";',
+    );
+    write(
+      "packages/features/agent/server/src/repositories/agent.repository.ts",
+      "export class AgentRepository {}",
+    );
+
+    expect(policies()).toContain("private-runtime-export");
+  });
+
+  /** @scenario A repository reached through a named re-export chain is still private */
+  it("rejects a repository reached through a named re-export chain", () => {
+    featurePackage({
+      feature: "agent",
+      role: "server",
+      source: 'export { AgentRepository } from "./adapters/agent.adapter";',
+    });
+    write(
+      "packages/features/agent/server/src/adapters/agent.adapter.ts",
+      'import { AgentRepository } from "../repositories/agent.repository";\nexport { AgentRepository };',
+    );
+    write(
+      "packages/features/agent/server/src/repositories/agent.repository.ts",
+      "export class AgentRepository {}",
+    );
+
+    expect(policies()).toContain("private-runtime-export");
+  });
+
+  /** @scenario A repository reached through a #app/ self-import alias is still private */
+  it("rejects a repository reached through a #app/ import alias", () => {
+    featurePackage({
+      feature: "agent",
+      role: "server",
+      source: 'export { AgentRepository } from "#app/repositories/agent.repository";',
+    });
+    write(
+      "packages/features/agent/server/package.json",
+      JSON.stringify({
+        name: "@langwatch/agent-server",
+        type: "module",
+        imports: { "#*": "./src/*.ts" },
+        exports: { ".": "./src/index.ts" },
+        dependencies: {},
+      }),
+    );
+    write(
+      "packages/features/agent/server/src/repositories/agent.repository.ts",
+      "export class AgentRepository {}",
+    );
+
+    expect(policies()).toContain("private-runtime-export");
+  });
+
+  /** @scenario Every declared package entrypoint is checked, not only src/index.ts */
+  it("rejects a repository reached through a secondary package entrypoint", () => {
+    featurePackage({
+      feature: "agent",
+      role: "server",
+      exports: {
+        ".": "./src/index.ts",
+        "./testing": "./src/testing.ts",
+      },
+    });
+    write(
+      "packages/features/agent/server/src/testing.ts",
+      'export { AgentRepository } from "./repositories/agent.repository";',
+    );
+    write(
+      "packages/features/agent/server/src/repositories/agent.repository.ts",
+      "export class AgentRepository {}",
+    );
+
+    expect(policies()).toContain("private-runtime-export");
+  });
+
+  /** @scenario A type-only export of a repository's database type is allowed */
+  it("allows a type-only export of a repository's database type", () => {
+    featurePackage({
+      feature: "agent",
+      role: "server",
+      source: 'export type { AgentDatabase } from "./repositories/agent.repository";',
+    });
+    write(
+      "packages/features/agent/server/src/repositories/agent.repository.ts",
+      "export type AgentDatabase = { agentId: string };\nexport class AgentRepository {}",
+    );
+
+    expect(policies()).not.toContain("private-runtime-export");
+  });
+
+  /** @scenario An adapter that merely uses a repository is not itself private */
+  it("allows an adapter export that only uses a repository internally", () => {
+    featurePackage({
+      feature: "agent",
+      role: "server",
+      source: 'export { AgentAdapter } from "./adapters/agent.adapter";',
+    });
+    write(
+      "packages/features/agent/server/src/adapters/agent.adapter.ts",
+      'import { AgentRepository } from "../repositories/agent.repository";\nexport class AgentAdapter { constructor(private repo: AgentRepository) {} static create() { return new AgentAdapter(new AgentRepository()); } }',
+    );
+    write(
+      "packages/features/agent/server/src/repositories/agent.repository.ts",
+      "export class AgentRepository {}",
+    );
+
+    expect(policies()).not.toContain("private-runtime-export");
+  });
+
   /** @scenario Prisma cannot leak through public declarations */
   it("rejects Prisma in emitted declarations", () => {
     featurePackage({

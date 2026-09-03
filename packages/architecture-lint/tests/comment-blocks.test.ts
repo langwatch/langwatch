@@ -27,42 +27,27 @@ function git(root: string, ...arguments_: string[]): void {
 }
 
 describe("oversized comment blocks", () => {
-  it("queues adjacent line and block comments at the soft threshold", () => {
-    const root = mkdtempSync(join(tmpdir(), "comment-blocks-adjacent-"));
-    writeFixture(root, "src/adjacent.ts", `${lineComments(14)}\n${blockComment(16)}`);
-
-    expect(lintCommentBlocks(root)).toEqual({
-      reviews: [
-        {
-          category: "comment-blocks",
-          file: "src/adjacent.ts",
-          line: 1,
-          lines: 30,
-          message: "Comment block has 30 lines and should receive review attention.",
-        },
-      ],
-      violations: [],
-    });
-  });
-
-  it("keeps 29 lines quiet, queues 30 through 60, and fails at 61", () => {
+  it("keeps 3 lines quiet, warns at 4 lines (over 3), and errors at 6 lines (over 5)", () => {
     const root = mkdtempSync(join(tmpdir(), "comment-blocks-boundaries-"));
-    writeFixture(root, "src/twenty-nine.ts", lineComments(29));
-    writeFixture(root, "src/thirty.ts", lineComments(30));
-    writeFixture(root, "src/sixty.ts", blockComment(60));
-    writeFixture(root, "src/sixty-one.ts", blockComment(61));
+    writeFixture(root, "src/three.ts", lineComments(3));
+    writeFixture(root, "src/four.ts", lineComments(4));
+    writeFixture(root, "src/five.ts", blockComment(5));
+    writeFixture(root, "src/six.ts", blockComment(6));
 
     const result = lintCommentBlocks(root);
     expect(result.reviews).toEqual(
       expect.arrayContaining([
-        expect.objectContaining({ file: "src/thirty.ts", line: 1, lines: 30 }),
-        expect.objectContaining({ file: "src/sixty.ts", line: 1, lines: 60 }),
+        expect.objectContaining({ file: "src/four.ts", line: 1, lines: 4 }),
+        expect.objectContaining({ file: "src/five.ts", line: 1, lines: 5 }),
       ]),
+    );
+    expect(result.reviews).not.toEqual(
+      expect.arrayContaining([expect.objectContaining({ file: "src/three.ts" })]),
     );
     expect(result.violations).toMatchObject([
       {
         policy: "comment-block-size",
-        file: join(root, "src/sixty-one.ts"),
+        file: join(root, "src/six.ts"),
         line: 1,
       },
     ]);
@@ -70,11 +55,11 @@ describe("oversized comment blocks", () => {
 
   it("does not merge blocks separated by a blank line or count code-line comments", () => {
     const root = mkdtempSync(join(tmpdir(), "comment-blocks-contiguous-"));
-    writeFixture(root, "src/separated.ts", `${lineComments(29)}\n\n${lineComments(29)}`);
+    writeFixture(root, "src/separated.ts", `${lineComments(3)}\n\n${lineComments(3)}`);
     writeFixture(
       root,
       "src/code.ts",
-      `${Array.from({ length: 61 }, () => "const value = 1; // comment").join("\n")}`,
+      `${Array.from({ length: 6 }, () => "const value = 1; // comment").join("\n")}`,
     );
 
     expect(lintCommentBlocks(root)).toEqual({ reviews: [], violations: [] });
@@ -88,7 +73,7 @@ describe("oversized comment blocks", () => {
       [
         'const value = "guard";',
         "const pattern = `${value}/*`;",
-        ...Array.from({ length: 61 }, (_, index) => `const item${index} = ${index};`),
+        ...Array.from({ length: 6 }, (_, index) => `const item${index} = ${index};`),
       ].join("\n"),
     );
 
@@ -101,16 +86,16 @@ describe("oversized comment blocks", () => {
     git(root, "config", "user.email", "test@example.com");
     git(root, "config", "user.name", "Architecture Lint Test");
     git(root, "config", "commit.gpgsign", "false");
-    writeFixture(root, "src/base.ts", lineComments(61));
+    writeFixture(root, "src/base.ts", lineComments(6));
     git(root, "add", ".");
     git(root, "commit", "--quiet", "-m", "base");
     git(root, "checkout", "--quiet", "-b", "comment-blocks");
 
-    writeFixture(root, "src/committed.ts", lineComments(61));
+    writeFixture(root, "src/committed.ts", lineComments(6));
     git(root, "add", ".");
     git(root, "commit", "--quiet", "-m", "committed change");
-    writeFixture(root, "src/current.ts", lineComments(61));
-    writeFixture(root, "src/untracked.ts", lineComments(61));
+    writeFixture(root, "src/current.ts", lineComments(6));
+    writeFixture(root, "src/untracked.ts", lineComments(6));
 
     const files = changedSourceFiles(root);
     expect(files.map((file) => file.slice(root.length + 1))).toEqual([
@@ -126,23 +111,97 @@ describe("oversized comment blocks", () => {
     writeFixture(
       root,
       "src/licensed.ts",
-      `// SPDX-License-Identifier: Apache-2.0\n${lineComments(61)}`,
+      `// SPDX-License-Identifier: Apache-2.0\n${lineComments(6)}`,
     );
     writeFixture(
       root,
       "src/copyright.ts",
-      `/* Copyright 2026 LangWatch. Licensed under Apache-2.0. */\n${lineComments(61)}`,
+      `/* Copyright 2026 LangWatch. Licensed under Apache-2.0. */\n${lineComments(6)}`,
     );
     writeFixture(
       root,
       "src/generated-header.ts",
-      `// Code generated by test. DO NOT EDIT.\n${lineComments(61)}`,
+      `// Code generated by test. DO NOT EDIT.\n${lineComments(6)}`,
     );
-    writeFixture(root, "src/schema.generated.ts", lineComments(61));
-    writeFixture(root, "vendor/vendor.ts", lineComments(61));
-    writeFixture(root, "generated/generated.ts", lineComments(61));
-    writeFixture(root, "build/build.ts", lineComments(61));
+    writeFixture(root, "src/schema.generated.ts", lineComments(6));
+    writeFixture(root, "vendor/vendor.ts", lineComments(6));
+    writeFixture(root, "generated/generated.ts", lineComments(6));
+    writeFixture(root, "build/build.ts", lineComments(6));
 
     expect(lintCommentBlocks(root)).toEqual({ reviews: [], violations: [] });
+  });
+
+  it("counts a JSDoc block toward the same thresholds as a plain block comment", () => {
+    const root = mkdtempSync(join(tmpdir(), "comment-blocks-jsdoc-"));
+    const jsdoc = [
+      "/**",
+      " * Line one of an explanation.",
+      " * Line two of an explanation.",
+      " * Line three of an explanation.",
+      " */",
+    ].join("\n");
+    writeFixture(root, "src/jsdoc.ts", `${jsdoc}\nexport const value = 1;`);
+
+    expect(lintCommentBlocks(root)).toEqual({
+      reviews: [
+        {
+          category: "comment-blocks",
+          file: "src/jsdoc.ts",
+          line: 1,
+          lines: 5,
+          message: "Comment block has 5 lines and should receive review attention.",
+        },
+      ],
+      violations: [],
+    });
+  });
+
+  it("exempts a JSDoc block carrying a @scenario annotation regardless of length", () => {
+    const root = mkdtempSync(join(tmpdir(), "comment-blocks-scenario-"));
+    const jsdoc = [
+      "/**",
+      ' * @scenario "A definition map becomes a JSON Schema object"',
+      " * Extra line one.",
+      " * Extra line two.",
+      " * Extra line three.",
+      " * Extra line four.",
+      " */",
+    ].join("\n");
+    writeFixture(root, "src/scenario.ts", `${jsdoc}\nit("works", () => {});`);
+
+    expect(lintCommentBlocks(root)).toEqual({ reviews: [], violations: [] });
+  });
+
+  it("exempts a block that is only eslint/oxlint/@ts- directives", () => {
+    const root = mkdtempSync(join(tmpdir(), "comment-blocks-directives-"));
+    writeFixture(
+      root,
+      "src/directives.ts",
+      [
+        "// eslint-disable-next-line no-console",
+        "// oxlint-disable-next-line no-unused-vars",
+        "// @ts-expect-error legacy shape",
+        "// eslint-disable-next-line max-len",
+        "// oxlint-disable-next-line no-empty",
+        "// @ts-ignore third-party types",
+        "export const value = 1;",
+      ].join("\n"),
+    );
+
+    expect(lintCommentBlocks(root)).toEqual({ reviews: [], violations: [] });
+  });
+
+  it("covers apps/ as a scanned source root, not only packages/", () => {
+    const root = mkdtempSync(join(tmpdir(), "comment-blocks-apps-root-"));
+    writeFixture(root, "apps/api/src/app/example.composition.ts", blockComment(6));
+
+    const result = lintCommentBlocks(root);
+    expect(result.violations).toMatchObject([
+      {
+        policy: "comment-block-size",
+        file: join(root, "apps/api/src/app/example.composition.ts"),
+        line: 1,
+      },
+    ]);
   });
 });
