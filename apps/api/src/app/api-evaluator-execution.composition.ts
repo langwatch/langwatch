@@ -131,7 +131,14 @@ export abstract class ApiEvaluatorExecutionAbsenceReportPort {
   /** No `LANGEVALS_ENDPOINT`: no evaluator runs on this process at all. */
   abstract withoutEvaluatorService(): void;
 
-  /** No metrics registry: the two evaluator process series are not reported. */
+  /**
+   * No telemetry adapter: the two evaluator process series are not reported.
+   *
+   * NOT a missing registry — `EvaluationExecutionTelemetryPort` takes none, only
+   * a `record({ evaluatorType, status, durationMs })`. What does not exist is
+   * any implementation of it, in this process or any other. The sibling that
+   * writes its series the same way is `OtelPiiAnalysisMetricsAdapter`.
+   */
   abstract withoutExecutionTelemetry(): void;
 }
 
@@ -625,7 +632,7 @@ export class LoggedApiEvaluatorExecutionAbsence extends ApiEvaluatorExecutionAbs
 
   withoutExecutionTelemetry(): void {
     this.logger.info(
-      "API composed the evaluator runtime without a metrics registry: evaluation_duration_milliseconds and evaluation_status_counter are not reported from this process.",
+      "API composed the evaluator runtime without an execution-telemetry adapter: nothing in the tree implements EvaluationExecutionTelemetryPort, so evaluation_duration_milliseconds and evaluation_status_counter are reported by no process.",
     );
   }
 }

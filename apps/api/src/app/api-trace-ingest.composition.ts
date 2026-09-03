@@ -32,12 +32,17 @@
  *
  * ## What is named as absent
  *
- *   - the PLAN ALLOWANCE. This process composes no usage meter, so no monthly
- *     allowance is enforced on an export. It degrades exactly the way the
- *     receiver has always degraded when the allowance LOOKUP fails — the batch
- *     is accepted — because telemetry a customer already paid to produce must
- *     not be dropped by a meter this process cannot read. The absence is
- *     reported once at boot rather than per request.
+ *   - the PLAN ALLOWANCE. Not for want of a plan: this process composes a
+ *     `PlanProvider` and eight surfaces already read allowances through it.
+ *     What has no implementation ANYWHERE is the enforcement pair
+ *     `UsageService` needs — `UsageOrganizationPort` (team to organization,
+ *     its projects, its pricing model) and `UsageVolumeCounterPort`
+ *     (`getCountByProjects` for traces and events) — so `UsageService` is
+ *     composed by no process and `checkLimit` is called by nothing. Until they
+ *     exist, an export degrades exactly the way the receiver has always
+ *     degraded when the allowance LOOKUP fails — the batch is accepted —
+ *     because telemetry a customer already paid to produce must not be dropped
+ *     by a meter no tier can read. Reported once at boot, not per request.
  *   - the LOG and METRIC collections. This process composes neither the log nor
  *     the metric fold, so those two routes are not mounted at all: an exporter
  *     gets a 404 from a receiver that honestly does not serve them, rather than
@@ -107,7 +112,7 @@ export class LoggedApiTraceIngestAbsence extends ApiTraceIngestAbsenceReport {
         ? "no command queue, so this process serves no OTLP ingestion at all"
         : capability === "dedup"
           ? "no Redis, so a span exported twice is recorded twice"
-          : "no usage meter, so an OTLP export is accepted without checking the plan's monthly allowance",
+          : "no usage enforcement: UsageOrganizationPort and UsageVolumeCounterPort have no implementation in any tier, so an OTLP export is accepted without checking the plan's monthly allowance",
     );
   }
 }

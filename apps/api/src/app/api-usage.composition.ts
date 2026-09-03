@@ -25,20 +25,29 @@
  *     Absent, every organization resolves to the free baseline — reported at
  *     composition rather than discovered by a customer whose paid plan reads
  *     as free.
- *   - **No approaching-limit mail.** The notification needs a Notification
- *     vertical and a mailer this process composes neither of, so
+ *   - **No approaching-limit mail.** The Notification vertical is NOT the gap —
+ *     it exists, and so do `UsageLimitService` and `UsageWarningService`. Two
+ *     things do not: the only implementation of `UsageLimitEmailAdapter` in the
+ *     tree is `NullUsageLimitEmailAdapter`, which sends nothing, and this
+ *     process parses no mailer configuration at all. So
  *     `limits.checkAndSendUsageLimitNotification` refuses BY NAME rather than
  *     reporting that it sent something it did not.
  *   - **Events metering.** The billable-events rollup is keyed by
- *     ORGANIZATION and routes on an organization-keyed ClickHouse client;
- *     this process holds a tenant-keyed one only. An organization metered in
- *     events therefore reads UNKNOWN rather than a number produced by routing
- *     an organization id through a tenant resolver, which is the bug that
- *     reads one tenant's rows on another's endpoint.
+ *     ORGANIZATION and routes on an organization-keyed ClickHouse client; this
+ *     process publishes a tenant-keyed resolver only. Routing an organization
+ *     id through it does not MIS-ROUTE — the directory answers a project id, so
+ *     an organization id raises `UnknownTenantError` — it simply cannot answer.
+ *     The primitive exists (`ClickHouseConnection.resolveOrganization`); what
+ *     is missing is an organization-keyed accessor on
+ *     `ApiClickHouseInfrastructure` and one option threaded to here. Until
+ *     then an organization metered in events reads UNKNOWN rather than a
+ *     number nothing produced.
  */
 import {
   BillableEventsQueryService,
   ClickHouseBillingAdapter,
+  SaaSPlanProviderService,
+  type BillingSubscriptionRepository,
 } from "@langwatch/enterprise-billing-server";
 import { getFreePlanLimits } from "@langwatch/enterprise-billing-contract";
 import {
@@ -46,7 +55,13 @@ import {
   UNLIMITED_PLAN,
 } from "@langwatch/enterprise-licensing-contract";
 import type { ClickHouseClient } from "@clickhouse/client";
-import type { PlanProvider, UsageUnit } from "@langwatch/entitlement-contract";
+import type {
+  EntitlementSource,
+  Plan,
+  PlanProvider,
+  ResolvePlanInput,
+  UsageUnit,
+} from "@langwatch/entitlement-contract";
 import {
   EntitlementService,
   PrismaUsageMembershipRepository,
@@ -74,6 +89,22 @@ export type ApiPlanProviderOptions = Readonly<{
    * so it is configuration rather than a guess.
    */
   isSaas: boolean;
+  /**
+   * The Stripe subscription rows a hosted paid plan is read from.
+   *
+   * Optional because a self-hosted deployment has none to read, and because a
+   * host may compose the provider itself. Supplied, it becomes the SUBSCRIPTION
+   * source `EntitlementService` consults before the baseline; absent on a
+   * hosted deployment, every organization resolves free and the absence is
+   * reported.
+   */
+  subscriptions?: BillingSubscriptionRepository;
+  /**
+   * The operator allow-list, for the ONE thing the subscription source does
+   * with it: an impersonating staff member sees the organization's real
+   * limitations rather than the override.
+   */
+  adminEmails?: readonly string[];
   /** Where the absent sources are written down. */
   report?: ApiEntitlementAbsenceReport;
 }>;
@@ -104,9 +135,9 @@ const ENTITLEMENT_CONSEQUENCE = {
   subscription:
     "API process composed no subscription source on a HOSTED deployment: every organization resolves the free baseline, including ones that are paying.",
   "usage-mail":
-    "API process composed no notifier: the approaching-limit mail refuses by name rather than reporting that it sent something.",
+    "API process composed no mail delivery: the only UsageLimitEmailAdapter in the tree sends nothing and this process reads no mailer configuration, so the approaching-limit mail refuses by name rather than reporting that it sent something.",
   "events-meter":
-    "API process composed no organization-keyed ClickHouse client: an organization metered in EVENTS reads its usage as unknown rather than as a number, because the billable-events rollup routes on an organization id.",
+    "API process publishes no organization-keyed ClickHouse accessor: the billable-events rollup routes on an organization id, which this process's tenant-keyed resolver cannot answer, so an organization metered in EVENTS reads its usage as unknown rather than as a number.",
 } as const;
 
 /**
@@ -119,12 +150,56 @@ const ENTITLEMENT_CONSEQUENCE = {
  */
 export function composeApiPlanProvider(options: ApiPlanProviderOptions): PlanProvider {
   options.report?.absent("licence");
-  if (options.isSaas) options.report?.absent("subscription");
+
+  const subscription = options.subscriptions
+    ? ApiSubscriptionEntitlementSource.create({
+        subscriptions: options.subscriptions,
+        isSaas: options.isSaas,
+        adminEmails: options.adminEmails ?? [],
+      })
+    : undefined;
+  if (options.isSaas && !subscription) options.report?.absent("subscription");
 
   return EntitlementService.create({
     baseline: options.isSaas ? getFreePlanLimits() : UNLIMITED_PLAN,
+    ...(subscription ? { subscription } : {}),
     enrichers: [{ enrich: applyPlanTypeEntitlements }],
   });
+}
+
+/**
+ * The hosted deployment's paid plan, as Entitlements' neutral source port.
+ *
+ * `SaaSPlanProviderService` answers the FREE baseline rather than null when an
+ * organization has no subscription row, and `EntitlementService` already
+ * discards a free plan before falling through to its own baseline. So the
+ * translation is the identity one and the two baselines cannot disagree.
+ *
+ * It is the twin of `LicensingEntitlementSource` on the licence side, and it
+ * lives here rather than in the billing package for the same reason the
+ * licensing one lives in its own: which source a deployment consults is a
+ * composition decision, not the store's.
+ */
+class ApiSubscriptionEntitlementSource implements EntitlementSource {
+  static create(options: {
+    subscriptions: BillingSubscriptionRepository;
+    isSaas: boolean;
+    adminEmails: readonly string[];
+  }): ApiSubscriptionEntitlementSource {
+    return new ApiSubscriptionEntitlementSource(
+      SaaSPlanProviderService.create({
+        subscriptions: options.subscriptions,
+        isSaas: options.isSaas,
+        adminEmails: options.adminEmails,
+      }),
+    );
+  }
+
+  private constructor(private readonly plans: SaaSPlanProviderService) {}
+
+  async resolve(input: ResolvePlanInput): Promise<Plan> {
+    return this.plans.getActivePlan(input.organizationId, input.user);
+  }
 }
 
 /** What the usage reading is composed from. */

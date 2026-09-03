@@ -282,12 +282,15 @@ class ApiModelProviderRateLimitAdapter extends ModelProviderRateLimitPort {
 }
 
 /**
- * Names the one precondition a model gateway has that this process can miss.
+ * Names which precondition a model gateway is missing, so an operator reading
+ * "no workflow surfaces" can tell a deployment that has no database from one
+ * whose tenancy graph never composed.
  *
- * The database and the tenancy graph are gated by the composition root for
- * every half at once; the cipher is this half's alone, and an operator reading
- * "no workflow surfaces" without this line has no way to tell a deployment
- * that has no database from one that simply never set `CREDENTIALS_SECRET`.
+ * `no-encryption` is the third reason and the one no composition root reaches:
+ * the tenancy graph is gated on the same cipher, so a half reached with a
+ * composed tenancy provably holds one. It stays because the cipher is this
+ * half's own non-optional input, and a gateway that vanished silently would be
+ * worse than one that names the precondition it wanted.
  */
 export class LoggedApiModelProviderAbsence {
   static create(logger: Pick<Logger, "info">): LoggedApiModelProviderAbsence {

@@ -59,6 +59,8 @@ import {
   ApiClickHouseAbsenceReportPort,
   ApiClickHouseInfrastructure,
 } from "../platform/infrastructure/api-clickhouse.infrastructure";
+import { PostgresBillingAdapter } from "@langwatch/enterprise-billing-server";
+import { ApiAgentWorkflowCopyAdapter } from "../features/agent/agent-workflow-copy.adapter";
 import { ApiAgentsAbsenceReportPort, ApiAgentsComposition } from "./api-agents.composition";
 import {
   composeApiAnalyticsCollaborators,
@@ -261,6 +263,7 @@ import {
   LoggedApiTraceIngestAbsence,
 } from "./api-trace-ingest.composition";
 import {
+  AdminAccessService,
   PrismaBugReportRepository,
   SilentBugReportNotifier,
   type BugReportRestPorts,
@@ -1115,6 +1118,12 @@ export class ApiProductionComposition extends ApiRuntimeCompositionPort {
     this.composedAgents = ApiAgentsComposition.tryCompose({
       database: this.composedDatabase?.connection,
       processName: options.config.serviceName,
+      // The execution half opens AFTER the agent service, so the Workflow
+      // application is resolved at the copy rather than captured here.
+      workflowCopies: ApiAgentWorkflowCopyAdapter.create({
+        workflows: () => this.composedExecution?.workflows.workflowService,
+        processName: options.config.serviceName,
+      }),
       report: LoggedApiAgentsAbsence.create(logger),
     });
     return this.composedAgents?.agents;
@@ -2598,7 +2607,7 @@ export class ApiProductionComposition extends ApiRuntimeCompositionPort {
       ops,
       resolveClickHouseClient: this.composedClickHouse?.resolveClient ?? null,
       storage: options.config.infrastructure.storedObjects,
-      ...(this.options.plans ? { plans: this.options.plans } : {}),
+      plans: this.options.plans ?? this.resolvePlanProvider(options),
       report: LoggedApiProductInfraAbsence.create(createLogger(options.config.serviceName)),
     });
     options.resources?.own("api stored-object aws clients", () => half.close());
@@ -3110,8 +3119,19 @@ export class ApiProductionComposition extends ApiRuntimeCompositionPort {
 
   private resolvePlanProvider(options: ApiRuntimeCompositionOptions): PlanProvider {
     if (this.composedPlanProvider) return this.composedPlanProvider;
+    const database = this.composedDatabase?.connection;
     this.composedPlanProvider = composeApiPlanProvider({
       isSaas: options.config.infrastructure.modelProvider.isSaas,
+      // The subscription rows the hosted deployment's paid plans live in, on
+      // the SAME guarded client every other read runs on. Without them a
+      // paying organization resolves the free baseline, which is a wrong
+      // answer rather than a missing one.
+      ...(database
+        ? { subscriptions: PostgresBillingAdapter.create(database.client).build().subscriptions }
+        : {}),
+      adminEmails: this.options.identity?.adminEmails
+        ? AdminAccessService.parseEmails(this.options.identity.adminEmails)
+        : [],
       report: this.entitlementAbsence(options),
     });
     return this.composedPlanProvider;
@@ -3140,11 +3160,11 @@ export class ApiProductionComposition extends ApiRuntimeCompositionPort {
    *     one written here decrypts there, because it is one cipher and one
    *     format.
    *
-   * Three things can leave it absent, and they are told apart at boot: no
-   * database, no tenancy graph, and no `CREDENTIALS_SECRET`. The third is the
-   * interesting one — every stored credential is encrypted, so a gateway
-   * without the cipher would report every configured provider as unusable
-   * rather than failing honestly, which is why it gates instead of degrading.
+   * Two things can leave it absent on this root, and they are told apart at
+   * boot: no database and no tenancy graph. `CREDENTIALS_SECRET` is a third
+   * reason the report can carry, but not one this ordering reaches — the
+   * tenancy graph is gated on the same cipher and composes nothing without it,
+   * so a composed tenancy is already proof the cipher exists.
    */
   private resolveModelProviders(
     options: ApiRuntimeCompositionOptions,
@@ -3171,11 +3191,16 @@ export class ApiProductionComposition extends ApiRuntimeCompositionPort {
       absence.absent("no-tenancy");
       return undefined;
     }
+    // Unreachable on this root, and kept: `resolveTenancy` composes nothing
+    // without the same `encryption` local this method is handed, so a composed
+    // tenancy graph is itself the proof the cipher exists. What the branch
+    // still carries is the NARROWING — `composeApiModelProviders` takes a
+    // non-optional cipher — and a silent `return undefined` in its place would
+    // drop the gateway with no line saying why.
     if (!encryption) {
       absence.absent("no-encryption");
       return undefined;
     }
-
     this.composedModelProviders = composeApiModelProviders({
       prisma: database.client,
       projects: tenancy.projects,

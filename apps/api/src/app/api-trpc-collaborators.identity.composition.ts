@@ -360,6 +360,15 @@ class ApiCapabilityUnavailableError extends HandledError {
  * plan's seat count and elevating a Lite Member into a full seat are both
  * things a licence exists to stop, and a process that cannot ask must not
  * decide.
+ *
+ * It is a refusal this process could stop making, and the parts are already
+ * here rather than in a package nobody owns. This root makes BOTH halves of the
+ * same decision under other names: `ApiInviteSeatCensus` compares seat counts
+ * against `maxMembers` / `maxMembersLite` for an invite, and the org group's
+ * `assertCustomRolesAllowed` gates a role change on the plan type. What is
+ * missing is only the wiring — `ApiIdentityCollaboratorsOptions` carries no
+ * `plans`, so this half cannot ask the provider the rest of the process
+ * already shares. Until it does, refusing is the safe direction.
  */
 class UnavailableApiOrganizationSeatLicense extends OrganizationSeatLicensePort {
   static create(processName: string): UnavailableApiOrganizationSeatLicense {

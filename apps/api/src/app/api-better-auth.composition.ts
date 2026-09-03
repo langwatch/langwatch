@@ -268,11 +268,18 @@ export class OffApiSignInRouterShadow extends SignInRouterShadowPort {
 /**
  * Sends the password-reset link.
  *
- * A PORT rather than a call into `@langwatch/mail`, for the reason
- * {@link ApiIdentityMailPort} gives: rendering a LangWatch message is
- * react-email, and a value-import chain from a backend process to React is
- * what `frontend-boundary.unit.test.ts` exists to stop. The process states
- * what it wants said and to whom; the tier that owns the gateway renders it.
+ * A PORT, but NOT for the reason first recorded here. `@langwatch/mail` is the
+ * one allowed terminal in `frontend-boundary.unit.test.ts` — the walk stops on
+ * entry, and `worker-mail.composition.ts` value-imports it from a real backend
+ * root — so reaching `sendResetPasswordEmail` would break no boundary, and
+ * `apps/api` already declares the dependency.
+ *
+ * What is actually missing is below the template: this process parses no mailer
+ * configuration and composes no `EmailDeliveryPort`, which is what
+ * `sendResetPasswordEmail` takes. The port stays because the process states
+ * what it wants said and to whom, and the tier that owns the gateway renders
+ * it; the shape to copy when one is composed here is
+ * `apps/worker/src/app/worker-mail.composition.ts`.
  */
 export abstract class ApiPasswordResetMailPort {
   abstract sendResetPassword(input: { email: string; token: string }): Promise<void>;

@@ -33,10 +33,20 @@
  * id-only path is the `/api/files` REST family's.
  *
  * `getMonitorPerformance` — the seven-day trend reads the evaluation RUN
- * stack, which has not moved out of the platform application. It refuses by
- * name rather than answering `[]`: an empty trend reads as "your monitors
- * caught nothing", which is the one answer a person acts on by turning a
- * monitor off.
+ * stack. That stack HAS moved: `EvaluationService.getMonitorPerformance` and
+ * `ClickHouseMonitorPerformanceRepository` both live in
+ * `@langwatch/evaluation-server`, and this process holds the routed ClickHouse
+ * they read on. What is missing is one line in that package: the repository is
+ * not exported, and the only exported route to it is `EvaluationAdapter`, which
+ * demands an evaluator executor and a whole workflow capability this read never
+ * touches — the precise shape the package's own comment on
+ * `ClickHouseEvaluationRepository` says a one-read caller should not synthesise.
+ * The closure is to export `ClickHouseMonitorPerformanceRepository` beside it,
+ * then compose it here on `resolveClickHouseClient`.
+ *
+ * Until then it refuses by name rather than answering `[]`: an empty trend
+ * reads as "your monitors caught nothing", which is the one answer a person
+ * acts on by turning a monitor off.
  *
  * ## The retention policy is composed, not re-implemented
  *
@@ -264,7 +274,7 @@ const CONSEQUENCE = {
   plans:
     "API process composed no plan provider: every retention write refuses by name, because a plan gate that cannot read a plan must not pass.",
   "evaluation-runs":
-    "API process composed no evaluation-run read stack: the monitors page's seven-day trend refuses by name rather than reporting that no monitor caught anything.",
+    "API process composed no evaluation-run read: @langwatch/evaluation-server owns the stack but exports ClickHouseMonitorPerformanceRepository to nobody, so the monitors page's seven-day trend refuses by name rather than reporting that no monitor caught anything.",
 } as const;
 
 // ---------------------------------------------------------------------------

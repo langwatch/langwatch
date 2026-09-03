@@ -72,6 +72,7 @@ import {
 } from "@langwatch/authz-contract";
 import type { FeatureFlagService, FeatureFlagTarget } from "@langwatch/feature-flag-contract";
 import type { EventSourcing } from "@langwatch/eventing";
+import { PrismaScheduledJobStore } from "@langwatch/eventing/server";
 import { HandledError, NotFoundError } from "@langwatch/handled-error";
 import {
   LangyApp,
@@ -99,7 +100,6 @@ import {
   type OpsProcessExplorer,
   type OpsReplayRunner,
   type OpsTrpcPorts,
-  type SchedulerOpsRepository,
 } from "@langwatch/ops-server";
 import type { OrganizationService } from "@langwatch/organization-contract";
 import type { PresenceEmitterPort } from "@langwatch/presence-server";
@@ -223,7 +223,7 @@ const CONSEQUENCE = {
   "turn-commands":
     "API process holds no command queue, so it registered no Langy conversation pipeline: starting a turn, continuing one, renaming, forking and deleting a conversation all refuse by name. Reading conversations and messages is unaffected, and both live channels still stream.",
   "operator-runtime":
-    "API process composed no operator runtime: the event-log explorer, the process-manager fleet, the replay runner and the scheduled-job store all refuse by name. The admin allow-list, the impersonation ledger and the back-office reads answer for real.",
+    "API process composed no operator runtime: the event-log explorer, the process-manager fleet and the replay runner refuse by name. The scheduled-job store, the admin allow-list, the impersonation ledger and the back-office reads answer for real.",
   "live-buffer":
     "API process holds no Redis: the Langy turn stream yields nothing and the browser falls back to the Postgres conversation read, tab presence is per-process, and the operator's queue views report nothing.",
 } as const;
@@ -368,9 +368,10 @@ export function composeApiAgentGroupCollaborators(
   const scenarioApp = ScenarioApp.create({
     scenarios,
     simulations,
-    // The run EXECUTOR, refused by name. It is the in-process worker pool a
-    // web process never holds anyway — `roleRunsWorkers` is false here — and
-    // its prefetcher reaches ten other verticals' services.
+    // The run EXECUTOR, refused by name. `submit` genuinely has no home here —
+    // it is the in-process worker pool a web process never holds — but the
+    // other four are refused for a smaller reason than this once claimed; see
+    // the class.
     scenarioExecution: new UnavailableApiScenarioExecution(),
     scenarioTabs,
     users: options.users,
@@ -575,12 +576,22 @@ class UnavailableApiScenarioTabStore extends ScenarioTabStorePort {
 }
 
 /**
- * The run executor, refused by name.
+ * The run executor, refused by name — and refusing MORE than it must.
  *
- * A web process never holds the in-process pool anyway; what it would need to
- * hold instead is the prefetcher, which reaches workflows, prompts, agents,
- * model providers, secrets and the trace tree. Refusing names that rather than
- * resolving a run against a graph this process does not have.
+ * `submit` is the honest half: a web process never holds the in-process pool,
+ * and `@langwatch/scenario-server` ships `UnavailableScenarioExecutionPoolService`
+ * for exactly that leg.
+ *
+ * The other four are not blocked by a missing collaborator. The package exports
+ * the concrete `ScenarioExecutionService`, and every dependency its prefetcher
+ * asks for — workflows, prompts, agents, model providers, secrets, projects,
+ * scenarios, suites, the trace tree and the stored-secret cipher — is composed
+ * on THIS process before the agent group is built. `ScenarioApp` reaches only
+ * `prefetch`, so closing it is one composition, not ten.
+ *
+ * What genuinely does not exist is CONFIGURATION: `ScenarioExecutionPrefetchConfig`
+ * wants `langwatchEndpoint` and `legacyDefaultModel`, and no process in the
+ * repository reads either. That pair is the whole remaining gap.
  */
 class UnavailableApiScenarioExecution extends ScenarioExecutionService {
   submit(): Promise<void> {
@@ -901,7 +912,7 @@ function composeOps(options: ApiAgentGroupCollaboratorsOptions, logger: Logger):
     users: options.users,
     auth: options.auth,
     scheduler: {
-      repository: unavailableSchedulerOpsRepository(),
+      repository: new PrismaScheduledJobStore(options.prisma),
       // The scheduler's own polling backstop preserves correctness without a
       // wake, which is what makes the noop the package's answer rather than a
       // degradation this root invented.
@@ -926,10 +937,26 @@ function composeOps(options: ApiAgentGroupCollaboratorsOptions, logger: Logger):
  * One operator explorer, refused by name on every method.
  *
  * A Proxy rather than twenty-seven written stand-ins: these three types are
- * structural views over the operations vocabulary with no packaged
- * implementation anywhere, so what this file has to say about them is one
- * sentence — "this process has none" — and writing it out per method would bury
- * that in boilerplate that a new method would silently escape.
+ * structural views over the operations vocabulary, so what this file has to say
+ * about them is one sentence — "this process has none" — and writing it out per
+ * method would bury that in boilerplate a new method would silently escape.
+ *
+ * What each is waiting for is NOT the same thing, and none of the three is
+ * "no package ships one" any more:
+ *
+ *   - the EVENT-LOG EXPLORER wants `EventExplorerService` over
+ *     `EventExplorerClickHouseRepository`, which takes ONE ClickHouse client
+ *     for a cross-tenant read. `ApiClickHouseInfrastructure` publishes a
+ *     tenant-keyed resolver only, so the missing piece is an accessor for the
+ *     shared endpoint — the same one `events-meter` waits on.
+ *   - the PROCESS-MANAGER FLEET wants `ManagerExplorerService` over
+ *     `PrismaProcessStore`, `ProcessOpsPrismaRepository` and an introspection
+ *     adapter. Every part exists; what is unsettled is whether a PRODUCER-ONLY
+ *     process should render a fleet whose definitions it registers three of, so
+ *     it is a decision rather than a wiring gap.
+ *   - the REPLAY RUNNER is the one genuine absence: `OpsReplayRuntimePort` has
+ *     no implementation anywhere in the tree, so `ReplayService` cannot be
+ *     constructed at all.
  */
 function unavailableOperatorRuntime<T>(capability: string): T {
   return new Proxy(
@@ -939,20 +966,6 @@ function unavailableOperatorRuntime<T>(capability: string): T {
       has: () => true,
     },
   ) as T;
-}
-
-/** The scheduled-job store, refused by name: no package ships one. */
-function unavailableSchedulerOpsRepository(): SchedulerOpsRepository {
-  const refuse = (): Promise<never> =>
-    Promise.reject(new ApiAgentGroupUnavailableError("The scheduled-job store"));
-  return {
-    tryFindByIdForOps: refuse,
-    setActiveForOps: refuse,
-    releaseSlotForOps: refuse,
-    requestImmediateRunForOps: refuse,
-    listForOps: refuse,
-    listPausedForOps: refuse,
-  } as unknown as SchedulerOpsRepository;
 }
 
 /** Bridges the operations package's audit sink onto this process's trail. */

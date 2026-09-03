@@ -12880,3 +12880,344 @@ back with the delivery id only that transport produces, and a queue endpoint
 refuses without an AWS transport and reaches it with one. `oxlint` over the
 eleven touched files — clean except seven pre-existing unused-import warnings in
 `worker-production.composition.ts`, none of them in the edited regions.
+
+## API absences audited: 43 named, 4 closed, 12 claims corrected, 2026-09-03
+
+`apps/api` names its gaps rather than hiding them, and three of those names fell
+to audit on 2026-09-03 alone — `tracked-events` (the span builder had been in
+`@langwatch/trace-server` for days), the avatar READ (the owner kind was on the
+row) and the avatar WRITE (the store was composed later in the same root). All
+three had one shape: the claim was true when written and false by the time
+anyone read it.
+
+So every remaining absence was audited the same way. The census:
+
+```
+grep -rho 'absent("[a-z-]*")\|new Unavailable[A-Za-z]*\|without[A-Z][A-Za-z]*(' \
+  apps/api/src | grep -v __tests__ | sort -u        →  43 distinct names
+```
+
+Each was read three ways — the class or function, the comment stating WHY, and
+the ledger record that introduced it — and then checked against the tree TODAY:
+does a package now export the collaborator the claim says nobody owns; does this
+process already compose it elsewhere in the root; is it a decision (the worker's
+capability, a live third-party client this process must not hold, or a security
+refusal).
+
+### The four categories, and the rule that sorts them
+
+The audit turned on one distinction the original records did not make, because
+when they were written there was only one caller:
+
+| The root … | and the collaborator … | verdict |
+| --- | --- | --- |
+| never passes it | exists nowhere | **REAL GAP** |
+| never passes it | exists and is reachable | **STALE** — close it |
+| always passes it | — | **DELIBERATE** — a host/library seam, kept |
+| cannot fail to pass it | — | **STALE**, but the branch may still be load-bearing as a type narrowing |
+
+`composeApiTraceGroupCollaborators`, `ApiAuthComposition.tryCompose` and friends
+are exported from `apps/api/src/index.ts` for an embedding host, so a guard the
+production root can never trip is not therefore dead — it is the library
+surface's. Six absences that read as stale are that, and they stay.
+
+### The 43
+
+| Name | Class | Evidence | Action |
+| --- | --- | --- | --- |
+| `absent("plans")` (product-infra) | **STALE** | `resolvePlanProvider` builds one and five other call sites read it; `composeProductInfra` threaded only `this.options.plans`, which the shipped `startStandaloneApi()` never sets — so **every retention plan gate refused in production** | **CLOSED**: root now passes `this.options.plans ?? this.resolvePlanProvider(options)`, exactly as the trace group one method away already did |
+| scheduled-job store (`unavailableSchedulerOpsRepository`) | **STALE** | Comment said "no package ships one". `PrismaScheduledJobStore` (`@langwatch/eventing/server`) implements all six `*ForOps` and its record is field-for-field the ops port's | **CLOSED**: composed over `options.prisma`; the stub deleted |
+| `withoutWorkflowCopies` | **STALE** | `WorkflowService.copy` exists and this process composes the service (`execution.workflows.workflowService`, already read at two other call sites) | **CLOSED**: new `ApiAgentWorkflowCopyAdapter`, resolved through a thunk because the agent service composes before the execution half |
+| `absent("subscription")` | **STALE** | `SaaSPlanProviderService` and `PostgresBillingAdapter` are exported from `@langwatch/enterprise-billing-server` — which `api-usage.composition.ts` already imports two symbols from | **CLOSED**: composed as the `EntitlementSource` the entitlement service consults before its baseline; the absence now fires only when the store genuinely is not there |
+| `absent("operator-runtime")` | **STALE (3 of 4)** | "no packaged implementation anywhere" is false: `EventExplorerService` and `ManagerExplorerService` are exported from `@langwatch/ops-server` | **PARTLY CLOSED** (the scheduled-job store, above); the comment now names what each of the other three actually waits on |
+| `absent("evaluation-runs")` | **STALE claim** | "has not moved out of the platform application" is false — `EvaluationService.getMonitorPerformance` and `ClickHouseMonitorPerformanceRepository` are in `@langwatch/evaluation-server` | **NOT CLOSED, named**: the repository is not exported, and `EvaluationAdapter` demands an executor and a workflow capability this read never touches. One export away |
+| `UnavailableApiScenarioExecution` | **STALE (4 of 5)** | The package ships the concrete `ScenarioExecutionService`; all ten prefetcher collaborators are composed on this process already, and `ScenarioApp` reaches only `prefetch` | **NOT CLOSED, named**: the gap is two config values (`langwatchEndpoint`, `legacyDefaultModel`) no process in the repository reads |
+| `UnavailableApiOrganizationSeatLicense` | **STALE** | This root makes both halves of the same decision under other names (`ApiInviteSeatCensus`; `assertCustomRolesAllowed`) | **NOT CLOSED, named**: `ApiIdentityCollaboratorsOptions` carries no `plans`, so the half cannot ask the provider the process already shares |
+| `absent("no-encryption")` | **STALE, kept** | `resolveTenancy` composes nothing without the same `encryption` local, so a composed tenancy is proof the cipher exists | **KEPT**: the branch is the NARROWING for a non-optional input; removing it fails `tsc`, and a silent `return undefined` would drop the gateway with no line saying why. Doc corrected |
+| `absent("plan-allowance")` | **REAL GAP** | "composes no usage meter" is half stale — the plan provider IS held, by eight readers | **MESSAGE CORRECTED**: `UsageOrganizationPort` and `UsageVolumeCounterPort` have no implementation in any tier, so `UsageService` is composed by nobody |
+| `withoutExecutionTelemetry` | **REAL GAP** | "no metrics registry" is wrong: `EvaluationExecutionTelemetryPort` takes no registry, only `record(...)` | **MESSAGE CORRECTED**: nothing in the tree implements the port. Template: `OtelPiiAnalysisMetricsAdapter` |
+| `absent("usage-mail")` | **REAL GAP** | "needs a Notification vertical" is stale — it exists, as do `UsageLimitService` and `UsageWarningService` | **MESSAGE CORRECTED**: the only `UsageLimitEmailAdapter` is the Null one, and this process parses no mailer config |
+| `UnavailableApiPasswordResetMail` | **REAL GAP** | The React-boundary reason is false: `@langwatch/mail` is the ONE allowed terminal in `frontend-boundary.unit.test.ts`, and `apps/api` already declares the dependency | **MESSAGE CORRECTED**: missing is a mailer config block and an `EmailDeliveryPort`. Shape: `worker-mail.composition.ts` |
+| `absent("events-meter")` | **REAL GAP** | "reads one tenant's rows on another's endpoint" is false — the directory answers a project id, so an organization id raises `UnknownTenantError` rather than mis-routing | **MESSAGE CORRECTED**: `ClickHouseConnection.resolveOrganization` exists; missing is an organization-keyed accessor on `ApiClickHouseInfrastructure` |
+| `withoutDurableAppend` | **REAL GAP** | Unconditional on the queue-PRESENT branch, so it fires on every production boot; `JoinRequestLedgerWriter.commit` awaits `storeEvents` on `EventStoreProducerOnly`, which rejects | Kept — the message already names it. `api.config.ts` has no `retention` leaf, which is the second blocker |
+| `withoutRateLimit` ("no public REST rate limiter") | **REAL GAP** | True at the framework port: `createRestService` is called once and passes no `rateLimiter`. The substrate exists (`ApiRateLimitInfrastructure`, ~12 consumers) but the shapes differ | Kept. **This claim has no ledger record at all** — it lived only in code |
+| `absent("copilotkit")` | **DELIBERATE** | Boundary refusal, not a missing collaborator: the adapter value-imports `@copilotkit/runtime` and browser modules | Kept. Two follow-ups recorded below |
+| `UnavailableApiLangyUiActionCatalog` (×2) | **DELIBERATE** | The only manifest is `@langwatch/experiment-web`'s, a browser package | Kept |
+| `absent("trace-reads")`, `absent("model-provider-host")`, `absent("studio")`, `absent("usage")`, `absent("plans")` (trace-group) | **DELIBERATE** | The root composes all five unconditionally; the guards are the exported group's host seam, and its own suite composes without them | Kept |
+| `absent("no-tenancy")` (auth), `absent("dedup")` | **DELIBERATE** | Same shape: unreachable through the root's own types, live for a direct `tryCompose` caller | Kept |
+| `absent("no-database")` (×6), `absent("no-authz")`, `absent("no-eventing")`, `absent("no-pepper")`, `absent("no-collaborators")`, `absent("no-browser-session-transport")`, `absent("clickhouse")`, `absent("command-queue")` | **DELIBERATE** | Degenerate-configuration guards. `no-browser-session-transport` is the one that fires on a normally-configured deployment missing a secret | Kept |
+| `withoutQueue` (×3), `withoutProgressStore`, `withoutPublicBaseUrl`, `UnavailableApiScenarioTabStore`, `absent("live-buffer")`, `absent("run-commands")`, `absent("turn-commands")` | **DELIBERATE** | All gate on Redis or `BASE_HOST`, both genuinely optional. `apps/api` IS a queue producer; the reports are the Redis-less path | Kept |
+| `withoutEvaluatorService`, `withoutResourceLimit` | **DELIBERATE** | `LANGEVALS_ENDPOINT` names a live third-party service; secret limits are service invariants | Kept |
+| `withoutEmptyPaths`, `withoutEmbeddedJsonSchemaDefinitions` | **not absences** | OpenAPI document post-processors that the census regex matched on shape | — |
+
+### Judgment calls, recorded
+
+1. **A guard the production root cannot trip is not dead code.** Six absences
+   read as stale on the root alone and are the exported group's host seam. The
+   test for "stale" used here is *the root holds the collaborator and fails to
+   pass it*, not *this branch is unreachable from one caller*.
+2. **`no-encryption` was deleted and then put back.** The branch is provably
+   unreachable, and it is also the type narrowing for
+   `composeApiModelProviders`'s non-optional cipher — deleting it turned a
+   compiling file red. It stays with a comment saying both things.
+3. **`evaluation-runs` was not closed through `EvaluationAdapter`.** The package
+   exports `ClickHouseEvaluationRepository` with a comment saying a one-read
+   caller should NOT reach the service and synthesise an executor and a workflow
+   capability it never touches. Doing exactly that to close this would be
+   building the thing that comment warns against. The closure is a one-line
+   export in `@langwatch/evaluation-server`, and that package is another lane's.
+4. **The seat licence and the scenario executor were named, not built.** Both
+   are genuinely stale, and both are their own lane: the seat licence decides
+   whether a paid plan's seats may be spent, and the scenario executor needs two
+   configuration values that do not exist anywhere. A wrong seat gate is worse
+   than an honest refusal.
+5. **The subscription source lives in `apps/api`, not in the billing package.**
+   `ApiSubscriptionEntitlementSource` is the twin of `LicensingEntitlementSource`
+   on the licence side, and for the same reason: which source a deployment
+   consults is a composition decision, not the store's.
+
+### File → change
+
+| File | Change |
+| --- | --- |
+| `apps/api/src/features/agent/agent-workflow-copy.adapter.ts` | NEW. `ApiAgentWorkflowCopyAdapter` — `LinkedWorkflowCopyPort` over `WorkflowService.copy`, taking the service as a thunk because the agent half composes first. Stamps `copiedFromWorkflowId` with the source. |
+| `apps/api/src/app/api-production.composition.ts` | `plans` threaded into `composeProductInfra`; `workflowCopies` threaded into `resolveAgents`; `resolvePlanProvider` now builds the subscription store and admin list; the `no-encryption` doc corrected. |
+| `apps/api/src/app/api-usage.composition.ts` | `subscriptions` and `adminEmails` on `ApiPlanProviderOptions`; `ApiSubscriptionEntitlementSource`; the `usage-mail` and `events-meter` reasons rewritten. |
+| `apps/api/src/app/api-trpc-collaborators.agent-group.composition.ts` | `PrismaScheduledJobStore` composed; `unavailableSchedulerOpsRepository` deleted; the operator-runtime and scenario-executor comments rewritten to name what each actually waits on. |
+| `apps/api/src/app/api-trpc-collaborators.product-infra.composition.ts` | The `evaluation-runs` claim rewritten: the stack has moved, the repository is unexported. |
+| `apps/api/src/app/api-trpc-collaborators.identity.composition.ts` | The seat-licence comment now names the missing wiring (`plans` on the identity options) rather than implying no collaborator exists. |
+| `apps/api/src/app/api-model-provider.composition.ts` | `LoggedApiModelProviderAbsence`'s header says which of its three reasons no root reaches, and why it stays. |
+| `apps/api/src/app/api-evaluator-execution.composition.ts` | `withoutExecutionTelemetry` no longer claims a missing registry. |
+| `apps/api/src/app/api-trace-ingest.composition.ts` | `plan-allowance` names the two enforcement ports instead of "no usage meter". |
+| `apps/api/src/app/api-better-auth.composition.ts` | The password-reset port's stated reason replaced: `@langwatch/mail` is the sanctioned terminal; the gap is config and an `EmailDeliveryPort`. |
+| `apps/api/src/features/agent/__tests__/agent-workflow-copy.unit.test.ts` | NEW. 3 tests: the copy and its command shape, the late-resolved thunk, the named refusal. |
+| `apps/api/src/app/__tests__/api-usage.composition.unit.test.ts` | NEW. 5 tests over a real `EntitlementService`: a paying organization resolves its plan, the absence is not reported when composed, free still resolves free, and both no-source cases. |
+| `apps/api/src/app/__tests__/api-production.composition.unit.test.ts` | One test: the composed agent service names no workflow-copy gap at boot. |
+| `apps/api/src/app/__tests__/api-trpc-collaborators.agent-group.integration.test.ts` | One test: `ops.listScheduledJobs` reads rather than refusing; `$queryRaw` added to the Prisma double. |
+
+### Gates
+
+- `apps/api`: `tsc --noEmit` **0 errors**.
+- `apps/api`: `vitest run src/app src/features/agent` — **44 files, 464 tests
+  passed**, from a 42 / 454 baseline taken before the first edit.
+- **Every new test was sabotage-checked.** The scheduled-job store test fails
+  when the store is swapped back for a refusing stub; the workflow-copy test
+  fails when the adapter is dropped from `resolveAgents`. The first draft of that
+  second test PASSED under sabotage — it spied on `langwatch-api-test` when the
+  composition logs to `langwatch-api`, and it sat where the composition never
+  reached `resolveAgents` — and is recorded here because a vacuous guard reads
+  exactly like a real one.
+- `task:openapi-check`: `served: 303`, `removed: 3 (0 outside the baseline)`,
+  `undescribed: 11`, `added: 0`, `changed: 0`. No REST family changed.
+- `oxlint` over every touched file — clean of anything this lane wrote. Deleting
+  the scheduler stub left one unused import, which is fixed. Two warnings remain
+  in files this lane touched only in comments — an unused `S3Client` in
+  `api-trpc-collaborators.product-infra.composition.ts` and an unused
+  `OrganizationPlanUser` in `api-trpc-collaborators.identity.composition.ts` —
+  both on lines no diff in this lane touches, and both left where they were.
+  `oxfmt --check` clean on the three new files.
+- Nothing under `platform/` was created, edited or read.
+
+### What this lane did NOT do
+
+- **Three stale absences are named, not closed**: `evaluation-runs` (one export
+  in another lane's package), the organization seat licence (`plans` on the
+  identity options), and the scenario executor (two config values). Each now
+  carries its closure recipe in the code rather than a reason that has stopped
+  being true.
+- **The two operator explorers were not composed.** The event-log explorer wants
+  a shared-endpoint ClickHouse accessor `ApiClickHouseInfrastructure` does not
+  publish — the same missing piece `events-meter` waits on. The fleet explorer
+  needs a decision first: whether a PRODUCER-ONLY process should render a fleet
+  whose definitions it registers three of. Rendering a plausible but wrong
+  operator view is worse than an honest refusal.
+- **Two copilotkit follow-ups, recorded and not acted on.** The browser still
+  points `runtimeUrl` at `/api/copilotkit`
+  (`prompt-playground-chat.tsx`), so the prompt-studio playground chat 404s
+  rather than merely being unmigrated — and nothing in this ledger had recorded
+  the CLIENT side of that absence. Separately, `apps/api/package.json` still
+  declares `@copilotkit/runtime`, which no file under `apps/api/src` imports.
+- **No test pins the product-infra `plans` wiring behaviourally.** The production
+  composition test cannot reach `composeProductInfra`: it needs a composed
+  identity half, which needs a composed tenancy graph, and that suite supplies
+  the tenancy pair by injection instead. The fix is one line mirroring the trace
+  group's, and `tsc` plus the corrected `plans` type carry it.
+- **Two labels are overloaded and were left alone.** `absent("no-database")` in
+  `api-trpc-features.composition.ts` also fires for a missing AuthZ, and
+  `absent("no-pepper")` in `api-tenancy.composition.ts` also fires for a missing
+  cipher. Both log honest prose; only the structured `reason` is wrong, and a
+  test currently pins the first one's behaviour.
+
+## The five follow-ups the drawer commit left, and the two screens that were still their own registry, 2026-09-03
+
+`2c6c3a9815` ("Every drawer the product addresses opens again") registered
+fourteen names across three lanes and wrote down five things it had not done.
+This closes all five. Two of them were cosmetic; two were live defects; one was
+an architectural half-measure that the drawers doc had already ruled on.
+
+### The five, and what each turned out to be
+
+| # | The follow-up | What it actually was |
+| --- | --- | --- |
+| 1 | Five simulations drawers registered with no host | **A crash.** `AgentWorkflowEditorDrawer` and `SuiteFormDrawer` call `useOrganizationTeamProject` on first render, and `useScenarioHost` THROWS without a `ScenarioHostProvider` |
+| 2 | `addOrEditDataset` calls `props.onSuccess` unconditionally | **A crash, after the write.** A bare-URL open has no caller, and a URL carries no functions |
+| 3 | Two screens reading their own overlay keys | **Two addresses for one editor**, and only one of them survived being pasted |
+| 4 | `chrome/index.ts:50` deferring to the family manifests | Stale prose over a real, and now short, list |
+| 5 | Four census rows | Stale prose |
+
+### The two crashes present identically, and that is the point
+
+Neither shows an error. `CurrentDrawer` wraps the resolved component in an error
+boundary; a throw inside one clears `?drawer.open=` and renders nothing, which
+is the same thing a MISSING registration does — the reader clicks and the page
+does not move. So the census's headline symptom covered two different faults,
+and registering the name fixed only one of them.
+
+`addOrEditDataset` is worse than that, because it throws LATE: the dataset has
+already been written by the time `props.onSuccess` is not a function, so the
+toast never fires, the list is never invalidated and the drawer stays open over
+a page that does not show what was just created. `onSuccess` is optional now,
+and a bare-URL open ends the way `dev/docs/best_practices/drawers.md` says a
+sub-flow ends — through `onClose`, which already falls back to `closeDrawer`.
+
+The type change had one consequence worth stating: `DatasetEditorComponent` in
+`@langwatch/trace-web`, which is how the application injects this editor into
+"Add to Dataset", declared `onSuccess` REQUIRED. `ComponentType` admits a class
+component, whose props are invariant, so a required callback on the slot rejects
+an optional one on the component. The slot is optional now too. `apps/ui`'s
+typecheck is what found it.
+
+### The registry is the single mechanism, and a second caller is what proves it
+
+`automations.screen.tsx` owned `?automation=` and `?viewAutomation=`;
+`gateway-routing-policies.screen.tsx` owned `?policy=`. Both recorded the same
+reason: the drawer registry is application composition a feature-web package may
+not reach. That is TRUE OF THE REGISTRY AND FALSE OF ITS ADDRESS. The registry
+is addressed by a query string, and a query string is something the host port
+already writes — so a screen can name a registered drawer without reaching the
+registry at all, which is exactly what the agents, api-key and model-provider
+families already do through `openPlatformDrawer`.
+
+Both ports gain an `openDrawer({ drawer, params })`, typed over a named union
+(`AutomationDrawer`, `GatewayDrawer`) so a screen cannot address an overlay the
+application does not register. The `drawer.` vocabulary stays in `apps/ui`: the
+adapter writes `?drawer.open=<name>` plus one `drawer.<key>` per parameter and
+clears every stale `drawer.*` key.
+
+What decided this was not tidiness. Each of these editors has a SECOND CALLER
+that the screen never controlled — every alert email's "Edit automation" link
+and the REST `platformUrl` for one, a virtual key's "routes through" link for
+the other — and those callers write the registry address. With the screen
+writing a different one, the same editor had two addresses, and a reader who
+copied the URL out of their address bar sent a colleague a link that opened a
+list with nothing on it.
+
+`viewAutomation` is registered as part of this. Two overlays that hand over to
+each other cannot sit on two mechanisms: the hand-over would have to clear one
+address and write the other, which is the bug the single mechanism removes.
+
+`@langwatch/ops-web` keeps its local overlays and its comment now says why: no
+email, no REST field and no other screen links to `opsGroupDetail`, so there is
+no second caller for one address to serve. Same for `dashboardName` and
+`seriesFilters`.
+
+### Where each half is proved
+
+The two halves are deliberately not tested in the same place, because they
+belong to different owners.
+
+- **Which overlay a click asks for** is the screen's, and is asserted off the
+  fake host's `recording.drawerOpens` — the shape `@langwatch/model-provider-web`'s
+  double already takes. The package states no `drawer.` string anywhere.
+- **What that becomes in the address bar** is the application's, and is asserted
+  in `apps/ui/tests/automation-host.adapter.unit.test.ts` (new) and
+  `gateway-host.adapter.unit.test.ts`, including the case that bites: a create
+  opened while the viewer is open must not inherit `drawer.automationId`.
+- **That the address then mounts something** is `installed-ui-drawers.integration.test.tsx`,
+  which drives the real registry.
+
+### File → change
+
+| File | Change |
+| --- | --- |
+| `apps/ui/src/features/simulations/ui/sections/simulations-drawers.tsx` | The five pre-existing drawers wrapped in `withScenarioDrawerHost`; four also in `fromDrawerAddress` (`suiteEditor` declares no `open` and reads the navigator itself) |
+| `apps/ui/src/features/simulations/index.ts` | Five entries re-pointed from `@langwatch/scenario-web/drawers` to the hosted module |
+| `apps/ui/src/features/automations/index.ts` | `viewAutomation` registered |
+| `apps/ui/src/features/automations/ui/sections/automations-drawers.tsx` | `ViewAutomationDrawer` adapter: `closeDrawer` for the close, `openDrawer("automation", …)` for the hand-over, nothing when the address names no automation |
+| `apps/ui/src/features/automations/behavior/automation-host.adapter.ts` | `openDrawer` + `DRAWER_OPEN_PARAM` |
+| `apps/ui/src/features/gateway/behavior/gateway-host.adapter.ts` | Same |
+| `apps/ui/src/features/gateway/ui/sections/gateway-drawers.tsx` | Comment: one way in, not two |
+| `apps/ui/src/features/chrome/index.ts` | The deferral replaced by the four names that are not registered and why |
+| `packages/features/automation/web/src/model/automation-host.ts` | `AutomationDrawer` union + `openDrawer` |
+| `packages/features/automation/web/src/screens/automations/automations.screen.tsx` | Both inline editors removed; `openEdit` / `openView` / `openCreate` go through the host. `?automation=new` is gone — a create is the drawer with no id |
+| `packages/features/automation/web/src/screens/drawers.ts` | `ViewAutomationDrawer` exported |
+| `packages/features/automation/web/src/behavior/automation-router.ts` | **Deleted** — the screen was its only consumer |
+| `packages/features/automation/web/src/testing.tsx` | `recording.drawerOpens` |
+| `packages/features/gateway/web/src/model/gateway-host.ts` | `GatewayDrawer` union + `openDrawer` |
+| `packages/features/gateway/web/src/screens/gateway/gateway-routing-policies.screen.tsx` | Inline editor removed; `ROUTING_POLICY_QUERY_KEY` gone |
+| `packages/features/gateway/web/src/testing.tsx` | `recording.drawerOpens` |
+| `packages/features/dataset/web/src/ui/sections/datasets/add-or-edit-dataset-drawer.tsx` | `onSuccess` optional, called optionally at both sites |
+| `packages/features/dataset/web/src/ui/sections/datasets/upload-csv-drawer.tsx` | `NonNullable<…["onSuccess"]>`, so its own contract stays required |
+| `packages/features/trace/web/src/ui/sections/datasets/add-dataset-record-drawer.tsx` | The injected editor's `onSuccess` optional, for the invariance reason above |
+| `packages/features/ops/web/src/behavior/ops-overlays.ts` | The precedent it cited went the other way; the comment says what actually decides |
+| `dev/docs/plans/ownerless-ui-surfaces-census.md` | Rows 38 and 39, both group-(c) "named by no comment" rows, all fourteen group-(b) rows, the summary table, the registered-today list and the outbound-email section |
+
+### Tests
+
+| File | What it now states |
+| --- | --- |
+| `apps/ui/tests/installed-ui-drawers.integration.test.tsx` | Five more table rows (the simulations drawers) and `viewAutomation`; the viewer is given both `onClose` and `onEdit`. 22 → 30 cases |
+| `apps/ui/tests/automation-host.adapter.unit.test.ts` | **New.** The address the adapter spells, including the stale-key clear |
+| `apps/ui/tests/gateway-host.adapter.unit.test.ts` | The same three cases for `routingPolicy` |
+| `packages/features/automation/web/src/screens/automations/__tests__/automations-screen.integration.test.tsx` | Rewritten onto `recording.drawerOpens`, plus "the screen renders neither editor" — a screen that kept one would stack a second copy under the registry's |
+| `packages/features/gateway/web/src/screens/gateway/__tests__/gateway-routing-policies.drawer-url.integration.test.tsx` | The two page cases assert the drawer request; the "rebuilds from the address" case renders the editor with the props the adapter builds |
+| `packages/features/dataset/web/src/ui/sections/datasets/__tests__/add-or-edit-dataset-drawer.integration.test.tsx` | **New.** A bare-URL open, a real submit, a real mutation callback. Verified by sabotage: restoring `props.onSuccess(` fails it with "is not a function" |
+
+### Specs
+
+`specs/navigation/drawer-opened-with-no-caller.feature` is new and states the
+general rule the dataset case is an instance of: a drawer reached from an
+address alone gets only what the URL carried, so it must still finish its work
+and close. `specs/automations/authoring-drawer.feature` gains a Rule with four
+scenarios, all bound. `specs/ai-gateway/governance/admin-routing-policies.feature`'s
+Rule is renamed to say what it now means — one address, whoever opened it.
+
+### Judgment calls
+
+- **`viewAutomation` with no id renders nothing.** The alternative is a query
+  with a blank id, which this repo treats as a wiring bug. Nothing mints such a
+  link: the screen, the viewer's own hand-over and every outbound link carry one.
+- **The `openDrawer` port method is not called `openPlatformDrawer`.** Six
+  families use that name, and it means "a `platform/app` drawer's address" — a
+  package that no longer exists. New ports get the honest name; renaming the six
+  is a sweep of its own.
+- **The fake hosts record the request rather than spelling the address.** A
+  double that spelled it would let a package's suite pass while disagreeing with
+  the application about the vocabulary, which is the failure the port exists to
+  prevent.
+
+### Gates
+
+`apps/ui`: `vitest run tests` — **98 files / 1036 tests**, `pnpm typecheck` — 0
+errors. `@langwatch/automation-web` — 35 files / 414 tests, typecheck clean.
+`@langwatch/gateway-web` — 38 / 304, clean. `@langwatch/dataset-web` — 19 / 118,
+clean. `@langwatch/scenario-web` — 52 / 421, clean. `@langwatch/trace-web`
+typecheck clean. `oxlint` over every touched file: clean (one pre-existing
+unused import in `automations.screen.tsx` removed on the way past). `oxfmt`:
+the two files I newly unformatted are fixed; `add-or-edit-dataset-drawer.tsx`
+and `gateway-routing-policies.screen.tsx` were already unformatted at HEAD in
+regions this change does not touch, and are left as they are. Feature parity:
+every scenario added here is bound.
+
+### What this lane did NOT do
+
+- **Nothing under `platform/` was created, edited or read.**
+- **No email template or REST field was edited.** Both outbound links keep the
+  address they mint; the change is that the screens now mint the same one.
+- **The six families still say `openPlatformDrawer`.** See the judgment call.
+- **`traceV2Details` is still not registered**, and should not be — it is
+  mounted, for the reason `trace-drawer-mount.tsx` states.
+- **`specs/navigation/child-drawer-nesting.feature` was not corrected**, though
+  its premise ("child drawers are rendered via local React state") now
+  contradicts the drawers doc. Every scenario in it is `@unimplemented`, so it
+  enforces nothing; rewriting it belongs with whoever implements it.

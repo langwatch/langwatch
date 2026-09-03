@@ -175,6 +175,7 @@ import {
   ApiProductionComposition,
   type ApiOwnedRestFeaturePorts,
 } from "../api-production.composition";
+import { createLogger } from "@langwatch/observability";
 import { ApiAuditPort } from "../../api-request.policy";
 import { resolveApiConfig } from "../../platform/config/api.config";
 
@@ -814,6 +815,28 @@ describe("ApiProductionComposition", () => {
         const composed = processMocks.agents() as AgentService;
         expect(composed).toBeInstanceOf(AgentService);
         await expect(composed.getAll({ projectId: "project-1" })).resolves.toEqual([]);
+      });
+    });
+
+    describe("when the deployment configured a database", () => {
+      it("hands that service a workflow copier, so it names no copy gap at boot", async () => {
+        databaseMocks.configured.value = true;
+        const info = vi.spyOn(createLogger("langwatch-api"), "info");
+
+        await composeSelfComposedAgents({ DATABASE_URL: "postgresql://localhost/langwatch" });
+
+        // The Workflow application composes AFTER the agent service, so the
+        // copier reaches it through a thunk. Before it did, this process
+        // composed its agent service without the capability and said so here.
+        expect(
+          info.mock.calls.filter(
+            ([first]) =>
+              typeof first === "object" &&
+              first !== null &&
+              (first as { reason?: string }).reason === "no-workflow-application",
+          ),
+        ).toEqual([]);
+        info.mockRestore();
       });
     });
 

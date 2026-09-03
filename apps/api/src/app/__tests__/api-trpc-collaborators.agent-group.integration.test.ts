@@ -131,6 +131,10 @@ function testPrisma() {
     },
     langyMessageProjection: { findMany: vi.fn(async () => []) },
     project: { findFirst: vi.fn(async () => null), findUnique: vi.fn(async () => null) },
+    // The operator's scheduled-job read is a cross-tenant `$queryRaw` scan, so
+    // it reaches the client rather than a model delegate. An empty result is a
+    // real answer for a deployment that has scheduled nothing.
+    $queryRaw: vi.fn(async () => []),
   } as unknown as PrismaClient;
 
   const held = client as unknown as {
@@ -830,6 +834,20 @@ describe("given the API process composed the agent-group half from its own graph
       // this pins.
       expect(status).toBeGreaterThanOrEqual(400);
       expect(JSON.stringify(body)).toContain("langy_agent_unavailable");
+    });
+
+    it("reads the scheduled-job store rather than refusing it by name", async () => {
+      const { application } = composeApplication();
+
+      const { status, body } = await callTrpc(application, "ops.listScheduledJobs", {
+        limit: 20,
+      });
+
+      // Before the store was composed this refused with the operator-runtime
+      // error. An empty list is the honest answer for a deployment that has
+      // scheduled nothing; a refusal was not.
+      expect(status).toBe(200);
+      expect(JSON.stringify(body)).not.toContain("scheduled-job store");
     });
 
     it("keeps a caller who is not on the allow-list out of the operator surface", async () => {
