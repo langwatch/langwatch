@@ -24,6 +24,7 @@ export type ClientSource =
   | "sdk"
   | "cli"
   | "mcp"
+  | "internal"
   | "browser"
   | "curl"
   | "otel-exporter"
@@ -104,11 +105,15 @@ const HTTP_CLIENT_AGENTS = [
   "ruby",
 ];
 
-const SDK_LANGUAGE_BY_AGENT: Record<string, string> = {
-  "langwatch-sdk-node": "typescript",
-  "langwatch-sdk-go": "go",
-  "langwatch-sdk-python": "python",
-};
+const SDK_LANGUAGE_BY_AGENT = new Map<string, string>([
+  ["langwatch-sdk-node", "typescript"],
+  ["langwatch-sdk-go", "go"],
+  ["langwatch-sdk-python", "python"],
+  ["langwatch-typescript", "typescript"],
+  ["langwatch-python", "python"],
+]);
+
+const INTERNAL_SERVICE_AGENT = "langwatch-aigateway";
 
 const present = (value: string | null | undefined): string | undefined =>
   value ? value : undefined;
@@ -118,7 +123,9 @@ const present = (value: string | null | undefined): string | undefined =>
  * recognised by the identity headers they send (`x-langwatch-sdk-*`,
  * `x-langwatch-surface`); everything else falls back to User-Agent
  * heuristics. The bare `x-langwatch-sdk-version` branch keeps older Python
- * SDKs — which sent only that header — counted as SDK traffic.
+ * SDKs — which sent only that header — counted as SDK traffic. A caller
+ * identified as one of our own internal services (the AI gateway) is
+ * classified "internal" rather than "sdk", "http-client" or "unknown".
  */
 export function classifyClient(
   header: (name: string) => string | null | undefined,
@@ -141,11 +148,12 @@ export function classifyClient(
     if (sdkName) return { clientSource: "sdk", ...identity };
 
     const [agentName, agentVersion] = userAgent.split("/", 2);
-    if (agentName && agentName in SDK_LANGUAGE_BY_AGENT) {
+    const agentLanguage = agentName ? SDK_LANGUAGE_BY_AGENT.get(agentName) : undefined;
+    if (agentLanguage) {
       return {
         clientSource: "sdk",
         clientSdkName: agentName,
-        clientSdkLanguage: SDK_LANGUAGE_BY_AGENT[agentName] as string,
+        clientSdkLanguage: agentLanguage,
         ...(agentVersion ? { clientSdkVersion: agentVersion } : {}),
         ...identity,
       };
@@ -153,6 +161,14 @@ export function classifyClient(
     if (agentName === "langwatch-mcp") {
       return {
         clientSource: "mcp",
+        ...(agentVersion ? { clientSdkVersion: agentVersion } : {}),
+        ...identity,
+      };
+    }
+    if (agentName === INTERNAL_SERVICE_AGENT) {
+      return {
+        clientSource: "internal",
+        clientSdkName: agentName,
         ...(agentVersion ? { clientSdkVersion: agentVersion } : {}),
         ...identity,
       };

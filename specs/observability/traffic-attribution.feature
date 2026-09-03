@@ -9,8 +9,9 @@ Feature: Traffic attribution on request logs
     (collector, OTLP, browser telemetry), the dashboard's own calls, the
     public REST API, MCP, Langy, the AI gateway
   - the client source: what kind of caller made the request - one of our
-    SDKs (with name, language and version), the CLI, MCP, a browser, curl,
-    a generic OpenTelemetry exporter, some other HTTP client, or unknown
+    SDKs (with name, language and version), the CLI, MCP, one of our own
+    internal services, a browser, curl, a generic OpenTelemetry exporter,
+    some other HTTP client, or unknown
 
   Our SDKs have identified themselves on every request for a long time; the
   platform used to discard those headers. The one SDK that sent only a bare
@@ -72,6 +73,25 @@ Feature: Traffic attribution on request logs
     When the request is classified
     Then the client source is unknown
 
+  @unit
+  Scenario: A request from the coding-agent tracking client is attributed to the SDK
+    Given a request from the CLI's coding-agent usage tracking client
+    When the request is classified
+    Then the client source is the SDK
+    And the SDK name, language and version are carried alongside
+
+  @unit
+  Scenario: A request from an internal LangWatch service is attributed as internal
+    Given a request from one of our own internal services
+    When the request is classified
+    Then the client source is internal
+
+  @unit
+  Scenario: A user agent that only looks like a known name does not match
+    Given a request whose user agent is not one we recognise
+    When the request is classified
+    Then the client source is unknown
+
   # ---------------------------------------------------------------------------
   # Endpoint class
   # ---------------------------------------------------------------------------
@@ -122,3 +142,8 @@ Feature: Traffic attribution on request logs
   Scenario: The MCP server identifies itself on every request
     When the MCP server calls the LangWatch API
     Then the request names the MCP server and its version
+
+  @unit
+  Scenario: The CLI declares itself on every request
+    When the CLI calls the LangWatch API
+    Then the request declares the CLI surface alongside the SDK identity

@@ -11,7 +11,7 @@ import { StringDecoder } from "node:string_decoder";
 
 import chalk from "chalk";
 
-import { runWithCredentialHolder } from "@/internal/credentialContext";
+import { runWithCliCredentialHolder } from "@/internal/credentialContext";
 import { AGENT_MODE_ENV_VARS } from "../utils/output";
 import { currentOutputScope, withOutputScope } from "../utils/errorOutput";
 
@@ -167,9 +167,11 @@ export function withExecutionContext<T>(
   // A fresh credential holder per request: the resolver fills it later and the
   // request's own services read it, so a resolved device-session key never
   // reaches the shared env where a concurrent request could pick it up
-  // (internal/credentialContext.ts).
+  // (internal/credentialContext.ts). The "Cli" variant also marks the
+  // holder's surface, so every request this daemon-served command makes
+  // through createLangWatchApiClient carries the CLI surface header.
   return storage.run(context, () =>
-    withOutputScope(() => runWithCredentialHolder(fn)),
+    withOutputScope(() => runWithCliCredentialHolder(fn)),
   );
 }
 
