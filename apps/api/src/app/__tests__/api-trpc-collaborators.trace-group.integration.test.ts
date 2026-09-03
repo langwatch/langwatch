@@ -822,7 +822,12 @@ describe("given an API process that composed the real observability collaborator
       usage: composeApiUsageStats({
         prisma,
         plans,
-        resolveClickHouseClient: clickHouse.resolveClient,
+        // Both routings, as the process publishes them: the trace rollup is
+        // keyed by project and the billable-events rollup by organization.
+        clickhouse: {
+          resolveClient: clickHouse.resolveClient,
+          resolveOrganizationClient: clickHouse.resolveClient,
+        },
         processName: "langwatch-api",
       }),
       plans,

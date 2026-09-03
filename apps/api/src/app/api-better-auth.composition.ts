@@ -14,6 +14,7 @@ import {
 } from "@langwatch/auth-server";
 import type { AuthzGrantsService } from "@langwatch/authz-contract";
 import type { RoutingDecision, SignInMethodPolicy } from "@langwatch/identity-contract";
+import { sendResetPasswordEmail } from "@langwatch/mail";
 import { resolveSignInMethodPolicy } from "@langwatch/identity-server";
 import type { Logger } from "@langwatch/observability";
 import type { PrismaClient } from "@langwatch/prisma-client/generated";
@@ -21,6 +22,7 @@ import type { RedisConnection } from "@langwatch/redis-client";
 import type { UserService } from "@langwatch/user-contract";
 import { prismaAdapter } from "better-auth/adapters/prisma";
 import type { ApiBrowserSessionConfig } from "../platform/config/api.config";
+import type { ApiMailComposition } from "./api-mail.composition";
 
 /**
  * This process's own Better Auth instance — the deployment's ONE identity
@@ -268,38 +270,75 @@ export class OffApiSignInRouterShadow extends SignInRouterShadowPort {
 /**
  * Sends the password-reset link.
  *
- * A PORT, but NOT for the reason first recorded here. `@langwatch/mail` is the
- * one allowed terminal in `frontend-boundary.unit.test.ts` — the walk stops on
- * entry, and `worker-mail.composition.ts` value-imports it from a real backend
- * root — so reaching `sendResetPasswordEmail` would break no boundary, and
- * `apps/api` already declares the dependency.
+ * A PORT because Better Auth hands this composition a token and an address and
+ * nothing else: the LINK is the deployment's, assembled from the host this
+ * process was configured with, and the gateway it leaves through is the
+ * process's too. Keeping both on this side of the port is what stops a
+ * template from reaching for an environment variable of its own — the rule
+ * `@langwatch/mail` states in its own header, that a message carrying a link
+ * takes the link rather than building one.
  *
- * What is actually missing is below the template: this process parses no mailer
- * configuration and composes no `EmailDeliveryPort`, which is what
- * `sendResetPasswordEmail` takes. The port stays because the process states
- * what it wants said and to whom, and the tier that owns the gateway renders
- * it; the shape to copy when one is composed here is
- * `apps/worker/src/app/worker-mail.composition.ts`.
+ * The React boundary is NOT what kept this unimplemented, and the note that
+ * said so was wrong. `@langwatch/mail` is the one allowed terminal in
+ * `frontend-boundary.unit.test.ts` — the walk stops on entry, and both process
+ * roots value-import it. What was missing was underneath: a mailer
+ * configuration and an `EmailDeliveryPort`. Both exist now
+ * ({@link ApiComposedPasswordResetMail}, `api-mail.composition.ts`).
  */
 export abstract class ApiPasswordResetMailPort {
   abstract sendResetPassword(input: { email: string; token: string }): Promise<void>;
 }
 
 /**
- * Password-reset mail, absent.
+ * Password-reset mail, over this process's own gateway.
  *
- * REFUSES rather than resolving quietly. A reset request that reports success
- * and sends nothing leaves the person waiting on an inbox for a link that was
- * never minted, which is worse than being told the door is shut.
+ * The reset URL is built here rather than in the template, at the platform
+ * application's exact shape — `<baseHost>/auth/reset-password?token=…` — so the
+ * link a person clicks out of their inbox is the same address the browser
+ * application already routes. The token is URL-encoded because it travels as a
+ * query parameter and Better Auth does not encode it.
  */
-export class UnavailableApiPasswordResetMail extends ApiPasswordResetMailPort {
-  static create(): UnavailableApiPasswordResetMail {
-    return new UnavailableApiPasswordResetMail();
+export class ApiComposedPasswordResetMail extends ApiPasswordResetMailPort {
+  static create(mail: ApiMailComposition): ApiComposedPasswordResetMail {
+    return new ApiComposedPasswordResetMail(mail);
+  }
+
+  private constructor(private readonly mail: ApiMailComposition) {
+    super();
+  }
+
+  async sendResetPassword(input: { email: string; token: string }): Promise<void> {
+    await sendResetPasswordEmail({
+      mailer: this.mail.delivery,
+      email: input.email,
+      resetUrl: `${this.mail.baseHost}/auth/reset-password?token=${encodeURIComponent(input.token)}`,
+    });
+  }
+}
+
+/**
+ * Password-reset mail on a deployment that configured none.
+ *
+ * No longer a gap in this process — {@link ApiComposedPasswordResetMail} is
+ * what a configured deployment gets. This is the DEGENERATE configuration:
+ * `resolveApiMailConfig` answers nothing without a `BASE_HOST`, and
+ * `sendResetPassword` is not optional on the transport, so something has to
+ * answer.
+ *
+ * It REFUSES rather than resolving quietly. A reset request that reports
+ * success and sends nothing leaves the person waiting on an inbox for a link
+ * that was never minted, which is worse than being told the door is shut.
+ */
+export class UnconfiguredApiPasswordResetMail extends ApiPasswordResetMailPort {
+  static create(): UnconfiguredApiPasswordResetMail {
+    return new UnconfiguredApiPasswordResetMail();
   }
 
   sendResetPassword(): Promise<void> {
     return Promise.reject(
-      new Error("This process composes no mail gateway, so it cannot send a password-reset link"),
+      new Error(
+        "This deployment named no BASE_HOST, so it composes no mail gateway and cannot send a password-reset link",
+      ),
     );
   }
 }
@@ -417,7 +456,7 @@ export function composeApiBetterAuth(options: ApiBetterAuthCompositionOptions) {
     authzGrants: options.authzGrants ?? UnavailableApiBetterAuthGrants.create(),
     signUpVerification: options.signUpVerification ?? AbsentApiSignUpVerification.create(logger),
     sendResetPassword: (input) =>
-      (options.mail ?? UnavailableApiPasswordResetMail.create()).sendResetPassword(input),
+      (options.mail ?? UnconfiguredApiPasswordResetMail.create()).sendResetPassword(input),
   });
 }
 

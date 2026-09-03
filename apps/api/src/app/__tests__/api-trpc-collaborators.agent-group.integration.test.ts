@@ -368,11 +368,33 @@ function producerEventing() {
   return { eventSourcing, storedEvents };
 }
 
+/**
+ * The install's shared ClickHouse endpoint, as the event-log explorer reaches
+ * it: one `query` call, and the SQL it was handed recorded so the test can say
+ * which table the composed repository read.
+ */
+type FakeEventLogClient = {
+  asked: string[];
+  query: (params: { query: string }) => Promise<{ json(): Promise<unknown> }>;
+};
+
+function eventLogClient(rows: unknown[]): FakeEventLogClient {
+  const asked: string[] = [];
+  return {
+    asked,
+    query: async ({ query }) => {
+      asked.push(query);
+      return { json: async () => rows };
+    },
+  };
+}
+
 function composeApplication(
   options: {
     langyEnabled?: boolean;
     adminEmails?: readonly string[];
     eventing?: EventSourcing;
+    eventLogClient?: FakeEventLogClient;
   } = {},
 ) {
   const prisma = testPrisma();
@@ -412,6 +434,10 @@ function composeApplication(
     // No ClickHouse and no Redis, which is a real deployment shape: the run
     // reader answers the empty set and the live turn buffer is absent.
     resolveClickHouseClient: null,
+    // The operator's event log is the one read here that is nobody's tenant,
+    // so it takes the install's shared endpoint rather than the resolver
+    // above. Absent by default: the explorer then refuses by name.
+    eventLogClient: (options.eventLogClient ?? null) as never,
     redis: null,
     // The four verticals a scenario RUN is prepared against, and the three
     // deployment facts its child is booted with. Doubles at the PORTS: what
@@ -895,6 +921,49 @@ describe("given the API process composed the agent-group half from its own graph
       // scheduled nothing; a refusal was not.
       expect(status).toBe(200);
       expect(JSON.stringify(body)).not.toContain("scheduled-job store");
+    });
+
+    /** @scenario "The operator searches the event log through the composed explorer" */
+    it("searches the event log rather than refusing it by name", async () => {
+      const client = eventLogClient([
+        {
+          aggregateId: "conversation-42",
+          aggregateType: "langy-conversation",
+          tenantId: PROJECT_ID,
+          eventCount: "7",
+          lastEventTime: "1756800000000",
+        },
+      ]);
+      const { application } = composeApplication({ eventLogClient: client });
+
+      const { status, body } = await callTrpc(application, "ops.searchAggregates", {
+        query: "conversation-42",
+      });
+
+      expect(status).toBe(200);
+      // The composed repository's own read, on the shared endpoint: before it
+      // was composed, every method of the explorer refused by name.
+      expect(client.asked).toHaveLength(1);
+      expect(client.asked[0]).toContain("FROM event_log");
+      expect(JSON.stringify(body)).toContain("conversation-42");
+      expect(JSON.stringify(body)).not.toContain("the event-log explorer");
+    });
+
+    /** @scenario "An install with no shared endpoint refuses the search by name" */
+    it("names the event-log explorer when this deployment has no shared endpoint", async () => {
+      const { application } = composeApplication();
+
+      const { status, body } = await callTrpc(application, "ops.searchAggregates", {
+        query: "conversation-42",
+      });
+
+      // A deployment holding only private routes has no install-wide event log
+      // to search, and refusing beats answering the empty set, which would read
+      // as "this install has recorded nothing". The capability NAME reaches the
+      // log rather than the wire — tRPC replaces a handled message with its
+      // code slug — so what is observable here is the refusal itself.
+      expect(status).toBeGreaterThanOrEqual(400);
+      expect(JSON.stringify(body)).toContain("service_unavailable");
     });
 
     it("keeps a caller who is not on the allow-list out of the operator surface", async () => {

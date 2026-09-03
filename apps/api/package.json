@@ -113,6 +113,7 @@
     "@langwatch/model-provider-server": "workspace:*",
     "@langwatch/monitor-contract": "workspace:*",
     "@langwatch/monitor-server": "workspace:*",
+    "@langwatch/notification-server": "workspace:*",
     "@langwatch/observability": "workspace:*",
     "@langwatch/ops-server": "workspace:*",
     "@langwatch/organization-contract": "workspace:*",

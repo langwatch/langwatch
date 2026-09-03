@@ -207,6 +207,46 @@ export class ApiClickHouseInfrastructure {
     this.connection.resolve(tenantId);
 
   /**
+   * One ORGANIZATION's endpoint, keyed by the organization itself.
+   *
+   * A second closure rather than a widening of the one above, because the two
+   * take different ids and one of them is not a tenant: the billable-events
+   * rollup is scoped by `OrganizationId` — an organization's events span every
+   * project it owns — and there is no project to route on. Handing that id to
+   * the tenant resolver does not mis-route, it simply cannot answer: the
+   * directory behind it looks a PROJECT row up and an organization id has
+   * none, so the router raises `UnknownTenantError`.
+   *
+   * The routing itself is the same table the tenant resolver lands on — a
+   * private route for this organization, and otherwise the shared endpoint —
+   * so this opens no second connection pool. It is not a way to reach another
+   * organization's rows: the id names the organization whose endpoint is
+   * returned.
+   */
+  readonly resolveOrganizationClient = async (organizationId: string): Promise<ClickHouseClient> =>
+    this.connection.resolveOrganization(organizationId);
+
+  /**
+   * The install's own shared endpoint, or none when this deployment has only
+   * private routes.
+   *
+   * The third and last question, and the only one that is nobody's tenant: the
+   * operator's event-log explorer reads `event_log` ACROSS tenants, so it has
+   * neither a project nor an organization to route on. Null rather than a
+   * throw, because "this deployment has no shared endpoint" is a composition
+   * fact the caller acts on — it composes the explorer or it names its
+   * absence — rather than an error at the first query.
+   */
+  readonly resolveSharedClient = (): ClickHouseClient | null => {
+    try {
+      return this.connection.shared();
+    } catch (error) {
+      if (error instanceof ClickHouseNotConfiguredError) return null;
+      throw error;
+    }
+  };
+
+  /**
    * Whether a query issued now would reach an endpoint.
    *
    * Reported rather than assumed: the connection exists as soon as one route
@@ -214,13 +254,7 @@ export class ApiClickHouseInfrastructure {
    * tenant that maps to none.
    */
   get sharedEndpointConfigured(): boolean {
-    try {
-      this.connection.shared();
-      return true;
-    } catch (error) {
-      if (error instanceof ClickHouseNotConfiguredError) return false;
-      throw error;
-    }
+    return this.resolveSharedClient() !== null;
   }
 
   close(): Promise<void> {

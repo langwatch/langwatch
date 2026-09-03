@@ -607,4 +607,78 @@ describe("API process configuration", () => {
       expect(config.observability.apiKey).toBeUndefined();
     });
   });
+
+  /**
+   * The outbound mail gateway, resolved the way the worker resolves its own.
+   *
+   * `BASE_HOST` is what makes the whole leaf resolvable, and it is bound ONCE
+   * — as `infrastructure.execution.publicBaseUrl` — so what is pinned here is
+   * that the mail leaf reads it from there rather than binding a second copy
+   * that could answer differently.
+   */
+  describe("the outbound mail gateway", () => {
+    describe("given a deployment that named no BASE_HOST", () => {
+      it("resolves no mail at all, even with a provider credential set", () => {
+        const config = resolveApiConfig({ SENDGRID_API_KEY: "sg-key" });
+
+        expect(config.mail).toBeUndefined();
+      });
+    });
+
+    describe("given a deployment that named a BASE_HOST", () => {
+      it("takes the host from the one variable the rest of the process reads", () => {
+        const config = resolveApiConfig({ BASE_HOST: "https://app.example.test" });
+
+        expect(config.mail?.baseHost).toBe("https://app.example.test");
+        expect(config.infrastructure.execution.publicBaseUrl).toBe("https://app.example.test");
+      });
+
+      it("derives the sender from the host when the deployment named none", () => {
+        const config = resolveApiConfig({ BASE_HOST: "https://app.example.test" });
+
+        expect(config.mail?.mailer.defaultFrom).toContain("app.example.test");
+      });
+
+      it("keeps the sender the deployment named", () => {
+        const config = resolveApiConfig({
+          BASE_HOST: "https://app.example.test",
+          EMAIL_DEFAULT_FROM: "LangWatch <no-reply@acme.test>",
+        });
+
+        expect(config.mail?.mailer.defaultFrom).toBe("LangWatch <no-reply@acme.test>");
+      });
+
+      it("carries every gateway credential the four transports are selected on", () => {
+        const config = resolveApiConfig({
+          BASE_HOST: "https://app.example.test",
+          EMAIL_PROVIDER: "smtp",
+          SMTP_HOST: "smtp.acme.test",
+          SMTP_PORT: "587",
+          SMTP_USER: "mailer",
+          SMTP_PASSWORD: "smtp-secret",
+          SENDGRID_API_KEY: "sg-key",
+          RESEND_API_KEY: "re-key",
+        });
+
+        expect(config.mail?.mailer).toMatchObject({
+          provider: "smtp",
+          smtp: { host: "smtp.acme.test", port: "587", user: "mailer", password: "smtp-secret" },
+          sendgrid: { apiKey: "sg-key" },
+          resend: { apiKey: "re-key" },
+        });
+      });
+
+      it("reads USE_AWS_SES by presence, as every deployment already sets it", () => {
+        // Not a boolean. `USE_AWS_SES=false` selects SES on the platform
+        // application and on the worker, and one process disagreeing would
+        // send the same deployment's mail through two different gateways.
+        const config = resolveApiConfig({
+          BASE_HOST: "https://app.example.test",
+          USE_AWS_SES: "false",
+        });
+
+        expect(config.mail?.mailer.ses.enabled).toBe(true);
+      });
+    });
+  });
 });

@@ -25,6 +25,7 @@ import {
   type ProcessObservabilityOptions,
 } from "@langwatch/observability/node";
 import { resolveGroupQueuePolicyFromEnv, type GroupQueuePolicy } from "@langwatch/group-queue";
+import { EmailProviderService, type MailerConfiguration } from "@langwatch/notification-server";
 import { resolveFeatureFlagConfig, type FeatureFlagConfig } from "@langwatch/feature-flag-contract";
 import { getLatestOpenAIChatFlagship } from "@langwatch/model-provider-contract";
 import { RedisConfigService, type RedisConfigResolution } from "@langwatch/redis-client";
@@ -388,6 +389,51 @@ export const apiConfigDefinition = RuntimeConfig.define({
     passkeyHandleSecret: Config.value(optionalEnvironmentString, {
       env: "PASSKEY_HANDLE_SECRET",
     }),
+  },
+  /**
+   * The one outbound mail gateway this process sends through.
+   *
+   * Every variable is the deployment's own spelling, which is the background
+   * process's too (`apps/worker/src/platform/config/worker.config.ts`): a
+   * password-reset link leaving the interactive process from a different
+   * sender domain than the settlement digest leaving the worker would fail one
+   * SPF policy and pass the other, and the half that failed is the half nobody
+   * is watching.
+   *
+   * `BASE_HOST` is deliberately NOT bound here. This module refuses to bind
+   * one variable twice, and it is already
+   * `infrastructure.execution.publicBaseUrl`; the mail resolution below reads
+   * it from there, so one variable cannot resolve to two hosts.
+   *
+   * The gateway settings themselves stay optional. A deployment with no email
+   * provider configured is an ordinary self-hosted install: it composes,
+   * serves every route, and fails at the moment of a send.
+   */
+  mail: {
+    defaultFrom: Config.value(optionalEnvironmentString, { env: "EMAIL_DEFAULT_FROM" }),
+    provider: Config.value(optionalEnvironmentString, { env: "EMAIL_PROVIDER" }),
+    ses: {
+      // Presence-based, exactly as the worker and the platform app read it:
+      // existing deployments treat USE_AWS_SES=false as enabled, and changing
+      // that would select a different gateway in one process and not the other.
+      enabled: Config.value(optionalEnvironmentString, { env: "USE_AWS_SES" }),
+      region: Config.value(optionalEnvironmentString, { env: "AWS_REGION" }),
+      endpoint: Config.value(optionalEnvironmentString, { env: "AWS_SES_ENDPOINT" }),
+    },
+    sendgrid: {
+      apiKey: Config.secret({ optional: true, env: "SENDGRID_API_KEY" }),
+    },
+    smtp: {
+      url: Config.secret({ optional: true, env: "SMTP_URL" }),
+      host: Config.value(optionalEnvironmentString, { env: "SMTP_HOST" }),
+      port: Config.value(optionalEnvironmentString, { env: "SMTP_PORT" }),
+      user: Config.value(optionalEnvironmentString, { env: "SMTP_USER" }),
+      password: Config.secret({ optional: true, env: "SMTP_PASSWORD" }),
+      secure: Config.value(optionalEnvironmentString, { env: "SMTP_SECURE" }),
+    },
+    resend: {
+      apiKey: Config.secret({ optional: true, env: "RESEND_API_KEY" }),
+    },
   },
   infrastructure: {
     /**
@@ -867,11 +913,27 @@ export type ApiShutdownConfig = Readonly<{
   processDeadlineMs: number;
 }>;
 
+/**
+ * Everything one process needs to send mail, or nothing at all.
+ *
+ * `baseHost` rides alongside the gateway configuration rather than inside it
+ * because the two answer different questions: the gateway decides how a
+ * message leaves, the host decides what the message can link to. A
+ * password-reset mail needs both — the link a person clicks is built from the
+ * host — and neither is derivable from the other.
+ */
+export type ApiMailConfig = Readonly<{
+  baseHost: string;
+  mailer: MailerConfiguration;
+}>;
+
 export type ApiConfig = Readonly<
-  Omit<ApiConfigProjection, "authz" | "browserSession" | "infrastructure" | "shutdown"> & {
+  Omit<ApiConfigProjection, "authz" | "browserSession" | "infrastructure" | "mail" | "shutdown"> & {
     authz: ApiAuthzConfig;
     /** The deployment's one browser-session identity, or nothing. */
     browserSession: ApiBrowserSessionConfig | undefined;
+    /** Absent when the deployment named no `BASE_HOST`; see `resolveApiMailConfig`. */
+    mail?: ApiMailConfig;
     /**
      * This deployment's rollout switches, as every LangWatch tier reads them.
      *
@@ -909,8 +971,14 @@ export function resolveApiConfig(source: Readonly<Record<string, unknown>>): Api
     },
   }).value;
   refuseApiSelfIngest(value);
+  // Destructured out of the spread rather than overwritten: the projection's
+  // `mail` is the raw environment, and leaving it in place would put an
+  // unresolved gateway on a deployment that named no `BASE_HOST`.
+  const { mail: mailSource, ...rest } = value;
+  const mail = resolveApiMailConfig(mailSource, value.infrastructure.execution.publicBaseUrl);
   return {
-    ...value,
+    ...rest,
+    ...(mail ? { mail } : {}),
     featureFlags: resolveFeatureFlagConfig(source),
     otlpMetrics: otlpMetricsExportOptionsFrom({
       telemetry: resolveTelemetryConfiguration(source),
@@ -1044,6 +1112,51 @@ function refuseApiSelfIngest(value: ApiConfigProjection): void {
       { env: "API_HOST/API_PORT", value: value.host, port: value.port },
     ],
   });
+}
+
+/**
+ * The mail configuration, or nothing.
+ *
+ * Nothing exactly when `BASE_HOST` is absent or blank, which is the same rule
+ * the background process applies (`resolveWorkerMailConfig`). It is the one
+ * variable the whole capability rests on — the sender address is derived from
+ * it and the reset link a person clicks is built from it — so a half-filled
+ * value would mint a link pointing at a host that is not the deployment's.
+ * What an absent capability costs is decided by the graph that would have
+ * consumed it, not here.
+ */
+function resolveApiMailConfig(
+  mail: ApiConfigProjection["mail"],
+  publicBaseUrl: string | undefined,
+): ApiMailConfig | undefined {
+  const baseHost = publicBaseUrl?.trim();
+  if (!baseHost) return undefined;
+
+  return {
+    baseHost,
+    mailer: {
+      defaultFrom: EmailProviderService.resolveDefaultFrom({
+        emailDefaultFrom: mail.defaultFrom,
+        baseHost,
+      }),
+      provider: mail.provider,
+      ses: {
+        enabled: Boolean(mail.ses.enabled),
+        region: mail.ses.region,
+        endpoint: mail.ses.endpoint,
+      },
+      sendgrid: { apiKey: mail.sendgrid.apiKey },
+      smtp: {
+        url: mail.smtp.url,
+        host: mail.smtp.host,
+        port: mail.smtp.port,
+        user: mail.smtp.user,
+        password: mail.smtp.password,
+        secure: mail.smtp.secure,
+      },
+      resend: { apiKey: mail.resend.apiKey },
+    },
+  };
 }
 
 /**

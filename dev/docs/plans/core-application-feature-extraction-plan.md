@@ -12936,8 +12936,8 @@ surface's. Six absences that read as stale are that, and they stay.
 | `absent("no-encryption")` | **STALE, kept** | `resolveTenancy` composes nothing without the same `encryption` local, so a composed tenancy is proof the cipher exists | **KEPT**: the branch is the NARROWING for a non-optional input; removing it fails `tsc`, and a silent `return undefined` would drop the gateway with no line saying why. Doc corrected |
 | `absent("plan-allowance")` | **REAL GAP** | "composes no usage meter" is half stale — the plan provider IS held, by eight readers | **MESSAGE CORRECTED**: `UsageOrganizationPort` and `UsageVolumeCounterPort` have no implementation in any tier, so `UsageService` is composed by nobody |
 | `withoutExecutionTelemetry` | **REAL GAP** | "no metrics registry" is wrong: `EvaluationExecutionTelemetryPort` takes no registry, only `record(...)` | **MESSAGE CORRECTED**: nothing in the tree implements the port. Template: `OtelPiiAnalysisMetricsAdapter` |
-| `absent("usage-mail")` | **REAL GAP** | "needs a Notification vertical" is stale — it exists, as do `UsageLimitService` and `UsageWarningService` | **MESSAGE CORRECTED**: the only `UsageLimitEmailAdapter` is the Null one, and this process parses no mailer config |
-| `UnavailableApiPasswordResetMail` | **REAL GAP** | The React-boundary reason is false: `@langwatch/mail` is the ONE allowed terminal in `frontend-boundary.unit.test.ts`, and `apps/api` already declares the dependency | **MESSAGE CORRECTED**: missing is a mailer config block and an `EmailDeliveryPort`. Shape: `worker-mail.composition.ts` |
+| `absent("usage-mail")` | **REAL GAP** | "needs a Notification vertical" is stale — it exists, as do `UsageLimitService` and `UsageWarningService` | **CLOSED** by "The two mail absences" below: `ApiUsageLimitEmailAdapter` is a real `UsageLimitEmailAdapter`, this process parses a mailer config, and `checkAndSendWarning` sends. The absence now fires only on a deployment that named no `BASE_HOST` |
+| `UnavailableApiPasswordResetMail` | **REAL GAP** | The React-boundary reason is false: `@langwatch/mail` is the ONE allowed terminal in `frontend-boundary.unit.test.ts`, and `apps/api` already declares the dependency | **CLOSED** by "The two mail absences" below: `ApiComposedPasswordResetMail` sends through `api-mail.composition.ts`. The class survives as `UnconfiguredApiPasswordResetMail`, a degenerate-configuration guard, because `sendResetPassword` is not optional on the transport |
 | `absent("events-meter")` | **REAL GAP** | "reads one tenant's rows on another's endpoint" is false — the directory answers a project id, so an organization id raises `UnknownTenantError` rather than mis-routing | **MESSAGE CORRECTED**: `ClickHouseConnection.resolveOrganization` exists; missing is an organization-keyed accessor on `ApiClickHouseInfrastructure` |
 | `withoutDurableAppend` | **REAL GAP** | Unconditional on the queue-PRESENT branch, so it fires on every production boot; `JoinRequestLedgerWriter.commit` awaits `storeEvents` on `EventStoreProducerOnly`, which rejects | Kept — the message already names it. `api.config.ts` has no `retention` leaf, which is the second blocker |
 | `withoutRateLimit` ("no public REST rate limiter") | **REAL GAP** | True at the framework port: `createRestService` is called once and passes no `rateLimiter`. The substrate exists (`ApiRateLimitInfrastructure`, ~12 consumers) but the shapes differ | Kept. **This claim has no ledger record at all** — it lived only in code |
@@ -14786,3 +14786,480 @@ current behaviour as a characterization test that names the reason.
 - **No worker change.** The consumer side was already unconditional.
 - **The protocol door still forwards no connection.** That is a write-authority
   decision with its own `@unimplemented` scenarios, not a wiring gap.
+
+## The API's two ClickHouse absences: one connection, two accessors it never published, 2026-09-03
+
+`events-meter` and the operator's event-log explorer were recorded as two
+absences waiting on "a ClickHouse accessor". The ledger's own note said they
+waited on the same one. They did not: they wait on two DIFFERENT accessors,
+and the connection this process opened has always been able to answer both.
+
+### What each actually needed
+
+The billable-events rollup is scoped by **organization**. An organization's
+events span every project it owns, so there is no project to route on, and
+`BillableEventsClickHouseRepository.findTotalUniq` asks its
+`resolveOrganizationClient` for the client by the ORGANIZATION id. Handing that
+id to the tenant resolver does not mis-route — the directory behind it looks a
+project row up, finds none, and raises `UnknownTenantError` — it simply cannot
+answer. The primitive was two lines away: `ClickHouseConnection.resolveOrganization`,
+which reads the private-route table directly and falls back to the shared
+endpoint, with no directory lookup at all.
+
+The operator's event-log explorer is the opposite shape. `EventExplorerClickHouseRepository`
+takes ONE client because its three reads are cross-tenant by design — which
+aggregates exist, which match this string, what happened to this one — so it
+needs the install's own **shared** endpoint, `ClickHouseConnection.shared()`.
+There is no id to route on until the operator has already found the aggregate.
+
+Both are questions of the SAME connection and the same physical endpoints. What
+was missing was two closures beside `resolveClient`, in exactly the shape the
+worker took for its spend settlement sweep (`resolveInstances`, 97fd817658):
+a bound closure per question, so a caller still cannot reach `shared()` and read
+one organization's rows on another's endpoint.
+
+```
+BEFORE                                        AFTER
+
+ApiClickHouseInfrastructure                   ApiClickHouseInfrastructure
+  └─ resolveClient(tenantId)                    ├─ resolveClient(tenantId)
+                                                ├─ resolveOrganizationClient(orgId)
+                                                └─ resolveSharedClient() | null
+        │                                             │        │        │
+        ▼                                             ▼        ▼        ▼
+  trace_summaries                               trace_    billable_   event_log
+  (by project)                                  summaries  events     (cross-tenant)
+                                                (project)  (org)
+
+  billable_events  ──► resolveOrganizationClient          usage panel, events unit
+    └─ () => Promise.reject(                        ──►   a NUMBER
+         OrganizationRoutedReadUnavailable)
+    └─ unit === "events" ⇒ USAGE_UNKNOWN               operator event-log explorer
+                                                  ──►   searches event_log
+  eventExplorer  ──► Proxy: every method rejects        (refuses only where a
+    "the event-log explorer"                             deployment has no
+                                                         shared endpoint)
+```
+
+### The half-composed state was the real hazard, so it is now unrepresentable
+
+Threading the second accessor as a second nullable option looked harmless and
+was not. `UsageStatsService` issues its seven readings in one `Promise.all`, so
+a caller holding the tenant resolver and not the organization one turns ONE
+withheld figure into a blank panel: the member counts, the plan and the spend go
+with it. `api-trpc-collaborators.trace-group.integration.test.ts` found it
+immediately — its "real reading taken against a real plan" went 200 → 500.
+
+The two accessors are one object. They are published by the same
+`ApiClickHouseInfrastructure` and no deployment holds one without the other, so
+they now arrive as ONE option:
+
+```
+BEFORE                                        AFTER
+
+ApiUsageStatsOptions                          ApiUsageStatsOptions
+  resolveClickHouseClient        | null         clickhouse: {
+  resolveOrganizationClickHouse… | null           resolveClient
+                                                  resolveOrganizationClient
+  ⇒ 4 states, 1 of them a 500                   } | null
+
+                                                ⇒ 2 states, both answerable
+```
+
+`ClickHouseBillingAdapter.create` takes exactly that pair, so the option is
+handed straight through and there is nothing left in this root to get the wrong
+way round. `ApiOrganizationRoutedReadUnavailableError` was deleted with the
+state it described.
+
+### The fleet explorer: left as it is, deliberately
+
+`ManagerExplorerService`, `PrismaProcessStore` and `ProcessOpsPrismaRepository`
+all exist and this process holds a database, so the fleet explorer is composable
+today. It is not composed, and this pass did not decide it: a PRODUCER-ONLY
+process runs none of the machines the fleet table lists — every row would be the
+worker's — and whether the operator should read that table from a process that
+does not run it is a product decision, not a wiring gap. The comment now says
+that rather than implying a missing collaborator.
+
+The replay runner stays the one genuine absence in that trio: `OpsReplayRuntimePort`
+has no implementation anywhere in the tree, so `ReplayService` cannot be
+constructed at all.
+
+### File → change
+
+| File | Change |
+| --- | --- |
+| `apps/api/src/platform/infrastructure/api-clickhouse.infrastructure.ts` | `resolveOrganizationClient` (organization-keyed, no directory lookup) and `resolveSharedClient` (null rather than a throw when a deployment has only private routes). `sharedEndpointConfigured` now reads through the latter instead of carrying its own try/catch |
+| `apps/api/src/app/api-usage.composition.ts` | `ApiUsageClickHouse` — the two routings as one option; the events branch reads `tryQueryBillableEventsTotalUniq`; the `events-meter` absence, its consequence string and `ApiOrganizationRoutedReadUnavailableError` deleted; module docblock rewritten from "what it cannot resolve" to what it now does |
+| `apps/api/src/app/api-trpc-collaborators.agent-group.composition.ts` | `composeEventExplorer` — `EventExplorerService` over `EventExplorerClickHouseRepository` and `EventingOpsIntrospectionAdapter` reading this process's own registered definitions, refusing by name only where there is no shared endpoint; new `eventLogClient` option; the `operator-runtime` consequence and the `unavailableOperatorRuntime` docblock corrected to the two that are left |
+| `apps/api/src/app/api-production.composition.ts` | both accessors threaded: `clickhouse: { resolveClient, resolveOrganizationClient }` to the usage reading, `eventLogClient: resolveSharedClient()` to the agent group |
+| `apps/api/src/platform/infrastructure/__tests__/api-clickhouse.infrastructure.unit.test.ts` | NEW. 6 tests over the real connection with only the vendor driver mocked: the organization arm routes without a directory lookup (the double throws if consulted), falls back to shared, the tenant arm is unchanged, one driver per endpoint across all three accessors, and a private-routes-only install answers null |
+| `apps/api/src/app/__tests__/api-usage.composition.unit.test.ts` | 4 tests through the real `UsageStatsService` + `BillableEventsQueryService`: an events-metered organization reads a number, the organization id reaches only the organization accessor, the SQL is `billable_events` by `OrganizationId`, and a process with no ClickHouse reads unknown rather than zero |
+| `apps/api/src/app/__tests__/api-trpc-collaborators.agent-group.integration.test.ts` | 2 tests over the real `/api/trpc` handler: `ops.searchAggregates` reads `event_log` and returns the match; with no shared endpoint it refuses |
+| `apps/api/src/app/__tests__/api-trpc-collaborators.trace-group.integration.test.ts` | one line: the real reading now composes both routings |
+| `specs/server/api-process-clickhouse-accessors.feature` | NEW. 11 scenarios, all bound |
+
+### Gates
+
+- `apps/api`: `vitest run src/app src/platform/infrastructure` — **53 files /
+  547 tests passing**; `tsc --noEmit` — **0 errors**.
+- `tsc --noEmit -p tsconfig.test.json` — 2 errors, both pre-existing at HEAD and
+  outside this diff (`prisma.scenario.findFirst` in the agent-group test,
+  `tryActor: () => undefined` in the trace-group test; both present verbatim in
+  `git show HEAD:`).
+- Feature parity: `specs/server/api-process-clickhouse-accessors.feature`
+  **11/11 bound**.
+- `oxlint --config .oxlintrc.architecture.json` over the eight touched files:
+  clean. `oxfmt --check`: clean on every file this pass created or whose format
+  it could affect; the three flagged files (`api-clickhouse.infrastructure.ts`,
+  `api-production.composition.ts`, the trace-group test) are flagged identically
+  at HEAD, on hunks this diff does not touch.
+- Sabotage, four ways, each failing exactly the tests that name it:
+  - events branch back to `USAGE_UNKNOWN` → 4 usage tests fail
+  - `resolveOrganizationClient` wired to the tenant resolver → 3 fail
+  - `resolveOrganizationClient` implemented as `connection.resolve` → the two
+    organization-routing tests fail
+  - `resolveSharedClient` without the `ClickHouseNotConfiguredError` catch → the
+    private-routes-only test fails
+  - `eventExplorer` back to the refusing Proxy → the search test fails; the
+    explorer answering an empty set instead of refusing → the no-endpoint test
+    fails
+
+### What this pass did NOT do
+
+- **Nothing under `platform/` was created, edited or read.**
+- **The fleet explorer was not composed.** See above: it is a decision, and it
+  is left open on purpose.
+- **`listPipelineRegistrations` still answers empty.** This process registers
+  seven definitions producer-only, so "registrations" is arguably now the wrong
+  word for what it reports — but the fact it reports (this process RUNS no
+  projection and no subscriber) is true, and changing what an operator page
+  counts is not a wiring fix.
+
+## The two mail absences: `usage-mail` and `UnavailableApiPasswordResetMail`
+
+Both were classed **REAL GAP** in "The 43", and the password-reset one carried a
+reason that was already false when it was written: *rendering a message is
+react-email, and `frontend-boundary.unit.test.ts` exists to stop a value-import
+chain from a backend process to React.* It does not stop this one.
+`@langwatch/mail` is the **one terminal that walk is allowed to enter** — the
+guard stops on entry to it, because react-email renders server-side at send
+time — and `apps/worker` has value-imported it from a real composition root
+since 51f4e11e9a. `apps/api` already declared the dependency and used none of
+it.
+
+What was actually missing was underneath the templates, and it was the same
+thing for both: this process parsed no mailer configuration and composed no
+`EmailDeliveryPort`. Two absences, one cause.
+
+```
+BEFORE                                   AFTER
+
+api.config.ts                            api.config.ts
+  (no mail leaf)                           mail: { defaultFrom, provider,
+  BASE_HOST ─┐                                    ses, sendgrid, smtp, resend }
+             └→ execution.publicBaseUrl    BASE_HOST ─┐
+                                                      ├→ execution.publicBaseUrl
+                                                      └→ mail.baseHost (projected,
+                                                         NOT bound twice)
+
+(no api-mail.composition.ts)             api-mail.composition.ts
+                                           ApiMailComposition { delivery, baseHost }
+                                           tryCreateApiMailComposition(config,
+                                             aws?, resources) → undefined
+                                             without BASE_HOST or a scope
+
+sendResetPassword                        sendResetPassword
+  └→ UnavailableApiPasswordResetMail        └→ ApiComposedPasswordResetMail
+       └→ reject("composes no gateway")          └→ sendResetPasswordEmail
+                                                      └→ EmailDeliveryAdapter
+                                                 (no BASE_HOST ⇒
+                                                  UnconfiguredApiPasswordResetMail,
+                                                  which still refuses)
+
+limits.checkAndSendUsageLimit…           limits.checkAndSendUsageLimit…
+  └→ reject(503 service_unavailable)       └→ UsageWarningService
+                                                ├ records      PostgresNotificationAdapter
+                                                ├ organizations ApiUsageWarningDirectory
+                                                ├ usageCounts   ApiUsageBreakdownAdapter
+                                                └ emails        NotificationService
+                                                                 └ ApiUsageLimitEmailAdapter
+                                                                    └→ sendUsageLimitEmail
+                                             (no BASE_HOST ⇒ the 503, unchanged)
+```
+
+### What each one needed
+
+**Password reset** needed three things and no more: the config leaf, the
+gateway, and the URL. The URL is the part a template must never build for
+itself — `@langwatch/mail`'s own header states the rule, *a message that carries
+a link takes the LINK* — so `ApiComposedPasswordResetMail` assembles
+`<baseHost>/auth/reset-password?token=…` at the platform application's exact
+shape and `encodeURIComponent`s the token, which Better Auth hands over raw. A
+`+` or a `/` reaching the query string unencoded resolves to a different token
+than the one that was minted.
+
+**Usage mail** needed the same gateway plus three collaborators no package
+ships, because each is a join across two aggregates a feature package may not
+name at once:
+
+- `ApiUsageWarningDirectory` — the organization's ADMIN members and its
+  projects, the platform application's own three queries, unchanged;
+- `ApiUsageBreakdownAdapter` — the per-project volume, in whichever unit the
+  organization is metered in. Events are one organization-keyed `GROUP BY
+  TenantId`, which only became readable here when the `events-meter` pass landed
+  `resolveOrganizationClient`. Traces have no per-project read at all — the
+  repository answers a total over a set of tenant ids — so the breakdown costs
+  one routed read per project, which is what tenant routing buys: each read
+  lands on that project's own endpoint;
+- the notification store, which is `PostgresNotificationAdapter` over the
+  process's own Prisma client and needed nothing but composing.
+
+### The defect the breakdown found
+
+A process that opened NO ClickHouse would have sent the warning with a table of
+zeros. `queryBillableEventsByProjectApprox` answers `[]` when it has no
+repository, and `[]` is also what an organization that sent nothing this month
+answers — the events rollup is a `GROUP BY`, so an unread rollup and a quiet
+month are the same shape. `UsageWarningService` would then have mailed every
+administrator a message whose heading says usage is high over a table saying it
+is zero, which is the exact failure
+`specs/billing/usage-metering-availability.feature` forbids. The difference is
+known at composition and nowhere below it, so `ApiUsageBreakdownAdapter` carries
+it: no ClickHouse ⇒ `USAGE_UNKNOWN` without asking, and the service sends
+nothing. That scenario is now bound.
+
+### File → change
+
+| File | Change |
+| --- | --- |
+| `apps/api/src/app/api-mail.composition.ts` | NEW. `ApiMailComposition` + `tryCreateApiMailComposition`, the twin of `worker-mail.composition.ts` down to the field names. No `MailRenderPort`: every message this process sends is a whole send `@langwatch/mail` owns end to end, so there is no envelope left to assemble and a renderer would be a second way to say the same thing |
+| `apps/api/src/platform/config/api.config.ts` | `mail` definition block at the worker's exact spellings; `ApiMailConfig`; `resolveApiMailConfig`, which PROJECTS `BASE_HOST` off `infrastructure.execution.publicBaseUrl` rather than binding it twice. The projection's raw `mail` is destructured out of the result spread, so a deployment with no `BASE_HOST` carries no half-resolved gateway |
+| `apps/api/src/app/api-better-auth.composition.ts` | `ApiComposedPasswordResetMail`; `UnavailableApiPasswordResetMail` → `UnconfiguredApiPasswordResetMail` with the reason corrected from "this process composes no gateway" to "this deployment named no `BASE_HOST`"; the port's docblock no longer claims a React boundary |
+| `apps/api/src/app/api-usage.composition.ts` | `mail` option; `ApiUsageLimitEmailAdapter`, `ApiUsageWarningDirectory`, `ApiUsageBreakdownAdapter`; `composeApiUsageWarnings`; `countByProjects` on the counter; `checkAndSendWarning` sends where a gateway exists and refuses where none does; the `usage-mail` absence fires only in the second case, and its consequence string rewritten |
+| `apps/api/src/app/api-production.composition.ts` | `composedMail` composed once before the Auth graph and shared by both senders; threaded as `ApiComposedPasswordResetMail` into `ApiAuthComposition.tryCompose` and as the composition itself into `composeApiUsageStats` |
+| `apps/api/tsconfig.json` | `"jsx": "react-jsx"`, for the reason `apps/worker/tsconfig.json` already carries it: `@langwatch/mail` resolves from source and its templates are JSX. No `.tsx` lives in this app and none may |
+| `apps/api/package.json` | One line: `@langwatch/notification-server`, for the `EmailDeliveryAdapter`, `EmailProviderService.resolveDefaultFrom` and `PostgresNotificationAdapter`. `@langwatch/mail` was already declared and unused |
+| `.env.example` | An OUTBOUND MAIL block: the eleven variables both processes read, with `SENDGRID_API_KEY` folded into it from where it sat alone |
+| `apps/api/src/app/__tests__/api-mail.composition.unit.test.ts` | NEW. 7 tests. The composition answers nothing without `BASE_HOST` and nothing without a resource scope, owns its transport on the scope, and carries the configured sender; `ApiComposedPasswordResetMail` renders through react-email and a recording gateway receives the message, its subject, the account's address and the reset link with the token encoded |
+| `apps/api/src/app/__tests__/api-usage-mail.composition.unit.test.ts` | NEW. 8 tests through the real `UsageWarningService`: the warning renders and reaches the administrators, carries the organization, both projects and their formatted counts and a button on this deployment's own host, records that it went, sends nothing when this month's warning for the threshold already went, fans out one routed read per project on the trace branch, sends nothing at all with no ClickHouse, and refuses by name with no gateway |
+| `apps/api/src/platform/config/__tests__/api.config.unit.test.ts` | 6 tests on the mail leaf: absent without `BASE_HOST`, the host taken from the one variable the rest of the process reads, the sender derived and the sender named, every gateway credential carried, and `USE_AWS_SES` read by PRESENCE as both other tiers read it |
+
+### Gates
+
+- `apps/api`: `tsc --noEmit` — **0 errors**; `vitest run src/app src/platform` —
+  **54 files / 587 tests passing**.
+- `packages/mail`: `pnpm test` — **4 files / 36 tests passing**. The package
+  needed no change: `sendResetPasswordEmail` and `sendUsageLimitEmail` already
+  take an `EmailDeliveryPort` and already own their own rendering.
+- `packages/architecture-lint`: `frontend-boundary.unit.test.ts` — **16 tests
+  passing**. The new value-import chain from `apps/api` into `@langwatch/mail`
+  terminates there, which is what that guard is for.
+- Feature parity: `specs/auth/password-reset.feature` 16/20 → **17/20**;
+  `specs/billing/usage-metering-availability.feature` 0/4 → **1/4**.
+- `oxlint` and `oxfmt --check` clean on every file this pass created or edited.
+  `api-production.composition.ts` is flagged by `oxfmt` identically at HEAD, on
+  122 lines this diff does not touch, and was left as found rather than
+  reformatted underneath the lanes editing it.
+- Sabotage, five ways, each failing exactly the tests that name it:
+  - `ApiComposedPasswordResetMail.sendResetPassword` silenced → 3 fail
+  - `encodeURIComponent` dropped from the reset URL → 1 fails
+  - `usageLimitEmail` dropped, so `NotificationService` falls back to
+    `NullUsageLimitEmailAdapter` → 3 fail
+  - `composeApiUsageWarnings` returning `undefined` whenever mail EXISTS → 6 fail
+  - the no-ClickHouse `USAGE_UNKNOWN` guard removed → 1 fails
+
+### Absences that remain, and what each waits on
+
+- **`UnconfiguredApiPasswordResetMail` and the `usage-mail` absence stay**, and
+  both are now degenerate-configuration guards rather than gaps —
+  `resolveApiMailConfig` answers nothing without a `BASE_HOST`, and
+  `sendResetPassword` is not optional on the Better Auth transport, so something
+  has to answer. This is the same class as `withoutQueue` and
+  `withoutPublicBaseUrl`.
+- **`ApiIdentityMailPort` was NOT closed.** The join-request notifications are
+  the worker's envelope — a BCC fan-out with a signed unsubscribe footer — and
+  the mail composition here holds no `MailRenderPort` because nothing else it
+  sends needs one. Closing it is a decision about which process notifies
+  administrators, not a wiring gap, and it is one composition away now that the
+  gateway exists.
+- **This process reads no outbound proxy**, so SES and Resend do not honour one.
+  Stated rather than invented: `ApiNoOutboundProxy` already says it for stored
+  objects, and deriving a proxy from an unrelated variable would route mail
+  through a host nobody chose. The worker does read one.
+
+## Two worker absences closed: legacy filter matching and runaway containment, 2026-09-03
+
+The audit above classed both as REAL GAPs. Both are now closed, and in each
+case the gap was smaller than the message said: one function pair had a home
+nobody had named, and one policy was already written, already tested, and
+simply not exported.
+
+### `withoutLegacyFilterMatching` — the two functions had no home, so one was made
+
+The audit's correction was right as far as it went: `matchesTriggerFilters` and
+`buildPreconditionTraceDataFromFoldState` died with
+`platform/app/src/server/filters/triggerFilter.matcher.ts` (637 lines, deleted
+in `6c99ad0a1c`), and its tests died one commit earlier in `69c1c03dbd`. What
+it got wrong is the fix it implied. It said the field matchers "survive as a
+React-free server subpath of the analytics package", as if a background process
+could import them. It cannot: `frontend-boundary.unit.test.ts` refuses a module
+out of a `*-web` package **by path**, framework-free or not, precisely because
+a file that looks framework-free today acquires a React edge on the next edit.
+`@langwatch/analytics-web/server/filters/*` is a browser subpath with a
+server-sounding name — a leftover of `platform/app/src/server/filters/` — and
+every one of its consumers today is another browser package.
+
+So the vocabulary moved down rather than the matcher moving sideways:
+
+```
+BEFORE                                     AFTER
+
+analytics-web (browser)                    analytics-contract (framework-free)
+ └─ model/filters/                          └─ analytics.precondition-matchers.ts
+     ├─ precondition-matchers.ts                ├─ PreconditionTraceData
+     │   ├─ PreconditionTraceData  ─────────────┤ PreconditionFieldMatcher
+     │   ├─ PRECONDITION_FIELD_MATCHERS ────────┤ PRECONDITION_FIELD_MATCHERS
+     │   ├─ normalizePreconditionTraceData ─────┘ normalizePreconditionTraceData
+     │   ├─ PRECONDITION_ALLOWED_RULES  (stays: needs CheckPreconditionRule)
+     │   └─ getFieldLabel               (stays: needs the filter registry)
+     └─ ...                                  ▲
+                                             │ imported by BOTH sides
+platform/app  (DELETED)                      │
+ └─ server/filters/                     analytics-server (framework-free)
+     └─ triggerFilter.matcher.ts  ──────► services/
+         ├─ matchesTriggerFilters            ├─ legacy-filter-matching.service.ts
+         ├─ matchesEvaluationFilters         │    ├─ matchesTraceFilters
+         ├─ buildPrecondition…FoldState      │    └─ matchesEvaluationFilters
+         ├─ classifyTriggerFilters ✗         └─ precondition-trace-data.service.ts
+         └─ triggerFiltersReferenceEvents ✗       └─ fromFoldState
+                                                          ▲
+apps/worker                                               │
+ └─ WorkerSettlementFilterEvaluator ──────────────────────┘
+     ├─ matchesFilterQuery      TraceQueryEvaluationService   (was already real)
+     ├─ matchesTraceFilters     throw DispatchError  ─►  the packaged matcher
+     └─ matchesEvaluationFilters throw DispatchError ─►  the packaged matcher
+```
+
+`analytics-server` is the home because the in-memory matcher is the TWIN of
+`filters/clickhouse/filter-conditions.ts`, which is already there: one file
+decides what `events.metrics.value` means in SQL and the other decides what it
+means against a trace in hand, and the matcher's own comments cite the SQL
+builder by name. Putting them in one package is what keeps the trace list and
+the alert from disagreeing.
+
+Two of the five recovered functions were NOT ported. `classifyTriggerFilters`
+and `triggerFiltersReferenceEvents` already exist in `automation-server` under
+other names — `splitFilters` and `hasEventFilters`, both private to
+`AutomationSettlementMatchConfirmationService` — so porting them would have been
+the duplication the audit exists to prevent.
+
+The 96 deleted scenarios were recovered with the code and rehomed as two files
+beside their subjects (89 of them; the seven that covered the two unported
+functions went with those functions). They carry the parts a rewrite loses:
+the #4805 fail-closed family — an actionable condition on a field the matcher
+cannot positively evaluate must NO-MATCH rather than skip to pass, which is what
+once made every such automation fire on every trace — and the
+`events.metrics.value` range-boundary parity table.
+
+**Manifests:** `@langwatch/trace-contract` added to `analytics-server` (the fold
+state's type), `@langwatch/analytics-contract` added to `evaluator-web` (the
+moved table). `pnpm install --offline` ran; `pnpm-lock.yaml` moved.
+
+**Cross-lane note.** Three files in the web lane were touched, all of them the
+move itself: `analytics-web`'s `precondition-matchers.ts` loses the four moved
+declarations and imports them, and `evaluator-web`'s two consumers change their
+import specifier. That is two FEWER `package-boundaries` lint violations than
+before, since two cross-feature imports now go through a contract.
+
+### `withoutRunawayContainment` — the policy was packaged, the export was not
+
+The audit's evidence was correct on both halves and understated the conclusion.
+`RunawayContainmentService` is written, is tested, and was missing one line in
+`packages/features/automation/server/src/index.ts`; `AutomationRunawayPort` had
+no real implementation, but every substrate it names was already composed in
+this process. Nothing had to be built except the adapter that joins them.
+
+```
+BEFORE                                    AFTER
+
+PostgresAutomationSettlement              PostgresAutomationSettlement
+  LedgerAdapter                             LedgerAdapter
+   └─ breach ─► LoggedSettlementBreach       └─ breach ─► WorkerSettlementBreach
+                  └─ logger.error()                        └─ RunawayContainmentService
+                     (nobody told,                              │  (Automation's own policy)
+                      nothing paused)                           ├─ triggers  PrismaTriggerRepository
+                                                                ├─ clock     WorkerAutomationClock
+                                                                └─ runaway   WorkerAutomationRunawayAdapter
+                                                                     ├─ countProjectTraces24h  ClickHouse (routed)
+                                                                     ├─ notificationRecipients tenancy.projects
+                                                                     │                        + tenancy.authorization
+                                                                     │                        + ledger.filterSuppressed
+                                                                     ├─ sendLimitEmail        mail.delivery
+                                                                     ├─ tryClaimOnce/release  Redis SET NX + Lua
+                                                                     └─ on{CeilingBreach,     OtelAutomationRunaway
+                                                                          AutoPaused,          MetricsAdapter
+                                                                          ContainmentFailed}
+```
+
+Four decisions worth recording:
+
+1. **The suppression reader is the ledger's, not a second one.** A limit notice
+   is filtered through the same rows a digest is filtered through. That makes
+   the ledger and containment mutually dependent — the ledger raises the breach
+   containment answers — so the knot is tied with one late read
+   (`() => containment`) rather than a second `EmailSuppressionRepository`. Two
+   readers of that table would let one half of Automation honour an unsubscribe
+   the other ignored.
+2. **The absence became CONDITIONAL, which is the honest shape.** It fired
+   unconditionally before. It now fires exactly when this graph composed no
+   outbound mail or no tenancy — a notice with no origin to link back to, or
+   nobody to send it to — and the message names both, since an automation's
+   administrators are its ORGANIZATION's role bindings.
+3. **The three containment counters are published for the first time.** The
+   metrics adapter's own doc said "nothing composes the OTLP sink yet"; this
+   process composes it. `apps/api` still holds `UncontainedApiAutomationRunaway`
+   and still refuses, which is correct — the ceiling is enforced where the
+   matches are confirmed.
+4. **No configuration was added.** The thresholds containment decides on
+   (`RUNAWAY_TRAFFIC_SHARE`, `RUNAWAY_MIN_PROJECT_TRACES`, the two claim
+   windows) are constants inside the package, not leaves; `baseHost` is the mail
+   composition's. The audit's suspicion of a missing config leaf did not survive
+   contact with the service.
+
+### Gates
+
+`apps/worker`: `vitest run src/app src/platform` — **45 files / 417 tests**, all
+passing. `worker-automation-settlement.composition.unit.test.ts` went from 16 to
+24: four for the recovered matcher (a confirm, a quiet drop, and both sides of
+the #6833 verdict guard) and four for containment, with `legacyFilterMatching`
+removed from the expected absence list. `tsc --noEmit` on both
+`tsconfig.json` and `tsconfig.test.json` — 0 errors.
+`@langwatch/analytics-contract` 115 tests, `@langwatch/analytics-server` 743
+(+89 recovered), `@langwatch/automation-server` 228, `@langwatch/analytics-web`
+274, `@langwatch/evaluator-web` 41 — all passing, all five typechecking clean.
+`frontend-boundary.unit.test.ts`, `feature-package-boundaries` and
+`test-colocation` pass. `check-feature-parity` reports
+`worker-automation-settlement-conversion.feature` **18/18 bound**. oxlint over
+every touched file is clean on the new ones and byte-identical to the base run
+on the edited ones.
+
+**Sabotage, five patches, each shown to land.** Trace filters forced to pass →
+"drops a match whose filters no longer hold" fails. An errored evaluation
+counted as a verdict → the #6833 scenario fails. The fold-state projection
+reading `langwatch.source` instead of `langwatch.origin` → the confirming
+scenario fails. Containment left uncomposed → both containment scenarios fail.
+The ADMIN filter dropped from the recipient roll → both fail on the extra
+address. The pause write disconnected from the trigger repository → the pause
+scenario fails. One patch that did NOT land is recorded too: stubbing
+`countProjectTraces24h` to 0 changed nothing, because with a cap of zero the
+confirmed count can never reach the traffic share — so the read is bound by
+asserting the tenant it was taken on instead.
+
+### Absences remaining in `apps/worker`
+
+Twenty-nine named absences remain, unchanged from the audit table except for
+these two. The nearest to closing are still the ones that table lists:
+`withoutAnnotationQueuePersist` (one dependency), `withoutTraceRecordRead` and
+the dataset half that waits on it, and `withoutDatasetStorage`, whose Azure
+branch is unreachable because the process fails to boot before it.

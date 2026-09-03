@@ -25,30 +25,53 @@
  *     Absent, every organization resolves to the free baseline — reported at
  *     composition rather than discovered by a customer whose paid plan reads
  *     as free.
- *   - **No approaching-limit mail.** The Notification vertical is NOT the gap —
- *     it exists, and so do `UsageLimitService` and `UsageWarningService`. Two
- *     things do not: the only implementation of `UsageLimitEmailAdapter` in the
- *     tree is `NullUsageLimitEmailAdapter`, which sends nothing, and this
- *     process parses no mailer configuration at all. So
- *     `limits.checkAndSendUsageLimitNotification` refuses BY NAME rather than
- *     reporting that it sent something it did not.
- *   - **Events metering.** The billable-events rollup is keyed by
- *     ORGANIZATION and routes on an organization-keyed ClickHouse client; this
- *     process publishes a tenant-keyed resolver only. Routing an organization
- *     id through it does not MIS-ROUTE — the directory answers a project id, so
- *     an organization id raises `UnknownTenantError` — it simply cannot answer.
- *     The primitive exists (`ClickHouseConnection.resolveOrganization`); what
- *     is missing is an organization-keyed accessor on
- *     `ApiClickHouseInfrastructure` and one option threaded to here. Until
- *     then an organization metered in events reads UNKNOWN rather than a
- *     number nothing produced.
+ *   - **No approaching-limit mail, on a deployment that named no `BASE_HOST`.**
+ *     Not a gap in this process any more, and the reason recorded here was
+ *     wrong twice over. The Notification vertical exists, so do
+ *     `UsageLimitService` and `UsageWarningService` — and the two things that
+ *     did not are now here: {@link ApiUsageLimitEmailAdapter} is a real
+ *     `UsageLimitEmailAdapter` over `@langwatch/mail`, and this process reads a
+ *     mailer configuration (`resolveApiMailConfig`). What is left is the
+ *     DEGENERATE case: no `BASE_HOST` means no gateway and no host to build the
+ *     usage link from, and `limits.checkAndSendUsageLimitNotification` refuses
+ *     BY NAME rather than reporting that it sent something it did not.
+ *
+ * ## What it does resolve, and what that took
+ *
+ * An organization metered in EVENTS is counted here rather than reported
+ * unknown. The rollup is keyed by ORGANIZATION — an organization's billable
+ * events span every project it owns, so there is no project to route on — and
+ * a tenant-keyed resolver cannot answer that id: the directory behind it looks
+ * a project row up, so an organization id raises `UnknownTenantError` rather
+ * than reading one tenant's rows on another's endpoint. What closed it was the
+ * second accessor `ApiClickHouseInfrastructure` now publishes beside the
+ * tenant-keyed one, over the SAME connection and the same physical endpoints:
+ * `resolveOrganizationClient`. The two arrive here as ONE option, because they
+ * are one object and a caller holding half of them is a state no root can
+ * produce.
+ *
+ * The approaching-limit MAIL resolves too, and what that took is one composed
+ * gateway plus three collaborators the warning service needs and no package
+ * ships: the organization's administrators, the per-project breakdown the
+ * message is mostly made of, and the notification row that stops a second
+ * message going out the same month. All three are read off this process's own
+ * graph, which is why they are here rather than in a feature package — which
+ * store a deployment counts and mails from is a composition decision.
  */
 import {
   BillableEventsQueryService,
   ClickHouseBillingAdapter,
   deploymentPlanSources,
+  NotificationService as BillingNotificationService,
+  UsageLimitEmailAdapter,
+  UsageWarningService,
   type BillingSubscriptionRepository,
+  type UsageLimitEmailData,
 } from "@langwatch/enterprise-billing-server";
+import type {
+  BillingUsageCounter,
+  BillingUsageLimitOrganization,
+} from "@langwatch/enterprise-billing-contract";
 import type { ClickHouseClient } from "@clickhouse/client";
 import type { PlanProvider, UsageUnit } from "@langwatch/entitlement-contract";
 import {
@@ -62,8 +85,11 @@ import {
   type UsageCount,
 } from "@langwatch/entitlement-server";
 import { HandledError } from "@langwatch/handled-error";
+import { sendUsageLimitEmail } from "@langwatch/mail";
+import { PostgresNotificationAdapter } from "@langwatch/notification-server";
 import { createLogger, type Logger } from "@langwatch/observability";
 import type { PricingModel, PrismaClient } from "@langwatch/prisma-client/generated";
+import type { ApiMailComposition } from "./api-mail.composition";
 import { ApiUsageStatsPort } from "./api-trpc-collaborators.trace-group.composition";
 
 /** What the plan provider is composed from. */
@@ -100,7 +126,7 @@ export type ApiPlanProviderOptions = Readonly<{
 
 /** What each unresolvable plan source costs, written where a deployment reads it. */
 export abstract class ApiEntitlementAbsenceReport {
-  abstract absent(source: "licence" | "subscription" | "usage-mail" | "events-meter"): void;
+  abstract absent(source: "licence" | "subscription" | "usage-mail"): void;
 }
 
 /** Writes each absent plan source to the process log, with what it costs. */
@@ -113,7 +139,7 @@ export class LoggedApiEntitlementAbsence extends ApiEntitlementAbsenceReport {
     super();
   }
 
-  absent(source: "licence" | "subscription" | "usage-mail" | "events-meter"): void {
+  absent(source: "licence" | "subscription" | "usage-mail"): void {
     this.logger.warn({ source }, ENTITLEMENT_CONSEQUENCE[source]);
   }
 }
@@ -124,9 +150,7 @@ const ENTITLEMENT_CONSEQUENCE = {
   subscription:
     "API process composed no subscription source on a HOSTED deployment: every organization resolves the free baseline, including ones that are paying.",
   "usage-mail":
-    "API process composed no mail delivery: the only UsageLimitEmailAdapter in the tree sends nothing and this process reads no mailer configuration, so the approaching-limit mail refuses by name rather than reporting that it sent something.",
-  "events-meter":
-    "API process publishes no organization-keyed ClickHouse accessor: the billable-events rollup routes on an organization id, which this process's tenant-keyed resolver cannot answer, so an organization metered in EVENTS reads its usage as unknown rather than as a number.",
+    "API process composed no mail gateway because this deployment named no BASE_HOST: there is no sender address to derive and no host to build the usage link from, so the approaching-limit mail refuses by name rather than reporting that it sent something.",
 } as const;
 
 /**
@@ -164,51 +188,265 @@ export function composeApiPlanProvider(options: ApiPlanProviderOptions): PlanPro
   return EntitlementService.create(sources);
 }
 
+/**
+ * The two routings the usage rollups take, off the one connection.
+ *
+ * They differ in the ID, not the endpoint: `trace_summaries` is scoped by a set
+ * of PROJECT ids and routes through the tenant directory, `billable_events` by
+ * the ORGANIZATION that is billed for them, which the directory cannot answer
+ * — it looks a project row up, so an organization id raises
+ * `UnknownTenantError`. Both land on the same physical endpoint for the same
+ * customer.
+ */
+export type ApiUsageClickHouse = Readonly<{
+  /** Tenant-keyed, for the trace rollup. */
+  resolveClient: (tenantId: string) => Promise<ClickHouseClient>;
+  /** Organization-keyed, for the billable-events rollup. */
+  resolveOrganizationClient: (organizationId: string) => Promise<ClickHouseClient>;
+}>;
+
 /** What the usage reading is composed from. */
 export type ApiUsageStatsOptions = Readonly<{
   /** The one guarded connection every membership and spend row is read on. */
   prisma: PrismaClient;
   /** The plan the reading is taken against — the SAME one every banner reads. */
   plans: PlanProvider;
-  /** The tenant-keyed ClickHouse this process opened, or none. */
-  resolveClickHouseClient: ((tenantId: string) => Promise<ClickHouseClient>) | null;
+  /**
+   * The ClickHouse this process opened, as the two routings the rollups take,
+   * or none at all.
+   *
+   * ONE option rather than two, because they are one object: both accessors
+   * are published by this process's single `ApiClickHouseInfrastructure` and
+   * no deployment holds one without the other. As two fields they let a caller
+   * compose HALF a ClickHouse — the trace rollup readable and the events
+   * rollup not — which no root can produce, and which this reading has no
+   * honest answer for: its seven readings are issued together, so a refusal in
+   * one of them is a blank panel rather than one figure withheld.
+   */
+  clickhouse: ApiUsageClickHouse | null;
+  /**
+   * The gateway the approaching-limit mail leaves through, and the host it
+   * links back to. Absent on a deployment that named no `BASE_HOST`, which is
+   * the one case the warning still refuses in.
+   */
+  mail?: ApiMailComposition | undefined;
   /** Names a refusal, so the mail's absence says which process reached it. */
   processName: string;
-  /** Where the two degraded answers are written down. */
+  /** Where the one degraded answer left here is written down. */
   report?: ApiEntitlementAbsenceReport;
 }>;
 
 /** Composes the usage reading over this process's own rows and rollups. */
 export function composeApiUsageStats(options: ApiUsageStatsOptions): ApiUsageStatsPort {
-  options.report?.absent("usage-mail");
+  if (!options.mail) options.report?.absent("usage-mail");
 
+  // ONE counter, read by both halves. The panel's total and the warning's
+  // breakdown are the same measurement at two granularities, and a second
+  // adapter would open a second ClickHouse billing graph over the same
+  // connection to answer them differently.
+  const counter = ApiUsageCounterAdapter.create(options);
   const stats = UsageStatsService.create({
     membership: PrismaUsageMembershipRepository.create(options.prisma),
-    counter: ApiUsageCounterAdapter.create(options),
+    counter,
     plans: options.plans,
   });
 
-  return ApiComposedUsageStats.create(stats, options.processName);
+  return ApiComposedUsageStats.create({
+    stats,
+    warnings: composeApiUsageWarnings(options, counter),
+    processName: options.processName,
+  });
+}
+
+/**
+ * The approaching-limit warning, or nothing to send it with.
+ *
+ * Nothing exactly when the deployment composed no mail. Every other
+ * collaborator is available on a process that opened a database: the
+ * administrators to write to, the per-project breakdown the message is mostly
+ * made of, and the notification row that keeps a second message from going out
+ * the same month.
+ */
+function composeApiUsageWarnings(
+  options: ApiUsageStatsOptions,
+  counter: ApiUsageCounterAdapter,
+): UsageWarningService | undefined {
+  const mail = options.mail;
+  if (!mail) return undefined;
+
+  return new UsageWarningService({
+    records: PostgresNotificationAdapter.create({ database: options.prisma }).build(),
+    organizations: ApiUsageWarningDirectory.create(options.prisma),
+    usageCounts: ApiUsageBreakdownAdapter.create(counter, options.clickhouse !== null),
+    emails: BillingNotificationService.create({
+      config: { baseHost: mail.baseHost },
+      usageLimitEmail: ApiUsageLimitEmailAdapter.create(mail),
+    }),
+    baseHost: mail.baseHost,
+  });
 }
 
 class ApiComposedUsageStats extends ApiUsageStatsPort {
-  static create(stats: UsageStatsService, processName: string): ApiComposedUsageStats {
-    return new ApiComposedUsageStats(stats, processName);
+  static create(options: {
+    stats: UsageStatsService;
+    warnings: UsageWarningService | undefined;
+    processName: string;
+  }): ApiComposedUsageStats {
+    return new ApiComposedUsageStats(options.stats, options.warnings, options.processName);
   }
 
   private constructor(
     private readonly stats: UsageStatsService,
+    private readonly warnings: UsageWarningService | undefined,
     private readonly processName: string,
   ) {
     super();
   }
 
   ports(): LimitsTrpcPorts {
+    const warnings = this.warnings;
     return {
       getUsageStats: (_ctx, input) => this.stats.getUsageStats(input.organizationId, input.user),
-      checkAndSendWarning: () =>
-        Promise.reject(new ApiUsageNotifierUnavailableError(this.processName)),
+      checkAndSendWarning: (_ctx, input) =>
+        warnings
+          ? warnings.checkAndSendWarning({
+              organizationId: input.organizationId,
+              currentMonthMessagesCount: input.currentMonthMessagesCount,
+              maxMonthlyUsageLimit: input.maxMonthlyUsageLimit,
+            })
+          : Promise.reject(new ApiUsageNotifierUnavailableError(this.processName)),
     };
+  }
+}
+
+/**
+ * The approaching-limit mail, rendered and sent by `@langwatch/mail`.
+ *
+ * A WHOLE send rather than a rendered body handed back: one recipient, one
+ * subject, no BCC fan-out and no footer to sign, so there is no envelope
+ * decision left for this process to make. Reaching the template here breaks no
+ * boundary — `@langwatch/mail` is the one terminal
+ * `frontend-boundary.unit.test.ts` allows a backend graph to enter, because
+ * react-email renders server-side at send time.
+ */
+export class ApiUsageLimitEmailAdapter extends UsageLimitEmailAdapter {
+  static create(mail: ApiMailComposition): ApiUsageLimitEmailAdapter {
+    return new ApiUsageLimitEmailAdapter(mail);
+  }
+
+  private constructor(private readonly mail: ApiMailComposition) {
+    super();
+  }
+
+  async send(input: {
+    to: string;
+    organizationName: string;
+    usage: UsageLimitEmailData;
+  }): Promise<void> {
+    // `usage` already carries the organization's name, and it is the same one:
+    // `NotificationService` reads both off the record it was handed.
+    await sendUsageLimitEmail({
+      mailer: this.mail.delivery,
+      to: input.to,
+      ...input.usage,
+    });
+  }
+}
+
+/**
+ * Who the warning goes to, and which projects it breaks down.
+ *
+ * Three reads no package ships an implementation of, because each is a join
+ * across two aggregates a feature package may not name at once. They are the
+ * platform application's own queries, unchanged: administrators only —
+ * a warning about an allowance is addressed to the people who can act on it —
+ * and every project the organization owns, ordered by name so the table in the
+ * message reads the same way twice.
+ */
+class ApiUsageWarningDirectory implements BillingUsageLimitOrganization {
+  static create(prisma: PrismaClient): ApiUsageWarningDirectory {
+    return new ApiUsageWarningDirectory(prisma);
+  }
+
+  private constructor(private readonly prisma: PrismaClient) {}
+
+  async findWithAdmins(organizationId: string): Promise<{
+    id: string;
+    name: string;
+    sentPlanLimitAlert: Date | null;
+    members: Array<{ user: { id: string; name: string | null; email: string | null } }>;
+  } | null> {
+    const organization = await this.prisma.organization.findUnique({
+      where: { id: organizationId },
+      select: {
+        id: true,
+        name: true,
+        sentPlanLimitAlert: true,
+        members: {
+          where: { role: "ADMIN" },
+          select: { user: { select: { id: true, name: true, email: true } } },
+        },
+      },
+    });
+    return organization ?? null;
+  }
+
+  async updateSentPlanLimitAlert(organizationId: string, timestamp: Date): Promise<void> {
+    await this.prisma.organization.update({
+      where: { id: organizationId },
+      data: { sentPlanLimitAlert: timestamp },
+    });
+  }
+
+  async findProjectsWithName(organizationId: string): Promise<Array<{ id: string; name: string }>> {
+    return await this.prisma.project.findMany({
+      where: { team: { organizationId } },
+      select: { id: true, name: true },
+      orderBy: { name: "asc" },
+    });
+  }
+}
+
+/**
+ * One organization's volume, split by project, in whichever unit it is metered.
+ *
+ * The two units take different routes, and neither is the display counter's
+ * single total. Events are one organization-keyed `GROUP BY TenantId` on the
+ * billable-events rollup. Traces have no per-project read of their own — the
+ * repository answers a total over a set of tenant ids — so this asks the same
+ * question once per project, which is what tenant routing costs and what it
+ * buys: each read lands on that project's own endpoint. An organization holds
+ * a handful of projects and this runs on a user-initiated mutation, so the
+ * fan-out is bounded and rare.
+ *
+ * UNKNOWN travels rather than a zero, all the way to the send: the message's
+ * whole premise is that usage is high, and a table of zeros under that heading
+ * tells an administrator the opposite of what happened. `UsageWarningService`
+ * sends nothing on unknown and the threshold is still crossed on the next run.
+ *
+ * A process with NO ClickHouse answers unknown without asking, and that is the
+ * one case the read below cannot recognise on its own: the events rollup is a
+ * `GROUP BY`, so an unread rollup and an organization that sent nothing this
+ * month both come back as an empty set. The difference is known here, at
+ * composition, and nowhere below it.
+ */
+class ApiUsageBreakdownAdapter implements BillingUsageCounter {
+  static create(counter: ApiUsageCounterAdapter, readable: boolean): ApiUsageBreakdownAdapter {
+    return new ApiUsageBreakdownAdapter(counter, readable);
+  }
+
+  private constructor(
+    private readonly counter: ApiUsageCounterAdapter,
+    private readonly readable: boolean,
+  ) {}
+
+  async getCountByProjects(input: {
+    organizationId: string;
+    projectIds: string[];
+  }): Promise<Array<{ projectId: string; count: number }> | typeof USAGE_UNKNOWN> {
+    if (!this.readable) return USAGE_UNKNOWN;
+    if (input.projectIds.length === 0) return [];
+    return await this.counter.countByProjects(input);
   }
 }
 
@@ -217,29 +455,23 @@ class ApiComposedUsageStats extends ApiUsageStatsPort {
  *
  * The unit decision is the platform application's, unchanged: a licence's own
  * `usageUnit` wins, then a seat-and-event pricing model, then the free tier,
- * and otherwise traces. What differs here is what happens when the answer is
- * `events` — see the module docblock.
+ * and otherwise traces. Both answers are read: `events` off the
+ * organization-keyed `billable_events` rollup, `traces` off the tenant-keyed
+ * `trace_summaries` one, and each returns UNKNOWN rather than zero when its
+ * query did not run.
  */
 class ApiUsageCounterAdapter extends UsageCounterPort {
   static create(options: ApiUsageStatsOptions): ApiUsageCounterAdapter {
-    const resolveClient = options.resolveClickHouseClient;
     return new ApiUsageCounterAdapter(
       options.prisma,
       options.plans,
+      // The pair, handed straight through: the adapter's two resolvers ARE the
+      // two accessors, so there is nothing left here to get the wrong way
+      // round. Null is a deployment that opened no ClickHouse, and both
+      // rollups then read UNKNOWN rather than zero.
       BillableEventsQueryService.create(
-        resolveClient
-          ? ClickHouseBillingAdapter.create({
-              resolveClient,
-              // Never reached: the only read taken here is the trace rollup,
-              // which routes on a project id. An organization-keyed read on a
-              // tenant-keyed connection would resolve one tenant's endpoint
-              // for another's rows, so it refuses instead of guessing.
-              resolveOrganizationClient: () =>
-                Promise.reject(new ApiOrganizationRoutedReadUnavailableError(options.processName)),
-            }).build()
-          : null,
+        options.clickhouse ? ClickHouseBillingAdapter.create(options.clickhouse).build() : null,
       ),
-      options.report,
     );
   }
 
@@ -247,7 +479,6 @@ class ApiUsageCounterAdapter extends UsageCounterPort {
     private readonly prisma: PrismaClient,
     private readonly plans: PlanProvider,
     private readonly billing: BillableEventsQueryService,
-    private readonly report: ApiEntitlementAbsenceReport | undefined,
   ) {
     super();
   }
@@ -255,8 +486,15 @@ class ApiUsageCounterAdapter extends UsageCounterPort {
   async getCurrentMonthCountForDisplay(input: { organizationId: string }): Promise<UsageCount> {
     const unit = await this.getResolvedUsageUnit(input);
     if (unit === "events") {
-      this.report?.absent("events-meter");
-      return USAGE_UNKNOWN;
+      // Approximate on purpose, and the same HyperLogLog read the enforcement
+      // path takes: ~1% error, constant memory, and what a person reads on the
+      // usage panel. The exact count is the invoice's, not this panel's.
+      const events = await this.billing.tryQueryBillableEventsTotalUniq({
+        organizationId: input.organizationId,
+        billingMonth: BillableEventsQueryService.getBillingMonth(),
+      });
+      // Null means the query did not run, which is not the same fact as zero.
+      return events ?? USAGE_UNKNOWN;
     }
 
     const projectIds = await this.projectIdsOf(input.organizationId);
@@ -269,6 +507,43 @@ class ApiUsageCounterAdapter extends UsageCounterPort {
     });
     // Null means the query did not run, which is not the same fact as zero.
     return total ?? USAGE_UNKNOWN;
+  }
+
+  /**
+   * The same month's volume, split by project, in the same unit.
+   *
+   * Events come back in one organization-keyed read. Traces have no
+   * per-project query — the repository answers a total over a set of tenant
+   * ids — so each project is asked for separately, which is what tenant
+   * routing costs: every read lands on that project's own endpoint. A single
+   * null anywhere makes the whole breakdown UNKNOWN rather than a table with
+   * one project silently reading zero.
+   */
+  async countByProjects(input: {
+    organizationId: string;
+    projectIds: string[];
+  }): Promise<Array<{ projectId: string; count: number }> | typeof USAGE_UNKNOWN> {
+    const billingMonth = BillableEventsQueryService.getBillingMonth();
+    const unit = await this.getResolvedUsageUnit(input);
+    if (unit === "events") {
+      return await this.billing.queryBillableEventsByProjectApprox({
+        organizationId: input.organizationId,
+        billingMonth,
+      });
+    }
+
+    const counts = await Promise.all(
+      input.projectIds.map(async (projectId) => ({
+        projectId,
+        count: await this.billing.tryQueryTraceSummariesTotalUniq({
+          projectIds: [projectId],
+          billingMonth,
+        }),
+      })),
+    );
+    if (counts.some((entry) => entry.count === null)) return USAGE_UNKNOWN;
+
+    return counts.map((entry) => ({ projectId: entry.projectId, count: entry.count ?? 0 }));
   }
 
   async getResolvedUsageUnit(input: { organizationId: string }): Promise<UsageUnit> {
@@ -297,7 +572,7 @@ class ApiUsageCounterAdapter extends UsageCounterPort {
   }
 }
 
-/** The approaching-limit mail was asked for on a process with no notifier. */
+/** The approaching-limit mail was asked for on a deployment with no gateway. */
 class ApiUsageNotifierUnavailableError extends HandledError {
   declare readonly code: "service_unavailable";
 
@@ -308,20 +583,6 @@ class ApiUsageNotifierUnavailableError extends HandledError {
       meta: { process: processName, capability: "the approaching-limit notification" },
     });
     this.name = "ApiUsageNotifierUnavailableError";
-  }
-}
-
-/** An organization-routed ClickHouse read on a tenant-routed connection. */
-class ApiOrganizationRoutedReadUnavailableError extends HandledError {
-  declare readonly code: "service_unavailable";
-
-  constructor(processName: string) {
-    super("service_unavailable", "This part of the product is not available on this deployment", {
-      httpStatus: 503,
-      fault: "platform",
-      meta: { process: processName, capability: "an organization-routed analytics read" },
-    });
-    this.name = "ApiOrganizationRoutedReadUnavailableError";
   }
 }
 

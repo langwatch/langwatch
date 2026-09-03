@@ -214,6 +214,8 @@ import {
   composeApiUsageStats,
   type LoggedApiEntitlementAbsence,
 } from "./api-usage.composition";
+import { tryCreateApiMailComposition, type ApiMailComposition } from "./api-mail.composition";
+import { ApiComposedPasswordResetMail } from "./api-better-auth.composition";
 import { ApiAuthzAbsenceReportPort, ApiAuthzComposition } from "./api-authz.composition";
 import { ApiTenancyAbsenceReportPort, ApiTenancyComposition } from "./api-tenancy.composition";
 import {
@@ -547,6 +549,14 @@ export class ApiProductionComposition extends ApiRuntimeCompositionPort {
   private composedTenancy: ApiTenancyComposition | undefined;
   private composedAgents: ApiAgentsComposition | undefined;
   private composedAuth: ApiAuthComposition | undefined;
+  /**
+   * The one outbound mail graph this process holds, or none.
+   *
+   * Composed once and shared by both senders — the password-reset link and the
+   * approaching-limit warning — because a gateway holds a transport, and two
+   * of them would open two SMTP pools over one deployment's credentials.
+   */
+  private composedMail: ApiMailComposition | undefined;
   private composedClickHouse: ApiClickHouseInfrastructure | undefined;
   private composedAnalytics: ApiAnalyticsCollaborators | undefined;
   private composedIdentity: ApiIdentityCollaborators | undefined;
@@ -738,6 +748,14 @@ export class ApiProductionComposition extends ApiRuntimeCompositionPort {
     const encryption = composeApiSecretEncryption(options)?.encryption;
     this.composedEncryption = encryption;
     const tenancy = authz ? this.resolveTenancy(options, encryption) : undefined;
+    // Before the Auth graph, because the password-reset link leaves through it
+    // and that graph is where Better Auth is composed. Nothing downstream of a
+    // session gate: a deployment that cannot verify a browser caller still has
+    // a gateway, it simply mounts no door that would use one.
+    this.composedMail = tryCreateApiMailComposition({
+      config: options.config,
+      resources: options.resources,
+    });
     const auth = tenancy ? this.resolveAuth(options, tenancy, queueInfrastructure) : undefined;
 
     if (!authz || !tenancy || !auth) {
@@ -1921,6 +1939,12 @@ export class ApiProductionComposition extends ApiRuntimeCompositionPort {
       browserSession: options.config.browserSession,
       authProvider: this.options.identity?.authProvider,
       isSaas: this.options.identity?.isSaas,
+      // The gateway a password-reset link leaves through, over the deployment's
+      // own host. Absent only where `BASE_HOST` is, and the refusal then says
+      // so rather than reporting a link that was never minted.
+      ...(this.composedMail
+        ? { mail: ApiComposedPasswordResetMail.create(this.composedMail) }
+        : {}),
       // The grant ledger a domain auto-join writes its membership through.
       // The pair this process composed, for the reason `resolveTenancy` gives.
       authzGrants: this.composedAuthz?.grants,
@@ -2713,6 +2737,11 @@ export class ApiProductionComposition extends ApiRuntimeCompositionPort {
       encryption,
       // The SAME routed ClickHouse the charted reads and the trace half use.
       resolveClickHouseClient: this.composedClickHouse?.resolveClient ?? null,
+      // The install's own SHARED endpoint, off the same connection, for the
+      // one read that is nobody's tenant: the operator searches `event_log`
+      // across tenants, so there is no id to route on. Null on a deployment
+      // with only private routes, and the explorer says so by name.
+      eventLogClient: this.composedClickHouse?.resolveSharedClient() ?? null,
       redis: queueInfrastructure?.redis ?? null,
       // The SAME producer-only Eventing the trace and evaluation halves send
       // on. This half registers three more definitions against it — simulation,
@@ -2871,7 +2900,19 @@ export class ApiProductionComposition extends ApiRuntimeCompositionPort {
         composeApiUsageStats({
           prisma: database.client,
           plans: this.resolvePlanProvider(options),
-          resolveClickHouseClient: this.composedClickHouse?.resolveClient ?? null,
+          // Both routings, off the ONE connection: the trace rollup is keyed
+          // by project and the billable-events rollup by organization, which
+          // the tenant router cannot answer. They travel together because this
+          // process either opened that connection or did not.
+          clickhouse: this.composedClickHouse
+            ? {
+                resolveClient: this.composedClickHouse.resolveClient,
+                resolveOrganizationClient: this.composedClickHouse.resolveOrganizationClient,
+              }
+            : null,
+          // The SAME gateway the password-reset link leaves through, and the
+          // same host the message's "View Usage Details" button points at.
+          ...(this.composedMail ? { mail: this.composedMail } : {}),
           processName: options.config.serviceName,
           report: this.entitlementAbsence(options),
         }),

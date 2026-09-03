@@ -62,14 +62,17 @@
  * feature's own `langy_agent_unavailable`. Renaming, forking, archiving and
  * importing into a conversation are pure commands and answer for real.
  *
- * The OPERATOR back office is the one surface that is mostly absence. Its
- * event-log explorer, its process-manager fleet explorer and its projection
- * replay runner have no packaged implementation at all — they are still the
- * platform application's classes — and its scheduled-job store is the same. All
- * four refuse by name. What does answer here is the half that is package-owned
- * and needs only Postgres: the admin allow-list, the impersonation ledger and
- * the back-office user, organization and project reads.
+ * The OPERATOR back office answers for most of itself now. The half that needs
+ * only Postgres — the admin allow-list, the impersonation ledger, the
+ * back-office user, organization and project reads and the scheduled-job store
+ * — is package-owned and composed. So is the EVENT-LOG EXPLORER, over the
+ * install's own shared ClickHouse endpoint and the pipeline definitions this
+ * process registered: `event_log` is read ACROSS tenants, which is why it takes
+ * the shared endpoint rather than the tenant-keyed resolver every other read
+ * here runs on. Two refuse by name, and for different reasons — see
+ * {@link unavailableOperatorRuntime}.
  */
+import type { ClickHouseClient } from "@clickhouse/client";
 import type { AgentService } from "@langwatch/agent-contract";
 import type { AuthService } from "@langwatch/auth-contract";
 import {
@@ -101,6 +104,9 @@ import {
   OpsApp,
   PostgresOpsAdapter,
   AdminAuditSink,
+  EventExplorerClickHouseRepository,
+  EventExplorerService,
+  EventingOpsIntrospectionAdapter,
   NoopSchedulerWakeService,
   type OpsCapability,
   type OpsEventExplorer,
@@ -242,7 +248,7 @@ const CONSEQUENCE = {
   "turn-commands":
     "API process holds no command queue, so it registered no Langy conversation pipeline: starting a turn, continuing one, renaming, forking and deleting a conversation all refuse by name. Reading conversations and messages is unaffected, and both live channels still stream.",
   "operator-runtime":
-    "API process composed no operator runtime: the event-log explorer, the process-manager fleet and the replay runner refuse by name. The scheduled-job store, the admin allow-list, the impersonation ledger and the back-office reads answer for real.",
+    "API process composed no operator runtime: the process-manager fleet and the projection replay runner refuse by name. The event-log explorer, the scheduled-job store, the admin allow-list, the impersonation ledger and the back-office reads answer for real.",
   "live-buffer":
     "API process holds no Redis: the Langy turn stream yields nothing and the browser falls back to the Postgres conversation read, tab presence is per-process, and the operator's queue views report nothing.",
 } as const;
@@ -322,6 +328,17 @@ export type ApiAgentGroupCollaboratorsOptions = Readonly<{
   resolveClickHouseClient:
     | ((projectId: string) => Promise<SimulationReadClient & SuiteClickHouseClient>)
     | null;
+  /**
+   * The install's own SHARED ClickHouse endpoint, for the one read here that is
+   * nobody's tenant: the operator's event-log explorer.
+   *
+   * A client rather than a resolver because there is no id to route on —
+   * `event_log` is searched across tenants, and the operator picking a tenant
+   * afterwards is a predicate, not a route. Absent (a deployment with only
+   * private routes, or none at all) the explorer refuses by name rather than
+   * answering the empty set, which would read as "this install has no events".
+   */
+  eventLogClient: ClickHouseClient | null;
   /** The queue's own Redis. The token buffer, tab presence and the ops queues share it. */
   redis: RedisConnection | null;
   /** The number the event store already stamps its own rows with. */
@@ -403,6 +420,11 @@ export function composeApiAgentGroupCollaborators(
       },
     },
   });
+  // Two of the four are still absent, and the event-log explorer is no longer
+  // one of them — see `composeEventExplorer`. The report stays unconditional
+  // because both remaining legs are unconditional: this process runs no
+  // process managers whatever it is configured with, and no `OpsReplayRuntimePort`
+  // exists in the tree for any process to compose.
   options.report?.absent("operator-runtime");
   if (!options.redis) options.report?.absent("live-buffer");
 
@@ -1012,7 +1034,7 @@ function composeOps(options: ApiAgentGroupCollaboratorsOptions, logger: Logger):
 
   return OpsApp.create({
     ops: Object.assign(operations, {
-      eventExplorer: unavailableOperatorRuntime<OpsEventExplorer>("the event-log explorer"),
+      eventExplorer: composeEventExplorer(options),
       managerExplorer: unavailableOperatorRuntime<OpsProcessExplorer>("the process-manager fleet"),
       replay: unavailableOperatorRuntime<OpsReplayRunner>("the projection replay runner"),
       snapshots: null,
@@ -1023,6 +1045,35 @@ function composeOps(options: ApiAgentGroupCollaboratorsOptions, logger: Logger):
 }
 
 /**
+ * The event-log explorer, over the install's own shared endpoint.
+ *
+ * Two collaborators, and this process holds both. The REPOSITORY takes one
+ * client because its three reads are cross-tenant by design — "which
+ * aggregates exist", "which match this string", "what happened to this one" —
+ * and the shared endpoint is the install's own event log. A tenant-keyed
+ * resolver cannot serve them: there is no project id until the operator has
+ * already found the aggregate.
+ *
+ * The INTROSPECTION half is read off the pipeline definitions this process
+ * registered, resolved lazily on every call because the agent-side pipelines
+ * are registered by this same composition a few lines above. Producer-only
+ * registration keeps the definition WHOLE — the runtime declines to RUN the
+ * managers, it does not drop the declaration — so the projections an operator
+ * picks in the replay wizard are the same names the worker folds under. A
+ * process that registered none answers an empty list, which is the true answer
+ * rather than a missing one.
+ */
+function composeEventExplorer(options: ApiAgentGroupCollaboratorsOptions): OpsEventExplorer {
+  const client = options.eventLogClient;
+  if (!client) return unavailableOperatorRuntime<OpsEventExplorer>("the event-log explorer");
+
+  return new EventExplorerService(
+    new EventExplorerClickHouseRepository(client),
+    EventingOpsIntrospectionAdapter.create(() => options.eventing?.definitions ?? []),
+  );
+}
+
+/**
  * One operator explorer, refused by name on every method.
  *
  * A Proxy rather than twenty-seven written stand-ins: these three types are
@@ -1030,22 +1081,22 @@ function composeOps(options: ApiAgentGroupCollaboratorsOptions, logger: Logger):
  * about them is one sentence — "this process has none" — and writing it out per
  * method would bury that in boilerplate a new method would silently escape.
  *
- * What each is waiting for is NOT the same thing, and none of the three is
- * "no package ships one" any more:
+ * Two callers are left, and what each waits on is NOT the same thing:
  *
- *   - the EVENT-LOG EXPLORER wants `EventExplorerService` over
- *     `EventExplorerClickHouseRepository`, which takes ONE ClickHouse client
- *     for a cross-tenant read. `ApiClickHouseInfrastructure` publishes a
- *     tenant-keyed resolver only, so the missing piece is an accessor for the
- *     shared endpoint — the same one `events-meter` waits on.
  *   - the PROCESS-MANAGER FLEET wants `ManagerExplorerService` over
  *     `PrismaProcessStore`, `ProcessOpsPrismaRepository` and an introspection
  *     adapter. Every part exists; what is unsettled is whether a PRODUCER-ONLY
- *     process should render a fleet whose definitions it registers three of, so
- *     it is a decision rather than a wiring gap.
+ *     process should render a fleet at all — it runs none of the machines the
+ *     table lists, and the rows would be the worker's. That is a decision, not
+ *     a wiring gap, and it is deliberately left open.
  *   - the REPLAY RUNNER is the one genuine absence: `OpsReplayRuntimePort` has
  *     no implementation anywhere in the tree, so `ReplayService` cannot be
  *     constructed at all.
+ *
+ * The EVENT-LOG EXPLORER used to be a third. It waited on an accessor for the
+ * shared endpoint, which `ApiClickHouseInfrastructure` now publishes as
+ * `resolveSharedClient`; it is composed by {@link composeEventExplorer} and
+ * refuses only where a deployment has no shared endpoint to read.
  */
 function unavailableOperatorRuntime<T>(capability: string): T {
   return new Proxy(
