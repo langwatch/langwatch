@@ -29,29 +29,29 @@ For the exact arithmetic per family, what is never billed, and how retries are d
 
 ### What's included
 
-Each plan includes a base volume of events stored for a default window. For example, the **Growth** plan includes **200,000 events stored for 30 days.** If you need more, a longer retention window or higher volume, you can [extend retention](#extending-retention) with an Enterprise plan or a self-hosted license.
+Each plan includes a base volume of events stored for a default window. For example, the **Growth** plan includes **200,000 events stored for 49 days.** If you need a longer retention window or a higher volume, you can [extend retention](#extending-retention) with an Enterprise plan.
 
 ## Custom data retention
 
-Retention controls how long your events are kept before they're automatically removed. Default retention depends on your plan:
+Retention controls how long your events are kept before they're automatically removed. Every plan keeps events for 49 days by default. Paid plans change the window in **Settings → Data Retention**, per organization, team or project:
 
-| Plan | Default retention |
-| --- | --- |
-| Free | 14 days |
-| Accelerate (legacy) | 30 days |
-| Growth | 30 days |
-| Custom / Enterprise | Defined with you directly |
+| Plan | Default retention | Windows you can set |
+| --- | --- | --- |
+| Free | 49 days | None. Trace content older than 14 days is redacted until you upgrade |
+| Accelerate (legacy) | 49 days | 35 or 63 days |
+| Growth | 49 days | 35 or 63 days |
+| Enterprise | 49 days | 35 or 63 days, or any whole number of weeks from 49 days up |
+
+Retention is set in whole weeks, because the data is partitioned by week.
 
 ### Extending retention
 
-The windows above are LangWatch Cloud plans. Going beyond your plan's default window, keeping events longer or storing a higher volume, is available on **Enterprise plans**; it isn't a self-serve toggle on the standard Cloud tiers.
+Windows longer than 63 days are available on **Enterprise plans**. Extended storage is priced from **€3 per GB** and configured as part of your agreement, so you only pay for the additional storage you actually use.
 
-On Enterprise, extended storage is priced from **€3 per GB** and configured as part of your agreement, so you only pay for the additional storage you actually use.
-
-Self-hosted deployments are different: the data sits in your own database, so there is no window we impose and no volume we meter. Retention is yours to configure, with or without a license. What a license adds there is multi-class retention, a separate policy per data category. See [Editions and licensing](/self-hosting/licensing).
+Self-hosted deployments keep the same 49-day default. An Enterprise license unlocks the same windows as the Enterprise plan, and a platform administrator can then keep data indefinitely. See [Editions and licensing](/self-hosting/licensing).
 
 <Note>
-  To extend retention beyond your plan default, reach out to your contact or [enterprise@langwatch.ai](mailto:enterprise@langwatch.ai). Self-hosting? See the [self-hosting docs](/self-hosting/overview) to configure retention with a license.
+  To extend retention beyond 63 days, reach out to your contact or [enterprise@langwatch.ai](mailto:enterprise@langwatch.ai).
 </Note>
 
 ## Frequently asked questions
@@ -92,7 +92,7 @@ Self-hosted deployments are different: the data sits in your own database, so th
   </Accordion>
 
   <Accordion title="Where is my data stored?">
-    For LangWatch Cloud, data is stored securely in the EU. For the US, Pacific, and other regions, contact us at [contact@langwatch.ai](mailto:contact@langwatch.ai) and we'll meet your requirements. For Enterprise users, we offer on-premise options so your data stays entirely within your own infrastructure. Nothing leaves your environment.
+    For LangWatch Cloud, data is stored securely in the EU. For the US, Pacific, and other regions, contact us at [contact@langwatch.ai](mailto:contact@langwatch.ai) and we'll meet your requirements. For Enterprise users, we offer on-premise options so your data stays entirely within your own infrastructure.
   </Accordion>
 
   <Accordion title="Do you support custom contracts and procurement reviews?">

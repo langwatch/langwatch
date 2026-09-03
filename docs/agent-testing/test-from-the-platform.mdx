@@ -49,6 +49,20 @@ Everyone with access to the project can read a scenario. Remove names, contact d
 
 **Save** stores the scenario. **Save & Run** stores it and opens the run dialog. Every save is a version, and the editor shows the version number next to **History**.
 
+## Draft a scenario with AI
+
+The editor drafts the situation and the criteria from a short description. In the sidebar on the right of the editor, press **Start a draft**, describe what your agent does and the behavior you want to test, then press **Draft with AI**.
+
+<Frame>
+<img className="block" src="/images/agent-testing/scenario-editor-ai-draft.png" alt="The scenario editor with the AI draft card open in the sidebar, a description typed in and the Draft with AI button" />
+</Frame>
+
+The draft fills the title, the situation and three to six criteria. Edit any of them. To change the draft, type what must change in the same card, for example "add an edge case about escalation", and press **Refine with AI**. The form stays editable between refinements.
+
+If the form already has content, the first draft replaces it after you confirm.
+
+The draft uses the default model of the project. If no model provider is set up, the card shows **Configure model provider** instead. An admin sets one up in **Settings → Model Providers**.
+
 ## Create scenarios with Langy
 
 Langy, the assistant in the bottom corner of every page, writes scenarios for you. Paste text from a document or a conversation, say what must hold, and Langy writes and saves the scenario:
@@ -89,7 +103,7 @@ A run of a few scenarios takes a few minutes. You can leave the page. **Open rec
 
 ## Read the results
 
-Press a row of a finished run. The drawer shows the conversation, then the verdict: **FAILED CRITERIA**, **PASSED CRITERIA** and **JUDGE REASONING**. The reasoning cites what the agent did, for example which lookup it made before answering.
+Press a row of a finished run. The drawer shows the conversation, then the verdict: **PASSED CRITERIA**, **FAILED CRITERIA** and **JUDGE REASONING**. The reasoning cites what the agent did, for example which lookup it made before answering.
 
 <Frame>
 <img className="block" src="/images/agent-testing/run-drawer-passed.png" alt="The conversation drawer of a passed run, with the transcript, the passed criteria and the judge reasoning" />
