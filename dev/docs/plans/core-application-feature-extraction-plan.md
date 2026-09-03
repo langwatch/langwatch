@@ -13825,3 +13825,131 @@ not be able to fail a seat decision.
   `UnavailableApiPasswordResetMail`, `events-meter`, `withoutDurableAppend` and
   `withoutRateLimit` each wait on an implementation or a config block that does
   not exist, and the boundary refusals stay.
+
+## The `any` placeholders swept, and the one that is a Prisma row, 2026-09-03
+
+`44a00aba9e` named three procedures in `workflow-web`'s api map that the
+contract had published types for all along, and left five saying so. This is
+the sweep behind that commit: every `*-api.ts` map `createFeatureApi` is called
+with, every `Unpublished`/`any` slot in them, and — for each — the server
+procedure, its input schema's origin, and its return type.
+
+Four maps carry placeholders. `workflow-api.ts` (88 entries), `scenario-api.ts`
+(54), `langy-api.ts` (35) and one `output: any` in `annotation-api.ts`. The
+enterprise maps, `apps/ui/src/behavior/ui-feature-transport.ts`,
+`coding-agent-api.ts`, `annotation-scores-api.ts` and `studio-host/api.ts` carry
+none; their only `any` hits are the word in a comment.
+
+### The rule that sorted them
+
+A placeholder is replaceable when the OWNING FEATURE'S CONTRACT is the source of
+truth for the shape — either it already publishes both halves, or it publishes
+the input and the output is derivable from a contract DTO the server's own app
+layer already returns. It is not replaceable when the shape is a raw Prisma row,
+a generic the host infers, or a literal declared in a server package a browser
+package may not name. The map is a contract surface; widening it with a guess is
+worse than the `any` it replaces, because a guess reads as verified.
+
+### Map → entry
+
+| Map | Entry | Before | After | Source of truth |
+| --- | --- | --- | --- | --- |
+| `workflow-api.ts` | `workflow.autosave` | `UnpublishedMutation` | `WorkflowApiAutosaveInput` → `WorkflowApiAutosaveOutput` | `WorkflowService.saveVersion` → `WorkflowVersion`, the contract's own zod DTO |
+| `workflow-api.ts` | `workflow.commitVersion` | `UnpublishedMutation` | `WorkflowApiCommitVersionInput` → `WorkflowApiCommitVersionOutput` | same port, same DTO |
+| `workflow-api.ts` | `workflow.restoreVersion` | `UnpublishedMutation` | `WorkflowApiRestoreVersionInput` → `WorkflowApiRestoreVersionOutput` | `WorkflowService.restoreVersion` → `WorkflowVersion` |
+| `workflow-api.ts` | `workflow.publish` | `UnpublishedMutation` | `WorkflowApiPublishInput` → `WorkflowApiPublishOutput` | `WorkflowApp.publish` → `Workflow` |
+| `workflow-api.ts` | `workflow.generateCommitMessage` | `UnpublishedMutation` | `WorkflowApiGenerateCommitMessageInput` → `WorkflowApiGenerateCommitMessageOutput` | `WorkflowTrpcPorts.generateCommitMessage` → `string`, or the literal `"no changes"` |
+| `langy-api.ts` | `langy.list` | `cursor?: Unpublished`, `items: Unpublished[]`, `nextCursor: Unpublished` | `LangyConversationListCursorDto` and `LangyConversationListItemDto[]` | the transport already annotates the resolver with exactly these |
+
+The five workflow outputs are NEW in
+`packages/features/workflow/contract/src/workflow.trpc-schemas.ts`, named the
+way its three existing outputs are, and the five resolvers now annotate their
+returns the way `getById` and `getVersions` already did. Nothing restates a
+Prisma row: `Workflow` and `WorkflowVersion` are the contract's own
+zod-inferred shapes, which is what made this publishable at all.
+
+`langy.list` needed no new type. The contract published both DTOs and the
+transport was already annotated with them; the map was simply behind.
+
+### Two casts the placeholder was holding up
+
+`generateCommitMessage` answering `any` had cost two casts at call sites, and
+both are gone with it: `(commitMessageResponse as string) ?? "autosaved"` in
+`use-run-evalution.ts` — where the `??` was dead as well, the procedure cannot
+answer null — and `data as string` in `version-to-be-used.tsx`. A cast that
+exists only because a map said `any` is the placeholder's real cost, and it is
+the thing to look for when one is removed.
+
+### Left as placeholders, and why
+
+| Entries | Why |
+| --- | --- |
+| `optimization.getPublishedWorkflow`, `optimization.getComponents` | **Raw Prisma rows.** `apps/api/src/app/api-trpc-ports.composition.ts:692` supplies `tryGetWorkflowVersion` as `prisma.workflowVersion.findFirst`, and `listPublishedComponents` as `prisma.workflow.findMany({ include: { versions: true } })`. The transport takes them as `TVersion`/`TComponent`. Publishing a Prisma type through a contract is the thing not to do, so these stop here. |
+| `optimization.toggleSaveAsComponent`, `disableAsComponent`, `toggleSaveAsEvaluator`, `disableAsEvaluator` | Output is provably `{ success: true }`, but the contract publishes no input for them — `workflowScopeSchema` is declared inline in the server file. Publishing the INPUT was outside this pass. One line of contract would unblock all four. |
+| `scenario-api.ts`, all 54 | The scenario contract has no trpc-schemas at all; its input schemas live in `server/src/transport/api-trpc/scenario.schemas.ts`, and not one of its resolvers carries a return annotation. Nothing to name. |
+| `langy-api.ts`, the other 34 | `langy.messages` and its siblings are annotated, but with a large literal declared in the server file (thirteen documented fields, of which only `messages: LangyMessageDto[]` is a contract type). Naming it from a browser package means moving that shape into the contract — a refactor, not a sweep. |
+| `annotation-api.ts`, `traces.getById` | The output IS knowable: `TraceApp.readTrace` → `Trace`, and the resolver throws on absence. **Stating it fails the build**, and that is the finding: `my-queue.screen.tsx:296` hands `AnnotationTrace` — the package's own four-field narrowing — to `legacyTraceToTurn(trace: Trace)`, which needs `project_id` and `spans`. The `any` has been hiding a real unsoundness in the queue walker's fallback turn. Fixing it is a behaviour decision about that fallback, not a type edit. |
+| `workflow-api.ts`, the 78 borrowed | Surveyed in full. **No feature contract in the set exports a single `*Output` type** — `prompt`, `dataset`, `evaluator`, `agent`, `model-provider`, `feature-flag` and `trace` publish inputs broadly and outputs never. 22 of the 78 have a contract-published input AND an app method already returning a contract DTO, so each needs one output type in its own contract plus one resolver annotation: `prompts` ×9, `evaluators` ×5, `dataset` ×5, `modelProvider.listAllForProjectForFrontend`/`getResolvedDefault`, `agents.update`. The rest are blocked on inline server schemas (`promptTags`, `datasetRecord`, `featureFlag`, four of six `traces`), host generics (`llmModelCost.getModelLimits` via `TPorts`; three `traces` reads whose INPUT is `ports.filterInputSchema`), or a transport-side reshape with no DTO behind it (`datasetRecord.getAll`/`download`/`getHead`, `agents.getAll`/`getById`, `traces.getTopicCounts`/`getSampleTraces`). |
+
+### Two latent `any` bugs the survey turned up
+
+Both are `Object.fromEntries` over a callback returning an untupled array, which
+lands on the `Iterable<readonly any[]>: any` overload and erases the router's
+output type outright — so the deliberate annotation right above one of them buys
+nothing:
+
+- `packages/features/model-provider/server/src/transport/api-trpc/model-provider.api.ts:266`
+  (`toLegacyProviderMap`), which erases `modelProvider.getAllForProject` AND
+  `getAllForProjectForFrontend` despite `toLegacyProvider` being annotated
+  `): ModelProviderListEntry` on the line above, with a comment explaining why.
+- `packages/features/trace/server/src/transport/api-trpc/traces.api.ts:404`
+  (`getFormattedSpansDigest`), intended `Record<string, string>`.
+
+Both fix with `as const` on the entry literal. Neither was touched here: they
+are server-side type bugs, not map entries, and each wants its own test.
+
+### File → change
+
+| File | Change |
+| --- | --- |
+| `packages/features/workflow/contract/src/workflow.trpc-schemas.ts` | Five new outputs — `WorkflowApiAutosaveOutput`, `…CommitVersionOutput`, `…RestoreVersionOutput`, `…PublishOutput`, `…GenerateCommitMessageOutput` — over the contract's own `Workflow` / `WorkflowVersion`. |
+| `packages/features/workflow/server/src/transport/api-trpc/workflow.api.ts` | The five resolvers annotate their returns, the way `getById` and `getVersions` already did. |
+| `packages/features/workflow/web/src/behavior/workflow-api.ts` | The five map entries name those types; the comment now says all eight reads and writes are the contract's rather than three of them. |
+| `packages/features/workflow/web/src/ui/sections/optimization_studio/use-run-evalution.ts` | `(… as string) ?? "autosaved"` → the value; the cast and the dead `??` both existed only because the output was `any`. |
+| `packages/features/workflow/web/src/ui/sections/optimization_studio/version-to-be-used.tsx` | `data as string` → `data`. |
+| `packages/features/langy/web/src/behavior/langy-api.ts` | `langy.list` names the two contract DTOs in all three slots. |
+
+### Gates
+
+- `@langwatch/workflow-contract`: `typecheck` clean; `test` — **9 files, 80
+  tests passed**.
+- `@langwatch/workflow-server`: `typecheck` clean; `test` — **10 files, 57 tests
+  passed**.
+- `@langwatch/workflow-web`: `typecheck` clean; `test` — **52 files, 323 tests
+  passed**.
+- `@langwatch/langy-web`: `typecheck` clean; `test` — **75 files, 739 tests
+  passed**.
+- `apps/ui`: `typecheck` clean.
+- `oxlint` over every touched file — clean of anything this lane wrote. The two
+  `package-boundaries` errors it reports in `version-to-be-used.tsx` are its
+  `@langwatch/model-provider-web` imports on lines 7 and 11, present at `HEAD`
+  on lines no diff here touches.
+- Mid-lane, `workflow-web` and `apps/ui` reported ten `TS2307`s and one failing
+  suite from another lane's in-flight move of the handled-error modules. Those
+  landed while this lane ran and the numbers above are from after; recorded
+  because a red gate that is somebody else's has to be shown to be, not
+  asserted.
+
+### What this lane did NOT do
+
+- **It published no INPUT types.** The sanctioned change was outputs. Four
+  `optimization.*` writes and the whole `promptTags`/`datasetRecord`/`featureFlag`
+  set are blocked on inline server schemas, and each wants a decision about the
+  contract's input surface rather than a sweep's guess.
+- **It did not open the six other feature contracts.** 22 borrowed entries are
+  mechanically fixable and named above with the exact DTO each wants, but that
+  is five contracts, five server packages and their gates — and every fill can
+  uncover a latent call-site break the way `annotation`'s did, which wants its
+  own pass rather than a footnote in this one.
+- **It did not paper over `annotation`'s `traces.getById`.** The honest type
+  fails the build, and that failure is the report.

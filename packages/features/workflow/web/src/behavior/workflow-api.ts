@@ -27,12 +27,22 @@
 
 import type {
   StudioWorkflow,
+  WorkflowApiAutosaveInput,
+  WorkflowApiAutosaveOutput,
+  WorkflowApiCommitVersionInput,
+  WorkflowApiCommitVersionOutput,
   WorkflowApiEngineModeInput,
   WorkflowApiEngineModeOutput,
+  WorkflowApiGenerateCommitMessageInput,
+  WorkflowApiGenerateCommitMessageOutput,
   WorkflowApiGetByIdInput,
   WorkflowApiGetByIdOutput,
   WorkflowApiGetVersionsInput,
   WorkflowApiGetVersionsOutput,
+  WorkflowApiPublishInput,
+  WorkflowApiPublishOutput,
+  WorkflowApiRestoreVersionInput,
+  WorkflowApiRestoreVersionOutput,
 } from "@langwatch/workflow-contract";
 import { createFeatureApi } from "@langwatch/platform-api-client";
 
@@ -209,12 +219,12 @@ export type WorkflowApiMap = {
      * than borrowed vocabulary — the graph it loads, autosaves, commits,
      * publishes and restores.
      *
-     * The three reads below are the ones `@langwatch/workflow-contract` already
-     * declares, so they are stated rather than left `Unpublished`: a row shape
-     * the contract publishes is a row shape this map has no business widening
-     * to `any`. Without them `getVersions.data` was `any` and every `.find`
-     * callback over it was an implicit any. The five writes stay placeholders
-     * until the contract declares their outputs too.
+     * All eight are the ones `@langwatch/workflow-contract` declares, so they
+     * are stated rather than left `Unpublished`: a row shape the contract
+     * publishes is a row shape this map has no business widening to `any`.
+     * Without them `getVersions.data` was `any` and every `.find` callback over
+     * it was an implicit any; the five writes answered `any` to every
+     * `onSuccess` that reads the version they wrote.
      */
     getById: { query: { input: WorkflowApiGetByIdInput; output: WorkflowApiGetByIdOutput } };
     getVersions: {
@@ -223,11 +233,22 @@ export type WorkflowApiMap = {
     engineMode: {
       query: { input: WorkflowApiEngineModeInput; output: WorkflowApiEngineModeOutput };
     };
-    autosave: UnpublishedMutation;
-    commitVersion: UnpublishedMutation;
-    generateCommitMessage: UnpublishedMutation;
-    publish: UnpublishedMutation;
-    restoreVersion: UnpublishedMutation;
+    autosave: {
+      mutation: { input: WorkflowApiAutosaveInput; output: WorkflowApiAutosaveOutput };
+    };
+    commitVersion: {
+      mutation: { input: WorkflowApiCommitVersionInput; output: WorkflowApiCommitVersionOutput };
+    };
+    generateCommitMessage: {
+      mutation: {
+        input: WorkflowApiGenerateCommitMessageInput;
+        output: WorkflowApiGenerateCommitMessageOutput;
+      };
+    };
+    publish: { mutation: { input: WorkflowApiPublishInput; output: WorkflowApiPublishOutput } };
+    restoreVersion: {
+      mutation: { input: WorkflowApiRestoreVersionInput; output: WorkflowApiRestoreVersionOutput };
+    };
   };
 
   optimization: {

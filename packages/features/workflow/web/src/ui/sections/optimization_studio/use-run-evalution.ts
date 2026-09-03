@@ -147,7 +147,7 @@ export const useRunEvalution = () => {
               prevDsl: previousVersionDsl,
               newDsl: getWorkflow(),
             });
-            commitMessage = (commitMessageResponse as string) ?? "autosaved";
+            commitMessage = commitMessageResponse;
           } catch (err) {
             // Autogen is cosmetic sugar over the "autosaved" fallback;
             // surfacing it as an error toast mid-evaluate reads like the

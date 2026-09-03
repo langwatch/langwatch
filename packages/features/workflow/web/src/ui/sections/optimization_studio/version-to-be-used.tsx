@@ -120,7 +120,7 @@ export function NewVersionFields({
         {
           onSuccess: (data) => {
             if (data && !userEditedCommitMessage.current) {
-              form.setValue("commitMessage", data as string, {
+              form.setValue("commitMessage", data, {
                 shouldDirty: true,
                 shouldValidate: true,
               });

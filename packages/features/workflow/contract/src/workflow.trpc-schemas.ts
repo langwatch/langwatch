@@ -1,6 +1,11 @@
 import { z } from "zod";
 import { studioWorkflowSchema } from "./studio-workflow";
-import type { WorkflowVersionHistoryEntry, WorkflowWithVersion } from "./workflow";
+import type {
+  Workflow,
+  WorkflowVersion,
+  WorkflowVersionHistoryEntry,
+  WorkflowWithVersion,
+} from "./workflow";
 
 /**
  * The transport inputs the workflow surface publishes.
@@ -121,3 +126,23 @@ export type WorkflowApiEngineModeOutput = {
 
 export type WorkflowApiGetByIdOutput = WorkflowWithVersion;
 export type WorkflowApiGetVersionsOutput = WorkflowVersionHistoryEntry[];
+
+/**
+ * The five writes the studio makes, answered with the row each one wrote.
+ *
+ * Every one of them is a contract DTO already — `WorkflowVersion` and
+ * `Workflow` are the zod-inferred shapes this package declares — so stating
+ * the outputs here restates nothing and leaks no Prisma row: `saveVersion`,
+ * `restoreVersion` and `publish` on {@link WorkflowService} return exactly
+ * these.
+ */
+export type WorkflowApiAutosaveOutput = WorkflowVersion;
+export type WorkflowApiCommitVersionOutput = WorkflowVersion;
+export type WorkflowApiRestoreVersionOutput = WorkflowVersion;
+export type WorkflowApiPublishOutput = Workflow;
+
+/**
+ * The generated message itself, and `"no changes"` when the two graphs
+ * normalise to the same text and no model was asked.
+ */
+export type WorkflowApiGenerateCommitMessageOutput = string;

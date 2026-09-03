@@ -44,6 +44,11 @@ import {
   WorkflowVersionNotFoundError,
   type StudioWorkflow,
   type Workflow,
+  type WorkflowApiAutosaveOutput,
+  type WorkflowApiCommitVersionOutput,
+  type WorkflowApiGenerateCommitMessageOutput,
+  type WorkflowApiPublishOutput,
+  type WorkflowApiRestoreVersionOutput,
   type WorkflowVersion,
   type WorkflowVersionHistoryEntry,
   type WorkflowWithVersion,
@@ -564,7 +569,7 @@ export class WorkflowTrpcApi {
 
       restoreVersion: policy("workflows:update")(
         procedure.input(workflowApiRestoreVersionInputSchema),
-      ).mutation(async ({ ctx, input }) => {
+      ).mutation(async ({ ctx, input }): Promise<WorkflowApiRestoreVersionOutput> => {
         try {
           return await ctx.app.workflows.restoreVersion({
             versionId: input.versionId,
@@ -589,7 +594,7 @@ export class WorkflowTrpcApi {
 
       autosave: policy("workflows:update")(
         procedure.input(workflowApiAutosaveInputSchema),
-      ).mutation(async ({ ctx, input }) => {
+      ).mutation(async ({ ctx, input }): Promise<WorkflowApiAutosaveOutput> => {
         return await ports.saveWorkflowVersion(ctx, {
           projectId: input.projectId,
           workflowId: input.workflowId,
@@ -602,7 +607,7 @@ export class WorkflowTrpcApi {
 
       commitVersion: policy("workflows:update")(
         procedure.input(workflowApiCommitVersionInputSchema),
-      ).mutation(async ({ ctx, input }) => {
+      ).mutation(async ({ ctx, input }): Promise<WorkflowApiCommitVersionOutput> => {
         return await ports.saveWorkflowVersion(ctx, {
           projectId: input.projectId,
           workflowId: input.workflowId,
@@ -613,7 +618,7 @@ export class WorkflowTrpcApi {
       }),
 
       publish: policy("workflows:update")(procedure.input(workflowApiPublishInputSchema)).mutation(
-        async ({ ctx, input }) => {
+        async ({ ctx, input }): Promise<WorkflowApiPublishOutput> => {
           return ctx.app.workflows.publish(
             {
               id: input.workflowId,
@@ -882,7 +887,7 @@ export class WorkflowTrpcApi {
        */
       generateCommitMessage: policy("workflows:update")(
         procedure.input(workflowApiGenerateCommitMessageInputSchema),
-      ).mutation(async ({ ctx, input }) => {
+      ).mutation(async ({ ctx, input }): Promise<WorkflowApiGenerateCommitMessageOutput> => {
         const previousDsl = comparableDsl(input.prevDsl);
         const nextDsl = comparableDsl(input.newDsl);
 

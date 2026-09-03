@@ -24,6 +24,10 @@
  * story.
  */
 
+import type {
+  LangyConversationListCursorDto,
+  LangyConversationListItemDto,
+} from "@langwatch/langy-contract";
 import { createFeatureApi } from "@langwatch/platform-api-client";
 
 /**
@@ -59,11 +63,22 @@ export type LangyApiMap = {
      * The input is stated rather than left `Unpublished` because the history
      * panel calls `useInfiniteQuery`, and tRPC only decorates a procedure with
      * that hook when its input carries a cursor.
+     *
+     * The cursor and the row are `@langwatch/langy-contract`'s own DTOs, which
+     * is what the transport already annotates this procedure with, so nothing
+     * here is a guess or a restatement of a server row.
      */
     list: {
       query: {
-        input: { projectId: string; limit?: number; cursor?: Unpublished };
-        output: { items: Unpublished[]; nextCursor: Unpublished };
+        input: {
+          projectId: string;
+          limit?: number;
+          cursor?: LangyConversationListCursorDto;
+        };
+        output: {
+          items: LangyConversationListItemDto[];
+          nextCursor: LangyConversationListCursorDto | null;
+        };
       };
     };
     messages: Q;
