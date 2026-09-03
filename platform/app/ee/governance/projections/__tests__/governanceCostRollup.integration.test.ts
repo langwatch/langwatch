@@ -196,9 +196,21 @@ async function plainSumOfDay(): Promise<number> {
   return Number(rows[0]?.Total ?? 0);
 }
 
+/**
+ * Compacts on demand, around the merge freeze `beforeAll` installs.
+ *
+ * `OPTIMIZE` is itself a merge, so it is refused while merges are stopped —
+ * the freeze has to lift for exactly as long as the compaction takes.
+ */
 async function compact(): Promise<void> {
   await ch.command({
+    query: `SYSTEM START MERGES ${GOVERNANCE_COST_ROLLUP_TABLE}`,
+  });
+  await ch.command({
     query: `OPTIMIZE TABLE ${GOVERNANCE_COST_ROLLUP_TABLE} FINAL`,
+  });
+  await ch.command({
+    query: `SYSTEM STOP MERGES ${GOVERNANCE_COST_ROLLUP_TABLE}`,
   });
 }
 
@@ -279,21 +291,40 @@ function pricedCell({
 }
 
 describe("governance cost rollup", () => {
-  beforeAll(() => {
+  beforeAll(async () => {
     const client = getTestClickHouseClient();
     if (!client) throw new Error("Test ClickHouse is not available");
     ch = client;
     repo = new GovernanceCostRollupClickHouseRepository(async () => ch);
     store = new GovernanceCostRollupStore(repo);
+
+    // Half these tests assert on what is still on disk BEFORE a compaction —
+    // that a superseded version survives, and that the read steps over it
+    // rather than waiting for a merge. A ReplacingMergeTree merges on its own
+    // schedule, so left running it can collapse those rows between the write
+    // and the assertion, and the test then fails for a reason that has nothing
+    // to do with the code. Merges are stopped for the whole file and lifted
+    // only inside `compact()`, where a compaction is the point.
+    await ch.command({
+      query: `SYSTEM STOP MERGES ${GOVERNANCE_COST_ROLLUP_TABLE}`,
+    });
   });
 
   beforeEach(() => {
-    // A fresh tenant per test: the table is shared and OPTIMIZE ... FINAL is
-    // table-wide, so tests that compact must not be able to see each other.
+    // A fresh tenant per test: the table is shared, so tests must not be able
+    // to see each other's rows. Note this does NOT isolate them from each
+    // other's merges, which are table-wide — the freeze above is what does.
     tenantId = `proj-costrollup-${nanoid(8)}`;
   });
 
   afterAll(async () => {
+    // Leaving a shared table frozen would strand every later test that needs a
+    // merge, so the freeze is lifted even though the container is torn down.
+    await ch
+      ?.command({
+        query: `SYSTEM START MERGES ${GOVERNANCE_COST_ROLLUP_TABLE}`,
+      })
+      .catch(() => undefined);
     await ch?.close();
   });
 
