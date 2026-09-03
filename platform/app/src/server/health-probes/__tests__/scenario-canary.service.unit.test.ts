@@ -28,6 +28,7 @@ import { launchScenarioRun } from "~/server/scenarios/launch-scenario-run.servic
 
 import {
   buildProductionDeps,
+  type CanaryConfig,
   classifyCanaryOutcome,
   createSingleFlightScenarioCanary,
   parseCanaryConfig,
@@ -35,7 +36,6 @@ import {
   runScenarioCanary,
   SCENARIO_CANARY_ATTEMPT_BUDGET_MS,
   SCENARIO_CANARY_TOTAL_BUDGET_MS,
-  type CanaryConfig,
   type ScenarioCanaryDeps,
   type ScenarioRunSnapshot,
 } from "../scenario-canary.service";
