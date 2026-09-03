@@ -7,19 +7,17 @@ import {
   gateTraceLogVisibility as gateTraceLogVisibilityWithService,
   redactTraceLogContent as redactTraceLogContentWithService,
   redactV2Content as redactV2ContentWithPorts,
-  type CategoryVisibility,
   type TraceContentPrivacyPort,
   type V2Protections,
 } from "../trace-read-mappers.api";
+import type { CategoryVisibility } from "../../../services/trace-viewer-protections.service";
 import {
   CONTENT_KEY_CATALOG,
   PRIVACY_DROPPED_MARKER_ATTR,
   PRIVACY_PII_INCOMPLETE_MARKER_ATTR,
+  stripRolesFromChatArrayJson,
 } from "@langwatch/data-privacy-contract";
-import { ContentDropPolicyService } from "@langwatch/data-privacy-server";
 
-/** The packaged chat-array stripper the ingestion path applies. */
-const dropPolicy = ContentDropPolicyService.create();
 import { TestCodingAgentService } from "../../../services/__tests__/support/coding-agent.service.fake";
 
 /**
@@ -32,8 +30,7 @@ const contentPrivacy: TraceContentPrivacyPort = {
   contentKeyCatalog: CONTENT_KEY_CATALOG,
   droppedMarkerAttribute: PRIVACY_DROPPED_MARKER_ATTR,
   piiIncompleteMarkerAttribute: PRIVACY_PII_INCOMPLETE_MARKER_ATTR,
-  stripRolesFromChatArrayJson: (json, roles, stripToolCalls) =>
-    dropPolicy.tryStripRolesFromChatArrayJson(json, roles, stripToolCalls),
+  stripRolesFromChatArrayJson,
   getResolvedPolicyForProject: () => {
     throw new Error("the resolved data-privacy policy is not read by these cases");
   },

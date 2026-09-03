@@ -4,6 +4,7 @@ import {
   CONTENT_KEY_CATALOG,
   compileAttributePatterns,
   matchesAnyAttributePattern,
+  stripRolesFromChatArrayJson,
   type CompiledAttributeMatcher,
   type ContentCategory,
   type ResolvedDataPrivacy,
@@ -22,10 +23,6 @@ const ROLE_BASED_CATEGORY_ROLES: Partial<Record<ContentCategory, readonly string
   system: ["system"],
   tools: ["tool", "function"],
 };
-
-function isChatMessage(value: unknown): value is Record<string, unknown> {
-  return typeof value === "object" && value !== null;
-}
 
 /**
  * What a resolved privacy policy means for a payload, independent of the shape
@@ -83,53 +80,7 @@ export class ContentDropPolicyService {
     roles: ReadonlySet<string>,
     stripToolCalls: boolean,
   ): { json: string; removed: number } | null {
-    if (roles.size === 0 && !stripToolCalls) {
-      return null;
-    }
-
-    let parsed: unknown;
-    try {
-      parsed = JSON.parse(json);
-    } catch {
-      return null;
-    }
-
-    let messages: unknown[];
-    let rewrap: (next: unknown[]) => unknown;
-    if (Array.isArray(parsed)) {
-      messages = parsed;
-      rewrap = (next) => next;
-    } else if (isChatMessage(parsed) && Array.isArray((parsed as { value?: unknown }).value)) {
-      messages = (parsed as { value: unknown[] }).value;
-      rewrap = (next) => ({ ...parsed, value: next });
-    } else {
-      return null;
-    }
-
-    let removed = 0;
-    const next: unknown[] = [];
-    for (const message of messages) {
-      const role = isChatMessage(message) ? message.role : undefined;
-      if (typeof role === "string" && roles.has(role)) {
-        removed++;
-        continue;
-      }
-
-      if (stripToolCalls && isChatMessage(message) && message.tool_calls != null) {
-        const { tool_calls: _dropped, ...rest } = message;
-        removed++;
-        next.push(rest);
-        continue;
-      }
-
-      next.push(message);
-    }
-
-    if (removed === 0) {
-      return null;
-    }
-
-    return { json: JSON.stringify(rewrap(next)), removed };
+    return stripRolesFromChatArrayJson(json, roles, stripToolCalls);
   }
 
   /**

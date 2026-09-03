@@ -1,5 +1,6 @@
 export * from "./data-privacy";
 export * from "./data-privacy.attribute-pattern";
+export * from "./data-privacy.chat-array";
 export * from "./data-privacy.content-catalog";
 export * from "./data-privacy.errors";
 export * from "./data-privacy.markers";

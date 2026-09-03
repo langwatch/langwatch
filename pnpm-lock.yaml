@@ -8409,9 +8409,6 @@ importers:
       '@clickhouse/client':
         specifier: ^1.23.0
         version: 1.23.0
-      '@langwatch/data-privacy-server':
-        specifier: workspace:*
-        version: link:../../data-privacy/server
       '@types/papaparse':
         specifier: ^5.5.2
         version: 5.5.2

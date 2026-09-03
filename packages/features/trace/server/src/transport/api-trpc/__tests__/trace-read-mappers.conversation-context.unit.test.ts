@@ -9,19 +9,15 @@ import {
   CONTENT_KEY_CATALOG,
   PRIVACY_DROPPED_MARKER_ATTR,
   PRIVACY_PII_INCOMPLETE_MARKER_ATTR,
+  stripRolesFromChatArrayJson,
 } from "@langwatch/data-privacy-contract";
-import { ContentDropPolicyService } from "@langwatch/data-privacy-server";
-
-/** The packaged chat-array stripper the ingestion path applies. */
-const dropPolicy = ContentDropPolicyService.create();
 
 /** The real data-privacy vocabulary, wired as the port the mapper now takes. */
 const contentPrivacy: TraceContentPrivacyPort = {
   contentKeyCatalog: CONTENT_KEY_CATALOG,
   droppedMarkerAttribute: PRIVACY_DROPPED_MARKER_ATTR,
   piiIncompleteMarkerAttribute: PRIVACY_PII_INCOMPLETE_MARKER_ATTR,
-  stripRolesFromChatArrayJson: (json, roles, stripToolCalls) =>
-    dropPolicy.tryStripRolesFromChatArrayJson(json, roles, stripToolCalls),
+  stripRolesFromChatArrayJson,
   getResolvedPolicyForProject: () => {
     throw new Error("the resolved data-privacy policy is not read by these cases");
   },
