@@ -122,7 +122,14 @@ export class ControlRequestService {
         }));
   }
 
-  /** Records the request the code access card renders. */
+  /**
+   * Records the request the code access card renders.
+   *
+   * A conversation holds one open request at a time. The card can be raised
+   * again in the same chat, and the developer runs the command minutes later:
+   * without this, the terminal lists the same conversation two or three times
+   * and the developer has to guess which row is the live one.
+   */
   async create({
     projectId,
     projectName,
@@ -138,6 +145,10 @@ export class ControlRequestService {
     conversationTitle: string;
     conversationUrl: string;
   }): Promise<StoredControlRequest> {
+    for (const older of await this.listOpen({ projectId, userId })) {
+      if (older.conversationId !== conversationId) continue;
+      await this.forget(older);
+    }
     const createdAt = this.now();
     const request: StoredControlRequest = {
       id: `lcr_${nanoid()}`,

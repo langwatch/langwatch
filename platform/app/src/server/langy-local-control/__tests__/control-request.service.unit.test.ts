@@ -82,6 +82,25 @@ describe("given a code access card that asked for a folder", () => {
     });
   });
 
+  describe("when the same conversation asks for the folder again", () => {
+    /** @scenario "A new request replaces the conversation's older open request" */
+    it("keeps only the newest, and leaves another conversation alone", async () => {
+      const first = await create();
+      const other = await create({ conversationId: "conv_2" });
+      now += 30_000;
+      const second = await create();
+
+      const open = await service.listOpen({ projectId, userId });
+      expect(open.map((row) => row.id).sort()).toEqual(
+        [second.id, other.id].sort(),
+      );
+      expect(await service.read(first.id)).toBeNull();
+      await expect(
+        service.approve({ requestId: first.id, userId, projectId }),
+      ).rejects.toMatchObject({ code: "langy_local_request_invalid" });
+    });
+  });
+
   describe("when a teammate lists their own open requests", () => {
     /** @scenario "Another user never sees my request" */
     it("leaves mine out, and refuses their approval of it", async () => {

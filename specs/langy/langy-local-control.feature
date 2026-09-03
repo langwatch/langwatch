@@ -28,6 +28,13 @@ Feature: Langy works in a folder shared from the developer's machine
       And the request expires in fifteen minutes
       And the CLI signed in as me lists it
 
+    @unit
+    Scenario: A new request replaces the conversation's older open request
+      Given a control request I created
+      When the same conversation asks for the folder again
+      Then only the newest request is open
+      And the CLI lists this conversation once
+
     @integration
     Scenario: Another user never sees my request
       Given a control request I created
