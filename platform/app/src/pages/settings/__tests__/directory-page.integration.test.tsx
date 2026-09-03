@@ -33,14 +33,8 @@ vi.mock("~/components/SettingsLayout", () => ({
   ),
 }));
 
-// The reconciliation panel, the summary band and the four tab bodies all have
-// their own tests; here they only have to be present and in the right place.
-vi.mock("~/components/settings/ScimReconciliationPanel", () => ({
-  ScimReconciliationPanel: () => (
-    <div data-testid="reconciliation-panel">connections</div>
-  ),
-}));
-
+// The summary band and the four tab bodies all have their own tests; here
+// they only have to be present and in the right place.
 vi.mock("~/components/access/DirectorySummary", () => ({
   DirectorySummary: () => <div data-testid="directory-summary">status</div>,
 }));
@@ -230,7 +224,6 @@ describe("given the directory page", () => {
       renderPage("/settings/directory?tab=provisioning");
 
       expect(tab("People")).toHaveAttribute("aria-selected", "true");
-      expect(screen.queryByTestId("reconciliation-panel")).toBeNull();
     });
   });
 

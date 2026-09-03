@@ -69,6 +69,17 @@ Feature: Passkeys - the fastest way in, and the one phishing cannot take
     Then the passkey appears in "sam"'s list of sign-in methods
     And "sam" can sign in with it from then on
 
+  # The settings page starts the ceremony with no address attached: the
+  # person is signed in, and the account is the one they are signed into.
+  # Reading a sign-up context anyway refused the passkey they had just
+  # created, on a page showing the very address it said was missing.
+  @unit
+  Scenario: Adding a passkey while signed in attaches it to that account
+    Given "sam" is signed in
+    When "sam" completes a passkey ceremony from their security settings
+    Then the passkey is attached to "sam"'s account
+    And no account is created and no address is asked for
+
   # ONE offer, two halves (D06 follow-up). A person is asked once about their
   # ACCOUNT rather than once about a passkey and again about two-step
   # verification: two dialogs on the way in is a nag whatever each one says,

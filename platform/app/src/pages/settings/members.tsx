@@ -26,17 +26,12 @@ const CUT_FOR_OLD_TAB: Record<string, string> = {
 export default function MembersRedirect() {
   const [searchParams] = useSearchParams();
   const cut = CUT_FOR_OLD_TAB[searchParams.get("tab") ?? ""];
+  // Everybody is the default cut, so the members tab — which was the default
+  // there too — arrives with no query at all.
+  const to =
+    cut && cut !== "members"
+      ? `/settings/directory?people=${cut}`
+      : "/settings/directory";
 
-  return (
-    <Navigate
-      to={
-        // Everybody is the default cut, so the members tab — which was the
-        // default there too — arrives with no query at all.
-        cut && cut !== "members"
-          ? `/settings/directory?people=${cut}`
-          : "/settings/directory"
-      }
-      replace
-    />
-  );
+  return <Navigate to={to} replace />;
 }

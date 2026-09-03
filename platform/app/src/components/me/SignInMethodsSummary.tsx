@@ -56,7 +56,6 @@ export function SignInMethodsSummary() {
   const twoStep = api.twoStepVerification.account.useQuery({});
   const passkeys = authClient.useListPasskeys();
 
-
   return (
     <SettingsSection
       icon={<KeyRound size={18} />}

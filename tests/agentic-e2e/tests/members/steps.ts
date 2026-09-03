@@ -19,13 +19,14 @@ import { E2E_ENTERPRISE_LICENSE_KEY } from "../license.fixture";
  * Extracts the org slug from the Home link to build the URL.
  */
 export async function givenIAmOnTheMembersPage(page: Page) {
-  // Members settings is org-scoped at /settings/members. The organization
-  // context comes from the authenticated session rather than the URL.
+  // Members is the first tab of the Directory. The old address still works —
+  // it forwards there — and the organization context comes from the
+  // authenticated session rather than the URL.
   await page.goto("/settings/members");
-  await expect(page).toHaveURL(/\/settings\/members/, { timeout: 15000 });
-  await expect(
-    page.getByRole("heading", { name: "Organization Members" })
-  ).toBeVisible({ timeout: 15000 });
+  await expect(page).toHaveURL(/\/settings\/directory/, { timeout: 15000 });
+  await expect(page.getByRole("heading", { name: "Directory" })).toBeVisible({
+    timeout: 15000,
+  });
 }
 
 // =============================================================================
