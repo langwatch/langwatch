@@ -1,4 +1,10 @@
-import { LANGY_CONVERSATION_STATUS, renderLangyTurnContext } from "@langwatch/langy-contract";
+import {
+  LANGY_CONVERSATION_STATUS,
+  LangyAgentUnavailableError,
+  LangyModelNotAllowedError,
+  LangyTurnInProgressError,
+  renderLangyTurnContext,
+} from "@langwatch/langy-contract";
 import { describe, expect, it, vi } from "vitest";
 import {
   LangyTurnService,
@@ -155,5 +161,417 @@ describe("LangyTurnService.startConversationTurn ui-action surface", () => {
       // The rest of the screen context still travels.
       expect(prompt).toContain("my-exp");
     });
+  });
+});
+
+/**
+ * The acceptance command and the fast-path dispatch are what
+ * LangyTurnPreparationService.prepareAndDispatch exists to produce, atomically
+ * with the durable admission commit — the golden path a turn takes end to end.
+ */
+describe("LangyTurnPreparationService golden path", () => {
+  it("commits one atomic message + acceptance command and fast-dispatches it", async () => {
+    const fixture = makeFixture();
+
+    const result = await LangyTurnService.create(fixture.deps).startConversationTurn(
+      input,
+    );
+
+    expect(result).toEqual({ conversationId: "conversation-1", turnId: "turn-1" });
+    expect(fixture.acceptTurn).toHaveBeenCalledWith(
+      expect.objectContaining({
+        questionParts: [{ type: "text", text: "hello" }],
+        userMessage: expect.objectContaining({
+          role: "user",
+          parts: [{ type: "text", text: "hello" }],
+        }),
+      }),
+    );
+    expect(fixture.dispatch).toHaveBeenCalledWith(
+      expect.objectContaining({
+        projectId: "project-1",
+        userId: "user-1",
+        conversationId: "conversation-1",
+        turnId: "turn-1",
+      }),
+    );
+  });
+
+  it("atomically prefixes a new conversation with its owner and run token", async () => {
+    const fixture = makeFixture();
+
+    await LangyTurnService.create(fixture.deps).startConversationTurn(input);
+
+    expect(fixture.acceptTurn).toHaveBeenCalledWith(
+      expect.objectContaining({
+        conversationStart: expect.objectContaining({
+          userId: "user-1",
+          runToken: expect.any(String),
+        }),
+        userMessage: expect.objectContaining({ role: "user" }),
+      }),
+    );
+  });
+
+  it("omits message_recorded when explicitly re-driving an existing message", async () => {
+    const fixture = makeFixture();
+
+    await LangyTurnService.create(fixture.deps).startConversationTurn({
+      ...input,
+      isRetry: true,
+    });
+
+    expect(fixture.acceptTurn).toHaveBeenCalledWith(
+      expect.not.objectContaining({ userMessage: expect.anything() }),
+    );
+  });
+
+  it("does not mint when the principal-bound worker probe hits", async () => {
+    const mint = vi.fn(async () => ({ token: "session-key", apiKeyId: "key-1" }));
+    const probe = vi.fn(async () => true);
+    const dispatch = vi.fn(async () => "accepted" as const);
+    const fixture = makeFixture({
+      worker: {
+        probe,
+        dispatch,
+        cancel: vi.fn(async () => undefined),
+        warm: vi.fn(async () => undefined),
+      },
+      sessionKeys: { mint, revoke: vi.fn(async () => undefined) },
+    } as unknown as Partial<LangyTurnServiceDeps>);
+
+    await LangyTurnService.create(fixture.deps).startConversationTurn(input);
+
+    expect(mint).not.toHaveBeenCalled();
+    expect(dispatch).toHaveBeenCalledWith(
+      expect.objectContaining({ intent: "continue" }),
+    );
+  });
+
+  it("finalizes the GitHub permit before probing the worker signature", async () => {
+    const order: string[] = [];
+    const reserve = vi.fn(async () => {
+      order.push("permit");
+      return { reserved: false, allowed: false, resetAt: Date.now() + 60_000 };
+    });
+    const probe = vi.fn(async ({ hasGithubAuth }: { hasGithubAuth: boolean }) => {
+      order.push(`probe:${String(hasGithubAuth)}`);
+      return false;
+    });
+    const dispatch = vi.fn(async () => "accepted" as const);
+    const fixture = makeFixture({
+      credentials: {
+        getOrProvision: vi.fn(async () => ({
+          organizationId: "organization-1",
+          githubToken: "gh-token",
+          githubLogin: "octocat",
+        })),
+        tryGetEgressAllowlist: vi.fn(async () => null),
+        resolveMirrorTier: vi.fn(async () => "content" as const),
+        tryGetModelsAllowed: vi.fn(async () => null),
+      },
+      permits: { reserve, release: vi.fn(async () => undefined), check: vi.fn(async () => ({ allowed: true })) },
+      worker: {
+        probe,
+        dispatch,
+        cancel: vi.fn(async () => undefined),
+        warm: vi.fn(async () => undefined),
+      },
+    } as unknown as Partial<LangyTurnServiceDeps>);
+
+    await LangyTurnService.create(fixture.deps).startConversationTurn(input);
+
+    expect(order).toEqual(["permit", "probe:false"]);
+    expect(dispatch).toHaveBeenCalledWith(
+      expect.objectContaining({
+        credentials: expect.not.objectContaining({ githubToken: expect.anything() }),
+      }),
+    );
+  });
+
+  it("keeps the projection guard only as rollout defence and aborts its claim", async () => {
+    const abort = vi.fn(async () => undefined);
+    const fixture = makeFixture({
+      conversations: {
+        ensureConversation: vi.fn(async () => ({ id: "conversation-1", isNew: false })),
+        tryFindByIdVisible: vi.fn(async () => ({ status: LANGY_CONVERSATION_STATUS.RUNNING })),
+        tryGetPendingHandoff: vi.fn(async () => null),
+        tryGetRunToken: vi.fn(async () => "run-token"),
+        acceptTurn: vi.fn(async () => undefined),
+        finalizeTurn: vi.fn(async () => undefined),
+      },
+      admission: {
+        claim: vi.fn(async () => ({
+          kind: "claimed" as const,
+          claimToken: "claim-1",
+          conversationId: "conversation-1",
+          turnId: "turn-1",
+        })),
+        commit: vi.fn(async () => undefined),
+        abort,
+        release: vi.fn(async () => undefined),
+      },
+    } as unknown as Partial<LangyTurnServiceDeps>);
+
+    await expect(
+      LangyTurnService.create(fixture.deps).startConversationTurn(input),
+    ).rejects.toBeInstanceOf(LangyTurnInProgressError);
+
+    expect(abort).toHaveBeenCalledOnce();
+    expect(fixture.dispatch).not.toHaveBeenCalled();
+  });
+
+  it("rejects a disallowed model and releases the admission", async () => {
+    const abort = vi.fn(async () => undefined);
+    const reserve = vi.fn(async () => ({ reserved: false, allowed: true, resetAt: 0 }));
+    const fixture = makeFixture({
+      credentials: {
+        getOrProvision: vi.fn(async () => ({ organizationId: "organization-1" })),
+        tryGetEgressAllowlist: vi.fn(async () => null),
+        resolveMirrorTier: vi.fn(async () => "content" as const),
+        tryGetModelsAllowed: vi.fn(async () => ["openai/gpt-5-mini"]),
+      },
+      permits: { reserve, release: vi.fn(async () => undefined), check: vi.fn(async () => ({ allowed: true })) },
+      admission: {
+        claim: vi.fn(async () => ({
+          kind: "claimed" as const,
+          claimToken: "claim-1",
+          conversationId: "conversation-1",
+          turnId: "turn-1",
+        })),
+        commit: vi.fn(async () => undefined),
+        abort,
+        release: vi.fn(async () => undefined),
+      },
+    } as unknown as Partial<LangyTurnServiceDeps>);
+
+    await expect(
+      LangyTurnService.create(fixture.deps).startConversationTurn({
+        ...input,
+        modelOverride: "evil/model",
+      }),
+    ).rejects.toBeInstanceOf(LangyModelNotAllowedError);
+
+    expect(abort).toHaveBeenCalledOnce();
+    expect(reserve).not.toHaveBeenCalled();
+  });
+
+  it("rejects a resolved default that is not on the allowlist before dispatch", async () => {
+    const fixture = makeFixture({
+      models: { resolve: vi.fn(async () => ({ modelId: "anthropic/claude-opus-4-8" })) },
+      credentials: {
+        getOrProvision: vi.fn(async () => ({ organizationId: "organization-1" })),
+        tryGetEgressAllowlist: vi.fn(async () => null),
+        resolveMirrorTier: vi.fn(async () => "content" as const),
+        tryGetModelsAllowed: vi.fn(async () => ["openai/gpt-5-mini"]),
+      },
+    } as unknown as Partial<LangyTurnServiceDeps>);
+
+    await expect(
+      LangyTurnService.create(fixture.deps).startConversationTurn(input),
+    ).rejects.toBeInstanceOf(LangyModelNotAllowedError);
+
+    expect(fixture.dispatch).not.toHaveBeenCalled();
+  });
+
+  it("revokes the key, releases the permit, and aborts when acceptance fails", async () => {
+    const revoke = vi.fn(async () => undefined);
+    const release = vi.fn(async () => undefined);
+    const abort = vi.fn(async () => undefined);
+    const acceptTurn = vi.fn(async () => {
+      throw new Error("event store failed");
+    });
+    const fixture = makeFixture({
+      credentials: {
+        getOrProvision: vi.fn(async () => ({
+          organizationId: "organization-1",
+          githubToken: "gh-token",
+        })),
+        tryGetEgressAllowlist: vi.fn(async () => null),
+        resolveMirrorTier: vi.fn(async () => "content" as const),
+        tryGetModelsAllowed: vi.fn(async () => null),
+      },
+      conversations: {
+        ensureConversation: vi.fn(async () => ({ id: "conversation-1", isNew: false })),
+        tryFindByIdVisible: vi.fn(async () => ({ status: LANGY_CONVERSATION_STATUS.IDLE })),
+        tryGetPendingHandoff: vi.fn(async () => null),
+        tryGetRunToken: vi.fn(async () => "run-token"),
+        acceptTurn,
+        finalizeTurn: vi.fn(async () => undefined),
+      },
+      sessionKeys: {
+        mint: vi.fn(async () => ({ token: "session-key", apiKeyId: "key-1" })),
+        revoke,
+      },
+      permits: { reserve: vi.fn(async () => ({ reserved: true, allowed: true, resetAt: 0 })), release, check: vi.fn(async () => ({ allowed: true })) },
+      admission: {
+        claim: vi.fn(async () => ({
+          kind: "claimed" as const,
+          claimToken: "claim-1",
+          conversationId: "conversation-1",
+          turnId: "turn-1",
+        })),
+        commit: vi.fn(async () => undefined),
+        abort,
+        release: vi.fn(async () => undefined),
+      },
+    } as unknown as Partial<LangyTurnServiceDeps>);
+
+    await expect(
+      LangyTurnService.create(fixture.deps).startConversationTurn(input),
+    ).rejects.toThrow();
+
+    expect(fixture.dispatch).not.toHaveBeenCalled();
+    expect(revoke).toHaveBeenCalledWith({ apiKeyId: "key-1", projectId: "project-1" });
+    expect(release).toHaveBeenCalledWith({ userId: "user-1" });
+    expect(abort).toHaveBeenCalledOnce();
+  });
+
+  it("does not fast-dispatch until the durable replay receipt commits", async () => {
+    let resolveCommit!: () => void;
+    const commit = vi.fn(
+      () =>
+        new Promise<void>((resolve) => {
+          resolveCommit = resolve;
+        }),
+    );
+    const fixture = makeFixture({
+      admission: {
+        claim: vi.fn(async () => ({
+          kind: "claimed" as const,
+          claimToken: "claim-1",
+          conversationId: "conversation-1",
+          turnId: "turn-1",
+        })),
+        commit,
+        abort: vi.fn(async () => undefined),
+        release: vi.fn(async () => undefined),
+      },
+    } as unknown as Partial<LangyTurnServiceDeps>);
+
+    const result = LangyTurnService.create(fixture.deps).startConversationTurn(input);
+    await vi.waitFor(() => expect(commit).toHaveBeenCalledOnce());
+    expect(fixture.dispatch).not.toHaveBeenCalled();
+    resolveCommit();
+    await result;
+    expect(fixture.dispatch).toHaveBeenCalledOnce();
+  });
+
+  it("leaves eager dispatch to the outbox when receipt commit is unconfirmed", async () => {
+    const fixture = makeFixture({
+      admission: {
+        claim: vi.fn(async () => ({
+          kind: "claimed" as const,
+          claimToken: "claim-1",
+          conversationId: "conversation-1",
+          turnId: "turn-1",
+        })),
+        commit: vi.fn(async () => {
+          throw new Error("postgres unavailable");
+        }),
+        abort: vi.fn(async () => undefined),
+        release: vi.fn(async () => undefined),
+      },
+    } as unknown as Partial<LangyTurnServiceDeps>);
+
+    await expect(
+      LangyTurnService.create(fixture.deps).startConversationTurn(input),
+    ).resolves.toEqual({ conversationId: "conversation-1", turnId: "turn-1" });
+
+    expect(fixture.acceptTurn).toHaveBeenCalledOnce();
+    expect(fixture.dispatch).not.toHaveBeenCalled();
+  });
+
+  it("consumes a pending handoff in the same acceptance command", async () => {
+    const acceptTurn = vi.fn(async () => undefined);
+    const fixture = makeFixture({
+      conversations: {
+        ensureConversation: vi.fn(async () => ({ id: "conversation-1", isNew: false })),
+        tryFindByIdVisible: vi.fn(async () => ({ status: LANGY_CONVERSATION_STATUS.IDLE })),
+        tryGetPendingHandoff: vi.fn(async () => ({ turnId: "old-turn", token: "checkpoint" })),
+        tryGetRunToken: vi.fn(async () => "run-token"),
+        acceptTurn,
+        finalizeTurn: vi.fn(async () => undefined),
+      },
+    } as unknown as Partial<LangyTurnServiceDeps>);
+
+    await LangyTurnService.create(fixture.deps).startConversationTurn(input);
+
+    expect(acceptTurn).toHaveBeenCalledWith(
+      expect.objectContaining({ consumeHandoffTurnId: "old-turn" }),
+    );
+    expect(fixture.dispatch).toHaveBeenCalledWith(
+      expect.objectContaining({ intent: "revive", resumeToken: "checkpoint" }),
+    );
+  });
+});
+
+/**
+ * The runToken is the HMAC key the worker signs every frame with, and the
+ * relay verifies against. It must never degrade to a sentinel: an empty key
+ * is publicly computable, and the relay maps "no token" to a rejection, so a
+ * turn signed with "" emits nothing and never terminates — a silent hang.
+ */
+describe("when the conversation's runToken cannot be resolved", () => {
+  /** @scenario Langy reports the agent unavailable instead of hanging the turn */
+  it("refuses the turn when the runToken read fails", async () => {
+    const fixture = makeFixture({
+      conversations: {
+        ensureConversation: vi.fn(async () => ({ id: "conversation-1", isNew: false })),
+        tryFindByIdVisible: vi.fn(async () => ({ status: LANGY_CONVERSATION_STATUS.IDLE })),
+        tryGetPendingHandoff: vi.fn(async () => null),
+        tryGetRunToken: vi.fn(async () => {
+          throw new Error("postgres unavailable");
+        }),
+        acceptTurn: vi.fn(async () => undefined),
+        finalizeTurn: vi.fn(async () => undefined),
+      },
+    } as unknown as Partial<LangyTurnServiceDeps>);
+
+    await expect(
+      LangyTurnService.create(fixture.deps).startConversationTurn(input),
+    ).rejects.toBeInstanceOf(LangyAgentUnavailableError);
+
+    expect(fixture.dispatch).not.toHaveBeenCalled();
+  });
+
+  /** @scenario Langy reports the agent unavailable instead of hanging the turn */
+  it("refuses the turn when the conversation carries no runToken", async () => {
+    const fixture = makeFixture({
+      conversations: {
+        ensureConversation: vi.fn(async () => ({ id: "conversation-1", isNew: false })),
+        tryFindByIdVisible: vi.fn(async () => ({ status: LANGY_CONVERSATION_STATUS.IDLE })),
+        tryGetPendingHandoff: vi.fn(async () => null),
+        tryGetRunToken: vi.fn(async (): Promise<string | null> => null),
+        acceptTurn: vi.fn(async () => undefined),
+        finalizeTurn: vi.fn(async () => undefined),
+      },
+    } as unknown as Partial<LangyTurnServiceDeps>);
+
+    await expect(
+      LangyTurnService.create(fixture.deps).startConversationTurn(input),
+    ).rejects.toBeInstanceOf(LangyAgentUnavailableError);
+
+    expect(fixture.dispatch).not.toHaveBeenCalled();
+  });
+
+  /** @scenario Langy reports the agent unavailable instead of hanging the turn */
+  it("never dispatches a turn with a falsy runToken", async () => {
+    const fixture = makeFixture({
+      conversations: {
+        ensureConversation: vi.fn(async () => ({ id: "conversation-1", isNew: false })),
+        tryFindByIdVisible: vi.fn(async () => ({ status: LANGY_CONVERSATION_STATUS.IDLE })),
+        tryGetPendingHandoff: vi.fn(async () => null),
+        tryGetRunToken: vi.fn(async (): Promise<string | null> => ""),
+        acceptTurn: vi.fn(async () => undefined),
+        finalizeTurn: vi.fn(async () => undefined),
+      },
+    } as unknown as Partial<LangyTurnServiceDeps>);
+
+    await expect(
+      LangyTurnService.create(fixture.deps).startConversationTurn(input),
+    ).rejects.toBeInstanceOf(LangyAgentUnavailableError);
+
+    expect(fixture.dispatch).not.toHaveBeenCalled();
   });
 });
