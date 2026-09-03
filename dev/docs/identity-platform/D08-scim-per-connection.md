@@ -2,6 +2,12 @@
 
 Epic: `../identity-platform-redesign.md` · Plan: `delivery-plan.md` · Wave 3 · Depends on: D05 (connection-scoped tokens) + **authz precondition checklist (hard)** · Flag: `SCIM_V2_GRANTS`
 
+> **Amendment 2026-09-03:** `platform/app` is deleted. SCIM now lives in
+> `packages/enterprise/features/scim/{contract,server,web}`; the service this
+> note refers to is
+> `packages/enterprise/features/scim/server/src/services/scim.service.ts`.
+> Verify current shape against that tree before treating paths below as live.
+
 # Overview
 
 SCIM stops writing membership tables directly. Tokens become scoped per SSO connection, a `(connectionId, externalId) → userId` mapping gives IdP-stable identity per connection, and every membership consequence flows through `grants.*` — SCIM becomes a command/event producer in the identity pipeline. De-enroll is a replayable event with a proven postcondition: no effective permissions remain.
@@ -60,7 +66,7 @@ Membership consequences are grants-ledger events, not SCIM events: the reconcile
 
 # Research
 
-- Today: `platform/app/ee/scim/` — full SCIM v2 at `/api/scim/v2`, per-org bearer tokens (`ScimToken` has no `connectionId`; the hash lookup is global and the organization is *derived* from the row), Auth0 log-stream webhook (dies at D10; customers repoint at D09). **Grants already flow through the ledger**: `scim-grants.reconciler.ts` diffs desired-against-current and calls `GrantsLedgerWriter.attachBindings({ source: "scim" })` / `revokeBindings`, so decision 18's reconciler shape is landed. What is still a direct write is the `OrganizationUser` row (`role: "MEMBER"`, unconditional) alongside it — that, not the grants, is what D08 removes.
+- Today: `platform/app/ee/scim/` — full SCIM v2 at `/api/scim/v2`, per-org bearer tokens (`ScimToken` has no `connectionId`; the hash lookup is global and the organization is _derived_ from the row), Auth0 log-stream webhook (dies at D10; customers repoint at D09). **Grants already flow through the ledger**: `scim-grants.reconciler.ts` diffs desired-against-current and calls `GrantsLedgerWriter.attachBindings({ source: "scim" })` / `revokeBindings`, so decision 18's reconciler shape is landed. What is still a direct write is the `OrganizationUser` row (`role: "MEMBER"`, unconditional) alongside it — that, not the grants, is what D08 removes.
 - Three gaps the current code carries into this deliverable: `ScimService.deleteUser` calls the low-level `GrantsLedgerWriter.offboardMember`, **not** `GrantsService.offboard`, so the empty-proof postcondition and the `needsHumanDecision` manifest are never exercised (`.offboard(` has no production call site anywhere in the tree); a `PATCH`/`PUT` setting `active: false` deactivates the user and **revokes no grants at all**; and the SCIM resource id for a Group resolves to our internal `Group.id` rather than the IdP's `externalId`, which is written only on create.
 - `GrantsService.attach` cannot express a system actor at all — its `Actor` is `{ userId: string }` and its serializer stamps `{ type: "user", … }` unconditionally. Routing SCIM through `GrantsService` (rather than the ledger writer directly) needs that seam widened first; it is an authz-package change, so it is a **breaking change to this program** under the risk register and belongs on the precondition checklist.
 - Doctrine anchor: `specs/event-sourcing/pipeline-model.feature` (pipelines own their commands/events/projections); content-boundary precedent ADR-052.

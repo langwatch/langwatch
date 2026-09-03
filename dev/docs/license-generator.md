@@ -1,5 +1,18 @@
 # License generator (dev / QA / seeding)
 
+> **Amendment 2026-09-04:** `platform/app` is deleted (commit `faaa9ec333`),
+> and `scripts/generate-license.ts` did not survive the split (see "What was
+> removed" below) — there is currently no CLI or task wired up to run it. The
+> signing logic itself lives on in `LicenseGenerationService`
+> (`packages/enterprise/features/licensing/server/src/services/license-generation.service.ts`),
+> plan templates in
+> `packages/enterprise/features/licensing/contract/src/license-plan-templates.ts`,
+> and the verifier's public key in
+> `packages/enterprise/features/licensing/server/src/adapters/node.license-cryptography.adapter.ts`.
+> The `pnpm tsx scripts/generate-license.ts` commands below describe intent,
+> not a runnable command — reinstate a CLI entry point (e.g. an `apps/tasks`
+> task) that calls `LicenseGenerationService` before relying on this guide.
+
 > Self-hosted LangWatch installs gate the Enterprise feature surface (audit log,
 > ingestion sources, anomaly rules, multi-user surfaces, the full governance
 > dashboard) on a real signed license file. There is **no env-var bypass**.
@@ -56,12 +69,12 @@ LANGWATCH_LICENSE_PRIVATE_KEY=$(cat private.pem) \
 
 Arguments:
 
-| Flag            | Required | Default                | Description                                                                                                  |
-| --------------- | -------- | ---------------------- | ------------------------------------------------------------------------------------------------------------ |
-| `--org-id`      | yes      | —                      | Target `Organization.id` to attach the license to. Org must already exist.                                   |
+| Flag            | Required | Default                | Description                                                                                                                                     |
+| --------------- | -------- | ---------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------- |
+| `--org-id`      | yes      | —                      | Target `Organization.id` to attach the license to. Org must already exist.                                                                      |
 | `--plan`        | no       | `ENTERPRISE`           | One of `ENTERPRISE` / `GROWTH` / `PRO`. Plan templates live at `packages/enterprise/features/licensing/contract/src/license-plan-templates.ts`. |
-| `--max-members` | no       | `50`                   | Seat cap. Must be ≥ 1.                                                                                       |
-| `--email`       | no       | `<orgSlug>@local.test` | Issued-to email for the license metadata + audit-trail field.                                                |
+| `--max-members` | no       | `50`                   | Seat cap. Must be ≥ 1.                                                                                                                          |
+| `--email`       | no       | `<orgSlug>@local.test` | Issued-to email for the license metadata + audit-trail field.                                                                                   |
 
 Output: prints the encoded license key to stdout + writes/updates the
 `Organization.license` + `Organization.licenseExpiresAt` columns. The

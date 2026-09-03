@@ -2,6 +2,13 @@
 
 Epic: `../identity-platform-redesign.md` · Plan: `delivery-plan.md` · Wave 4 · Depends on: D09 program exit (zero ACTIVE legacy connections) · **Program exit criterion — customer-paced, not a scheduled milestone**
 
+> **Amendment 2026-09-03:** `platform/app` itself has since been deleted
+> entirely (commit `faaa9ec333`). The Auth0 surfaces this deliverable targets
+> now live in `packages/enterprise/features/sso/server/src/adapters/` and
+> `packages/features/auth/server/src/services/auth0-password.service.ts` —
+> re-verify what remains against the current tree before executing this
+> deliverable's exit gate.
+
 # Overview
 
 Auth0 actually dies: provider config, Management API password service, federated logout, SCIM webhook, env wiring, SaaS secrets, the legacy callback shim, and the agents-box Playwright login. Customer migration is deliberately slow and per-tenant (D09); this deliverable starts only when the last legacy connection tears down. This is the program's DONE signal.

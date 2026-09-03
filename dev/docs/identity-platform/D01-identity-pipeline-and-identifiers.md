@@ -1,6 +1,12 @@
 # D01 — Identity pipeline skeleton + identifiers
 
-Epic: `../identity-platform-redesign.md` · Plan: `delivery-plan.md` · Wave 1 · Depends on: the landed authz program — ADR-110's migration state, `@langwatch/system-migrations`, and the shared `_shared/per-subject-cached-gate.ts` are all reused here (the authz *engine* itself is never consulted on an identity write)
+Epic: `../identity-platform-redesign.md` · Plan: `delivery-plan.md` · Wave 1 · Depends on: the landed authz program — ADR-110's migration state, `@langwatch/system-migrations`, and the shared `_shared/per-subject-cached-gate.ts` are all reused here (the authz _engine_ itself is never consulted on an identity write)
+
+> **Amendment 2026-09-03:** `platform/app` is deleted. The event-sourcing
+> framework this deliverable targeted now lives in `packages/eventing`; the
+> identity pipeline it describes lives under `packages/features/identity/server/src/`
+> (`adapters/`, `ports/`, `processes/`, `projections/`). Verify current shape
+> against that tree before treating paths below as live.
 
 # Overview
 
@@ -47,11 +53,11 @@ model Identifier {
 }
 ```
 
-  No DB unique constraint on the natural key — tombstones and replay make constraints lie; uniqueness of verified values is a command-time guard re-checked inside the verify command (concurrent verifies → second fails to DEAD_END). The table is an ordinary whole-row projection: replay rebuilds it entirely, ADR-022/015 stand unamended, identity is in replay discovery from the first release.
+No DB unique constraint on the natural key — tombstones and replay make constraints lie; uniqueness of verified values is a command-time guard re-checked inside the verify command (concurrent verifies → second fails to DEAD_END). The table is an ordinary whole-row projection: replay rebuilds it entirely, ADR-022/015 stand unamended, identity is in replay discovery from the first release.
 
 - **Our own adapter (R10) — better-auth never writes the database.** better-auth's `database` option is a first-class contract (the stock Prisma adapter is just one implementation); we implement the **identity adapter** as a routing facade whose row engine is the stock prismaAdapter — the sanctioned "you handle reading and writing" plug point, uniform across core and every plugin, with the guarantees (routing, gating, veto-before-write) in the facade rather than a reimplemented query layer:
   - **Reads** pass straight through to PG (protocol reads hit `Account`/`Session` as always; domain reads hit `Identifier` from D03 on; the hot path never touches CH or the queue).
-  - **Domain-significant writes** (account create/delete, verification consumed, passkey add/remove, MFA enroll/disable, user create) check the **per-user write gate**: for a **latched** user (backfill `finalized`; `migrated` is held, ADR-110) they become identity **commands** — guards veto *before* any row exists, deterministic ids, events appended to CH (**waited**), the fold applies them to `Identifier` on the calling path, the protocol values ride only on the command and land through the **credentials repository** on `Account` (row-truth), the row is returned to better-auth. For an **unlatched** user, the protocol write happens identically and no events are emitted (yet) — the gate governs whether events *also* flow, never whether better-auth works. Read-your-writes holds; the queue fold re-applies the same events later and converges because applies are idempotent (ADR-092 §13).
+  - **Domain-significant writes** (account create/delete, verification consumed, passkey add/remove, MFA enroll/disable, user create) check the **per-user write gate**: for a **latched** user (backfill `finalized`; `migrated` is held, ADR-110) they become identity **commands** — guards veto _before_ any row exists, deterministic ids, events appended to CH (**waited**), the fold applies them to `Identifier` on the calling path, the protocol values ride only on the command and land through the **credentials repository** on `Account` (row-truth), the row is returned to better-auth. For an **unlatched** user, the protocol write happens identically and no events are emitted (yet) — the gate governs whether events _also_ flow, never whether better-auth works. Read-your-writes holds; the queue fold re-applies the same events later and converges because applies are idempotent (ADR-092 §13).
   - **High-churn protocol writes** (session rows, OAuth token refresh) stay row-truth repository writes with no events (R12) — `SessionRepository` for session rows, the credentials repository for token columns — declared in a per-(model, operation) **routing table** in this module. Nothing is implicitly captured or implicitly passed through — an unrouted write is refused, loudly, naming itself, and the routing coverage test pins the full mounted surface in CI.
   - **The write gate** is the authz engine gate re-tenanted (ADR-110: finishing the migration IS the switch): reads the user's `identity-d01-identifier-backfill` row in `SystemMigrationTenantState` (tenant = the user), answers true for **`finalized` only** (`migrated` is held — the proof found the projection behind or disagreeing, and the next pass heals it), cached per subject via the shared `_shared/per-subject-cached-gate.ts` the engine gate also uses, fail-safe to the protocol-only path with a warn + metric. Both directions take effect within the cache TTL. Ships closed for everyone — deploying the adapter changes nothing on its own.
   - A thin endpoint-hook plugin stamps ceremony context (flow, actor, request metadata) onto request-scoped storage so the adapter knows why a row is written (epic Open Q16 for non-request writes).
@@ -60,7 +66,7 @@ model Identifier {
   - A **user-rooted `TenantSource`** registers alongside the organization source — migration state, latch, and gates are per-user. (The generic engine is tenant-agnostic; this is app-composition surface only.)
   - **Enrollment is a switch (ADR-110)**: on cloud the ops page enrolls organizations — the one pacing lever — and a user is in the cohort when any organization they belong to is enrolled; there is no everyone-else cohort, no sampling, no ladder. A user outside every organization stays on the legacy path until they join one. Self-hosted runs what the release declares (`runsAutomaticallyOnSelfHosted`) for every user, silently.
   - `identity-d01-identifier-backfill` **does not wait**: each pass re-reads the user's rows, restates every fact (deterministic command ids `backfill:<accountId>`, backdated `occurredAt` from the source row's `createdAt` — restated facts dedupe at the store), detaches identifiers whose `Account` row is gone (`backfill:detach:<identifierId>:<accountId>`), and proves the fold-built `Identifier` rows against what the live `Account`/`User` rows imply. No `previous` record is consulted. Agreement ⇒ `finalized`; a missing or disagreeing row ⇒ held at `migrated` with the outstanding identifiers named on the ops migrations page; a thrown pass parks. Content: `provider="email"` rows minted from `User.email`; VERIFIED state for rows with established ceremonies; existing OAuth/credential rows get lifecycle state from their history.
-  - Writes flip per user via the adapter's gate the moment their backfill finalizes; reads flip in D03 on the *same* status row (one source of truth for both forks). Rollback is a status change, effective within the gate's TTL.
+  - Writes flip per user via the adapter's gate the moment their backfill finalizes; reads flip in D03 on the _same_ status row (one source of truth for both forks). Rollback is a status change, effective within the gate's TTL.
 - From this deliverable on, every latched user's identity write produces its event — structurally, via the adapter, not by hook coverage.
 - Identifier state machine:
 
@@ -133,16 +139,16 @@ export const USER_IDENTITY_AGGREGATE_TYPE = "user_identity" as const;
 
 export const ATTACH_IDENTIFIER_COMMAND_TYPE = "lw.identity.attach_identifier" as const;
 export const VERIFY_IDENTIFIER_COMMAND_TYPE = "lw.identity.verify_identifier" as const;
-export const MARK_PRIMARY_COMMAND_TYPE      = "lw.identity.mark_primary" as const;
+export const MARK_PRIMARY_COMMAND_TYPE = "lw.identity.mark_primary" as const;
 export const DETACH_IDENTIFIER_COMMAND_TYPE = "lw.identity.detach_identifier" as const;
-export const ERASE_USER_COMMAND_TYPE        = "lw.identity.erase_user" as const;
+export const ERASE_USER_COMMAND_TYPE = "lw.identity.erase_user" as const;
 
-export const IDENTIFIER_ATTACHED_EVENT_TYPE  = "lw.identity.identifier_attached" as const;
-export const IDENTIFIER_VERIFIED_EVENT_TYPE  = "lw.identity.identifier_verified" as const;
+export const IDENTIFIER_ATTACHED_EVENT_TYPE = "lw.identity.identifier_attached" as const;
+export const IDENTIFIER_VERIFIED_EVENT_TYPE = "lw.identity.identifier_verified" as const;
 export const IDENTIFIER_DEAD_ENDED_EVENT_TYPE = "lw.identity.identifier_dead_ended" as const;
-export const PRIMARY_CHANGED_EVENT_TYPE      = "lw.identity.primary_changed" as const;
-export const IDENTIFIER_DETACHED_EVENT_TYPE  = "lw.identity.identifier_detached" as const;
-export const USER_ERASED_EVENT_TYPE          = "lw.identity.user_erased" as const;
+export const PRIMARY_CHANGED_EVENT_TYPE = "lw.identity.primary_changed" as const;
+export const IDENTIFIER_DETACHED_EVENT_TYPE = "lw.identity.identifier_detached" as const;
+export const USER_ERASED_EVENT_TYPE = "lw.identity.user_erased" as const;
 
 export const IDENTITY_EVENT_VERSION_LATEST = "2026-08-20" as const;
 ```
@@ -155,12 +161,12 @@ A command — PII rides here, transiently (commands are dispatched and processed
 {
   "tenantId": "user_2c9x…",
   "userId": "user_2c9x…",
-  "commandId": "idcmd_2f8a…",            // caller-minted; retries reuse it
+  "commandId": "idcmd_2f8a…", // caller-minted; retries reuse it
   "accountId": "acc_9k2p…",
-  "provider": "google",                   // widened provider enum (D01)
-  "value": "Alex.Doe+x@Acme.com",        // RAW — normalized by the handler, never stored in an event
+  "provider": "google", // widened provider enum (D01)
+  "value": "Alex.Doe+x@Acme.com", // RAW — normalized by the handler, never stored in an event
   "ceremony": { "flow": "oauth-callback", "requestId": "req_…" },
-  "actor": { "type": "user", "id": "user_2c9x…" }
+  "actor": { "type": "user", "id": "user_2c9x…" },
 }
 ```
 
@@ -169,27 +175,27 @@ The events it produces — the email is the fact and rides in the payload (erasu
 ```jsonc
 // envelope fields come from the framework EventSchema; data is the payload
 {
-  "id": "evt_…",                          // pure KSUID
+  "id": "evt_…", // pure KSUID
   "aggregateId": "user_2c9x…",
   "aggregateType": "user_identity",
   "tenantId": "user_2c9x…",
   "type": "lw.identity.identifier_attached",
   "version": "2026-08-20",
-  "occurredAt": 1755446400000,            // business time (backfill: legacy row's createdAt)
-  "createdAt": 1755446400123,             // ledger-accepted time
+  "occurredAt": 1755446400000, // business time (backfill: legacy row's createdAt)
+  "createdAt": 1755446400123, // ledger-accepted time
   "idempotencyKey": "idcmd_2f8a…:0",
   "data": {
-    "identifierId": "idf_9k2p…",          // deterministic — the Identifier row's id
+    "identifierId": "idf_9k2p…", // deterministic — the Identifier row's id
     "accountId": "acc_9k2p…",
     "userId": "user_2c9x…",
     "provider": "google",
-    "email": "alex.doe@acme.com",         // normalized; the erase command wipes this field (R11)
-    "identifierHash": "hmac:b1e4…",       // HMAC-SHA256(userHashKey, normalized value) — noise once the key is shredded
-    "domain": "acme.com",                 // org-level fact; survives erasure
-    "connectionId": null,                  // FK → sso_connections from D04 on
-    "state": "VERIFIED",                   // OAuth ceremonies arrive verified (R8)
-    "actor": { "type": "user", "id": "user_2c9x…" }
-  }
+    "email": "alex.doe@acme.com", // normalized; the erase command wipes this field (R11)
+    "identifierHash": "hmac:b1e4…", // HMAC-SHA256(userHashKey, normalized value) — noise once the key is shredded
+    "domain": "acme.com", // org-level fact; survives erasure
+    "connectionId": null, // FK → sso_connections from D04 on
+    "state": "VERIFIED", // OAuth ceremonies arrive verified (R8)
+    "actor": { "type": "user", "id": "user_2c9x…" },
+  },
 }
 ```
 
@@ -198,11 +204,14 @@ The events it produces — the email is the fact and rides in the payload (erasu
 // wipes the email fields out of the user's prior events (ClickHouse mutation),
 // wipes Identifier value columns, deletes protocol rows and the userHashKey,
 // and this event records that it happened. Replay reproduces the tombstone.
-{ "type": "lw.identity.user_erased", "data": {
+{
+  "type": "lw.identity.user_erased",
+  "data": {
     "userId": "user_2c9x…",
     "erasedIdentifierIds": ["idf_9k2p…", "idf_1m3q…"],
-    "actor": { "type": "system", "id": "ops:erasure-request" }
-} }
+    "actor": { "type": "system", "id": "ops:erasure-request" },
+  },
+}
 ```
 
 The truth split, by table (both Postgres):

@@ -1,5 +1,13 @@
 # BetterAuth cutover — deployment notes
 
+> **Amendment 2026-09-03:** This describes a deploy that already happened
+> against the old Next.js `platform/app`, since deleted (commit `faaa9ec333`).
+> The product is now `apps/ui` (Vite SPA) + `apps/api`; there is no
+> `src/pages/api/` and no `platform/app/server.log`. BetterAuth wiring now
+> lives in `packages/features/auth/server/src/transport/better-auth/` and
+> `packages/features/identity/server/src/better-auth/`. Kept as historical
+> record of the cutover, not a live runbook.
+
 This document describes how the NextAuth → BetterAuth migration ships and
 what happens on deploy day.
 

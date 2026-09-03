@@ -32,11 +32,14 @@ the authoritative link to the producing trace, avoiding log searches.
 
 ## Ownership and residuals
 
-The process-manager repository, app transport, worker registration, and
-Prometheus adapter remain in `platform/app/src/server/app-layer/ops` because
-they compose the shared process-manager substrate and application auth. The
-Ops package owns the reusable presentation and operator contract surfaces; its
-package tests bind those portions to the scenarios above. Alert routes and
-retention/index operations remain infrastructure/runbook concerns. This file
-records the shipped boundary; implementation sketches and unresolved questions
-from the original plan were removed once the three phases were built.
+The process-manager repository (`ProcessOpsPrismaRepository`), app transport,
+worker registration, and Prometheus adapter live in
+`packages/features/ops/server/src/` (`repositories/prisma/`, `services/manager-explorer.service.ts`,
+`app/ops.app.ts`) — `platform/app` is deleted (commit `faaa9ec333`; amended
+2026-09-04) and this surface moved there whole, along with the rest of the
+feature, rather than staying split from it. The Ops package owns the reusable
+presentation and operator contract surfaces; its package tests bind those
+portions to the scenarios above. Alert routes and retention/index operations
+remain infrastructure/runbook concerns. This file records the shipped
+boundary; implementation sketches and unresolved questions from the original
+plan were removed once the three phases were built.

@@ -2,6 +2,11 @@
 
 Epic: `../identity-platform-redesign.md` · Plan: `delivery-plan.md` · Wave 3 · Depends on: D03 · Flag: `MFA_ENROLLMENT_OPEN` · Specs: `specs/identity/mfa-and-session-shape.feature`
 
+> **Amendment 2026-09-03:** `platform/app` is deleted. BetterAuth config now
+> lives in `packages/features/auth/server/src/transport/better-auth/better-auth.api.ts`
+> and `packages/features/identity/server/src/better-auth/`. Verify current
+> shape against that tree before treating paths below as live.
+
 # Overview
 
 Adds MFA (TOTP + backup codes, never SMS) with an event-sourced enrollment aggregate, extends sessions with identifier/MFA claims, and moves impersonation off the legacy `Session.impersonating` JSON onto the authz `Principal {actor, subject}`.
@@ -14,7 +19,7 @@ The consequence is what collapses the complexity: if MFA is enabled on an accoun
 - **There is no per-org step-up screen.** Enrollment is a **gate**: when an admin turns `mfaRequired` on, members who cannot yet prove a factor are prompted to enroll and are held out of **that organization** until they do. Everything else they use is untouched, so nobody's personal workspace is stranded by their employer's decision — and enrolling for the employer protects the personal one too.
 - The "which org wins when a person belongs to a strict one and a lax one" question is **void**. There is no per-org session trust to reconcile: a person either can prove a factor or cannot.
 
-**Nobody is signed out.** The session columns land **nullable** and nothing here revokes a session — not the deploy, and not an admin turning `mfaRequired` on (turning it on ends *zero* sessions; it opens a gate). The only deploy-time revoke is the legacy `impersonating` sessions, below.
+**Nobody is signed out.** The session columns land **nullable** and nothing here revokes a session — not the deploy, and not an admin turning `mfaRequired` on (turning it on ends _zero_ sessions; it opens a gate). The only deploy-time revoke is the legacy `impersonating` sessions, below.
 
 The only deploy-time revoke is sessions holding a non-null legacy `impersonating` value: LangWatch operators only, a handful of rows, and the payload is being deleted underneath them. They re-impersonate in one click. **D06 is therefore no longer a one-way door**, and its rollback is the flag like every other deliverable's.
 
@@ -66,13 +71,13 @@ Session
 
 - Passkeys (D07). Open Q4 is **decided**: `amr: ["phw"]` satisfies `mfaRequired` — see D07 for the reasoning. An org-level "hardware-bound keys only" refinement is out of scope until somebody asks.
 - SMS anything. WebAuthn as an MFA second factor (passkeys are first-factor here).
-- MFA as an *organization-owned* factor (a per-org enrollment). One enrollment per person is the model; an org only enforces that the person has one.
+- MFA as an _organization-owned_ factor (a per-org enrollment). One enrollment per person is the model; an org only enforces that the person has one.
 - A freshness window on a proof, and any form of step-up. Both are structurally absent, not deferred.
 
 # Research
 
 - better-auth 1.6.23: `twoFactor` is built in; plugin migrations are Kysely-only ⇒ hand-written Prisma models; `databaseHooks` don't fire for plugin tables — moot under R10: the identity adapter sees plugin-table writes uniformly.
-- Session today: PG + Redis dual-write, 30-day TTL, `impersonating` JSON. Two things to fix while in there: the Prisma column is `impersonating Json?` while better-auth's config declares the same field `{ type: "string" }` (`src/server/better-auth/index.ts`) — they disagree today, and the disagreement dies with the column. And `storeSessionInDatabase: true` is currently justified *by* impersonation reading the DB row directly; re-justify or drop it when the JSON path goes.
+- Session today: PG + Redis dual-write, 30-day TTL, `impersonating` JSON. Two things to fix while in there: the Prisma column is `impersonating Json?` while better-auth's config declares the same field `{ type: "string" }` (`src/server/better-auth/index.ts`) — they disagree today, and the disagreement dies with the column. And `storeSessionInDatabase: true` is currently justified _by_ impersonation reading the DB row directly; re-justify or drop it when the JSON path goes.
 - The `twoFactor` plugin's own table already carries `failedVerificationCount` and `lockedUntil`, so lockout is the plugin's, not ours to build. Its error vocabulary distinguishes `INVALID_CODE` from `INVALID_BACKUP_CODE`; our boundary deliberately collapses both to one `identity_mfa_code_invalid` so the endpoint is not an oracle for which check failed.
 - Corpus-audit spec impacts: `phase-1-better-auth-config.feature:150-168` (locks in legacy impersonating — retire, replace with `{actor, subject}` scenarios). **The line range this document originally cited, `:119-137`, is wrong** — that block is the `DIFFERENT_EMAIL_NOT_ALLOWED` guard and the SSO domain-join scenarios. Note also `:166`, inside the same block: "only genericOAuth is present in the plugins array" — registering `twoFactor` breaks it, so it retires with the pair. `sessions-and-devices.feature` (inventory gains `identifierId`/`amr`; `maxSessionDurationDays` is the precedent for policy-tightening revocation, not a conflict with it); anchors that survive: `impersonation-banner.feature`, `dejaview-impersonation-access.feature` (already conceptually actor/subject), `backoffice-user-impersonation-reason.feature` (reason requirement inherited), `password-reset.feature:90-93` (revoke-all on reset — consistent with per-identifier revocation).
 

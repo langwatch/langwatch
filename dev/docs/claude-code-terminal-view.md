@@ -30,7 +30,7 @@ content and no cost.** `claude_code.tool` carries `tool_name`, `tool_use_id`,
 
 There is **no shared `body` convention**. This bit us: enrichment read `body` for
 everything, so on the light path spans came back with no input and no output,
-silently (fixed; regression-pinned in `trace-service-claude-enrichment.unit.test.ts`).
+silently (fixed; regression-pinned in `claude-code-log-enrichment.service.unit.test.ts`).
 
 | event                                    | content key                     | gate                                                     |
 | ---------------------------------------- | ------------------------------- | -------------------------------------------------------- |
@@ -47,9 +47,9 @@ prompt) and **`event.sequence`** (monotonic per session).
 
 Claude's spans have the structure but no content; the logs have the content but
 no span ids. `enrichCodingAgentSpansFromLogs`
-(`src/server/app-layer/traces/claude-code-log-enrichment.ts`) joins them at read
-time and is called by BOTH read paths — `tracesV2.spansFull` (the drawer) and the
-legacy `TraceService` (REST, exports, evals). Joins:
+(`packages/features/trace/server/src/services/claude-code-log-enrichment.service.ts`)
+joins them at read time and is called by BOTH read paths — `tracesV2.spansFull`
+(the drawer) and the legacy `TraceService` (REST, exports, evals). Joins:
 
 - **output**, **cost** — exact, by `request_id`.
 - **input** — positional today (Nth span ↔ Nth `api_request_body` within a

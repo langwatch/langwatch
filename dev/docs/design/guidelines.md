@@ -41,7 +41,7 @@ All overlays (drawers, popovers, dialogs) should have translucent backgrounds wi
 
 ### Implementation Details
 
-The overlay components in `components/ui/` already implement these styles:
+The overlay components in `@langwatch/design-system` already implement these styles:
 
 | Property         | Value             |
 | ---------------- | ----------------- |
@@ -54,9 +54,9 @@ The overlay components in `components/ui/` already implement these styles:
 
 ```tsx
 // These components already have the translucent effect built-in:
-import { Drawer } from "../../components/ui/drawer";
-import { Dialog } from "../../components/ui/dialog";
-import { Popover } from "../../components/ui/popover";
+import { Drawer } from "@langwatch/design-system/drawer";
+import { Dialog } from "@langwatch/design-system/dialog";
+import { Popover } from "@langwatch/design-system/popover";
 
 // If creating custom overlays, apply:
 <Box background="white/75" backdropFilter="blur(8px)" borderRadius="lg">
@@ -107,7 +107,7 @@ LangWatch uses a drawer navigation system that allows drawers to navigate to oth
 **Implementation:**
 
 ```tsx
-import { useDrawer } from "~/hooks/useDrawer";
+import { useDrawer } from "@langwatch/ui-drawer";
 
 function ParentDrawer() {
   const { openDrawer, canGoBack, goBack, closeDrawer } = useDrawer();
@@ -125,9 +125,7 @@ function ParentDrawer() {
         </HStack>
       </Drawer.Header>
       <Drawer.Body>
-        <Button onClick={() => openDrawer("childDrawer", { id: "123" })}>
-          Open Child
-        </Button>
+        <Button onClick={() => openDrawer("childDrawer", { id: "123" })}>Open Child</Button>
       </Drawer.Body>
     </Drawer.Root>
   );
@@ -150,7 +148,7 @@ All pages should follow a consistent layout structure.
 ### Code Pattern
 
 ```tsx
-import { PageLayout } from "../../components/ui/layouts/PageLayout";
+import { PageLayout } from "@langwatch/design-system/page-layout";
 
 <PageLayout.Container>
   <PageLayout.Header>
@@ -177,32 +175,7 @@ import { PageLayout } from "../../components/ui/layouts/PageLayout";
 - Action buttons grouped on the right
 - Consistent padding and spacing
 
-## 5. Collapsed Menu for Busy Pages
-
-For content-heavy pages, use the compact sidebar that expands on hover.
-
-### When to Use Compact Menu
-
-- Pages with dense content (prompt editor, settings)
-- Pages where users need maximum horizontal space
-- "Focused mode" pages where navigation is secondary
-
-### Implementation
-
-```tsx
-import { DashboardLayout } from "~/components/DashboardLayout";
-
-<DashboardLayout compactMenu>{/* Page content */}</DashboardLayout>;
-```
-
-### Behavior
-
-- Sidebar collapses to icons only
-- Expands on hover to show labels
-- Maintains navigation accessibility
-- Reduces visual noise
-
-## 6. Form Validation: Submit-then-Surface, Don't Pre-Disable
+## 5. Form Validation: Submit-then-Surface, Don't Pre-Disable
 
 Forms always allow Save to be clicked. Validation runs on submit and surfaces errors inline (field-level) and/or via toast (cross-field or backend). The Save button is disabled **only** while a request is in flight.
 
@@ -234,11 +207,9 @@ For validation:
 - **A server rejection that names fields:** Put it back on those fields with `applyHandledErrorToForm`, paired with `<FormServerError form={form} />` for complaints about the submission as a whole.
 
 ```tsx
-import {
-  applyHandledErrorToForm,
-  FormServerError,
-  showErrorToast,
-} from "~/features/errors";
+// Each feature's `web` package owns its own copy of these helpers (e.g.
+// `behavior/errors.tsx`) rather than importing from a shared barrel.
+import { applyHandledErrorToForm, FormServerError, showErrorToast } from "../../behavior/errors";
 
 const mutation = api.team.update.useMutation({
   onError: (error) => {
@@ -289,7 +260,6 @@ When implementing new features, verify:
 - [ ] Overlays use translucent backgrounds with blur
 - [ ] Resource management uses drawers, not modals
 - [ ] Page follows standard layout (header, title, actions)
-- [ ] Content-heavy pages use compact menu
-- [ ] Components imported from `components/ui/` where available
+- [ ] Components imported from `@langwatch/design-system` where available
 - [ ] Save buttons disable only on `isPending`, never on `!isValid`
 - [ ] Validation errors surface inline or via toast; Save never silently no-ops

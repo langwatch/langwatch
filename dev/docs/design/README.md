@@ -10,7 +10,6 @@ This documentation outlines the design principles and guidelines for the LangWat
 | **Translucent Overlays** | `background="white/75"` + `backdropFilter="blur(8px)"`    |
 | **Prefer Drawers**       | Use drawers for resource selection, creation, and editing |
 | **Page Layout**          | Full width, small title, action buttons top-right         |
-| **Collapsed Menu**       | Use `compactMenu` for content-heavy pages                 |
 
 ## Documentation Structure
 

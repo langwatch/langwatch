@@ -5,6 +5,11 @@
 **Status:** Investigated — not ready to implement without two preconditions below
 **No GitHub issue yet.** File one before `/plan` runs.
 
+> **Amendment 2026-09-03:** `platform/app` is deleted (commit `faaa9ec333`).
+> The product is now `apps/ui`, `apps/api`, `apps/worker`, plus
+> `packages/features/<name>/{contract,server,web}`; any reference below to
+> `platform/app/src/` describes a path that no longer exists.
+
 ## Starting state / context
 
 The ask: add a GitHub Actions workflow that (a) provisions a Boxd VM forked from a golden image on every PR open/sync, runs LangWatch on it, exposes it at a predictable URL, and (b) keeps the golden fresh on every main merge. Destroy on PR close. Users review PRs by clicking a link instead of pulling the branch.

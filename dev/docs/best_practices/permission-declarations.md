@@ -41,16 +41,16 @@ lands you in the next.
 
 ## Which call do I make?
 
-| You are writing                              | Declare with                                                          |
-| -------------------------------------------- | --------------------------------------------------------------------- |
-| A tRPC procedure                             | `.permission("resource:action")` after `.input(...)`                  |
-| A tRPC procedure with no check               | `.noPermission({ reason, allow })`                                    |
-| A tRPC procedure with a custom check         | `.use(declareAuthzMiddleware(declaration, middleware))`               |
-| A management API endpoint (`@langwatch/api`) | `...guard("resource:action")` in the endpoint config                  |
-| A management API endpoint with no check      | `noPermission: { reason: "..." }` in the endpoint config              |
-| A Hono route on `SecuredApp`                 | `.access(requires("resource:action"))` before the verb                |
-| Service or route code deciding imperatively  | `requireProjectPermission(ctx, id, permission)` — returns the witness |
-| Code that genuinely branches on the answer   | `probeProjectPermission(ctx, id, permission)` — returns the boolean   |
+| You are writing                              | Declare with                                                                        |
+| -------------------------------------------- | ----------------------------------------------------------------------------------- |
+| A tRPC procedure                             | `.permission("resource:action")` after `.input(...)`                                |
+| A tRPC procedure with no check               | `.noPermission({ reason, allow })`                                                  |
+| A tRPC procedure with a custom check         | `.use(declareAuthzMiddleware(declaration, middleware))`                             |
+| A management API endpoint (`@langwatch/api`) | `...guard("resource:action")` in the endpoint config                                |
+| A management API endpoint with no check      | `noPermission: { reason: "..." }` in the endpoint config                            |
+| A Hono route on `SecuredApp`                 | `.access(requires("resource:action"))` before the verb                              |
+| Service or route code deciding imperatively  | `authz.authorizePermission({ userId, permission, ...scope })` — returns the witness |
+| Code that genuinely branches on the answer   | `authz.hasPermission({ userId, permission, ...scope })` — returns the boolean       |
 
 Permissions are always the registry union (`AuthzPermission` from
 `@langwatch/authz-contract`). The union is generated per resource, so
@@ -236,21 +236,37 @@ async function exportRuns(authz: Authorized<"project">, mode: ExportMode) {
   ...
 }
 
-exportRuns(await requireProjectPermission(ctx, projectId, "scenarios:view"), mode); // ✓
+exportRuns(
+  await authz.authorizePermission({ userId: actorId(ctx), permission: "scenarios:view", projectId }),
+  mode,
+); // ✓
 exportRuns({ permission: "scenarios:view", scope: { tier: "project", id } }, mode); // ✗ does not compile
 ```
 
 Adopt the witness on any new service method that must never run unchecked.
 The service stops trusting its callers and starts requiring proof.
 
-`PermissionsService.requirePermission` returns the same witness, with the
+`AuthzService.authorizePermission` returns the same witness, with the
 scope argument typed by the permission's registry tiers — one id, at a tier
 the permission is grantable at, or the call does not compile.
+
+A route or service that only needs one project-scoped permission and does not
+want to depend on the whole `AuthzService` can instead take a narrower
+`requireProjectPermission(args)` / `probeProjectPermission(ctx, id, permission)`
+capability as an injected port — several feature packages' REST/tRPC
+transports do this (e.g. `packages/features/stored-object/server/src/transport/api-rest/stored-object.api.ts`,
+`packages/features/dataset/server/src/transport/api-trpc/dataset.api.ts`).
+The composition root wires that port to `authz.authorizeProjectPermission` /
+`authz.hasPermission` — it is the same check, named narrowly at the call site.
 
 ### `probe*` — the deliberate boolean
 
 ```ts
-const canSeeCosts = await probeProjectPermission(ctx, projectId, "cost:view");
+const canSeeCosts = await authz.hasPermission({
+  userId: actorId(ctx),
+  permission: "cost:view",
+  projectId,
+});
 ```
 
 For call sites that genuinely branch: custom refusal bodies, capability

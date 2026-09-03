@@ -2,6 +2,12 @@
 
 Epic: `../identity-platform-redesign.md` · Plan: `delivery-plan.md` · Wave 2 · Depends on: D03 · Flag: `SSOCONN_ROUTING` (shadow → enforce)
 
+> **Amendment 2026-09-03:** `platform/app` is deleted. Enterprise SSO now
+> lives in `packages/enterprise/features/sso/{contract,server,web}`; the
+> BetterAuth provider adapter is
+> `packages/enterprise/features/sso/server/src/adapters/better-auth.better-auth.adapter.ts`.
+> Verify current shape against that tree before treating paths below as live.
+
 # Overview
 
 Enterprise SSO stops being two hand-set strings on `Organization` and becomes a first-class event-sourced aggregate: `SsoConnection` per (org, IdP), with domains, IdP metadata, and a guarded lifecycle. Existing orgs are grandfathered in; the router's domain lookup flips from strings to the projection behind a shadow flag. Super-admin/backoffice parity only — self-service UI is D05.
@@ -55,13 +61,15 @@ Aggregate `sso_connection`; `tenantId = organizationId`, `aggregateId = connecti
 
 ```jsonc
 // lw.identity.connection_registered
-{ "data": {
+{
+  "data": {
     "connectionId": "ssoc_…",
     "organizationId": "org_…",
     "type": "oidc",
     "idp": { "issuer": "https://login.acme.okta.com", "clientIdRef": "cred_…" },
-    "actor": { "type": "user", "id": "user_…" }
-} }
+    "actor": { "type": "user", "id": "user_…" },
+  },
+}
 
 // lw.identity.domain_claimed        { connectionId, domain: "acme.com", actor }
 // lw.identity.domain_claim_approved { connectionId, domain, actor: { type: "user", id: <ops user> } }
@@ -119,7 +127,7 @@ round-trip that buys nothing.
   domain, a recorded test login and a live break-glass binding.
 
 **An attestation does not expire, and there is no later DNS upgrade path.**
-No other method's verification expires either — DNS TXT expires the *token*
+No other method's verification expires either — DNS TXT expires the _token_
 before it is found, never the verification it produced; `legacy-configuration`
 rests on history that only grows — so an expiry unique to attestation would
 make the operator path the only one able to stop routing without anybody
@@ -164,7 +172,7 @@ been written method-agnostically in a way this could break).
 # Security Concerns
 
 - First-verifier-owns with global scope makes the ops approval step the abuse boundary — every claim decision is an audited event.
-- Grandfathered connections must not weaken guards: they get VERIFIED state from history, but activation guards (break-glass binding) still apply to any *state change*.
+- Grandfathered connections must not weaken guards: they get VERIFIED state from history, but activation guards (break-glass binding) still apply to any _state change_.
 
 # Open Questions
 

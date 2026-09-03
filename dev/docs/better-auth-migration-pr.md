@@ -1,5 +1,13 @@
 # feat(auth): migrate NextAuth → BetterAuth
 
+> **Amendment 2026-09-03:** This is the historical PR description for a
+> change already merged against the old Next.js `platform/app`, since deleted
+> (commit `faaa9ec333`). Every `src/`, `src/pages/api/`, and `platform/app`
+> path below is gone; BetterAuth now lives in
+> `packages/features/auth/server/src/transport/better-auth/` and
+> `packages/features/identity/server/src/better-auth/`. Kept as historical
+> record, not a live reference.
+
 Migrates the entire authentication stack from NextAuth v4 to BetterAuth
 v1.6.2, preparing langwatch to decouple from Next.js for a future framework
 migration. Preserves every user-facing behavior exactly, plus fixes **37

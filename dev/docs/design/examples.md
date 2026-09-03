@@ -4,34 +4,29 @@ Practical examples implementing LangWatch design guidelines.
 
 ## Page Layout
 
-Standard page with header, actions, and content. Use `compactMenu` for content-heavy pages.
+Standard page with header, actions, and content.
 
 ```tsx
 import { HStack, Spacer, VStack } from "@chakra-ui/react";
 import { Plus } from "lucide-react";
-import { DashboardLayout } from "~/components/DashboardLayout";
-import { PageLayout } from "../../components/ui/layouts/PageLayout";
+import { PageLayout } from "@langwatch/design-system/page-layout";
 
 export function ExamplePage() {
   return (
-    <DashboardLayout compactMenu={false}>
-      {" "}
-      {/* true for content-heavy pages */}
-      <PageLayout.Container>
-        <PageLayout.Header>
-          <PageLayout.Heading>Page Title</PageLayout.Heading>
-          <Spacer />
-          <HStack gap={2}>
-            <PageLayout.HeaderButton onClick={handleCreate}>
-              <Plus /> Create New
-            </PageLayout.HeaderButton>
-          </HStack>
-        </PageLayout.Header>
-        <VStack gap={4} padding={6} align="stretch">
-          {/* Page content */}
-        </VStack>
-      </PageLayout.Container>
-    </DashboardLayout>
+    <PageLayout.Container>
+      <PageLayout.Header>
+        <PageLayout.Heading>Page Title</PageLayout.Heading>
+        <Spacer />
+        <HStack gap={2}>
+          <PageLayout.HeaderButton onClick={handleCreate}>
+            <Plus /> Create New
+          </PageLayout.HeaderButton>
+        </HStack>
+      </PageLayout.Header>
+      <VStack gap={4} padding={6} align="stretch">
+        {/* Page content */}
+      </VStack>
+    </PageLayout.Container>
   );
 }
 ```
@@ -42,7 +37,7 @@ Use for resource creation, editing, and selection flows.
 
 ```tsx
 import { Button, Field, Input, useDisclosure, VStack } from "@chakra-ui/react";
-import { Drawer } from "../../components/ui/drawer";
+import { Drawer } from "@langwatch/design-system/drawer";
 
 export function ResourceDrawer() {
   const { open, onOpen, onClose } = useDisclosure();
@@ -88,7 +83,7 @@ Use for destructive action confirmations only.
 
 ```tsx
 import { Button, useDisclosure, Text } from "@chakra-ui/react";
-import { Dialog } from "../../components/ui/dialog";
+import { Dialog } from "@langwatch/design-system/dialog";
 
 export function DeleteConfirmDialog({ itemName, onConfirm }) {
   const { open, onOpen, onClose } = useDisclosure();
@@ -150,7 +145,7 @@ For custom translucent containers (overlay components have this built-in).
 ```tsx
 import { Button } from "@chakra-ui/react";
 import { MoreVertical, Pencil, Trash } from "lucide-react";
-import { Menu } from "../../components/ui/menu";
+import { Menu } from "@langwatch/design-system/menu";
 
 <Menu.Root>
   <Menu.Trigger asChild>
@@ -171,13 +166,13 @@ import { Menu } from "../../components/ui/menu";
 
 ## Nested Drawer Navigation
 
-Pattern for multi-step flows (e.g., type → list → editor). See `evaluations-v3` for the canonical implementation.
+Pattern for multi-step flows (e.g., type → list → editor). See `dev/docs/best_practices/drawers.md` ("Going to another drawer and back") for the canonical walkthrough.
 
 ```tsx
 import { Button, Heading, HStack } from "@chakra-ui/react";
 import { ArrowLeft } from "lucide-react";
-import { Drawer } from "../../components/ui/drawer";
-import { useDrawer } from "~/hooks/useDrawer";
+import { Drawer } from "@langwatch/design-system/drawer";
+import { useDrawer } from "@langwatch/ui-drawer";
 
 // Parent: Set callbacks and start flow
 export function StartFlow() {
@@ -262,7 +257,7 @@ export function ItemDrawer() {
 ```tsx
 import { Button, Text } from "@chakra-ui/react";
 import { Info } from "lucide-react";
-import { Popover } from "../../components/ui/popover";
+import { Popover } from "@langwatch/design-system/popover";
 
 <Popover.Root positioning={{ placement: "bottom-start" }}>
   <Popover.Trigger asChild>

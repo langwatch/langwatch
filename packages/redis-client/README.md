@@ -90,9 +90,10 @@ change with its own callers to fix first, not a rename — see the note on
 ## Guardrails
 
 The rule is: no file may name the retired singleton, and no file outside this
-package may construct an ioredis client. Two source guards used to enforce
-this in `platform/app/src/server/app-layer/__tests__/redis-ownership.unit.test.ts`,
-one test per pattern so a gap in either would fail silently rather than
-together. `platform/app` is deleted and this repo-wide check has not been
-re-established anywhere else — treat the rule as convention, not as something
-CI currently verifies, until a replacement guard lands.
+package may construct an ioredis client. Two source guards enforce this in
+`packages/architecture-lint/tests/redis-ownership.unit.test.ts`, one test per
+pattern so a gap in either would fail silently rather than together — the
+rebuild of the guard that went with `platform/app`
+(`src/server/app-layer/__tests__/redis-ownership.unit.test.ts`, deleted in
+commit `faaa9ec333`). Run it with
+`pnpm --filter @langwatch/architecture-lint test:unit tests/redis-ownership.unit.test.ts`.

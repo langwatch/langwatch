@@ -4,21 +4,20 @@ This guide outlines which components to use for common UI patterns in LangWatch.
 
 ## Import Guidelines
 
-Always import overlay components from the `components/ui/` directory, not directly from Chakra UI. These local components have the translucent styling pre-applied.
+Always import overlay components from `@langwatch/design-system`, not directly from Chakra UI. These components have the translucent styling pre-applied. Each imports from its own subpath.
 
 ### Local UI Components (use these)
 
 ```tsx
-import { Drawer } from "../../components/ui/drawer";
-import { Dialog } from "../../components/ui/dialog";
-import { Popover } from "../../components/ui/popover";
-import { Tooltip } from "../../components/ui/tooltip";
-import { Menu } from "../../components/ui/menu";
-import { Checkbox, CheckboxGroup } from "../../components/ui/checkbox";
-import { Radio, RadioGroup } from "../../components/ui/radio";
-import { Switch } from "../../components/ui/switch";
-import { InputGroup } from "../../components/ui/input-group";
-import { Link } from "../../components/ui/link";
+import { Drawer } from "@langwatch/design-system/drawer";
+import { Dialog } from "@langwatch/design-system/dialog";
+import { Popover } from "@langwatch/design-system/popover";
+import { Tooltip } from "@langwatch/design-system/tooltip";
+import { Menu } from "@langwatch/design-system/menu";
+import { Checkbox, CheckboxGroup } from "@langwatch/design-system/checkbox";
+import { Radio, RadioGroup } from "@langwatch/design-system/radio";
+import { Switch } from "@langwatch/design-system/switch";
+import { InputGroup } from "@langwatch/design-system/input-group";
 ```
 
 ### Chakra UI Direct Imports
@@ -70,12 +69,7 @@ import {
 ### Drawer Anatomy
 
 ```tsx
-<Drawer.Root
-  open={isOpen}
-  onOpenChange={({ open }) => setOpen(open)}
-  placement="end"
-  size="lg"
->
+<Drawer.Root open={isOpen} onOpenChange={({ open }) => setOpen(open)} placement="end" size="lg">
   <Drawer.Backdrop />
   <Drawer.Content>
     <Drawer.CloseTrigger />
@@ -125,8 +119,8 @@ LangWatch uses a centralized drawer system with URL-based state management. Draw
 
 The system consists of two parts:
 
-1. **`CurrentDrawer`** - A global component (in `DashboardLayout`) that reads URL params and renders the appropriate drawer
-2. **`useDrawer`** - A hook for opening/closing drawers and managing navigation
+1. **`CurrentDrawer`** - A global component, mounted once near the app root, that reads URL params and renders the appropriate drawer
+2. **`useDrawer`** - A hook (from `@langwatch/ui-drawer`) for opening/closing drawers and managing navigation
 
 **Important:** Don't render drawers explicitly in pages - `CurrentDrawer` handles rendering automatically based on URL state. This ensures:
 
@@ -137,7 +131,7 @@ The system consists of two parts:
 ### Basic Usage
 
 ```tsx
-import { useDrawer } from "~/hooks/useDrawer";
+import { useDrawer } from "@langwatch/ui-drawer";
 
 function MyComponent() {
   const { openDrawer, closeDrawer, canGoBack, goBack, currentDrawer } = useDrawer();
@@ -201,33 +195,14 @@ callbacks?.onSelect?.(selectedPrompt);
 
 ### Registered Drawers
 
-Drawers must be registered in `src/components/drawerRegistry.ts` to be used with `useDrawer`. See that file for the full list of available drawer types.
-
-### Reference Implementation: Evaluations V3
-
-The **evaluations-v3** module is the canonical example of this drawer pattern. Study these files:
-
-| File                                                  | Purpose                                                      |
-| ----------------------------------------------------- | ------------------------------------------------------------ |
-| `src/evaluations-v3/hooks/useOpenTargetEditor.ts`     | Sets up flow callbacks and opens prompt/agent editor drawers |
-| `src/evaluations-v3/utils/promptEditorCallbacks.ts`   | Centralizes callback creation for prompt editor              |
-| `src/components/targets/TargetTypeSelectorDrawer.tsx` | Multi-step flow: type → list → editor                        |
-
-**Flow example (selecting/creating prompts):**
-
-1. User clicks "Add Target" → opens `targetTypeSelector`
-2. User selects "Prompt" → navigates to `promptList`
-3. User selects a prompt → navigates to `promptEditor`
-4. Back button returns through the stack, or user closes to exit flow
-
-This pattern should be followed for any multi-step selection/creation flows.
+A drawer is registered by the feature that owns it, not in one shared file. Each feature's `web` package exports a `UiDrawerRegistry` (built with `lazyDrawer` from `@langwatch/ui-drawer`), and `apps/ui/src/features/installed-ui-drawers.ts` composes every feature's registry into the one the application serves. See `dev/docs/best_practices/drawers.md` ("Adding a new drawer") for the full walkthrough, including the `withHost` wrapping step that happens in `apps/ui`'s own `*-drawers.tsx` files.
 
 ## Page Layout Components
 
 Use `PageLayout` for consistent page structure.
 
 ```tsx
-import { PageLayout } from "../../components/ui/layouts/PageLayout";
+import { PageLayout } from "@langwatch/design-system/page-layout";
 ```
 
 ### Available Components
@@ -239,24 +214,6 @@ import { PageLayout } from "../../components/ui/layouts/PageLayout";
 | `PageLayout.Heading`      | Page title (h1)                             |
 | `PageLayout.HeaderButton` | Styled button for header actions            |
 | `PageLayout.Content`      | Card wrapper for page content               |
-
-## Dashboard Layout
-
-Wrap pages with `DashboardLayout` for navigation sidebar.
-
-```tsx
-import { DashboardLayout } from "~/components/DashboardLayout";
-
-// Standard layout
-<DashboardLayout>
-  <PageContent />
-</DashboardLayout>
-
-// Compact menu for busy pages
-<DashboardLayout compactMenu>
-  <PageContent />
-</DashboardLayout>
-```
 
 ## Button Variants
 
@@ -304,7 +261,7 @@ import { DashboardLayout } from "~/components/DashboardLayout";
 ### Checkbox
 
 ```tsx
-import { Checkbox } from "../../components/ui/checkbox";
+import { Checkbox } from "@langwatch/design-system/checkbox";
 
 <Checkbox checked={isChecked} onCheckedChange={({ checked }) => setChecked(checked)}>
   Enable feature
@@ -326,7 +283,7 @@ import { Plus, Trash, Pencil, Check, X } from "lucide-react";
 ## Tooltip
 
 ```tsx
-import { Tooltip } from "../../components/ui/tooltip";
+import { Tooltip } from "@langwatch/design-system/tooltip";
 
 <Tooltip content="Helpful description" positioning={{ placement: "top" }} showArrow>
   <Button>Hover me</Button>
@@ -336,7 +293,7 @@ import { Tooltip } from "../../components/ui/tooltip";
 ## Menu
 
 ```tsx
-import { Menu } from "../../components/ui/menu";
+import { Menu } from "@langwatch/design-system/menu";
 
 <Menu.Root>
   <Menu.Trigger asChild>

@@ -2,23 +2,28 @@
 
 Epic: `../identity-platform-redesign.md` · Plan: `delivery-plan.md` · Wave 4 · Depends on: D05, D08 · Rollback is structural: both-connections-active grace · **customer-paced, per tenant — slow by design**
 
+> **Amendment 2026-09-03:** `platform/app` is deleted. Auth0 password-change
+> handling now lives at
+> `packages/features/auth/server/src/services/auth0-password.service.ts`.
+> Verify current shape against the tree before treating paths below as live.
+
 # Overview
 
 Enterprise customers move off the Auth0 broker onto direct OIDC connections, one tenant at a time, driven by a **migration wizard** in org settings (assumed frontend shape — Open Q7 — pending validation against the Notion comment). Grace with both connections active is the rollback. A temporary **legacy callback shim** (R9) keeps customer-pinned Auth0 redirect URIs working through grace, so no customer is ever forced to reconfigure their IdP mid-migration.
 
 # What Auth0 is today, and what removes each piece
 
-| Auth0 dependency today | What retires it | When |
-|---|---|---|
-| OIDC broker for enterprise SSO (genericOAuth `auth0`/`okta` providers) | Direct per-org `SsoConnection` (OIDC/SAML), one customer at a time | this deliverable, per tenant |
-| Front-door screens (Universal Login owned the unauthenticated visuals) | First-party screen set | D13, at the `IDENTITY_ROUTER_V2` flip |
-| `Organization.ssoDomain`/`ssoProvider` string routing | Connection-based routing | D04 (`SSOCONN_ROUTING`) |
-| `src/server/auth0/passwordService.ts` (Management API password ops) | Identifier-model password change (`change-password-auth0.feature` rewrite) | D10 |
-| Federated logout | Direct-connection logout semantics | this deliverable per tenant; code deleted D10 |
-| SCIM log-stream webhook | Per-connection SCIM tokens; customers repoint during Step 6 | D08 machinery; per tenant here; webhook deleted D10 |
-| Customer-pinned `/api/auth/callback/auth0\|okta` redirect URIs | The legacy callback shim (R9) through grace; zero-hit metric | shim deleted D10 |
-| `AUTH0_*` secrets via the `langwatch_secrets` blob | Nothing to replace — removed from the blob | D10 |
-| agents-box Playwright QA login via Auth0 | QA login against the first-party screens | D10 |
+| Auth0 dependency today                                                 | What retires it                                                            | When                                                |
+| ---------------------------------------------------------------------- | -------------------------------------------------------------------------- | --------------------------------------------------- |
+| OIDC broker for enterprise SSO (genericOAuth `auth0`/`okta` providers) | Direct per-org `SsoConnection` (OIDC/SAML), one customer at a time         | this deliverable, per tenant                        |
+| Front-door screens (Universal Login owned the unauthenticated visuals) | First-party screen set                                                     | D13, at the `IDENTITY_ROUTER_V2` flip               |
+| `Organization.ssoDomain`/`ssoProvider` string routing                  | Connection-based routing                                                   | D04 (`SSOCONN_ROUTING`)                             |
+| `src/server/auth0/passwordService.ts` (Management API password ops)    | Identifier-model password change (`change-password-auth0.feature` rewrite) | D10                                                 |
+| Federated logout                                                       | Direct-connection logout semantics                                         | this deliverable per tenant; code deleted D10       |
+| SCIM log-stream webhook                                                | Per-connection SCIM tokens; customers repoint during Step 6                | D08 machinery; per tenant here; webhook deleted D10 |
+| Customer-pinned `/api/auth/callback/auth0\|okta` redirect URIs         | The legacy callback shim (R9) through grace; zero-hit metric               | shim deleted D10                                    |
+| `AUTH0_*` secrets via the `langwatch_secrets` blob                     | Nothing to replace — removed from the blob                                 | D10                                                 |
+| agents-box Playwright QA login via Auth0                               | QA login against the first-party screens                                   | D10                                                 |
 
 # Requirements
 
@@ -54,15 +59,15 @@ Per-tenant migration state is a `@langwatch/system-migrations` record (migration
 {
   "migrationName": "identity-d09-auth0-cutover",
   "tenantId": "org_…",
-  "status": "migrated",              // work done, held: proof below not yet clean
+  "status": "migrated", // work done, held: proof below not yet clean
   "report": {
     "directConnectionId": "ssoc_…",
     "activeUsers": 42,
-    "linkedUsers": 18,               // link-on-login progress (identifier data)
-    "stragglers": ["user_…"],        // dormant/contractor accounts for the exception queue
+    "linkedUsers": 18, // link-on-login progress (identifier data)
+    "stragglers": ["user_…"], // dormant/contractor accounts for the exception queue
     "legacyLoginsLast14d": 3,
-    "shimHitsLast14d": 7             // per-org shim metric (R9)
-  }
+    "shimHitsLast14d": 7, // per-org shim metric (R9)
+  },
 }
 // finalized ⇔ linkedUsers == activeUsers ∧ legacyLogins quiet ∧ shimHits == 0
 // finalized is what enables Step 7 teardown; rolled_back pins the org on grace
@@ -92,7 +97,7 @@ Progress reads are queries over identifier data (`Identifier` rows with `connect
 
 - **Exit per customer:** all active users linked; quiet grace (no legacy logins for N days, shim hits at zero); teardown event.
 - **Program exit:** zero ACTIVE legacy connections.
-- **Rollback:** grace *is* the rollback — legacy stays ACTIVE until teardown.
+- **Rollback:** grace _is_ the rollback — legacy stays ACTIVE until teardown.
 
 # Security Concerns
 
