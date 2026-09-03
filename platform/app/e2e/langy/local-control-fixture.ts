@@ -1159,6 +1159,28 @@ export async function freePort(): Promise<number> {
   });
 }
 
+/**
+ * Keeps one entry out of the repository through git's own exclude file, so
+ * the demo's `.gitignore` stays exactly as it ships and Langy never commits
+ * the credentials the fixture wrote.
+ */
+async function excludeFromGit({
+  root,
+  entry,
+}: {
+  root: string;
+  entry: string;
+}): Promise<void> {
+  const excludeFile = path.join(root, ".git", "info", "exclude");
+  await fs.mkdir(path.dirname(excludeFile), { recursive: true });
+  const current = existsSync(excludeFile)
+    ? await fs.readFile(excludeFile, "utf8")
+    : "";
+  if (current.split("\n").some((line) => line.trim() === entry)) return;
+  const separator = current === "" || current.endsWith("\n") ? "" : "\n";
+  await fs.appendFile(excludeFile, `${separator}${entry}\n`, "utf8");
+}
+
 /** The demo application, running from the shared folder. */
 export interface DemoApp {
   port: number;
@@ -1174,6 +1196,12 @@ export interface DemoApp {
  * It runs in its own terminal rather than as a child of the test, because
  * Langy restarts it through the folder and the test must not own the process
  * it is asserting about.
+ *
+ * The credentials go in the folder's own `.env`, which is where a developer
+ * keeps them and where the demo reads them from. Exporting them only in this
+ * launcher would leave them out of the shell Langy restarts the application
+ * in, so the new process would come up with no way to reach the platform and
+ * the agent would never register the change.
  */
 export async function startDemoApp({
   repo,
@@ -1186,6 +1214,17 @@ export async function startDemoApp({
 }): Promise<DemoApp> {
   const apiKey = await getCliApiKey();
   const chosenPort = port ?? (await freePort());
+  await fs.writeFile(
+    path.join(repo.root, ".env"),
+    [
+      `LANGWATCH_ENDPOINT=${APP_BASE}`,
+      `LANGWATCH_API_KEY=${apiKey}`,
+      "LANGWATCH_AGENT_CONNECT=1",
+      "",
+    ].join("\n"),
+    "utf8",
+  );
+  await excludeFromGit({ root: repo.root, entry: ".env" });
   const sessionName = `acme-${label}-${Date.now().toString(36)}`;
   const logPath = path.join(repo.root, "..", `${sessionName}.log`);
   const command =
