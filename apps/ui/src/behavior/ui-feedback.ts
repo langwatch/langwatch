@@ -177,6 +177,16 @@ export type UiToaster = {
     type: string;
     duration?: number;
     meta?: Record<string, unknown>;
+    /**
+     * The one way out the failure offered, in the shape the Design System's
+     * toast renders: it draws the trigger itself, in the status accent, and
+     * dismisses the toast when the reader takes it.
+     *
+     * `UiFailureAction` says `run`; this says `onClick`. The rename is the
+     * whole of the translation, and it happens here rather than in the port
+     * because a port describes what happens and a toaster describes a click.
+     */
+    action?: { label: string; onClick: () => void };
   }) => unknown;
 };
 
@@ -206,6 +216,13 @@ export class BrowserUiFeedback extends UiFeedbackPort {
       ...(copy.description ? { description: copy.description } : {}),
       type: "error",
       duration: FAILURE_DURATION_MS,
+      // The one way out, where the screen offered one. The Design System's
+      // toast already draws this trigger — in the status accent, and
+      // dismissing itself when the reader takes it — so the whole of the
+      // translation is `run` becoming `onClick`.
+      ...(failure.action
+        ? { action: { label: failure.action.label, onClick: failure.action.run } }
+        : {}),
       // Read by the toaster's `renderMeta` (see `ui/elements/ui-error-actions`):
       // the docs link and the copyable error id, which is the whole of the
       // technical detail a customer is shown.

@@ -1,8 +1,7 @@
-import { Button, Text, VStack } from "@chakra-ui/react";
 import { useCallback } from "react";
 import { toaster } from "../../../behavior/studio-host/toaster";
 import type { BaseComponent } from "@langwatch/workflow-contract";
-import { explainExecutionStateError } from "./execution-state-error";
+import { reportableExecutionFailure } from "./execution-state-error";
 import { useWorkflowStore } from "@langwatch/workflow-web";
 
 export const useAlertOnComponent = () => {
@@ -29,42 +28,26 @@ export const useAlertOnComponent = () => {
       const toastId = `component-error-${componentId}`;
 
       // The node's raw `error` names hosts, URLs and Go internals — it stays in
-      // the properties panel and the logs. The customer reads the copy the
-      // registry holds for the node's code, or, for a failure with no code,
-      // the generic unknown state under this headline. See ADR-045.
-      const { title, description, traceId } = explainExecutionStateError({
-        state: execution_state,
-        fallbackTitle: "That step didn't run",
-      });
-
+      // the properties panel and the logs. What travels is the node's CODE, as
+      // the serialised handled error the engine sent, and the application
+      // resolves the words and the copyable error id from it. See ADR-045.
+      //
+      // "Go to component" used to be a `<Button>` rendered inside the toast's
+      // `description`, which the feedback capability takes as text: the button
+      // was dropped on the floor at the port. It is an offered ACTION now, and
+      // the application's toaster draws and dismisses it.
       toaster.create({
-        title,
+        error: reportableExecutionFailure(execution_state),
+        title: "That step didn't run",
         id: toastId,
-        description: (
-          <VStack align="start">
-            {description && <Text>{description}</Text>}
-            <Button
-              unstyled
-              color="white"
-              cursor="pointer"
-              textDecoration="underline"
-              size="sm"
-              onClick={() => {
-                setSelectedNode(componentId);
-                setPropertiesExpanded(true);
-                toaster.dismiss(toastId);
-              }}
-            >
-              Go to component
-            </Button>
-          </VStack>
-        ),
         type: "error",
         duration: 5000,
-        meta: {
-          // The copyable error id, which is all a customer gets of the
-          // technical detail when the failure carried no code.
-          traceId,
+        action: {
+          label: "Go to component",
+          onClick: () => {
+            setSelectedNode(componentId);
+            setPropertiesExpanded(true);
+          },
         },
       });
     },

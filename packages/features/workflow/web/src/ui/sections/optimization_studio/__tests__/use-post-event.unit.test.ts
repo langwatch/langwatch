@@ -34,8 +34,16 @@ function lastToast() {
         title?: string;
         description?: string;
         type?: string;
+        /** The failure itself, handed over whole for the application to explain. */
+        error?: unknown;
       }
     | undefined;
+}
+
+/** The trace id the reported failure carried, wherever it carried it. */
+function reportedTraceId(toast: ReturnType<typeof lastToast>): string | undefined {
+  const error = toast?.error as { traceId?: string; trace?: { traceId?: string } } | undefined;
+  return error?.traceId ?? error?.trace?.traceId;
 }
 
 function handleErroredExecution(
@@ -258,7 +266,10 @@ describe("alertOnError", () => {
       expect(toast?.type).toBe("error");
       expect(toast?.title).not.toContain("expected_output");
       expect(toast?.title).not.toContain("/tmp/");
-      expect(toast?.description ?? "").not.toContain("/tmp/");
+      // The failure travels whole so the application can explain it — and what
+      // travels is the CODE, never the engine's own sentence.
+      expect(JSON.stringify(toast)).not.toContain("/tmp/");
+      expect((toast?.error as { code?: string } | undefined)?.code).toBe("invalid_dataset");
     });
   });
 
@@ -289,19 +300,21 @@ describe("alertOnError", () => {
     });
 
     /**
-     * "We've been notified" has to be true when we say it. A failure with no
-     * trace id has no log line behind it — the studio's own client-side
-     * timeout, for one — so the toast makes no promise nobody kept.
+     * The trace id is the one thing on an uncoded frame that may be shown, and
+     * it is the whole of what a customer can hand support. It has to survive
+     * the trip to the host, which now writes the words: a report that arrives
+     * with no trace leaves the reader with nothing to quote.
      */
-    it("only claims we were notified when there is a trace to be notified by", () => {
-      const untraced = handleErroredExecution({ error: "Timeout" });
-      expect(untraced?.description ?? "").toBe("");
-
+    it("carries the trace id over, and nothing else off the frame", () => {
       const traced = handleErroredExecution({
         error: "Timeout",
         trace_id: "4bf92f3577b34da6a3ce929d0e0e4736",
       });
-      expect(traced?.description ?? "").toContain("notified");
+      expect(reportedTraceId(traced)).toBe("4bf92f3577b34da6a3ce929d0e0e4736");
+      expect(JSON.stringify(traced)).not.toContain("Timeout");
+
+      const untraced = handleErroredExecution({ error: "Timeout" });
+      expect(reportedTraceId(untraced)).toBeUndefined();
     });
   });
 

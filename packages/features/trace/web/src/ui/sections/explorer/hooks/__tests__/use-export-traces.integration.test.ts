@@ -11,6 +11,8 @@
  */
 import { act, renderHook } from "@testing-library/react";
 import { afterEach, describe, expect, it, vi } from "vitest";
+import { setTraceErrorHost, showErrorToast } from "../../../errors";
+import type { TraceFailureNotice, TraceHostPort } from "../../../../../behavior/trace-host";
 import { useExportTraces } from "../use-export-traces";
 
 const { mockToasterCreate } = vi.hoisted(() => ({
@@ -18,7 +20,7 @@ const { mockToasterCreate } = vi.hoisted(() => ({
 }));
 
 // Mock toaster
-vi.mock("../../../../blocks/toaster", () => ({
+vi.mock("@langwatch/design-system/toaster", () => ({
   toaster: { create: mockToasterCreate },
 }));
 
@@ -272,17 +274,35 @@ describe("useExportTraces()", () => {
   });
 
   describe("when projectId is undefined", () => {
-    it("does not start export and shows error toast", () => {
+    it("does not start export and reports the refusal through the host", () => {
+      // The failure leaves this package whole: the application resolves the
+      // words from its own code-keyed registry, so what is asserted here is
+      // that it was HANDED OVER, not what it was made to say.
+      const failures: TraceFailureNotice[] = [];
+      setTraceErrorHost({
+        failed: (failure: TraceFailureNotice) => failures.push(failure),
+      } as unknown as TraceHostPort);
+
       const { result } = renderHook(() => useExportTraces({ projectId: undefined }));
 
       act(() => {
         result.current.startExport({ mode: "summary", format: "csv" });
       });
 
+      setTraceErrorHost(void 0);
+
       expect(result.current.isExporting).toBe(false);
-      expect(mockToasterCreate).toHaveBeenCalledWith(
-        expect.objectContaining({ type: "error" }),
-      );
+      expect(failures).toHaveLength(1);
+      expect(failures[0]?.fallbackTitle).toBe("Couldn't export the traces");
+    });
+
+    it("drops the report rather than throwing when no host is mounted", () => {
+      const warn = vi.spyOn(console, "warn").mockImplementation(() => void 0);
+
+      expect(() =>
+        showErrorToast({ fallbackTitle: "Couldn't export the traces" }),
+      ).not.toThrow();
+      expect(warn).toHaveBeenCalled();
     });
   });
 

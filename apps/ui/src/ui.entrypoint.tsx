@@ -20,7 +20,6 @@
  * named in the UI rows of `dev/docs/plans/core-application-feature-extraction-plan.md`.
  */
 
-import { Toaster } from "@langwatch/design-system/toaster";
 import type { ReactNode } from "react";
 import { registerChunkReloadListener } from "./behavior/chunk-reload";
 import { readPublicAppConfig } from "./behavior/public-config";
@@ -29,6 +28,7 @@ import { UiShellPort } from "./behavior/ui-runtime.port";
 import { UiRuntime } from "./behavior/ui.runtime";
 import { createUiApplication } from "./features/installed-ui-features.composition";
 import type { PublicEnvironment } from "./model/public-environment";
+import { UiErrorToaster } from "./ui/elements/ui-error-toaster";
 import { UiApplicationShell } from "./ui/sections/ui-application-shell";
 import type { UiApplication } from "./ui/sections/ui-application";
 
@@ -88,7 +88,7 @@ class BrowserUiShell extends UiShellPort {
           transport: UiPendingProvider,
           graphicsQuality: UiPendingProvider,
           commandBar: UiPendingProvider,
-          toaster: Toaster,
+          toaster: UiErrorToaster,
           footer: UiNoFooter,
           usePublicEnvironment: useBootPublicEnvironment,
           useNavigationTracking: useNoNavigationTracking,

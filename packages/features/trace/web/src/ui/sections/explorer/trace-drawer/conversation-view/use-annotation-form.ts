@@ -13,7 +13,8 @@ import {
   type PopoverAnnotationFormInput,
   type TraceAnnotation,
 } from "@langwatch/annotation-web";
-import { toaster } from "../../../../blocks/toaster";
+import { toaster } from "@langwatch/design-system/toaster";
+import { showErrorToast } from "../../../errors";
 import { useAnnotationInvalidation } from "../../../use-annotation-invalidation";
 import { useOrganizationTeamProject } from "../../../../../behavior/use-organization-team-project";
 import { api } from "../../../trace-api";
@@ -38,11 +39,8 @@ function saveCallbacks({
       });
       onDone();
     },
-    onError: () => {
-      toaster.create({
-        title: "Could not save annotation",
-        type: "error",
-      });
+    onError: (error: unknown) => {
+      showErrorToast({ error, fallbackTitle: "Couldn't save the annotation" });
     },
   };
 }
@@ -149,11 +147,8 @@ export function useAnnotationMutations({
           toaster.create({ title: "Annotation deleted", type: "success" });
           onDone();
         },
-        onError: () => {
-          toaster.create({
-            title: "Could not delete annotation",
-            type: "error",
-          });
+        onError: (error: unknown) => {
+          showErrorToast({ error, fallbackTitle: "Couldn't delete the annotation" });
         },
       },
     );

@@ -23,9 +23,12 @@ import { useCallback, useEffect, useState } from "react";
 import { useModelProvidersSettings } from "@langwatch/model-provider-web/hooks/useModelProvidersSettings";
 import { useOrganizationTeamProject } from "../../../behavior/use-organization-team-project";
 import { api } from "../../../behavior/scenario-api";
-import { toaster } from "@langwatch/design-system/toaster";
 import { ResolvedModelCaption } from "../../elements/scenarios/resolved-model-caption";
-import { classifyGenerationError } from "../../../behavior/scenarios/classify-generation-error";
+import {
+  classifyGenerationError,
+  reportableGenerationFailure,
+} from "../../../behavior/scenarios/classify-generation-error";
+import { showErrorToast } from "../../../behavior/errors";
 import { getDefaultModelState } from "../../../model/scenarios/default-model-state";
 
 const logger = createLogger("langwatch:scenarios:ai-generation");
@@ -99,7 +102,6 @@ export function formHasContent(input: {
 }
 
 const PROMPT_INPUT_ROWS = 5;
-const TOAST_DURATION_MS = 5000;
 
 export function ScenarioAIGeneration({ form }: ScenarioAIGenerationProps) {
   const { project } = useOrganizationTeamProject();
@@ -169,20 +171,22 @@ export function ScenarioAIGeneration({ form }: ScenarioAIGenerationProps) {
       const classified = classifyGenerationError(error);
       const needsConfiguration =
         classified.cta === "configure" || classified.cta === "configure-and-retry";
-      // STAYS ON THE DESIGN SYSTEM TOASTER: a generation failure that needs a
-      // model provider offers the way to configure one, and the feedback port
-      // has no slot for an offered action. See the plan doc's UI ledger.
-      toaster.create({
-        title: classified.title,
-        description: classified.copy,
-        type: "error", // no-raw-error-toast-ok
-        duration: TOAST_DURATION_MS,
-        action: needsConfiguration
+      // The classifier decides the RECOVERY; the application decides the words.
+      // It kept deciding both while the toast was raised here, and its words
+      // were the generic pair for every failure — the code-keyed registry did
+      // not travel with this package. The failure goes over whole now, in the
+      // envelope the REST route sent it in, and keeps its button.
+      showErrorToast({
+        error: reportableGenerationFailure(error),
+        fallbackTitle: "Couldn't generate the scenario",
+        ...(needsConfiguration
           ? {
-              label: "Model settings",
-              onClick: () => window.open("/settings/model-providers", "_blank"),
+              action: {
+                label: "Model settings",
+                run: () => window.open("/settings/model-providers", "_blank"),
+              },
             }
-          : undefined,
+          : {}),
       });
     }
   }, [input, project?.id, form, hasExistingContent, hasHistory, generate, addPrompt]);

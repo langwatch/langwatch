@@ -200,10 +200,10 @@ const exportWorkflow = async (
     document.body.appendChild(link);
     link.click();
     link.remove();
-  } catch {
+  } catch (error) {
     toaster.create({
-      title: "Error exporting workflow",
-      description: "An error occurred while exporting the workflow.",
+      error,
+      title: "Couldn't export the workflow",
       type: "error",
     });
   }
@@ -473,7 +473,8 @@ function PublishModalContent({
           setCurrentVersionId(versionId);
         } catch (error) {
           toaster.create({
-            title: "Error saving version",
+            error,
+            title: "Couldn't save the version",
             type: "error",
             duration: 5000,
           });
@@ -510,9 +511,10 @@ function PublishModalContent({
               toggleSaveAsComponent();
             }
           },
-          onError: () => {
+          onError: (error) => {
             toaster.create({
-              title: "Error publishing workflow",
+              error,
+              title: "Couldn't publish the workflow",
               type: "error",
               duration: 5000,
             });

@@ -41,7 +41,7 @@ vi.mock("@langwatch/design-system/color-mode", () => ({
   useColorMode: () => ({ colorMode: "light" }),
 }));
 
-vi.mock("../../../blocks/toaster", () => ({
+vi.mock("@langwatch/design-system/toaster", () => ({
   toaster: { create: vi.fn() },
 }));
 

@@ -27,8 +27,12 @@
  * renders read-only, which is what it did in `platform/app`.
  */
 
-import { traceApi, TraceHostProvider } from "@langwatch/trace-web/screens/traces";
-import { useMemo, type ComponentType, type ReactNode } from "react";
+import {
+  setTraceErrorHost,
+  traceApi,
+  TraceHostProvider,
+} from "@langwatch/trace-web/screens/traces";
+import { useEffect, useMemo, type ComponentType, type ReactNode } from "react";
 import { useLocation } from "react-router";
 
 import { useUiCapabilities } from "../../../../behavior/ui-capabilities";
@@ -145,6 +149,18 @@ function TraceHost({ children }: { children: ReactNode }) {
       feedback,
     ],
   );
+
+  /**
+   * The failure singleton, published for the mutation callbacks.
+   *
+   * `showErrorToast` fires from `onError`, where no hook can run, so the
+   * package keeps a module-scope host. Set on every render rather than once,
+   * because the host is a new value object whenever the scope moves.
+   */
+  useEffect(() => {
+    setTraceErrorHost(host);
+    return () => setTraceErrorHost(void 0);
+  }, [host]);
 
   return <TraceHostProvider value={host}>{children}</TraceHostProvider>;
 }

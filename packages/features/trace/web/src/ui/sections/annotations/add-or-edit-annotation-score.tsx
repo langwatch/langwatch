@@ -10,7 +10,7 @@ import {
 import { AnnotationScoreDataType } from "../../../model/prisma-types";
 import { useOrganizationTeamProject } from "../../../behavior/use-organization-team-project";
 import { api } from "../trace-api";
-import { toaster } from "../../blocks/toaster";
+import { toaster } from "@langwatch/design-system/toaster";
 
 type FormData = {
   name: string;
@@ -109,12 +109,11 @@ export const AddOrEditAnnotationScore = ({
 
   const onSubmit = (data: FormData) => {
     if (scoreTypeOptions.every((option) => !option.trim())) {
-      toaster.create({
-        title: annotationScoreId
-          ? "Error updating annotation score"
-          : "Error creating annotation score",
-        description: "Please add at least one option",
-        type: "error",
+      showErrorToast({
+        fallbackTitle: annotationScoreId
+          ? "Couldn't update the annotation score"
+          : "Couldn't create the annotation score",
+        description: "Add at least one option.",
       });
       return;
     }
@@ -125,12 +124,11 @@ export const AddOrEditAnnotationScore = ({
 
     const normalizedOptions = trimmedRadioCheckboxOptions.map((opt) => opt.toLowerCase());
     if (normalizedOptions.length !== new Set(normalizedOptions).size) {
-      toaster.create({
-        title: annotationScoreId
-          ? "Error updating annotation score"
-          : "Error creating annotation score",
-        description: "Duplicate options are not allowed (case-insensitive)",
-        type: "error",
+      showErrorToast({
+        fallbackTitle: annotationScoreId
+          ? "Couldn't update the annotation score"
+          : "Couldn't create the annotation score",
+        description: "Options must be different from one another, ignoring case.",
       });
       return;
     }

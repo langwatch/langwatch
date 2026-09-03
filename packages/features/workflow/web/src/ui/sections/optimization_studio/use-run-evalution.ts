@@ -181,7 +181,8 @@ export const useRunEvalution = () => {
         } catch (err) {
           logger.error({ error: err }, "evaluation: error saving version");
           toaster.create({
-            title: "Error saving version",
+            error: err,
+            title: "Couldn't save the version",
             type: "error",
             duration: 5000,
           });

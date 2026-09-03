@@ -40,11 +40,16 @@ const FAULTS = new Set<string>(["customer", "platform", "provider"]);
  * returning `null` when the failure was not handled (an infrastructure fault,
  * a bug) and therefore has nothing structured to say.
  *
- * Two shapes, because the platform has two boundaries:
+ * Three shapes, because the platform has three boundaries:
  *   - tRPC nests it under `data.error` (see `src/server/api/trpc.ts`);
  *   - a Hono REST route sends it FLAT (`src/app/api/middleware/error-handler.ts`
  *     puts the code in `error`, spreads `meta` at the top level, and hangs the
- *     trace off `trace`).
+ *     trace off `trace`);
+ *   - an event stream sends the SERIALISED payload with no envelope at all —
+ *     a workflow node's `domainError`, an evaluator's, a `target_result`'s.
+ *     Without that third reader the studio's coded failures reached the
+ *     feedback port and resolved to the generic unknown line, even though the
+ *     engine had named the failure and the registry had copy for it.
  *
  * `null` is the signal to fall back to the generic unknown treatment. It is a
  * correct, expected outcome — see ADR-045.
@@ -53,7 +58,39 @@ const FAULTS = new Set<string>(["customer", "platform", "provider"]);
  * must not be able to crash a render by omitting a field.
  */
 export function readHandledError(err: unknown): HandledErrorShape | null {
-  return fromTrpcEnvelope(err) ?? fromRestBody(err);
+  return fromTrpcEnvelope(err) ?? fromRestBody(err) ?? fromSerializedPayload(err);
+}
+
+/**
+ * The envelope-less shape: `HandledError.serialize()` exactly as it left the
+ * server, riding on an event payload rather than on a transport error.
+ *
+ * Read LAST, because it is the loosest of the three: `code` plus a numeric
+ * `httpStatus` is all there is to recognise it by. Both are required together
+ * for that reason — a bare `{ code }` is any tagged object in the app, and a
+ * bare `{ httpStatus }` is a response. `kind` is accepted alongside `code` for
+ * the same back-compat reason the tRPC reader accepts it.
+ */
+function fromSerializedPayload(err: unknown): HandledErrorShape | null {
+  if (!isRecord(err)) return null;
+  if (typeof err.httpStatus !== "number") return null;
+
+  const code =
+    typeof err.code === "string" ? err.code : typeof err.kind === "string" ? err.kind : null;
+  if (code === null) return null;
+  if (!KNOWN_CODES.has(code) && !SLUG_SHAPED.test(code)) return null;
+
+  return {
+    code,
+    httpStatus: err.httpStatus,
+    meta: isRecord(err.meta) ? err.meta : {},
+    fault: safeFault(err.fault),
+    retryable: err.retryable === true,
+    tips: safeTips(err.tips),
+    docsUrl: safeDocsUrl(err.docsUrl),
+    traceId: typeof err.traceId === "string" ? err.traceId : undefined,
+    reasons: safeReasons(err.reasons),
+  };
 }
 
 /** The tRPC shape: the whole payload under `data.error`. */

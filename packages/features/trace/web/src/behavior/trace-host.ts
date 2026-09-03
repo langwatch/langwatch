@@ -104,6 +104,18 @@ export type TraceSuccessNotice = {
  * (#5984). `fallbackTitle` names the action that failed, so an unrecognised
  * code still says what the reader was doing.
  */
+/**
+ * The one way out a failure offers.
+ *
+ * `run` rather than `onClick`: a port says what happens, and the application's
+ * toaster is what turns it into a click. Rare by design — a button that only
+ * re-runs what just failed is noise.
+ */
+export type TraceFailureAction = {
+  label: string;
+  run: () => void;
+};
+
 export type TraceFailureNotice = {
   error: unknown;
   fallbackTitle: string;
@@ -117,6 +129,8 @@ export type TraceFailureNotice = {
    * server's own numbers.
    */
   description?: string;
+  /** The single fix this failure offers, rendered as a button on the notice. */
+  action?: TraceFailureAction;
   id?: string;
 };
 

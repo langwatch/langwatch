@@ -31,7 +31,7 @@ vi.mock("../../../../../../behavior/auth-session", () => ({
   useRequiredSession: () => ({ data: { user: { id: "user-1" } } }),
 }));
 
-vi.mock("../../../../../blocks/toaster", () => ({ toaster: { create: vi.fn() } }));
+vi.mock("@langwatch/design-system/toaster", () => ({ toaster: { create: vi.fn() } }));
 
 vi.mock("../../../../me/use-personal-feature-gate", () => ({
   usePersonalFeatureGate: () => ({

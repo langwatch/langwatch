@@ -1,5 +1,5 @@
 import { useCallback, useMemo, useRef, useState } from "react";
-import { toaster } from "../../../blocks/toaster";
+import { showErrorToast } from "../../errors";
 import { useOrganizationTeamProject } from "../../../../behavior/use-organization-team-project";
 import { api } from "../../trace-api";
 import { shouldShowGenericTranslateError } from "../../../../behavior/explorer/utils/translation-error";
@@ -88,10 +88,9 @@ export function useTextTranslation({
         // utils/api.tsx; only fall back to a generic toast when none of
         // those matched, so a non-typed failure still gives feedback.
         if (shouldShowGenericTranslateError(error)) {
-          toaster.create({
-            title: "Error translating",
-            description: "There was an error translating the message, please try again.",
-            type: "error",
+          showErrorToast({
+            error,
+            fallbackTitle: "Couldn't translate the message",
           });
         }
       })

@@ -80,7 +80,7 @@ vi.mock("../../../../behavior/next-router", () => ({
   useRouter: () => ({ push: mocks.push }),
 }));
 
-vi.mock("../../../blocks/toaster", () => ({
+vi.mock("@langwatch/design-system/toaster", () => ({
   toaster: { create: mocks.toastCreate },
 }));
 

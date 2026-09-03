@@ -3,7 +3,8 @@ import type React from "react";
 import { useState } from "react";
 import { LuBookOpen, LuChevronDown, LuSparkles, LuTerminal } from "react-icons/lu";
 import { Menu } from "@langwatch/design-system/menu";
-import { toaster } from "../blocks/toaster";
+import { toaster } from "@langwatch/design-system/toaster";
+import { showErrorToast } from "./errors";
 import { useCanAskLangy } from "../../behavior/langy/use-can-ask-langy";
 import { useLangyStore } from "@langwatch/langy-web";
 import { withCredentials } from "../../model/skills/setup-prompt";
@@ -248,9 +249,9 @@ export function AgentActionsMenu({
           title: copy.copiedTitle,
         }),
       () =>
-        toaster.create({
-          type: "error",
-          title: "Couldn't copy the prompt",
+        showErrorToast({
+          fallbackTitle: "Couldn't copy the prompt",
+          description: "Clipboard access is restricted. This can happen on non-HTTPS domains.",
         }),
     );
   };

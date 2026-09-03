@@ -2,7 +2,7 @@ import { Button, chakra, HStack, Input, Stack, Text } from "@chakra-ui/react";
 import { BadgeCheck, Gauge, type LucideIcon, Tag, X } from "lucide-react";
 import type React from "react";
 import { useMemo, useState } from "react";
-import { toaster } from "../../../../blocks/toaster";
+import { toaster } from "@langwatch/design-system/toaster";
 import type { EvaluatorOption } from "../../hooks/use-evaluator-options";
 import {
   EVAL_COLUMN_FIELDS,

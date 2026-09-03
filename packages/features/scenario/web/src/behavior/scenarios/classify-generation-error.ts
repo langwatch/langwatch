@@ -129,6 +129,23 @@ function explain(error: unknown): ErrorExplanation {
   return explainAnyError(error);
 }
 
+/**
+ * The failure in the shape the APPLICATION's registry can read.
+ *
+ * `generateScenarioWithAI` calls a REST route and throws away the envelope:
+ * `{ error: "<code>", ...meta }` becomes a plain `ScenarioGenerationError`
+ * carrying `kind` and `meta`, which no boundary reader recognises. Handing that
+ * to `ScenarioHostPort.failed` would resolve to the generic unknown line even
+ * though the server named the failure. This puts the body back the way the
+ * route sent it — a reconstruction, not an invention — so the registry answers.
+ *
+ * Anything else travels untouched: a tRPC failure already carries its envelope.
+ */
+export function reportableGenerationFailure(error: unknown): unknown {
+  if (!(error instanceof ScenarioGenerationError)) return error;
+  return { ...error.meta, error: error.kind };
+}
+
 /** Maps a generation failure to its tier, its recovery CTA and its copy. */
 export function classifyGenerationError(error: unknown): GenerationErrorClass {
   const handled = readHandledError(error);

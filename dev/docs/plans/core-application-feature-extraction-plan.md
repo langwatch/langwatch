@@ -8409,8 +8409,11 @@ failure to support.
 
 ### Named absences
 
-- **30 files in eight `packages/features/*/web` packages import
-  `@langwatch/design-system/toaster` directly** and raise 24 hardcoded error
+- ~~**30 files in eight `packages/features/*/web` packages import
+  `@langwatch/design-system/toaster` directly**~~ — **CLOSED** by the record
+  immediately below, and the five it left marked are closed by the one after
+  that. Kept as written: **30 files in eight `packages/features/*/web` packages
+  import `@langwatch/design-system/toaster` directly** and raise 24 hardcoded error
   toasts (scenario 18 files, onboarding 3, auth 3, langy 2, and one each in
   trace, organization, navigation, analytics). They bypass the capability port
   entirely, so this slice does not reach them: routing them means giving each
@@ -8633,9 +8636,11 @@ guard naming `agent-list-drawer.tsx:96`, and restoring it turns it green.
 
 ### Named absences
 
-- **`UiFailureNotice` has no `action`.** Five sites need one and are marked;
-  see the judgment call above. It is the next thing this port wants, and it is a
-  change to `apps/ui`'s own capability rather than to any package.
+- ~~**`UiFailureNotice` has no `action`.**~~ **CLOSED** by "the offered action,
+  and the two packages that toasted for themselves" below. The port carries
+  `action: { label, run }`, all five markers are gone, and four of the five
+  sites keep both the registry's words and their button — the fifth was a
+  `warning` rather than a failure and stays a toast.
 - **`validation_error`'s registry copy cannot read a `field`/`maxLength` meta.**
   It reads `meta.fieldErrors` and `meta.formErrors` only, so the trace rename's
   rejection — which names `newName`, its limit and what arrived — degrades to
@@ -8649,18 +8654,17 @@ guard naming `agent-list-drawer.tsx:96`, and restoring it turns it green.
   remain on the toaster, with one marked line. Moving them wants either an
   optional host on `OnboardingHostPort` or `@langwatch/trace-web` no longer
   borrowing an onboarding component — neither of which is a copy slice.
-- **A SECOND absence this slice surfaced and did not create.**
-  `@langwatch/trace-web` carries its own toast singleton
-  (`ui/blocks/toaster.tsx`) and its own copy resolver
-  (`behavior/errors/logic/resolve-error-copy.ts`) behind a package-local
-  `showErrorToast`, and `@langwatch/workflow-web` has the same shape in
-  `behavior/studio-host/toaster.ts`. Neither imports
-  `@langwatch/design-system/toaster`, so neither was in the 30 and neither is a
-  finding here — but a second toaster and a second copy table are exactly what
-  the registry exists to prevent, and roughly 40 error toasts sit behind them.
-  That is a family-sized slice of its own; the guard as written will not stop it
-  growing, and widening it to a package-local toaster is the first thing that
-  slice should do.
+- ~~**A SECOND absence this slice surfaced and did not create.**~~ **CLOSED**
+  by the record below. `@langwatch/trace-web`'s toaster is deleted — nothing in
+  `apps/ui` had ever mounted a renderer bound to it, so every toast it raised
+  was invisible — and its `showErrorToast` hands the failure whole to
+  `TraceHostPort.failed`. `@langwatch/workflow-web`'s studio toaster stays,
+  because it renders nothing and only routes; what it was dropping was the
+  ERROR, so every studio failure resolved to the generic unknown line. The
+  guard was widened as this note asked: a package-local toaster module is now
+  itself a finding unless every failure it can raise leaves through a host port.
+  What remains is trace's copied registry and resolver, which only the two
+  inline surfaces read — named again there.
 
 ### Gates
 
@@ -10183,3 +10187,270 @@ typecheck clean.
    document describes them by hand and nothing keeps the two in step. Adding
    the descriptions to those routes would move them from `undescribed` into the
    generated 287.
+
+## UI: the offered action, and the two packages that toasted for themselves, 2026-09-03
+
+The two absences the record above named, closed together because they are the
+same absence seen twice. **`UiFailureNotice` had no slot for an offered ACTION**,
+so five scenario failures whose whole point was a button kept the button and
+gave up the registry's words. And **`@langwatch/trace-web` and
+`@langwatch/workflow-web` each carried a toaster of their own** with about forty
+error toasts behind them — a second toast surface and, in trace's case, a second
+copy resolver, which is exactly what the code-keyed registry exists to prevent.
+
+```
+  BEFORE                                   AFTER
+
+  scenario/web ─┬─► showErrorToast ─► host  scenario/web ─┬─► showErrorToast ─┐
+                └─► DS toaster (5 marked,                 └───────────────────┤
+                    each keeps a button)                                      │
+                                                                              ▼
+  trace/web ────► ui/blocks/toaster.tsx     trace/web ────► showErrorToast ──►│
+                  (createToaster — NOTHING                  (behavior/, no    │
+                   in apps/ui mounted it)                    toaster at all)  │
+                + behavior/errors/logic/                                      │
+                  resolve-error-copy                                          ▼
+                                                                    UiFeedbackPort
+  workflow/web ─► studio-host/toaster ────  workflow/web ─► studio-host/    .failed
+                  (routes, but dropped                       toaster ───────►│
+                   the error: every studio                   (routes, error   │
+                   failure read as unknown)                   travels whole)  │
+                                                                              ▼
+                                                     model/errors/presentation
+                                                     + the action, as a button
+```
+
+### The action slot
+
+`UiFailureNotice` gains `action?: { label: string; run: () => void }`, and
+`ScenarioFailureNotice`, `TraceFailureNotice` and `WorkflowFailureNotice` gain
+the same shape. No host adapter changed: all three providers already forward the
+whole notice to `feedback.failed(failure)`, so the field threads through
+structurally.
+
+`run` rather than `onClick` — a port says what happens, not which input device
+caused it — and `BrowserUiFeedback.failed` is where the rename happens, because
+that is where a notice becomes a toast.
+
+- **It rides the Design System toast's own `action` slot, not `meta`.** The
+  slot already exists (`Toast.ActionTrigger`, in the status accent, dismissing
+  the toast when the reader takes it), the packages already used it before they
+  moved, and `meta` is a bag `renderMeta` reads — putting a FUNCTION on it to
+  hand-roll a button the design system already draws would have bought a
+  different placement and lost the dismiss. The cost is placement: `renderMeta`
+  renders above `toast.action`, so the offered fix sits below the docs link and
+  the error id rather than beside them. It is the larger, accented control of
+  the two rows, which is the right reading of "primary".
+
+### Scenario: five markers, four actions, one warning
+
+All five `// no-raw-error-toast-ok` markers are gone.
+
+- `show-suite-run-error.ts` — the whole special case collapsed. It no longer
+  calls `explainHandledError` or the toaster; it reads the code only to decide
+  WHETHER this failure has a way out, and `showErrorToast` carries both the
+  registry's words and "Edit Run Plan".
+- `use-run-scenario.ts` — the model-provider gate keeps "Configure model
+  providers" on the port. `buildRunOutcomeToast` became `reportRunOutcome`:
+  one place still decides how a run outcome is reported, in two channels. The
+  two FAILURES go through the host; the run that finished and did not pass
+  stays a `warning` toast raised here, because it is a result rather than a
+  fault and the port has no channel that means "it finished, and the answer was
+  no".
+- `scenario-ai-generation.tsx` — the classifier decides the RECOVERY, the
+  application decides the words. Its `title`/`copy` came from this package's
+  degenerate `explainAnyError`, which answers the generic pair for every code,
+  so every generation failure already read as "Something went wrong" —
+  `classified.title` and `classified.copy` are no longer rendered at all.
+  `reportableGenerationFailure` puts the REST body back the way the route sent
+  it (`{ ...meta, error: kind }`), because `generateScenarioWithAI` strips the
+  envelope into a plain `ScenarioGenerationError` that no boundary reader
+  recognises.
+
+### Trace: the toaster nobody rendered
+
+`ui/blocks/toaster.tsx` called `createToaster(...)`, and **nothing in `apps/ui`
+ever mounted a `<Toaster>` bound to that instance** — the application renders
+the Design System's. Every toast raised on it, success and failure alike, was
+created into a store with no renderer and was never seen. That is the finding,
+not a side note: the module is deleted, and the twenty-odd success, info and
+warning callers now import `@langwatch/design-system/toaster`, which the
+application does render.
+
+- **`showErrorToast` moved to `behavior/errors/logic/` and resolves nothing.**
+  It reads `isHandledByGlobalHandler`, then hands the failure whole to
+  `TraceHostPort.failed`. A module-scope host (`setTraceErrorHost`, bound in
+  `apps/ui/src/features/traces/ui/sections/host-provider.tsx` exactly as the
+  scenario family's is) because most of these fire from `onError`, where no hook
+  can run; with no host mounted the report is warned about and dropped rather
+  than thrown.
+- **Fourteen hardcoded `type: "error"` toasts in twelve files** now go through
+  it, and four of them (`use-annotation-form`'s two `onError: () => {}`,
+  `message-annotate-cluster`, `use-text-translation`) bind the error they were
+  discarding.
+- **`ui/blocks/missing-model-toast.tsx` deleted.** 200 lines, two exported
+  toast raisers, and nothing anywhere imports it — the global tRPC interceptor
+  that called it did not travel. Its only live dependency was the toaster.
+
+### Workflow: the error was being dropped at the seam
+
+`behavior/studio-host/toaster.ts` already routed to `WorkflowHostPort.failed`,
+which is why it was not in the eight — but it passed `error: void 0`, so **every
+one of the studio's error toasts resolved to the generic unknown line** even
+where the engine had named the failure. `StudioToast` gains `error`, and the
+toaster forwards it, along with the `action` it was also dropping.
+
+- **Seven call sites had an error in scope and were throwing it away** — three
+  `catch (error)`, two `onError: () => {}`, one bare `catch {}`, one logged-then-
+  discarded `err`. They pass it now.
+- **The two studio failure surfaces hand over the engine's own serialised
+  handled error.** `reportableExecutionFailure` rebuilds it with
+  `nodeErrorToDomainError`; an uncoded frame gives up its `error` string (it
+  names hosts, URLs and Go internals) and keeps its trace id, travelling as
+  `{ trace: { traceId } }`.
+- **`use-alert-on-component` lost a button the port was silently eating.** "Go
+  to component" was a `<Button>` rendered inside the toast's `description`,
+  which the feedback capability takes as TEXT — so the whole node was dropped at
+  the seam and the reader got no button at all. It is an offered action now.
+  The file is `.ts` rather than `.tsx`, since a hook returns state, not JSX.
+
+### `readHandledError` gains its third shape
+
+`apps/ui/src/model/errors/read-handled-error.ts` read two boundaries: tRPC's
+`data.error` and a flat REST body. It could not read the shape ADR-045 says an
+event stream sends — `HandledError.serialize()` with no envelope at all, which
+is what a workflow node's `domainError` and a `target_result`'s are. Without the
+third reader the studio's coded failures would have arrived at the feedback port
+and resolved to the generic line anyway, which is the bug this lane was closing.
+
+Read last, and gated on `code` AND a numeric `httpStatus` together: a bare
+`{ code }` is any tagged object in the app and a bare `{ httpStatus }` is a
+response.
+
+### Registry entries, per code
+
+Trace's copied registry differs from `apps/ui`'s by four entries, in both
+directions. The two `apps/ui` lacks are **dropped, not added**:
+
+- **`evaluation_not_found`** — dropped. Not in `APP_ERROR_CODES`; `codes.ts`'s
+  own scan finds no `HandledError` subclass declaring it, and the codes test
+  fails a listed code nothing raises as dead copy.
+- **`malformed_custom_role_permissions`** — dropped, same reason.
+
+Neither could have been added without failing `pnpm typecheck` (the registry is
+exhaustive over the enumerated codes) or `codes.unit.test.ts` (which is
+exhaustive in the other direction). The two `apps/ui` has and trace does not —
+`forbidden` and `service_unavailable` — are copy the trace fork never received,
+and every trace toast now reads them.
+
+### The guard
+
+The rule the last record asked for: **a package-local toaster module is itself a
+finding**. Two shapes, both named by their EXPORT or their renderer rather than
+by what they import, because an offender imports nothing:
+
+- `createToaster(` inside a `packages/features/*/web` file is a finding on its
+  own terms. It is a toast surface the composing application cannot reach — as
+  trace proved by never being mounted.
+- A module exporting a `toaster`-shaped API that can shape a failure and does
+  not hand it to a host port is a finding on each `type: "error"` line.
+
+A local toaster is allowed exactly one shape: it may ROUTE. Workflow's
+`studio-host/toaster.ts` renders nothing, owns no store, and turns every error
+call into `failed(...)`, which is how twenty-five studio files reach the
+application's registry without importing a renderer — so it passes, and the
+`.failed(` call is what makes it pass.
+
+It has its own scan floor (`FEATURE_WEB_SCANNED_FILE_FLOOR`, 500 against
+thousands) for the reason the file already states twice: this rule scans EVERY
+feature-web file rather than the ones importing the Design System, so the path
+shape changing is its one way of going quiet.
+
+**Shown to land, twice.** Re-creating `trace/web/src/ui/blocks/toaster.tsx` with
+nothing but `createToaster` fails the guard naming `toaster.tsx:3`; renaming
+workflow's `mounted.failed(` to anything else fails it naming
+`studio-host/toaster.ts:126`. Both restore green.
+
+### Judgment calls
+
+- **Trace's `resolve-error-copy.ts` is kept, and its docblock now says why.**
+  The instruction for this lane was to delete it. It is no longer a toast path —
+  `show-error-toast.ts` resolves nothing — but `HandledErrorAlert` and
+  `HandledErrorState` still read it, and those render a failure INTO the page
+  rather than over it: there is no inline counterpart to the feedback port to
+  report through, and the last record already names their non-arrival as an open
+  absence. Deleting the module would have copied its two rules into both
+  components, which is the drift it exists to prevent. What did go is
+  `describeError`, which nothing imported.
+- **Trace's copied `presentation.ts` stays too**, for the same reason and named
+  as an absence below. It is 3,696 lines of copy that only the two inline
+  surfaces read now.
+- **`render-code.tsx` keeps a marked `toaster.error`.** It is a `blocks/`
+  element, and a block may not depend upward on `behavior/`, where this
+  package's reporter lives. A clipboard refusal is the one failure that can
+  afford the exemption — no code, never crosses a wire, nothing the registry
+  knows is given up — which is the precedent the onboarding clipboard helper
+  set. The copy object is hoisted so the marker survives a reformat; oxfmt moves
+  a comment written inside an expanded object literal onto its own line, which
+  put it one line off the slot the guard matches, and the marker silently
+  stopped suppressing.
+- **The studio's "only claim we were notified when there is a trace" rule is
+  gone.** `explainExecutionStateError` withheld the generic description when the
+  frame carried no trace id. The application's unknown state says "We've been
+  notified. Try again in a moment." for every unhandled failure everywhere else,
+  so the studio was the outlier, and one unknown state written in one place is
+  the whole point of the consolidation. The trace id itself still travels, which
+  is the half that matters.
+- **`ShowErrorToastOptions.title` dropped from trace's reporter.** A hard
+  override of the headline that no caller in the package passed.
+- **The dedupe key for an uncoded studio failure is its title alone**, no longer
+  title plus description: the description it keyed on is not rendered here any
+  more, so keying on it was keying on something invisible.
+
+### Named absences
+
+- **`<HandledErrorAlert>`, `<HandledErrorState>` and `FormServerError` have
+  still not moved**, so trace keeps a copy of the registry and the resolver for
+  them, and `meta.fieldErrors` still is not mapped onto form fields in
+  `apps/ui`. That move deletes 3,800 lines from `trace/web` and is the last
+  thing standing between this family and one copy surface.
+- **`isHandledByGlobalHandler` is read by trace's reporter but nothing sets it
+  up in `apps/ui`** — no global interceptor opens a modal there yet, so the
+  dedup it performs is currently vacuous rather than wrong.
+- **Fourteen studio call sites still have no error to give** (the socket gate,
+  four browser-side timeouts, "version id not found"). Each is a browser-side
+  refusal with no wire behind it, so `error: undefined` plus the screen's title
+  is the honest report, not a gap.
+- **The `run_failed` warning toast in `use-run-scenario.ts`** is the one
+  remaining `toaster.create` in `scenario/web`. Routing it wants a third channel
+  on the feedback port — an outcome that is neither a success nor a failure —
+  which is mechanism bought for one caller.
+
+### Gates
+
+- Per-package `tsc --noEmit`: `@langwatch/trace-web` **clean**;
+  `@langwatch/scenario-web` **clean**; `@langwatch/workflow-web` **7 errors,
+  byte-identical to the baseline** and none in this lane's files (six `TS7006`
+  in `use-component-version.tsx` and `history.tsx`, and one `import.meta.env`
+  typing on `trace/web/src/behavior/docs-url.ts` that only surfaces from
+  workflow's project).
+- `apps/ui`: `tsc --noEmit -p tsconfig.json` **6 errors**, `-p
+  tsconfig.test.json` **11 errors in 5 files** — byte-identical to the baseline
+  both times, **0 in this lane's files**.
+- Per-package `vitest run`: trace **231 files / 1,818** (baseline 231 / 1,817;
+  one test added), workflow **52 / 323** (baseline 51 / 318; one file and five
+  tests added), scenario **52 / 421 + 1 skipped**, unchanged.
+- `apps/ui`: `vitest run` **100 files / 1,017 tests** from a baseline of
+  100 / 1,009 — two tests on the action slot, six on the new guard rule.
+- `architecture-lint` (`--no-declarations --no-legacy-application-migration`):
+  **identical per package for every package this lane touched** — trace 180,
+  scenario 137, workflow 189, `apps/ui` 92, all four unchanged, and no rule
+  gained an occurrence. The repo total fell from 2,115 to 2,113: two findings on
+  `packages/features/dashboard/server/package.json` went while this lane ran,
+  which is a sibling's and not this one's. Everything else differs only in line
+  numbers.
+- `oxfmt`: the three files this lane put out of format are reformatted; the
+  other 32 with drift carry it from before and are untouched. `oxlint`: three
+  warnings across the touched set, all pre-existing.
+- `git diff --numstat -- platform/app`: this lane touched nothing under
+  `platform/app`.

@@ -2,7 +2,8 @@ import { VStack } from "@chakra-ui/react";
 import { copyShareLink, ShareTraceDialogBody } from "@langwatch/share-web";
 import { useRef } from "react";
 import { Dialog } from "../../../dialog";
-import { toaster } from "../../../../blocks/toaster";
+import { toaster } from "@langwatch/design-system/toaster";
+import { showErrorToast } from "../../../errors";
 import { useShareTrace } from "../../hooks/use-share-trace";
 
 /**
@@ -42,11 +43,9 @@ export function ShareTraceDialog({
         return;
       }
 
-      toaster.create({
-        title: "Couldn't copy the link",
+      showErrorToast({
+        fallbackTitle: "Couldn't copy the link",
         description: "Clipboard access is restricted. This can happen on non-HTTPS domains.",
-        type: "error",
-        duration: 6000,
       });
     });
   };

@@ -6,7 +6,8 @@ import { isPythonRepr, parsePythonInsideJson } from "@langwatch/trace-contract";
 import dynamic from "../../../behavior/compat/next-dynamic";
 import { CopyIcon } from "../../elements/icons/copy";
 import { useColorMode } from "@langwatch/design-system/color-mode";
-import { toaster } from "../../blocks/toaster";
+import { toaster } from "@langwatch/design-system/toaster";
+import { showErrorToast } from "../errors";
 import { Tooltip } from "@langwatch/design-system/tooltip";
 import { TraceMediaPart } from "./trace-media-part";
 
@@ -49,16 +50,16 @@ export const RenderInputOutput = React.memo(function RenderInputOutput(
       window.location.hostname !== "localhost" &&
       window.location.hostname !== "127.0.0.1"
     ) {
-      toaster.create({
-        title: "Cannot copy to clipboard on HTTP",
-        type: "error",
+      showErrorToast({
+        fallbackTitle: "Cannot copy to clipboard on HTTP",
+        description: "Browsers only allow the clipboard on a secure origin.",
       });
       return;
     }
 
-    toaster.create({
-      title: "Failed to copy to clipboard",
-      type: "error",
+    showErrorToast({
+      fallbackTitle: "Couldn't copy to clipboard",
+      description: "Clipboard access is restricted. This can happen on non-HTTPS domains.",
     });
   };
 

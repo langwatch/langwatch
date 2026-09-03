@@ -8,6 +8,19 @@
  * `WorkflowHostPort.failed`, everything else becomes `succeeded`, and the
  * application's own toaster renders it with the application's own copy rules.
  *
+ * NOTHING IS RENDERED HERE and no copy is written here. It routes; it does not
+ * toast. That is the whole difference between this module and the package-local
+ * toaster the trace family carried, and it is what the corpus guard checks: a
+ * `toaster`-shaped export inside a feature-web package is a finding unless
+ * every failure it can raise leaves through a host port.
+ *
+ * THE FAILURE TRAVELS WHOLE. `error` is on {@link StudioToast} because the
+ * words a customer reads are resolved from the error's `code` by the
+ * application's registry, and a call site that hands over only a title has
+ * thrown that away before the port ever sees it. The studio's coded failures —
+ * a node's `domainError`, a `target_result`'s — are serialised handled errors,
+ * and the application reads that shape directly.
+ *
  * IT IS A SINGLETON BECAUSE THE CALL SITES ARE NOT COMPONENTS. Half of them
  * fire from a mutation callback or a store action, where no hook can run. The
  * host that is currently mounted registers itself here; a toast raised with no
@@ -24,6 +37,17 @@ export type StudioToast = {
   title?: ReactNode;
   /** Likewise: a few toasts carry an action button in their body. */
   description?: ReactNode;
+  /**
+   * The failure itself, for an `error` toast that has one.
+   *
+   * Handed to the host untouched, because the application's code-keyed registry
+   * is what turns it into words. A call site with nothing to give — the studio
+   * socket is not connected yet, a run timed out on the browser's own clock —
+   * leaves it unset, and the notice degrades to its `title` plus ADR-045's
+   * unknown state, which is the honest answer for a failure that never crossed
+   * a wire.
+   */
+  error?: unknown;
   type?: "error" | "success" | "warning" | "info" | "loading";
   duration?: number;
   id?: string;
@@ -61,9 +85,12 @@ export const toaster = {
     }
     if (toast.type === "error") {
       mounted.failed({
-        error: void 0,
+        error: toast.error,
         fallbackTitle: title(toast),
         description: typeof toast.description === "string" ? toast.description : void 0,
+        ...(toast.action
+          ? { action: { label: toast.action.label, run: toast.action.onClick } }
+          : {}),
         id: toast.id,
       });
       return toast.id;

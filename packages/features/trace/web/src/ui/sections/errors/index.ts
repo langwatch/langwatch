@@ -6,10 +6,9 @@
  * read the handled payload and let the code-keyed registry supply the words.
  */
 
-// `ErrorActions` is deliberately absent: `components/ui/toaster.tsx` renders
-// it, and this barrel re-exports `showErrorToast`, which imports `toaster` —
-// so exporting the component here would close an import cycle. Its consumers
-// deep-import `./components/ErrorActions` instead.
+// `ErrorActions` is deliberately absent: the two inline surfaces below render
+// it themselves, and a consumer that wants the row on its own deep-imports
+// `../../elements/errors/error-actions`.
 export { FormServerError } from "./form-server-error";
 export type { HandledErrorAlertProps } from "./handled-error-alert";
 export { HandledErrorAlert } from "./handled-error-alert";
@@ -34,6 +33,9 @@ export type { HandledErrorShape } from "../../../behavior/errors/logic/read-hand
 // id. See the note above `isRecord` in `readHandledError`.
 export { readHandledError } from "../../../behavior/errors/logic/read-handled-error";
 export type { ResolvedErrorCopy } from "../../../behavior/errors/logic/resolve-error-copy";
-export { describeError, resolveErrorCopy } from "../../../behavior/errors/logic/resolve-error-copy";
-export type { ShowErrorToastOptions } from "./logic/show-error-toast";
-export { showErrorToast } from "./logic/show-error-toast";
+export { resolveErrorCopy } from "../../../behavior/errors/logic/resolve-error-copy";
+export type { ShowErrorToastOptions } from "../../../behavior/errors/logic/show-error-toast";
+export {
+  setTraceErrorHost,
+  showErrorToast,
+} from "../../../behavior/errors/logic/show-error-toast";

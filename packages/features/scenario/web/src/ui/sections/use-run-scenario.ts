@@ -1,5 +1,6 @@
 import { useCallback, useState } from "react";
 import { showErrorToast } from "../../behavior/errors";
+import type { ScenarioFailureAction } from "../../model/scenario-host";
 import type { RunParameterValues } from "@langwatch/scenario-contract";
 import type { TargetValue } from "./scenarios/target-selector";
 import { toaster } from "@langwatch/design-system/toaster";
@@ -39,11 +40,16 @@ interface RunScenarioParams {
 }
 
 /**
- * Builds the toast action that opens a finished run.
+ * Builds the way out that opens a finished run.
  *
  * Returns undefined when there is no run to open, and when the caller supplied
  * no `onRunFailed` handler — a button that does nothing when clicked is worse
  * than no button. `ScenarioFormDrawer` is such a caller.
+ *
+ * `run` rather than `onClick`, which is the shape `ScenarioFailureNotice.action`
+ * takes: two of the three outcomes below are failures and report through the
+ * host, and only the third — a run that finished and did not pass — is a toast
+ * this file raises itself.
  */
 function buildViewRunAction({
   label,
@@ -57,32 +63,32 @@ function buildViewRunAction({
   setId: string;
   batchRunId: string;
   onRunFailed: ((result: RunCompleteResult) => void) | undefined;
-}) {
+}): ScenarioFailureAction | undefined {
   if (!scenarioRunId || !onRunFailed) return undefined;
 
   return {
     label,
-    onClick: () => onRunFailed({ scenarioRunId, setId, batchRunId }),
+    run: () => onRunFailed({ scenarioRunId, setId, batchRunId }),
   };
 }
 
 /**
- * Turns a poll result that is not a success into the toast the user sees.
+ * Reports a poll result that is not a success.
  *
  * The three cases are genuinely different events, and saying so is the point of
  * this module: a run that did not pass produced an outcome, a run that errored
  * produced nothing, and a timeout means nothing became visible at all. Lives
  * outside the hook so the run callback stays about running the scenario.
  *
- * Note this is the only one of ~411 `toaster.create` call sites in the app that
- * passes a built config rather than an inline literal. That is not style: three
- * inline toasts put `runScenario` over a 60-line function limit that the
- * lint gate enforced when this was written. That rule is not currently
- * carried (oxlint has no cognitive-complexity rule and the line-count
- * backlog was four figures), so inlining them back would lint clean and
- * still be worse to read.
+ * ONE OUTCOME, TWO CHANNELS, and the split is the distinction above rather than
+ * a compromise. A run that finished and did not pass is a RESULT: no error
+ * framing, and the feedback port has nothing to say it with — `succeeded` and
+ * `failed` are its two channels and neither means "it finished, and the answer
+ * was no". So that one stays a `warning` notice raised here. The other two are
+ * failures, and go through the host, where they pick up the application's copy
+ * rules, its duration and its trace id.
  */
-function buildRunOutcomeToast({
+function reportRunOutcome({
   result,
   setId,
   batchRunId,
@@ -92,7 +98,7 @@ function buildRunOutcomeToast({
   setId: string;
   batchRunId: string;
   onRunFailed: ((result: RunCompleteResult) => void) | undefined;
-}) {
+}): void {
   const viewRunAction = (label: string) =>
     buildViewRunAction({
       label,
@@ -106,28 +112,33 @@ function buildRunOutcomeToast({
     // The run executed and did not pass. That is a result, not a fault: no
     // error framing, and the user decides whether to open it rather than
     // being navigated there.
-    return {
+    const view = viewRunAction("View run");
+    toaster.create({
       title: "Scenario did not pass",
       description: "The run finished. Open it to see the criteria and the reasoning.",
-      type: "warning" as const,
-      action: viewRunAction("View run"),
-    };
+      type: "warning",
+      ...(view ? { action: { label: view.label, onClick: view.run } } : {}),
+    });
+    return;
   }
 
   if (result.error === "run_error") {
-    return {
-      title: "Scenario run failed",
+    // No error travels: the poll classified a terminal status rather than
+    // catching a failure, so there is no code for the registry to read and the
+    // screen's own line is the whole of what is known.
+    const view = viewRunAction("View failed run");
+    showErrorToast({
+      fallbackTitle: "Scenario run failed",
       description: "The scenario encountered an error during execution.",
-      type: "error" as const, // no-raw-error-toast-ok
-      action: viewRunAction("View failed run"),
-    };
+      ...(view ? { action: view } : {}),
+    });
+    return;
   }
 
-  return {
-    title: "Run timed out",
+  showErrorToast({
+    fallbackTitle: "Run timed out",
     description: "The scenario run took too long to start. Please try again.",
-    type: "error" as const, // no-raw-error-toast-ok
-  };
+  });
 }
 
 export function useRunScenario({
@@ -153,18 +164,16 @@ export function useRunScenario({
 
       // Check if model providers are configured before attempting to run
       if (!hasEnabledProviders) {
-        // STAYS ON THE DESIGN SYSTEM TOASTER: a browser-side gate with no
-        // failure to hand over, whose whole point is the link that fixes it,
-        // and the feedback port has no slot for an offered action. See the plan
-        // doc's UI ledger.
-        toaster.create({
-          title: "No model provider configured",
+        // A browser-side gate: no failure crossed a wire, so there is no code
+        // for the registry to read and the screen's own line is the whole of
+        // what is known. The link that fixes it is the point of the notice, and
+        // it rides on the port's action slot.
+        showErrorToast({
+          fallbackTitle: "No model provider configured",
           description: "A model provider must be configured to run scenarios.",
-          type: "error", // no-raw-error-toast-ok
           action: {
             label: "Configure model providers",
-            onClick: () =>
-              window.open("/settings/model-providers", "_blank", "noopener,noreferrer"),
+            run: () => window.open("/settings/model-providers", "_blank", "noopener,noreferrer"),
           },
         });
         return;
@@ -213,14 +222,12 @@ export function useRunScenario({
             batchRunId: returnedBatchRunId,
           });
         } else {
-          toaster.create(
-            buildRunOutcomeToast({
-              result,
-              setId: returnedSetId,
-              batchRunId: returnedBatchRunId,
-              onRunFailed,
-            }),
-          );
+          reportRunOutcome({
+            result,
+            setId: returnedSetId,
+            batchRunId: returnedBatchRunId,
+            onRunFailed,
+          });
         }
       } catch (error) {
         showErrorToast({ error, fallbackTitle: "Couldn't start the scenario" });

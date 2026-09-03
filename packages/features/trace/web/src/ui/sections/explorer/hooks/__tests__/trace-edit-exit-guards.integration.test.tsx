@@ -52,7 +52,7 @@ vi.mock("../../../trace-api", () => ({
   },
 }));
 
-vi.mock("../../../../blocks/toaster", () => ({ toaster: { create: vi.fn() } }));
+vi.mock("@langwatch/design-system/toaster", () => ({ toaster: { create: vi.fn() } }));
 vi.mock("../../../errors", () => ({ showErrorToast: vi.fn() }));
 
 const { EditModeBar } = await import("../../trace-drawer/edit-mode/edit-mode-bar");

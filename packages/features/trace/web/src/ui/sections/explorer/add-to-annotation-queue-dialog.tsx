@@ -3,7 +3,7 @@ import { useState } from "react";
 import { AddAnnotationQueueDrawer } from "../add-annotation-queue-drawer";
 import { AddParticipants } from "../traces/add-participants";
 import { Dialog } from "../dialog";
-import { toaster } from "../../blocks/toaster";
+import { toaster } from "@langwatch/design-system/toaster";
 import { showErrorToast } from "../errors";
 import { useOrganizationTeamProject } from "../../../behavior/use-organization-team-project";
 import { api } from "../trace-api";

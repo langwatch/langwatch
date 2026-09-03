@@ -39,7 +39,7 @@ vi.mock("../../../../trace-api", () => ({
   },
 }));
 
-vi.mock("../../../../../blocks/toaster", () => ({
+vi.mock("@langwatch/design-system/toaster", () => ({
   toaster: { create: (...args: unknown[]) => toasterCreate(...args) },
 }));
 

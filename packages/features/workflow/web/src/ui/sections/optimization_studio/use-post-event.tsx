@@ -11,6 +11,7 @@ import type { StudioClientEvent, StudioServerEvent } from "@langwatch/workflow-c
 import {
   type CodedExecutionFailure,
   explainExecutionStateError,
+  reportableExecutionFailure,
 } from "./execution-state-error";
 import { useWorkflowStore, type WorkflowStore } from "@langwatch/workflow-web";
 
@@ -213,14 +214,18 @@ export const useHandleServerMessage = ({
   } = workflowStore;
 
   /**
-   * Toasts a failed run.
+   * Reports a failed run.
    *
-   * The words come from the state's `error_type` via the code-keyed registry
-   * (ADR-045). A state with no code — or one whose code the registry has no
-   * copy for — degrades to the generic unknown state under the caller's own
-   * headline, plus the trace id as a copyable error id. The engine's raw
-   * message is not copy and does not appear here; it is in the node properties
-   * panel. See `explainExecutionStateError`.
+   * The failure travels WHOLE — the engine's own serialised handled error — and
+   * the application resolves the words from its code-keyed registry (ADR-045),
+   * along with the docs link and the copyable error id. A state with no code
+   * degrades to the generic unknown state under the caller's own headline. The
+   * engine's raw message is not copy and does not appear here; it is in the
+   * node properties panel. See `reportableExecutionFailure`.
+   *
+   * A deliberate STOP is not a failure and keeps the local explainer: it is an
+   * `info` notice, and "we've been notified" would be wrong for something the
+   * reader did on purpose.
    */
   const alertOnError = useCallback(
     ({
@@ -243,9 +248,7 @@ export const useHandleServerMessage = ({
       // than the same sentence twice. A code the registry knows keys on the
       // code, so it never collapses onto an unrelated failure.
       const dedupeId = `studio-${wasStopped ? "stopped" : "error"}-${
-        explanation.isRegistered
-          ? failure?.error_type
-          : explanation.title + explanation.description
+        explanation.isRegistered ? failure?.error_type : explanation.title
       }`;
 
       if (wasStopped) {
@@ -263,15 +266,9 @@ export const useHandleServerMessage = ({
       } else {
         toaster.create({
           id: dedupeId,
+          error: reportableExecutionFailure(failure),
           title: explanation.title,
-          description: explanation.description || undefined,
           type: "error",
-          meta: {
-            // The copyable error id. For a failure we could not name it is the
-            // only thing the customer can hand support — ADR-045's "generic
-            // unknown PLUS a trace id", both halves.
-            traceId: explanation.traceId,
-          },
           duration: 5000,
         });
       }

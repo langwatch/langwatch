@@ -55,6 +55,40 @@ export interface CodedExecutionFailure {
  *     own 20s component-execution timeout) gets the caller's title and no
  *     promise nobody kept.
  */
+/**
+ * The failure as the APPLICATION reads it: the engine's own serialised handled
+ * error, or `undefined` when the frame carried no code at all.
+ *
+ * A studio failure does not arrive as a thrown error — it arrives as execution
+ * state on an event stream — so "hand the error over whole" means handing over
+ * the payload the engine sent, which `nodeErrorToDomainError` reconstitutes.
+ * The application's reader takes that shape directly and resolves the registry
+ * copy, the docs link and the trace id from it.
+ *
+ * An uncoded frame gives up its `error` string and keeps its trace id: the
+ * string names hosts, URLs and Go internals and may never be shown, while the
+ * id is the one handle a customer can give support. The caller's title plus
+ * ADR-045's unknown state is the whole of the rest.
+ */
+export function reportableExecutionFailure(
+  state: CodedExecutionFailure | undefined | null,
+): unknown {
+  if (state?.error_type) {
+    return nodeErrorToDomainError({
+      errorType: state.error_type,
+      upstreamStatus: state.upstream_status,
+      traceId: state.trace_id,
+      spanId: state.span_id,
+    });
+  }
+
+  // Uncoded, but traced: the id is the only thing on the frame that may be
+  // shown, and it is the one handle a customer has to give support. It travels
+  // in the envelope shape every boundary hangs a trace off, so the application
+  // finds it without a slot of its own on the port.
+  return state?.trace_id ? { trace: { traceId: state.trace_id } } : void 0;
+}
+
 export function explainExecutionStateError({
   state,
   fallbackTitle,

@@ -279,8 +279,8 @@ export function OptimizeModalContent({
           });
         } catch (error) {
           toaster.create({
-            title: "Error",
-            description: "Failed to save version",
+            error,
+            title: "Couldn't save the version",
             type: "error",
           });
           throw error;

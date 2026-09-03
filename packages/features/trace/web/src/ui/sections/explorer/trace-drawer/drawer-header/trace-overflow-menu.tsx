@@ -17,7 +17,7 @@ import {
   LuScanSearch,
 } from "react-icons/lu";
 import { Menu } from "@langwatch/design-system/menu";
-import { toaster } from "../../../../blocks/toaster";
+import { toaster } from "@langwatch/design-system/toaster";
 import { showErrorToast } from "../../../errors";
 import { useDrawer } from "../../../../../behavior/use-drawer";
 import { useOrganizationTeamProject } from "../../../../../behavior/use-organization-team-project";

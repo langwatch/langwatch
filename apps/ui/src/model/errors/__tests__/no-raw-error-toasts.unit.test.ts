@@ -101,6 +101,17 @@ const SCANNED_FILE_FLOOR = 200;
  */
 const FEATURE_WEB_TOASTER_FILE_FLOOR = 10;
 
+/**
+ * The floor for the package-local toaster rule below.
+ *
+ * That rule scans EVERY file in a `packages/features/*\/web` package rather
+ * than only the ones importing the Design System, because the shape it looks
+ * for is a package that built a toaster of its own and therefore imports
+ * nothing. Thousands of files match today; a floor in the hundreds catches the
+ * one failure mode — the path shape changing — without tracking churn.
+ */
+const FEATURE_WEB_SCANNED_FILE_FLOOR = 500;
+
 /** Copy slots a customer reads, in an object literal or a JSX attribute. */
 const COPY_KEYS = new Set(["title", "description", "fallbackTitle"]);
 
@@ -893,6 +904,84 @@ function findToastedFailures(raw: string): number[] {
     .sort((left, right) => left - right);
 }
 
+/* ------------------------------------------------------------------ */
+/* Nor may they build a toaster of their own                           */
+/* ------------------------------------------------------------------ */
+
+/**
+ * A module that publishes a toast API of its own.
+ *
+ * Read as an EXPORT rather than as a call, because the thing that matters is
+ * that other modules in the package can reach it: `@langwatch/trace-web`
+ * carried `ui/blocks/toaster.tsx`, and thirty files imported `toaster` from it
+ * without ever naming the Design System — so the rule above, which keys on that
+ * import, was blind to every one of them. Roughly forty error toasts sat behind
+ * two such modules.
+ */
+const LOCAL_TOASTER_EXPORT =
+  /export\s+(?:const|function|let)\s+toaster\b|export\s*\{[^}]*\btoaster\b[^}]*\}/;
+
+/**
+ * A toast renderer the composing application never sees.
+ *
+ * `createToaster` builds its own store, and only a `<Toaster toaster={...}>`
+ * bound to THAT store renders it. A second one inside a package is a second
+ * toast surface: its toasts carry none of the application's copy rules, and —
+ * as the trace family found — nothing in `apps/ui` mounted the renderer at all,
+ * so every toast raised on it was invisible.
+ */
+const OWN_TOAST_RENDERER = /\bcreateToaster\s*\(/;
+
+/** The same, for enumerating the lines. Separate because `/g` makes `.test` stateful. */
+const OWN_TOAST_RENDERER_LINES = /\bcreateToaster\s*\(/g;
+
+/** Hands a failure to a host port, which is the sanctioned way out. */
+const ROUTES_THROUGH_HOST = /\.\s*failed\s*\(/;
+
+/**
+ * Every line that makes a package-local toaster module a finding.
+ *
+ * The module is one of two things, and both are named by their export or their
+ * renderer rather than by what they import — an offender imports nothing.
+ *
+ * A local toaster is allowed exactly one shape: it may ROUTE. Workflow's
+ * `behavior/studio-host/toaster.ts` is that shape — it renders nothing, owns no
+ * store, and turns every `type: "error"` call into `WorkflowHostPort.failed`,
+ * which is how twenty-five studio files reach the application's registry
+ * without importing a renderer. So a module that hands its failures to a port
+ * and builds no renderer is clean; anything else that can emit a failure is a
+ * finding, and a success-or-info-only toaster is never one.
+ */
+function findLocalToasterFailures(raw: string): number[] {
+  const source = stripComments(raw);
+  const publishes = LOCAL_TOASTER_EXPORT.test(source);
+  const renders = OWN_TOAST_RENDERER.test(source);
+  if (!publishes && !renders) return [];
+
+  const suppressed = suppressedLines(raw);
+  const lines = new Set<number>();
+
+  // A renderer inside a package is a finding on its own terms: whatever it
+  // shows, the application cannot reach it and neither can the registry.
+  if (renders) {
+    for (const match of source.matchAll(OWN_TOAST_RENDERER_LINES)) {
+      lines.add(lineOf(source, match.index));
+    }
+  }
+
+  // A published toaster that can shape a failure, and does not hand it to a
+  // host port, is the second authoring surface this rule exists to stop.
+  if (publishes && !ROUTES_THROUGH_HOST.test(source)) {
+    for (const match of source.matchAll(ERROR_TOAST_TYPE)) {
+      lines.add(lineOf(source, match.index));
+    }
+  }
+
+  return [...lines]
+    .filter((line) => !markerCovers(suppressed, line, line))
+    .sort((left, right) => left - right);
+}
+
 function walk(dir: string, out: string[] = []): string[] {
   for (const entry of readdirSync(dir, { withFileTypes: true })) {
     const path = join(dir, entry.name);
@@ -1254,6 +1343,55 @@ describe("the feature-web failure detector", () => {
   });
 });
 
+describe("the package-local toaster detector", () => {
+  describe("given a package that built a toaster of its own", () => {
+    it.each([
+      [
+        "a renderer with its own store",
+        `import { createToaster } from "@chakra-ui/react";\nconst instance = createToaster({ placement: "bottom" });\nexport const toaster = { ...instance };`,
+      ],
+      [
+        "a published toaster that shapes failures itself",
+        `export const toaster = {\n  error: (t) => shell.push({ ...t, type: "error" }),\n};`,
+      ],
+    ])("catches it as %s", (_shape, source) => {
+      expect(findLocalToasterFailures(source).length).toBeGreaterThan(0);
+    });
+  });
+
+  describe("given a local toaster that only routes to the host", () => {
+    it("stays quiet, because nothing is rendered and no copy is written", () => {
+      const source = [
+        `export const toaster = {`,
+        `  create(toast) {`,
+        `    if (toast.type === "error") {`,
+        `      mounted.failed({ error: toast.error, fallbackTitle: title(toast) });`,
+        `      return toast.id;`,
+        `    }`,
+        `    mounted.succeeded({ title: title(toast) });`,
+        `  },`,
+        `};`,
+      ].join("\n");
+      expect(findLocalToasterFailures(source)).toEqual([]);
+    });
+
+    it("stays quiet about a local toaster that raises no failure at all", () => {
+      const source = `export const toaster = {\n  info: (t) => shell.push({ ...t, type: "info" }),\n};`;
+      expect(findLocalToasterFailures(source)).toEqual([]);
+    });
+  });
+
+  describe("given a module that is not a toaster", () => {
+    it("stays quiet about a file that merely uses one", () => {
+      const source = [
+        `import { toaster } from "@langwatch/design-system/toaster";`,
+        `toaster.create({ title: "Saved", type: "success" });`,
+      ].join("\n");
+      expect(findLocalToasterFailures(source)).toEqual([]);
+    });
+  });
+});
+
 describe("feature-web packages", () => {
   /** @scenario "A moved family reports a failure through its host, not the toaster" */
   it("never raise a failure on the Design System toaster", () => {
@@ -1290,6 +1428,44 @@ describe("feature-web packages", () => {
         `line genuinely cannot travel (an offered ACTION has no slot on the ` +
         `feedback port yet), mark that one line with // ${SUPPRESSION_MARKER} ` +
         `and say why.`,
+    ).toEqual([]);
+  });
+
+  /** @scenario "A moved family does not carry a toaster of its own" */
+  it("never carry a toast renderer or a second copy surface", () => {
+    const offenders: string[] = [];
+    let scanned = 0;
+
+    for (const file of ROOTS.flatMap((root) => walk(root))) {
+      if (!FEATURE_WEB_FILE.test(file)) continue;
+
+      scanned++;
+      const raw = readFileSync(file, "utf8");
+      const rel = relative(PACKAGE_ROOT, file);
+      for (const line of findLocalToasterFailures(raw)) offenders.push(`${rel}:${line}`);
+    }
+
+    expect(
+      scanned,
+      `The guard walked ${scanned} feature-web files, which is fewer than a tree ` +
+        `this size can plausibly have — the path shape ` +
+        `(${String(FEATURE_WEB_FILE)}) has almost certainly changed, and a rule ` +
+        `that scans nothing passes forever.`,
+    ).toBeGreaterThan(FEATURE_WEB_SCANNED_FILE_FLOOR);
+
+    expect(
+      offenders,
+      `These modules give a feature-web package a toaster of its own. A renderer ` +
+        `built with createToaster is a second toast surface the composing ` +
+        `application cannot reach — @langwatch/trace-web carried one, and ` +
+        `nothing in apps/ui ever mounted it, so every toast raised on it was ` +
+        `invisible. A published toaster that shapes its own failures is the ` +
+        `second copy-authoring surface the code-keyed registry exists to ` +
+        `prevent. A local toaster may ROUTE — turn every failure into ` +
+        `host.failed({ error, fallbackTitle }) and render nothing, the way ` +
+        `@langwatch/workflow-web's studio-host toaster does — and it may raise ` +
+        `success, info and warning notices. Anything else belongs in the ` +
+        `Design System.`,
     ).toEqual([]);
   });
 });

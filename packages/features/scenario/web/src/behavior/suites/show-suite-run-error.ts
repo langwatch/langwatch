@@ -1,5 +1,4 @@
-import { explainHandledError, readHandledError, showErrorToast } from "../errors";
-import { toaster } from "@langwatch/design-system/toaster";
+import { readHandledError, showErrorToast } from "../errors";
 
 /**
  * The codes that mean the run plan itself has nothing left to run.
@@ -24,6 +23,8 @@ const NOTHING_RUNNABLE_CODES = new Set([
  * actionable is two chances for them to disagree about it.
  *
  * The words stay in the registry, keyed by code — nothing here authors copy.
+ * What is decided here is only WHETHER this failure has a way out, which is a
+ * fact about the two codes rather than a sentence about them.
  */
 export function showSuiteRunError({
   error,
@@ -37,25 +38,11 @@ export function showSuiteRunError({
   onEditRunPlan: () => void;
 }): void {
   const handled = readHandledError(error);
+  const hasNothingRunnable = !!handled && NOTHING_RUNNABLE_CODES.has(handled.code);
 
-  if (handled && NOTHING_RUNNABLE_CODES.has(handled.code)) {
-    const { title, description } = explainHandledError(handled);
-    // STAYS ON THE DESIGN SYSTEM TOASTER, and it is the only failure in this
-    // package that does. `ScenarioHostPort.failed` — and the `UiFailureNotice`
-    // behind it — has no slot for an offered ACTION, and this toast is the
-    // action: both codes mean the run plan has nothing runnable left in it, and
-    // "Edit Run Plan" is the single way out. Routing it through the port would
-    // buy the registry's words and lose the button that acts on them. The slot
-    // is a change to the application's feedback capability rather than to this
-    // package; see the plan doc's UI ledger.
-    toaster.create({
-      title,
-      description: description || undefined,
-      type: "error", // no-raw-error-toast-ok
-      action: { label: "Edit Run Plan", onClick: onEditRunPlan },
-    });
-    return;
-  }
-
-  showErrorToast({ error, fallbackTitle });
+  showErrorToast({
+    error,
+    fallbackTitle,
+    ...(hasNothingRunnable ? { action: { label: "Edit Run Plan", run: onEditRunPlan } } : {}),
+  });
 }

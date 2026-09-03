@@ -35,6 +35,25 @@ export abstract class UiDocumentTitlePort {
   abstract set(title: string): () => void;
 }
 
+/**
+ * The one way out a failure offers, when there is one.
+ *
+ * A failure that has a fix the reader can reach in a click — open the run plan
+ * that has nothing runnable in it, configure the model provider the run needs
+ * — is not fully reported by words alone: the registry's copy for
+ * `suite_all_scenarios_archived` literally reads "Edit the plan to include
+ * active scenarios", and the button is what acts on that sentence. Without this
+ * slot those failures had to choose between the registry's words and the
+ * button, and five of them chose the button and stayed off the port.
+ *
+ * `run` rather than `onClick`: a port describes what happens, not which input
+ * device caused it. The renderer is what turns it into a click handler.
+ */
+export type UiFailureAction = {
+  label: string;
+  run: () => void;
+};
+
 /** A short confirmation of something the user just did. */
 export type UiSuccessNotice = {
   title: string;
@@ -78,6 +97,15 @@ export type UiFailureNotice = {
    * where they are standing.
    */
   description?: string;
+  /**
+   * The single fix this failure offers, rendered as a button on the notice.
+   *
+   * Optional, and it stays rare: most failures have no one-click way out, and a
+   * button that only re-runs what just failed is noise. Where one does exist it
+   * belongs HERE rather than in a hand-rolled toast, because that is what lets
+   * the failure keep the registry's words as well as the button.
+   */
+  action?: UiFailureAction;
   id?: string;
 };
 

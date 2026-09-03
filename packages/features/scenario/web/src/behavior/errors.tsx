@@ -24,7 +24,11 @@
 import { Alert, Box, Button, HStack, Text, VStack } from "@chakra-ui/react";
 import type { ReactNode } from "react";
 
-import { useScenarioHost, type ScenarioHostPort } from "../model/scenario-host";
+import {
+  useScenarioHost,
+  type ScenarioFailureAction,
+  type ScenarioHostPort,
+} from "../model/scenario-host";
 
 /**
  * The generic line, shared by every slot below so the two never disagree.
@@ -125,6 +129,16 @@ export type ShowErrorToastOptions = {
   error?: unknown;
   fallbackTitle?: string;
   description?: string;
+  /**
+   * The single fix this failure offers, where there is one.
+   *
+   * Four failures in this package have one — both "the run plan has nothing
+   * runnable left in it" codes, the model-provider gate, and a generation
+   * failure that needs a provider configured — and each used to reach the
+   * Design System toaster directly to keep its button, giving up the
+   * registry's words for it. They keep both now.
+   */
+  action?: ScenarioFailureAction;
   id?: string;
 };
 
@@ -151,6 +165,7 @@ export function showErrorToast(options: ShowErrorToastOptions): void {
     error: options.error,
     fallbackTitle: options.fallbackTitle ?? UNKNOWN_ERROR_PRESENTATION.title,
     description: options.description,
+    action: options.action,
     id: options.id,
   });
 }

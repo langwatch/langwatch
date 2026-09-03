@@ -35,7 +35,7 @@ vi.mock("../../../hooks/use-conversation-turns", () => ({
   useConversationTurns: () => ({ data: undefined }),
 }));
 
-vi.mock("../../../../../blocks/toaster", () => ({
+vi.mock("@langwatch/design-system/toaster", () => ({
   toaster: { create: vi.fn() },
 }));
 

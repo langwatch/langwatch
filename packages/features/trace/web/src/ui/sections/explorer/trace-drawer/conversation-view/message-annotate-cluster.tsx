@@ -2,7 +2,7 @@ import { createLogger } from "@langwatch/observability";
 import { Edit3, Languages, Lightbulb } from "lucide-react";
 import { PersonalFeatureGateDialog } from "../../../me/personal-feature-gate-dialog";
 import { usePersonalFeatureGate } from "../../../me/use-personal-feature-gate";
-import { toaster } from "../../../../blocks/toaster";
+import { showErrorToast } from "../../../errors";
 import { useOrganizationTeamProject } from "../../../../../behavior/use-organization-team-project";
 import {
   isSameAnnotationTarget,
@@ -117,9 +117,9 @@ function AnnotateActions({
       })
       .catch((error) => {
         logger.error({ error }, "could not open the annotation composer");
-        toaster.create({
-          title: "Could not open the annotation composer",
-          type: "error",
+        showErrorToast({
+          error,
+          fallbackTitle: "Couldn't open the annotation composer",
         });
       });
   };

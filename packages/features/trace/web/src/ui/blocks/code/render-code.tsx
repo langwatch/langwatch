@@ -3,7 +3,13 @@ import { CopyIcon } from "lucide-react";
 import type React from "react";
 import { useEffect, useState } from "react";
 import { codeToHtml, codeToHtmlDark } from "@langwatch/trace-web";
-import { toaster } from "../toaster";
+import { toaster } from "@langwatch/design-system/toaster";
+
+/** What a refused clipboard write says. Hoisted so its opt-out marker survives a reformat. */
+const COPY_REFUSED = {
+  title: "Couldn't copy the code",
+  description: "Clipboard access is restricted. This can happen on non-HTTPS domains.",
+};
 
 /** A resolved highlight, tagged with the inputs it was produced from. */
 interface Highlighted {
@@ -38,9 +44,12 @@ export const RenderCode = ({
         });
       })
       .catch(() => {
-        toaster.error({
-          title: "Failed to copy",
-        });
+        // STAYS ON THE DESIGN SYSTEM TOASTER. A `blocks/` element may not
+        // depend upward on `behavior/`, which is where this package's failure
+        // reporter lives, and a clipboard refusal is the one failure that can
+        // afford the exemption: it has no code, never crosses a wire, and
+        // nothing the presentation registry knows is given up.
+        toaster.error(COPY_REFUSED); // no-raw-error-toast-ok
       });
   };
 

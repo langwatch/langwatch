@@ -224,6 +224,36 @@ describe("given a failure a screen hands over", () => {
       });
     });
 
+    it("keeps the registry's words AND the one way out the screen offered", () => {
+      const { toaster, toasts } = recordingToaster();
+      let taken = 0;
+
+      BrowserUiFeedback.create(toaster).failed({
+        error: trpcFailure("suite_all_scenarios_archived"),
+        fallbackTitle: "Couldn't start the run",
+        action: { label: "Edit Run Plan", run: () => (taken += 1) },
+      });
+
+      // The whole reason the slot exists: before it, a failure with a fix had
+      // to choose between the registry's sentence and the button that acts on
+      // it, and five of them chose the button.
+      expect(toasts[0]?.title).not.toBe("Couldn't start the run");
+      expect(toasts[0]?.action?.label).toBe("Edit Run Plan");
+      toasts[0]?.action?.onClick();
+      expect(taken).toBe(1);
+    });
+
+    it("offers no action at all for a failure that has no way out", () => {
+      const { toaster, toasts } = recordingToaster();
+
+      BrowserUiFeedback.create(toaster).failed({
+        error: trpcFailure("not_found"),
+        fallbackTitle: "Couldn't open the source",
+      });
+
+      expect(toasts[0]).not.toHaveProperty("action");
+    });
+
     it("raises a success toast that carries the screen's own words", () => {
       const { toaster, toasts } = recordingToaster();
 

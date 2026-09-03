@@ -65,10 +65,25 @@ export type WorkflowCopyTarget = {
  * wrote its own copy would print the slug at the customer. `fallbackTitle`
  * names the action that failed.
  */
+/**
+ * The one way out a failure offers.
+ *
+ * `run` rather than `onClick`: a port says what happens, and the application's
+ * toaster turns it into a click. The studio's component alert is why this
+ * exists — it used to render a "Go to component" button inside a `description`
+ * node, which the feedback capability takes as text and dropped on the floor.
+ */
+export type WorkflowFailureAction = {
+  label: string;
+  run: () => void;
+};
+
 export type WorkflowFailureNotice = {
   error: unknown;
   fallbackTitle: string;
   description?: string;
+  /** The single fix this failure offers, rendered as a button on the notice. */
+  action?: WorkflowFailureAction;
   id?: string;
 };
 

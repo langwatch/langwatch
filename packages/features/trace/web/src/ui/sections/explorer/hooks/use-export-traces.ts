@@ -1,5 +1,5 @@
 import { useCallback, useRef, useState } from "react";
-import { toaster } from "../../../blocks/toaster";
+import { toaster } from "@langwatch/design-system/toaster";
 import { readHandledError, showErrorToast } from "../../errors";
 import type { ExportProgressEvent } from "../../../../model/export-types";
 import type { ExportFormat, ExportMode, ExportProgress } from "../../../../model/export-types";
@@ -201,10 +201,9 @@ export function useExportTraces({
     // biome-ignore lint/complexity/noExcessiveLinesPerFunction: relocated, not rewritten
     (config: ExportConfig) => {
       if (!projectId) {
-        toaster.create({
-          title: "Export failed",
-          description: "No project selected",
-          type: "error",
+        showErrorToast({
+          fallbackTitle: "Couldn't export the traces",
+          description: "No project is selected.",
         });
         return;
       }

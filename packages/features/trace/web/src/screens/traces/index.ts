@@ -42,6 +42,7 @@ export {
   TraceHostProvider,
   useOptionalTraceHost,
   useTraceHost,
+  type TraceFailureAction,
   type TraceFailureNotice,
   type TraceHostOrganization,
   type TraceHostOrganizationRole,
@@ -51,3 +52,11 @@ export {
   type TraceRouteReading,
   type TraceSuccessNotice,
 } from "../../behavior/trace-host";
+/**
+ * Binds the mounted host to the failure reporter these screens call.
+ *
+ * A singleton rather than a hook because most failures are reported from a
+ * mutation's `onError`, where no hook can run. The application's host provider
+ * sets it on mount and clears it on unmount.
+ */
+export { setTraceErrorHost } from "../../behavior/errors/logic/show-error-toast";

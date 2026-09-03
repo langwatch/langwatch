@@ -57,7 +57,7 @@ vi.mock("../../../../use-annotation-invalidation", () => ({
   useAnnotationInvalidation: () => vi.fn(),
 }));
 
-vi.mock("../../../../../blocks/toaster", () => ({ toaster: { create: vi.fn() } }));
+vi.mock("@langwatch/design-system/toaster", () => ({ toaster: { create: vi.fn() } }));
 
 vi.mock("../../../../trace-api", () => ({
   api: {

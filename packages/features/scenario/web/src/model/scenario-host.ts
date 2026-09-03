@@ -70,6 +70,21 @@ export type ScenarioRouteReading = {
 
 export type ScenarioSuccessNotice = { title: string; description?: string };
 
+/**
+ * The one way out a failure offers.
+ *
+ * `run` rather than `onClick`: a port says what happens, and the application's
+ * toaster is what turns it into a click. Rare by design — a button that only
+ * re-runs what just failed is noise — but the four scenario failures that have
+ * a real fix (open the run plan with nothing runnable in it, configure the
+ * model provider a run needs) would otherwise have to choose between the
+ * registry's words and the button that acts on them.
+ */
+export type ScenarioFailureAction = {
+  label: string;
+  run: () => void;
+};
+
 export type ScenarioFailureNotice = {
   /** The raw failure. The application resolves the words from its own registry. */
   error: unknown;
@@ -77,6 +92,8 @@ export type ScenarioFailureNotice = {
   fallbackTitle: string;
   /** A sentence the caller already had, where it knows better than the registry. */
   description?: string;
+  /** The single fix this failure offers, rendered as a button on the notice. */
+  action?: ScenarioFailureAction;
   /** A dedupe id, so a retried failure replaces its own notice rather than stacking. */
   id?: string;
 };

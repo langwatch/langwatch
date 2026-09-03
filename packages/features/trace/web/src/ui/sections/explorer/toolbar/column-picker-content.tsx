@@ -4,7 +4,7 @@ import type React from "react";
 import { useMemo, useState } from "react";
 import { useOrganizationTeamProject } from "../../../../behavior/use-organization-team-project";
 import { Checkbox } from "@langwatch/design-system/checkbox";
-import { toaster } from "../../../blocks/toaster";
+import { toaster } from "@langwatch/design-system/toaster";
 import { useEvaluatorOptions } from "../hooks/use-evaluator-options";
 import type { LensColumnOption, TimeColumnFormat } from "../../../../index";
 import {

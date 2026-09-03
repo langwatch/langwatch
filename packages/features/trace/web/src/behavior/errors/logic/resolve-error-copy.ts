@@ -22,17 +22,23 @@ export interface ResolvedErrorCopy {
 }
 
 /**
- * The one implementation of "what does this error say to a customer".
+ * What an INLINE failure surface in this package says to a customer.
  *
- * The toast, the inline alert and `describeError` each used to work this out
- * for themselves, and the two rules involved had drifted: three copies of
- * whose headline wins, and two different answers to whether server tips show
- * next to a registry description. Three implementations of a rule is three
- * chances to get it wrong, and all three were reachable from the same failure.
+ * It is no longer the toast's answer, and that is the point: a toast reports
+ * through `TraceHostPort.failed`, and the application resolves it against the
+ * one registry it owns. Two packages resolving copy for the same code is two
+ * places for the sentence to drift, and the code-keyed registry exists to stop
+ * exactly that.
  *
- * It also parses the error ONCE. Reading title, description, tips, docs link
- * and trace id separately meant four `readHandledError` passes over the same
- * payload on every toast.
+ * WHAT IS LEFT, and why it is left: `HandledErrorAlert` and `HandledErrorState`
+ * render a failure INTO the page rather than over it, and neither has moved to
+ * the application yet — there is no inline counterpart to the feedback port to
+ * report through. Deleting this would put the two rules below into both of
+ * those components instead, which is the drift it was written to prevent. It
+ * goes when they go; the plan doc's UI ledger names that as the open absence.
+ *
+ * It parses the error ONCE. Reading title, description, tips, docs link and
+ * trace id separately meant four `readHandledError` passes over one payload.
  *
  * Two rules live here:
  *
@@ -85,27 +91,6 @@ export function resolveErrorCopy({
     // exactly when it matters.
     traceId: handled?.traceId || readEnvelopeTraceId(error),
   };
-}
-
-/**
- * The whole explanation as one string, for slots that can only take text —
- * a `title=` tooltip, a state field typed `string`, an aria-label.
- *
- * Prefer `HandledErrorAlert` or `showErrorToast` wherever a component can be
- * rendered: they show the remediation tips, the docs link and the error id,
- * all of which are lost here. This exists so the awkward slots have something
- * better than `error.message`, not as a general-purpose escape hatch.
- */
-export function describeError({
-  error,
-  fallbackTitle,
-}: {
-  error: unknown;
-  fallbackTitle?: string;
-}): string {
-  const { title, description } = resolveErrorCopy({ error, fallbackTitle });
-
-  return description ? `${title}. ${description}` : title;
 }
 
 /**

@@ -288,7 +288,8 @@ export function EvaluateModalContent({
           setCurrentVersionId(versionId);
         } catch (error) {
           toaster.create({
-            title: "Error saving version",
+            error,
+            title: "Couldn't save the version",
             type: "error",
             duration: 5000,
           });

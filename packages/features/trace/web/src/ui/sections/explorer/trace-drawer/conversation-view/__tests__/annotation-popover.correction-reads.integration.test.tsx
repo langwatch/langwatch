@@ -30,7 +30,7 @@ vi.mock("../../../../../../behavior/use-organization-team-project", () => ({
   useOrganizationTeamProject: () => ({ project: { id: "project-1" } }),
 }));
 
-vi.mock("../../../../../blocks/toaster", () => ({ toaster: { create: vi.fn() } }));
+vi.mock("@langwatch/design-system/toaster", () => ({ toaster: { create: vi.fn() } }));
 
 vi.mock("../../../../trace-api", () => ({
   api: {

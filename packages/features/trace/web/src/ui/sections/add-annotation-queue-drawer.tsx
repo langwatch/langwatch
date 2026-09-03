@@ -25,7 +25,7 @@ import { api } from "./trace-api";
 import { slugify } from "../../model/slugify";
 import { Drawer } from "./drawer";
 import { Popover } from "@langwatch/design-system/popover";
-import { toaster } from "../blocks/toaster";
+import { toaster } from "@langwatch/design-system/toaster";
 import { AddOrEditAnnotationScore } from "./annotations/add-or-edit-annotation-score";
 import { FullWidthFormControl } from "../elements/full-width-form-control";
 import { RandomColorAvatar } from "../blocks/random-color-avatar";
@@ -146,10 +146,9 @@ export const AddAnnotationQueueDrawer = ({
 
   const onSubmit = (data: FormData) => {
     if (participants.length === 0 || scoreTypes.length === 0) {
-      toaster.create({
-        title: "Error",
-        description: "Please select at least one participant and score type",
-        type: "error",
+      showErrorToast({
+        fallbackTitle: "Couldn't save the annotation queue",
+        description: "Please select at least one participant and score type.",
       });
       return;
     }

@@ -29,7 +29,8 @@ import {
   MenuRoot,
 } from "@langwatch/design-system/menu";
 import { TriggerAnchor } from "@langwatch/design-system/trigger-anchor";
-import { toaster } from "../../../../blocks/toaster";
+import { toaster } from "@langwatch/design-system/toaster";
+import { showErrorToast } from "../../../errors";
 import { Tooltip } from "@langwatch/design-system/tooltip";
 import { TracePresenceAvatars } from "@langwatch/presence-web";
 import { useDejaViewLink } from "../../../use-deja-view-link";
@@ -130,12 +131,10 @@ function TraceIdChip({ traceId }: { traceId: string }) {
       }
       throw new Error("clipboard unavailable");
     } catch {
-      toaster.create({
-        title: "Couldn't copy trace ID",
+      showErrorToast({
+        fallbackTitle: "Couldn't copy trace ID",
         description:
           "Clipboard access is restricted. This can happen on non-HTTPS domains. Copy the ID manually from the URL.",
-        type: "error",
-        duration: 6000,
       });
     }
   };
