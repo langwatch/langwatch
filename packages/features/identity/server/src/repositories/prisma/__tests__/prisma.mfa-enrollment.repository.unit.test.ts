@@ -45,7 +45,7 @@ describe("PrismaMfaEnrollmentRepository", () => {
             { organization: { slug: "globex" } },
           ],
         });
-        const repository = new PrismaMfaEnrollmentRepository(
+        const repository = PrismaMfaEnrollmentRepository.create(
           prisma as unknown as PrismaClient,
         );
 
@@ -59,7 +59,7 @@ describe("PrismaMfaEnrollmentRepository", () => {
 
       it("answers empty for somebody the row lookup does not find", async () => {
         const prisma = makeGuardedPrisma(null);
-        const repository = new PrismaMfaEnrollmentRepository(
+        const repository = PrismaMfaEnrollmentRepository.create(
           prisma as unknown as PrismaClient,
         );
 

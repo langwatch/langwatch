@@ -49,7 +49,7 @@ function compose(
     insert,
     query: async () => ({ json: async () => [] }),
   }));
-  const set = vi.fn(async () => "OK");
+  const set = vi.fn(async (..._args: unknown[]) => "OK");
   const redis = { get: vi.fn(async () => null), set };
 
   const pipeline: SuiteRunProcessingPipeline = ClickHouseSuiteRunProcessingAdapter.create({

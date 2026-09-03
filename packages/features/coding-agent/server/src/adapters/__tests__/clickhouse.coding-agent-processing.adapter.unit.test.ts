@@ -38,11 +38,11 @@ class TestTraceCanonicalisation extends TraceCanonicalisationService {
   }
 
   deriveClaudeResponseContent() {
-    return { text: null, toolCalls: [] };
+    return { assistantText: null, assistantOutput: null, sessionTitle: null };
   }
 
   classifyClaudeCall() {
-    return { cacheWritesLongLived: false };
+    return { conversational: false, cacheWritesLongLived: false };
   }
 }
 
