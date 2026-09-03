@@ -21,7 +21,7 @@ Goal: catch misconfigurations in the gateway BEFORE they surface during an on-ca
 
 - A CI-scoped API token stored in `CI_LANGWATCH_TOKEN` with scopes `virtualKeys:create`, `virtualKeys:delete`, `modelProviders:view` (all at the same ORGANIZATION the CI VK is created in).
 - A `CI_ORG_SLUG` env var naming the org scope (e.g. `acme`). The CI VK lives at this ORG scope so its eligible-MP set is the union of every ModelProvider visible from the org.
-- At least one healthy ModelProvider configured under **Settings → Model Providers** at ORG, TEAM, or PROJECT scope. Set the rate-limit / fallback fields in its Advanced (Gateway) section if you want CI to exercise them.
+- At least one healthy ModelProvider configured under **Settings → Model Providers** at ORG, TEAM, or PROJECT scope. Set the fallback priority in its Advanced (Gateway) section if you want CI to exercise the fallback order. The RPM, TPM and RPD inputs on the same row are stored and not enforced, so CI cannot exercise them; to test a rate limit, set RPM or RPD on the virtual key.
 - `jq` available on the runner.
 
 ## The script

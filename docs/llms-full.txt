@@ -5068,7 +5068,7 @@ Goal: catch misconfigurations in the gateway BEFORE they surface during an on-ca
 
 - A CI-scoped API token stored in `CI_LANGWATCH_TOKEN` with scopes `virtualKeys:create`, `virtualKeys:delete`, `modelProviders:view` (all at the same ORGANIZATION the CI VK is created in).
 - A `CI_ORG_SLUG` env var naming the org scope (e.g. `acme`). The CI VK lives at this ORG scope so its eligible-MP set is the union of every ModelProvider visible from the org.
-- At least one healthy ModelProvider configured under **Settings → Model Providers** at ORG, TEAM, or PROJECT scope. Set the rate-limit / fallback fields in its Advanced (Gateway) section if you want CI to exercise them.
+- At least one healthy ModelProvider configured under **Settings → Model Providers** at ORG, TEAM, or PROJECT scope. Set the fallback priority in its Advanced (Gateway) section if you want CI to exercise the fallback order. The RPM, TPM and RPD inputs on the same row are stored and not enforced, so CI cannot exercise them; to test a rate limit, set RPM or RPD on the virtual key.
 - `jq` available on the runner.
 
 ## The script
@@ -6382,13 +6382,14 @@ For this walkthrough, assume **per-customer** model. Note that `principal` budge
 
 ## Step 2: Configure the upstream ModelProvider once
 
-Your LangWatch org owns a single ModelProvider row per upstream (OpenAI, Anthropic) at ORGANIZATION scope. End-users never see these. Configure them under **Settings → Model Providers → Add Model Provider** (Scope = Organization), then expand each row's **Advanced (Gateway)** section and set the per-credential gateway caps:
+Your LangWatch org owns a single ModelProvider row per upstream (OpenAI, Anthropic) at ORGANIZATION scope. End-users never see these. Configure them under **Settings → Model Providers → Add Model Provider** (Scope = Organization), then expand each row's **Advanced (Gateway)** section and set the gateway fields:
 
 | Field | Suggested value |
 |---|---|
-| RPM | 100000 (your bulk-purchase cap from the upstream) |
 | Fallback priority | 10 for primary, 20 for backup |
 | Provider config (JSON) | region/deployment overrides as needed |
+
+The same section has RPM, TPM and RPD inputs. The gateway stores them and does not enforce them, so they set no ceiling on this row. Put the ceiling on each tenant's virtual key instead, which is what Step 3 mints. See [Rate limits](/ai-gateway/rate-limits).
 
 No separate "binding" entity to mint. The ModelProvider id is what your code references:
 
