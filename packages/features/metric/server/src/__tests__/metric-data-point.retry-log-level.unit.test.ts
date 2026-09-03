@@ -1,10 +1,7 @@
 /**
  * @vitest-environment node
- *
- * A canonical metric write this repository rethrows is not its outcome to
- * claim. The worker queue above it owns retries and terminal error logging.
- *
- * Spec: specs/observability/retryable-failure-log-level.feature
+ * A rethrow here is not this repository's outcome to claim — the worker
+ * queue above it owns retries and terminal error logging.
  */
 import { describe, expect, it, vi } from "vitest";
 import type { CanonicalMetricDataPoint } from "@langwatch/metric-contract";
@@ -21,7 +18,9 @@ vi.mock("@langwatch/observability", () => ({
   createLogger: () => logger,
 }));
 
-const { MetricDataPointClickHouseRepository } = await import("@langwatch/metric-server/testing");
+const { MetricDataPointClickHouseRepository } = await import(
+  "../repositories/clickhouse/clickhouse.metric-data-point.repository"
+);
 
 const REFUSED = new Error("Too many queries in flight");
 

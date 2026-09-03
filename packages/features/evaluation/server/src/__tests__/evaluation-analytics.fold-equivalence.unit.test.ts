@@ -1,11 +1,13 @@
 import { afterAll, beforeAll, describe, expect, it, vi } from "vitest";
 import {
   EVALUATION_ANALYTICS_PROJECTION_VERSION_LATEST,
-  type EvaluationAnalyticsData,
   EvaluationAnalyticsFoldProjection,
+} from "../projections/evaluation-analytics-fold.projection";
+import {
+  type EvaluationAnalyticsData,
   type EvaluationAnalyticsRow,
   EvaluationAnalyticsRowProjection,
-} from "@langwatch/evaluation-server/internal";
+} from "../projections/evaluation-analytics-row.projection";
 import {
   createEvaluationCompletedEvent,
   createEvaluationScheduledEvent,
@@ -14,23 +16,9 @@ import {
 import { PreserveEvaluationAnalyticsAttributes } from "./eventing/fixtures/preserve-attributes.policy";
 
 /**
- * FOLD-EQUIVALENCE for the slim evaluation fold's read-back (ADR-066).
- *
- * `evaluationAnalytics.readBack.unit.test.ts` proves a fixed point —
- * `project(fromRow(project(s))) === project(s)`. That only says the row is
- * stable under re-writing; it says nothing about what happens when the NEXT
- * event folds onto the reconstructed state. The property the read-back really
- * rests on is:
- *
- *     fold(events, fromRow(project(s))) === fold(events, s)
- *
- * For this fold the sharp edge is `DurationMs`: it is derived from StartedAt and
- * CompletedAt, so a read-back that lost StartedAt would compute zero durations
- * over real ones — and the fixed point would still pass, because both sides of it
- * see the same lost value.
- *
- * State is folded out of real lifecycle events through the projection's own
- * dispatch, never written as a literal.
+ * FOLD-EQUIVALENCE (ADR-066): proves `fold(events, fromRow(project(s))) ===
+ * fold(events, s)`, not just the read-back fixed point — a read-back that lost
+ * `StartedAt` would still pass the fixed point since both sides lose it alike.
  */
 
 const TENANT = "proj-eval-equiv";
@@ -169,13 +157,9 @@ describe("evaluationAnalytics fold-equivalence across the read-back boundary", (
 });
 
 /**
- * Round-trip disposition for every field of the fold's working state.
- *
- * This table is the exhaustiveness guard: it is typed as a total map over
- * `keyof EvaluationAnalyticsData`, so ADDING a field to the state type fails to
- * compile until someone records what happens to it across the persistence
- * boundary — and the runtime key check below catches a field that exists on a
- * folded state without existing on the type.
+ * Round-trip disposition for every field of the fold's state. Typed as a
+ * total map over `keyof EvaluationAnalyticsData` so a new field fails to
+ * compile until its persistence disposition is recorded here.
  */
 type RoundTripDisposition =
   /** The row carries a column for it and `fromRow` restores it verbatim. */

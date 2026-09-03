@@ -1,10 +1,12 @@
 import { describe, expect, it } from "vitest";
 import {
   EVALUATION_ANALYTICS_PROJECTION_VERSION_LATEST,
-  type EvaluationAnalyticsData,
   EvaluationAnalyticsFoldProjection,
+} from "../projections/evaluation-analytics-fold.projection";
+import {
+  type EvaluationAnalyticsData,
   EvaluationAnalyticsRowProjection,
-} from "@langwatch/evaluation-server/internal";
+} from "../projections/evaluation-analytics-row.projection";
 import {
   createEvaluationCompletedEvent,
   createEvaluationReportedEvent,

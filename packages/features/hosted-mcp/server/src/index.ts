@@ -10,11 +10,6 @@ export {
   type McpToolServer,
 } from "./ports/hosted-mcp.port";
 export {
-  getOAuthClient,
-  registerOAuthClient,
-  type RegisteredOAuthClient,
-} from "./repositories/redis/redis.oauth-client.repository";
-export {
   createMcpAuthorizeRestApp,
   type McpAuthorizeProject,
   type McpAuthorizeRestPorts,

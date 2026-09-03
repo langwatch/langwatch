@@ -81,16 +81,6 @@ export { issuerForProviderId } from "./better-auth/account-queries";
  * a second copy of either mapping would eventually disagree with this one
  * about what a column means.
  */
-export {
-  type IdentifierRow,
-  identifierFactToRow,
-  identifierRowToFact,
-  parseIdentifierLifecycleState,
-} from "./repositories/prisma/prisma.identifier.mapper";
-export {
-  type MfaEnrollmentRow,
-  mfaEnrollmentRowToState,
-} from "./repositories/prisma/prisma.mfa-enrollment.mapper";
 /**
  * The identity platform's event-sourcing layer (ADR-101, ADR-115, ADR-116,
  * ADR-117), folded into this package in the core-application exit: the
@@ -238,11 +228,6 @@ export {
 } from "./sso-connection-grandfather.service";
 export { SsoConnectionGuards, type SsoConnectionGuardsDeps } from "./sso-connection-guards";
 export {
-  AdminEmailPlatformOperators,
-  SystemActorPlatformOperators,
-  type PrismaSsoPlatformOperatorDatabase,
-} from "./repositories/prisma/prisma.sso-platform-operators.repository";
-export {
   grandfatherCommandId,
   grandfatheredSsoConnectionId,
   newSsoConnectionCommandId,
@@ -340,10 +325,6 @@ export {
   PrismaIdentityHeadsRepository,
   type PrismaIdentityHeadsDatabase,
 } from "./repositories/prisma/prisma.identity-heads.repository";
-export {
-  PrismaIdentityReservationRepository,
-  type PrismaIdentityReservationsDatabase,
-} from "./repositories/prisma/prisma.identity-reservations.repository";
 
 // The identity graph's remaining application half: the birth entrance, the
 // newborn sweep, the write-gate latch, the SCIM sync ledger and projection,
@@ -398,17 +379,6 @@ export {
   SsoConnectionTeardownDispatcher,
   type ConnectionDirectoryRevocation,
 } from "./adapters/sso-connection-teardown.adapter";
-export { PrismaIdentityAccountsRepository } from "./repositories/prisma/prisma.identity-accounts.repository";
-export { PrismaIdentityBackfillRepository } from "./repositories/prisma/prisma.identity-backfill.repository";
-export {
-  IDENTITY_BORN_REPORT_KIND,
-  PrismaIdentityNewbornRepository,
-  type AbandonedNewborn,
-} from "./repositories/prisma/prisma.identity-newborn.repository";
-export { PrismaIdentityResolutionRepository } from "./repositories/prisma/prisma.identity-resolution.repository";
-export { PrismaIdentitySecretCarryRepository } from "./repositories/prisma/prisma.identity-secret-carry.repository";
-export { PrismaLegacySsoOrganizationRepository } from "./repositories/prisma/prisma.legacy-sso-organization.repository";
-export { PrismaMfaEnrollmentProjectionRepository } from "./repositories/prisma/prisma.mfa-enrollment-projection.repository";
 export {
   PrismaScimSyncProjectionRepository,
   rowToScimSync,

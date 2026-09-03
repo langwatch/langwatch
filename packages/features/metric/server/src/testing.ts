@@ -3,6 +3,4 @@ export { CanonicalMetricAdapter } from "./adapters/canonical-metric.adapter";
 export { canonicalAttributes } from "./adapters/metric-attributes.rules";
 export { stableStringify } from "./adapters/metric-serialization.rules";
 export { MetricService } from "./services/metric.service";
-export { ClickHouseMetricDataPointAppendRepository } from "./repositories/clickhouse/clickhouse.metric-data-point-append.repository";
 export type { MetricClickHouseClient } from "./repositories/clickhouse/clickhouse.metric-data-point-append.repository";
-export { MetricDataPointClickHouseRepository } from "./repositories/clickhouse/clickhouse.metric-data-point.repository";

@@ -117,12 +117,6 @@ export {
   type ProcessOpsRepository,
 } from "./ports/process-ops.repository";
 export { NullReplayRepository, type ReplayRepository } from "./ports/replay.repository";
-export {
-  NullProcessAuditSink,
-  ProcessAuditRepository,
-  type ProcessAuditSink,
-  type ProcessControlAction,
-} from "./repositories/prisma/prisma.process-audit.repository";
 export { ProcessOpsPrismaRepository } from "./repositories/prisma/prisma.process-ops.repository";
 export { EventExplorerClickHouseRepository } from "./repositories/clickhouse/clickhouse.event-explorer.repository";
 export {
@@ -130,7 +124,6 @@ export {
   OpsExplainClientResolver,
   type OpsExplainClientResolution,
 } from "./repositories/clickhouse/clickhouse.ops-explain.repository";
-export { ReplayRedisRepository } from "./repositories/redis/redis.replay.repository";
 
 /** Public intake for the reports customers' coding agents file. */
 export {
@@ -163,14 +156,6 @@ export {
   migrationRunsOnThisInstallation,
   organizationMigrates,
 } from "./ops.system-migration-cohort";
-export { PrismaSystemMigrationStateRepository } from "./repositories/prisma/prisma.system-migration-state.repository";
-export { PrismaSystemMigrationEnrollmentRepository } from "./repositories/prisma/prisma.system-migration-enrollment.repository";
-export { PrismaOrganizationTenantSource } from "./repositories/prisma/prisma.organization-tenant-source.repository";
-export {
-  PrismaOrganizationMemberTenantSource,
-  PrismaUserTenantSource,
-} from "./repositories/prisma/prisma.user-tenant-source.repository";
-export { RedisMigrationLeaseRepository } from "./repositories/redis/redis.migration-lease.repository";
 
 // The back-office REST transport: impersonation, and the React Admin resource
 // operations. Its two session reads are ports, because who is acting and which

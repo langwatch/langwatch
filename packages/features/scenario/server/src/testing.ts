@@ -19,14 +19,6 @@ import {
   type SimulationTextMessageStart,
 } from "@langwatch/scenario-contract";
 
-export {
-  ClickHouseSimulationRunMetricsRepository,
-  SimulationRunMetricsRepositoryClickHouse,
-} from "./repositories/clickhouse/clickhouse.simulation-run-metrics.repository";
-export {
-  ClickHouseSimulationRunStateRepository,
-  SimulationRunStateRepositoryClickHouse,
-} from "./repositories/clickhouse/clickhouse.simulation-run-state.repository";
 export type { SimulationRunMetricsProjectionRecord } from "./projections/simulation-run-metrics.projection";
 export type { SimulationRunState } from "./projections/simulation-run-state.projection";
 

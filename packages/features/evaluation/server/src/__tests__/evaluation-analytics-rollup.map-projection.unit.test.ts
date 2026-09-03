@@ -7,7 +7,7 @@ import {
   evaluationCompletedEventSchema,
   evaluationReportedEventSchema,
 } from "@langwatch/evaluation-contract";
-import { EvaluationAnalyticsRollupMapProjection } from "@langwatch/evaluation-server/internal";
+import { EvaluationAnalyticsRollupMapProjection } from "../projections/evaluation-analytics-rollup.projection";
 
 const TENANT = "proj-1";
 

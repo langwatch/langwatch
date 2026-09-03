@@ -12,4 +12,3 @@
  * rather than opened to everyone.
  */
 export { GatewayUsageService } from "./services/gateway-usage.service";
-export { GatewayBudgetClickHouseRepository } from "./repositories/clickhouse/clickhouse.gateway-budget.repository";

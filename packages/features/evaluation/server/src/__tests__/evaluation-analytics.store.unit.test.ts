@@ -5,20 +5,20 @@ import { AnalyticsService } from "@langwatch/analytics-contract";
 import { evaluationCompletedEventSchema } from "@langwatch/evaluation-contract";
 import {
   EVALUATION_ANALYTICS_PROJECTION_VERSION_LATEST,
-  EvaluationAnalyticsAttributePolicy,
-  type EvaluationAnalyticsData,
   EvaluationAnalyticsFoldProjection,
+} from "../projections/evaluation-analytics-fold.projection";
+import {
+  type EvaluationAnalyticsData,
   type EvaluationAnalyticsRow,
-  EvaluationAnalyticsStore,
   EvaluationAnalyticsRowProjection,
-} from "../testing";
+} from "../projections/evaluation-analytics-row.projection";
+import { EvaluationAnalyticsAttributePolicy } from "../ports/evaluation.port";
+import { EvaluationAnalyticsStore } from "../stores/eventing/evaluation-attributes.store";
 
 /**
- * Read-back round-trip for the slim evaluation fold (ADR-066). `fromRow`
- * recovers the fold's WORKING state from the last committed row so the delivery
- * path never refolds from `event_log`. The genuine gap is the lifecycle
- * timestamps DurationMs is derived from — the row persisted only the derived
- * duration, not its operands.
+ * Read-back round-trip (ADR-066): `fromRow` recovers WORKING state from the
+ * last committed row, since `DurationMs` is derived and the row keeps only
+ * the derived value, not its operands.
  */
 
 const TENANT = "proj-eval-rb";

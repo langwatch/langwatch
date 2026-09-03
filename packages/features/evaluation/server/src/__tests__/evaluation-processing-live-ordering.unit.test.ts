@@ -12,11 +12,9 @@ import { EvaluationCommandAdapter } from "@langwatch/evaluation-server/internal"
 import type { EvaluationRunData } from "@langwatch/evaluation-contract";
 import { createEvaluationProcessingPipeline } from "@langwatch/evaluation-server/internal";
 import { ExecuteEvaluationCommand } from "../intents/evaluation-execution.intent";
-import {
-  type EvaluationAnalyticsData,
-  EvaluationAnalyticsFoldProjection,
-} from "@langwatch/evaluation-server/internal";
-import { EvaluationRunFoldProjection } from "@langwatch/evaluation-server/internal";
+import { EvaluationAnalyticsFoldProjection } from "../projections/evaluation-analytics-fold.projection";
+import type { EvaluationAnalyticsData } from "../projections/evaluation-analytics-row.projection";
+import { EvaluationRunFoldProjection } from "../projections/evaluation-run.projection";
 import { EVALUATION_PROCESSING_EVENT_TYPES } from "@langwatch/evaluation-contract";
 import type {
   EvaluationCompletedEvent,

@@ -11,17 +11,13 @@ import {
   evaluationScheduledEventSchema,
   evaluationStartedEventSchema,
 } from "@langwatch/evaluation-contract";
-import {
-  EvaluationAnalyticsFoldProjection,
-  EvaluationRunFoldProjection,
-} from "@langwatch/evaluation-server/internal";
+import { EvaluationAnalyticsFoldProjection } from "../projections/evaluation-analytics-fold.projection";
+import { EvaluationRunFoldProjection } from "../projections/evaluation-run.projection";
 
 /**
- * ADR-034 Phase 6 parity contract.
- *
- * The slim fold reuses the same per-event logic as `EvaluationRunFoldProjection`
- * for the shared fields. This test drives the SAME event stream through
- * both projections and asserts the shared fields agree to the cent.
+ * ADR-034 Phase 6: the slim fold reuses `EvaluationRunFoldProjection`'s
+ * per-event logic for shared fields; drives one event stream through both
+ * and asserts they agree.
  */
 
 const TENANT = "proj-parity";
