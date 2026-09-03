@@ -14,6 +14,7 @@
 
 import { Type } from "typebox";
 import type { ExtensionAPI, InlineExtension } from "@earendil-works/pi-coding-agent";
+import { callIds, conversationId, type TurnContext } from "./turn-context.js";
 
 export const CODE_ACCESS_TOOL_NAME = "code_access";
 
@@ -43,9 +44,19 @@ const MAX_POLL_FAILURES = 3;
 /** The longest a single local call may wait for its answer. */
 const CALL_MAX_WAIT_MS = 20 * 60 * 1000;
 
-/** What the model reads when the folder is not there. */
-export const OFFLINE_PUSHBACK =
-  "the shared folder is not connected; ask the user to run `npx langwatch@latest langy --share-control` again or continue without it";
+/**
+ * What the model reads when the folder is not there.
+ *
+ * It names both ways on, because a reply that only reports the folder is gone
+ * leaves the user with nothing to do next.
+ */
+export const OFFLINE_PUSHBACK = [
+  "The shared folder is not connected any more, so this call did not run.",
+  "Tell the user in one line what is not done, then give them the two ways on:",
+  "they can run `npx langwatch@latest langy --share-control` in the folder again,",
+  "or they can work through GitHub, which you offer by calling `code_access`.",
+  "End your turn with that offer.",
+].join(" ");
 
 /** What the model reads when a call is stopped. */
 export const CANCELLED_PUSHBACK =
@@ -230,11 +241,15 @@ export function renderWorkspaceFacts(workspace: WorkspaceInfo): string {
 export async function runLocalCall({
   tool,
   params,
+  turnContext,
+  toolCallId,
   signal,
   now = () => Date.now(),
 }: {
   tool: LocalToolName;
   params: unknown;
+  turnContext: TurnContext;
+  toolCallId?: string;
   signal?: AbortSignal;
   now?: () => number;
 }): Promise<string> {
@@ -242,7 +257,7 @@ export async function runLocalCall({
   const started = await callApp<{ callId: string }>({
     path: "/api/langy/local/calls",
     method: "POST",
-    body: { tool, params },
+    body: { ...callIds({ turnContext, ...(toolCallId ? { toolCallId } : {}) }), tool, params },
     signal,
     timeoutMs: REQUEST_TIMEOUT_MS,
   });
@@ -296,10 +311,11 @@ export async function readCodeAccess({
 }: {
   signal?: AbortSignal;
 }): Promise<string> {
+  const conversation = conversationId();
   let status: WorkspaceStatus;
   try {
     status = await callApp<WorkspaceStatus>({
-      path: "/api/langy/local/workspace",
+      path: `/api/langy/local/workspace?conversationId=${encodeURIComponent(conversation)}`,
       method: "GET",
       signal,
       timeoutMs: REQUEST_TIMEOUT_MS,
@@ -321,6 +337,7 @@ export async function readCodeAccess({
     created = await callApp<CreateControlRequestResponse>({
       path: "/api/langy/local/requests",
       method: "POST",
+      body: { conversationId: conversation },
       signal,
       timeoutMs: REQUEST_TIMEOUT_MS,
     });
@@ -434,7 +451,11 @@ function textResult(text: string) {
   return { content: [{ type: "text" as const, text }], details: {} };
 }
 
-export function createLocalWorkspaceExtension(): InlineExtension {
+export function createLocalWorkspaceExtension({
+  turnContext,
+}: {
+  turnContext: TurnContext;
+}): InlineExtension {
   return {
     name: "langy-local-workspace",
     factory: (pi: ExtensionAPI) => {
@@ -460,9 +481,11 @@ export function createLocalWorkspaceExtension(): InlineExtension {
           label: localToolLabels[name],
           description: localToolDescriptions[name],
           parameters: localToolParams[name],
-          async execute(_toolCallId, params, signal) {
+          async execute(toolCallId, params, signal) {
             try {
-              return textResult(await runLocalCall({ tool: name, params, signal }));
+              return textResult(
+                await runLocalCall({ tool: name, params, turnContext, toolCallId, signal }),
+              );
             } catch (error) {
               // A folder that is not there is a pushback the model acts on,
               // not a failure: it asks for code access instead of retrying.

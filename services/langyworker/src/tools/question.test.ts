@@ -1,6 +1,7 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
 import type { ExtensionAPI } from "@earendil-works/pi-coding-agent";
 import { NO_ANSWER_PUSHBACK, QUESTION_TOOL_NAME, createQuestionExtension } from "./question.js";
+import { createTurnContext, type TurnContext } from "./turn-context.js";
 
 type RegisteredTool = {
   name: string;
@@ -14,7 +15,14 @@ type RegisteredTool = {
   ) => Promise<{ content: { type: string; text: string }[] }>;
 };
 
-function questionTool(): RegisteredTool {
+/** The holder as the runner leaves it while a turn runs. */
+function turnInFlight(turnId = "turn_1"): TurnContext {
+  const context = createTurnContext();
+  context.turnId = turnId;
+  return context;
+}
+
+function questionTool(turnContext: TurnContext = turnInFlight()): RegisteredTool {
   let registered: RegisteredTool | undefined;
   const pi = {
     registerTool: (tool: RegisteredTool) => {
@@ -22,7 +30,9 @@ function questionTool(): RegisteredTool {
     },
     on: () => undefined,
   };
-  const extension = createQuestionExtension() as { factory: (pi: ExtensionAPI) => void };
+  const extension = createQuestionExtension({ turnContext }) as {
+    factory: (pi: ExtensionAPI) => void;
+  };
   extension.factory(pi as unknown as ExtensionAPI);
   return registered!;
 }
@@ -54,6 +64,7 @@ function fakeApp(routes: Record<string, unknown[]>) {
 
 process.env.LANGWATCH_ENDPOINT = "http://app.test";
 process.env.LANGWATCH_API_KEY = "sk-lw-session-key";
+process.env.LANGY_CONVERSATION_ID = "langyconv_1";
 
 afterEach(() => {
   vi.unstubAllGlobals();
@@ -115,7 +126,11 @@ describe("the question tool", () => {
 
       expect(calls[0]?.url).toBe("http://app.test/api/langy/waits");
       expect(calls[0]?.method).toBe("POST");
-      expect((calls[0]?.body as { kind: string }).kind).toBe("question");
+      expect(calls[0]?.body).toMatchObject({
+        kind: "question",
+        conversationId: "langyconv_1",
+        turnId: "turn_1",
+      });
       expect(text).toContain("Q: Which file owns the tracing setup?");
       expect(text).toContain("A: src/index.ts");
     });

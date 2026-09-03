@@ -6,6 +6,7 @@ import {
   OFFLINE_PUSHBACK,
   createLocalWorkspaceExtension,
 } from "./local-workspace.js";
+import { createTurnContext, type TurnContext } from "./turn-context.js";
 
 type RegisteredTool = {
   name: string;
@@ -19,17 +20,24 @@ type RegisteredTool = {
   ) => Promise<{ content: { type: string; text: string }[] }>;
 };
 
-function registeredTools(): Map<string, RegisteredTool> {
+function registeredTools(turnContext: TurnContext = turnInFlight()): Map<string, RegisteredTool> {
   const tools = new Map<string, RegisteredTool>();
   const pi = {
     registerTool: (tool: RegisteredTool) => tools.set(tool.name, tool),
     on: () => undefined,
   };
-  const extension = createLocalWorkspaceExtension() as {
+  const extension = createLocalWorkspaceExtension({ turnContext }) as {
     factory: (pi: ExtensionAPI) => void;
   };
   extension.factory(pi as unknown as ExtensionAPI);
   return tools;
+}
+
+/** The holder as the runner leaves it while a turn runs. */
+function turnInFlight(turnId = "turn_1"): TurnContext {
+  const context = createTurnContext();
+  context.turnId = turnId;
+  return context;
 }
 
 function textOf(result: { content: { type: string; text: string }[] }): string {
@@ -38,13 +46,22 @@ function textOf(result: { content: { type: string; text: string }[] }): string {
 
 /** One fake app: the answers each request gets, in order, per path prefix. */
 function fakeApp(routes: Record<string, unknown[]>) {
-  const calls: { url: string; method: string; headers: Record<string, string> }[] = [];
+  const calls: {
+    url: string;
+    method: string;
+    headers: Record<string, string>;
+    body: Record<string, unknown> | undefined;
+  }[] = [];
   const fetchMock = vi.fn(async (url: string, init: RequestInit) => {
     const path = new URL(url).pathname;
     calls.push({
       url,
       method: init.method ?? "GET",
       headers: init.headers as Record<string, string>,
+      body:
+        typeof init.body === "string"
+          ? (JSON.parse(init.body) as Record<string, unknown>)
+          : undefined,
     });
     const queue = routes[path];
     if (!queue || queue.length === 0) throw new Error(`no fake answer for ${path}`);
@@ -64,6 +81,7 @@ function fakeApp(routes: Record<string, unknown[]>) {
 
 process.env.LANGWATCH_ENDPOINT = "http://app.test";
 process.env.LANGWATCH_API_KEY = "sk-lw-session-key";
+process.env.LANGY_CONVERSATION_ID = "langyconv_1";
 
 afterEach(() => {
   vi.unstubAllGlobals();
@@ -123,6 +141,13 @@ describe("the local workspace tools", () => {
       expect(calls[0]?.method).toBe("POST");
       expect(calls[0]?.url).toBe("http://app.test/api/langy/local/calls");
       expect(calls[0]?.headers["X-Auth-Token"]).toBe("sk-lw-session-key");
+      expect(calls[0]?.body).toEqual({
+        conversationId: "langyconv_1",
+        turnId: "turn_1",
+        toolCallId: "t1",
+        tool: "local_ls",
+        params: { path: "." },
+      });
       expect(calls[1]?.url).toBe("http://app.test/api/langy/local/calls/call_1");
       expect(calls).toHaveLength(3);
     });
@@ -333,8 +358,12 @@ describe("the local workspace tools", () => {
           .execute("t9", { reason: "add tracing" }),
       );
 
+      expect(calls[0]?.url).toBe(
+        "http://app.test/api/langy/local/workspace?conversationId=langyconv_1",
+      );
       expect(calls[1]?.method).toBe("POST");
       expect(calls[1]?.url).toBe("http://app.test/api/langy/local/requests");
+      expect(calls[1]?.body).toEqual({ conversationId: "langyconv_1" });
       expect(text).toContain("code access card is shown");
       expect(text).toContain("npx langwatch@latest langy --share-control");
       expect(text).toContain("END YOUR TURN");

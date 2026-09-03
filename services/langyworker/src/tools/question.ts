@@ -15,6 +15,7 @@ import {
   CallCancelledError,
   CANCELLED_PUSHBACK,
 } from "./local-workspace.js";
+import { callIds, type TurnContext } from "./turn-context.js";
 
 export const QUESTION_TOOL_NAME = "question";
 
@@ -82,10 +83,14 @@ export function renderAnswers(answers: QuestionAnswer[]): string {
 
 export async function askQuestions({
   questions,
+  turnContext,
+  toolCallId,
   signal,
   now = () => Date.now(),
 }: {
   questions: unknown;
+  turnContext: TurnContext;
+  toolCallId?: string;
   signal?: AbortSignal;
   now?: () => number;
 }): Promise<string> {
@@ -93,7 +98,11 @@ export async function askQuestions({
   const started = await callApp<{ waitId: string }>({
     path: "/api/langy/waits",
     method: "POST",
-    body: { kind: "question", questions },
+    body: {
+      ...callIds({ turnContext, ...(toolCallId ? { toolCallId } : {}) }),
+      kind: "question",
+      questions,
+    },
     signal,
     timeoutMs: REQUEST_TIMEOUT_MS,
   });
@@ -156,7 +165,11 @@ const questionParams = Type.Object({
   ),
 });
 
-export function createQuestionExtension(): InlineExtension {
+export function createQuestionExtension({
+  turnContext,
+}: {
+  turnContext: TurnContext;
+}): InlineExtension {
   return {
     name: "langy-question",
     factory: (pi: ExtensionAPI) => {
@@ -166,9 +179,14 @@ export function createQuestionExtension(): InlineExtension {
         description:
           "Ask the user a question and wait for the answer. Decide routine things alone. Ask only when two ways forward differ for the user, for example which file owns the setup, which account to use, or whether to open the pull request now. Ask one question at a time. The options are the answers, so write them as answers, not as more questions.",
         parameters: questionParams,
-        async execute(_toolCallId, params, signal) {
+        async execute(toolCallId, params, signal) {
           try {
-            const text = await askQuestions({ questions: params.questions, signal });
+            const text = await askQuestions({
+              questions: params.questions,
+              turnContext,
+              toolCallId,
+              signal,
+            });
             return { content: [{ type: "text" as const, text }], details: {} };
           } catch (error) {
             if (error instanceof AppUnreachableError) {

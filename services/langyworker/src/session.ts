@@ -35,6 +35,7 @@ import {
 import { QUESTION_TOOL_NAME, createQuestionExtension } from "./tools/question.js";
 import { SKILL_TOOL_NAME, createSkillExtension } from "./tools/skill.js";
 import { TODOWRITE_TOOL_NAME, createTodowriteExtension } from "./tools/todowrite.js";
+import type { TurnContext } from "./tools/turn-context.js";
 
 export const ENABLED_TOOLS = [
   "read",
@@ -74,6 +75,8 @@ export type CreateLangySessionOptions = {
   home: string;
   /** Holder carrying the composed system prompt; recomposed per turn. */
   systemPrompt: SystemPromptHolder;
+  /** Holder carrying the turn in flight; the local tools name it in every call. */
+  turnContext: TurnContext;
 };
 
 export type LangySessionHandle = {
@@ -116,6 +119,7 @@ export async function createLangySession({
   config,
   home,
   systemPrompt,
+  turnContext,
 }: CreateLangySessionOptions): Promise<LangySessionHandle> {
   const agentDir = join(home, ".langy-pi");
   const generated = writeModelsJson({ agentDir, model: config.model, env: process.env });
@@ -155,8 +159,8 @@ export async function createLangySession({
       createSystemPromptExtension(systemPrompt),
       createTodowriteExtension(),
       createSkillExtension(config.skillsDir),
-      createQuestionExtension(),
-      createLocalWorkspaceExtension(),
+      createQuestionExtension({ turnContext }),
+      createLocalWorkspaceExtension({ turnContext }),
     ],
   });
   await resourceLoader.reload();
