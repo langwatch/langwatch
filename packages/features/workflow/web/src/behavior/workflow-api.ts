@@ -25,7 +25,15 @@
  * import below is the only one in the package.
  */
 
-import type { StudioWorkflow } from "@langwatch/workflow-contract";
+import type {
+  StudioWorkflow,
+  WorkflowApiEngineModeInput,
+  WorkflowApiEngineModeOutput,
+  WorkflowApiGetByIdInput,
+  WorkflowApiGetByIdOutput,
+  WorkflowApiGetVersionsInput,
+  WorkflowApiGetVersionsOutput,
+} from "@langwatch/workflow-contract";
 import { createFeatureApi } from "@langwatch/platform-api-client";
 
 /** Where a workflow lives, as the copy lineage tooltip spells it out. */
@@ -200,10 +208,21 @@ export type WorkflowApiMap = {
      * The studio's own eight, and they are the family's own transport rather
      * than borrowed vocabulary — the graph it loads, autosaves, commits,
      * publishes and restores.
+     *
+     * The three reads below are the ones `@langwatch/workflow-contract` already
+     * declares, so they are stated rather than left `Unpublished`: a row shape
+     * the contract publishes is a row shape this map has no business widening
+     * to `any`. Without them `getVersions.data` was `any` and every `.find`
+     * callback over it was an implicit any. The five writes stay placeholders
+     * until the contract declares their outputs too.
      */
-    getById: UnpublishedQuery;
-    getVersions: UnpublishedQuery;
-    engineMode: UnpublishedQuery;
+    getById: { query: { input: WorkflowApiGetByIdInput; output: WorkflowApiGetByIdOutput } };
+    getVersions: {
+      query: { input: WorkflowApiGetVersionsInput; output: WorkflowApiGetVersionsOutput };
+    };
+    engineMode: {
+      query: { input: WorkflowApiEngineModeInput; output: WorkflowApiEngineModeOutput };
+    };
     autosave: UnpublishedMutation;
     commitVersion: UnpublishedMutation;
     generateCommitMessage: UnpublishedMutation;
