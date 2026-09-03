@@ -322,8 +322,9 @@ describe("given a provider-named person an organization has asked us to erase", 
       });
 
       // Two blanked in the first sweep, one more that appeared after it. The
-      // exclusion constraint would not have stopped this one: the person's own
-      // rows were blanked, so a fresh link on them overlaps nothing.
+      // one-open-link index is no guarantee against that one — a person whose
+      // links were all closed, or who had none, holds no open slot to refuse
+      // it — so the second sweep is what actually catches it.
       expect(outcome.identityMatchesBlanked).toBe(3);
       expect(calls.filter((call) => call === "matches.blank")).toHaveLength(2);
     });

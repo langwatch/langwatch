@@ -211,9 +211,12 @@ Feature: Deciding which provider-named person is which LangWatch account
 
   # The automatic half of the same rule. The pass reads the whole organization
   # once and then writes its way through it, so an erasure that finishes in the
-  # middle leaves a pass holding a list that says the person is still live. The
-  # database will not refuse the row either: erasure blanks the person's links
-  # rather than removing them, so a fresh link overlaps nothing.
+  # middle leaves a pass holding a list that says the person is still live.
+  # The database only half-helps: erasure blanks a person's links rather than
+  # removing them, so someone who HAD a link still holds their one-open-link
+  # slot and a fresh link is refused — but a person who never had a link has
+  # nothing in the database to refuse the row. The re-check below is the only
+  # guard that covers everyone.
 
   @unit
   Scenario: A person erased while a match pass is running is not linked

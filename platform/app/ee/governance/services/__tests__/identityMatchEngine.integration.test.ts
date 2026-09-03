@@ -539,9 +539,9 @@ describe("Feature: the match engine, against the database that holds its rules",
         discoveredPeople: racing,
       }).linkProvenMatches({ organizationId });
 
-      // The exclusion constraint is no help here and this is why: the person
-      // held no link before the erasure, so there is no overlapping row for a
-      // new one to collide with. The re-read is the whole of the defence.
+      // The one-open-link index is no help here and this is why: the person
+      // held no link before the erasure, so there is no open row for a new
+      // one to collide with. The re-read is the whole of the defence.
       expect(outcome.linked).toBe(0);
       await expect(linksFor(person.id)).resolves.toHaveLength(0);
     });

@@ -6,7 +6,6 @@ Deploy LangWatch to Kubernetes. Includes the web app, workers, NLP service, Lang
 
 - Kubernetes 1.24+, Helm 3.12+
 - A default StorageClass for persistent components if chart-managed
-- An external PostgreSQL must allow `CREATE EXTENSION btree_gist`; migrations create it and fail loudly if it is unavailable. The chart-managed PostgreSQL already has it.
 
 ### Install
 

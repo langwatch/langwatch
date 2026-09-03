@@ -14,20 +14,20 @@ Feature: Erasing a person from the governance data, and making it stick
   # ── The identity records themselves ───────────────────────────────────────
 
   @integration
-  Scenario: A person can only be linked to one account at a time
+  Scenario: A person can only have one open link at a time
     Given a provider-named person already linked to an account
     When a second link is opened for that same person while the first is open
     Then the second link is refused
-    And the refusal names the overlap rather than a duplicate row
+    And the refusal says the person is already linked
 
   @integration
   Scenario: A link that covers no time at all is refused
     Given a link whose start and end are the same instant
     When it is saved
     Then it is refused
-    # An empty span overlaps nothing — not even itself — so the overlap rule
-    # cannot see it. It would file a person against no time at all and read as
-    # if the link had never been made.
+    # The one-open-link rule only counts links, not time, so it cannot see an
+    # empty span. A separate check refuses any link that covers no time at
+    # all, which would otherwise read as if the link had never been made.
 
   @integration
   Scenario: A link that ends before it starts is refused
@@ -42,6 +42,18 @@ Feature: Erasing a person from the governance data, and making it stick
     Then both links are kept
     # This is what makes a re-issued email address survivable: last year's
     # spend stays with last year's person.
+    # Boundary: the one-open-link rule only counts open links. A closed link
+    # that overlaps another in time is no longer refused by the database.
+    # Nothing in the product closes links yet, so no such row can exist;
+    # revisit when closing links ships.
+
+  @integration
+  Scenario: A second open link is refused even when written straight to the database
+    Given a provider-named person already linked to an account
+    When a second open link is written to the database directly, skipping the application
+    Then the database itself refuses it
+    # The one-open-link rule lives in the database, not in application code, so
+    # a script or a future writer that skips the service cannot break it.
 
   # ── Which tenants an organization's data lives in ─────────────────────────
 

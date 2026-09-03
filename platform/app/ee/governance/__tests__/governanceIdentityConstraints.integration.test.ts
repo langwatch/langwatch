@@ -8,8 +8,6 @@
  * pass this file while leaving the constraint absent, which is the failure this
  * exists to catch.
  *
- * Requires the `btree_gist` extension the migration installs.
- *
  * Spec: specs/governance/governance-identity-and-erasure.feature
  * Decision: ADR-128 §11
  */
@@ -24,14 +22,15 @@ import {
   resolveGovOrganizationId,
   resolveGovTenantIds,
 } from "../services/governanceTenantHistory.service";
+import { isOpenLinkViolation } from "../services/identityMatch.errors";
 
 const ns = `gov-identity-${nanoid(8)}`;
 const organizationId = `org_${ns}`;
 const otherOrganizationId = `org_other_${ns}`;
 const discoveredPersonId = `dp_${ns}`;
 
-/** Postgres's exclusion-constraint violation. Asserted by code, never by prose. */
-const EXCLUSION_VIOLATION = "23P01";
+/** Postgres's unique-constraint violation. Asserted by code, never by prose. */
+const UNIQUE_VIOLATION = "23505";
 /** Postgres's check-constraint violation. */
 const CHECK_VIOLATION = "23514";
 
@@ -68,7 +67,7 @@ const sqlState = (error: unknown): string | undefined => {
   }
   // Last resort: the message carries the SQLSTATE when the chain does not.
   const message = String((error as { message?: string })?.message ?? "");
-  return /\b(23P01|23514)\b/.exec(message)?.[1];
+  return /\b(23505|23514)\b/.exec(message)?.[1];
 };
 
 const link = (overrides: {
@@ -123,8 +122,8 @@ describe("Feature: the identity tables hold their own rules", () => {
     });
 
     describe("when a second link is opened while the first is open", () => {
-      /** @scenario "A person can only be linked to one account at a time" */
-      it("is refused by the overlap rule rather than by a duplicate-row rule", async () => {
+      /** @scenario "A person can only have one open link at a time" */
+      it("is refused as a duplicate open link", async () => {
         let caught: unknown;
         try {
           await prisma.identityMatch.create({
@@ -138,36 +137,80 @@ describe("Feature: the identity tables hold their own rules", () => {
         }
 
         expect(caught).toBeDefined();
-        // 23P01 and not 23505: one rule, one error code. A partial unique index
-        // on top of the exclusion constraint would make the common race report
-        // the other one, and the application would have to handle both to say
-        // one sentence (ADR-128 §7).
-        expect(sqlState(caught)).toBe(EXCLUSION_VIOLATION);
+        // The partial unique index on open links is the only uniqueness rule
+        // left after ADR-128 dropped the gist exclusion constraint (nothing
+        // ever writes validTo, so overlap degenerated to "at most one open
+        // link per person"). Prisma wraps its 23505 as P2002 and keeps the
+        // SQLSTATE to itself, so the assertion is the application's own
+        // predicate — the exact contract the service's catch sites rely on.
+        expect((caught as { code?: string }).code).toBe("P2002");
+        expect(isOpenLinkViolation(caught)).toBe(true);
       });
     });
 
-    describe("when a closed link overlapping the open one is opened", () => {
-      it("is refused too, because a read on a spend date could match both", async () => {
+    describe("when a second open link is written straight to the database", () => {
+      /** @scenario "A second open link is refused even when written straight to the database" */
+      it("is refused by the database itself, not by application code", async () => {
         let caught: unknown;
         try {
-          await prisma.identityMatch.create({
-            data: link({
-              id: `im_overlap_${ns}`,
-              validFrom: new Date("2026-04-01T00:00:00.000Z"),
-              validTo: new Date("2026-04-30T00:00:00.000Z"),
-            }),
-          });
+          // Raw SQL on purpose: this proves the rule holds for a writer that
+          // skips Prisma and the service layer entirely.
+          await prisma.$executeRawUnsafe(
+            `
+            -- @tenancy: single fixed test row; the rule under test is per-person,
+            -- not per-tenant.
+            INSERT INTO "IdentityMatch"
+              ("id", "organizationId", "discoveredPersonId", "userId", "evidenceKind", "validFrom", "validTo")
+            VALUES ($1, $2, $3, $4, 'verified_email', '2026-05-02T00:00:00Z', NULL)
+            `,
+            `im_raw_${ns}`,
+            organizationId,
+            discoveredPersonId,
+            `user_${ns}`,
+          );
         } catch (error) {
           caught = error;
         }
 
-        expect(sqlState(caught)).toBe(EXCLUSION_VIOLATION);
+        expect(sqlState(caught)).toBe(UNIQUE_VIOLATION);
+
+        // And the invariant itself: no person holds two open links.
+        const doubled = await prisma.$queryRawUnsafe<unknown[]>(`
+          -- @tenancy: invariant sweep across the whole test database; a second
+          -- open link anywhere is a failure regardless of tenant.
+          SELECT "discoveredPersonId", count(*)
+          FROM "IdentityMatch"
+          WHERE "validTo" IS NULL
+          GROUP BY 1
+          HAVING count(*) > 1
+        `);
+        expect(doubled).toHaveLength(0);
+      });
+    });
+
+    describe("when a closed link overlapping the open one is written", () => {
+      it("is accepted: the rule only counts open links", async () => {
+        // Boundary made explicit by the spec: nothing in the product closes
+        // links yet, so an overlapping closed row cannot occur outside a test.
+        // Revisit when closing links ships.
+        await prisma.identityMatch.create({
+          data: link({
+            id: `im_overlap_${ns}`,
+            validFrom: new Date("2026-04-01T00:00:00.000Z"),
+            validTo: new Date("2026-04-30T00:00:00.000Z"),
+          }),
+        });
+
+        const rows = await prisma.identityMatch.findMany({
+          where: { organizationId, discoveredPersonId },
+        });
+        expect(rows.map((row) => row.id)).toContain(`im_overlap_${ns}`);
       });
     });
 
     describe("when a link whose start and end are the same instant is saved", () => {
       /** @scenario "A link that covers no time at all is refused" */
-      it("is refused, rather than slipping past the overlap rule as an empty span", async () => {
+      it("is refused, rather than slipping past the open-link rule as a closed row", async () => {
         let caught: unknown;
         try {
           await prisma.identityMatch.create({

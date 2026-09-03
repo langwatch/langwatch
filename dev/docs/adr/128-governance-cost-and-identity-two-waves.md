@@ -512,15 +512,18 @@ Making midnight the only legal effective time is what keeps "May stays
 under Bill 1" true on the one day people actually check it. Admin UI
 therefore offers a date, not a timestamp.
 
-**Deployment: `btree_gist` is the repo's first extension.** No
-`CREATE EXTENSION` exists in the 297 migrations shipped so far. The
-migration must check the extension is available and fail with an
-actionable message rather than half-applying; the self-host
-documentation and the Helm chart must state the requirement; and
-availability must be verified per managed-Postgres provider before the
-migration ships (Azure Database for PostgreSQL in particular is
-unverified). This applies equally to `IdentityMatch` and `SeatPrice`,
-which use the same guard.
+**Deployment: no extensions.** An earlier revision made `btree_gist`
+the repo's first `CREATE EXTENSION`, for `IdentityMatch`'s overlap
+constraint — with an availability guard in the migration, a stated
+requirement in the self-host documentation and the Helm chart, and
+per-provider verification before shipping. That was reversed before
+anything shipped: nothing in wave 2 ever closes a link (no writer sets
+`validTo`), so the overlap rule degenerates to "at most one OPEN link
+per person", which a plain partial unique index holds with no extension
+at all. `SeatPrice` must make its own call when it ships — its dated
+price ranges do close, so if it wants the general overlap rule held in
+the database it re-opens this deployment question, guard and docs and
+provider verification included.
 
 The mapping is edited beside the source config (small admin list,
 audited, read at query time like every overlap rule). The exclusion filter
@@ -1435,7 +1438,7 @@ drift apart).
 | Path | Reversible? | Blast radius | Gate |
 |---|---|---|---|
 | ClickHouse migration `ALTER`ing `governance_cost_rollup_1d` (the table itself shipped in wave 1 as 00087; wave 2 adds exactly two columns, `RevisedAt` and `LastObservedAt` — the prior-amount column `PreviousAmountNanoUsd` is already there) | no (schema) | large | human review + a written manual rollback (`DROP COLUMN` per added column — the down path is narrower than wave 1's `DROP TABLE` precisely because the table is not ours to drop any more) — repo convention keeps data-touching down paths commented out, and no down-testing harness exists, so "tested down path" would be a false promise |
-| Prisma migration adding the identity tables, seat price list, coverage, tenant history, suppression list and suggestion index | no (schema) | large | human review + reversibility reviewed in PR (Prisma migrations here have no down files; rollback is a follow-up migration); the migration is also the repo's first `CREATE EXTENSION` (`btree_gist`, §7) — it must check availability and fail actionably, and the self-host docs and Helm chart must state the requirement |
+| Prisma migration adding the identity tables, seat price list, coverage, tenant history, suppression list and suggestion index | no (schema) | large | human review + reversibility reviewed in PR (Prisma migrations here have no down files; rollback is a follow-up migration); the identity migration needs no extensions (§7 — the one-open-link rule is a plain partial unique index); if `SeatPrice` re-opens the `btree_gist` question, that PR re-inherits the availability-guard, docs and Helm gates |
 | Rollup fold projection | yes (replayable) | large | automated: replay-equality test; feature flags gate the screens (no §7 dependency in wave 1 — lanes never summed) |
 | Exclusion filter + key-to-bill mapping (wave 2) | yes | large (money correctness) | automated: one-dollar-one-home test suite is a merge blocker for the first lane-merging screen |
 | Auto-link on deterministic evidence | yes (links are dated; closing reverses) | medium | automated: conflict-rule tests (two candidates → suspend + flag); fuzzy scoring runs **only** in §12's background suggestion job, never inline in a request — test: no request path computes an edit distance |
@@ -1598,15 +1601,14 @@ model IdentityMatch {
   validTo            DateTime? // open link = null; offboarding/correction closes, never rewrites
   createdAt          DateTime  @default(now())
   // at most one OPEN link per discovered person — enforced with a partial unique index
-  // (raw SQL in the migration: UNIQUE (discoveredPersonId) WHERE validTo IS NULL)
-  // Overlap guard: no two rows for the same discoveredPersonId may have overlapping
-  // validity ranges. Enforced by an exclusion constraint (raw SQL in the migration:
-  // CREATE EXTENSION IF NOT EXISTS btree_gist;
-  // EXCLUDE USING gist ("discoveredPersonId" WITH =,
-  //   tsrange("validFrom", COALESCE("validTo", 'infinity')) WITH &&)).
-  // tsrange treats NULL validTo as unbounded via COALESCE, so both open and closed
-  // rows participate. Without it, a read-time join on validFrom <= spendDate < validTo
-  // could match multiple rows.
+  // (raw SQL in the migration: UNIQUE (discoveredPersonId) WHERE validTo IS NULL,
+  // SQLSTATE 23505; Prisma wraps it as P2002 and the app maps both to one sentence).
+  // An earlier revision held the general overlap rule instead (btree_gist EXCLUDE,
+  // both open and closed rows participating) so a read-time join on
+  // validFrom <= spendDate < validTo could never match two rows. Reversed before
+  // shipping: nothing in wave 2 writes validTo, so closed rows cannot exist and the
+  // general rule guarded an unreachable case at the price of an extension
+  // requirement on every Postgres. Revisit when closing links ships.
 }
 
 model SeatPrice {
@@ -1634,10 +1636,13 @@ model IngestionSourceKeyCoverage {
   virtualKeyId      String              // the gateway key that bill pays for
   validFrom         DateTime            // §7: UTC midnight only — a day is the finest grain a bill can own
   validTo           DateTime?           // open coverage = null; re-pointing closes, never rewrites
-  // Overlap guard, and the ONLY uniqueness rule here: same btree_gist
-  // exclusion pattern as IdentityMatch —
+  // Overlap guard, and the ONLY uniqueness rule here — unlike IdentityMatch,
+  // coverage rows really do close (re-pointing writes validTo), so this table
+  // still needs the general overlap rule, which is a btree_gist exclusion:
   // EXCLUDE USING gist ("virtualKeyId" WITH =,
   //   tsrange("validFrom", COALESCE("validTo", 'infinity')) WITH &&).
+  // That makes this table (with SeatPrice) the one that re-opens the
+  // CREATE EXTENSION deployment question §7's identity reversal closed.
   // It already rejects a second open row for a key (SQLSTATE 23P01), so
   // NO partial unique index is added on top: the redundant index would only
   // make the common race surface as 23505 instead, two codes for one rule
@@ -1810,12 +1815,29 @@ money tables, only the identity tables and read paths.
 | Two sources may claim two DIFFERENT subscriptions (the ownership guard refuses only a duplicate), and the spend panel carries one note — the oldest claim speaks (`createdAt` order, deterministic). One note for two bills is unresolved | before a second claiming source is a real shape |
 | Azure and Databricks restatement windows are unmeasured; `SETTLING_WINDOW_DAYS` stays provisional for those sources until probed (§15) | Sergio / puller implementer |
 | Payload-level redaction for `governance_ocsf_events` — the raw OCSF JSON holds names and email addresses that a single-column pseudonym cannot reach; wave 2 answers with delete-and-suppress (§16), a redacting read path or structured columns is owed | identity implementer |
-| `btree_gist` availability per managed-Postgres provider (Azure Database for PostgreSQL unverified) — the repo's first `CREATE EXTENSION` (§7) | Sergio |
+| `btree_gist` availability per managed-Postgres provider (Azure Database for PostgreSQL unverified) — no longer needed by the identity tables (§7 reversal), but still ahead of `SeatPrice` and `IngestionSourceKeyCoverage` if their overlap rules stay database-held | Sergio |
 | LWQL org-wide cost surface (§17) — own design pass, wave 2+ | deferred |
 | Registry-final permission verb names (§18) | implementation PR |
 
 ## Revisions
 
+- **v3.10 (2026-09-03, captain: Sergio Esteban).** `IdentityMatch`'s
+  overlap rule is narrowed to "at most one OPEN link per person", held by
+  a plain partial unique index (`UNIQUE (discoveredPersonId) WHERE
+  "validTo" IS NULL`, SQLSTATE 23505 / Prisma P2002) — the `btree_gist`
+  exclusion constraint, and with it the repo's first `CREATE EXTENSION`,
+  is dropped before shipping (§7 deployment note, Schema, Gates, open
+  questions). The general rule guarded a case wave 2 cannot produce:
+  nothing writes `validTo`, so no closed row exists to overlap anything —
+  at the price of an extension requirement on every self-hosted and
+  managed Postgres, with per-provider availability unverified. Consequences
+  folded in: the app maps 23505/P2002 (not 23P01) to the same
+  already-linked sentence; a closed link overlapping an open one is no
+  longer database-refused (unreachable today, revisit when closing
+  ships); Helm chart and self-host docs drop the extension requirement.
+  `SeatPrice` and `IngestionSourceKeyCoverage` are untouched — their rows
+  really close, so their exclusion constraints stand and re-open the
+  extension question when they ship. Status unchanged (Proposed).
 - **v3.9 (2026-09-02, captain: Sergio Esteban).** Red-team panel on the
   wave-2 lock: five independent refuters attacked the claim that the six
   v3.8 lock decisions could be implemented without violating a hard
