@@ -32,6 +32,8 @@ function makeSuite(overrides: Partial<SimulationSuite> = {}): SimulationSuite {
     labels: [],
     simulatorModel: null,
     judgeModel: null,
+    fields: null,
+    evaluators: null,
     archivedAt: null,
     createdAt: new Date(),
     updatedAt: new Date(),
@@ -54,6 +56,7 @@ function makeMockRepository(
     findSlugsByPrefix: vi.fn().mockResolvedValue([]),
     findFirstByLabel: vi.fn().mockResolvedValue(null),
     findNamesByIds: vi.fn(async () => []),
+    findManyByIdsIncludingArchived: vi.fn(async () => []),
     // No plan answers to a name unless a scenario says one does.
     findPlanByName: vi.fn().mockResolvedValue(null),
     update: vi.fn(),
@@ -67,6 +70,7 @@ type MockScenarioRepository = {
   findNamesByIds: ReturnType<typeof vi.fn>;
   findActiveNamesByIds: ReturnType<typeof vi.fn>;
   findRunConfigByIds: ReturnType<typeof vi.fn>;
+  findTestSuiteIdsByIds: ReturnType<typeof vi.fn>;
   findManyByTestSuite: ReturnType<typeof vi.fn>;
   findAll: ReturnType<typeof vi.fn>;
 };
@@ -99,6 +103,9 @@ function makeMockScenarioRepository(
         parameters: null,
         version: 1,
       })),
+    ),
+    findTestSuiteIdsByIds: vi.fn(async ({ ids }: { ids: string[] }) =>
+      ids.map((id) => ({ id, testSuiteId: null })),
     ),
     findManyByTestSuite: vi.fn(async () => []),
     findAll: vi.fn(async () => []),
@@ -1557,6 +1564,8 @@ describe("SuiteService", () => {
           targets: [],
           repeatCount: 1,
           labels: [],
+          fields: [],
+          evaluators: [],
         });
       });
     });

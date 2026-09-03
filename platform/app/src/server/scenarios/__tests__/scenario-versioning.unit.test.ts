@@ -32,6 +32,7 @@ function fields(
     judgeModel: null,
     maxTurns: null,
     minTurns: null,
+    fields: null,
     ...overrides,
   };
 }
@@ -110,6 +111,7 @@ describe("the snapshot envelope", () => {
       "judgeModel",
       "maxTurns",
       "minTurns",
+      "fields",
     ]);
 
     const scenarioRow = {

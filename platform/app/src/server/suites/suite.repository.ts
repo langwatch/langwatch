@@ -263,6 +263,23 @@ export class SuiteRepository {
   }
 
   /**
+   * The given suites, archived ones included, in no particular order.
+   *
+   * Feeds the evaluator attachments a run carries: a run reads the test
+   * suites of the scenarios it covers and the plan it is filed under, and a
+   * plan archived after the run was queued still says what it attached.
+   */
+  async findManyByIdsIncludingArchived(params: {
+    ids: string[];
+    projectId: string;
+  }): Promise<SimulationSuite[]> {
+    if (params.ids.length === 0) return [];
+    return this.prisma.simulationSuite.findMany({
+      where: { id: { in: params.ids }, projectId: params.projectId },
+    });
+  }
+
+  /**
    * The first non-archived suite carrying the label, or null. Used to find
    * managed singleton suites, which are marked by a reserved label rather
    * than by name.

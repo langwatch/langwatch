@@ -25,8 +25,16 @@ import {
   type AgentIdentityRow,
   AgentRepository,
 } from "../agents/agent.repository";
+import {
+  EvaluatorService,
+  type EvaluatorWithFields,
+} from "../evaluators/evaluator.service";
 import { LlmConfigRepository } from "../prompt-config/repositories/llm-config.repository";
 import { ScenarioNotFoundError } from "../scenarios/errors";
+import {
+  type EvaluatorAttachment,
+  parseEvaluatorAttachments,
+} from "../scenarios/evaluator-attachments";
 import {
   parseScenarioParameterDefinitions,
   partitionParameterDefinitions,
@@ -43,6 +51,10 @@ import {
   type ScenarioRunConfig,
 } from "../scenarios/scenario.repository";
 import {
+  parseSuiteFieldDefinitions,
+  type SuiteFieldDefinition,
+} from "../scenarios/suite-fields";
+import {
   agentParameterDefinitionsOf,
   assertConnectedAgentsRunnable,
   isAgentUnseen,
@@ -55,6 +67,7 @@ import {
   AllTargetsArchivedError,
   InvalidScenarioReferencesError,
   InvalidTargetReferencesError,
+  SuiteEvaluatorMappingsMissingError,
   SuiteNameTakenError,
   SuiteNotFoundError,
   SuiteScopeEmptyError,
@@ -76,6 +89,13 @@ import {
   SuiteRepository,
   type UpdateSuiteInput,
 } from "./suite.repository";
+import {
+  assertFieldsNotInUse,
+  findMissingMappings,
+  mergeRunAttachments,
+  readEvaluatorAttachments,
+  readSuiteFieldDefinitions,
+} from "./suite-evaluators";
 import {
   declaredDefaults,
   targetKeyOf,
@@ -370,7 +390,28 @@ export type RunPlanConfigInput = {
    * scenario in the rule itself, so the plan runs what it stores here.
    */
   scenarioIds?: string[];
+  /**
+   * The evaluators the plan runs beside the ones of the test suites its
+   * scenarios belong to. Absent leaves the plan's own list as it is.
+   */
+  evaluators?: EvaluatorAttachment[];
 };
+
+/**
+ * What a suite update may carry beside the stored columns: the fields a
+ * test suite declares and the evaluators a suite or a plan attaches, both in
+ * their domain shape rather than as raw JSON.
+ */
+export type SuiteUpdateData = Omit<
+  UpdateSuiteInput,
+  "slug" | "fields" | "evaluators"
+> & {
+  fields?: SuiteFieldDefinition[];
+  evaluators?: EvaluatorAttachment[];
+};
+
+const PLAN_FIELDS_REFUSAL =
+  "A run plan takes no fields. Fields are declared on a test suite.";
 
 export class SuiteService {
   constructor(
@@ -380,6 +421,9 @@ export class SuiteService {
     private readonly llmConfigRepository: LlmConfigRepository,
     private readonly suiteRunService: SuiteRunService,
     private readonly prisma: PrismaClient,
+    private readonly evaluatorService: EvaluatorService = EvaluatorService.create(
+      prisma,
+    ),
   ) {}
 
   /**
@@ -473,6 +517,8 @@ export class SuiteService {
   async createTestSuite(params: {
     projectId: string;
     name: string;
+    fields?: SuiteFieldDefinition[];
+    evaluators?: EvaluatorAttachment[];
   }): Promise<SimulationSuite> {
     return tracer.withActiveSpan(
       "SuiteService.createTestSuite",
@@ -490,6 +536,20 @@ export class SuiteService {
             meta: { fieldErrors: { name: ["A test suite needs a name"] } },
           });
         }
+        const fields =
+          params.fields === undefined
+            ? []
+            : readSuiteFieldDefinitions(params.fields);
+        const evaluators =
+          params.evaluators === undefined
+            ? []
+            : await this.readAttachments({
+                projectId: params.projectId,
+                attachments: params.evaluators,
+                fields,
+                planLevel: false,
+              });
+        assertFieldsNotInUse({ fields, attachments: evaluators });
         const initialSlug = await this.generateUniqueSlug({
           baseSlug,
           projectId: params.projectId,
@@ -506,6 +566,8 @@ export class SuiteService {
               targets: [],
               repeatCount: 1,
               labels: [],
+              fields: fields as unknown as Prisma.InputJsonValue,
+              evaluators: evaluators as unknown as Prisma.InputJsonValue,
             }),
           regenerateSlug: () =>
             this.generateUniqueSlug({
@@ -616,6 +678,200 @@ export class SuiteService {
   }
 
   /**
+   * Edits what a test suite declares: its name, its fields and its
+   * evaluators. The slug stays as it was, as on a rename.
+   *
+   * A field an attached evaluator still reads cannot be removed, and every
+   * attachment must name an evaluator of the project with mappings the run
+   * can read. See {@link SuiteService.update} for the checks.
+   */
+  async updateTestSuite(params: {
+    projectId: string;
+    testSuiteId: string;
+    name?: string;
+    fields?: SuiteFieldDefinition[];
+    evaluators?: EvaluatorAttachment[];
+  }): Promise<SimulationSuite> {
+    return tracer.withActiveSpan(
+      "SuiteService.updateTestSuite",
+      {
+        kind: SpanKind.INTERNAL,
+        attributes: {
+          "tenant.id": params.projectId,
+          "suite.id": params.testSuiteId,
+        },
+      },
+      async () => {
+        const name = params.name?.trim();
+        if (params.name !== undefined && !name) {
+          throw new ValidationError("A test suite needs a name", {
+            meta: { fieldErrors: { name: ["A test suite needs a name"] } },
+          });
+        }
+        const testSuite = await this.repository.findById({
+          id: params.testSuiteId,
+          projectId: params.projectId,
+        });
+        if (testSuite?.kind !== "test_suite") {
+          throw new SuiteNotFoundError();
+        }
+        return await this.update({
+          id: params.testSuiteId,
+          projectId: params.projectId,
+          data: {
+            ...(name !== undefined && { name }),
+            ...(params.fields !== undefined && { fields: params.fields }),
+            ...(params.evaluators !== undefined && {
+              evaluators: params.evaluators,
+            }),
+          },
+        });
+      },
+    );
+  }
+
+  /**
+   * The evaluator attachments one run carries: the test suite's, then the
+   * plan's own, an evaluator on both sides listed once. Either id may be
+   * absent, and an archived row still answers, so a run queued before an
+   * archive reads what it was queued with.
+   */
+  async getRunAttachments(params: {
+    projectId: string;
+    /** The test suite the scenario is filed in. */
+    suiteId?: string | null;
+    /** The run plan the run is filed under. */
+    planId?: string | null;
+  }): Promise<EvaluatorAttachment[]> {
+    const ids = [params.suiteId, params.planId].filter(
+      (id): id is string => !!id,
+    );
+    const rows = await this.repository.findManyByIdsIncludingArchived({
+      ids,
+      projectId: params.projectId,
+    });
+    const byId = new Map(rows.map((row) => [row.id, row]));
+    const suite = params.suiteId ? byId.get(params.suiteId) : undefined;
+    const plan = params.planId ? byId.get(params.planId) : undefined;
+    return mergeRunAttachments({
+      suiteAttachments:
+        suite?.kind === "test_suite"
+          ? parseEvaluatorAttachments(suite.evaluators)
+          : [],
+      planAttachments: plan ? parseEvaluatorAttachments(plan.evaluators) : [],
+    });
+  }
+
+  /**
+   * The saved evaluators the attachments name, with their input fields, by
+   * id. An id the project does not hold is left out.
+   */
+  async getAttachedEvaluators(params: {
+    projectId: string;
+    attachments: readonly Pick<EvaluatorAttachment, "evaluatorId">[];
+  }): Promise<Map<string, EvaluatorWithFields>> {
+    const ids = [
+      ...new Set(
+        params.attachments.map((attachment) => attachment.evaluatorId),
+      ),
+    ];
+    const rows = await Promise.all(
+      ids.map((id) =>
+        this.evaluatorService.getByIdWithFields({
+          id,
+          projectId: params.projectId,
+        }),
+      ),
+    );
+    return new Map(
+      rows.flatMap((row) => (row ? [[row.id, row] as const] : [])),
+    );
+  }
+
+  /** The attachments a write carries, checked against the project. */
+  private async readAttachments(params: {
+    projectId: string;
+    attachments: EvaluatorAttachment[];
+    fields: SuiteFieldDefinition[];
+    planLevel: boolean;
+  }): Promise<EvaluatorAttachment[]> {
+    const evaluatorsById = await this.getAttachedEvaluators({
+      projectId: params.projectId,
+      attachments: params.attachments,
+    });
+    return readEvaluatorAttachments({
+      attachments: params.attachments,
+      fields: params.fields,
+      planLevel: params.planLevel,
+      evaluatorsById,
+    });
+  }
+
+  /**
+   * Refuses a run while an attachment in its scope misses a required
+   * mapping: the test suites of the scenarios it covers, then the plan's own
+   * list. Decided before any plan row is written or any job queued.
+   *
+   * @throws {SuiteEvaluatorMappingsMissingError} naming the first offender
+   */
+  private async assertRunMappings(params: {
+    projectId: string;
+    scenarioIds: string[];
+    planId?: string;
+    planAttachments: readonly EvaluatorAttachment[];
+  }): Promise<void> {
+    const filed = await this.scenarioRepository.findTestSuiteIdsByIds({
+      ids: params.scenarioIds,
+      projectId: params.projectId,
+    });
+    const suiteIds = [
+      ...new Set(
+        filed.flatMap((row) => (row.testSuiteId ? [row.testSuiteId] : [])),
+      ),
+    ];
+    if (suiteIds.length === 0 && params.planAttachments.length === 0) return;
+    const suites = (
+      await this.repository.findManyByIdsIncludingArchived({
+        ids: suiteIds,
+        projectId: params.projectId,
+      })
+    ).filter((suite) => suite.kind === "test_suite");
+    const scoped: { suiteId: string; attachments: EvaluatorAttachment[] }[] = [
+      ...suites.map((suite) => ({
+        suiteId: suite.id,
+        attachments: parseEvaluatorAttachments(suite.evaluators),
+      })),
+      ...(params.planAttachments.length > 0
+        ? [
+            {
+              suiteId: params.planId ?? "",
+              attachments: [...params.planAttachments],
+            },
+          ]
+        : []),
+    ];
+    const all = scoped.flatMap((entry) => entry.attachments);
+    if (all.length === 0) return;
+    const evaluatorsById = await this.getAttachedEvaluators({
+      projectId: params.projectId,
+      attachments: all,
+    });
+    for (const entry of scoped) {
+      const missing = findMissingMappings({
+        attachments: entry.attachments,
+        evaluatorsById,
+      })[0];
+      if (missing) {
+        throw new SuiteEvaluatorMappingsMissingError({
+          evaluatorId: missing.attachment.evaluatorId,
+          suiteId: entry.suiteId,
+          inputs: missing.inputs.map((input) => input.id),
+        });
+      }
+    }
+  }
+
+  /**
    * Archives a test suite and every scenario filed in it, in one transaction.
    *
    * Constraint: the test suite's scenarioIds is NOT recomputed here. The archived
@@ -699,7 +955,7 @@ export class SuiteService {
   async update(params: {
     id: string;
     projectId: string;
-    data: Omit<UpdateSuiteInput, "slug">;
+    data: SuiteUpdateData;
   }): Promise<SimulationSuite> {
     return tracer.withActiveSpan(
       "SuiteService.update",
@@ -722,10 +978,15 @@ export class SuiteService {
         if (!existing) {
           throw new SuiteNotFoundError();
         }
-        const data: UpdateSuiteInput = { ...params.data };
+        const { fields, evaluators, ...columns } = params.data;
+        const data: UpdateSuiteInput = { ...columns };
         if (existing.kind === "test_suite") {
           assertTestSuiteUpdate(data);
           // A test suite rename keeps its slug (see renameTestSuite), so no re-slug.
+        } else if (fields !== undefined) {
+          throw new ValidationError(PLAN_FIELDS_REFUSAL, {
+            meta: { fieldErrors: { fields: [PLAN_FIELDS_REFUSAL] } },
+          });
         } else if (params.data.name) {
           const slug = slugify(params.data.name);
           await this.ensureSlugAvailable({
@@ -734,6 +995,32 @@ export class SuiteService {
             excludeId: params.id,
           });
           data.slug = slug;
+        }
+        if (fields !== undefined || evaluators !== undefined) {
+          const nextFields =
+            fields === undefined
+              ? parseSuiteFieldDefinitions(existing.fields)
+              : readSuiteFieldDefinitions(fields);
+          const nextAttachments =
+            evaluators === undefined
+              ? parseEvaluatorAttachments(existing.evaluators)
+              : await this.readAttachments({
+                  projectId: params.projectId,
+                  attachments: evaluators,
+                  fields: nextFields,
+                  planLevel: existing.kind !== "test_suite",
+                });
+          assertFieldsNotInUse({
+            fields: nextFields,
+            attachments: nextAttachments,
+          });
+          if (fields !== undefined) {
+            data.fields = nextFields as unknown as Prisma.InputJsonValue;
+          }
+          if (evaluators !== undefined) {
+            data.evaluators =
+              nextAttachments as unknown as Prisma.InputJsonValue;
+          }
         }
         return await this.repository.update({
           id: params.id,
@@ -787,6 +1074,12 @@ export class SuiteService {
           labels: original.labels,
           simulatorModel: original.simulatorModel,
           judgeModel: original.judgeModel,
+          ...(original.fields !== null && {
+            fields: original.fields as Prisma.InputJsonValue,
+          }),
+          ...(original.evaluators !== null && {
+            evaluators: original.evaluators as Prisma.InputJsonValue,
+          }),
         });
         span.setAttribute("suite.duplicated_id", result.id);
         return result;
@@ -878,7 +1171,7 @@ export class SuiteService {
      * @see specs/scenarios/run-actor-on-runs.feature
      */
     actor?: RunActor;
-  }): Promise<SuiteRunResult> {
+  }): Promise<SuiteRunResult & { planSlug: string }> {
     if (params.suite.kind === "test_suite") {
       const { suite, ...rest } = params;
       return this.runTestSuite({
@@ -920,6 +1213,12 @@ export class SuiteService {
           parameters: params.parameters,
           actor: params.actor,
         });
+        await this.assertRunMappings({
+          projectId,
+          scenarioIds: prepared.references.activeScenarioIds,
+          planId: suite.id,
+          planAttachments: parseEvaluatorAttachments(suite.evaluators),
+        });
 
         const result = await this.scheduleRun({
           suite,
@@ -934,7 +1233,7 @@ export class SuiteService {
         span.setAttribute("suite.batch_run_id", result.batchRunId);
         span.setAttribute("suite.job_count", result.jobCount);
 
-        return result;
+        return { ...result, planSlug: suite.slug };
       },
     );
   }
@@ -1261,7 +1560,12 @@ export class SuiteService {
     note?: string;
     actor?: RunActor;
   }): Promise<
-    SuiteRunResult & { suiteId: string; planName: string; created: boolean }
+    SuiteRunResult & {
+      suiteId: string;
+      planName: string;
+      planSlug: string;
+      created: boolean;
+    }
   > {
     return tracer.withActiveSpan(
       "SuiteService.runPlan",
@@ -1300,6 +1604,32 @@ export class SuiteService {
         });
         span.setAttribute("suite.scenario_count", prepared.scenarioIds.length);
 
+        // The plan's own evaluators: what the caller sent, checked, or what
+        // the plan of that name already holds when the caller sent none.
+        const evaluators =
+          params.config.evaluators === undefined
+            ? undefined
+            : await this.readAttachments({
+                projectId: params.projectId,
+                attachments: params.config.evaluators,
+                fields: [],
+                planLevel: true,
+              });
+        const existingPlan =
+          evaluators === undefined && requestedName !== undefined
+            ? await this.repository.findPlanByName({
+                projectId: params.projectId,
+                name: requestedName,
+              })
+            : null;
+        await this.assertRunMappings({
+          projectId: params.projectId,
+          scenarioIds: prepared.references.activeScenarioIds,
+          planId: existingPlan?.id,
+          planAttachments:
+            evaluators ?? parseEvaluatorAttachments(existingPlan?.evaluators),
+        });
+
         // Derived only once the run holds up, so a refused run reads no names
         // it will not use. The prepared targets carry the canonical
         // overrides, so the name and the stored config read the same target
@@ -1321,6 +1651,7 @@ export class SuiteService {
           scope,
           targets: prepared.targets,
           scenarioIds: prepared.scenarioIds,
+          evaluators,
         });
         span.setAttribute("suite.id", suite.id);
         span.setAttribute("suite.plan_created", created);
@@ -1341,6 +1672,7 @@ export class SuiteService {
           ...result,
           suiteId: suite.id,
           planName: suite.name,
+          planSlug: suite.slug,
           created,
         };
       },
@@ -1373,8 +1705,15 @@ export class SuiteService {
     parameters?: RunParameterValues;
     note?: string;
     actor?: RunActor;
+    /** The plan's own evaluators, beside the suite's. */
+    evaluators?: EvaluatorAttachment[];
   }): Promise<
-    SuiteRunResult & { suiteId: string; planName: string; created: boolean }
+    SuiteRunResult & {
+      suiteId: string;
+      planName: string;
+      planSlug: string;
+      created: boolean;
+    }
   > {
     if (params.targets.length === 0) {
       throw new SuiteTargetsRequiredError();
@@ -1401,6 +1740,9 @@ export class SuiteService {
         }),
         ...(params.judgeModel !== undefined && {
           judgeModel: params.judgeModel,
+        }),
+        ...(params.evaluators !== undefined && {
+          evaluators: params.evaluators,
         }),
       },
       idempotencyKey: params.idempotencyKey,
@@ -1436,7 +1778,12 @@ export class SuiteService {
     note?: string;
     actor?: RunActor;
   }): Promise<
-    SuiteRunResult & { suiteId: string; planName: string; created: boolean }
+    SuiteRunResult & {
+      suiteId: string;
+      planName: string;
+      planSlug: string;
+      created: boolean;
+    }
   > {
     const found = await this.scenarioRepository.findNamesByIds({
       ids: [params.scenarioId],
@@ -1662,6 +2009,8 @@ export class SuiteService {
     targets: SuiteTarget[];
     /** The scenarios the run covers, which the plan reads back as its own. */
     scenarioIds: string[];
+    /** The plan's own evaluators, checked. Absent keeps what the plan holds. */
+    evaluators?: EvaluatorAttachment[];
   }): Promise<{ suite: SimulationSuite; created: boolean }> {
     const storedConfig = {
       scope: params.scope as unknown as Prisma.InputJsonValue,
@@ -1670,6 +2019,9 @@ export class SuiteService {
       simulatorModel: params.config.simulatorModel ?? null,
       judgeModel: params.config.judgeModel ?? null,
       scenarioIds: params.scenarioIds,
+      ...(params.evaluators !== undefined && {
+        evaluators: params.evaluators as unknown as Prisma.InputJsonValue,
+      }),
     };
 
     const baseSlug = slugify(params.name) || "run-plan";

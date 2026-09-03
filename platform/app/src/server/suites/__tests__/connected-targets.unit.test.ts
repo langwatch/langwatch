@@ -68,6 +68,8 @@ function suiteWith(targets: SuiteTarget[]): SimulationSuite {
     labels: [],
     simulatorModel: null,
     judgeModel: null,
+    fields: null,
+    evaluators: null,
     archivedAt: null,
     createdAt: new Date(),
     updatedAt: new Date(),
@@ -109,6 +111,9 @@ function serviceWith({
         parameters: scenarioParameters,
         version: 1,
       })),
+    ),
+    findTestSuiteIdsByIds: vi.fn(async ({ ids }: { ids: string[] }) =>
+      ids.map((id) => ({ id, testSuiteId: null })),
     ),
   };
   const prisma = {

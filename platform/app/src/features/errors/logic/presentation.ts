@@ -1870,6 +1870,36 @@ const presentations = {
       return `${subject} A secret reaches the target as secrets.name and cannot be written into the scenario text, because that text is recorded with the run.`;
     },
   },
+  scenario_field_unknown: {
+    // The names are our own identifiers, not free text: the editor shows the
+    // refused name beside the ones the suite declares so the typo is visible.
+    title:
+      "This scenario carries a value for a field its test suite does not declare",
+    describe: (error) => {
+      const unknown = strList(error, "identifiers");
+      const declared = strList(error, "declared");
+      const subject =
+        unknown.length > 0
+          ? `${listLabels(unknown)} ${unknown.length > 1 ? "are" : "is"} not declared by the test suite.`
+          : "The value names a field the test suite does not declare.";
+      const hint =
+        declared.length > 0
+          ? ` It declares ${listLabels(declared)}.`
+          : " It declares no fields.";
+      return `${subject}${hint} Add the field to the test suite, or remove the value.`;
+    },
+  },
+  scenario_field_type_invalid: {
+    title: "A field value does not match the type its test suite declares",
+    describe: (error) => {
+      const identifier = str(error, "identifier", "");
+      const type = str(error, "type", "");
+      const subject = identifier
+        ? `The value of ${identifier} cannot be read as ${type || "its declared type"}.`
+        : "One value cannot be read as the type the test suite declares.";
+      return `${subject} Enter a value of that type, or leave the field empty.`;
+    },
+  },
   scenario_stale_version: {
     // Nothing was written: the save is refused before the update, so the copy
     // can promise the customer's own edit is still theirs to redo.
@@ -2270,6 +2300,56 @@ const presentations = {
     title: "Choose an agent to run against",
     describe: () =>
       "This suite has no agent or prompt to test yet. Pick one in the run dialog, then run again.",
+  },
+  suite_field_identifier_invalid: {
+    title: "That field name cannot be used",
+    describe: (error) => {
+      const identifier = str(error, "identifier", "");
+      const lead = identifier ? `${identifier} is not a usable name.` : "";
+      return `${lead} Field names start with a lowercase letter and use only lowercase letters, digits and underscores, and cannot be situation, criteria, name, input or output.`.trim();
+    },
+  },
+  suite_field_identifier_duplicate: {
+    title: "Two fields share a name",
+    describe: (error) => {
+      const identifier = str(error, "identifier", "");
+      return identifier
+        ? `${identifier} is declared more than once. Give each field its own name.`
+        : "Give each field its own name.";
+    },
+  },
+  suite_field_in_use: {
+    title: "An evaluator still reads this field",
+    describe: (error) => {
+      const identifier = str(error, "identifier", "this field");
+      return `Change the evaluator mappings that read ${identifier} first, then remove the field.`;
+    },
+  },
+  suite_evaluator_not_found: {
+    title: "That evaluator is not in this project",
+    describe: () =>
+      "It may have been deleted. Pick an evaluator from the list, then save again.",
+  },
+  suite_evaluator_mapping_invalid: {
+    title: "An evaluator mapping points at something the run cannot read",
+    describe: (error) => {
+      const input = str(error, "input", "");
+      const lead = input ? `The mapping of ${input} ` : "One mapping ";
+      return `${lead}names a source the run does not provide, or a field the test suite does not declare. Open the evaluator and pick another source.`;
+    },
+  },
+  suite_evaluator_mappings_missing: {
+    // The run is refused before anything is queued, so the copy can send the
+    // customer to the evaluator instead of warning about a half-started run.
+    title: "An evaluator is missing required mappings",
+    describe: (error) => {
+      const inputs = strList(error, "inputs");
+      const subject =
+        inputs.length > 0
+          ? `${listLabels(inputs)} ${inputs.length > 1 ? "have" : "has"} no source yet.`
+          : "A required input has no source yet.";
+      return `${subject} Configure the missing mappings on the evaluator, then run again.`;
+    },
   },
 
   // ---- automations & notifications ----
