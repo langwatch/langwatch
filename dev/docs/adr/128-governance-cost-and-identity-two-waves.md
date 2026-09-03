@@ -133,7 +133,7 @@ before the relying code ships:
 Numbered; each states why and what it rejects. §1–§8 are the money
 design — wave 1 ships the lanes **independent**; §2's interconnection
 and §7's mapping ship in **wave 2** (ruled by Sergio 2026-08-29) —
-§9–§17 identity and wave 2, §18–§20 cross-cutting.
+§9–§17 identity and wave 2, §18–§22 cross-cutting.
 
 ### §1. One ADR, two waves, cost before identity
 
@@ -264,10 +264,12 @@ not the rollup's inputs. Projections register per-pipeline, so this is
 two registrations (one on each money pipeline) writing one table; replay
 means replaying both aggregates from the log.
 
-- **`governance_cost_rollup_1d`** — one row per day × org × ingestion
+- **`governance_cost_rollup_1d`** — one row per tenant × day × ingestion
   source × cost_source × provider × model × agent × currency ×
   raw-actor-id (see Schema). **Every one of those dimensions is in the
-  table's dedup key** — in a ReplacingMergeTree the ORDER BY tuple *is*
+  table's dedup key** — `OrganizationId` is deliberately payload rather
+  than a dimension, because `TenantId` already addresses the row
+  (Schema) — in a ReplacingMergeTree the ORDER BY tuple *is*
   the row's identity, and a dimension left out of it is not "stored for
   drill-down", it is silently collapsed on merge (this codebase already
   shipped that bug once: migration 00069's comment documents two budgets
@@ -277,6 +279,16 @@ means replaying both aggregates from the log.
   event *updates* the affected old day instead of adding to it — the
   known MV failure mode on corrected rows (and the reason ADR-034 already
   made this exact choice for trace analytics).
+- **A pull that changes nothing still appends an event.** Re-reading a
+  day and finding the same figure is not a no-op to be optimized away: it
+  is the observation that says the provider has stopped moving that day,
+  and it is the only thing that advances `LastObservedAt` and lets §15
+  ever call a day settled. The event carries the pull's observation
+  timestamp, so the fold takes that value off the event rather than off
+  the clock and a replay lands on the same number (Invariants,
+  "Rebuild = replay"). Suppressing confirming events would leave the
+  provisional marker anchored on the last *change*, which is the calendar
+  bug §15 already rejected wearing a different hat.
 - **All columns on day one, wave-2 ones included** (raw actor id,
   department at time of spend). Summed rows cannot grow dimensions later.
 - **Thin service in front**: computes seat money at read (§6), attaches
@@ -285,8 +297,12 @@ means replaying both aggregates from the log.
   ledger) — per-*person* aggregates come from the rollup itself, since
   raw-actor-id is a rollup dimension — joins puller health (§4a) so a
   missing day renders as "no data", and enforces §18's permissions.
-- **Every read of this table must be dedup-safe** (`argMax` by `Version`
-  or the IN-tuple pattern — ADR-015:98). ReplacingMergeTree dedups
+- **Every read of this table must be dedup-safe** (`argMax` by
+  `EventTimestamp` — the ReplacingMergeTree's replacement version — or
+  the IN-tuple pattern, ADR-015:98). The shipped table's column named
+  `Version` is *not* that: it is the fold's schema-snapshot stamp
+  (Schema), and taking `argMax` over it would dedup on the wrong axis
+  entirely. ReplacingMergeTree dedups
   eventually, in background merges, not on write: after a restatement,
   the old and new row versions coexist until a merge runs, and a plain
   `SUM … GROUP BY` double-counts the restated day for exactly that
@@ -404,8 +420,16 @@ removes the filter from the wave-1 critical path.)
 
 **Wave 2 — coverage is an explicit admin mapping, not an assumption.**
 When an admin connects a provider bill (an `IngestionSource`), they say
-which gateway keys that bill pays for (a schema addition on the source
-config — the reason this waits for wave 2). The rule then reads:
+which gateway keys that bill pays for. **The mapping is a dated join
+table** (`IngestionSourceKeyCoverage`, Schema) — the schema addition that
+is the reason this waits for wave 2. Dated, because coverage is read at
+query time: re-pointing a key from Bill 1 to Bill 2 in June must leave May
+filed under Bill 1, and an un-dated column would silently re-file every
+past month the next time a chart is drawn — history edited by a
+present-tense edit, which hard constraint 2 forbids. A separate table,
+because one-home then becomes a **database** guarantee: an exclusion
+constraint refuses a second bill claiming an already-covered key, rather
+than letting the last admin to hit Save win. The rule then reads:
 
 - A gateway row whose key is **mapped** to a source: the bill replaces
   its number in the combined total; the row still splits the bill (§2).
@@ -435,10 +459,76 @@ config — the reason this waits for wave 2). The rule then reads:
   rather than dragging it toward zero, and the same count is what tells
   the screen to render "—" instead of a figure.
 
-The mapping lives with the source config (small admin list, audited,
-read at query time like every overlap rule). The exclusion filter stays
-a **blocking prerequisite of the wave-2 combined view** — the first
-screen that merges lanes cannot ship before it. Rejected: provider-wide
+**Re-pointing is one transaction, and a gap is unrepresentable.** The
+guarantee the database gives here is non-overlap, and a non-overlap
+constraint structurally cannot see a *gap*: two admins editing through
+independent updates can close the open row for a key and open its
+successor an hour later, leaving an hour of that key's spend covered by
+no bill at all, with nothing raised and nothing to find it later. So
+re-pointing is never two writes. It is one transaction that takes
+`SELECT … FOR UPDATE` on the key's open coverage row, closes it, and
+opens the successor with the same instant as its `validFrom` — the two
+rows are written together or neither is. Continuity is the transaction's
+job; the constraints below cover only the errors a correct transaction
+can still make. (Proved on live Postgres 16.14 in the 2026-09-02
+red-team panel: the two-admin interleave left usage at 11:00 with zero
+covering bills and raised nothing.)
+
+Three constraint rules follow from that:
+
+- **No partial unique index.** The exclusion constraint alone already
+  rejects a second open row for a key (SQLSTATE 23P01). Adding
+  `UNIQUE ("virtualKeyId") WHERE "validTo" IS NULL` on top is strictly
+  redundant, and it makes the *common* race surface as 23505 instead of
+  23P01 — two error codes for one rule, and the application would have to
+  handle both to say one sentence. Exclusion constraint only.
+- **`CHECK ("validTo" IS NULL OR "validTo" > "validFrom")`.** A zero-width
+  row (`validFrom == validTo`) forms an empty range, which overlaps
+  nothing — not even itself — so it slips past the exclusion constraint
+  entirely and files a bill against no time at all. An inverted row
+  (`validFrom > validTo`) raises a raw type error (SQLSTATE 22000) that
+  no layer maps. The `CHECK` rejects both, in the database, with one
+  named condition.
+- **SQLSTATE 23P01 is mapped to a named domain error**, with copy the
+  admin can act on ("another bill already covers this key"). Today the
+  repo maps only Prisma's `P2002` (unique violation) and handles no
+  exclusion violation anywhere, so without this the losing side of a
+  legitimate race gets a generic unknown error and a trace id.
+
+**Cross-org rows and dangling open rows need a trigger.** `relationMode
+= "prisma"` means these are not real foreign keys, so nothing in the
+database stops a coverage row from naming one organization while its
+virtual key belongs to another, and nothing removes an open row when the
+key it points at goes away — the orphan then occupies the key's one open
+slot forever. A trigger (or an equivalent check on the write path, if
+the trigger proves impractical in the migration) ties the coverage row's
+`organizationId` to the key's `organizationId` at write time.
+
+**A re-point takes effect at the next UTC midnight.** The rollup buckets
+spend with `toStartOfDay`, so a day is the finest thing a bill can own; a
+mid-day effective instant is not representable and a noon re-point would
+file the whole day under whichever bill the read happened to resolve.
+Making midnight the only legal effective time is what keeps "May stays
+under Bill 1" true on the one day people actually check it. Admin UI
+therefore offers a date, not a timestamp.
+
+**Deployment: `btree_gist` is the repo's first extension.** No
+`CREATE EXTENSION` exists in the 297 migrations shipped so far. The
+migration must check the extension is available and fail with an
+actionable message rather than half-applying; the self-host
+documentation and the Helm chart must state the requirement; and
+availability must be verified per managed-Postgres provider before the
+migration ships (Azure Database for PostgreSQL in particular is
+unverified). This applies equally to `IdentityMatch` and `SeatPrice`,
+which use the same guard.
+
+The mapping is edited beside the source config (small admin list,
+audited, read at query time like every overlap rule). The exclusion filter
+stays a **blocking prerequisite of the wave-2 combined view** — the first
+screen that merges lanes cannot ship before it. Rejected: a list column of
+key ids on `IngestionSource` — un-dated, rewritten wholesale on every
+edit, and with no way for the database itself to hold the one-home rule.
+Rejected: provider-wide
 coverage — one connected bill silently claiming *all* that provider's
 gateway traffic. Zero-config, and correct for a single-account org, but
 an org with a second, unconnected account of the same provider would
@@ -490,22 +580,78 @@ match today (Maria's January spend would silently move to Engineering
 after her March transfer, and every re-org would trigger a rewrite job).
 Old rows are facts; the lens moves, the facts don't.
 
-**Erasure.** When a provider-supplied raw actor id contains personal data
-(e.g. an email address), GDPR erasure:
+**Erasure is keyed on `DiscoveredPerson`, not on the platform user.**
+The unit of erasure is the discovered-person record, and the erase
+action on that record is what drives every step below. This is not a
+detail of plumbing: most `DiscoveredPerson` rows name people who have no
+LangWatch login at all — contractors, seat holders who never signed in,
+anyone whose email a provider put on a cost row — so there is no
+`userId` to key on, and a user-deletion event can never fire for them.
+Keying on the platform user would have silently scoped "every erasure
+path" to the minority of discovered people who happen to also be
+customers of ours. (Ruled 2026-09-02 after the red-team panel; the
+earlier v3.8 design drove erasure from the `lw.identity.user_erased`
+event, which is now the optional supplementary trigger described in
+§11.)
 
-1. blanks `IdentityMatch.userId` (§11),
-2. pseudonymizes `rawActorId` and `displayText` on the `DiscoveredPerson`
+When a provider-supplied raw actor id contains personal data (e.g. an
+email address), GDPR erasure:
+
+1. **records the erased identifiers on a suppression list** — a hash of
+   each identifier the erasure covers, scoped to the organization *and
+   the provider* (`ErasedIdentifierSuppression`, Schema), so erasing an
+   address a customer holds at one provider does not silently suppress
+   the same string arriving from another. Without this the erasure is
+   undone by the pipeline that produced it: the pullers look 30 days
+   back, so the next day's pull re-ingests the same email and re-writes
+   what we erased. The list stores hashes, never the identifier, so it
+   is not itself a copy of the data it exists to keep out. The stored
+   `identifierHash` and the pseudonym written in step 5 are **the same
+   function of the same input** — `SHA-256(secret ‖ original)` — so a
+   write path computes that digest once and uses it twice: as the
+   membership test against this list, and, on a hit, as the value it
+   writes in place of the original.
+
+   **The check gates every write path that carries the identifier, not
+   just the identity tables.** Suppressing only `DiscoveredPerson`
+   creates and updates would leave the erased email flowing back in
+   through the paths that never touch that table:
+
+   - `DiscoveredPerson` creates and updates, and the `DiscoveredAgent` /
+     `IdentityMatch` writes that hang off them;
+   - **writes into `governance_ocsf_events`**, including the structured
+     `ActorEmail` column and the raw OCSF payload — a suppressed
+     identifier is dropped from the event rather than written and
+     erased again later;
+   - **seat-pull row writes** (§16), which carry `displayName`,
+     `userPrincipalName` and `mail` and would otherwise re-materialize an
+     erased person on the very next roster pull.
+
+   One check, consulted at each of those write points, is what makes the
+   erasure hold against a pipeline whose whole job is to re-fetch the
+   same 30 days tomorrow.
+2. blanks `IdentityMatch.userId` (§11) where a platform user was linked,
+3. pseudonymizes `rawActorId` and `displayText` on the `DiscoveredPerson`
    row (hash-replace, preserving the row for spend attribution),
-3. rewrites the rollup rows carrying that id so they carry the pseudonym
+4. rewrites the rollup rows carrying that id so they carry the pseudonym
    instead. **Not with an `ALTER TABLE … UPDATE`:** `RawActorId` is in
    the ORDER BY, and ClickHouse refuses a mutation on a sorting-key
    column — the key *is* the row's identity, so a changed key is a
    different row rather than an edited one, and the engine will not
    pretend otherwise. Erasure goes through the rebuild path the rollup
-   already has (§4: "a rebuild is a replay"): record the mapping (step
-   4), `ALTER TABLE … DELETE` this organization's rows carrying the
-   original value, then replay the affected days, which re-derives them
-   with the mapping applied. The pseudonym is deterministic (e.g.
+   already has (§4: "a rebuild is a replay"): record the identifier on
+   the suppression list (step 1), `ALTER TABLE … DELETE` the rows
+   carrying the original value, then replay the affected days, which
+   re-derives them with the pseudonym in place of the original. **The
+   delete is scoped by `TenantId`, not by `OrganizationId`** — the same
+   predicate §11 lands on, `TenantId IN` every tenant this organization
+   has ever written under per `GovernanceTenantHistory`, and for the same
+   reason: `OrganizationId` is payload carrying a `DEFAULT ''`, so a
+   predicate on it misses any row
+   written before the column was populated and leaves the erased
+   identifier sitting in the table. `TenantId` leads the ORDER BY and is
+   never empty, and the history table is what makes the scope survive an
+   org that has been renamed or re-tenanted. The pseudonym is deterministic (e.g.
    `SHA-256(secret ‖ original)`) so every replay lands on one stable key
    rather than minting a new one per run.
 
@@ -516,22 +662,41 @@ Old rows are facts; the lens moves, the facts don't.
    those days drop by the erased amount. The alternative — leaving the
    row and its personal data in place — is not one, so the erasure job
    records which days it could not rebuild instead of failing silently.
-4. **Replay safety:** the fold / replay pipeline (§4) must apply the
-   erasure mapping — a lookup from original `RawActorId` to its
-   pseudonym — *before* writing the rollup row. Without this, a replay
-   re-derives the original value from the raw event log and inserts it
-   beside the pseudonymized row, duplicating the amount. The mapping is
-   a small table (`ErasedActorId(organizationId, provider, original,
-   pseudonym)`), joined during the fold's projection step. The key
-   includes `organizationId` and `provider` because the same raw actor
-   id string can appear under different providers or tenants — scoping
-   prevents cross-tenant collisions. Tests, against the ClickHouse
-   version we deploy rather than a mock: erase, replay, assert the
-   rollup contains only the pseudonymized key with the correct total; a
-   collision test with the same `original` under two providers; and one
-   that asserts the mutation route is closed — an `ALTER TABLE … UPDATE`
-   on `RawActorId` must be rejected, so nobody re-adds the step that
-   cannot work.
+5. **Replay safety, with no stored mapping from pseudonym back to the
+   original.** The fold / replay pipeline (§4) must pseudonymize an
+   erased `RawActorId` *before* writing the rollup row. Without that, a
+   replay re-derives the original value from the raw event log and
+   inserts it beside the pseudonymized row, duplicating the amount.
+
+   It does **not** need a table of original-to-pseudonym pairs to do it,
+   and must not have one: such a table would keep the erased identifier
+   in plaintext forever, which is the opposite of what the erasure was
+   for, and would contradict step 1's whole point that we store hashes
+   and not identifiers. The fold already holds the original value in
+   hand — it just read it off the raw event — so the two things it
+   needs are a **membership test** and a **recomputation**: hash the
+   value it is about to write, test that hash against
+   `ErasedIdentifierSuppression` for this `(organizationId, provider)`,
+   and on a hit write that same digest in place of the original — the
+   suppression list's `identifierHash` and the pseudonym are one
+   `SHA-256(secret ‖ original)`, computed once per write and used for
+   both the lookup and the replacement (step 1). Because the
+   pseudonym is deterministic in the original, every replay of every day
+   lands on the same key without anything ever having been stored.
+   `ErasedIdentifierSuppression` is therefore the only table erasure
+   adds. Scoping the lookup by `organizationId` and `provider` matters
+   for the same reason it does on the suppression list: the same raw
+   actor id string can be a different person under a different provider
+   or tenant.
+
+   Tests, against the ClickHouse version we deploy rather than a mock:
+   erase, replay, assert the rollup contains only the pseudonymized key
+   with the correct total; a replay-twice test asserting the pseudonym
+   is byte-identical across runs; a collision test with the same
+   original value under two providers, where only the erased side is
+   pseudonymized; and one that asserts the mutation route is closed — an
+   `ALTER TABLE … UPDATE` on `RawActorId` must be rejected, so nobody
+   re-adds the step that cannot work.
 
 Retention policy (§7) covers event expiry; the identity tables carry
 their own `validTo` lifecycle. Provider-opaque identifiers (UUIDs,
@@ -560,10 +725,11 @@ exempting it from erasure.
   Agent-level **activity** works everywhere; the column says which it is
   showing. Discovering an agent grants nothing.
 
-### §11. The identity wave stands on three Postgres tables, defined here
+### §11. The identity wave stands on six Postgres tables, defined here
 
 Defined fresh in this document (the closed branch is design debris, mined
-for nothing), argued from scripts and scenarios:
+for nothing), argued from scripts and scenarios. Three carry the identity
+model itself:
 
 1. **`DiscoveredPerson`** — a name-text seen on provider rows ("the
    provider told us someone called m.silva exists"), one row per
@@ -578,6 +744,15 @@ for nothing), argued from scripts and scenarios:
    a correction closes the old row and opens a new one; nothing is
    silently rewritten.
 
+Three more support them, each argued where it is decided rather than
+here: **`GovernanceTenantHistory`** (every `TenantId` the org has written
+governance rows under — below in this section),
+**`ErasedIdentifierSuppression`** (hashes of erased identifiers, gating
+every write path that carries one — §9 step 1), and
+**`IdentityMatchSuggestion`** (background-computed match candidates —
+§12). All six are defined in the Schema block, alongside the two the cost
+wave adds (`SeatPrice`, §6; `IngestionSourceKeyCoverage`, §7).
+
 Postgres because the volume is small (hundreds–thousands of rows),
 relational (uniqueness on provider + raw id, foreign keys to
 Organization), and served to admin screens via Prisma like every other
@@ -585,6 +760,83 @@ app table. ClickHouse rows stay pure (raw ids only) and join at read in
 the app layer — the pattern the whole codebase uses. Rejects: ClickHouse
 residence (admin-curated rows are what it is worst at); a Postgres → CH
 sync (infrastructure for a problem app-layer joins don't have yet).
+
+**All six are keyed by `organizationId`, never by the hidden governance
+project.** The rollup's `TenantId` is that project's id (§8), and unlike the
+organization it is not durable: `resolveGovProjectId` resolves only
+un-archived projects (`archivedAt: null`,
+`ee/governance/services/govProject.ts`), and the re-mint path in
+`governanceProject.service.ts` can hand back an archived row — so one
+archive/re-mint cycle would orphan every identity and erasure row keyed to
+it, and a delete job walking that key could miss an erased person's rows
+entirely. That is the one failure this design cannot have. The organization
+id outlives all of it. Rejects: keying identity and erasure on the hidden
+project id (cheaper join, at the price of rows that can be orphaned by an
+operation nobody connects to governance).
+
+**Org → `TenantId` is a persisted history, not a live lookup.** Keying on
+the organization is only half the fix; the other half is how the org is
+translated back to the ClickHouse tenant at read and at erasure. A live
+`resolveGovProjectId` call is not that translation, because it filters
+`archivedAt: null` and therefore returns *null forever* once someone
+archives the governance project — while the write path re-reads the same
+project by slug with no such filter and keeps landing rows under the old
+`TenantId`. The org would map to zero tenants on read and one on write:
+a permanent split-brain in which the cost screen reports "no governance
+data" and a ClickHouse erasure job erases nothing and reports success,
+indistinguishable from an org that never ingested anything.
+
+So the design persists a small table recording **every `TenantId` the
+organization has ever written governance rows under**
+(`GovernanceTenantHistory`, Schema), appended the first time a tenant is
+used and never pruned. Reads resolve against the whole history (the
+current tenant for new rows, all of them for totals); erasure walks all
+of them, because personal data does not stop existing in a tenant that
+stopped being current. The live resolver stays what it is — the way to
+find *today's* write target — and stops being load-bearing for anything
+historical.
+
+**Guard rails so the governance project stays out of generic routes.**
+The hiding invariant is enforced today only on the list surface, which is
+why archiving it is reachable at all: `PATCH /api/projects/:id` and the
+project service's archive/update paths guard personal projects but never
+filter on `kind`, and the repository layer does not either. Wave 2 adds a
+`kind` guard to the project archive and update service paths and to
+GET-by-id, so a `kind = internal_governance` project is refused by the
+generic project routes the way it is already excluded from the generic
+project lists. This does not replace the history table — it reduces how
+often the history is the only thing standing between an admin click and
+an unreadable governance tenant.
+
+**A user-erased event can trigger the flow; it can never drive it.**
+Erasure is keyed on `DiscoveredPerson` (§9), and the identity pipeline's
+`lw.identity.user_erased` event is an **optional supplementary trigger**
+on top of that — a convenience for the subset of discovered people who
+are also platform users, so that deleting such a user can kick off the
+governance flow without an operator remembering to. Three limits keep it
+supplementary rather than primary, and all three are structural:
+
+- It can only ever fire for discovered people who are also platform
+  users. Most are not (§9), so the majority of governance PII is outside
+  its reach by construction.
+- It fires for nobody today: emission is gated on the identity migration
+  latch, and that gate ships closed fleet-wide, so deleting a user right
+  now produces zero events. A design that depended on it would be a
+  design that erased nothing and looked finished.
+- Its payload carries no identifier *values* — the fold has already
+  nulled them by the time the event exists — so a subscriber cannot
+  learn which email to pseudonymize. It can name a user; it cannot
+  perform §9's steps 1, 3 or 4.
+
+There is a fourth reason not to depend on it, which is why it is a
+trigger and not a queue: subscriber dispatch in the event-sourcing router
+is caught-and-logged with no retry, and subscribers are unreachable from
+replay by construction, so an erasure event missed while the subscriber
+was down is missed permanently. A missed *trigger* costs a manual erase
+action; a missed *driver* would cost the erasure itself. Rejects (v3.8's
+position): driving erasure from the listener, on the reasoning that
+subscribing covers every erasure path automatically — it covers no path
+at all today, and only ever a minority of the population.
 
 ### §12. Proof connects itself; guesses wait for a human; conflicts always stop the machine
 
@@ -601,7 +853,37 @@ The match policy for `IdentityMatch`:
   notes only; no script artifact backs it.)
 - **Anything weaker only suggests** — "m.silva" resembling "Maria Silva"
   creates a suggestion an admin confirms. Nothing ever merges two people
-  automatically.
+  automatically. **Suggestions are computed in a background job and
+  stored** (`IdentityMatchSuggestion`, Schema); the review screen reads
+  stored rows and never scores anything itself. Confirming one writes an
+  `IdentityMatch` row and closes the suggestion.
+
+  This reverses v3.8's compute-at-read ruling, on measurement. Fuzzy
+  matching is quadratic and there is no database route to it — the repo
+  has no `pg_trgm` (no extension exists in 297 migrations) and no
+  edit-distance library in its dependencies, so the scoring would run in
+  our own Node process. At the volume this ADR itself uses as its
+  example, 2,000 discovered people × 500 platform users is 1,000,000
+  pairs, and plain Levenshtein over that set measured **2.9 seconds of
+  blocked event loop** — per page load, uncached, stalling every other
+  request on the instance. The resolve-at-read argument is right about
+  *facts* (§9's people and departments are cheap lookups); it does not
+  survive contact with a scoring pass. A second reason: without stored
+  rows there is no pending-count badge, because counting the maybes
+  costs the same full sweep as showing them, on every navigation render.
+
+  **The approach, named:** a prefilter narrows the candidate pairs
+  before any edit distance is computed — a length band plus a
+  shared-token requirement — and only surviving pairs are scored. The
+  job runs when its inputs change (new or updated discovered people, org
+  membership changes), never per page view. Suggestion rows are
+  invalidated and recomputed by the same job, so the lifecycle v3.8
+  wanted to avoid is a job's, not a screen's.
+
+  Accepted cost: a suggestion can be a few minutes stale after a
+  discovery, and dismissals are now storable but stay out of v1 (a maybe
+  an admin ignores still comes back), so dismiss-fatigue is unresolved
+  either way.
 - **Conflict rule (the two-m.silvas safeguard):** if evidence points at
   two candidates, or new evidence contradicts an existing link (a
   provider id already linked to someone else), automatic linking
@@ -610,7 +892,11 @@ The match policy for `IdentityMatch`:
   shared mailboxes, and addresses re-issued to new hires. Re-issued
   emails are survivable *because links are dated*: the leaver's link
   closes at offboarding, the new hire gets a new link, and January's
-  spend stays with January's person.
+  spend stays with January's person. **The suspension itself is stored**,
+  and on the discovered person rather than in the suggestion job's
+  output, because a halt on automatic linking is worthless if a restart
+  or a recompute clears it (`DiscoveredPerson.suspendedAt` /
+  `suspendedReason`, Schema). Unchanged from v3.8.
 - A collision-review screen is future work (Open questions), flagged per
   the framing ruling.
 
@@ -631,7 +917,7 @@ SCIM degrade to "unassigned", never break.
 - **Anthropic**: a fourth bucket, **"key owner — not spender"** —
   `created_by` names the key's creator, and one measured account credited
   one person with 100% of tokens through it. Key names are stored as
-  *hints* (`claude_code_key_rogerio_*` is signal), never as attribution.
+  *hints* (`claude_code_key_<team>_*` is signal), never as attribution.
 - **OpenAI**: the label is **"attributed to", never "spent by"**, and
   spend is never resolved through the key roster — 53% of measured spend
   sits on deleted keys. The `user_id`/`user_email` on the cost row itself
@@ -669,6 +955,70 @@ shape), never as mutated rows. Rejects: silent recompute
 (unreconcilable exports); freeze-after-N-days (our screen would
 knowingly disagree with the provider's own console).
 
+**Provisional is a second marker, and it is orthogonal to the first.** A
+figure whose day still sits inside the provider's settling window renders
+as **provisional** — "this can still move" — while *revised* says a
+restatement already happened. The two are not opposites and do not
+compete: "already moved" and "can still move" are independent facts
+about a day, and a day can be both. No source supplies finality:
+Anthropic revises cost for up to 30 days (#6978), and FOCUS's
+`ChargeClass="Correction"` describes only periods that have already
+closed, so nothing on the wire tells us a day is settled. The flag is
+therefore **derived** from a per-source settling window
+(`SETTLING_WINDOW_DAYS`, Constants — 30 days by default, overridable per
+source as providers differ), computed **at read, from a stored
+observation timestamp** rather than persisted as a flag — like every
+other overlap rule, the answer changes with the clock, so storing it
+would only mean storing something that goes stale. The reason it earns a
+marker at all: a governance number that silently restates is worse than
+one that admitted up front it might.
+
+Three rules make the marker mean what it says.
+
+- **The window is anchored on the pull, not on the calendar.** A day is
+  provisional while fewer than `SETTLING_WINDOW_DAYS` have passed since
+  **a pull last touched that day**, not since the day itself. Calendar
+  age gets both ends wrong. On the first connect a puller backfills 90
+  days, so every day older than 30 would render *settled* the instant it
+  landed, having been read exactly once — the opposite of the truth. And
+  a source pulled weekly keeps showing days as provisional for up to 23
+  days after the provider has stopped touching them, because the clock
+  ran while nothing was watching. Anchoring on the last pull that
+  covered the day means the marker tracks our own observation of the
+  provider, which is the only thing we can honestly claim to know. The
+  test reads that anchor from **`LastObservedAt`** on the rollup row
+  (Schema), which every fold write touching the day moves forward —
+  including a re-pull that confirms an unchanged figure, which is
+  precisely the case a correction-only timestamp would miss. The value
+  is **the pull's own observation timestamp, carried on the event**, not
+  the wall clock at fold time: taking the clock would mean a replay
+  stamped every day as observed today, breaking the rebuild-equals-replay
+  invariant, and would let §9's delete-then-replay erasure quietly flip
+  long-settled days back to provisional. It is also not the shipped
+  `LastEventOccurredAt`, which is the newest *provider-side* event time
+  folded into the row — that one stands still exactly when a re-pull
+  re-confirms old events, which is the case this marker exists to see.
+- **Revised and provisional render together, because together is the
+  normal case.** Anthropic restates within 30 days and the window is 30
+  days, so essentially every revision we see lands on a day that is
+  still inside its own window: the both-true cell is not an edge case,
+  it is the common one. The cell shows both markers, in one line —
+  *"revised, was $X — may still change"*. Showing only one of them would
+  either hide a change that already happened or promise a finality we do
+  not have.
+- **Gateway rows are exempt.** Rows with `IngestionSourceId = ''` are
+  metered by us in real time and are never restated by anyone; the
+  per-source override cannot reach them because they have no source. Left
+  in the general rule they would carry "can still move" for 30 days on
+  the product's most-viewed and most-final numbers. They render with no
+  provisional marker, ever.
+
+Open, and recorded rather than assumed: **the 30-day default is measured
+for Anthropic only.** Azure's and Databricks' restatement windows have
+not been probed, so `SETTLING_WINDOW_DAYS` stays a provisional constant
+for those sources until they are — the per-source override exists
+precisely so measuring one does not require re-deciding the others.
+
 ### §16. Idle seats split across the waves (FR3)
 
 - **Wave 1, the aggregate**: "you pay for N seats, M are assigned" per
@@ -677,9 +1027,72 @@ knowingly disagree with the provider's own console).
 - **Wave 2, the names and the activity**: an *active*-seat count (distinct
   raw actor ids on usage rows) and listing *which* seats are idle both
   require the roster ↔ usage-actor join (§11). Idle default: no activity
-  for 30 days, adjustable per org; last-activity date always shown.
+  for 30 days, adjustable per org; last-activity date always shown. The
+  roster side of that join comes from **extending the seat pull to
+  per-user assignment facts** — "the provider reported that this person
+  holds a seat of type X on day D" — appended as durable events on the
+  same spine as §6's counts, which today carry only a number. That
+  extension is what makes a never-active seat holder visible at all: by
+  definition they appear in zero usage rows, so no usage-side derivation
+  can ever name them, and they are precisely the person this feature
+  exists to find. Stated plainly, it widens what the pull stores to names
+  and email addresses — the same class of personal data §9 already carries
+  on usage rows, under the same erasure path (§9, §11). Rejects: keeping
+  the pull counts-only, which would quietly demote this bullet's promise
+  from *which* seats are idle to *how many*.
 - FR3 is **partially** met in wave 1, met in wave 2 — the ADR says so
   rather than rounding up.
+
+**What the seat feature must fix before it may ship, in its own PR.**
+Naming seat holders puts names and email addresses into
+`governance_ocsf_events`, and that table is not currently ready to hold
+them. Four obligations ride inside wave 2, in the same change as the
+seat feature — not as follow-ups, because a follow-up would mean
+shipping the widening without the containment:
+
+- **A fixed TTL on `governance_ocsf_events`, declared in the migration
+  and deliberately outside the retention map.** The table declares no
+  TTL at all, so today its rows are kept forever. It gets a **fixed
+  13-month `TTL … DELETE`** written into the migration, and stays
+  **absent from `RETENTION_TABLE_CATEGORY_MAP` and `TABLE_TTL_CONFIG`** —
+  which is the actual precedent migration 00087 set for the rollup, for
+  the same reason that applies here: the identifier is personal data, so
+  its holding period must be a fixed bound rather than a customer
+  setting. Enrolling the table in the retention map is ruled out, not
+  merely skipped: the reconciler's `MODIFY TTL` replaces the whole TTL
+  expression atomically (`ttlReconciler.ts:463`), so enrolment would
+  overwrite the fixed 13-month bound with the customer's own retention
+  value — and a customer who sets a longer one would then hold names and
+  email addresses past 13 months. The un-TTL'd table is a pre-existing
+  defect (four shipped pullers already write provider emails into it);
+  the seat feature does not get to compound it.
+- **Seat-assignment rows are excluded from the SIEM export.** The export
+  filters on tenant and time and never on `ActionName`, so it ships
+  whatever is in the table wholesale to a customer's SIEM. Seat rows are
+  roster facts about employees, not security events, and they are
+  excluded by action name.
+- **Payload-level redaction is an open problem, and the wave-2 answer is
+  delete-and-skip.** The raw OCSF JSON carries `displayName`,
+  `userPrincipalName` and `mail` verbatim, and the read path returns that
+  blob whole (`argMax(RawOcsfJson, …)`). Substituting a pseudonym into
+  one column cannot redact a JSON document, so §9's step-3
+  pseudonymization does not reach seat rows. For wave 2 the erasure path
+  for seat rows is therefore **delete the rows and suppress the
+  identifier** (§9 step 1). Deleting alone would not be complete — the
+  next roster pull re-reads the same 30 days and re-writes
+  `displayName`, `userPrincipalName`, `mail` and the structured
+  `ActorEmail` column straight back in. It is the suppression check
+  sitting on the OCSF and seat-pull write paths, not only on
+  `DiscoveredPerson`, that makes the deletion stick. Complete, then, but
+  coarse: the seat history for that person disappears rather than
+  becoming anonymous. A
+  payload-level redaction story — structured columns, or a redacting
+  read path — is named here as owed work, not solved.
+- **The puller loop needs paging.** The per-user Graph seat endpoint
+  paginates; the current `subscribedSkus` pull does not, and its cursor
+  design assumes an unpaged response. At 10,000 seats across 3 SKUs the
+  extension is roughly 30,000 rows per day, so this is a pull-loop
+  change, not a parameter change.
 
 ### §17. LWQL cost queries are wave 2 or later (FR7); FR6 and FR8 are out of scope, with reasons
 
@@ -745,6 +1158,21 @@ then.
   since [date]" render depends on both; ships with wave 1.
 - The broken `openai_compliance` / `claude_compliance` sources are
   replaced/retired per ADR-122's diagnosis, outside this document.
+
+### §20a. Pre-existing defects surfaced by review
+
+The 2026-09-02 red-team panel found four problems that are **not** this
+ADR's design and were already shipped, but that wave 2 either has to fix
+or has to stop leaning on. Written down here so nobody re-discovers them
+as surprises during implementation, and so the ones being fixed inside
+wave 2 are visibly scoped rather than quietly absorbed.
+
+| Defect | Status |
+|---|---|
+| `governance_ocsf_events` declares no TTL at all, so its rows are kept forever, while four already-shipped pullers write provider email addresses into it — and the SIEM export ships the table filtered only by tenant and time | **Fixed inside wave 2** (§16): a fixed 13-month `TTL … DELETE` declared in the migration, the table deliberately left out of the retention map (whole-clause `MODIFY TTL` would overwrite the fixed bound with a customer-settable one), seat rows excluded from the export by action name |
+| The hidden governance project is reachable through the generic project routes — `PATCH /api/projects/:id` and the archive path guard personal projects but not `kind`; the hiding invariant is enforced only on the list surface | **Fixed inside wave 2** (§11): `kind` guard on archive, update and GET-by-id, on top of the `GovernanceTenantHistory` table that makes an archive survivable rather than fatal |
+| The `event_log` plaintext erasure service designed in ADR-101 §5 was never written, so pre-erasure identifier values remain in the log (already documented in ADR-127) | Tracked separately; §9's erasure is complete for the rollup and the identity tables and does not claim to reach the event log |
+| The identity migration latch ships closed fleet-wide, so `lw.identity.user_erased` currently fires for no one | Tracked separately; §11 demotes that event to an optional trigger precisely so this does not block or fake governance erasure |
 
 ### §21. Azure billing is a second identity on the same connection, and a bill we could not read is never rendered as zero
 
@@ -920,6 +1348,33 @@ to change, in a branch already four deep in a stack.
 *Rejects:* a shared lane type spanning seats and spend now. Revisit at
 the third lane.
 
+### §22. New surfaces speak FOCUS; the shipped internal names stay
+
+Every **new** wave-2 surface a customer can see — DTO fields, export
+columns, any header on a downloadable file — uses the FinOps FOCUS
+standard's name where the standard has one, and an `x_`-prefixed extension
+where it does not. FOCUS through 1.4 has no columns for identity, team,
+cost center, or AI/token dimensions, so most of what this ADR adds is
+necessarily an extension; naming them the standard's way now means a
+customer's FOCUS tooling ingests our export without a translation table,
+and the ones FOCUS *does* define (§3's `BilledCost`, `BillingCurrency`,
+`ChargePeriodStart/End`, `ProviderName`) already line up.
+`IdentityMatch.evidenceKind` (§11) stays mappable onto the pull-mode
+architecture map's `x_PersonResolutionMethod` vocabulary — the values are
+chosen so the mapping is a lookup, never a re-derivation.
+
+**The shipped rollup's internal column names do not change.** Renaming a
+live table buys nothing: no customer reads a ClickHouse column name, the
+export layer is where the standard is actually observed, and a rename
+costs a migration plus every query that references it. The boundary is
+therefore where the name becomes visible, not where the data is stored.
+
+Source: the pull-mode architecture map (`_pull-mode-architecture-map.md`,
+§8.3). Rejects: retrofitting FOCUS names onto the live rollup (churn with
+no reader); ignoring FOCUS entirely (the first export surface would then
+need a rename layer, and rename layers are where column meanings quietly
+drift apart).
+
 ## Constants
 
 | Name | Value | Purpose |
@@ -937,6 +1392,7 @@ the third lane.
 | One-app choice (§21.1 form default, v3.7) | `azureBillingUsesSameApp: boolean`, written by the create form's builder beside a claimed subscription, default `true` | the only durable record of whether the billing pair is a copy of the bot's or a second app; nothing reads it at run time — the edit path (#7777) will |
 | Spend-lane reasons (§21.3) | `billing_read_failed`, `prepaid_declared`, `no_spend_recorded` | closed list bounded by what the system can know (v3.4: `awaiting_grant` withdrawn with §21.6; `billing_access_denied` folded into `billing_read_failed` — 403 and 429 die at the same line today; `no_billing_credentials` became a save-time refusal, `assertAzureBillHasItsOwnCredential`, so the state cannot be stored to need a sentence — true on every write path only since v3.5, which closed the create that still passed through); the screen maps each to a sentence, provider text never reaches the browser |
 | Azure cost read interval | 6 h (`AZURE_COST_READ_INTERVAL_MS`), max hold 7 d (`AZURE_COST_MAX_HOLD_MS`) | already shipped; the allowance is a few requests/minute **shared with the customer's own portal users** |
+| `SETTLING_WINDOW_DAYS` | 30 days, overridable per ingestion source; measured for Anthropic only, provisional for Azure/Databricks | §15: a day renders *provisional* while fewer than this many days have passed since **a pull last touched that day** (not since the day itself); gateway rows are exempt; no provider feed supplies finality |
 
 ## Invariants
 
@@ -944,10 +1400,10 @@ the third lane.
 |---|---|---|
 | Bill = total | per provider/day with a bill: the billed lane's displayed total equals the provider's **pre-tax cost-feed subtotal** (§2 bill composition — refund days may be negative, never clamped); in the wave-2 connected view, gateway split + unallocated line sum to it exactly | query-time §2 rule; test: split + unallocated = bill for seeded over-, under-metered *and negative* days (wave 2) |
 | No cross-currency sums | no query ever adds amounts with different currency codes | `CurrencyCode` in the rollup's ORDER BY (dedup key) and every group key; test: mixed EUR/USD seed renders two totals |
-| Full-grain dedup key | the rollup's ORDER BY equals its full dimension tuple — no dimension exists only as a payload column | schema review gate; test: two actors (and two currencies) sharing all other dimensions on one day, `OPTIMIZE … FINAL`, sum still equals both rows |
-| Dedup-safe reads | every query on the rollup uses `argMax`/IN-tuple (ADR-015:98), never plain SUM | thin-service query helpers; test: seed pre- and post-restatement versions of one day *without* OPTIMIZE, read must return only the restated amount |
+| Full-grain dedup key | the rollup's ORDER BY is `(TenantId, Day, CostSource, IngestionSourceId, Provider, Model, AgentId, CurrencyCode, RawActorId)` and equals its full dimension tuple — no *dimension* exists only as a payload column. `OrganizationId` is payload by design (`TenantId` already addresses the row; keying on it would make an org rename a key change), as are the markers `RevisedAt`, `PreviousAmountNanoUsd` and `LastObservedAt` | schema review gate; test: two actors (and two currencies) sharing all other dimensions on one day, `OPTIMIZE … FINAL`, sum still equals both rows |
+| Dedup-safe reads | every query on the rollup uses `argMax` over `EventTimestamp` — the ReplacingMergeTree's replacement version, *not* the `Version` schema-snapshot stamp — or the IN-tuple pattern (ADR-015:98), never plain SUM | thin-service query helpers; test: seed pre- and post-restatement versions of one day *without* OPTIMIZE, read must return only the restated amount |
 | Rebuild = replay | dropping `governance_cost_rollup_1d` and replaying events reproduces it exactly | ADR-015 fold projection; test: replay equality on seeded corrections |
-| Erasure never mutates a key | an erased actor id leaves the rollup by delete-then-replay, never by `ALTER TABLE … UPDATE` on `RawActorId` — ClickHouse refuses mutations on a sorting-key column | §9 step 3; test against the deployed ClickHouse version: the `UPDATE` is rejected, and erase → delete → replay leaves only the pseudonymized key with the original total |
+| Erasure never mutates a key | an erased actor id leaves the rollup by delete-then-replay, never by `ALTER TABLE … UPDATE` on `RawActorId` — ClickHouse refuses mutations on a sorting-key column | §9 step 4; test against the deployed ClickHouse version: the `UPDATE` is rejected, and erase → delete → replay leaves only the pseudonymized key with the original total |
 | One dollar, one home | a dollar appears in exactly one channel; wave 1: structural — lanes are never summed into one figure (§1); wave 2: the combined view counts each dollar once | wave 1: no cross-lane sum exists (code review gate); wave 2: §7 key-to-bill mapping + exclusion filter, blocking prerequisite of the combined view; test: gateway row whose key maps to a pulled bill is excluded from the combined total once |
 | Pulled rows never enforce | no budget resolver ever reaches `Scope="pulled"` rows | structural, ADR-088 Decision 3 (unchanged) |
 | Raw ids stay raw | actor-id columns contain only what the provider sent; no resolved name or person id is ever written into a money row | §9; code review gate + test: ingest path has no identity lookup |
@@ -978,11 +1434,11 @@ the third lane.
 
 | Path | Reversible? | Blast radius | Gate |
 |---|---|---|---|
-| ClickHouse migration adding `governance_cost_rollup_1d` | no (schema) | large | human review + a written manual rollback (`DROP TABLE`, the 00067 create-table precedent) — repo convention keeps data-touching down paths commented out, and no down-testing harness exists, so "tested down path" would be a false promise |
-| Prisma migration adding the three identity tables + seat price list | no (schema) | large | human review + reversibility reviewed in PR (Prisma migrations here have no down files; rollback is a follow-up migration) |
+| ClickHouse migration `ALTER`ing `governance_cost_rollup_1d` (the table itself shipped in wave 1 as 00087; wave 2 adds exactly two columns, `RevisedAt` and `LastObservedAt` — the prior-amount column `PreviousAmountNanoUsd` is already there) | no (schema) | large | human review + a written manual rollback (`DROP COLUMN` per added column — the down path is narrower than wave 1's `DROP TABLE` precisely because the table is not ours to drop any more) — repo convention keeps data-touching down paths commented out, and no down-testing harness exists, so "tested down path" would be a false promise |
+| Prisma migration adding the identity tables, seat price list, coverage, tenant history, suppression list and suggestion index | no (schema) | large | human review + reversibility reviewed in PR (Prisma migrations here have no down files; rollback is a follow-up migration); the migration is also the repo's first `CREATE EXTENSION` (`btree_gist`, §7) — it must check availability and fail actionably, and the self-host docs and Helm chart must state the requirement |
 | Rollup fold projection | yes (replayable) | large | automated: replay-equality test; feature flags gate the screens (no §7 dependency in wave 1 — lanes never summed) |
 | Exclusion filter + key-to-bill mapping (wave 2) | yes | large (money correctness) | automated: one-dollar-one-home test suite is a merge blocker for the first lane-merging screen |
-| Auto-link on deterministic evidence | yes (links are dated; closing reverses) | medium | automated: conflict-rule tests (two candidates → suspend + flag); no fuzzy path exists in code |
+| Auto-link on deterministic evidence | yes (links are dated; closing reverses) | medium | automated: conflict-rule tests (two candidates → suspend + flag); fuzzy scoring runs **only** in §12's background suggestion job, never inline in a request — test: no request path computes an edit distance |
 | GDPR erasure blanking person references | no | large | human review, always; erasure blanks person fields, money amounts stay |
 | Screens behind flags | yes | small | none — ship it |
 | Seat price list edits (admin) | yes (recompute at read heals) | small | none — audit-logged, no approval step |
@@ -992,12 +1448,30 @@ the third lane.
 
 ## Schema
 
-Sketches; exact DDL lands with the first migration PR.
+Sketches, not DDL — the exact shipped statement is the migration.
+
+`governance_cost_rollup_1d` **already exists**: it shipped with wave 1 as
+migration `00087`, and the `CREATE TABLE` below is shown whole only
+because a column list is the readable way to say what the table means.
+Wave 2 does not create it, and adds **two** columns, not three:
+`RevisedAt` and `LastObservedAt`, by **`ALTER TABLE … ADD COLUMN`**. The
+prior-amount column is *not* one of them — 00087 already ships
+`PreviousAmountNanoUsd Nullable(Int64)` alongside `RevisionCount`, so
+adding a `PreviousAmountNano` would put a second prior-amount money
+column on the table and leave a reader to guess which one is authoritative.
+§15's restatement markers use the shipped column. What a reader should
+check is the defaults of the two that are genuinely new: existing
+rows get `LastObservedAt` = epoch, so every pre-migration day reads as
+long since observed and therefore *settled*. That is the right answer
+rather than a compromise, because the pullers look 30 days back: any day
+still genuinely in its settling window gets re-stamped on the next daily
+pull, and any day the backfill "wrongly" called settled was one no pull
+was ever going to touch again.
 
 ```sql
 -- ClickHouse: the one summed table (fed by fold projection, NOT an MV).
 -- As shipped in migration 00089 — read that file, not this block, when
--- the two ever disagree.
+-- the two ever disagree. Wave 2 ALTERs it, it does not create.
 CREATE TABLE governance_cost_rollup_1d (
     -- ---- the sort key: the fold's group key, exactly ----
     TenantId           String,        -- the org's hidden governance project
@@ -1022,12 +1496,39 @@ CREATE TABLE governance_cost_rollup_1d (
     RequestCount       UInt64 DEFAULT 0,
     RevisionCount      UInt32 DEFAULT 0,        -- §15 restatement history
     PreviousAmountNanoUsd Nullable(Int64) DEFAULT NULL,  -- §15 "was $X"
+                                      -- shipped in 00087, not added by wave 2
+    RevisedAt          Nullable(DateTime) DEFAULT NULL,  -- §15 marker, wave 2 ADDs it
+                                      -- (latest revision only)
+    LastObservedAt     DateTime DEFAULT 0,      -- §15: when a pull last TOUCHED this day.
+                                      -- Wave 2 ADDs it. Written on every fold write that
+                                      -- touches the row, not only on corrections — that is
+                                      -- RevisedAt's job. A re-pull that confirms an
+                                      -- unchanged figure still moves it, which is exactly
+                                      -- the fact the provisional test needs. Read with
+                                      -- argMax like every other payload column.
+                                      -- Its value is the PULL'S OBSERVATION TIMESTAMP, taken
+                                      -- off the event, never the wall clock at fold time: a
+                                      -- clock read would stamp every day with today on replay,
+                                      -- breaking "Rebuild = replay" and its equality gate, and
+                                      -- would let §9 step 4's delete-then-replay flip a
+                                      -- settled day back to provisional just because we
+                                      -- erased someone. Off the event, replay reproduces it.
+                                      -- Not the shipped LastEventOccurredAt: that is the max
+                                      -- occurred-at of the events folded in — provider-side
+                                      -- event time — and the two diverge in precisely the
+                                      -- case that matters, a re-pull re-confirming old
+                                      -- events. Our observation moved; theirs did not.
     PulledItemsJson    String DEFAULT '',       -- latest contribution per item
-    Version            LowCardinality(String) DEFAULT '',  -- schema snapshot
+    Version            LowCardinality(String) DEFAULT '',  -- schema snapshot:
+                                      -- it filters read-back to rows written by the current
+                                      -- fold schema. It is payload, NOT the dedup version;
+                                      -- the two must never be confused in a query.
     AppliedEventIds    Array(String) DEFAULT [],  -- redelivery dedup (00054)
     CreatedAt          UInt64 DEFAULT 0,
     LastEventOccurredAt UInt64 DEFAULT 0,
-    EventTimestamp     UInt64                   -- RMT replacement version
+    EventTimestamp     UInt64                   -- the ReplacingMergeTree's replacement version
+                                      -- (the fold's monotonic updatedAt). This is the column
+                                      -- every dedup-safe read takes argMax over.
 ) ENGINE = ReplacingMergeTree(EventTimestamp)   -- via the
                                          -- CLICKHOUSE_ENGINE_REPLACING_PREFIX
                                          -- envsub, never a bare literal
@@ -1045,6 +1546,10 @@ TTL toDateTime(Day) + INTERVAL 13 MONTH DELETE;
 -- `ExactOrEstimate` is deliberately OUTSIDE the key — a day moving from
 -- estimate to exact is a restatement that must REPLACE, and in the key
 -- both rows would survive and the day would read as double its cost.
+-- OrganizationId stays out for a different reason: it is not a dimension
+-- the row is distinguished BY, it is who owns the row TenantId already
+-- addresses. RevisedAt, PreviousAmountNanoUsd and LastObservedAt are
+-- markers about the row, not dimensions of it, and are likewise payload.
 -- Retention is a fixed 13-month TTL, exempt from tenant retention
 -- (following gateway_spend, 00067): cost records must not be governed by
 -- a policy a customer can shrink to weeks.
@@ -1055,14 +1560,18 @@ TTL toDateTime(Day) + INTERVAL 13 MONTH DELETE;
 ```prisma
 // Postgres: identity tables (§11) — beside ADR-101, never inside it
 model DiscoveredPerson {
-  id             String   @id @default(nanoid())
-  organizationId String
-  provider       String            // "anthropic" | "openai" | "databricks" | ...
-  rawActorId     String            // what the provider calls them (§9's join key)
-  displayText    String            // name/email text as seen, verbatim
-  kind           String            // person | service_account (deterministic, §10)
-  firstSeenAt    DateTime
-  lastSeenAt     DateTime
+  id              String   @id @default(nanoid())
+  organizationId  String
+  provider        String           // "anthropic" | "openai" | "databricks" | ...
+  rawActorId      String           // what the provider calls them (§9's join key)
+  displayText     String           // name/email text as seen, verbatim
+  kind            String           // person | service_account (deterministic, §10)
+  firstSeenAt     DateTime
+  lastSeenAt      DateTime
+  suspendedAt     DateTime?        // §12 conflict rule: automatic linking stopped for this identity
+  suspendedReason String?          // what tripped it, for the human who reviews
+  // Suspension lives here, not on the suggestion rows (§12) — a halt on
+  // auto-linking that a recompute or a restart clears is not a halt.
   @@unique([organizationId, provider, rawActorId])
 }
 
@@ -1082,7 +1591,8 @@ model IdentityMatch {
   id                 String    @id @default(nanoid())
   organizationId     String
   discoveredPersonId String    // the provider-side identity
-  userId             String?   // platform user; nullable — GDPR erasure blanks it, row and dates remain
+  userId             String?   // platform user; nullable — blanked by §9's erasure (step 2),
+                               // which is keyed on DiscoveredPerson; the row and its dates remain
   evidenceKind       String    // directory_id | verified_email | human_confirmed
   validFrom          DateTime
   validTo            DateTime? // open link = null; offboarding/correction closes, never rewrites
@@ -1115,6 +1625,82 @@ model SeatPrice {
   // EXCLUDE USING gist (
   //   "organizationId" WITH =, "provider" WITH =, "licenseType" WITH =,
   //   tsrange("validFrom", COALESCE("validTo", 'infinity')) WITH &&)).
+}
+
+model IngestionSourceKeyCoverage {
+  id                String    @id @default(nanoid())
+  organizationId    String
+  ingestionSourceId String              // the connected bill
+  virtualKeyId      String              // the gateway key that bill pays for
+  validFrom         DateTime            // §7: UTC midnight only — a day is the finest grain a bill can own
+  validTo           DateTime?           // open coverage = null; re-pointing closes, never rewrites
+  // Overlap guard, and the ONLY uniqueness rule here: same btree_gist
+  // exclusion pattern as IdentityMatch —
+  // EXCLUDE USING gist ("virtualKeyId" WITH =,
+  //   tsrange("validFrom", COALESCE("validTo", 'infinity')) WITH &&).
+  // It already rejects a second open row for a key (SQLSTATE 23P01), so
+  // NO partial unique index is added on top: the redundant index would only
+  // make the common race surface as 23505 instead, two codes for one rule
+  // (§7). The application maps 23P01 to a named domain error — today the
+  // repo maps Prisma's P2002 and no exclusion violation anywhere.
+  // Zero-width and inverted rows slip past an exclusion constraint (an empty
+  // range overlaps nothing, not even itself), so:
+  //   CHECK ("validTo" IS NULL OR "validTo" > "validFrom").
+  // relationMode = "prisma" means these are not real foreign keys: a trigger
+  // ties this row's organizationId to the virtual key's own organizationId,
+  // or an open row can name the wrong org, or outlive its key and hold that
+  // key's one open slot forever (§7).
+  // Gaps are NOT a database guarantee — a non-overlap constraint cannot see
+  // one. Re-pointing is a single transaction (SELECT ... FOR UPDATE on the
+  // open row, close it and open the successor together) (§7).
+}
+
+model GovernanceTenantHistory {
+  id             String   @id @default(nanoid())
+  organizationId String
+  tenantId       String            // a hidden governance project id this org has written rows under
+  firstUsedAt    DateTime
+  lastUsedAt     DateTime
+  // §11: every TenantId the org has EVER written governance rows under,
+  // appended on first use and never pruned. Reads and erasure resolve
+  // against the whole history; the live resolveGovProjectId call only finds
+  // today's write target and filters archived projects, so it cannot be the
+  // historical translation without going permanently blind after an archive.
+  @@unique([organizationId, tenantId])
+}
+
+model ErasedIdentifierSuppression {
+  id             String   @id @default(nanoid())
+  organizationId String
+  provider       String            // scoped: the same string can be a different person elsewhere
+  identifierHash String            // hash of the erased identifier — never the identifier
+  erasedAt       DateTime
+  // §9 step 1: consulted by EVERY write path that carries the identifier —
+  // DiscoveredPerson creates/updates, governance_ocsf_events writes
+  // (ActorEmail and the raw payload) and seat-pull row writes — each of
+  // which skips a suppressed identifier. Without it the next
+  // 30-day-lookback pull re-creates the row the erasure just removed.
+  // §9 step 5: the fold also membership-tests against it at replay and
+  // recomputes the deterministic pseudonym on a hit, which is why no
+  // original-to-pseudonym mapping table exists (one would hold the erased
+  // identifier in plaintext forever). This is the only table erasure adds.
+  @@unique([organizationId, provider, identifierHash])
+}
+
+model IdentityMatchSuggestion {
+  id                 String   @id @default(nanoid())
+  organizationId     String
+  discoveredPersonId String
+  userId             String            // the platform user this might be
+  score              Float             // edit-distance score, after the §12 prefilter
+  computedAt         DateTime
+  // §12: written by the background suggestion job, read by the review
+  // screen; the screen never scores anything itself. Recomputed when
+  // discovery or org membership changes, never per page view. Confirming a
+  // suggestion writes an IdentityMatch row and closes this one.
+  // Suspension lives on DiscoveredPerson, not here — a recompute must not
+  // clear a conflict halt.
+  @@unique([organizationId, discoveredPersonId, userId])
 }
 ```
 
@@ -1222,11 +1808,218 @@ money tables, only the identity tables and read paths.
 | A reason surviving the puller: 403 vs 429 die at the same `return null` (`copilotStudioDataverse.puller.ts:1128`), so `billing_read_failed` cannot yet say *refused* vs *throttled*. Worth threading a reason through the cursor? | implementation PR or follow-up |
 | ~~The rollup's `costSource` is the LANE (`pulled`), not the provider, and the Azure billing note reads pulled-lane content as Azure content~~ | resolved in the implementation PR — the premise ("Azure is the only pulled producer") was already false: the OpenAI, Anthropic and Databricks admin pullers feed the same lane today, so a mixed org's note fell permanently silent, including the failed-read warning. The note's spend check now asks the rollup for the CLAIMING SOURCE's own rows (`hasRowsForSource`, keyed on `IngestionSourceId`), never the lane's |
 | Two sources may claim two DIFFERENT subscriptions (the ownership guard refuses only a duplicate), and the spend panel carries one note — the oldest claim speaks (`createdAt` order, deterministic). One note for two bills is unresolved | before a second claiming source is a real shape |
+| Azure and Databricks restatement windows are unmeasured; `SETTLING_WINDOW_DAYS` stays provisional for those sources until probed (§15) | Sergio / puller implementer |
+| Payload-level redaction for `governance_ocsf_events` — the raw OCSF JSON holds names and email addresses that a single-column pseudonym cannot reach; wave 2 answers with delete-and-suppress (§16), a redacting read path or structured columns is owed | identity implementer |
+| `btree_gist` availability per managed-Postgres provider (Azure Database for PostgreSQL unverified) — the repo's first `CREATE EXTENSION` (§7) | Sergio |
 | LWQL org-wide cost surface (§17) — own design pass, wave 2+ | deferred |
 | Registry-final permission verb names (§18) | implementation PR |
-| Key-to-bill mapping schema shape (§7) — column vs join table on `IngestionSource` | wave-2 implementation |
 
 ## Revisions
+
+- **v3.9 (2026-09-02, captain: Sergio Esteban).** Red-team panel on the
+  wave-2 lock: five independent refuters attacked the claim that the six
+  v3.8 lock decisions could be implemented without violating a hard
+  constraint, producing a wrong money total, or leaving an erasure
+  incomplete. All five returned "refuted", with executed evidence — the
+  claim died and no decision survived exactly as written. Two components
+  were redesigned and four narrowed; every ratified fix is folded in.
+  Status unchanged (Proposed).
+  - **Re-pointing a key is one transaction, and the constraints are
+    corrected** (§7, Schema, Gates): a non-overlap constraint cannot see a
+    *gap*, and two independent updates were proved on live Postgres to
+    leave an hour of spend covered by no bill, silently. Re-point is now a
+    single `SELECT … FOR UPDATE` transaction. The redundant partial unique
+    index is **dropped** (the exclusion constraint already rejects a second
+    open row; keeping both made the common race surface as 23505 instead of
+    23P01), a `CHECK ("validTo" IS NULL OR "validTo" > "validFrom")` closes
+    the zero-width and inverted rows that slip past an exclusion
+    constraint, 23P01 gets a named domain error with operator copy, a
+    trigger ties the coverage row's org to the key's org, and a re-point
+    takes effect at the next UTC midnight because the rollup buckets by
+    day. Deployment note added: `btree_gist` is the repo's first
+    `CREATE EXTENSION` in 297 migrations.
+  - **Org → `TenantId` is a persisted history, not a live lookup** (§11,
+    Schema): archiving the governance project made the read resolver return
+    null forever while the write path kept resurrecting the archived
+    project — a permanent split-brain in which a ClickHouse erasure job
+    would erase nothing and report success. `GovernanceTenantHistory`
+    records every tenant the org has written under; reads and erasure
+    resolve against all of them. Plus `kind` guards on the project archive,
+    update and GET-by-id paths, since only the list surface filtered
+    governance projects and `PATCH /api/projects/:id` reached them.
+  - **Erasure is keyed on `DiscoveredPerson`, with a suppression list**
+    (§9, §11, Schema): v3.8 drove erasure from `lw.identity.user_erased`,
+    which fires for no one today (the identity latch ships closed), can
+    never fire for the majority of discovered people (they have no
+    LangWatch login by construction), carries no identifier values in its
+    payload, and is unreplayable if missed. The erase action on the
+    discovered-person record now drives every step;
+    `ErasedIdentifierSuppression` stops the next 30-day-lookback pull from
+    re-creating the erased row; the event is demoted to an optional
+    supplementary trigger. The suppression check gates **every write path
+    that carries the identifier**, not only `DiscoveredPerson` — the OCSF
+    event writes (the structured `ActorEmail` column and the raw payload)
+    and the seat-pull row writes included, because deleting rows that a
+    nightly pull re-writes is not an erasure. And there is **no
+    `ErasedActorId` mapping table**: a stored table of
+    original-to-pseudonym pairs would keep the erased identifier in
+    plaintext forever, contradicting the hashes-only suppression list in
+    the same section. None is needed, because the pseudonym is
+    deterministic — at replay the fold already holds the original value,
+    tests its hash for membership, and on a hit recomputes
+    `SHA-256(secret ‖ original)` — one digest, computed once per write and
+    used both as the membership key and as the replacement value, since
+    the suppression list's `identifierHash` and the pseudonym are the same
+    function of the same input. Scope is `(organizationId, provider)`
+    throughout, on the list and on the lookup alike, so an address erased
+    at one provider is not suppressed when a different provider reports
+    it. The rollup half of the erasure deletes by **`TenantId`** — every
+    tenant in `GovernanceTenantHistory` for the org — not by
+    `OrganizationId`, which is payload carrying `DEFAULT ''` and would let
+    the predicate skip rows and leave the erased identifier in place.
+    `ErasedIdentifierSuppression` is the only table erasure adds.
+  - **Match suggestions are computed in the background and stored** (§12,
+    Schema, Gates): this **reverses** v3.8's compute-at-read ruling.
+    Measured at the ADR's own example size, 2,000 discovered people × 500
+    users is 1M pairs and 2.9 s of blocked event loop per page load, with
+    no database fuzzy route available; and no-storage forecloses the
+    pending-count badge. `IdentityMatchSuggestion` holds rows written by a
+    job that prefilters (length band, shared token) before scoring and
+    recomputes on discovery or membership change.
+    `DiscoveredPerson.suspendedAt`/`suspendedReason` stay exactly as
+    ratified. The Gates row claiming "no fuzzy path exists in code" is
+    corrected to the real gate: fuzzy scoring runs only in the background
+    job, never inline in a request.
+  - **The provisional window anchors on the pull, and renders alongside
+    revised** (§15, Constants): calendar age marked a 90-day backfill
+    settled sight-unseen and kept weekly-pull sources provisional 23 extra
+    days, so the window now counts days since a pull last touched the day.
+    That anchor needs a place to live, so the rollup gains a
+    `LastObservedAt` payload column (Schema), moved forward by every fold
+    write that touches the day — a re-pull confirming an unchanged figure
+    included, which is exactly what `RevisedAt` would miss; the flag stays
+    computed at read, now *from* that stored timestamp. Its value is the
+    **pull's observation timestamp, carried on the event**, never the wall
+    clock at fold time: a clock read would make replay non-deterministic,
+    breaking "Rebuild = replay" and its equality gate, and would let §9's
+    delete-then-replay erasure flip settled days back to provisional. §4
+    states the mechanism the marker depends on — a pull that confirms an
+    unchanged figure still appends an event — and the Schema records why
+    the shipped `LastEventOccurredAt` cannot serve as the anchor: it is
+    provider-side event time, which stands still in exactly the
+    re-confirmation case this marker exists to notice.
+    revised ∧ provisional is the **normal** case, not a contradiction —
+    Anthropic revises within 30 days and the window is 30 days — and the
+    cell shows both: *"revised, was $X — may still change"*; the v3.8
+    sentence calling the two markers opposites is corrected. Gateway rows
+    (`IngestionSourceId = ''`) are exempt: metered in real time, never
+    restated. Azure and Databricks windows are recorded as unmeasured.
+    §15's restatement mechanics (`RevisedAt`, and the prior amount, which
+    is 00087's already-shipped `PreviousAmountNanoUsd`) were not refuted
+    and are unchanged.
+  - **Seat events carry PII obligations, inside the same PR** (§16, §20a):
+    `governance_ocsf_events` gets a **fixed 13-month `TTL … DELETE`
+    declared in its migration** and stays **out** of
+    `RETENTION_TABLE_CATEGORY_MAP` and `TABLE_TTL_CONFIG` — which is what
+    migration 00087 actually did for the rollup, and the two halves are not
+    interchangeable: the reconciler's `MODIFY TTL` replaces the whole TTL
+    expression atomically (`ttlReconciler.ts:463`), so enrolling the table
+    would overwrite the fixed bound with a customer-settable one and let a
+    customer hold personal data past 13 months. Seat-assignment rows are
+    excluded from the SIEM export — a pre-existing defect the seat feature
+    must not compound. The raw OCSF payload holds names and email
+    addresses that single-column pseudonymization cannot reach: wave 2
+    answers with delete-and-suppress, complete only because the
+    suppression check also sits on the OCSF and seat-pull write paths, and
+    records the redaction story as owed. The per-user Graph endpoint
+    paginates and the current pull does not (~30k rows/day at 10k seats ×
+    3 SKUs).
+  - **The rollup sketch is corrected to the shipped table, and the table
+    counts to the schema** (Schema, Invariants, §11): the sketch had no
+    `TenantId` column and led its ORDER BY with `OrganizationId`, while
+    the shipped migration 00087 leads with `TenantId` and carries
+    `OrganizationId` as a payload column defaulting to `''` — ownership is
+    an attribute of the row, its address is the tenant. §11 and the new
+    `GovernanceTenantHistory` design already assumed the shipped shape, so
+    the drift was confined to the sketch and the "full-grain dedup key"
+    invariant. The invariant now matches the shipped table exactly and
+    states which columns are payload by design rather than implying every
+    column belongs in the key; the sketch is **corrected in tenancy, dedup
+    key, replacement version and prior-amount column** but remains a
+    sketch — it omits `RevisionCount`, `PulledItemsJson`,
+    `AppliedEventIds`, `CreatedAt` and `LastEventOccurredAt` entirely.
+    **The exact DDL is
+    00087**, and the Schema section now says so rather than reading like
+    a specification of a table wave 2 is about to create. The same pass
+    fixed the sketch's `Version UInt64` replacement column: shipped 00087
+    replaces on `EventTimestamp UInt64` and keeps `Version` as a
+    `LowCardinality(String)` schema-snapshot stamp — payload, not the
+    dedup version — so every `argMax`-on-`Version` instruction in §4, the
+    Invariants and the sketch pointed readers at the wrong column. §4 also
+    still enumerated `org` as a rollup dimension and asserted every listed
+    dimension was in the key; both corrected. And the migration this
+    implies is stated for the first time: the rollup **shipped in wave 1**,
+    so wave 2's new columns land by `ALTER TABLE … ADD COLUMN`, not a
+    create — and there are **two** of them, `RevisedAt` and
+    `LastObservedAt`, not three: 00087 already carries
+    `PreviousAmountNanoUsd`, so the ADR's `PreviousAmountNano` would have
+    added a *second* prior-amount money column to the same table, with
+    nothing to tell a reader which one the restatement markers meant. The
+    sketch, the invariant, the Gates row and §15 now all name the shipped
+    column. `LastObservedAt` backfills as epoch, which reads every
+    pre-migration day as settled and is correct rather than merely
+    tolerable, since a day still in its window is re-stamped by the next
+    30-day-lookback pull. The Gates row that promised a "migration adding
+    `governance_cost_rollup_1d`" is corrected along with its rollback,
+    which is now `DROP COLUMN` rather than a `DROP TABLE` of a table wave 2
+    does not own. §11's
+    "three Postgres tables" is likewise restated as six, the fold having
+    added `GovernanceTenantHistory`, `ErasedIdentifierSuppression` and
+    `IdentityMatchSuggestion` to the original three.
+  - **Pre-existing defects written down** (§20a new, Open questions): four
+    findings that predate this ADR — the un-TTL'd, unfiltered
+    `governance_ocsf_events` already carrying provider emails from four
+    shipped pullers; the archivable governance project; the ADR-101 §5
+    event-log erasure service that was never written; the closed identity
+    latch — with which of them wave 2 fixes and which are tracked
+    elsewhere.
+  - *Numbered v3.9 rather than v3.4 on rebase: wave 1 shipped v3.3–v3.7 to
+    `main` in parallel with this branch.*
+
+- **v3.8 (2026-09-01, captain: Sergio Esteban).** Wave-2 lock completed; the
+  two #7740 forks plus four gaps found in the lock-completeness pass, all
+  ratified:
+  - **Identity and erasure key on `organizationId`** (§11, Schema): the
+    rollup's `TenantId` is the hidden governance project's id, and that id
+    is not durable — the resolver filters archived projects and the re-mint
+    path can return an archived row, so keying on it could orphan the very
+    rows an erasure job must find. Reads translate org → tenant through the
+    `resolveGovProjectId` call every cost read already makes.
+  - **Key-to-bill mapping is a dated join table** (§7, Schema, Open
+    questions): `IngestionSourceKeyCoverage`, with a partial unique index
+    holding one-home in the database. Dates keep a June re-point from
+    re-filing May; a list column on the source is rejected. Resolves the
+    open question of that name.
+  - **Erasure blanks matches through a listener** (§11, Schema): a
+    governance subscriber to the existing `lw.identity.user_erased` event,
+    not a step appended to the erasure service — so a future second erasure
+    path cannot silently skip governance rows.
+  - **Suggestions compute at read; suspension is stored** (§12, Schema): no
+    suggestion table and its lifecycle, at the accepted cost of no
+    dismiss-forever; `DiscoveredPerson.suspendedAt`/`suspendedReason`
+    persist the conflict halt, which a restart must not clear.
+  - **Idle-seat names come from per-user seat-assignment facts** (§16): the
+    seat pull extends from counts to "this person holds a seat of type X on
+    day D", appended on §6's spine — the only way to name a holder who
+    appears in zero usage rows, and a stated expansion of stored personal
+    data to the class §9 already carries.
+  - **New surfaces speak FOCUS** (§22 new, §15, Constants): FOCUS names on
+    new customer-visible surfaces and `x_` extensions where the standard has
+    none, with the live rollup's internal names left alone; plus a
+    *provisional* marker, distinct from *revised*, derived from a
+    `SETTLING_WINDOW_DAYS` window because no provider feed states finality.
+  - *Numbered v3.8 rather than v3.3 on rebase: wave 1 shipped v3.3–v3.7 to
+    `main` in parallel with this branch.*
 
 - **v3.7 (2026-09-03, captain: Sergio Esteban).** The create form's
   default flipped to one app registration for both reads (issue #7775).

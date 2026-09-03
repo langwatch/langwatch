@@ -18,6 +18,24 @@ import {
   type PulledContribution,
 } from "./governanceCostRollup.foldProjection";
 
+/**
+ * The two `DateTime` columns hold SECONDS; the fold's state holds epoch
+ * milliseconds like every other instant it carries. The conversion lives here,
+ * at the one seam between them, rather than at each call site.
+ *
+ * The truncation is lossy and deliberately stable: a value that has been
+ * through the table floors to the same second on every subsequent write, so a
+ * round-trip through the store is idempotent rather than drifting. Nothing
+ * downstream resolves finer than a day.
+ */
+function toUnixSeconds(epochMs: number): number {
+  return Math.floor(epochMs / 1000);
+}
+
+function fromUnixSeconds(seconds: number): number {
+  return seconds * 1000;
+}
+
 /** State → row. Exported so a test can assert the projection without a store. */
 export function projectGovernanceCostRollupStateToRow({
   state,
@@ -52,6 +70,8 @@ export function projectGovernanceCostRollupStateToRow({
     RequestCount: totals.requestCount,
     RevisionCount: state.revisionCount,
     PreviousAmountNanoUsd: state.previousAmountNanoUsd,
+    RevisedAt: state.revisedAt === null ? null : toUnixSeconds(state.revisedAt),
+    LastObservedAt: toUnixSeconds(state.lastObservedAt),
     PulledItemsJson: JSON.stringify(state.pulledItems),
     Version: version,
     AppliedEventIds: [...appliedEventIds],
@@ -105,6 +125,12 @@ export function governanceCostRollupStateFromRow(
     pulledItems,
     revisionCount: row.RevisionCount,
     previousAmountNanoUsd: row.PreviousAmountNanoUsd,
+    revisedAt: row.RevisedAt === null ? null : fromUnixSeconds(row.RevisedAt),
+    // A row written before migration 00090 carries the epoch here, which reads
+    // as long since observed and therefore settled — the deliberate backfill,
+    // not a gap. The next daily pull re-stamps any day still inside its
+    // window, because the pullers look 30 days back.
+    lastObservedAt: fromUnixSeconds(row.LastObservedAt),
     createdAt: row.CreatedAt,
     updatedAt: row.EventTimestamp,
     LastEventOccurredAt: row.LastEventOccurredAt,

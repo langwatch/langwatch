@@ -77,3 +77,79 @@ export function azureBillingNoteSentence(
       return "The Azure bill could not be read, so its charges are missing here rather than empty. They appear as soon as a read succeeds.";
   }
 }
+
+/**
+ * How much to trust a billed day's figure: whether it has already been
+ * restated, and whether it may still be (ADR-128 §15).
+ *
+ * The two are orthogonal and the common case is BOTH — providers restate
+ * inside the same 30 days the settling window covers — so they render as one
+ * sentence rather than competing badges. Showing only one would either hide a
+ * change that already happened or promise a finality nobody has given us.
+ *
+ * Null when the day is neither: an unmarked day is the quiet default, and a
+ * note on every cell teaches a reader to stop seeing them.
+ *
+ * A revised day whose earlier figure cannot be stated in dollars says only
+ * that it changed. Naming a number we withheld from the lane total two lines
+ * up would be the partial figure that whole read side exists to refuse.
+ */
+/** "day" or "days", so the note below reads as a sentence either way. */
+function days(count: number): string {
+  return count === 1 ? "day" : "days";
+}
+
+/**
+ * The window-level version of the same two facts, for a reader who has not
+ * hovered any day.
+ *
+ * Counts rather than dates: the dates are on the days themselves, and a list
+ * of them here would be a second place to keep in step with the first.
+ */
+export function restatementNote({
+  revisedDays,
+  provisionalDays,
+}: {
+  revisedDays: number;
+  provisionalDays: number;
+}): string {
+  const clauses: string[] = [];
+  if (revisedDays > 0) {
+    clauses.push(
+      `${revisedDays} ${days(revisedDays)} in this window ${
+        revisedDays === 1 ? "has" : "have"
+      } been revised by the provider since first reported`,
+    );
+  }
+  if (provisionalDays > 0) {
+    clauses.push(
+      `${provisionalDays} ${days(
+        provisionalDays,
+      )} can still change while the provider settles ${
+        provisionalDays === 1 ? "it" : "them"
+      }`,
+    );
+  }
+  return `${clauses.join(", and ")}. Hover a day to see which.`;
+}
+
+export function dayTrustNote({
+  revised,
+  previousUsd,
+  provisional,
+}: {
+  revised: boolean;
+  previousUsd: number | null;
+  provisional: boolean;
+}): string | null {
+  if (!revised && !provisional) return null;
+  const mayChange = "may still change";
+  if (!revised) {
+    return `This day ${mayChange} — the provider can still restate it.`;
+  }
+  const was =
+    previousUsd === null
+      ? "Revised since it was first reported"
+      : `Revised, was ${formatLaneUsd(previousUsd)}`;
+  return provisional ? `${was} — ${mayChange}.` : `${was}.`;
+}

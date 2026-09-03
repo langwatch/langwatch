@@ -35,6 +35,13 @@ export interface GovernanceCostRollupRow {
   RequestCount: number;
   RevisionCount: number;
   PreviousAmountNanoUsd: number | null;
+  /**
+   * Unix SECONDS, not milliseconds — both of these are `DateTime` columns.
+   * Null until a provider restates the cell to a different figure.
+   */
+  RevisedAt: number | null;
+  /** Unix SECONDS. The epoch on any row written before migration 00090. */
+  LastObservedAt: number;
   PulledItemsJson: string;
   Version: string;
   AppliedEventIds: string[];
@@ -105,6 +112,17 @@ const LATEST_PAYLOAD_COLUMNS = [
   "argMax(RequestCount, EventTimestamp) AS RequestCount",
   "argMax(RevisionCount, EventTimestamp) AS RevisionCount",
   "argMax(tuple(PreviousAmountNanoUsd), EventTimestamp).1 AS PreviousAmountNanoUsd",
+  // The two DateTime markers come back as integer seconds rather than as
+  // formatted timestamps: a `DateTime` renders in the SERVER's timezone with
+  // no offset on it, so a client parsing that string reads the instant the
+  // client's own timezone makes of it. An integer has no timezone to get
+  // wrong. `RevisedAt` takes the same tuple form as the two Nullable money
+  // columns above — whether argMax skips a NULL first argument has varied
+  // between ClickHouse versions, and a cell restated back to unrevised must
+  // read as unrevised on every one of them rather than resurrecting an older
+  // version's revision date.
+  "argMax(tuple(toUnixTimestamp(RevisedAt)), EventTimestamp).1 AS RevisedAt",
+  "toUnixTimestamp(argMax(LastObservedAt, EventTimestamp)) AS LastObservedAt",
   "argMax(PulledItemsJson, EventTimestamp) AS PulledItemsJson",
   "argMax(Version, EventTimestamp) AS Version",
   "argMax(AppliedEventIds, EventTimestamp) AS AppliedEventIds",
@@ -313,6 +331,28 @@ export class GovernanceCostRollupClickHouseRepository {
    * because `CurrencyCode` is already a key column in the inner `GROUP BY`:
    * the screen can then say WHICH currency it could not state a total in,
    * rather than only that it could not.
+   *
+   * The §15 markers ride along too, aggregated the only ways that are honest
+   * for a whole day. `RevisedAt` is the LATEST revision anywhere in the day,
+   * because the marker says the day changed and one changed cell changed it.
+   * `LastObservedAt` is the NEWEST touch anywhere in the day, because a pull
+   * that reached any cell of the day looked at that day.
+   *
+   * The prior total is pinned to that same latest revision — it is what the
+   * day added up to in the moment BEFORE it, not before every revision the day
+   * has ever seen. Only the cells revised at that moment contribute what they
+   * used to hold; every other cell contributes what it holds now, because by
+   * then it already did. Summing every revised cell's prior regardless of date
+   * reports a move that spans revisions weeks apart under the latest one's
+   * date, and §15 is explicit that the marker holds only the latest revision.
+   * That needs a third layer: the day's latest revision is a window over the
+   * deduped cells, and it has to be known before the sum that uses it.
+   *
+   * `CellsWithoutPreviousAmount` counts the cells whose CONTRIBUTION to that
+   * prior total cannot be stated in dollars — a max-revised cell whose earlier
+   * figure was unpriced, or any cell whose current figure is. Above zero the
+   * caller withholds the whole "was", the same way it withholds a partial
+   * total.
    */
   async sumDaysByLane(input: {
     tenantId: string;
@@ -332,6 +372,23 @@ export class GovernanceCostRollupClickHouseRepository {
        * could report, so it is counted and not named.
        */
       currenciesWithoutUsdAmount: string[];
+      /**
+       * Unix SECONDS of the day's most recent revision, or null when no cell
+       * of it has ever been restated.
+       */
+      revisedAt: number | null;
+      /**
+       * What the day totalled in the moment before `revisedAt`, nano-USD —
+       * not before every revision it has ever had. See the method doc.
+       */
+      previousAmountNanoUsd: number | null;
+      /**
+       * Cells whose contribution to that prior total cannot be stated in
+       * dollars. Above zero, withhold the "was".
+       */
+      cellsWithoutPreviousAmount: number;
+      /** Unix SECONDS a pull last touched any cell of the day. */
+      lastObservedAt: number;
     }>
   > {
     const client = await this.resolveClient(input.tenantId);
@@ -347,17 +404,57 @@ export class GovernanceCostRollupClickHouseRepository {
               CurrencyCode,
               LatestAmountNanoUsd IS NULL AND CurrencyCode != {usd:String}
             )
-          ) AS CurrenciesWithoutUsdAmount
+          ) AS CurrenciesWithoutUsdAmount,
+          max(LatestRevisedAt)             AS RevisedAt,
+          sumOrNull(PriorAmountNanoUsd)    AS PreviousAmountNanoUsd,
+          countIf(PriorAmountNanoUsd IS NULL) AS CellsWithoutPreviousAmount,
+          max(LatestLastObservedAt)        AS LastObservedAt
         FROM (
+          -- Middle layer: what each cell contributed to the day's total AS OF
+          -- the moment before the day's latest revision.
+          --
+          -- Only the cells revised AT that moment swap in what they used to
+          -- hold. A cell revised EARLIER was already carrying its current
+          -- figure by then, so swapping in its prior would rewind a change
+          -- that had finished happening and inflate the reported move. Two
+          -- cells restated a fortnight apart is the case that exposes it: the
+          -- day would be labelled with the later date and a delta spanning
+          -- both. §15 says the marker holds only the LATEST revision.
+          --
+          -- The ifNull is load-bearing: a never-revised cell compares NULL
+          -- against the day's max, and a NULL condition is not a branch
+          -- anyone should have to reason about. Those cells belong in the
+          -- current-amount arm, not out of the sum.
           SELECT
-            ${KEY_COLUMNS.join(",\n            ")},
-            argMax(tuple(AmountNanoUsd), EventTimestamp).1 AS LatestAmountNanoUsd
-          FROM ${GOVERNANCE_COST_ROLLUP_TABLE}
-          WHERE TenantId = {tenantid:String}
-            AND Day >= {fromday:Date}
-            AND Day <= {today:Date}
-            AND Version = {version:String}
-          GROUP BY ${KEY_COLUMNS.join(", ")}
+            Day,
+            CostSource,
+            CurrencyCode,
+            LatestAmountNanoUsd,
+            LatestRevisedAt,
+            LatestLastObservedAt,
+            if(
+              ifNull(
+                LatestRevisedAt
+                  = max(LatestRevisedAt) OVER (PARTITION BY Day, CostSource),
+                0
+              ),
+              LatestPreviousAmountNanoUsd,
+              LatestAmountNanoUsd
+            ) AS PriorAmountNanoUsd
+          FROM (
+            SELECT
+              ${KEY_COLUMNS.join(",\n              ")},
+              argMax(tuple(AmountNanoUsd), EventTimestamp).1 AS LatestAmountNanoUsd,
+              argMax(tuple(PreviousAmountNanoUsd), EventTimestamp).1 AS LatestPreviousAmountNanoUsd,
+              argMax(tuple(toUnixTimestamp(RevisedAt)), EventTimestamp).1 AS LatestRevisedAt,
+              toUnixTimestamp(argMax(LastObservedAt, EventTimestamp)) AS LatestLastObservedAt
+            FROM ${GOVERNANCE_COST_ROLLUP_TABLE}
+            WHERE TenantId = {tenantid:String}
+              AND Day >= {fromday:Date}
+              AND Day <= {today:Date}
+              AND Version = {version:String}
+            GROUP BY ${KEY_COLUMNS.join(", ")}
+          )
         )
         GROUP BY Day, CostSource
         ORDER BY Day, CostSource
@@ -378,6 +475,10 @@ export class GovernanceCostRollupClickHouseRepository {
       amountNanoUsd: nullableInt(row.AmountNanoUsd),
       cellsWithoutAmount: int(row.CellsWithoutAmount),
       currenciesWithoutUsdAmount: strArray(row.CurrenciesWithoutUsdAmount),
+      revisedAt: nullableInt(row.RevisedAt),
+      previousAmountNanoUsd: nullableInt(row.PreviousAmountNanoUsd),
+      cellsWithoutPreviousAmount: int(row.CellsWithoutPreviousAmount),
+      lastObservedAt: int(row.LastObservedAt),
     }));
   }
 
@@ -579,6 +680,8 @@ export class GovernanceCostRollupClickHouseRepository {
       RequestCount: int(row.RequestCount),
       RevisionCount: int(row.RevisionCount),
       PreviousAmountNanoUsd: nullableInt(row.PreviousAmountNanoUsd),
+      RevisedAt: nullableInt(row.RevisedAt),
+      LastObservedAt: int(row.LastObservedAt),
       PulledItemsJson: str(row.PulledItemsJson),
       Version: str(row.Version),
       AppliedEventIds: strArray(row.AppliedEventIds),
