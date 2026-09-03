@@ -1,14 +1,33 @@
-import { Prisma, type PrismaClient } from "@langwatch/prisma-client/generated";
+import { Prisma } from "@langwatch/prisma-client/generated";
 import {
   type AuthzAuditRow,
   AuthzAuditTrailStore,
 } from "../../adapters/eventing.authz-audit.adapter";
 
 /**
- * Only what this repository touches, so composition names the slice it needs
- * rather than the whole generated client.
+ * Only what this repository touches: one call, `createMany`.
+ * `Pick<PrismaClient, "auditLog">` read as that narrowing but was not one — it
+ * keeps the whole generated `AuditLogDelegate`, so every caller, a test double
+ * included, owed all 18 of its members to satisfy a repository that calls
+ * exactly one of them. Structural on purpose, like the feature's other Postgres
+ * seams: a composition root adapts its own typed client to this shape once at
+ * its boundary, and no generated database type crosses into the feature.
  */
-export type AuthzAuditDatabase = Pick<PrismaClient, "auditLog">;
+export type AuthzAuditDatabase = {
+  auditLog: {
+    createMany(args: { data: AuthzAuditInsert[]; skipDuplicates: boolean }): Promise<unknown>;
+  };
+};
+
+/**
+ * The audit fact as it is written: `AuthzAuditRow`, except that `metadata`
+ * arrives as `Record<string, unknown>` and the column it lands in is `Json`.
+ * Stating the written row here is what lets the seam above be narrow enough
+ * to implement without the generated delegate.
+ */
+export type AuthzAuditInsert = Omit<AuthzAuditRow, "metadata"> & {
+  metadata: Prisma.InputJsonValue;
+};
 
 /**
  * Idempotent Postgres implementation keyed by the event-derived audit row ID.

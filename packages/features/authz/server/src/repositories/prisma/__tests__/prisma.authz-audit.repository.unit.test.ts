@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 import type { AuthzAuditRow } from "../../../adapters/eventing.authz-audit.adapter";
 import {
   type AuthzAuditDatabase,
+  type AuthzAuditInsert,
   PrismaAuthzAuditRepository,
 } from "../prisma.authz-audit.repository";
 
@@ -15,14 +16,14 @@ const ROW: AuthzAuditRow = {
 };
 
 class InMemoryAuditTable {
-  readonly rows = new Map<string, AuthzAuditRow>();
+  readonly rows = new Map<string, AuthzAuditInsert>();
   readonly writes: Array<{
-    data: AuthzAuditRow[];
+    data: AuthzAuditInsert[];
     skipDuplicates: boolean;
   }> = [];
 
   async createMany(args: {
-    data: AuthzAuditRow[];
+    data: AuthzAuditInsert[];
     skipDuplicates: boolean;
   }): Promise<{ count: number }> {
     this.writes.push(args);

@@ -138,6 +138,27 @@ overrides:
   # receives it. 0.5.0 is the version that must exist regardless, so it is the
   # one everything gets.
   "@better-auth/utils": 0.5.0
+  # One copy of the Node typings, for the same reason as the line above: a
+  # second copy is a second set of GLOBAL module declarations, so `stream/web`
+  # from one is not the `stream/web` from the other and every type crossing
+  # them stops being itself. The tree carried five majors — 10.17.60, 18.19.130,
+  # 22.20.1, 24.13.3 and 26.2.0 — because @types packages depend on @types/node
+  # themselves and pnpm gives each its own. The 18.x copy is the one that bit:
+  # @types/ssh2@1.15.5 depends on `@types/node: ^18.11.18` and opens with
+  # `/// <reference types="node" />`, which resolves to ITS OWN copy, so any
+  # program reaching @types/ssh2 (via @langwatch/test-harness ->
+  # @testcontainers/clickhouse -> testcontainers -> @types/dockerode) loaded
+  # BOTH 18 and 26. That is what made `ReadableStream<any>` unassignable to
+  # `ReadableStream<Uint8Array>` in apps/api/src/rest/body-limit.ts — the
+  # detail named `import("stream/web")` and `import("node:stream/web")` as
+  # different types — and what made every ioredis `.on(...)` / `.once(...)`
+  # a union of two incompatible EventEmitter bases ("this expression is not
+  # callable"). The shared source was correct throughout; only the programs
+  # that pulled a second copy were red. ^26.0.1 is what the workspace already
+  # declares almost everywhere; the stragglers on ^22/^24 were drift, not a
+  # requirement. Do NOT narrow this to a path-scoped pin: six different
+  # packages request the 18.x line, so pinning one edge just moves the bug.
+  "@types/node": ^26.0.1
   # Raised from ^8.5.13 to clear a postcss parsing DoS: the caret already
   # permitted 8.5.23, but resolution was sitting on a vulnerable 8.5.x.
   postcss: ^8.5.23
