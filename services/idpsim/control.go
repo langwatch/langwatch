@@ -13,10 +13,15 @@ func (s *Server) handleControlState(w http.ResponseWriter, _ *http.Request) {
 	tenants := make([]map[string]any, 0, len(s.tenants))
 	for _, t := range s.tenants {
 		tenants = append(tenants, map[string]any{
-			"id":            t.ID,
-			"baseUrl":       t.BaseURL,
-			"domain":        t.Domain,
+			"id":      t.ID,
+			"baseUrl": t.BaseURL,
+			"domain":  t.Domain,
+			// scimToken is the simulator's own — synthetic, and printed on the
+			// page. provisioning carries somebody else's, so it is masked: the
+			// point of showing it at all is telling whether the right value was
+			// pasted.
 			"scimToken":     t.SCIMToken,
+			"provisioning":  provisioningState(t),
 			"samlpSubjects": t.SamlpSubjects(),
 			"users":         t.Users(),
 			"groups":        t.Groups(),
@@ -29,6 +34,20 @@ func (s *Server) handleControlState(w http.ResponseWriter, _ *http.Request) {
 		"txtRecords":         txt,
 		"verificationTokens": tokens,
 	})
+}
+
+// provisioningState is a tenant's connection as the state dump reports it, or
+// nil when it has none.
+func provisioningState(t *Tenant) map[string]any {
+	target := t.Provisioning()
+	if !target.Configured() {
+		return nil
+	}
+	return map[string]any{
+		"baseUrl": target.BaseURL,
+		"token":   maskedToken(target.Token),
+		"last":    t.LastProvisioning(),
+	}
 }
 
 // handleControlReset restores a tenant's seeded state.
@@ -132,55 +151,106 @@ func (s *Server) handleControlConfig(w http.ResponseWriter, r *http.Request) {
 	writeJSON(w, http.StatusOK, map[string]any{"samlpSubjects": t.SamlpSubjects()})
 }
 
-// handleControlSCIMPush drives the tenant's directory at an external SCIM
-// service provider.
-func (s *Server) handleControlSCIMPush(w http.ResponseWriter, r *http.Request) {
+// handleControlSCIMTarget sets or clears where the tenant provisions — the
+// scriptable twin of the tenant page's connection form. The token belongs to
+// the receiving side, so there is nothing to generate here either.
+func (s *Server) handleControlSCIMTarget(w http.ResponseWriter, r *http.Request) {
 	t, ok := s.tenantFor(r)
 	if !ok {
 		http.NotFound(w, r)
 		return
 	}
-	var req ProvisioningTarget
-	if err := json.NewDecoder(r.Body).Decode(&req); err != nil || req.BaseURL == "" {
-		http.Error(w, "a push needs a target SCIM base URL", http.StatusBadRequest)
+	if r.Method == http.MethodDelete {
+		t.ClearProvisioning()
+		w.WriteHeader(http.StatusNoContent)
 		return
 	}
-	result := pushDirectory(r.Context(), t, req)
-	// The result and the sentence describing it, together: the activity feed
-	// reads the sentence, an assertion reads the counts. Embedded rather than
-	// nested so the counts stay where a caller already looks for them.
-	writeJSON(w, http.StatusOK, struct {
-		scimPushResult
-		Summary string `json:"summary"`
-	}{result, pushSummary(result, req.BaseURL)})
+	var target ProvisioningTarget
+	if err := json.NewDecoder(r.Body).Decode(&target); err != nil {
+		http.Error(w, "unparseable target body", http.StatusBadRequest)
+		return
+	}
+	target.BaseURL = normalizeSCIMBase(target.BaseURL)
+	if !target.Configured() || !reachableSCIMBase(target.BaseURL) {
+		http.Error(w, "a target needs a reachable SCIM base URL and the token that provider issued", http.StatusBadRequest)
+		return
+	}
+	t.SetProvisioning(target)
+	s.record(t, Event{
+		Kind:    "scim.target",
+		Outcome: OutcomeOK,
+		Detail:  "will provision into " + target.BaseURL,
+	})
+	writeJSON(w, http.StatusOK, map[string]any{"baseUrl": target.BaseURL, "token": maskedToken(target.Token)})
 }
 
-// handleControlSCIMPull reads a target's directory back over the same
-// credential, which is how a provisioning run is checked without leaving the
-// simulator: a push reports what the target ACCEPTED, and this reports what it
-// turned out to be holding. The two disagree exactly where a service provider
-// deduplicated, dropped members, or took a deactivation as a delete.
+// handleControlSCIMPush drives the tenant's directory at an external SCIM
+// service provider — the one it is connected to, or one named in the body for
+// a caller that would rather not connect first.
+func (s *Server) handleControlSCIMPush(w http.ResponseWriter, r *http.Request) {
+	t, target, ok := s.controlTarget(w, r)
+	if !ok {
+		return
+	}
+	result := pushDirectory(r.Context(), t, target)
+	s.record(t, Event{
+		Kind:    "scim.push",
+		Outcome: outcomeOf(result.UsersCreated+result.GroupsCreated > 0 || len(result.Failures) == 0),
+		Detail:  pushSummary(result, target.BaseURL),
+	})
+	writeJSON(w, http.StatusOK, result)
+}
+
+// handleControlSCIMPull reads the target's directory back, so a test can
+// assert on what the receiving side ended up holding rather than on what it
+// accepted.
 func (s *Server) handleControlSCIMPull(w http.ResponseWriter, r *http.Request) {
-	if _, ok := s.tenantFor(r); !ok {
-		http.NotFound(w, r)
+	t, target, ok := s.controlTarget(w, r)
+	if !ok {
 		return
 	}
-	var req ProvisioningTarget
-	if err := json.NewDecoder(r.Body).Decode(&req); err != nil || req.BaseURL == "" {
-		http.Error(w, "a read-back needs a target SCIM base URL", http.StatusBadRequest)
-		return
-	}
-	snapshot, err := pullDirectory(r.Context(), req)
+	snapshot, err := pullDirectory(r.Context(), target)
 	if err != nil {
-		// The target answering badly is the target's news, not a fault of the
-		// simulator, so it is reported as an upstream failure rather than a 500.
+		s.record(t, Event{
+			Kind: "scim.pull", Outcome: OutcomeRefused,
+			Detail: "could not read " + target.BaseURL + " back: " + err.Error(),
+		})
 		http.Error(w, err.Error(), http.StatusBadGateway)
 		return
 	}
-	writeJSON(w, http.StatusOK, struct {
-		directorySnapshot
-		Summary string `json:"summary"`
-	}{snapshot, pullSummary(snapshot, req.BaseURL)})
+	s.record(t, Event{
+		Kind: "scim.pull", Outcome: OutcomeOK, Detail: pullSummary(snapshot, target.BaseURL),
+	})
+	writeJSON(w, http.StatusOK, map[string]any{
+		"users": snapshot.Users, "groups": snapshot.Groups,
+	})
+}
+
+// controlTarget resolves which service provider a control-API push or
+// read-back is aimed at: the one named in the body, or the one the tenant is
+// connected to when the body names none.
+func (s *Server) controlTarget(w http.ResponseWriter, r *http.Request) (*Tenant, ProvisioningTarget, bool) {
+	t, ok := s.tenantFor(r)
+	if !ok {
+		http.NotFound(w, r)
+		return nil, ProvisioningTarget{}, false
+	}
+	var body struct {
+		Target string `json:"target"`
+		Token  string `json:"token"`
+	}
+	// A read-back is a GET-shaped action with no body of its own, so an
+	// unparseable one falls back to the connection rather than refusing.
+	_ = json.NewDecoder(r.Body).Decode(&body)
+	target := t.Provisioning()
+	if body.Target != "" {
+		target = ProvisioningTarget{BaseURL: normalizeSCIMBase(body.Target), Token: body.Token}
+	}
+	if !target.Configured() {
+		http.Error(w, "no SCIM target: name one in the body, or connect the tenant first", http.StatusBadRequest)
+		return nil, ProvisioningTarget{}, false
+	}
+	return t, target, true
 }
 
 // handleControlDNS sets or clears a TXT record.

@@ -80,7 +80,7 @@ Feature: The SCIM reconciliation surfaces - directory sync you can read
     Then both the push and the failure are listed, in the order they happened
     And the failure is words rather than an error code
 
-  @integration @unimplemented
+  @integration
   Scenario: A connection nothing has happened on says so rather than drawing an empty list
     Given "acme" holds a second connection whose token has never been used
     When "ana" reads what that connection has been doing
@@ -92,7 +92,7 @@ Feature: The SCIM reconciliation surfaces - directory sync you can read
     Then nothing from "globex" is listed
     And the read is built from "acme" rather than filtered down to it
 
-  @integration @unimplemented
+  @integration
   Scenario: Seeing the sequence takes the same permission as seeing the state
     Given "acme" has a reader who may see single sign-on but not manage it
     When that reader opens the SCIM settings page
@@ -139,7 +139,7 @@ Feature: The SCIM reconciliation surfaces - directory sync you can read
     Then nothing from "globex" is listed
     And naming "globex"'s connection in a request answers as if it did not exist
 
-  @integration @unimplemented
+  @integration
   Scenario: Seeing sync status and managing tokens are two different permissions
     Given "rio" of "acme" may see single sign-on but not manage it
     When "rio" opens the SCIM settings page

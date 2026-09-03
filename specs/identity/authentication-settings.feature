@@ -44,7 +44,7 @@ Feature: Authentication settings - every way in, in one place, with the guards v
   # organization's two-step requirement - and the addresses and the linked
   # accounts are one subject because the identity model holds both as
   # identifiers and the detach guard reasons across the whole set.
-  @integration @unimplemented
+  @integration
   Scenario: The page is four sections, one per subject
     When the authentication settings are shown
     Then the page runs from what "sam" is known by, through the two proofs, to
@@ -55,7 +55,7 @@ Feature: Authentication settings - every way in, in one place, with the guards v
   # refusal can come from either. One list and one row of offers; sub-headings
   # over each half split a list whose rows already say what they are, and made
   # one offer look like two.
-  @integration @unimplemented
+  @integration
   Scenario: Email addresses and linked accounts sit under one heading
     When the authentication settings are shown
     Then the addresses and the identity providers are one section
@@ -68,14 +68,14 @@ Feature: Authentication settings - every way in, in one place, with the guards v
   # is already down to one and only finds out on trying to tidy up. The same
   # fact, said in advance, is early enough to act on — and it is said inside
   # the section whose halves are the remedy, not in a summary of its own.
-  @integration @unimplemented
+  @integration
   Scenario: An account with one way in is told so, where the remedy is
     Given the only way into "sam"'s account is one of them
     When the authentication settings are shown
     Then the section that adds another way in says so
     And it names what to add
 
-  @integration @unimplemented
+  @integration
   Scenario: An account with more than one way in is told nothing
     Given "sam" holds two ways in
     When the authentication settings are shown
@@ -90,14 +90,14 @@ Feature: Authentication settings - every way in, in one place, with the guards v
     Then the confirmed one is shown as confirmed
     And the unconfirmed one is shown as not confirmed yet
 
-  @integration @unimplemented
+  @integration
   Scenario: An unconfirmed address offers to send its link again
     Given "sam" holds an address that has never been confirmed
     When "sam" asks for the link to be sent again
     Then the row says the link is on its way and names the address it went to
     And the row does not look the same afterwards as it did before
 
-  @integration @unimplemented
+  @integration
   Scenario: A confirmed address offers nothing to resend
     Given every address "sam" holds is confirmed
     When the sign-in addresses are listed
@@ -105,7 +105,7 @@ Feature: Authentication settings - every way in, in one place, with the guards v
 
   # ── Adding another address ─────────────────────────────────────────────
 
-  @integration @unimplemented
+  @integration
   Scenario: Adding a second address starts a confirmation rather than a sign-in method
     When "sam" adds a second email address
     Then a confirmation link is sent to it
@@ -126,7 +126,7 @@ Feature: Authentication settings - every way in, in one place, with the guards v
     Then no second identifier is created for it
     And the account is told it is already there
 
-  @integration @unimplemented
+  @integration
   Scenario: The confirmation link only completes where the ceremony was started
     Given "sam" added an address and a confirmation link went out
     When the link is opened in a browser that did not start the ceremony
@@ -153,7 +153,7 @@ Feature: Authentication settings - every way in, in one place, with the guards v
     Then it disappears from the list
     And the other one still signs "sam" in
 
-  @integration @unimplemented
+  @integration
   Scenario: Removing the last confirmed address is refused before it is clicked
     Given the only confirmed way in "sam" holds is one address
     When the sign-in addresses are listed
@@ -213,28 +213,28 @@ Feature: Authentication settings - every way in, in one place, with the guards v
   # both were rows of one database table. That is a fact about our storage and
   # never a fact about the person reading: a password is something you choose
   # and change, and a linked account is something you connect and disconnect.
-  @integration @unimplemented
+  @integration
   Scenario: The password and the linked accounts are separate sections
     Given "sam" holds a password and signs in through single sign-on too
     When the authentication settings are shown
     Then the password is a section of its own
     And the identity providers are another, with nothing about a password in it
 
-  @integration @unimplemented
+  @integration
   Scenario: An account with no password is offered one rather than a change
     Given "sam" signs in without a password
     When the password section is shown
     Then it offers to set a first password
     And it offers nothing to remove, because there is nothing there to give up
 
-  @integration @unimplemented
+  @integration
   Scenario: Removing the password is refused before it is clicked where it is the last way in
     Given the password is the only confirmed way in "sam" holds
     When the password section is shown
     Then removing it is not offered
     And the reason given is the words registered for "identity_detach_strands_user"
 
-  @integration @unimplemented
+  @integration
   Scenario: Removing the password asks first and says what stays
     Given "sam" holds a password and another confirmed way in
     When "sam" asks to remove the password
@@ -243,28 +243,28 @@ Feature: Authentication settings - every way in, in one place, with the guards v
 
   # ── Unlinking single sign-on ───────────────────────────────────────────
 
-  @integration @unimplemented
+  @integration
   Scenario: Unlinking a single sign-on method asks first and says what stays
     Given "sam" signs in through single sign-on and holds a confirmed address
     When "sam" asks to unlink the single sign-on method
     Then the confirmation names the ways in that stay behind
     And nothing is unlinked until "sam" confirms
 
-  @integration @unimplemented
+  @integration
   Scenario: A member of an organization that enforces single sign-on is told it comes back
     Given "sam" belongs to an organization that enforces single sign-on
     When "sam" asks to unlink the single sign-on method
     Then the confirmation says signing in that way links it again
     And the unlink is allowed, because nothing is lost that does not return
 
-  @unit @unimplemented
+  @unit
   Scenario: A passkey on its own does not make unlinking safe
     Given the only other way in "sam" holds is a passkey
     When unlinking the single sign-on method is considered
     Then it is refused, because no message could reach "sam" to recover them
     And the words are the ones registered for "identity_detach_strands_user"
 
-  @integration @unimplemented
+  @integration
   Scenario: Unlinking a primary single sign-on method demotes it first
     Given "sam"'s single sign-on identifier is the primary one
     When "sam" confirms unlinking it

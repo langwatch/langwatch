@@ -151,7 +151,7 @@ Feature: Proving a domain by publishing a record
     And no fact is recorded
     And the words say to try again, and do not tell her to change her DNS
 
-  @unit @unimplemented
+  @unit
   Scenario: A name with nothing on it and a resolver that will not answer are told apart
     When the lookup is answered that the name does not exist, or has no such record
     Then that is "nothing is published there"
@@ -204,7 +204,7 @@ Feature: Proving a domain by publishing a record
     And no fact is recorded
     And the words say to try again, and do not tell her to re-deploy the file
 
-  @unit @unimplemented
+  @unit
   Scenario: A token read off https proves nothing
     Given "acme.com" redirects the well-known address onto plain http
     When LangWatch fetches the file

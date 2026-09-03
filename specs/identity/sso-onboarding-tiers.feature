@@ -392,7 +392,7 @@ Feature: Enterprise single sign-on onboarding - three tiers, in priority order
     Then the grant is refused
     And only a grant across the whole organization is accepted
 
-  @integration @unimplemented
+  @integration
   Scenario: An administrator without the permission is not offered setup, and cannot reach it
     Given "ana" may administer "acme" but may not manage single sign-on
     When she opens organization settings
