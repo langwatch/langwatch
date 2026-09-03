@@ -139,21 +139,28 @@ test.describe("Password reset completion", () => {
       });
 
       // The old password no longer works and the new one does — the last
-      // half of the always-manual scenario this test now automates.
+      // half of the always-manual scenario this test now automates. Checked
+      // at the credential endpoint rather than through the sign-in screen:
+      // this account now holds a passkey, so the screen ASKS for it the
+      // moment the address is submitted (signin-signup-screens.feature "An
+      // account with a passkey is asked for it, not offered a button") and
+      // the virtual authenticator answers before a password box ever shows.
+      // The endpoint is the one thing both passwords are actually checked
+      // against, whichever door leads to it.
       await whenISignOut(page);
-      await page.goto("/auth/signin");
-      await page.getByLabel("Email", { exact: true }).fill(email);
-      await page.getByRole("button", { name: "Continue", exact: true }).click();
-      await expect(page.getByTestId("routed-identifier")).toContainText(email);
-      await page.getByLabel("Password", { exact: true }).fill(oldPassword);
-      await page.getByRole("button", { name: "Log in", exact: true }).click();
-      await expect(page.getByTestId("signin-failure")).toBeVisible({
-        timeout: 10000,
+      const withOld = await page.request.post("/api/auth/sign-in/email", {
+        headers: betterAuthRequestHeaders(),
+        data: { email, password: oldPassword },
       });
-
-      await page.getByLabel("Password", { exact: true }).fill(newPassword);
-      await page.getByRole("button", { name: "Log in", exact: true }).click();
-      await expect(page).not.toHaveURL(/\/auth\/signin/, { timeout: 15000 });
+      expect(withOld.ok(), "the old password is refused").toBe(false);
+      const withNew = await page.request.post("/api/auth/sign-in/email", {
+        headers: betterAuthRequestHeaders(),
+        data: { email, password: newPassword },
+      });
+      expect(
+        withNew.ok(),
+        `the new password signs in: ${withNew.status()} ${(await withNew.text()).slice(0, 200)}`,
+      ).toBe(true);
     } finally {
       await removeVirtualAuthenticator(authenticator);
     }

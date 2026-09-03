@@ -241,11 +241,12 @@ export async function thenIAmCalledByMyEmailNeverNull(
   await page.waitForURL((url) => !url.pathname.startsWith("/auth/"), {
     timeout: 15000,
   });
-  // A password-made account gets the "Sign in faster next time" offer on its
-  // first authenticated screen (`SecureAccountNudge`, a modal dialog), and a
-  // modal's backdrop swallows the click on the user menu behind it. Answer
-  // it the way a person in a hurry does, then carry on.
-  await whenIDeclineTheSecureAccountNudgeIfOffered(page);
+  // A fresh account's first authenticated screen can open a modal — the
+  // join-your-team takeover for a confirmed address whose domain already has
+  // organizations, the "Sign in faster next time" offer for a password-made
+  // account — and a modal's backdrop swallows the click on the user menu
+  // behind it. Answer them the way a person in a hurry does, then carry on.
+  await whenIDeclineWhatTheShellOffersFirst(page);
   await page
     .getByRole("button", { name: /Open user menu/ })
     .click();
@@ -258,22 +259,55 @@ export async function thenIAmCalledByMyEmailNeverNull(
 }
 
 /**
- * Declines the passkey / two-step offer (`secure-account-nudge`) when it is
- * on screen, and does nothing when it is not. The offer is a modal, so any
- * step that needs to click through the app shell after a password sign-in
- * has to get past it first.
+ * Declines whichever modal the app shell opens over a fresh account's first
+ * screen, and does nothing when none does. Two exist today, and either can
+ * arrive a beat after the page (each waits on its own query):
+ *
+ *   - the join-your-team takeover (`JoinYourTeamTakeover`, "Your colleagues
+ *     are already here"), offered to a CONFIRMED address whose domain already
+ *     has organizations — every account this suite confirms is
+ *     `@langwatch.ai`, the same domain as `browser-test@langwatch.ai`'s org
+ *     and every earlier front-door run's, so a link-confirmed account always
+ *     gets it (the lookup answers only for verified addresses, which is why a
+ *     `user.register` account, unverified, does not);
+ *   - the passkey / two-step offer (`SecureAccountNudge`, "Sign in faster
+ *     next time"), for a password-made account.
+ *
+ * Both are modals, so any step that needs to click through the shell has to
+ * get past them first. Declined in turn, then checked once more, because
+ * dismissing the takeover is what lets the nudge's turn come.
  */
-export async function whenIDeclineTheSecureAccountNudgeIfOffered(
+export async function whenIDeclineWhatTheShellOffersFirst(
   page: Page,
 ): Promise<void> {
+  const takeover = page.getByRole("dialog", {
+    name: "Your colleagues are already here",
+  });
   const nudge = page.getByTestId("secure-account-nudge");
-  const offered = await nudge
-    .waitFor({ state: "visible", timeout: 3000 })
-    .then(() => true)
-    .catch(() => false);
-  if (!offered) return;
-  await page.getByRole("button", { name: "Not now" }).click();
-  await expect(nudge).not.toBeVisible();
+  for (let round = 0; round < 3; round++) {
+    // Each wait swallows its own timeout, so the losers of the race never
+    // surface as unhandled rejections after the winner has been acted on.
+    const which = await Promise.race([
+      takeover
+        .waitFor({ state: "visible", timeout: 3000 })
+        .then(() => "takeover" as const)
+        .catch(() => "none" as const),
+      nudge
+        .waitFor({ state: "visible", timeout: 3000 })
+        .then(() => "nudge" as const)
+        .catch(() => "none" as const),
+    ]);
+    if (which === "none") return;
+    if (which === "takeover") {
+      await takeover
+        .getByRole("button", { name: /keep working on my own/ })
+        .click();
+      await expect(takeover).not.toBeVisible();
+    } else {
+      await nudge.getByRole("button", { name: "Not now" }).click();
+      await expect(nudge).not.toBeVisible();
+    }
+  }
 }
 
 function escapeRegExp(value: string): string {
