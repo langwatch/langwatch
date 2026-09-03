@@ -24,9 +24,9 @@
   },
   "scripts": {
     "typecheck": "tsc --noEmit",
-    "test": "vitest run",
+    "test": "vitest run --exclude \"**/*.integration.test.ts\"",
     "test:unit": "vitest run --exclude \"**/*.integration.test.ts\"",
-    "test:integration": "vitest run \"**/*.integration.test.ts\""
+    "test:integration": "vitest run --config vitest.integration.config.ts"
   },
   "dependencies": {
     "@clickhouse/client": "^1.23.0",

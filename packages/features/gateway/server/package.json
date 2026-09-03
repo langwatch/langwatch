@@ -44,8 +44,9 @@
   },
   "scripts": {
     "typecheck": "tsc --noEmit",
-    "test": "vitest run",
-    "test:unit": "vitest run"
+    "test": "vitest run --exclude \"**/*.integration.test.ts\"",
+    "test:unit": "vitest run --exclude \"**/*.integration.test.ts\"",
+    "test:integration": "vitest run --config vitest.integration.config.ts"
   },
   "dependencies": {
     "@langwatch/api": "workspace:*",

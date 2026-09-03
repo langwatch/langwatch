@@ -24,8 +24,9 @@
   "scripts": {
     "prisma:generate": "prisma generate --config ./prisma.config.ts",
     "typecheck": "tsc --noEmit",
-    "test": "vitest",
-    "test:unit": "vitest run",
+    "test": "vitest run --exclude \"**/*.integration.test.ts\"",
+    "test:unit": "vitest run --exclude \"**/*.integration.test.ts\"",
+    "test:integration": "vitest run --config vitest.integration.config.ts",
     "db:seed": "tsx prisma/seed.ts"
   },
   "dependencies": {
