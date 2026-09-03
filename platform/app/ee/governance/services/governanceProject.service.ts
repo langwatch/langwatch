@@ -136,10 +136,25 @@ async function resolveHiddenGovernanceProject(
     return bySlug;
   }
 
-  // Two concurrent ensures can both pass the check above and reach create
-  // — the slug-uniqueness re-check closes the common case but not the
-  // window between the findUnique and the create. Catch P2002 (unique
-  // constraint) and re-fetch the row that won the race.
+  return await createGovernanceProject({ prisma, slug, teamId: team.id });
+}
+
+/** Creates the row, or returns the one that beat us to the slug.
+ *
+ *  Two concurrent ensures can both pass the caller's slug re-check and reach
+ *  create — that re-check closes the common case but not the window between
+ *  the findUnique and the create. P2002 (unique constraint) is the losing
+ *  side of that race, and the winner's row is the correct answer.
+ */
+async function createGovernanceProject({
+  prisma,
+  slug,
+  teamId,
+}: {
+  prisma: PrismaClient;
+  slug: string;
+  teamId: string;
+}): Promise<Project> {
   try {
     return await prisma.project.create({
       data: {
@@ -147,7 +162,7 @@ async function resolveHiddenGovernanceProject(
         name: "Governance (internal)",
         slug,
         apiKey: generateApiKey(),
-        teamId: team.id,
+        teamId,
         kind: PROJECT_KIND.INTERNAL_GOVERNANCE,
         // Internal-only — these aren't real "I'm building an app"
         // language/framework signals, but the Project model requires
@@ -162,13 +177,14 @@ async function resolveHiddenGovernanceProject(
     });
   } catch (err) {
     if (
-      err instanceof Prisma.PrismaClientKnownRequestError &&
-      err.code === "P2002"
+      !(err instanceof Prisma.PrismaClientKnownRequestError) ||
+      err.code !== "P2002"
     ) {
-      const winner = await prisma.project.findUnique({ where: { slug } });
-      if (winner && winner.kind === PROJECT_KIND.INTERNAL_GOVERNANCE) {
-        return winner;
-      }
+      throw err;
+    }
+    const winner = await prisma.project.findUnique({ where: { slug } });
+    if (winner?.kind === PROJECT_KIND.INTERNAL_GOVERNANCE) {
+      return winner;
     }
     throw err;
   }
