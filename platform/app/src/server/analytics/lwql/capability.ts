@@ -95,12 +95,18 @@ const BCRYPT_MAX_SECRET_BYTES = 72;
  * Derived capabilities, keyed by the derived salt rather than by the secret so
  * that nothing in this map can be turned back into a credential.
  *
+ * It holds the in-flight hash, not the finished digest, so that concurrent
+ * first queries for one project share a single hash instead of each starting
+ * their own. A dashboard opening several LangWatchQL queries at once is the
+ * normal case, not a rare one, and bcrypt runs on the libuv thread pool — four
+ * copies of the same cold derivation would occupy all of it.
+ *
  * Bounded, and evicted oldest-first: the cost of evicting a project that is
  * still active is one re-hash, so the simplest policy that cannot grow without
  * limit is the right one.
  */
 const CAPABILITY_CACHE_LIMIT = 10_000;
-const capabilityCache = new Map<string, string>();
+const capabilityCache = new Map<string, Promise<string>>();
 
 /**
  * The bcrypt salt for a secret, in the modular-crypt form bcrypt parses.
@@ -159,7 +165,7 @@ export async function lwqlTenantCapability({
     return cached;
   }
 
-  const capability = await hash(secret, salt);
+  const capability = hash(secret, salt);
   if (capabilityCache.size >= CAPABILITY_CACHE_LIMIT) {
     const oldest = capabilityCache.keys().next();
     if (!oldest.done) {
@@ -167,5 +173,9 @@ export async function lwqlTenantCapability({
     }
   }
   capabilityCache.set(salt, capability);
+  // A failed hash must not be remembered as this project's answer: drop it so
+  // the next query derives again rather than replaying the failure forever.
+  // The rejection still reaches this call's caller through the returned promise.
+  capability.catch(() => capabilityCache.delete(salt));
   return capability;
 }
