@@ -40,10 +40,6 @@
       "types": "./src/behavior/prompts/use-latest-prompt-version.ts",
       "default": "./src/behavior/prompts/use-latest-prompt-version.ts"
     },
-    "./prompts/prompt-playground/hooks/useLoadSpanIntoPromptPlayground": {
-      "types": "./src/behavior/prompts/prompt-playground/use-load-span-into-prompt-playground.ts",
-      "default": "./src/behavior/prompts/prompt-playground/use-load-span-into-prompt-playground.ts"
-    },
     "./prompts/utils/llmPromptConfigUtils": {
       "types": "./src/behavior/prompts/llm-prompt-config-utils.ts",
       "default": "./src/behavior/prompts/llm-prompt-config-utils.ts"
