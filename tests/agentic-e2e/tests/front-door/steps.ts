@@ -19,10 +19,24 @@
  * (50 attempts / 15 minutes on `/sign-in/email` — see
  * `platform/app/src/server/better-auth/config/rate-limit.ts`).
  */
-import { expect, type Page } from "@playwright/test";
+import { expect, type Page, test } from "@playwright/test";
 import { findSignUpVerificationToken } from "./db";
 
 export const FRONT_DOOR_PASSWORD = "FrontDoorTest123!";
+
+/**
+ * The headers every direct call to a better-auth endpoint needs. better-auth's
+ * origin check (`api/middlewares/origin-check`) refuses any cookie-bearing
+ * POST whose `Origin` (or `Referer`) is missing or untrusted, and Playwright's
+ * `page.request` sends neither on its own — so a bare `page.request.post(
+ * "/api/auth/...")` from a signed-in context is a silent 403, not a sign-out.
+ * The app's own tRPC endpoints do not run this check, which is why
+ * `user.register` and the onboarding calls below need nothing extra.
+ */
+export function betterAuthRequestHeaders(): Record<string, string> {
+  const baseURL = test.info().project.use.baseURL ?? "http://localhost:5570";
+  return { Origin: new URL(baseURL).origin };
+}
 
 /** A fresh address, so re-runs never collide with a prior run's account. */
 export function generateFrontDoorEmail(prefix: string): string {
@@ -124,26 +138,48 @@ export async function whenIOpenTheConfirmationLinkFor(
  * no passkey error, no second password prompt — and lands them past the
  * sign-up screen. Bound to "Opening the link is what signs me in for the
  * first time" (signin-signup-screens.feature).
+ *
+ * The screen's "You're in" handoff card (`signed-in-handoff`) is set in the
+ * same tick as the `hardRedirect` that leaves the page
+ * (`VerificationFirstSignUp.tsx`), so against a local prod build the browser
+ * is often already on the next page before the card is ever painted. It is
+ * not a dependable observable, and the component test already pins it. What
+ * this step asserts instead is what the person actually gets: the browser
+ * leaves /auth/signup on its own, the session behind it belongs to `email`,
+ * and nothing on the way asked for a password or a passkey.
  */
 export async function thenTheLinkSignsMeInWithNoSecondPrompt(
   page: Page,
   email: string,
 ): Promise<void> {
-  await expect(page.getByTestId("signed-in-handoff")).toContainText(email, {
-    timeout: 10000,
+  // The handoff is a real `hardRedirect`, so the browser leaves /auth/signup
+  // entirely rather than the screen quietly re-rendering in place. Had the
+  // link opened no session, the screen would have stayed put and offered a
+  // way in (`AccountIsReady` / `MethodChoice`) — so leaving IS the sign-in.
+  await page.waitForURL((url) => !url.pathname.startsWith("/auth/signup"), {
+    timeout: 15000,
   });
-  // Neither a password box nor a passkey ceremony panel is on screen: the
-  // handoff card is the ONLY thing drawn.
+  await expect
+    .poll(
+      async () => {
+        const response = await page.request.get("/api/auth/get-session");
+        if (!response.ok()) return null;
+        const body = (await response.json().catch(() => null)) as {
+          user?: { email?: string };
+        } | null;
+        return body?.user?.email ?? null;
+      },
+      { timeout: 10000 },
+    )
+    .toBe(email);
+  // Wherever the redirect landed, it is not a credential prompt: no password
+  // box, no passkey ceremony, no passkey refusal.
   await expect(page.getByLabel("Password", { exact: true })).toHaveCount(0);
   await expect(page.getByTestId("passkey-ceremony")).toHaveCount(0);
   await expect(
     page.getByText("Could not use a passkey", { exact: false }),
   ).toHaveCount(0);
-  // The handoff is a real `hardRedirect`, so the browser leaves /auth/signup
-  // entirely rather than the screen quietly re-rendering in place.
-  await page.waitForURL((url) => !url.pathname.startsWith("/auth/signup"), {
-    timeout: 15000,
-  });
+  await expect(page).not.toHaveURL(/\/auth\/sign(in|up)/);
 }
 
 // =============================================================================
@@ -294,7 +330,14 @@ export async function whenISignInWithPassword(
  * rate limit actually counts.
  */
 export async function whenISignOut(page: Page): Promise<void> {
-  await page.request.post("/api/auth/sign-out");
+  const response = await page.request.post("/api/auth/sign-out", {
+    headers: betterAuthRequestHeaders(),
+  });
+  if (!response.ok()) {
+    throw new Error(
+      `sign-out failed: ${response.status()} ${(await response.text()).slice(0, 300)}`,
+    );
+  }
 }
 
 /**

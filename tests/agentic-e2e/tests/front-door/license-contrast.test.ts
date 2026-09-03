@@ -79,10 +79,11 @@ test.describe("Activate-a-license button contrast", () => {
     await givenMyAccountHasAWorkspace(page);
     await page.goto("/settings/security");
 
-    await expect(page.getByTestId("enterprise-capabilities")).toBeVisible({
-      timeout: 15000,
-    });
-    const button = page.locator('a[href="/settings/license"]');
+    const section = page.getByTestId("enterprise-capabilities");
+    await expect(section).toBeVisible({ timeout: 15000 });
+    // Scoped to the section: the sidebar carries its own "License" link to
+    // the same address, and this is the button, not the navigation.
+    const button = section.locator('a[href="/settings/license"]');
     await expect(button).toBeVisible();
     await expect(button).toHaveText("Activate a license");
 

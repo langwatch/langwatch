@@ -19,6 +19,7 @@ import { expect, test } from "@playwright/test";
 import { findPasswordResetToken } from "./db";
 import { addVirtualAuthenticator, removeVirtualAuthenticator } from "./webauthn";
 import {
+  betterAuthRequestHeaders,
   FRONT_DOOR_PASSWORD,
   generateFrontDoorEmail,
   givenARegisteredAccount,
@@ -32,6 +33,7 @@ async function requestResetToken(
   email: string,
 ): Promise<string> {
   const response = await page.request.post("/api/auth/request-password-reset", {
+    headers: betterAuthRequestHeaders(),
     data: { email, redirectTo: "/auth/reset-password" },
   });
   if (!response.ok()) {
