@@ -8,9 +8,11 @@
  * `typescript/unstable/*`, and this pins that nothing drifts back.
  *
  * The version sweep is here rather than in a lint rule because the exemptions
- * are the interesting part: two packages publish bundled `.d.ts` through a
- * toolchain that drives the old compiler API, so they are held on 6
- * deliberately and must not be swept forward by a well-meaning bulk bump.
+ * are the interesting part: three packages drive the old programmatic compiler
+ * API, so they are held on 6 deliberately and must not be swept forward by a
+ * well-meaning bulk bump. The exemption is what the root-import scan reads too
+ * — on 6 the root export IS the compiler, so a value import of it there is the
+ * supported way to reach the API rather than the runtime failure it is on 7.
  *
  * Spec: specs/setup/typescript-7.feature
  * ADR: dev/docs/adr/099-typescript-7-is-the-compiler.md
@@ -27,11 +29,30 @@ const PACKAGE_ROOT = resolve(__dirname, "../..");
 const REPO_ROOT = resolve(PACKAGE_ROOT, "../..");
 
 /**
- * Packages held on TypeScript 6, each for the same reason: `tsup`'s `dts: true`
- * bundles declarations through the programmatic compiler API, which TypeScript
- * 7 does not expose. They move when a `.d.ts` bundler speaks the 7 API.
+ * Packages held on TypeScript 6, for two reasons rather than one.
+ *
+ * `sdks/typescript` and `mcp/typescript` publish bundled `.d.ts` through
+ * `tsup`'s `dts: true`, which drives the programmatic compiler API that
+ * TypeScript 7 does not expose. They move when a `.d.ts` bundler speaks the
+ * 7 API.
+ *
+ * `packages/architecture-lint` drives that API directly, and far more of it:
+ * 19 rule modules and ~726 call sites, including `createProgram`,
+ * `createPrinter`, `createScanner`, `preProcessFile`, `parseJsonText`,
+ * `readConfigFile` and `sys`, none of which `typescript/unstable/*` offers.
+ * It is also the wrong shape for the ADR-099 seam: the seam parses through a
+ * `tsgo` child, which is a round trip per file, and this is a synchronous CLI
+ * walking 8,700 modules on every `pnpm lint`. Parsing in process against 6,
+ * with a cache keyed on path + mtime + size, is the deliberate call recorded
+ * in `dev/docs/plans/core-application-feature-extraction-plan.md`. It moves
+ * when the unstable API grows a program, a printer and a scanner, or when the
+ * rules are restructured to parse the whole tree in one exchange.
  */
-const HELD_ON_SIX = new Set(["sdks/typescript", "mcp/typescript"]);
+const HELD_ON_SIX = new Set([
+  "sdks/typescript",
+  "mcp/typescript",
+  "packages/architecture-lint",
+]);
 
 /**
  * Where the workspace's own package manifests live, relative to the root.

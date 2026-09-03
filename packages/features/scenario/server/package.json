@@ -62,6 +62,7 @@
   },
   "devDependencies": {
     "@langwatch/redis-client": "workspace:*",
+    "@langwatch/test-harness": "workspace:*",
     "@opentelemetry/sdk-trace-base": "2.10.0",
     "@opentelemetry/sdk-trace-node": "2.10.0",
     "@types/papaparse": "^5.5.2",

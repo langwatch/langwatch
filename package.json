@@ -50,7 +50,6 @@
   },
   "devDependencies": {
     "@0xdeafcafe/tslsp-cli": "0.6.0",
-    "@typescript/native-preview": "7.0.0-dev.20260506.1",
     "concurrently": "^9.1.2",
     "oxfmt": "0.63.0",
     "oxlint": "^1.78.0",

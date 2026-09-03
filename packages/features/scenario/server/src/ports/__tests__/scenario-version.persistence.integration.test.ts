@@ -12,6 +12,7 @@ import {
   type PrismaQueryExecutor,
 } from "@langwatch/prisma-client";
 import type { PrismaClient } from "@langwatch/prisma-client/generated";
+import { cleanupTestRows } from "@langwatch/test-harness";
 import { SimulationService } from "@langwatch/scenario-contract";
 import { randomUUID } from "node:crypto";
 import { afterAll, beforeAll, beforeEach, describe, expect, it } from "vitest";
@@ -158,17 +159,21 @@ describe.skipIf(!databaseUrl)("Scenario version persistence", () => {
   });
 
   afterAll(async () => {
-    if (projectId && otherProjectId) {
-      const projectIds = [projectId, otherProjectId];
-      await database().scenarioVersion.deleteMany({ where: { projectId: { in: projectIds } } });
-      await database().scenario.deleteMany({ where: { projectId: { in: projectIds } } });
-      await database().simulationSuite.deleteMany({ where: { projectId: { in: projectIds } } });
-      await database().project.deleteMany({ where: { id: { in: projectIds } } });
-      await database().team.deleteMany({ where: { id: teamId } });
-      await database().organization.deleteMany({ where: { id: organizationId } });
+    try {
+      if (projectId && otherProjectId) {
+        const projectIds = [projectId, otherProjectId];
+        await cleanupTestRows(database(), [
+          ["scenarioVersion", { projectId: { in: projectIds } }],
+          ["scenario", { projectId: { in: projectIds } }],
+          ["simulationSuite", { projectId: { in: projectIds } }],
+          ["project", { id: { in: projectIds } }],
+          ["team", { id: teamId }],
+          ["organization", { id: organizationId }],
+        ]);
+      }
+    } finally {
+      await connection?.closeOnce();
     }
-
-    await connection?.closeOnce();
   });
 
   it("records complete snapshots, deliberate no-op saves, changed fields and attribution", async () => {

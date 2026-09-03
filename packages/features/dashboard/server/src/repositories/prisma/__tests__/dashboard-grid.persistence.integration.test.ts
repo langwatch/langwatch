@@ -15,6 +15,7 @@ import {
   type PrismaQueryExecutor,
 } from "@langwatch/prisma-client";
 import type { PrismaClient } from "@langwatch/prisma-client/generated";
+import { cleanupTestRows } from "@langwatch/test-harness";
 import { randomUUID } from "node:crypto";
 import { afterAll, beforeAll, beforeEach, describe, expect, it } from "vitest";
 import {
@@ -137,19 +138,26 @@ describe.skipIf(!databaseUrl)("Dashboard shared grid persistence", () => {
   });
 
   beforeEach(async () => {
-    await database().customGraph.deleteMany({ where: { projectId } });
-    await database().dashboard.deleteMany({ where: { projectId } });
+    await cleanupTestRows(database(), [
+      ["customGraph", { projectId }],
+      ["dashboard", { projectId }],
+    ]);
   });
 
   afterAll(async () => {
-    if (projectId) {
-      await database().customGraph.deleteMany({ where: { projectId } });
-      await database().dashboard.deleteMany({ where: { projectId } });
-      await database().project.delete({ where: { id: projectId } });
-      await database().team.delete({ where: { id: teamId } });
-      await database().organization.delete({ where: { id: organizationId } });
+    try {
+      if (projectId) {
+        await cleanupTestRows(database(), [
+          ["customGraph", { projectId }],
+          ["dashboard", { projectId }],
+        ]);
+        await database().project.delete({ where: { id: projectId } });
+        await database().team.delete({ where: { id: teamId } });
+        await database().organization.delete({ where: { id: organizationId } });
+      }
+    } finally {
+      await connection?.closeOnce();
     }
-    await connection?.closeOnce();
   });
 
   /** @scenario "Placing a chart onto a dashboard already holding builder charts does not overlap them" */

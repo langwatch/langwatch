@@ -37,6 +37,7 @@
     "zod": "^4.4.3"
   },
   "devDependencies": {
+    "@langwatch/test-harness": "workspace:*",
     "@types/jsonwebtoken": "^9.0.10",
     "@types/node": "^26.0.1",
     "typescript": "^7.0.2",

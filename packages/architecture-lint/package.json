@@ -30,7 +30,7 @@
     "check:feature-parity": "tsx src/check-feature-parity.ts"
   },
   "dependencies": {
-    "typescript": "6.0.3",
+    "typescript": "^6.0.3",
     "zod": "^4.4.3"
   },
   "devDependencies": {

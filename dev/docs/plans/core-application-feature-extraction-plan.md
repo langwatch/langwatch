@@ -11199,3 +11199,111 @@ same thing it does.
   `api-trpc-collaborators.trace-group.{composition,integration.test}.ts` and
   `trace-rest.integration.test.ts` is pre-existing and left where it was.
 - Nothing under `platform/` was created, edited or read.
+
+## `@langwatch/test-harness` is green, and its four guards say what they mean, 2026-09-03
+
+The package CI runs with no exclusions and no allowed failures was red on five
+counts — the four the earlier lane surfaced, plus one that never got as far as
+being counted, because the suite holding it failed to collect.
+
+### What was red, and why
+
+| Guard | Cause |
+| --- | --- |
+| `typescript-compiler-api` — no value import of the `typescript` root | 19 files in `packages/architecture-lint/src` import it. They are correct: the package is on TypeScript 6, where the root export IS the compiler. The scan skipped `HELD_ON_SIX` and that set named only the two `tsup` packages. |
+| the same guard — every package declares one compiler major | `packages/architecture-lint` declared `6.0.3`, which is neither `^7.` nor the `^6.` its held siblings use. |
+| the same guard — the preview compiler is gone | `@typescript/native-preview` was still a root devDependency. |
+| `teardown-scan` — no teardown deletes by a reassignable id | 43 sites across `packages/features/**`, unasserted until the lane before this one removed the dead `ee/` root that had been aborting the walk. |
+| `mock-specifier-scan` — **suite error, not a test failure** | `parseVitestConfigAliases` threw on the first config it could not read. 22 of the 23 alias tables in the tree are built with `fileURLToPath(new URL(…, import.meta.url))` or `new URL(…).pathname`, and the reader knew only `join`/`resolve` off `__dirname`. Nothing downstream of it ran, so the whole-tree mock check had never reported. |
+
+### Decisions taken
+
+- **`packages/architecture-lint` joins `HELD_ON_SIX`, and its pin becomes
+  `^6.0.3`.** The alternative — lifting it to 7 — is the 726 call sites across
+  19 rule modules that reach `createProgram`, `createPrinter`, `createScanner`,
+  `preProcessFile`, `parseJsonText`, `readConfigFile`, `sys` and
+  `parseJsonConfigFileContent`. `typescript/unstable/*` offers none of those,
+  and the ADR-099 seam is the wrong shape besides: it is a round trip per parse,
+  and this is a synchronous CLI over 8,700 modules on every `pnpm lint`. The
+  decision was already taken and recorded in this plan ("`typescript@6`'s
+  in-process API, deliberately"); it just was not in the code that enforces it.
+  So the list's docblock, `specs/setup/typescript-7.feature` and ADR-099 all say
+  the second reason now, with its own exit condition. The exemption is not a
+  suppression: on 6 the root export is the compiler, which is why one set
+  governs both halves of the guard.
+- **The teardown rule now names a Prisma delegate, not any receiver.** Two of
+  the 43 were `caller.deleteMany(...)` and `repository.deleteMany(...)` — the
+  product's own tRPC procedure and repository method, driven against fakes that
+  never see a database. Prisma always reaches a model through the client, so a
+  delegate call's receiver is itself a property access; a bare identifier has no
+  model segment. A repo-wide check found exactly those two bare receivers, so
+  the narrowing costs no coverage, and it is pinned by a case and a scenario.
+  The limit it accepts (`const team = prisma.team` then `team.deleteMany(…)`) is
+  written down in the docblock.
+- **The other 41 go through `cleanupTestRows`,** in the five feature-server
+  packages that now declare `@langwatch/test-harness`. Each `afterAll` that
+  closes a connection got a `try`/`finally`, because the helper throws on an
+  unidentified filter by design and an unclosed pool after that is a hang.
+- **The alias reader learned the two URL forms and the anchored-regex find.**
+  `fileURLToPath(new URL("…", import.meta.url))` and `new URL(…).pathname` both
+  resolve against the config's own directory. An anchored `/^name$/` is a
+  package name spelled as a regex — the way a config asks for an exact match
+  rather than vite's prefix rule — and `ModuleAlias` carries `exact` so the
+  resolver honours it. A pattern that is not one anchored literal still throws.
+  `packages/enterprise/features/webhook/server/vitest.config.ts` spells its four
+  entries out rather than building them through two local arrow functions, since
+  a table assembled by calling a function is a table this reader cannot follow,
+  and it refuses rather than skips.
+
+### What fixing the reader surfaced
+
+Ten `vi.mock` calls naming no module — mocks that registered nothing and let the
+real module load while the suite read green. All ten are monolith-era paths that
+survived the package moves:
+
+| Site | Was | Now |
+| --- | --- | --- |
+| `analytics/web` browser workbench test, 2 calls | `../../behavior/…`, `../../ui/…` | `../../src/…` |
+| `prompt/contract` `reasoningBoundary` | `../../../utils/modelProviderHelpers` | deleted — no such module exists anywhere, and the suite drives the contract's own exports |
+| `suite/web` group-row, run-row, scenario-target-row | `../use-prefetch-run-state` | deleted — the hook lives in `@langwatch/scenario-web` and none of the three subjects imports it |
+| `trace/web` traces-mapping, 3 files | `../../../hooks/useFilterParams` | deleted — `traces-mapping.tsx` reads no filter params |
+| `workflow/web` `use-evaluation-execution` | `../../../components/ui/toaster` | `../../../../behavior/studio-host/toaster`, which is what the hook imports |
+
+**Left standing, and named rather than fixed:** the rest of
+`packages/features/analytics/web/tests/browser/**` still imports `../../ui/…`
+and `../../__tests__/…`, neither of which exists — the whole browser lane is
+stale, and its own config says CI does not run it. Fixing the two mock
+specifiers is what the guard asks for; repointing four test files' imports is
+the browser lane's own job.
+
+### Gates
+
+- `@langwatch/test-harness`: **Test Files 12 passed (12)**, **Tests 137 passed (137)**.
+- `@langwatch/architecture-lint`: **38 passed (38)**, **495 passed (495)**.
+- `@langwatch/dashboard-server`: **7 passed | 2 skipped (9)**, **81 passed | 12 skipped (93)**.
+- `@langwatch/experiment-server`: **20 passed | 1 skipped (21)**, **5248 passed | 3 skipped (5251)**.
+- `@langwatch/github-server`: **15 passed | 2 skipped (17)**, **126 passed | 31 skipped (157)**.
+- `@langwatch/scenario-server`: **2 failed | 62 passed | 2 skipped (66)**, **823 passed | 42 skipped (865)** — both failures are `cancellation-channel` and `scenario-tab-registry` refusing to run without Redis, neither touched here.
+- `@langwatch/share-server`: **4 passed | 1 skipped (5)**, **60 passed | 5 skipped (65)**.
+- `@langwatch/analytics-web`: **34 passed (34)**, **274 passed (274)**.
+- `@langwatch/prompt-contract`: **9 passed (9)**, **131 passed (131)**.
+- `@langwatch/suite-web`: **25 passed (25)**, **313 passed (313)**.
+- `@langwatch/trace-web` (`test:unit`): **231 passed (231)**, **1818 passed (1818)**.
+- `@langwatch/workflow-web`: **52 passed (52)**, **323 passed (323)**.
+- `@langwatch/enterprise-webhook-server`: **9 passed (9)**, **90 passed (90)**.
+- `pnpm install --offline` from the root: clean, no network. `tsc --noEmit` for
+  `@langwatch/test-harness` is clean; the five feature-server packages carry
+  pre-existing errors only in `packages/{api,eventing,group-queue,otlp,redis-client}`
+  sources, none in a file this lane touched.
+- `oxlint`: clean over every touched file. The one error under them —
+  `ExperimentNotFoundError` imported and unused in the experiment workbench
+  suite — is at `HEAD` too and is left where it was.
+
+### Consequence worth knowing
+
+`node_modules/.bin/tsgo` is gone with the preview package. Nothing in the repo
+invoked it: no script names it, and `@0xdeafcafe/tslsp-cli` carries its own copy
+as a dependency of its own. `dev/scripts/install-check-shims.mjs` still lists it
+and stands down when the binary is absent — and the root manifest declares no
+`postinstall`, so on this branch the shims are not installed at all, which is a
+separate gap from this one.

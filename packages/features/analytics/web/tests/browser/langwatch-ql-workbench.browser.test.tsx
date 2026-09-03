@@ -46,7 +46,7 @@ vi.mock("@trpc/client", async (importOriginal) => {
   };
 });
 
-vi.mock("../../behavior/analytics-api", () => ({
+vi.mock("../../src/behavior/analytics-api", () => ({
   api: {
     useUtils: () => ({ client: {} }),
     analytics: {
@@ -107,7 +107,7 @@ vi.mock("@monaco-editor/react", () => {
   return { __esModule: true, default: StubMonacoEditor };
 });
 
-vi.mock("../../ui/sections/lazy-langwatch-ql-chart-mode", () => ({
+vi.mock("../../src/ui/sections/lazy-langwatch-ql-chart-mode", () => ({
   LazyLangWatchQLChartMode: () => <div data-testid="stub-chart-mode" />,
 }));
 

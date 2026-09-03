@@ -42,6 +42,19 @@ cannot resolve; making that resolve means changing what the package declares as
 a dependency, which is a decision about the published artifact and not a build
 detail. These two move when a `.d.ts` bundler that speaks the TS 7 API exists.
 
+**A third package stays on `typescript@6`: `packages/architecture-lint`.** It is
+not a publishing concern — it drives the old programmatic API directly, across
+19 rule modules and roughly 726 call sites, and reaches for `createProgram`,
+`createPrinter`, `createScanner`, `preProcessFile`, `parseJsonText`,
+`readConfigFile`, `sys` and `parseJsonConfigFileContent`. `typescript/unstable/*`
+offers none of those. It is also the wrong shape for the parse seam below: the
+seam is a round trip per parse, and this is a synchronous CLI that walks 8,700
+modules on every `pnpm lint`. It parses in process against 6 instead, with a
+cache keyed on path + mtime + size so no file is parsed twice, which is how it
+honours the batching this ADR asks for. It moves when the unstable API grows a
+program, a printer and a scanner, or when every rule is restructured to parse
+the tree in one exchange.
+
 **Static scans go through one API session.** TypeScript 7 has no in-process
 parser: `ts.createSourceFile(fileName, text)` is gone, and parsing is a request
 to the Go binary. `src/test-utils/tsAst.ts` owns a single `API` session for the
@@ -158,7 +171,7 @@ nothing so far establishes that this is the binding constraint. The sampling in
 working set stayed in a 2.3–3.5 GB band at every ceiling, so the compiler never
 came close to needing what it had.
 
-The two packages on `typescript@6` are a standing item, not a resting state.
+The three packages on `typescript@6` are a standing item, not a resting state.
 
 ## References
 

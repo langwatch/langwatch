@@ -142,8 +142,19 @@ export function scanSourceForMockSpecifiers({
  * `"@"` (the SDK's alias for its own `src`) from claiming
  * `@opentelemetry/api`.
  */
-function aliasMatches({ find, specifier }: { find: string; specifier: string }): boolean {
+function aliasMatches({
+  find,
+  specifier,
+  exact,
+}: {
+  find: string;
+  specifier: string;
+  exact?: boolean;
+}): boolean {
   if (specifier === find) return true;
+  // An anchored entry claims the bare specifier and nothing under it, so a
+  // subpath falls through to the package's own `exports` map.
+  if (exact) return false;
   return specifier.startsWith(find.endsWith("/") ? find : `${find}/`);
 }
 
@@ -161,8 +172,8 @@ function applyAliases({
   specifier: string;
   aliases: ModuleAlias[];
 }): string {
-  for (const { find, replacement } of aliases) {
-    if (aliasMatches({ find, specifier })) {
+  for (const { find, replacement, exact } of aliases) {
+    if (aliasMatches({ find, specifier, exact })) {
       return replacement + specifier.slice(find.length);
     }
   }

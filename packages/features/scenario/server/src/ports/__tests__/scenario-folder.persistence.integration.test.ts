@@ -8,6 +8,7 @@ import {
   type PrismaQueryExecutor,
 } from "@langwatch/prisma-client";
 import type { PrismaClient } from "@langwatch/prisma-client/generated";
+import { cleanupTestRows } from "@langwatch/test-harness";
 import { randomUUID } from "node:crypto";
 import { afterAll, beforeAll, beforeEach, describe, expect, it } from "vitest";
 import { PrismaScenarioAdapter } from "../../index";
@@ -169,17 +170,20 @@ describe.skipIf(!databaseUrl)("Scenario folder persistence", () => {
   });
 
   afterAll(async () => {
-    if (projectId && otherProjectId) {
-      const db = database();
-      const projectIds = [projectId, otherProjectId];
-      await db.scenario.deleteMany({ where: { projectId: { in: projectIds } } });
-      await db.simulationSuite.deleteMany({ where: { projectId: { in: projectIds } } });
-      await db.project.deleteMany({ where: { id: { in: projectIds } } });
-      await db.team.deleteMany({ where: { id: teamId } });
-      await db.organization.deleteMany({ where: { id: organizationId } });
+    try {
+      if (projectId && otherProjectId) {
+        const projectIds = [projectId, otherProjectId];
+        await cleanupTestRows(database(), [
+          ["scenario", { projectId: { in: projectIds } }],
+          ["simulationSuite", { projectId: { in: projectIds } }],
+          ["project", { id: { in: projectIds } }],
+          ["team", { id: teamId }],
+          ["organization", { id: organizationId }],
+        ]);
+      }
+    } finally {
+      await connection?.closeOnce();
     }
-
-    await connection?.closeOnce();
   });
 
   it("returns the complete folder row and lists only active folders of the project", async () => {

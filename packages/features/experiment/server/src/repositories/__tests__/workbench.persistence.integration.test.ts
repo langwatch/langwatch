@@ -15,6 +15,7 @@ import {
   type PrismaQueryExecutor,
 } from "@langwatch/prisma-client";
 import type { PrismaClient } from "@langwatch/prisma-client/generated";
+import { cleanupTestRows } from "@langwatch/test-harness";
 import { PromptService } from "@langwatch/prompt-contract";
 import { WorkflowService } from "@langwatch/workflow-contract";
 import { randomUUID } from "node:crypto";
@@ -128,25 +129,26 @@ describe.skipIf(!databaseUrl)("Experiment workbench persistence", () => {
   });
 
   beforeEach(async () => {
-    const db = database();
-    await db.experimentVersion.deleteMany({
-      where: { projectId: { in: [projectId, otherProjectId] } },
-    });
-    await db.experiment.deleteMany({ where: { projectId: { in: [projectId, otherProjectId] } } });
+    await cleanupTestRows(database(), [
+      ["experimentVersion", { projectId: { in: [projectId, otherProjectId] } }],
+      ["experiment", { projectId: { in: [projectId, otherProjectId] } }],
+    ]);
   });
 
   afterAll(async () => {
-    if (projectId) {
-      const db = database();
-      await db.experimentVersion.deleteMany({
-        where: { projectId: { in: [projectId, otherProjectId] } },
-      });
-      await db.experiment.deleteMany({ where: { projectId: { in: [projectId, otherProjectId] } } });
-      await db.project.deleteMany({ where: { id: { in: [projectId, otherProjectId] } } });
-      await db.team.deleteMany({ where: { id: teamId } });
-      await db.organization.deleteMany({ where: { id: organizationId } });
+    try {
+      if (projectId) {
+        await cleanupTestRows(database(), [
+          ["experimentVersion", { projectId: { in: [projectId, otherProjectId] } }],
+          ["experiment", { projectId: { in: [projectId, otherProjectId] } }],
+          ["project", { id: { in: [projectId, otherProjectId] } }],
+          ["team", { id: teamId }],
+          ["organization", { id: organizationId }],
+        ]);
+      }
+    } finally {
+      await connection?.closeOnce();
     }
-    await connection?.closeOnce();
   });
 
   it("keeps one rolling autosave, pages named history, and restores setup with live results", async () => {

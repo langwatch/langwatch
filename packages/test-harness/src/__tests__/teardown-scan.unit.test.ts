@@ -231,8 +231,23 @@ describe("scanTestSourceForUnsafeDeleteMany", () => {
     });
   });
 
+  describe("given a deleteMany on the unit under test rather than a client", () => {
+    /** @scenario "A domain method named deleteMany is not a table" */
+    it("passes: a bare receiver has no model segment, so it reaches no table", () => {
+      const violations = scan(
+        [
+          `let recordIds: string[];`,
+          `await caller.deleteMany({ datasetId: "d1", recordIds });`,
+          `await repository.deleteMany({ recordIds, projectId: "p1" });`,
+        ].join("\n"),
+      );
+
+      expect(violations).toEqual([]);
+    });
+  });
+
   describe("given deleteMany on something other than prisma", () => {
-    it("still flags it: any deleteMany in a test file is a database write", () => {
+    it("still flags it: any deleteMany through a client is a database write", () => {
       // ctx.prisma, tx, a repository holding the client: the collapse is
       // identical whatever the client is called.
       const violations = scan(

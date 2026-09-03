@@ -19,6 +19,7 @@ import {
   type PrismaQueryExecutor,
 } from "@langwatch/prisma-client";
 import { type PrismaClient } from "@langwatch/prisma-client/generated";
+import { cleanupTestRows } from "@langwatch/test-harness";
 import { nanoid } from "nanoid";
 import { afterAll, beforeAll, beforeEach, describe, expect, it, vi } from "vitest";
 import {
@@ -271,23 +272,28 @@ describe.skipIf(!databaseUrl)("GitHub pull-request mapping persistence", () => {
   beforeEach(async () => {
     vi.restoreAllMocks();
     vi.unstubAllGlobals();
-    const db = database();
-    await db.githubPullRequest.deleteMany({ where: { organizationId } });
-    await db.githubBranchPullRequestCheck.deleteMany({ where: { organizationId } });
+    await cleanupTestRows(database(), [
+      ["githubPullRequest", { organizationId }],
+      ["githubBranchPullRequestCheck", { organizationId }],
+    ]);
   });
 
   afterAll(async () => {
     vi.unstubAllGlobals();
-    if (organizationId !== "") {
-      const db = database();
-      await db.githubPullRequest.deleteMany({ where: { organizationId } });
-      await db.githubBranchPullRequestCheck.deleteMany({ where: { organizationId } });
-      await db.githubInstallation.deleteMany({ where: { organizationId } });
-      await db.project.deleteMany({ where: { id: projectId } });
-      await db.team.deleteMany({ where: { organizationId } });
-      await db.organization.deleteMany({ where: { id: organizationId } });
+    try {
+      if (organizationId !== "") {
+        await cleanupTestRows(database(), [
+          ["githubPullRequest", { organizationId }],
+          ["githubBranchPullRequestCheck", { organizationId }],
+          ["githubInstallation", { organizationId }],
+          ["project", { id: projectId }],
+          ["team", { organizationId }],
+          ["organization", { id: organizationId }],
+        ]);
+      }
+    } finally {
+      await connection?.closeOnce();
     }
-    await connection?.closeOnce();
   });
 
   it("exposes the configured install and webhook values through the canonical service", () => {

@@ -95,10 +95,27 @@ function lineOf(source: SourceFile, node: Node): number {
   return source.getLineAndCharacterOfPosition(node.getStart(source)).line + 1;
 }
 
-function modelNameOf(callee: PropertyAccessExpression): string {
+/**
+ * The model a `deleteMany` call names, or undefined when the call reaches no
+ * table at all.
+ *
+ * Prisma always reaches a model through the client — `prisma.team`,
+ * `ctx.prisma.team`, `tx.team`, `database().customGraph` — so the receiver of
+ * a delegate call is itself a property access. A receiver that is a bare
+ * identifier has no model segment, which makes it the unit under test's own
+ * method rather than a table: the product ships a `deleteMany` tRPC procedure
+ * and a `deleteMany` repository method, and their unit suites call both
+ * against fakes that never see a database.
+ *
+ * The limit this accepts is `const team = prisma.team` followed by
+ * `team.deleteMany(...)`, which reads as a bare identifier here. No test in
+ * the tree is written that way, and the alternative — reporting the product's
+ * own API as a teardown hazard — teaches contributors to ignore the check.
+ */
+function modelDelegateNameOf(callee: PropertyAccessExpression): string | undefined {
   const owner = unwrapExpression(callee.expression);
+  if (isIdentifier(owner)) return undefined;
   if (isPropertyAccessExpression(owner)) return owner.name.text;
-  if (isIdentifier(owner)) return owner.text;
   return "<unknown>";
 }
 
@@ -270,14 +287,17 @@ export function scanTestSourceForUnsafeDeleteMany(source: SourceFile): TeardownV
       isPropertyAccessExpression(node.expression) &&
       node.expression.name.text === "deleteMany"
     ) {
-      checkDeleteManyArgument({
-        argument: node.arguments[0],
-        line: lineOf(source, node),
-        model: modelNameOf(node.expression),
-        reassignable,
-        source,
-        violations,
-      });
+      const model = modelDelegateNameOf(node.expression);
+      if (model !== undefined) {
+        checkDeleteManyArgument({
+          argument: node.arguments[0],
+          line: lineOf(source, node),
+          model,
+          reassignable,
+          source,
+          violations,
+        });
+      }
     }
     node.forEachChild(visit);
   };

@@ -2,6 +2,7 @@ import { dirname, join, resolve } from "node:path";
 import type {
   CallExpression,
   Expression,
+  NewExpression,
   Node,
   ObjectLiteralElementLike,
 } from "typescript/unstable/ast";
@@ -9,10 +10,13 @@ import {
   isArrayLiteralExpression,
   isCallExpression,
   isIdentifier,
+  isMetaProperty,
+  isNewExpression,
   isNoSubstitutionTemplateLiteral,
   isObjectLiteralExpression,
   isPropertyAccessExpression,
   isPropertyAssignment,
+  isRegularExpressionLiteral,
   isStringLiteral,
 } from "typescript/unstable/ast";
 import { parseSourceText } from "./ts-ast";
@@ -34,6 +38,16 @@ export type ModuleAlias = {
   find: string;
   /** The absolute path it expands to. */
   replacement: string;
+  /**
+   * Whether the entry claims only the bare specifier, never a subpath under
+   * it. An anchored regular-expression `find` is how a config says that, and
+   * it says it for a reason: mapping a package name to one file by prefix
+   * turns `@langwatch/observability/metrics` into
+   * `…/observability/src/index.ts/metrics`, which is an `ENOTDIR` rather than
+   * a module. Absent, the entry matches vite's ordinary rule — the exact
+   * specifier, or a prefix ending at a path boundary.
+   */
+  exact?: boolean;
 };
 
 /** Where one alias entry is being read from, for the throw messages. */
@@ -87,6 +101,82 @@ function pathCallValue({
   return expanded.endsWith("/") ? expanded : `${expanded}/`;
 }
 
+/** Whether an expression is `import.meta.url`, the base every config's URL takes. */
+function isImportMetaUrl(node: Expression): boolean {
+  return (
+    isPropertyAccessExpression(node) && node.name.text === "url" && isMetaProperty(node.expression)
+  );
+}
+
+/** The literal specifier one `new URL("…", import.meta.url)` carries. */
+function urlSpecifierOf(node: NewExpression): string | undefined {
+  if (!isIdentifier(node.expression) || node.expression.text !== "URL") return undefined;
+  const [specifier, base] = node.arguments ?? [];
+  if (!specifier || !isStringLiteral(specifier)) return undefined;
+  if (!base || !isImportMetaUrl(base)) return undefined;
+  return specifier.text;
+}
+
+/**
+ * The path a `new URL(…, import.meta.url)` resolves to, whether the config
+ * unwraps it with `fileURLToPath` or reads `.pathname` off it.
+ *
+ * `import.meta.url` is the config file, and a relative URL resolves against
+ * the file's directory, which is the config's own directory. A trailing
+ * separator is kept for the same reason `join` keeps one: it is what makes an
+ * entry expand to a directory rather than glue the rest of the specifier onto
+ * the directory's name.
+ */
+function urlCallValue({
+  node,
+  configDir,
+}: {
+  node: NewExpression;
+  configDir: string;
+}): string | undefined {
+  const specifier = urlSpecifierOf(node);
+  if (specifier === undefined) return undefined;
+  const expanded = resolve(configDir, specifier);
+  if (!specifier.endsWith("/")) return expanded;
+  return expanded.endsWith("/") ? expanded : `${expanded}/`;
+}
+
+/**
+ * The exact specifier an anchored regular-expression `find` names, or
+ * undefined for any pattern that is not one literal specifier.
+ *
+ * `/^@langwatch\/eventing$/` is a package name spelled as a regex, which is
+ * how a config asks for an exact match. Anything with a character class, a
+ * quantifier, an alternation or a flag is a real pattern, cannot be reduced to
+ * a prefix, and is refused rather than guessed at.
+ */
+function anchoredExactFindOf(node: Expression): string | undefined {
+  if (!isRegularExpressionLiteral(node)) return undefined;
+  const text = node.text;
+  const end = text.lastIndexOf("/");
+  if (end <= 0 || text.slice(end + 1) !== "") return undefined;
+  const body = text.slice(1, end);
+  if (!body.startsWith("^") || !body.endsWith("$")) return undefined;
+
+  const inner = body.slice(1, -1);
+  let literal = "";
+  for (let index = 0; index < inner.length; index += 1) {
+    const character = inner[index]!;
+    if (character === "\\") {
+      const escaped = inner[index + 1];
+      // `\d`, `\w`, `\1` and friends are classes and backreferences, not the
+      // character they spell.
+      if (escaped === undefined || /[a-zA-Z0-9]/.test(escaped)) return undefined;
+      literal += escaped;
+      index += 1;
+      continue;
+    }
+    if ("^$.*+?()[]{}|/".includes(character)) return undefined;
+    literal += character;
+  }
+  return literal;
+}
+
 /** The key and value of one `"key": value` entry, or undefined for any other shape. */
 function simpleEntryOf({
   property,
@@ -111,7 +201,20 @@ function aliasReplacementOf({
 }): string | undefined {
   if (isStringLiteral(value)) return value.text;
   if (isCallExpression(value)) {
+    const [argument] = value.arguments;
+    if (calleeName(value) === "fileURLToPath" && argument && isNewExpression(argument)) {
+      return urlCallValue({ node: argument, configDir });
+    }
     return pathCallValue({ node: value, configDir });
+  }
+  // `new URL("…", import.meta.url).pathname`, the other way a config spells
+  // the same thing.
+  if (
+    isPropertyAccessExpression(value) &&
+    value.name.text === "pathname" &&
+    isNewExpression(value.expression)
+  ) {
+    return urlCallValue({ node: value.expression, configDir });
   }
   return undefined;
 }
@@ -188,19 +291,23 @@ function readArrayEntry({
   if (!find || !replacementValue) {
     throw new Error(`${fileName}: alias array entry is missing find or replacement`);
   }
-  if (!isStringLiteral(find)) {
-    // A regular-expression `find` is legal here and cannot be prefix-matched.
+  const exactFind = isStringLiteral(find) ? undefined : anchoredExactFindOf(find);
+  if (!isStringLiteral(find) && exactFind === undefined) {
+    // A pattern `find` that is not one anchored literal cannot be prefix-matched.
     throw new Error(`${fileName}: alias array entry's find is not a string literal`);
   }
+  const findText = isStringLiteral(find) ? find.text : exactFind!;
 
   const replacement = aliasReplacementOf({
     value: replacementValue,
     configDir,
   });
   if (replacement === undefined) {
-    throw new Error(`${fileName}: alias "${find.text}" is built in a way this scanner cannot read`);
+    throw new Error(`${fileName}: alias "${findText}" is built in a way this scanner cannot read`);
   }
-  return { find: find.text, replacement };
+  return exactFind === undefined
+    ? { find: findText, replacement }
+    : { find: findText, replacement, exact: true };
 }
 
 /**

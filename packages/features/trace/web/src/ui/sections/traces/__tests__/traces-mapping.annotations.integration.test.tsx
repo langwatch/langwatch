@@ -77,10 +77,6 @@ vi.mock("../../use-annotations-by-trace-ids", () => ({
   useAnnotationsByTraceIds: mocks.annotationsRead,
 }));
 
-vi.mock("../../../hooks/useFilterParams", () => ({
-  useFilterParams: () => ({ filterParams: {}, queryOpts: {} }),
-}));
-
 vi.mock("../../trace-api", () => ({
   api: {
     annotationScore: { getAllActive: { useQuery: () => ({ data: [] }) } },

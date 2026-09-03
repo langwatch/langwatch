@@ -34,6 +34,7 @@ import {
   type PrismaQueryExecutor,
 } from "@langwatch/prisma-client";
 import { nanoid } from "nanoid";
+import { cleanupTestRows } from "@langwatch/test-harness";
 import { afterAll, beforeAll, beforeEach, describe, expect, it } from "vitest";
 import {
   GrantPrincipalType,
@@ -190,7 +191,7 @@ describe.skipIf(!databaseUrl)("given a cut-over organization's capped share link
   beforeEach(async () => {
     // Every case starts from the handed-over budget, whatever the last one
     // spent.
-    await prisma.grantUsage.deleteMany({ where: { grantId: shareLinkId } });
+    await cleanupTestRows(prisma, [["grantUsage", { grantId: shareLinkId }]]);
     await prisma.grantUsage.create({
       data: {
         grantId: shareLinkId,
@@ -270,7 +271,7 @@ describe.skipIf(!databaseUrl)("given a cut-over organization's capped share link
 
     describe("when the link has no usage row at all", () => {
       it("creates it on the first view rather than losing the count", async () => {
-        await prisma.grantUsage.deleteMany({ where: { grantId: shareLinkId } });
+        await cleanupTestRows(prisma, [["grantUsage", { grantId: shareLinkId }]]);
 
         expect(await consume()).toBe(true);
 
@@ -280,7 +281,7 @@ describe.skipIf(!databaseUrl)("given a cut-over organization's capped share link
       it("lets exactly one of two simultaneous first views create it", async () => {
         // The race the create exists to resolve: the unique violation on the
         // primary key is what tells the loser it was a race and not a cap.
-        await prisma.grantUsage.deleteMany({ where: { grantId: shareLinkId } });
+        await cleanupTestRows(prisma, [["grantUsage", { grantId: shareLinkId }]]);
 
         const outcomes = await Promise.all([consume(), consume()]);
 

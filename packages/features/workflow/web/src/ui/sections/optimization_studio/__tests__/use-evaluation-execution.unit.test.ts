@@ -40,7 +40,7 @@ vi.mock("../use-post-event", () => ({
 }));
 
 
-vi.mock("../../../components/ui/toaster", () => ({
+vi.mock("../../../../behavior/studio-host/toaster", () => ({
   toaster: { create: vi.fn() },
 }));
 

@@ -10,20 +10,12 @@
  * - Gemini: reasoning_effort -> thinking_level or thinking with budget
  * - OpenAI: reasoning_effort -> passed as-is
  */
-import { describe, expect, it, vi } from "vitest";
+import { describe, expect, it } from "vitest";
 import {
   LITELLM_PARAMETER_TRANSLATION,
   mapReasoningToProvider,
   normalizeReasoningFromProviderFields,
 } from "@langwatch/prompt-contract";
-
-// Mock the provider helper - matches real behavior in modelProviderHelpers.ts
-vi.mock("../../../utils/modelProviderHelpers", () => ({
-  getProviderFromModel: vi.fn((model: string) => {
-    // Real behavior: just extract provider from model string
-    return model.split("/")[0] ?? "";
-  }),
-}));
 
 describe("reasoningBoundary", () => {
   describe("LITELLM_PARAMETER_TRANSLATION", () => {
