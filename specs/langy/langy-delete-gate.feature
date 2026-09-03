@@ -140,6 +140,35 @@ Feature: Langy's worker-side delete gate
       # the segment — that over-block is what gets the whole gate flag-disabled.
 
     @unit
+    Scenario: Routine brace expansion in a non-langwatch command is not over-blocked
+      Given a command whose brace group is a path or range list in an ordinary,
+        non-langwatch command (`cp foo.{js,ts} bar/`, `mkdir -p src/{a,b,c}`,
+        `echo {1..3}`, `rm -rf build/{dist,tmp}`, `git add src/{a,b}.ts`)
+      When the gated bash command runs
+      Then the gate returns allow:true
+      # The argument brace-expansion pass is scoped to langwatch invocations, so
+      # routine path/range braces never reach it and are not over-blocked.
+
+    @unit
+    Scenario: An escaped double-quote inside a double-quoted word is parsed as one argument, not held
+      Given a command with a backslash-escaped double-quote inside a double-quoted
+        word (`git commit -m "she said \"hi\""`, `curl -d "{\"key\":\"value\"}"`)
+      When the gated bash command runs
+      Then the gate returns allow:true
+      # Bash parses `\"` inside double quotes as a literal quote, yielding one
+      # argument; the lexer must not mis-read the word as an unterminated quote.
+
+    @unit
+    Scenario: An unquoted shell comment does not make a command unparseable
+      Given a command with an unquoted `#` comment that contains an apostrophe
+        (`echo hi # don't remove this`, `ls # can't hurt`)
+      When the gated bash command runs
+      Then the gate returns allow:true
+      # An unquoted `#` at a word boundary starts a comment to end-of-segment, so
+      # an odd quote count inside the comment must not trip "unterminated". A `#`
+      # inside a quote or mid-word (`foo#bar`, `"#notacomment"`) is not a comment.
+
+    @unit
     Scenario: A block reason for an unconfirmed delete tells the agent to ask first
       Given a gated bash command deletes a LangWatch resource with no confirmation on record
       When the gate returns allow:false
@@ -229,6 +258,19 @@ Feature: Langy's worker-side delete gate
       # Same class as the quote-splice: bash collapses the head token to
       # langwatch/lw, so the literal is never contiguous statically and the
       # obfuscated command name is held with a targeted re-issue reason.
+
+    @unit
+    Scenario: A brace-expansion splice that reassembles a destructive verb or resource is held
+      Given a langwatch command whose argument carries a comma or empty-alternative
+        brace group that bash would expand into a destructive verb or a resource
+        type (`dele{,}te`, `{,delete,}`, `data{set,}`, `d{el,}ete`)
+      When the spliced command is run as a gated bash command
+      Then the gate returns allow:false
+      # The lexer copies braces literally into the word value, so the verb match
+      # misses them; a dedicated argument brace-expansion pass unmasks the
+      # reassembled verb/resource and holds fail-closed, even with a valid
+      # confirmation. Quoted braces are suppressed and non-langwatch path braces
+      # (`cp foo.{js,ts}`) never reach the pass.
 
     @unit
     Scenario: An awk program that concatenates a destructive command through system() is held
@@ -404,10 +446,10 @@ Feature: Langy's worker-side delete gate
 # AC 7: "Mismatch: confirm A, delete B -> blocked" -> Scenario Outline: A confirmed delete does not authorize a mismatched target
 # AC 8: "Single-use: consumed on first gated allow" -> Scenario: A confirmation is consumed on its first authorized delete
 # AC 9: "Multi-target in one command, partial confirm -> blocked" -> Scenario: A multi-target command with only one target confirmed is blocked entirely
-# AC 10: "Read-only langwatch calls pass" -> Scenario Outline: Read-only langwatch CLI calls pass without confirmation; Scenario: A quoted or escaped argument is not over-blocked, even with word-internal splices
+# AC 10: "Read-only langwatch calls pass" -> Scenario Outline: Read-only langwatch CLI calls pass without confirmation; Scenario: A quoted or escaped argument is not over-blocked, even with word-internal splices; Scenario: Routine brace expansion in a non-langwatch command is not over-blocked; Scenario: An escaped double-quote inside a double-quoted word is parsed as one argument, not held; Scenario: An unquoted shell comment does not make a command unparseable
 # AC 11: "Non-langwatch bash passes" -> Scenario Outline: Non-langwatch bash commands pass without confirmation
 # AC 12: "Block reason is actionable" -> Scenario: A block reason for an unconfirmed delete tells the agent to ask first; Scenario: A block reason for an unresolvable command tells the agent how to re-issue it; Scenario: An obfuscated command-name block names the obfuscation and says to re-issue the name plainly; Scenario: A destructive HTTP block tells the agent to re-issue through the CLI, not to confirm
-# AC 13: "Write-then-execute is held unconditionally" -> Scenario: A write or edit whose content contains a destructive command is held; Scenario Outline: Executing an agent-written file is held even with a valid confirmation; Scenario: A bash native quote-splice that reassembles the CLI name is held; Scenario: A backslash- or brace-spliced command name that reassembles the CLI name is held; Scenario: An awk program that concatenates a destructive command through system() is held
+# AC 13: "Write-then-execute is held unconditionally" -> Scenario: A write or edit whose content contains a destructive command is held; Scenario Outline: Executing an agent-written file is held even with a valid confirmation; Scenario: A bash native quote-splice that reassembles the CLI name is held; Scenario: A backslash- or brace-spliced command name that reassembles the CLI name is held; Scenario: A brace-expansion splice that reassembles a destructive verb or resource is held; Scenario: An awk program that concatenates a destructive command through system() is held
 # AC 14: "Destructive HTTP beyond literal DELETE is held" -> Scenario: A POST GraphQL delete or archive mutation...; Scenario: A PUT or PATCH soft-delete...; Scenario: A POST to a destructive action endpoint...; Scenario: A destructive HTTP block tells the agent to re-issue through the CLI, not to confirm; Scenario Outline: Each unconfirmed bypass class is blocked at the real tool_call seam (HTTP-shape delete case)
 # AC 15: "Benign HTTP to a langwatch host is NOT over-blocked" -> Scenario: A GET request to a langwatch host is not blocked; Scenario: A read or non-destructive GraphQL POST to a langwatch host is not blocked
 # AC 16: "Equals-form flag values are evaluated" -> Scenario: An equals-form flag value carrying a destructive verb is matched; Scenario Outline: Each unconfirmed bypass class is blocked at the real tool_call seam (equals-form case)

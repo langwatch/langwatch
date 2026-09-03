@@ -255,6 +255,12 @@ const FILE_EXECUTORS = new Set(["bash", "sh", "zsh", "dash", "ksh", "source", ".
  *    (stripped as a runner wrapper) or `busybox`, not the interpreter behind it,
  *    so a concat payload wrapped in either is a known residual — narrow, and
  *    unlikely in the worker image. Recorded in the threat model, not closed here.
+ *  - heredoc bodies: `splitSegments` splits on every newline regardless of
+ *    heredoc context, so a heredoc body line carrying an unmatched literal quote
+ *    is read as an unterminated segment and held. This fails CLOSED (an
+ *    over-block, never a bypass) and heredoc bodies are rare in this agent's bash
+ *    usage, so the split stays newline-crude rather than growing heredoc
+ *    awareness. Accepted residual, not closed here.
  */
 export const CODE_INTERPRETERS = new Set([
   "python",
@@ -298,9 +304,12 @@ const UNRESOLVABLE = /[$`]|<\(/;
  * keeps legitimate quoted/escaped ARGUMENTS out — `git commit -m "don't crash"`,
  * `grep -rn 'foo"bar' .`, `sed 's/foo"bar"baz/qux/'` all carry word-internal
  * splices in argument position, which are not CLI-name obfuscations and must not
- * hold the segment. A splice that reassembles a destructive verb in argument
- * position is still caught: the lexer de-splices each token to its bash word
- * value before the verb match runs.
+ * hold the segment. A quote- or backslash-splice that reassembles a destructive
+ * verb in argument position is still caught: the lexer de-splices each such token
+ * to its bash word value before the verb match runs. A BRACE splice is the
+ * exception the lexer does not collapse (`dele{,}te` stays literal in `value`),
+ * so brace groups in a `langwatch` argument get a dedicated expansion pass
+ * (`braceExpandWord`) in `classifySegment` before the verb/resource match.
  *
  * Each alternative requires word text adjacent to the splice, so a fully-quoted
  * token (`"langwatch"`, which the lexer already resolves cleanly) never matches.
@@ -387,11 +396,16 @@ export type Word = { raw: string; value: string };
  * Split a segment into bash words, honouring quoting the way the shell does:
  * whitespace inside quotes does not break a word, and adjacent quoted/unquoted
  * runs concatenate into one word (`lang""watch` → one word `langwatch`,
- * `"de""lete"` → one word `delete`). Brace expansion is NOT performed — braces
- * are copied literally into both `raw` and `value`; a word-internal brace group
- * in the HEAD is caught by `HEAD_SPLICE` on `raw` instead. `unterminated` is
- * true when a quote is opened and never closed, which means the parse does not
- * describe the command and the segment must be held.
+ * `"de""lete"` → one word `delete`). Inside double quotes a backslash escapes
+ * only `$`, backtick, `"`, `\`, and newline (bash), so `"she said \"hi\""` is
+ * one word `she said "hi"`; single quotes take no escapes. An unquoted `#` at a
+ * word boundary starts a comment that ends the segment. Brace expansion is NOT
+ * performed here — braces are copied literally into both `raw` and `value`; a
+ * word-internal brace group in the HEAD is caught by `HEAD_SPLICE` on `raw`, and
+ * a comma/empty-alternative brace group in an ARGUMENT of a `langwatch`
+ * invocation is expanded by `braceExpandWord` in `classifySegment`.
+ * `unterminated` is true when a quote is opened and never closed, which means
+ * the parse does not describe the command and the segment must be held.
  */
 export function shellWords(segment: string): { words: Word[]; unterminated: boolean } {
   const words: Word[] = [];
@@ -401,17 +415,58 @@ export function shellWords(segment: string): { words: Word[]; unterminated: bool
   while (i < n) {
     while (i < n && /\s/.test(segment[i] ?? "")) i += 1;
     if (i >= n) break;
+    // An unquoted `#` at a word boundary begins a comment that runs to the end
+    // of the segment (bash semantics). Stop lexing here: the comment text is not
+    // part of any command, so an apostrophe or an odd quote count inside it must
+    // not make the segment read as unterminated. A `#` mid-word (`foo#bar`) or
+    // inside a quote (`"#notacomment"`) never reaches this point — it is consumed
+    // as an ordinary word character below.
+    if (segment[i] === "#") break;
     let raw = "";
     let value = "";
     while (i < n && !/\s/.test(segment[i] ?? "")) {
       const c = segment[i] ?? "";
-      if (c === '"' || c === "'") {
+      if (c === "'") {
+        // Single quotes: everything up to the next `'` is literal, no escapes.
         raw += c;
         i += 1;
-        while (i < n && segment[i] !== c) {
+        while (i < n && segment[i] !== "'") {
           raw += segment[i];
           value += segment[i];
           i += 1;
+        }
+        if (i < n) {
+          raw += segment[i]; // closing quote
+          i += 1;
+        } else {
+          unterminated = true;
+        }
+      } else if (c === '"') {
+        // Double quotes: a backslash escapes only `$`, backtick, `"`, `\`, and
+        // newline (bash); before any other character it stays literal. Honouring
+        // `\"` here is what keeps a real one-word argument (`"she said \"hi\""`)
+        // from being mis-read as an unterminated quote.
+        raw += c;
+        i += 1;
+        while (i < n && segment[i] !== '"') {
+          if (
+            segment[i] === "\\" &&
+            i + 1 < n &&
+            (segment[i + 1] === "$" ||
+              segment[i + 1] === "`" ||
+              segment[i + 1] === '"' ||
+              segment[i + 1] === "\\" ||
+              segment[i + 1] === "\n")
+          ) {
+            raw += segment[i];
+            raw += segment[i + 1] ?? "";
+            value += segment[i + 1] ?? ""; // escaped char is literal; backslash dropped
+            i += 2;
+          } else {
+            raw += segment[i];
+            value += segment[i];
+            i += 1;
+          }
         }
         if (i < n) {
           raw += segment[i]; // closing quote
@@ -473,6 +528,118 @@ function verbOfToken(token: string): string | null {
   }
   const lower = token.toLowerCase();
   return DESTRUCTIVE_VERB_SET.has(lower) ? lower : null;
+}
+
+/** Split on the top-level commas of a brace body, honouring nested braces. */
+function splitTopLevelCommas(body: string): string[] {
+  const parts: string[] = [];
+  let depth = 0;
+  let current = "";
+  for (const ch of body) {
+    if (ch === "{") {
+      depth += 1;
+      current += ch;
+    } else if (ch === "}") {
+      depth -= 1;
+      current += ch;
+    } else if (ch === "," && depth === 0) {
+      parts.push(current);
+      current = "";
+    } else {
+      current += ch;
+    }
+  }
+  parts.push(current);
+  return parts;
+}
+
+/**
+ * The first brace group in `text` that bash would actually expand: one with a
+ * top-level comma (`{a,b}`, `{,delete,}`) or a `..` range (`{1..3}`). A literal
+ * `{foo}` (no comma, no range) is left alone, so the scan skips it and looks for
+ * the next `{`. Returns the group's bounds and whether it is a range.
+ */
+function findExpandableBrace(
+  text: string,
+): { start: number; end: number; isRange: boolean } | null {
+  for (let i = 0; i < text.length; i += 1) {
+    if (text[i] !== "{") continue;
+    let depth = 0;
+    let hasComma = false;
+    let hasRange = false;
+    for (let j = i; j < text.length; j += 1) {
+      const c = text[j];
+      if (c === "{") {
+        depth += 1;
+      } else if (c === "}") {
+        depth -= 1;
+        if (depth === 0) {
+          if (hasComma) return { start: i, end: j, isRange: false };
+          if (hasRange) return { start: i, end: j, isRange: true };
+          break; // literal `{…}`: skip it and look for the next brace group.
+        }
+      } else if (c === "," && depth === 1) {
+        hasComma = true;
+      } else if (c === "." && text[j + 1] === "." && depth === 1) {
+        hasRange = true;
+      }
+    }
+  }
+  return null;
+}
+
+/**
+ * Bash-faithful comma brace expansion for a single word, enough to unmask a
+ * destructive verb or resource type spliced apart by braces
+ * (`dele{,}te` → [`delete`, `delete`], `{,delete,}` → [``, `delete`, ``]). Range
+ * groups (`{1..3}`) are NOT enumerated — treated as unresolvable, so the group is
+ * left brace-stripped in a single expansion and matched only if that literal text
+ * is itself a verb/resource, which a numeric range never is. Ranges that touch a
+ * verb never arise in practice; leaving them brace-stripped keeps
+ * `echo {1..3}`-shaped tokens from exploding.
+ */
+function braceExpandWord(text: string): string[] {
+  const brace = findExpandableBrace(text);
+  if (!brace) return [text];
+  const pre = text.slice(0, brace.start);
+  const body = text.slice(brace.start + 1, brace.end);
+  const post = text.slice(brace.end + 1);
+  const alternatives = brace.isRange ? [body] : splitTopLevelCommas(body);
+  const results: string[] = [];
+  for (const alternative of alternatives) {
+    for (const expandedAlt of braceExpandWord(alternative)) {
+      for (const expandedPost of braceExpandWord(post)) {
+        results.push(pre + expandedAlt + expandedPost);
+      }
+    }
+  }
+  return results;
+}
+
+/**
+ * True when `raw` contains a `{` that bash would subject to brace expansion —
+ * i.e. one outside any quotes and not backslash-escaped. Quoting suppresses
+ * brace expansion (`"dele{,}te"` stays literal), so a quoted brace must NOT
+ * trigger the argument expansion pass.
+ */
+function hasUnquotedBrace(raw: string): boolean {
+  let inSingle = false;
+  let inDouble = false;
+  for (let i = 0; i < raw.length; i += 1) {
+    const c = raw[i];
+    if (c === "\\" && !inSingle) {
+      i += 1; // skip the escaped character
+      continue;
+    }
+    if (c === "'" && !inDouble) {
+      inSingle = !inSingle;
+    } else if (c === '"' && !inSingle) {
+      inDouble = !inDouble;
+    } else if (c === "{" && !inSingle && !inDouble) {
+      return true;
+    }
+  }
+  return false;
 }
 
 /**
@@ -607,6 +774,25 @@ function classifySegment(segment: string): DestructiveMatch | null {
       const verb = verbOfToken(token);
       if (verb) {
         return { kind: "cli-verb", verb, segment, target: commandTarget(values, i, verb) };
+      }
+    }
+    // Brace-expansion splice in argument position: the lexer copies braces
+    // literally into `value`, so a comma/empty-alternative group that bash would
+    // expand into a destructive verb or a resource type (`dele{,}te` → `delete`,
+    // `data{set,}` → `dataset`) slips past the verb match above. Expand every
+    // unquoted-brace argument and hold if any expansion is a destructive verb or
+    // a resource type — a reconstructed command shape we cannot bind, so it is
+    // held unconditionally (fail-closed). Quoted braces are suppressed by
+    // `hasUnquotedBrace`, and routine path braces (`cp foo.{js,ts}`,
+    // `mkdir src/{a,b}`) never reach here — this branch is `langwatch`-only.
+    for (let i = 1; i < stripped.length; i += 1) {
+      const word = stripped[i];
+      if (!word || !hasUnquotedBrace(word.raw)) continue;
+      for (const expansion of braceExpandWord(word.value)) {
+        const lower = expansion.toLowerCase();
+        if (DESTRUCTIVE_VERB_SET.has(lower) || RESOURCE_TYPES.has(lower)) {
+          return { kind: "unparseable", segment };
+        }
       }
     }
     return null;

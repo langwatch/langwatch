@@ -370,6 +370,89 @@ describe("Bash native quote-splice evasion (Finding A)", () => {
   });
 });
 
+describe("Brace-expansion splice in argument position (Item 1)", () => {
+  /** @scenario A brace-expansion splice that reassembles a destructive verb or resource is held */
+  it("holds a langwatch argument whose brace group bash would expand to a destructive verb or resource", () => {
+    // Real bash expands each of these to a genuine delete: `dele{,}te` ->
+    // `delete delete`, `{,delete,}` -> `'' delete ''`, `data{set,}` ->
+    // `dataset data`, `d{el,}ete` -> `delete dete`. The lexer copies braces
+    // literally into the word value, so the verb match misses them; the
+    // argument brace-expansion pass unmasks the reassembled verb/resource and
+    // holds fail-closed. No confirmation releases an unparseable segment.
+    for (const command of [
+      "langwatch dataset dele{,}te d1",
+      "langwatch dataset {,delete,} d1",
+      "langwatch data{set,} delete d1",
+      "langwatch dataset d{el,}ete d1",
+    ]) {
+      expect(bash(command).allow, command).toBe(false);
+      expect(bash(command, confirmedForD1).allow, command).toBe(false);
+    }
+    // The verb-spliced forms slip past the literal verb match and are held by
+    // the brace-expansion pass as unresolvable (`data{set,} delete` still
+    // carries a literal `delete`, so it matches as a plain cli-verb instead).
+    for (const command of [
+      "langwatch dataset dele{,}te d1",
+      "langwatch dataset {,delete,} d1",
+      "langwatch dataset d{el,}ete d1",
+    ]) {
+      expect(findDestructiveMatches(command), command).toContainEqual(
+        expect.objectContaining({ kind: "unparseable" }),
+      );
+    }
+  });
+
+  /** @scenario Routine brace expansion in a non-langwatch command is not over-blocked */
+  it("does not over-block routine brace expansion in ordinary commands", () => {
+    // Path-list and range braces in everyday commands must pass — the
+    // expansion pass is scoped to `langwatch` invocations, so these never reach
+    // it. A quoted brace on a langwatch command is suppressed by bash and so is
+    // not treated as an expansion either.
+    for (const command of [
+      "cp foo.{js,ts} bar/",
+      "mkdir -p src/{a,b,c}",
+      "echo {1..3}",
+      "rm -rf build/{dist,tmp}",
+      "git add src/{a,b}.ts",
+      'langwatch dataset "dele{,}te" d1',
+    ]) {
+      expect(bash(command).allow, command).toBe(true);
+    }
+  });
+});
+
+describe("Lexer fidelity: escaped double-quote and shell comments (Items 2 and 3)", () => {
+  /** @scenario An escaped double-quote inside a double-quoted word is parsed as one argument, not held */
+  it("parses an escaped double-quote inside a double-quoted word as one argument", () => {
+    // Bash parses `"she said \"hi\""` as the single argument `she said "hi"`;
+    // the lexer must honour `\"` inside double quotes so the word is not
+    // mis-read as an unterminated quote and held.
+    for (const command of [
+      'git commit -m "she said \\"hi\\""',
+      'curl -d "{\\"key\\":\\"value\\"}"',
+      'echo "a \\"quoted\\" word"',
+    ]) {
+      expect(bash(command).allow, command).toBe(true);
+    }
+  });
+
+  /** @scenario An unquoted shell comment does not make a command unparseable */
+  it("stops lexing at an unquoted comment and does not treat a quoted or mid-word # as one", () => {
+    // An unquoted `#` at a word boundary begins a comment to end-of-segment, so
+    // an apostrophe inside the comment must not make the command read as
+    // unterminated. A `#` inside a quote or mid-word is an ordinary character.
+    for (const command of [
+      "echo hi # don't remove this",
+      "ls # can't hurt",
+      "git status  # what's changed",
+      "foo#bar",
+      'echo "#notacomment"',
+    ]) {
+      expect(bash(command).allow, command).toBe(true);
+    }
+  });
+});
+
 describe("awk system() concatenation (Finding B)", () => {
   /** @scenario An awk program that concatenates a destructive command through system() is held */
   it("holds an awk/gawk/mawk system() call that builds the CLI name at runtime", () => {
