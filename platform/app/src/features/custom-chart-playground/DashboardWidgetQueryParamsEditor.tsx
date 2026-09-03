@@ -6,7 +6,6 @@
  */
 
 import {
-  Badge,
   Box,
   Button,
   HStack,
@@ -17,6 +16,7 @@ import {
 } from "@chakra-ui/react";
 import { Plus, Trash2 } from "lucide-react";
 
+import { ReservedParamRow } from "~/components/analytics/ReservedParamRow";
 import {
   RESERVED_PARAMETERS,
   type DashboardWidgetQueryParameterDeclaration,
@@ -46,37 +46,6 @@ function defaultInputValue(
   value: DashboardWidgetQueryParameterDeclaration["default"],
 ): string {
   return value === undefined ? "" : String(value);
-}
-
-/** One reserved param, shown read-only above user-declared params. */
-function ReservedParamRow({
-  reserved,
-}: {
-  reserved: (typeof RESERVED_PARAMETERS)[number];
-}) {
-  return (
-    <HStack gap={2} title={reserved.description}>
-      <Text
-        fontSize="12px"
-        fontFamily="mono"
-        flex={1}
-        minWidth={0}
-        truncate
-        color="fg.muted"
-      >
-        {reserved.name}
-      </Text>
-      <Text fontSize="12px" color="fg.muted" width="90px" flexShrink={0}>
-        {reserved.type}
-      </Text>
-      <Badge size="sm" colorPalette="gray" flexShrink={0}>
-        built-in
-      </Badge>
-      {/* Spacer matching the remove IconButton's width so name/type columns
-          still line up with the editable rows below. */}
-      <Box width="26px" flexShrink={0} />
-    </HStack>
-  );
 }
 
 interface ParamRowProps {

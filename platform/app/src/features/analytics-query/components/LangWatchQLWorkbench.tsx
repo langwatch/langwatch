@@ -28,10 +28,13 @@ import {
 import { usePeriodSelector } from "~/components/PeriodSelector";
 // The leaf module, never the barrel — see LangWatchQLTimeWindowEditor.
 import {
+  formatLangWatchQLDateTimeParameter,
   isLangWatchQLSurfaceParameter,
   type LangWatchQLGranularityStep,
   LWQL_GRANULARITY_STEPS,
+  LWQL_PERIOD_END_PARAMETER,
   LWQL_PERIOD_GRANULARITY_PARAMETER,
+  LWQL_PERIOD_START_PARAMETER,
 } from "~/server/analytics/lwql/timeWindow";
 
 import { useLangWatchQLQuery } from "../hooks/useLangWatchQLQuery";
@@ -710,6 +713,30 @@ function SchemaSidebar({
  * answer, Run stays lit and the round-trip comes back naming a parameter the
  * member is looking at, filled in.
  */
+/**
+ * The reserved parameters' current live values, formatted the way the
+ * statement receives them — an ISO instant for the window, the plain integer
+ * for the step — so the read-only rows above the author's own show what those
+ * names actually resolve to.
+ */
+function builtinParameterValues({
+  timeWindow,
+  granularity,
+}: {
+  timeWindow: ReturnType<typeof useWorkbenchTimeWindow>;
+  granularity: ReturnType<typeof useWorkbenchGranularity>;
+}): Readonly<Record<string, string>> {
+  return {
+    [LWQL_PERIOD_START_PARAMETER]: formatLangWatchQLDateTimeParameter(
+      new Date(timeWindow.value.start),
+    ),
+    [LWQL_PERIOD_END_PARAMETER]: formatLangWatchQLDateTimeParameter(
+      new Date(timeWindow.value.end),
+    ),
+    [LWQL_PERIOD_GRANULARITY_PARAMETER]: String(granularity.value),
+  };
+}
+
 function useParameterState({
   query,
   openedRevision,
@@ -840,6 +867,7 @@ function QueryCard({
           onChange={onParametersChange}
           missingParameters={failure.missingParameters}
           reservedParameters={failure.reservedParameters}
+          builtinValues={builtinParameterValues({ timeWindow, granularity })}
           {...(wiring.openedParameters
             ? { initialParameters: wiring.openedParameters }
             : {})}
