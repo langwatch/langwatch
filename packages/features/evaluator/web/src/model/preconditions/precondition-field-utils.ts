@@ -1,11 +1,8 @@
-import type {
-  CheckPreconditionFields,
-  CheckPreconditionRule,
-} from "../evaluations/types";
+import type { CheckPreconditionFields, CheckPreconditionRule } from "../evaluations/types";
+import type { PreconditionField } from "@langwatch/analytics-contract";
 import {
   getAvailablePreconditionFields,
   PRECONDITION_ALLOWED_RULES,
-  type PreconditionField,
 } from "@langwatch/analytics-web/server/filters/precondition-matchers";
 import { availableFilters } from "@langwatch/analytics-web/server/filters/registry";
 import type { FilterField } from "@langwatch/analytics-web/server/filters/types";
@@ -72,9 +69,7 @@ export function getFieldOptionsByCategory(): {
 }
 
 /** Get the allowed rules for a given field */
-export function getAllowedRulesForField(
-  field: CheckPreconditionFields,
-): CheckPreconditionRule[] {
+export function getAllowedRulesForField(field: CheckPreconditionFields): CheckPreconditionRule[] {
   return PRECONDITION_ALLOWED_RULES[field as PreconditionField] ?? [];
 }
 

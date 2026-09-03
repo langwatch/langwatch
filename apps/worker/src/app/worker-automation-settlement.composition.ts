@@ -7,6 +7,10 @@ import type {
   AutomationPlanProvider,
   DatasetActionParams,
 } from "@langwatch/automation-contract";
+import {
+  LegacyFilterMatchingService,
+  PreconditionTraceDataService,
+} from "@langwatch/analytics-server";
 import type { DatasetRecordEntry } from "@langwatch/dataset-contract";
 import {
   AutomationClockPort,
@@ -28,10 +32,12 @@ import {
   AutomationNotificationDeliveryPort,
   createAutomationsPipeline,
   GraphTriggerHeartbeatService,
+  OtelAutomationRunawayMetricsAdapter,
   PostgresAutomationSettlementLedgerAdapter,
   PrismaGraphTriggerSentRepository,
   PrismaTriggerRepository,
   PrismaWebhookDeliveryRepository,
+  RunawayContainmentService,
   SlackProviderAdapter,
   WebhookProviderAdapter,
   type AutomationEvent,
@@ -46,6 +52,7 @@ import type { EvaluationRunData } from "@langwatch/evaluation-contract";
 import { DispatchError } from "@langwatch/eventing";
 import { createLogger, type Logger } from "@langwatch/observability";
 import type { ProjectService } from "@langwatch/project-contract";
+import type { EmailDeliveryPort } from "@langwatch/notification-server";
 import type { RedisConnection } from "@langwatch/redis-client";
 import {
   mapTraceToDatasetEntry,
@@ -56,6 +63,11 @@ import {
   type TraceSummaryData,
 } from "@langwatch/trace-contract";
 import { TraceQueryEvaluationService } from "@langwatch/trace-server";
+import {
+  WorkerAutomationRunawayAdapter,
+  type WorkerAutomationRunawayDirectories,
+  type WorkerRunawayClickHouseResolver,
+} from "../features/automation/automation-runaway.adapter";
 import type { AutomationWorkerCapability } from "../features/automation/automation-worker-feature.installer";
 import type { WorkerConfig } from "../platform/config/worker.config";
 
@@ -102,6 +114,17 @@ export type WorkerAutomationSettlementCompositionOptions = Readonly<{
    * back to the paid tier and says so.
    */
   plans?: WorkerAutomationPlanSource | undefined;
+  /**
+   * What this process does about an automation that ran past its daily ceiling.
+   *
+   * The POLICY is Automation's own `RunawayContainmentService`; these are the
+   * three substrates it names that settlement does not otherwise hold — the
+   * mailer a limit notice leaves through, the directories an organization's
+   * administrators are read from, and the routed client a project's 24-hour
+   * trace count is taken on. Absent when this graph composed no tenancy, in
+   * which case there is nobody to tell.
+   */
+  containment?: WorkerAutomationContainment | undefined;
   redis?: RedisConnection | null;
   absence?: WorkerAutomationSettlementAbsenceReportPort;
   logger?: Logger;
@@ -159,6 +182,20 @@ export type WorkerAutomationPlanSource = Readonly<{
   projects: ProjectService;
 }>;
 
+/**
+ * The three substrates runaway containment adds on top of settlement's own.
+ *
+ * The claim leases, the trigger row it pauses and the clock it buckets a day
+ * on are already this composition's; what containment needs beyond them is a
+ * way to reach an administrator and a way to see how much of a project's
+ * traffic one automation is claiming.
+ */
+export type WorkerAutomationContainment = Readonly<{
+  mailer: EmailDeliveryPort;
+  directories: WorkerAutomationRunawayDirectories;
+  resolveClickHouseClient: WorkerRunawayClickHouseResolver;
+}>;
+
 export type WorkerAutomationAnnotationWriter = Readonly<{
   annotations: Parameters<typeof createOrUpdateQueueItems>[0]["annotations"];
   findExistingTraceIds: Parameters<typeof createOrUpdateQueueItems>[0]["findExistingTraceIds"];
@@ -174,18 +211,6 @@ export type WorkerAutomationAnnotationWriter = Readonly<{
  * never filled.
  */
 export abstract class WorkerAutomationSettlementAbsenceReportPort {
-  /**
-   * Legacy `filters` matching, for automations written before the LWQL
-   * `filterQuery` migration.
-   *
-   * The matcher and the field schema it parses against live in the analytics
-   * WEB package, which a background process must not import — it would put
-   * React on the boot graph. An automation carrying a `filterQuery` confirms
-   * normally; one still carrying the old `filters` map is refused BY NAME at
-   * confirmation, so it dead-letters visibly rather than silently never firing.
-   */
-  abstract withoutLegacyFilterMatching(): void;
-
   /**
    * The full trace record, spans and all.
    *
@@ -224,9 +249,12 @@ export abstract class WorkerAutomationSettlementAbsenceReportPort {
   /**
    * Runaway containment.
    *
-   * The breach is still counted and still logged with the project, the trigger
-   * and the skipped total; what an absent notifier costs is the mail to the
-   * organization's admins and the auto-pause of a misconfigured automation.
+   * Reported when this graph composed no outbound mail or no tenancy — the
+   * first leaves a limit notice with no origin to link back to, the second
+   * leaves nobody to send it to, since an automation's administrators are its
+   * ORGANIZATION's role bindings. The breach is still counted and still logged
+   * with the project, the trigger and the skipped total; what is lost is the
+   * mail and the auto-pause of a misconfigured automation.
    */
   abstract withoutRunawayContainment(): void;
 
@@ -280,10 +308,9 @@ export function createWorkerAutomationSettlement(
   const absence = options.absence;
   if (!options.graphActivity) absence?.withoutGraphAlertEvaluation();
   if (!options.notifications) absence?.withoutNotificationDelivery();
-  absence?.withoutLegacyFilterMatching();
   if (!options.datasets) absence?.withoutDatasetPersist();
   if (!options.annotations) absence?.withoutAnnotationQueuePersist();
-  absence?.withoutRunawayContainment();
+  if (!options.notifications || !options.containment) absence?.withoutRunawayContainment();
   if (!options.plans) absence?.withoutPlanResolvedPersistCap();
 
   // The ceiling's tier, resolved through Automation's own cap service so that
@@ -302,6 +329,13 @@ export function createWorkerAutomationSettlement(
         },
       })
     : undefined;
+  // Containment and the ledger each need the other: the ledger is what raises
+  // the breach, and the notice containment sends is filtered through the
+  // ledger's own suppression rows — the SAME rows a digest is filtered
+  // through, because two readers of that table would let one half of
+  // automation honour an unsubscribe the other ignored. The knot is tied with
+  // one late read rather than a second suppression reader.
+  let containment: RunawayContainmentService | undefined;
   const ledger = PostgresAutomationSettlementLedgerAdapter.create({
     prisma: options.prisma,
     clock: options.clock,
@@ -310,9 +344,25 @@ export function createWorkerAutomationSettlement(
       ? { kind: "resolved", resolve: (projectId) => persistCaps.resolvePersistDailyCap(projectId) }
       : // The paid ceiling, stated rather than resolved. See the config leaf.
         { kind: "fixed", cap: options.config.automation.persistDailyCapPaid },
-    breach: new LoggedSettlementBreach(logger),
+    breach: new WorkerSettlementBreach(logger, () => containment),
   });
   const notifications = options.notifications ?? unavailableNotifications();
+  if (options.notifications && options.containment) {
+    containment = RunawayContainmentService.create({
+      runaway: WorkerAutomationRunawayAdapter.create({
+        redis: options.redis ?? null,
+        directories: options.containment.directories,
+        suppression: ledger,
+        mailer: options.containment.mailer,
+        resolveClickHouseClient: options.containment.resolveClickHouseClient,
+        metrics: OtelAutomationRunawayMetricsAdapter.create(),
+        baseHost: options.notifications.baseHost,
+        logger,
+      }),
+      triggers: PrismaTriggerRepository.create(options.prisma, options.clock),
+      clock: options.clock,
+    });
+  }
   const settlement = AutomationSettlementDispatchService.create({
     automation: ledger,
     projects: options.projects,
@@ -409,14 +459,19 @@ class UnavailableNotificationDelivery extends AutomationNotificationDeliveryPort
  * A settled match's re-check against its own trace, over the two grammars
  * automations are written in.
  *
- * The LWQL half is REAL: `TraceQueryEvaluationService` is Trace's own
- * evaluator, so a filter query decides the same way in this process as in the
- * application. The legacy half refuses, and refuses TERMINALLY — a settlement
- * that returned `false` would look exactly like an automation whose condition
- * was not met, so the customer would see silence and we would see nothing at
- * all.
+ * Both halves are the packaged decision, so an automation confirms here the
+ * way it confirmed in the application. `TraceQueryEvaluationService` is
+ * Trace's own LangWatchQL evaluator; `LegacyFilterMatchingService` is
+ * Analytics' in-memory twin of the ClickHouse filter builder, reading the
+ * settled fold state through `PreconditionTraceDataService`. Neither is
+ * reimplemented here, which is the point: a matcher written twice is a
+ * customer whose automation fires in the list view and stays silent in the
+ * alert, or the reverse.
  */
 class WorkerSettlementFilterEvaluator extends AutomationSettlementFilterEvaluatorPort {
+  private readonly legacy = LegacyFilterMatchingService.create();
+  private readonly traceData = PreconditionTraceDataService.create();
+
   matchesFilterQuery(input: {
     query: string;
     foldState: TraceSummaryData;
@@ -431,19 +486,27 @@ class WorkerSettlementFilterEvaluator extends AutomationSettlementFilterEvaluato
     });
   }
 
-  matchesTraceFilters(): boolean {
-    throw this.unavailable();
+  matchesTraceFilters(input: {
+    filters: Record<string, unknown>;
+    foldState: TraceSummaryData;
+    events: DerivedTraceEvent[] | null;
+  }): boolean {
+    return this.legacy.matchesTraceFilters({
+      traceData: this.traceData.fromFoldState({
+        foldState: input.foldState,
+        events: input.events,
+      }),
+      filters: input.filters,
+    });
   }
 
-  matchesEvaluationFilters(): boolean {
-    throw this.unavailable();
-  }
-
-  private unavailable(): DispatchError {
-    return new DispatchError({
-      message:
-        "This process cannot match an automation's legacy filters: the two functions that walked them — the trace-data matcher and the fold-state projection it reads — left the tree with the platform application and were not re-homed, so no process has them. The field matchers they stood on survive as a React-free server subpath of the analytics package. Re-save the automation to convert it to a filter query.",
-      retryable: false,
+  matchesEvaluationFilters(input: {
+    filters: Record<string, unknown>;
+    evaluations: EvaluationRunData[];
+  }): boolean {
+    return this.legacy.matchesEvaluationFilters({
+      evaluations: input.evaluations,
+      filters: input.filters,
     });
   }
 }
@@ -663,13 +726,28 @@ class LoggedSettlementObservability extends AutomationSettlementObservabilityPor
   }
 }
 
-/** Containment refused by name, with the breach still recorded. */
-class LoggedSettlementBreach extends AutomationSettlementBreachPort {
-  constructor(private readonly logger: Logger) {
+/**
+ * What this process does about an automation past its ceiling.
+ *
+ * Containment is resolved LATE — the containment service reads the suppression
+ * rows off the ledger this port is handed to — so the thunk is the knot, not
+ * an optional dependency nobody supplies. When it resolves to nothing, the
+ * breach is still recorded with everything an operator needs to act on it by
+ * hand, and the log line says which half is missing rather than reading like a
+ * containment that ran and decided to do nothing.
+ */
+class WorkerSettlementBreach extends AutomationSettlementBreachPort {
+  constructor(
+    private readonly logger: Logger,
+    private readonly resolve: () => RunawayContainmentService | undefined,
+  ) {
     super();
   }
 
   async handle(input: AutomationPersistCapBreach): Promise<void> {
+    const containment = this.resolve();
+    if (containment) return containment.handle(input);
+
     this.logger.error(
       {
         projectId: input.projectId,
@@ -678,7 +756,7 @@ class LoggedSettlementBreach extends AutomationSettlementBreachPort {
         count: input.count,
         skipped: input.skipped,
       },
-      "Automation passed its daily ceiling on confirmed matches and further matches are being skipped; this process composes no runaway containment, so nobody has been notified and the automation has not been paused",
+      "Automation passed its daily ceiling on confirmed matches and further matches are being skipped; this process composed no outbound mail or no tenancy, so nobody has been notified and the automation has not been paused",
     );
   }
 }

@@ -1,4 +1,11 @@
 export { filterFieldsEnum, type FilterField } from "./analytics.filter-field";
+export {
+  normalizePreconditionTraceData,
+  PRECONDITION_FIELD_MATCHERS,
+  type PreconditionField,
+  type PreconditionFieldMatcher,
+  type PreconditionTraceData,
+} from "./analytics.precondition-matchers";
 export * from "./analytics.service";
 export * from "./analytics.lwql";
 export * from "./analytics.lwql-time-window";

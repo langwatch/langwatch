@@ -110,6 +110,22 @@ export type {
 } from "./ports/automation-graph.port";
 export { AutomationGraphDeliveryPort } from "./ports/automation-graph-delivery.port";
 export { AutomationRunawayPort, type ClaimLease } from "./ports/automation-runaway.port";
+/**
+ * The containment POLICY behind that port.
+ *
+ * Published because the decision — is this automation misconfigured, has this
+ * organization already been told today, may this process be the one to pause
+ * it — belongs to the feature, and the only thing a composition root supplies
+ * is the infrastructure the port names. A root that wrote the policy itself
+ * would be free to pause on a different rule than the one the spec pins.
+ */
+export {
+  CONTAINMENT_CHECK_CLAIM_SECONDS,
+  PAUSE_ATTEMPT_CLAIM_SECONDS,
+  RUNAWAY_MIN_PROJECT_TRACES,
+  RUNAWAY_TRAFFIC_SHARE,
+  RunawayContainmentService,
+} from "./services/runaway-containment.service";
 export { AutomationNotificationDeliveryPort } from "./ports/automation-notification-delivery.port";
 export {
   AutomationSlackProviderPort,

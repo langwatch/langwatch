@@ -1102,6 +1102,24 @@ export class WorkerProductionComposition {
         ...(automationDatasets ? { datasets: automationDatasets } : {}),
         ...(automationAnnotations ? { annotations: automationAnnotations } : {}),
         ...(plans && tenancy ? { plans: { plans, projects: tenancy.projects } } : {}),
+        // Runaway containment: the mailer a limit notice leaves through, the
+        // directories its administrators are read from, and the routed client
+        // a project's own 24-hour traffic is counted on. Composed exactly when
+        // this process holds all three — mail is what carries the notice, and
+        // tenancy is what knows whom to carry it to.
+        ...(mail && tenancy
+          ? {
+              containment: {
+                mailer: mail.delivery,
+                directories: {
+                  projects: tenancy.projects,
+                  authorization: tenancy.authorization,
+                },
+                resolveClickHouseClient: (projectId: string) =>
+                  options.eventing.resolveClickHouseClient(projectId),
+              },
+            }
+          : {}),
         evaluations: WorkerAutomationSettlementEvaluationReader.create({
           resolveClickHouse: options.eventing.resolveClickHouseClient as unknown as Parameters<
             typeof WorkerAutomationSettlementEvaluationReader.create
@@ -2169,12 +2187,6 @@ export class LoggedWorkerAutomationSettlementAbsence extends WorkerAutomationSet
     super();
   }
 
-  withoutLegacyFilterMatching(): void {
-    this.logger.warn(
-      "worker composed automation settlement without the legacy filter matcher: an automation still carrying the pre-query filters map is refused by name at confirmation, and one carrying a filter query confirms normally",
-    );
-  }
-
   withoutTraceRecordRead(): void {
     this.logger.warn(
       { reason: "no-typed-prisma-connection" },
@@ -2198,7 +2210,8 @@ export class LoggedWorkerAutomationSettlementAbsence extends WorkerAutomationSet
 
   withoutRunawayContainment(): void {
     this.logger.warn(
-      "worker composed automation settlement without runaway containment: the containment POLICY is written and tested inside the automation package but is not exported from it, and no implementation of its port exists in any process — so an automation past its daily ceiling still skips and still logs the breach, but nobody is notified and a misconfigured automation is not paused",
+      { reason: "no-mail-or-no-tenancy" },
+      "worker composed automation settlement without runaway containment: a limit notice goes to the ORGANIZATION's administrators and links back to this deployment's own host, so it needs both the mail graph BASE_HOST unlocks and the tenancy directories the role bindings are read from — an automation past its daily ceiling still skips and still logs the breach, but nobody is notified and a misconfigured automation is not paused",
     );
   }
 

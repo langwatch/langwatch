@@ -136,7 +136,6 @@ function clickHouseWithAgedTrace() {
 
 function recordingAbsence(into: string[]) {
   return new (class extends WorkerAutomationSettlementAbsenceReportPort {
-    withoutLegacyFilterMatching(): void {}
     withoutTraceRecordRead(): void {
       into.push("traceRecordRead");
     }

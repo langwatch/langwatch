@@ -7,6 +7,18 @@ export {
   type AnalyticsFilterOptionsRequest,
 } from "./app/analytics.app";
 export { LoggingAnalyticsTripwire } from "./services/analytics.tripwire";
+
+/**
+ * Filter matching without a query engine.
+ *
+ * The legacy `filters` grammar decided in memory, and the projection that
+ * reads a settled fold state as the trace those filters match. Published
+ * because the deciding happens in a background process — a settled automation
+ * match is re-checked where there is no ClickHouse round trip to spend and no
+ * browser to render the answer.
+ */
+export { LegacyFilterMatchingService } from "./services/legacy-filter-matching.service";
+export { PreconditionTraceDataService } from "./services/precondition-trace-data.service";
 export { ANALYTICS_CLICKHOUSE_SETTINGS } from "./clickhouse/settings";
 export {
   AnalyticsTrpcApi,
@@ -54,10 +66,7 @@ export {
   type LangWatchQLResultLimits,
 } from "./langwatch-ql/executor";
 export { MAX_LWQL_LENGTH } from "./langwatch-ql/sqlText";
-export {
-  lwqlGranularityStepSchema,
-  lwqlTimeWindowSchema,
-} from "./langwatch-ql/timeWindowSchema";
+export { lwqlGranularityStepSchema, lwqlTimeWindowSchema } from "./langwatch-ql/timeWindowSchema";
 
 /**
  * The filter picker: the values one field can offer, and the two facts a door
@@ -65,10 +74,7 @@ export {
  */
 export { FilterOptionsAdapter } from "./adapters/filter-options.adapter";
 export { FilterService, type GetFilterOptionsInput } from "./services/filter.service";
-export {
-  FilterOptionsRepository,
-  type FindFilterOptionsInput,
-} from "./ports/filter-options.port";
+export { FilterOptionsRepository, type FindFilterOptionsInput } from "./ports/filter-options.port";
 export type { FilterOption } from "./filters/clickhouse/types";
 export {
   filterFieldRequiresKey,
@@ -120,10 +126,7 @@ export {
 // The production provisioning statements and names the deploy task runs. Kept
 // beside the runtime reader deliberately: the views a query reads and the
 // statements that create them are one description of the same objects.
-export {
-  KEY_MAP_COLUMNS,
-  type LangWatchQLNames,
-} from "./langwatch-ql/provisioning";
+export { KEY_MAP_COLUMNS, type LangWatchQLNames } from "./langwatch-ql/provisioning";
 export {
   type LwqlKeyMapBackfillPlan,
   type LwqlKeyMapRow,

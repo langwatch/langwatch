@@ -5,7 +5,7 @@ import {
   normalizePreconditionTraceData,
   PRECONDITION_FIELD_MATCHERS,
   type PreconditionTraceData,
-} from "@langwatch/analytics-web/server/filters/precondition-matchers";
+} from "@langwatch/analytics-contract";
 import { extractRAGTextualContext } from "@langwatch/trace-contract";
 import type {
   ElasticSearchTrace,
@@ -17,7 +17,7 @@ import type {
 import { getEvaluatorDefinitions } from "@langwatch/evaluator-contract";
 import type { CheckPreconditionRule, CheckPreconditions } from "./types";
 
-export type { PreconditionTraceData } from "@langwatch/analytics-web/server/filters/precondition-matchers";
+export type { PreconditionTraceData } from "@langwatch/analytics-contract";
 
 const logger = createLogger("langwatch:evaluations:preconditions");
 
@@ -42,8 +42,7 @@ function resolveFieldValue({
   subkey?: string;
   value: string;
 }): string | string[] | null | undefined {
-  const matcher =
-    PRECONDITION_FIELD_MATCHERS[field as keyof typeof PRECONDITION_FIELD_MATCHERS];
+  const matcher = PRECONDITION_FIELD_MATCHERS[field as keyof typeof PRECONDITION_FIELD_MATCHERS];
 
   if (matcher == null) {
     // Key-selector or unavailable field — not matchable
@@ -119,9 +118,7 @@ function evaluateContainsRule({
   if (fieldValue == null) return false;
 
   if (Array.isArray(fieldValue)) {
-    return fieldValue.some((item) =>
-      item.toLowerCase().includes(conditionValue.toLowerCase()),
-    );
+    return fieldValue.some((item) => item.toLowerCase().includes(conditionValue.toLowerCase()));
   }
 
   return fieldValue.toLowerCase().includes(conditionValue.toLowerCase());
@@ -141,9 +138,7 @@ function evaluateNotContainsRule({
   if (fieldValue == null) return true;
 
   if (Array.isArray(fieldValue)) {
-    return !fieldValue.some((item) =>
-      item.toLowerCase().includes(conditionValue.toLowerCase()),
-    );
+    return !fieldValue.some((item) => item.toLowerCase().includes(conditionValue.toLowerCase()));
   }
 
   return !fieldValue.toLowerCase().includes(conditionValue.toLowerCase());
@@ -167,17 +162,12 @@ function evaluateRegexRule({
       throw new Error("Invalid regex");
     }
 
-    const valueToTest = Array.isArray(fieldValue)
-      ? JSON.stringify(fieldValue)
-      : fieldValue;
+    const valueToTest = Array.isArray(fieldValue) ? JSON.stringify(fieldValue) : fieldValue;
 
     const regex = new RegExp(conditionValue, "gi");
     return regex.test(valueToTest);
   } catch (error) {
-    logger.error(
-      { error, precondition: conditionValue },
-      "Invalid regex in preconditions",
-    );
+    logger.error({ error, precondition: conditionValue }, "Invalid regex in preconditions");
     return false;
   }
 }
@@ -206,8 +196,7 @@ export function checkEvaluatorRequiredFields({
     if (
       !spans.some(
         (span) =>
-          span.type === "rag" &&
-          extractRAGTextualContext((span as RAGSpan).contexts).length > 0,
+          span.type === "rag" && extractRAGTextualContext((span as RAGSpan).contexts).length > 0,
       )
     ) {
       return false;

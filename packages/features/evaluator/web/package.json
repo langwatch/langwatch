@@ -70,6 +70,7 @@
   },
   "dependencies": {
     "@hookform/resolvers": "^5.4.0",
+    "@langwatch/analytics-contract": "workspace:*",
     "@langwatch/analytics-web": "workspace:*",
     "@langwatch/design-system": "workspace:*",
     "@langwatch/evaluation-contract": "workspace:*",

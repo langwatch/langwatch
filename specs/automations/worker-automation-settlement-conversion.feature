@@ -125,3 +125,51 @@ Feature: The background worker owns automation settlement
     Then the match is refused by name, naming the client the write is composed
       over
     And nothing is appended and the automation is not stamped as having run
+
+  @unit
+  Scenario: A settled match is re-checked against an automation's legacy filters
+    Given an active email automation written before the filter-query migration
+    And its filters name the trace origin the settled trace actually carries
+    When a settled window is notified through the pipeline's own intent handler
+    Then the match is confirmed and the digest is sent
+    And nothing about the legacy filter grammar is reported as absent
+
+  @unit
+  Scenario: A settled match whose legacy filters no longer hold is dropped quietly
+    Given an active email automation written before the filter-query migration
+    And its filters name a trace origin the settled trace does not carry
+    When a settled window is notified through the pipeline's own intent handler
+    Then no digest is sent and the window closes without an error
+
+  @unit
+  Scenario: A legacy evaluation filter only counts an evaluation that ran
+    Given an active email automation whose legacy filters require a failed evaluation
+    And the trace carries an evaluation that errored before producing a verdict
+    When a settled window is notified through the pipeline's own intent handler
+    Then no digest is sent, because an errored evaluation carries no verdict
+
+  @unit
+  Scenario: A breached ceiling is contained from this process
+    Given a background worker that composed outbound mail and its tenancy
+      directories
+    When the composition root builds the automations pipeline
+    Then runaway containment is not reported as absent
+    And a worker without those directories still reports it
+
+  @unit
+  Scenario: A misconfigured automation is paused and its administrators are told
+    Given an automation with no narrowing condition at all
+    And a confirmed match past the ceiling its plan grants
+    When the match is persisted through the pipeline's own intent handler
+    Then the automation is paused, naming runaway volume as the reason
+    And only the organization's administrators are mailed about it
+    And nothing is appended
+
+  @unit
+  Scenario: An automation that merely reached its ceiling is told, not paused
+    Given an automation narrowed by a condition its trace meets
+    And a confirmed match past the ceiling its plan grants
+    When the match is persisted through the pipeline's own intent handler
+    Then the automation stays active
+    And its administrators are told it reached its daily limit
+    And the decision is taken against the project's own trace count

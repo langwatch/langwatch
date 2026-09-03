@@ -54,9 +54,13 @@ const RECORDED: {
     createdByUserId: string;
   }>;
   breaches: Array<{ cap: number; count: number; skipped: number }>;
+  pauses: Array<{ triggerId: string; projectId: string; pausedReason: unknown }>;
+  trafficReads: Array<{ tenantId: unknown }>;
   captured: string[];
 } = {
   breaches: [],
+  pauses: [],
+  trafficReads: [],
   absences: [],
   mail: [],
   claims: [],
@@ -78,6 +82,8 @@ function reset(): void {
   RECORDED.existenceChecks.length = 0;
   RECORDED.queueItems.length = 0;
   RECORDED.breaches.length = 0;
+  RECORDED.pauses.length = 0;
+  RECORDED.trafficReads.length = 0;
   RECORDED.captured.length = 0;
   // The cap service caches a project's resolved ceiling for ten minutes in a
   // module-level map, and counts its slots in another. Both outlive a test.
@@ -106,9 +112,6 @@ function recordingLogger() {
 }
 
 class RecordingAbsence extends WorkerAutomationSettlementAbsenceReportPort {
-  withoutLegacyFilterMatching(): void {
-    RECORDED.absences.push("legacyFilterMatching");
-  }
   withoutTraceRecordRead(): void {
     RECORDED.absences.push("traceRecordRead");
   }
@@ -178,7 +181,21 @@ function prismaDouble(trigger: TriggerRow) {
       findMany: async () => [trigger],
       findFirst: async () => trigger,
       findUnique: async () => trigger,
-      update: async (input: { where: { id: string; projectId: string } }) => {
+      update: async (input: {
+        where: { id: string; projectId: string };
+        data?: Record<string, unknown>;
+      }) => {
+        // Two different writes land here. `updateLastRunAt` stamps the run;
+        // containment's auto-pause clears `active` and says why. Split on the
+        // data so a test cannot mistake one for the other.
+        if (input.data && "active" in input.data) {
+          RECORDED.pauses.push({
+            triggerId: input.where.id,
+            projectId: input.where.projectId,
+            pausedReason: input.data.pausedReason,
+          });
+          return trigger;
+        }
         RECORDED.lastRunAt.push({
           triggerId: input.where.id,
           projectId: input.where.projectId,
@@ -225,21 +242,92 @@ class RecordingMailer {
   }
 }
 
+const DATASET_ACTION_PARAMS = {
+  datasetId: "support-replies",
+  datasetMapping: {
+    mapping: {
+      question: { source: "input" },
+      answer: { source: "output" },
+    },
+    expansions: [],
+  },
+};
+
+/**
+ * A grandfathered automation with no narrowing condition at all.
+ *
+ * `triggerKind: "AUTOMATION"` with empty filters and no query is what
+ * `isMatchEverythingTrigger` reads as misconfigured: it appends every trace
+ * the project sees. Two ids because the containment claim keys are per
+ * trigger and a claim taken in one test must not decide another.
+ */
+const RUNAWAY_TRIGGER_ROW: TriggerRow = {
+  ...TRIGGER_ROW,
+  id: "trigger-runaway-1",
+  action: "ADD_TO_DATASET",
+  triggerKind: "AUTOMATION",
+  actionParams: DATASET_ACTION_PARAMS,
+  filters: {},
+  filterQuery: null,
+};
+
+/** The same automation, but narrowed by a real condition. */
+const NARROWED_TRIGGER_ROW: TriggerRow = {
+  ...RUNAWAY_TRIGGER_ROW,
+  id: "trigger-runaway-2",
+  filters: { "traces.origin": ["application"] },
+};
+
+/** The same automation, written before the filter-query migration. */
+const LEGACY_ORIGIN_TRIGGER_ROW: TriggerRow = {
+  ...TRIGGER_ROW,
+  id: "trigger-4",
+  filters: { "traces.origin": ["application"] },
+  filterQuery: null,
+};
+
+/** And one whose legacy filters reach the evaluation half. */
+const LEGACY_EVALUATION_TRIGGER_ROW: TriggerRow = {
+  ...TRIGGER_ROW,
+  id: "trigger-5",
+  filters: { "evaluations.passed": { "evaluator-1": ["false"] } },
+  filterQuery: null,
+};
+
+/** One evaluation run, as an SDK that reported a failure without running. */
+function erroredEvaluationRun(): Record<string, unknown> {
+  return {
+    evaluationId: "evaluation-1",
+    evaluatorId: "evaluator-1",
+    evaluatorType: "custom",
+    evaluatorName: "Quality",
+    traceId: "trace-1",
+    isGuardrail: false,
+    status: "error",
+    score: null,
+    passed: false,
+    label: null,
+    details: null,
+    inputs: null,
+    error: "provider timed out",
+    errorDetails: null,
+    createdAt: 1,
+    updatedAt: 1,
+    LastEventOccurredAt: 1,
+    archivedAt: null,
+    scheduledAt: null,
+    startedAt: null,
+    completedAt: null,
+    costId: null,
+  };
+}
+
 /** The same automation, written to append its matches to a dataset. */
 const DATASET_TRIGGER_ROW: TriggerRow = {
   ...TRIGGER_ROW,
   id: "trigger-2",
   action: "ADD_TO_DATASET",
-  actionParams: {
-    datasetId: "support-replies",
-    datasetMapping: {
-      mapping: {
-        question: { source: "input" },
-        answer: { source: "output" },
-      },
-      expansions: [],
-    },
-  },
+  actionParams: DATASET_ACTION_PARAMS,
 };
 
 /**
@@ -296,6 +384,12 @@ type ComposeOverrides = {
   /** Which trace ids this process's own storage says the project holds. */
   heldTraceIds?: string[];
   trigger?: TriggerRow;
+  /** The attributes the settled fold state carries, for legacy filter matching. */
+  summaryAttributes?: Record<string, string>;
+  /** The evaluation runs this process's own storage answers for the trace. */
+  evaluationRuns?: Array<Record<string, unknown>>;
+  /** Runaway containment, and how much traffic the project itself carried. */
+  containment?: { projectTraces24h: number };
 };
 
 function compose(over: ComposeOverrides = {}) {
@@ -318,6 +412,17 @@ function compose(over: ComposeOverrides = {}) {
         output: "world",
         occurredAt: 1,
         spanCount: 1,
+        // The fields the legacy filter projection reads off a fold state. The
+        // matcher walks the flat attribute map, so a double that stopped at
+        // the digest's four fields would assert the projection away.
+        computedInput: "hello",
+        computedOutput: "world",
+        containsErrorStatus: false,
+        models: [],
+        topicId: null,
+        subTopicId: null,
+        annotationIds: [],
+        attributes: over.summaryAttributes ?? {},
       }),
       // The reader this process composes when it holds no typed client: the
       // full record enriches a candidate the fold state already produced, so
@@ -332,7 +437,9 @@ function compose(over: ComposeOverrides = {}) {
       classifyQuery: () => ({ evaluations: false, events: false, spans: false }),
       deriveEvents: async () => [],
     } as never,
-    evaluations: { findRunsByTraceId: async () => [] } as never,
+    evaluations: {
+      findRunsByTraceId: async () => over.evaluationRuns ?? [],
+    } as never,
     heartbeat: { tryResolveClickHouseClient: async () => null } as never,
     ...(over.datasets === true ? { datasets: recordingDatasets() } : {}),
     ...(over.annotations === true
@@ -346,10 +453,46 @@ function compose(over: ComposeOverrides = {}) {
           } as never,
         }
       : {}),
+    ...(over.containment ? { containment: recordingContainment(over.containment) } : {}),
     redis: null,
     absence: new RecordingAbsence(),
     logger: recordingLogger(),
   });
+}
+
+/**
+ * The three substrates containment adds, standing where this process's mail
+ * graph, tenancy directories and routed ClickHouse client stand in production.
+ *
+ * The POLICY is not doubled: `RunawayContainmentService` is the packaged one,
+ * so what these assertions observe is the decision the feature makes, not one
+ * written in the test.
+ */
+function recordingContainment(input: { projectTraces24h: number }) {
+  return {
+    mailer: new RecordingMailer() as never,
+    directories: {
+      projects: {
+        getOrganizationId: async () => "organization-1",
+        tryGetById: async () => ({ id: "project-1", name: "Acme", slug: "acme" }),
+      },
+      authorization: {
+        listOrganizationBindings: async () => [
+          { role: "ADMIN", user: { email: "ada@example.com" } },
+          // A member is not an administrator: they cannot pause or re-scope an
+          // automation, so telling them is noise they cannot act on.
+          { role: "MEMBER", user: { email: "grace@example.com" } },
+        ],
+      },
+    },
+    resolveClickHouseClient: async () => ({
+      query: async (request: { query_params: { tenantId: unknown } }) => {
+        RECORDED.trafficReads.push({ tenantId: request.query_params.tenantId });
+
+        return { json: async () => [{ Total: String(input.projectTraces24h) }] };
+      },
+    }),
+  } as never;
 }
 
 /** Dataset's own write, recorded at the one call this path makes. */
@@ -521,6 +664,97 @@ describe("given the automations pipeline this process composes for itself", () =
     });
   });
 
+  describe("when a settled match is re-checked against an automation's legacy filters", () => {
+    /**
+     * The two functions this exercises left the tree with the platform
+     * application and were recovered into `@langwatch/analytics-server`. What
+     * is asserted here is the WIRING: that this process reaches the packaged
+     * matcher rather than refusing, and that a legacy automation therefore
+     * confirms or drops on the same rules the interactive filter uses.
+     */
+    /** @scenario "A settled match is re-checked against an automation's legacy filters" */
+    it("confirms a pre-query automation whose filters hold and sends the digest", async () => {
+      reset();
+      const settlement = build({
+        trigger: LEGACY_ORIGIN_TRIGGER_ROW,
+        summaryAttributes: { "langwatch.origin": "application" },
+      }).processManagers.get("triggerSettlement");
+      if (!settlement) throw new Error("the pipeline registered no triggerSettlement");
+
+      await settlement.config.intents.notifyDigest!.run(
+        { triggerId: "trigger-4", traceIds: ["trace-1"], boundary: 1 } as never,
+        { projectId: "project-1", messageKey: "digest:legacy-match", attempt: 1 } as never,
+      );
+
+      expect(RECORDED.mail).toHaveLength(1);
+      // The refusal this replaces was TERMINAL, so it landed here rather than
+      // being thrown out of the intent.
+      expect(RECORDED.captured).toEqual([]);
+      expect(RECORDED.absences).not.toContain("legacyFilterMatching");
+    });
+
+    /** @scenario "A settled match whose legacy filters no longer hold is dropped quietly" */
+    it("drops a match whose filters no longer hold rather than refusing by name", async () => {
+      reset();
+      const settlement = build({
+        trigger: LEGACY_ORIGIN_TRIGGER_ROW,
+        summaryAttributes: { "langwatch.origin": "playground" },
+      }).processManagers.get("triggerSettlement");
+      if (!settlement) throw new Error("the pipeline registered no triggerSettlement");
+
+      await settlement.config.intents.notifyDigest!.run(
+        { triggerId: "trigger-4", traceIds: ["trace-1"], boundary: 1 } as never,
+        { projectId: "project-1", messageKey: "digest:legacy-miss", attempt: 1 } as never,
+      );
+
+      expect(RECORDED.mail).toEqual([]);
+      expect(RECORDED.captured).toEqual([]);
+    });
+
+    /**
+     * The #6833 guard, asserted through the composition because it is the one
+     * rule a rewritten matcher would most plausibly drop: an SDK may attach
+     * `passed: false` beside `status: "error"`, and reading that as a verdict
+     * pages someone for a provider timeout.
+     */
+    /** @scenario "A legacy evaluation filter only counts an evaluation that ran" */
+    it("does not read a verdict off an evaluation that errored", async () => {
+      reset();
+      const settlement = build({
+        trigger: LEGACY_EVALUATION_TRIGGER_ROW,
+        summaryAttributes: { "langwatch.origin": "application" },
+        evaluationRuns: [erroredEvaluationRun()],
+      }).processManagers.get("triggerSettlement");
+      if (!settlement) throw new Error("the pipeline registered no triggerSettlement");
+
+      await settlement.config.intents.notifyDigest!.run(
+        { triggerId: "trigger-5", traceIds: ["trace-1"], boundary: 1 } as never,
+        { projectId: "project-1", messageKey: "digest:legacy-eval", attempt: 1 } as never,
+      );
+
+      expect(RECORDED.mail).toEqual([]);
+      expect(RECORDED.captured).toEqual([]);
+    });
+
+    /** @scenario "A legacy evaluation filter only counts an evaluation that ran" */
+    it("confirms once the same evaluation has actually run to a verdict", async () => {
+      reset();
+      const settlement = build({
+        trigger: LEGACY_EVALUATION_TRIGGER_ROW,
+        summaryAttributes: { "langwatch.origin": "application" },
+        evaluationRuns: [{ ...erroredEvaluationRun(), status: "processed" }],
+      }).processManagers.get("triggerSettlement");
+      if (!settlement) throw new Error("the pipeline registered no triggerSettlement");
+
+      await settlement.config.intents.notifyDigest!.run(
+        { triggerId: "trigger-5", traceIds: ["trace-1"], boundary: 1 } as never,
+        { projectId: "project-1", messageKey: "digest:legacy-eval-ok", attempt: 1 } as never,
+      );
+
+      expect(RECORDED.mail).toHaveLength(1);
+    });
+  });
+
   describe("when a settled window is notified", () => {
     /** @scenario "A settled match reaches its recipients from this process" */
     it("claims the send and delivers the digest through this process's own mailer", async () => {
@@ -576,7 +810,6 @@ describe("given the automations pipeline this process composes for itself", () =
       // makes.
       expect(RECORDED.absences).toEqual([
         "graphAlertEvaluation",
-        "legacyFilterMatching",
         "datasetPersist",
         "annotationQueuePersist",
         "runawayContainment",
@@ -758,6 +991,93 @@ describe("given the automations pipeline this process composes for itself", () =
 
       expect(RECORDED.datasetAppends).toHaveLength(1);
       expect(RECORDED.breaches).toEqual([]);
+    });
+  });
+
+  describe("when an automation runs past its daily ceiling", () => {
+    /** @scenario "A breached ceiling is contained from this process" */
+    it("stops reporting containment as absent once mail and tenancy are composed", () => {
+      reset();
+      build({ containment: { projectTraces24h: 1000 } });
+
+      expect(RECORDED.absences).not.toContain("runawayContainment");
+    });
+
+    /** @scenario "A breached ceiling is contained from this process" */
+    it("still reports containment as absent when this graph composed no tenancy", () => {
+      reset();
+      build();
+
+      expect(RECORDED.absences).toContain("runawayContainment");
+    });
+
+    /**
+     * The pause is the part that cannot be recovered by hand: an automation
+     * appending every trace a project sees fills a dataset and burns a
+     * customer's ceiling every day until somebody notices. So the assertion is
+     * on the WRITE and on the reason it carries, not on the log line.
+     */
+    /** @scenario "A misconfigured automation is paused and its administrators are told" */
+    it("pauses a match-everything automation and mails only the organization's administrators", async () => {
+      reset();
+      const settlement = build({
+        datasets: true,
+        containment: { projectTraces24h: 1000 },
+        plan: { type: "FREE", free: true, maxTriggerPersistDispatchesPerDay: 0 },
+        trigger: RUNAWAY_TRIGGER_ROW,
+      }).processManagers.get("triggerSettlement");
+      if (!settlement) throw new Error("the pipeline registered no triggerSettlement");
+
+      await settlement.config.intents.persistMatch!.run(
+        { triggerId: RUNAWAY_TRIGGER_ROW.id, traceIds: ["trace-1"], boundary: 1 } as never,
+        { projectId: "project-1", messageKey: "persist:runaway-1", attempt: 1 } as never,
+      );
+
+      expect(RECORDED.pauses).toEqual([
+        {
+          triggerId: RUNAWAY_TRIGGER_ROW.id,
+          projectId: "project-1",
+          pausedReason: "runaway_volume",
+        },
+      ]);
+      expect(RECORDED.mail.map((sent) => sent.to)).toEqual(["ada@example.com"]);
+      expect(RECORDED.mail[0]!.subject).toBe("Automation paused: Error rate");
+      expect(RECORDED.datasetAppends).toEqual([]);
+    });
+
+    /**
+     * A narrowed automation that merely reached its ceiling is a customer
+     * whose usage grew, not a bug. Pausing it would be the platform deciding
+     * to stop a working feature, so the notice goes out and the automation
+     * stays on.
+     */
+    /** @scenario "An automation that merely reached its ceiling is told, not paused" */
+    it("tells the administrators without pausing a narrowed automation", async () => {
+      reset();
+      const settlement = build({
+        datasets: true,
+        containment: { projectTraces24h: 1000 },
+        plan: { type: "FREE", free: true, maxTriggerPersistDispatchesPerDay: 0 },
+        trigger: NARROWED_TRIGGER_ROW,
+        // The narrowing condition has to actually hold, or the match is never
+        // confirmed and the ceiling is never reached — a green test that
+        // asserted nothing about containment.
+        summaryAttributes: { "langwatch.origin": "application" },
+      }).processManagers.get("triggerSettlement");
+      if (!settlement) throw new Error("the pipeline registered no triggerSettlement");
+
+      await settlement.config.intents.persistMatch!.run(
+        { triggerId: NARROWED_TRIGGER_ROW.id, traceIds: ["trace-1"], boundary: 1 } as never,
+        { projectId: "project-1", messageKey: "persist:runaway-2", attempt: 1 } as never,
+      );
+
+      expect(RECORDED.pauses).toEqual([]);
+      expect(RECORDED.mail.map((sent) => sent.to)).toEqual(["ada@example.com"]);
+      expect(RECORDED.mail[0]!.subject).toBe("Automation reached its daily limit: Error rate");
+      // "Not misconfigured" is a decision about how much of the project's own
+      // traffic this automation claims, so the count has to have been read on
+      // the project's own tenant rather than assumed.
+      expect(RECORDED.trafficReads).toEqual([{ tenantId: "project-1" }]);
     });
   });
 
