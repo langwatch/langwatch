@@ -196,6 +196,7 @@ describe("OnboardingTrpcApi", () => {
       );
     });
 
+    /** @scenario A fresh organization gets the full standard catalog with no admin action */
     it("gives the new organization the standard tool catalogue", async () => {
       const { caller, ports } = harness();
 

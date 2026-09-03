@@ -430,6 +430,7 @@ describe("OrganizationMembershipService", () => {
     });
 
     describe("when re-enabling a member the plan has no seat for", () => {
+      /** @scenario Re-enabling a member is refused when it would exceed the seats */
       it("refuses with member_seat_limit_reached", async () => {
         vi.mocked(mockRepo.tryFindMembership).mockResolvedValue({
           userId: "user-456",
@@ -461,6 +462,7 @@ describe("OrganizationMembershipService", () => {
     });
 
     describe("when re-enabling a member the plan has a seat for", () => {
+      /** @scenario A disabled member can be re-enabled when a seat is free */
       it("delegates to the repository", async () => {
         vi.mocked(mockRepo.tryFindMembership).mockResolvedValue({
           userId: "user-456",

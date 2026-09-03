@@ -264,6 +264,41 @@ describe.skipIf(!databaseUrl)("Saved workbench chart persistence", () => {
 
       expect(listed.map((chart) => chart.id)).toEqual([mine.id]);
     });
+
+    /** @scenario "Another project's saved chart is not readable" */
+    it("answers exactly as it would for an id that never existed", async () => {
+      const saved = await saveChart();
+
+      await expect(
+        service().getSavedWorkbenchChart({ projectId: otherProjectId, chartId: saved.id }),
+      ).rejects.toBeInstanceOf(SavedWorkbenchChartNotFoundError);
+      await expect(
+        service().getSavedWorkbenchChart({
+          projectId: otherProjectId,
+          chartId: `never-${randomUUID()}`,
+        }),
+      ).rejects.toBeInstanceOf(SavedWorkbenchChartNotFoundError);
+    });
+
+    /** @scenario "Another project's saved chart cannot be edited or deleted" */
+    it("refuses both as not found and leaves the chart exactly as it was", async () => {
+      const saved = await saveChart();
+
+      await expect(
+        service().updateSavedWorkbenchChart({
+          projectId: otherProjectId,
+          chartId: saved.id,
+          name: "Renamed by a stranger",
+        }),
+      ).rejects.toBeInstanceOf(SavedWorkbenchChartNotFoundError);
+      await expect(
+        service().deleteSavedWorkbenchChart({ projectId: otherProjectId, chartId: saved.id }),
+      ).rejects.toBeInstanceOf(SavedWorkbenchChartNotFoundError);
+
+      const after = await service().getSavedWorkbenchChart({ projectId, chartId: saved.id });
+      expect(after.name).toBe("Traces over time");
+      expect(after.definition).toEqual(DEFINITION);
+    });
   });
 
   describe("given a chart being placed on a dashboard", () => {

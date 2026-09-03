@@ -51,6 +51,7 @@ import {
   type TRPCRuntimeConfigOptions,
 } from "@trpc/server";
 import type { DatasetApp } from "#app/dataset.app";
+import { DatasetNameTakenError, DatasetStaleColumnsError } from "../../services/errors";
 
 /**
  * The host supplies authentication; authorization arrives as `policy`.
@@ -134,15 +135,13 @@ function translateDatasetError(error: unknown): unknown {
   // Both conflicts are knowable and both are actionable, but not by the same
   // action — a name clash is fixed by renaming, a stale editor by reloading.
   // Collapsing them onto one code told the second caller to pick a different
-  // name, which could never resolve their failure (ADR-045). `message` here
-  // is server copy; the customer-facing words live in the client's
-  // presentation registry, keyed by these codes.
+  // name, which could never resolve their failure (ADR-045). Promoted to the
+  // matching `HandledError` subclass so it crosses the boundary with its own
+  // code, httpStatus and fault rather than server-copy prose on a TRPCError.
   if (isDatasetError(error, "DatasetConflictError")) {
-    return new TRPCError({
-      code: "CONFLICT",
-      message: error.reason === "stale_columns" ? "dataset_stale_columns" : "dataset_name_taken",
-      cause: error,
-    });
+    return error.reason === "stale_columns"
+      ? new DatasetStaleColumnsError()
+      : new DatasetNameTakenError();
   }
 
   return error;
@@ -171,7 +170,7 @@ interface MiddlewareOutcome {
  * The original error is on `error.cause` — tRPC wraps anything that is not
  * already a `TRPCError` via `getTRPCErrorFromUnknown`.
  */
-const datasetErrorHandler = async <T extends MiddlewareOutcome>({
+export const datasetErrorHandler = async <T extends MiddlewareOutcome>({
   next,
 }: {
   next: () => Promise<T>;

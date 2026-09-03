@@ -208,12 +208,21 @@ describe("DatasetTrpcApi", () => {
         },
       });
 
+      // The middleware throws the `HandledError` subclass directly (ADR-045);
+      // this bare `initTRPC` harness carries no error formatter, so the raw
+      // caller wraps it as INTERNAL_SERVER_ERROR with the original on `.cause`
+      // — the host's real error formatter is what unwraps that back onto the
+      // wire (see apps/api/src/app-trpc/__tests__/app-trpc-error-formatter).
       await expect(
         nameTaken.caller.validateDatasetName({ projectId: "project-1", proposedName: "x" }),
-      ).rejects.toMatchObject({ code: "CONFLICT", message: "dataset_name_taken" });
+      ).rejects.toMatchObject({
+        cause: { code: "dataset_name_taken", httpStatus: 409, fault: "customer" },
+      });
       await expect(
         staleColumns.caller.validateDatasetName({ projectId: "project-1", proposedName: "x" }),
-      ).rejects.toMatchObject({ code: "CONFLICT", message: "dataset_stale_columns" });
+      ).rejects.toMatchObject({
+        cause: { code: "dataset_stale_columns", httpStatus: 409, fault: "customer" },
+      });
     });
 
     it("surfaces a missing dataset as NOT_FOUND through the error handler", async () => {

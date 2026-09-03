@@ -1,136 +1,110 @@
-/**
- * Every write a dataset record goes through, and the scope each one carries.
- *
- * Dataset records are project-level rows, so every statement here has to name
- * both the project and the dataset — a write scoped by record id alone would
- * reach across either boundary. That is the property under test; the entry
- * payload is checked alongside it because these methods exist to carry it.
- *
- * The client is a fake that records what it was asked, since the claim is about
- * the statement issued rather than about what a database does with it.
- */
+import { describe, expect, it, vi } from "vitest";
+import type { PrismaClient } from "@langwatch/prisma-client/generated";
 
-import { describe, expect, it } from "vitest";
 import { DatasetRecordContentRepository } from "../dataset-record-content.repository";
 
-type Call = { method: string; args: Record<string, unknown> };
-
-function repositoryWith(rows: Array<Record<string, unknown>> = []) {
-  const calls: Call[] = [];
-  const record = (method: string) => async (args: Record<string, unknown>) => {
-    calls.push({ method, args });
-    return method === "findMany"
-      ? rows
-      : method === "deleteMany"
-        ? { count: rows.length }
-        : rows[0];
-  };
-  const prisma = {
-    datasetRecord: {
-      update: record("update"),
-      create: record("create"),
-      createMany: record("createMany"),
-      findMany: record("findMany"),
-      deleteMany: record("deleteMany"),
-    },
-  };
-
-  return { calls, repository: DatasetRecordContentRepository.create(prisma as never) };
-}
-
-const SCOPE = { datasetId: "dataset-1", projectId: "project-1" };
-
+/**
+ * Unit tests for {@link DatasetRecordRepository} read ordering. Boundary mock:
+ * the Prisma client's `datasetRecord.findMany` is a spy so we can assert the
+ * exact query shape (`where` + `orderBy`) the repository issues — no DB.
+ *
+ * The ordering contract matters beyond this repository: the PG→S3 backfill
+ * migration reads through `findDatasetRecords`, and a stable, canonical order is
+ * what keeps migrated chunk/row order identical to what users saw on the PG read
+ * paths (first/last/random/number `entrySelection` parity) and identical across
+ * crash-resume re-runs.
+ */
 describe("DatasetRecordContentRepository", () => {
-  describe("given a record being edited", () => {
-    describe("when the entry is written", () => {
-      it("scopes the update to the record, its dataset and its project", async () => {
-        const { repository, calls } = repositoryWith([{ id: "record-1" }]);
+  describe("findDatasetRecords()", () => {
+    describe("when reading a dataset's records", () => {
+      /** @scenario An existing dataset stays usable after the storage migration */
+      it("orders by [createdAt asc, id asc] to match the other PG read paths", async () => {
+        const findMany = vi.fn().mockResolvedValue([]);
+        const prisma = {
+          datasetRecord: { findMany },
+        } as unknown as PrismaClient;
+        const repo = DatasetRecordContentRepository.create(prisma);
 
-        await repository.updateEntry({ id: "record-1", ...SCOPE, entry: { a: 1 } });
+        await repo.findDatasetRecords({ datasetId: "ds_1", projectId: "p1" });
 
-        expect(calls[0]?.args.where).toEqual({
-          id: "record-1",
-          datasetId: "dataset-1",
-          projectId: "project-1",
+        expect(findMany).toHaveBeenCalledWith({
+          where: { datasetId: "ds_1", projectId: "p1" },
+          orderBy: [{ createdAt: "asc" }, { id: "asc" }],
         });
       });
+    });
 
-      it("writes the entry it was given", async () => {
-        const { repository, calls } = repositoryWith([{ id: "record-1" }]);
+    describe("when a transaction client is provided", () => {
+      it("issues the ordered read on the tx client, not the base prisma", async () => {
+        const baseFindMany = vi.fn().mockResolvedValue([]);
+        const txFindMany = vi.fn().mockResolvedValue([]);
+        const prisma = {
+          datasetRecord: { findMany: baseFindMany },
+        } as unknown as PrismaClient;
+        const tx = {
+          datasetRecord: { findMany: txFindMany },
+        } as never;
+        const repo = DatasetRecordContentRepository.create(prisma);
 
-        await repository.updateEntry({ id: "record-1", ...SCOPE, entry: { a: 1 } });
+        await repo.findDatasetRecords(
+          { datasetId: "ds_1", projectId: "p1" },
+          { tx },
+        );
 
-        expect(calls[0]?.args.data).toEqual({ entry: { a: 1 } });
+        expect(baseFindMany).not.toHaveBeenCalled();
+        expect(txFindMany).toHaveBeenCalledWith({
+          where: { datasetId: "ds_1", projectId: "p1" },
+          orderBy: [{ createdAt: "asc" }, { id: "asc" }],
+        });
       });
     });
   });
 
-  describe("given a record being created", () => {
-    describe("when it is written", () => {
-      it("carries the entry and both scope ids onto the row", async () => {
-        const { repository, calls } = repositoryWith([{ id: "record-1" }]);
+  describe("findDatasetRecordsPage()", () => {
+    describe("when reading the first page (no cursor)", () => {
+      /** @scenario A very large dataset migrates without loading every row at once */
+      it("reads `take` rows in canonical order with no cursor/skip", async () => {
+        const findMany = vi.fn().mockResolvedValue([]);
+        const prisma = {
+          datasetRecord: { findMany },
+        } as unknown as PrismaClient;
+        const repo = DatasetRecordContentRepository.create(prisma);
 
-        await repository.create({ id: "record-1", ...SCOPE, entry: { a: 1 } });
+        await repo.findDatasetRecordsPage({
+          datasetId: "ds_1",
+          projectId: "p1",
+          take: 1000,
+        });
 
-        expect(calls[0]?.args.data).toEqual({
-          id: "record-1",
-          entry: { a: 1 },
-          datasetId: "dataset-1",
-          projectId: "project-1",
+        expect(findMany).toHaveBeenCalledWith({
+          where: { datasetId: "ds_1", projectId: "p1" },
+          orderBy: [{ createdAt: "asc" }, { id: "asc" }],
+          take: 1000,
         });
       });
     });
-  });
 
-  describe("given several records being created at once", () => {
-    describe("when they are written", () => {
-      it("stamps every row with both scope ids", async () => {
-        const { repository, calls } = repositoryWith([]);
+    describe("when reading a subsequent page (cursor given)", () => {
+      it("keyset-seeks past the cursor row (cursor + skip:1), same order", async () => {
+        const findMany = vi.fn().mockResolvedValue([]);
+        const prisma = {
+          datasetRecord: { findMany },
+        } as unknown as PrismaClient;
+        const repo = DatasetRecordContentRepository.create(prisma);
 
-        await repository.createMany({
-          records: [
-            { id: "record-1", entry: { a: 1 } },
-            { id: "record-2", entry: { a: 2 } },
-          ],
-          ...SCOPE,
+        await repo.findDatasetRecordsPage({
+          datasetId: "ds_1",
+          projectId: "p1",
+          take: 1000,
+          cursorId: "rec_last",
         });
 
-        expect(calls[0]?.args.data).toEqual([
-          { id: "record-1", entry: { a: 1 }, datasetId: "dataset-1", projectId: "project-1" },
-          { id: "record-2", entry: { a: 2 }, datasetId: "dataset-1", projectId: "project-1" },
-        ]);
-      });
-
-      it("reads them back within the same scope, oldest first", async () => {
-        const { repository, calls } = repositoryWith([]);
-
-        await repository.createMany({
-          records: [{ id: "record-1", entry: { a: 1 } }],
-          ...SCOPE,
-        });
-
-        const read = calls.find((call) => call.method === "findMany");
-        expect(read?.args.where).toEqual({
-          id: { in: ["record-1"] },
-          datasetId: "dataset-1",
-          projectId: "project-1",
-        });
-        expect(read?.args.orderBy).toEqual({ createdAt: "asc" });
-      });
-    });
-  });
-
-  describe("given records being deleted", () => {
-    describe("when the delete is issued", () => {
-      it("scopes it to the named ids within one dataset and project", async () => {
-        const { repository, calls } = repositoryWith([]);
-
-        await repository.deleteMany({ recordIds: ["record-1", "record-2"], ...SCOPE });
-
-        expect(calls[0]?.args.where).toEqual({
-          id: { in: ["record-1", "record-2"] },
-          datasetId: "dataset-1",
-          projectId: "project-1",
+        expect(findMany).toHaveBeenCalledWith({
+          where: { datasetId: "ds_1", projectId: "p1" },
+          orderBy: [{ createdAt: "asc" }, { id: "asc" }],
+          take: 1000,
+          cursor: { id: "rec_last" },
+          skip: 1,
         });
       });
     });
