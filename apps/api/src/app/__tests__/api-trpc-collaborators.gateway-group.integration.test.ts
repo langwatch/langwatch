@@ -250,10 +250,8 @@ function baseCollaborators(): AnyApiTrpcCollaborators {
       opsCheck: () => passThroughMiddleware,
       scenarios: stub("agentGroup.scenarios"),
     },
-    productInfra: {
-      dataRetention: stub("productInfra.dataRetention"),
-      monitors: stub("productInfra.monitors", { preconditionsSchema: anySchema }),
-    },
+    dataRetention: stub("dataRetention"),
+    monitors: stub("monitors", { preconditionsSchema: anySchema }),
     user: stub("user"),
     workflows: {
       lifecycle: stub("workflows.lifecycle"),
@@ -441,14 +439,14 @@ describe("given an API process composed with the gateway-group half of the recor
       ]);
     });
 
-    it("names the three port groups the half fills and nothing else", () => {
+    it("names the three port groups the half fills", () => {
       const { group } = composeApplication();
 
-      expect(Object.keys(group.ports).sort()).toEqual([
-        "gateway",
-        "governanceHome",
-        "saasBilling",
-      ]);
+      expect(group).toMatchObject({
+        gateway: expect.anything(),
+        governanceHome: expect.anything(),
+        saasBilling: expect.any(Boolean),
+      });
     });
   });
 

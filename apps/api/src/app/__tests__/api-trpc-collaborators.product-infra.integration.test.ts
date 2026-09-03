@@ -389,10 +389,8 @@ function baseCollaborators(): AnyApiTrpcCollaborators {
     prompts: stub("prompts"),
     role: stub("role", { customRolePermission: anySchema }),
     team: stub("team"),
-    productInfra: {
-      dataRetention: stub("productInfra.dataRetention"),
-      monitors: stub("productInfra.monitors", { preconditionsSchema: anySchema }),
-    },
+    dataRetention: stub("dataRetention"),
+    monitors: stub("monitors", { preconditionsSchema: anySchema }),
     /**
      * The nine tenant-administration surfaces, stubbed with only what the
      * record reads while it is BUILT: the sign-up questionnaire the
@@ -455,11 +453,9 @@ function baseCollaborators(): AnyApiTrpcCollaborators {
      * the SaaS-billing decision, which chooses which router the two billing
      * namespaces ARE. Their own suite is what proves they answer.
      */
-    gatewayGroup: {
-      gateway: { virtualKeys: { virtualKeyBudgetInput: anySchema } },
-      governanceHome: stub("gatewayGroup.governanceHome"),
-      saasBilling: false,
-    },
+    gateway: { virtualKeys: { virtualKeyBudgetInput: anySchema } },
+    governanceHome: stub("governanceHome"),
+    saasBilling: false,
     github: stub("github"),
     agentGroup: {
       langy: stub("agentGroup.langy"),
@@ -865,7 +861,7 @@ describe("given an API process composed with the product-infrastructure half", (
       const { half } = composeHalf({ plans: undefined });
 
       await expect(
-        half.ports.dataRetention.assertPlanForProject(
+        half.dataRetention.assertPlanForProject(
           { session: { user: SESSION_USER } } as never,
           PROJECT_ID,
         ),
@@ -876,7 +872,7 @@ describe("given an API process composed with the product-infrastructure half", (
       const { half } = composeHalf();
 
       expect(() =>
-        half.ports.dataRetention.assertCanDisableRetention({
+        half.dataRetention.assertCanDisableRetention({
           session: { user: SESSION_USER },
         } as never),
       ).toThrow(/platform administrators/);

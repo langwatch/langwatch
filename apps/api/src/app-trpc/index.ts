@@ -91,12 +91,6 @@ export {
   createModelProviderTrpcRouter,
   type ModelProviderTrpcChecks,
 } from "../features/model-provider/model-provider-trpc.mount";
-export {
-  createAppProductInfraTrpcFeatures,
-  type AnyAppProductInfraTrpcPorts,
-  type AppProductInfraTrpcContext,
-  type AppProductInfraTrpcPorts,
-} from "./app-trpc.product-infra";
 export { createDataRetentionTrpcRouter } from "../features/data-retention/data-retention-trpc.mount";
 export { createMonitorTrpcRouter } from "../features/monitor/monitor-trpc.mount";
 export {

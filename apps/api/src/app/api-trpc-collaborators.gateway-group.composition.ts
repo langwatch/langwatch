@@ -58,7 +58,7 @@ import type { PrismaClient } from "@langwatch/prisma-client/generated";
 import type { ProjectService } from "@langwatch/project-contract";
 import type { AnyApiTrpcCollaborators } from "../app-trpc/app-trpc.collaborators";
 import type { ApiTrpcFeatureApplication } from "../app-trpc/app-trpc.context";
-import type { AnyAppGatewayGroupTrpcPorts } from "../app-trpc/app-trpc.gateway-group";
+import type { GatewayTrpcPorts } from "../features/gateway/gateway-trpc.mount";
 import type { GovernanceHomeTrpcPorts } from "../features/enterprise/governance-home.mount";
 import type { GithubTrpcMountPorts } from "../features/github/github-trpc.mount";
 import type { ApiAuditPort } from "../api-request.policy";
@@ -139,8 +139,12 @@ export type ApiGatewayGroupCollaborators = Readonly<{
     ApiTrpcFeatureApplication,
     "gateway" | "github" | "governance" | "governanceApp" | "sessionPolicy" | "webhooks"
   >;
-  /** The `gatewayGroup` entry of {@link ApiTrpcCollaborators}. */
-  ports: AnyAppGatewayGroupTrpcPorts;
+  /** The virtual-key budget parser — fixed when the router is BUILT. */
+  gateway: GatewayTrpcPorts;
+  /** The six answers the `/` landing decision is gathered from. */
+  governanceHome: GovernanceHomeTrpcPorts;
+  /** Whether this installation bills through Stripe. */
+  saasBilling: boolean;
   /** The `github` entry beside it: one namespace, two answers nobody else owns. */
   github: GithubTrpcMountPorts;
   /**
@@ -188,13 +192,11 @@ export function composeApiGatewayGroupCollaborators(
       github: options.github,
       ...enterpriseGovernanceApplication(options, logger),
     },
-    ports: {
-      // The one member that could not follow the rest onto `GatewayApp`: a tRPC
-      // input parser is fixed when the router is BUILT.
-      gateway: { virtualKeys: gateway.app.schemas },
-      governanceHome: governanceHomePorts(options),
-      saasBilling: options.saasBilling,
-    },
+    // The one member that could not follow the rest onto `GatewayApp`: a tRPC
+    // input parser is fixed when the router is BUILT.
+    gateway: { virtualKeys: gateway.app.schemas },
+    governanceHome: governanceHomePorts(options),
+    saasBilling: options.saasBilling,
     github: githubPorts(options, logger),
     gatewayApp: gateway.app,
     composition: gateway,
@@ -369,7 +371,9 @@ export function withApiGatewayGroupCollaborators(
   if (!base || !group) return base;
   return {
     ...base,
-    gatewayGroup: group.ports,
+    gateway: group.gateway,
+    governanceHome: group.governanceHome,
+    saasBilling: group.saasBilling,
     github: group.github,
     application: {
       ...base.application,

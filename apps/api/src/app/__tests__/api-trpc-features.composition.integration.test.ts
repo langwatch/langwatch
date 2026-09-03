@@ -249,10 +249,8 @@ function testCollaborators(): AnyApiTrpcCollaborators {
     // The three product-infrastructure surfaces, as one entry. Only the
     // monitor precondition parser is read while the record is BUILT; the
     // retention policy and the rest refuse by name if a call reaches them.
-    productInfra: {
-      dataRetention: stub("productInfra.dataRetention"),
-      monitors: stub("productInfra.monitors", { preconditionsSchema: anySchema }),
-    },
+    dataRetention: stub("dataRetention"),
+    monitors: stub("monitors", { preconditionsSchema: anySchema }),
     /**
      * The trace group, stubbed with only what the record reads while it is
      * being BUILT: the input schemas its procedures are parsed with, and the
@@ -314,17 +312,12 @@ function testCollaborators(): AnyApiTrpcCollaborators {
      * The six agent surfaces, stubbed with only what the record reads while it
      * is being BUILT. Their own suite is what proves they answer.
      */
-    /**
-     * The twenty-one gateway and governance surfaces, stubbed with only what
-     * the record reads while it is BUILT: the virtual-key budget parser and
-     * the SaaS-billing decision, which chooses which router the two billing
-     * namespaces ARE. Their own suite is what proves they answer.
-     */
-    gatewayGroup: {
-      gateway: { virtualKeys: { virtualKeyBudgetInput: anySchema } },
-      governanceHome: stub("gatewayGroup.governanceHome"),
-      saasBilling: false,
-    },
+    // The virtual-key budget parser and the SaaS-billing decision, stubbed
+    // with only what the record reads while it is BUILT. Their own suite is
+    // what proves they answer.
+    gateway: { virtualKeys: { virtualKeyBudgetInput: anySchema } },
+    governanceHome: stub("governanceHome"),
+    saasBilling: false,
     github: stub("github"),
     agentGroup: {
       scenarios: stub("agentGroup.scenarios"),

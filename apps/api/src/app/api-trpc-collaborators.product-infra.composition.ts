@@ -112,7 +112,6 @@ import {
 } from "@langwatch/stored-object-server";
 import type { AnyApiTrpcCollaborators } from "../app-trpc/app-trpc.collaborators";
 import type { ApiTrpcFeatureApplication, ApiTrpcPortsContext } from "../app-trpc/app-trpc.context";
-import type { AppProductInfraTrpcPorts } from "../app-trpc/app-trpc.product-infra";
 import type { ApiStoredObjectsConfigResolution } from "../platform/config/api.config";
 
 /**
@@ -199,8 +198,10 @@ export type ApiProductInfraCollaborators = Readonly<{
    * object precisely because both write through this instance.
    */
   storedObjectBytes: StoredObjectsService;
-  /** The `productInfra` entry of {@link ApiTrpcCollaborators}. */
-  ports: AppProductInfraTrpcPorts<RetentionPolicySnapshot, StorageScopeUsage>;
+  /** The retention policy: who may write an override, and the two RBAC-filtered reads. */
+  dataRetention: DataRetentionTrpcPolicy<RetentionPolicySnapshot, StorageScopeUsage>;
+  /** The monitor surface's precondition parser, comparison window and evaluator replication. */
+  monitors: MonitorTrpcPorts;
   /** Released with the process: the pooled outbound handlers the S3 clients share. */
   close(): Promise<void>;
 }>;
@@ -224,7 +225,8 @@ export function composeApiProductInfraCollaborators(
     monitorApp: monitors.app,
     storedObjectApp: storage.app,
     storedObjectBytes: storage.bytes,
-    ports: { dataRetention: retention, monitors: monitors.ports },
+    dataRetention: retention,
+    monitors: monitors.ports,
     close: () => storage.close(),
   };
 }
@@ -245,7 +247,8 @@ export function withApiProductInfraCollaborators(
   if (!base || !half) return base;
   return {
     ...base,
-    productInfra: half.ports,
+    dataRetention: half.dataRetention,
+    monitors: half.monitors,
     application: {
       ...base.application,
       monitors: half.monitorApp,

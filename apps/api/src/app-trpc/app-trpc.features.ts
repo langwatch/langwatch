@@ -36,6 +36,12 @@ import type {
   DatasetTrpcContext,
   DatasetTrpcPorts,
 } from "@langwatch/dataset-server";
+import type {
+  DataRetentionTrpcContext,
+  DataRetentionTrpcPolicy,
+} from "@langwatch/data-retention-server";
+import type { MonitorTrpcContext, MonitorTrpcPorts } from "@langwatch/monitor-server";
+import type { StoredObjectTrpcContext } from "@langwatch/stored-object-server";
 import type { FeatureFlagTrpcContext } from "@langwatch/feature-flag-server";
 import type { AuthApp, FrontDoorTrpcContext, PublicEnvTrpcContext } from "@langwatch/auth-server";
 import type { DataPrivacyTrpcContext, DataPrivacyTrpcPorts } from "@langwatch/data-privacy-server";
@@ -121,6 +127,9 @@ import {
   createDataPrivacyTrpcRouter,
   type DataPrivacyTrpcChecks,
 } from "../features/data-privacy/data-privacy-trpc.mount";
+import { createDataRetentionTrpcRouter } from "../features/data-retention/data-retention-trpc.mount";
+import { createMonitorTrpcRouter } from "../features/monitor/monitor-trpc.mount";
+import { createStoredObjectTrpcRouter } from "../features/stored-object/stored-object-trpc.mount";
 import {
   createEvaluationTrpcRouter,
   type EvaluationMountPorts,
@@ -164,25 +173,33 @@ import {
   createWorkflowTrpcRouter,
 } from "../features/workflow/workflow-trpc.mount";
 import {
+  createEnterpriseBillingTrpcRouters,
+  type EnterpriseBillingTrpcContext,
+} from "../features/enterprise/enterprise-billing-trpc.mount";
+import {
+  createEnterpriseGovernanceTrpcRouters,
+  type EnterpriseGovernanceMountContext,
+} from "../features/enterprise/enterprise-governance-trpc.mount";
+import {
+  createGovernanceHomeTrpcRouter,
+  type GovernanceHomeTrpcContext,
+  type GovernanceHomeTrpcPorts,
+} from "../features/enterprise/governance-home.mount";
+import {
+  createGatewayTrpcRouters,
+  type GatewayTrpcContext,
+  type GatewayTrpcPorts,
+} from "../features/gateway/gateway-trpc.mount";
+import {
   createAppAgentGroupTrpcFeatures,
   type AnyAppAgentGroupTrpcPorts,
   type AppAgentGroupTrpcContext,
 } from "./app-trpc.agent-group";
 import {
-  createAppGatewayGroupTrpcFeatures,
-  type AnyAppGatewayGroupTrpcPorts,
-  type AppGatewayGroupTrpcContext,
-} from "./app-trpc.gateway-group";
-import {
   createAppOrgGroupTrpcFeatures,
   type AnyAppOrgGroupTrpcPorts,
   type AppOrgGroupTrpcContext,
 } from "./app-trpc.org-group";
-import {
-  createAppProductInfraTrpcFeatures,
-  type AnyAppProductInfraTrpcPorts,
-  type AppProductInfraTrpcContext,
-} from "./app-trpc.product-infra";
 import {
   createAppTraceGroupTrpcFeatures,
   type AnyAppTraceGroupTrpcPorts,
@@ -220,21 +237,15 @@ export interface AppTrpcFeaturePorts<
   TTraceGroup extends AnyAppTraceGroupTrpcPorts = AnyAppTraceGroupTrpcPorts,
   TOrgGroup extends AnyAppOrgGroupTrpcPorts = AnyAppOrgGroupTrpcPorts,
   TAgentGroup extends AnyAppAgentGroupTrpcPorts = AnyAppAgentGroupTrpcPorts,
-  TProductInfra extends AnyAppProductInfraTrpcPorts = AnyAppProductInfraTrpcPorts,
-  TGatewayGroup extends AnyAppGatewayGroupTrpcPorts = AnyAppGatewayGroupTrpcPorts,
+  TRetentionSnapshot = unknown,
+  TStorageScopeUsage = unknown,
 > {
-  /**
-   * The twenty-one surfaces the AI Gateway and the governance console that
-   * steers it are administered through, as one entry.
-   *
-   * Same reason the trace, organization, agent and product-infrastructure
-   * groups are one entry each: they are one graph — a virtual key is minted by
-   * the governance console, priced by the budget ledger, delivered on by a
-   * webhook endpoint and billed through a subscription — and one entry keeps
-   * their ports in {@link AppGatewayGroupTrpcPorts} rather than on this
-   * interface, which five other halves of the record also edit.
-   */
-  gatewayGroup: TGatewayGroup;
+  /** The virtual-key budget parser — fixed when the router is BUILT, so it cannot live on the per-request application. */
+  gateway: GatewayTrpcPorts;
+  /** The six answers the `/` landing decision is gathered from. */
+  governanceHome: GovernanceHomeTrpcPorts;
+  /** Whether this installation bills through Stripe. */
+  saasBilling: boolean;
   /**
    * The two answers `github.*` reaches that the GitHub feature does not own:
    * which organization a project belongs to, and where a command on the
@@ -242,16 +253,17 @@ export interface AppTrpcFeaturePorts<
    */
   github: GithubTrpcMountPorts;
   /**
-   * The three surfaces that answer for a project's own storage, retention and
-   * monitoring, as one entry.
-   *
-   * Same reason the trace, organization and agent groups are one entry each:
-   * they are one graph — every one of them is answered from a store the
-   * PROCESS operates rather than from a product surface — and one entry keeps
-   * their ports in {@link AppProductInfraTrpcPorts} rather than on this
-   * interface, which five other halves of the record also edit.
+   * The retention policy: who may write an override at a scope, which values
+   * that scope's plan may persist, who may switch retention off, and the two
+   * RBAC-filtered reads the settings page renders.
    */
-  productInfra: TProductInfra;
+  dataRetention: DataRetentionTrpcPolicy<TRetentionSnapshot, TStorageScopeUsage>;
+  /**
+   * The monitor surface's four: the precondition parser its two write inputs
+   * are built from, the previous window its performance trend compares to,
+   * and the evaluator replication a monitor copy carries with it.
+   */
+  monitors: MonitorTrpcPorts;
   /**
    * The six surfaces an AGENT is written, watched and driven through, as one
    * entry.
@@ -529,10 +541,15 @@ export function createAppTrpcFeatures<
     WorkflowOptimizationTrpcContext &
     WorkflowTrpcContext &
     AppAgentGroupTrpcContext &
-    AppGatewayGroupTrpcContext &
+    EnterpriseBillingTrpcContext &
+    EnterpriseGovernanceMountContext &
+    GatewayTrpcContext &
+    GovernanceHomeTrpcContext &
     GithubTrpcContext &
     AppOrgGroupTrpcContext &
-    AppProductInfraTrpcContext &
+    DataRetentionTrpcContext &
+    MonitorTrpcContext &
+    StoredObjectTrpcContext &
     AppTraceGroupTrpcContext,
   TOptions extends TRPCRuntimeConfigOptions<TContext, object>,
   TRoot extends AnyTRPCRootTypes,
@@ -556,8 +573,8 @@ export function createAppTrpcFeatures<
   TTraceGroup extends AnyAppTraceGroupTrpcPorts = AnyAppTraceGroupTrpcPorts,
   TOrgGroup extends AnyAppOrgGroupTrpcPorts = AnyAppOrgGroupTrpcPorts,
   TAgentGroup extends AnyAppAgentGroupTrpcPorts = AnyAppAgentGroupTrpcPorts,
-  TProductInfra extends AnyAppProductInfraTrpcPorts = AnyAppProductInfraTrpcPorts,
-  TGatewayGroup extends AnyAppGatewayGroupTrpcPorts = AnyAppGatewayGroupTrpcPorts,
+  TRetentionSnapshot = unknown,
+  TStorageScopeUsage = unknown,
 >(options: {
   mount: TrpcApiMount<TContext, TOptions, TRoot> & TrpcApiPublicMount<TContext, TOptions, TRoot>;
   ports: AppTrpcFeaturePorts<
@@ -581,11 +598,20 @@ export function createAppTrpcFeatures<
     TTraceGroup,
     TOrgGroup,
     TAgentGroup,
-    TProductInfra,
-    TGatewayGroup
+    TRetentionSnapshot,
+    TStorageScopeUsage
   >;
 }) {
   const { mount, ports } = options;
+  const gateway = createGatewayTrpcRouters({ ...mount, ports: ports.gateway });
+  const governance = createEnterpriseGovernanceTrpcRouters(mount);
+  const billing = createEnterpriseBillingTrpcRouters({
+    ...mount,
+    saasBilling: ports.saasBilling,
+  });
+  // `personalDashboard` is not a namespace of its own: `user:` below merges
+  // it into `user.*`, which is the name the /me page and the CLI call it by.
+  const { personalDashboard } = governance;
 
   return {
     // The sixteen observability surfaces, spread in whole. They are built by
@@ -604,18 +630,46 @@ export function createAppTrpcFeatures<
     // over `/api/sse`: the lane resolves a path against a caller built from
     // THIS record.
     ...createAppAgentGroupTrpcFeatures({ mount, ports: ports.agentGroup }),
-    // The three product-infrastructure surfaces, spread in whole for the same
-    // reason: one graph — a project's own object store, the retention window
-    // it is swept on, and the monitors running beside it — one entry, and one
-    // place their parameters live.
-    ...createAppProductInfraTrpcFeatures({ mount, ports: ports.productInfra }),
-    // The twenty-one AI Gateway and governance-console surfaces, spread in
-    // whole for the same reason again: one graph — a virtual key is minted by
-    // the console, priced by the budget ledger, delivered on by a webhook
-    // endpoint and billed through a subscription — one entry, and one place
-    // their ports live. Fifteen of them are Enterprise, and they arrive
-    // through the single composition seam a core process may see them through.
-    ...createAppGatewayGroupTrpcFeatures({ mount, ports: ports.gatewayGroup }),
+    dataRetention: createDataRetentionTrpcRouter({ ...mount, ports: ports.dataRetention }),
+    monitors: createMonitorTrpcRouter({ ...mount, ports: ports.monitors }),
+    // No ports: the probe reads `ctx.app.storedObjectApp` and nothing else.
+    storedObjects: createStoredObjectTrpcRouter(mount),
+    // The six core AI Gateway surfaces — one entry per namespace, straight off
+    // `createGatewayTrpcRouters`. Composed over this process's own Prisma and
+    // ClickHouse (see `composeApiGateway`); nothing here is a port any more.
+    virtualKeys: gateway.virtualKeys,
+    gatewayBudgets: gateway.gatewayBudgets,
+    gatewayCacheRules: gateway.gatewayCacheRules,
+    gatewayGuardrails: gateway.gatewayGuardrails,
+    gatewaySpendEvents: gateway.gatewaySpendEvents,
+    gatewayUsage: gateway.gatewayUsage,
+    // `personalDashboard` is not mounted under its own name here — see `user:` below.
+    activityMonitor: governance.activityMonitor,
+    aiTools: governance.aiTools,
+    anomalyRules: governance.anomalyRules,
+    departments: governance.departments,
+    ingestionKey: governance.ingestionKey,
+    ingestionSources: governance.ingestionSources,
+    ingestionTemplates: governance.ingestionTemplates,
+    personalSessions: governance.personalSessions,
+    personalVirtualKeys: governance.personalVirtualKeys,
+    routingPolicy: governance.routingPolicy,
+    sessionPolicy: governance.sessionPolicy,
+    webhookEndpoints: governance.webhookEndpoints,
+    // `governance` has two owners on one wire name: the five packaged
+    // procedures above and this process's own `/` landing decision. Merged
+    // HERE rather than inside either mount, so nothing outside this record can
+    // add a third door onto the same name.
+    governance: mount.root.mergeRouters(
+      governance.governance,
+      createGovernanceHomeTrpcRouter({ ...mount, ports: ports.governanceHome }),
+    ),
+    // The two Enterprise billing surfaces — one entry per namespace, straight
+    // off `createEnterpriseBillingTrpcRouters`. Both are mounted either way:
+    // `saasBilling` false serves the empty router of the same served type
+    // rather than dropping the namespace.
+    currency: billing.currency,
+    subscription: billing.subscription,
     // One wire namespace assembled from three packaged transports, exactly as
     // the client has always called it: the charted reads at `analytics.*`, the
     // workbench at `analytics.lwql`, and the saved charts at
@@ -730,7 +784,10 @@ export function createAppTrpcFeatures<
     // The signed-in person's own account. The process merges the Enterprise
     // /me dashboard reads into the same namespace, so `user.*` answers from
     // two owners on one wire name.
-    user: createUserTrpcRouter({ ...mount, ports: ports.user }),
+    user: mount.root.mergeRouters(
+      createUserTrpcRouter({ ...mount, ports: ports.user }),
+      personalDashboard,
+    ),
     workflow: createWorkflowTrpcRouter({ ...mount, ports: ports.workflows.lifecycle }),
   };
 }

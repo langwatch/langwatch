@@ -60,10 +60,12 @@ import type {
 import type { ZodTypeAny } from "zod";
 import type { EvaluationMountPorts } from "../features/evaluation/evaluation-trpc.mount";
 import type { ApiTrpcFeatureApplication } from "./app-trpc.context";
+import type { GatewayTrpcPorts } from "../features/gateway/gateway-trpc.mount";
+import type { GovernanceHomeTrpcPorts } from "../features/enterprise/governance-home.mount";
+import type { DataRetentionTrpcPolicy } from "@langwatch/data-retention-server";
+import type { MonitorTrpcPorts } from "@langwatch/monitor-server";
 import type { AnyAppAgentGroupTrpcPorts } from "./app-trpc.agent-group";
-import type { AnyAppGatewayGroupTrpcPorts } from "./app-trpc.gateway-group";
 import type { AnyAppOrgGroupTrpcPorts } from "./app-trpc.org-group";
-import type { AnyAppProductInfraTrpcPorts } from "./app-trpc.product-infra";
 import type { AnyAppTraceGroupTrpcPorts } from "./app-trpc.trace-group";
 
 /**
@@ -136,8 +138,8 @@ export type ApiTrpcCollaborators<
   TTraceGroup extends AnyAppTraceGroupTrpcPorts = AnyAppTraceGroupTrpcPorts,
   TOrgGroup extends AnyAppOrgGroupTrpcPorts = AnyAppOrgGroupTrpcPorts,
   TAgentGroup extends AnyAppAgentGroupTrpcPorts = AnyAppAgentGroupTrpcPorts,
-  TProductInfra extends AnyAppProductInfraTrpcPorts = AnyAppProductInfraTrpcPorts,
-  TGatewayGroup extends AnyAppGatewayGroupTrpcPorts = AnyAppGatewayGroupTrpcPorts,
+  TRetentionSnapshot = unknown,
+  TStorageScopeUsage = unknown,
 > = Readonly<{
   /**
    * The application slices every packaged surface reads off `ctx.app`.
@@ -288,7 +290,12 @@ export type ApiTrpcCollaborators<
    * reads one absence per capability rather than one absence for twenty-one
    * namespaces.
    */
-  gatewayGroup: TGatewayGroup;
+  /** The virtual-key budget parser — fixed when the router is BUILT. */
+  gateway: GatewayTrpcPorts;
+  /** The six answers the `/` landing decision is gathered from. */
+  governanceHome: GovernanceHomeTrpcPorts;
+  /** Whether this installation bills through Stripe. */
+  saasBilling: boolean;
 
   /**
    * The two answers `github.*` reaches that the GitHub feature does not own:
@@ -302,17 +309,13 @@ export type ApiTrpcCollaborators<
   github: GithubTrpcMountPorts;
 
   /**
-   * The three product-infrastructure surfaces' ports, as one entry.
-   *
-   * Like the three groups above, this is not a leftover: the API composes the
-   * object store, the retention policy and the monitor application for itself,
-   * off its own Prisma and ClickHouse connections and the byte backend its
-   * configuration names. What it cannot compose is named INSIDE the group —
-   * the Azure byte driver, the plan reading and the evaluation-run trend — so
-   * a deployment reads one absence per capability rather than one absence for
-   * three namespaces.
+   * The retention policy: who may write an override at a scope, which values
+   * that scope's plan may persist, who may switch retention off, and the two
+   * RBAC-filtered reads the settings page renders.
    */
-  productInfra: TProductInfra;
+  dataRetention: DataRetentionTrpcPolicy<TRetentionSnapshot, TStorageScopeUsage>;
+  /** The monitor surface's precondition parser, comparison window and evaluator replication. */
+  monitors: MonitorTrpcPorts;
 
   user: Omit<UserTrpcPorts, ApiOwnedUserPorts>;
 
@@ -368,7 +371,5 @@ export type AnyApiTrpcCollaborators = ApiTrpcCollaborators<
   unknown,
   AnyAppTraceGroupTrpcPorts,
   AnyAppOrgGroupTrpcPorts,
-  AnyAppAgentGroupTrpcPorts,
-  AnyAppProductInfraTrpcPorts,
-  AnyAppGatewayGroupTrpcPorts
+  AnyAppAgentGroupTrpcPorts
 >;

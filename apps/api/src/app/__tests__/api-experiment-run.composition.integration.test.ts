@@ -271,10 +271,8 @@ function otherCollaborators(): AnyApiTrpcCollaborators {
     prompts: stub("prompts"),
     role: stub("role", { customRolePermission: anySchema }),
     team: stub("team"),
-    productInfra: {
-      dataRetention: stub("productInfra.dataRetention"),
-      monitors: stub("productInfra.monitors", { preconditionsSchema: anySchema }),
-    },
+    dataRetention: stub("dataRetention"),
+    monitors: stub("monitors", { preconditionsSchema: anySchema }),
     orgGroup: {
       organization: stub("orgGroup.organization", {
         signUpDataSchema: anySchema,
@@ -330,11 +328,9 @@ function otherCollaborators(): AnyApiTrpcCollaborators {
       ops: stub("agentGroup.ops"),
       opsCheck: () => passThroughMiddleware,
     },
-    gatewayGroup: {
-      gateway: { virtualKeys: schemaBag() },
-      governanceHome: stub("gatewayGroup.governanceHome"),
-      saasBilling: false,
-    },
+    gateway: { virtualKeys: schemaBag() },
+    governanceHome: stub("governanceHome"),
+    saasBilling: false,
     github: stub("github"),
     user: stub("user"),
     workflows: {

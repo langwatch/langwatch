@@ -357,13 +357,8 @@ export function createApiTrpcPorts<
      */
     traceGroup: collaborators.traceGroup,
 
-    /**
-     * The three product-infrastructure surfaces, forwarded whole, for the same
-     * reason the group above is: they are COMPOSED against this process's own
-     * connections by `composeApiProductInfraCollaborators`, which is also where
-     * each capability it cannot build names its own absence.
-     */
-    productInfra: collaborators.productInfra,
+    dataRetention: collaborators.dataRetention,
+    monitors: collaborators.monitors,
 
     /**
      * The nine tenant-administration surfaces, forwarded whole, for the same
@@ -382,14 +377,9 @@ export function createApiTrpcPorts<
      */
     agentGroup: collaborators.agentGroup,
 
-    /**
-     * The twenty-one gateway and governance surfaces, forwarded whole, for the
-     * same reason: the group is COMPOSED against this process's own Prisma and
-     * ClickHouse already, by `composeApiGatewayGroupCollaborators`, which is
-     * also where the one capability it cannot build — the Enterprise governance
-     * application — names its own absence.
-     */
-    gatewayGroup: collaborators.gatewayGroup,
+    gateway: collaborators.gateway,
+    governanceHome: collaborators.governanceHome,
+    saasBilling: collaborators.saasBilling,
 
     /** The two answers `github.*` reaches, forwarded whole for the same reason. */
     github: collaborators.github,

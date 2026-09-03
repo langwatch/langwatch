@@ -70,16 +70,18 @@ import type {
 import { initTRPC } from "@trpc/server";
 import { describe, expect, it } from "vitest";
 import { z } from "zod";
-import { createAppTrpcFeatures, type AppTrpcFeaturePorts } from "../app-trpc.features";
+import type { EnterpriseBillingTrpcContext } from "../../features/enterprise/enterprise-billing-trpc.mount";
+import type { EnterpriseGovernanceMountContext } from "../../features/enterprise/enterprise-governance-trpc.mount";
+import type { GovernanceHomeTrpcContext } from "../../features/enterprise/governance-home.mount";
+import type { GatewayTrpcContext } from "../../features/gateway/gateway-trpc.mount";
+import {
+  createAppTrpcFeatures,
+  type AppTrpcFeaturePorts,
+} from "../app-trpc.features";
 import type { AppAgentGroupTrpcContext } from "../app-trpc.agent-group";
-import type {
-  AnyAppGatewayGroupTrpcPorts,
-  AppGatewayGroupTrpcContext,
-} from "../app-trpc.gateway-group";
-import type {
-  AnyAppProductInfraTrpcPorts,
-  AppProductInfraTrpcContext,
-} from "../app-trpc.product-infra";
+import type { DataRetentionTrpcContext } from "@langwatch/data-retention-server";
+import type { MonitorTrpcContext } from "@langwatch/monitor-server";
+import type { StoredObjectTrpcContext } from "@langwatch/stored-object-server";
 import type {
   AnyAppOrgGroupTrpcPorts,
   AppOrgGroupTrpcContext,
@@ -95,7 +97,10 @@ import type {
  * in this suite rather than a surprise in the app.
  */
 type TestContext = AnalyticsTrpcContext &
-  AppGatewayGroupTrpcContext &
+  EnterpriseBillingTrpcContext &
+  EnterpriseGovernanceMountContext &
+  GatewayTrpcContext &
+  GovernanceHomeTrpcContext &
   AuthzTrpcContext &
   AnnotationTrpcContext &
   AnnotationScoreTrpcContext &
@@ -136,7 +141,9 @@ type TestContext = AnalyticsTrpcContext &
   // the group itself, for the same reason the record mounts them as one entry.
   AppTraceGroupTrpcContext &
   // The three product-infrastructure surfaces, for the same reason.
-  AppProductInfraTrpcContext &
+  DataRetentionTrpcContext &
+  MonitorTrpcContext &
+  StoredObjectTrpcContext &
   // The nine tenant-administration surfaces, for the same reason.
   AppOrgGroupTrpcContext &
   // The six agent surfaces, for the same reason.
@@ -380,31 +387,24 @@ function refusingPorts(): AppTrpcFeaturePorts<
       httpProxy: refuseEvery("traceGroup.httpProxy"),
       limits: refuseEvery("traceGroup.limits"),
     } as unknown as AnyAppTraceGroupTrpcPorts,
-    // The product-infrastructure group. Its one build-time member is the
-    // monitor precondition parser, which the create and update inputs are
+    // The monitor precondition parser, which the create and update inputs are
     // constructed from; everything else refuses. `storedObjects` is absent
     // because it takes no ports at all.
-    productInfra: {
-      dataRetention: refuseEvery("productInfra.dataRetention"),
-      monitors: {
-        ...(refuseEvery("productInfra.monitors") as object),
-        preconditionsSchema: z.array(z.object({ field: z.string() })),
-      },
-    } as unknown as AnyAppProductInfraTrpcPorts,
-    // The gateway and governance group. Two build-time members: the
-    // virtual-key budget parser, which is fixed when the router is BUILT
-    // because a tRPC input parser is, and the billing switch, which decides
-    // which router the two billing namespaces ARE. Everything else refuses.
-    gatewayGroup: {
-      gateway: { virtualKeys: { virtualKeyBudgetInput: z.object({}) } },
-      governanceHome: refuseEvery("gatewayGroup.governanceHome"),
-      // The SaaS shape, because this suite's last assertion is that no
-      // namespace mounts without procedures: `false` is the self-hosted
-      // answer, and it deliberately serves `subscription` and `currency` as
-      // empty routers of the same type. Which shape a deployment gets is the
-      // gateway group's own suite to pin.
-      saasBilling: true,
-    } as unknown as AnyAppGatewayGroupTrpcPorts,
+    dataRetention: refuseEvery("dataRetention"),
+    monitors: {
+      ...(refuseEvery("monitors") as object),
+      preconditionsSchema: z.array(z.object({ field: z.string() })),
+    } as never,
+    // The virtual-key budget parser, fixed when the router is BUILT because a
+    // tRPC input parser is.
+    gateway: { virtualKeys: { virtualKeyBudgetInput: z.object({}) } } as never,
+    governanceHome: refuseEvery("governanceHome"),
+    // The SaaS shape, because this suite's last assertion is that no
+    // namespace mounts without procedures: `false` is the self-hosted answer,
+    // and it deliberately serves `subscription` and `currency` as empty
+    // routers of the same type. Which shape a deployment gets is the gateway
+    // group's own suite to pin.
+    saasBilling: true,
     github: refuseEvery("github"),
     user: refuseEvery("user"),
     workflows: {
@@ -625,13 +625,15 @@ describe("the app tRPC feature list", () => {
         "onPresenceUpdate",
         "update",
       ]);
-      // The account surface only. `personalUsage`, `budgetOverview` and
-      // `cliBootstrap` answer on the same `user.*` name in the app, but they
-      // read governance data and are mounted from the Enterprise composition,
-      // so a copy of them appearing here would mean the feature had grown a
-      // second owner.
+      // The account surface, merged with the Enterprise /me dashboard reads:
+      // `personalUsage`, `budgetOverview` and `cliBootstrap` answer on the
+      // same `user.*` name but are mounted from the Enterprise composition
+      // (`personalDashboard`), so this pins that the merge lands all three
+      // packaged names on the one namespace rather than a copy growing here.
       expect(procedureNamesOf(features.user)).toEqual([
+        "budgetOverview",
         "changePassword",
+        "cliBootstrap",
         "deactivate",
         "dismissPasskeyNudge",
         "dismissTraceExplorerTour",
@@ -645,6 +647,7 @@ describe("the app tRPC feature list", () => {
         "passkeyNudge",
         "personalBudget",
         "personalContext",
+        "personalUsage",
         "reactivate",
         "register",
         "removeAvatar",

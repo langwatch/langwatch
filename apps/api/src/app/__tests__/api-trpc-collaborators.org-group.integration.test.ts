@@ -223,11 +223,9 @@ function baseCollaborators(organizations: unknown): AnyApiTrpcCollaborators {
      * the SaaS-billing decision, which chooses which router the two billing
      * namespaces ARE. Their own suite is what proves they answer.
      */
-    gatewayGroup: {
-      gateway: { virtualKeys: { virtualKeyBudgetInput: anySchema } },
-      governanceHome: stub("gatewayGroup.governanceHome"),
-      saasBilling: false,
-    },
+    gateway: { virtualKeys: { virtualKeyBudgetInput: anySchema } },
+    governanceHome: stub("governanceHome"),
+    saasBilling: false,
     github: stub("github"),
     agentGroup: {
       langy: stub("agentGroup.langy"),
@@ -242,10 +240,8 @@ function baseCollaborators(organizations: unknown): AnyApiTrpcCollaborators {
       opsCheck: () => passThroughMiddleware,
       scenarios: stub("agentGroup.scenarios"),
     },
-    productInfra: {
-      dataRetention: stub("productInfra.dataRetention"),
-      monitors: stub("productInfra.monitors", { preconditionsSchema: anySchema }),
-    },
+    dataRetention: stub("dataRetention"),
+    monitors: stub("monitors", { preconditionsSchema: anySchema }),
     user: stub("user"),
     workflows: {
       lifecycle: stub("workflows.lifecycle"),
