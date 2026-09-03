@@ -335,9 +335,12 @@ export async function waitForRequests({
   api,
   intervalMs = REQUEST_POLL_INTERVAL_MS,
   onWaiting,
+  // The timer is NOT unref'd: it is the only thing holding the event loop
+  // while the command waits, so an unref'd one lets node exit at once and the
+  // command answers "waiting" and then stops.
   sleep = (ms: number) =>
     new Promise<void>((resolve) => {
-      setTimeout(resolve, ms).unref();
+      setTimeout(resolve, ms);
     }),
   attempts = Number.POSITIVE_INFINITY,
 }: {

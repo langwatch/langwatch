@@ -148,6 +148,14 @@ Feature: Langy is tested with LangWatch's own scenario and evaluation tooling
     And changing the choice clears it for the next conversation
 
   @e2e
+  Scenario: A scenario checks that platform work never asks for the code
+    Given a Langy dogfood scenario where the user asks for a scenario about refunds
+    When the scenario runs against Langy
+    Then no code access card is rendered
+    And no control request is recorded for the conversation
+    And Langy creates the scenario on the platform
+
+  @e2e
   Scenario: A scenario checks that Langy adds a run parameter to a connected agent
     Given a Langy dogfood scenario where the demo agent is connected and the user asks for a free-plan-only case using a named account
     When the scenario runs against Langy

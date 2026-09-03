@@ -148,6 +148,54 @@ Monitors are deliberately NOT on this list. `POST /api/monitors` used to demand
 asked only for `evaluations:create` — a route bug that looked like a boundary.
 The quality suite now asserts the monitor really gets created.
 
+## The shared folder (local-control-fixture.ts)
+
+Six files cover ADR-129, Langy working on the developer's own code. They drive
+the REAL command line, `langwatch langy --share-control`, in a tmux session
+against a demo application copied into a temporary git repository, and answer
+the permission and question cards through tRPC as the user would.
+
+| File | What it covers |
+|---|---|
+| `langy-code-access.scenario.test.ts` | the ask, the card, the folder shared, the branch and commit that follow |
+| `langy-code-access-github.scenario.test.ts` | GitHub with remember, no card in the next conversation, and the choice cleared |
+| `langy-code-access-platform-only.scenario.test.ts` | platform work never asks: no `code_access` call and no control request |
+| `langy-local-connected-agent.scenario.test.ts` | a run parameter added to a connected agent, restarted through the folder |
+| `langy-local-permissions.scenario.test.ts` | the folder boundary, a denial that is not retried, a pattern granted once |
+| `langy-local-disconnect.scenario.test.ts` | Ctrl-C mid-task, and the next code ask that asks again |
+
+`local-control-fixture.ts` is what they share:
+
+- `createDemoRepo({ language, name, install })` copies
+  `dev/dogfood/acme-support/{python,typescript}` into
+  `.claude/tmp/scenario-repos/`, points the LangWatch SDK dependency at this
+  checkout by absolute path (the demo's relative path only resolves inside the
+  monorepo), makes it a git repository on `main` with one commit, and installs
+  the dependencies. It answers the reads the assertions make: `branches()`,
+  `log()`, `diffAgainstMain()`, `status()`, `read()`.
+- `startShareControl({ repo, label })` builds the command line once
+  (`pnpm --filter langwatch exec tsup`; `LANGY_SKIP_CLI_BUILD=1` reuses `dist`)
+  and starts it in tmux. `approve()` waits for the terminal question and answers
+  Approve, `capture()` is the transcript, `disconnect()` is the two-stage Ctrl-C.
+- `watchLangyConversation({ adapter, policy, answerQuestion })` follows the
+  conversation, including the turn the connection starts on its own, and answers
+  every permission card on a policy (`deny`, `allowPattern`, `fallback`) and
+  every question card. It records each ask, so a test asserts on what was asked
+  before it asks a judge.
+- `getLocalWorkspace`, `waitForPendingRequest`, `waitForConnectedWorkspace`,
+  `setCodeAccessPreference`, `disconnectLocalWorkspace`, `readAgent` and
+  `startDemoApp` are the platform-side reads and writes.
+
+**The command line runs on a user-scoped API key, not on a device login.** A
+control request belongs to a person, and a plain project key has no person
+behind it. `getCliApiKey()` mints the same class of credential the login mints,
+through the product's own `apiKey.create` mutation as the signed-in user, with
+one PROJECT-scoped binding so the platform resolves the project from the key
+alone. It reaches the command line as `LANGWATCH_API_KEY`, which is the
+documented environment path of `resolveCredentials`, and `LANGWATCH_CLI_CONFIG`
+points at a scratch file so the developer's own `~/.langwatch/config.json` is
+never touched.
+
 ## Red team
 
 `langy-redteam.scenario.test.ts` uses `@langwatch/scenario`'s `redTeamCrescendo()`
