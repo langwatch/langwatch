@@ -88,3 +88,11 @@ export {
   useLangyContextTargetStore,
 } from "./behavior/langy-context-target.store";
 export { LangyClient, type LangyTransport } from "./model/langy-client";
+// Per-page registration surface (proposal handlers + live UI actions,
+// specs/langy/langy-ui-actions.feature). A page outside this package —
+// the experiments workbench and its siblings — registers through these.
+export {
+  useRegisterLangyActions,
+  useRegisterLangyHandlers,
+} from "./features/langy/ui/sections/langy-context";
+export type { ProposalHandlers } from "./features/langy/ui/sections/message-content";

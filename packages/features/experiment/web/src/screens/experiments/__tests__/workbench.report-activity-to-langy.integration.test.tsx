@@ -101,6 +101,19 @@ vi.mock("../../../behavior/experiments-v3/use-optimize-with-langy", () => ({
   useOptimizeWithLangy: () => undefined,
 }));
 
+// Registration is exercised by `run-flushes-pending-save` and
+// `stale-page-refuses-agent-actions`; this test only reads `useLangyStore`,
+// so the two hooks are stood down and everything else (including the store)
+// stays real.
+vi.mock("@langwatch/langy-web", async (importOriginal) => {
+  const actual = await importOriginal<typeof import("@langwatch/langy-web")>();
+  return {
+    ...actual,
+    useRegisterLangyHandlers: () => undefined,
+    useRegisterLangyActions: () => undefined,
+  };
+});
+
 // The page's heavy children read the store and tRPC directly; this test only
 // exercises the activity-reporting handover, so they are stubbed out like the
 // sibling `RunFlushesPendingSave` workbench test.
@@ -121,6 +134,17 @@ vi.mock("../../../ui/sections/experiments-v3/undo-redo", () => ({
 }));
 vi.mock("../../../ui/sections/experiments-v3/run-evaluation-button", () => ({
   RunEvaluationButton: () => null,
+}));
+
+vi.mock("@langwatch/ui-drawer", () => ({
+  useDrawer: () => ({
+    openDrawer: vi.fn(),
+    closeDrawer: vi.fn(),
+    drawerOpen: () => false,
+  }),
+  useDrawerParams: () => ({}),
+  getComplexProps: () => ({}),
+  setFlowCallbacks: vi.fn(),
 }));
 
 vi.mock("@langwatch/workflow-web/studio-host/api", () => ({
