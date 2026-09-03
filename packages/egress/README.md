@@ -29,15 +29,19 @@ feature home is reachable by all three. This is a shared non-feature package for
 that reason, and because the fence is egress policy rather than any one
 feature's asset.
 
-## Frozen twin
+## Frozen twin (historical)
 
-While the application and the background process both send, every module here
-is a frozen twin of its counterpart under `platform/app/src/server/webhooks/`
-and `platform/app/src/utils/ssrfProtection.ts`. Each file names its twin. The
-rules are pinned as literals in this package's own tests rather than read out of
-the application's source, which would die the moment either side moved — and
-would not catch the failure that matters anyway, which is a rule quietly
-loosening and delivering to an address it should have refused.
+This package started life as a frozen twin of the SSRF and webhook-sending
+code that used to live under `platform/app/src/server/webhooks/` and
+`platform/app/src/utils/ssrfProtection.ts` — a few source comments still name
+that twin for provenance. `platform/app` is deleted, so there is no longer a
+live counterpart to drift from: this package is now the sole, canonical
+implementation, used directly by `apps/worker`'s webhook and gateway-spend
+composition, the enterprise webhook feature's destination adapters, and the
+model-provider egress adapter. The rules stay pinned as literals in this
+package's own tests rather than read out of a caller's source, so a rule
+quietly loosening and delivering to an address it should have refused still
+fails here even with no twin left to compare against.
 
 The signature is pinned against `specs/webhooks/signature-vectors.json`, the
 same committed vectors the TypeScript and Python SDKs verify against.

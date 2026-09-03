@@ -12,13 +12,13 @@ act on, and reads as "here is what you can do with what you picked".
 
 ## The pattern
 
-Use the shared `SelectionActionBar` shell from `~/components/ui/SelectionActionBar`.
+Use the shared `SelectionActionBar` shell from `@langwatch/design-system/selection-action-bar`.
 It owns the position, the **white** surface (`bg.panel`, never `bg.emphasized`),
 the border, the shadow, and the trailing clear-selection `X`. You pass the count
 label and the action buttons.
 
 ```tsx
-import { SelectionActionBar } from "~/components/ui/SelectionActionBar";
+import { SelectionActionBar } from "@langwatch/design-system/selection-action-bar";
 
 {
   selectedRows.size > 0 && (
@@ -48,7 +48,7 @@ Rules:
 
 ## Canonical examples
 
-- `src/features/traces-v2/components/Toolbar/BulkActionBar.tsx` (traces: export +
-  add-to-dataset, with select-all-matching)
-- `src/components/datasets/editor/DatasetEditorTable.tsx` (dataset detail page:
-  delete selected rows, behind `floatingSelectionBar`)
+- `@langwatch/trace-web`'s `ui/sections/explorer/toolbar/bulk-action-bar.tsx`
+  (traces: export + add-to-dataset, with select-all-matching)
+- `@langwatch/dataset-web`'s `ui/sections/datasets/editor/dataset-editor-table.tsx`
+  (dataset detail page: delete selected rows, behind `floatingSelectionBar`)

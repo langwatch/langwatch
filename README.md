@@ -103,7 +103,7 @@ You can also run LangWatch locally without docker to develop and help contribute
 Start just the databases using docker and leave it running:
 
 ```bash
-docker compose up redis postgres opensearch
+docker compose -f infra/compose.yml --project-directory . up -d postgres redis clickhouse
 ```
 
 Then, on another terminal, install the dependencies and start LangWatch:
@@ -112,6 +112,8 @@ Then, on another terminal, install the dependencies and start LangWatch:
 make install
 make start
 ```
+
+`make start` runs `pnpm dev`, which brings up all three Node applications (`apps/ui`, `apps/api`, `apps/worker`) plus the Go services. See `CONTRIBUTING.md` and `make quickstart-help` for other local-dev presets.
 
 </details>
 

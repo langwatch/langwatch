@@ -64,58 +64,62 @@ document includes the optional path, registered dates and `latest`.
 A service is one file exporting a built Hono app. An endpoint is one `registerRoute` call carrying its method, its path, its version, its handler and its definition chain:
 
 ```ts
-// src/app/api/things/[[...route]]/app.ts
+// packages/features/things/server/src/transport/api-rest/things.api.ts
 import { z } from "zod";
-import { createProjectApiService } from "~/server/api/project-service";
+import type { AppRestSecurity } from "@langwatch/api/rest";
 
 const thingSchema = z.object({ id: z.string(), name: z.string() });
 
-export const app = createProjectApiService({
-  name: "things",
-  basePath: "/api/things",
-})
-  .registerRoute(
-    "post",
-    "/things.create",
-    "2026-08-07",
-    async (context, input: { projectId: string; name: string }) =>
-      context.app.things.create({
-        ...input,
-        actorId: context.actor().id,
-      }),
-    (b) =>
-      b
-        .withInput(
-          z.object({
-            projectId: z.string().min(1),
-            name: z.string().min(1),
-          }),
-        )
-        .withOutput(thingSchema)
-        .withStatus(201)
-        .withDocs({ operationId: "createThing", tags: ["Things"] }),
-  )
-  .registerRoute(
-    "post",
-    "/things.list",
-    "2026-08-07",
-    async (context, input: { projectId: string }) => context.app.things.list(input),
-    (b) =>
-      b
-        .withInput(z.object({ projectId: z.string().min(1) }))
-        .withOutput(z.array(thingSchema))
-        .withDocs({ operationId: "listThings", tags: ["Things"] }),
-  )
-  .build();
+export function createThingsRestApp(options: { security: AppRestSecurity /* ... */ }) {
+  const { service } = options.security.createVersionedApp({
+    name: "things",
+    basePath: "/api/things",
+  });
+
+  return service
+    .registerRoute(
+      "post",
+      "/things.create",
+      "2026-08-07",
+      async (context, input: { projectId: string; name: string }) =>
+        context.app.things.create({
+          ...input,
+          actorId: context.actor().id,
+        }),
+      (b) =>
+        b
+          .withInput(
+            z.object({
+              projectId: z.string().min(1),
+              name: z.string().min(1),
+            }),
+          )
+          .withOutput(thingSchema)
+          .withStatus(201)
+          .withDocs({ operationId: "createThing", tags: ["Things"] }),
+    )
+    .registerRoute(
+      "post",
+      "/things.list",
+      "2026-08-07",
+      async (context, input: { projectId: string }) => context.app.things.list(input),
+      (b) =>
+        b
+          .withInput(z.object({ projectId: z.string().min(1) }))
+          .withOutput(z.array(thingSchema))
+          .withDocs({ operationId: "listThings", tags: ["Things"] }),
+    )
+    .build();
+}
 ```
 
-The built app carries its own base path (`/api/things` from `name`, or an explicit `basePath`), so the host's API router mounts it at the root, next to every other service:
+The built app carries its own base path (`/api/things` from `name`, or an explicit `basePath`), so the process composing the API mounts it at the root, next to every other family — inside `apps/api/src/app/*.composition.ts`, not a single dedicated router file:
 
 ```ts
-// src/server/api-router.ts
-import { app as thingsApp } from "../app/api/things/[[...route]]/app";
+// apps/api/src/app/api-production.composition.ts
+import { createThingsRestApp } from "@langwatch/things-server";
 
-api.route("/", thingsApp);
+rest.route("/", createThingsRestApp({ security: restSecurity /* ... */ }));
 ```
 
 ### Legacy Next-style hosts
@@ -374,8 +378,8 @@ src/
 
 When creating a new API service using this framework:
 
-1. Create `src/app/api/{name}/[[...route]]/app.ts` exporting the built app: `export const app = createService({ name })...build()`
-2. Mount it in `src/server/api-router.ts` with `api.route("/", app)` next to the other services (do not create a `route.ts`; `routeHandlers()` is only for legacy Next-style hosts)
+1. Create `packages/features/<feature>/server/src/transport/api-rest/<feature>.api.ts` exporting a factory that builds the app: `export function create<Feature>RestApp(options) { ...; return createService({ name })...build(); }`
+2. Mount the result in the owning application's composition, e.g. `apps/api/src/app/api-production.composition.ts`, with `rest.route("/", create<Feature>RestApp(...))` next to the other families (do not create a `route.ts`; `routeHandlers()` is only for legacy Next-style hosts)
 3. Use `createService({ name })` from `@langwatch/api/rest`, with the service name matching the URL path segment
 4. Pass auth and organization middleware through `createService({ auth, _legacy: { organizationMiddleware } })`; pass capability ports through `createService({ rateLimiter, cache })` when any endpoint declares them — declaring without the port fails the build
 5. Use `createRestService().get/post/put/patch/delete` for new public REST, compatibility `registerRoute` for existing HTTP, and `registerSse` for streams

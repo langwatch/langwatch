@@ -202,21 +202,26 @@ argument cannot disagree with itself.
 ## Imperative checks
 
 Two families, named for what they return. The name is deliberately not
-`has*Permission`: the legacy `has{Project,Team,Organization}Permission` twins
-still live in `server/api/rbac.ts` for the tRPC routers not yet migrated off
-them, so a new `has*` here would be a name collision a test mock could bind the
-wrong one of. Those twins are being retired; new code uses this facade.
+`has*Permission`: legacy `has{Project,Team,Organization}Permission`-shaped
+checks still exist as composition-root port names for tRPC routers not yet
+migrated off them, so a new `has*` here would be a name collision a test mock
+could bind the wrong one of. Those twins are being retired; new code uses this
+facade.
 
 ### `require*` — the default
 
 Throws the engine's denial (`permission_denied`) or returns the
-**authorization witness**:
+**authorization witness**, via `authorizePermission` on the injected
+`AuthzService` (`@langwatch/authz-contract`) — not a standalone free-function
+import:
 
 ```ts
-import { requireProjectPermission } from "~/server/app-layer/permissions/imperative";
-
-const authz = await requireProjectPermission(ctx, projectId, "traces:view");
-// past this line, the check passed; authz: Authorized<"project">
+const authz = await authz.authorizePermission({
+  userId: actorId(ctx),
+  permission: "traces:view",
+  projectId,
+});
+// past this line, the check passed; authz: Authorized<"project", "traces:view">
 ```
 
 The witness is the piece that makes "forgot the check" a compile error.

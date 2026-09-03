@@ -23,14 +23,20 @@ durable read model exists.
 
 ## Remaining migration seams
 
-- `platform/app/src/runtime/app/features/suite-execution.adapter.ts` is the application
-  execution port: it resolves run-only parameters and dispatches the existing
-  simulation and Suite-run commands. The Suite service and its run repository
-  remain package-owned.
-- `platform/app/src/components/suites/` retains only page and transport
-  composition: form orchestration, routing, tRPC queries, and drawers. The
-  controlled scenario/target pickers, run dialogs, and run-history
-  presentation, transforms, polling, expansion, and store state live in
-  `suite/web` and are driven by explicit callbacks from the app.
-- The REST `/api/suites` and tRPC suite router consume the process-owned
-  `app.suites`; neither transport constructs a service per request.
+- The execution port (`server/src/ports/suite-execution.port.ts`) is now
+  implemented package-side by `SuiteExecutionService`
+  (`server/src/services/suite-execution.service.ts`), which resolves run-only
+  parameters and dispatches the existing simulation and Suite-run commands.
+  `apps/api/src/app/api-trpc-collaborators.agent-group.composition.ts` only
+  injects its collaborators (the command queue, the run-id generator, and run-
+  model resolution). The Suite service and its run repository remain
+  package-owned.
+- `suite/web` owns the controlled scenario/target pickers, run dialogs, and
+  run-history presentation, transforms, polling, expansion, and store state.
+  As of this writing it is not composed into `apps/ui` — there is no page,
+  routing, or drawer host wiring `@langwatch/suite-web` there yet; see
+  `dev/docs/plans/suite-restore-review.md` for the tracked restoration work.
+- The REST `/api/suites` family (`createSuiteRestApp`, mounted from
+  `apps/api/src/app-rest/app-rest.packaged-families.ts`) and the tRPC suite
+  router both consume the process-owned `app.suites`; neither transport
+  constructs a service per request.

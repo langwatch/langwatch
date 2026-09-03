@@ -13,7 +13,7 @@ and the Langy event-sourcing pipeline.
   controlled presentation, including capability resolution, feature-map
   lookups, result formatting, derived cards, choices, failure disclosures, and
   streaming previews. App pages/routes, state, viewer hydration, charts, route
-  builders, and transport hooks remain in `platform/app`.
+  builders, and transport hooks remain in `apps/ui`.
 - `specs/` and `adrs/` record the current behavioural and architectural facts.
 
 The process builds one `LangyService` through `PostgresLangyAdapter` and

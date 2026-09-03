@@ -11,15 +11,16 @@ LangWatch is distributed as three Docker images, each serving a distinct role in
 
 The main application image. Used for both LangWatch App and LangWatch Workers. Handles the web UI, REST API, OTel trace ingestion, and authentication.
 
-| | |
-|---|---|
-| **Port** | 5560 |
-| **Base** | `node:24-alpine` |
-| **Entrypoint** | `pnpm start` |
-| **Workers** | In Kubernetes, Workers run as a separate Deployment using the same image with `pnpm start:workers`. |
+|                |                                                                                                                                                                 |
+| -------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| **Port**       | 5560                                                                                                                                                            |
+| **Base**       | `node:24-alpine`                                                                                                                                                |
+| **Entrypoint** | Runs pending Postgres/ClickHouse/LangWatchQL migrations, then starts the API process (`pnpm start` in `apps/api`).                                              |
+| **Workers**    | In Kubernetes, Workers run as a separate Deployment using the same image, started from `apps/worker` instead of `apps/api`. There is no in-process worker mode. |
 
 **What it does:**
-- Serves the LangWatch web UI (Next.js)
+
+- Serves the LangWatch web UI — a prebuilt Vite/React single-page app, served as static assets by the API process (no separate UI server)
 - Exposes REST and OTel APIs for trace ingestion from SDKs
 - Handles authentication (email or SSO providers)
 - Queries ClickHouse for analytics, dashboards, and trace search
@@ -30,13 +31,14 @@ The main application image. Used for both LangWatch App and LangWatch Workers. H
 
 Python service for natural language processing tasks.
 
-| | |
-|---|---|
-| **Port** | 5561 |
-| **Base** | Python |
+|               |                                                                      |
+| ------------- | -------------------------------------------------------------------- |
+| **Port**      | 5561                                                                 |
+| **Base**      | Python                                                               |
 | **Callbacks** | Calls back to the app at the URL configured via `LANGWATCH_ENDPOINT` |
 
 **What it does:**
+
 - Runs Optimization Studio workflows
 - Executes topic clustering algorithms
 - Handles custom evaluator execution
@@ -46,13 +48,14 @@ Python service for natural language processing tasks.
 
 Python service providing the built-in evaluator library.
 
-| | |
-|---|---|
-| **Port** | 5562 |
-| **Base** | Python |
+|            |                                                                                   |
+| ---------- | --------------------------------------------------------------------------------- |
+| **Port**   | 5562                                                                              |
+| **Base**   | Python                                                                            |
 | **Memory** | Higher memory requirements due to model loading (default: 6Gi request, 8Gi limit) |
 
 **What it does:**
+
 - LLM-as-a-Judge evaluators (boolean, category, score)
 - RAG evaluators (faithfulness, context precision, context recall, answer relevancy)
 - Safety evaluators (content safety, jailbreak detection, PII detection)
@@ -60,7 +63,9 @@ Python service providing the built-in evaluator library.
 - Custom evaluators (exact match, BLEU/ROUGE scores, format validation)
 
 <Note>
-LangEvals calls external LLM providers (OpenAI, Azure OpenAI, Google) to run model-based evaluations. Ensure your evaluator pods have network access to these providers, or configure your own provider credentials via the Helm chart.
+  LangEvals calls external LLM providers (OpenAI, Azure OpenAI, Google) to run model-based
+  evaluations. Ensure your evaluator pods have network access to these providers, or configure your
+  own provider credentials via the Helm chart.
 </Note>
 
 ### Additional Images
@@ -89,14 +94,15 @@ graph LR
 
 ## Image Tags
 
-| Tag | Description |
-|-----|-------------|
-| `latest` | Latest stable release |
-| `x.y.z` | A specific release, recommended for production: pick one from [Releases](https://github.com/langwatch/langwatch/releases) |
-| `local` | Built locally via `make images` (development only) |
+| Tag      | Description                                                                                                               |
+| -------- | ------------------------------------------------------------------------------------------------------------------------- |
+| `latest` | Latest stable release                                                                                                     |
+| `x.y.z`  | A specific release, recommended for production: pick one from [Releases](https://github.com/langwatch/langwatch/releases) |
+| `local`  | Built locally via `make images` (development only)                                                                        |
 
 <Tip>
-Pin to a specific version tag in production to prevent unexpected changes during upgrades. Update deliberately using the [Upgrade Guide](/self-hosting/upgrade).
+  Pin to a specific version tag in production to prevent unexpected changes during upgrades. Update
+  deliberately using the [Upgrade Guide](/self-hosting/upgrade).
 </Tip>
 
 ## Private Registries

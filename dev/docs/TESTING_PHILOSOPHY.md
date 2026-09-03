@@ -169,10 +169,10 @@ Feature specs in `specs/` define what tests must exist. **Every scenario in a fe
 
 ### Convention
 
-| Feature file                              | Test file                                                              |
-| ----------------------------------------- | ---------------------------------------------------------------------- |
-| `specs/analytics/chart-rendering.feature` | `src/server/analytics/__tests__/chart-rendering.integration.test.ts`   |
-| `specs/scenarios/welcome-modal.feature`   | `src/components/scenarios/__tests__/welcome-modal.integration.test.ts` |
+| Feature file                              | Test file                                                                                                                                     |
+| ----------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------- |
+| `specs/analytics/chart-rendering.feature` | the owning feature package's own `__tests__/chart-rendering.integration.test.ts`, e.g. `packages/features/analytics/server/src/**/__tests__/` |
+| `specs/langy/langy-panel-layout.feature`  | `packages/features/langy/web/src/model/__tests__/langy-panel-layout.unit.test.ts`                                                             |
 
 The scenario title in the feature file should match the `it()` description in the test. Use `describe("Feature: <feature name>")` as the outer block.
 

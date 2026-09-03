@@ -64217,8 +64217,8 @@ LangWatch is configured through environment variables. How you set them depends 
 
 <Tip>
   When using the Helm chart, you rarely need to set environment variables directly. The
-  `values.yaml` file provides a structured way to configure everything. See the [Helm
-  chart mapping table](#helm-chart-mapping) below.
+  `values.yaml` file provides a structured way to configure everything. See the [Helm chart mapping
+  table](#helm-chart-mapping) below.
 </Tip>
 
 ## Core Configuration
@@ -64231,7 +64231,12 @@ LangWatch is configured through environment variables. How you set them depends 
 | `NODE_ENV`       | Environment (`production`, `development`)                                       | No       | `production`        |
 | `BASE_HOST`      | Internal base URL for the application                                           | Yes      | -                   |
 | `NEXTAUTH_URL`   | Public URL for authentication callbacks                                         | Yes      | Same as `BASE_HOST` |
-| `START_WORKERS`  | Run workers in-process (`true`/`false`)                                         | No       | `false`             |
+
+<Note>
+  There is no in-process worker mode. The app and the background workers are always separate
+  processes/pods — see [Architecture](/self-hosting/infrastructure/architecture) and the `workers.*`
+  Helm values below.
+</Note>
 
 ## Secrets
 
@@ -64243,9 +64248,8 @@ LangWatch is configured through environment variables. How you set them depends 
 | `CRON_API_KEY`         | API key for authenticating internal cron job HTTP calls | Yes      |
 
 <Warning>
-  Never commit secrets to version control. In production, use a secrets manager (AWS
-  Secrets Manager, HashiCorp Vault) or Kubernetes Secrets with `secretKeyRef` in the Helm
-  chart.
+  Never commit secrets to version control. In production, use a secrets manager (AWS Secrets
+  Manager, HashiCorp Vault) or Kubernetes Secrets with `secretKeyRef` in the Helm chart.
 </Warning>
 
 ## Authentication
@@ -64329,8 +64333,8 @@ When `S3_BUCKET_NAME` is set, all consumers use that bucket. When it is not set,
 | `LANGWATCH_LOCAL_STORAGE_PATH` | Filesystem root used for stored-objects when no S3 is configured | `/var/lib/langwatch/objects` |
 
 <Note>
-  When running on AWS with IRSA (IAM Roles for Service Accounts), you don't need to set S3
-  access keys. The pod's service account assumes the IAM role automatically.
+  When running on AWS with IRSA (IAM Roles for Service Accounts), you don't need to set S3 access
+  keys. The pod's service account assumes the IAM role automatically.
 </Note>
 
 <Warning>
@@ -64355,16 +64359,15 @@ Precedence, evaluated in this order: a per-project BYOC S3 bucket (if configured
 | `AZURE_BLOB_ENDPOINT`       | Blob endpoint base URL. Optional on the Azure public cloud; required for sovereign clouds (`*.usgovcloudapi.net`, `*.chinacloudapi.cn`), private endpoints, and the Azurite emulator              | `https://{accountName}.blob.core.windows.net` |
 
 <Warning>
-  When `STORED_OBJECTS_BACKEND=azure` is set, `AZURE_BLOB_ACCOUNT_NAME` and
-  `AZURE_BLOB_CONTAINER` are required, plus `AZURE_BLOB_ACCOUNT_KEY` when
-  `AZURE_BLOB_AUTH_MODE` is `sharedKey` (the default). Under an identity mode the key must
-  be absent (see below). An incomplete active Azure configuration fails loudly and never
-  falls back to S3 or the local filesystem. Inactive Azure settings are validated only
-  when an `azure-blob://` address is used, so they cannot break global or private-bucket
-  S3 traffic. Set `AZURE_BLOB_ENDPOINT` (chart:
-  `app.dataplane.providers.azureBlob.endpoint`) for sovereign clouds or private endpoints;
-  it defaults to `https://{accountName}.blob.core.windows.net`. Per-project Azure BYOC is
-  tracked separately (issue #6088).
+  When `STORED_OBJECTS_BACKEND=azure` is set, `AZURE_BLOB_ACCOUNT_NAME` and `AZURE_BLOB_CONTAINER`
+  are required, plus `AZURE_BLOB_ACCOUNT_KEY` when `AZURE_BLOB_AUTH_MODE` is `sharedKey` (the
+  default). Under an identity mode the key must be absent (see below). An incomplete active Azure
+  configuration fails loudly and never falls back to S3 or the local filesystem. Inactive Azure
+  settings are validated only when an `azure-blob://` address is used, so they cannot break global
+  or private-bucket S3 traffic. Set `AZURE_BLOB_ENDPOINT` (chart:
+  `app.dataplane.providers.azureBlob.endpoint`) for sovereign clouds or private endpoints; it
+  defaults to `https://{accountName}.blob.core.windows.net`. Per-project Azure BYOC is tracked
+  separately (issue #6088).
 </Warning>
 
 ### Migrating an existing installation
@@ -64372,17 +64375,17 @@ Precedence, evaluated in this order: a per-project BYOC S3 bucket (if configured
 Do not switch `STORED_OBJECTS_BACKEND` before copying existing data. The migration task uses its own `OBJECT_STORAGE_MIGRATION_*` credentials, so source reads and destination writes do not depend on the app's active provider:
 
 ```bash
-pnpm run task migrateObjectStorage plan
-pnpm run task migrateObjectStorage copy
+pnpm --filter @langwatch/tasks task object-storage-migrate plan
+pnpm --filter @langwatch/tasks task object-storage-migrate copy
 
 # Stop all app and worker read/write traffic, drain GroupQueue, then:
 OBJECT_STORAGE_MIGRATION_WRITES_PAUSED=1 \
 OBJECT_STORAGE_MIGRATION_READS_PAUSED=1 \
-  pnpm run task migrateObjectStorage finalize
+  pnpm --filter @langwatch/tasks task object-storage-migrate finalize
 
 # Switch STORED_OBJECTS_BACKEND and active credentials, then deploy while
 # traffic remains paused.
-pnpm run task migrateObjectStorage verify
+pnpm --filter @langwatch/tasks task object-storage-migrate verify
 ```
 
 `plan` is read-only. `copy` is resumable, verifies SHA-256 at the destination, and repairs a mismatched destination object. `finalize` refuses to run unless both reads and writes are explicitly paused, dataset uploads are idle, and GroupQueue has no pending, delayed, active, blocked, or staged durable references. Reads must remain paused because finalization publishes destination storage addresses before the target-provider deployment is active. It publishes newer ClickHouse stored-object rows only after the final verified copy; it does not rewrite or delete history. No phase deletes source bytes.
@@ -64506,10 +64509,10 @@ Deployments whose only egress is a corporate HTTP proxy can set the standard `HT
 The `smtp` gateway ignores these variables on purpose, because an SMTP relay is normally an internal host that must be reached directly. Point it at your relay's real address, or use a vendor's SMTP endpoint if that is what the proxy allows out.
 
 <Note>
-  Neither the AWS SDK nor Node's HTTP client reads `HTTPS_PROXY` on its own, so LangWatch
-  attaches the proxy to the SES and Resend clients itself. SendGrid's client is
-  axios-based and reads the variables directly. Without this wiring, a proxied deployment
-  fails with a `read ETIMEDOUT` reaching the provider.
+  Neither the AWS SDK nor Node's HTTP client reads `HTTPS_PROXY` on its own, so LangWatch attaches
+  the proxy to the SES and Resend clients itself. SendGrid's client is axios-based and reads the
+  variables directly. Without this wiring, a proxied deployment fails with a `read ETIMEDOUT`
+  reaching the provider.
 </Note>
 
 ## Evaluator Providers
@@ -64541,9 +64544,9 @@ The `smtp` gateway ignores these variables on purpose, because an SMTP relay is 
 Langy, the automated AI engineer, runs as a separate agent pod that is off by default. Enabling it adds a `langyagent.chartManaged` toggle and a shared `LANGY_INTERNAL_SECRET` (plus optional `GITHUB_LANGY_*` and mirror-lane vars). Those are documented on their own page.
 
 <Note>
-  See [Langy environment variables](/self-hosting/langy/environment-variables) for the
-  full `LANGY_*` and `GITHUB_LANGY_*` reference, and [Setup](/self-hosting/langy/setup)
-  for the `langyagent.chartManaged` toggle and the `LANGY_INTERNAL_SECRET` secret.
+  See [Langy environment variables](/self-hosting/langy/environment-variables) for the full
+  `LANGY_*` and `GITHUB_LANGY_*` reference, and [Setup](/self-hosting/langy/setup) for the
+  `langyagent.chartManaged` toggle and the `LANGY_INTERNAL_SECRET` secret.
 </Note>
 
 ## Helm Chart Mapping
@@ -64590,7 +64593,7 @@ When using the Helm chart, configuration is set in `values.yaml` rather than env
 | `app.dataplane.legacyAzureRead`                           | Keeps `AZURE_BLOB_*` settings emitted after moving writes to S3 so persisted `azure-blob://` stored objects remain readable. It is not a dataset migration mechanism: dataset chunks require a verified copy before switching providers                          |
 | `postgresql.external.connectionString.value`              | `DATABASE_URL`                                                                                                                                                                                                                                                   |
 | `redis.external.connectionString.value`                   | `REDIS_URL`                                                                                                                                                                                                                                                      |
-| `workers.enabled`                                         | Inverse of `START_WORKERS`                                                                                                                                                                                                                                       |
+| `workers.enabled`                                         | Not an environment variable — toggles whether the separate workers Deployment is created at all. There is no in-process worker mode to fall back to.                                                                                                             |
 
 <Tip>
 For production, use `secretKeyRef` instead of inline values. This references a Kubernetes Secret:
@@ -65825,15 +65828,16 @@ LangWatch is distributed as three Docker images, each serving a distinct role in
 
 The main application image. Used for both LangWatch App and LangWatch Workers. Handles the web UI, REST API, OTel trace ingestion, and authentication.
 
-| | |
-|---|---|
-| **Port** | 5560 |
-| **Base** | `node:24-alpine` |
-| **Entrypoint** | `pnpm start` |
-| **Workers** | In Kubernetes, Workers run as a separate Deployment using the same image with `pnpm start:workers`. |
+|                |                                                                                                                                                                 |
+| -------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| **Port**       | 5560                                                                                                                                                            |
+| **Base**       | `node:24-alpine`                                                                                                                                                |
+| **Entrypoint** | Runs pending Postgres/ClickHouse/LangWatchQL migrations, then starts the API process (`pnpm start` in `apps/api`).                                              |
+| **Workers**    | In Kubernetes, Workers run as a separate Deployment using the same image, started from `apps/worker` instead of `apps/api`. There is no in-process worker mode. |
 
 **What it does:**
-- Serves the LangWatch web UI (Next.js)
+
+- Serves the LangWatch web UI — a prebuilt Vite/React single-page app, served as static assets by the API process (no separate UI server)
 - Exposes REST and OTel APIs for trace ingestion from SDKs
 - Handles authentication (email or SSO providers)
 - Queries ClickHouse for analytics, dashboards, and trace search
@@ -65844,13 +65848,14 @@ The main application image. Used for both LangWatch App and LangWatch Workers. H
 
 Python service for natural language processing tasks.
 
-| | |
-|---|---|
-| **Port** | 5561 |
-| **Base** | Python |
+|               |                                                                      |
+| ------------- | -------------------------------------------------------------------- |
+| **Port**      | 5561                                                                 |
+| **Base**      | Python                                                               |
 | **Callbacks** | Calls back to the app at the URL configured via `LANGWATCH_ENDPOINT` |
 
 **What it does:**
+
 - Runs Optimization Studio workflows
 - Executes topic clustering algorithms
 - Handles custom evaluator execution
@@ -65860,13 +65865,14 @@ Python service for natural language processing tasks.
 
 Python service providing the built-in evaluator library.
 
-| | |
-|---|---|
-| **Port** | 5562 |
-| **Base** | Python |
+|            |                                                                                   |
+| ---------- | --------------------------------------------------------------------------------- |
+| **Port**   | 5562                                                                              |
+| **Base**   | Python                                                                            |
 | **Memory** | Higher memory requirements due to model loading (default: 6Gi request, 8Gi limit) |
 
 **What it does:**
+
 - LLM-as-a-Judge evaluators (boolean, category, score)
 - RAG evaluators (faithfulness, context precision, context recall, answer relevancy)
 - Safety evaluators (content safety, jailbreak detection, PII detection)
@@ -65874,7 +65880,9 @@ Python service providing the built-in evaluator library.
 - Custom evaluators (exact match, BLEU/ROUGE scores, format validation)
 
 <Note>
-LangEvals calls external LLM providers (OpenAI, Azure OpenAI, Google) to run model-based evaluations. Ensure your evaluator pods have network access to these providers, or configure your own provider credentials via the Helm chart.
+  LangEvals calls external LLM providers (OpenAI, Azure OpenAI, Google) to run model-based
+  evaluations. Ensure your evaluator pods have network access to these providers, or configure your
+  own provider credentials via the Helm chart.
 </Note>
 
 ### Additional Images
@@ -65903,14 +65911,15 @@ graph LR
 
 ## Image Tags
 
-| Tag | Description |
-|-----|-------------|
-| `latest` | Latest stable release |
-| `x.y.z` | A specific release, recommended for production: pick one from [Releases](https://github.com/langwatch/langwatch/releases) |
-| `local` | Built locally via `make images` (development only) |
+| Tag      | Description                                                                                                               |
+| -------- | ------------------------------------------------------------------------------------------------------------------------- |
+| `latest` | Latest stable release                                                                                                     |
+| `x.y.z`  | A specific release, recommended for production: pick one from [Releases](https://github.com/langwatch/langwatch/releases) |
+| `local`  | Built locally via `make images` (development only)                                                                        |
 
 <Tip>
-Pin to a specific version tag in production to prevent unexpected changes during upgrades. Update deliberately using the [Upgrade Guide](/self-hosting/upgrade).
+  Pin to a specific version tag in production to prevent unexpected changes during upgrades. Update
+  deliberately using the [Upgrade Guide](/self-hosting/upgrade).
 </Tip>
 
 ## Private Registries
@@ -66471,7 +66480,7 @@ Run the full LangWatch stack locally on a [Kind](https://kind.sigs.k8s.io/) clus
 - [Helm](https://helm.sh/docs/intro/install/) 3.12+
 - `make` (included on macOS and most Linux distributions)
 
-> **Note:** The first image build (especially the Next.js app) is memory-intensive and can take 15-30 minutes. Subsequent builds reuse Docker cache and are much faster.
+> **Note:** The first image build (especially the app image) is memory-intensive and can take 15-30 minutes. Subsequent builds reuse Docker cache and are much faster.
 
 ## Quick Start
 
@@ -66705,7 +66714,10 @@ All traces, spans, evaluations, experiments, analytics. Hot storage on SSD, cold
 
 ### LangWatch App (port 5560)
 
-Next.js server, the single external entry point for all traffic:
+The API process (`apps/api`, built on Hono), the single external entry point
+for all traffic. It serves REST, tRPC and SSE, and also serves the prebuilt
+browser bundle (a Vite/React single-page app, `apps/ui`) as static assets —
+one container is the whole interactive tier:
 
 - **Web UI**: dashboards, trace explorer, prompt management, experiment views
 - **REST API + OTel ingestion**: receives spans from LangWatch SDKs
@@ -66716,7 +66728,10 @@ Next.js server, the single external entry point for all traffic:
 
 ### LangWatch Workers
 
-Same `langwatch/langwatch` image, started with `pnpm start:workers`. Consumes jobs from a BullMQ queue in Redis and runs the event sourcing pipeline (see below).
+Same `langwatch/langwatch` image, started from `apps/worker` instead of
+`apps/api` (there is no in-process worker mode — the app and the workers are
+always separate processes). Consumes jobs from a BullMQ queue in Redis and
+runs the event sourcing pipeline (see below).
 
 - Deployed as a separate Kubernetes Deployment
 - Stateless, scale by adding replicas
@@ -66849,9 +66864,8 @@ The pipeline produces three types of output:
 | Dataset Append | Automation rules    | Auto-add traces to datasets        |
 
 <Note>
-  If Worker queue depth grows in Redis, it means processing is falling behind ingestion.
-  The fix is to add more Worker replicas, each one is stateless and consumes jobs
-  independently.
+  If Worker queue depth grows in Redis, it means processing is falling behind ingestion. The fix is
+  to add more Worker replicas, each one is stateless and consumes jobs independently.
 </Note>
 
 ## Data Flow
@@ -66899,8 +66913,8 @@ Only the App is exposed externally. Everything else is cluster-internal:
 | Redis      | ClusterIP                | No       |
 
 <Note>
-  LangEvals and NLP make outbound calls to external LLM providers (OpenAI, Azure, etc.).
-  Ensure these pods have network egress to the relevant endpoints.
+  LangEvals and NLP make outbound calls to external LLM providers (OpenAI, Azure, etc.). Ensure
+  these pods have network egress to the relevant endpoints.
 </Note>
 
 ### Connected agents

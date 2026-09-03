@@ -1,15 +1,28 @@
-# React/Next.js
+# React
+
+`apps/ui` is a Vite single-page app routed with `react-router`, not Next.js —
+there is no `src/pages/` file-based routing, and no server components.
 
 ## Page vs Component Separation
 
-- **Pages**: routing, permissions (`src/pages/`)
-- **Components**: UI logic (`src/*/components/*.layout.tsx`)
+- **Screens**: a feature's routable page content lives in its own `web`
+  package, under `web/src/screens/`. A screen renders UI; it does not know its
+  own URL, guard, or chrome.
+- **Routes and hosts**: `apps/ui` owns routing, permission guards, and chrome
+  composition, in `apps/ui/src/features/<area>/ui/sections/`. A route file
+  wires one feature's screen(s) into the app's router and wraps them with the
+  fixed order documented at the top of `apps/ui/src/ui/sections/ui-page.tsx`:
+  host outermost, settings chrome next, permission guard innermost around the
+  screen.
+- **Components**: reusable UI logic lives beside the screen that owns it, or
+  in the feature's own component directories — not duplicated into `apps/ui`.
 
 ## File Organization
 
 - `hooks/` for hooks
 - `components/` for components
-- `pages/` for pages
+- `screens/` for a feature's routable pages (in that feature's `web` package)
+- `ui/sections/` for the app's routing/composition layer (in `apps/ui`)
 
 ## Hooks
 

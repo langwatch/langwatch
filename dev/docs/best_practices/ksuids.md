@@ -4,7 +4,7 @@ User-facing resource IDs (URLs, exports, support tickets, API contracts) use **K
 
 ```typescript
 import { generate } from "xksuid";
-import { KSUID_RESOURCES } from "~/utils/constants";
+import { KSUID_RESOURCES } from "./model/constants"; // package-local; see below
 
 const id = generate(KSUID_RESOURCES.MODEL_PROVIDER).toString();
 // → "provider_2lT9b...sortable-by-creation-time"
@@ -46,7 +46,7 @@ Prefixes are short (≤8 chars), lowercase, no punctuation. Avoid abbreviations 
 The repository layer is the right place. Service decides "we need a new row," repository allocates the id + writes the row:
 
 ```typescript
-// model-providers/modelProvider.repository.ts
+// repositories/prisma/prisma.model-provider.repository.ts
 async create(input: CreateModelProviderInput): Promise<ModelProvider> {
   return await this.prisma.modelProvider.create({
     data: {

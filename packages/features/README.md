@@ -103,13 +103,16 @@ decision from an Enterprise entitlement. The Enterprise catalogue contains the
 singular `audit-log`, `billing`, `governance`, `licensing`, `managed-provider`,
 `saas`, `scim`, `sso`, and `webhook` features.
 
-During the physical application split in
-[ADR-111](../../dev/docs/adr/111-physical-application-workspaces.md), reusable
-source from `platform/app/ee` moves feature by feature into those ownership
-roots. Do not rename the old tree wholesale or create an enterprise legacy
-package: move reusable code into a strict enterprise feature, register it once
-in the matching composition package and remove the `@ee/*` alias with its last
-caller.
+The physical application split in
+[ADR-111](../../dev/docs/adr/111-physical-application-workspaces.md) moved the
+former `platform/app` monolith's enterprise source feature by feature into
+these ownership roots; `platform/app` is deleted and the legacy application
+boundary baseline it left behind has shrunk to empty. The same rule still
+applies to any future consolidation: do not rename an old tree wholesale or
+create an enterprise legacy package. Move reusable code into a strict
+enterprise feature, register it once in the matching composition package
+(`packages/enterprise/composition/{api,worker}`), and remove any temporary
+alias with its last caller.
 
 ## Version-0 source layout
 
@@ -342,8 +345,8 @@ Feature packages expose classes and deliberate entry points without registering
 anything on import. Application and worker composition belongs under:
 
 ```text
-platform/app/src/runtime/app/
-platform/app/src/runtime/worker/
+apps/api/src/app/
+apps/worker/src/app/
 ```
 
 Those runtime roots construct concrete adapters and services, then mount API or
@@ -449,10 +452,10 @@ boundary check rather than work hidden inside the fast lint loop:
 pnpm lint:architecture:declarations
 ```
 
-The exact shrinking baseline for the temporary `platform/app` split is also a
-separate migration audit. New `@ee/*` and other retired entry points still fail
-the ordinary source lint immediately; this command only reconciles already
-tolerated legacy edges:
+The exact shrinking baseline for the completed `platform/app` split is also a
+separate migration audit; every edge group in it is now empty. New `@ee/*` and
+other retired entry points still fail the ordinary source lint immediately;
+this command only reconciles already tolerated legacy edges:
 
 ```bash
 pnpm lint:architecture:migration

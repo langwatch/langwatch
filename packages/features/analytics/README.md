@@ -20,9 +20,9 @@ error, colour-mode, and lazy-chart render ports. This web extraction does not
 change the timeseries service or the separate trace analytics, trace summaries,
 or timeseries rollup boundaries.
 
-Server-side LangWatchQL execution remains a deliberate migration residual under
-`platform/app/src/server/analytics/lwql`. It is Analytics behaviour still to
-move, not a second owner.
+Server-side LangWatchQL execution lives under
+`packages/features/analytics/server/src/langwatch-ql/`; `apps/api` composes and
+mounts it (`analytics.lwql` on the tRPC router) but does not own its behaviour.
 
 The LangWatchQL behaviour contract is [the web spec](./specs/analytics-lwql-workbench.feature);
 the chart-runtime decision is [ADR-002](./adrs/002-lwql-chart-runtime-without-eval.md),

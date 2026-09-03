@@ -2,12 +2,12 @@
 
 Index pages that list resources (datasets, settings entries, and the like)
 use one shared table look so they read consistently. That look lives in
-`src/components/ui/ListTable.tsx`. Use it for any new list page; do not restyle
-a Chakra `Table.Root` per page.
+`@langwatch/design-system/list-table`. Use it for any new list page; do not
+restyle a Chakra `Table.Root` per page.
 
 ```tsx
 import { Table } from "@chakra-ui/react";
-import { ListTable } from "~/components/ui/ListTable";
+import { ListTable } from "@langwatch/design-system/list-table";
 
 <ListTable>
   <Table.Header>

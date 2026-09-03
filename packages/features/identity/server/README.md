@@ -43,12 +43,12 @@ package.
 ```
 
 Nothing here reads the environment or a database. The write gate, the
-clock and the command-id minter arrive as closures; the app implements the
-five interfaces with Prisma and its event-sourcing pipeline
-(`platform/app/src/server/app-layer/identity/{repositories,ledger.ts}`) and
-composes every service once in
-`platform/app/src/server/app-layer/identity/runtime.ts`. The pure half —
-vocabulary, facts, the reducer, the refusal errors — is
+clock and the command-id minter arrive as closures; this package implements
+the five interfaces with Prisma and its event-sourcing pipeline
+(`repositories/prisma/`, `adapters/`), and
+`apps/api/src/app/api-trpc-collaborators.identity.composition.ts` composes
+every service once. The pure half — vocabulary, facts, the reducer, the
+refusal errors — is
 [`@langwatch/identity-contract`](../contract/README.md).
 
 Server-only by construction: nothing in the browser reaches this package,

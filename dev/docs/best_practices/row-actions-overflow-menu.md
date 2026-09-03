@@ -18,7 +18,7 @@ Import `Menu` from the local UI wrapper (see
 `MoreVertical` lucide icon as the trigger.
 
 ```tsx
-import { Menu } from "~/components/ui/menu";
+import { Menu } from "@langwatch/design-system/menu";
 import { MoreVertical } from "lucide-react";
 
 <Menu.Root>
@@ -85,8 +85,11 @@ footer.
 
 ## Canonical examples
 
-- `src/pages/governance/departments.tsx` (departments row)
-- `src/pages/settings/model-providers.tsx` (provider row, with a permission
-  tooltip on the trigger)
-- `src/components/governance/ToolCatalogEditor.tsx` (AI tool catalog
+- `@langwatch/enterprise-governance-web`'s `screens/governance/governance-people.screen.tsx`
+  (departments row)
+- `@langwatch/model-provider-web`'s
+  `screens/model-provider/model-providers.screen.tsx` (provider row, with a
+  permission tooltip on the trigger)
+- `@langwatch/enterprise-governance-web`'s
+  `features/ai-tools/ui/sections/tool-catalog-editor.tsx` (AI tool catalog
   tile row: Edit / Enable-Disable / Delete-archive)

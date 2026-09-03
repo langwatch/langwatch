@@ -3,10 +3,12 @@
 Drawers are URL-routed. Opening a drawer pushes a `drawer.open=<name>`
 query param onto the page URL; closing pops it. The shell that renders
 the drawer (`<CurrentDrawer />`, mounted once near the app root) keys
-off that param and resolves the component via `drawerRegistry`.
+off that param and resolves the component via the `UiDrawerRegistry`
+the application composes from each feature's `lazyDrawer` entries (see
+"Adding a new drawer" below).
 
 Always render through the shared `Drawer.Root` wrapper
-(`components/ui/drawer.tsx`), never raw Chakra. Drawers anchor to the right
+(`@langwatch/design-system/drawer`), never raw Chakra. Drawers anchor to the right
 (`end`) as usual even while the Langy panel is open: the panel notices the
 open drawer and re-seats ITSELF as a floating companion card beside the
 drawer (same height, same radius, a strip of space between the two), then
@@ -23,10 +25,11 @@ on a new drawer — the URL form gives you:
 
 ## Adding a new drawer
 
-1. Add the component under `src/components/.../<MyDrawer>.tsx`. It
-   should render `Drawer.Root` with `open={true}` (the registry only
-   mounts it when active), and call `closeDrawer()` from
-   `useDrawer()` on the close trigger.
+1. Add the presentational component in the owning feature's `web` package
+   (e.g. `packages/features/<feature>/web/src/features/.../ui/sections/<MyDrawer>.tsx`).
+   It should render `Drawer.Root` with `open={true}` (the registry only mounts
+   it when active), and call `closeDrawer()` from `useDrawer()` (from
+   `@langwatch/ui-drawer`) on the close trigger.
 
 2. Define the props as a single `interface Props` — the props you
    accept become serializable URL parameters by default. Use scalar
@@ -40,26 +43,32 @@ on a new drawer — the URL form gives you:
    }
    export function MyDrawer({ editingId }: Props) {
      const { closeDrawer } = useDrawer();
-     const dataQuery = api.x.getOne.useQuery(
-       { id: editingId ?? "" },
-       { enabled: !!editingId },
-     );
+     const dataQuery = api.x.getOne.useQuery({ id: editingId ?? "" }, { enabled: !!editingId });
      // ...
    }
    ```
 
-3. Register in `src/components/drawerRegistry.ts`:
+3. Wrap it with its host in the consuming application's `*-drawers.tsx`
+   (e.g. `apps/ui/src/features/<feature>/ui/sections/<feature>-drawers.tsx`),
+   using `withHost(FeatureHost, MyDrawer)` — see "Host wrapping" below — then
+   register the host-wrapped component from that application's feature entry
+   (`apps/ui/src/features/<feature>/index.ts`) with `lazyDrawer` from
+   `@langwatch/ui-drawer`:
 
    ```ts
-   export const drawers = {
-     // ...
-     myDrawer: MyDrawer,
-   } satisfies Record<string, React.FC<any>>;
+   import { lazyDrawer, type UiDrawerRegistry } from "@langwatch/ui-drawer";
+
+   export const myFeatureDrawers: UiDrawerRegistry = {
+     myDrawer: lazyDrawer({
+       factory: () => import("./ui/sections/my-feature-drawers"),
+       key: "MyDrawer",
+     }),
+   };
    ```
 
-   The registry inference picks up the props automatically, so
-   `openDrawer("myDrawer", { editingId: "abc" })` is fully type-safe
-   at the call site.
+   The registry key (`myDrawer` above) is the name the address bar uses:
+   `?drawer.open=myDrawer`. Every drawer stays lazy on purpose, so its
+   transitive dependencies stay out of the initial bundle.
 
 4. Open from any component via `useDrawer().openDrawer("myDrawer",
 { editingId })`. The hook handles URL serialization, push vs
@@ -96,7 +105,7 @@ Two things to get right, or the return trip lands somewhere wrong:
   the calling drawer exactly like closing it does. Draft state therefore
   belongs in a store that outlives the component, and any reset-on-unmount
   must be able to tell a departure from a close
-  (`features/automations/state/automationStore.ts`).
+  (`@langwatch/automation-web`'s `features/authoring/ui/sections/automation-store.ts`).
 - **Read the stack to tell the two apart, do not consume a flag.** React
   StrictMode replays every effect once on mount in development: setup,
   cleanup, setup. A cleanup that consumes a one-shot "I am leaving for a
@@ -127,7 +136,7 @@ opens them, so component tests of the opener can assert by mocking
 
 ```ts
 const mockOpenDrawer = vi.fn();
-vi.mock("~/hooks/useDrawer", () => ({
+vi.mock("@langwatch/ui-drawer", () => ({
   useDrawer: () => ({ openDrawer: mockOpenDrawer /* ... */ }),
 }));
 
@@ -140,8 +149,9 @@ it("opens the drawer with the row id", () => {
 ```
 
 Full end-to-end tests (router + `CurrentDrawer` + the drawer itself)
-go in `*.integration.test.tsx` with a Next.js router mock that lets
-`useDrawer` write to the URL.
+go in `*.integration.test.tsx`, rendered inside a real `react-router`
+`<MemoryRouter>` (see `current-drawer.integration.test.tsx`) so
+`useDrawer` can actually write to the URL.
 
 Testing the StrictMode replay needs `StrictMode` OUTSIDE the Chakra
 provider. Inside it, React skips the replay, so the test passes against
@@ -158,3 +168,24 @@ render(
   </StrictMode>,
 );
 ```
+
+## Host wrapping in `apps/ui` (2026-09-03)
+
+A feature package's drawer registers under `@langwatch/ui-drawer`'s
+`UiDrawerRegistry`/`lazyDrawer`, and `apps/ui`'s `*-drawers.tsx` wraps the
+package's presentational drawer with `withHost(FeatureHost, Drawer)`. A drawer
+is not a page: it opens over whatever page the reader is on, so the host
+travels with the drawer rather than with the address, and the wrapping happens
+once per drawer file, which stays behind the registry's lazy import.
+
+`CurrentDrawer` spreads the _parsed address_ onto the resolved component, so a
+drawer's `open` prop arrives as the string `?drawer.open=<name>` names, never
+`true` — a component that passes it straight to Chakra's `Drawer.Root`, or
+compares it `=== true`, renders closed against an address that says it is
+open (the defect `agent-drawers.tsx` hit when the agent type selector first
+moved). `@langwatch/ui-drawer`'s own contract is "the address's keys arrive as
+props" and deliberately stops there — coercing `open` to a real boolean is
+this application's problem, which is what `fromDrawerAddress`
+(`features/drawers/model/ui-drawer-address.tsx`) is for. Wrap with it, or
+default `open` to `true` and compare with `!== false && !== undefined`
+yourself.

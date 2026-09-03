@@ -91,7 +91,10 @@ All traces, spans, evaluations, experiments, analytics. Hot storage on SSD, cold
 
 ### LangWatch App (port 5560)
 
-Next.js server, the single external entry point for all traffic:
+The API process (`apps/api`, built on Hono), the single external entry point
+for all traffic. It serves REST, tRPC and SSE, and also serves the prebuilt
+browser bundle (a Vite/React single-page app, `apps/ui`) as static assets —
+one container is the whole interactive tier:
 
 - **Web UI**: dashboards, trace explorer, prompt management, experiment views
 - **REST API + OTel ingestion**: receives spans from LangWatch SDKs
@@ -102,7 +105,10 @@ Next.js server, the single external entry point for all traffic:
 
 ### LangWatch Workers
 
-Same `langwatch/langwatch` image, started with `pnpm start:workers`. Consumes jobs from a BullMQ queue in Redis and runs the event sourcing pipeline (see below).
+Same `langwatch/langwatch` image, started from `apps/worker` instead of
+`apps/api` (there is no in-process worker mode — the app and the workers are
+always separate processes). Consumes jobs from a BullMQ queue in Redis and
+runs the event sourcing pipeline (see below).
 
 - Deployed as a separate Kubernetes Deployment
 - Stateless, scale by adding replicas
@@ -235,9 +241,8 @@ The pipeline produces three types of output:
 | Dataset Append | Automation rules    | Auto-add traces to datasets        |
 
 <Note>
-  If Worker queue depth grows in Redis, it means processing is falling behind ingestion.
-  The fix is to add more Worker replicas, each one is stateless and consumes jobs
-  independently.
+  If Worker queue depth grows in Redis, it means processing is falling behind ingestion. The fix is
+  to add more Worker replicas, each one is stateless and consumes jobs independently.
 </Note>
 
 ## Data Flow
@@ -285,8 +290,8 @@ Only the App is exposed externally. Everything else is cluster-internal:
 | Redis      | ClusterIP                | No       |
 
 <Note>
-  LangEvals and NLP make outbound calls to external LLM providers (OpenAI, Azure, etc.).
-  Ensure these pods have network egress to the relevant endpoints.
+  LangEvals and NLP make outbound calls to external LLM providers (OpenAI, Azure, etc.). Ensure
+  these pods have network egress to the relevant endpoints.
 </Note>
 
 ### Connected agents
