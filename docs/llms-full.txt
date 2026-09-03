@@ -9667,6 +9667,8 @@ The gateway then gives you, on every request:
 | Embeddings | `POST /v1/embeddings` | OpenAI |
 | Speech | `POST /v1/audio/speech` | OpenAI |
 | Transcription | `POST /v1/audio/transcriptions` | OpenAI |
+| Image generation | `POST /v1/images/generations` | OpenAI |
+| Image editing | `POST /v1/images/edits` | OpenAI |
 | Realtime session credentials | `POST /v1/realtime/client_secrets` | OpenAI |
 | Model list | `GET /v1/models` | OpenAI |
 | Gemini native | `/v1beta/*` | Google |
@@ -10288,6 +10290,7 @@ The gateway sends the request to `<endpoint>/openai/deployments/<deployment>/cha
 | `POST /v1/responses` | Yes |
 | `POST /v1/messages` | Yes, translated |
 | `POST /v1/embeddings` | Yes |
+| `POST /v1/images/generations`, `POST /v1/images/edits` | Yes, non-streaming. See [Images](/ai-gateway/api/images) |
 | `GET /v1/models` | Yes, the names under Custom Models |
 
 ## More than one resource
@@ -10349,6 +10352,7 @@ curl https://gateway.langwatch.ai/v1/chat/completions \
 | `POST /v1/chat/completions` | Yes |
 | `POST /v1/messages` | Yes, translated |
 | `POST /v1/embeddings` | Yes, for Bedrock embedding models |
+| `POST /v1/images/generations`, `POST /v1/images/edits` | Yes, non-streaming. See [Images](/ai-gateway/api/images) |
 | `GET /v1/models` | Yes, the ids under Custom Models |
 
 `cache_control` blocks on Anthropic models become Converse `cachePoint` markers, and the cache token counts come back in `usage`. See [Cache control](/ai-gateway/cache-control).
@@ -10461,6 +10465,7 @@ curl https://gateway.langwatch.ai/v1/chat/completions \
 | `POST /v1/chat/completions` | Yes |
 | `POST /v1/messages` | Yes, translated |
 | `POST /v1/embeddings` | Yes, when the endpoint serves it |
+| `POST /v1/images/generations`, `POST /v1/images/edits` | No, rejected with HTTP 400. Image traffic needs a direct OpenAI, Azure OpenAI, Gemini, Vertex AI or Bedrock credential. See [Images](/ai-gateway/api/images) |
 | `GET /v1/models` | Yes, the names under Custom Models |
 
 Streaming, tools and other features depend on what the endpoint implements. A feature the endpoint does not support comes back as the endpoint's own error.
@@ -10513,6 +10518,7 @@ curl https://gateway.langwatch.ai/v1/chat/completions \
 |---|---|
 | `POST /v1/chat/completions` | Yes |
 | `POST /v1/messages` | Yes, translated |
+| `POST /v1/images/generations`, `POST /v1/images/edits` | No, rejected with HTTP 400. Image traffic needs a direct OpenAI, Azure OpenAI, Gemini, Vertex AI or Bedrock credential. See [Images](/ai-gateway/api/images) |
 | `GET /v1/models` | Yes, from the DeepSeek catalog |
 
 ---
@@ -10752,6 +10758,7 @@ print(response.text)
 | `POST /v1/chat/completions` | Yes |
 | `POST /v1/messages` | Yes, translated |
 | `POST /v1/embeddings` | Yes |
+| `POST /v1/images/generations`, `POST /v1/images/edits` | Yes, non-streaming. See [Images](/ai-gateway/api/images) |
 | `/v1beta/*` | Yes, forwarded to the Gemini API |
 | `GET /v1/models` | Yes, from the Gemini catalog |
 
@@ -10848,6 +10855,7 @@ curl https://gateway.langwatch.ai/v1/responses \
 | `POST /v1/responses` | Yes, streamed from OpenAI |
 | `POST /v1/messages` | Yes, translated to Responses |
 | `POST /v1/chat/completions`, `POST /v1/embeddings` | No, rejected with HTTP 400 |
+| `POST /v1/images/generations`, `POST /v1/images/edits` | No, rejected with HTTP 400. Image traffic needs a direct OpenAI, Azure OpenAI, Gemini, Vertex AI or Bedrock credential. See [Images](/ai-gateway/api/images) |
 
 If OpenAI answers 401, the gateway refreshes the session once. If the refresh is rejected, the request fails with `codex_session_expired`. Sign in again on the row.
 
@@ -10903,6 +10911,7 @@ curl https://gateway.langwatch.ai/v1/chat/completions \
 | `POST /v1/messages` | Yes, translated from the Anthropic format |
 | `POST /v1/embeddings` | Yes |
 | `POST /v1/audio/speech`, `POST /v1/audio/transcriptions` | Yes |
+| `POST /v1/images/generations`, `POST /v1/images/edits` | Yes, non-streaming. Not on a row that sets a base URL. See [Images](/ai-gateway/api/images) |
 | `POST /v1/realtime/client_secrets` | Yes. See [Realtime](/ai-gateway/api/realtime) |
 | `GET /v1/models` | Yes, from the OpenAI catalog |
 
@@ -10940,12 +10949,12 @@ Model names are `provider/model`. The provider segment is the id in the first co
 
 | Provider | Id | Credential | Endpoints served |
 |---|---|---|---|
-| [OpenAI](/ai-gateway/providers/openai) | `openai` | API key, optional base URL | Chat, Responses, Messages, embeddings, speech, transcription, realtime, models |
+| [OpenAI](/ai-gateway/providers/openai) | `openai` | API key, optional base URL | Chat, Responses, Messages, embeddings, images, speech, transcription, realtime, models |
 | [Anthropic](/ai-gateway/providers/anthropic) | `anthropic` | API key, optional base URL | Messages, Chat, models |
-| [Azure OpenAI](/ai-gateway/providers/azure-openai) | `azure` | API key, endpoint, API version | Chat, Responses, Messages, embeddings, models |
-| [AWS Bedrock](/ai-gateway/providers/bedrock) | `bedrock` | Access key id, secret access key, region | Chat, Messages, embeddings, models |
-| [Google Vertex AI](/ai-gateway/providers/vertex) | `vertex` | Service account JSON, project, location | Chat, Messages, embeddings, Gemini native, models |
-| [Google Gemini](/ai-gateway/providers/gemini) | `gemini` | API key, optional project and location | Chat, Messages, embeddings, Gemini native, models |
+| [Azure OpenAI](/ai-gateway/providers/azure-openai) | `azure` | API key, endpoint, API version | Chat, Responses, Messages, embeddings, images, models |
+| [AWS Bedrock](/ai-gateway/providers/bedrock) | `bedrock` | Access key id, secret access key, region | Chat, Messages, embeddings, images, models |
+| [Google Vertex AI](/ai-gateway/providers/vertex) | `vertex` | Service account JSON, project, location | Chat, Messages, embeddings, images, Gemini native, models |
+| [Google Gemini](/ai-gateway/providers/gemini) | `gemini` | API key, optional project and location | Chat, Messages, embeddings, images, Gemini native, models |
 | [xAI](/ai-gateway/providers/xai) | `xai` | API key | Chat, Messages, models |
 | [Groq](/ai-gateway/providers/groq) | `groq` | API key | Chat, Messages, models |
 | [Cerebras](/ai-gateway/providers/cerebras) | `cerebras` | API key | Chat, Messages, models |
@@ -10966,6 +10975,7 @@ The provider ids `azure_openai`, `aws_bedrock`, `vertex_ai`, `google_vertex` and
 | Messages | `POST /v1/messages` | Anthropic wire format. Forwarded as is to Anthropic, translated for the others. |
 | Embeddings | `POST /v1/embeddings` | OpenAI wire format. |
 | Speech, transcription | `POST /v1/audio/speech`, `POST /v1/audio/transcriptions` | OpenAI and ElevenLabs. |
+| Images | `POST /v1/images/generations`, `POST /v1/images/edits` | A direct OpenAI, Azure OpenAI, Gemini, Vertex AI or Bedrock credential. Both are non-streaming. See [Images](/ai-gateway/api/images). |
 | Realtime | `POST /v1/realtime/client_secrets` | OpenAI only. |
 | Gemini native | `/v1beta/*` | The Google GenAI SDKs. Gemini and Vertex AI. |
 | ElevenLabs native | `POST /v1/text-to-speech/{voice_id}`, `POST /v1/speech-to-text` | The ElevenLabs SDKs. |
@@ -11030,6 +11040,7 @@ curl https://gateway.langwatch.ai/v1/chat/completions \
 | `POST /v1/chat/completions` | Yes |
 | `POST /v1/messages` | Yes, translated |
 | `POST /v1/embeddings` | Yes |
+| `POST /v1/images/generations`, `POST /v1/images/edits` | Yes, non-streaming. See [Images](/ai-gateway/api/images) |
 | `/v1beta/*` | Yes, the Google GenAI SDKs. See [Gemini](/ai-gateway/providers/gemini#google-genai-sdks) |
 | `GET /v1/models` | Yes, the names under Custom Models |
 

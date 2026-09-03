@@ -43,5 +43,6 @@ curl https://gateway.langwatch.ai/v1/chat/completions \
 | `POST /v1/chat/completions` | Yes |
 | `POST /v1/messages` | Yes, translated |
 | `POST /v1/embeddings` | Yes |
+| `POST /v1/images/generations`, `POST /v1/images/edits` | Yes, non-streaming. See [Images](/ai-gateway/api/images) |
 | `/v1beta/*` | Yes, the Google GenAI SDKs. See [Gemini](/ai-gateway/providers/gemini#google-genai-sdks) |
 | `GET /v1/models` | Yes, the names under Custom Models |

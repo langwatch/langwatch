@@ -46,6 +46,7 @@ curl https://gateway.langwatch.ai/v1/chat/completions \
 | `POST /v1/messages` | Yes, translated from the Anthropic format |
 | `POST /v1/embeddings` | Yes |
 | `POST /v1/audio/speech`, `POST /v1/audio/transcriptions` | Yes |
+| `POST /v1/images/generations`, `POST /v1/images/edits` | Yes, non-streaming. Not on a row that sets a base URL. See [Images](/ai-gateway/api/images) |
 | `POST /v1/realtime/client_secrets` | Yes. See [Realtime](/ai-gateway/api/realtime) |
 | `GET /v1/models` | Yes, from the OpenAI catalog |
 

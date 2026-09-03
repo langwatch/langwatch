@@ -61,5 +61,6 @@ print(response.text)
 | `POST /v1/chat/completions` | Yes |
 | `POST /v1/messages` | Yes, translated |
 | `POST /v1/embeddings` | Yes |
+| `POST /v1/images/generations`, `POST /v1/images/edits` | Yes, non-streaming. See [Images](/ai-gateway/api/images) |
 | `/v1beta/*` | Yes, forwarded to the Gemini API |
 | `GET /v1/models` | Yes, from the Gemini catalog |

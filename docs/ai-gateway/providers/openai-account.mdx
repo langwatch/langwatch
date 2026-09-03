@@ -39,5 +39,6 @@ curl https://gateway.langwatch.ai/v1/responses \
 | `POST /v1/responses` | Yes, streamed from OpenAI |
 | `POST /v1/messages` | Yes, translated to Responses |
 | `POST /v1/chat/completions`, `POST /v1/embeddings` | No, rejected with HTTP 400 |
+| `POST /v1/images/generations`, `POST /v1/images/edits` | No, rejected with HTTP 400. Image traffic needs a direct OpenAI, Azure OpenAI, Gemini, Vertex AI or Bedrock credential. See [Images](/ai-gateway/api/images) |
 
 If OpenAI answers 401, the gateway refreshes the session once. If the refresh is rejected, the request fails with `codex_session_expired`. Sign in again on the row.

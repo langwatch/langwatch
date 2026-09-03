@@ -42,4 +42,5 @@ curl https://gateway.langwatch.ai/v1/chat/completions \
 |---|---|
 | `POST /v1/chat/completions` | Yes |
 | `POST /v1/messages` | Yes, translated |
+| `POST /v1/images/generations`, `POST /v1/images/edits` | No, rejected with HTTP 400. Image traffic needs a direct OpenAI, Azure OpenAI, Gemini, Vertex AI or Bedrock credential. See [Images](/ai-gateway/api/images) |
 | `GET /v1/models` | Yes, from the DeepSeek catalog |

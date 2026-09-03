@@ -26,12 +26,12 @@ Model names are `provider/model`. The provider segment is the id in the first co
 
 | Provider | Id | Credential | Endpoints served |
 |---|---|---|---|
-| [OpenAI](/ai-gateway/providers/openai) | `openai` | API key, optional base URL | Chat, Responses, Messages, embeddings, speech, transcription, realtime, models |
+| [OpenAI](/ai-gateway/providers/openai) | `openai` | API key, optional base URL | Chat, Responses, Messages, embeddings, images, speech, transcription, realtime, models |
 | [Anthropic](/ai-gateway/providers/anthropic) | `anthropic` | API key, optional base URL | Messages, Chat, models |
-| [Azure OpenAI](/ai-gateway/providers/azure-openai) | `azure` | API key, endpoint, API version | Chat, Responses, Messages, embeddings, models |
-| [AWS Bedrock](/ai-gateway/providers/bedrock) | `bedrock` | Access key id, secret access key, region | Chat, Messages, embeddings, models |
-| [Google Vertex AI](/ai-gateway/providers/vertex) | `vertex` | Service account JSON, project, location | Chat, Messages, embeddings, Gemini native, models |
-| [Google Gemini](/ai-gateway/providers/gemini) | `gemini` | API key, optional project and location | Chat, Messages, embeddings, Gemini native, models |
+| [Azure OpenAI](/ai-gateway/providers/azure-openai) | `azure` | API key, endpoint, API version | Chat, Responses, Messages, embeddings, images, models |
+| [AWS Bedrock](/ai-gateway/providers/bedrock) | `bedrock` | Access key id, secret access key, region | Chat, Messages, embeddings, images, models |
+| [Google Vertex AI](/ai-gateway/providers/vertex) | `vertex` | Service account JSON, project, location | Chat, Messages, embeddings, images, Gemini native, models |
+| [Google Gemini](/ai-gateway/providers/gemini) | `gemini` | API key, optional project and location | Chat, Messages, embeddings, images, Gemini native, models |
 | [xAI](/ai-gateway/providers/xai) | `xai` | API key | Chat, Messages, models |
 | [Groq](/ai-gateway/providers/groq) | `groq` | API key | Chat, Messages, models |
 | [Cerebras](/ai-gateway/providers/cerebras) | `cerebras` | API key | Chat, Messages, models |
@@ -52,6 +52,7 @@ The provider ids `azure_openai`, `aws_bedrock`, `vertex_ai`, `google_vertex` and
 | Messages | `POST /v1/messages` | Anthropic wire format. Forwarded as is to Anthropic, translated for the others. |
 | Embeddings | `POST /v1/embeddings` | OpenAI wire format. |
 | Speech, transcription | `POST /v1/audio/speech`, `POST /v1/audio/transcriptions` | OpenAI and ElevenLabs. |
+| Images | `POST /v1/images/generations`, `POST /v1/images/edits` | A direct OpenAI, Azure OpenAI, Gemini, Vertex AI or Bedrock credential. Both are non-streaming. See [Images](/ai-gateway/api/images). |
 | Realtime | `POST /v1/realtime/client_secrets` | OpenAI only. |
 | Gemini native | `/v1beta/*` | The Google GenAI SDKs. Gemini and Vertex AI. |
 | ElevenLabs native | `POST /v1/text-to-speech/{voice_id}`, `POST /v1/speech-to-text` | The ElevenLabs SDKs. |
