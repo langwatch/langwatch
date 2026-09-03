@@ -4,6 +4,7 @@ import { PrismaDriverAdapterService } from "./driver-adapter";
 describe("PrismaDriverAdapterService", () => {
   const service = PrismaDriverAdapterService.create();
 
+  /** @scenario "The schema URL parameter routes both model queries and raw SQL" */
   it("routes model and raw queries to the URL schema", () => {
     expect(
       service.poolConfig("postgresql://user:pass@localhost:5432/db?schema=langwatch_db"),
@@ -14,6 +15,7 @@ describe("PrismaDriverAdapterService", () => {
     });
   });
 
+  /** @scenario "Pool tuning URL parameters reach the pg pool" */
   it("maps Prisma pool tuning parameters onto pg", () => {
     expect(
       service.poolConfig("postgresql://localhost/db?connection_limit=7&pool_timeout=20"),
@@ -25,6 +27,7 @@ describe("PrismaDriverAdapterService", () => {
     });
   });
 
+  /** @scenario "Absent or invalid pool parameters leave pg defaults untouched" */
   it.each([
     "postgresql://localhost/db",
     "postgresql://localhost/db?connection_limit=nope&pool_timeout=0",
@@ -35,6 +38,7 @@ describe("PrismaDriverAdapterService", () => {
     });
   });
 
+  /** @scenario "A malformed DATABASE_URL defers failure to first use" */
   it("defers a malformed URL failure until the adapter is used", () => {
     expect(service.poolConfig("not a url")).toEqual({
       connectionString: "not a url",

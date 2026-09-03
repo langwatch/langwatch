@@ -7,6 +7,7 @@ import { StackContextManager } from "@opentelemetry/sdk-trace-web";
 import { TRPCError } from "@trpc/server";
 import { describe, expect, it } from "vitest";
 import { z } from "zod";
+import { z as z4 } from "zod/v4";
 import { appTrpcErrorFormatter as errorFormatter } from "../app-trpc.error-formatter";
 
 function format(error: TRPCError) {
@@ -217,6 +218,30 @@ describe("tRPC error response boundary", () => {
         const formatted = format(error);
 
         expect(formatted.data).not.toHaveProperty("zodError");
+        expect(formatted.data.error).toMatchObject({
+          code: "validation_error",
+          meta: { fieldErrors: { name: expect.any(Array) } },
+        });
+      });
+    });
+
+    describe("when the schema was authored against the other zod major", () => {
+      /** @scenario "Validation failures travel that channel whichever zod threw them" */
+      it("promotes it the same, rather than letting it pass as an unknown 500", () => {
+        // Parsed for real, not hand-built: the defect being pinned is that a
+        // v4 `ZodError` is not `instanceof` the v3 class this boundary used to
+        // import, and only the object zod itself throws carries that. A
+        // literal shaped like an error would pass a broken gate.
+        const parsed = z4.object({ name: z4.string().min(1) }).safeParse({});
+        const cause = parsed.error;
+        const error = new TRPCError({
+          code: "INTERNAL_SERVER_ERROR",
+          message: cause!.message,
+          cause,
+        });
+
+        const formatted = format(error);
+
         expect(formatted.data.error).toMatchObject({
           code: "validation_error",
           meta: { fieldErrors: { name: expect.any(Array) } },
