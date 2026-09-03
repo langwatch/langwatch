@@ -40,6 +40,11 @@ finally:
     else:
         os.environ["DISABLE_EVALUATORS_PRELOAD"] = _original_preload
 
+# The server captured its baseline while the temporary preload flag was set.
+# Rebase it on the clean environment, so the drift tripwire compares against
+# what the process actually holds.
+server.original_env = os.environ.copy()
+
 from langevals_core import litellm_patch
 from langevals_core.request_env import request_env
 from langevals_ragas.faithfulness import (
