@@ -429,7 +429,9 @@ describe("SubjectSection", () => {
   });
 
   describe("given a trace draft with no condition yet", () => {
-    const seedEmptyConditionDraft = (annotators: string[]) =>
+    const seedEmptyConditionDraft = (
+      annotators: { id: string; name: string }[],
+    ) =>
       useAutomationStore.getState().hydrate({
         ...INITIAL_DRAFT,
         source: "trace",
@@ -457,7 +459,7 @@ describe("SubjectSection", () => {
     describe("when the delivery is set up", () => {
       /** @scenario "The missing condition is only flagged once the delivery is set up" */
       it("flags the missing condition", () => {
-        seedEmptyConditionDraft(["user-1"]);
+        seedEmptyConditionDraft([{ id: "u_1", name: "Ada" }]);
         render(<SubjectSection />, { wrapper: Wrapper });
 
         expect(
