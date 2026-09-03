@@ -350,3 +350,16 @@ Feature: Passkeys - the fastest way in, and the one phishing cannot take
     When the method picker is rendered and the security settings are opened
     Then a passkey can be registered and accepted
     And the endpoint behind every passkey button is mounted
+
+  # A passkey is bound to a relying party at the moment it is created, and the
+  # browser offers it back only to that one - which is exactly what makes it
+  # unphishable, and exactly what breaks when we name the wrong one. Behind a
+  # reverse proxy, and on every preview host, the address we dial ourselves on
+  # is not the address the person's browser typed. The public one is the only
+  # one the browser ever signed for.
+  @unit
+  Scenario: The passkey relying party is the deployment's public address
+    Given a deployment whose internal address differs from its public one
+    When better-auth's passkey plugin is configured
+    Then the relying party id and origin are the public address
+    And a passkey registered on the public host is recognized there

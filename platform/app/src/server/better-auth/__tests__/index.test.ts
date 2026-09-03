@@ -127,6 +127,37 @@ describe("better-auth config", () => {
       vi.resetModules();
     });
 
+    /** @scenario "The passkey relying party is the deployment's public address" */
+    it("binds the passkey relying party to the address a browser reaches", async () => {
+      // The plugin derives its own rpID from `baseURL` (`NEXTAUTH_URL`), and
+      // on a preview host that is the internal address. Every ceremony was
+      // then built for "localhost" while the browser signed for the public
+      // host, and SimpleWebAuthn refused the RP-id-hash mismatch as
+      // `identity_passkey_not_recognized`. Asserted on the plugin's own
+      // options because that is what the ceremonies read.
+      vi.resetModules();
+      const { env } = await import("~/env.mjs");
+      vi.spyOn(env, "BASE_HOST", "get").mockReturnValue(
+        "https://lw7631.boxd.sh" as never,
+      );
+      vi.spyOn(env, "NEXTAUTH_URL", "get").mockReturnValue(
+        "http://localhost:5560" as never,
+      );
+
+      const { auth } = await import("../index");
+      const passkeyPlugin = ((auth as any).options?.plugins ?? []).find(
+        (p: { id?: string }) => p?.id === "passkey",
+      );
+
+      expect(passkeyPlugin?.options).toMatchObject({
+        rpID: "lw7631.boxd.sh",
+        origin: "https://lw7631.boxd.sh",
+      });
+
+      vi.restoreAllMocks();
+      vi.resetModules();
+    });
+
     it("gates emailAndPassword.enabled on NEXTAUTH_PROVIDER=email or self-hosted (ADR-027)", async () => {
       // Regression for iter-20 bug 16: BetterAuth's email/password routes
       // (`/sign-up/email`, `/sign-in/email`) were unconditionally enabled,

@@ -53,6 +53,7 @@ import {
 } from "./hooks";
 import { isLastWayInPath, refuseIfItClosesTheLastDoor } from "./last-way-in";
 import { passkeySignUpRegistration } from "./passkey-signup";
+import { passkeyRelyingParty } from "./passkeyRelyingParty";
 import {
   recordPasswordReset,
   signInAfterPasswordReset,
@@ -165,9 +166,18 @@ const plugins = [
   ...[
     passkey({
       rpName: "LangWatch",
-      // The relying party is the app's own origin. Left to the plugin's
-      // default derivation from `baseURL` so a self-hosted install on
-      // its own hostname works without a second place to configure it.
+      // The relying party is the address a BROWSER reaches this deployment
+      // on, which behind a reverse proxy is not `baseURL`. The plugin's own
+      // default derives it from `baseURL` — our internal address — and a
+      // preview host then builds every ceremony for the relying party
+      // "localhost" while the browser signs for the public one, so every
+      // passkey is refused as unrecognized. See `passkeyRelyingParty.ts`.
+      // Null when the deployment names neither address, and the plugin keeps
+      // its own default there rather than the boot failing.
+      ...(passkeyRelyingParty({
+        baseHost: env.BASE_HOST,
+        nextAuthUrl: env.NEXTAUTH_URL,
+      }) ?? {}),
 
       // Signing UP with a passkey, not only adding one to an account that
       // already exists. This is what drops the session requirement from
