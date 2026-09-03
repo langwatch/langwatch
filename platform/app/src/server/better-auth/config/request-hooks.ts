@@ -70,6 +70,63 @@ function refusesCredentialRoute({
 }
 
 /**
+ * Credential-mutation block: keyed off the CONFIGURED mode, blocked in every
+ * gate state (ADR-027 Constants table). The password-reset pair is excluded
+ * here — it's gate-dependent, handled by `enforceGate`.
+ */
+function refuseCredentialMutation(pathname: string): void {
+  if (!isCredentialMutationPath(pathname)) return;
+  throw APIError.from("BAD_REQUEST", {
+    code: "EMAIL_PASSWORD_DISABLED",
+    message:
+      "Credential management is disabled in cloud/SSO mode — your account is managed by your identity provider.",
+  });
+}
+
+/**
+ * The gate-dependent half of the route table, decided from the resolved
+ * method policy (ADR-027 sites #2 and #3).
+ */
+function enforceGate({
+  url,
+  pathname,
+  policy,
+}: {
+  url: string;
+  pathname: string;
+  policy: SignInMethodPolicy;
+}): void {
+  const isResetPath = isPasswordResetPath(pathname);
+
+  if (policy.federationLicensed) {
+    // Gate ALLOW (site #3): refuse the routes that would otherwise mint a
+    // password account on a licensed SSO-capable deployment (v5 BLOCKER).
+    if (refusesCredentialRoute({ pathname, isResetPath, policy })) {
+      throw APIError.from("BAD_REQUEST", {
+        code: "EMAIL_PASSWORD_DISABLED",
+        message:
+          "Credential management is disabled — your account is managed by your identity provider.",
+      });
+    }
+    return;
+  }
+
+  // Gate DENY (site #2): run in email mode, exactly as if the SSO env vars
+  // were unset. The reset pair stays open so OAuth-born users self-recover.
+  if (!isResetPath && isGatedSsoPath(url)) {
+    logger.warn(
+      { path: requestPathname(url), reason: "no_license" },
+      "Blocked SSO request: deployment has no genuine license",
+    );
+    throw APIError.from("FORBIDDEN", {
+      code: "SSO_LICENSE_REQUIRED",
+      message:
+        "SSO is not available on this deployment — sign in with your email and password instead.",
+    });
+  }
+}
+
+/**
  * Global before-hook that blocks credential-management endpoints in
  * cloud/SSO mode, and the after-hook that states what a finished call meant.
  *
@@ -136,18 +193,7 @@ export function requestHooks({
       // told it has nothing to wait for.
       if (!deploymentIsFederationCapable()) return;
 
-      // Credential-mutation block: keyed off the CONFIGURED mode, blocked in
-      // every gate state (ADR-027 Constants table). The password-reset pair
-      // is excluded here — it's gate-dependent, handled below.
-      if (isCredentialMutationPath(pathname)) {
-        throw APIError.from("BAD_REQUEST", {
-          code: "EMAIL_PASSWORD_DISABLED",
-          message:
-            "Credential management is disabled in cloud/SSO mode — your account is managed by your identity provider.",
-        });
-      }
-
-      const isResetPath = isPasswordResetPath(pathname);
+      refuseCredentialMutation(pathname);
 
       // Nothing below this line can change the answer for the rest of the
       // route table, so it never waits on the gate (see `isGateDependentPath`).
@@ -161,34 +207,7 @@ export function requestHooks({
       // `/callback/auth0|okta` rewrite. Every ADR-027 semantic is unchanged:
       // the gate inside the policy is the same per-process memo, so a license
       // still takes effect on restart and never mid-flight.
-      const policy = await resolveSignInMethodPolicy();
-
-      if (policy.federationLicensed) {
-        // Gate ALLOW (site #3): refuse the routes that would otherwise mint a
-        // password account on a licensed SSO-capable deployment (v5 BLOCKER).
-        if (refusesCredentialRoute({ pathname, isResetPath, policy })) {
-          throw APIError.from("BAD_REQUEST", {
-            code: "EMAIL_PASSWORD_DISABLED",
-            message:
-              "Credential management is disabled — your account is managed by your identity provider.",
-          });
-        }
-        return;
-      }
-
-      // Gate DENY (site #2): run in email mode, exactly as if the SSO env vars
-      // were unset. The reset pair stays open so OAuth-born users self-recover.
-      if (!isResetPath && isGatedSsoPath(url)) {
-        logger.warn(
-          { path: requestPathname(url), reason: "no_license" },
-          "Blocked SSO request: deployment has no genuine license",
-        );
-        throw APIError.from("FORBIDDEN", {
-          code: "SSO_LICENSE_REQUIRED",
-          message:
-            "SSO is not available on this deployment — sign in with your email and password instead.",
-        });
-      }
+      enforceGate({ url, pathname, policy: await resolveSignInMethodPolicy() });
     },
     /**
      * D06 follow-up 1: the two-factor endpoints, as identity facts.

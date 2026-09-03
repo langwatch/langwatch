@@ -52,15 +52,19 @@ vi.mock("@ee/audit-log/auditLog", () => ({
   auditLog: vi.fn(async () => undefined),
 }));
 
-vi.mock("~/server/app-layer/identity/runtime", () => ({
+// The composition root is reached at MODULE LOAD by better-auth's own wiring,
+// which the router's import graph pulls in, so the rest of its surface stays
+// the real one and only what these scenarios drive is replaced. Better Auth
+// validates its adapter eagerly, so that one is its empty in-memory engine
+// rather than an incomplete object.
+vi.mock("~/server/app-layer/identity/runtime", async (importOriginal) => ({
+  ...(await importOriginal<
+    typeof import("~/server/app-layer/identity/runtime")
+  >()),
   accountIdentifiers: () => serviceRef.current,
   verificationCeremony: () => {
     throw new Error("not used by these scenarios");
   },
-  // The composition root is reached at MODULE LOAD by better-auth's own
-  // wiring, which the router's import graph pulls in. It is named here so the
-  // double is complete. Better Auth still validates that adapter eagerly, so
-  // use its empty in-memory implementation instead of an incomplete object.
   identityStorageAdapter: () => memoryAdapter({}),
 }));
 

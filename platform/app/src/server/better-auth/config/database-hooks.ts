@@ -1,4 +1,3 @@
-import type { IdentityAccountCeremonies } from "@langwatch/identity-server/better-auth";
 import type { BetterAuthOptions } from "better-auth";
 import type { BetterAuthDatabaseHooks } from "../hooks";
 import type { SessionClaimsPort } from "../session-claims-hook";
@@ -7,6 +6,29 @@ import { sessionClaimsData } from "../session-claims-hook";
 /** ADR-101 §2's erasure, taken before the user row goes. */
 export interface UserErasureCeremonyPort {
   beforeUserDelete(user: { id?: unknown }): Promise<void>;
+}
+
+/**
+ * The `Account` fields the two account ceremonies read. Structural, and
+ * declared here rather than imported: better-auth reaches identity only
+ * through the composition root (ADR-115), and a type import from the identity
+ * server package is the same edge in the dependency graph as a value one.
+ */
+export interface CeremonyAccountRow {
+  id?: unknown;
+  userId?: unknown;
+  providerId?: unknown;
+  issuer?: unknown;
+  accountId?: unknown;
+  createdAt?: unknown;
+}
+
+/** The two account ceremonies `databaseHooks` binds (ADR-116 §5). */
+export interface AccountCeremoniesPort {
+  beforeAccountCreate(
+    account: CeremonyAccountRow,
+  ): Promise<{ data: { id: string } } | undefined>;
+  beforeAccountDelete(account: CeremonyAccountRow): Promise<void>;
 }
 
 export interface DatabaseHooksDeps {
@@ -25,10 +47,7 @@ export interface DatabaseHooksDeps {
    * the identity branch, because the adapter states those facts itself and a
    * second statement in the same request appends the event twice.
    */
-  accountCeremonies: () => Pick<
-    IdentityAccountCeremonies,
-    "beforeAccountCreate" | "beforeAccountDelete"
-  >;
+  accountCeremonies: () => AccountCeremoniesPort;
   /** What a session records at mint: the identifier, and what was proved. */
   sessionClaims: () => SessionClaimsPort;
 }
