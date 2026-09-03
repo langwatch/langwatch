@@ -1,7 +1,7 @@
 import { builtinRolePermissions } from "@langwatch/authz";
 import { describe, expect, it } from "vitest";
-import { isOrgExclusivePermission } from "~/server/api/rbac";
 import type { Permission } from "~/server/api/rbac";
+import { isOrgExclusivePermission } from "~/server/api/rbac";
 import { defaultCliKeyPermissions } from "~/server/api-key/cli-key-defaults";
 import { defaultCliKeyScopes } from "../cliKeyScopeDefaults";
 
@@ -197,7 +197,7 @@ describe("defaultCliKeyScopes()", () => {
     });
   });
 
-  describe("mintability of the organization-chip fallback", () => {
+  describe("when the organization-chip fallback is offered", () => {
     // The cross-layer pin for the fallback: the screen's permission list is
     // `defaultCliKeyPermissions()` intersected with the chip's ceiling, and
     // the mint (`filterToGrantable`) keeps org-exclusive permissions only
