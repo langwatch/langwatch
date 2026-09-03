@@ -25,6 +25,10 @@ The endpoint must be reachable from the gateway. The gateway always refuses link
 
 On LangWatch Cloud the endpoint must use `https`: a hosted gateway refuses to start without `REQUIRE_HTTPS_CUSTOM_ENDPOINTS=true`, and with it an `http` endpoint is refused. A self-hosted gateway accepts `http` while that setting stays `false`.
 
+<Warning>
+An `http` endpoint sends `CUSTOM_API_KEY` in cleartext, because the gateway puts it in an `Authorization: Bearer` header on every request. Anyone on the path between the gateway and the endpoint can read the key. Use `http` only for an endpoint with no `CUSTOM_API_KEY`. On a self-hosted gateway that dispatches to a row with a key, set `REQUIRE_HTTPS_CUSTOM_ENDPOINTS=true` as well.
+</Warning>
+
 ## Model names
 
 Write `custom/<model>`, for example `custom/qwen3-14b`. Give the row a **Routing handle** when you have several custom endpoints: `acme-gpu/qwen3-14b` pins that row.
