@@ -667,7 +667,7 @@ describe("getUserPermissionsAtScope()", () => {
   });
 
   describe("when an org-level MEMBER binding covers a project scope", () => {
-    it("returns the org-member bag, not the team-role bag", () => {
+    it("returns nothing: the whole org-member bag is org-exclusive", () => {
       const result = getUserPermissionsAtScope({
         myBindings: [
           { scopeType: "ORGANIZATION", scopeId: "org-1", role: "MEMBER" },
@@ -679,11 +679,30 @@ describe("getUserPermissionsAtScope()", () => {
         isServiceKey: false,
         getTeamRolePermissions: mockGetPerms,
       });
-      // The resolver grants an ORGANIZATION-scoped non-ADMIN binding the
-      // org-member bag only — offering the team bag here made the authorize
-      // screen send permissions the approve endpoint then refused with
-      // "exceeds your own access".
-      expect(result).toEqual([...builtinRolePermissions("org-member")]);
+      // The org-member bag (organization:view, aiTools:view) targets
+      // org-tier-only resources, and the mint strips org-exclusive
+      // permissions from any selection with no ORGANIZATION binding
+      // (`filterToGrantable`). Offering them on a PROJECT chip made the
+      // approve request carry only permissions the server then dropped,
+      // failing with "Select at least one permission".
+      expect(result).toEqual([]);
+    });
+  });
+
+  describe("when an org-level MEMBER binding covers a team scope", () => {
+    it("returns nothing: no org-exclusive permission is grantable there", () => {
+      const result = getUserPermissionsAtScope({
+        myBindings: [
+          { scopeType: "ORGANIZATION", scopeId: "org-1", role: "MEMBER" },
+        ],
+        scopeType: "TEAM",
+        scopeId: "team-1",
+        organizationId: "org-1",
+        orgProjects,
+        isServiceKey: false,
+        getTeamRolePermissions: mockGetPerms,
+      });
+      expect(result).toEqual([]);
     });
   });
 

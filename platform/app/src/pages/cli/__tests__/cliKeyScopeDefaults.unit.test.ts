@@ -4,6 +4,12 @@ import { defaultCliKeyScopes } from "../cliKeyScopeDefaults";
 describe("defaultCliKeyScopes()", () => {
   const organizationId = "org-1";
   const sharedTeamIds = ["team-1", "team-2"];
+  const personalProject = { id: "proj-personal", teamId: "team-personal" };
+  const personalTeamBinding = {
+    scopeType: "TEAM",
+    scopeId: "team-personal",
+    role: "ADMIN",
+  };
 
   describe("when the caller holds an ORGANIZATION-scoped ADMIN binding", () => {
     it("collapses to a single organization scope", () => {
@@ -14,7 +20,7 @@ describe("defaultCliKeyScopes()", () => {
           { scopeType: "TEAM", scopeId: "team-1", role: "MEMBER" },
         ],
         sharedTeamIds,
-        personalProjectId: "proj-personal",
+        personalProject,
       });
       expect(scopes).toEqual([
         { scopeType: "ORGANIZATION", scopeId: organizationId },
@@ -34,7 +40,7 @@ describe("defaultCliKeyScopes()", () => {
           },
         ],
         sharedTeamIds,
-        personalProjectId: null,
+        personalProject: null,
       });
       expect(scopes).toEqual([
         { scopeType: "ORGANIZATION", scopeId: organizationId },
@@ -57,9 +63,10 @@ describe("defaultCliKeyScopes()", () => {
             role: "MEMBER",
           },
           { scopeType: "TEAM", scopeId: "team-2", role: "MEMBER" },
+          personalTeamBinding,
         ],
         sharedTeamIds,
-        personalProjectId: "proj-personal",
+        personalProject,
       });
       expect(scopes).toEqual([
         { scopeType: "TEAM", scopeId: "team-2" },
@@ -67,7 +74,33 @@ describe("defaultCliKeyScopes()", () => {
       ]);
     });
 
-    it("offers the personal project when no team bindings exist", () => {
+    it("offers the personal project when its team binding is held", () => {
+      const scopes = defaultCliKeyScopes({
+        organizationId,
+        bindings: [
+          {
+            scopeType: "ORGANIZATION",
+            scopeId: organizationId,
+            role: "MEMBER",
+          },
+          personalTeamBinding,
+        ],
+        sharedTeamIds,
+        personalProject,
+      });
+      expect(scopes).toEqual([
+        { scopeType: "PROJECT", scopeId: "proj-personal" },
+      ]);
+    });
+
+    it("skips a personal project whose team binding is missing and offers the organization instead", () => {
+      // The personal-workspace owner grant is appended to the grants ledger
+      // asynchronously and is skipped outright on a ledger outage, so the
+      // personal project can be visible while its TEAM binding row is not.
+      // A PROJECT chip whose ceiling resolves to the org-member bag can
+      // never mint (both permissions are org-exclusive and the mint strips
+      // them from selections with no ORGANIZATION binding) — the org chip
+      // mints a view-only key instead of dead-ending the login.
       const scopes = defaultCliKeyScopes({
         organizationId,
         bindings: [
@@ -78,10 +111,28 @@ describe("defaultCliKeyScopes()", () => {
           },
         ],
         sharedTeamIds,
-        personalProjectId: "proj-personal",
+        personalProject,
       });
       expect(scopes).toEqual([
-        { scopeType: "PROJECT", scopeId: "proj-personal" },
+        { scopeType: "ORGANIZATION", scopeId: organizationId },
+      ]);
+    });
+
+    it("offers the organization when there is nothing else to offer", () => {
+      const scopes = defaultCliKeyScopes({
+        organizationId,
+        bindings: [
+          {
+            scopeType: "ORGANIZATION",
+            scopeId: organizationId,
+            role: "MEMBER",
+          },
+        ],
+        sharedTeamIds,
+        personalProject: null,
+      });
+      expect(scopes).toEqual([
+        { scopeType: "ORGANIZATION", scopeId: organizationId },
       ]);
     });
   });
@@ -99,9 +150,27 @@ describe("defaultCliKeyScopes()", () => {
           { scopeType: "TEAM", scopeId: "team-1", role: "VIEWER" },
         ],
         sharedTeamIds,
-        personalProjectId: null,
+        personalProject: null,
       });
       expect(scopes).toEqual([{ scopeType: "TEAM", scopeId: "team-1" }]);
+    });
+
+    it("offers the organization when there is nothing else to offer", () => {
+      const scopes = defaultCliKeyScopes({
+        organizationId,
+        bindings: [
+          {
+            scopeType: "ORGANIZATION",
+            scopeId: organizationId,
+            role: "VIEWER",
+          },
+        ],
+        sharedTeamIds,
+        personalProject: null,
+      });
+      expect(scopes).toEqual([
+        { scopeType: "ORGANIZATION", scopeId: organizationId },
+      ]);
     });
   });
 
@@ -112,9 +181,10 @@ describe("defaultCliKeyScopes()", () => {
         bindings: [
           { scopeType: "TEAM", scopeId: "team-1", role: "MEMBER" },
           { scopeType: "TEAM", scopeId: "team-other-org", role: "MEMBER" },
+          personalTeamBinding,
         ],
         sharedTeamIds,
-        personalProjectId: "proj-personal",
+        personalProject,
       });
       expect(scopes).toEqual([
         { scopeType: "TEAM", scopeId: "team-1" },
@@ -123,17 +193,19 @@ describe("defaultCliKeyScopes()", () => {
     });
   });
 
-  describe("when the caller holds no bindings", () => {
-    it("offers only the personal project", () => {
+  describe("when the caller holds no bindings at all", () => {
+    it("offers nothing: there is no ceiling to mint from", () => {
+      // With no RoleBinding rows the client ceiling is empty for every
+      // possible chip, so any offered scope would render an approve button
+      // that can never be enabled. The screen's "nothing here for you"
+      // state is the honest rendering of that.
       const scopes = defaultCliKeyScopes({
         organizationId,
         bindings: [],
         sharedTeamIds,
-        personalProjectId: "proj-personal",
+        personalProject,
       });
-      expect(scopes).toEqual([
-        { scopeType: "PROJECT", scopeId: "proj-personal" },
-      ]);
+      expect(scopes).toEqual([]);
     });
   });
 });
