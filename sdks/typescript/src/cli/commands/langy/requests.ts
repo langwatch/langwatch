@@ -205,11 +205,8 @@ export function createControlApi({
       body = null;
     }
     if (!response.ok) {
-      const reported = (body as { message?: unknown } | null)?.message;
       throw new ShareControlError(
-        typeof reported === "string" && reported !== ""
-          ? reported
-          : `LangWatch answered ${response.status} for ${urlPath}`,
+        refusalText(body) ?? `LangWatch answered ${response.status} for ${urlPath}`,
       );
     }
     return body;
@@ -373,3 +370,26 @@ export const asShareControlError = (error: unknown): ShareControlError =>
           ? error.message
           : String(error),
       );
+
+/**
+ * The words of a refusal. The v1 envelope carries the customer-facing
+ * sentences in `tips` and repeats the error code in `message`, so the tips
+ * come first and a bare code is never printed on its own.
+ */
+function refusalText(body: unknown): string | undefined {
+  if (body === null || typeof body !== "object") return undefined;
+  const { tips, message, code } = body as {
+    tips?: unknown;
+    message?: unknown;
+    code?: unknown;
+  };
+  if (Array.isArray(tips)) {
+    const lines = tips.filter((t): t is string => typeof t === "string" && t !== "");
+    if (lines.length > 0) return lines.join(" ");
+  }
+  if (typeof message === "string" && message !== "" && message !== code) {
+    return message;
+  }
+  if (typeof code === "string" && code !== "") return `LangWatch refused: ${code}`;
+  return undefined;
+}

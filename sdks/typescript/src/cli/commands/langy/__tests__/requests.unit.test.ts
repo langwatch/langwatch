@@ -153,6 +153,27 @@ describe("given the share-control command", () => {
       });
       await expect(api.list()).rejects.toBeInstanceOf(ShareControlError);
     });
+
+    it("prints the tips of a v1 refusal, never the bare code", async () => {
+      const { impl } = fakeFetch({
+        "/api/v1/langy/control/requests": {
+          status: 403,
+          body: {
+            code: "langy_local_request_invalid",
+            message: "langy_local_request_invalid",
+            tips: ["This request was cancelled.", "Ask Langy again."],
+          },
+        },
+      });
+      const api = createControlApi({
+        endpoint: ENDPOINT,
+        apiKey: "sk-lw-abc",
+        fetchImpl: impl,
+      });
+      await expect(api.list()).rejects.toThrow(
+        "This request was cancelled. Ask Langy again.",
+      );
+    });
   });
 
   describe("when one request is open", () => {
