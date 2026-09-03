@@ -19,6 +19,9 @@ import {
 import type { DataPrivacyResolutionService } from "@langwatch/data-privacy-server";
 import { createTenantId, type FoldProjectionStore } from "@langwatch/eventing";
 import { createLogger, type Logger } from "@langwatch/observability";
+import { FREE_VISIBILITY_DAYS } from "@langwatch/enterprise-licensing-contract";
+import type { PlanProvider } from "@langwatch/entitlement-contract";
+import type { ProjectService } from "@langwatch/project-contract";
 import type { PrismaConnection } from "@langwatch/prisma-client";
 import {
   TraceNotFoundError,
@@ -34,6 +37,7 @@ import {
   ClickHouseTraceService,
   TraceEventDerivationService,
   TraceQueryClassificationAdapter,
+  VisibilityWindowService,
   type Protections,
   type TraceClickHouseWriteResolver,
 } from "@langwatch/trace-server";
@@ -55,6 +59,8 @@ import type { WorkerAutomationSettlementAbsenceReportPort } from "./worker-autom
  * client there is nothing to compose it over, so it refuses BY NAME and the
  * absence is reported here rather than at the first degraded digest.
  */
+const DAY_MS = 24 * 60 * 60 * 1000;
+
 export class WorkerAutomationSettlementTraceReader extends AutomationSettlementTraceReaderPort {
   static create(options: {
     /** The fold this process writes, read back at the same key it wrote. */
@@ -160,16 +166,15 @@ export class WorkerAutomationSettlementTraceReader extends AutomationSettlementT
  * and hides EVERY attribute behind a `*` pattern, because the redact helpers
  * no-op on an empty list and an outage must not be the thing that leaks.
  *
- * The ONE field of the application's resolution this cannot fill is the plan's
- * VISIBILITY WINDOW, which teases content older than the free tier's allowance.
- * It needs the plan source this process does not compose — the same absence
- * `withoutPlanResolvedPersistCap` and `withoutWebhookEntitlements` name — and
- * the two available defaults are each wrong in a way this one is not: an
- * unconditional free window would tease a PAID organization's rows and every
- * self-hosted deployment's, and refusing the whole read would keep three
- * capabilities shut over a field that cannot fire here. Both callers read a
- * trace that has just settled a match, so the window's cutoff is always in the
- * past relative to it. Stated rather than silently dropped.
+ * The plan's VISIBILITY WINDOW is filled too, from the same provider the
+ * interactive process resolves it from, and it fails CLOSED the same way: a
+ * project that resolves to no organization and a plan lookup that throws both
+ * apply the FREE tier's window rather than answering "unbounded", because a
+ * leak is irreversible and over-teasing is a refresh away. It cannot actually
+ * fire on either path that reaches this reader — the digest fallback and the
+ * dataset row both read a trace that has just settled a match, so the cutoff is
+ * always in its past — but a field left blank because it happens to be
+ * unreachable is a field that leaks the day a caller reaches it.
  */
 export class WorkerTraceRecordReader {
   static create(options: {
@@ -183,6 +188,17 @@ export class WorkerTraceRecordReader {
     resolveClickHouseClient: TraceClickHouseWriteResolver;
     /** The project's resolved content policy, from this process's own graph. */
     dataPrivacy: DataPrivacyResolutionService;
+    /**
+     * Which plan the project's organization is on, and the directory that
+     * answers which organization that is.
+     *
+     * Not optional: both are composed over the same typed client this read is,
+     * so a graph that can read a record can always answer the window — and a
+     * record read that quietly skipped the window would return a free
+     * organization's aged content unteased.
+     */
+    plans: PlanProvider;
+    projects: Pick<ProjectService, "getOrganizationId">;
     /** The SAME stateless derivation the record pipeline canonicalises with. */
     traceCanonicalisation: TraceCanonicalisationService;
     logger?: Logger;
@@ -197,6 +213,8 @@ export class WorkerTraceRecordReader {
         traceCanonicalisation: options.traceCanonicalisation,
       }),
       options.dataPrivacy,
+      new VisibilityWindowService(options.plans),
+      options.projects,
       options.logger ?? createLogger("langwatch:automation:trace-record"),
     );
   }
@@ -204,8 +222,31 @@ export class WorkerTraceRecordReader {
   private constructor(
     private readonly reads: ClickHouseTraceService,
     private readonly dataPrivacy: DataPrivacyResolutionService,
+    private readonly window: VisibilityWindowService,
+    private readonly projects: Pick<ProjectService, "getOrganizationId">,
     private readonly logger: Logger,
   ) {}
+
+  /**
+   * The plan's cutoff for one project, failing CLOSED.
+   *
+   * The interactive process makes the identical decision one file away; the two
+   * must agree, because a customer whose aged content is teased in the trace
+   * view and copied verbatim into a dataset has not been protected at all.
+   */
+  private async visibilityCutoffMs(projectId: string): Promise<number | null> {
+    try {
+      const organizationId = await this.projects.getOrganizationId(projectId);
+      return await this.window.getVisibilityCutoffMs({ organizationId });
+    } catch (error) {
+      this.logger.error(
+        { projectId, error },
+        "visibility window failing closed: plan resolution failed",
+      );
+
+      return Date.now() - FREE_VISIBILITY_DAYS * DAY_MS;
+    }
+  }
 
   async getById(input: { projectId: string; traceId: string }): Promise<TraceRecord> {
     const protections = await this.protections(input.projectId);
@@ -225,6 +266,7 @@ export class WorkerTraceRecordReader {
   /** What a background process may read of one project's captured content. */
   private async protections(projectId: string): Promise<Protections> {
     const visibleTo = "members of this project";
+    const visibilityCutoffMs = await this.visibilityCutoffMs(projectId);
     try {
       const policy = await this.dataPrivacy.getResolvedForProject({ projectId });
       const restricted = policy.customAttributes.filter((rule) => rule.disposition === "restrict");
@@ -257,6 +299,7 @@ export class WorkerTraceRecordReader {
           visibleTo,
           canSee: false,
         })),
+        visibilityCutoffMs,
       };
     } catch (error) {
       this.logger.error(
@@ -271,6 +314,7 @@ export class WorkerTraceRecordReader {
         capturedInputVisibleTo: null,
         capturedOutputVisibleTo: null,
         hiddenAttributes: [{ pattern: "*", visibleTo }],
+        visibilityCutoffMs,
       };
     }
   }

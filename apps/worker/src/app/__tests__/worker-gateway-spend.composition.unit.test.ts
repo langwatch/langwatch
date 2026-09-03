@@ -5,6 +5,7 @@ import { resolveWorkerConfig } from "../../platform/config/worker.config";
 import {
   createWorkerGatewaySpend,
   dispatchWebhookThrough,
+  resolveWebhookPlan,
   WorkerGatewaySpendAbsenceReportPort,
 } from "../worker-gateway-spend.composition";
 import { createWorkerProcessDatabase } from "./support/worker-database.double";
@@ -181,7 +182,7 @@ describe("given the spend spine and the governance signal log this process compo
      * given the instance directory a graph that opened its own ClickHouse
      * connection holds, the sweeper mounts.
      *
-     * @scenario "The settlement sweeper is declared absent, not silently skipped" */
+     * @scenario "The settlement sweeper mounts once the graph can enumerate its endpoints" */
     it("mounts the settlement sweeper once it is handed the instance directory", () => {
       reset();
       const definition = compose(
@@ -259,6 +260,75 @@ describe("given the spend spine and the governance signal log this process compo
 
       expect(RECORDED.absences).not.toContain("endpointSecretKey");
     });
+
+    /** @scenario "A webhook batch is gated on the plan this deployment resolves" */
+    it("declares the missing entitlement graph rather than guessing an answer", () => {
+      reset();
+      compose();
+
+      expect(RECORDED.absences).toContain("webhookEntitlements");
+    });
+  });
+});
+
+describe("given the entitlement the webhook delivery gate reads", () => {
+  describe("when this process composed no plan provider", () => {
+    /**
+     * The gate awaits `getPlan` before a batch leaves, so a REJECTION stops the
+     * delivery. Answering a plan here would be the two failures the report
+     * names: a paid feature delivered to an organization that did not buy it,
+     * or silence for one that did.
+     *
+     * @scenario "A webhook batch is gated on the plan this deployment resolves" */
+    it("refuses by name rather than answering a plan nobody can stand behind", async () => {
+      reset();
+      const getPlan = resolveWebhookPlan({ absence: new RecordingAbsence() } as never);
+
+      await expect(getPlan("organization_1")).rejects.toThrow(/composes no entitlement graph/);
+      expect(RECORDED.absences).toEqual(["webhookEntitlements"]);
+    });
+  });
+
+  describe("when this process composed one", () => {
+    /** @scenario "A webhook batch is gated on the plan this deployment resolves" */
+    it("answers the organization's own entitlement and declares no absence", async () => {
+      reset();
+      const asked: string[] = [];
+      const getPlan = resolveWebhookPlan({
+        absence: new RecordingAbsence(),
+        plans: {
+          getActivePlan: async ({ organizationId }: { organizationId: string }) => {
+            asked.push(organizationId);
+            return { webhookEndpointsEnabled: true };
+          },
+        },
+      } as never);
+
+      await expect(getPlan("organization_1")).resolves.toMatchObject({
+        webhookEndpointsEnabled: true,
+      });
+      expect(asked).toEqual(["organization_1"]);
+      expect(RECORDED.absences).toEqual([]);
+    });
+
+    /**
+     * The gate reads `webhookEndpointsEnabled !== true`, so an organization
+     * whose plan does not carry the entitlement must come back as a plan that
+     * says so rather than as a rejection — a rejection is the graph being
+     * absent, and the two are different incidents.
+     *
+     * @scenario "A webhook batch is gated on the plan this deployment resolves" */
+    it("answers a plan without the entitlement rather than refusing", async () => {
+      reset();
+      const getPlan = resolveWebhookPlan({
+        absence: new RecordingAbsence(),
+        plans: { getActivePlan: async () => ({ free: true }) },
+      } as never);
+
+      await expect(getPlan("organization_1")).resolves.not.toMatchObject({
+        webhookEndpointsEnabled: true,
+      });
+    });
   });
 });
 
@@ -304,7 +374,10 @@ describe("given a webhook endpoint's last hop", () => {
       reset();
       const { dispatch, sent } = dispatcher();
 
-      const result = await dispatch({ ...batch, destination: { kind: "http", url: "https://receiver.test/hook" } } as never);
+      const result = await dispatch({
+        ...batch,
+        destination: { kind: "http", url: "https://receiver.test/hook" },
+      } as never);
 
       expect(sent).toHaveLength(1);
       expect(sent[0]).toMatchObject({

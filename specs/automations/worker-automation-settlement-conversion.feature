@@ -77,9 +77,51 @@ Feature: The background worker owns automation settlement
       lacks
 
   @unit
-  Scenario: An annotation-queue automation is refused by the package it needs
+  Scenario: Content older than the plan's window is teased in this process too
+    Given a project whose organization is on a plan with a visibility window
+    When the full record for a trace older than that window is read
+    Then its captured content comes back teased rather than whole
+    And the same trace is read whole for a plan that carries no window
+    And a plan that cannot be resolved applies the free tier's window rather
+      than answering unbounded
+    And the window is asked for under the organization the project belongs to
+
+  @unit
+  Scenario: A confirmed match is held to the ceiling this project's plan grants
+    Given a project whose organization is on a plan with its own daily ceiling
+    When a confirmed match is persisted through the pipeline's own intent handler
+    Then a match past that ceiling is skipped and the breach is recorded against
+      the ceiling the plan granted
+    And a match with room inside it is appended
+    And the plan-resolved ceiling is no longer reported as a capability this
+      process lacks
+
+  @unit
+  Scenario: A confirmed match is queued for annotation from this process
     Given an active automation that queues matched traces for annotation
     When a confirmed match is persisted through the pipeline's own intent handler
-    Then the match is refused by name, naming the package this process does not
-      depend on
+    Then the annotators the automation names are checked against this project
+    And the trace is queued only after this process's own storage confirms the
+      project holds it
+    And the automation is stamped as having run
+    And the annotation-queue write is no longer reported as a capability this
+      process lacks
+
+  @unit
+  Scenario: An annotation-queue automation whose annotator cannot be read is refused once
+    Given an active automation naming an annotator that is neither a queue nor a
+      member
+    When a confirmed match is persisted through the pipeline's own intent handler
+    Then the match is refused terminally rather than retried on every
+      redelivery
+    And the refusal names the reference the automation carries
+    And nothing is queued and the automation is not stamped as having run
+
+  @unit
+  Scenario: An annotation-queue automation without a database client is refused
+    Given an active automation that queues matched traces for annotation
+    And a process that opened no database client
+    When a confirmed match is persisted through the pipeline's own intent handler
+    Then the match is refused by name, naming the client the write is composed
+      over
     And nothing is appended and the automation is not stamped as having run

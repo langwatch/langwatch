@@ -278,25 +278,26 @@ export const workerConfigDefinition = RuntimeConfig.define({
     /**
      * The daily ceiling on CONFIRMED persist-class matches, per project.
      *
-     * Three numbers rather than one because the application resolves the tier
-     * from the organization's active plan. This process composes no
-     * entitlement provider — that needs the licence handler and the billing
-     * subscription source — so it settles on the paid ceiling and says so by
-     * name at composition. The free and enterprise numbers are still read, so
-     * a deployment that later hands this process a plan provider changes one
-     * composition line rather than three variables.
+     * Three numbers rather than one because the tier comes from the
+     * organization's active plan, which this process now resolves for itself
+     * whenever it opened a typed Prisma client. A graph without one settles on
+     * the paid number and says so by name.
      *
-     * They are read under the application's own names because the ceiling is a
-     * FLEET fact: a worker counting against a different ceiling than the API
-     * screen displays would skip matches the customer was told were allowed.
+     * **The defaults are the interactive process's own numbers**, because the
+     * ceiling is a FLEET fact and the customer reads it from the other half:
+     * `automation.persistCapUsage` answers the automations screen with the cap
+     * this project resolves to, and a worker enforcing a different one either
+     * skips matches the screen said were allowed or lets through matches it
+     * said were not. They stayed 100/1000/10000 for as long as the ceiling here
+     * was a flat fallback nobody could compare against.
      */
-    persistDailyCapFree: Config.value(z.coerce.number().int().positive().default(100), {
+    persistDailyCapFree: Config.value(z.coerce.number().int().positive().default(50), {
       env: "TRIGGER_PERSIST_DAILY_CAP_FREE",
     }),
-    persistDailyCapPaid: Config.value(z.coerce.number().int().positive().default(1000), {
+    persistDailyCapPaid: Config.value(z.coerce.number().int().positive().default(500), {
       env: "TRIGGER_PERSIST_DAILY_CAP_PAID",
     }),
-    persistDailyCapEnterprise: Config.value(z.coerce.number().int().positive().default(10000), {
+    persistDailyCapEnterprise: Config.value(z.coerce.number().int().positive().default(5000), {
       env: "TRIGGER_PERSIST_DAILY_CAP_ENTERPRISE",
     }),
   },

@@ -39,6 +39,7 @@ import { createGatewayChangeEventsPort } from "@langwatch/gateway-server/composi
 import { WEBHOOK_DELIVERY_PROCESS_NAME } from "@langwatch/enterprise-webhook-server";
 import { GATEWAY_DEBITS_PROCESS_NAME } from "@langwatch/enterprise-governance-server";
 import type { WebhookDispatchRateLimiterPort, WebhookEgressService } from "@langwatch/egress";
+import type { PlanProvider } from "@langwatch/entitlement-contract";
 import { generate } from "@langwatch/ksuid";
 import { createLogger, type Logger } from "@langwatch/observability";
 import type { ProcessStore } from "@langwatch/eventing";
@@ -119,6 +120,16 @@ export type WorkerGatewaySpendCompositionInput = Readonly<{
    * queue endpoint would be the one uncapped destination in the product.
    */
   dispatchRateLimiter?: WebhookDispatchRateLimiterPort;
+  /**
+   * Which plan an organization is on, for the live-delivery gate.
+   *
+   * Webhook endpoints are a paid entitlement, so this decides whether a batch
+   * leaves at all. Absent exactly when this graph composed no typed Prisma
+   * client, in which case the gate refuses rather than guessing — a baseline
+   * answered here would silently stop delivering to organizations that bought
+   * the feature, and an unconditional yes would deliver it to ones that did not.
+   */
+  plans?: PlanProvider;
   /** Governance's two command proxies, published before either installs. */
   governanceCommands: {
     recordVkLifecycle: (data: GovernanceVkLifecycleData) => Promise<void>;
@@ -212,8 +223,7 @@ export function createWorkerGatewaySpend(
     governance,
     spend: {
       buildProcessing: () => spend.buildProcessing() as never,
-      connectSettlement: (sendSettleSpend) =>
-        spend.connectSettlement(sendSettleSpend as never),
+      connectSettlement: (sendSettleSpend) => spend.connectSettlement(sendSettleSpend as never),
     },
   };
 }
@@ -364,15 +374,36 @@ function createWebhookDeliveryDeps(
     }),
     pruneExpiredIdempotencyReceipts: (now) => pruneExpiredIdempotencyReceipts(options, now),
     dispatch: dispatchWebhookThrough(options, logger),
-    getPlan: (organizationId) => {
-      options.absence?.withoutWebhookEntitlements();
-      return Promise.reject(
+    getPlan: resolveWebhookPlan(options),
+  };
+}
+
+/**
+ * The entitlement the delivery gate reads, or the refusal that stands in for it.
+ *
+ * The provider is the deployment's own — the same subscription rows and the
+ * same baseline the interactive process resolves from — so an organization
+ * whose endpoints the settings screen shows as enabled is one this process
+ * actually delivers to. Without it the gate refuses BY NAME: `getPlan` is
+ * awaited before a batch leaves, so a rejection stops the delivery instead of
+ * answering a plan nobody can stand behind.
+ */
+export function resolveWebhookPlan(
+  options: WorkerGatewaySpendCompositionInput,
+): WebhookDeliveryProcessDeps["getPlan"] {
+  const plans = options.plans;
+  if (!plans) {
+    options.absence?.withoutWebhookEntitlements();
+
+    return (organizationId) =>
+      Promise.reject(
         new Error(
           `Webhook delivery for organization ${organizationId} asked for its plan, and this process composes no entitlement graph; a plan answered here would either deliver a paid feature to an organization that did not buy it or silently stop delivering to one that did.`,
         ),
       );
-    },
-  };
+  }
+
+  return (organizationId) => plans.getActivePlan({ organizationId });
 }
 
 /**

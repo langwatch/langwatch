@@ -49,15 +49,89 @@ function openPolicy() {
   } as never;
 }
 
-function recordReader(resolve: ReturnType<typeof clickHouse>["resolve"]) {
+/** One organization's plan, at the two shapes the window reads. */
+function planOf(visibilityDays: number | null) {
+  return {
+    getActivePlan: async () => ({ visibilityDays }) as never,
+  } as never;
+}
+
+const PROJECT_DIRECTORY = { getOrganizationId: async () => "org-1" } as never;
+
+function recordReader(
+  resolve: ReturnType<typeof clickHouse>["resolve"],
+  plans: ReturnType<typeof planOf> = planOf(null),
+) {
   return WorkerTraceRecordReader.create({
     // The packaged read declares the generated client by type and reads no row
     // through it on this path, so the double carries no delegate.
     connection: { client: {} } as never,
     resolveClickHouseClient: resolve,
     dataPrivacy: openPolicy(),
+    plans,
+    projects: PROJECT_DIRECTORY,
     traceCanonicalisation: TraceCanonicalisationService.create(),
   });
+}
+
+/**
+ * Long enough that the teaser actually truncates it.
+ *
+ * `teaserOf` keeps `max(50, min(300, 10%))` characters, so a short fixture
+ * comes back whole and a test asserting on its text would pass whether the
+ * window fired or not. The `redacted_by_visibility_window` flag is asserted
+ * beside the truncation for the same reason.
+ */
+const AGED_INPUT = `how do I reset my password? ${"the customer wrote a great deal more. ".repeat(20)}`;
+
+/**
+ * A ClickHouse double that answers the summary read and nothing else.
+ *
+ * The joined record read issues two queries — light summaries, then the heavy
+ * `stored_spans` scan bounded by them — and only the first is fixtured here:
+ * the trace-level teaser is what the plan's window decides, and a span list
+ * would only re-assert the pass that runs over it.
+ */
+function clickHouseWithAgedTrace() {
+  const startedAt = Date.now() - 365 * 24 * 60 * 60 * 1000;
+  const summaryRow = {
+    ts_TraceId: "trace-1",
+    ts_SpanCount: 1,
+    ts_TotalDurationMs: 10,
+    ts_ComputedIOSchemaVersion: "1",
+    ts_ComputedInput: JSON.stringify({ value: AGED_INPUT }),
+    ts_ComputedOutput: JSON.stringify({ value: "open the settings page" }),
+    ts_TimeToFirstTokenMs: null,
+    ts_TimeToLastTokenMs: null,
+    ts_TokensPerSecond: null,
+    ts_ContainsErrorStatus: false,
+    ts_ContainsOKStatus: true,
+    ts_ErrorMessage: null,
+    ts_Models: [],
+    ts_TotalCost: null,
+    ts_NonBilledCost: null,
+    ts_TokensEstimated: false,
+    ts_TotalPromptTokenCount: null,
+    ts_TotalCompletionTokenCount: null,
+    ts_TopicId: null,
+    ts_SubTopicId: null,
+    ts_HasAnnotation: null,
+    ts_AnnotationIds: [],
+    ts_Attributes: {},
+    ts_TraceName: null,
+    ts_OccurredAt: startedAt,
+    ts_CreatedAt: startedAt,
+    ts_UpdatedAt: startedAt,
+  };
+
+  return {
+    resolve: (async () => ({
+      insert: async () => undefined,
+      query: async (request: { query: string }) => ({
+        json: async () => (request.query.includes("ts_TraceId") ? [summaryRow] : []),
+      }),
+    })) as never,
+  };
 }
 
 function recordingAbsence(into: string[]) {
@@ -179,6 +253,8 @@ describe("given the trace reads automation settlement makes in this process", ()
             throw new Error("privacy store unreachable");
           },
         } as never,
+        plans: planOf(null),
+        projects: PROJECT_DIRECTORY,
         traceCanonicalisation: TraceCanonicalisationService.create(),
         logger: {
           error: (fields: Record<string, unknown>) => errors.push(fields),
@@ -193,6 +269,95 @@ describe("given the trace reads automation settlement makes in this process", ()
       ).rejects.toBeInstanceOf(TraceNotFoundError);
       expect(errors).toHaveLength(1);
       expect(errors[0]).toMatchObject({ projectId: "project-1" });
+    });
+  });
+
+  describe("when the project's plan carries a visibility window", () => {
+    /**
+     * The window is the plan's, and on this read it is load-bearing: the
+     * redaction pass the legacy read runs teases a trace whose start is before
+     * the cutoff. Unfilled, a free organization's aged conversation would be
+     * copied verbatim into a dataset row by this process while the product's
+     * own trace view teases it.
+     */
+    /** @scenario "Content older than the plan's window is teased in this process too" */
+    it("teases a trace older than the plan's window", async () => {
+      const ch = clickHouseWithAgedTrace();
+      const reader = recordReader(ch.resolve, planOf(14));
+
+      const trace = await reader.getById({ projectId: "project-1", traceId: "trace-1" });
+
+      expect(String(trace.input?.value ?? "")).not.toContain(AGED_INPUT);
+      expect(trace.redacted_by_visibility_window).toBe(true);
+    });
+
+    /** @scenario "Content older than the plan's window is teased in this process too" */
+    it("leaves the same trace alone for a plan with no window", async () => {
+      const ch = clickHouseWithAgedTrace();
+      const reader = recordReader(ch.resolve, planOf(null));
+
+      const trace = await reader.getById({ projectId: "project-1", traceId: "trace-1" });
+
+      expect(String(trace.input?.value ?? "")).toContain(AGED_INPUT);
+      expect(trace.redacted_by_visibility_window ?? false).toBe(false);
+    });
+
+    /**
+     * A leak is irreversible and over-teasing is a refresh away, so a plan
+     * lookup that throws applies the FREE tier's window rather than answering
+     * "unbounded" — the identical fallback the interactive process makes.
+     */
+    /** @scenario "Content older than the plan's window is teased in this process too" */
+    it("fails closed to the free window when the plan cannot be resolved", async () => {
+      const errors: Array<Record<string, unknown>> = [];
+      const ch = clickHouseWithAgedTrace();
+      const reader = WorkerTraceRecordReader.create({
+        connection: { client: {} } as never,
+        resolveClickHouseClient: ch.resolve,
+        dataPrivacy: openPolicy(),
+        plans: {
+          getActivePlan: async () => {
+            throw new Error("plan store unreachable");
+          },
+        } as never,
+        projects: PROJECT_DIRECTORY,
+        traceCanonicalisation: TraceCanonicalisationService.create(),
+        logger: {
+          error: (fields: Record<string, unknown>) => errors.push(fields),
+          warn: () => undefined,
+          info: () => undefined,
+          debug: () => undefined,
+        } as never,
+      });
+
+      const trace = await reader.getById({ projectId: "project-1", traceId: "trace-1" });
+
+      expect(trace.redacted_by_visibility_window).toBe(true);
+      expect(errors).toHaveLength(1);
+      expect(errors[0]).toMatchObject({ projectId: "project-1" });
+    });
+
+    /** @scenario "Content older than the plan's window is teased in this process too" */
+    it("asks for the window under the organization the project belongs to", async () => {
+      const asked: string[] = [];
+      const ch = clickHouseWithAgedTrace();
+      const reader = WorkerTraceRecordReader.create({
+        connection: { client: {} } as never,
+        resolveClickHouseClient: ch.resolve,
+        dataPrivacy: openPolicy(),
+        plans: {
+          getActivePlan: async ({ organizationId }: { organizationId: string }) => {
+            asked.push(organizationId);
+            return { visibilityDays: null };
+          },
+        } as never,
+        projects: PROJECT_DIRECTORY,
+        traceCanonicalisation: TraceCanonicalisationService.create(),
+      });
+
+      await reader.getById({ projectId: "project-1", traceId: "trace-1" });
+
+      expect(asked).toEqual(["org-1"]);
     });
   });
 

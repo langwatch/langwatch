@@ -1,5 +1,10 @@
+import {
+  AnnotationAnnotatorReferenceInvalidError,
+  createOrUpdateQueueItems,
+} from "@langwatch/annotation-server";
 import type {
   AutomationPersistCapBreach,
+  AutomationPlanProvider,
   DatasetActionParams,
 } from "@langwatch/automation-contract";
 import type { DatasetRecordEntry } from "@langwatch/dataset-contract";
@@ -7,6 +12,7 @@ import {
   AutomationClockPort,
   AutomationDatasetMapperPort,
   AutomationPersistActionService,
+  AutomationPersistCapService,
   AutomationPersistActionWriterPort,
   AutomationScheduledIntentPort,
   AutomationSettlementBreachPort,
@@ -39,6 +45,7 @@ import type { DatasetService } from "@langwatch/dataset-contract";
 import type { EvaluationRunData } from "@langwatch/evaluation-contract";
 import { DispatchError } from "@langwatch/eventing";
 import { createLogger, type Logger } from "@langwatch/observability";
+import type { ProjectService } from "@langwatch/project-contract";
 import type { RedisConnection } from "@langwatch/redis-client";
 import {
   mapTraceToDatasetEntry,
@@ -76,6 +83,25 @@ export type WorkerAutomationSettlementCompositionOptions = Readonly<{
    * which case the record it would map cannot be read either.
    */
   datasets?: WorkerAutomationDatasetWriter | undefined;
+  /**
+   * Where an `ADD_TO_ANNOTATION_QUEUE` automation puts the trace it settled.
+   *
+   * Annotation's own queueing call plus the existence check it asks for, which
+   * is trace storage's answer rather than Annotation's. Absent exactly when
+   * this graph composed no typed Prisma client, since the queue rows and the
+   * project and organization directories the write authorizes against are all
+   * on it.
+   */
+  annotations?: WorkerAutomationAnnotationWriter | undefined;
+  /**
+   * Which plan a project's organization is on, for the daily persist ceiling.
+   *
+   * Absent exactly when this graph composed no typed Prisma client — the
+   * subscription rows the ceiling's tier is read from and the project directory
+   * it is resolved through are both on it — in which case the ceiling falls
+   * back to the paid tier and says so.
+   */
+  plans?: WorkerAutomationPlanSource | undefined;
   redis?: RedisConnection | null;
   absence?: WorkerAutomationSettlementAbsenceReportPort;
   logger?: Logger;
@@ -108,6 +134,35 @@ export type AutomationSettlementNotifications = AutomationSettlementDeliveryComp
  * process that settles matches from having to compose the upload half.
  */
 export type WorkerAutomationDatasetWriter = Pick<DatasetService, "batchCreateRecords">;
+
+/**
+ * The annotation-queue write, and the trace-existence check it asks for.
+ *
+ * Both members are named off `createOrUpdateQueueItems` rather than restated,
+ * so this process cannot drift from the call it makes: `annotations` is
+ * Annotation's own service and `findExistingTraceIds` is the answer Annotation
+ * deliberately does NOT give itself — which trace ids a project actually holds
+ * is trace storage's question, and answering it anywhere else would queue items
+ * a reviewer can open and never read.
+ */
+/**
+ * The plan lookup behind the persist ceiling, and the directory it goes through.
+ *
+ * Two collaborators rather than one because the ceiling is keyed by PROJECT and
+ * a plan is bought by an ORGANIZATION: `AutomationPersistCapService` owns that
+ * hop, along with the ten-minute cache and the fall back to the paid tier when
+ * the lookup itself fails — so a plan-store outage loosens the ceiling for one
+ * dispatch instead of skipping a customer's matches.
+ */
+export type WorkerAutomationPlanSource = Readonly<{
+  plans: AutomationPlanProvider;
+  projects: ProjectService;
+}>;
+
+export type WorkerAutomationAnnotationWriter = Readonly<{
+  annotations: Parameters<typeof createOrUpdateQueueItems>[0]["annotations"];
+  findExistingTraceIds: Parameters<typeof createOrUpdateQueueItems>[0]["findExistingTraceIds"];
+}>;
 
 /**
  * What this process CANNOT do about a settled match, said once at composition.
@@ -156,10 +211,13 @@ export abstract class WorkerAutomationSettlementAbsenceReportPort {
   /**
    * `ADD_TO_ANNOTATION_QUEUE`, whose writer is Annotation's own service.
    *
-   * `createOrUpdateQueueItems` is exported from `@langwatch/annotation-server`
-   * and every collaborator it takes is one this process holds. The package is
-   * not a dependency of this one, and adding one is a manifest change rather
-   * than wiring — so the action is refused BY NAME here.
+   * `createOrUpdateQueueItems` is `@langwatch/annotation-server`'s — the SAME
+   * call the application made, including the id hygiene it owns: blanks are
+   * dropped, a repeated id survives once so a rerun does not un-finish a
+   * reviewer's work, and an id no trace answers to is skipped rather than
+   * queued as an item nobody can get past. Absent exactly when this graph
+   * composed no typed Prisma client, which is also when the annotator
+   * directories the write authorizes against cannot be read.
    */
   abstract withoutAnnotationQueuePersist(): void;
 
@@ -172,7 +230,15 @@ export abstract class WorkerAutomationSettlementAbsenceReportPort {
    */
   abstract withoutRunawayContainment(): void;
 
-  /** The plan lookup behind the daily persist ceiling; the paid tier is used. */
+  /**
+   * The plan lookup behind the daily persist ceiling.
+   *
+   * Reported when this graph composed no typed Prisma client, which is when the
+   * subscription rows a tier is read from cannot be reached. The ceiling then
+   * settles on the PAID tier for every project, which is deliberately the
+   * generous answer: a background process that guessed low would skip confirmed
+   * matches a customer had bought the right to keep.
+   */
   abstract withoutPlanResolvedPersistCap(): void;
 
   /** The graph-alert evaluator the 30-second sweep re-evaluates through. */
@@ -216,16 +282,34 @@ export function createWorkerAutomationSettlement(
   if (!options.notifications) absence?.withoutNotificationDelivery();
   absence?.withoutLegacyFilterMatching();
   if (!options.datasets) absence?.withoutDatasetPersist();
-  absence?.withoutAnnotationQueuePersist();
+  if (!options.annotations) absence?.withoutAnnotationQueuePersist();
   absence?.withoutRunawayContainment();
-  absence?.withoutPlanResolvedPersistCap();
+  if (!options.plans) absence?.withoutPlanResolvedPersistCap();
 
+  // The ceiling's tier, resolved through Automation's own cap service so that
+  // the hop from project to organization, the contract override and the
+  // ten-minute cache are the ones the interactive process uses. Only the
+  // resolution is taken: the COUNTING stays on the ledger's Redis slot, and two
+  // services counting the same slot would give one fleet two tallies.
+  const persistCaps = options.plans
+    ? AutomationPersistCapService.create({
+        projects: options.plans.projects,
+        planProvider: options.plans.plans,
+        config: {
+          free: options.config.automation.persistDailyCapFree,
+          paid: options.config.automation.persistDailyCapPaid,
+          enterprise: options.config.automation.persistDailyCapEnterprise,
+        },
+      })
+    : undefined;
   const ledger = PostgresAutomationSettlementLedgerAdapter.create({
     prisma: options.prisma,
     clock: options.clock,
     redis: options.redis ?? null,
-    // The paid ceiling, stated rather than resolved. See the config leaf.
-    persistCap: { kind: "fixed", cap: options.config.automation.persistDailyCapPaid },
+    persistCap: persistCaps
+      ? { kind: "resolved", resolve: (projectId) => persistCaps.resolvePersistDailyCap(projectId) }
+      : // The paid ceiling, stated rather than resolved. See the config leaf.
+        { kind: "fixed", cap: options.config.automation.persistDailyCapPaid },
     breach: new LoggedSettlementBreach(logger),
   });
   const notifications = options.notifications ?? unavailableNotifications();
@@ -244,7 +328,7 @@ export function createWorkerAutomationSettlement(
       projects: options.projects,
       traces: options.traces,
       mapper: new WorkerAutomationDatasetMapper(),
-      writer: new WorkerAutomationPersistActionWriter(options.datasets),
+      writer: new WorkerAutomationPersistActionWriter(options.datasets, options.annotations),
     }),
     delivery: notifications.delivery,
     emailCaps: notifications.emailCaps,
@@ -396,32 +480,60 @@ class WorkerAutomationDatasetMapper extends AutomationDatasetMapperPort {
 }
 
 /**
- * The two persist writes: the dataset append for real, the queue by name.
+ * The two persist writes, both of them the feature's own packaged call.
  *
  * The dataset half is Dataset's own `batchCreateRecords`, which is the one call
  * the application made — including the chunked `s3_jsonl` branch, because the
  * service is composed with this process's own storage resolver rather than
  * with the Postgres half alone.
  *
- * The annotation half refuses, and the refusal names a MANIFEST line rather
- * than a missing capability: `createOrUpdateQueueItems` is exported from
- * `@langwatch/annotation-server`, `PostgresAnnotationAdapter` takes a database,
- * a project service and an organization service — all three of which this
- * process holds — and the package is simply not a dependency of this one.
+ * The annotation half is Annotation's own `createOrUpdateQueueItems`, so a
+ * trace queued by an automation lands as the same item, with the same
+ * annotator validation and the same id hygiene, as one a reviewer queues by
+ * hand. Neither half re-implements anything: what this class owns is the
+ * refusal when a graph was composed without the client both writes stand on.
  */
 class WorkerAutomationPersistActionWriter extends AutomationPersistActionWriterPort {
-  constructor(private readonly datasets: WorkerAutomationDatasetWriter | undefined) {
+  constructor(
+    private readonly datasets: WorkerAutomationDatasetWriter | undefined,
+    private readonly annotations: WorkerAutomationAnnotationWriter | undefined,
+  ) {
     super();
   }
 
-  addToAnnotationQueue(): Promise<void> {
-    return Promise.reject(
-      new DispatchError({
+  async addToAnnotationQueue(input: {
+    traceIds: string[];
+    projectId: string;
+    annotators: string[];
+    userId: string;
+  }): Promise<void> {
+    const annotations = this.annotations;
+    if (!annotations) {
+      throw new DispatchError({
         message:
-          "This process composes no annotation queue writer, so an automation cannot add a trace to one from here: the queueing service is packaged and every collaborator it takes is one this process holds, but `@langwatch/annotation-server` is not a dependency of this process, so nothing here can import it.",
+          "This process composes no annotation queue writer, so an automation cannot add a trace to one from here: the queueing service is composed over the typed Prisma client this graph was given, and it was given none.",
         retryable: false,
-      }),
-    );
+      });
+    }
+
+    try {
+      await createOrUpdateQueueItems({ ...input, ...annotations });
+    } catch (error) {
+      // Annotation answers a caller who sent a malformed annotator reference
+      // with a 400, which is right for the surface a person typed it into and
+      // wrong for this one: the reference is SAVED on the automation, so it
+      // parses the same way on every redelivery. Settlement retries anything
+      // that is not a terminal `DispatchError`, so left alone this would be a
+      // page that fails forever. Named terminally instead, so it dead-letters
+      // once with the reference in the message.
+      if (error instanceof AnnotationAnnotatorReferenceInvalidError) {
+        throw new DispatchError({
+          message: `This automation names an annotator that parses as neither a queue nor a member (${String(error.meta?.annotator ?? "")}), so a queue item cannot be written for it. Re-save the automation with a queue or a member that still exists.`,
+          retryable: false,
+        });
+      }
+      throw error;
+    }
   }
 
   async addToDataset(input: {

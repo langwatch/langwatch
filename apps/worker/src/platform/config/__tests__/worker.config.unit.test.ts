@@ -44,9 +44,11 @@ describe("resolveWorkerConfig", () => {
       automation: {
         emailHourlyCap: 100,
         tenantDailyCap: 10_000,
-        persistDailyCapFree: 100,
-        persistDailyCapPaid: 1_000,
-        persistDailyCapEnterprise: 10_000,
+        // The interactive process's own numbers, because the ceiling is a
+        // fleet fact and the customer reads it from the automations screen.
+        persistDailyCapFree: 50,
+        persistDailyCapPaid: 500,
+        persistDailyCapEnterprise: 5_000,
       },
       // The epoch cache is OFF unless a deployment opts in, and there is no
       // demo project unless one is named. Both are read at the API tier's

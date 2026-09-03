@@ -259,9 +259,9 @@ describe("resolveWorkerConfig automation leaves", () => {
         emailHourlyCap: 7,
         tenantDailyCap: 70,
         credentialsEncryptionKey: "ab".repeat(32),
-        persistDailyCapFree: 100,
-        persistDailyCapPaid: 1000,
-        persistDailyCapEnterprise: 10000,
+        persistDailyCapFree: 50,
+        persistDailyCapPaid: 500,
+        persistDailyCapEnterprise: 5000,
       });
       expect(config.mail?.unsubscribeSigningSecret).toBe("0f".repeat(32));
     });
@@ -274,9 +274,9 @@ describe("resolveWorkerConfig automation leaves", () => {
         emailHourlyCap: 100,
         tenantDailyCap: 10000,
         credentialsEncryptionKey: "0f".repeat(32),
-        persistDailyCapFree: 100,
-        persistDailyCapPaid: 1000,
-        persistDailyCapEnterprise: 10000,
+        persistDailyCapFree: 50,
+        persistDailyCapPaid: 500,
+        persistDailyCapEnterprise: 5000,
       });
     });
   });

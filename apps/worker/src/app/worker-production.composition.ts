@@ -11,6 +11,7 @@ import type { Logger } from "@langwatch/observability";
 import type { ProcessObservability } from "@langwatch/observability/node";
 import type { PrismaConnection } from "@langwatch/prisma-client";
 import { ResourceScope } from "@langwatch/runtime-composition";
+import { PostgresAnnotationAdapter } from "@langwatch/annotation-server";
 import {
   type AgentSandboxKeyReapDatabase,
   PostgresAgentSandboxKeyReapAdapter,
@@ -65,6 +66,7 @@ import {
   RedisBillingTenantOrganizationCacheAdapter,
   StripeUsageReportingAdapter,
   BillingTenantOrganizationService,
+  PostgresBillingAdapter,
   type BillingReportingDatabase,
   type BillingTenantOrganizationDatabase,
 } from "@langwatch/enterprise-billing-server";
@@ -161,6 +163,7 @@ import {
 } from "@langwatch/automation-server";
 import { ExperimentEventingAdapter } from "@langwatch/experiment-server";
 import {
+  ClickHouseTraceExistenceRepository,
   ClickHouseTraceStoredSpanReaderAdapter,
   TraceProcessingServerInstaller,
 } from "@langwatch/trace-server";
@@ -179,6 +182,10 @@ import {
   tryCreateWorkerTenancy,
   WorkerTenancyAbsenceReportPort,
 } from "./worker-tenancy.composition";
+import {
+  createWorkerPlanProvider,
+  LoggedWorkerEntitlementAbsence,
+} from "./worker-plan-provider.composition";
 import {
   createWorkerEvaluationProcessing,
   WorkerEvaluationAbsenceReportPort,
@@ -647,6 +654,25 @@ export class WorkerProductionComposition {
     // process appends through its two commands and receives them as the
     // installer's own late-bound proxies. Ordering is enforced again at install
     // time by `orderedFeatureInstallers`.
+    // Which plan an organization is on, composed ONCE for the three questions
+    // this process asks of it: whether a webhook batch may leave, how many
+    // confirmed matches an automation may persist in a day, and how far back a
+    // trace's captured content stays unteased.
+    //
+    // One provider rather than three because all three are the same fleet fact.
+    // It resolves from the deployment's own subscription rows and the same
+    // baseline the interactive process starts from — see the composition, which
+    // also names the one line the two roots still write twice.
+    const plans = options.connection
+      ? createWorkerPlanProvider({
+          isSaas: options.config.deployment.saas,
+          subscriptions: PostgresBillingAdapter.create(options.connection.client).build()
+            .subscriptions,
+          ...(options.observability
+            ? { report: LoggedWorkerEntitlementAbsence.create(options.observability.logger) }
+            : {}),
+        })
+      : undefined;
     const gatewayAbsence = WorkerProductionComposition.gatewayAbsence(options);
     const governanceEventsInstaller = GovernanceEventsWorkerFeatureInstaller.create({
       installer: { buildProcessing: () => gatewaySpendGraph.governance.buildProcessing() },
@@ -672,6 +698,7 @@ export class WorkerProductionComposition {
         recordBudgetCrossing: (data) =>
           governanceEventsInstaller.commands.recordBudgetCrossing(data),
       },
+      ...(plans ? { plans } : {}),
       ...(gatewayAbsence ? { absence: gatewayAbsence } : {}),
       ...(options.observability ? { logger: options.observability.logger } : {}),
     });
@@ -1002,24 +1029,51 @@ export class WorkerProductionComposition {
     // without the read has nothing to write, and a read without the writer
     // still serves the digest's fallback, which is why the read is the one that
     // is passed on its own.
-    const traceRecords = options.connection
-      ? WorkerTraceRecordReader.create({
-          connection: options.connection,
-          resolveClickHouseClient: options.eventing
-            .resolveClickHouseClient as unknown as Parameters<
-            typeof WorkerTraceRecordReader.create
-          >[0]["resolveClickHouseClient"],
-          dataPrivacy: traceServices.dataPrivacy,
-          traceCanonicalisation,
-          ...(options.observability ? { logger: options.observability.logger } : {}),
-        })
-      : undefined;
+    const traceRecords =
+      options.connection && plans && tenancy
+        ? WorkerTraceRecordReader.create({
+            connection: options.connection,
+            resolveClickHouseClient: options.eventing
+              .resolveClickHouseClient as unknown as Parameters<
+              typeof WorkerTraceRecordReader.create
+            >[0]["resolveClickHouseClient"],
+            dataPrivacy: traceServices.dataPrivacy,
+            plans,
+            projects: tenancy.projects,
+            traceCanonicalisation,
+            ...(options.observability ? { logger: options.observability.logger } : {}),
+          })
+        : undefined;
     const automationDatasets =
       options.connection && traceRecords
         ? createWorkerDatasetWrites({
             database: options.connection.client,
             storage: objectStorage,
           })
+        : undefined;
+    // `ADD_TO_ANNOTATION_QUEUE`'s write, on the same typed client the dataset
+    // half stands on — but NOT on the record read, because a queue item is a
+    // trace id and a pointer rather than a copy of the content.
+    //
+    // Which of the ids sent address a trace this project holds is trace
+    // storage's answer, not Annotation's — the same split the application made,
+    // over this process's own ClickHouse.
+    const traceExistence = ClickHouseTraceExistenceRepository.create({
+      resolveClient: options.eventing.resolveClickHouseClient as unknown as Parameters<
+        typeof ClickHouseTraceExistenceRepository.create
+      >[0]["resolveClient"],
+    });
+    const automationAnnotations =
+      options.connection && tenancy
+        ? {
+            annotations: PostgresAnnotationAdapter.create({
+              database: options.connection.client,
+              projects: tenancy.projects,
+              organizations: tenancy.organizations,
+            }).build(),
+            findExistingTraceIds: (input: { projectId: string; traceIds: string[] }) =>
+              traceExistence.findExistingTraceIds(input),
+          }
         : undefined;
     // ONE trace reader for both halves of this process's Automation work.
     // The settlement digest and Evaluation's alert subscriber ask it the same
@@ -1046,6 +1100,8 @@ export class WorkerProductionComposition {
         projects: traceServices.projects,
         traces: settlementTraceReader,
         ...(automationDatasets ? { datasets: automationDatasets } : {}),
+        ...(automationAnnotations ? { annotations: automationAnnotations } : {}),
+        ...(plans && tenancy ? { plans: { plans, projects: tenancy.projects } } : {}),
         evaluations: WorkerAutomationSettlementEvaluationReader.create({
           resolveClickHouse: options.eventing.resolveClickHouseClient as unknown as Parameters<
             typeof WorkerAutomationSettlementEvaluationReader.create
@@ -2065,8 +2121,8 @@ export class LoggedWorkerGatewaySpendAbsence extends WorkerGatewaySpendAbsenceRe
 
   withoutWebhookEntitlements(): void {
     this.logger.warn(
-      { reason: "no-plan-source" },
-      "worker composed webhook delivery without an entitlement graph: what is missing is the PLAN SOURCE, a signed licence or a subscription row, which no process in this deployment composes — so the batch is refused rather than delivered to an organization that may not have bought the feature, and a baseline plan answered here would silently stop delivering to organizations that did",
+      { reason: "no-typed-prisma-connection" },
+      "worker composed webhook delivery without an entitlement graph: the plan is resolved from the deployment's own subscription rows over the typed Prisma client this graph was given none of, so the batch is refused rather than delivered to an organization that may not have bought the feature, and a baseline plan answered here would silently stop delivering to organizations that did",
     );
   }
 
@@ -2135,8 +2191,8 @@ export class LoggedWorkerAutomationSettlementAbsence extends WorkerAutomationSet
 
   withoutAnnotationQueuePersist(): void {
     this.logger.warn(
-      { reason: "annotation-server-not-a-dependency" },
-      "worker composed automation settlement without an annotation queue writer: createOrUpdateQueueItems is exported from @langwatch/annotation-server and every collaborator it takes is one this process holds, but that package is not a dependency of this one, so an ADD_TO_ANNOTATION_QUEUE automation is refused by name",
+      { reason: "no-typed-prisma-connection" },
+      "worker composed automation settlement without an annotation queue writer: the write is Annotation's own createOrUpdateQueueItems over the typed Prisma client this graph was given none of, so an ADD_TO_ANNOTATION_QUEUE automation is refused by name",
     );
   }
 
@@ -2148,8 +2204,8 @@ export class LoggedWorkerAutomationSettlementAbsence extends WorkerAutomationSet
 
   withoutPlanResolvedPersistCap(): void {
     this.logger.warn(
-      { reason: "no-plan-source" },
-      "worker composed automation settlement without an entitlement provider: the same missing PLAN SOURCE the webhook gate names, so the daily persist ceiling is the paid tier for every project rather than the one its plan grants — which is deliberately the generous answer, because a baseline provider composed here would drop every project to the free ceiling instead",
+      { reason: "no-typed-prisma-connection" },
+      "worker composed automation settlement without a plan-resolved persist ceiling: the tier is read from the deployment's own subscription rows over the typed Prisma client this graph was given none of, so the daily ceiling is the paid tier for every project rather than the one its plan grants — deliberately the generous answer, because a background process that guessed low would skip confirmed matches a customer had bought the right to keep",
     );
   }
 

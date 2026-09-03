@@ -14120,3 +14120,219 @@ workspace edge; `pnpm-lock.yaml` +28 / −16, no network.
   in eight web, server and contract packages were left alone. They are comments naming a
   tree that has been deleted for days; correcting them is a sweep, and it belongs
   to whoever owns those files.
+
+## The worker learns which plan a customer is on, and queues for annotation, 2026-09-03
+
+Two closures the last two audits each left one line short, and they turned out
+to be one closure and three. `withoutAnnotationQueuePersist` needed a manifest
+line. `withoutWebhookEntitlements`, `withoutPlanResolvedPersistCap` and the
+trace record reader's visibility window all named the same missing PLAN
+SOURCE — and the third of those was not merely unfilled. It was a leak.
+
+### 1. The annotation queue: the manifest line, spent
+
+`@langwatch/annotation-server` is a dependency of `apps/worker` now, and the
+composition the audit wrote out is composed. Nothing was rediscovered; the paste
+was correct. Two things were added to it.
+
+```
+BEFORE                                      AFTER
+
+ AutomationPersistActionService              AutomationPersistActionService
+   writer                                      writer
+     addToDataset ─ DatasetService               addToDataset ─ DatasetService
+     addToAnnotationQueue ─ REFUSES              addToAnnotationQueue
+       "annotation-server is not a                 └─ createOrUpdateQueueItems
+        dependency of this process"                    (@langwatch/annotation-server)
+                                                        ├─ annotations
+                                                        │    PostgresAnnotationAdapter
+                                                        │      database      connection.client
+                                                        │      projects      tenancy.projects
+                                                        │      organizations tenancy.organizations
+                                                        └─ findExistingTraceIds
+                                                             ClickHouseTraceExistenceRepository
+                                                               over resolveClickHouseClient
+```
+
+**The absence is kept and re-aimed.** It now fires on the same gate as the
+dataset half — no typed Prisma client — rather than on a manifest fact that is
+no longer true. A graph with a client composes both; one without refuses both,
+by name.
+
+**A 400 became a terminal refusal, deliberately.** `createOrUpdateQueueItems`
+raises `AnnotationAnnotatorReferenceInvalidError` for an annotator that parses as
+neither `queue-<id>` nor `user-<id>`. That is the right answer for the surface a
+person typed it into and the wrong one here: settlement's
+`recordTraceFailure` treats anything that is not a terminal `DispatchError` as
+retryable (`trigger-settlement-persistence.service.ts:241`), and the reference is
+SAVED on the automation, so it parses the same way on every redelivery. Left
+alone this is a page that fails forever. It is translated at the composition seam
+into a terminal refusal naming the reference, so it dead-letters once.
+
+The fixture that found it was wrong too: `ANNOTATION_TRIGGER_ROW` carried
+`user_ada`, which the grammar rejects. It had never been exercised, because the
+write refused before the parse.
+
+### 2. The plan source: one provider, three consumers
+
+`apps/api` resolves a plan in `resolvePlanProvider`
+(`api-production.composition.ts:3164`), which calls `composeApiPlanProvider`
+(`api-usage.composition.ts:151`). **That function cannot be called from here** —
+it lives inside the interactive application, which a background process must not
+import — so what the worker gained is the same COLLABORATORS, from the same
+packages, behind a composition of its own.
+
+Three manifest lines, and no new configuration at all:
+
+```json
+    "@langwatch/annotation-server": "workspace:*",
+    "@langwatch/enterprise-licensing-contract": "workspace:*",
+    "@langwatch/entitlement-server": "workspace:*",
+```
+
+`pnpm install --offline` resolved all three from the store; **no network was
+needed.** `@langwatch/enterprise-billing-server` (the subscription rows and
+`SaaSPlanProviderService`), `@langwatch/enterprise-billing-contract`
+(`getFreePlanLimits`) and `@langwatch/entitlement-contract` were already
+dependencies, and `worker.config.ts` already read both inputs — `IS_SAAS` as
+`deployment.saas` and `ADMIN_EMAILS` as `deployment.adminEmails` — at the App's
+own spelling, with a byte-identical parse.
+
+```
+                          config.deployment.saas ( IS_SAAS )
+                                    │
+                                    ▼
+                        createWorkerPlanProvider
+                          EntitlementService
+                            baseline   isSaas ? getFreePlanLimits()
+                            │                 : UNLIMITED_PLAN
+                            subscription  ◄── PostgresBillingAdapter(connection.client)
+                            │                   .subscriptions
+                            enrichers  applyPlanTypeEntitlements
+                                    │
+              ┌─────────────────────┼─────────────────────┐
+              ▼                     ▼                     ▼
+   webhook delivery gate    persist ceiling        visibility window
+   getPlan(orgId)           AutomationPersistCap   VisibilityWindowService
+     .webhookEndpoints        Service                 .getVisibilityCutoffMs
+      Enabled !== true        resolvePersistDaily     → Protections
+      ⇒ batch stays            Cap(projectId)            .visibilityCutoffMs
+```
+
+**`adminEmails` is deliberately not passed.** It feeds one field —
+`overrideAddingLimitations`, for an operator impersonating a member — and no
+call site in this process supplies a user at all. A list threaded here would be
+a collaborator nothing can reach. (The standalone API passes `[]` for the same
+field, so the two agree.)
+
+### 3. The one that was a leak, not a gap
+
+The record read's `Protections.visibilityCutoffMs` is **load-bearing on the
+legacy read this process makes**, and the previous record did not know it. It is
+consumed inside `applyTraceProtections` and `applySpanProtections`
+(`trace-read-redaction.service.ts:237,286,400`), which
+`ClickHouseTraceService.getTracesWithSpans` calls on every row it returns.
+
+So for as long as the field was left unset, this process read a free-tier
+organization's year-old conversation **whole** and copied it verbatim into a
+dataset row, while the product's own trace view teased the same content. It is
+filled now, and it fails CLOSED exactly as the interactive process does: a
+project that resolves to no organization and a plan lookup that throws both
+apply the free tier's window rather than answering "unbounded".
+
+### 4. The number that disagreed — customer-visible
+
+`worker.config.ts` said its persist ceilings were read "under the application's
+own names because the ceiling is a FLEET fact", and then defaulted to
+**100 / 1000 / 10000** where `apps/api` states **50 / 500 / 5000** inline
+(`api-automation.composition.ts:75`). The API's number is the one the customer
+reads — `automation.persistCapUsage` returns `resolvePersistDailyCap` to the
+automations screen — so the two have disagreed the whole time, invisibly,
+because the worker's ceiling was a flat fallback nothing could be compared
+against.
+
+Resolving the tier makes the disagreement live, so the defaults are now the
+interactive process's. **A free project's effective daily ceiling drops from
+1000 to 50**, which is the ceiling it was sold and the one its screen displays.
+A deployment that set `TRIGGER_PERSIST_DAILY_CAP_*` keeps its own values.
+
+### File → change
+
+| File | Change |
+| --- | --- |
+| `apps/worker/package.json` | Three dependencies: `annotation-server`, `enterprise-licensing-contract`, `entitlement-server` |
+| `apps/worker/src/app/worker-plan-provider.composition.ts` | **New.** `createWorkerPlanProvider`, the absence port for `licence`/`subscription`, and the subscription source as Entitlements' neutral port |
+| `apps/worker/src/app/worker-automation-settlement.composition.ts` | The annotation writer and `createOrUpdateQueueItems`; the annotator 400 translated terminally; `plans` on the options and `AutomationPersistCapService` behind a `{kind:"resolved"}` ceiling; two absence docs re-aimed |
+| `apps/worker/src/app/worker-automation-settlement-reads.composition.ts` | `WorkerTraceRecordReader` takes the provider and the project directory, fills `visibilityCutoffMs` and fails closed to `FREE_VISIBILITY_DAYS` |
+| `apps/worker/src/app/worker-gateway-spend.composition.ts` | `plans` on the options; `resolveWebhookPlan` is the gate or the named refusal, exported for the same reason `dispatchWebhookThrough` is |
+| `apps/worker/src/app/worker-production.composition.ts` | The provider composed once over `connection.client`; threaded to all three; the annotation writer and the trace-existence repository composed; three absence messages corrected |
+| `apps/worker/src/platform/config/worker.config.ts` | The three persist ceilings default to the interactive process's numbers |
+| `specs/automations/worker-plan-resolution.feature` | **New.** 4 scenarios, deliberately the ones `api-usage.composition.unit.test.ts` asserts |
+| `specs/automations/worker-automation-settlement-conversion.feature` | 8 → 12 scenarios: the queue write, the two refusals, the window and the plan-resolved ceiling |
+| `specs/ai-gateway/worker-gateway-spend-conversion.feature` | The webhook plan gate; and the sweeper-mount scenario, unbound at HEAD, is bound |
+| `apps/worker/src/app/__tests__/worker-plan-provider.composition.unit.test.ts` | **New.** 10 tests |
+| three worker composition tests + `worker.config.unit.test.ts` | Doubles and expectations for all of the above |
+
+### Judgment calls, recorded
+
+1. **The policy line is written twice, and a test holds it — not a type.**
+   `baseline: isSaas ? getFreePlanLimits() : UNLIMITED_PLAN`, the subscription
+   source over it and the one enricher are `composeApiPlanProvider`'s too. They
+   cannot be one function today: the API's copy is inside the interactive
+   application, and the only sound shared home reaches the enterprise billing
+   and licensing tiers, which no feature package carries. So
+   `worker-plan-provider.composition.unit.test.ts` asserts the SAME resolutions
+   `api-usage.composition.unit.test.ts` asserts, on the same fixtures — if
+   either root's policy moves, the pair of suites disagrees rather than
+   production disagreeing with itself. **The follow-up that removes the copy is
+   a `deploymentBaselinePlan({ isSaas })` in
+   `@langwatch/enterprise-licensing-contract`**, which already owns one of the
+   two baselines and is a contract package both roots may depend on.
+2. **`applyPlanTypeEntitlements` is carried and is inert.** It fills a tier's
+   entitlement only where the resolved plan left it undefined, and the one
+   field it maps is already set by `PLAN_LIMITS[ENTERPRISE]`. It is kept
+   because it is the seam a NEW tier entitlement lands on, and it must land on
+   both roots at once. This is true of the API's composition as well.
+3. **The three absences are kept, re-aimed at the client.** All three now fire
+   on "this graph opened no typed Prisma client", which is the only way the
+   provider can be missing — not on "no process in this deployment composes a
+   plan source", which has stopped being true.
+4. **Only the RESOLUTION was taken from `AutomationPersistCapService`.** The
+   slot COUNTING stays on the ledger's Redis key; two services counting the
+   same slot would give one fleet two tallies.
+
+### Gates
+
+- `apps/worker`: `tsc --noEmit` and `tsc --noEmit -p tsconfig.test.json` — **0
+  errors each**. `vitest run src/app src/platform` — **45 files / 409 tests, all
+  passing** (up from 44 / 384).
+- `packages/architecture-lint` — **38 files / 495 tests**, including the
+  frontend-boundary walk over the new `annotation-server`,
+  `entitlement-server` and `enterprise-licensing-contract` value imports.
+- Feature parity: `worker-automation-settlement-conversion` **12/12**,
+  `worker-plan-resolution` **4/4**, `worker-gateway-spend-conversion` **7/7** —
+  all bound.
+- `oxlint` over the eleven touched files — clean except the seven pre-existing
+  unused-import warnings in `worker-production.composition.ts`, none in an
+  edited region. `oxfmt` — clean.
+- **Six sabotages, five landed and one did not, which was the point.** Dropping
+  `options.annotations` from the writer fails 3; deleting the annotator-error
+  translation fails the terminal-refusal test; forcing the baseline to the free
+  plan fails 2; removing `visibilityCutoffMs` from the protections fails 2;
+  reverting the ceiling to the fixed paid number fails 1; answering the webhook
+  gate `true` unconditionally fails 2. **Emptying `enrichers` failed nothing** —
+  which is how judgment call 2 was found, and a test that had asserted the
+  enricher's effect was rewritten to assert the subscription path that actually
+  produces it.
+
+### What this pass did NOT do
+
+- **`apps/api` was not touched.** The duplicated policy line is recorded above
+  with the package that should own it; collapsing it edits a file another lane
+  holds.
+- **No licence source was composed.** Neither process reads one; both report
+  `absent("licence")`, and the enterprise composition in this process
+  (`@langwatch/enterprise-worker`) contains only governance.
+- **`adminEmails` is read and not used.** See above — the field it feeds is
+  unreachable without a user, and no consumer here supplies one.
+- **Nothing under `platform/` was created, edited or read.**

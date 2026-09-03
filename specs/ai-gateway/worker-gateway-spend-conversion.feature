@@ -71,3 +71,11 @@ Feature: The worker mounts the gateway spend and governance signal pipelines
       When the worker dispatches a batch to it and composed no AWS transport
       Then the delivery is refused terminally and the absence is named
       But a worker that owns the process's AWS transport builds the queue transport instead
+
+    @unit
+    Scenario: A webhook batch is gated on the plan this deployment resolves
+      Given a worker that opened its own database client
+      When a batch is about to be delivered for an organization
+      Then the organization's own plan decides whether the endpoint is enabled
+      And a worker that opened no client refuses the batch and names the absence
+        rather than answering a plan it cannot resolve

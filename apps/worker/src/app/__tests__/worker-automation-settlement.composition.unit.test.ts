@@ -3,6 +3,7 @@ import { describe, expect, it } from "vitest";
 import {
   AutomationClockPort,
   AutomationEmailCapService,
+  AutomationPersistCapService,
   AutomationTraceRecordUnavailableError,
 } from "@langwatch/automation-server";
 import { ReactEmailMailRenderer } from "@langwatch/mail";
@@ -43,8 +44,29 @@ const RECORDED: {
     projectId: string;
     entries: Array<Record<string, unknown>>;
   }>;
+  annotatorChecks: Array<{ projectId: string; queueIds: string[]; userIds: string[] }>;
+  existenceChecks: Array<{ projectId: string; traceIds: string[] }>;
+  queueItems: Array<{
+    projectId: string;
+    traceIds: string[];
+    queueIds: string[];
+    userIds: string[];
+    createdByUserId: string;
+  }>;
+  breaches: Array<{ cap: number; count: number; skipped: number }>;
   captured: string[];
-} = { absences: [], mail: [], claims: [], lastRunAt: [], datasetAppends: [], captured: [] };
+} = {
+  breaches: [],
+  absences: [],
+  mail: [],
+  claims: [],
+  lastRunAt: [],
+  datasetAppends: [],
+  annotatorChecks: [],
+  existenceChecks: [],
+  queueItems: [],
+  captured: [],
+};
 
 function reset(): void {
   RECORDED.absences.length = 0;
@@ -52,7 +74,14 @@ function reset(): void {
   RECORDED.claims.length = 0;
   RECORDED.lastRunAt.length = 0;
   RECORDED.datasetAppends.length = 0;
+  RECORDED.annotatorChecks.length = 0;
+  RECORDED.existenceChecks.length = 0;
+  RECORDED.queueItems.length = 0;
+  RECORDED.breaches.length = 0;
   RECORDED.captured.length = 0;
+  // The cap service caches a project's resolved ceiling for ten minutes in a
+  // module-level map, and counts its slots in another. Both outlive a test.
+  AutomationPersistCapService.resetMemoryStore();
 }
 
 /**
@@ -64,6 +93,11 @@ function recordingLogger() {
   return {
     error: (fields: Record<string, unknown>) => {
       if (typeof fields.error === "string") RECORDED.captured.push(fields.error);
+      if (typeof fields.cap === "number") {
+        RECORDED.breaches.push(
+          fields as unknown as { cap: number; count: number; skipped: number },
+        );
+      }
     },
     warn: () => undefined,
     info: () => undefined,
@@ -208,13 +242,29 @@ const DATASET_TRIGGER_ROW: TriggerRow = {
   },
 };
 
-/** The same automation again, written to queue its matches for annotation. */
+/**
+ * The same automation again, written to queue its matches for annotation.
+ *
+ * The annotator id carries the `user-`/`queue-` prefix the reference grammar
+ * is written in, because that grammar is Annotation's and this process must
+ * send what Annotation parses rather than what it would have parsed itself.
+ */
 const ANNOTATION_TRIGGER_ROW: TriggerRow = {
   ...TRIGGER_ROW,
   id: "trigger-3",
   action: "ADD_TO_ANNOTATION_QUEUE",
   actionParams: {
-    annotators: [{ id: "user_ada", name: "Ada" }],
+    annotators: [{ id: "user-ada", name: "Ada" }],
+    createdByUserId: "user_ada",
+  },
+};
+
+/** The same automation, saved against an annotator the grammar cannot read. */
+const UNPARSEABLE_ANNOTATOR_TRIGGER_ROW: TriggerRow = {
+  ...ANNOTATION_TRIGGER_ROW,
+  id: "trigger-4",
+  actionParams: {
+    annotators: [{ id: "ada", name: "Ada" }],
     createdByUserId: "user_ada",
   },
 };
@@ -240,6 +290,11 @@ const TRACE_RECORD = {
 type ComposeOverrides = {
   notifications?: boolean;
   datasets?: boolean;
+  /** The organization plan the daily persist ceiling is resolved from. */
+  plan?: { type: string; free: boolean; maxTriggerPersistDispatchesPerDay?: number };
+  annotations?: boolean;
+  /** Which trace ids this process's own storage says the project holds. */
+  heldTraceIds?: string[];
   trigger?: TriggerRow;
 };
 
@@ -280,6 +335,17 @@ function compose(over: ComposeOverrides = {}) {
     evaluations: { findRunsByTraceId: async () => [] } as never,
     heartbeat: { tryResolveClickHouseClient: async () => null } as never,
     ...(over.datasets === true ? { datasets: recordingDatasets() } : {}),
+    ...(over.annotations === true
+      ? { annotations: recordingAnnotations(over.heldTraceIds ?? ["trace-1"]) }
+      : {}),
+    ...(over.plan
+      ? {
+          plans: {
+            plans: { getActivePlan: async () => over.plan! },
+            projects: { getOrganizationId: async () => "org-1" },
+          } as never,
+        }
+      : {}),
     redis: null,
     absence: new RecordingAbsence(),
     logger: recordingLogger(),
@@ -296,6 +362,43 @@ function recordingDatasets() {
     }) => {
       RECORDED.datasetAppends.push(input);
       return [];
+    },
+  } as never;
+}
+
+/**
+ * Annotation's own service and the existence check it asks somebody else for.
+ *
+ * Both are recorded rather than asserted here: what this file is proving is
+ * that the composition reaches Annotation's PACKAGED call — which is what
+ * parses the annotator references, drops the ids this project does not hold and
+ * upserts the items — rather than a second queueing implementation written in
+ * this process. The two doubles stand where the Postgres adapter and the
+ * ClickHouse repository stand in production.
+ */
+function recordingAnnotations(heldTraceIds: readonly string[]) {
+  return {
+    annotations: {
+      assertAnnotatorReferences: async (input: {
+        projectId: string;
+        queueIds: string[];
+        userIds: string[];
+      }) => {
+        RECORDED.annotatorChecks.push(input);
+      },
+      createQueueItems: async (input: {
+        projectId: string;
+        traceIds: string[];
+        queueIds: string[];
+        userIds: string[];
+        createdByUserId: string;
+      }) => {
+        RECORDED.queueItems.push(input);
+      },
+    },
+    findExistingTraceIds: async (input: { projectId: string; traceIds: string[] }) => {
+      RECORDED.existenceChecks.push({ projectId: input.projectId, traceIds: [...input.traceIds] });
+      return input.traceIds.filter((traceId) => heldTraceIds.includes(traceId));
     },
   } as never;
 }
@@ -525,8 +628,173 @@ describe("given the automations pipeline this process composes for itself", () =
   });
 
   describe("when a confirmed match is queued for annotation", () => {
-    /** @scenario "An annotation-queue automation is refused by the package it needs" */
-    it("refuses by naming the package that is not a dependency of this process", async () => {
+    /** @scenario "A confirmed match is queued for annotation from this process" */
+    it("stops reporting the annotation-queue write as absent once the writer is composed", () => {
+      reset();
+      build({ annotations: true, trigger: ANNOTATION_TRIGGER_ROW });
+
+      expect(RECORDED.absences).not.toContain("annotationQueuePersist");
+    });
+
+    /** @scenario "A confirmed match is queued for annotation from this process" */
+    it("checks the annotators against the project and queues the trace it holds", async () => {
+      reset();
+      const settlement = build({
+        annotations: true,
+        trigger: ANNOTATION_TRIGGER_ROW,
+      }).processManagers.get("triggerSettlement");
+      if (!settlement) throw new Error("the pipeline registered no triggerSettlement");
+
+      await settlement.config.intents.persistMatch!.run(
+        { triggerId: "trigger-3", traceIds: ["trace-1"], boundary: 1 } as never,
+        { projectId: "project-1", messageKey: "persist:1", attempt: 1 } as never,
+      );
+
+      // The `user_ada` annotator reached the service as a USER reference, which
+      // is Annotation's own parse of the `user-`/`queue-` grammar — a second
+      // implementation here would be free to disagree with it.
+      expect(RECORDED.annotatorChecks).toEqual([
+        { projectId: "project-1", queueIds: [], userIds: ["ada"] },
+      ]);
+      expect(RECORDED.existenceChecks).toEqual([{ projectId: "project-1", traceIds: ["trace-1"] }]);
+      expect(RECORDED.queueItems).toEqual([
+        {
+          projectId: "project-1",
+          traceIds: ["trace-1"],
+          queueIds: [],
+          userIds: ["ada"],
+          createdByUserId: "user_ada",
+        },
+      ]);
+      expect(RECORDED.captured).toEqual([]);
+      expect(RECORDED.lastRunAt).toEqual([{ triggerId: "trigger-3", projectId: "project-1" }]);
+    });
+
+    /**
+     * The existence check is not decoration. An id this project does not hold
+     * becomes a queue item a reviewer can open, cannot read and cannot get
+     * past, so the packaged call drops it — and the drop is asserted here so a
+     * composition that answered the check from Annotation's own tables, or
+     * skipped it, is caught.
+     */
+    /** @scenario "A confirmed match is queued for annotation from this process" */
+    it("queues nothing for a trace this process's own storage does not hold", async () => {
+      reset();
+      const settlement = build({
+        annotations: true,
+        heldTraceIds: [],
+        trigger: ANNOTATION_TRIGGER_ROW,
+      }).processManagers.get("triggerSettlement");
+      if (!settlement) throw new Error("the pipeline registered no triggerSettlement");
+
+      await settlement.config.intents.persistMatch!.run(
+        { triggerId: "trigger-3", traceIds: ["trace-1"], boundary: 1 } as never,
+        { projectId: "project-1", messageKey: "persist:1", attempt: 1 } as never,
+      );
+
+      expect(RECORDED.existenceChecks).toHaveLength(1);
+      expect(RECORDED.queueItems).toEqual([
+        {
+          projectId: "project-1",
+          traceIds: [],
+          queueIds: [],
+          userIds: ["ada"],
+          createdByUserId: "user_ada",
+        },
+      ]);
+    });
+  });
+
+  describe("when the project's plan carries its own daily persist ceiling", () => {
+    /** @scenario "A confirmed match is held to the ceiling this project's plan grants" */
+    it("stops reporting the plan-resolved ceiling as absent once the provider is composed", () => {
+      reset();
+      build({ plan: { type: "LAUNCH", free: false } });
+
+      expect(RECORDED.absences).not.toContain("planResolvedPersistCap");
+    });
+
+    /**
+     * The ceiling the plan grants, not the paid one this process used to assume.
+     * A contract override of zero is the sharpest fixture available: it can only
+     * come from the plan, so a composition that ignored the provider and kept
+     * the fixed paid number would let the match through.
+     */
+    /** @scenario "A confirmed match is held to the ceiling this project's plan grants" */
+    it("skips a confirmed match past the ceiling the project's own plan grants", async () => {
+      reset();
+      const settlement = build({
+        datasets: true,
+        plan: { type: "FREE", free: true, maxTriggerPersistDispatchesPerDay: 0 },
+        trigger: DATASET_TRIGGER_ROW,
+      }).processManagers.get("triggerSettlement");
+      if (!settlement) throw new Error("the pipeline registered no triggerSettlement");
+
+      await settlement.config.intents.persistMatch!.run(
+        { triggerId: "trigger-2", traceIds: ["trace-1"], boundary: 1 } as never,
+        { projectId: "project-1", messageKey: "persist:1", attempt: 1 } as never,
+      );
+
+      expect(RECORDED.datasetAppends).toEqual([]);
+      expect(RECORDED.lastRunAt).toEqual([]);
+      expect(RECORDED.breaches).toHaveLength(1);
+      expect(RECORDED.breaches[0]).toMatchObject({ cap: 0, skipped: 1 });
+    });
+
+    /** @scenario "A confirmed match is held to the ceiling this project's plan grants" */
+    it("appends the match when the plan's ceiling has room", async () => {
+      reset();
+      const settlement = build({
+        datasets: true,
+        plan: { type: "LAUNCH", free: false },
+        trigger: DATASET_TRIGGER_ROW,
+      }).processManagers.get("triggerSettlement");
+      if (!settlement) throw new Error("the pipeline registered no triggerSettlement");
+
+      await settlement.config.intents.persistMatch!.run(
+        { triggerId: "trigger-2", traceIds: ["trace-1"], boundary: 1 } as never,
+        { projectId: "project-1", messageKey: "persist:1", attempt: 1 } as never,
+      );
+
+      expect(RECORDED.datasetAppends).toHaveLength(1);
+      expect(RECORDED.breaches).toEqual([]);
+    });
+  });
+
+  describe("when the automation names an annotator the grammar cannot read", () => {
+    /**
+     * The reference is SAVED on the automation, so it parses the same way on
+     * every redelivery. Annotation answers a caller with a 400 and settlement
+     * retries anything that is not a terminal refusal, so a composition that
+     * passed the 400 through would build a page that fails forever.
+     */
+    /** @scenario "An annotation-queue automation whose annotator cannot be read is refused once" */
+    it("refuses terminally, naming the reference the automation carries", async () => {
+      reset();
+      const settlement = build({
+        annotations: true,
+        trigger: UNPARSEABLE_ANNOTATOR_TRIGGER_ROW,
+      }).processManagers.get("triggerSettlement");
+      if (!settlement) throw new Error("the pipeline registered no triggerSettlement");
+
+      await settlement.config.intents.persistMatch!.run(
+        { triggerId: "trigger-4", traceIds: ["trace-1"], boundary: 1 } as never,
+        { projectId: "project-1", messageKey: "persist:1", attempt: 1 } as never,
+      );
+
+      // Captured means the page dead-lettered rather than being re-thrown for
+      // redelivery, which is the whole point of the translation.
+      expect(RECORDED.captured).toHaveLength(1);
+      expect(RECORDED.captured[0]).toContain("parses as neither a queue nor a member");
+      expect(RECORDED.captured[0]).toContain("(ada)");
+      expect(RECORDED.queueItems).toEqual([]);
+      expect(RECORDED.lastRunAt).toEqual([]);
+    });
+  });
+
+  describe("when a confirmed match is queued for annotation by a process with no client", () => {
+    /** @scenario "An annotation-queue automation without a database client is refused" */
+    it("refuses by naming the client the write is composed over", async () => {
       reset();
       const settlement = build({
         datasets: true,
@@ -540,10 +808,11 @@ describe("given the automations pipeline this process composes for itself", () =
       );
 
       expect(RECORDED.captured).toHaveLength(1);
-      expect(RECORDED.captured[0]).toContain("@langwatch/annotation-server");
-      expect(RECORDED.captured[0]).toContain("is not a dependency of this process");
-      // Nothing was appended and nothing was stamped: a refusal must not look
-      // like a match that ran.
+      expect(RECORDED.captured[0]).toContain("composes no annotation queue writer");
+      expect(RECORDED.captured[0]).toContain("typed Prisma client this graph was given");
+      // Nothing was queued, nothing was appended and nothing was stamped: a
+      // refusal must not look like a match that ran.
+      expect(RECORDED.queueItems).toEqual([]);
       expect(RECORDED.datasetAppends).toEqual([]);
       expect(RECORDED.lastRunAt).toEqual([]);
     });
