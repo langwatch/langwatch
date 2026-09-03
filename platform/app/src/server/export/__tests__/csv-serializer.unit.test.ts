@@ -644,10 +644,6 @@ describe("when an export spans several batches", () => {
   });
 });
 
-// ---------------------------------------------------------------------------
-// Spreadsheet formula injection
-// ---------------------------------------------------------------------------
-
 /**
  * These files exist to be opened in a spreadsheet, and a cell opening with `=`
  * is a formula Excel and Sheets run on the reader's machine. RFC 4180 quoting
@@ -664,46 +660,50 @@ describe("when an export spans several batches", () => {
 describe("spreadsheet formula injection", () => {
   const FORMULA = "=cmd|' /c calc'!A1";
 
-  it("defuses a formula in a trace input cell", () => {
-    const csv = serializeTracesToSummaryCsv({
-      traces: [buildTrace({ input: { value: FORMULA } })],
-      evaluatorNames: [],
+  describe("when a typed value opens like a formula", () => {
+    it("defuses it in a trace input cell", () => {
+      const csv = serializeTracesToSummaryCsv({
+        traces: [buildTrace({ input: { value: FORMULA } })],
+        evaluatorNames: [],
+      });
+
+      const rows = parseCsv(csv).data as Record<string, string>[];
+      expect(rows[0]?.input).toBe(`'${FORMULA}`);
     });
 
-    const rows = parseCsv(csv).data as Record<string, string>[];
-    expect(rows[0]?.input).toBe(`'${FORMULA}`);
+    it("defuses it in a column heading the project named", () => {
+      const csv = serializeTracesToSummaryCsv({
+        traces: [buildTrace()],
+        evaluatorNames: [FORMULA],
+      });
+
+      expect(csv.split("\r\n")[0]).toContain(`'${FORMULA}_score`);
+    });
+
+    it("defuses it in a span cell in full mode", () => {
+      const csv = serializeTracesToFullCsv({
+        traces: [
+          buildTrace({
+            spans: [buildLLMSpan({ output: { type: "text", value: FORMULA } })],
+          }),
+        ],
+        evaluatorNames: [],
+      });
+
+      const rows = parseCsv(csv).data as Record<string, string>[];
+      expect(rows[0]?.span_output).toBe(`'${FORMULA}`);
+    });
   });
 
-  it("defuses a formula in a column heading the project named", () => {
-    const csv = serializeTracesToSummaryCsv({
-      traces: [buildTrace()],
-      evaluatorNames: [FORMULA],
+  describe("when a cell is a negative number", () => {
+    it("leaves it alone so a number column stays numeric", () => {
+      const csv = serializeTracesToSummaryCsv({
+        traces: [buildTrace({ output: { value: "-5" } })],
+        evaluatorNames: [],
+      });
+
+      const rows = parseCsv(csv).data as Record<string, string>[];
+      expect(rows[0]?.output).toBe("-5");
     });
-
-    expect(csv.split("\r\n")[0]).toContain(`'${FORMULA}_score`);
-  });
-
-  it("leaves a negative number alone so a number column stays numeric", () => {
-    const csv = serializeTracesToSummaryCsv({
-      traces: [buildTrace({ output: { value: "-5" } })],
-      evaluatorNames: [],
-    });
-
-    const rows = parseCsv(csv).data as Record<string, string>[];
-    expect(rows[0]?.output).toBe("-5");
-  });
-
-  it("defuses a formula in a span cell in full mode", () => {
-    const csv = serializeTracesToFullCsv({
-      traces: [
-        buildTrace({
-          spans: [buildLLMSpan({ output: { type: "text", value: FORMULA } })],
-        }),
-      ],
-      evaluatorNames: [],
-    });
-
-    const rows = parseCsv(csv).data as Record<string, string>[];
-    expect(rows[0]?.span_output).toBe(`'${FORMULA}`);
   });
 });

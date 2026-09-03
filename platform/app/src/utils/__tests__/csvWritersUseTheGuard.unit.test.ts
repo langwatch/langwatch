@@ -74,8 +74,9 @@ const GUARDED_WRITERS: Record<string, string> = {
 
 /**
  * Below this many scanned files, assume the walk broke rather than that the
- * codebase shrank. Without it, a bad root or a thrown readdir reports "no
- * offenders" and the guard is green forever. Roughly 6,000 files match today.
+ * codebase shrank. A missing root throws on its own; this catches the quieter
+ * failure where the walk runs but matches almost nothing. Roughly 6,000 files
+ * match today.
  */
 const SCANNED_FILE_FLOOR = 2000;
 
@@ -98,13 +99,7 @@ const isTest = (relativePath: string): boolean =>
   relativePath.split("/").includes("__tests__");
 
 function sourceFiles(): string[] {
-  return ROOTS.flatMap((root) => {
-    try {
-      return walk(join(PACKAGE_ROOT, root));
-    } catch {
-      return [];
-    }
-  });
+  return ROOTS.flatMap((root) => walk(join(PACKAGE_ROOT, root)));
 }
 
 function callSites(): string[] {
