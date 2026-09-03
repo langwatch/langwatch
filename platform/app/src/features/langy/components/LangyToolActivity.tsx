@@ -93,7 +93,7 @@ const dotPulse = keyframes`
  * The old label table lived here. It is gone.
  *
  * It mapped a tool's NAME to a word — `bash` → "Coding", and anything unmapped
- * to a humanised version of its own name, which is how opencode's `skill` tool
+ * to a humanised version of its own name, which is how the `skill` tool
  * produced a card reading "SKILL / Skill". Both were the same mistake: naming
  * the mechanism where the act belongs. A `bash` running `langwatch trace search`
  * is not "Coding"; it is searching traces, and the command said so all along.

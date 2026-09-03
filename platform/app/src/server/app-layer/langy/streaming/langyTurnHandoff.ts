@@ -58,7 +58,7 @@ export interface LangyTurnHandoff {
    * ADR-048 shutdown-handoff: an opaque, worker-authored resume token from a
    * prior turn that checkpointed on pod termination. Set by the route when it
    * found a pending handoff on the conversation projection; `runTurn` threads it onto
-   * the manager /chat body so opencode resumes from the checkpoint instead of a
+   * the manager /chat body so the worker resumes from the checkpoint instead of a
    * cold start. Absent on a normal turn.
    */
   resumeToken?: string;

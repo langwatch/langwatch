@@ -26,7 +26,7 @@
  *
  * TRANSPORT: Langy calls the `langwatch` CLI, so a live tool call arrives as
  * `langwatch.<resource>.<verb>` — rewritten server-side by the CLI envelope out
- * of the `bash` call opencode actually made. `resolveCliCapability` (below)
+ * of the `bash` call the worker actually made. `resolveCliCapability` (below)
  * resolves EVERY such name to a card: the capability catalog
  * (`capabilityCatalog.ts`) binds the view (surface, noun, body widget) for the
  * resources it lists, and anything it has never heard of — a command the

@@ -25,7 +25,7 @@ export interface LangyMessagesResult {
    * DURABLE truth, not the browser stream. Covers the whole span from
    * message-sent (`active`) through the agent responding (`running`), so it
    * includes the worker cold-start window (the fold only reaches `running` at
-   * `agent_turn_accepted`, after opencode has forked + npm-installed). The
+   * `agent_turn_accepted`, after the worker has forked + npm-installed). The
    * live `useChat` transport only knows a turn is running while its
    * `onTurnStream` subscription is open, and that closes the moment a silent
    * worker stops pushing frames — long before the turn ends. This lets the panel

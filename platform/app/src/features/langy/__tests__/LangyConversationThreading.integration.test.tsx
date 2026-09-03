@@ -4,7 +4,7 @@
  * Regression for #4748: the sidebar must thread the active conversation id
  * into every tRPC turn-start mutation, and adopt the id createConversation
  * returns — otherwise each message forks a brand-new conversation (and a
- * brand-new OpenCode worker, which is keyed by conversation id), silently
+ * brand-new worker, which is keyed by conversation id), silently
  * breaking multi-turn memory.
  *
  * Boundary mocks mirror LangyConversationHistory.integration.test.tsx:

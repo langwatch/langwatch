@@ -11,7 +11,7 @@
  * `MemoryRouter`, shaped like the app: the transcript lives in a LAYOUT route
  * (ProjectLangyLayout's role) and the pages swap in an <Outlet/> beneath it.
  *
- * The fixture is the live transport exactly as the panel receives it: opencode
+ * The fixture is the live transport exactly as the panel receives it: the worker
  * ran the CLI through `bash`, and the server's envelope retyped the call to
  * `langwatch.trace.search` while keeping the shell payload as its input. The
  * row it earns: a carried "Alert me on this" (the search rides to the

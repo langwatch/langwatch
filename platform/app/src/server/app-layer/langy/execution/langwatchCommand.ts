@@ -1,7 +1,7 @@
 /**
  * Recognising a `langwatch` CLI invocation inside a shell command.
  *
- * Langy reaches LangWatch through the `langwatch` CLI, which opencode runs in
+ * Langy reaches LangWatch through the `langwatch` CLI, which the worker runs in
  * its `bash` tool — so what arrives on the wire is a command STRING, and the
  * capability it invoked (`trace search`, `dataset list`) has to be read back out
  * of it. We own the CLI, so its grammar is a contract, not a guess:

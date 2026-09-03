@@ -3,7 +3,7 @@
  *
  * ── WHY THIS EXISTS ─────────────────────────────────────────────────────────
  * Langy's agent keeps a todo list with the `todowrite` tool for multi-step work
- * (AGENTS.md, "How you work"). opencode's `todowrite` is a WHOLE-LIST REWRITE
+ * (AGENTS.md, "How you work"). The `todowrite` tool is a WHOLE-LIST REWRITE
  * per call —
  * `{ todos: [{ content, status }] }`, status ∈ pending | in_progress | completed
  * | cancelled — so the plan already crosses the wire as ordinary tool input and
@@ -18,7 +18,7 @@
  * narration" precedent as `githubProgressFromToolParts`; degrades gracefully.
  */
 
-/** A plan item's lifecycle, mirroring opencode's todo statuses. */
+/** A plan item's lifecycle, mirroring the worker's todo statuses. */
 export type LangyPlanItemStatus =
   | "pending"
   | "in_progress"

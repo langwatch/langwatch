@@ -37,7 +37,6 @@ import {
   renderLangyConversationMemory,
   renderLangyConversationTranscript,
 } from "~/server/app-layer/langy/langyConversationMemory";
-import type { LangyHarness } from "~/server/app-layer/langy/langyHarness";
 import {
   LANGY_PROMPT_HANDLES,
   LANGY_TURN_OVERRIDE_FALLBACK,
@@ -200,8 +199,8 @@ const LANGY_UI_ACTIONS_FLAG = "release_langy_ui_actions" as const;
  * off. Resolved here so the two ends agree: an agent told about a command that
  * answers "never deployed" spends the turn on a surface it cannot reach.
  *
- * Never throws — the same contract `resolveLangyHarness` holds. A flag-store
- * blip must not keep a turn from starting, so it resolves to closed: the turn
+ * Never throws: a flag-store blip must not keep a turn from starting, so it
+ * resolves to closed: the turn
  * runs without live page control, which is the flag's own rollback position.
  * Resolving to open would be the worse half of the trade, because it is the
  * one answer that can send the agent to a surface answering "never deployed".
@@ -383,18 +382,6 @@ export interface LangyTurnServiceDeps {
    * open. Optional: absent means the warm assumes the cap is not reached.
    */
   checkPermit?: (args: { userId: string }) => Promise<{ allowed: boolean }>;
-  /**
-   * Which worker harness serves this turn (`release_langy_pi_harness`),
-   * resolved once per turn in the base-dependency phase. Contract:
-   * never throws (see `resolveLangyHarness`). Optional: absent (tests,
-   * minimal compositions) leaves `credentials.harness` unset, which the
-   * manager treats as its default harness.
-   */
-  resolveHarness?: (args: {
-    userId: string;
-    projectId: string;
-    organizationId: string;
-  }) => Promise<LangyHarness>;
   perDayPrCap: number;
   /** Mint the per-turn session key (prisma pre-bound at composition). */
   mintSessionKey: (args: {
@@ -426,8 +413,8 @@ export interface LangyTurnServiceDeps {
  * capability fields into the worker signature, so any drift between the two
  * callers would make every warm boot a worker the turn cannot reuse. The model
  * is part of the signature (a model change is a probe MISS and the worker
- * re-provisions), as are the GitHub scope, the egress list, the ADR-061 mirror
- * tier and the harness.
+ * re-provisions), as are the GitHub scope, the egress list and the ADR-061
+ * mirror tier.
  */
 function buildWorkerProbeArgs({
   projectId,
@@ -455,7 +442,6 @@ function buildWorkerProbeArgs({
       ? { egressAllowlist: credentials.egressAllowlist }
       : {}),
     ...(credentials.mirrorTier ? { mirrorTier: credentials.mirrorTier } : {}),
-    ...(credentials.harness ? { harness: credentials.harness } : {}),
   };
 }
 

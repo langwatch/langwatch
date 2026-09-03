@@ -149,7 +149,7 @@ describe("parseTraceSearchCommand", () => {
 
 describe("readTraceSearchQuery", () => {
   describe("given the CLI envelope's tool input", () => {
-    describe("when it is opencode's raw shell payload", () => {
+    describe("when it is a raw shell payload", () => {
       it("reads the flags out of the command string", () => {
         expect(
           readTraceSearchQuery({

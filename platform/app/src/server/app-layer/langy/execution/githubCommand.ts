@@ -3,7 +3,7 @@
  * is reaching for GitHub.
  *
  * Sibling of `langwatchCommand.ts`, and it exists for the same reason. Langy
- * runs on opencode and does its GitHub work through the `gh` CLI and `git` in
+ * does its GitHub work through the `gh` CLI and `git` in
  * the `bash` tool, so the intent arrives buried in a command string. We decode
  * it ONCE, here, from the tool stream the manager already forwards
  * (`langy.tool` frames carry `name` + `input`) — and never from the model's

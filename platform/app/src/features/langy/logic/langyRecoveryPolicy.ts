@@ -196,7 +196,7 @@ const POLICIES: Record<string, LangyRecoveryPolicy> = {
   langy_agent_unavailable: terminal("langy_agent_unavailable"),
   langy_agent_at_capacity: terminal("langy_agent_at_capacity"),
 
-  // TERMINAL. The opencode session backing this turn is gone; the manager
+  // TERMINAL. The agent session backing this turn is gone; the manager
   // recycles the worker and the next turn gets a fresh session. Re-driving the
   // SAME turn walks straight back into the same wall. The user sends again — a
   // new turn, a new session — and the card says exactly that.
@@ -309,7 +309,7 @@ export function canAutoRecover({
  * Tool names that CHANGE something. Langy's catalog splits cleanly: reads are
  * `search_*` / `get_*` / `list_*`, writes are `create_*` / `update_*` /
  * `delete_*` / `run_*` (see the system block in `routes/langy.ts`), plus the
- * GitHub PR path and the raw file/shell tools opencode exposes.
+ * GitHub PR path and the raw file/shell tools the worker exposes.
  */
 const MUTATING_TOOL_PREFIXES = [
   "create_",

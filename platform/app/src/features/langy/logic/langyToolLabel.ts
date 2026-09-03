@@ -7,7 +7,7 @@ import { resolveCapabilityProgress } from "../components/capabilities/capability
  * What a tool call is DOING, in human words.
  *
  * ── THE BUG THIS EXISTS TO KILL ────────────────────────────────────────────
- * The cards used to be labelled from the tool's TYPE. So a call to opencode's
+ * The cards used to be labelled from the tool's TYPE. So a call to the worker's
  * `skill` tool rendered a card that said "SKILL / Skill", and a `bash` call
  * running `langwatch trace search` rendered "BASH / Coding…". Both are the same
  * mistake twice: the name of the mechanism where the name of the ACT belongs.
@@ -36,7 +36,7 @@ const SHELL_TOOLS = new Set(["bash", "shell", "execute"]);
 /** Keys a shell tool may pass its command under. */
 const COMMAND_KEYS = ["command", "cmd", "script"] as const;
 
-/** Keys opencode's `skill` tool may name the skill under. */
+/** Keys the `skill` tool may name the skill under. */
 const SKILL_KEYS = ["name", "skill", "id", "skill_name"] as const;
 
 function readString(

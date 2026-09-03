@@ -248,7 +248,7 @@ export function LangyCardGallery() {
           A gallery is only worth anything if it renders what the stream actually
           sends. These used to be tidied-up frames of our own invention, and they
           were more flattering than reality: the live stream sends a bare `bash`
-          carrying a LangWatch command (which rendered "Coding") and opencode's
+          carrying a LangWatch command (which rendered "Coding") and the worker's
           `skill` tool (which rendered "Skill"), and neither shape appeared here,
           so the gallery showed a kit that looked fine while the product did not.
           Every frame below is now one the agent genuinely emits. */}
@@ -309,7 +309,7 @@ export function LangyCardGallery() {
             totalHits } }`, where a Trace carries `timestamps.started_at`,
             `input.value`, `metrics.total_time_ms` / `total_cost` and `error`.
             34 hits, 3 shown — the honesty rule the card exists to hold.
-            The input is opencode's raw shell payload, because that is exactly
+            The input is the raw shell payload, because that is exactly
             what the CLI envelope forwards, and it is what the "View in Trace
             Explorer" link parses the agent's query back out of. */}
         <LangyCapabilityRenderer
