@@ -15,16 +15,12 @@
  * apart would mean three trace collaborators built three times, and the one
  * that drifts is always the copy.
  *
- * ## This half SEEDS the collaborator set
+ * ## All ten halves, or none
  *
- * The analytics, identity and execution folds all overlay onto a base and pass
- * an absent base through untouched, because each of them can genuinely be
- * missing: a deployment with no ClickHouse composes no charted reads, one with
- * no model gateway composes no execution. This half cannot be missing on a
- * process that composed a database at all — its ports are row reads with an id
- * already in hand — so it is where the set BEGINS. What refuses a half-filled
- * record is {@link sealApiTrpcCollaborators}, which names the entries a fold
- * failed to fill rather than mounting twenty-two namespaces over them.
+ * `composeApiTrpcCollaborators` (`api-trpc-features.composition.ts`) reads
+ * this half directly into the flat record alongside the other nine. It is
+ * all-or-nothing at that one call: any half missing — this one included —
+ * and the whole record is `undefined`, named by which half.
  *
  * ## What reaches the trace pipeline, and what happens without it
  *
@@ -88,8 +84,7 @@ import {
   TraceEditOverlayService,
 } from "@langwatch/trace-server";
 import type { UserService } from "@langwatch/user-contract";
-import type { AnyApiTrpcCollaborators } from "../app-trpc/app-trpc.collaborators";
-import type { ApiTrpcFeatureApplication, ApiTrpcPortsContext } from "../app-trpc/app-trpc.context";
+import type { ApiTrpcPortsContext } from "../app-trpc/app-trpc.context";
 
 /**
  * The reviewer's trace content, as the annotation queue asks for it.
@@ -399,168 +394,9 @@ export function composeApiProductCollaborators(
   };
 }
 
-/**
- * Folds the product half into the collaborator set, SEEDING it when nothing
- * else has.
- *
- * The other three folds pass an absent base through untouched because each of
- * their halves can genuinely be missing. This one starts the object instead: a
- * process that composed a database can always answer these four, so there is
- * no deployment shape in which the record is missing BECAUSE of this half. A
- * host that supplied its own whole set still wins the entries it filled — the
- * spread below only replaces the four this half owns.
- */
-export function withApiProductCollaborators(
-  base: AnyApiTrpcCollaborators | undefined,
-  product: ApiProductCollaborators | undefined,
-): AnyApiTrpcCollaborators | undefined {
-  if (!product) return base;
-  return {
-    ...(base ?? {}),
-    annotation: product.annotationPorts,
-    bugReports: product.bugReportPorts,
-    dataPrivacy: product.dataPrivacyPorts,
-    integrationsChecks: product.integrationsChecksPorts,
-    application: {
-      ...(base?.application ?? {}),
-      annotations: product.annotations,
-    },
-  } as AnyApiTrpcCollaborators;
-}
-
-/** The entries a complete collaborator set carries, in the order it declares them. */
-const REQUIRED_COLLABORATORS = [
-  "analytics",
-  "annotation",
-  "auth",
-  "automation",
-  "batchRecord",
-  "bugReports",
-  "codingAgents",
-  "costs",
-  "dataPrivacy",
-  "dataRetention",
-  "dataset",
-  "emailSuppression",
-  "enterprise",
-  "evaluations",
-  "evaluators",
-  "experiments",
-  "gateway",
-  "github",
-  "governanceHome",
-  "graphs",
-  "group",
-  "home",
-  "httpProxy",
-  "identity",
-  "integrationsChecks",
-  "joinRequests",
-  "langy",
-  "langyEgress",
-  "langyGates",
-  "limits",
-  "llmModelCost",
-  "modelProvider",
-  "modelProviderChecks",
-  "monitors",
-  "onboarding",
-  "ops",
-  "opsCheck",
-  "organization",
-  "organizationAuditLogCheck",
-  "project",
-  "projectChecks",
-  "prompts",
-  "role",
-  "saasBilling",
-  "savedViews",
-  "scenarios",
-  "sharedTrace",
-  "spans",
-  "team",
-  "traceEditOverlay",
-  "traces",
-  "tracesV2",
-  "translate",
-  "user",
-  "workflows",
-] as const;
-
-/** The application slices the mounted surfaces read off `ctx.app`. */
-const REQUIRED_APPLICATION_SLICES: ReadonlyArray<keyof ApiTrpcFeatureApplication> = [
-  "analytics",
-  "annotations",
-  "apiKeys",
-  "authzApp",
-  "automation",
-  "codingAgentApp",
-  "broadcast",
-  "config",
-  "dashboard",
-  "dataset",
-  "evaluations",
-  "evaluatorApp",
-  "experiments",
-  "featureFlags",
-  "gateway",
-  "github",
-  "governance",
-  "governanceApp",
-  "langy",
-  "licensing",
-  "monitors",
-  "ops",
-  "organizations",
-  "permissions",
-  "presence",
-  "projects",
-  "prompts",
-  "roles",
-  "scenarios",
-  "storedObjectApp",
-  "scimApp",
-  "sessionPolicy",
-  "suites",
-  "usageLimits",
-  "users",
-  "webhooks",
-  "workflows",
-];
-
 /** What a set is missing, and therefore why the record is not mountable. */
 export abstract class ApiTrpcCollaboratorGapReport {
   abstract incomplete(missing: readonly string[]): void;
-}
-
-/**
- * The completeness check the folds cannot make for themselves.
- *
- * Each fold fills the entries it owns and leaves the rest alone, which is what
- * lets four of them compose in any order — and it is also what makes a
- * half-filled set indistinguishable from a full one at the call site. The
- * record is ALL OR NOTHING (see {@link ApiTrpcCollaborators}), so the set is
- * either whole here or it is `undefined` with every missing entry named. A
- * deployment then reads one line saying which capability it did not compose,
- * rather than discovering it by clicking into a namespace whose ports are not
- * there.
- */
-export function sealApiTrpcCollaborators(
-  candidate: AnyApiTrpcCollaborators | undefined,
-  report?: ApiTrpcCollaboratorGapReport,
-): AnyApiTrpcCollaborators | undefined {
-  if (!candidate) return undefined;
-  const held = candidate as unknown as Record<string, unknown>;
-  const application = (held.application ?? {}) as Record<string, unknown>;
-  const missing = [
-    ...REQUIRED_COLLABORATORS.filter((entry) => held[entry] === undefined),
-    ...REQUIRED_APPLICATION_SLICES.filter(
-      (slice) => application[slice] === undefined,
-    ).map((slice) => `application.${slice}`),
-  ];
-  if (missing.length === 0) return candidate;
-  report?.incomplete(missing);
-  return undefined;
 }
 
 /**

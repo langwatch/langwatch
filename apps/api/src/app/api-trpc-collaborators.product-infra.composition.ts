@@ -110,7 +110,6 @@ import {
   type StoredObjectS3Target,
   type StoredObjectsClickHouseClient,
 } from "@langwatch/stored-object-server";
-import type { AnyApiTrpcCollaborators } from "../app-trpc/app-trpc.collaborators";
 import type { ApiTrpcFeatureApplication, ApiTrpcPortsContext } from "../app-trpc/app-trpc.context";
 import type { ApiStoredObjectsConfigResolution } from "../platform/config/api.config";
 
@@ -231,31 +230,6 @@ export function composeApiProductInfraCollaborators(
   };
 }
 
-/**
- * Folds this half into a collaborator set the process assembled from its other
- * halves.
- *
- * A function rather than a spread at the call site, for the reason every other
- * fold gives: the record is all-or-nothing, so a set that is `undefined` stays
- * `undefined` and a half that failed to compose must not leave three
- * namespaces answering with whatever was there before.
- */
-export function withApiProductInfraCollaborators(
-  base: AnyApiTrpcCollaborators | undefined,
-  half: ApiProductInfraCollaborators | undefined,
-): AnyApiTrpcCollaborators | undefined {
-  if (!base || !half) return base;
-  return {
-    ...base,
-    dataRetention: half.dataRetention,
-    monitors: half.monitors,
-    application: {
-      ...base.application,
-      monitors: half.monitorApp,
-      storedObjectApp: half.storedObjectApp,
-    },
-  } as AnyApiTrpcCollaborators;
-}
 
 /** Writes each absence to the process log, with what it costs. */
 export class LoggedApiProductInfraAbsence extends ApiProductInfraAbsenceReport {

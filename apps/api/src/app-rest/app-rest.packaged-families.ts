@@ -16,8 +16,14 @@
  * the route-authorization audit reads, so a family served from anywhere but an
  * enumeration would drop silently out of that audit while still serving traffic.
  */
-import type { AgentApp, AgentPlatformUrlBuilder } from "@langwatch/agent-server";
-import { createAgentLegacyRestApp } from "@langwatch/agent-server";
+import type {
+  AgentApp,
+  AgentCallDeps,
+  AgentPlatformUrlBuilder,
+  ConnectedAgentRuntime,
+  LongPollTransport,
+} from "@langwatch/agent-server";
+import { createAgentLegacyRestApp, createAgentV1RestApp } from "@langwatch/agent-server";
 import type { ApiKeyService } from "@langwatch/api-key-contract";
 import type {
   AppRestBroadcast,
@@ -133,6 +139,18 @@ export type ApiPackagedRestServices = Readonly<{
   agentCache?: (() => AgentCacheStore) | undefined;
   /** The deprecated `/api/agents` family's read/write capability. */
   agents?: (() => AgentApp) | undefined;
+  /**
+   * The connected-agent transport (ADR-128), layered onto `/api/v1/agents`'s
+   * `/connect/*` and `/:id/call` routes. Absent takes those two route groups
+   * off; list/create/read/update/archive/test still mount on `agents` alone.
+   */
+  agentsV1?:
+    | (() => {
+        connectedRuntime: () => ConnectedAgentRuntime;
+        connect: { transport: () => LongPollTransport; relayMaxPayloadMb?: number };
+        call: Omit<AgentCallDeps, "agents">;
+      })
+    | undefined;
   apiKeys?: (() => ApiKeyService) | undefined;
   /** Writing role bindings: the grants ledger `/api/role-bindings` appends to. */
   authzGrants?: (() => AuthzGrantsService) | undefined;
@@ -321,6 +339,7 @@ export abstract class ApiPackagedRestAbsenceReport {
 export type ApiPackagedRestFamilyName =
   | "agent-cache"
   | "agents"
+  | "agents-v1"
   | "coding-agent"
   | "coding-agent-v1"
   | "dashboards"
@@ -396,6 +415,23 @@ export function mountApiPackagedRestFamilies(options: {
             security,
             agents,
             agentPlatformUrl: ports.agentPlatformUrl,
+          }).hono
+      : null,
+  );
+
+  // `/api/v1/agents`: the same application as the deprecated family above,
+  // plus ADR-128's connected-agent routes when this process composed that
+  // transport (`agentsV1`, absent leaves `/connect/*` and `/:id/call` off).
+  const agentsV1 = services.agentsV1;
+  mount(
+    "agents-v1",
+    agents
+      ? () =>
+          createAgentV1RestApp({
+            security,
+            agents,
+            agentPlatformUrl: ports.agentPlatformUrl,
+            ...(agentsV1 ? agentsV1() : {}),
           }).hono
       : null,
   );

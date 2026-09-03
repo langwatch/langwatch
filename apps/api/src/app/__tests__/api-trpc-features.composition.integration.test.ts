@@ -26,9 +26,8 @@ import type { PrismaClient } from "@langwatch/prisma-client/generated";
 import type { PrismaConnection } from "@langwatch/prisma-client";
 import { describe, expect, it, vi } from "vitest";
 import { z } from "zod";
-import { ApiApplication } from "../../api.application";
+import { ApiApplication, MissingAgentService, MissingSecretService } from "../../api.application";
 import { ApiAuditPort } from "../../api-request.policy";
-import type { AnyApiTrpcCollaborators } from "../../app-trpc/app-trpc.collaborators";
 import type { ApiTrpcFeatureApplication } from "../../app-trpc/app-trpc.context";
 import {
   ApiTrpcFeaturesComposition,
@@ -203,7 +202,7 @@ function testAuthApp(): AuthApp {
   });
 }
 
-function testCollaborators(): AnyApiTrpcCollaborators {
+function testCollaborators() {
   return {
     application: testApplication(),
     analytics: {
@@ -329,7 +328,7 @@ function testCollaborators(): AnyApiTrpcCollaborators {
       lifecycle: stub("workflows.lifecycle"),
       optimization: stub("workflows.optimization"),
     },
-  } as unknown as AnyApiTrpcCollaborators;
+  } as never;
 }
 
 function composeApplication(
@@ -353,6 +352,8 @@ function composeApplication(
       : overrides.session;
 
   const application = ApiApplication.create({
+    agents: new MissingAgentService(),
+    secrets: new MissingSecretService(),
     features,
     http: {
       createContext: async () => ({
@@ -478,6 +479,8 @@ describe("given an API process with no collaborators for the record", () => {
 
   it("serves its own two routers unchanged", () => {
     const application = ApiApplication.create({
+      agents: new MissingAgentService(),
+      secrets: new MissingSecretService(),
       http: { createContext: async () => ({ actor: () => ({ id: "user-1" }), authorize: async () => undefined }) },
     });
 

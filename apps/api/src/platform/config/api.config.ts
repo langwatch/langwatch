@@ -1,9 +1,22 @@
 import {
   assertObservabilityDoesNotSelfIngest,
+  authzConfigDefinition,
+  clickhouseConfigDefinition,
   Config,
+  egressConfigDefinition,
   environmentBooleanSchema,
+  githubAppConfigDefinition,
+  groupQueueConfigDefinition,
+  licensingConfigDefinition,
+  loggerConfigDefinition,
+  mailConfigDefinition,
+  objectStorageConfigDefinition,
+  observabilityConfigDefinition,
   parseDataplaneS3RoutingTable,
+  postgresConfigDefinition,
+  redisConfigDefinition,
   resolveTelemetryConfiguration,
+  runtimeIdentityConfigDefinition,
   RuntimeConfig,
   portSchema,
   type ConfigValue,
@@ -97,16 +110,9 @@ export const API_KEY_PEPPER_ENV_PRECEDENCE = ["CREDENTIALS_SECRET", "NEXTAUTH_SE
 export const apiConfigDefinition = RuntimeConfig.define({
   /** A standalone API owns dispatch-only web behaviour. */
   processRole: Config.value(z.literal("web").default("web"), { env: "API_PROCESS_ROLE" }),
-  environment: Config.value(z.string().min(1).default("local"), { env: "ENVIRONMENT" }),
-  nodeEnvironment: Config.value(
-    z.enum(["development", "test", "production"]).default("development"),
-    { env: "NODE_ENV" },
-  ),
+  ...runtimeIdentityConfigDefinition,
   serviceName: Config.value(z.string().min(1).default("langwatch-api"), {
     env: "API_SERVICE_NAME",
-  }),
-  serviceVersion: Config.value(z.string().min(1).optional(), {
-    env: "SERVICE_VERSION",
   }),
   host: Config.value(z.string().min(1).default("0.0.0.0"), { env: "API_HOST" }),
   port: Config.value(portSchema.default(5560), { env: "API_PORT" }),
@@ -118,21 +124,8 @@ export const apiConfigDefinition = RuntimeConfig.define({
       env: "API_SHUTDOWN_DEADLINE_MS",
     }),
   },
-  logger: {
-    format: Config.value(z.enum(["pretty", "json"]).optional(), { env: "LOG_FORMAT" }),
-    level: Config.value(z.string().min(1).optional(), { env: "LOG_LEVEL" }),
-    consoleLevel: Config.value(z.string().min(1).optional(), { env: "LOG_CONSOLE_LEVEL" }),
-    otelExportEnabled: Config.value(environmentBooleanSchema.optional(), {
-      env: "LOG_OTEL_EXPORT_ENABLED",
-    }),
-  },
-  observability: {
-    apiKey: Config.secret({ optional: true, env: "LANGWATCH_API_KEY" }),
-    endpoint: Config.url({ optional: true, env: "LANGWATCH_ENDPOINT" }),
-    processorType: Config.value(z.enum(["simple", "batch"]).default("batch"), {
-      env: "LANGWATCH_PROCESSOR_TYPE",
-    }),
-  },
+  logger: { ...loggerConfigDefinition },
+  observability: { ...observabilityConfigDefinition },
   /**
    * The instance administrator credential the self-hosted provisioning family
    * authenticates with.
@@ -330,8 +323,7 @@ export const apiConfigDefinition = RuntimeConfig.define({
    * `""` widens rather than narrows.
    */
   authz: {
-    epochCache: Config.value(optionalEnvironmentString, { env: "AUTHZ_EPOCH_CACHE" }),
-    demoProjectId: Config.value(optionalEnvironmentString, { env: "DEMO_PROJECT_ID" }),
+    ...authzConfigDefinition,
     /**
      * The account the demo project's own work is attributed to.
      *
@@ -409,32 +401,7 @@ export const apiConfigDefinition = RuntimeConfig.define({
    * provider configured is an ordinary self-hosted install: it composes,
    * serves every route, and fails at the moment of a send.
    */
-  mail: {
-    defaultFrom: Config.value(optionalEnvironmentString, { env: "EMAIL_DEFAULT_FROM" }),
-    provider: Config.value(optionalEnvironmentString, { env: "EMAIL_PROVIDER" }),
-    ses: {
-      // Presence-based, exactly as the worker and the platform app read it:
-      // existing deployments treat USE_AWS_SES=false as enabled, and changing
-      // that would select a different gateway in one process and not the other.
-      enabled: Config.value(optionalEnvironmentString, { env: "USE_AWS_SES" }),
-      region: Config.value(optionalEnvironmentString, { env: "AWS_REGION" }),
-      endpoint: Config.value(optionalEnvironmentString, { env: "AWS_SES_ENDPOINT" }),
-    },
-    sendgrid: {
-      apiKey: Config.secret({ optional: true, env: "SENDGRID_API_KEY" }),
-    },
-    smtp: {
-      url: Config.secret({ optional: true, env: "SMTP_URL" }),
-      host: Config.value(optionalEnvironmentString, { env: "SMTP_HOST" }),
-      port: Config.value(optionalEnvironmentString, { env: "SMTP_PORT" }),
-      user: Config.value(optionalEnvironmentString, { env: "SMTP_USER" }),
-      password: Config.secret({ optional: true, env: "SMTP_PASSWORD" }),
-      secure: Config.value(optionalEnvironmentString, { env: "SMTP_SECURE" }),
-    },
-    resend: {
-      apiKey: Config.secret({ optional: true, env: "RESEND_API_KEY" }),
-    },
-  },
+  mail: { ...mailConfigDefinition },
   infrastructure: {
     /**
      * The Postgres connection the process composes its one guarded Prisma
@@ -446,9 +413,7 @@ export const apiConfigDefinition = RuntimeConfig.define({
      * export is not a connection string, and a client built over one would
      * fail on its first query instead of at boot.
      */
-    database: {
-      url: Config.value(optionalEnvironmentString, { env: "DATABASE_URL" }),
-    },
+    database: { ...postgresConfigDefinition },
     /**
      * The TWO ClickHouse identities this process reads analytics through, and
      * they are deliberately separate values.
@@ -470,7 +435,7 @@ export const apiConfigDefinition = RuntimeConfig.define({
      * once at boot, rather than refusing to start.
      */
     clickhouse: {
-      url: Config.value(optionalEnvironmentString, { env: "CLICKHOUSE_URL" }),
+      ...clickhouseConfigDefinition,
       /**
        * The THIRD identity, and the one the tenant-keyed application client
        * deliberately cannot stand in for: a dedicated `langwatch_ops` account
@@ -573,12 +538,7 @@ export const apiConfigDefinition = RuntimeConfig.define({
      */
     modelProvider: {
       isSaas: Config.value(optionalEnvironmentString, { env: "IS_SAAS" }),
-      blockLocalHttpCalls: Config.value(optionalEnvironmentString, {
-        env: "BLOCK_LOCAL_HTTP_CALLS",
-      }),
-      allowedProxyHosts: Config.value(optionalEnvironmentString, {
-        env: "ALLOWED_PROXY_HOSTS",
-      }),
+      ...egressConfigDefinition,
     },
     /**
      * The GitHub App this deployment reads coding-agent pull requests through.
@@ -592,13 +552,12 @@ export const apiConfigDefinition = RuntimeConfig.define({
      * Read here because this module is the process's only environment reader.
      */
     github: {
-      appId: Config.value(optionalEnvironmentString, { env: "GITHUB_LANGY_APP_ID" }),
+      ...githubAppConfigDefinition,
       privateKey: Config.value(optionalEnvironmentString, { env: "GITHUB_LANGY_PRIVATE_KEY" }),
       appSlug: Config.value(optionalEnvironmentString, { env: "GITHUB_LANGY_APP_SLUG" }),
       webhookSecret: Config.value(optionalEnvironmentString, {
         env: "GITHUB_LANGY_WEBHOOK_SECRET",
       }),
-      host: Config.value(optionalEnvironmentString, { env: "GITHUB_LANGY_HOST" }),
     },
     /**
      * The key an activated Enterprise licence's signature is checked against.
@@ -614,11 +573,7 @@ export const apiConfigDefinition = RuntimeConfig.define({
      * different keys is one deployment with two answers to whether it is
      * licensed at all.
      */
-    licensing: {
-      publicKey: Config.value(optionalEnvironmentString, {
-        env: "LANGWATCH_LICENSE_PUBLIC_KEY",
-      }),
-    },
+    licensing: { ...licensingConfigDefinition },
     /**
      * Where this deployment keeps the bytes it externalized out of traces,
      * datasets, scenarios and evaluation payloads.
@@ -638,89 +593,16 @@ export const apiConfigDefinition = RuntimeConfig.define({
      * still work, which is exactly the danger — one tenant's objects would be
      * addressed in an account they do not own and cannot read.
      */
-    storedObjects: {
-      backend: Config.value(z.enum(["s3", "azure"]).optional(), {
-        env: "STORED_OBJECTS_BACKEND",
+    storedObjects: { ...objectStorageConfigDefinition },
+    redis: { ...redisConfigDefinition },
+    groupQueue: { ...groupQueueConfigDefinition },
+    /** The connected-agent transport's replica count and its relay payload cap (ADR-128). */
+    connectedAgents: {
+      replicaCount: Config.value(z.coerce.number().int().positive().default(1), {
+        env: "LANGWATCH_APP_REPLICAS",
       }),
-      localFilesystemRoot: Config.value(optionalEnvironmentString, {
-        env: "LANGWATCH_LOCAL_STORAGE_PATH",
-      }),
-      s3: {
-        bucket: Config.value(optionalEnvironmentString, { env: "S3_BUCKET_NAME" }),
-        endpoint: Config.value(optionalEnvironmentString, { env: "S3_ENDPOINT" }),
-        region: Config.value(optionalEnvironmentString, { env: "S3_REGION" }),
-        accessKeyId: Config.value(optionalEnvironmentString, { env: "S3_ACCESS_KEY_ID" }),
-        secretAccessKey: Config.value(optionalEnvironmentString, {
-          env: "S3_SECRET_ACCESS_KEY",
-        }),
-        sessionToken: Config.value(optionalEnvironmentString, { env: "S3_SESSION_TOKEN" }),
-      },
-      /**
-       * The Azure Blob account this deployment reads and writes through, and
-       * the federated identity it authenticates as.
-       *
-       * Read together and interpreted nowhere here: which of the four auth
-       * modes applies, which variables each one requires, and whether a
-       * plaintext endpoint or a sovereign cloud is admissible are the stored
-       * object feature's own rules, and `resolveAzureCredentials` is the one
-       * place that decides. This module only supplies what it read.
-       *
-       * `identity` is the AKS azure-workload-identity webhook's own three
-       * variables. They are named here because this module is the process's
-       * only environment reader, not because an operator sets them: their
-       * absence means the webhook never mutated this pod, which is what the
-       * credential resolver's refusal says.
-       */
-      azure: {
-        authMode: Config.value(optionalEnvironmentString, { env: "AZURE_BLOB_AUTH_MODE" }),
-        accountName: Config.value(optionalEnvironmentString, {
-          env: "AZURE_BLOB_ACCOUNT_NAME",
-        }),
-        accountKey: Config.value(optionalEnvironmentString, {
-          env: "AZURE_BLOB_ACCOUNT_KEY",
-        }),
-        container: Config.value(optionalEnvironmentString, { env: "AZURE_BLOB_CONTAINER" }),
-        endpoint: Config.value(optionalEnvironmentString, { env: "AZURE_BLOB_ENDPOINT" }),
-        authorityHost: Config.value(optionalEnvironmentString, {
-          env: "AZURE_BLOB_AUTHORITY_HOST",
-        }),
-        tokenAudience: Config.value(optionalEnvironmentString, {
-          env: "AZURE_BLOB_TOKEN_AUDIENCE",
-        }),
-        allowInsecureTokenEndpointForTests: Config.value(optionalEnvironmentString, {
-          env: "AZURE_BLOB_ALLOW_INSECURE_TOKEN_ENDPOINT_FOR_TESTS",
-        }),
-        identity: {
-          tenantId: Config.value(optionalEnvironmentString, { env: "AZURE_TENANT_ID" }),
-          clientId: Config.value(optionalEnvironmentString, { env: "AZURE_CLIENT_ID" }),
-          federatedTokenFile: Config.value(optionalEnvironmentString, {
-            env: "AZURE_FEDERATED_TOKEN_FILE",
-          }),
-        },
-      },
-    },
-    redis: {
-      url: Config.value(optionalEnvironmentString, { env: "REDIS_URL" }),
-      clusterEndpoints: Config.value(optionalEnvironmentString, {
-        env: "REDIS_CLUSTER_ENDPOINTS",
-      }),
-      dbIndex: Config.value(optionalEnvironmentString, { env: "REDIS_DB_INDEX" }),
-    },
-    groupQueue: {
-      globalConcurrency: Config.value(optionalEnvironmentString, {
-        env: "GLOBAL_QUEUE_CONCURRENCY",
-      }),
-      zstdWritesEnabled: Config.value(optionalEnvironmentString, {
-        env: "GROUP_QUEUE_ZSTD_WRITES_ENABLED",
-      }),
-      msgpackWritesEnabled: Config.value(optionalEnvironmentString, {
-        env: "GROUP_QUEUE_MSGPACK_WRITES_ENABLED",
-      }),
-      tenantConcurrencyCap: Config.value(optionalEnvironmentString, {
-        env: "LANGWATCH_DISPATCH_TENANT_CAP",
-      }),
-      globalConcurrencyBudget: Config.value(optionalEnvironmentString, {
-        env: "LANGWATCH_DISPATCH_GLOBAL_BUDGET",
+      relayMaxPayloadMb: Config.value(z.coerce.number().positive().optional(), {
+        env: "LANGWATCH_AGENT_RELAY_MAX_PAYLOAD_MB",
       }),
     },
   },
@@ -911,6 +793,13 @@ export type ApiInfrastructureConfig = Readonly<{
   storedObjects: ApiStoredObjectsConfigResolution;
   redis: RedisConfigResolution;
   groupQueue: GroupQueuePolicy;
+  /** The connected-agent transport's replica count and relay payload cap (ADR-128). */
+  connectedAgents: Readonly<{
+    /** The app replicas of this deployment; the no-Redis refusal threshold. */
+    replicaCount: number;
+    /** `LANGWATCH_AGENT_RELAY_MAX_PAYLOAD_MB`; the default cap when absent. */
+    relayMaxPayloadMb: number | undefined;
+  }>;
 }>;
 
 /** The AuthZ decisions this process was configured with, already interpreted. */
@@ -1115,6 +1004,10 @@ export function resolveApiConfig(source: Readonly<Record<string, unknown>>): Api
       },
       redis: new RedisConfigService().resolve(value.infrastructure.redis),
       groupQueue: resolveGroupQueuePolicyFromEnv(value.infrastructure.groupQueue),
+      connectedAgents: {
+        replicaCount: value.infrastructure.connectedAgents.replicaCount,
+        relayMaxPayloadMb: value.infrastructure.connectedAgents.relayMaxPayloadMb,
+      },
     },
   };
 }
@@ -1233,24 +1126,26 @@ function resolveBrowserSessionConfig(
 /**
  * The deployment's answers for the model gateway.
  *
- * Both flags are read the platform app's way: `"1"` or `"true"` is on, and
- * every other value — including a variable set to something well-meant like
- * `"yes"` — is off, because two tiers disagreeing about whether a fence is up
- * is worse than either answer. The allowlist is split on commas and trimmed,
- * and blank entries are dropped: an empty host matches nothing useful and
- * would otherwise sit in the list looking like a rule.
+ * `isSaas` is read the platform app's way: `"1"` or `"true"` is on, and every
+ * other value — including a variable set to something well-meant like `"yes"`
+ * — is off. `blockLocalHttpCalls` already arrived parsed by the same rule,
+ * through the shared egress block's `environmentOneOrTrueSchema` leaf, so two
+ * tiers cannot disagree about whether that fence is up. The allowlist is
+ * split on commas and trimmed, and blank entries are dropped: an empty host
+ * matches nothing useful and would otherwise sit in the list looking like a
+ * rule.
  */
 function resolveModelProviderConfig(
   value: Readonly<{
     isSaas: string | undefined;
-    blockLocalHttpCalls: string | undefined;
+    blockLocalHttpCalls: boolean;
     allowedProxyHosts: string | undefined;
   }>,
   environment: Readonly<Record<string, string | undefined>>,
 ): ApiModelProviderConfigResolution {
   return {
     isSaas: isEnabledFlag(value.isSaas),
-    blockLocalHttpCalls: isEnabledFlag(value.blockLocalHttpCalls),
+    blockLocalHttpCalls: value.blockLocalHttpCalls,
     allowedProxyHosts:
       value.allowedProxyHosts
         ?.split(",")

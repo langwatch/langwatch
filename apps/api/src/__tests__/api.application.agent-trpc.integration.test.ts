@@ -2,7 +2,7 @@ import { AgentService, type AgentWithFields } from "@langwatch/agent-contract";
 import { getCurrentContext } from "@langwatch/observability/context";
 import { SecretService } from "@langwatch/secret-contract";
 import { describe, expect, it, vi } from "vitest";
-import { ApiApplication } from "../api.application";
+import { ApiApplication, MissingAgentService } from "../api.application";
 
 const agent: AgentWithFields = {
   id: "agent-1",
@@ -51,7 +51,10 @@ class TestAgentService extends AgentService {
     return this.unavailable();
   }
   ownersOf() {
-    return this.unavailable();
+    // No agent in this fixture carries an `ownerUserId`, so there is nobody
+    // to look up: `AgentApp.getAll` calls this on every read now (ADR-128),
+    // not only for a connected agent.
+    return Promise.resolve(new Map<string, { userId: string; name: string | null }>());
   }
   getConnectedByNameAndEnvironment() {
     return this.unavailable();
@@ -141,8 +144,19 @@ describe("ApiApplication Agent tRPC composition", () => {
     const agentCaller = caller.agents;
     if (!agentCaller) throw new Error("Agent router was not composed.");
 
+    // The ADR-128 view every read carries now: this process composed no
+    // `connected` dependency, so a non-connected agent degrades to no
+    // declared parameters, no owner and offline presence with no instances.
     await expect(agentCaller.getAll({ projectId: "project-1" })).resolves.toEqual([
-      { ...agent, _count: { copiedAgents: 2 } },
+      {
+        ...agent,
+        _count: { copiedAgents: 2 },
+        ownerUserId: null,
+        parameters: [],
+        owner: null,
+        status: "offline",
+        instances: [],
+      },
     ]);
     expect(agents.observedContexts).toEqual([{ userId: "user-1" }]);
     expect(authorize).toHaveBeenCalledWith("evaluations:view", { projectId: "project-1" });
@@ -170,14 +184,28 @@ describe("ApiApplication Agent tRPC composition", () => {
   });
 
   /** @scenario "A process with no database composes no agent service" */
-  it("mounts no agents surface at all for a process that composed no agent service", () => {
-    const application = ApiApplication.create({ secrets: new TestSecretService() });
+  it("mounts the agents surface backed by the null object, refusing every call by name", async () => {
+    const application = ApiApplication.create({
+      agents: new MissingAgentService(),
+      secrets: new TestSecretService(),
+    });
 
     const names = Object.keys(application.trpc._def.procedures).filter((path) =>
       path.startsWith("agents."),
     );
+    expect(names.length).toBeGreaterThan(0);
 
-    expect(names).toEqual([]);
+    const caller = application.createCaller({
+      actor: () => ({ id: "user-1" }),
+      authorize: async () => undefined,
+      can: async () => true,
+    });
+    const agentCaller = caller.agents;
+    if (!agentCaller) throw new Error("Agent router was not composed.");
+
+    await expect(agentCaller.getAll({ projectId: "project-1" })).rejects.toThrow(
+      "Agent service is not configured for this API application.",
+    );
   });
 
   it("refuses a copy command whose project inputs cross tenant boundaries", async () => {

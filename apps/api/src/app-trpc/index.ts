@@ -50,7 +50,6 @@ export {
 export { createAppTrpcFeatures, type AppTrpcFeaturePorts } from "./app-trpc.features";
 export {
   ApiTrpcCollaboratorsAbsence,
-  type AnyApiTrpcCollaborators,
   type ApiTrpcCollaborators,
 } from "./app-trpc.collaborators";
 export type {

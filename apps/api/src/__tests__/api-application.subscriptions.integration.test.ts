@@ -18,7 +18,7 @@ import { OrganizationService } from "@langwatch/organization-contract";
 import { SecretService, type Secret } from "@langwatch/secret-contract";
 import superjson from "superjson";
 import { describe, expect, it, vi } from "vitest";
-import { ApiApplication } from "../api.application";
+import { ApiApplication, MissingAgentService } from "../api.application";
 import { ApiRestSecurity } from "../api-rest.security";
 import { ApiRestObservabilityComposition } from "../app/api-rest-observability.composition";
 import { createSseSubscriptionApp } from "../app-trpc/app-trpc.sse";
@@ -67,6 +67,7 @@ describe("ApiApplication's subscription lane", () => {
     it("resolves a path against the same root and context the tRPC endpoint serves", async () => {
       const secrets = new TestSecretService();
       const application = ApiApplication.create({
+        agents: new MissingAgentService(),
         secrets,
         http: {
           createContext: async () => ({
@@ -108,6 +109,7 @@ describe("ApiApplication's subscription lane", () => {
   describe("given a process that composed none", () => {
     it("serves no /api/sse route at all", async () => {
       const application = ApiApplication.create({
+        agents: new MissingAgentService(),
         secrets: new TestSecretService(),
         http: {
           createContext: async () => ({

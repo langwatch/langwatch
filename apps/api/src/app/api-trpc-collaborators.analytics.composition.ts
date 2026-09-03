@@ -93,7 +93,6 @@ import type { ResourceScope } from "@langwatch/runtime-composition";
 import { nanoid } from "nanoid";
 import type { z } from "zod";
 import type { ApiLangWatchQLConfigResolution } from "../platform/config/api.config";
-import type { AnyApiTrpcCollaborators } from "../app-trpc/app-trpc.collaborators";
 import type { ApiTrpcPortsContext } from "../app-trpc/app-trpc.context";
 
 /**
@@ -524,31 +523,3 @@ class ApiAnalyticsProtections {
 }
 
 
-/**
- * Folds the analytics half into a collaborator set the process assembled from
- * its other halves.
- *
- * A function rather than a spread at the call site, because the record is
- * all-or-nothing: a set that is `undefined` stays `undefined` — the process
- * serves no packaged namespaces and says why — and an analytics half that
- * failed to compose must not silently leave four namespaces answering with
- * whatever was there before. It composes with the other halves' own folds
- * rather than competing with them: each fills the entries it owns and passes
- * the rest through untouched.
- */
-export function withApiAnalyticsCollaborators(
-  base: AnyApiTrpcCollaborators | undefined,
-  analytics: ApiAnalyticsCollaborators | undefined,
-): AnyApiTrpcCollaborators | undefined {
-  if (!base || !analytics) return base;
-  return {
-    ...base,
-    analytics: analytics.analyticsPorts,
-    graphs: analytics.graphPorts,
-    application: {
-      ...base.application,
-      analytics: analytics.analytics,
-      dashboard: analytics.dashboard,
-    },
-  } as AnyApiTrpcCollaborators;
-}

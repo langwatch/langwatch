@@ -31,6 +31,19 @@ import {
 import type { ApiTrpcFeatureApplication } from "../app-trpc/app-trpc.context";
 import { createAppTrpcFeatures } from "../app-trpc/app-trpc.features";
 import { createApiTrpcPorts } from "./api-trpc-ports.composition";
+import type { ApiAgentGroupCollaborators } from "./api-trpc-collaborators.agent-group.composition";
+import type { ApiAnalyticsCollaborators } from "./api-trpc-collaborators.analytics.composition";
+import type { ApiExecutionCollaborators } from "./api-trpc-collaborators.execution.composition";
+import type { ApiGatewayGroupCollaborators } from "./api-trpc-collaborators.gateway-group.composition";
+import type { ApiIdentityCollaborators } from "./api-trpc-collaborators.identity.composition";
+import type { ApiOrgGroupCollaborators } from "./api-trpc-collaborators.org-group.composition";
+import type { ApiProductGroupCollaborators } from "./api-trpc-collaborators.product-group.composition";
+import type { ApiProductInfraCollaborators } from "./api-trpc-collaborators.product-infra.composition";
+import {
+  type ApiProductCollaborators,
+  type ApiTrpcCollaboratorGapReport,
+} from "./api-trpc-collaborators.product.composition";
+import type { ApiTraceGroupCollaborators } from "./api-trpc-collaborators.trace-group.composition";
 
 /**
  * Everything the record is composed from, with the two halves it can be
@@ -287,4 +300,169 @@ export class LoggedApiTrpcFeaturesAbsence extends ApiTrpcCollaboratorsAbsence {
       `API process serves no packaged tRPC namespaces: ${consequence}. The agent and secret routers are unaffected.`,
     );
   }
+}
+
+/**
+ * The ten halves {@link composeApiTrpcCollaborators} reads into one flat
+ * {@link ApiTrpcCollaborators} record. Each is `undefined` exactly when the
+ * process composed nothing for it — see that half's own composing function
+ * for why it can be missing.
+ */
+export type ApiTrpcCollaboratorHalves = Readonly<{
+  product: ApiProductCollaborators | undefined;
+  analytics: ApiAnalyticsCollaborators | undefined;
+  identity: ApiIdentityCollaborators | undefined;
+  execution: ApiExecutionCollaborators | undefined;
+  productGroup: ApiProductGroupCollaborators | undefined;
+  traceGroup: ApiTraceGroupCollaborators | undefined;
+  agentGroup: ApiAgentGroupCollaborators | undefined;
+  orgGroup: ApiOrgGroupCollaborators | undefined;
+  productInfra: ApiProductInfraCollaborators | undefined;
+  gatewayGroup: ApiGatewayGroupCollaborators | undefined;
+}>;
+
+/**
+ * Reads all ten collaborator halves into ONE flat {@link ApiTrpcCollaborators}
+ * record, or refuses by name.
+ *
+ * All-or-nothing, replacing the ten `withApi*Collaborators` folds and the
+ * runtime `sealApiTrpcCollaborators` check those folds needed: a process
+ * missing any half composes none of the record, named, rather than mounting
+ * the other nine over a gap. No cast to an erased type anywhere in this
+ * function — every `half.field` access below is checked against the real,
+ * concrete type each `compose*` function already returns, so a half's return
+ * type drifting from what this literal expects is a compile error here
+ * rather than a silent `unknown`. The return type is left to inference
+ * rather than restated as an explicit `ApiTrpcCollaborators<...>` — the
+ * interface takes more type parameters than any one caller instantiates by
+ * hand, and inference already carries the concrete types through to
+ * `ApiTrpcFeaturesComposition.tryCompose`, which is the one place they are
+ * pinned.
+ */
+export function composeApiTrpcCollaborators(
+  halves: ApiTrpcCollaboratorHalves,
+  report?: ApiTrpcCollaboratorGapReport,
+) {
+  const missing = (Object.keys(halves) as (keyof ApiTrpcCollaboratorHalves)[]).filter(
+    (name) => halves[name] === undefined,
+  );
+  if (missing.length > 0) {
+    report?.incomplete(missing);
+    return undefined;
+  }
+  const {
+    product,
+    analytics,
+    identity,
+    execution,
+    productGroup,
+    traceGroup,
+    agentGroup,
+    orgGroup,
+    productInfra,
+    gatewayGroup,
+  } = halves as Required<ApiTrpcCollaboratorHalves>;
+
+  return {
+    application: {
+      annotations: product.annotations,
+      analytics: analytics.analytics,
+      dashboard: analytics.dashboard,
+      ...identity.application,
+      workflows: execution.workflows,
+      experiments: execution.experiments,
+      evaluations: execution.evaluations,
+      authzApp: productGroup.authzApp,
+      dataset: productGroup.datasetApp,
+      evaluatorApp: productGroup.evaluatorApp,
+      featureFlags: productGroup.featureFlagService,
+      permissions: productGroup.permissions,
+      projects: productGroup.projectReads,
+      prompts: productGroup.promptApp,
+      roles: productGroup.roleApp,
+      traces: traceGroup.traces,
+      share: traceGroup.share,
+      dataRetention: traceGroup.dataRetention,
+      topics: traceGroup.topics,
+      modelProviders: traceGroup.modelProviders,
+      planProvider: traceGroup.planProvider,
+      scenarios: agentGroup.scenarios,
+      suites: agentGroup.suites,
+      langy: agentGroup.langy,
+      // Overwrites the identity half's narrower `isAdmin` reader in this same
+      // slot on purpose: the operator SURFACE reads the whole application,
+      // and the SSO connection door (which gates on the staff list rather
+      // than `ops:*`) is satisfied by it unchanged.
+      ops: agentGroup.ops,
+      ...orgGroup.application,
+      monitors: productInfra.monitorApp,
+      storedObjectApp: productInfra.storedObjectApp,
+      ...gatewayGroup.application,
+    },
+
+    annotation: product.annotationPorts,
+    bugReports: product.bugReportPorts,
+    dataPrivacy: product.dataPrivacyPorts,
+    integrationsChecks: product.integrationsChecksPorts,
+
+    analytics: analytics.analyticsPorts,
+    graphs: analytics.graphPorts,
+
+    auth: identity.auth,
+    group: identity.group,
+    identity: identity.identity,
+    joinRequests: identity.joinRequests,
+    onboarding: identity.onboarding,
+    user: identity.user,
+
+    workflows: execution.workflowPorts,
+    experiments: execution.experimentPorts,
+    evaluations: execution.evaluationPorts,
+
+    batchRecord: productGroup.batchRecordPorts,
+    evaluators: productGroup.evaluatorPorts,
+    role: productGroup.rolePorts,
+    dataset: productGroup.datasetPorts,
+    home: productGroup.homePorts,
+    prompts: productGroup.promptPorts,
+    team: productGroup.teamPorts,
+
+    traces: traceGroup.ports.traces,
+    tracesV2: traceGroup.ports.tracesV2,
+    spans: traceGroup.ports.spans,
+    traceEditOverlay: traceGroup.ports.traceEditOverlay,
+    sharedTrace: traceGroup.ports.sharedTrace,
+    savedViews: traceGroup.ports.savedViews,
+    costs: traceGroup.ports.costs,
+    llmModelCost: traceGroup.ports.llmModelCost,
+    modelProvider: traceGroup.ports.modelProvider,
+    modelProviderChecks: traceGroup.ports.modelProviderChecks,
+    translate: traceGroup.ports.translate,
+    httpProxy: traceGroup.ports.httpProxy,
+    limits: traceGroup.ports.limits,
+
+    scenarios: agentGroup.ports.scenarios,
+    langy: agentGroup.ports.langy,
+    langyGates: agentGroup.ports.langyGates,
+    langyEgress: agentGroup.ports.langyEgress,
+    ops: agentGroup.ports.ops,
+    opsCheck: agentGroup.ports.opsCheck,
+
+    organization: orgGroup.organization,
+    organizationAuditLogCheck: orgGroup.organizationAuditLogCheck,
+    project: orgGroup.project,
+    projectChecks: orgGroup.projectChecks,
+    codingAgents: orgGroup.codingAgents,
+    automation: orgGroup.automation,
+    emailSuppression: orgGroup.emailSuppression,
+    enterprise: orgGroup.enterprise,
+
+    dataRetention: productInfra.dataRetention,
+    monitors: productInfra.monitors,
+
+    gateway: gatewayGroup.gateway,
+    governanceHome: gatewayGroup.governanceHome,
+    saasBilling: gatewayGroup.saasBilling,
+    github: gatewayGroup.github,
+  };
 }

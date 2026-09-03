@@ -842,7 +842,7 @@ describe("ApiProductionComposition", () => {
 
     describe("when the deployment configured no database", () => {
       /** @scenario "A process with no database composes no agent service" */
-      it("composes no agent service, so the process mounts no agents surface", async () => {
+      it("composes no agent service, so the process forwards none to ApiProcess", async () => {
         await composeSelfComposedAgents({});
 
         expect(processMocks.agents()).toBeUndefined();

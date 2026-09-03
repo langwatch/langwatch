@@ -14,7 +14,7 @@ import { OrganizationService } from "@langwatch/organization-contract";
 import type { AppRestSecurity } from "@langwatch/api/rest";
 import { afterEach, describe, expect, it } from "vitest";
 
-import { ApiApplication } from "../../../api.application";
+import { ApiApplication, MissingAgentService, MissingSecretService } from "../../../api.application";
 import { ApiHttpListener } from "../../../api-http.listener";
 import { ApiRestSecurity } from "../../../api-rest.security";
 import { ApiRestObservabilityComposition } from "../../../app/api-rest-observability.composition";
@@ -250,6 +250,8 @@ async function startApi() {
   }
 
   const application = ApiApplication.create({
+    agents: new MissingAgentService(),
+    secrets: new MissingSecretService(),
     rest,
     http: {
       createContext: async () => ({

@@ -56,7 +56,6 @@ import type { MonitorService } from "@langwatch/monitor-contract";
 import { createLogger, type Logger } from "@langwatch/observability";
 import type { PrismaClient } from "@langwatch/prisma-client/generated";
 import type { ProjectService } from "@langwatch/project-contract";
-import type { AnyApiTrpcCollaborators } from "../app-trpc/app-trpc.collaborators";
 import type { ApiTrpcFeatureApplication } from "../app-trpc/app-trpc.context";
 import type { GatewayTrpcPorts } from "../features/gateway/gateway-trpc.mount";
 import type { GovernanceHomeTrpcPorts } from "../features/enterprise/governance-home.mount";
@@ -357,27 +356,3 @@ function enterpriseGovernanceApplication(
   >;
 }
 
-/**
- * Folds this half onto a collaborator set, leaving every other entry alone.
- *
- * An absent group passes the base through rather than replacing entries with
- * gaps: the seal is what refuses a set nobody filled, and it names what is
- * missing instead of mounting twenty-two namespaces over it.
- */
-export function withApiGatewayGroupCollaborators(
-  base: AnyApiTrpcCollaborators | undefined,
-  group: ApiGatewayGroupCollaborators | undefined,
-): AnyApiTrpcCollaborators | undefined {
-  if (!base || !group) return base;
-  return {
-    ...base,
-    gateway: group.gateway,
-    governanceHome: group.governanceHome,
-    saasBilling: group.saasBilling,
-    github: group.github,
-    application: {
-      ...base.application,
-      ...group.application,
-    },
-  } as unknown as AnyApiTrpcCollaborators;
-}

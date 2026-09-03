@@ -130,7 +130,6 @@ import type { ShareService } from "@langwatch/share-contract";
 import type { TopicService } from "@langwatch/topic-contract";
 import type { EmailSuppressionTrpcPorts } from "@langwatch/automation-server";
 import type { ApiAuditPort } from "../api-request.policy";
-import type { AnyApiTrpcCollaborators } from "../app-trpc/app-trpc.collaborators";
 import type { ApiTrpcFeatureApplication, ApiTrpcPortsContext } from "../app-trpc/app-trpc.context";
 import type { AutomationMountPorts } from "../features/automation/automation-trpc.mount";
 import type { EnterpriseTrpcMountPorts } from "../features/enterprise/enterprise-trpc.mount";
@@ -1246,40 +1245,3 @@ function maskAddress(email: string): string {
   return `${head}${"*".repeat(Math.max(local.length - 1, 1))}@${domain}`;
 }
 
-/**
- * Overlays the org-group half onto whatever collaborator set the process
- * holds.
- *
- * Merged rather than replacing, and the application slice merged field by
- * field, for the reason `ApiTrpcCollaborators.application` states: a request
- * carries ONE application, and a process that could hand a different `projects`
- * to the project surface than to the flag resolution beside it would have two.
- *
- * `projects` is DELIBERATELY written here rather than by the product-group
- * half. That half holds the narrow organization read the flag surface
- * declared; this one holds the whole project application `project.*` writes
- * through, and it satisfies the narrow read as well. Two would let the
- * settings form and the flag resolution disagree about which organization a
- * project belongs to.
- */
-export function withApiOrgGroupCollaborators(
-  base: AnyApiTrpcCollaborators | undefined,
-  group: ApiOrgGroupCollaborators | undefined,
-): AnyApiTrpcCollaborators | undefined {
-  if (!base || !group) return base;
-  return {
-    ...base,
-    organization: group.organization,
-    organizationAuditLogCheck: group.organizationAuditLogCheck,
-    project: group.project,
-    projectChecks: group.projectChecks,
-    codingAgents: group.codingAgents,
-    automation: group.automation,
-    emailSuppression: group.emailSuppression,
-    enterprise: group.enterprise,
-    application: {
-      ...base.application,
-      ...group.application,
-    },
-  } as unknown as AnyApiTrpcCollaborators;
-}

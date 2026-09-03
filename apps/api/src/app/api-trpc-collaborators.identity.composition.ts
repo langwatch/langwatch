@@ -157,7 +157,6 @@ import {
 } from "@langwatch/user-server";
 import { z } from "zod";
 import type { ApiTrpcFeatureApplication } from "../app-trpc/app-trpc.context";
-import type { AnyApiTrpcCollaborators } from "../app-trpc/app-trpc.collaborators";
 
 /**
  * What the deployment answers so a person-shaped surface can be served.
@@ -287,7 +286,8 @@ export type ApiIdentityCollaboratorsOptions = Readonly<{
 }>;
 
 /**
- * The identity half, as {@link withApiIdentityCollaborators} overlays it.
+ * The identity half, as `composeApiTrpcCollaborators`
+ * (`api-trpc-features.composition.ts`) reads it into the flat record.
  *
  * The application slices are separate from the port groups for the same reason
  * the analytics half separates them: a request carries ONE application, so the
@@ -1299,31 +1299,3 @@ async function firstAdminEmail(
   return admin?.user.email ?? null;
 }
 
-/**
- * Overlays the identity half onto whatever collaborator set the process holds.
- *
- * Merged rather than replacing, and the application slice merged field by
- * field, for the reason `ApiTrpcCollaborators.application` states: a request
- * carries ONE application, and a process that could hand a different
- * `organizations` to the group surface than to the onboarding behind it would
- * have two.
- */
-export function withApiIdentityCollaborators(
-  base: AnyApiTrpcCollaborators | undefined,
-  identity: ApiIdentityCollaborators | undefined,
-): AnyApiTrpcCollaborators | undefined {
-  if (!base || !identity) return base;
-  return {
-    ...base,
-    auth: identity.auth,
-    group: identity.group,
-    identity: identity.identity,
-    joinRequests: identity.joinRequests,
-    onboarding: identity.onboarding,
-    user: identity.user,
-    application: {
-      ...base.application,
-      ...identity.application,
-    },
-  } as AnyApiTrpcCollaborators;
-}

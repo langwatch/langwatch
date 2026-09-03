@@ -31,7 +31,6 @@ import {
 } from "@langwatch/user-server";
 import { describe, expect, it, vi } from "vitest";
 import type { ApiTrpcFeatureMount } from "../../api.application";
-import type { AnyApiTrpcCollaborators } from "../../app-trpc/app-trpc.collaborators";
 import { createApiTrpcPorts } from "../api-trpc-ports.composition";
 
 const USER_ID = "user-1";
@@ -213,7 +212,7 @@ function composePorts() {
 
   const collaborators = new Proxy({ user: userPorts } as Record<string, unknown>, {
     get: (target, property) => (property in target ? target[property as string] : emptyGroup()),
-  }) as unknown as AnyApiTrpcCollaborators;
+  }) as never;
 
   const ports = createApiTrpcPorts({
     prisma,

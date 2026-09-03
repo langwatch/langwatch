@@ -48,10 +48,8 @@ Feature: The standalone API process composes its own agent service
       And no host supplied an agent service
       When the process composes
       Then it composes no agent service, and names the missing half at boot
-      And no agents RPC surface is mounted
-      # Absent rather than mounted, for the same reason the secret door is:
-      # a door that answers every call with a 500 is worse than one that is
-      # not there.
+      And the agents RPC surface mounts backed by the null object
+      And every agents call refuses by name instead of leaving no route at all
 
   Rule: The one capability it cannot compose is announced at boot
 

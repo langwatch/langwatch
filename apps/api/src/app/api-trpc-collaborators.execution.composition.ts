@@ -144,7 +144,6 @@ import { nanoid } from "nanoid";
 import type { ZodTypeAny } from "zod";
 import { z } from "zod";
 import type { EvaluationMountPorts } from "../features/evaluation/evaluation-trpc.mount";
-import type { AnyApiTrpcCollaborators } from "../app-trpc/app-trpc.collaborators";
 import type { ApiTrpcPortsContext } from "../app-trpc/app-trpc.context";
 import {
   composeApiExperimentRun,
@@ -864,32 +863,3 @@ class LoggedExperimentRunHistoryTelemetry {
   }
 }
 
-/**
- * Folds the execution half into a collaborator set the process assembled from
- * its other halves.
- *
- * A function rather than a spread at the call site, for the reason the
- * analytics fold gives: the record is all-or-nothing, so a set that is
- * `undefined` stays `undefined` and an execution half that failed to compose
- * must not leave four namespaces answering with whatever was there before. It
- * composes with the other halves' own folds rather than competing with them —
- * each fills the entries it owns and passes the rest through untouched.
- */
-export function withApiExecutionCollaborators(
-  base: AnyApiTrpcCollaborators | undefined,
-  execution: ApiExecutionCollaborators | undefined,
-): AnyApiTrpcCollaborators | undefined {
-  if (!base || !execution) return base;
-  return {
-    ...base,
-    workflows: execution.workflowPorts,
-    experiments: execution.experimentPorts,
-    evaluations: execution.evaluationPorts,
-    application: {
-      ...base.application,
-      workflows: execution.workflows,
-      experiments: execution.experiments,
-      evaluations: execution.evaluations,
-    },
-  } as AnyApiTrpcCollaborators;
-}

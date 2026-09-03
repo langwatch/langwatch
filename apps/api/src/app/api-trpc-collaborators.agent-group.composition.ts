@@ -378,9 +378,9 @@ export type ApiAgentGroupCollaboratorsOptions = Readonly<{
  * Nested here rather than flattened onto {@link ApiAgentGroupCollaborators}
  * itself: this half also carries the `scenarios`, `langy` and `ops`
  * APPLICATION slices under those exact names, and a port and an application
- * slice cannot share one key on one object. `withApiAgentGroupCollaborators`
- * is where the two meet — it spreads these six INTO the flat record, and the
- * application slices into `application` beside them.
+ * slice cannot share one key on one object. `composeApiTrpcCollaborators`
+ * (`api-trpc-features.composition.ts`) reads `ports.*` into the flat record
+ * and the application slices into `application` beside them.
  */
 type ApiAgentGroupPorts = Readonly<{
   scenarios: ScenarioTrpcPorts;

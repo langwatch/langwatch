@@ -1,7 +1,7 @@
 import { SecretNotFoundError, SecretService, type Secret } from "@langwatch/secret-contract";
 import { describe, expect, it, vi } from "vitest";
 import { z } from "zod";
-import { ApiApplication } from "../api.application";
+import { ApiApplication, MissingAgentService } from "../api.application";
 
 const secret: Secret = {
   id: "secret-1",
@@ -25,7 +25,7 @@ class TestSecretService extends SecretService {
 function createCaller(service: TestSecretService) {
   const actor = vi.fn(() => ({ id: "user-1" }));
   const authorize = vi.fn(async () => undefined);
-  const app = ApiApplication.create({ secrets: service });
+  const app = ApiApplication.create({ agents: new MissingAgentService(), secrets: service });
   return { actor, authorize, secrets: secretRouterOf(app.createCaller({ actor, authorize })) };
 }
 
@@ -101,7 +101,7 @@ describe("ApiApplication Secret tRPC composition", () => {
   it("stops before service dispatch when exact project authorization refuses", async () => {
     const service = new TestSecretService();
     const authorizationError = new Error("project access denied");
-    const app = ApiApplication.create({ secrets: service });
+    const app = ApiApplication.create({ agents: new MissingAgentService(), secrets: service });
     const secrets = secretRouterOf(
       app.createCaller({
         actor: () => ({ id: "user-1" }),
@@ -132,7 +132,7 @@ describe("ApiApplication Secret tRPC composition", () => {
 
   it("keeps one composed service instance across callers", async () => {
     const service = new TestSecretService();
-    const app = ApiApplication.create({ secrets: service });
+    const app = ApiApplication.create({ agents: new MissingAgentService(), secrets: service });
     const callerContext = {
       actor: () => ({ id: "user-1" }),
       authorize: async () => undefined,

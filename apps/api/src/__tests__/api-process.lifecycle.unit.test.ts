@@ -1,7 +1,7 @@
 import { SecretService } from "@langwatch/secret-contract";
 import { Hono } from "hono";
 import { describe, expect, it, vi } from "vitest";
-import { ApiApplication } from "../api.application";
+import { ApiApplication, MissingAgentService } from "../api.application";
 import {
   ApiMetricsPort,
   ApiProcessLifecycleRoutes,
@@ -42,6 +42,7 @@ describe("ApiApplication HTTP failures", () => {
       throw new Error("boom");
     });
     const application = ApiApplication.create({
+      agents: new MissingAgentService(),
       secrets: new TestSecretService(),
       rest,
       http: {
@@ -72,6 +73,7 @@ describe("ApiApplication HTTP failures", () => {
       throw new Error("child-handled");
     });
     const application = ApiApplication.create({
+      agents: new MissingAgentService(),
       secrets: new TestSecretService(),
       rest,
       http: {

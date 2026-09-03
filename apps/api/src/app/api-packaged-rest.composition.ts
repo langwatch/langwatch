@@ -74,6 +74,7 @@ import type {
   ApiPackagedRestFamilyName,
 } from "../app-rest/app-rest.packaged-families";
 import { ApiPackagedRestAbsenceReport } from "../app-rest/app-rest.packaged-families";
+import type { ApiConnectedAgentsComposition } from "./api-connected-agents.composition";
 import type { AgentService } from "@langwatch/agent-contract";
 import type { ModelProviderService } from "@langwatch/model-provider-contract";
 import type { OrganizationService } from "@langwatch/organization-contract";
@@ -86,6 +87,8 @@ import { requestTraceIds } from "@langwatch/api/rest";
 /** What the packaged families are composed from, all of it already open. */
 export type ApiPackagedRestCompositionOptions = Readonly<{
   agents: AgentService | undefined;
+  /** The connected-agent transport (ADR-128), for `/api/v1/agents`'s connect and call routes. */
+  connectedAgents: ApiConnectedAgentsComposition | undefined;
   agentGroup: ApiAgentGroupCollaborators | undefined;
   analytics: ApiAnalyticsCollaborators | undefined;
   authz: AuthzService;
@@ -163,6 +166,9 @@ export function composeApiPackagedRest(
     services: {
       ...(agentCache ? { agentCache: () => agentCache } : {}),
       ...(options.agents ? { agents: agentAppFrom(options.agents) } : {}),
+      ...(options.connectedAgents
+        ? { agentsV1: agentsV1ConnectedFrom(options.connectedAgents) }
+        : {}),
       apiKeys: () => options.apiKeys,
       ...(options.authzComposition ? { authzGrants: () => options.authzComposition!.grants } : {}),
       ...(options.orgGroup
@@ -336,6 +342,31 @@ class ApiTraceMediaStore extends TraceMediaStorePort {
 function agentAppFrom(agents: AgentService): () => AgentApp {
   const app = AgentApp.create({ agents });
   return () => app;
+}
+
+/**
+ * The `/api/v1/agents` family's connected-agent deps, over the SAME
+ * composition the WebSocket gateway and the long-poll transport run on — a
+ * relay dispatched through this door and one delivered over the socket read
+ * one runtime.
+ */
+function agentsV1ConnectedFrom(connectedAgents: ApiConnectedAgentsComposition) {
+  return () => ({
+    connectedRuntime: () => connectedAgents.runtime,
+    connect: {
+      transport: () => connectedAgents.longPoll,
+      ...(connectedAgents.relayMaxPayloadMb !== undefined
+        ? { relayMaxPayloadMb: connectedAgents.relayMaxPayloadMb }
+        : {}),
+    },
+    call: {
+      runtime: () => connectedAgents.runtime,
+      assertRunnable: connectedAgents.assertRunnable,
+      ...(connectedAgents.relayMaxPayloadMb !== undefined
+        ? { relayMaxPayloadMb: connectedAgents.relayMaxPayloadMb }
+        : {}),
+    },
+  });
 }
 
 /** The secret application over the service the process already resolved. */

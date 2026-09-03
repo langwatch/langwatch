@@ -26,19 +26,22 @@ import { TraceApp, type TraceAppDependencies } from "@langwatch/trace-server";
 import superjson from "superjson";
 import { describe, expect, it, vi } from "vitest";
 import { z } from "zod";
-import { ApiApplication } from "../../api.application";
+import { ApiApplication, MissingAgentService, MissingSecretService } from "../../api.application";
 import { ApiRestSecurity } from "../../api-rest.security";
-import type { AnyApiTrpcCollaborators } from "../../app-trpc/app-trpc.collaborators";
-import type { ApiTrpcFeatureApplication } from "../../app-trpc/app-trpc.context";
 import { createSseSubscriptionApp } from "../../app-trpc/app-trpc.sse";
 import { ApiRestObservabilityComposition } from "../api-rest-observability.composition";
-import { ApiTrpcFeaturesComposition } from "../api-trpc-features.composition";
+import {
+  ApiTrpcFeaturesComposition,
+  composeApiTrpcCollaborators,
+} from "../api-trpc-features.composition";
 import {
   composeApiTraceGroupCollaborators,
   LoggedApiTraceGroupAbsence,
+  type ApiTraceGroupCollaborators,
   type ApiTraceGroupPorts,
   type ApiTraceReadStackPort,
 } from "../api-trpc-collaborators.trace-group.composition";
+import { testHalves } from "./api-trpc-collaborators.test-halves";
 import { ApiRateLimitInfrastructure } from "../../platform/infrastructure/api-rate-limit.infrastructure";
 import { resolveDataPrivacy } from "@langwatch/data-privacy-contract";
 import { composeApiModelProviderHost } from "../api-model-provider-host.composition";
@@ -153,27 +156,6 @@ function testTraceApp(broadcast: PresenceEmitterPort): TraceApp {
   });
 }
 
-/** The six application slices this half fills, plus the ones the record needs. */
-function testApplication(broadcast: PresenceEmitterPort): ApiTrpcFeatureApplication {
-  return {
-    ...stub<ApiTrpcFeatureApplication>("app"),
-    ops: { isAdmin: () => true },
-    monitors: stub("app.monitors"),
-    storedObjectApp: stub("app.storedObjectApp"),
-    config: {},
-    broadcast,
-    traces: testTraceApp(broadcast),
-    share: { listForResource: async () => [{ id: "share-1", token: "tok" }] },
-    dataRetention: { listByProject: async () => [{ traceId: "trace-1" }] },
-    topics: { getAll: async () => [{ id: "topic-1", name: "Refunds" }] },
-    modelProviders: {
-      getForProject: async () => ({}),
-      listCosts: async () => [{ id: "cost-1", model: "gpt-5-mini" }],
-    },
-    planProvider: { getActivePlan: async () => ({ type: "OPEN_SOURCE", name: "Developer" }) },
-  } as unknown as ApiTrpcFeatureApplication;
-}
-
 /** The group's ports, every one of them a fake this suite can observe. */
 function testTraceGroupPorts(): ApiTraceGroupPorts {
   const protections = { visibilityCutoffMs: null, canSeeCosts: true };
@@ -244,106 +226,24 @@ function testAuthz(): AuthzService {
   } as unknown as AuthzService;
 }
 
-function testCollaborators(broadcast: PresenceEmitterPort): AnyApiTrpcCollaborators {
+/**
+ * The trace-group half, faked: the application slices this half fills, plus
+ * its port group. Passed to `composeApiTrpcCollaborators` as the one real
+ * half under test; the other nine come from the shared stub halves.
+ */
+function testTraceGroupHalf(broadcast: PresenceEmitterPort): ApiTraceGroupCollaborators {
   return {
-    application: testApplication(broadcast),
-    analytics: {
-      reads: stub("analytics.reads", {
-        timeseriesInputSchema: anySchema,
-        sharedFiltersSchema: anySchema,
-        filterFieldSchema: anySchema,
-      }),
-      workbench: stub("analytics.workbench", {
-        requireWorkbenchEnabled: <T>(p: T) => p,
-        maxStatementLength: 4_000,
-        timeWindowSchema: anySchema,
-        granularityStepSchema: anySchema,
-      }),
-      savedCharts: stub("analytics.savedCharts", {
-        requireWorkbenchEnabled: <T>(p: T) => p,
-        timeWindowSchema: anySchema,
-        granularityStepSchema: anySchema,
-      }),
+    traces: testTraceApp(broadcast),
+    share: { listForResource: async () => [{ id: "share-1", token: "tok" }] },
+    dataRetention: { listByProject: async () => [{ traceId: "trace-1" }] },
+    topics: { getAll: async () => [{ id: "topic-1", name: "Refunds" }] },
+    modelProviders: {
+      getForProject: async () => ({}),
+      listCosts: async () => [{ id: "cost-1", model: "gpt-5-mini" }],
     },
-    annotation: stub("annotation"),
-    auth: stub("auth"),
-    bugReports: stub("bugReports"),
-    dataPrivacy: stub("dataPrivacy"),
-    evaluations: stub("evaluations", { mappingsSchema: anySchema }),
-    experiments: stub("experiments", { workbenchStateSchema: anySchema }),
-    graphs: stub("graphs", { filterFieldSchema: anySchema }),
-    group: stub("group"),
-    batchRecord: stub("batchRecord"),
-    dataset: stub("dataset"),
-    evaluators: stub("evaluators"),
-    home: stub("home"),
-    identity: stub("identity"),
-    integrationsChecks: stub("integrationsChecks"),
-    joinRequests: stub("joinRequests"),
-    onboarding: stub("onboarding", { signUpDataSchema: anySchema }),
-    prompts: stub("prompts"),
-    role: stub("role", { customRolePermission: anySchema }),
-    team: stub("team"),
-    // The three product-infrastructure surfaces, as one entry. Only the
-    // monitor precondition parser is read while the record is BUILT; the
-    // retention policy and the rest refuse by name if a call reaches them.
-    dataRetention: stub("dataRetention"),
-    monitors: stub("monitors", { preconditionsSchema: anySchema }),
-    /**
-     * The nine tenant-administration surfaces, stubbed with only what the
-     * record reads while it is BUILT: the sign-up questionnaire the
-     * organization ceremony parses against, and the three data-dependent gates
-     * the mounts chain onto a procedure. Their own suite is what proves they
-     * answer.
-     */
-    organization: stub("organization", {
-      signUpDataSchema: anySchema,
-      isCustomRole: () => false,
-    }),
-    organizationAuditLogCheck: passthroughCheck,
-    project: stub("project"),
-    projectChecks: { create: passthroughCheck, traceSharing: passthroughCheck },
-    codingAgents: stub("codingAgents"),
-    automation: stub("automation", {
-      providers: stub("automation.providers"),
-    }),
-    emailSuppression: stub("emailSuppression"),
-    enterprise: {
-      scimToken: stub("enterprise.scimToken"),
-      ssoConnections: stub("enterprise.ssoConnections"),
-    },
-    ...testTraceGroupPorts(),
-    /**
-     * The six agent surfaces, stubbed with only what the record reads while it
-     * is being BUILT. Their own suite is what proves they answer.
-     */
-    /**
-     * The twenty-one gateway and governance surfaces, stubbed with only what
-     * the record reads while it is BUILT: the virtual-key budget parser and
-     * the SaaS-billing decision, which chooses which router the two billing
-     * namespaces ARE. Their own suite is what proves they answer.
-     */
-    gateway: { virtualKeys: { virtualKeyBudgetInput: anySchema } },
-    governanceHome: stub("governanceHome"),
-    saasBilling: false,
-    github: stub("github"),
-    scenarios: stub("scenarios"),
-    langy: stub("langy"),
-    langyGates: {
-      refuseDemoProject: passthroughCheck,
-      enforceLangyAccess: passthroughCheck,
-    },
-    langyEgress: stub("langyEgress"),
-    ops: stub("ops"),
-    // Read at BUILD time — the mount asks it for a middleware — so it
-    // answers one rather than being one.
-    opsCheck: () => passthroughCheck,
-    user: stub("user"),
-    workflows: {
-      lifecycle: stub("workflows.lifecycle"),
-      optimization: stub("workflows.optimization"),
-    },
-  } as unknown as AnyApiTrpcCollaborators;
+    planProvider: { getActivePlan: async () => ({ type: "OPEN_SOURCE", name: "Developer" }) },
+    ports: testTraceGroupPorts(),
+  } as unknown as ApiTraceGroupCollaborators;
 }
 
 /** A REST security whose credential services are never reached on this lane. */
@@ -362,12 +262,16 @@ function composeApplication() {
     database: { client: {} as unknown as PrismaClient } as unknown as PrismaConnection,
     authz: testAuthz(),
     audit: undefined,
-    collaborators: testCollaborators(broadcast),
+    collaborators: composeApiTrpcCollaborators(
+      testHalves({ traceGroup: testTraceGroupHalf(broadcast) }, broadcast),
+    ),
   });
   if (!features) throw new Error("the record refused to compose against its test collaborators");
 
   const session = { user: { id: "user-1", email: "person@example.com" } };
   const application = ApiApplication.create({
+    agents: new MissingAgentService(),
+    secrets: new MissingSecretService(),
     features,
     http: {
       createContext: async () => ({
@@ -830,19 +734,7 @@ describe("given an API process that composed the real observability collaborator
   function composeRealApplication(clickHouse: ReturnType<typeof testClickHouse>) {
     const { broadcast } = testBroadcast();
     const group = composeRealGroup(clickHouse);
-    const collaborators = {
-      ...testCollaborators(broadcast),
-      ...group.ports,
-      application: {
-        ...testApplication(broadcast),
-        traces: group.traces,
-        share: group.share,
-        dataRetention: group.dataRetention,
-        topics: group.topics,
-        modelProviders: group.modelProviders,
-        planProvider: group.planProvider,
-      } as unknown as ApiTrpcFeatureApplication,
-    } as AnyApiTrpcCollaborators;
+    const collaborators = composeApiTrpcCollaborators(testHalves({ traceGroup: group }, broadcast));
 
     const features = ApiTrpcFeaturesComposition.tryCompose({
       database: { client: {} as unknown as PrismaClient } as unknown as PrismaConnection,
@@ -855,6 +747,8 @@ describe("given an API process that composed the real observability collaborator
     return {
       group,
       application: ApiApplication.create({
+        agents: new MissingAgentService(),
+        secrets: new MissingSecretService(),
         features,
         http: {
           createContext: async () => ({
@@ -1194,14 +1088,7 @@ describe("given the anonymous share read composed on this process", () => {
       readCachedSharePayload: async () => sharedTracePayload(),
     });
 
-    const collaborators = {
-      ...testCollaborators(broadcast),
-      ...group.ports,
-      application: {
-        ...testApplication(broadcast),
-        traces,
-      } as unknown as ApiTrpcFeatureApplication,
-    } as AnyApiTrpcCollaborators;
+    const collaborators = composeApiTrpcCollaborators(testHalves({ traceGroup: group }, broadcast));
 
     const features = ApiTrpcFeaturesComposition.tryCompose({
       database: { client: {} as unknown as PrismaClient } as unknown as PrismaConnection,
@@ -1214,6 +1101,8 @@ describe("given the anonymous share read composed on this process", () => {
     return {
       metered,
       application: ApiApplication.create({
+        agents: new MissingAgentService(),
+        secrets: new MissingSecretService(),
         features,
         http: {
           createContext: async () => ({

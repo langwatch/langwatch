@@ -3,7 +3,7 @@ import { AuthzService } from "@langwatch/authz-contract";
 import { OrganizationService } from "@langwatch/organization-contract";
 import { SecretService, type Secret } from "@langwatch/secret-contract";
 import { afterEach, describe, expect, it, vi } from "vitest";
-import { ApiApplication } from "../api.application";
+import { ApiApplication, MissingAgentService } from "../api.application";
 import { ApiHttpListener } from "../api-http.listener";
 import { ApiRestSecurity } from "../api-rest.security";
 import { ApiSecretRestFeature } from "../api-secret-rest.feature";
@@ -220,6 +220,7 @@ async function startApi() {
     organizations: new Proxy(OrganizationService.prototype, {}),
   });
   const application = ApiApplication.create({
+    agents: new MissingAgentService(),
     secrets,
     rest: ApiSecretRestFeature.create({ secrets, security }),
     http: {

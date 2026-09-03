@@ -22,10 +22,10 @@
  *   export.onExportProgress  a SUBSCRIPTION in the record, resolved over the
  *                            SSE lane on the SAME root `/api/trpc` serves.
  *
- * And the seal, twice over: a complete collaborator set mounts every namespace
- * the record declares, and a set any half left unfilled composes NOTHING and
- * names what is missing — which is what keeps "the record did not mount" from
- * being a symptom nobody can act on.
+ * And the completeness check, twice over: a full set of ten halves mounts
+ * every namespace the record declares, and a set with any half missing
+ * composes NOTHING and names which half — which is what keeps "the record did
+ * not mount" from being a symptom nobody can act on.
  */
 import type { AuthzCanBatchByIdsInput, AuthzService } from "@langwatch/authz-contract";
 import type { OrganizationService } from "@langwatch/organization-contract";
@@ -38,49 +38,21 @@ import type { UserService } from "@langwatch/user-contract";
 import { EventEmitter } from "node:events";
 import superjson from "superjson";
 import { describe, expect, it, vi } from "vitest";
-import { z } from "zod";
-import { ApiApplication } from "../../api.application";
+import { ApiApplication, MissingAgentService, MissingSecretService } from "../../api.application";
 import { ApiAuditPort } from "../../api-request.policy";
 import { ApiRestSecurity } from "../../api-rest.security";
-import type { AnyApiTrpcCollaborators } from "../../app-trpc/app-trpc.collaborators";
-import type { ApiTrpcFeatureApplication } from "../../app-trpc/app-trpc.context";
 import { createSseSubscriptionApp } from "../../app-trpc/app-trpc.sse";
 import { ApiRestObservabilityComposition } from "../api-rest-observability.composition";
-import { ApiTrpcFeaturesComposition } from "../api-trpc-features.composition";
+import {
+  ApiTrpcFeaturesComposition,
+  composeApiTrpcCollaborators,
+} from "../api-trpc-features.composition";
 import {
   ApiTrpcCollaboratorGapReport,
   composeApiProductCollaborators,
-  sealApiTrpcCollaborators,
-  withApiProductCollaborators,
   type ApiModelProviderEvidencePort,
 } from "../api-trpc-collaborators.product.composition";
-
-/**
- * A collaborator group with only the members the record reads while it is being
- * BUILT — the input schemas, and the one decorator a rollout gate applies to a
- * procedure. Everything else answers a function that refuses by name when a
- * call actually reaches it.
- */
-function stub<T>(group: string, buildTime: Record<string, unknown> = {}): T {
-  return new Proxy(buildTime, {
-    get(target, property) {
-      if (property in target) return target[property as string];
-      return () => {
-        throw new Error(`the test reached ${group}.${String(property)}, which it does not stub`);
-      };
-    },
-    has: () => true,
-  }) as T;
-}
-
-const anySchema = z.any();
-const openGate = <TProcedure>(procedure: TProcedure): TProcedure => procedure;
-
-/**
- * A middleware that does nothing, for the custom checks a mount installs while
- * the record is being BUILT.
- */
-const passThroughMiddleware = ({ next }: { next: () => unknown }) => next();
+import { stub, testHalves } from "./api-trpc-collaborators.test-halves";
 
 const SESSION_USER = { id: "user-1", name: "Sam Rivers", email: "sam@acme.test", role: "ADMIN" };
 const PROJECT_ID = "project-1";
@@ -360,189 +332,6 @@ class RecordingAudit extends ApiAuditPort {
 }
 
 /**
- * The rest of the record, stubbed: this file describes the product half, and a
- * namespace it does not own answering a call would mean the test had wandered.
- * The two application slices below are real, because two of the calls read
- * them: the operator check behind the support inbox, and the tenant emitter the
- * export relay watches.
- */
-function baseCollaborators(broadcast: EventEmitter): AnyApiTrpcCollaborators {
-  return {
-    // Named one slice at a time rather than proxied: the folds SPREAD this
-    // object, and a proxy's own keys are only the ones it was seeded with — so
-    // a proxied application would collapse to those on the first fold and the
-    // completeness seal would report the rest missing.
-    application: {
-      ops: { isAdmin: () => true },
-      broadcast: {
-        getTenantEmitter: () => broadcast,
-        cleanupTenantEmitter: () => undefined,
-      },
-      analytics: stub("app.analytics"),
-      apiKeys: stub("app.apiKeys"),
-      authzApp: stub("app.authzApp"),
-      config: {},
-      dashboard: stub("app.dashboard"),
-      dataset: stub("app.dataset"),
-      evaluations: stub("app.evaluations"),
-      evaluatorApp: stub("app.evaluatorApp"),
-      experiments: stub("app.experiments"),
-      featureFlags: stub("app.featureFlags"),
-      organizations: stub("app.organizations"),
-      permissions: stub("app.permissions"),
-      presence: stub("app.presence"),
-      projects: stub("app.projects"),
-      prompts: stub("app.prompts"),
-      roles: stub("app.roles"),
-      users: stub("app.users"),
-      monitors: stub("app.monitors"),
-      // The four slices the agent half writes. Its own suite is what proves
-      // they answer; here they only have to be present, because the seal
-      // refuses a set any fold left unfilled.
-      langy: stub("app.langy"),
-      scenarios: stub("app.scenarios"),
-      suites: stub("app.suites"),
-      storedObjectApp: stub("app.storedObjectApp"),
-      // The six slices the org-group half writes, present for the same reason.
-      automation: stub("app.automation"),
-      codingAgentApp: stub("app.codingAgentApp"),
-      licensing: stub("app.licensing"),
-      scimApp: stub("app.scimApp"),
-      usageLimits: stub("app.usageLimits"),
-      workflows: stub("app.workflows"),
-      // The six slices the gateway-group half writes, present for the same
-      // reason: the seal refuses a set any fold left unfilled, and the group's
-      // own suite is what proves they answer.
-      gateway: stub("app.gateway"),
-      github: stub("app.github"),
-      governance: stub("app.governance"),
-      governanceApp: stub("app.governanceApp"),
-      sessionPolicy: stub("app.sessionPolicy"),
-      webhooks: stub("app.webhooks"),
-    } as unknown as ApiTrpcFeatureApplication,
-    analytics: {
-      reads: stub("analytics.reads", {
-        timeseriesInputSchema: anySchema,
-        sharedFiltersSchema: anySchema,
-        filterFieldSchema: anySchema,
-      }),
-      workbench: stub("analytics.workbench", {
-        requireWorkbenchEnabled: openGate,
-        maxStatementLength: 4_000,
-        timeWindowSchema: anySchema,
-        granularityStepSchema: anySchema,
-      }),
-      savedCharts: stub("analytics.savedCharts", {
-        requireWorkbenchEnabled: openGate,
-        timeWindowSchema: anySchema,
-        granularityStepSchema: anySchema,
-      }),
-    },
-    auth: stub("auth"),
-    batchRecord: stub("batchRecord"),
-    dataset: stub("dataset"),
-    evaluators: stub("evaluators"),
-    evaluations: stub("evaluations", { mappingsSchema: anySchema }),
-    experiments: stub("experiments", { workbenchStateSchema: anySchema }),
-    graphs: stub("graphs", { filterFieldSchema: anySchema }),
-    group: stub("group"),
-    home: stub("home"),
-    identity: stub("identity"),
-    joinRequests: stub("joinRequests"),
-    onboarding: stub("onboarding", { signUpDataSchema: anySchema }),
-    prompts: stub("prompts"),
-    role: stub("role", { customRolePermission: anySchema }),
-    team: stub("team"),
-    // The three product-infrastructure surfaces, as one entry. Only the
-    // monitor precondition parser is read while the record is BUILT; the
-    // retention policy and the rest refuse by name if a call reaches them.
-    dataRetention: stub("dataRetention"),
-    monitors: stub("monitors", { preconditionsSchema: anySchema }),
-    /**
-     * The trace group, stubbed with only what the record reads while it is
-     * being BUILT: the input schemas its procedures are parsed with, and the
-     * two custom checks its model-provider mount wraps a procedure in. Its own
-     * suite is what proves it answers.
-     */
-    /**
-     * The nine tenant-administration surfaces, stubbed with only what the
-     * record reads while it is BUILT: the sign-up questionnaire the
-     * organization ceremony parses against, and the three data-dependent
-     * gates the mounts chain onto a procedure. Its own suite is what proves it
-     * answers.
-     */
-    organization: stub("organization", {
-      signUpDataSchema: anySchema,
-      isCustomRole: () => false,
-    }),
-    organizationAuditLogCheck: passThroughMiddleware,
-    project: stub("project"),
-    projectChecks: {
-      create: passThroughMiddleware,
-      traceSharing: passThroughMiddleware,
-    },
-    codingAgents: stub("codingAgents"),
-    automation: stub("automation", {
-      providers: stub("automation.providers"),
-    }),
-    emailSuppression: stub("emailSuppression"),
-    enterprise: {
-      scimToken: stub("enterprise.scimToken"),
-      ssoConnections: stub("enterprise.ssoConnections"),
-    },
-    traces: stub("traces", {
-      listInputSchema: anySchema,
-      filterInputSchema: anySchema,
-      evaluatorTypeSchema: anySchema,
-      preconditionSchema: anySchema,
-    }),
-    tracesV2: stub("tracesV2", { traceMetadataUpdateSchema: anySchema }),
-    spans: stub("spans"),
-    traceEditOverlay: stub("traceEditOverlay"),
-    sharedTrace: stub("sharedTrace"),
-    savedViews: stub("savedViews"),
-    costs: stub("costs"),
-    llmModelCost: stub("llmModelCost"),
-    modelProvider: stub("modelProvider"),
-    modelProviderChecks: {
-      tenantWrite: () => passThroughMiddleware,
-      credentialProbe: passThroughMiddleware,
-    },
-    translate: stub("translate"),
-    httpProxy: stub("httpProxy"),
-    limits: stub("limits"),
-    /**
-     * The six agent surfaces, stubbed with only what the record reads while it
-     * is being BUILT. Their own suite is what proves they answer.
-     */
-    scenarios: stub("scenarios"),
-    langy: stub("langy"),
-    langyGates: {
-      refuseDemoProject: passThroughMiddleware,
-      enforceLangyAccess: passThroughMiddleware,
-    },
-    langyEgress: stub("langyEgress"),
-    ops: stub("ops"),
-    opsCheck: () => passThroughMiddleware,
-    /**
-     * The twenty-one gateway and governance surfaces, stubbed with only what
-     * the record reads while it is being BUILT: the virtual-key budget parser
-     * and the SaaS-billing decision, which chooses which router the two
-     * billing namespaces ARE. Their own suite is what proves they answer.
-     */
-    gateway: { virtualKeys: { virtualKeyBudgetInput: anySchema } },
-    governanceHome: stub("governanceHome"),
-    saasBilling: false,
-    github: stub("github"),
-    user: stub("user"),
-    workflows: {
-      lifecycle: stub("workflows.lifecycle"),
-      optimization: stub("workflows.optimization"),
-    },
-  } as unknown as AnyApiTrpcCollaborators;
-}
-
-/**
  * The setup checklist's provider step, as the process composes it: the REAL
  * `ModelProviderEvidenceService`, built by the model-provider package's own
  * adapter over its own client.
@@ -612,13 +401,10 @@ function composeApplication() {
   const audit = new RecordingAudit();
   const providers = testProviderEvidence();
 
-  const collaborators = sealApiTrpcCollaborators(
-    withApiProductCollaborators(
-      baseCollaborators(broadcast),
-      composeProductHalf(prisma.client, clickHouse, providers.port),
-    ),
+  const collaborators = composeApiTrpcCollaborators(
+    testHalves({ product: composeProductHalf(prisma.client, clickHouse, providers.port) }, broadcast),
   );
-  if (!collaborators) throw new Error("the collaborator set was sealed as incomplete");
+  if (!collaborators) throw new Error("the collaborator set was incomplete");
 
   const features = ApiTrpcFeaturesComposition.tryCompose({
     database: { client: prisma.client } as unknown as PrismaConnection,
@@ -629,6 +415,8 @@ function composeApplication() {
   if (!features) throw new Error("the record refused to compose against its collaborators");
 
   const application = ApiApplication.create({
+    agents: new MissingAgentService(),
+    secrets: new MissingSecretService(),
     features,
     http: {
       createContext: async () => ({
@@ -907,9 +695,9 @@ describe("given an API process composed with the product half of the record", ()
     });
   });
 
-  describe("when a half left the entries it owns unfilled", () => {
+  describe("when a half is missing", () => {
     /** @scenario "An incomplete collaborator set composes no record and names the gap" */
-    it("seals the set as incomplete and names every missing entry", () => {
+    it("composes no record and names the missing half", () => {
       const reported: string[][] = [];
       const report = new (class extends ApiTrpcCollaboratorGapReport {
         incomplete(missing: readonly string[]): void {
@@ -917,34 +705,22 @@ describe("given an API process composed with the product half of the record", ()
         }
       })();
 
-      const base = baseCollaborators(new EventEmitter());
-      const withoutExecution = { ...base } as Record<string, unknown>;
-      delete withoutExecution.evaluations;
-      delete withoutExecution.workflows;
-      const application = { ...(base.application as Record<string, unknown>) };
-      delete application.evaluations;
-      delete application.workflows;
-      withoutExecution.application = application;
-
-      const sealed = sealApiTrpcCollaborators(
-        withApiProductCollaborators(
-          withoutExecution as unknown as AnyApiTrpcCollaborators,
-          composeProductHalf(testPrisma().client, testClickHouse([]), testProviderEvidence().port),
-        ),
+      const composed = composeApiTrpcCollaborators(
+        testHalves({
+          product: composeProductHalf(
+            testPrisma().client,
+            testClickHouse([]),
+            testProviderEvidence().port,
+          ),
+          execution: undefined,
+        }),
         report,
       );
 
-      expect(sealed).toBeUndefined();
-      // Named one by one: "the record did not mount" is a symptom every half
-      // shares, and the names are what an operator can act on.
-      expect(reported[0]).toEqual(
-        expect.arrayContaining([
-          "evaluations",
-          "workflows",
-          "application.evaluations",
-          "application.workflows",
-        ]),
-      );
+      expect(composed).toBeUndefined();
+      // Named by half: "the record did not mount" is a symptom every half
+      // shares, and the name is what an operator can act on.
+      expect(reported[0]).toEqual(["execution"]);
     });
   });
 

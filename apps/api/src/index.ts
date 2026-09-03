@@ -37,7 +37,6 @@ export {
   ApiUsageStatsPort,
   composeApiTraceGroupCollaborators,
   LoggedApiTraceGroupAbsence,
-  withApiTraceGroupCollaborators,
   type ApiProjectSpendRollup,
   type ApiTraceGroupCollaborators,
   type ApiTraceGroupCollaboratorsOptions,
@@ -45,12 +44,11 @@ export {
 } from "./app/api-trpc-collaborators.trace-group.composition";
 /**
  * The AI Gateway and governance half: the gateway application every one of its
- * doors is given, and the collaborator fold the record's twenty-one gateway and
+ * doors is given, and the collaborator set the record's twenty-one gateway and
  * governance namespaces arrive through.
  */
 export {
   composeApiGatewayGroupCollaborators,
-  withApiGatewayGroupCollaborators,
   type ApiGatewayGroupCollaborators,
   type ApiGatewayGroupCollaboratorsOptions,
 } from "./app/api-trpc-collaborators.gateway-group.composition";

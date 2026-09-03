@@ -65,13 +65,16 @@ import { ApiAgentTestAdapter } from "../features/agent/agent-test.adapter";
 import { ApiAgentWorkflowCopyAdapter } from "../features/agent/agent-workflow-copy.adapter";
 import { ApiAgentsAbsenceReportPort, ApiAgentsComposition } from "./api-agents.composition";
 import {
+  ApiConnectedAgentsAbsenceReportPort,
+  ApiConnectedAgentsComposition,
+} from "./api-connected-agents.composition";
+import { ApiUpgradeRouter } from "../api-upgrade-router";
+import {
   composeApiAnalyticsCollaborators,
-  withApiAnalyticsCollaborators,
   type ApiAnalyticsCollaborators,
 } from "./api-trpc-collaborators.analytics.composition";
 import {
   composeApiIdentityCollaborators,
-  withApiIdentityCollaborators,
   type ApiIdentityCollaborators,
   type ApiIdentityDeploymentFacts,
   type ApiIdentityMailPort,
@@ -84,7 +87,6 @@ import {
 import {
   composeApiExecutionCollaborators,
   ExecutionCapabilityUnavailableError,
-  withApiExecutionCollaborators,
   type ApiExecutionCollaborators,
 } from "./api-trpc-collaborators.execution.composition";
 import {
@@ -95,7 +97,6 @@ import {
 import {
   composeApiTraceGroupCollaborators,
   LoggedApiTraceGroupAbsence,
-  withApiTraceGroupCollaborators,
   type ApiModelProviderHostPort,
   type ApiStudioHostPort,
   type ApiTraceGroupCollaborators,
@@ -122,23 +123,19 @@ import {
 import {
   composeApiAgentGroupCollaborators,
   LoggedApiAgentGroupAbsence,
-  withApiAgentGroupCollaborators,
   type ApiAgentGroupCollaborators,
 } from "./api-trpc-collaborators.agent-group.composition";
 import {
   composeApiProductGroupCollaborators,
-  withApiProductGroupCollaborators,
   type ApiProductGroupCollaborators,
 } from "./api-trpc-collaborators.product-group.composition";
 import {
   composeApiProductInfraCollaborators,
   LoggedApiProductInfraAbsence,
-  withApiProductInfraCollaborators,
   type ApiProductInfraCollaborators,
 } from "./api-trpc-collaborators.product-infra.composition";
 import {
   composeApiOrgGroupCollaborators,
-  withApiOrgGroupCollaborators,
   type ApiEnterpriseApplicationPort,
   type ApiOrgGroupCollaborators,
   type ApiOrganizationInvitePort,
@@ -150,7 +147,6 @@ import {
 } from "./api-organization-invites.composition";
 import {
   composeApiGatewayGroupCollaborators,
-  withApiGatewayGroupCollaborators,
   type ApiGatewayGroupCollaborators,
 } from "./api-trpc-collaborators.gateway-group.composition";
 import type { ApiGatewayIdempotencyPort } from "./api-gateway.composition";
@@ -184,8 +180,6 @@ import { createPlatformUrlBuilder } from "./api-rest-ports";
 import { nanoid } from "nanoid";
 import {
   composeApiProductCollaborators,
-  sealApiTrpcCollaborators,
-  withApiProductCollaborators,
   ApiTrpcCollaboratorGapReport,
   type ApiAnnotationTraceContentPort,
   type ApiProductCollaborators,
@@ -196,9 +190,9 @@ import { TraceSpanIngestPort } from "@langwatch/trace-server";
 import type { RecordSpanCommandData } from "@langwatch/trace-contract";
 import {
   ApiTrpcFeaturesComposition,
+  composeApiTrpcCollaborators,
   LoggedApiTrpcFeaturesAbsence,
 } from "./api-trpc-features.composition";
-import type { AnyApiTrpcCollaborators } from "../app-trpc/app-trpc.collaborators";
 import { generateClickHouseFilterConditions } from "@langwatch/analytics-server";
 import { composeApiModelProviderHost } from "./api-model-provider-host.composition";
 import {
@@ -398,20 +392,6 @@ export type ApiProductionCompositionOptions = {
   featureDrain?: ApiFeatureDrainPort;
   queueStorage?: GroupQueueStoragePort;
   /**
-   * The capabilities the packaged tRPC record reaches that no package owns
-   * yet — the analytics filter catalogue, the LangWatchQL workbench, the trace
-   * pipeline, the sign-in and sign-up ceremonies, the evaluator runtime, the
-   * model gateway and the Enterprise governance surfaces.
-   *
-   * Optional, and its absence is the reason this process serves no packaged
-   * namespaces rather than a reason it fails to boot. See
-   * {@link ApiTrpcCollaborators}: with them, all twenty-two mount on the same
-   * root the subscription lane resolves paths on; without them, the process
-   * serves its agent and secret routers exactly as before and says so once at
-   * boot.
-   */
-  trpcCollaborators?: AnyApiTrpcCollaborators;
-  /**
    * A host's already-composed model gateway, when it has one.
    *
    * Optional since this process now composes its own — see
@@ -553,6 +533,7 @@ export class ApiProductionComposition extends ApiRuntimeCompositionPort {
   private composedAuthz: ApiAuthzComposition | undefined;
   private composedTenancy: ApiTenancyComposition | undefined;
   private composedAgents: ApiAgentsComposition | undefined;
+  private composedConnectedAgents: ApiConnectedAgentsComposition | undefined;
   private composedAuth: ApiAuthComposition | undefined;
   /**
    * The one outbound mail graph this process holds, or none.
@@ -820,6 +801,7 @@ export class ApiProductionComposition extends ApiRuntimeCompositionPort {
       audit: this.options.audit,
     });
     const agents = this.resolveAgents(options);
+    this.resolveConnectedAgents(options, authz, tenancy, agents);
     // "Test agent", over the agent-group half's Scenario application — a
     // thunk for the same reason `workflowCopies` above is one: the agent
     // group composes AFTER this point, so a service read here rather than at
@@ -942,42 +924,22 @@ export class ApiProductionComposition extends ApiRuntimeCompositionPort {
       // same procedure would have.
       authz,
       audit: this.options.audit,
-      // Six folds and one seal. Each fold fills the entries its half owns and
-      // passes the rest through, which is what lets them compose in any order;
-      // the seal is what refuses a set any of them left incomplete, naming the
-      // entries rather than mounting every namespace over the gaps.
-      collaborators: sealApiTrpcCollaborators(
-        withApiGatewayGroupCollaborators(
-        withApiProductInfraCollaborators(
-        withApiOrgGroupCollaborators(
-        withApiAgentGroupCollaborators(
-          withApiTraceGroupCollaborators(
-          withApiProductGroupCollaborators(
-            withApiExecutionCollaborators(
-              withApiIdentityCollaborators(
-                withApiAnalyticsCollaborators(
-                  withApiProductCollaborators(
-                    this.options.trpcCollaborators,
-                    this.composedProduct,
-                  ),
-                  this.composedAnalytics,
-                ),
-                this.composedIdentity,
-              ),
-              this.composedExecution,
-            ),
-            this.composedProductGroup,
-          ),
-            this.composedTraceGroup,
-          ),
-          this.composedAgentGroup,
-        ),
-          this.composedOrgGroup,
-        ),
-          this.composedProductInfra,
-        ),
-          this.composedGatewayGroup,
-        ),
+      // One literal, checked against the real type each half returns. A
+      // process missing any of the ten composes none of the record — see
+      // {@link composeApiTrpcCollaborators}.
+      collaborators: composeApiTrpcCollaborators(
+        {
+          product: this.composedProduct,
+          analytics: this.composedAnalytics,
+          identity: this.composedIdentity,
+          execution: this.composedExecution,
+          productGroup: this.composedProductGroup,
+          traceGroup: this.composedTraceGroup,
+          agentGroup: this.composedAgentGroup,
+          orgGroup: this.composedOrgGroup,
+          productInfra: this.composedProductInfra,
+          gatewayGroup: this.composedGatewayGroup,
+        },
         LoggedApiCollaboratorGap.create(createLogger(options.config.serviceName)),
       ),
       report: LoggedApiTrpcFeaturesAbsence.create(createLogger(options.config.serviceName)),
@@ -1005,6 +967,24 @@ export class ApiProductionComposition extends ApiRuntimeCompositionPort {
         createLogger(options.config.serviceName).info(context, message),
     });
     const rawSurface = CompositeApiRawSurface.of([hostedMcp, staticSurface]);
+    // The WebSocket upgrade path (ADR-128): one router shared with a second
+    // registrant should this process ever gain one (`api-upgrade-router.ts`'s
+    // own docblock). Built only when the transport composed, so a deployment
+    // with no connected-agent capability answers every upgrade 404 through
+    // the plain listener rather than mounting a router with nothing on it.
+    const connectedAgentsUpgradeRouter = this.composedConnectedAgents
+      ? ApiUpgradeRouter.create()
+      : undefined;
+    if (this.composedConnectedAgents && connectedAgentsUpgradeRouter) {
+      this.composedConnectedAgents.mount(connectedAgentsUpgradeRouter);
+      // Drain order (ADR-128): the listener stops taking new upgrades first
+      // (`closeApiProcessResources`'s own listener-close phase), then this
+      // closes the socket, the long-poll transport and the runtime, then the
+      // rest of `options.resources`' registrations release.
+      options.resources?.own("api connected-agent transport", () =>
+        this.composedConnectedAgents!.close(),
+      );
+    }
     const process = ApiProcess.create({
       agents,
       agentTesting,
@@ -1031,6 +1011,7 @@ export class ApiProductionComposition extends ApiRuntimeCompositionPort {
         port: options.config.port,
         drainGraceMs: options.config.httpDrainGraceMs,
         ...(rawSurface ? { rawSurface } : {}),
+        ...(connectedAgentsUpgradeRouter ? { upgrades: connectedAgentsUpgradeRouter } : {}),
       },
     });
 
@@ -1192,6 +1173,51 @@ export class ApiProductionComposition extends ApiRuntimeCompositionPort {
       report: LoggedApiAgentsAbsence.create(logger),
     });
     return this.composedAgents?.agents;
+  }
+
+  /**
+   * The connected-agent transport (ADR-128): the WebSocket gateway, the HTTP
+   * long-poll fallback and the credential/runnable checks the `/api/v1/agents`
+   * family's `/connect/*` and `/:id/call` routes need.
+   *
+   * Resolved here, right after the agent service, because
+   * `installConnectedAgentRedis` is a process-wide singleton install
+   * (`@langwatch/agent-server`'s `getConnectedAgentRuntime`) that must run
+   * before any request reads it — "Test agent" and the experiment
+   * orchestrator's relay both read the singleton directly.
+   */
+  private resolveConnectedAgents(
+    options: ApiRuntimeCompositionOptions,
+    authz: AuthzService,
+    tenancy: ApiResolvedTenancy,
+    agents: AgentService | undefined,
+  ): ApiConnectedAgentsComposition | undefined {
+    if (!agents) return undefined;
+    const projects = this.composedTenancy?.projects;
+    this.composedConnectedAgents = ApiConnectedAgentsComposition.tryCompose({
+      database: this.composedDatabase?.connection,
+      redis: this.composedQueueRedis ?? null,
+      agents,
+      apiKeys: tenancy.apiKeys,
+      credentials: ApiHandlerManagedCredentials.create({ apiKeys: tenancy.apiKeys, authz }),
+      // Absent when this process received its tenancy from a host rather than
+      // composing its own: the `project_required` refusal then names none,
+      // the same degrade every other project-dependent packaged family here
+      // already accepts for that shape.
+      projectsReachableBy: async (organizationId) => {
+        if (!projects) return [];
+        const page = await projects.listByOrganization({ organizationId, page: 1, limit: 50 });
+        return page.data.map((project) => ({ id: project.id, name: project.name }));
+      },
+      publicBaseUrl: options.config.infrastructure.execution.publicBaseUrl,
+      replicaCount: options.config.infrastructure.connectedAgents.replicaCount,
+      ...(options.config.infrastructure.connectedAgents.relayMaxPayloadMb !== undefined
+        ? { relayMaxPayloadMb: options.config.infrastructure.connectedAgents.relayMaxPayloadMb }
+        : {}),
+      processName: options.config.serviceName,
+      report: LoggedApiConnectedAgentsAbsence.create(createLogger(options.config.serviceName)),
+    });
+    return this.composedConnectedAgents;
   }
 
   /**
@@ -1720,6 +1746,7 @@ export class ApiProductionComposition extends ApiRuntimeCompositionPort {
     // browser's door answer the same question differently.
     const packaged = composeApiPackagedRest({
       agents: this.composedAgents?.agents,
+      connectedAgents: this.composedConnectedAgents,
       agentGroup: this.composedAgentGroup,
       analytics: this.composedAnalytics,
       authz,
@@ -3782,11 +3809,12 @@ export class LoggedApiAuthzAbsence extends ApiAuthzAbsenceReportPort {
  * Names what the agent service is missing once, at boot, rather than leaving it
  * to be inferred.
  *
- * Two different facts, so two different lines. No client means no agent service
- * and no agents door at all. A composed service with no workflow-copy
- * capability is a door that serves every operation but one, and a deployment
- * should read that in its own logs rather than on the first copy of a workflow
- * agent.
+ * Two different facts, so two different lines. No client means no agent
+ * service, so `api.process.ts` mounts `agents.*` against the null object
+ * instead — every call refuses by name. A composed service with no
+ * workflow-copy capability is a door that serves every operation but one, and
+ * a deployment should read that in its own logs rather than on the first copy
+ * of a workflow agent.
  */
 export class LoggedApiAgentsAbsence extends ApiAgentsAbsenceReportPort {
   static create(logger: Pick<Logger, "info" | "warn">): LoggedApiAgentsAbsence {
@@ -3800,7 +3828,7 @@ export class LoggedApiAgentsAbsence extends ApiAgentsAbsenceReportPort {
   absent(reason: "no-database"): void {
     this.logger.warn(
       { reason },
-      "API composed no agent service and no host supplied one: it mounts no agents surface, because every operation on it reads the agent rows",
+      "API composed no agent service and no host supplied one: agents.* mounts against the null object and refuses every call by name",
     );
   }
 
@@ -3808,6 +3836,31 @@ export class LoggedApiAgentsAbsence extends ApiAgentsAbsenceReportPort {
     this.logger.info(
       { reason: "no-workflow-application" },
       "API composed its agent service without a workflow-copy capability: every agent operation is served except copying a workflow agent, which needs the Studio graph this process does not compose",
+    );
+  }
+}
+
+/** Names the connected-agent transport's (ADR-128) composition decisions once, at boot. */
+export class LoggedApiConnectedAgentsAbsence extends ApiConnectedAgentsAbsenceReportPort {
+  static create(logger: Pick<Logger, "warn">): LoggedApiConnectedAgentsAbsence {
+    return new LoggedApiConnectedAgentsAbsence(logger);
+  }
+
+  private constructor(private readonly logger: Pick<Logger, "warn">) {
+    super();
+  }
+
+  withoutDatabase(): void {
+    this.logger.warn(
+      { reason: "no-database" },
+      "API composed no connected-agent transport: with no database an instance has nowhere to register, so the WebSocket gateway and the /connect/* long-poll routes do not mount",
+    );
+  }
+
+  withoutSharedStore(replicaCount: number): void {
+    this.logger.warn(
+      { reason: "no-redis", replicaCount },
+      "API composed the connected-agent transport on a memory store with more than one app replica: every connect refuses replica_count_unsupported, because an instance registered on one pod would be invisible to the others. Configure Redis, or run a single replica",
     );
   }
 }
@@ -4016,7 +4069,7 @@ export class LoggedApiCollaboratorGap extends ApiTrpcCollaboratorGapReport {
   incomplete(missing: readonly string[]): void {
     this.logger.warn(
       { missing },
-      `API process composed an incomplete tRPC collaborator set, so it serves no packaged namespaces: ${missing.join(", ")} ${missing.length === 1 ? "was" : "were"} never filled by any half.`,
+      `API process composed an incomplete tRPC collaborator set, so it serves no packaged namespaces: ${missing.join(", ")} ${missing.length === 1 ? "was" : "were"} never composed.`,
     );
   }
 }

@@ -8,6 +8,8 @@ import type { AgentTestPort } from "@langwatch/agent-server";
 import type { SecretService } from "@langwatch/secret-contract";
 import {
   ApiApplication,
+  MissingAgentService,
+  MissingSecretService,
   type ApiHttpOptions,
   type ApiSubscriptionMount,
   type ApiTrpcFeaturesPort,
@@ -42,11 +44,11 @@ export abstract class ApiProcessGraphPort {
  */
 export class ApiProcess {
   static create(options: {
-    /** Absent for a process that composed no agent service; see ApiApplication. */
+    /** Absent for a process that composed no agent service; ApiApplication gets the null object. */
     agents?: AgentService;
     /** Absent for a process that composed no Scenario application; see ApiApplication. */
     agentTesting?: AgentTestPort;
-    /** Absent for a process that composed no secret service; see ApiApplication. */
+    /** Absent for a process that composed no secret service; ApiApplication gets the null object. */
     secrets?: SecretService;
     http?: Omit<ApiHttpOptions, "logger">;
     requestPolicy?: ApiRequestPolicy;
@@ -79,9 +81,12 @@ export class ApiProcess {
     }
     const observability = createProcessObservability(options.observability);
     const application = ApiApplication.create({
-      agents: options.agents,
+      // ApiApplication requires both: a process that composed neither passes
+      // the null objects, so `agents.*`/`secrets.*` still mount and refuse by
+      // name instead of leaving the router off the wire.
+      agents: options.agents ?? new MissingAgentService(),
       agentTesting: options.agentTesting,
-      secrets: options.secrets,
+      secrets: options.secrets ?? new MissingSecretService(),
       ...(options.features ? { features: options.features } : {}),
       http: {
         ...http,

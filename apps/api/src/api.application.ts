@@ -204,7 +204,7 @@ export abstract class ApiTrpcFeaturesPort {
   abstract build(mount: ApiTrpcFeatureMount): TRPCRouterRecord;
 }
 
-class MissingAgentService extends AgentService {
+export class MissingAgentService extends AgentService {
   private unavailable(): never {
     throw new Error("Agent service is not configured for this API application.");
   }
@@ -291,15 +291,12 @@ class MissingAgentService extends AgentService {
 }
 
 /**
- * What stands in when a process composed no secret service.
- *
- * Its methods are unreachable through HTTP — the router and the REST family
- * are not mounted without a service — and it exists so the tRPC context keeps
- * one shape whether or not the service was composed. A caller that reaches it
- * some other way is told the process is not configured for secrets rather
- * than getting a null-pointer failure three layers down.
+ * What a process passes {@link ApiApplication.create} when it composed no
+ * secret service, so `secrets.*` still mounts and answers by name instead of
+ * being absent from the wire. The REST secret family is a separate decision,
+ * made by the composition root, and stays unmounted without a real service.
  */
-class MissingSecretService extends SecretService {
+export class MissingSecretService extends SecretService {
   private unavailable(): never {
     throw new Error("Secret service is not configured for this API application.");
   }
@@ -388,16 +385,13 @@ function createTrpcRoot(errorFormatter: ApiErrorFormatter) {
  * do not leak into feature packages.
  */
 export class ApiApplication {
-  private static readonly unavailableAgents = AgentApp.create({
-    agents: new MissingAgentService(),
-  });
-
-  private static readonly unavailableSecrets = SecretApp.create({
-    secrets: new MissingSecretService(),
-  });
-
   static create(options: {
-    agents?: AgentService;
+    /**
+     * Required — a process that composes no real agent service passes
+     * {@link MissingAgentService}, which mounts the router and refuses every
+     * call by name instead of leaving `agents.*` off the wire.
+     */
+    agents: AgentService;
     /**
      * Runs "Test agent" over the Scenario application. Absent leaves
      * `agents.testTurn`/`agents.testRun` composed but refusing by name — the
@@ -406,10 +400,11 @@ export class ApiApplication {
      */
     agentTesting?: AgentTestPort;
     /**
-     * Absent for a process that composed no secret service: its tRPC router is
-     * left off the root, the same way the agent router is.
+     * Required — a process that composes no real secret service passes
+     * {@link MissingSecretService}, which mounts the router and refuses every
+     * call by name instead of leaving `secrets.*` off the wire.
      */
-    secrets?: SecretService;
+    secrets: SecretService;
     topic?: TopicApiFeature;
     http?: ApiHttpOptions;
     rest?: Hono;
@@ -423,10 +418,8 @@ export class ApiApplication {
     options.topic?.install();
     return new ApiApplication(
       {
-        agents: options.agents
-          ? AgentApp.create({ agents: options.agents, testing: options.agentTesting })
-          : undefined,
-        secrets: options.secrets ? SecretApp.create({ secrets: options.secrets }) : undefined,
+        agents: AgentApp.create({ agents: options.agents, testing: options.agentTesting }),
+        secrets: SecretApp.create({ secrets: options.secrets }),
       },
       options.http,
       options.rest,
@@ -441,10 +434,7 @@ export class ApiApplication {
   private readonly root: ReturnType<typeof createTrpcRoot>;
 
   private constructor(
-    private readonly services: Readonly<{
-      agents: AgentApp | undefined;
-      secrets: SecretApp | undefined;
-    }>,
+    private readonly services: ApiServices,
     private readonly http: ApiHttpOptions | undefined,
     rest: Hono | undefined,
     readonly topic: TopicApiFeature | undefined,
@@ -452,15 +442,11 @@ export class ApiApplication {
   ) {
     this.root = createTrpcRoot(http?.errorFormatter ?? defaultErrorFormatter);
     const protectedProcedure = this.createProtectedProcedure();
-    const agents = services.agents
-      ? AgentTrpcApi.create(this.root, { protected: protectedProcedure })
-      : undefined;
-    const secrets = services.secrets
-      ? SecretTrpcApi.create(this.root, { protected: protectedProcedure })
-      : undefined;
+    const agents = AgentTrpcApi.create(this.root, { protected: protectedProcedure });
+    const secrets = SecretTrpcApi.create(this.root, { protected: protectedProcedure });
     this.trpc = this.root.router({
-      ...(agents ? { agents } : {}),
-      ...(secrets ? { secrets } : {}),
+      agents,
+      secrets,
       // Spread rather than nested: every packaged surface is keyed by the wire
       // namespace it has always answered on, and nesting them under one key
       // would rename all twenty-two of them at once.
@@ -538,13 +524,6 @@ export class ApiApplication {
     return Object.fromEntries(request.headers);
   }
 
-  private requireServices(): ApiServices {
-    return {
-      agents: this.services.agents ?? ApiApplication.unavailableAgents,
-      secrets: this.services.secrets ?? ApiApplication.unavailableSecrets,
-    };
-  }
-
   private withServices(context: ApiRequestContext, request?: Request): ApiTrpcContext {
     return {
       ...context,
@@ -577,7 +556,7 @@ export class ApiApplication {
        */
       req: request ? { headers: ApiApplication.headersOf(request) } : undefined,
       app: {
-        ...this.requireServices(),
+        ...this.services,
         ...(this.features?.application ?? unavailableFeatureApplication),
       },
     };

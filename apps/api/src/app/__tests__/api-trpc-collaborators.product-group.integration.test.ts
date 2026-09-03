@@ -55,44 +55,15 @@ import type { PrismaConnection } from "@langwatch/prisma-client";
 import type { PrismaClient } from "@langwatch/prisma-client/generated";
 import { PostgresDatasetAdapter } from "@langwatch/dataset-server";
 import type { ProjectService } from "@langwatch/project-contract";
+import { EventEmitter } from "node:events";
 import { describe, expect, it, vi } from "vitest";
-import { z } from "zod";
-import { ApiApplication } from "../../api.application";
-import type { AnyApiTrpcCollaborators } from "../../app-trpc/app-trpc.collaborators";
-import type { ApiTrpcFeatureApplication } from "../../app-trpc/app-trpc.context";
-import { ApiTrpcFeaturesComposition } from "../api-trpc-features.composition";
+import { ApiApplication, MissingAgentService, MissingSecretService } from "../../api.application";
 import {
-  composeApiProductGroupCollaborators,
-  withApiProductGroupCollaborators,
-} from "../api-trpc-collaborators.product-group.composition";
-
-/**
- * A collaborator group with only the members the record reads while it is being
- * BUILT — the input schemas, and the one decorator a rollout gate applies to a
- * procedure. Everything else answers a function that refuses by name when a
- * call actually reaches it.
- */
-function stub<T>(group: string, buildTime: Record<string, unknown> = {}): T {
-  return new Proxy(buildTime, {
-    get(target, property) {
-      if (property in target) return target[property as string];
-      return () => {
-        throw new Error(`the test reached ${group}.${String(property)}, which it does not stub`);
-      };
-    },
-    has: () => true,
-  }) as T;
-}
-
-const anySchema = z.any();
-const openGate = <TProcedure>(procedure: TProcedure): TProcedure => procedure;
-
-/**
- * A middleware that does nothing, for the custom checks a mount installs while
- * the record is being BUILT. It carries no authorization declaration because
- * nothing in this file exercises a trace-group procedure.
- */
-const passThroughMiddleware = ({ next }: { next: () => unknown }) => next();
+  ApiTrpcFeaturesComposition,
+  composeApiTrpcCollaborators,
+} from "../api-trpc-features.composition";
+import { composeApiProductGroupCollaborators } from "../api-trpc-collaborators.product-group.composition";
+import { stubIdentityHalf, stubOrgGroupHalf, testHalves } from "./api-trpc-collaborators.test-halves";
 
 const SESSION_USER = { id: "user-1", name: "Sam Rivers", email: "sam@acme.test", role: "ADMIN" };
 const PROJECT_ID = "project-1";
@@ -221,144 +192,9 @@ function testAuthz(): AuthzService {
 }
 
 /**
- * The rest of the record, stubbed: this file describes the product-group half,
- * and a namespace it does not own answering a call would mean the test had
- * wandered.
- */
-function baseCollaborators(organizations: unknown): AnyApiTrpcCollaborators {
-  return {
-    application: stub<ApiTrpcFeatureApplication>("app", { organizations }),
-    analytics: {
-      reads: stub("analytics.reads", {
-        timeseriesInputSchema: anySchema,
-        sharedFiltersSchema: anySchema,
-        filterFieldSchema: anySchema,
-      }),
-      workbench: stub("analytics.workbench", {
-        requireWorkbenchEnabled: openGate,
-        maxStatementLength: 4_000,
-        timeWindowSchema: anySchema,
-        granularityStepSchema: anySchema,
-      }),
-      savedCharts: stub("analytics.savedCharts", {
-        requireWorkbenchEnabled: openGate,
-        timeWindowSchema: anySchema,
-        granularityStepSchema: anySchema,
-      }),
-    },
-    annotation: stub("annotation"),
-    auth: stub("auth"),
-    batchRecord: stub("batchRecord"),
-    bugReports: stub("bugReports"),
-    dataPrivacy: stub("dataPrivacy"),
-    dataset: stub("dataset"),
-    evaluators: stub("evaluators"),
-    evaluations: stub("evaluations", { mappingsSchema: anySchema }),
-    experiments: stub("experiments", { workbenchStateSchema: anySchema }),
-    graphs: stub("graphs", { filterFieldSchema: anySchema }),
-    group: stub("group"),
-    home: stub("home"),
-    identity: stub("identity"),
-    integrationsChecks: stub("integrationsChecks"),
-    joinRequests: stub("joinRequests"),
-    onboarding: stub("onboarding", { signUpDataSchema: anySchema }),
-    prompts: stub("prompts"),
-    role: stub("role", { customRolePermission: anySchema }),
-    team: stub("team"),
-    // The three product-infrastructure surfaces, as one entry. Only the
-    // monitor precondition parser is read while the record is BUILT; the
-    // retention policy and the rest refuse by name if a call reaches them.
-    dataRetention: stub("dataRetention"),
-    monitors: stub("monitors", { preconditionsSchema: anySchema }),
-    /**
-     * The trace group, stubbed with only what the record reads while it is
-     * being BUILT: the input schemas its procedures are parsed with. Its own
-     * suite is what proves it answers.
-     */
-    /**
-     * The nine tenant-administration surfaces, stubbed with only what the
-     * record reads while it is BUILT: the sign-up questionnaire the
-     * organization ceremony parses against, and the three data-dependent
-     * gates the mounts chain onto a procedure. Its own suite is what proves it
-     * answers.
-     */
-    organization: stub("organization", {
-      signUpDataSchema: anySchema,
-      isCustomRole: () => false,
-    }),
-    organizationAuditLogCheck: passThroughMiddleware,
-    project: stub("project"),
-    projectChecks: {
-      create: passThroughMiddleware,
-      traceSharing: passThroughMiddleware,
-    },
-    codingAgents: stub("codingAgents"),
-    automation: stub("automation", {
-      providers: stub("automation.providers"),
-    }),
-    emailSuppression: stub("emailSuppression"),
-    enterprise: {
-      scimToken: stub("enterprise.scimToken"),
-      ssoConnections: stub("enterprise.ssoConnections"),
-    },
-    traces: stub("traces", {
-      listInputSchema: anySchema,
-      filterInputSchema: anySchema,
-      evaluatorTypeSchema: anySchema,
-      preconditionSchema: anySchema,
-    }),
-    tracesV2: stub("tracesV2", { traceMetadataUpdateSchema: anySchema }),
-    spans: stub("spans"),
-    traceEditOverlay: stub("traceEditOverlay"),
-    sharedTrace: stub("sharedTrace"),
-    savedViews: stub("savedViews"),
-    costs: stub("costs"),
-    llmModelCost: stub("llmModelCost"),
-    modelProvider: stub("modelProvider"),
-    modelProviderChecks: {
-      // Both are read at BUILD time — the mount wraps a procedure in each —
-      // so they answer a pass-through middleware rather than refusing.
-      tenantWrite: () => passThroughMiddleware,
-      credentialProbe: passThroughMiddleware,
-    },
-    translate: stub("translate"),
-    httpProxy: stub("httpProxy"),
-    limits: stub("limits"),
-    /**
-     * The six agent surfaces, stubbed with only what the record reads while it
-     * is being BUILT. Their own suite is what proves they answer.
-     */
-    /**
-     * The twenty-one gateway and governance surfaces, stubbed with only what
-     * the record reads while it is BUILT: the virtual-key budget parser and
-     * the SaaS-billing decision, which chooses which router the two billing
-     * namespaces ARE. Their own suite is what proves they answer.
-     */
-    gateway: { virtualKeys: { virtualKeyBudgetInput: anySchema } },
-    governanceHome: stub("governanceHome"),
-    saasBilling: false,
-    github: stub("github"),
-    scenarios: stub("scenarios"),
-    langy: stub("langy"),
-    langyGates: {
-      refuseDemoProject: passThroughMiddleware,
-      enforceLangyAccess: passThroughMiddleware,
-    },
-    langyEgress: stub("langyEgress"),
-    ops: stub("ops"),
-    opsCheck: () => passThroughMiddleware,
-    user: stub("user"),
-    workflows: {
-      lifecycle: stub("workflows.lifecycle"),
-      optimization: stub("workflows.optimization"),
-    },
-  } as unknown as AnyApiTrpcCollaborators;
-}
-
-/**
  * The organization application the identity half owns, as the two surfaces
  * that read it off `ctx.app` ask it. Supplied by the BASE rather than by this
- * half on purpose — see `withApiProductGroupCollaborators`.
+ * half on purpose — see `composeApiTrpcCollaborators`.
  */
 function testOrganizationApp() {
   return {
@@ -373,6 +209,7 @@ function composeApplication(options: { customRolePlan?: undefined } = {}) {
   const prisma = testPrisma();
   const authz = testAuthz();
   const organizations = testOrganizationApp();
+  const broadcast = new EventEmitter();
 
   const projects = {
     getOrganizationId: vi.fn(async () => ORGANIZATION_ID),
@@ -411,11 +248,30 @@ function composeApplication(options: { customRolePlan?: undefined } = {}) {
     database: { client: prisma.client } as unknown as PrismaConnection,
     authz,
     audit: undefined,
-    collaborators: withApiProductGroupCollaborators(baseCollaborators(organizations), group),
+    collaborators: composeApiTrpcCollaborators(
+      testHalves({
+        productGroup: group,
+        identity: {
+          ...stubIdentityHalf(broadcast),
+          application: { ...stubIdentityHalf(broadcast).application, organizations },
+        },
+        // `application.projects` is org-group's to write in production (see
+        // `composeApiTrpcCollaborators`), and it overwrites product-group's own
+        // narrower one there — so the org-group half's stub here has to carry
+        // the SAME `projects` this test observes, or the flag resolution reads
+        // a different project directory than the one it asserts against.
+        orgGroup: {
+          ...stubOrgGroupHalf(),
+          application: { ...stubOrgGroupHalf().application, projects },
+        } as never,
+      }),
+    ),
   });
   if (!features) throw new Error("the record refused to compose against its collaborators");
 
   const application = ApiApplication.create({
+    agents: new MissingAgentService(),
+    secrets: new MissingSecretService(),
     features,
     http: {
       createContext: async () => ({

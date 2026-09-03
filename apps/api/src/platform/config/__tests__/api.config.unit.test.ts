@@ -177,6 +177,7 @@ describe("API process configuration", () => {
           payloadCodec: "json",
         },
         licensing: { publicKey: undefined },
+        connectedAgents: { replicaCount: 1, relayMaxPayloadMb: undefined },
       },
     });
   });
@@ -265,6 +266,27 @@ describe("API process configuration", () => {
       const raw = "  0f0f  ";
 
       expect(resolveApiConfig({ CREDENTIALS_SECRET: raw }).apiKeyPepper).toBe(raw);
+    });
+  });
+
+  describe("when the connected-agent transport is configured", () => {
+    it("reads the replica count and the relay payload cap override", () => {
+      const config = resolveApiConfig({
+        LANGWATCH_APP_REPLICAS: "3",
+        LANGWATCH_AGENT_RELAY_MAX_PAYLOAD_MB: "64",
+      });
+
+      expect(config.infrastructure.connectedAgents).toEqual({
+        replicaCount: 3,
+        relayMaxPayloadMb: 64,
+      });
+    });
+
+    it("defaults to a single replica and no payload override", () => {
+      expect(resolveApiConfig({}).infrastructure.connectedAgents).toEqual({
+        replicaCount: 1,
+        relayMaxPayloadMb: undefined,
+      });
     });
   });
 
@@ -537,6 +559,7 @@ describe("API process configuration", () => {
         payloadCodec: "msgpack",
       },
       licensing: { publicKey: undefined },
+      connectedAgents: { replicaCount: 1, relayMaxPayloadMb: undefined },
     });
   });
 

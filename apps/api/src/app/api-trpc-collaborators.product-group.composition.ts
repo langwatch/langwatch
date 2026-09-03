@@ -93,7 +93,6 @@ import {
   RoleScopePort,
 } from "@langwatch/role-server";
 import type { RoleTrpcPorts } from "../features/role/role-trpc.mount";
-import type { AnyApiTrpcCollaborators } from "../app-trpc/app-trpc.collaborators";
 import type { ApiTrpcPortsContext } from "../app-trpc/app-trpc.context";
 
 /**
@@ -486,51 +485,6 @@ function isCustomRole(role: string): boolean {
   return !BUILT_IN_TEAM_ROLES.has(role);
 }
 
-/**
- * Overlays the product-group half onto whatever collaborator set the process
- * holds.
- *
- * Merged rather than replacing, and the application slice merged field by
- * field, for the reason {@link ApiTrpcCollaborators.application} states: a
- * request carries ONE application, and a process that could hand a different
- * `organizations` to the team surface than to the onboarding behind it would
- * have two.
- *
- * `organizations` is DELIBERATELY not among the slices written here even
- * though `team.*` and `personalWorkspaceFeatures.*` read it. The organization
- * application it needs is the wide one — the twelve membership operations the
- * canonical contract does not declare — and only the identity half composes
- * that. Writing a narrower second one here would give this process two
- * organization applications and let the team surface answer differently from
- * the onboarding beside it.
- */
-export function withApiProductGroupCollaborators(
-  base: AnyApiTrpcCollaborators | undefined,
-  group: ApiProductGroupCollaborators | undefined,
-): AnyApiTrpcCollaborators | undefined {
-  if (!base || !group) return base;
-  return {
-    ...base,
-    batchRecord: group.batchRecordPorts,
-    evaluators: group.evaluatorPorts,
-    role: group.rolePorts,
-    dataset: group.datasetPorts,
-    home: group.homePorts,
-    prompts: group.promptPorts,
-    team: group.teamPorts,
-    application: {
-      ...base.application,
-      authzApp: group.authzApp,
-      dataset: group.datasetApp,
-      evaluatorApp: group.evaluatorApp,
-      featureFlags: group.featureFlagService,
-      permissions: group.permissions,
-      projects: group.projectReads,
-      prompts: group.promptApp,
-      roles: group.roleApp,
-    },
-  } as unknown as AnyApiTrpcCollaborators;
-}
 
 /**
  * The personal-workspace fence a role binding is refused at, over this

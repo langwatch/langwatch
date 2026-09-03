@@ -113,8 +113,6 @@ import {
 import type { TraceLegacyFilterInput, TraceLegacyListInput } from "@langwatch/trace-contract";
 import type { CostTrpcPorts } from "@langwatch/entitlement-server";
 import type { SavedViewTrpcPorts } from "@langwatch/dashboard-server";
-import type { AnyApiTrpcCollaborators } from "../app-trpc/app-trpc.collaborators";
-import type { ApiTrpcFeatureApplication } from "../app-trpc/app-trpc.context";
 import type { ModelProviderTrpcChecks } from "../features/model-provider/model-provider-trpc.mount";
 
 // ---------------------------------------------------------------------------
@@ -352,8 +350,8 @@ export type ApiTraceGroupCollaborators = Readonly<{
  * Nested here rather than flattened onto {@link ApiTraceGroupCollaborators}
  * itself: this half also carries the `traces` APPLICATION slice under that
  * exact name, and a port and an application slice cannot share one key on one
- * object. `withApiTraceGroupCollaborators` is where the two meet — it spreads
- * these thirteen INTO the flat record, and the application slice into
+ * object. `composeApiTrpcCollaborators` (`api-trpc-features.composition.ts`)
+ * reads `ports.*` into the flat record and the application slice into
  * `application` beside them.
  */
 export type ApiTraceGroupPorts = Readonly<{
@@ -591,49 +589,6 @@ export function composeApiTraceGroupCollaborators(
   };
 }
 
-/**
- * Folds the observability half into a collaborator set the process assembled
- * from its other halves.
- *
- * It REFUSES rather than passing through, which is the difference between this
- * fold and the analytics, identity and execution ones. Those three can be
- * genuinely missing — a deployment with no ClickHouse composes no charted
- * reads — and the seal catches the entries they left unfilled. This half is
- * composed from the same connection the record already required, so a set
- * without it is not a smaller product, it is a set whose sixteen ports are
- * `undefined` and whose namespaces would fail while being BUILT.
- */
-export function withApiTraceGroupCollaborators(
-  base: AnyApiTrpcCollaborators | undefined,
-  group: ApiTraceGroupCollaborators | undefined,
-): AnyApiTrpcCollaborators | undefined {
-  if (!base || !group) return undefined;
-  return {
-    ...base,
-    traces: group.ports.traces,
-    tracesV2: group.ports.tracesV2,
-    spans: group.ports.spans,
-    traceEditOverlay: group.ports.traceEditOverlay,
-    sharedTrace: group.ports.sharedTrace,
-    savedViews: group.ports.savedViews,
-    costs: group.ports.costs,
-    llmModelCost: group.ports.llmModelCost,
-    modelProvider: group.ports.modelProvider,
-    modelProviderChecks: group.ports.modelProviderChecks,
-    translate: group.ports.translate,
-    httpProxy: group.ports.httpProxy,
-    limits: group.ports.limits,
-    application: {
-      ...base.application,
-      traces: group.traces,
-      share: group.share,
-      dataRetention: group.dataRetention,
-      topics: group.topics,
-      modelProviders: group.modelProviders,
-      planProvider: group.planProvider,
-    } as ApiTrpcFeatureApplication,
-  } as AnyApiTrpcCollaborators;
-}
 
 /** Writes each absence to the process log, with what it costs. */
 export class LoggedApiTraceGroupAbsence extends ApiTraceGroupAbsenceReport {

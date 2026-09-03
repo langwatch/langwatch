@@ -48,16 +48,14 @@ import type { PrismaConnection } from "@langwatch/prisma-client";
 import type { PrismaClient } from "@langwatch/prisma-client/generated";
 import type { RedisConnection } from "@langwatch/redis-client";
 import { afterEach, describe, expect, it, vi } from "vitest";
-import { z } from "zod";
 import { ApiAuditPort } from "../../api-request.policy";
-import { ApiApplication } from "../../api.application";
-import type { AnyApiTrpcCollaborators } from "../../app-trpc/app-trpc.collaborators";
-import type { ApiTrpcFeatureApplication } from "../../app-trpc/app-trpc.context";
+import { ApiApplication, MissingAgentService, MissingSecretService } from "../../api.application";
+import { composeApiExecutionCollaborators } from "../api-trpc-collaborators.execution.composition";
 import {
-  composeApiExecutionCollaborators,
-  withApiExecutionCollaborators,
-} from "../api-trpc-collaborators.execution.composition";
-import { ApiTrpcFeaturesComposition } from "../api-trpc-features.composition";
+  ApiTrpcFeaturesComposition,
+  composeApiTrpcCollaborators,
+} from "../api-trpc-features.composition";
+import { testHalves } from "./api-trpc-collaborators.test-halves";
 
 const NLP_SERVICE_URL = "http://127.0.0.1:5561";
 const PUBLIC_BASE_URL = "https://app.example.test";
@@ -74,22 +72,6 @@ function stub<T>(group: string, buildTime: Record<string, unknown> = {}): T {
     has: () => true,
   }) as T;
 }
-
-const anySchema = z.any();
-const openGate = <TProcedure>(procedure: TProcedure): TProcedure => procedure;
-const passThroughMiddleware = ({ next }: { next: () => unknown }) => next();
-
-/**
- * A group every member of which is a permissive input parser.
- *
- * A tRPC input schema is read while the router is BUILT, so a group of them
- * cannot be a refusing proxy the way a group of capabilities can — the build
- * itself would throw. This answers every name with `z.any()`, which mounts the
- * procedures without claiming anything about what they accept; the surfaces
- * that own those schemas assert them in their own suites.
- */
-const schemaBag = <T>(): T =>
-  new Proxy({}, { get: () => anySchema, has: () => true }) as T;
 
 const experimentRow = {
   id: "experiment-1",
@@ -226,114 +208,6 @@ function testApiKeys(): { service: ApiKeyService; created: unknown[] } {
   return { service, created };
 }
 
-/** Every collaborator the record needs EXCEPT the execution half, stubbed. */
-function otherCollaborators(): AnyApiTrpcCollaborators {
-  return {
-    application: {
-      ...stub<ApiTrpcFeatureApplication>("app"),
-      ops: { isAdmin: () => true },
-      config: { opsSidebarEmails: [] },
-    },
-    analytics: {
-      reads: stub("analytics.reads", {
-        timeseriesInputSchema: anySchema,
-        sharedFiltersSchema: anySchema,
-        filterFieldSchema: anySchema,
-      }),
-      workbench: stub("analytics.workbench", {
-        requireWorkbenchEnabled: openGate,
-        maxStatementLength: 4_000,
-        timeWindowSchema: anySchema,
-        granularityStepSchema: anySchema,
-      }),
-      savedCharts: stub("analytics.savedCharts", {
-        requireWorkbenchEnabled: openGate,
-        timeWindowSchema: anySchema,
-        granularityStepSchema: anySchema,
-      }),
-    },
-    annotation: stub("annotation"),
-    batchRecord: stub("batchRecord"),
-    auth: stub("auth"),
-    bugReports: stub("bugReports"),
-    dataPrivacy: stub("dataPrivacy"),
-    dataset: stub("dataset"),
-    evaluators: stub("evaluators"),
-    evaluations: stub("evaluations", { mappingsSchema: anySchema }),
-    experiments: stub("experiments", { workbenchStateSchema: anySchema }),
-    graphs: stub("graphs", { filterFieldSchema: anySchema }),
-    group: stub("group"),
-    home: stub("home"),
-    identity: stub("identity"),
-    integrationsChecks: stub("integrationsChecks"),
-    joinRequests: stub("joinRequests"),
-    onboarding: stub("onboarding", { signUpDataSchema: anySchema }),
-    prompts: stub("prompts"),
-    role: stub("role", { customRolePermission: anySchema }),
-    team: stub("team"),
-    dataRetention: stub("dataRetention"),
-    monitors: stub("monitors", { preconditionsSchema: anySchema }),
-    organization: stub("organization", {
-      signUpDataSchema: anySchema,
-      isCustomRole: () => false,
-    }),
-    organizationAuditLogCheck: passThroughMiddleware,
-    project: stub("project"),
-    projectChecks: {
-      create: passThroughMiddleware,
-      traceSharing: passThroughMiddleware,
-    },
-    codingAgents: stub("codingAgents"),
-    automation: stub("automation", {
-      providers: stub("automation.providers"),
-    }),
-    emailSuppression: stub("emailSuppression"),
-    enterprise: {
-      scimToken: stub("enterprise.scimToken"),
-      ssoConnections: stub("enterprise.ssoConnections"),
-    },
-    traces: stub("traces", {
-      listInputSchema: anySchema,
-      filterInputSchema: anySchema,
-      evaluatorTypeSchema: anySchema,
-      preconditionSchema: anySchema,
-    }),
-    tracesV2: stub("tracesV2", { traceMetadataUpdateSchema: anySchema }),
-    spans: stub("spans"),
-    traceEditOverlay: stub("traceEditOverlay"),
-    sharedTrace: stub("sharedTrace"),
-    savedViews: stub("savedViews"),
-    costs: stub("costs"),
-    llmModelCost: stub("llmModelCost"),
-    modelProvider: stub("modelProvider"),
-    modelProviderChecks: {
-      tenantWrite: () => passThroughMiddleware,
-      credentialProbe: passThroughMiddleware,
-    },
-    translate: stub("translate"),
-    httpProxy: stub("httpProxy"),
-    limits: stub("limits"),
-    scenarios: stub("scenarios"),
-    langy: stub("langy"),
-    langyGates: {
-      refuseDemoProject: passThroughMiddleware,
-      enforceLangyAccess: passThroughMiddleware,
-    },
-    langyEgress: stub("langyEgress"),
-    ops: stub("ops"),
-    opsCheck: () => passThroughMiddleware,
-    gateway: { virtualKeys: schemaBag() },
-    governanceHome: stub("governanceHome"),
-    saasBilling: false,
-    github: stub("github"),
-    user: stub("user"),
-    workflows: {
-      lifecycle: stub("workflows.lifecycle"),
-      optimization: stub("workflows.optimization"),
-    },
-  } as unknown as AnyApiTrpcCollaborators;
-}
-
 /**
  * One HTTP agent, which is the target a cell can run with no model and no
  * saved prompt: the graph it builds carries no LLM node, so what this exercises
@@ -458,11 +332,13 @@ function composeApplication(options: { redis?: RedisConnection | null } = {}) {
     audit: new (class extends ApiAuditPort {
       async record(): Promise<void> {}
     })(),
-    collaborators: withApiExecutionCollaborators(otherCollaborators(), execution),
+    collaborators: composeApiTrpcCollaborators(testHalves({ execution })),
   });
   if (!features) throw new Error("the record refused to compose against its collaborators");
 
   const application = ApiApplication.create({
+    agents: new MissingAgentService(),
+    secrets: new MissingSecretService(),
     features,
     http: {
       createContext: async () => ({
