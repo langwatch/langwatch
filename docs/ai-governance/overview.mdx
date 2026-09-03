@@ -11,7 +11,43 @@ The section is in the sidebar under **AI Governance**, with four pages: **Overvi
 
 ## The overview page
 
-The overview at `/governance` shows the last 30 days: spend over time, the spend share across teams, the top teams and users by spend, spend by department, the recent anomalies and the status of each ingestion source. Before the first source reports activity, the page shows a setup checklist instead: add tools to the catalog, define a routing policy, connect an ingestion source and define anomaly rules.
+The overview at `/governance` shows the last 30 days: spend over time, the spend share across teams, the top teams and users by spend, spend by department, the recent anomalies and the status of each ingestion source. The panels roll up the events of your ingestion sources. LangWatch AI Gateway traffic is under **Gateway > Usage**.
+
+Until the first ingestion source reports an event, the page shows a setup checklist instead: add tools to the catalog, define a routing policy, connect an ingestion source and define anomaly rules.
+
+<Frame caption="The overview before the first ingestion source reports an event: the setup checklist with all four steps complete.">
+  ![The AI Governance overview with the setup checklist](/images/ai-governance/governance-overview.png)
+</Frame>
+
+## Inventory
+
+The inventory has two tabs. **Sources** lists the systems that report AI activity, in two groups: real-time streams that push events as they happen, and sources synced on a schedule. A new source reads **Awaiting first event** until its first event arrives, then **Active**.
+
+<Frame caption="The Sources tab with two real-time sources, a Claude Code source and a generic OpenTelemetry source, both awaiting their first event.">
+  ![The Sources tab of the inventory](/images/ai-governance/governance-inventory-sources.png)
+</Frame>
+
+**Catalog** holds the tool tiles that developers see on their personal home page, in three groups: coding assistants, model providers and internal tools. Each tile carries its scope.
+
+<Frame caption="The Catalog tab after the starter pack import: four coding assistants and four model providers, each scoped to the organization.">
+  ![The Catalog tab of the inventory](/images/ai-governance/governance-inventory-catalog.png)
+</Frame>
+
+## Anomaly Rules
+
+Rules are grouped by severity: Critical, Warning and Info. Each rule has a type, a description and a scope.
+
+<Frame caption="One Warning rule of type spend_spike, scoped to the organization.">
+  ![The Anomaly Rules page with one rule](/images/ai-governance/governance-anomaly-rule.png)
+</Frame>
+
+## Personal home page
+
+`/me` shows each developer the tools published in the catalog, the budgets that apply to them, and their usage this month.
+
+<Frame caption="The personal home page: the tool tiles, the personal and organization budgets, and the Spent, Requests and Most-used model cards.">
+  ![The personal home page](/images/ai-governance/me-home.png)
+</Frame>
 
 ## Pages
 
@@ -20,7 +56,7 @@ The overview at `/governance` shows the last 30 days: spend over time, the spend
     The systems that report AI activity to LangWatch: Claude Code, generic OpenTelemetry, Workato, Microsoft Copilot Studio, the OpenAI and Anthropic compliance and admin APIs, Databricks Genie, and custom S3 or HTTP audit logs. Each source shows whether it is active, awaiting its first event or disabled.
   </Card>
   <Card title="Inventory: tool catalog" icon="grid-2" href="/ai-governance/personal-portal/admin-catalog">
-    The coding assistants, model providers and external tools that developers see on their personal home page. Import the starter pack, then scope each tile to the whole organization or to departments.
+    The coding assistants, model providers and internal tools that developers see on their personal home page. Import the starter pack, then scope each tile to the whole organization or to departments.
   </Card>
   <Card title="Anomaly Rules" icon="triangle-exclamation" href="/ai-governance/anomaly-rules">
     Rules with a severity (Critical, Warning or Info) and a scope (the organization, one source type or one source) that raise an alert when activity crosses a threshold. Available on Enterprise plans.

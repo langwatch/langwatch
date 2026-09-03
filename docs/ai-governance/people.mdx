@@ -7,7 +7,7 @@ keywords: departments, people, spend attribution, cost center, scim, langwatch
 
 A department is an accounting label for AI spend. You create departments on the **People** page, assign people, teams and projects to them on the members and teams pages, and the governance overview shows spend by department for the whole organization.
 
-A department never grants or restricts access. Assigning a person to Engineering changes where their spend is counted and nothing else. For access, see [Access Control (RBAC)](/platform/rbac).
+A department never grants or restricts access. Assigning a person to Engineering changes only where their spend is counted. For access, see [Access Control (RBAC)](/platform/rbac).
 
 ## Manage departments
 
@@ -16,6 +16,10 @@ Open **AI Governance > People** (`/governance/people`). The page has:
 - **Create a department**: type a name and click **Create**.
 - The department list, with **Edit** to rename and **Archive** in the row menu.
 - **Assigning departments**: links to the members and teams pages, where you assign each person, team and project.
+
+<Frame caption="The People page with two departments and the assignment guide below the list.">
+  ![The People page](/images/ai-governance/governance-people.png)
+</Frame>
 
 Reading the list needs `governance:view`. Creating, renaming, archiving and assigning need `governance:manage`. Without it the page shows the list only.
 
@@ -31,6 +35,14 @@ The People page does not list assignments per person, so it stays usable in a la
 
 The Department column and the pickers appear once the organization has at least one department, for a viewer with `organization:manage`.
 
+<Frame caption="The Department column on Settings > Members, with each person assigned to Engineering or Marketing.">
+  ![The Department column on Settings > Members](/images/ai-governance/governance-people-member-assignment.png)
+</Frame>
+
+<Frame caption="The Department picker on each team row and on the project row under the expanded team at Settings > Teams & Projects.">
+  ![The department pickers on Settings > Teams & Projects](/images/ai-governance/governance-people-team-assignment.png)
+</Frame>
+
 ## How spend is attributed
 
 Each request counts once, in exactly one department.
@@ -43,7 +55,7 @@ The person always wins over the project, so a developer's personal AI use and th
 
 ## Archive a department
 
-Archive removes the department from the pickers. Spend already attributed to it is counted under **Unassigned** from then on; the assignments stay stored, so nothing is deleted. You can create a new department with the same name as an archived one.
+Archive removes the department from the pickers. Spend already attributed to it is counted under **Unassigned** from then on. The assignments stay stored; archive deletes no data. You can create a new department with the same name as an archived one.
 
 ## Assign departments through SCIM
 
