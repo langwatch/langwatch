@@ -56,6 +56,7 @@ function createService() {
 }
 
 describe("PresenceService", () => {
+  /** @scenario "Presence uses Project-owned policy" */
   it("uses the canonical Project service for the effective policy", async () => {
     const { service, projects } = createService();
     projects.enabled = false;
@@ -64,6 +65,7 @@ describe("PresenceService", () => {
     );
   });
 
+  /** @scenario "A first heartbeat joins a project" */
   it("persists and broadcasts the first session heartbeat", async () => {
     const { service, repository, broadcast } = createService();
     await expect(
@@ -127,6 +129,7 @@ describe("PresenceService", () => {
     );
   });
 
+  /** @scenario "An unchanged heartbeat refreshes only the TTL" */
   it("refreshes an unchanged session without broadcasting a delta", async () => {
     const { service, repository, broadcast } = createService();
     repository.current = session;
@@ -140,10 +143,13 @@ describe("PresenceService", () => {
     expect(broadcast.publish).not.toHaveBeenCalled();
   });
 
+  /** @scenario "Leaving twice is idempotent" */
   it("makes leave idempotent", async () => {
     const { service, repository, broadcast } = createService();
     repository.remove.mockResolvedValue(false);
-    await service.leave({ projectId: "project-1", sessionId: "missing" });
+    await expect(
+      service.leave({ projectId: "project-1", sessionId: "missing" }),
+    ).resolves.toBeUndefined();
     expect(broadcast.publish).not.toHaveBeenCalled();
   });
 

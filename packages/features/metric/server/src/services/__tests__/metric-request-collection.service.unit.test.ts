@@ -92,6 +92,7 @@ const requestContext = {
 } as const;
 
 describe("MetricRequestCollectionService", () => {
+  /** @scenario "Missing or invalid exemplars do not call Trace" */
   it("keeps a standalone gauge as one canonical integer data point", async () => {
     const { service, recordDataPoints, recordMetricCorrelations } = makeService();
 
@@ -162,6 +163,9 @@ describe("MetricRequestCollectionService", () => {
     expect(changedValue.pointId).not.toBe(first.pointId);
   });
 
+  /** @scenario "Invalid metric points use partial success" */
+  /** @scenario "A valid exemplar requests Trace correlation only" */
+  /** @scenario "Missing or invalid exemplars do not call Trace" */
   it("rejects an oversized sibling while accepting and correlating a valid point", async () => {
     const { service, recordDataPoints, recordMetricCorrelations } = makeService();
     const traceId = "0123456789abcdef0123456789abcdef";
@@ -236,6 +240,9 @@ describe("MetricRequestCollectionService", () => {
       spanId,
       exemplarValue: 2.5,
     });
+    expect(recordMetricCorrelations.mock.calls[0]![0]).not.toContainEqual(
+      expect.objectContaining({ exemplarValue: 4 }),
+    );
   });
 
   describe("when persisting a point throws", () => {

@@ -3,6 +3,7 @@ import { prepare } from "./fixtures/canonical-metric.fixtures";
 
 describe("canonical OTLP metric preparation", () => {
   describe("when a request carries every supported metric kind", () => {
+    /** @scenario "Valid OTLP points become canonical durable events" */
     it("preserves each kind and its integer fidelity", async () => {
       const result = await prepare({
         request: {
@@ -99,6 +100,8 @@ describe("canonical OTLP metric preparation", () => {
       const points = Object.fromEntries(
         result.accepted.map(({ dataPoint }) => [dataPoint.metricName, dataPoint]),
       );
+      expect(points.gauge!.seriesId).toMatch(/^[0-9a-f]{64}$/);
+      expect(points.gauge!.pointId).toMatch(/^[0-9a-f]{64}$/);
       expect(points.gauge).toMatchObject({
         metricKind: "gauge",
         valueType: "int",

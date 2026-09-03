@@ -1,5 +1,6 @@
 Feature: Enterprise package catalogue
 
+  @unit
   Scenario: Discover every installed Enterprise feature contract
     Given the portable Enterprise catalogue is created
     When a caller lists its features

@@ -73,6 +73,7 @@ function pointAt(overrides: Partial<CanonicalMetricDataPoint> = {}): CanonicalMe
 }
 
 describe("MetricDataPointClickHouseRepository", () => {
+  /** @scenario "Valid OTLP points become canonical durable events" */
   it("writes raw data before its payload-free usage estimate", async () => {
     const insert = vi.fn<MetricClickHouseClient["insert"]>(async () => undefined);
     await repository(client({ insert })).ensureDataPoint({

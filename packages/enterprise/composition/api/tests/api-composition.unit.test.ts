@@ -3,6 +3,7 @@ import { EnterpriseApiComposition } from "../src";
 import type { LicensingService } from "@langwatch/enterprise-licensing-contract";
 
 describe("EnterpriseApiComposition", () => {
+  /** @scenario "Compose an optional licensing capability" */
   it("retains an explicitly supplied licensing capability", () => {
     const licensing = {} as LicensingService;
     const composition = EnterpriseApiComposition.create({ licensing });

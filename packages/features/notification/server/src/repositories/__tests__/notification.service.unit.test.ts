@@ -37,6 +37,7 @@ class InMemoryNotificationRepository extends NotificationRepository {
 }
 
 describe("NotificationService", () => {
+  /** @scenario "Create a notification record" */
   it("creates and queries durable records through one repository", async () => {
     const repository = new InMemoryNotificationRepository();
     const service = NotificationService.create({ repository });

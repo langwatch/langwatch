@@ -86,6 +86,7 @@ describe("TopicService", () => {
     expect(() => service.getAll({ projectId: "" })).toThrow();
   });
 
+  /** @scenario "read clustering status and history" */
   it("derives in-flight status and preserves bounded history", async () => {
     const status = await service.getClusteringStatus({ projectId: "project-1" });
     expect(status.isRunInFlight).toBe(true);

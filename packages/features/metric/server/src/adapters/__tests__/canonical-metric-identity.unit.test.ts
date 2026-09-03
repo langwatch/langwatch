@@ -32,6 +32,7 @@ function identityRequest({
 
 describe("canonical metric identity", () => {
   describe("when the same measurement arrives reordered or retried", () => {
+    /** @scenario "Canonical metric identity and retries are stable" */
     it("keeps SeriesId stable and excludes values and descriptions", async () => {
       const first = (
         await prepare({

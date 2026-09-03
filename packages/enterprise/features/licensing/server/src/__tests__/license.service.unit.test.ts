@@ -129,6 +129,7 @@ describe("LicenseService", () => {
     await expect(service.getActivePlan(ORGANIZATION_ID)).resolves.toBe(UNLIMITED_PLAN);
   });
 
+  /** @scenario "Inspect platform access for another feature" */
   it("lets a valid instance license satisfy platform access without listing organizations", async () => {
     const result = await service.inspectPlatformAccess({
       instanceLicenseKey: VALID_LICENSE_KEY,
@@ -141,6 +142,7 @@ describe("LicenseService", () => {
     expect(repository.listCalls).toBe(0);
   });
 
+  /** @scenario "Inspect platform access for another feature" */
   it("scans organization licenses after an invalid instance candidate and accepts a signed expired license", async () => {
     repository.stored.set(ORGANIZATION_ID, {
       licenseKey: EXPIRED_LICENSE_KEY,
@@ -169,6 +171,7 @@ describe("LicenseService", () => {
     expect(repository.listCalls).toBe(1);
   });
 
+  /** @scenario "Activate a valid signed license" */
   it("stores a valid signed license before provisioning missing retention", async () => {
     retention.rules = [
       {
@@ -197,6 +200,7 @@ describe("LicenseService", () => {
     ]);
   });
 
+  /** @scenario "Reject a license that was not signed by LangWatch" */
   it("rejects invalid licenses without writing", async () => {
     const result = await service.validateAndStoreLicense({
       organizationId: ORGANIZATION_ID,

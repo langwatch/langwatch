@@ -184,6 +184,7 @@ const verified = {
 };
 
 describe("AuthService", () => {
+  /** @scenario "A cached Better Auth session has been revoked" */
   it("fails closed when Better Auth returns a cached session with no row", async () => {
     const sessions = new Sessions();
     sessions.stored = null;
@@ -202,6 +203,7 @@ describe("AuthService", () => {
     });
   });
 
+  /** @scenario "A live admin impersonation acts as its target" */
   it("switches actor only for a live impersonation target", async () => {
     const sessions = new Sessions();
     sessions.stored = {
@@ -264,6 +266,7 @@ describe("AuthService", () => {
     });
   });
 
+  /** @scenario "Revoking other browser sessions retains the current device" */
   it("clears cached and persisted sessions while retaining a requested current session", async () => {
     const store = new Store();
     store.values.set(

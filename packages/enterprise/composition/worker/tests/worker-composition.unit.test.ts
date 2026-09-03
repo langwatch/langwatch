@@ -16,6 +16,7 @@ describe("EnterpriseWorkerComposition", () => {
     expect(composition.managedProviders).toBeUndefined();
   });
 
+  /** @scenario "Create the worker composition with explicit feature ports" */
   it("creates a worker-only composition over the portable catalogue", () => {
     const composition = EnterpriseWorkerComposition.create({
       managedProvider: {
@@ -34,6 +35,7 @@ describe("EnterpriseWorkerComposition", () => {
     ).toBe(true);
   });
 
+  /** @scenario "Managed provider execution uses the composed worker capability" */
   it("passes worker-owned project persistence through to managed provider execution", async () => {
     const composition = EnterpriseWorkerComposition.create({
       managedProvider: {

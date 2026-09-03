@@ -42,9 +42,11 @@ describe("the analytics period", () => {
         expect(analyticsDaysDifference(reading.period.startDate, reading.period.endDate)).toBe(7);
       });
 
+      /** @scenario "Unknown or malformed period key falls back to the default" */
       it("ignores a preset key nothing offers rather than producing an empty window", () => {
         const reading = readAnalyticsPeriod({ query: { period: "42y" }, now: NOW });
 
+        expect(reading.mode).toBe("relative");
         expect(reading.isDefault).toBe(true);
         expect(analyticsDaysDifference(reading.period.startDate, reading.period.endDate)).toBe(30);
       });
@@ -53,6 +55,8 @@ describe("the analytics period", () => {
 
   describe("given an address that names an absolute range", () => {
     describe("when the window is read", () => {
+      /** @scenario "An absolute selection does not move with time" */
+      /** @scenario "Picking explicit dates stores the selection as absolute" */
       it("uses the two instants exactly", () => {
         const reading = readAnalyticsPeriod({
           query: {
@@ -100,6 +104,7 @@ describe("the analytics period", () => {
 
   describe("given a sub-day preset", () => {
     describe("when its window is computed", () => {
+      /** @scenario "A relative selection re-anchors on a later visit" */
       it("ends now and looks back exactly the minutes it names", () => {
         const window = computeRelativeWindow("15m", NOW);
 

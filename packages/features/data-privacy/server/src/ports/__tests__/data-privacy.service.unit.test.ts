@@ -57,6 +57,7 @@ const organizations = {
 } as unknown as OrganizationService;
 
 describe("DataPrivacyService", () => {
+  /** @scenario "Unsafe customer patterns are rejected before persistence" */
   it("rejects unsafe custom secret patterns before persistence", async () => {
     const repository = new MemoryDataPrivacyRepository();
     const service = DataPrivacyService.create({ repository, projects, organizations });

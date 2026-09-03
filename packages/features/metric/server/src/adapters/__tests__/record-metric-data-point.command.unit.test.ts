@@ -9,6 +9,8 @@ import {
 import { RecordMetricDataPointCommand } from "../metric-processing.adapter";
 
 describe("RecordMetricDataPointCommand", () => {
+  /** @scenario "Valid OTLP points become canonical durable events" */
+  /** @scenario "Canonical metric identity and retries are stable" */
   it("uses PointId for the aggregate and a tenant-prefixed idempotency key", async () => {
     const pointId = "a".repeat(64);
     const data = {

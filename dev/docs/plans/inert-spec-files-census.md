@@ -413,3 +413,96 @@ fixed, which is the point.
 4. **`LEGACY_INERT` is the escape hatch, and it only ever shrinks.** Any file this census cannot
    land in one pass can be added with a reason rather than left as a hard failure — but that
    choice should be deliberate, not the default for the awkward ones.
+
+---
+
+## Lane 1 ledger — 2026-09-03
+
+Sixteen of the seventeen files landed. `gateway-realtime-session-reconciliation` was skipped
+because its only matching test lives in `packages/features/gateway/server`, which another lane
+holds open; tagging its scenarios without annotating that test would have swapped three inert
+scenarios for three unbound ones, which is worse than leaving it.
+
+| Feature file | Scenarios bound | Test file(s) carrying the `@scenario` annotations |
+| --- | --- | --- |
+| `packages/features/notification/specs/notification-service.feature` | 2 of 2 | `notification/server/src/repositories/__tests__/notification.service.unit.test.ts`, `notification/server/src/repositories/prisma/__tests__/prisma.notification.repository.unit.test.ts` (new) |
+| `packages/features/auth/specs/browser-session.feature` | 3 of 3 | `auth/server/src/ports/__tests__/auth.service.unit.test.ts` |
+| `packages/features/presence/specs/presence.feature` | 5 of 5 | `presence/server/src/ports/__tests__/presence.service.unit.test.ts`, `presence/server/src/ports/__tests__/presence-trpc.api.unit.test.ts` |
+| `packages/features/topic/specs/topic-read-surface.feature` | 4 of 4 | `topic/server/src/repositories/prisma/__tests__/prisma.topic.repository.unit.test.ts`, `topic/server/src/repositories/__tests__/topic.service.unit.test.ts` |
+| `packages/features/monitor/specs/monitor-service.feature` | 7 of 7 | `monitor/server/src/repositories/__tests__/monitor.service.unit.test.ts`, `monitor/server/src/adapters/__tests__/postgres.monitor-catalog.adapter.unit.test.ts` |
+| `packages/features/suite/specs/suite-service.feature` | 6 of 6 | `suite/server/src/repositories/__tests__/suite.service.unit.test.ts`, `suite/server/src/repositories/clickhouse/__tests__/clickhouse.suite-run.repository.unit.test.ts` |
+| `packages/features/model-provider/specs/model-provider.feature` | 4 of 4 | `model-provider/server/src/ports/__tests__/model-provider.service.test.ts`, `model-provider/server/src/ports/__tests__/prisma-model-provider.repository.test.ts` |
+| `packages/features/metric/specs/metric-processing.feature` | 5 of 6 | seven files under `metric/server/src/{adapters,services,repositories}/__tests__` |
+| `packages/features/scenario/specs/scenario-service.feature` | 4 of 5 | `scenario/server/src/repositories/__tests__/scenario.service.unit.test.ts`, `scenario/contract/src/__tests__/scenario.contract.unit.test.ts` |
+| `specs/period-selector.feature` | 5 of 7 | `analytics/web/src/model/__tests__/analytics-period.unit.test.ts`, `analytics/web/src/behavior/__tests__/use-analytics-period.unit.test.tsx` |
+| `packages/features/data-privacy/specs/data-privacy-service.feature` | 1 of 3 | `data-privacy/server/src/ports/__tests__/data-privacy.service.unit.test.ts` |
+| `packages/enterprise/features/licensing/specs/licensing.feature` | 3 more, 5 of 6 | `enterprise/features/licensing/server/src/__tests__/license.service.unit.test.ts` |
+| `packages/enterprise/composition/worker/specs/worker-composition.feature` | 2 of 3 | `enterprise/composition/worker/tests/worker-composition.unit.test.ts` |
+| `packages/enterprise/composition/api/specs/api-composition.feature` | 1 of 2 | `enterprise/composition/api/tests/api-composition.unit.test.ts` |
+| `packages/enterprise/specs/enterprise-catalogue.feature` | 1 of 2 | `enterprise/tests/enterprise-catalogue.unit.test.ts` |
+| `packages/enterprise/features/saas/specs/saas.feature` | 1 of 2 | `enterprise/features/saas/web/src/__tests__/extra-footer-components.integration.test.tsx` |
+| `packages/features/gateway/specs/gateway-realtime-session-reconciliation.feature` | **skipped** | test lives in a directory another lane holds |
+
+54 scenarios newly bound. Every file above reports `✓ all bound`.
+
+### Gate, before and after
+
+```
+before  Enforced: 1375 file(s) · Legacy: 15 file(s) · Inert: 409 file(s)
+        FAIL: 4629 unbound scenario(s) in enforced files, 352 unknown annotation(s),
+              46 file(s) enforce no scenario at all
+
+after   Enforced: 1376 file(s) · Legacy: 15 file(s) · Inert: 394 file(s)
+        FAIL: 4629 unbound scenario(s) in enforced files, 354 unknown annotation(s),
+              31 file(s) enforce no scenario at all
+```
+
+Fifteen fatal-inert files cleared (licensing was already enforcing two scenarios before this
+lane, so it was not on the fatal list). The unbound count did not move: everything tagged here
+was annotated in the same pass. The two extra unknown annotations are not from this lane — they
+name `Credential password hashes never leave the user feature` and `Virtual key rows are read
+only through the gateway feature`, both in-flight work in `packages/features/{user,gateway}`.
+
+### Where a test was tightened rather than trusted
+
+Seven scenarios named a clause the matching test did not assert. Each was closed with the
+smallest honest assertion rather than tagged over:
+
+- **notification** — "newest first" was unprovable at the service (its fake did the sorting), so
+  the ordering is now pinned where it lives, on `orderBy: { sentAt: "desc" }` in a new Prisma
+  repository test.
+- **topic** — "known ids are returned with their names, unknown ids are absent" had no test at
+  all; the repository test now exercises `findNamesByIds` with one present and one absent id.
+- **monitor** — the replica's unique name and slug were unasserted, and "the source monitor is
+  unchanged" now spies on the repository's `update` to prove no write reaches the source.
+- **suite** — batch history asserted only the set-id filter and the limits; it now also pins
+  `GROUP BY TenantId, ScenarioSetId, BatchRunId` and `ORDER BY t.CreatedAt DESC`.
+- **presence** — "the service reports success" on a repeat leave is now an explicit `resolves`.
+- **period selector** — the absolute write asserted only `startDate`; it now names `endDate` too,
+  and the bogus-preset fallback asserts the mode it falls back to.
+- **model provider** — "rejects the write before calling the repository" now proves the
+  repository saw nothing, and the translation port records the model it was handed.
+- **metric** — the preparation test now pins the 64-hex shape of `SeriesId` and `PointId`, and the
+  exemplar test proves the malformed exemplar produced no correlation.
+
+### Left untagged on purpose
+
+| Scenario | Why |
+| --- | --- |
+| `data-privacy-service` 1–2 (platform default, nearest scope wins) | The resolution adapter test asserts `categories: expect.any(Object)` on an empty rule set — neither the default values nor scope precedence is exercised anywhere. A WRITE, not a bind. |
+| `scenario-service` 5 (input mapping is portable) | True by imports only. Both surfaces reach `@langwatch/scenario-contract`, but no test and no boundary lint proves it. |
+| `metric-processing` 3 (four tables and rollup width) | `metric_data_points`, `metric_usage_estimates` and the 30-second bucket are asserted; `metric_series` and `metric_time_rollups` are named by no test. The rollup insert only fires when the authoritative read returns rows, which needs a fixture nobody has written. |
+| `period-selector` 1 (relative pick stores as relative) | Restates scenario 5 from a neutral address. The only test starts from an address that already carries an absolute range, and nothing proves the mode on the write path. |
+| `period-selector` 7 (selector label reflects the mode) | `AnalyticsPeriodPicker` is rendered by no test. `getDateRangeLabel` is untested, and the model has no label function to stand in for it. |
+| `licensing` 6, `api-composition` 2, `worker-composition` 3, `enterprise-catalogue` 2 | The four "import without side effects" scenarios. Nothing asserts import-time purity for these packages; the shape to copy is `architecture-lint/tests/identity-package-boundaries.test.ts`. |
+| `saas` 1 (scripts stay dormant off SaaS) | No test renders the footer with `isSaas` false. |
+| `monitor-service`, `presence`, `scenario-service` overlaps | The census flagged these as possible duplicates of root specs. Grepping the exact titles across every `.feature` file found no collision, so they were bound in place rather than trimmed. |
+
+### Riders bound without their own assertion
+
+Three scenarios carry an architectural clause the test cannot express, and were bound on the
+behaviour the test does prove. Named here so nobody mistakes the binding for coverage:
+`api-composition` 1 ("without registering routes" — registration is app-owned and the composition
+class has no such method), `model-provider` 1 ("the provider repository remains private" — the
+server package index never exports it), and `metric-processing` 2 (the partial-success clause is
+proven at the service result; the OTLP route body that serialises it has no test).

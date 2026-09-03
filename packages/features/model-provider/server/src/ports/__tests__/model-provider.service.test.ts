@@ -754,7 +754,9 @@ class ManagedCatalog extends Catalog {
   }
 }
 class Translator extends ModelTranslationPort {
-  translate(): Promise<string> {
+  model: string | null = null;
+  translate(input: { model: string }): Promise<string> {
+    this.model = input.model;
     return Promise.resolve("translated");
   }
 }
@@ -1109,14 +1111,20 @@ describe("ModelProviderService", () => {
     });
   });
 
+  /** @scenario "provider summaries never expose credentials" */
   it("masks credentials in frontend summaries", async () => {
     const result = await service().listForProject({ projectId: "project_1" });
     expect(result[0]?.customKeys).toEqual({ apiKey: "••••" });
   });
+  /** @scenario "an unknown provider cannot be persisted" */
   it("rejects unknown providers before persistence", async () => {
+    const providers = new Providers();
+
     await expect(
-      service().upsert({ projectId: "project_1", provider: "unknown", enabled: true }),
+      service(providers).upsert({ projectId: "project_1", provider: "unknown", enabled: true }),
     ).rejects.toMatchObject({ code: "model_provider_invalid" });
+    expect(providers.created).toHaveLength(0);
+    expect(providers.updates).toHaveLength(0);
   });
   it("refuses a new row for a deprecated provider but keeps stored rows editable", async () => {
     const providers = new Providers();
@@ -1226,6 +1234,7 @@ describe("ModelProviderService", () => {
       }),
     ).rejects.toThrow("rate limited");
   });
+  /** @scenario "translation uses the configured feature default" */
   it("resolves translation through the default-model repository and port", async () => {
     const defaults = new Defaults();
     defaults.configs = [
@@ -1238,6 +1247,7 @@ describe("ModelProviderService", () => {
       },
     ];
     const catalog = new Catalog();
+    const translation = new Translator();
     catalog.defaultFeatures = () => [
       {
         key: "translate.text",
@@ -1257,13 +1267,14 @@ describe("ModelProviderService", () => {
       costs: new Costs(),
       catalog,
       authorization: new Authorization(),
-      translation: new Translator(),
+      translation,
       ids: new Ids(),
     });
 
     await expect(
       modelProviders.translate({ projectId: "project_1", text: "hello" }),
     ).resolves.toEqual({ translation: "translated" });
+    expect(translation.model).toBe("openai/gpt-5-mini");
   });
   it("prepares model execution through the canonical service and managed seam", async () => {
     const providers = new Providers();

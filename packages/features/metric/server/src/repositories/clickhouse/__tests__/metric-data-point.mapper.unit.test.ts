@@ -27,6 +27,7 @@ const accepted = (acceptedAt: number): CanonicalMetricDataPoint =>
 
 describe("MetricDataPointMapper.firstAcceptanceWinsVersion", () => {
   describe("given the same point accepted twice", () => {
+    /** @scenario "Canonical metric identity and retries are stable" */
     it("gives the earlier acceptance the LARGER version, so the merge keeps it", () => {
       expect(versionAt(EARLIER)).toBeGreaterThan(versionAt(LATER));
     });

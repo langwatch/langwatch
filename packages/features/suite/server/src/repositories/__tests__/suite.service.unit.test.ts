@@ -126,6 +126,7 @@ function mockPromptService(methods: object): PromptService {
 }
 
 describe("SuiteService", () => {
+  /** @scenario "Create a suite definition" */
   it("creates a slugged suite through its own repository", async () => {
     const repo = repository({
       create: vi.fn().mockImplementation(async (input) => suite(input)),
@@ -145,6 +146,7 @@ describe("SuiteService", () => {
     expect(repo.create).toHaveBeenCalledWith(expect.objectContaining({ slug: "critical-path" }));
   });
 
+  /** @scenario "Read a missing suite" */
   it("throws a domain error when a definition is absent", async () => {
     const service = SuiteService.create(
       serviceOptions(repository({ tryFindById: vi.fn().mockResolvedValue(null) })),
@@ -154,6 +156,7 @@ describe("SuiteService", () => {
     ).rejects.toBeInstanceOf(SuiteNotFoundError);
   });
 
+  /** @scenario "Reject a colliding suite name" */
   it("rejects an occupied slug", async () => {
     const service = SuiteService.create(
       serviceOptions(repository({ tryFindBySlug: vi.fn().mockResolvedValue(suite()) })),
@@ -168,6 +171,7 @@ describe("SuiteService", () => {
     ).rejects.toBeInstanceOf(SuiteNameTakenError);
   });
 
+  /** @scenario "Resolve a run through owning feature services" */
   it("resolves references before handing a run to the execution port", async () => {
     const execute = vi.fn().mockResolvedValue({
       batchRunId: "batch_1",

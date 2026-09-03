@@ -43,6 +43,7 @@ function setup(rows: unknown[] = [stateReadRow]) {
 }
 
 describe("ClickHouseSuiteRunRepository", () => {
+  /** @scenario "Read the latest durable suite run state" */
   it("maps the complete suite run state shape", async () => {
     const { repository } = setup();
     await expect(
@@ -53,6 +54,7 @@ describe("ClickHouseSuiteRunRepository", () => {
     ).resolves.toEqual({ ...stateRow, LastEventOccurredAt: 0 });
   });
 
+  /** @scenario "Read the latest durable suite run state" */
   it("deduplicates latest state by the tenant and batch tuple", async () => {
     const { repository, query } = setup([]);
     await repository.tryGetSuiteRunState({ projectId: "project_1", batchRunId: "batch_1" });
@@ -98,6 +100,7 @@ describe("ClickHouseSuiteRunRepository", () => {
     });
   });
 
+  /** @scenario "Read suite batch history" */
   it("preserves the default-set compatibility filter and history limits", async () => {
     const { repository, query } = setup([]);
     await repository.getBatchHistory({
@@ -120,6 +123,9 @@ describe("ClickHouseSuiteRunRepository", () => {
       limit: 50,
     });
     expect(cappedInput.query_params.limit).toBe(100);
+    const sql = query.mock.calls[0]?.[0]?.query as string;
+    expect(sql).toContain("GROUP BY TenantId, ScenarioSetId, BatchRunId");
+    expect(sql).toContain("ORDER BY t.CreatedAt DESC");
   });
 
   it("wraps ClickHouse resolution failures instead of silently succeeding", async () => {

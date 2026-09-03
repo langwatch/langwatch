@@ -1,5 +1,6 @@
 Feature: Enterprise API composition
 
+  @unit
   Scenario: Compose an optional licensing capability
     Given an API licensing service has been constructed
     When the Enterprise API composition is created with that service

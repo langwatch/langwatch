@@ -3,6 +3,7 @@ import { gaugeMetric, prepare, requestForMetric } from "./fixtures/canonical-met
 
 describe("canonical OTLP metric validation", () => {
   describe("when one data point in a metric is malformed", () => {
+    /** @scenario "Invalid metric points use partial success" */
     it("rejects it without dropping its valid sibling", async () => {
       const result = await prepare({
         request: requestForMetric({

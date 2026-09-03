@@ -42,6 +42,7 @@ function makeDatabase(
 }
 
 describe("PrismaTopicRepository", () => {
+  /** @scenario "list topics for a project" */
   it("preserves the database order of topics and the legacy read selection", async () => {
     const { database, topicFindMany } = makeDatabase();
     const repository = PrismaTopicRepository.create(database);
@@ -68,6 +69,23 @@ describe("PrismaTopicRepository", () => {
     expect(topicFindMany).not.toHaveBeenCalled();
   });
 
+  /** @scenario "resolve names for trace facets" */
+  it("names the topics the project holds and leaves unknown ids out", async () => {
+    const { database, topicFindMany } = makeDatabase({
+      topicRows: [{ id: "topic-2", name: "Payments" }],
+    });
+    const repository = PrismaTopicRepository.create(database);
+
+    await expect(
+      repository.findNamesByIds({ projectId: "project-1", ids: ["topic-2", "topic-absent"] }),
+    ).resolves.toEqual(new Map([["topic-2", "Payments"]]));
+    expect(topicFindMany).toHaveBeenCalledWith({
+      where: { projectId: "project-1", id: { in: ["topic-2", "topic-absent"] } },
+      select: { id: true, name: true },
+    });
+  });
+
+  /** @scenario "read clustering status and history" */
   it("maps and validates the status projection without exposing raw error text", async () => {
     const { database, statusFindUnique } = makeDatabase({
       projection: {
@@ -113,6 +131,7 @@ describe("PrismaTopicRepository", () => {
     });
   });
 
+  /** @scenario "tolerate an unavailable history projection" */
   it("returns an empty history when the projection row is missing", async () => {
     const { database, historyFindUnique } = makeDatabase();
     const repository = PrismaTopicRepository.create(database);
@@ -126,6 +145,7 @@ describe("PrismaTopicRepository", () => {
     });
   });
 
+  /** @scenario "tolerate an unavailable history projection" */
   it("returns an empty history for malformed projection JSON", async () => {
     const { database } = makeDatabase({ history: "not an array" });
     const repository = PrismaTopicRepository.create(database);

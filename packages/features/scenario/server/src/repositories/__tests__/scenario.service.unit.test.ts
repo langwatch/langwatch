@@ -314,6 +314,8 @@ class MemoryScenarioRepository extends ScenarioRepository {
 }
 
 describe("ScenarioService", () => {
+  /** @scenario "A required scenario read is tenant scoped" */
+  /** @scenario "Optional scenario discovery is explicit" */
   it("keeps reads project-scoped and only makes optional reads nullable", async () => {
     const repository = new MemoryScenarioRepository();
     const service = ScenarioService.create(serviceOptions(repository, "scenario_1"));
@@ -339,6 +341,7 @@ describe("ScenarioService", () => {
     await expect(service.count({ projectId: "project-b" })).resolves.toBe(0);
   });
 
+  /** @scenario "Scenario archive delivery is retry safe" */
   it("preserves the first archive timestamp across retry delivery", async () => {
     const repository = new MemoryScenarioRepository();
     const first = new Date("2026-01-01T00:00:00.000Z");

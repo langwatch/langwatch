@@ -13,6 +13,7 @@ Feature: Data Privacy service
     Then the team rule supplies fields it sets
     And custom patterns from both rules are applied
 
+  @unit
   Scenario: Unsafe customer patterns are rejected before persistence
     Given a data privacy rule with an invalid or unsafe regular expression
     When the rule is saved

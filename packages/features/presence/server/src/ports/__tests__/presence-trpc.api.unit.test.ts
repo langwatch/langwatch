@@ -88,6 +88,7 @@ function createCaller(presence: TestPresenceService) {
 
 describe("PresenceTrpcApi", () => {
   describe("given the composed router", () => {
+    /** @scenario "Existing transports remain compatible" */
     it("exposes exactly the presence procedure names the client calls", () => {
       const { router } = createCaller(new TestPresenceService());
       const procedures = (router as unknown as { _def: { procedures: Record<string, unknown> } })
@@ -301,6 +302,7 @@ describe("PresenceTrpcApi", () => {
      * an unrecognised-keys error before any presence work happened, which the
      * client only ever saw as an unknown failure.
      */
+    /** @scenario "Existing transports remain compatible" */
     it("asks the policy for the project alone, so a heartbeat reaches the repository", async () => {
       const { repository, caller } = createComposedCaller();
 

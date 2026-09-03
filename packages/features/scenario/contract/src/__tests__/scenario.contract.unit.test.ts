@@ -6,6 +6,7 @@ import {
 import { describe, expect, it } from "vitest";
 
 describe("Scenario contract", () => {
+  /** @scenario "Secret parameter definitions cannot persist a default" */
   it("refuses defaults on secret parameters", () => {
     const parsed = scenarioParameterDefinitionsSchema.safeParse([
       { name: "api_token", secret: true, defaultValue: "not-a-secret" },

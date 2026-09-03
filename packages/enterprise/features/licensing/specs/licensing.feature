@@ -1,10 +1,12 @@
 Feature: Enterprise licensing lifecycle
 
+  @unit
   Scenario: Activate a valid signed license
     Given an organization exists and a current license verifies
     When the licensing service activates the license
     Then it stores validation metadata and provisions only missing retention rules
 
+  @unit
   Scenario: Reject a license that was not signed by LangWatch
     Given a license payload has an invalid signature
     When the licensing service validates it for activation
@@ -22,6 +24,7 @@ Feature: Enterprise licensing lifecycle
     When the active Cloud license source resolves the organization
     Then it returns the free baseline so another entitlement source may apply
 
+  @unit
   Scenario: Inspect platform access for another feature
     Given an optional instance license and organization license candidates
     When the licensing service inspects platform access

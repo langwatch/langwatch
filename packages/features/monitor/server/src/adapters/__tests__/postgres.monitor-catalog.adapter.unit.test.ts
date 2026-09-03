@@ -34,6 +34,7 @@ describe("PostgresMonitorCatalogAdapter", () => {
   describe("given a Prisma client and nothing else", () => {
     describe("when the catalogue is composed", () => {
       /** @scenario "The monitor catalogue composes from a database alone" */
+      /** @scenario "Runtime reads are project scoped" */
       it("lists a project's enabled on-message monitors", async () => {
         const { client, findMany } = database();
 

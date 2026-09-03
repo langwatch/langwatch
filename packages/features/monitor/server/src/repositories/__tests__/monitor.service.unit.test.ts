@@ -172,6 +172,7 @@ const evaluator = new FakeEvaluatorService();
 const generateId = () => "monitor_test";
 
 describe("MonitorService", () => {
+  /** @scenario "Creating a monitor requires a project evaluator" */
   it("requires an evaluator on create", async () => {
     const service = MonitorService.create({
       repository: new FakeRepository(),
@@ -192,6 +193,8 @@ describe("MonitorService", () => {
     ).rejects.toBeInstanceOf(MonitorEvaluatorRequiredError);
   });
 
+  /** @scenario "Updating a legacy monitor may preserve its missing evaluator" */
+  /** @scenario "Monitor mappings are canonicalised" */
   it("preserves omitted evaluator and normalises mappings on update", async () => {
     const repository = new FakeRepository();
     const service = MonitorService.create({ repository, evaluators: evaluator, generateId });
@@ -210,6 +213,7 @@ describe("MonitorService", () => {
     expect(evaluator.getById).not.toHaveBeenCalled();
   });
 
+  /** @scenario "Explicitly removing an evaluator is rejected" */
   it("rejects explicitly removing an evaluator", async () => {
     const service = MonitorService.create({
       repository: new FakeRepository(),
@@ -232,6 +236,7 @@ describe("MonitorService", () => {
     ).rejects.toBeInstanceOf(MonitorEvaluatorRequiredError);
   });
 
+  /** @scenario "Missing monitor reads throw" */
   it("throws for a missing monitor", async () => {
     const repository = new FakeRepository();
     repository.value = null;
@@ -241,6 +246,7 @@ describe("MonitorService", () => {
     );
   });
 
+  /** @scenario "Replicating a monitor creates a disabled target monitor" */
   it("replicates a monitor disabled into the target project", async () => {
     const repository = new FakeRepository();
     const service = MonitorService.create({
@@ -248,6 +254,8 @@ describe("MonitorService", () => {
       evaluators: evaluator,
       generateId: () => "monitor_replica",
     });
+
+    const sourceWrite = vi.spyOn(repository, "update");
 
     const replica = await service.replicate({
       sourceMonitorId: "monitor_1",
@@ -262,7 +270,10 @@ describe("MonitorService", () => {
       evaluatorId: null,
       enabled: false,
       experimentId: null,
+      name: "Hallucination (2)",
+      slug: "hallucination-2-plica",
     });
+    expect(sourceWrite).not.toHaveBeenCalled();
   });
 
   describe("given an experiment being published as a monitor", () => {

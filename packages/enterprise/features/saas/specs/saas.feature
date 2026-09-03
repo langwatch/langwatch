@@ -5,6 +5,7 @@ Feature: SaaS browser integrations
     When it renders
     Then it emits no third-party script
 
+  @integration
   Scenario: Delayed analytics globals are used
     Given a signed-in SaaS user and organization context
     When Reo and gtag appear after mount

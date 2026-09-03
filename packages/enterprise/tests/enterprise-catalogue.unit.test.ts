@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 import { EnterpriseCatalogue } from "../src";
 
 describe("EnterpriseCatalogue", () => {
+  /** @scenario "Discover every installed Enterprise feature contract" */
   it("discovers every installed Enterprise feature through portable package names", () => {
     expect(EnterpriseCatalogue.create().list()).toEqual([
       {

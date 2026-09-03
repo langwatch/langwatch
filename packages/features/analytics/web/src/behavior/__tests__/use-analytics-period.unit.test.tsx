@@ -64,6 +64,7 @@ describe("the analytics period, at the render seam", () => {
   describe("given a reader who picks a preset", () => {
     describe("when the write reaches the address", () => {
       /** @scenario "A range and a preset are the same setting, so one replaces the other" */
+      /** @scenario "Switching from absolute back to a relative quick selector clears absolute params" */
       it("names the preset and REMOVES any absolute range, which is the same setting said twice", () => {
         const { host, wrapper } = harness({
           startDate: "2026-06-01T00:00:00.000Z",
@@ -78,6 +79,7 @@ describe("the analytics period, at the render seam", () => {
         expect(host.lastQuery?.endDate).toBeUndefined();
       });
 
+      /** @scenario "Picking explicit dates stores the selection as absolute" */
       it("names an absolute range and REMOVES the preset, in the other direction", () => {
         const { host, wrapper } = harness({ period: "7d" });
         const { result } = renderHook(() => useAnalyticsPeriod(), { wrapper });
@@ -89,6 +91,7 @@ describe("the analytics period, at the render seam", () => {
 
         expect(host.lastQuery?.period).toBeUndefined();
         expect(host.lastQuery?.startDate).toBe("2026-06-01T00:00:00.000Z");
+        expect(host.lastQuery?.endDate).toBe("2026-06-08T00:00:00.000Z");
       });
 
       /**
