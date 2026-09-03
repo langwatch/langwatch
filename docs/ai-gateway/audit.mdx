@@ -72,7 +72,11 @@ Every virtual key and every budget detail page has an **Audit history** button. 
 
 `Args`, `Before` and `After` are JSON, capped at 4096 characters per cell. A capped cell ends with a `…[truncated N chars]` marker.
 
-For a scheduled export into a SIEM, read the `AuditLog` table in the application Postgres database directly. Filter on `organizationId` first, because that column is what keeps one organization's rows out of another's, then on `targetKind IN ('virtual_key', 'budget', 'cache_rule', 'guardrail')` to select gateway rows, and join `User` on `userId` for the actor. There is no REST endpoint for reading audit rows. For a governance event feed with its own permission check, see [OCSF export](/ai-gateway/governance/ocsf-export), which carries trace and anomaly events rather than these audit rows.
+For a scheduled export into a SIEM, call the same query the Audit Log page uses: `organization.getAuditLogs`, at `GET /api/trpc/organization.getAuditLogs` with the input JSON in the `input` query parameter. It takes an `organizationId`, optional `projectId`, `userId`, `action` and `startDate`/`endDate` filters, and pages with `pageOffset` and `pageSize` up to 10000. It checks `auditLog:view` at the organization every call, so the export carries the same authorization as the page.
+
+There is no REST endpoint for audit rows. Reading the `AuditLog` table in the application Postgres database is possible on a self-hosted deployment that owns the database, and it enforces no permission of its own, so keep it for operators who already hold database credentials. Filter on `organizationId` first, because that column is what separates one organization's rows from another's, then on `targetKind IN ('virtual_key', 'budget', 'cache_rule', 'guardrail')` for gateway rows, and join `User` on `userId` for the actor.
+
+For a governance event feed, see [OCSF export](/ai-gateway/governance/ocsf-export), which carries trace and anomaly events rather than these audit rows.
 
 ## Retention and integrity
 

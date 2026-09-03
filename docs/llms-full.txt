@@ -1612,7 +1612,7 @@ The response is JSON with `text`, plus the duration or token usage the provider 
 
 The `X-LangWatch-End-User-Id`, `X-LangWatch-Metadata` and `Traceparent` request headers work as on [Chat Completions](/ai-gateway/api/chat-completions#request-headers-the-gateway-reads).
 
-Both routes return the same response headers as [Chat Completions](/ai-gateway/api/chat-completions#response-headers): `X-LangWatch-Gateway-Version`, `X-LangWatch-Gateway-Request-Id`, `X-LangWatch-Fallback-Count`, `X-LangWatch-Budget-Warning`, `Traceparent`, `X-LangWatch-Heartbeat-Active`, and `X-LangWatch-Provider` on a forwarded provider error.
+Both routes return the same response headers as [Chat Completions](/ai-gateway/api/chat-completions#response-headers): `X-LangWatch-Gateway-Version`, `X-LangWatch-Gateway-Request-Id`, `X-LangWatch-Fallback-Count`, `X-LangWatch-Budget-Warning`, `Traceparent`, `X-LangWatch-Heartbeat-Active`, and `X-LangWatch-Provider` on a forwarded provider error. `X-LangWatch-Handled-Error` carries the `error.code` when the gateway wrote the error itself, and is removed from a forwarded provider response.
 
 ## Streaming
 
@@ -1929,7 +1929,7 @@ The `X-LangWatch-End-User-Id`, `X-LangWatch-Metadata` and `Traceparent` request 
 
 ## Response headers
 
-The same set as [Chat Completions](/ai-gateway/api/chat-completions#response-headers): `X-LangWatch-Gateway-Version`, `X-LangWatch-Gateway-Request-Id`, `X-LangWatch-Fallback-Count`, `X-LangWatch-Budget-Warning`, `Traceparent`, `X-LangWatch-Heartbeat-Active`, and `X-LangWatch-Provider` on a forwarded provider error.
+The same set as [Chat Completions](/ai-gateway/api/chat-completions#response-headers): `X-LangWatch-Gateway-Version`, `X-LangWatch-Gateway-Request-Id`, `X-LangWatch-Fallback-Count`, `X-LangWatch-Budget-Warning`, `Traceparent`, `X-LangWatch-Heartbeat-Active`, and `X-LangWatch-Provider` on a forwarded provider error. `X-LangWatch-Handled-Error` carries the `error.code` when the gateway wrote the error itself, and is removed from a forwarded provider response.
 
 ## Streaming
 
@@ -2124,7 +2124,7 @@ The `X-LangWatch-End-User-Id`, `X-LangWatch-Metadata` and `Traceparent` request 
 
 ## Response headers
 
-Google's own response headers, including its `Content-Type`, plus the gateway set from [Chat Completions](/ai-gateway/api/chat-completions#response-headers): `X-LangWatch-Gateway-Version`, `X-LangWatch-Gateway-Request-Id`, `X-LangWatch-Fallback-Count`, `X-LangWatch-Budget-Warning`, `Traceparent`, `X-LangWatch-Heartbeat-Active`, and `X-LangWatch-Provider` on a forwarded provider error.
+Google's own response headers, including its `Content-Type`, plus the gateway set from [Chat Completions](/ai-gateway/api/chat-completions#response-headers): `X-LangWatch-Gateway-Version`, `X-LangWatch-Gateway-Request-Id`, `X-LangWatch-Fallback-Count`, `X-LangWatch-Budget-Warning`, `Traceparent`, `X-LangWatch-Heartbeat-Active`, and `X-LangWatch-Provider` on a forwarded provider error. `X-LangWatch-Handled-Error` carries the `error.code` when the gateway wrote the error itself, and is removed from a forwarded provider response.
 
 ## Streaming
 
@@ -2293,7 +2293,7 @@ The `X-LangWatch-End-User-Id`, `X-LangWatch-Metadata` and `Traceparent` request 
 
 ## Response headers
 
-The same set as [Chat Completions](/ai-gateway/api/chat-completions#response-headers): `X-LangWatch-Gateway-Version`, `X-LangWatch-Gateway-Request-Id`, `X-LangWatch-Fallback-Count`, `X-LangWatch-Budget-Warning`, `X-LangWatch-Cache-Mode`, `X-LangWatch-Params-Dropped`, `Traceparent`, `X-LangWatch-Heartbeat-Active`, and `X-LangWatch-Provider` on a forwarded provider error.
+The same set as [Chat Completions](/ai-gateway/api/chat-completions#response-headers): `X-LangWatch-Gateway-Version`, `X-LangWatch-Gateway-Request-Id`, `X-LangWatch-Fallback-Count`, `X-LangWatch-Budget-Warning`, `X-LangWatch-Cache-Mode`, `X-LangWatch-Params-Dropped`, `Traceparent`, `X-LangWatch-Heartbeat-Active`, and `X-LangWatch-Provider` on a forwarded provider error. `X-LangWatch-Handled-Error` carries the `error.code` when the gateway wrote the error itself, and is removed from a forwarded provider response.
 
 ## Streaming
 
@@ -2748,7 +2748,11 @@ Every virtual key and every budget detail page has an **Audit history** button. 
 
 `Args`, `Before` and `After` are JSON, capped at 4096 characters per cell. A capped cell ends with a `…[truncated N chars]` marker.
 
-For a scheduled export into a SIEM, read the `AuditLog` table in the application Postgres database directly. Filter on `organizationId` first, because that column is what keeps one organization's rows out of another's, then on `targetKind IN ('virtual_key', 'budget', 'cache_rule', 'guardrail')` to select gateway rows, and join `User` on `userId` for the actor. There is no REST endpoint for reading audit rows. For a governance event feed with its own permission check, see [OCSF export](/ai-gateway/governance/ocsf-export), which carries trace and anomaly events rather than these audit rows.
+For a scheduled export into a SIEM, call the same query the Audit Log page uses: `organization.getAuditLogs`, at `GET /api/trpc/organization.getAuditLogs` with the input JSON in the `input` query parameter. It takes an `organizationId`, optional `projectId`, `userId`, `action` and `startDate`/`endDate` filters, and pages with `pageOffset` and `pageSize` up to 10000. It checks `auditLog:view` at the organization every call, so the export carries the same authorization as the page.
+
+There is no REST endpoint for audit rows. Reading the `AuditLog` table in the application Postgres database is possible on a self-hosted deployment that owns the database, and it enforces no permission of its own, so keep it for operators who already hold database credentials. Filter on `organizationId` first, because that column is what separates one organization's rows from another's, then on `targetKind IN ('virtual_key', 'budget', 'cache_rule', 'guardrail')` for gateway rows, and join `User` on `userId` for the actor.
+
+For a governance event feed, see [OCSF export](/ai-gateway/governance/ocsf-export), which carries trace and anomaly events rather than these audit rows.
 
 ## Retention and integrity
 
@@ -3834,7 +3838,7 @@ A leaked provider credential is a different problem. Rotate that one in the prov
 | Revoke | Every request answers `403 virtual_key_revoked`. The key is dead and cannot come back | The secret is publicly exposed |
 | Rotate | Keeps working for 24 hours, then fails | The secret left a trusted boundary but is not exposed, and callers need time to pick up the new one |
 
-Disable and revoke contain the leak as soon as the change reaches the gateway. The control plane writes a change event, and the gateway stops serving the key on the next request after it picks the event up on its change feed. A gateway that cannot reach the control plane keeps serving the cached key configuration until its 60 second configuration lifetime runs out, so plan for that window when you report containment.
+Disable and revoke contain the leak as soon as the change reaches every gateway pod. The control plane writes a change event, and a pod that receives it stops serving the key on the next request, in about 10 seconds. A pod that cannot reach the control plane serves the cached key for longer: up to the token expiry of 15 minutes, and past it to the hard cap set by `LW_GATEWAY_AUTH_CACHE_HARD_GRACE_SECONDS`, six hours by default. Read [Step 3](#step-3-stop-the-traffic) for the three paths and their timings, and report containment against the slowest one that applies.
 
 Rotate leaves the old secret working for a day, so it is a rollover tool rather than a containment tool.
 
@@ -5672,17 +5676,24 @@ A page that returns `limit` records may be followed by more. Pull again at once 
 
 ## Example
 
+Write the cookie into a curl config file that only the job user can read, and pass the file rather than the value. A `-H` argument puts the cookie in the process argument list, where every other user on the host can read it out of `ps`.
+
+```bash
+umask 077
+printf 'header = "Cookie: %s"\n' "$SESSION_COOKIE" > /run/ocsf-export/curl.conf
+```
+
 ```bash
 INPUT='{"json":{"organizationId":"YOUR_ORGANIZATION_ID","sinceMs":0,"limit":500}}'
 
 curl -G "https://app.langwatch.ai/api/trpc/governance.ocsfExport" \
   --data-urlencode "input=$INPUT" \
-  -H "Cookie: YOUR_SESSION_COOKIE"
+  --config /run/ocsf-export/curl.conf
 ```
 
-Replace `YOUR_SESSION_COOKIE` with the cookie of a browser session signed in as a user who holds `complianceExport:view`. Forward `events[]` to your SIEM's ingest API, then store `nextCursorCompound` for the next run.
+`$SESSION_COOKIE` is the cookie of a browser session signed in as a user who holds `complianceExport:view`. Read it from your secrets store into the job environment, and delete the config file when the run finishes. Forward `events[]` to your SIEM's ingest API, then store `nextCursorCompound` for the next run.
 
-<Warning>The session cookie is a full browser credential for that user, and this endpoint takes no other credential. A cookie written on a command line lands in the shell history and in the process list of the host that runs the job. Read it from a secrets store into the environment of a scheduled job, never from a literal in a script, and rotate the session when the job host changes.</Warning>
+<Warning>The session cookie is a full browser credential for that user, and this endpoint takes no other credential. It is not scoped to `complianceExport:view`, and it expires on the session's own schedule rather than the job's. Keep it out of shell history, out of the process argument list, and out of any script committed to a repository, and rotate the session when the job host changes.</Warning>
 
 **Also check:** [Anomaly rules](/ai-governance/anomaly-rules) for what sets `anomalyAlertId`, and [Retention](/ai-gateway/governance/retention) for how long the source traces are kept.
 
@@ -8449,7 +8460,7 @@ The spend record is what budgets debit from. It holds the organization, project,
 
 The gateway does not write request or response bodies to its logs. The access log records the fields in the table above and no headers.
 
-The gateway builds the upstream request itself and injects the real provider credential, so the credential your client sent is not the one the provider sees. On the Gemini passthrough lane it drops `Authorization`, `X-Api-Key` and `X-Goog-Api-Key` from what it forwards. `Xi-Api-Key` is also accepted as a virtual-key header, and the passthrough lane forwards it, so send the virtual key on `Authorization` or `X-Goog-Api-Key` when you call `/v1beta`. `X-LangWatch-End-User-Id`, `X-Litellm-End-User-Id` and `X-LangWatch-Metadata` are read and then deleted at the edge, so they do not travel either.
+The gateway builds the upstream request itself and injects the real provider credential, so the credential your client sent is not the one the provider sees. On the Gemini passthrough lane it drops `Authorization`, `X-Api-Key` and `X-Goog-Api-Key` from what it forwards. Do not send a virtual key on `Xi-Api-Key` to a `/v1beta` path. The gateway accepts that header as a virtual key, and the passthrough lane forwards it to Google, which puts your gateway credential in a provider's request logs. Use `Authorization` or `X-Goog-Api-Key` on `/v1beta`. `Xi-Api-Key` is for the ElevenLabs routes, which do not use this lane. `X-LangWatch-End-User-Id`, `X-Litellm-End-User-Id` and `X-LangWatch-Metadata` are read and then deleted at the edge, so they do not travel either.
 
 <Warning>One self-hosted debug switch overrides this. `LW_LOG_MESSAGE_BODY=1` writes the full request body of `/v1/messages` and `/v1/responses` to the gateway log at info level, including prompts. Use it to reproduce a provider rejection, then turn it off.</Warning>
 
@@ -8819,7 +8830,7 @@ gateway:
       service.beta.kubernetes.io/aws-load-balancer-backend-protocol: tcp
 ```
 
-<Warning>`aws-load-balancer-backend-protocol: tcp` terminates TLS on the load balancer and forwards plain TCP to gateway port 5563, so the `Authorization` header that carries the virtual key crosses that hop without encryption. Use this only when the network between the load balancer and the pods already encrypts traffic, for example under a service mesh with mutual TLS. Otherwise keep the ingress path above, which terminates TLS inside the cluster.</Warning>
+<Warning>Both examples terminate TLS in front of the gateway and reach port 5563 over plain HTTP, so the `Authorization` header that carries the virtual key crosses that last hop without encryption. The ingress terminates at the ingress controller and the network load balancer terminates at the load balancer, which puts the plaintext hop inside the cluster network in the first case and between the load balancer and the pods in the second. Both assume that network is trusted. Where it is not, run a service mesh with mutual TLS between the terminator and the gateway pods.</Warning>
 
 Request the certificate first and publish the validation CNAME records ACM prints:
 
@@ -9316,7 +9327,7 @@ Expected:
 
 `version` carries the `ENVIRONMENT` value, `local` unless you set it.
 
-This probe reaches the gateway because `networkPolicy.enabled` is `false` by default. With the network policy on, the gateway admits only the selectors in `networkPolicy.ingressFrom`, and this pod is not one of them. Either add a selector for the probe pod to `ingressFrom`, or run this check through the ingress host instead of the in-cluster service name.
+This probe reaches the gateway because `networkPolicy.enabled` is `false` by default. With the network policy on, the gateway admits only the selectors in `networkPolicy.ingressFrom`, and this pod is not one of them. Add a selector for the probe pod to `ingressFrom` to run it. The ingress is no way around this: it publishes `/v1` and `/health`, never `/healthz`. To check the process from outside the cluster, use `/health` and read step 3, which covers what its `control_plane` field means.
 
 ## 3. The gateway reaches the control plane
 

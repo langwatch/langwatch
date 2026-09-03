@@ -54,7 +54,7 @@ The `X-LangWatch-End-User-Id`, `X-LangWatch-Metadata` and `Traceparent` request 
 
 ## Response headers
 
-Google's own response headers, including its `Content-Type`, plus the gateway set from [Chat Completions](/ai-gateway/api/chat-completions#response-headers): `X-LangWatch-Gateway-Version`, `X-LangWatch-Gateway-Request-Id`, `X-LangWatch-Fallback-Count`, `X-LangWatch-Budget-Warning`, `Traceparent`, `X-LangWatch-Heartbeat-Active`, and `X-LangWatch-Provider` on a forwarded provider error.
+Google's own response headers, including its `Content-Type`, plus the gateway set from [Chat Completions](/ai-gateway/api/chat-completions#response-headers): `X-LangWatch-Gateway-Version`, `X-LangWatch-Gateway-Request-Id`, `X-LangWatch-Fallback-Count`, `X-LangWatch-Budget-Warning`, `Traceparent`, `X-LangWatch-Heartbeat-Active`, and `X-LangWatch-Provider` on a forwarded provider error. `X-LangWatch-Handled-Error` carries the `error.code` when the gateway wrote the error itself, and is removed from a forwarded provider response.
 
 ## Streaming
 

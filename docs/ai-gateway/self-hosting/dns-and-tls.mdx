@@ -136,7 +136,7 @@ gateway:
       service.beta.kubernetes.io/aws-load-balancer-backend-protocol: tcp
 ```
 
-<Warning>`aws-load-balancer-backend-protocol: tcp` terminates TLS on the load balancer and forwards plain TCP to gateway port 5563, so the `Authorization` header that carries the virtual key crosses that hop without encryption. Use this only when the network between the load balancer and the pods already encrypts traffic, for example under a service mesh with mutual TLS. Otherwise keep the ingress path above, which terminates TLS inside the cluster.</Warning>
+<Warning>Both examples terminate TLS in front of the gateway and reach port 5563 over plain HTTP, so the `Authorization` header that carries the virtual key crosses that last hop without encryption. The ingress terminates at the ingress controller and the network load balancer terminates at the load balancer, which puts the plaintext hop inside the cluster network in the first case and between the load balancer and the pods in the second. Both assume that network is trusted. Where it is not, run a service mesh with mutual TLS between the terminator and the gateway pods.</Warning>
 
 Request the certificate first and publish the validation CNAME records ACM prints:
 
