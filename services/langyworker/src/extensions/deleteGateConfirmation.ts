@@ -82,9 +82,19 @@ const AFFIRMATIVE_LEAD =
   /^(yes|yep|yeah|yup|confirm(ed)?|go ahead|do it|proceed|approved?|ok(ay)?|sure|delete it|please delete)\b/i;
 const CONFIRMATION_MAX_LENGTH = 200;
 
+/**
+ * Even a reply that LEADS with assent is not a confirmation when it trails a
+ * question or carries a negation or hedge: "Ok, what does that dataset contain?"
+ * and "Yes but NOT d2" both open affirmative yet withhold or narrow consent.
+ * Reject on a trailing `?` or any of these words, so a bound "yes" is an
+ * unqualified yes to exactly what the ask named.
+ */
+const NEGATION_OR_HEDGE = /\b(no|not|don't|dont|never|wait|stop|but|except|instead|hold)\b/i;
+
 export function isUserConfirmation(text: string): boolean {
   const own = stripResumeSeed(text).trim();
   if (own.length === 0 || own.length > CONFIRMATION_MAX_LENGTH) return false;
+  if (own.endsWith("?") || NEGATION_OR_HEDGE.test(own)) return false;
   return AFFIRMATIVE_LEAD.test(own);
 }
 

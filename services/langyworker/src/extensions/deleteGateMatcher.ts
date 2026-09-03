@@ -288,6 +288,27 @@ export const CODE_INTERPRETERS = new Set([
   "mawk",
 ]);
 
+/**
+ * Argument-runner commands that hand their argv on to another command to run
+ * (`xargs cmd`, `find … -exec cmd`, `parallel cmd`). They build no strings, but
+ * they DO execute whatever executable their argv names — so one that hands off to
+ * a shell or a code interpreter (`xargs sh -c`, `find … -exec bash {} \;`)
+ * re-opens the stdin/script-fed shell-out those heads are already held for. A
+ * hand-off to a non-executor (`find … | xargs wc -l`) stays allowed.
+ */
+const ARGV_RUNNERS = new Set(["xargs", "find", "parallel"]);
+
+/**
+ * The executor tokens whose presence in an argument-runner's argv triggers a
+ * hold. The `.` / `source` shell builtins are excluded: they cannot be exec'd as
+ * external programs by `xargs`/`find`, and `.` is overwhelmingly the
+ * current-directory argument to `find`, not the source builtin.
+ */
+const HANDOFF_EXECUTORS = new Set<string>([
+  ...[...FILE_EXECUTORS].filter((name) => name !== "." && name !== "source"),
+  ...CODE_INTERPRETERS,
+]);
+
 /** HTTP clients whose invocations reach the REST/GraphQL delete surface. */
 const HTTP_CLIENTS = new Set(["curl", "http", "https", "wget", "fetch", "xh"]);
 
@@ -374,17 +395,6 @@ export function splitSegments(command: string): string[] {
     .split(/\|\||&&|[;\n|&]/)
     .map((segment) => segment.trim())
     .filter((segment) => segment.length > 0);
-}
-
-/** Whitespace tokenizer that strips one layer of matched quotes per token. */
-export function tokenize(segment: string): string[] {
-  const tokens: string[] = [];
-  const pattern = /"([^"]*)"|'([^']*)'|(\S+)/g;
-  let match: RegExpExecArray | null;
-  while ((match = pattern.exec(segment)) !== null) {
-    tokens.push(match[1] ?? match[2] ?? match[3] ?? "");
-  }
-  return tokens;
 }
 
 /**
@@ -869,9 +879,12 @@ function classifyHttp(segment: string): DestructiveMatch | null {
  * parseable AND provably not a destructive LangWatch call.
  */
 function classifySegment(segment: string): DestructiveMatch | null {
-  // A segment we cannot resolve statically is held whenever it could reach the
-  // product: command substitution, variable expansion, and process substitution
-  // can all spell any command at all.
+  // A segment we cannot resolve statically is held UNCONDITIONALLY — command
+  // substitution, variable expansion, and process substitution can each spell any
+  // command at all, so the segment is fail-closed whether or not it mentions
+  // LangWatch. This deliberately holds even a non-LangWatch `echo $HOME` or
+  // `` ls `pwd` ``: the gate cannot prove such a segment is not a destructive
+  // LangWatch call, and fail-closed is the design.
   if (UNRESOLVABLE.test(segment)) {
     return { kind: "unparseable", segment };
   }
@@ -925,13 +938,30 @@ function classifySegment(segment: string): DestructiveMatch | null {
     return { kind: "exec-file", segment };
   }
 
-  // Executing an agent-written file: the shell resolves file contents the gate
-  // never sees, so it is unresolvable and held unconditionally.
-  if (FILE_EXECUTORS.has(headBase) && values.length > 1) {
+  // A shell resolves content the gate never sees — a script file (`bash f.sh`)
+  // OR its stdin when run bare (`… | bash`, `cat f.sh | bash`). Held
+  // UNCONDITIONALLY, even bare, mirroring CODE_INTERPRETERS above: a bare shell
+  // in a pipeline reads its script from stdin just as a bare interpreter does.
+  if (FILE_EXECUTORS.has(headBase)) {
     return { kind: "exec-file", segment };
   }
   if (/^\.{1,2}\//.test(head)) {
     return { kind: "exec-file", segment };
+  }
+
+  // An argument-runner (`xargs`/`find`/`parallel`) that hands its argv to a shell
+  // or a code interpreter (`xargs -I{} sh -c {}`, `find … -exec bash {} \;`) runs
+  // code the gate never resolves, so it is held. The hand-off target is matched
+  // as a bare token or the basename of a path token; a hand-off to a non-executor
+  // (`find … | xargs wc -l`) is untouched.
+  if (ARGV_RUNNERS.has(headBase)) {
+    for (let i = 1; i < values.length; i += 1) {
+      const token = values[i] ?? "";
+      const base = (token.split("/").pop() ?? token).toLowerCase();
+      if (HANDOFF_EXECUTORS.has(base)) {
+        return { kind: "exec-file", segment };
+      }
+    }
   }
 
   if (CLI_NAMES.has(headBase)) {

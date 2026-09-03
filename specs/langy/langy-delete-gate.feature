@@ -44,6 +44,15 @@ Feature: Langy's worker-side delete gate
       When a gated bash command deletes a LangWatch resource
       Then the gate returns allow:false
 
+    @unit
+    Scenario: A confirmation that trails a question or embeds a negation is not a confirmation
+      Given a user reply that leads with an affirmative token
+      And the reply ends with a question mark or contains a negation or hedge
+        ("Ok, what does that dataset contain?", "Yes but NOT d2")
+      When the reply is read as a possible confirmation
+      Then it is not treated as user assent
+      # An unqualified affirmative ("yes", "Yes, go ahead.", "confirm") still confirms.
+
   Rule: The confirmation must be genuinely user-authored (the #7562 self-authored bypass)
 
     @unit
@@ -127,6 +136,17 @@ Feature: Langy's worker-side delete gate
         | git status       |
         | ls -la /tmp      |
         | pnpm test:unit   |
+
+    @unit
+    Scenario Outline: An innocent pipeline into a non-shell tool is not over-blocked
+      When a gated bash command runs "<command>"
+      Then the gate returns allow:true
+
+      Examples:
+        | command                            |
+        | echo hi \| grep hi                 |
+        | cat file \| wc -l                  |
+        | find . -name '*.ts' \| xargs wc -l |
 
     @unit
     Scenario: A quoted or escaped argument is not over-blocked, even with word-internal splices
@@ -213,6 +233,49 @@ Feature: Langy's worker-side delete gate
         | source f.sh   |
         | . f.sh        |
         | ./f.sh        |
+
+    @unit
+    Scenario Outline: A bare shell fed its script on stdin is held
+      Given a bound, valid confirmation is present for the same target
+      When a gated bash command runs "<command>"
+      Then the gate returns allow:false
+      # A bare shell reads its script from stdin — the gate never sees the piped-in
+      # content, so it is held unconditionally, exactly like a bare code interpreter.
+
+      Examples:
+        | command                                                        |
+        | echo 'ynatjngpu qngnfrg qryrgr q1' \| tr a-z n-za-m \| bash    |
+        | printf bGFuZ3dhdGNo... \| base64 -d \| sh                      |
+        | cat f.sh \| bash                                               |
+
+    @unit
+    Scenario Outline: An argument-runner that hands its argv to a shell or interpreter is held
+      Given a bound, valid confirmation is present for the same target
+      When a gated bash command runs "<command>"
+      Then the gate returns allow:false
+      # xargs/find/parallel execute whatever their argv names — a hand-off to a
+      # shell or code interpreter runs code the gate never resolves.
+
+      Examples:
+        | command                              |
+        | cat targets \| xargs -I{} sh -c {}   |
+        | find . -name x -exec bash {} \;      |
+        | find . -name '*.py' -exec python3 {} \; |
+
+    @unit
+    Scenario Outline: A command using shell expansion is held even when it does not mention LangWatch
+      When a gated bash command runs "<command>"
+      Then the gate returns allow:false
+      # The UNRESOLVABLE hold on command substitution, variable expansion, and
+      # process substitution is fail-closed by design: the gate cannot prove such a
+      # segment is not a destructive LangWatch call, so it holds unconditionally —
+      # LangWatch-related or not.
+
+      Examples:
+        | command          |
+        | echo $HOME       |
+        | ls `pwd`         |
+        | cat <(echo hi)   |
 
     @unit
     Scenario: An interpreter running code that builds a destructive command at runtime is held
@@ -514,7 +577,7 @@ Feature: Langy's worker-side delete gate
 
 # --- AC Coverage Map ---
 # AC 1: "Golden-negative: no confirmation anywhere -> blocked" -> Scenario: No confirmation anywhere blocks a destructive delete
-# AC 2: "Leading yes with no preceding assistant ask -> blocked" -> Scenario: A leading "yes" with no preceding assistant ask is not confirmation
+# AC 2: "Leading yes with no preceding assistant ask -> blocked" -> Scenario: A leading "yes" with no preceding assistant ask is not confirmation; Scenario: A confirmation that trails a question or embeds a negation is not a confirmation
 # AC 3: "Stale confirmation -> blocked" -> Scenario: A stale confirmation does not carry forward across intervening assistant turns
 # AC 4: "Assistant-authored confirmation -> blocked" -> Scenario: An assistant-authored or extension-injected affirmative is not confirmation
 # AC 5: "Affirmative inside the resume-seed digest -> blocked" -> Scenario: An affirmative inside the resume-seed digest is not read as user assent
@@ -523,9 +586,9 @@ Feature: Langy's worker-side delete gate
 # AC 8: "Single-use: consumed on first gated allow" -> Scenario: A confirmation is consumed on its first authorized delete
 # AC 9: "Multi-target in one command, partial confirm -> blocked" -> Scenario: A multi-target command with only one target confirmed is blocked entirely
 # AC 10: "Read-only langwatch calls pass" -> Scenario Outline: Read-only langwatch CLI calls pass without confirmation; Scenario: A quoted or escaped argument is not over-blocked, even with word-internal splices; Scenario: Routine brace expansion in a non-langwatch command is not over-blocked; Scenario: An escaped double-quote inside a double-quoted word is parsed as one argument, not held; Scenario: An unquoted shell comment does not make a command unparseable
-# AC 11: "Non-langwatch bash passes" -> Scenario Outline: Non-langwatch bash commands pass without confirmation
+# AC 11: "Non-langwatch bash passes" -> Scenario Outline: Non-langwatch bash commands pass without confirmation; Scenario Outline: An innocent pipeline into a non-shell tool is not over-blocked
 # AC 12: "Block reason is actionable" -> Scenario: A block reason for an unconfirmed delete tells the agent to ask first; Scenario: A block reason for an unresolvable command tells the agent how to re-issue it; Scenario: An obfuscated command-name block names the obfuscation and says to re-issue the name plainly; Scenario: A destructive HTTP block tells the agent to re-issue through the CLI, not to confirm
-# AC 13: "Write-then-execute is held unconditionally" -> Scenario: A write or edit whose content contains a destructive command is held; Scenario Outline: Executing an agent-written file is held even with a valid confirmation; Scenario: A bash native quote-splice that reassembles the CLI name is held; Scenario: A backslash- or brace-spliced command name that reassembles the CLI name is held; Scenario: A brace-expansion splice that reassembles a destructive verb or resource is held; Scenario: A single-element or enumerated range brace that reassembles a destructive verb is held; Scenario: A brace expansion exceeding the enumeration budget is held quickly; Scenario: A long run of unmatched braces on a langwatch argument is held quickly; Scenario: A non-langwatch command with the same unmatched-brace run is unaffected; Scenario: A long brace-free langwatch argument is not over-blocked; Scenario: An escaped or quoted brace that bash leaves literal is not over-blocked; Scenario: The brace expander matches real bash for every handled brace form; Scenario: An awk program that concatenates a destructive command through system() is held
+# AC 13: "Write-then-execute is held unconditionally" -> Scenario: A write or edit whose content contains a destructive command is held; Scenario Outline: Executing an agent-written file is held even with a valid confirmation; Scenario: A bash native quote-splice that reassembles the CLI name is held; Scenario: A backslash- or brace-spliced command name that reassembles the CLI name is held; Scenario: A brace-expansion splice that reassembles a destructive verb or resource is held; Scenario: A single-element or enumerated range brace that reassembles a destructive verb is held; Scenario: A brace expansion exceeding the enumeration budget is held quickly; Scenario: A long run of unmatched braces on a langwatch argument is held quickly; Scenario: A non-langwatch command with the same unmatched-brace run is unaffected; Scenario: A long brace-free langwatch argument is not over-blocked; Scenario: An escaped or quoted brace that bash leaves literal is not over-blocked; Scenario: The brace expander matches real bash for every handled brace form; Scenario: An awk program that concatenates a destructive command through system() is held; Scenario Outline: A bare shell fed its script on stdin is held; Scenario Outline: An argument-runner that hands its argv to a shell or interpreter is held; Scenario Outline: A command using shell expansion is held even when it does not mention LangWatch
 # AC 14: "Destructive HTTP beyond literal DELETE is held" -> Scenario: A POST GraphQL delete or archive mutation...; Scenario: A PUT or PATCH soft-delete...; Scenario: A POST to a destructive action endpoint...; Scenario: A destructive HTTP block tells the agent to re-issue through the CLI, not to confirm; Scenario Outline: Each unconfirmed bypass class is blocked at the real tool_call seam (HTTP-shape delete case)
 # AC 15: "Benign HTTP to a langwatch host is NOT over-blocked" -> Scenario: A GET request to a langwatch host is not blocked; Scenario: A read or non-destructive GraphQL POST to a langwatch host is not blocked
 # AC 16: "Equals-form flag values are evaluated" -> Scenario: An equals-form flag value carrying a destructive verb is matched; Scenario Outline: Each unconfirmed bypass class is blocked at the real tool_call seam (equals-form case)

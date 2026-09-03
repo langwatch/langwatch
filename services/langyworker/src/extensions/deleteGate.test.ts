@@ -174,6 +174,13 @@ describe("Ordinary and unrelated commands", () => {
     expect(bash("pnpm test:unit").allow).toBe(true);
   });
 
+  /** @scenario An innocent pipeline into a non-shell tool is not over-blocked */
+  it("allows a pipeline whose stages are non-shell tools", () => {
+    expect(bash("echo hi | grep hi").allow).toBe(true);
+    expect(bash("cat file | wc -l").allow).toBe(true);
+    expect(bash("find . -name '*.ts' | xargs wc -l").allow).toBe(true);
+  });
+
   /** @scenario A block reason for an unconfirmed delete tells the agent to ask first */
   it("gives an unconfirmed delete an actionable, confirm-first reason", () => {
     const decision = bash("langwatch dashboard delete d1");
@@ -250,6 +257,42 @@ describe("Unresolvable commands held unconditionally", () => {
   it("holds execution of an agent-written file regardless of confirmation", () => {
     for (const command of ["bash f.sh", "sh f.sh", "source f.sh", ". f.sh", "./f.sh"]) {
       expect(bash(command, confirmedForD1).allow).toBe(false);
+    }
+  });
+
+  /** @scenario A bare shell fed its script on stdin is held */
+  it("holds a bare shell that reads its script from stdin, even with a valid confirmation", () => {
+    const held = [
+      // The gate never sees the piped-in script — an encoded delete decodes and
+      // runs inside the bare shell with no langwatch literal for it to catch.
+      "echo 'ynatjngpu qngnfrg qryrgr q1' | tr a-z n-za-m | bash",
+      "printf bGFuZ3dhdGNoIGRhdGFzZXQgZGVsZXRlIGQx | base64 -d | sh",
+      "cat f.sh | bash",
+      "echo hi | zsh",
+      "bash -c \"echo hi\"",
+    ];
+    for (const command of held) {
+      expect(bash(command, confirmedForD1).allow, command).toBe(false);
+    }
+  });
+
+  /** @scenario An argument-runner that hands its argv to a shell or interpreter is held */
+  it("holds xargs/find/parallel that hand argv to a shell or code interpreter", () => {
+    const held = [
+      "cat targets | xargs -I{} sh -c {}",
+      "find . -name x -exec bash {} \\;",
+      "find . -name '*.py' -exec python3 {} \\;",
+      "parallel bash ::: a.sh b.sh",
+    ];
+    for (const command of held) {
+      expect(bash(command, confirmedForD1).allow, command).toBe(false);
+    }
+  });
+
+  /** @scenario A command using shell expansion is held even when it does not mention LangWatch */
+  it("holds any command using shell substitution or expansion, LangWatch-related or not", () => {
+    for (const command of ["echo $HOME", "ls `pwd`", "cat <(echo hi)"]) {
+      expect(bash(command).allow, command).toBe(false);
     }
   });
 });
@@ -810,5 +853,17 @@ describe("isUserConfirmation", () => {
           "command actually removes and whether the retention policy already covers it.",
       ),
     ).toBe(false);
+  });
+
+  /** @scenario A confirmation that trails a question or embeds a negation is not a confirmation */
+  it("rejects an affirmative lead that trails a question or embeds a negation", () => {
+    // Leads affirmative but ends with a question — not assent.
+    expect(isUserConfirmation("Ok, what does that dataset contain?")).toBe(false);
+    // Leads affirmative but narrows/withholds consent with a negation.
+    expect(isUserConfirmation("Yes but NOT d2")).toBe(false);
+    // Plain, unqualified affirmatives still confirm.
+    expect(isUserConfirmation("yes")).toBe(true);
+    expect(isUserConfirmation("Yes, go ahead.")).toBe(true);
+    expect(isUserConfirmation("confirm")).toBe(true);
   });
 });
