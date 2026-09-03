@@ -968,7 +968,11 @@ function AutomationsPage() {
                                   </Table.Cell>
                                   <Table.Cell>
                                     {isWatchingGraph ? (
-                                      <VStack gap={0} align="start" minWidth={0}>
+                                      <VStack
+                                        gap={0}
+                                        align="start"
+                                        minWidth={0}
+                                      >
                                         <GraphWatchCell
                                           graphName={
                                             trigger.customGraph?.name ?? null

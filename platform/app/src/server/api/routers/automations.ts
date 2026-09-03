@@ -754,7 +754,7 @@ export const automationRouter = createTRPCRouter({
       }),
     )
     .permission("triggers:update")
-    .mutation(async ({ ctx, input }) => {
+    .mutation(async ({ input }) => {
       const { sanitized, unknownFields } = sanitizeTriggerFilters(
         input.filters,
       );
