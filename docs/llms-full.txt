@@ -40206,7 +40206,7 @@ Each dataset entry contains:
 | `createdAt` | Timestamp of creation |
 | `updatedAt` | Timestamp of last update |
 
-In Python, `get_dataset` returns entries with `id` and `entry` only. The records returned by `list_records` and `create_records` carry all six fields in both SDKs.
+Which fields you get back depends on the operation. `list_records` returns all six. `create_records` returns `id`, `entry` and `createdAt`. In Python, `get_dataset` returns entries with `id` and `entry` only.
 
 ## Typed Datasets (TypeScript)
 
@@ -40246,6 +40246,8 @@ langwatch dataset records add user-feedback --file ./records.json
 langwatch dataset records update user-feedback RECORD_ID --json '{"input": "..."}'
 langwatch dataset records delete user-feedback RECORD_ID
 ```
+
+A service API key also needs `LANGWATCH_PROJECT_ID`, so the CLI knows which project to use. A project API key from the project settings page already carries the project.
 
 `--if-exists` takes `append` (default), `replace` or `error`. `records add` reads a JSON array from `--json`, `--file` or `--stdin`. Every command accepts `--format json` for machine-readable output.
 
