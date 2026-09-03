@@ -1,6 +1,12 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
 import type { ExtensionAPI } from "@earendil-works/pi-coding-agent";
-import { NO_ANSWER_PUSHBACK, QUESTION_TOOL_NAME, createQuestionExtension } from "./question.js";
+import {
+  askQuestions,
+  NO_ANSWER_PUSHBACK,
+  QUESTION_TOOL_NAME,
+  WAIT_MAX_MS,
+  createQuestionExtension,
+} from "./question.js";
 import { createTurnContext, type TurnContext } from "./turn-context.js";
 
 type RegisteredTool = {
@@ -188,6 +194,31 @@ describe("the question tool", () => {
 
       expect(text).toBe(NO_ANSWER_PUSHBACK);
       expect(text).toContain("End your turn");
+    });
+  });
+
+  describe("when the app never settles the card", () => {
+    /** @scenario "A question no one answers ends the turn in words" */
+    it("stops waiting at the ten minutes the card on screen waits", async () => {
+      const { calls } = fakeApp({
+        "/api/langy/waits": [{ waitId: "wait_5" }],
+        "/api/langy/waits/wait_5": [{ waitId: "wait_5", state: "pending" }],
+      });
+      expect(WAIT_MAX_MS).toBe(10 * 60 * 1000);
+
+      let clock = 1_700_000_000_000;
+      const text = await askQuestions({
+        questions: [{ question: "Which file?", options: [{ label: "a" }] }],
+        turnContext: turnInFlight(),
+        now: () => {
+          clock += 60_000;
+          return clock;
+        },
+      });
+
+      expect(text).toBe(NO_ANSWER_PUSHBACK);
+      const polls = calls.filter((call) => call.method === "GET").length;
+      expect(polls).toBeLessThanOrEqual(WAIT_MAX_MS / 60_000 + 1);
     });
   });
 

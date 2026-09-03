@@ -31,8 +31,16 @@ const POLL_RETRY_DELAY_MS = 1_000;
 /** Give up after this many failed polls in a row. */
 const MAX_POLL_FAILURES = 3;
 
-/** The longest the tool waits for an answer. The app expires the wait first. */
-const WAIT_MAX_MS = 15 * 60 * 1000;
+/**
+ * The longest the tool waits for an answer.
+ *
+ * It is the app's own question budget (`QUESTION_WAIT_BUDGET_MS` in
+ * `platform/app/src/server/langy-local-control/constants.ts`). The app expires
+ * the card and answers `expired` first; this is the net under it, so a worker
+ * that cannot reach the app still ends its turn at the same minute the card
+ * on screen stops waiting.
+ */
+export const WAIT_MAX_MS = 10 * 60 * 1000;
 
 /** What the model reads when the wait passes its budget. */
 export const NO_ANSWER_PUSHBACK =
