@@ -113,7 +113,7 @@ describe("Langy changes a connected agent through the shared folder", () => {
                 "my refund scenario always runs on the pro plan. Let me pick the account and the plan when a run starts, and make that scenario run against the account acme-free on the free plan",
               ),
               scenario.agent(),
-              async () => {
+              async (_state, executor) => {
                 const conversationId = langy.state.conversationId ?? "";
                 // A failure here reads as an empty tool list otherwise, and
                 // the reply is what says why Langy did not ask for the code.
@@ -140,6 +140,12 @@ describe("Langy changes a connected agent through the shared folder", () => {
                 });
                 seenTurns.push(autoTurnId);
                 await watcher!.waitForIdle(LONG_RUN_TIMEOUT_MS);
+                // The panel started that turn, so it never passed through the
+                // adapter. Its tool record goes in front of the judge here, or
+                // the whole change reads as a plan Langy never carried out.
+                for (const message of await watcher!.lastTurnMessages()) {
+                  await executor.message(message as never);
+                }
               },
               scenario.judge(),
             ],
@@ -165,8 +171,10 @@ describe("Langy changes a connected agent through the shared folder", () => {
         expect(diff).toMatch(/tests\//);
 
         // The restart went through the folder, in the background, so the turn
-        // was never blocked by a process that does not exit.
-        expect(langy.state.toolNames).toContain("local_bash");
+        // was never blocked by a process that does not exit. The terminal is
+        // where this is read: the panel started that turn, so its tool calls
+        // never passed through the adapter.
+        expect(capture).toMatch(/• bash /);
         expect(capture).toMatch(/started in the background/i);
 
         // The platform holds the agent again, with the new parameter.
