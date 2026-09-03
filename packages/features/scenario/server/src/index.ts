@@ -90,6 +90,11 @@ export {
 } from "./adapters/simulation-processing-pipeline.adapter";
 export { createSimulationProcessingProducerPipeline } from "./adapters/simulation-processing-producer.adapter";
 export {
+  StalledRunsBackfillTask,
+  backfillStalledRuns,
+  type StalledRunFinder,
+} from "./tasks/stalled-runs-backfill.task";
+export {
   ScenarioApp,
   type QueueSimulationRunInput,
   type ScenarioAppDependencies,

@@ -20,6 +20,8 @@ export const tasksConfigDefinition = RuntimeConfig.define({
   /** Consumed by `ModelProviderCredentialsMigrateTask`; absent means that
    * task refuses at run time rather than at catalogue construction. */
   credentialsSecret: Config.secret({ optional: true, env: "CREDENTIALS_SECRET" }),
+  /** Comma-separated module specifiers loaded at boot; see task-modules-loader.ts. */
+  taskModules: Config.value(z.string().optional(), { env: "LANGWATCH_TASK_MODULES" }),
   nodeEnvironment: Config.value(
     z.enum(["development", "test", "production"]).default("development"),
     {

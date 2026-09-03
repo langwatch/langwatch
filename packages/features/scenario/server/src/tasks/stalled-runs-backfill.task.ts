@@ -29,14 +29,11 @@ const logger = createLogger("langwatch:tasks:backfillStalledSimulationRuns");
  * Idempotent: finishRun dedups on the run id, and closed runs leave the
  * population, so re-running converges to zero.
  *
- * It has no entrypoint in this process yet, and that is a composed-collaborator
- * gap rather than an oversight: the worker's `ScenarioExecutionService`
- * (`app/worker-scenario-processing.composition.ts`) rejects
- * `finishUnsuccessfulRun` by name — "Scenario failure handling is not composed
- * in this process" — so a runner wired here today would fail every row it
- * found. The sweep itself takes both collaborators as parameters, so the day
- * that call is composed the runner is a handful of lines over
- * `SimulationStalledRunAdapter.create(client)` and this function.
+ * Registered in `apps/tasks`' catalogue
+ * (`apps/tasks/src/platform/stalled-runs-backfill.composition.ts`), whose
+ * `execution` dispatches `finishRun` through a producer-only Eventing
+ * registration of the SAME `simulation_processing` pipeline the worker
+ * consumes (`createSimulationProcessingProducerPipeline`).
  */
 
 /**
@@ -99,21 +96,21 @@ export async function backfillStalledRuns({
 
 /**
  * The task-launcher entry — `pnpm --filter @langwatch/tasks task
- * stalled-runs-backfill`. Not yet registered in `apps/tasks`' catalogue:
- * `execution` is the worker's `ScenarioExecutionService`
- * (`app/worker-scenario-processing.composition.ts`), and `apps/tasks` does
- * not compose scenario processing today — `finishUnsuccessfulRun` would
- * refuse by name for every row a runner found. `DRY_RUN` is read here, at
- * the process boundary; {@link backfillStalledRuns} above takes it as a
- * parsed value so it stays testable without an environment.
+ * stalled-runs-backfill`. `DRY_RUN` is read here, at the process boundary;
+ * {@link backfillStalledRuns} above takes it as a parsed value so it stays
+ * testable without an environment.
+ *
+ * Both collaborators are factories (the `TopicClusteringRunTask` shape):
+ * building the real `execution` registers an Eventing pipeline, which needs
+ * Redis, and a value here would force that at catalogue-construction time.
  */
 export class StalledRunsBackfillTask extends Task {
   readonly name = "stalled-runs-backfill";
   readonly description = "Closes historical simulation runs that never received a terminal event.";
 
   private constructor(
-    private readonly finder: StalledRunFinder,
-    private readonly execution: ScenarioExecutionService,
+    private readonly finder: () => StalledRunFinder,
+    private readonly execution: () => ScenarioExecutionService,
   ) {
     super();
   }
@@ -122,16 +119,16 @@ export class StalledRunsBackfillTask extends Task {
     finder,
     execution,
   }: {
-    finder: StalledRunFinder;
-    execution: ScenarioExecutionService;
+    finder: () => StalledRunFinder;
+    execution: () => ScenarioExecutionService;
   }): StalledRunsBackfillTask {
     return new StalledRunsBackfillTask(finder, execution);
   }
 
   async run(_input: { args: readonly string[]; signal: AbortSignal }): Promise<void> {
     const result = await backfillStalledRuns({
-      finder: this.finder,
-      execution: this.execution,
+      finder: this.finder(),
+      execution: this.execution(),
       dryRun: process.env.STALLED_RUNS_BACKFILL_DRY_RUN === "true",
     });
     logger.info(result, "stalled-runs-backfill finished");

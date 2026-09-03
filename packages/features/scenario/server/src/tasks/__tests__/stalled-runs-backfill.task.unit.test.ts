@@ -8,7 +8,7 @@ import {
 } from "@langwatch/scenario-contract";
 import { describe, expect, it, vi } from "vitest";
 import type { SimulationStalledRun } from "@langwatch/scenario-server";
-import { backfillStalledRuns } from "../stalled-runs-backfill.task";
+import { backfillStalledRuns, StalledRunsBackfillTask } from "../stalled-runs-backfill.task";
 
 function makeRun(overrides: Partial<SimulationStalledRun> = {}): SimulationStalledRun {
   return {
@@ -128,6 +128,45 @@ describe("backfillStalledRuns", () => {
 
       expect(outcome).toEqual({ found: 0, closed: 0, failed: 0 });
       expect(execution.finishUnsuccessfulRun).not.toHaveBeenCalled();
+    });
+  });
+});
+
+describe("StalledRunsBackfillTask", () => {
+  describe("when constructed", () => {
+    /** @scenario "Composing the task never resolves its collaborators" */
+    it("does not call the finder or execution factories until run()", () => {
+      const finder = vi.fn(() => makeFinder([]));
+      const execution = vi.fn(() => new TestScenarioExecutionService());
+
+      StalledRunsBackfillTask.create({ finder, execution });
+
+      expect(finder).not.toHaveBeenCalled();
+      expect(execution).not.toHaveBeenCalled();
+    });
+  });
+
+  describe("when run", () => {
+    /** @scenario "A run resolves both collaborators exactly once and delegates to the backfill" */
+    it("resolves the factories and closes every stalled run through them", async () => {
+      const runs = [makeRun()];
+      const finder = vi.fn(() => makeFinder(runs));
+      const testExecution = new TestScenarioExecutionService();
+      const execution = vi.fn(() => testExecution);
+      const task = StalledRunsBackfillTask.create({ finder, execution });
+
+      await task.run({ args: [], signal: new AbortController().signal });
+
+      expect(finder).toHaveBeenCalledTimes(1);
+      expect(execution).toHaveBeenCalledTimes(1);
+      expect(testExecution.finishUnsuccessfulRun).toHaveBeenCalledWith({
+        projectId: "tenant-1",
+        scenarioId: "scenario-1",
+        setId: "set-1",
+        batchRunId: "batch-1",
+        scenarioRunId: "run-1",
+        error: "stalled",
+      });
     });
   });
 });

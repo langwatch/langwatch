@@ -149,7 +149,7 @@ function isFeatureServerCompositionRoot(workspacePath) {
   // and the only ways out are to stop testing the wiring or to record a rule
   // gap as if it were debt. A test elsewhere is still held: this is scoped to
   // the composition workspaces, not to test files in general.
-  return /^(apps\/(api|worker)|packages\/enterprise\/composition\/(api|worker))\/(?:src|tests)\//.test(
+  return /^(apps\/(api|worker|tasks)|packages\/enterprise\/composition\/(api|worker))\/(?:src|tests)\//.test(
     workspacePath,
   );
 }

@@ -1,6 +1,9 @@
 import { createLogger } from "@langwatch/observability";
 import { Task } from "@langwatch/task";
-import type { TopicClusteringPageOutcome, TopicClusteringRunPort } from "../intents/topic-clustering.intent";
+import type {
+  TopicClusteringPageOutcome,
+  TopicClusteringRunPort,
+} from "../intents/topic-clustering.intent";
 
 const logger = createLogger("langwatch:tasks:topic-clustering-run");
 
@@ -13,14 +16,12 @@ const logger = createLogger("langwatch:tasks:topic-clustering-run");
  * stable run identity for the whole walk, so re-recorded pages dedupe instead
  * of appending a fresh `topics_recorded` chain on every re-run.
  *
- * The composed entrypoint is still absent, and the reason is named: the
- * runner needs `TopicClusteringCommandsPort` and `TraceTopicAssignmentPort`,
- * both dispatched through the Topic and Trace processing pipelines'
- * PRODUCER-side commands — the same Eventing-over-Group-Queue infrastructure
- * `stalled-runs-backfill` is blocked on — and `apps/tasks` composes no
- * Eventing producer today. `runPage` takes the composed
- * {@link TopicClusteringRunPort} as a parameter, so a runner is a few lines
- * the moment that pipeline is reachable from this process.
+ * The composed entrypoint is still absent: a real {@link TopicClusteringRunPort}
+ * needs a model-provider gateway, langevals, a Prisma repository, AND two
+ * separate producer-only Eventing registrations (`topic_clustering_processing`
+ * and the trace pipeline), neither with a ready-made producer factory the way
+ * `simulation_processing` has. Full collaborator list and blocker:
+ * `apps/tasks/src/tasks.catalogue.ts` and the launch-interface plan doc.
  */
 export class TopicClusteringRunTask extends Task {
   readonly name = "topic-clustering-run";

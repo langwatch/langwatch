@@ -396,3 +396,182 @@ skipped.
   are genuinely test-only or unused outside the package and are left for a
   follow-up pass to audit individually rather than cut under this review's
   time budget.
+
+- **Fix 8 follow-up (2026-09-03) — `stalled-runs-backfill` is now wired.**
+  A later pass composed a minimal producer-only Eventing host in
+  `apps/tasks` (`apps/tasks/src/platform/tasks-eventing.composition.ts`,
+  over the same Redis the process's other handles use) and registered
+  `stalled-runs-backfill`
+  (`apps/tasks/src/platform/stalled-runs-backfill.composition.ts`), reusing
+  `createSimulationProcessingProducerPipeline` — the exact "smallest wiring"
+  path this review named. `StalledRunsBackfillTask.create` changed shape from
+  two eager values to two deferred factories (`finder: () => StalledRunFinder`,
+  `execution: () => ScenarioExecutionService`), matching
+  `TopicClusteringRunTask`'s existing `runPage` factory: registering the
+  Eventing pipeline needs Redis, and a value (rather than a factory) would
+  force that at catalogue-construction time, failing every OTHER task's boot
+  in an environment with no `REDIS_URL`. `topic-clustering-run` stays
+  unregistered — it needs the full `TopicClusteringRunner` (ClickHouse reads,
+  a model-provider gateway, langevals, a Prisma repository, the legacy-import
+  seed guard) plus TWO separate producer registrations
+  (`topic_clustering_processing` for `TopicClusteringCommandsPort`, and the
+  trace pipeline for `TraceTopicAssignmentPort`), neither of which has a
+  ready-made producer factory the way `simulation_processing` does. See the
+  task's own comment
+  (`packages/features/topic/server/src/tasks/topic-clustering-run.task.ts`)
+  and `apps/tasks/src/tasks.catalogue.ts` for the named absence.
+
+## Fix 16 plan: lazy handle composition (written, not implemented)
+
+Fix 16 asked `TasksHost` to compose each infrastructure handle on a task's
+first `require*()` call instead of at `TasksHost.create()`, so
+`prisma-migrate` — the container CMD's first step — does not also open a
+ClickHouse client and a Redis connection it never reads. The review skipped
+it as a P2 risk; this section is the plan for actually doing it, written so
+a later pass does not have to re-derive the shape.
+
+### Why it is not a one-line change
+
+`TasksHost` today (`apps/tasks/src/platform/tasks-host.composition.ts:40-62`)
+opens all three handles inside `static create()` and stores each as a plain
+`readonly` field set once in the constructor; `close()` (`:86-94`) decides
+what to shut down by checking those same fields for `undefined`. Laziness
+changes three things at once, not one:
+
+1. **The fields become getters.** `TaskHostPort`'s abstract contract
+   (`packages/task/src/task-host.port.ts:23-26`) declares
+   `abstract readonly prisma: Prisma | undefined` etc. A subclass may satisfy
+   an abstract `readonly` member with a `get prisma()` accessor — TypeScript
+   treats both as the same read-only shape — so this is not a `TaskHostPort`
+   change, only a `TasksHost` one.
+2. **Each getter must memoize.** A task can call `requireClickhouse()` more
+   than once in one run (`stalled-runs-backfill`'s `finder` and `execution`
+   factories both reach for ClickHouse independently in this pass's own
+   wiring). A naive getter that reconnects on every access would open a
+   second client, a second connection pool, and — for Prisma specifically —
+   burn a second `PrismaTenancyGuardService` wrap per call. The getter must
+   open at most once and return the same instance on every later call.
+3. **`close()` must track what was actually OPENED, not what was
+   CONFIGURED.** Today `close()`'s `this.clickhouse ? ... : Promise.resolve()`
+   check is sound because "configured" and "opened" are the same fact — every
+   configured handle is opened at `create()`. Once opening is deferred, a
+   task that only ever called `requireRedis()` must not have `close()` reach
+   for `this.clickhouse` (a getter call), because reading the getter to check
+   its presence WOULD open it — turning shutdown into the last thing that
+   creates a connection just to immediately tear it down. `close()` needs its
+   own three booleans (or three nullable private fields checked directly,
+   never through the public getter) recording whether each handle was ever
+   actually constructed.
+
+None of this touches `TaskHostPort`, `TasksConfig`, or any task — it is
+entirely inside `TasksHost`'s own body, plus the four call sites
+(`buildStalledRunsBackfillTask`, `buildObjectStorageMigrateTask`,
+`LwqlProvisionTask`, the two `ModelProvider*MigrateTask`s) that already call
+`require*()` through deferred factories and therefore do not change at all —
+that is the whole reason fix 16 is safe to defer instead of urgent: every
+consumer already goes through `require*()`, never the raw field, so the
+laziness is invisible to them by construction.
+
+### The target shape
+
+```ts
+export class TasksHost extends TaskHostPort<TasksConfig, PrismaClient, ClickHouseClient, RedisConnection, never> {
+  private _prismaConnection: PrismaConnection | undefined | "unresolved" = "unresolved";
+  private _clickhouse: ClickHouseClient | undefined | "unresolved" = "unresolved";
+  private _redis: RedisConnection | undefined | "unresolved" = "unresolved";
+
+  private constructor(readonly config: TasksConfig) { super(); }
+
+  static create(config: TasksConfig): TasksHost {
+    return new TasksHost(config); // opens nothing
+  }
+
+  get prisma(): PrismaClient | undefined {
+    return this.resolvePrisma()?.client;
+  }
+
+  private resolvePrisma(): PrismaConnection | undefined {
+    if (this._prismaConnection === "unresolved") {
+      const databaseUrl = this.config.databaseUrl?.trim();
+      this._prismaConnection = databaseUrl
+        ? PrismaConnectionService.create({ guard: PrismaTenancyGuardService.create() }).connect(...)
+        : loggedAbsence("prisma");
+    }
+    return this._prismaConnection;
+  }
+
+  get clickhouse(): ClickHouseClient | undefined { /* same "unresolved" sentinel shape */ }
+  get redis(): RedisConnection | undefined { /* same */ }
+
+  async close(): Promise<void> {
+    await Promise.all([
+      this._prismaConnection && this._prismaConnection !== "unresolved"
+        ? PrismaShutdownService.create().shutdown(this._prismaConnection)
+        : Promise.resolve(),
+      this._clickhouse && this._clickhouse !== "unresolved" ? this._clickhouse.close() : Promise.resolve(),
+      this._redis && this._redis !== "unresolved" ? RedisShutdownService.create().shutdown(this._redis) : Promise.resolve(),
+    ]);
+  }
+}
+```
+
+The three-state sentinel (`"unresolved"` vs. the resolved `T | undefined`) is
+what makes "never accessed" distinguishable from "accessed, and this
+environment has none" — a plain `T | undefined` field cannot tell `close()`
+the difference between "never asked" and "asked, absent", and the difference
+is exactly what determines whether `close()` may safely skip it. `loggedAbsence`
+moves from boot-time (logged once for every unset URL, whether or not any
+task cares) to first-access time (logged only for a handle some task actually
+reached for) — a deliberate behavior change worth calling out in the same PR,
+since today's boot log is also incidentally an inventory of what a deployment
+has configured.
+
+### Lifecycle tests it needs
+
+All of these are new `apps/tasks/src/platform/__tests__/tasks-host.composition.unit.test.ts`
+scenarios (the file does not exist today — this class currently has no
+dedicated unit test, only the black-box entrypoint integration test).
+Each needs the ability to observe whether the underlying connect factory
+(`PrismaConnectionService.connect`, `createClient` from `@clickhouse/client`,
+`RedisConnectionService.connect`) was actually invoked — spy on the module
+export or inject a factory port, whichever this codebase's existing
+composition tests already do for `PrismaConnectionService`/`RedisConnectionService`
+(check `apps/api`'s or `apps/worker`'s infrastructure unit tests for the
+established mocking seam before inventing a new one).
+
+  - **Construction opens nothing.** Given all three URLs configured,
+    `TasksHost.create(config)` must not call any of the three connect
+    factories. Assert zero calls on each spy immediately after `create()`.
+  - **First access opens exactly one handle.** After `create()`, calling
+    `host.requireClickhouse()` calls `createClient` exactly once, and leaves
+    the Prisma and Redis connect factories uncalled.
+  - **Repeated access memoizes.** Calling `host.requireClickhouse()` twice
+    (or once via `.clickhouse` and once via `.requireClickhouse()`) calls
+    `createClient` exactly once and both calls return the SAME object
+    (`toBe`, not `toEqual`).
+  - **Absence is still named at first access.** With `CLICKHOUSE_URL` unset,
+    the first `host.clickhouse` read (or `requireClickhouse()` call) logs the
+    absence exactly once; a second read does not log it again.
+  - **`close()` on an untouched host closes nothing.** Given all three URLs
+    configured but no `require*()` ever called (the `prisma-migrate` task's
+    real shape — it reads `process.env` itself, never the host), `close()`
+    must not call any of `PrismaShutdownService.shutdown`,
+    `clickhouse.close`, or `RedisShutdownService.shutdown`. This is the
+    regression test for the exact case fix 16 named.
+  - **`close()` closes only what was opened.** Given all three URLs
+    configured, calling only `requireRedis()` before `close()` must shut down
+    Redis and must NOT construct (and then close) ClickHouse or Prisma —
+    assert both the connect and the shutdown spies for the untouched handles
+    stay at zero calls each.
+  - **`close()` on a host with nothing configured is a no-op**, unchanged
+    from today's behavior — kept as a regression guard since the sentinel
+    rework touches the same branch.
+  - **Concurrent first access does not double-open.** Two overlapping
+    `require*()` calls for the same handle before the first has resolved
+    (relevant if a future connect factory becomes genuinely async — today's
+    `PrismaConnectionService.connect`/`RedisConnectionService.connect` are
+    synchronous, but the sentinel must not assume that stays true) must still
+    open exactly one connection. If the real factories stay synchronous this
+    collapses to the "repeated access memoizes" case above and needs no
+    separate async test; note which is true at implementation time rather
+    than assuming.

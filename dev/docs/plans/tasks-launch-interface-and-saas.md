@@ -91,31 +91,54 @@ CLI binary, and the image installs `--prod`, so it has to be a real
 dependency rather than inherited from a devDependency elsewhere in the
 workspace.
 
-Four tasks exist as `Task` subclasses but are not registered — each names its
-own `apps/tasks` blocker in its file (`apps/tasks/src/tasks.catalogue.ts`
+**Update (2026-09-03, later pass): `stalled-runs-backfill` is now wired**,
+the ninth registered task. `apps/tasks` composes a minimal producer-only
+Eventing host (`apps/tasks/src/platform/tasks-eventing.composition.ts`) over
+its own Group Queue Redis — `consumersEnabled: false`,
+`EventStoreProducerOnly`, `processManagerMode: "producer-only"`, the same
+three decisions `ApiEventingInfrastructure` makes
+(`apps/api/src/platform/infrastructure/api-eventing.infrastructure.ts`) — and
+registers `createSimulationProcessingProducerPipeline` (already exported by
+`@langwatch/scenario-server` for exactly this shape) to get a real
+`finishRun` command sender. `StalledRunsBackfillTask.create` changed from two
+eager collaborators to two deferred factories
+(`packages/features/scenario/server/src/tasks/stalled-runs-backfill.task.ts`),
+matching `TopicClusteringRunTask`'s existing `runPage` shape, so a missing
+`REDIS_URL` fails only this task at run time rather than every task at
+catalogue construction. Full wiring:
+`apps/tasks/src/platform/stalled-runs-backfill.composition.ts`.
+
+Three tasks still exist as `Task` subclasses but are not registered — each
+names its own `apps/tasks` blocker in its file (`apps/tasks/src/tasks.catalogue.ts`
 lists them by name too):
 
   - `annotation-clickhouse-backfill` (annotation) — needs a queue write for
-    `bulkSyncAnnotations` on the trace pipeline.
+    `bulkSyncAnnotations` on the trace pipeline; wiring it needs a producer
+    registration of the trace-processing pipeline definition, which
+    `apps/tasks` does not build (only `simulation_processing` is registered).
   - `dataset-content-backfill` (dataset) — needs `DatasetStorageResolver`,
     built from the worker's stored-object runtime (`TasksHost.objectStorage`
     is `never`).
-  - `stalled-runs-backfill` (scenario) — needs the real
-    `ScenarioExecutionService`, dispatched through a producer-only Eventing
-    pipeline over Group Queue infrastructure `apps/tasks` does not compose.
   - `topic-clustering-run` (topic) — restored from main's `runTopicClustering`
-    as `packages/features/topic/server/src/tasks/topic-clustering-run.task.ts`,
-    but blocked on the same Eventing producer as `stalled-runs-backfill`:
-    `TopicClusteringCommandsPort` and `TraceTopicAssignmentPort` are both
-    dispatched through it.
+    as `packages/features/topic/server/src/tasks/topic-clustering-run.task.ts`.
+    Unlike `stalled-runs-backfill`, this one needs far more than a command
+    sender: the full `TopicClusteringRunner` (ClickHouse reads, a
+    model-provider gateway `apps/tasks` composes none of, langevals, a
+    Prisma-backed repository, the legacy-import seed guard) PLUS two separate
+    producer registrations — `topic_clustering_processing` for
+    `TopicClusteringCommandsPort` (needs stand-ins for three Postgres
+    `StateProjectionStore`s and its process manager's metrics and run ports)
+    and the trace pipeline for `TraceTopicAssignmentPort`. Neither has a
+    ready-made producer factory the way `simulation_processing` does. See the
+    task's own comment for the full collaborator list.
 
-All four share one root cause: `apps/tasks` composes Prisma, ClickHouse and
-Redis, but no producer-only Eventing pipeline over Group Queue. Wiring one is
-follow-up work, not a one-line fix — it is the same infrastructure the API
-process's `ApiEventingInfrastructure` builds
-(`apps/api/src/platform/infrastructure/api-eventing.infrastructure.ts`), and
-building it for `apps/tasks` without integration coverage against a real
-Redis was judged too large a risk to land inside this review pass.
+`annotation-clickhouse-backfill` and `dataset-content-backfill` share one
+root cause with each other, distinct from `topic-clustering-run`'s: a
+producer registration `apps/tasks` has not built (the trace pipeline) or an
+infrastructure handle it does not compose (object storage). Building the
+trace pipeline's producer registration is follow-up work, not a one-line
+fix — the same shape `stalled-runs-backfill` used for `simulation_processing`,
+applied to a different, not-yet-built factory.
 
 `slack-alert` was restored from main and no longer hardcodes
 `baseHost: "https://app.langwatch.ai"` — it takes the base host as the task's
@@ -187,17 +210,95 @@ private, it stays in saas as a plugin (below) and the rest move.
 
 ### Fallback: saas keeps private tasks as plugins on the same interface
 
-`@langwatch/task` is a leaf package (deps: `@langwatch/observability`, zod), so
-saas can depend on it as a git subdirectory dependency and implement `Task`.
-`apps/tasks` gains `LANGWATCH_TASK_MODULES=/app/saas/tasks`: a directory of
-modules each exporting `tasks: Task[]`, loaded after the built-in catalogue,
-name collisions refused. The saas image is
-`FROM langwatch/langwatch:<sha>` plus `COPY dist/tasks /app/saas/tasks`. What
-a plugin can reach is exactly `TaskHostPort`, typed narrowly (a Prisma
+**Implemented (2026-09-03).** `@langwatch/task` is a leaf package (deps:
+`@langwatch/observability`, zod), so saas can depend on it as a git
+subdirectory dependency and implement `Task`. `apps/tasks` reads
+`LANGWATCH_TASK_MODULES` — a comma-separated list of module SPECIFIERS
+(package names or absolute paths, not a directory to scan), split and
+trimmed by `parseTaskModuleSpecifiers`
+(`apps/tasks/src/platform/task-modules-loader.ts`). Each specifier is
+imported with exactly one dynamic `import()` — the one place in `apps/tasks`
+the inline-import ban is lifted, because a specifier named by an environment
+variable cannot be a static `import` and this is the CLI's own boot seam
+(`tasks.entrypoint.ts`), not a runtime path a composition function reaches
+into later.
+
+**The module contract.** A named module exports exactly one of:
+
+  - `tasks: Task[]` — already-constructed instances, or
+  - `createTasks(host: TaskHostPort): Task[]` — a factory over the SAME
+    `TaskHostPort` the built-in tasks compose against.
+
+Every element is checked with `instanceof Task` (imported from
+`@langwatch/task`, so a plugin built against a mismatched version of the
+package fails this check rather than silently passing a lookalike object).
+A module exporting neither shape, a module whose array holds a non-`Task`
+value, and a module that fails to `import()` at all (not found, throws at
+its own top level, ...) all fail the same way: `loadTaskModules` throws an
+`Error` naming the specifier, and boot fails outright — `main()` in
+`tasks.entrypoint.ts` never reaches `TaskCatalogue.create`. An unknown or
+broken plugin module is a container that refuses to start, not a smaller
+catalogue nobody notices shrank.
+
+Plugin tasks are concatenated with the built-in catalogue and handed to
+`TaskCatalogue.create` together, which already refuses a duplicate `name`
+at construction (`packages/task/src/task-catalogue.ts`) — a plugin colliding
+with a first-party task name, or with another plugin's, fails boot the same
+way as two first-party tasks racing for one name. No separate collision
+check was needed in the loader itself.
+
+What a plugin can reach is exactly `TaskHostPort` (typed narrowly — a Prisma
 client type would drag the generated client in, so the host exposes the
-contract services it composed, not the raw client). This keeps the submodule
-out and the runner single, at the price of a second build and a narrower
-surface for the private tasks. Use it only for tasks that cannot be public.
+contract services it composed, not the raw client): `require*()` refuses by
+name for a handle this deployment did not configure, the same vocabulary a
+first-party task gets.
+
+The saas image is `FROM langwatch/langwatch:<sha>` plus a `COPY` of the
+plugin module's build output, with `LANGWATCH_TASK_MODULES` naming its
+resolvable module path:
+
+```dockerfile
+# langwatch-saas/Dockerfile.tasks (sketch — saas repo, not built here)
+FROM langwatch/langwatch:<sha>
+
+# The saas repo's own private tasks, built to plain ESM/CJS ahead of time —
+# `apps/tasks` imports this by specifier, not by source, so the plugin's own
+# build step (tsc/tsup/whatever saas already uses) runs before this COPY.
+COPY dist/tasks /app/saas-tasks
+
+ENV LANGWATCH_TASK_MODULES=/app/saas-tasks/index.js
+
+# Same CMD the public image already runs; the saas image differs only in
+# what LANGWATCH_TASK_MODULES points at.
+```
+
+And the saas-side module, `dist/tasks/index.js` (built from whatever source
+`langwatch-saas` keeps its private tasks in):
+
+```ts
+// langwatch-saas/src/tasks/index.ts (sketch — saas repo, not built here)
+import { Task, type TaskHostPort } from "@langwatch/task";
+
+class StripePricesSyncTask extends Task {
+  readonly name = "stripe-prices-sync";
+  readonly description = "...";
+  static create(host: TaskHostPort): StripePricesSyncTask { /* ... */ }
+  async run(input: { args: readonly string[]; signal: AbortSignal }): Promise<void> { /* ... */ }
+}
+
+export function createTasks(host: TaskHostPort): Task[] {
+  return [StripePricesSyncTask.create(host) /* , ...the rest of the 8 */];
+}
+```
+
+This keeps the submodule out and the runner single, at the price of a second
+build and a narrower surface for the private tasks. Use it only for tasks
+that cannot be public.
+
+Test coverage: `apps/tasks/src/platform/__tests__/task-modules-loader.unit.test.ts`
+exercises both export shapes, a module exporting neither, a `tasks` array
+holding a non-`Task` value, and an unresolvable specifier — each fixture
+lives in `apps/tasks/src/platform/__tests__/fixtures/`.
 
 ### Not recommended
 
