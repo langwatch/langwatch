@@ -34,12 +34,14 @@ const {
   mockGraphsGetByIdInvalidate,
   mockCreateGraph,
   mockRouterPush,
+  mockDrawerStack,
 } = vi.hoisted(() => ({
   mockGraphsGetAllQuery: vi.fn(),
   mockGraphsGetAllInvalidate: vi.fn(),
   mockGraphsGetByIdInvalidate: vi.fn(),
   mockCreateGraph: vi.fn(),
   mockRouterPush: vi.fn(),
+  mockDrawerStack: [] as { drawer: string; params: Record<string, unknown> }[],
 }));
 
 vi.mock("~/components/DashboardLayout", () => ({
@@ -94,6 +96,9 @@ vi.mock("~/hooks/useDrawer", () => ({
     goBack: vi.fn(),
   }),
   useDrawerParams: () => ({}),
+  // The drawer reads the navigation stack to tell a sub-flow apart from a
+  // close.
+  getDrawerStack: () => mockDrawerStack,
 }));
 
 vi.mock("~/utils/compat/next-router", () => ({
@@ -176,6 +181,8 @@ describe("Creating a custom graph then alerting on it", () => {
     vi.clearAllMocks();
     serverGraphs = [];
     cachedGraphs = [];
+    mockDrawerStack.length = 0;
+    mockDrawerStack.push({ drawer: "automation", params: {} });
     mockGraphsGetAllQuery.mockImplementation(() => ({
       data: cachedGraphs,
       isLoading: false,
