@@ -240,38 +240,32 @@ describe("given an open question card", () => {
   });
 });
 
-describe("given a question the browser streamed and nothing stamped", () => {
+// Langy asks through its `question` tool, which the panel turns into the same
+// choices card (see LangyQuestionToolCard.integration.test.tsx). A choices
+// FENCE is therefore a kind the card channel does not know, and it degrades
+// like any other unknown card rather than opening a second asking path the
+// tool wait knows nothing about.
+describe("given a choices fence in the assistant's own prose", () => {
   const FENCED_QUESTION = {
     type: "text",
     text: 'One thing I need from you:\n\n```langy-card\n{"kind":"choices","blockId":"q1","question":"Which agent should this scenario run against?","options":[{"id":"staging","label":"Staging agent"},{"id":"prod","label":"Production agent"}]}\n```',
   };
 
-  /** @scenario "A settled turn's cards reach the reader who watched it stream" */
-  it("is answerable, because the timeline reads the same fences the panel draws", () => {
+  it("degrades to the disclosure, with nothing to answer", () => {
     const message = assistantMessage({ parts: [FENCED_QUESTION] });
-    const onChoiceSelect = vi.fn();
-    renderMessage(message, {
-      choicesTimeline: langyChoicesTimeline([message]),
-      onChoiceSelect,
-    });
-
-    fireEvent.click(screen.getByText("Staging agent"));
-    expect(onChoiceSelect.mock.calls[0]?.[0]).toMatchObject({
-      selection: { blockId: "q1", optionIds: ["staging"] },
-    });
-  });
-
-  it("stays closed once the message is the durable record's", () => {
-    const message = assistantMessage({
-      parts: [FENCED_QUESTION],
-      metadata: recorded,
-    });
     renderMessage(message, {
       choicesTimeline: langyChoicesTimeline([message]),
       onChoiceSelect: vi.fn(),
     });
 
     expect(screen.queryByText("Staging agent")).toBeNull();
+    expect(derivedFrames()).toHaveLength(0);
+    expect(screen.getByText("Langy tried to draw a card here")).toBeDefined();
+  });
+
+  it("puts no question on the timeline, so nothing binds an answer to it", () => {
+    const message = assistantMessage({ parts: [FENCED_QUESTION] });
+    expect(langyChoicesTimeline([message])).toEqual([{ kind: "message" }]);
   });
 });
 

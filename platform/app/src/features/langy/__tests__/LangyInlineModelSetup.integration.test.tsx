@@ -208,6 +208,14 @@ vi.mock("~/utils/api", () => ({
       warmWorker: {
         useMutation: () => ({ mutate: () => undefined }),
       },
+      // ADR-129: the panel reads the shared folder and answers a
+      // question card's wait; neither is what these tests drive.
+      getLocalWorkspace: {
+        useQuery: () => ({ data: undefined, refetch: () => undefined }),
+      },
+      answerQuestion: {
+        useMutation: () => ({ mutate: () => undefined, isPending: false }),
+      },
       stopTurn: {
         useMutation: () => ({ mutateAsync: () => Promise.resolve() }),
       },

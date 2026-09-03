@@ -21,6 +21,7 @@ import {
   langyAnswerSegments,
   langyAnswerSegmentsFromText,
 } from "../logic/langyAnswerSegments";
+import { codeAccessCallId } from "../logic/langyCodeAccessTool";
 import {
   isSubstantiveLangyAnswer,
   parseLangyFeedbackDirective,
@@ -35,6 +36,7 @@ import { stripToolNarration } from "../logic/langyToolNarration";
 import { langyRunText, langyTranscriptRuns } from "../logic/langyTranscript";
 import { useSpaLinkClick } from "../logic/spaLink";
 import { useLangyStore } from "../stores/langyStore";
+import { LangyCodeAccessCard } from "./derived-cards/LangyCodeAccessCard";
 import { LangyDerivedCardView } from "./derived-cards/LangyDerivedCardView";
 import { LangyFailedCard } from "./derived-cards/LangyFailedCard";
 import { StreamingAnswerWithCards } from "./derived-cards/StreamingAnswerWithCards";
@@ -83,6 +85,7 @@ function MessageContentImpl({
   choicesTimeline,
   onChoiceSelect,
   onVerifyDerivedCard,
+  onAskCodeAccessAgain,
 }: {
   message: UIMessage;
   organizationId?: string | null;
@@ -127,6 +130,12 @@ function MessageContentImpl({
   }) => void;
   /** Bind a derived card's verify hint. Absent = chip hidden. */
   onVerifyDerivedCard?: (a: { card: LangyDerivedCard }) => void;
+  /**
+   * Stop whatever is running and ask Langy the code access question again —
+   * what the code access card's Change and Ask again controls do. Absent =
+   * the card renders read-only.
+   */
+  onAskCodeAccessAgain?: () => void;
 }) {
   const isUser = message.role === "user";
   const { project } = useOrganizationTeamProject();
@@ -176,6 +185,15 @@ function MessageContentImpl({
       isUser
         ? []
         : message.parts.flatMap((part) => questionToolCardParts(part)),
+    [isUser, message.parts],
+  );
+
+  // The `code_access` TOOL call, which is where the code access card hangs
+  // (ADR-129). The call says the question was asked; the card reads its own
+  // state from `langy.getLocalWorkspace`, because the folder can connect long
+  // after this turn ended.
+  const codeAccessCall = useMemo(
+    () => (isUser ? null : codeAccessCallId(message.parts)),
     [isUser, message.parts],
   );
 
@@ -436,6 +454,22 @@ function MessageContentImpl({
             />
           </LangyCardBoundary>
         ))}
+        {/* How Langy reaches this person's code (ADR-129). Asked once per
+            conversation, by the tool, and answered here. */}
+        {codeAccessCall && conversationId && project?.id ? (
+          <LangyCardBoundary scope="the code access card">
+            <LangyCodeAccessCard
+              projectId={project.id}
+              conversationId={conversationId}
+              callId={codeAccessCall}
+              organizationId={organizationId ?? null}
+              {...(onChoiceSelect ? { onChoiceSelect } : {})}
+              {...(onAskCodeAccessAgain
+                ? { onAskAgain: onAskCodeAccessAgain }
+                : {})}
+            />
+          </LangyCardBoundary>
+        ) : null}
         {/* WHEN to ask is the backend's call (langy.messages `shouldAskFeedback` —
             conversation depth + a per-user quiet period), or the agent's own
             [langy:feedback] directive at a high-signal moment, or the user

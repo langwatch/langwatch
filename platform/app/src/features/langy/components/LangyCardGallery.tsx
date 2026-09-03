@@ -33,19 +33,23 @@ import {
 import type { UIMessage } from "ai";
 import { X } from "lucide-react";
 import { LangyCard } from "~/features/asaplangy";
+import { useOrganizationTeamProject } from "~/hooks/useOrganizationTeamProject";
 import {
   explainLangyError,
   KNOWN_LANGY_ERROR_KINDS,
 } from "../logic/langyErrorExplainer";
+import type { LangyPermissionCardData } from "../logic/langyLocalWaits";
 import { useLangyStore } from "../stores/langyStore";
 import { LangyCapabilityPendingCard } from "./capabilities/LangyCapabilityPendingCard";
 import { LangyCapabilityRenderer } from "./capabilities/LangyCapabilityRenderer";
+import { LangyCodeAccessCard } from "./derived-cards/LangyCodeAccessCard";
 import { LangyDerivedCardsTestingGround } from "./derived-cards/LangyDerivedCardsTestingGround";
 import { LangyGitHubConnectCard } from "./github/LangyGitHubConnectCard";
 import { LangyGitHubPrCard } from "./github/LangyGitHubPrCard";
 import { LangyGitHubProgressCard } from "./github/LangyGitHubProgressCard";
 import { LangyError } from "./LangyError";
 import { LangyFeedback } from "./LangyFeedback";
+import { LangyLocalPermissionCard } from "./LangyLocalPermissionCard";
 import { LangyPlanLimitCard } from "./LangyPlanLimitCard";
 import { LangyRecoveringLine } from "./LangyRecoveringLine";
 import { LangyToolActivity } from "./LangyToolActivity";
@@ -289,6 +293,14 @@ export function LangyCardGallery() {
           streaming playground feeds the REAL preview reducer chunk by chunk. */}
       <Section title="Model-emitted blocks — derived cards and choices (ADR-060)">
         <LangyDerivedCardsTestingGround />
+      </Section>
+
+      {/* ADR-129: the cards that stand between Langy and the developer's own
+          machine. The permission card is fed fixtures in each of its states;
+          the code access card is the REAL card on the open conversation, so it
+          reads whatever the folder and the remembered choice actually are. */}
+      <Section title="The developer's own machine (ADR-129)">
+        <LangyLocalControlGallery />
       </Section>
 
       <Section title="Capabilities — reads">
@@ -626,6 +638,58 @@ export function LangyCardGallery() {
           onAction={() => undefined}
         />
       </Section>
+    </VStack>
+  );
+}
+
+/** The local-control cards: one permission card per state, plus the ask. */
+function LangyLocalControlGallery() {
+  const { project } = useOrganizationTeamProject();
+  const conversationId = useLangyStore((state) => state.activeConversationId);
+  const permission: LangyPermissionCardData = {
+    waitId: "gallery-wait",
+    status: "pending",
+    decision: null,
+    command: "pnpm typecheck",
+    pattern: "pnpm *",
+    reason: "Runs the project's own type check before I commit",
+    skipOffered: true,
+    workspaceName: "acme-app",
+    hostname: "rogerio-mbp",
+  };
+  const shared = {
+    projectId: project?.id ?? "",
+    conversationId: conversationId ?? "",
+    skipPermissions: false,
+  };
+
+  return (
+    <VStack align="stretch" gap={3}>
+      <LangyLocalPermissionCard {...shared} card={permission} skipAllowed />
+      <LangyLocalPermissionCard
+        {...shared}
+        card={permission}
+        skipAllowed={false}
+      />
+      <LangyLocalPermissionCard
+        {...shared}
+        card={{ ...permission, status: "answered", decision: "allow_pattern" }}
+        skipAllowed
+      />
+      <LangyLocalPermissionCard
+        {...shared}
+        card={{ ...permission, status: "expired" }}
+        skipAllowed
+      />
+      {project?.id && conversationId ? (
+        <LangyCodeAccessCard
+          projectId={project.id}
+          conversationId={conversationId}
+          callId="gallery-code-access"
+          onChoiceSelect={() => undefined}
+          onAskAgain={() => undefined}
+        />
+      ) : null}
     </VStack>
   );
 }

@@ -36,6 +36,7 @@ import {
 import { AnimatePresence, motion } from "motion/react";
 import {
   Profiler,
+  type ReactNode,
   useCallback,
   useEffect,
   useMemo,
@@ -53,7 +54,7 @@ import { Menu } from "~/components/ui/menu";
 import { TriggerAnchor } from "~/components/ui/TriggerAnchor";
 import { toaster } from "~/components/ui/toaster";
 import { Tooltip } from "~/components/ui/tooltip";
-import { showErrorToast } from "~/features/errors";
+import { readHandledError, showErrorToast } from "~/features/errors";
 import { ModelProviderScreen } from "~/features/onboarding/components/sections/ModelProviderScreen";
 import { useDrawer } from "~/hooks/useDrawer";
 import { useFeatureFlag } from "~/hooks/useFeatureFlag";
@@ -113,6 +114,11 @@ import {
   selectLangySuggestions,
 } from "../logic/langyHomeSuggestions";
 import {
+  langyPermissionCards,
+  langyQuestionWaitsByToolCall,
+  routeLangyChoiceAnswer,
+} from "../logic/langyLocalWaits";
+import {
   type MakeDefaultWritePlan,
   makeDefaultOffer,
 } from "../logic/langyMakeDefaultOffer";
@@ -146,6 +152,7 @@ import { buildTimeTravelView } from "../logic/langyTimeTravel";
 import { deriveWaveActivity } from "../logic/langyWaveMotion";
 import { isInternalHref } from "../logic/spaLink";
 import { tapeForConversation, useLangyDevLog } from "../stores/langyDevLog";
+import { useLangyLocalControlStore } from "../stores/langyLocalControlStore";
 import {
   attachedContextToChip,
   type LangyPanelEffect,
@@ -160,6 +167,7 @@ import {
   ConversationSkeleton,
   skeletonMessageCount,
 } from "./ConversationSkeleton";
+import { LANGY_CODE_ACCESS_ASK_AGAIN } from "./derived-cards/LangyCodeAccessCard";
 import { EmptyState } from "./EmptyState";
 import { LangyGitHubConnectCard } from "./github/LangyGitHubConnectCard";
 import { LangyCardBoundary } from "./LangyCardBoundary";
@@ -168,6 +176,8 @@ import { LangyContextTargetLayer } from "./LangyContextTargetLayer";
 import { LangyDevDrawer } from "./LangyDevDrawer";
 import { LangyError } from "./LangyError";
 import { LangyExternalLinkDialog } from "./LangyExternalLinkDialog";
+import { LangyLocalPermissionCard } from "./LangyLocalPermissionCard";
+import { LangyLocalWorkspaceChip } from "./LangyLocalWorkspaceChip";
 import { LangyMakeDefaultDialog } from "./LangyMakeDefaultDialog";
 import { LangyMark, LangyMarkGradientDefs } from "./LangyMark";
 import { LangyPlanCard } from "./LangyPlanCard";
@@ -857,6 +867,30 @@ function LangyPanel({
             projectId: turnContextRef.current?.projectId,
             seen: uiActionSeenRef.current,
             handlers: actionHandlersRef?.current ?? {},
+          });
+        },
+        // ADR-129. A card the turn is waiting on. The durable event is the
+        // truth (the tail folds it onto the tool call); this is the fast path
+        // that puts the card up before the tail lands.
+        onLocalWait: (entry) => {
+          useLangyLocalControlStore.getState().recordWait({
+            conversationId: useLangyStore.getState().activeConversationId,
+            wait:
+              entry.type === "local_permission"
+                ? { ...entry, kind: "permission" }
+                : { ...entry, kind: "question" },
+          });
+        },
+        onLocalWorkspace: (entry) => {
+          useLangyLocalControlStore.getState().recordWorkspace({
+            conversationId: useLangyStore.getState().activeConversationId,
+            workspace: {
+              state: entry.state,
+              name: entry.name,
+              root: entry.root,
+              hostname: entry.hostname,
+              ...(entry.gitBranch ? { gitBranch: entry.gitBranch } : {}),
+            },
           });
         },
         onSignal: (signal) => {
@@ -2127,6 +2161,121 @@ function LangyPanel({
     return choicesTimelineRef.current.value;
   }, [displayMessages]);
 
+  // ── The developer's own machine (ADR-129) ───────────────────────────────
+  //
+  // Everything the local cards read comes from two places and no more: the
+  // folded turn document (the durable truth, which a tab that adopted a
+  // running turn has without ever seeing the live stream) and the live wait
+  // entries this browser's own stream delivered. `langyLocalWaits` merges
+  // them with a rule that only ever moves a card forward.
+  const turnToolCalls = useLangyStore(
+    (s) => s.turnProjection.turn?.ToolCalls ?? null,
+  );
+  const liveWaits = useLangyLocalControlStore((s) => s.waits);
+  const permissionCards = useMemo(
+    () => langyPermissionCards({ toolCalls: turnToolCalls, live: liveWaits }),
+    [turnToolCalls, liveWaits],
+  );
+  const questionWaits = useMemo(
+    () =>
+      langyQuestionWaitsByToolCall({
+        toolCalls: turnToolCalls,
+        live: liveWaits,
+      }),
+    [turnToolCalls, liveWaits],
+  );
+
+  // The live entries belong to one conversation; opening another drops them.
+  useEffect(() => {
+    useLangyLocalControlStore.getState().reset(activeConversationId);
+  }, [activeConversationId]);
+
+  const localWorkspace = api.langy.getLocalWorkspace.useQuery(
+    { projectId: projectId ?? "", conversationId: activeConversationId ?? "" },
+    { enabled: !!projectId && !!activeConversationId },
+  );
+
+  const answerQuestion = api.langy.answerQuestion.useMutation();
+
+  /**
+   * Answer a question card the waiting tool asked. A wait the server no longer
+   * holds refuses with `langy_wait_expired`, which is exactly the signal to
+   * send the answer as the next message instead — the late-answer path the
+   * choices card has always had.
+   */
+  const answerQuestionWait = ({
+    conversationId,
+    waitId,
+    selection,
+    card,
+  }: {
+    conversationId: string;
+    waitId: string;
+    selection: LangyChoiceSelection;
+    card: LangyDerivedChoicesCard;
+  }) => {
+    if (!projectId) return;
+    const labelById = new Map(
+      card.options.map((option) => [option.id, option.label]),
+    );
+    answerQuestion.mutate(
+      {
+        projectId,
+        conversationId,
+        waitId,
+        answers: [
+          {
+            question: card.question,
+            selected: selection.optionIds.flatMap((id) => {
+              const label = labelById.get(id);
+              return label ? [label] : [];
+            }),
+            ...(selection.otherText !== undefined
+              ? { other: selection.otherText }
+              : {}),
+          },
+        ],
+      },
+      {
+        onSuccess: () =>
+          useLangyLocalControlStore
+            .getState()
+            .settleWait({ waitId, status: "answered" }),
+        onError: (error) => {
+          // Only an expired wait falls back to a message. Anything else is a
+          // real failure, and the toast says what it was.
+          if (readHandledError(error)?.code === "langy_wait_expired") {
+            useLangyLocalControlStore
+              .getState()
+              .settleWait({ waitId, status: "expired" });
+            selectChoiceImplementationRef.current({ selection, card });
+            return;
+          }
+          showErrorToast({
+            error,
+            title: "Could not send your answer",
+          });
+        },
+      },
+    );
+  };
+
+  /**
+   * Change the code access choice: stop the turn that is running on the old
+   * answer (ADR-078 turn controls) and ask the question again. The send waits
+   * for the stop to land, because `send` refuses while a turn is in flight.
+   */
+  const [reAskCodeAccess, setReAskCodeAccess] = useState(false);
+  const askCodeAccessAgain = useCallback(() => {
+    setReAskCodeAccess(true);
+    if (isBusy) handleStop();
+  }, [isBusy, handleStop]);
+  useEffect(() => {
+    if (!reAskCodeAccess || isBusy) return;
+    setReAskCodeAccess(false);
+    void send(LANGY_CODE_ACCESS_ASK_AGAIN);
+  }, [reAskCodeAccess, isBusy, send]);
+
   // Answer a choices card: the selection is the NEXT USER MESSAGE — a typed
   // part the record binds by blockId, plus the readable "Chose: X" the model
   // acts on (ADR-060 §6). Rides the ordinary send path; the turn lifecycle
@@ -2152,7 +2301,26 @@ function LangyPanel({
     [],
   );
   selectChoiceImplementationRef.current = ({ selection, card }) => {
-    if (!projectId || isBusy) return;
+    if (!projectId) return;
+    // A question asked MID-TURN is waiting on a tool, not on the next message
+    // (ADR-129). The answer goes back to the wait, the turn keeps the plan it
+    // had, and nothing is sent. A wait that already ended (`langy_wait_expired`)
+    // falls through to the message path below, which is the late-answer route.
+    const conversationId = useLangyStore.getState().activeConversationId;
+    const route = routeLangyChoiceAnswer({
+      blockId: selection.blockId,
+      waits: questionWaits,
+    });
+    if (conversationId && route.kind === "wait") {
+      answerQuestionWait({
+        conversationId,
+        waitId: route.waitId,
+        selection,
+        card,
+      });
+      return;
+    }
+    if (isBusy) return;
     const text = renderLangyChoiceSelectionText({
       selection,
       optionLabelById: new Map(
@@ -2680,6 +2848,14 @@ function LangyPanel({
           >
             <PanelHeader
               conversationTitle={conversationTitle}
+              workspaceChip={
+                projectId && activeConversationId ? (
+                  <LangyLocalWorkspaceChip
+                    projectId={projectId}
+                    conversationId={activeConversationId}
+                  />
+                ) : null
+              }
               onNewChat={handleNewChat}
               onClose={() => {
                 setReconnectCodex(false);
@@ -3027,6 +3203,9 @@ function LangyPanel({
                                 onVerifyDerivedCard={
                                   timeTravel ? undefined : verifyDerivedCard
                                 }
+                                onAskCodeAccessAgain={
+                                  timeTravel ? undefined : askCodeAccessAgain
+                                }
                                 // (No connect-card prop: MessageContent no longer sniffs
                                 // the prose for `[langy:connect-github]`. The connect card
                                 // is driven by the structured `langy_github_not_connected`
@@ -3047,6 +3226,32 @@ function LangyPanel({
                             That is not a polish gap, it is input that looks
                             lost. Drawn as the real bubble, in the place the
                             real bubble will appear, so the swap is invisible. */}
+                          {/* What Langy is waiting for on the developer's own
+                              machine (ADR-129). Read from the folded turn
+                              document, so a tab that adopted a running turn
+                              renders the card without the live stream. */}
+                          {!timeTravel && projectId && activeConversationId
+                            ? permissionCards.map((card) => (
+                                <IsolatedErrorBoundary
+                                  key={card.waitId}
+                                  scope="This permission card failed to render"
+                                  resetKeys={[card.waitId]}
+                                >
+                                  <LangyLocalPermissionCard
+                                    projectId={projectId}
+                                    conversationId={activeConversationId}
+                                    card={card}
+                                    skipAllowed={
+                                      localWorkspace.data?.skipAllowed ?? false
+                                    }
+                                    skipPermissions={
+                                      localWorkspace.data?.skipPermissions ??
+                                      false
+                                    }
+                                  />
+                                </IsolatedErrorBoundary>
+                              ))
+                            : null}
                           {!timeTravel && pendingPrompt ? (
                             <QueuedPrompt
                               prompt={pendingPrompt}
@@ -3395,6 +3600,7 @@ function JumpToLatest({
 
 function PanelHeader({
   conversationTitle,
+  workspaceChip,
   onNewChat,
   onClose,
   hideClose,
@@ -3406,6 +3612,8 @@ function PanelHeader({
 }: {
   /** The conversation's GENERATED title, or null while it has none yet. */
   conversationTitle: string | null;
+  /** The shared folder chip (ADR-129), which renders nothing while none is. */
+  workspaceChip?: ReactNode;
   onNewChat: () => void;
   onClose: () => void;
   /** Hide the Minimise control (drawer companion: the drawer owns the only X). */
@@ -3456,6 +3664,8 @@ function PanelHeader({
             "Langy"
           )}
         </Box>
+
+        {workspaceChip}
 
         <HStack gap={0.5} flexShrink={0}>
           <Tooltip content="New chat" positioning={{ placement: "bottom" }}>

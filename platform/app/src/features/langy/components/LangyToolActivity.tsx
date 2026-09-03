@@ -50,6 +50,7 @@ import {
   type CapabilityCommand,
   commandOfToolCall,
 } from "../logic/langyCapabilityDigest";
+import { isCodeAccessToolPart } from "../logic/langyCodeAccessTool";
 import { isPlanToolPart } from "../logic/langyPlan";
 import {
   isQuestionToolPart,
@@ -575,6 +576,10 @@ function readActivityGroups(message: PartsView): ActivityGroup[] {
     if (isQuestionToolPart(part) && questionToolCardParts(part).length > 0) {
       return;
     }
+    // The `code_access` tool is the code access card (ADR-129), for the same
+    // reason: it speaks to the person, not to the model, and the card carries
+    // its whole life.
+    if (isCodeAccessToolPart(part)) return;
     const name = partToolName(part);
     if (!name) return;
 

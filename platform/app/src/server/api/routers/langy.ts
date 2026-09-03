@@ -1045,6 +1045,26 @@ export const langyRouter = createTRPCRouter({
       },
     ),
 
+  /**
+   * The remembered choice on its own, for the settings page: it shows and
+   * clears the preference outside any conversation, so it has no folder to
+   * read and no conversation id to read one with.
+   */
+  getCodeAccessPreference: langyReadProcedure.query(
+    async ({ ctx }): Promise<{ preference: "github" | null }> => {
+      const user = await prisma.user.findUnique({
+        where: { id: ctx.session.user.id },
+        select: { langyCodeAccessPreference: true },
+      });
+      return {
+        preference:
+          user?.langyCodeAccessPreference === "github"
+            ? ("github" as const)
+            : null,
+      };
+    },
+  ),
+
   /** What the panel chip, the code access card and the settings page read. */
   getLocalWorkspace: langyReadProcedure
     .input(z.object({ conversationId: z.string() }))
