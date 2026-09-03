@@ -8,7 +8,11 @@ import {
   endPasskeyCeremony,
   startPasskeyCeremony,
 } from "../logic/passkeyCeremony";
-import { passkeyFailure, passkeyFailureFrom } from "../logic/passkeyFailure";
+import {
+  isCeremonyAbandoned,
+  passkeyFailure,
+  passkeyFailureFrom,
+} from "../logic/passkeyFailure";
 import { MethodButton } from "./MethodButton";
 import { SignInMethodIcon } from "./SignInMethodIcon";
 
@@ -138,13 +142,14 @@ export function PasskeySignInButton({
 
   // A cancelled prompt is not a failure worth shouting about: the person
   // closed it, and the other methods are still on the screen behind this.
-  // But ONLY the explicit abort is a cancel. A client-side failure — the
-  // authenticator erroring, a relying-party mismatch — also comes back with
-  // no status, and silencing it left somebody whose passkey FAILED staring at
-  // a screen that said nothing at all.
+  // But ONLY the ones nobody finished are silent — `isCeremonyAbandoned` is
+  // that rule, and it is the same rule the offer in the address field reads,
+  // because the two routes reach the same ceremony. A client-side failure —
+  // the authenticator erroring, a relying-party mismatch — also comes back
+  // with no status, and silencing it left somebody whose passkey FAILED
+  // staring at a screen that said nothing at all.
   const announceRefusal = (error: { code?: string; status?: number }) => {
-    const cancelled = error.code === "ERROR_CEREMONY_ABORTED";
-    if (!cancelled) {
+    if (!isCeremonyAbandoned({ code: error.code })) {
       onError(passkeyFailureFrom(error));
     }
     // Told either way, quiet refusal included: the screen's job now is to

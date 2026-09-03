@@ -1,17 +1,62 @@
 import { useEffect, useRef } from "react";
 import { authClient, navigate, safeRedirectTarget } from "~/utils/auth-client";
 import { rememberLastUsedMethod } from "../logic/lastUsedMethod";
-import { passkeyFailure, passkeyFailureFrom } from "../logic/passkeyFailure";
+import {
+  isCeremonyAbandoned,
+  passkeyFailure,
+  passkeyFailureFrom,
+} from "../logic/passkeyFailure";
 
 /**
- * A ceremony nobody completed: the sheet was dismissed, the screen went away,
- * the request was superseded. WebAuthn reports a decline and an abort the same
- * way it reports "no credential matched", deliberately, and none of them are
- * events a person needs telling about.
+ * What a ceremony that RESOLVED owes the screen — and nothing at all where
+ * nobody finished it.
+ *
+ * The plugin does not throw an abandoned ceremony: it RESOLVES it, carrying a
+ * 400, straight into the branch that reads a 400 as "the server looked at this
+ * credential and said no". That is the split-second alert a SUCCESSFUL
+ * password sign-in used to raise on its way out of the screen.
+ *
+ * Everything else is mapped to a code the registry has words for, exactly as
+ * the button on the rail maps its own. Handed on raw, the plugin's
+ * `{ code, status }` is not a shape `readHandledError` can read, so a refusal
+ * it had named correctly reached the card as "Something went wrong. We've been
+ * notified." — the generic line for a failure nobody anticipated, and this one
+ * we anticipated and wrote copy for.
  */
-function wasDeclined(error: unknown): boolean {
-  if (!(error instanceof DOMException)) return false;
-  return error.name === "NotAllowedError" || error.name === "AbortError";
+function announceRefusal({
+  error,
+  onError,
+}: {
+  error: { code?: string; status?: number };
+  onError: (error: unknown) => void;
+}): void {
+  if (isCeremonyAbandoned({ code: error.code })) return;
+  onError(passkeyFailureFrom(error));
+}
+
+/**
+ * The same for a ceremony that THREW.
+ *
+ * A `name` is the platform's own word for how a ceremony ended, so it is read
+ * off the platform's own exception and off nothing else — anything else that
+ * throws here failed for a reason somebody has to act on.
+ */
+function announceThrow({
+  error,
+  onError,
+}: {
+  error: unknown;
+  onError: (error: unknown) => void;
+}): void {
+  if (
+    error instanceof DOMException &&
+    isCeremonyAbandoned({ name: error.name })
+  ) {
+    return;
+  }
+  // A throw never reached the server, so there is no status to read and
+  // nothing to tell apart — the ceremony simply did not finish.
+  onError(passkeyFailure(void 0));
 }
 
 /**
@@ -46,13 +91,7 @@ async function offerPasskeyFromAutofill({
     // passkey the server no longer holds (`identity_passkey_not_recognized`)
     // was refused correctly, and the screen said nothing.
     if (result.error) {
-      // Mapped to a code the registry has words for, exactly as the button on
-      // the rail maps its own. Handed on raw, the plugin's `{ code, status }`
-      // is not a shape `readHandledError` can read, so a refusal it had named
-      // correctly reached the card as "Something went wrong. We've been
-      // notified." — which is the generic line for a failure nobody
-      // anticipated, and this one we anticipated and wrote copy for.
-      onError(passkeyFailureFrom(result.error));
+      announceRefusal({ error: result.error, onError });
       return;
     }
 
@@ -60,10 +99,8 @@ async function offerPasskeyFromAutofill({
     navigate(safeRedirectTarget(callbackUrl));
   } catch (error) {
     // Still silent for the ones nobody finished, and only those.
-    if (!isLive() || wasDeclined(error)) return;
-    // A throw never reached the server, so there is no status to read and
-    // nothing to tell apart — the ceremony simply did not finish.
-    onError(passkeyFailure(void 0));
+    if (!isLive()) return;
+    announceThrow({ error, onError });
   }
 }
 
@@ -172,6 +209,18 @@ export function usePasskeyAutofill({
       }
     };
 
+    // A page on its way out is not live, and unmounting is too late to learn
+    // it. A password sign-in leaves by `window.location.href`, which tears the
+    // pending ceremony down while this component is still mounted — so the
+    // refusal that tear-down produces would be announced onto a card nobody
+    // will look at again, and it flashes up in the moment before the next
+    // document commits. `pagehide` is the last thing the screen is told, and
+    // unlike `unload` it fires for a page going into the back/forward cache
+    // too, so a screen somebody may come back to also stops reporting.
+    const onPageHide = () => {
+      live = false;
+    };
+
     const remove = () => {
       document.removeEventListener("focusin", onFocusIn);
       document.removeEventListener("pointerdown", onGesture);
@@ -181,10 +230,14 @@ export function usePasskeyAutofill({
     document.addEventListener("focusin", onFocusIn);
     document.addEventListener("pointerdown", onGesture);
     document.addEventListener("keydown", onGesture);
+    // NOT removed by `remove()`: the gesture listeners have done their job once
+    // the offer is out, and this one only starts mattering at that point.
+    window.addEventListener("pagehide", onPageHide);
 
     return () => {
       live = false;
       remove();
+      window.removeEventListener("pagehide", onPageHide);
     };
   }, [enabled, callbackUrl]);
 }

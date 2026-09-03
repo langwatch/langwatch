@@ -229,6 +229,19 @@ Feature: Passkeys - the fastest way in, and the one phishing cannot take
     Then the picker is still on screen with every other method usable
     And nothing tells "sam" they have failed at anything
 
+  # The offer waiting in the address field has no abort handle, so a screen on
+  # its way out cannot cancel the ceremony it started — and going away is
+  # exactly what a sign-in that WORKED does. The tear-down is reported as a
+  # refusal carrying the status that means "the server looked at this
+  # credential and said no", so the last thing somebody saw after typing the
+  # right password was a passkey they had never picked being turned down.
+  @integration
+  Scenario: Leaving the sign-in screen does not read as a passkey failure
+    Given the passkey offer is waiting in the address field of the sign-in screen
+    When "sam" signs in with their password and the screen navigates away
+    Then the abandoned passkey ceremony shows no error
+    And nothing about the sign-in that worked says anything went wrong
+
   # ── A passkey and an organization that requires two steps ──────────────
 
   @unit

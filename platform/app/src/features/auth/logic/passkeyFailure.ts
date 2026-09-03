@@ -42,3 +42,42 @@ export function passkeyFailureFrom(error: unknown): { error: string } {
     typeof status === "number" && status !== 0 ? status : void 0,
   );
 }
+
+/**
+ * Nobody finished this ceremony, so nobody is owed an error.
+ *
+ * A ceremony ends unfinished in three indistinguishable ways — the sheet was
+ * dismissed, the request was superseded, the screen went away — and WebAuthn
+ * reports all of them the way it reports "no credential matched",
+ * deliberately, so that watching the prompt tells an attacker nothing. None is
+ * an event a person needs telling about: they either decided this, or they
+ * were already somewhere else.
+ *
+ * Two shapes carry it, which is why it is read in one place. The browser
+ * throws a `DOMException` named `AbortError` or `NotAllowedError`. The plugin
+ * catches that same throw on its way out of the ceremony and RESOLVES it
+ * instead, as `ERROR_CEREMONY_ABORTED` carrying a status of 400 — a refusal's
+ * clothes on something the server never saw.
+ *
+ * That second shape is how a SUCCESSFUL password sign-in ended in a passkey
+ * alert. The offer pending in the address field has no abort handle, so the
+ * navigation away tears the ceremony down, the plugin resolves it as a 400,
+ * and 400 is the status that means "the server looked at this credential and
+ * said no" — so the screen said "That passkey isn't one we recognize" for the
+ * split second before the next document committed.
+ */
+export function isCeremonyAbandoned({
+  code,
+  name,
+}: {
+  /** The plugin's own code, from a ceremony that resolved rather than threw. */
+  code?: string;
+  /** A thrown `DOMException`'s name — the platform's own word for it. */
+  name?: string;
+}): boolean {
+  return (
+    code === "ERROR_CEREMONY_ABORTED" ||
+    name === "AbortError" ||
+    name === "NotAllowedError"
+  );
+}
