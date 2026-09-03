@@ -17,9 +17,15 @@ import { z } from "zod";
 import {
   LANGY_CONVERSATION_EVENT_TYPES,
   LANGY_CONVERSATION_TURN_STATUS,
+  LANGY_PERMISSION_DECISIONS,
   LANGY_TURN_TOOL_CALL_STATUS,
+  LANGY_USER_WAIT_KINDS,
+  LANGY_USER_WAIT_OUTCOMES,
   type LangyConversationTurnStatus,
+  type LangyPermissionDecision,
   type LangyTurnToolCallStatus,
+  type LangyUserWaitKind,
+  type LangyUserWaitOutcome,
 } from "../../constants";
 import type {
   LangyAgentResponseFailedEventData,
@@ -30,6 +36,8 @@ import type {
   LangyToolCallFailedEventData,
   LangyToolCallInitiatedEventData,
   LangyToolCallSucceededEventData,
+  LangyUserWaitEndedEventData,
+  LangyUserWaitStartedEventData,
 } from "../contracts/events";
 import { langyJsonValueSchema } from "../../json";
 import type {
@@ -77,7 +85,69 @@ export type LangyTurnToolCall = LangyJsonObject & {
   status: LangyTurnToolCallStatus;
   durationMs?: number;
   errorText?: string;
+  /** The card this call put in front of the developer, when it asked for one. */
+  wait?: LangyTurnWait;
 };
+
+/**
+ * The card one tool call put in front of the developer: a permission ask, or a
+ * question. It rides on the tool call it belongs to, so the turn document
+ * renders the card without a second list and without a new column, and a
+ * reload shows a pending card as pending and an answered one as answered.
+ */
+export type LangyTurnWait = {
+  waitId: string;
+  kind: LangyUserWaitKind;
+  status: "pending" | LangyUserWaitOutcome;
+  expiresAt: number;
+  /** The local control call this permission card belongs to. */
+  callId: string | null;
+  summary: string | null;
+  pattern: string | null;
+  reason: string | null;
+  skipOffered: boolean;
+  workspaceName: string | null;
+  hostname: string | null;
+  questions: LangyJsonValue;
+  decision: LangyPermissionDecision | null;
+  answers: LangyJsonValue;
+  answeredBy: string | null;
+  answeredAt: number | null;
+};
+
+/** Wire/persistence schema for one card, in this package's own zod instance. */
+export const langyTurnWaitSchema = z.object({
+  waitId: z.string(),
+  kind: z.union([
+    z.literal(LANGY_USER_WAIT_KINDS.PERMISSION),
+    z.literal(LANGY_USER_WAIT_KINDS.QUESTION),
+  ]),
+  status: z.union([
+    z.literal("pending"),
+    z.literal(LANGY_USER_WAIT_OUTCOMES.ANSWERED),
+    z.literal(LANGY_USER_WAIT_OUTCOMES.EXPIRED),
+    z.literal(LANGY_USER_WAIT_OUTCOMES.CANCELLED),
+  ]),
+  expiresAt: z.number(),
+  callId: z.string().nullable(),
+  summary: z.string().nullable(),
+  pattern: z.string().nullable(),
+  reason: z.string().nullable(),
+  skipOffered: z.boolean(),
+  workspaceName: z.string().nullable(),
+  hostname: z.string().nullable(),
+  questions: langyJsonValueSchema,
+  decision: z
+    .union([
+      z.literal(LANGY_PERMISSION_DECISIONS.ALLOW_ONCE),
+      z.literal(LANGY_PERMISSION_DECISIONS.ALLOW_PATTERN),
+      z.literal(LANGY_PERMISSION_DECISIONS.DENY),
+    ])
+    .nullable(),
+  answers: langyJsonValueSchema,
+  answeredBy: z.string().nullable(),
+  answeredAt: z.number().nullable(),
+});
 
 /**
  * Wire/persistence schema for one folded tool call. Lives HERE — composed
@@ -102,8 +172,48 @@ export const langyTurnToolCallSchema = z
       ]),
       durationMs: z.number().optional(),
       errorText: z.string().optional(),
+      wait: langyTurnWaitSchema.optional(),
     }),
   );
+
+/** A wait with no answer yet, from what the start event carried. */
+function pendingWait(data: LangyUserWaitStartedEventData): LangyTurnWait {
+  const permission = data.permission ?? null;
+  return {
+    waitId: data.waitId,
+    kind: data.kind,
+    status: "pending",
+    expiresAt: data.expiresAt,
+    callId: permission?.callId ?? null,
+    summary: permission?.summary ?? null,
+    pattern: permission?.pattern ?? null,
+    reason: permission?.reason ?? null,
+    skipOffered: permission?.skipOffered ?? false,
+    workspaceName: permission?.workspaceName ?? null,
+    hostname: permission?.hostname ?? null,
+    questions: (data.questions ?? null) as LangyJsonValue,
+    decision: null,
+    answers: null,
+    answeredBy: null,
+    answeredAt: null,
+  };
+}
+
+/** The wait fields one terminal writes, whichever terminal it is. */
+function endedWait(
+  wait: LangyTurnWait,
+  data: LangyUserWaitEndedEventData,
+  occurredAt: number,
+): LangyTurnWait {
+  return {
+    ...wait,
+    status: data.outcome,
+    decision: data.decision ?? null,
+    answers: (data.answers ?? null) as LangyJsonValue,
+    answeredBy: data.userId ?? null,
+    answeredAt: occurredAt,
+  };
+}
 
 /**
  * The turn render document — one turn folded into its final state. A SECOND fold
@@ -207,6 +317,14 @@ export type LangyConversationTurnEvent =
   | TurnFoldEvent<
       typeof LANGY_CONVERSATION_EVENT_TYPES.AGENT_RESPONDED,
       LangyAgentRespondedEventData
+    >
+  | TurnFoldEvent<
+      typeof LANGY_CONVERSATION_EVENT_TYPES.USER_WAIT_STARTED,
+      LangyUserWaitStartedEventData
+    >
+  | TurnFoldEvent<
+      typeof LANGY_CONVERSATION_EVENT_TYPES.USER_WAIT_ENDED,
+      LangyUserWaitEndedEventData
     >;
 
 /** Set identity from any turn event (the fold may hydrate mid-stream). */
@@ -238,6 +356,11 @@ function upsertToolCall(
   const next = [...state.ToolCalls];
   next[idx] = patch(next[idx]!);
   return next;
+}
+
+/** The tool a wait of this kind belongs to, when its call id never arrived. */
+function waitToolName(kind: LangyUserWaitKind): string {
+  return kind === LANGY_USER_WAIT_KINDS.PERMISSION ? "local_bash" : "question";
 }
 
 /**
@@ -335,6 +458,62 @@ export function foldLangyConversationTurn<
         ...withIdentity(event, state),
         Plan: event.data.items,
       };
+    }
+    // A card went up in front of the developer, on the tool call that asked
+    // for it. Idempotent: a redelivered start keeps the outcome an end wrote.
+    case LANGY_CONVERSATION_EVENT_TYPES.USER_WAIT_STARTED: {
+      const started = pendingWait(event.data);
+      const key = event.data.toolCallId ?? started.waitId;
+      const ToolCalls = upsertToolCall(
+        state,
+        key,
+        () => ({
+          toolCallId: key,
+          toolName: waitToolName(started.kind),
+          status: LANGY_TURN_TOOL_CALL_STATUS.INITIATED,
+          wait: started,
+        }),
+        (existing) => {
+          const current = existing.wait;
+          const settled =
+            current?.waitId === started.waitId && current.status !== "pending";
+          return { ...existing, wait: settled ? current : started };
+        },
+      );
+      return { ...withIdentity(event, state), ToolCalls };
+    }
+    // The card reached its one terminal. A second end never overwrites the
+    // first, so a late answer to an expired card leaves the record alone.
+    case LANGY_CONVERSATION_EVENT_TYPES.USER_WAIT_ENDED: {
+      const data = event.data;
+      const key = data.toolCallId ?? data.waitId;
+      const blank = pendingWait({
+        conversationId: data.conversationId,
+        turnId: data.turnId,
+        waitId: data.waitId,
+        kind: data.kind,
+        expiresAt: 0,
+      });
+      const ToolCalls = upsertToolCall(
+        state,
+        key,
+        () => ({
+          toolCallId: key,
+          toolName: waitToolName(data.kind),
+          status: LANGY_TURN_TOOL_CALL_STATUS.INITIATED,
+          wait: endedWait(blank, data, event.occurredAt),
+        }),
+        (existing) => {
+          const current = existing.wait;
+          if (!current || current.waitId !== data.waitId) return existing;
+          if (current.status !== "pending") return existing;
+          return {
+            ...existing,
+            wait: endedWait(current, data, event.occurredAt),
+          };
+        },
+      );
+      return { ...withIdentity(event, state), ToolCalls };
     }
     case LANGY_CONVERSATION_EVENT_TYPES.AGENT_RESPONSE_FAILED: {
       return {

@@ -21,6 +21,7 @@ import { app as gatewaySpendApp } from "../app/api/gateway-spend/[[...route]]/ap
 import { app as governanceApp } from "../app/api/governance/[[...route]]/app";
 import { app as graphsApp } from "../app/api/graphs/[[...route]]/app";
 import { app as groupsApp } from "../app/api/groups/[[...route]]/app";
+import { app as langyControlApp } from "../app/api/langy-control/[[...route]]/app";
 import { app as meApp } from "../app/api/me/[[...route]]/app";
 import { app as modelDefaultsApp } from "../app/api/model-defaults/[[...route]]/app";
 import { app as modelProvidersApp } from "../app/api/model-providers/[[...route]]/app";
@@ -82,6 +83,7 @@ const APP_DERIVED_PREFIXES = [
   "/api/analytics",
   "/api/coding-agent",
   "/api/v1/coding-agent",
+  "/api/v1/langy/control",
   "/api/v1/projects",
   "/api/v1/query",
   // The query domain's former prefix, kept listed so the two paths it used to
@@ -235,6 +237,8 @@ export default async function execute() {
   const governanceSpec = await generateSpecs(governanceApp);
   console.log("Building graphs spec...");
   const graphsSpec = await generateSpecs(graphsApp);
+  console.log("Building langy control spec...");
+  const langyControlSpec = await generateSpecs(langyControlApp);
   console.log("Building me spec...");
   const meSpec = await generateSpecs(meApp);
   console.log("Building llm configs spec...");
@@ -316,6 +320,7 @@ export default async function execute() {
       gatewayPlatformSpec,
       governanceSpec,
       graphsSpec,
+      langyControlSpec,
       meSpec,
       llmConfigsSpec,
       modelDefaultsSpec,

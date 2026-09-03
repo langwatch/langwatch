@@ -383,6 +383,41 @@ const registry = {
     ],
     docsPath: "/agent-testing/connect-your-agent",
   },
+  // ---- Langy local control (ADR-129) ----
+  langy_local_workspace_offline: {
+    tips: [
+      "Run `npx langwatch@latest langy --share-control` in the folder Langy should work in, then approve the request in the terminal",
+      "A folder is shared with one conversation; a folder connected to another chat does not answer here",
+    ],
+  },
+  langy_local_request_invalid: {
+    tips: [
+      "Only the person Langy asked can approve a request; ask Langy for the code change again to get your own",
+      "A request is single use, so a second approval of the same one is refused",
+    ],
+  },
+  langy_local_request_expired: {
+    tips: [
+      "A request to share a folder lasts fifteen minutes; ask Langy for the code change again to get a new one",
+    ],
+  },
+  langy_local_permission_timeout: {
+    tips: [
+      "Answer the permission card in the LangWatch panel while Langy is working",
+      "To stop the cards for a whole session, choose to skip permission checks on the card, where the model allows it",
+    ],
+  },
+  langy_local_skip_model_not_allowed: {
+    tips: [
+      "Add the model to the provider's allowed models list in the model provider settings",
+      "Answer each permission card instead; the folder boundary and the privilege rule hold either way",
+    ],
+  },
+  langy_wait_expired: {
+    tips: [
+      "Send your answer to Langy as a message; it reads a late answer as the next thing you said",
+    ],
+  },
   agent_call_timeout: {
     tips: [
       "Raise the agent's timeout, up to the platform cap of 300 seconds",

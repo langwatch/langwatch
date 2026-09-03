@@ -34824,6 +34824,1482 @@
         ]
       }
     },
+    "/api/v1/langy/control/connect/register": {
+      "post": {
+        "operationId": "registerLangyControlSession",
+        "responses": {
+          "200": {
+            "description": "The folder is shared",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "frame": {
+                      "anyOf": [
+                        {
+                          "type": "object",
+                          "properties": {
+                            "protocol": {
+                              "type": "number",
+                              "const": 1
+                            },
+                            "type": {
+                              "type": "string",
+                              "const": "registered"
+                            },
+                            "instanceId": {
+                              "type": "string"
+                            },
+                            "heartbeatIntervalMs": {
+                              "type": "integer",
+                              "exclusiveMinimum": 0
+                            },
+                            "conversation": {
+                              "type": "object",
+                              "properties": {
+                                "id": {
+                                  "type": "string"
+                                },
+                                "title": {
+                                  "type": "string"
+                                },
+                                "url": {
+                                  "type": "string"
+                                }
+                              },
+                              "required": [
+                                "id",
+                                "title",
+                                "url"
+                              ]
+                            },
+                            "policy": {
+                              "type": "object",
+                              "properties": {
+                                "skipPermissions": {
+                                  "type": "boolean"
+                                }
+                              },
+                              "required": [
+                                "skipPermissions"
+                              ]
+                            }
+                          },
+                          "required": [
+                            "protocol",
+                            "type",
+                            "instanceId",
+                            "heartbeatIntervalMs",
+                            "conversation",
+                            "policy"
+                          ]
+                        },
+                        {
+                          "type": "object",
+                          "properties": {
+                            "protocol": {
+                              "type": "number",
+                              "const": 1
+                            },
+                            "type": {
+                              "type": "string",
+                              "const": "refused"
+                            },
+                            "code": {
+                              "type": "string",
+                              "enum": [
+                                "api_key_invalid",
+                                "key_type_not_allowed",
+                                "conversation_mismatch",
+                                "workspace_already_connected",
+                                "replica_count_unsupported",
+                                "protocol_invalid"
+                              ]
+                            },
+                            "message": {
+                              "type": "string"
+                            }
+                          },
+                          "required": [
+                            "protocol",
+                            "type",
+                            "code",
+                            "message"
+                          ]
+                        }
+                      ],
+                      "description": "The registered frame, or the refused frame with its reason."
+                    },
+                    "instanceToken": {
+                      "type": "string",
+                      "description": "The token the poll and frames endpoints are addressed with, in the X-Agent-Instance-Token header. Present when the register was accepted."
+                    }
+                  },
+                  "required": [
+                    "frame"
+                  ]
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "The session key is not valid: a refused frame"
+          },
+          "403": {
+            "description": "The key is not a Langy session key, or it controls no conversation: a refused frame"
+          },
+          "422": {
+            "description": "The body is not a register frame"
+          }
+        },
+        "description": "Share a folder over HTTP, for a network that blocks WebSockets. The body is the register frame of the control protocol. Answers with the registered frame and the instance token the poll and frames endpoints are addressed with, or with a refused frame.",
+        "tags": [
+          "Langy"
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "protocol": {
+                    "type": "number",
+                    "enum": [
+                      1
+                    ]
+                  },
+                  "type": {
+                    "type": "string",
+                    "enum": [
+                      "register"
+                    ]
+                  },
+                  "cli": {
+                    "type": "object",
+                    "properties": {
+                      "name": {
+                        "type": "string",
+                        "minLength": 1,
+                        "maxLength": 64
+                      },
+                      "version": {
+                        "type": "string",
+                        "minLength": 1,
+                        "maxLength": 64
+                      }
+                    },
+                    "required": [
+                      "name",
+                      "version"
+                    ],
+                    "additionalProperties": false
+                  },
+                  "instance": {
+                    "type": "object",
+                    "properties": {
+                      "id": {
+                        "type": "string",
+                        "minLength": 1,
+                        "maxLength": 128
+                      },
+                      "hostname": {
+                        "type": "string",
+                        "maxLength": 255
+                      },
+                      "username": {
+                        "type": "string",
+                        "maxLength": 255
+                      },
+                      "pid": {
+                        "type": "integer",
+                        "minimum": 0
+                      },
+                      "startedAt": {
+                        "type": "string",
+                        "maxLength": 64
+                      },
+                      "inFlightCallIds": {
+                        "type": "array",
+                        "items": {
+                          "type": "string",
+                          "maxLength": 128
+                        },
+                        "maxItems": 1000,
+                        "default": []
+                      }
+                    },
+                    "required": [
+                      "id",
+                      "hostname",
+                      "username",
+                      "pid",
+                      "startedAt"
+                    ],
+                    "additionalProperties": false
+                  },
+                  "workspace": {
+                    "type": "object",
+                    "properties": {
+                      "root": {
+                        "type": "string",
+                        "minLength": 1,
+                        "maxLength": 4096
+                      },
+                      "name": {
+                        "type": "string",
+                        "minLength": 1,
+                        "maxLength": 255
+                      },
+                      "gitBranch": {
+                        "type": "string",
+                        "maxLength": 255
+                      },
+                      "gitRemote": {
+                        "type": "string",
+                        "maxLength": 2048
+                      },
+                      "gitDirty": {
+                        "type": "boolean"
+                      },
+                      "os": {
+                        "type": "string",
+                        "maxLength": 64
+                      },
+                      "nodeVersion": {
+                        "type": "string",
+                        "maxLength": 64
+                      },
+                      "pythonVersion": {
+                        "type": "string",
+                        "maxLength": 64
+                      },
+                      "ghAuthenticated": {
+                        "type": "boolean"
+                      },
+                      "packageManager": {
+                        "type": "string",
+                        "maxLength": 32
+                      }
+                    },
+                    "required": [
+                      "root",
+                      "name",
+                      "os"
+                    ],
+                    "additionalProperties": false
+                  }
+                },
+                "required": [
+                  "protocol",
+                  "type",
+                  "cli",
+                  "instance",
+                  "workspace"
+                ],
+                "additionalProperties": false
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "project_api_key": []
+          }
+        ]
+      }
+    },
+    "/api/v1/langy/control/connect/poll": {
+      "get": {
+        "operationId": "pollLangyControlSession",
+        "responses": {
+          "200": {
+            "description": "The frames waiting for the folder, possibly none",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "frames": {
+                      "type": "array",
+                      "items": {
+                        "oneOf": [
+                          {
+                            "type": "object",
+                            "properties": {
+                              "protocol": {
+                                "type": "number",
+                                "const": 1
+                              },
+                              "type": {
+                                "type": "string",
+                                "const": "registered"
+                              },
+                              "instanceId": {
+                                "type": "string"
+                              },
+                              "heartbeatIntervalMs": {
+                                "type": "integer",
+                                "exclusiveMinimum": 0
+                              },
+                              "conversation": {
+                                "type": "object",
+                                "properties": {
+                                  "id": {
+                                    "type": "string"
+                                  },
+                                  "title": {
+                                    "type": "string"
+                                  },
+                                  "url": {
+                                    "type": "string"
+                                  }
+                                },
+                                "required": [
+                                  "id",
+                                  "title",
+                                  "url"
+                                ]
+                              },
+                              "policy": {
+                                "type": "object",
+                                "properties": {
+                                  "skipPermissions": {
+                                    "type": "boolean"
+                                  }
+                                },
+                                "required": [
+                                  "skipPermissions"
+                                ]
+                              }
+                            },
+                            "required": [
+                              "protocol",
+                              "type",
+                              "instanceId",
+                              "heartbeatIntervalMs",
+                              "conversation",
+                              "policy"
+                            ]
+                          },
+                          {
+                            "type": "object",
+                            "properties": {
+                              "protocol": {
+                                "type": "number",
+                                "const": 1
+                              },
+                              "type": {
+                                "type": "string",
+                                "const": "refused"
+                              },
+                              "code": {
+                                "type": "string",
+                                "enum": [
+                                  "api_key_invalid",
+                                  "key_type_not_allowed",
+                                  "conversation_mismatch",
+                                  "workspace_already_connected",
+                                  "replica_count_unsupported",
+                                  "protocol_invalid"
+                                ]
+                              },
+                              "message": {
+                                "type": "string"
+                              }
+                            },
+                            "required": [
+                              "protocol",
+                              "type",
+                              "code",
+                              "message"
+                            ]
+                          },
+                          {
+                            "type": "object",
+                            "properties": {
+                              "protocol": {
+                                "type": "number",
+                                "const": 1
+                              },
+                              "type": {
+                                "type": "string",
+                                "const": "call"
+                              },
+                              "call": {
+                                "allOf": [
+                                  {
+                                    "type": "object",
+                                    "properties": {
+                                      "callId": {
+                                        "type": "string"
+                                      },
+                                      "conversationId": {
+                                        "type": "string"
+                                      },
+                                      "turnId": {
+                                        "type": "string"
+                                      },
+                                      "deadlineAt": {
+                                        "type": "integer"
+                                      }
+                                    },
+                                    "required": [
+                                      "callId",
+                                      "conversationId",
+                                      "turnId",
+                                      "deadlineAt"
+                                    ]
+                                  },
+                                  {
+                                    "oneOf": [
+                                      {
+                                        "type": "object",
+                                        "properties": {
+                                          "tool": {
+                                            "type": "string",
+                                            "const": "local_read"
+                                          },
+                                          "params": {
+                                            "type": "object",
+                                            "properties": {
+                                              "path": {
+                                                "type": "string",
+                                                "minLength": 1,
+                                                "maxLength": 4096
+                                              },
+                                              "offset": {
+                                                "type": "integer",
+                                                "exclusiveMinimum": 0
+                                              },
+                                              "limit": {
+                                                "type": "integer",
+                                                "exclusiveMinimum": 0
+                                              }
+                                            },
+                                            "required": [
+                                              "path"
+                                            ]
+                                          }
+                                        },
+                                        "required": [
+                                          "tool",
+                                          "params"
+                                        ]
+                                      },
+                                      {
+                                        "type": "object",
+                                        "properties": {
+                                          "tool": {
+                                            "type": "string",
+                                            "const": "local_write"
+                                          },
+                                          "params": {
+                                            "type": "object",
+                                            "properties": {
+                                              "path": {
+                                                "type": "string",
+                                                "minLength": 1,
+                                                "maxLength": 4096
+                                              },
+                                              "content": {
+                                                "type": "string"
+                                              }
+                                            },
+                                            "required": [
+                                              "path",
+                                              "content"
+                                            ]
+                                          }
+                                        },
+                                        "required": [
+                                          "tool",
+                                          "params"
+                                        ]
+                                      },
+                                      {
+                                        "type": "object",
+                                        "properties": {
+                                          "tool": {
+                                            "type": "string",
+                                            "const": "local_edit"
+                                          },
+                                          "params": {
+                                            "type": "object",
+                                            "properties": {
+                                              "path": {
+                                                "type": "string",
+                                                "minLength": 1,
+                                                "maxLength": 4096
+                                              },
+                                              "edits": {
+                                                "type": "array",
+                                                "items": {
+                                                  "type": "object",
+                                                  "properties": {
+                                                    "oldText": {
+                                                      "type": "string",
+                                                      "minLength": 1
+                                                    },
+                                                    "newText": {
+                                                      "type": "string"
+                                                    }
+                                                  },
+                                                  "required": [
+                                                    "oldText",
+                                                    "newText"
+                                                  ]
+                                                },
+                                                "minItems": 1,
+                                                "maxItems": 200
+                                              }
+                                            },
+                                            "required": [
+                                              "path",
+                                              "edits"
+                                            ]
+                                          }
+                                        },
+                                        "required": [
+                                          "tool",
+                                          "params"
+                                        ]
+                                      },
+                                      {
+                                        "type": "object",
+                                        "properties": {
+                                          "tool": {
+                                            "type": "string",
+                                            "const": "local_bash"
+                                          },
+                                          "params": {
+                                            "type": "object",
+                                            "properties": {
+                                              "command": {
+                                                "type": "string",
+                                                "minLength": 1,
+                                                "maxLength": 20000
+                                              },
+                                              "timeout": {
+                                                "type": "integer",
+                                                "exclusiveMinimum": 0
+                                              },
+                                              "background": {
+                                                "type": "boolean"
+                                              }
+                                            },
+                                            "required": [
+                                              "command"
+                                            ]
+                                          }
+                                        },
+                                        "required": [
+                                          "tool",
+                                          "params"
+                                        ]
+                                      },
+                                      {
+                                        "type": "object",
+                                        "properties": {
+                                          "tool": {
+                                            "type": "string",
+                                            "const": "local_grep"
+                                          },
+                                          "params": {
+                                            "type": "object",
+                                            "properties": {
+                                              "pattern": {
+                                                "type": "string",
+                                                "minLength": 1,
+                                                "maxLength": 2000
+                                              },
+                                              "path": {
+                                                "type": "string",
+                                                "maxLength": 4096
+                                              },
+                                              "glob": {
+                                                "type": "string",
+                                                "maxLength": 500
+                                              },
+                                              "ignoreCase": {
+                                                "type": "boolean"
+                                              },
+                                              "literal": {
+                                                "type": "boolean"
+                                              },
+                                              "context": {
+                                                "type": "integer",
+                                                "minimum": 0,
+                                                "maximum": 50
+                                              },
+                                              "limit": {
+                                                "type": "integer",
+                                                "exclusiveMinimum": 0,
+                                                "maximum": 5000
+                                              }
+                                            },
+                                            "required": [
+                                              "pattern"
+                                            ]
+                                          }
+                                        },
+                                        "required": [
+                                          "tool",
+                                          "params"
+                                        ]
+                                      },
+                                      {
+                                        "type": "object",
+                                        "properties": {
+                                          "tool": {
+                                            "type": "string",
+                                            "const": "local_find"
+                                          },
+                                          "params": {
+                                            "type": "object",
+                                            "properties": {
+                                              "pattern": {
+                                                "type": "string",
+                                                "minLength": 1,
+                                                "maxLength": 500
+                                              },
+                                              "path": {
+                                                "type": "string",
+                                                "maxLength": 4096
+                                              },
+                                              "limit": {
+                                                "type": "integer",
+                                                "exclusiveMinimum": 0,
+                                                "maximum": 20000
+                                              }
+                                            },
+                                            "required": [
+                                              "pattern"
+                                            ]
+                                          }
+                                        },
+                                        "required": [
+                                          "tool",
+                                          "params"
+                                        ]
+                                      },
+                                      {
+                                        "type": "object",
+                                        "properties": {
+                                          "tool": {
+                                            "type": "string",
+                                            "const": "local_ls"
+                                          },
+                                          "params": {
+                                            "type": "object",
+                                            "properties": {
+                                              "path": {
+                                                "type": "string",
+                                                "maxLength": 4096
+                                              },
+                                              "limit": {
+                                                "type": "integer",
+                                                "exclusiveMinimum": 0,
+                                                "maximum": 20000
+                                              }
+                                            }
+                                          }
+                                        },
+                                        "required": [
+                                          "tool",
+                                          "params"
+                                        ]
+                                      }
+                                    ]
+                                  }
+                                ]
+                              }
+                            },
+                            "required": [
+                              "protocol",
+                              "type",
+                              "call"
+                            ]
+                          },
+                          {
+                            "type": "object",
+                            "properties": {
+                              "protocol": {
+                                "type": "number",
+                                "const": 1
+                              },
+                              "type": {
+                                "type": "string",
+                                "const": "cancel"
+                              },
+                              "callId": {
+                                "type": "string"
+                              }
+                            },
+                            "required": [
+                              "protocol",
+                              "type",
+                              "callId"
+                            ]
+                          },
+                          {
+                            "type": "object",
+                            "properties": {
+                              "protocol": {
+                                "type": "number",
+                                "const": 1
+                              },
+                              "type": {
+                                "type": "string",
+                                "const": "permission"
+                              },
+                              "callId": {
+                                "type": "string"
+                              },
+                              "decision": {
+                                "type": "string",
+                                "enum": [
+                                  "allow_once",
+                                  "allow_pattern",
+                                  "deny",
+                                  "expired"
+                                ]
+                              }
+                            },
+                            "required": [
+                              "protocol",
+                              "type",
+                              "callId",
+                              "decision"
+                            ]
+                          },
+                          {
+                            "type": "object",
+                            "properties": {
+                              "protocol": {
+                                "type": "number",
+                                "const": 1
+                              },
+                              "type": {
+                                "type": "string",
+                                "const": "policy"
+                              },
+                              "skipPermissions": {
+                                "type": "boolean"
+                              }
+                            },
+                            "required": [
+                              "protocol",
+                              "type",
+                              "skipPermissions"
+                            ]
+                          },
+                          {
+                            "type": "object",
+                            "properties": {
+                              "protocol": {
+                                "type": "number",
+                                "const": 1
+                              },
+                              "type": {
+                                "type": "string",
+                                "const": "disconnect"
+                              },
+                              "reason": {
+                                "type": "string",
+                                "maxLength": 500
+                              }
+                            },
+                            "required": [
+                              "protocol",
+                              "type",
+                              "reason"
+                            ]
+                          }
+                        ]
+                      },
+                      "description": "The frames waiting for the folder; empty once the poll wait passes with none."
+                    }
+                  },
+                  "required": [
+                    "frames"
+                  ]
+                }
+              }
+            }
+          },
+          "410": {
+            "description": "The instance token is not known; share the folder again"
+          }
+        },
+        "description": "Wait for the next frames of a shared folder, then answer with what is waiting or with an empty list. Each poll is also the folder's heartbeat, so a command line that polls reads connected. Addressed with the instance token in the X-Agent-Instance-Token header.",
+        "tags": [
+          "Langy"
+        ],
+        "security": [
+          {
+            "project_api_key": []
+          }
+        ]
+      }
+    },
+    "/api/v1/langy/control/connect/frames": {
+      "post": {
+        "operationId": "postLangyControlFrames",
+        "responses": {
+          "200": {
+            "description": "The frames were taken",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "accepted": {
+                      "type": "integer",
+                      "description": "How many frames were taken."
+                    }
+                  },
+                  "required": [
+                    "accepted"
+                  ]
+                }
+              }
+            }
+          },
+          "410": {
+            "description": "The instance token is not known; share the folder again"
+          },
+          "422": {
+            "description": "The body is not a list of frames"
+          }
+        },
+        "description": "Post the frames the command line has for the platform: the acknowledgement of a call, its result, a permission the developer has to answer first, and the deregister that ends the share.",
+        "tags": [
+          "Langy"
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "frames": {
+                    "type": "array",
+                    "items": {
+                      "anyOf": [
+                        {
+                          "type": "object",
+                          "properties": {
+                            "protocol": {
+                              "type": "number",
+                              "enum": [
+                                1
+                              ]
+                            },
+                            "type": {
+                              "type": "string",
+                              "enum": [
+                                "register"
+                              ]
+                            },
+                            "cli": {
+                              "type": "object",
+                              "properties": {
+                                "name": {
+                                  "type": "string",
+                                  "minLength": 1,
+                                  "maxLength": 64
+                                },
+                                "version": {
+                                  "type": "string",
+                                  "minLength": 1,
+                                  "maxLength": 64
+                                }
+                              },
+                              "required": [
+                                "name",
+                                "version"
+                              ],
+                              "additionalProperties": false
+                            },
+                            "instance": {
+                              "type": "object",
+                              "properties": {
+                                "id": {
+                                  "type": "string",
+                                  "minLength": 1,
+                                  "maxLength": 128
+                                },
+                                "hostname": {
+                                  "type": "string",
+                                  "maxLength": 255
+                                },
+                                "username": {
+                                  "type": "string",
+                                  "maxLength": 255
+                                },
+                                "pid": {
+                                  "type": "integer",
+                                  "minimum": 0
+                                },
+                                "startedAt": {
+                                  "type": "string",
+                                  "maxLength": 64
+                                },
+                                "inFlightCallIds": {
+                                  "type": "array",
+                                  "items": {
+                                    "type": "string",
+                                    "maxLength": 128
+                                  },
+                                  "maxItems": 1000,
+                                  "default": []
+                                }
+                              },
+                              "required": [
+                                "id",
+                                "hostname",
+                                "username",
+                                "pid",
+                                "startedAt"
+                              ],
+                              "additionalProperties": false
+                            },
+                            "workspace": {
+                              "type": "object",
+                              "properties": {
+                                "root": {
+                                  "type": "string",
+                                  "minLength": 1,
+                                  "maxLength": 4096
+                                },
+                                "name": {
+                                  "type": "string",
+                                  "minLength": 1,
+                                  "maxLength": 255
+                                },
+                                "gitBranch": {
+                                  "type": "string",
+                                  "maxLength": 255
+                                },
+                                "gitRemote": {
+                                  "type": "string",
+                                  "maxLength": 2048
+                                },
+                                "gitDirty": {
+                                  "type": "boolean"
+                                },
+                                "os": {
+                                  "type": "string",
+                                  "maxLength": 64
+                                },
+                                "nodeVersion": {
+                                  "type": "string",
+                                  "maxLength": 64
+                                },
+                                "pythonVersion": {
+                                  "type": "string",
+                                  "maxLength": 64
+                                },
+                                "ghAuthenticated": {
+                                  "type": "boolean"
+                                },
+                                "packageManager": {
+                                  "type": "string",
+                                  "maxLength": 32
+                                }
+                              },
+                              "required": [
+                                "root",
+                                "name",
+                                "os"
+                              ],
+                              "additionalProperties": false
+                            }
+                          },
+                          "required": [
+                            "protocol",
+                            "type",
+                            "cli",
+                            "instance",
+                            "workspace"
+                          ],
+                          "additionalProperties": false
+                        },
+                        {
+                          "type": "object",
+                          "properties": {
+                            "protocol": {
+                              "type": "number",
+                              "enum": [
+                                1
+                              ]
+                            },
+                            "type": {
+                              "type": "string",
+                              "enum": [
+                                "ack"
+                              ]
+                            },
+                            "callId": {
+                              "type": "string"
+                            }
+                          },
+                          "required": [
+                            "protocol",
+                            "type",
+                            "callId"
+                          ],
+                          "additionalProperties": false
+                        },
+                        {
+                          "type": "object",
+                          "properties": {
+                            "protocol": {
+                              "type": "number",
+                              "enum": [
+                                1
+                              ]
+                            },
+                            "type": {
+                              "type": "string",
+                              "enum": [
+                                "result"
+                              ]
+                            },
+                            "callId": {
+                              "type": "string"
+                            },
+                            "ok": {
+                              "type": "boolean"
+                            },
+                            "text": {
+                              "type": "string"
+                            },
+                            "output": {
+                              "type": "object",
+                              "properties": {
+                                "exitCode": {
+                                  "type": "integer",
+                                  "nullable": true
+                                },
+                                "stdout": {
+                                  "type": "string"
+                                },
+                                "stderr": {
+                                  "type": "string"
+                                },
+                                "truncated": {
+                                  "type": "boolean"
+                                },
+                                "logPath": {
+                                  "type": "string"
+                                },
+                                "pid": {
+                                  "type": "integer",
+                                  "exclusiveMinimum": true,
+                                  "minimum": 0
+                                },
+                                "durationMs": {
+                                  "type": "integer",
+                                  "minimum": 0
+                                }
+                              },
+                              "required": [
+                                "exitCode",
+                                "stdout",
+                                "stderr",
+                                "truncated",
+                                "durationMs"
+                              ],
+                              "additionalProperties": false
+                            },
+                            "error": {
+                              "type": "object",
+                              "properties": {
+                                "code": {
+                                  "type": "string",
+                                  "enum": [
+                                    "path_refused",
+                                    "command_refused",
+                                    "permission_denied",
+                                    "permission_expired",
+                                    "cancelled",
+                                    "timeout",
+                                    "exec_failed",
+                                    "not_found"
+                                  ]
+                                },
+                                "message": {
+                                  "type": "string",
+                                  "maxLength": 4000
+                                }
+                              },
+                              "required": [
+                                "code",
+                                "message"
+                              ],
+                              "additionalProperties": false
+                            }
+                          },
+                          "required": [
+                            "protocol",
+                            "type",
+                            "callId",
+                            "ok"
+                          ],
+                          "additionalProperties": false
+                        },
+                        {
+                          "type": "object",
+                          "properties": {
+                            "protocol": {
+                              "type": "number",
+                              "enum": [
+                                1
+                              ]
+                            },
+                            "type": {
+                              "type": "string",
+                              "enum": [
+                                "permission_required"
+                              ]
+                            },
+                            "callId": {
+                              "type": "string"
+                            },
+                            "summary": {
+                              "type": "string",
+                              "maxLength": 4000
+                            },
+                            "pattern": {
+                              "type": "string",
+                              "maxLength": 500
+                            },
+                            "reason": {
+                              "type": "string",
+                              "maxLength": 500
+                            },
+                            "skipOffered": {
+                              "type": "boolean"
+                            }
+                          },
+                          "required": [
+                            "protocol",
+                            "type",
+                            "callId",
+                            "summary",
+                            "pattern",
+                            "reason",
+                            "skipOffered"
+                          ],
+                          "additionalProperties": false
+                        },
+                        {
+                          "type": "object",
+                          "properties": {
+                            "protocol": {
+                              "type": "number",
+                              "enum": [
+                                1
+                              ]
+                            },
+                            "type": {
+                              "type": "string",
+                              "enum": [
+                                "deregister"
+                              ]
+                            }
+                          },
+                          "required": [
+                            "protocol",
+                            "type"
+                          ],
+                          "additionalProperties": false
+                        }
+                      ]
+                    },
+                    "minItems": 1,
+                    "maxItems": 100,
+                    "description": "Ack, result, permission_required and deregister frames, in order."
+                  }
+                },
+                "required": [
+                  "frames"
+                ],
+                "additionalProperties": false
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "project_api_key": []
+          }
+        ]
+      }
+    },
+    "/api/v1/langy/control/requests": {
+      "get": {
+        "operationId": "listLangyControlRequests",
+        "responses": {
+          "200": {
+            "description": "Success",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "requests": {
+                      "type": "array",
+                      "items": {
+                        "type": "object",
+                        "properties": {
+                          "id": {
+                            "type": "string"
+                          },
+                          "conversationId": {
+                            "type": "string"
+                          },
+                          "conversationTitle": {
+                            "type": "string"
+                          },
+                          "conversationUrl": {
+                            "type": "string"
+                          },
+                          "projectId": {
+                            "type": "string"
+                          },
+                          "projectName": {
+                            "type": "string"
+                          },
+                          "createdAt": {
+                            "type": "string"
+                          },
+                          "expiresAt": {
+                            "type": "string"
+                          }
+                        },
+                        "required": [
+                          "id",
+                          "conversationId",
+                          "conversationTitle",
+                          "conversationUrl",
+                          "projectId",
+                          "projectName",
+                          "createdAt",
+                          "expiresAt"
+                        ]
+                      }
+                    }
+                  },
+                  "required": [
+                    "requests"
+                  ]
+                }
+              }
+            }
+          }
+        },
+        "description": "List the open requests Langy made for a folder of mine in this project. Only the person Langy asked ever sees a request, and each one expires fifteen minutes after it was made.",
+        "tags": [
+          "Langy"
+        ],
+        "security": [
+          {
+            "project_api_key": []
+          }
+        ]
+      }
+    },
+    "/api/v1/langy/control/requests/{id}/approve": {
+      "post": {
+        "operationId": "approveLangyControlRequest",
+        "responses": {
+          "200": {
+            "description": "Success",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "sessionKey": {
+                      "type": "string"
+                    },
+                    "endpoint": {
+                      "type": "string"
+                    },
+                    "conversation": {
+                      "type": "object",
+                      "properties": {
+                        "id": {
+                          "type": "string"
+                        },
+                        "title": {
+                          "type": "string"
+                        },
+                        "url": {
+                          "type": "string"
+                        }
+                      },
+                      "required": [
+                        "id",
+                        "title",
+                        "url"
+                      ]
+                    }
+                  },
+                  "required": [
+                    "sessionKey",
+                    "endpoint",
+                    "conversation"
+                  ]
+                }
+              }
+            }
+          }
+        },
+        "description": "Approve one request and share the current folder with the conversation that asked. Answers with a Langy session key scoped to that conversation, which is never shown again. A request is single use: a second approval is refused.",
+        "tags": [
+          "Langy"
+        ],
+        "parameters": [
+          {
+            "in": "path",
+            "name": "id",
+            "schema": {
+              "type": "string",
+              "minLength": 1
+            },
+            "required": true,
+            "description": "The control request id."
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "workspace": {
+                    "type": "object",
+                    "properties": {
+                      "root": {
+                        "type": "string",
+                        "minLength": 1,
+                        "maxLength": 4096
+                      },
+                      "name": {
+                        "type": "string",
+                        "minLength": 1,
+                        "maxLength": 255
+                      },
+                      "gitBranch": {
+                        "type": "string",
+                        "maxLength": 255
+                      },
+                      "gitRemote": {
+                        "type": "string",
+                        "maxLength": 2048
+                      },
+                      "gitDirty": {
+                        "type": "boolean"
+                      },
+                      "os": {
+                        "type": "string",
+                        "maxLength": 64
+                      },
+                      "nodeVersion": {
+                        "type": "string",
+                        "maxLength": 64
+                      },
+                      "pythonVersion": {
+                        "type": "string",
+                        "maxLength": 64
+                      },
+                      "ghAuthenticated": {
+                        "type": "boolean"
+                      },
+                      "packageManager": {
+                        "type": "string",
+                        "maxLength": 32
+                      }
+                    },
+                    "required": [
+                      "root",
+                      "name",
+                      "os"
+                    ]
+                  }
+                },
+                "required": [
+                  "workspace"
+                ]
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "project_api_key": []
+          }
+        ]
+      }
+    },
+    "/api/v1/langy/control/requests/{id}/cancel": {
+      "post": {
+        "operationId": "cancelLangyControlRequest",
+        "responses": {
+          "200": {
+            "description": "Success",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "id": {
+                      "type": "string",
+                      "description": "The request that was cancelled."
+                    },
+                    "cancelled": {
+                      "type": "boolean",
+                      "const": true,
+                      "description": "Always true once the request is gone."
+                    }
+                  },
+                  "required": [
+                    "id",
+                    "cancelled"
+                  ]
+                }
+              }
+            }
+          }
+        },
+        "description": "Refuse one request from the terminal. The card in the chat reads that sharing was cancelled, and Langy's next turn offers the choice again.",
+        "tags": [
+          "Langy"
+        ],
+        "parameters": [
+          {
+            "in": "path",
+            "name": "id",
+            "schema": {
+              "type": "string",
+              "minLength": 1
+            },
+            "required": true,
+            "description": "The control request id."
+          }
+        ],
+        "security": [
+          {
+            "project_api_key": []
+          }
+        ]
+      }
+    },
     "/api/me/usage": {
       "get": {
         "operationId": "getApiMeUsage",
@@ -50440,6 +51916,133 @@
                                         "content"
                                       ]
                                     }
+                                  ]
+                                },
+                                {
+                                  "type": "object",
+                                  "properties": {
+                                    "role": {
+                                      "type": "string"
+                                    },
+                                    "content": {
+                                      "type": "array",
+                                      "items": {
+                                        "anyOf": [
+                                          {
+                                            "type": "object",
+                                            "properties": {
+                                              "type": {
+                                                "type": "string",
+                                                "const": "text"
+                                              },
+                                              "text": {
+                                                "type": "string"
+                                              },
+                                              "citations": {
+                                                "type": [
+                                                  "array",
+                                                  "null"
+                                                ],
+                                                "items": {}
+                                              }
+                                            },
+                                            "required": [
+                                              "type",
+                                              "text"
+                                            ]
+                                          },
+                                          {
+                                            "type": "object",
+                                            "properties": {
+                                              "type": {
+                                                "type": "string",
+                                                "const": "tool_use"
+                                              },
+                                              "id": {
+                                                "type": "string"
+                                              },
+                                              "name": {
+                                                "type": "string"
+                                              },
+                                              "input": {}
+                                            },
+                                            "required": [
+                                              "type",
+                                              "id",
+                                              "name"
+                                            ]
+                                          },
+                                          {
+                                            "type": "object",
+                                            "properties": {
+                                              "type": {
+                                                "type": "string",
+                                                "const": "tool_result"
+                                              },
+                                              "tool_use_id": {
+                                                "type": "string"
+                                              },
+                                              "content": {
+                                                "anyOf": [
+                                                  {
+                                                    "type": "string"
+                                                  },
+                                                  {
+                                                    "type": "array",
+                                                    "items": {}
+                                                  }
+                                                ]
+                                              },
+                                              "is_error": {
+                                                "type": "boolean"
+                                              }
+                                            },
+                                            "required": [
+                                              "type",
+                                              "tool_use_id"
+                                            ]
+                                          },
+                                          {
+                                            "type": "object",
+                                            "properties": {
+                                              "type": {
+                                                "type": "string",
+                                                "const": "thinking"
+                                              },
+                                              "thinking": {
+                                                "type": "string"
+                                              },
+                                              "signature": {
+                                                "type": "string"
+                                              }
+                                            },
+                                            "required": [
+                                              "type",
+                                              "thinking"
+                                            ]
+                                          },
+                                          {
+                                            "type": "object",
+                                            "properties": {
+                                              "type": {
+                                                "type": "string",
+                                                "const": "redacted_thinking"
+                                              },
+                                              "data": {
+                                                "type": "string"
+                                              }
+                                            },
+                                            "required": [
+                                              "type",
+                                              "data"
+                                            ]
+                                          }
+                                        ]
+                                      }
+                                    }
+                                  },
+                                  "required": [
+                                    "content"
                                   ]
                                 },
                                 {

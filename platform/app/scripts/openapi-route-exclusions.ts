@@ -247,6 +247,18 @@ export const UNPUBLISHED = [
   },
 
   {
+    match: "/api/langy/local",
+    category: "internal",
+    why: "the Langy worker's door onto a folder the developer shared from their own machine (ADR-129). Every call is bound to the conversation the caller's own session key was minted for and only answers while that turn runs, so no reader of the API reference can call it; the payload contract is the in-repo local control protocol, which the command line and the worker both ship with",
+  },
+
+  {
+    match: "/api/langy/waits",
+    category: "internal",
+    why: "the other half of the same worker surface: it parks a tool while a card waits for the developer's answer in the chat. Same session key, same conversation binding, same in-repo contract",
+  },
+
+  {
     match: "/api/langy/ui",
     category: "internal",
     why: "the live UI-action channel between a Langy worker and the user's open browser tab. It only answers mid-turn, for the conversation the caller's own session key was minted for, so no reader of the API reference can call it: outside a turn every request is refused, and the payload contract is the in-repo action manifest, not a stable public schema",

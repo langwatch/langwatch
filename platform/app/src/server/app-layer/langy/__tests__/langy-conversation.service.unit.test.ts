@@ -62,6 +62,12 @@ function makeCommands(
     recordTurnHandoff: vi.fn(async () => {}),
     consumeTurnHandoff: vi.fn(async () => {}),
     generateConversationTitle: vi.fn(async () => {}),
+    requestLocalControl: vi.fn(async () => {}),
+    connectLocalWorkspace: vi.fn(async () => {}),
+    disconnectLocalWorkspace: vi.fn(async () => {}),
+    changeLocalPolicy: vi.fn(async () => {}),
+    startUserWait: vi.fn(async () => {}),
+    endUserWait: vi.fn(async () => {}),
     ...overrides,
   };
 }

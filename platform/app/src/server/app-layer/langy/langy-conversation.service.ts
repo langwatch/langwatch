@@ -11,6 +11,10 @@ import type {
   LangyConversationMetadataUpdatedEventData,
   LangyConversationStartedEventData,
   LangyConversationTitleGeneratedEventData,
+  LangyLocalControlRequestedEventData,
+  LangyLocalPolicyChangedEventData,
+  LangyLocalWorkspaceConnectedEventData,
+  LangyLocalWorkspaceDisconnectedEventData,
   LangyMessageImportedEventData,
   LangyMessagePart,
   LangyMessageRecordedEventData,
@@ -19,6 +23,8 @@ import type {
   LangyToolCallFailedEventData,
   LangyToolCallInitiatedEventData,
   LangyToolCallSucceededEventData,
+  LangyUserWaitEndedEventData,
+  LangyUserWaitStartedEventData,
 } from "@langwatch/langy";
 import {
   cursorHasReachedEvent,
@@ -199,6 +205,15 @@ export interface LangyConversationCommands {
   recordTurnHandoff: Dispatch<LangyConversationHandoffPendingEventData>;
   consumeTurnHandoff: Dispatch<LangyConversationHandoffConsumedEventData>;
   generateConversationTitle: Dispatch<LangyConversationTitleGeneratedEventData>;
+  // ADR-129 local control: the shared folder and the cards that wait for the
+  // developer. Written by the local control services, folded by the spine and
+  // the turn document.
+  requestLocalControl: Dispatch<LangyLocalControlRequestedEventData>;
+  connectLocalWorkspace: Dispatch<LangyLocalWorkspaceConnectedEventData>;
+  disconnectLocalWorkspace: Dispatch<LangyLocalWorkspaceDisconnectedEventData>;
+  changeLocalPolicy: Dispatch<LangyLocalPolicyChangedEventData>;
+  startUserWait: Dispatch<LangyUserWaitStartedEventData>;
+  endUserWait: Dispatch<LangyUserWaitEndedEventData>;
 }
 
 function newConversationId(): string {

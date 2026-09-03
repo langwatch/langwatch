@@ -349,3 +349,171 @@ export const langyConversationTitleGeneratedEventDataSchema = z.object({
 export type LangyConversationTitleGeneratedEventData = z.infer<
   typeof langyConversationTitleGeneratedEventDataSchema
 >;
+
+// ---------------------------------------------------------------------------
+// Local control (ADR-129)
+// ---------------------------------------------------------------------------
+
+/**
+ * What the platform knows about the developer's shared folder. The command
+ * line sends it in its register frame, so the skill never spends a turn asking
+ * the folder about itself. Everything past `root` is best effort.
+ */
+export const langyLocalWorkspaceSchema = z.object({
+  root: z.string(),
+  name: z.string(),
+  hostname: z.string(),
+  gitBranch: z.string().optional(),
+  gitRemote: z.string().optional(),
+  gitDirty: z.boolean().optional(),
+  os: z.string().optional(),
+  nodeVersion: z.string().optional(),
+  pythonVersion: z.string().optional(),
+  ghAuthenticated: z.boolean().optional(),
+  packageManager: z.string().optional(),
+});
+export type LangyLocalWorkspaceData = z.infer<typeof langyLocalWorkspaceSchema>;
+
+/**
+ * LocalControlRequested — the code access card asked the developer to share a
+ * folder. The request is single use and expires; the command line lists it,
+ * approves it and gets a session key bound to this conversation.
+ */
+export const langyLocalControlRequestedEventDataSchema = z.object({
+  conversationId: z.string(),
+  requestId: z.string(),
+  /** The user who may approve it. Nobody else ever sees it. */
+  userId: z.string(),
+  /** Unix ms after which the request is refused. */
+  expiresAt: z.number(),
+  /** The one command the card shows. */
+  command: z.string(),
+});
+export type LangyLocalControlRequestedEventData = z.infer<
+  typeof langyLocalControlRequestedEventDataSchema
+>;
+
+/** LocalWorkspaceConnected — a folder registered for this conversation. */
+export const langyLocalWorkspaceConnectedEventDataSchema = z.object({
+  conversationId: z.string(),
+  requestId: z.string(),
+  userId: z.string(),
+  instanceId: z.string(),
+  workspace: langyLocalWorkspaceSchema,
+});
+export type LangyLocalWorkspaceConnectedEventData = z.infer<
+  typeof langyLocalWorkspaceConnectedEventDataSchema
+>;
+
+/**
+ * LocalWorkspaceDisconnected — the folder is gone. `reason` says who ended it,
+ * so the card can tell a Ctrl-C from a disconnect the user asked for in the
+ * panel, and both from a machine that stopped answering.
+ */
+export const langyLocalWorkspaceDisconnectedEventDataSchema = z.object({
+  conversationId: z.string(),
+  instanceId: z.string(),
+  reason: z.enum(["cli_exit", "panel", "presence_lost"]),
+});
+export type LangyLocalWorkspaceDisconnectedEventData = z.infer<
+  typeof langyLocalWorkspaceDisconnectedEventDataSchema
+>;
+
+/**
+ * LocalPolicyChanged — the developer turned the permission checks off, or back
+ * on, for this conversation. `userId` is the consent: the choice is a person's,
+ * never the model's.
+ */
+export const langyLocalPolicyChangedEventDataSchema = z.object({
+  conversationId: z.string(),
+  userId: z.string(),
+  skipPermissions: z.boolean(),
+  /** The model the gate resolved against when the choice was made. */
+  model: z.string().optional(),
+});
+export type LangyLocalPolicyChangedEventData = z.infer<
+  typeof langyLocalPolicyChangedEventDataSchema
+>;
+
+/** One option on a question card. */
+export const langyUserWaitQuestionOptionSchema = z.object({
+  label: z.string(),
+  description: z.string().optional(),
+});
+
+/** One question of a question wait. */
+export const langyUserWaitQuestionSchema = z.object({
+  question: z.string(),
+  header: z.string().optional(),
+  options: z.array(langyUserWaitQuestionOptionSchema),
+  multiple: z.boolean().optional(),
+  allowOther: z.boolean().optional(),
+});
+
+/** What a permission wait shows on its card. */
+export const langyUserWaitPermissionPayloadSchema = z.object({
+  callId: z.string(),
+  /** The command, as the card prints it. */
+  summary: z.string(),
+  /** What "allow for this session" would grant. */
+  pattern: z.string(),
+  /** Why the call is not read-only, in one line. */
+  reason: z.string(),
+  /** Whether the card may offer the skip toggle at all. */
+  skipOffered: z.boolean(),
+  /** The folder the command would run in. */
+  workspaceName: z.string(),
+  hostname: z.string(),
+});
+
+/**
+ * UserWaitStarted — a tool is waiting for the developer. One primitive behind
+ * the permission card and the question card: the durable record is here, and
+ * the live stream entry only wakes the panel up.
+ */
+export const langyUserWaitStartedEventDataSchema = z.object({
+  conversationId: z.string(),
+  turnId: z.string(),
+  waitId: z.string(),
+  kind: z.enum(["permission", "question"]),
+  /**
+   * The tool call that asked. The card rides on it in the turn document, so
+   * the panel renders the ask where the work is. Absent when the worker did
+   * not name one, and the fold then keys the card by the wait id.
+   */
+  toolCallId: z.string().optional(),
+  /** Unix ms after which the wait gives up and the tool answers in words. */
+  expiresAt: z.number(),
+  permission: langyUserWaitPermissionPayloadSchema.optional(),
+  questions: z.array(langyUserWaitQuestionSchema).optional(),
+});
+export type LangyUserWaitStartedEventData = z.infer<
+  typeof langyUserWaitStartedEventDataSchema
+>;
+
+/** The developer's answer to one question. */
+export const langyUserWaitQuestionAnswerSchema = z.object({
+  question: z.string(),
+  selected: z.array(z.string()),
+  other: z.string().optional(),
+});
+
+/**
+ * UserWaitEnded — the wait reached its one terminal. An answered permission
+ * wait carries the decision; an answered question wait carries the choices.
+ */
+export const langyUserWaitEndedEventDataSchema = z.object({
+  conversationId: z.string(),
+  turnId: z.string(),
+  waitId: z.string(),
+  kind: z.enum(["permission", "question"]),
+  toolCallId: z.string().optional(),
+  outcome: z.enum(["answered", "expired", "cancelled"]),
+  /** Who answered. Absent when the wait expired or was cancelled. */
+  userId: z.string().optional(),
+  decision: z.enum(["allow_once", "allow_pattern", "deny"]).optional(),
+  answers: z.array(langyUserWaitQuestionAnswerSchema).optional(),
+});
+export type LangyUserWaitEndedEventData = z.infer<
+  typeof langyUserWaitEndedEventDataSchema
+>;

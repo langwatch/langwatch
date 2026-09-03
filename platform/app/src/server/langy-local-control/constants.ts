@@ -44,3 +44,10 @@ export const CALL_RESULT_TTL_MS = 60_000;
 
 /** Where the CLI keeps command logs inside the shared folder. */
 export const LOCAL_LOG_DIR = ".langwatch/langy-logs";
+
+/** The one command the code access card tells the developer to run. */
+export const SHARE_CONTROL_COMMAND =
+  "npx langwatch@latest langy --share-control";
+
+/** How often a long-poll checks its answer while it holds. */
+export const POLL_INTERVAL_MS = 250;

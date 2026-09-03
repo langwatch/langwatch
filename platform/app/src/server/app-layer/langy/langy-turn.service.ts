@@ -56,6 +56,7 @@ import type { LangyTurnAccessStore } from "~/server/app-layer/langy/streaming/la
 import type { LangyTurnHandoffStore } from "~/server/app-layer/langy/streaming/langyTurnHandoff";
 import type { Session } from "~/server/auth";
 import { featureFlagService } from "~/server/featureFlag";
+import { cancelLocalWorkForTurn } from "~/server/langy-local-control/runtime";
 import { getLangyTurnsCounter } from "~/server/metrics";
 import type { PromptService } from "~/server/prompt-config/prompt.service";
 import {
@@ -574,10 +575,15 @@ export class LangyTurnService {
     // End the stream and chase the token burn. Both are best-effort and
     // independent of the durable terminal above; neither may throw back into the
     // mutation, and a wedged worker must not delay the stop the user already got.
+    //
+    // The developer's machine is on the same footing: a command the turn
+    // started keeps running until the command line is told, and a card the turn
+    // raised would wait for an answer nobody will read (ADR-129).
     await Promise.allSettled([
       tokenBuffer?.markEnd({ conversationId, turnId }) ?? Promise.resolve(),
       worker?.cancel({ conversationId, turnId, projectId }) ??
         Promise.resolve(),
+      cancelLocalWorkForTurn({ conversationId, turnId }),
     ]);
   }
 

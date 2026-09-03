@@ -88,6 +88,44 @@ export type LangyStreamEntry =
   // an action. `actionId` is the server-minted claim/result key, which makes
   // the whole round trip at-most-once.
   | { type: "ui"; actionId: string; kind: string; payload: unknown }
+  // ADR-129. A card the developer has to answer while the turn is in flight:
+  // a permission ask for one command on their machine, or a question Langy
+  // needs settled before it goes on. The DURABLE `user_wait_started` event is
+  // the source of truth, because a tab that adopted a running turn never
+  // subscribes to this stream; these entries are the fast path for the tab
+  // that sent the message, and the wake-up that says the card is there now.
+  | {
+      type: "local_permission";
+      waitId: string;
+      callId: string;
+      toolCallId?: string;
+      summary: string;
+      pattern: string;
+      reason: string;
+      skipOffered: boolean;
+      workspaceName: string;
+      hostname: string;
+      status: "pending" | "answered" | "expired" | "cancelled";
+      decision?: string;
+    }
+  | {
+      type: "question";
+      waitId: string;
+      toolCallId?: string;
+      questions: unknown;
+      status: "pending" | "answered" | "expired" | "cancelled";
+      answers?: unknown;
+    }
+  // The developer's folder came or went while the turn was running, so the
+  // chip and the code access card change without a reload.
+  | {
+      type: "local_workspace";
+      state: "connected" | "disconnected";
+      name: string;
+      root: string;
+      hostname: string;
+      gitBranch?: string;
+    }
   | { type: "end" }
   | { type: "error"; error: string };
 
@@ -306,6 +344,61 @@ export class LangyTokenBuffer {
     status: string;
   }): Promise<void> {
     await this.append(conversationId, turnId, { type: "status", status });
+  }
+
+  /**
+   * Push the permission card of one local call onto the live edge. Flushes the
+   * buffered tokens first, like every other card append, so the line that
+   * announces the command lands before the card that asks about it.
+   */
+  async appendLocalPermission({
+    conversationId,
+    turnId,
+    entry,
+  }: {
+    conversationId: string;
+    turnId: string;
+    entry: Omit<
+      Extract<LangyStreamEntry, { type: "local_permission" }>,
+      "type"
+    >;
+  }): Promise<void> {
+    await this.flush({ conversationId, turnId });
+    await this.append(conversationId, turnId, {
+      type: "local_permission",
+      ...entry,
+    });
+  }
+
+  /** Push a question card onto the live edge. */
+  async appendQuestion({
+    conversationId,
+    turnId,
+    entry,
+  }: {
+    conversationId: string;
+    turnId: string;
+    entry: Omit<Extract<LangyStreamEntry, { type: "question" }>, "type">;
+  }): Promise<void> {
+    await this.flush({ conversationId, turnId });
+    await this.append(conversationId, turnId, { type: "question", ...entry });
+  }
+
+  /** Push the shared folder's connect or disconnect onto the live edge. */
+  async appendLocalWorkspace({
+    conversationId,
+    turnId,
+    entry,
+  }: {
+    conversationId: string;
+    turnId: string;
+    entry: Omit<Extract<LangyStreamEntry, { type: "local_workspace" }>, "type">;
+  }): Promise<void> {
+    await this.flush({ conversationId, turnId });
+    await this.append(conversationId, turnId, {
+      type: "local_workspace",
+      ...entry,
+    });
   }
 
   /**
