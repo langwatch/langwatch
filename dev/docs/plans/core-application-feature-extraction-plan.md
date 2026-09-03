@@ -16562,3 +16562,307 @@ order.
 - **`PrismaUserRepository` still takes the older hand-written `UserDatabase` shape** rather than a `Pick` of the generated client. Narrowing it touches `PostgresUserAdapter` and every composition that builds it, which is a different change.
 - **`VirtualKeyService.create` still takes the whole `PrismaClient`** and builds its three repositories internally, so the gateway composition test cannot refuse the delegate outright the way the credential one can. What it pins instead is that exactly one statement shape reaches the table and that it is the repository's.
 - **Nothing under `platform/` was created, edited or read.**
+
+## The strict-schema sweep the last ledger deferred, 2026-09-03
+
+`603f31eb81` fixed `updateTriggerCommandSchema` and closed by naming what it had
+not done: "**The edit fix was not swept for siblings.** `createTriggerCommandSchema`
+and the other strict command schemas in that file were not audited for the same
+extraction-era omission." This pass is that sweep, widened from one file to every
+`.strict()` schema in every feature contract.
+
+### What the class actually is
+
+The starting grep — `.strict()` across `packages/features/*/contract/src` and
+`packages/enterprise/features/*/contract/src` — returns **618 schemas**. That is
+not the risk surface, and the reason is the whole finding:
+
+```
+  browser  ──{ a, b, JUNK }──▶  .input(z.object({a,b}))  ──{ a, b }──▶  service
+                                 non-strict: STRIPS junk        strictSchema.parse ✓
+
+  browser  ──{ a, b }──────▶  .input(...)  ──▶ transport BUILDS { a, b, c } ──▶ service
+                                                        ▲                strictSchema.parse ✗
+                                                        └─ `c` never came from a client
+```
+
+A plain Zod object **strips** unknown keys, so a loose `.input()` is not itself a
+defect — a stray browser key is gone before the service sees it. The defect needs
+the object that **actually reaches the `.parse()`** to carry a key the strict
+schema does not list, which is what `...data` did to the automations drawer.
+Narrowing on that rule takes 618 schemas to **335 pass-through `.parse()` sites**,
+of which **71** are mutation-shaped (81 call sites) across 20 packages. Those 71
+were read one at a time, call site by call site, against the union of keys each
+caller can build.
+
+The three defects this found say the rule is right and the emphasis on
+"transport" was too narrow. The object that reaches the parse is not always
+built by a transport, and the other two sources are worse because nothing in the
+repo describes their shape:
+
+| Defect | Where the extra keys come from | What hid it |
+| --- | --- | --- |
+| `updateTriggerCommandSchema` (already fixed, `603f31eb81`) | a transport `...data` spread | excess-property checks do not see a spread |
+| `createdUserSchema` | a Prisma row with no `select` | the port types the row as `Record<string, unknown>` |
+| `verifiedBrowserSessionSchema` | Better Auth's own session record | an `as unknown as` cast on the lookup |
+
+In all three the tests were green against a hand-built object of exactly the
+strict shape — a shape the real producer never sends. That, not the schema, is
+the thing this class keeps hiding behind.
+
+### Table
+
+| Schema | Procedure | Missing keys | Fix |
+| --- | --- | --- | --- |
+| `verifiedBrowserSessionSchema` (`auth/contract/src/browser-session.ts:13`) | **every authenticated request** — `AuthSessionApiAuthenticationAdapter.authenticate` (`api-auth.composition.ts:385`) and `api-handler-managed-session.ts:62` | `session.token`, `session.userId`, `session.createdAt`, `session.updatedAt`, `session.ipAddress`, `session.userAgent`, `session.impersonating`; `user.emailVerified`, `user.createdAt`, `user.updatedAt`, `user.deactivatedAt`, `user.lastLoginAt` | `.strict()` dropped from the three objects in its tree. It is a PROJECTION of Better Auth's record, not a shape we own; a plain object still narrows to the declared keys |
+| `createdUserSchema` (`user/contract/src/user.ts:75`) | `user.register` (tRPC) and the better-auth passkey sign-up hook | all 14 non-`id` columns of `model User` — `name`, `email`, `emailVerified`, `image`, `pendingSsoSetup`, `userHashKey`, `twoFactorEnabled`, `createdAt`, `updatedAt`, `lastLoginAt`, `deactivatedAt`, `lastHomePath`, `tracesExplorerTourDismissedAt`, `passkeyNudgeDismissedAt` | **Not** a schema widening — `CreatedUser` genuinely is `{ id }`. `select: createdUserSelect` added to both `transaction.user.create(...)` calls so the row and the schema are the same shape |
+| `codeEvaluatorConfigSchema` (`evaluator/contract/src/code-evaluator.ts:9`) | `evaluator.update` (tRPC) and `PATCH /evaluators/:id` | none it *should* list — see below | **Reported, not changed.** Extra keys in a code-evaluator config are genuinely invalid; the bug is the channel, not the key list |
+| every other audited schema | — | none | no change |
+
+### The worst one: every signed-in caller was served as anonymous
+
+`verifiedBrowserSessionSchema` was `.strict()` on `session: { id, expiresAt }`
+and `user: { id, name?, email?, image?, pendingSsoSetup? }`. What it is handed is
+Better Auth's `getSession` result, **verbatim** — `tryResolveVerifiedSession`
+(`api-auth.composition.ts:84-94`) returns `verified` with no reshaping, and
+`authenticate` (`:385`) passes it straight to `AuthService.tryResolveBrowserSession`,
+which parses it (`auth.service.ts:50`).
+
+Better Auth returns whole rows. Its session is
+`{ id, token, userId, expiresAt, createdAt, updatedAt, ipAddress?, userAgent? }`
+and its user is `{ id, name, email, emailVerified, image?, createdAt, updatedAt }`,
+plus every `additionalFields` entry the transport configures
+(`better-auth.api.ts:277-300`: `pendingSsoSetup`, `deactivatedAt`, `lastLoginAt`,
+`impersonating`). Twelve keys the strict schema did not list.
+
+```
+  getSession ──▶ { session: {id, token, userId, expiresAt, createdAt, …}, user: {…} }
+                              │
+                 .strict() ───┴──▶ ZodError: unrecognized_keys
+                                        │
+              authenticate's catch ─────┴──▶ return null   ← signed in, served anonymous
+```
+
+`authenticate` wraps the call in `try/catch` and answers `null`, so the failure
+is not even a 500 — **every signed-in browser caller silently became anonymous**,
+which is the exact failure mode the docblock two screens above it says already
+took sign-in down in production once. The `api-handler-managed-session.ts:62`
+path has no catch and throws instead.
+
+Two things hid it, and they are the same two that hid the user defect. The
+compiler was told a lie: `BetterAuthSessionLookup` declares
+`getSession(): Promise<VerifiedBrowserSession | null>`, and the real instance is
+handed over as `as unknown as BetterAuthSessionLookup` (`:346`). And every
+fixture in the repo hand-builds the trimmed object —
+`api-auth.composition.unit.test.ts:32`, `auth.service.unit.test.ts:181`, and the
+contract's own test, which called that fiction "the Better Auth-compatible
+browser-session boundary".
+
+The fix is not to enumerate Better Auth's columns; that re-breaks on its next
+added field. It is to stop being strict about a record we do not own. A plain
+`z.object` still narrows — the parsed value carries the five and two keys the
+feature reads and drops the rest — which is what a projection is for.
+
+### The second: both signup routes answered 500
+
+`createdUserSchema` is `.strict()` on exactly `{ id }`. Both signup routes did:
+
+```ts
+const user = await transaction.user.create({
+  data: { name: input.name, email: input.email },   // no `select`
+});
+const parsedUser = createdUserSchema.parse(user);   // strict, one key
+```
+
+Prisma with no `select` returns **every scalar on the model**, so the parse threw
+`ZodError: unrecognized_keys` naming all fourteen — from inside a repository, on
+an unhandled channel. **Email/password signup and passkey signup both answered
+500.** Every other read in that file already passed an explicit `select`
+(`userProfileSelect`, `userFullProfileSelect`); these two were the only ones that
+did not.
+
+Three things hid it. The port erases the row shape
+(`create(args): PromiseLike<Record<string, unknown>>`), so the type checker had
+nothing to check. The composition hands the repository the plain typed client with
+no result extension, so nothing narrowed the row at runtime. And the unit test
+mocked `user.create` as `async () => ({ id: "user-1" })` — **a row shape the
+database never sends**, so the guard was green against a fiction.
+
+It is an extraction loss, like the automation one. `git show 4bba78994c^:platform/app/src/server/users/credential-user.ts`
+shows the platform reading `created.id` off the full row and returning `{ id }`
+with **no validation at all**; the strict parse arrived with the move.
+
+### The class the sweep found instead — and cleared
+
+The user defect is "a strict schema parsed over a raw Prisma row", not "a client
+sends a key the schema lacks". Correlating selectless Prisma calls against strict
+parses of their result finds **14 sites** beyond it. All 14 are full-row schemas
+whose key list matches their model exactly, checked column by column against
+`schema.prisma`:
+
+| Schema | Model | Columns / keys |
+| --- | --- | --- |
+| `notificationSchema` | `Notification` | 7 / 7 |
+| `dataPrivacyPolicySchema` | `DataPrivacyPolicy` | 8 / 8 |
+| `retentionPolicySchema` | `RetentionPolicy` | 8 / 8 |
+| `shareLinkSchema` | `ShareLink` | 13 / 13 |
+| `scenarioSchema` | `Scenario` | 17 / 17 |
+
+They are correct today and stay correct only while every migration that adds a
+column also adds the key. That is a standing coupling, not a defect.
+
+### The third one, reported rather than changed: `codeEvaluatorConfigSchema`
+
+`EvaluatorService.update` (`evaluator.service.ts:187-191`) does:
+
+```ts
+const config = evaluatorConfigSchema.parse(input.data.config);   // z.record — keeps EVERY key
+if ((input.data.type ?? existing.type) === "code") {
+  codeEvaluatorConfigSchema.parse(config);                        // .strict()
+}
+```
+
+The intermediate is `z.record(z.string(), z.unknown())` (`evaluator.ts:16`), and
+**a record does not strip** — so the stripping that protects every other
+procedure in this sweep is absent here. The `??` is load-bearing: the strict
+branch fires off the STORED type when the caller omits `type`, while the
+app-layer guard that would turn this into a `HandledError`
+(`evaluator.app.ts:242`) only fires when `type` is explicitly `"code"`. Omitting
+`type` on an update to a stored code evaluator therefore reaches the strict parse
+with nothing to convert the throw.
+
+It is left alone on purpose, on three grounds. Extra keys in a code-evaluator
+config are genuinely invalid, so widening the schema would be wrong. The current
+drawer (`code-evaluator-editor-drawer.tsx:174-194`) builds exactly
+`{ code, inputs, outputs }` and does send `type: "code"`, so no customer reaches
+it today. And it is not an extraction loss — `git show 367178c4be^:platform/app/src/server/api/routers/evaluators.ts:128`
+carries the same `input.type === "code"` gate. What is wrong is the channel, and
+that is the formatter finding below, not a schema repair.
+
+### The error formatter does map it — and still reports a 500
+
+`apps/api/src/app-trpc/app-trpc.error-formatter.ts` delegates to
+`createTrpcErrorFormatter` (`packages/api/src/trpc/trpc-error-formatter.ts:47`, the Zod branch at `:62`),
+which recognises a Zod failure **structurally** (`isZodLikeError`: `name === "ZodError"`,
+an `issues` array, a `flatten` method) and converts it with
+`ValidationError.fromZodError`. Zod 4.4.3's error satisfies that shape, so a raw
+`ZodError` thrown by a `.parse` inside a service **does** reach the browser as a
+handled `validation_error` carrying `meta.fieldErrors` and `meta.formErrors`. That
+half is working as designed. Two things about it are worth recording rather than
+redesigning:
+
+1. **The transport code is not re-coded, and the two boundaries disagree about
+   that.** The formatter rewrites `message` and `data.error` and deletes `stack`;
+   it never touches `shape.data.code` or `shape.data.httpStatus`. Setting the
+   code is `handledErrorMiddleware`'s job
+   (`packages/api/src/trpc/trpc-runtime-policy.ts:352`) — and it maps only
+   `HandledError.isHandled(cause)` and the cause-translation port. A bare
+   ZodError matches neither, falls through `return result`, and stays
+   `INTERNAL_SERVER_ERROR`. The REST boundary has exactly the branch tRPC is
+   missing (`packages/api/src/errors.ts:254`: `isZodLikeError(err)` →
+   `validationErrorFromZod`). So the same throw is a 400 through Hono and a
+   **500** through tRPC, while `data.error.httpStatus` says 422 on both. The
+   customer gets correct copy either way; logs and alerting book a validation
+   failure as an internal server error on the tRPC door. Adding that one branch
+   to `handledErrorMiddleware` would defuse this whole defect class rather than
+   its instances — which is a decision, not a sweep repair, so it is named here
+   and not taken.
+2. **`unrecognized_keys` produces no field errors at all.** Its issue `path` is
+   `[]`, so `flatten()` puts it in `formErrors` and leaves `fieldErrors` empty.
+   The presentation entry (`packages/handled-error/src/presentation.ts:2743`)
+   finds no labelled field, falls through to `safeProse(formErrors[0])`, and
+   renders the raw Zod sentence — for the automation bug, `Unrecognized keys:
+   "action", "triggerKind", "customGraphId"`. So this defect class can never map
+   onto form fields the way `error-handling.md` prescribes; it shows the customer
+   internal wire identifiers they did not type.
+
+### Audited and clean
+
+71 mutation-shaped schemas across **automation, suite, share, notification,
+presence, langy, data-retention, organization, user, model-provider, monitor,
+governance, gateway, secret, api-key, annotation, dataset, dashboard, scenario,
+project**, and the query-shaped remainder in **analytics, trace, coding-agent,
+experiment, topic, evaluator, auth** plus the read halves of share, suite,
+scenario, data-retention and project. The structural reason so many are clean:
+nearly every transport **rebuilds an explicit object literal** rather than
+spreading `input`, and TypeScript's excess-property check catches a stray key in
+a literal at compile time. The three defects all got past that a different way —
+a `...data` spread (automation), a database row (user), a third-party record
+(auth) — which is the pattern: the defect is never in the code the compiler can
+see.
+
+Two near-misses worth naming. `coding-agent.api.ts:275` passes `input` — which
+carries a `projectId` the strict schema does not list — straight to
+`getPullRequestDetail`; what saves it is that the **app** re-enumerates the four
+fields it wants (`coding-agent.app.ts:186-193`) and drops `projectId`. Replace
+that re-enumeration with a spread and it becomes a fourth defect. `analytics`'s
+transport `timeseriesInputSchema` (`analytics-input.ts:125`) and the contract's
+strict `analyticsTimeseriesInputSchema` are two hand-maintained copies of the
+same twelve keys, connected by a pass-through.
+
+Two more facts worth carrying, neither a defect today:
+
+- **`secrets.create` is the shape to copy.** `.input(createSecretInputSchema.omit({ actorId: true }))`
+  (`secret/server/src/transport/api-trpc/secret.api.ts:135`) derives the wire
+  schema *from* the command schema, and `.omit()` preserves strictness — drift is
+  impossible and an unknown key is a 400 at the parser, never a 500 from the body.
+  `presence.api.ts:109` does the same.
+- **Three true pass-throughs agree only by hand.** `suites.update`
+  (`suite.api.ts:86`, `updateSuiteSchema` vs `updateSuiteCommandSchema`, 11 keys
+  each), `dataset.validateName` (`dataset.api.ts:241`) and the four app-layer
+  `{...input, actorUserId}` spreads in governance/gateway. Each is one added
+  `.input()` field away from reproducing the automation defect exactly.
+
+### File → change
+
+| File | Change |
+| --- | --- |
+| `packages/features/user/server/src/repositories/prisma/prisma.user.repository.ts` | `createdUserSelect` added (`:74`) and named by both `transaction.user.create` calls (`:122`, `:144`), so the created row is read back as its id alone and the strict parse has the shape it declares |
+| `packages/features/user/server/src/repositories/prisma/__tests__/prisma-user.repository.credential-creation.unit.test.ts` | The mock stopped lying: `FULL_USER_ROW` is every scalar on `model User`, and `selectFrom` projects it through a `select` the way Prisma does, so a selectless `create` now returns the row production returns. +2 tests pinning that both signup routes ask for the id alone |
+| `packages/features/auth/contract/src/browser-session.ts` | `verifiedBrowserSessionSchema` and a new `verifiedBrowserSessionUserSchema` are plain objects, not strict, with the docblock saying why a projection of a third-party record must not be. `browserSessionUserSchema` stays `.strict()` — it describes objects we build, and `browserSessionSchema` still parses one |
+| `packages/features/auth/contract/src/__tests__/auth-contract.unit.test.ts` | +2 tests over Better Auth's real record — its eight session keys and ten user keys — asserting the session resolves, and that `token` and the rest are dropped from the parsed value rather than carried |
+
+### Gates
+
+- `@langwatch/user-server`: `pnpm test` — **5 files / 43 tests**. `pnpm typecheck` — 0 errors (the package tsconfig `include`s `src/**/*.ts`, so the test file is checked too).
+- `@langwatch/auth-contract`: `pnpm test` — **1 file / 3 tests** (was 1). `pnpm typecheck` — 0 errors.
+- `@langwatch/auth-server`: `pnpm test` — 6 files / 57 tests. `pnpm typecheck` — 0 errors.
+- `oxlint` over all four touched files: clean. `oxfmt --check`: clean.
+
+### The sabotage
+
+Two, one per repair, each run on its own:
+
+1. `select: createdUserSelect` removed from `createCredentialUser` alone → **3 of
+   43 failed**, each with `ZodError: unrecognized_keys` naming all fourteen
+   columns — the production failure, reproduced in the test. Restored: 43 pass.
+2. `.strict()` put back on the three objects of `verifiedBrowserSessionSchema` →
+   **exactly the 2 new tests failed**, with `unrecognized_keys`; the pre-existing
+   test passed, which is the point — it was written against the trimmed fiction
+   and cannot see this. Restored: 3 pass.
+
+### What this pass did NOT do
+
+- **`codeEvaluatorConfigSchema` was reported, not repaired.** Reasons in its
+  section: the keys are genuinely invalid, no current client sends them, and the
+  platform carried the same gate. The channel is the bug and the channel is the
+  formatter's.
+- **`handledErrorMiddleware` was not given the Zod branch the REST boundary has.**
+  That is the one change that would turn this whole class from 500s into 400s, and
+  it is a deliberate decision about every tRPC procedure at once, not a repair.
+- **The three hand-maintained pass-throughs were left alone.** Converting them to
+  `.input(<command schema>)` is the right hardening and is a behaviour change on
+  live procedures (unknown keys would start 400-ing), so it wants its own decision.
+- **The formatter was not redesigned.** The 500-vs-422 code and the empty
+  `fieldErrors` on `unrecognized_keys` are reported above, not changed.
+- **The auth defect was not proven against a running Better Auth.** Its shape is
+  established from Better Auth 1.7.1's own published session and user types, the
+  `additionalFields` this transport configures, and the absence of any reshaping
+  or `customSession` plugin between `getSession` and the parse. Nobody signed in
+  to watch it happen — which is also why it survived: no test in this repo feeds
+  the real record, and the local stack never folds identity.
+- **The two `user`-package files were committed by another lane**, not by this
+  one: `52213bf2dd` picked up the uncommitted working tree with a broad `git add`.
+  The change is intact and green there; nothing was staged or committed from here.
+  The two `auth`-contract files were left uncommitted, as this lane's brief says.
+- **Nothing under `platform/` was created, edited or read.**
