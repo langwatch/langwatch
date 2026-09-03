@@ -75,7 +75,7 @@ describe("given the personal-workspace pages this package now serves", () => {
       // Every wrapper is named, and the order is the load-bearing part: the
       // host is outside the guard, so a refusal renders without one, and the
       // title is inside it, so a page that is not here never renames the tab.
-      expect(module.default.displayName).toContain("withPersonalWorkspaceHost");
+      expect(module.default.displayName).toContain("withHost(PersonalWorkspaceHost");
       expect(module.default.displayName).toContain("withUiPageGuard");
     });
   });

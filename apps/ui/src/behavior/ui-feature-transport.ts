@@ -43,8 +43,6 @@ import {
   type FeatureApiClient,
   type FeatureApiMap,
   type RouterFromMap,
-  type SseEventSourceConstructor,
-  sseSubscriptionLink,
 } from "@langwatch/platform-api-client";
 import type { QueryClient } from "@tanstack/react-query";
 import {
@@ -56,6 +54,7 @@ import {
 } from "@trpc/client";
 import type { ComponentType, ReactNode } from "react";
 import superjson from "superjson";
+import { type SseEventSourceConstructor, sseSubscriptionLink } from "./ui-sse-subscription-link";
 
 /** Same-origin, so the browser sends the session cookie without configuration. */
 export const UI_TRPC_ENDPOINT = "/api/trpc";

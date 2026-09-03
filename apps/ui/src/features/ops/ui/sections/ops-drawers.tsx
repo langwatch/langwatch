@@ -7,7 +7,7 @@
  * The page was registered and the drawer was not, so the palette entry opened
  * nothing.
  *
- * IT NEEDS TWO THINGS AROUND IT, not one. `withOpsHost` answers for the project
+ * IT NEEDS TWO THINGS AROUND IT, not one. `OpsHost` answers for the project
  * an operator is standing in; `FoundryTransport` turns that answer, plus the
  * organization graph, into the runtime the playground reads for the API key it
  * sends a generated trace with. The page mounts the same pair, and this file is
@@ -24,7 +24,8 @@
 import { FoundryDrawer as Foundry, FoundryTransport } from "@langwatch/ops-web/drawers";
 import { useDrawer } from "@langwatch/ui-drawer";
 
-import { withOpsHost } from "./ops-host-provider";
+import { withHost } from "../../../../ui/sections/ui-page";
+import { OpsHost } from "./ops-host";
 
 /**
  * The drawer takes the close as a callback rather than closing itself, which is
@@ -41,4 +42,4 @@ function FoundryFromAddress() {
   );
 }
 
-export const FoundryDrawer = withOpsHost(FoundryFromAddress);
+export const FoundryDrawer = withHost(OpsHost, FoundryFromAddress);

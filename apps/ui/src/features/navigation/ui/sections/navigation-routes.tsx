@@ -25,18 +25,15 @@
  */
 
 import { navigationScreens } from "@langwatch/navigation-web/screens/landing";
-import type { UiPageLoader, UiPageLoaderRegistry } from "../../../../behavior/ui-page-loaders";
-import { withNavigationHost } from "./navigation-host-provider";
-
-function hostedScreen(load: () => Promise<{ default: React.ComponentType }>): UiPageLoader {
-  return async () => {
-    const module = await load();
-    return { default: withNavigationHost(module.default) };
-  };
-}
+import type { UiPageLoaderRegistry } from "../../../../behavior/ui-page-loaders";
+import { uiPage } from "../../../../ui/sections/ui-page";
+import { NavigationHostSection } from "./navigation-host";
 
 export const navigationPageLoaders: UiPageLoaderRegistry = {
-  "pages/index": hostedScreen(navigationScreens.landing),
-  "pages/not-found": hostedScreen(navigationScreens.notFound),
-  "pages/@project/[...path]/index": hostedScreen(navigationScreens.projectRedirect),
+  "pages/index": uiPage({ screen: navigationScreens.landing, host: NavigationHostSection }),
+  "pages/not-found": uiPage({ screen: navigationScreens.notFound, host: NavigationHostSection }),
+  "pages/@project/[...path]/index": uiPage({
+    screen: navigationScreens.projectRedirect,
+    host: NavigationHostSection,
+  }),
 };

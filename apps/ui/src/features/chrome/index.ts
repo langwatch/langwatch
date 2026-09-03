@@ -70,10 +70,8 @@ export { chromePageLoaders };
 /**
  * The two switchers, and nothing else from the layout module.
  *
- * `ui-app-chrome` is reached ONLY through its lazy loader. It asks
- * `installed-ui-page-keys`, which reads the registry that composes this file, so
- * a static export from here would put the layout inside that cycle at module
- * initialisation and drag the chrome into the bundle a signed-out reader
+ * `ui-app-chrome` is reached ONLY through its lazy loader, so a static export
+ * from here would drag the chrome into the bundle a signed-out reader
  * downloads for the front door. The switcher blocks have no such reach.
  *
  * They are still exported because they are handed ACROSS seams: a screen's own

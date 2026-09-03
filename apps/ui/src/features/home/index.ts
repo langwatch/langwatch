@@ -24,4 +24,4 @@ export const homeApiBinding: UiFeatureApiBinding = uiFeatureApi({
 });
 
 export { homePageLoaders };
-export { ProjectHomeHostSection, withProjectHomeHost } from "./ui/sections/home-host-provider";
+export { ProjectHomeHostSection } from "./ui/sections/home-host";

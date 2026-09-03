@@ -25,7 +25,8 @@
 import { traceDrawerMount } from "@langwatch/trace-web/screens/traces";
 import { lazy, Suspense } from "react";
 
-import { withTraceHost } from "./host-provider";
+import { withHost } from "../../../../ui/sections/ui-page";
+import { TraceHost } from "./trace-host";
 
 const TraceDrawer = lazy(traceDrawerMount);
 
@@ -37,4 +38,4 @@ function TraceDrawerMount() {
   );
 }
 
-export const UiTraceDrawerMount = withTraceHost(TraceDrawerMount);
+export const UiTraceDrawerMount = withHost(TraceHost, TraceDrawerMount);

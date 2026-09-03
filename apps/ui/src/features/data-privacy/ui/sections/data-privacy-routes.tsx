@@ -10,32 +10,20 @@
 
 import { dataPrivacyScreens } from "@langwatch/data-privacy-web/screens/data-privacy";
 import type { ComponentType } from "react";
-import type { UiPageLoader, UiPageLoaderRegistry } from "../../../../behavior/ui-page-loaders";
-import {
-  UiPageForbidden,
-  UiPageLoading,
-  UiPageNotFound,
-} from "../../../../ui/elements/ui-page-fallbacks";
-import { withUiPageGuard } from "../../../../ui/sections/ui-page-guard";
-import { withUiSettingsLayout } from "../../../../ui/sections/ui-settings-layout";
-import { DATA_PRIVACY_PAGE_PERMISSION } from "../../behavior/data-privacy-host.adapter";
-import { withDataPrivacyHost } from "./data-privacy-host-provider";
+import type { UiPageLoaderRegistry } from "../../../../behavior/ui-page-loaders";
+import { uiPage } from "../../../../ui/sections/ui-page";
+import { DataPrivacyHost } from "./data-privacy-host";
 
-const FALLBACKS = {
-  loading: UiPageLoading,
-  notFound: UiPageNotFound,
-  forbidden: UiPageForbidden,
-};
-
-const dataPrivacyPage: UiPageLoader = async () => {
-  const module = await dataPrivacyScreens.dataPrivacy();
-  const guarded = withUiPageGuard({
-    permission: DATA_PRIVACY_PAGE_PERMISSION,
-    fallbacks: FALLBACKS,
-  })(module.default as ComponentType);
-  return { default: withDataPrivacyHost(withUiSettingsLayout(guarded)) };
-};
+/** The grant the platform page asked for, unchanged. */
+const DATA_PRIVACY_PAGE_PERMISSION = "project:view";
 
 export const dataPrivacyPageLoaders: UiPageLoaderRegistry = {
-  "pages/settings/data-privacy": dataPrivacyPage,
+  "pages/settings/data-privacy": uiPage({
+    screen: async () => ({
+      default: (await dataPrivacyScreens.dataPrivacy()).default as ComponentType,
+    }),
+    host: DataPrivacyHost,
+    settingsLayout: true,
+    permission: DATA_PRIVACY_PAGE_PERMISSION,
+  }),
 };

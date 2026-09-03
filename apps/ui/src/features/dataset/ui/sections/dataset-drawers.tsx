@@ -8,6 +8,7 @@
 
 import { SelectDatasetDrawer as SelectDataset } from "@langwatch/dataset-web/drawers";
 
-import { withDatasetHost } from "./dataset-host-provider";
+import { withHost } from "../../../../ui/sections/ui-page";
+import { DatasetHost } from "./dataset-host";
 
-export const SelectDatasetDrawer = withDatasetHost(SelectDataset);
+export const SelectDatasetDrawer = withHost(DatasetHost, SelectDataset);

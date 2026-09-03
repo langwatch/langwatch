@@ -1,11 +1,8 @@
 import { describe, expect, it, vi } from "vitest";
-import { FeatureRuntimeBuilder, ResourceScope } from "@langwatch/runtime-composition";
 import {
   GatewayRealtimeSessionReconciliationWorker,
-  createGatewayRealtimeSessionReconciliationFeature,
   realtimeSessionReconciliationConfig,
   type ElevenLabsConversationReader,
-  type GatewayRealtimeSessionReconciliationInfrastructure,
   type RealtimeSessionReconciliationRepository,
 } from "../realtime-session-reconciliation.adapter";
 
@@ -114,27 +111,11 @@ describe("GatewayRealtimeSessionReconciliationWorker", () => {
     expect(repository.releaseMissingVendorConversation).not.toHaveBeenCalled();
   });
 
-  it("does not schedule a timer until the worker feature is built", async () => {
-    const { repository, conversations } = buildWorker();
-    const resources = new ResourceScope();
-    const feature = createGatewayRealtimeSessionReconciliationFeature();
-    const credentials = {
-      getApiCredential: vi.fn().mockResolvedValue(null),
-    };
+  it("does not poll before start is called", async () => {
+    const { worker, repository } = buildWorker();
 
     expect(repository.expireStaleSessions).not.toHaveBeenCalled();
-    const infrastructure: GatewayRealtimeSessionReconciliationInfrastructure = {
-      repository,
-      credentials,
-      conversations,
-      logger: { warn: vi.fn(), info: vi.fn(), error: vi.fn() },
-      config: realtimeSessionReconciliationConfig,
-      clock: { now: () => new Date() },
-    };
-    await FeatureRuntimeBuilder.create({
-      infrastructure,
-      resources,
-    }).build({ features: [feature], target: "worker" });
-    await resources.close();
+    const handle = worker.start();
+    handle.stop();
   });
 });

@@ -1,9 +1,9 @@
 /**
  * Which page key the Annotation Scoring address answers, and what it is wrapped in.
  *
- * ONE KEY, ONE SCREEN, and the same three wrappers in the same order as every
- * other settings family: the host outermost, the harvested settings chrome
- * inside it, and the platform page's own `annotations:view` grant innermost.
+ * ONE KEY, ONE SCREEN, and the same wrapping order as every other settings
+ * family: the host outermost, the settings chrome inside it, and the platform
+ * page's own `annotations:view` grant innermost.
  *
  * THE GRANT OPENS THE PAGE AND DOES NOT OPEN THE WRITES. A lite member reads
  * the definitions and is offered neither the switch, the menu nor the add
@@ -14,33 +14,20 @@
 import { annotationScoresScreens } from "@langwatch/annotation-web/screens/annotation-scores";
 import type { ComponentType } from "react";
 
-import type { UiPageLoader, UiPageLoaderRegistry } from "../../../../behavior/ui-page-loaders";
-import {
-  UiPageForbidden,
-  UiPageLoading,
-  UiPageNotFound,
-} from "../../../../ui/elements/ui-page-fallbacks";
-import { withUiPageGuard } from "../../../../ui/sections/ui-page-guard";
-import { withUiSettingsLayout } from "../../../../ui/sections/ui-settings-layout";
-import { ANNOTATION_SCORES_PAGE_PERMISSION } from "../../behavior/annotation-scores-host.adapter";
-import { withAnnotationScoresHost } from "./annotation-scores-host-provider";
+import type { UiPageLoaderRegistry } from "../../../../behavior/ui-page-loaders";
+import { uiPage } from "../../../../ui/sections/ui-page";
+import { AnnotationScoresHost } from "./annotation-scores-host";
 
-const FALLBACKS = {
-  loading: UiPageLoading,
-  notFound: UiPageNotFound,
-  forbidden: UiPageForbidden,
-};
-
-const annotationScoresPage: UiPageLoader = async () => {
-  const module = await annotationScoresScreens.annotationScores();
-  const guarded = withUiPageGuard({
-    permission: ANNOTATION_SCORES_PAGE_PERMISSION,
-    fallbacks: FALLBACKS,
-  })(module.default as ComponentType);
-  guarded.displayName = "AnnotationScoresPage";
-  return { default: withAnnotationScoresHost(withUiSettingsLayout(guarded)) };
-};
+/** The grant the platform page asked for, unchanged. */
+export const ANNOTATION_SCORES_PAGE_PERMISSION = "annotations:view";
 
 export const annotationScoresPageLoaders: UiPageLoaderRegistry = {
-  "pages/settings/annotation-scores": annotationScoresPage,
+  "pages/settings/annotation-scores": uiPage({
+    screen: async () => ({
+      default: (await annotationScoresScreens.annotationScores()).default as ComponentType,
+    }),
+    host: AnnotationScoresHost,
+    settingsLayout: true,
+    permission: ANNOTATION_SCORES_PAGE_PERMISSION,
+  }),
 };

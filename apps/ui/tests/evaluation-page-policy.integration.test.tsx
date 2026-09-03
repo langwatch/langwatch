@@ -85,9 +85,9 @@ import {
 } from "../src/behavior/ui-capabilities";
 import { uiRouteTable, type UiRouteDescriptor } from "../src/model/ui-route-table";
 import { evaluatorPageLoaders } from "../src/features/evaluator";
-import { overlayQuery as evaluatorOverlayQuery } from "../src/features/evaluator/behavior/evaluator-host.adapter";
+import { overlayQuery as evaluatorOverlayQuery } from "../src/features/evaluator/behavior/evaluator-overlay-address";
 import { monitorPageLoaders } from "../src/features/monitor";
-import { overlayQuery as monitorOverlayQuery } from "../src/features/monitor/behavior/monitor-host.adapter";
+import { overlayQuery as monitorOverlayQuery } from "../src/features/monitor/behavior/monitor-open-overlay";
 
 class SilentNavigation extends UiNavigationPort {
   navigate(): void {}

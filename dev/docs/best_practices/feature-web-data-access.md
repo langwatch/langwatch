@@ -55,6 +55,13 @@ is the single most important property here and it is explained in full below.
 
 ## Where a browser component gets its typed client
 
+**Where this is going:** `packages/platform-api-client` already exports a
+single shared `trpcReact` built against `apps/api`'s root router type (see
+`secret/web/src/behavior/secret-api.ts`). It is meant to replace the
+per-feature `createFeatureApi<Map>()` maps described below once the api-map
+lane finishes its fan-out (`dev/docs/plans/install-composition-review-2026-09-03.md`
+§5). This section will be rewritten around `trpcReact` at that point.
+
 From its own feature package, never from `~/utils/api` and never from a client
 it builds itself.
 
@@ -134,18 +141,24 @@ router type to export.
 ## The mounting, once, in the shell
 
 ```tsx
-// apps/ui/src/ui/sections/ui-feature-shell.tsx
-const featureApiClient = useMemo(() => getUntypedClient(trpcClientInstance), [trpcClientInstance]);
-
-<api.Provider client={trpcClientInstance} queryClient={queryClient}>
-  <traceApi.Provider
-    client={asFeatureApiClient<TraceApiMap>(featureApiClient)}
-    queryClient={queryClient}
-  >
-    <QueryClientProvider client={queryClient}>{children}</QueryClientProvider>
-  </traceApi.Provider>
-</api.Provider>
+// apps/ui/src/ui/sections/ui-feature-shell.tsx:114-118
+const mounted = apis.reduceRight<ReactNode>(
+  (inner, { Provider }) => (
+    <Provider client={ownTransport} queryClient={queryClient}>
+      {inner}
+    </Provider>
+  ),
+  <UiRpcContextProvider value={rpc}>
+    <UiCapabilities transport={ownTransport}>{children}</UiCapabilities>
+  </UiRpcContextProvider>,
+);
 ```
+
+One untyped client (`ownTransport`) is handed to every binding's `Provider` in
+turn, `reduceRight` so the list reads in mount order at the call site. There is
+no cast: `Provider` accepts the client as `unknown` at this call site, and each
+feature's own binding — `createFeatureApi<Map>()` or `trpcReact` — supplies the
+type on the way back out through its own hooks.
 
 Two rules, and breaking either one is the cause of the bug class this whole
 document exists to prevent:
@@ -155,12 +168,6 @@ document exists to prevent:
   package hook in the same tick stop travelling in one request.
 - **Pass the shell's `queryClient`.** A fresh QueryClient gives the package a
   private cache that no application invalidation can reach.
-
-`asFeatureApiClient` is a cast, and it is the one cast in the pattern. It exists
-because the shell's client is typed by the real `AppRouter` and the feature's is
-typed by its map; at runtime there is exactly one kind of untyped client and it
-dispatches on a path string. Keeping the cast in one named function means it is
-one reviewed line rather than one per mount site.
 
 ---
 

@@ -63,7 +63,6 @@
     "@langwatch/organization-contract": "workspace:*",
     "@langwatch/prisma-client": "workspace:*",
     "@langwatch/project-contract": "workspace:*",
-    "@langwatch/runtime-composition": "workspace:*",
     "@langwatch/trace-contract": "workspace:*",
     "@trpc/server": "^11.18.0",
     "hono": "^4.12.27",

@@ -3,7 +3,7 @@
  *
  * A DRAWER IS NOT A PAGE, and the difference is what this file exists for: a
  * page is mounted by the route it answers, so its frontend feature wraps it
- * once in `withEvaluatorHost` there. A drawer opens OVER whatever page the
+ * once in `uiPage`'s `host` option there. A drawer opens OVER whatever page the
  * reader is on — the evaluators list, a workflow, a trace — so the host has to
  * travel with the drawer rather than with the address. Wrapping happens here,
  * once, and the whole file is behind the registry's lazy import, so a reader
@@ -16,7 +16,8 @@ import {
 } from "@langwatch/evaluator-web/drawers";
 import { useDrawer } from "@langwatch/ui-drawer";
 
-import { withEvaluatorHost } from "./evaluator-host-provider";
+import { withHost } from "../../../../ui/sections/ui-page";
+import { EvaluatorHost } from "./evaluator-host";
 
 /**
  * `evaluatorHistory`, as the address spells it.
@@ -45,6 +46,6 @@ function EvaluatorHistory({
   );
 }
 
-export const EvaluatorHistoryDrawer = withEvaluatorHost(EvaluatorHistory);
+export const EvaluatorHistoryDrawer = withHost(EvaluatorHost, EvaluatorHistory);
 
-export const EvaluatorListDrawer = withEvaluatorHost(EvaluatorList);
+export const EvaluatorListDrawer = withHost(EvaluatorHost, EvaluatorList);

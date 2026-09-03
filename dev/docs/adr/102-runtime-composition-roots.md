@@ -309,3 +309,11 @@ in-process service handlers instead.
 - Runtime shutdown preserves careful worker drain and resource ownership
   ordering.
 - Physical app extraction remains available later without being required now.
+
+## Amendment 2026-09-03
+
+`Capability`, `CapabilityRegistry`, `FeatureDefinition`, `FeatureRuntimeBuilder`
+and `RuntimeBoot` were never adopted: both `apps/api` and `apps/worker` compose
+by hand in their `*-production.composition.ts` roots, not through the typed
+feature-installer graph this ADR describes. They were deleted from
+`@langwatch/runtime-composition`, which now holds only `ResourceScope`.

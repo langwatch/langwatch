@@ -1,0 +1,49 @@
+/**
+ * What a front-door screen is mounted inside.
+ *
+ * Two things go around every `/auth/*` address and `/invite/accept`: the tRPC
+ * Provider the package's own hooks run on, and the host port that answers for
+ * the deployment and for the address.
+ *
+ * THE PATHNAME COMES OFF `useUiAddress`, not off the route reading.
+ * `UiRoutePort` answers with path parameters and the query string, which is
+ * what every family before this one needed; `useRequiredSession` asks a
+ * different question — whether THIS address is one of the public ones — and
+ * that needs the path. The ops family took the same route out for its
+ * fragment-backed workspace, and for the same reason: `react-router` is sealed
+ * off from `src/features/*`, and `behavior/ui-address.ts` is the seam.
+ *
+ * THE PUBLIC ENVIRONMENT IS THE SHELL'S. `readPublicAppConfig()` parses the
+ * bootstrap the document was served with, which is the same read the
+ * application's own `usePublicEnv` makes — so a screen that moved reads
+ * exactly the deployment it read before. The per-viewer half (which sign-in
+ * provider is configured, whether mail can be sent) is a query the package
+ * makes for itself on this transport.
+ */
+
+import { AuthHostProvider, type AuthHostPort } from "@langwatch/auth-web/screens/auth";
+import { readPublicAppConfig, toPublicEnvironment } from "@langwatch/ui/public-config";
+import { useMemo, type ReactNode } from "react";
+
+import { useUiAddress } from "../../../../behavior/ui-address";
+import { useUiCapabilities } from "../../../../behavior/ui-capabilities";
+
+export function AuthHost({ children }: { children: ReactNode }) {
+  const { route, feedback } = useUiCapabilities();
+  const reading = route.reading();
+  const address = useUiAddress();
+  const pathname = address.split("?")[0]?.split("#")[0] ?? "/";
+
+  const host = useMemo<AuthHostPort>(
+    () => ({
+      publicEnvironment: () => toPublicEnvironment(readPublicAppConfig()),
+      route: () => ({ pathname, params: reading.params, query: reading.query }),
+      // The application's own feedback capability, so a refused sign-in reads
+      // the code-keyed registry rather than a sentence the screen wrote.
+      failed: (failure) => feedback.failed(failure),
+    }),
+    [pathname, reading.params, reading.query, feedback],
+  );
+
+  return <AuthHostProvider value={host}>{children}</AuthHostProvider>;
+}

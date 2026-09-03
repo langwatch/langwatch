@@ -355,11 +355,12 @@ because that source is governed by the Enterprise licence.
 
 ADR-111 adds the deliberate aggregate root around those features. The portable
 `@langwatch/enterprise` package owns catalogue vocabulary; separate
-`@langwatch/enterprise-api`, `@langwatch/enterprise-worker` and
-`@langwatch/enterprise-web` packages compose the compatible feature surfaces
-for one application each. These are composition packages, not feature packages,
-and may import enterprise implementations only for their declared runtime. The
-legal Enterprise `LICENSE.md` sits at the ownership root and governs the entire
+`@langwatch/enterprise-api` and `@langwatch/enterprise-worker` packages compose
+the compatible feature surfaces for one backend application each. Browser
+enterprise screens are mounted by `apps/ui`'s own feature folders, with no
+composition package of their own. The two backend composition packages may
+import enterprise implementations only for their declared runtime. The legal
+Enterprise `LICENSE.md` sits at the ownership root and governs the entire
 tree. Product licensing follows the same strict feature layout as other
 enterprise behavior and contributes to the provider-neutral Entitlements
 decision.

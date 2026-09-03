@@ -7,24 +7,8 @@
  * tab-as-prop shape, applied to a form. The graph `:id` itself is a route
  * PARAMETER, which the router captured.
  *
- * Each page is wrapped twice, and the order matters. The host provider is
- * OUTSIDE the guard: a refusal renders the guard's own fallback, which asks
- * nothing of the analytics host, but a page that opens needs the host mounted
- * above it before its first render. Inside that, the guard states the policy
- * the platform higher-order component carried.
- *
- * THE POLICY IS THE PLATFORM PAGES', ONE FOR ONE, AND HERE ALL NINE AGREE.
- * Every one of the nine page files was `withPermissionGuard("analytics:view")`,
- * so there is no asymmetry to carry and none to invent — unlike the annotations
- * family, where one of four pages was guarded and three were not.
- *
- * `layoutComponent: DashboardLayout` was the other half of two of those calls
- * and does not travel — chrome belongs to the route tree, and these pages are
- * children of a layout route the composing application still serves.
- *
- * The wrapping happens once per lazy load rather than once per render: React
- * Router caches what a `lazy` resolves to, so the component identity below is
- * stable for the life of the route.
+ * THE POLICY IS THE PLATFORM PAGES', ONE FOR ONE, AND HERE ALL NINE AGREE:
+ * every one of the nine page files was `withPermissionGuard("analytics:view")`.
  */
 
 import {
@@ -34,63 +18,39 @@ import {
 import type { ComponentType } from "react";
 
 import type { UiPageLoader, UiPageLoaderRegistry } from "../../../../behavior/ui-page-loaders";
-import {
-  UiPageForbidden,
-  UiPageLoading,
-  UiPageNotFound,
-} from "../../../../ui/elements/ui-page-fallbacks";
-import { withUiPageGuard } from "../../../../ui/sections/ui-page-guard";
-import { ANALYTICS_PAGE_PERMISSION } from "../../behavior/analytics-host.adapter";
-import { withAnalyticsHost } from "./analytics-host-provider";
+import { uiPage } from "../../../../ui/sections/ui-page";
+import { AnalyticsHost } from "./analytics-host";
 
-const FALLBACKS = {
-  loading: UiPageLoading,
-  notFound: UiPageNotFound,
-  forbidden: UiPageForbidden,
-};
+/** The grant every one of the nine platform pages asked for, unchanged. */
+const ANALYTICS_PAGE_PERMISSION = "analytics:view";
 
 /** Guards one screen and mounts the analytics host above it. */
-function analyticsPage(
-  load: () => Promise<{ default: ComponentType }>,
-  name: string,
-): UiPageLoader {
-  return async () => {
-    const module = await load();
-    const guarded = withUiPageGuard({
-      permission: ANALYTICS_PAGE_PERMISSION,
-      fallbacks: FALLBACKS,
-    })(module.default);
-    guarded.displayName = `AnalyticsPage(${name})`;
-    return { default: withAnalyticsHost(guarded) };
-  };
+function analyticsPage(load: () => Promise<{ default: ComponentType }>): UiPageLoader {
+  return uiPage({ screen: load, host: AnalyticsHost, permission: ANALYTICS_PAGE_PERMISSION });
 }
 
 /** The builder, told which of its two addresses this is. */
 function customGraphPage(mode: CustomGraphScreenMode): UiPageLoader {
-  return async () => {
-    const module = await analyticsScreens.customGraph();
-    const Screen = module.default;
-    const OnMode = () => <Screen mode={mode} />;
-    OnMode.displayName = `CustomGraphPage(${mode})`;
-    const guarded = withUiPageGuard({
-      permission: ANALYTICS_PAGE_PERMISSION,
-      fallbacks: FALLBACKS,
-    })(OnMode as ComponentType);
-    return { default: withAnalyticsHost(guarded) };
-  };
+  return uiPage({
+    screen: async () => {
+      const Screen = (await analyticsScreens.customGraph()).default;
+      const OnMode = () => <Screen mode={mode} />;
+      OnMode.displayName = `CustomGraphPage(${mode})`;
+      return { default: OnMode as ComponentType };
+    },
+    host: AnalyticsHost,
+    permission: ANALYTICS_PAGE_PERMISSION,
+  });
 }
 
 export const analyticsPageLoaders: UiPageLoaderRegistry = {
-  "pages/[project]/analytics/index": analyticsPage(analyticsScreens.overview, "overview"),
-  "pages/[project]/analytics/users": analyticsPage(analyticsScreens.users, "users"),
-  "pages/[project]/analytics/topics": analyticsPage(analyticsScreens.topics, "topics"),
-  "pages/[project]/analytics/metrics": analyticsPage(analyticsScreens.metrics, "metrics"),
-  "pages/[project]/analytics/evaluations": analyticsPage(
-    analyticsScreens.evaluations,
-    "evaluations",
-  ),
-  "pages/[project]/analytics/reports": analyticsPage(analyticsScreens.reports, "reports"),
-  "pages/[project]/analytics/query": analyticsPage(analyticsScreens.query, "query"),
+  "pages/[project]/analytics/index": analyticsPage(analyticsScreens.overview),
+  "pages/[project]/analytics/users": analyticsPage(analyticsScreens.users),
+  "pages/[project]/analytics/topics": analyticsPage(analyticsScreens.topics),
+  "pages/[project]/analytics/metrics": analyticsPage(analyticsScreens.metrics),
+  "pages/[project]/analytics/evaluations": analyticsPage(analyticsScreens.evaluations),
+  "pages/[project]/analytics/reports": analyticsPage(analyticsScreens.reports),
+  "pages/[project]/analytics/query": analyticsPage(analyticsScreens.query),
   "pages/[project]/analytics/custom/index": customGraphPage("new"),
   "pages/[project]/analytics/custom/[id]": customGraphPage("edit"),
 };

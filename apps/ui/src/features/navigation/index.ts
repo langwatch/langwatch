@@ -20,7 +20,4 @@ export const navigationApiBinding: UiFeatureApiBinding = uiFeatureApi({
 });
 
 export { navigationPageLoaders };
-export {
-  NavigationHostSection,
-  withNavigationHost,
-} from "./ui/sections/navigation-host-provider";
+export { NavigationHostSection } from "./ui/sections/navigation-host";

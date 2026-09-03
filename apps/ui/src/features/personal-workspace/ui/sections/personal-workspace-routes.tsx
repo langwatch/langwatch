@@ -9,14 +9,6 @@
  * in the table, which is what a path that only ever went somewhere else should
  * be.
  *
- * Each page is wrapped three times, and the order matters. The host provider is
- * OUTSIDE the guard: a refusal renders the guard's own fallback, which asks
- * nothing of the personal-workspace host, but a page that opens needs the host
- * mounted above it before its first render. Inside that, the guard states the
- * policy the platform higher-order component carried. Innermost, the title: it
- * is set by a page that actually opened, never by one that turned out to be a
- * 404.
- *
  * THE POLICY IS THE PLATFORM PAGES', ONE FOR ONE. All seven personal keys were
  * behind `withFeatureFlagGuard("release_ui_ai_governance_enabled")` and none of them
  * carried a permission guard, so that is what is stated here. The five `/me`
@@ -25,9 +17,14 @@
  * onboarding. Landing policy did not travel with the family (the gateway family
  * made the same cut), so there is nothing left to bypass and no flag for it.
  *
- * The wrapping happens once per lazy load rather than once per render: React
- * Router caches what a `lazy` resolves to, so the component identity below is
- * stable for the life of the route.
+ * SETTINGS > AUTHENTICATION IS WRAPPED DIFFERENTLY from the other seven, in all
+ * three of the ways that can differ, and each is the platform page's policy one
+ * for one: NO FLAG (it shipped long before the AI Governance flag existed and
+ * every signed-in reader has always been able to open it), NO PERMISSION
+ * (everything on it is keyed on the reader's own account), and SETTINGS CHROME
+ * rather than a personal-home marker (it is reached from the settings
+ * navigation, and a reader who opens it has not chosen the personal workspace
+ * as their home).
  */
 
 import {
@@ -35,29 +32,18 @@ import {
   type PersonalWorkspaceScreenName,
 } from "@langwatch/user-web/screens/personal-workspace";
 import { useEffect, type ComponentType } from "react";
-import type { UiPageLoader, UiPageLoaderRegistry } from "../../../../behavior/ui-page-loaders";
+import type { UiPageLoaderRegistry } from "../../../../behavior/ui-page-loaders";
 import { useUiCapabilities } from "../../../../behavior/ui-capabilities";
-import {
-  UiPageForbidden,
-  UiPageLoading,
-  UiPageNotFound,
-} from "../../../../ui/elements/ui-page-fallbacks";
-import { withUiPageGuard } from "../../../../ui/sections/ui-page-guard";
-import { withUiSettingsLayout } from "../../../../ui/sections/ui-settings-layout";
-import { withPersonalWorkspaceHost } from "./personal-workspace-host-provider";
+import { uiPage } from "../../../../ui/sections/ui-page";
+import { PersonalWorkspaceHost } from "./personal-workspace-host";
 
 /**
- * The one flag every page in this family is behind. It is the governance
- * section's flag rather than a personal one: the personal workspace shipped as
- * part of AI Governance and the whole family releases with it.
+ * The one flag every `/me` and project-scoped page in this family is behind.
+ * It is the governance section's flag rather than a personal one: the personal
+ * workspace shipped as part of AI Governance and the whole family releases
+ * with it.
  */
 const PERSONAL_WORKSPACE_FLAG = "release_ui_ai_governance_enabled";
-
-const FALLBACKS = {
-  loading: UiPageLoading,
-  notFound: UiPageNotFound,
-  forbidden: UiPageForbidden,
-};
 
 /**
  * The browser tab's title, set by the page that owns it.
@@ -81,47 +67,31 @@ function withDocumentTitle<P extends object>(
   return Titled;
 }
 
-function personalWorkspacePage(
-  screen: PersonalWorkspaceScreenName,
-  { title }: { title: string },
-): UiPageLoader {
-  return async () => {
-    const module = await personalWorkspaceScreens[screen]();
-    const titled = withDocumentTitle(title, module.default as ComponentType);
-    const guarded = withUiPageGuard({ flags: [PERSONAL_WORKSPACE_FLAG], fallbacks: FALLBACKS })(
-      titled,
-    );
-    return { default: withPersonalWorkspaceHost(guarded) };
-  };
+/** The seven `/me` and project-scoped pages: flagged, no permission, no chrome. */
+function personalWorkspacePage(screen: PersonalWorkspaceScreenName, { title }: { title: string }) {
+  return uiPage({
+    screen: async () => ({
+      default: withDocumentTitle(
+        title,
+        (await personalWorkspaceScreens[screen]()).default as ComponentType,
+      ),
+    }),
+    host: PersonalWorkspaceHost,
+    flags: [PERSONAL_WORKSPACE_FLAG],
+  });
 }
 
-/**
- * Settings > Authentication, which is this package's eighth key and the one
- * that is not a `/me/*` page. It rides the family's own screen entry rather
- * than one of its own: `ui-screen-owner` requires a screen entry's id to match
- * the frontend feature that composes it, so one feature may mount exactly one.
- *
- * WRAPPED DIFFERENTLY FROM THE OTHER SEVEN, in all three of the ways that can
- * differ, and each is the platform page's policy one for one:
- *
- * - NO FLAG. The seven `/me` and project keys are behind
- *   `release_ui_ai_governance_enabled`; this page shipped long before that flag
- *   and every signed-in reader has always been able to open it.
- * - NO PERMISSION. Everything on it is keyed on the reader's own account, so
- *   there is no scope to hold a grant over.
- * - SETTINGS CHROME rather than a personal-home marker. It is a settings page,
- *   it is reached from the settings navigation, and a reader who opens it has
- *   not chosen the personal workspace as their home.
- */
-const authenticationPage: UiPageLoader = async () => {
-  const module = await personalWorkspaceScreens.authentication();
-  const titled = withDocumentTitle("Authentication · LangWatch", module.default as ComponentType);
-  const guarded = withUiPageGuard({ fallbacks: FALLBACKS })(titled);
-  return { default: withPersonalWorkspaceHost(withUiSettingsLayout(guarded)) };
-};
-
 export const personalWorkspacePageLoaders: UiPageLoaderRegistry = {
-  "pages/settings/authentication": authenticationPage,
+  "pages/settings/authentication": uiPage({
+    screen: async () => ({
+      default: withDocumentTitle(
+        "Authentication · LangWatch",
+        (await personalWorkspaceScreens.authentication()).default as ComponentType,
+      ),
+    }),
+    host: PersonalWorkspaceHost,
+    settingsLayout: true,
+  }),
   "pages/me/index": personalWorkspacePage("overview", { title: "My Usage · LangWatch" }),
   "pages/me/configure": personalWorkspacePage("configure", {
     title: "My Settings · LangWatch",

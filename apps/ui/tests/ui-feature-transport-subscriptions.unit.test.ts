@@ -1,4 +1,3 @@
-import type { SseEventSourceConstructor, SseEventSourceLike } from "@langwatch/platform-api-client";
 import superjson from "superjson";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import {
@@ -6,6 +5,10 @@ import {
   UI_SSE_ENDPOINT_PREFIX,
   UI_TRPC_ENDPOINT,
 } from "../src/behavior/ui-feature-transport";
+import type {
+  SseEventSourceConstructor,
+  SseEventSourceLike,
+} from "../src/behavior/ui-sse-subscription-link";
 
 /**
  * The third lane on this process's transport: the one a live procedure rides.

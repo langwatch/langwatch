@@ -271,8 +271,8 @@
       "default": "./src/model/utils/types.ts"
     },
     "./utils/workflow-api": {
-      "types": "./src/behavior/workflow-api.tsx",
-      "default": "./src/behavior/workflow-api.tsx"
+      "types": "./src/behavior/workflow-api.ts",
+      "default": "./src/behavior/workflow-api.ts"
     },
     "./utils/zodSalvage": {
       "types": "./src/model/zod-salvage.ts",
@@ -301,7 +301,6 @@
     "@langwatch/model-provider-web": "workspace:*",
     "@langwatch/observability": "workspace:*",
     "@langwatch/platform-api-client": "workspace:*",
-    "@langwatch/platform-api-contract": "workspace:*",
     "@langwatch/prompt-contract": "workspace:*",
     "@langwatch/prompt-web": "workspace:*",
     "@langwatch/trace-contract": "workspace:*",

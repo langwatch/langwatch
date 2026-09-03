@@ -6,48 +6,6 @@ Feature: App and worker runtime encapsulation
   I want separate API and worker compositions with an explicit development parent
   So that each process loads and owns only the services it runs
 
-  @architecture @typecheck
-  Scenario: The interactive app has a closed capability graph
-    Given the app feature catalogue has been selected
-    When createApp builds the interactive runtime
-    Then every required service capability is satisfied
-    And the service registry is sealed before HTTP starts
-    And no worker consumer, scheduler or process manager is started
-
-  @architecture @typecheck
-  Scenario: The worker has a closed capability graph
-    Given the worker feature catalogue has been selected
-    When createWorker builds the background runtime
-    Then every required service capability is satisfied
-    And no React source, internal RPC router, legacy REST router or realtime server is loaded
-
-  @unit @architecture
-  Scenario: Missing feature requirements fail during build
-    Given an installed feature requires a capability no selected feature provides
-    When the runtime is built
-    Then build fails naming the feature and missing capability
-    And no transport begins accepting work
-
-  @unit @architecture
-  Scenario: Duplicate capability providers fail during build
-    Given two installed features provide the same capability key
-    When the runtime is built
-    Then build fails naming both providers
-    And neither silently replaces the other
-
-  @unit @architecture
-  Scenario: A built registry cannot be mutated
-    Given a runtime has completed feature installation
-    When code tries to install or replace a capability
-    Then the operation is rejected
-
-  @architecture @registration
-  Scenario: Feature imports have no registration side effects
-    Given an app or worker imports a feature server package
-    Then no route, queue consumer, subscriber or scheduler is registered
-    When a runtime calls a selected feature installer
-    Then only that installer's declared contributions are added
-
   @integration @runtime
   Scenario: Standalone runtimes own their infrastructure
     Given app and worker run in separate processes

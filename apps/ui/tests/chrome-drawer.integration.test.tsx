@@ -123,10 +123,6 @@ vi.mock("../src/features/traces", () => ({
   UiTraceDrawerMount: () => null,
 }));
 
-vi.mock("../src/features/installed-ui-page-keys", () => ({
-  isUiInstalledPage: (key: string) => key === "pages/served-here",
-}));
-
 function QueueEditorDrawer({ queueId }: { queueId?: string }) {
   const { closeDrawer } = useDrawer();
   return (
@@ -164,9 +160,6 @@ const loaders = {
       </div>
     ),
   }),
-  "pages/served-by-platform": async () => ({
-    default: () => <div>legacy screen</div>,
-  }),
 };
 
 function renderAt(path: string) {
@@ -174,10 +167,7 @@ function renderAt(path: string) {
     table: [
       {
         page: "features/chrome/UiAppChrome",
-        children: [
-          { path: "/here", page: "pages/served-here" },
-          { path: "/legacy", page: "pages/served-by-platform" },
-        ],
+        children: [{ path: "/here", page: "pages/served-here" }],
       },
     ],
     loaders,
@@ -214,23 +204,6 @@ describe("given an address that names an installed drawer", () => {
         expect(screen.getByTestId("address").textContent).toBe("/here?tab=queues");
       });
       expect(screen.queryByText("editing queue q-42")).toBeNull();
-    });
-  });
-
-  describe("when the page below is one platform/app still serves", () => {
-    /**
-     * A drawer is addressed by the query string and renders through a portal,
-     * so a reader who follows a `?drawer.open=` link onto a legacy page is
-     * asking for the same drawer. The header is the conditional half; the
-     * drawer mount is not.
-     */
-    it("opens the drawer over it anyway", async () => {
-      renderAt("/legacy?drawer.open=queueEditor&drawer.queueId=q-7");
-
-      await waitFor(() => {
-        expect(screen.getByText("legacy screen")).toBeTruthy();
-      });
-      expect(await screen.findByText("editing queue q-7")).toBeTruthy();
     });
   });
 });

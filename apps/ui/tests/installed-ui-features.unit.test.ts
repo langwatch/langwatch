@@ -8,8 +8,8 @@
  */
 
 import { describe, expect, it } from "vitest";
-import { UiFeedbackPort, UiSessionPort } from "../src/behavior/ui-capabilities";
-import { installedUiFeatures, mergeUiFeatureInstalls } from "../src/features/installed-ui-features";
+import { UiFeedbackPort } from "../src/behavior/ui-capabilities";
+import { installedUiFeatures } from "../src/features/installed-ui-features";
 
 const AGENT_PAGE_KEYS = [
   // ONE key for ONE screen, and it still names the platform adapter that used
@@ -437,29 +437,6 @@ const GOVERNANCE_PAGE_KEYS = [
  */
 const HOME_PAGE_KEYS = ["pages/[project]/index"];
 
-class RecordingFeedback extends UiFeedbackPort {
-  succeeded(): void {}
-  failed(): void {}
-}
-
-class RecordingSession extends UiSessionPort {
-  currentUser() {
-    return null;
-  }
-  activeScope() {
-    return { organizationId: null, projectId: null };
-  }
-  hasPermission() {
-    return false;
-  }
-  isSettled() {
-    return true;
-  }
-  featureFlag() {
-    return false;
-  }
-}
-
 describe("given what apps/ui serves itself", () => {
   describe("when the standing declaration is read", () => {
     it("registers a loader for every page key the families it serves name", () => {
@@ -561,84 +538,6 @@ describe("given what apps/ui serves itself", () => {
 
     it("reads the deployment's own session", () => {
       expect(installedUiFeatures.session).toBeTypeOf("function");
-    });
-  });
-
-  describe("when a host brings an install of its own", () => {
-    it("adds the host's loaders without dropping this package's", () => {
-      const merged = mergeUiFeatureInstalls(installedUiFeatures, {
-        loaders: { "pages/host/only": () => Promise.resolve({ default: () => null }) },
-      });
-
-      expect(Object.keys(merged.loaders ?? {})).toContain("pages/host/only");
-      expect(Object.keys(merged.loaders ?? {})).toContain("pages/governance/index");
-    });
-
-    it("lets the host's capability win over this package's", () => {
-      const hostFeedback = new RecordingFeedback();
-
-      const merged = mergeUiFeatureInstalls(installedUiFeatures, {
-        capabilities: { feedback: hostFeedback },
-      });
-
-      expect(merged.capabilities?.feedback).toBe(hostFeedback);
-    });
-
-    it("lets the host's session source win over this package's", () => {
-      const hostSession = () => new RecordingSession();
-
-      const merged = mergeUiFeatureInstalls(installedUiFeatures, { session: hostSession });
-
-      expect(merged.session).toBe(hostSession);
-    });
-
-    it("keeps this package's install whole when the host brings nothing", () => {
-      const merged = mergeUiFeatureInstalls(installedUiFeatures);
-
-      expect(Object.keys(merged.loaders ?? {}).sort()).toEqual(
-        [
-          ...AGENT_PAGE_KEYS,
-          ...ANALYTICS_PAGE_KEYS,
-          ...ANNOTATION_PAGE_KEYS,
-          ...ANNOTATION_SCORES_PAGE_KEYS,
-          ...API_KEY_PAGE_KEYS,
-          ...AUTH_PAGE_KEYS,
-          ...AUTHORIZE_PAGE_KEYS,
-          ...AUTHZ_PAGE_KEYS,
-          ...AUTOMATION_PAGE_KEYS,
-          ...BILLING_PAGE_KEYS,
-          ...CHROME_PAGE_KEYS,
-          ...DATA_GOVERNANCE_PAGE_KEYS,
-          ...DATASET_PAGE_KEYS,
-          ...EVALUATION_EDIT_PAGE_KEYS,
-          ...EVALUATOR_PAGE_KEYS,
-          ...EXPERIMENT_PAGE_KEYS,
-          ...GATEWAY_PAGE_KEYS,
-          ...GITHUB_PAGE_KEYS,
-          ...GOVERNANCE_PAGE_KEYS,
-          ...HOME_PAGE_KEYS,
-          ...LICENSING_PAGE_KEYS,
-          ...MODEL_PROVIDER_PAGE_KEYS,
-          ...MONITOR_PAGE_KEYS,
-          ...NAVIGATION_PAGE_KEYS,
-          ...NOTIFICATION_PAGE_KEYS,
-          ...ONBOARDING_PAGE_KEYS,
-          ...OPS_PAGE_KEYS,
-          ...ORGANIZATION_PAGE_KEYS,
-          ...PROJECT_PAGE_KEYS,
-          ...PROMPT_PAGE_KEYS,
-          ...SCIM_PAGE_KEYS,
-          ...SECRET_PAGE_KEYS,
-          ...LANGY_PAGE_KEYS,
-          ...SIMULATION_PAGE_KEYS,
-          ...TOPIC_PAGE_KEYS,
-          ...TRACE_PAGE_KEYS,
-          ...WORKFLOW_PAGE_KEYS,
-          ...PERSONAL_WORKSPACE_PAGE_KEYS,
-        ].sort(),
-      );
-      expect(merged.apis).toHaveLength(36);
-      expect(merged.session).toBe(installedUiFeatures.session);
     });
   });
 });

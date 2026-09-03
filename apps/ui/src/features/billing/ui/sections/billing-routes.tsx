@@ -1,10 +1,6 @@
 /**
  * Which page keys the billing addresses answer, and what they are wrapped in.
  *
- * THREE KEYS, THREE SCREENS, and the same three wrappers in the same order as
- * every other settings family: the host outermost, the harvested settings
- * chrome inside it, and the platform page's own grant innermost.
- *
  * THE GRANTS ARE THE PLATFORM PAGES', ONE FOR ONE, AND THEY DISAGREE WITH EACH
  * OTHER. Plans carried `organization:view`, Usage carried `cost:view`, and
  * Subscription carried nothing at all. The asymmetry is carried rather than
@@ -18,39 +14,30 @@ import { billingScreens } from "@langwatch/enterprise-billing-web/screens/billin
 import type { ComponentType } from "react";
 
 import type { UiPageLoader, UiPageLoaderRegistry } from "../../../../behavior/ui-page-loaders";
-import {
-  UiPageForbidden,
-  UiPageLoading,
-  UiPageNotFound,
-} from "../../../../ui/elements/ui-page-fallbacks";
-import { withUiPageGuard } from "../../../../ui/sections/ui-page-guard";
-import { withUiSettingsLayout } from "../../../../ui/sections/ui-settings-layout";
-import {
-  PLANS_PAGE_PERMISSION,
-  USAGE_PAGE_PERMISSION,
-} from "../../behavior/billing-host.adapter";
-import { withBillingHost } from "./billing-host-provider";
+import { uiPage } from "../../../../ui/sections/ui-page";
+import { BillingHost } from "./billing-host";
 
-const FALLBACKS = {
-  loading: UiPageLoading,
-  notFound: UiPageNotFound,
-  forbidden: UiPageForbidden,
-};
+/** The grant the plans page asked for, unchanged. */
+const PLANS_PAGE_PERMISSION = "organization:view";
+/** The grant the usage page asked for, unchanged. */
+const USAGE_PAGE_PERMISSION = "cost:view";
 
 function billingPage(
   screen: () => Promise<{ default: ComponentType }>,
   displayName: string,
   permission?: string,
 ): UiPageLoader {
-  return async () => {
-    const module = await screen();
-    const guarded = withUiPageGuard({
-      ...(permission ? { permission } : {}),
-      fallbacks: FALLBACKS,
-    })(module.default as ComponentType);
-    guarded.displayName = displayName;
-    return { default: withBillingHost(withUiSettingsLayout(guarded)) };
-  };
+  return uiPage({
+    screen: async () => {
+      const module = await screen();
+      const Component = module.default as ComponentType & { displayName?: string };
+      Component.displayName = displayName;
+      return { default: Component };
+    },
+    host: BillingHost,
+    settingsLayout: true,
+    permission,
+  });
 }
 
 export const billingPageLoaders: UiPageLoaderRegistry = {

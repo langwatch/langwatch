@@ -175,8 +175,7 @@ packages/enterprise/
 ├── src/                      # portable enterprise catalogue
 ├── composition/
 │   ├── api/                  # @langwatch/enterprise-api
-│   ├── worker/               # @langwatch/enterprise-worker
-│   └── web/                  # @langwatch/enterprise-web
+│   └── worker/               # @langwatch/enterprise-worker
 └── features/<feature>/
     ├── feature.json
     ├── contract/
@@ -205,16 +204,17 @@ Licensing remains a source of entitlement information as decided by the
 it does not replace the provider-neutral plan decision or make SaaS depend on a
 signed self-host license.
 
-Each application gets one convenient enterprise composition import without
-collapsing runtime graphs. `@langwatch/enterprise-api` composes enterprise API
-installers, `@langwatch/enterprise-worker` composes background installers, and
-`@langwatch/enterprise-web` composes browser installers. Each is a physical
-workspace package, exports a composition class with static `create`, and may
-depend only on enterprise feature surfaces valid for that runtime. The API
-composition package cannot import enterprise web or worker implementations;
-the corresponding restrictions apply to the other two. Applications import
-their one matching composition package rather than maintaining independent
-lists of every enterprise feature.
+Each backend application gets one convenient enterprise composition import
+without collapsing runtime graphs. `@langwatch/enterprise-api` composes
+enterprise API installers and `@langwatch/enterprise-worker` composes
+background installers. Each is a physical workspace package, exports a
+composition class with static `create`, and may depend only on enterprise
+feature surfaces valid for that runtime. The API composition package cannot
+import enterprise worker implementations, and worker cannot import API's.
+Applications import their one matching composition package rather than
+maintaining independent lists of every enterprise feature. Browser enterprise
+screens have no composition package of their own: `apps/ui`'s own feature
+folders mount them directly, the same way every other feature is mounted.
 
 Enterprise feature packages use names such as
 `@langwatch/enterprise-<feature>-contract` and obey the same version-0
@@ -259,15 +259,10 @@ The UI also stops importing the server router to infer the complete tRPC
 surface. Browser-facing inputs, outputs and client capabilities must be
 portable contracts rather than declarations that pull the API implementation
 graph into the UI. Feature-owned procedures expose these schemas and types from
-their feature contract. Legacy application procedures that have not yet moved
-to a feature use a temporary `@langwatch/platform-api-contract` package. The
-tRPC router implementation remains in `apps/api`; the temporary contract
-package owns no router or handler. Its portable procedure type map is either
-declared directly or produced as a checked-in generated artifact, and a
-conformance test compares that map with the implemented router so the two
-cannot silently drift. It is deleted after its last legacy procedure moves.
-Existing whole-router inference is a migration seam, not an accepted cross-app
-boundary, and must be removed before `platform/app` is deleted.
+their feature contract. The temporary `@langwatch/platform-api-contract`
+package was deleted on 2026-09-03 after its last legacy procedure moved; the
+browser types its client from `@langwatch/platform-api/app-trpc/types`, which
+supersedes the "whole-router inference is a migration seam" clause.
 
 ### Prisma becomes an owned infrastructure client package
 

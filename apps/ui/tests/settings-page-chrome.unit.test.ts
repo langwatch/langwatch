@@ -156,10 +156,10 @@ describe("the pages under /settings", () => {
         const wrapped = [...settingsRouteSections().values()].filter(
           (source) =>
             source.includes(`"${moduleSpecifier}"`) &&
-            // The open parenthesis is what separates APPLYING the wrapper from
-            // merely importing it — the same distinction `<SettingsLayout` drew
-            // on the legacy side, where an import line could never match it.
-            source.includes("withUiSettingsLayout("),
+            // `settingsLayout: true` is what `uiPage()` reads to apply the
+            // chrome — the same distinction `<SettingsLayout` drew on the
+            // legacy side, where an import line could never match it.
+            source.includes("settingsLayout: true"),
         );
         expect(wrapped).toHaveLength(1);
         return;

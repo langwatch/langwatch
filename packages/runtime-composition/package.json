@@ -2,7 +2,7 @@
   "name": "@langwatch/runtime-composition",
   "version": "0.1.0",
   "private": true,
-  "description": "Portable typed capability graphs, feature installation, and runtime resource ownership.",
+  "description": "Ordered ownership of process resources, closed once in reverse order.",
   "license": "MIT",
   "files": [
     "src"

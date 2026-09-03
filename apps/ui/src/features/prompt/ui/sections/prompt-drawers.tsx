@@ -8,6 +8,7 @@
 
 import { PromptListDrawer as PromptList } from "@langwatch/prompt-web/drawers";
 
-import { withPromptHost } from "./prompt-host-provider";
+import { withHost } from "../../../../ui/sections/ui-page";
+import { PromptHost } from "./prompt-host";
 
-export const PromptListDrawer = withPromptHost(PromptList);
+export const PromptListDrawer = withHost(PromptHost, PromptList);

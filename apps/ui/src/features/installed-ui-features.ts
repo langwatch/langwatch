@@ -142,27 +142,3 @@ export const installedUiFeatures: UiFeatureInstall = {
   session: useBrowserUiSession,
 };
 
-/**
- * The host's install, over this package's own.
- *
- * Additive where a list makes that meaningful and last-wins where one answer is
- * all there is: a host that brings its own toaster gets its own toaster, and a
- * host that brings its own loader for a key this package also serves wins the
- * key. The host is the more specific composition, so it is the one that decides
- * — the merge inside `createUiApplication` then puts the result ahead of the
- * host's own legacy registry, which is a different question and answered there.
- */
-export function mergeUiFeatureInstalls(
-  installed: UiFeatureInstall,
-  host: UiFeatureInstall = {},
-): UiFeatureInstall {
-  return {
-    loaders: { ...installed.loaders, ...host.loaders },
-    apis: [...(installed.apis ?? []), ...(host.apis ?? [])],
-    capabilities: { ...installed.capabilities, ...host.capabilities },
-    ...((host.transport ?? installed.transport)
-      ? { transport: host.transport ?? installed.transport }
-      : {}),
-    ...((host.session ?? installed.session) ? { session: host.session ?? installed.session } : {}),
-  };
-}

@@ -7,35 +7,18 @@
  * a redirect row in the table, which is what a page whose whole body was a
  * `router.replace` should have been all along.
  *
- * Each page is wrapped twice, and the order matters. The host provider is
- * OUTSIDE the guard: a refusal renders the guard's own fallback, which asks
- * nothing of the gateway host, but a page that opens needs the host mounted
- * above it before its first render. Inside that, the guard states the policy
- * the two platform higher-order components used to carry — the page's flag
- * where it has one, then the grant — with the flag reading as a 404 for
- * everyone before any permission is considered.
- *
  * THE PERMISSIONS ARE THE PLATFORM PAGES', ONE FOR ONE. The webhooks page is
  * the one with none, and that is not an oversight: it opened for anyone in the
  * organization, showed the Enterprise upsell to a plan without the entitlement,
  * and asked `webhookEndpoints:manage` for its own controls. Adding a view grant
  * here would refuse readers the platform page admitted.
- *
- * The wrapping happens once per lazy load rather than once per render: React
- * Router caches what a `lazy` resolves to, so the component identity below is
- * stable for the life of the route.
  */
 
 import type { ComponentType } from "react";
 import { gatewayScreens, type GatewayScreenName } from "@langwatch/gateway-web/screens/gateway";
 import type { UiPageLoader, UiPageLoaderRegistry } from "../../../../behavior/ui-page-loaders";
-import {
-  UiPageForbidden,
-  UiPageLoading,
-  UiPageNotFound,
-} from "../../../../ui/elements/ui-page-fallbacks";
-import { withUiPageGuard } from "../../../../ui/sections/ui-page-guard";
-import { withGatewayHost } from "./gateway-host-provider";
+import { uiPage } from "../../../../ui/sections/ui-page";
+import { GatewayHost } from "./gateway-host";
 
 /**
  * Routing policies are the one gateway page behind a flag, and it is the
@@ -45,23 +28,15 @@ import { withGatewayHost } from "./gateway-host-provider";
  */
 const ROUTING_POLICIES_FLAG = "release_ui_ai_governance_enabled";
 
-const FALLBACKS = {
-  loading: UiPageLoading,
-  notFound: UiPageNotFound,
-  forbidden: UiPageForbidden,
-};
-
 function gatewayPage(
   screen: GatewayScreenName,
   policy: { permission?: string; flags?: readonly string[] } = {},
 ): UiPageLoader {
-  return async () => {
-    const module = await gatewayScreens[screen]();
-    const guarded = withUiPageGuard({ ...policy, fallbacks: FALLBACKS })(
-      module.default as ComponentType,
-    );
-    return { default: withGatewayHost(guarded) };
-  };
+  return uiPage({
+    screen: async () => ({ default: (await gatewayScreens[screen]()).default as ComponentType }),
+    host: GatewayHost,
+    ...policy,
+  });
 }
 
 export const gatewayPageLoaders: UiPageLoaderRegistry = {

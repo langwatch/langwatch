@@ -9,12 +9,6 @@
  * screen is told rather than having to read the address. That is the shape the
  * automations family established for its four tabs.
  *
- * Each page is wrapped twice, and the order matters. The host provider is
- * OUTSIDE the guard: a refusal renders the guard's own fallback, which asks
- * nothing of the Ops host, but a page that opens needs the host mounted above it
- * before its first render. Inside that, the guard states the policy the platform
- * page shells carried.
- *
  * THE POLICY IS THE PLATFORM SHELLS', ONE FOR ONE, AND IT IS TWO POLICIES.
  * `OpsPageShell` gated the workspace on the live `ops.getScope` probe and
  * `BackofficeShell` gated the Backoffice on `user.isAdmin`, decoupled on purpose
@@ -24,63 +18,43 @@
  * and not the second sees every Ops page and is refused every Backoffice one.
  *
  * WHAT DOES NOT TRAVEL is the redirect. Both platform shells pushed a denied
- * reader to `/`; the guard renders a refusal in place instead, which is what
- * every family before this one did and what a page guard is for — a redirect
+ * reader to `/`; the guard renders a refusal in place instead — a redirect
  * hides from the reader that the address exists and they may not see it.
  *
  * `DashboardLayout` and `SettingsLayout` were the other half of those shells and
  * do not travel either: chrome belongs to the route tree.
- *
- * The wrapping happens once per lazy load rather than once per render: React
- * Router caches what a `lazy` resolves to, so the component identity below is
- * stable for the life of the route.
  */
 
 import { opsScreens, type BackofficeResource } from "@langwatch/ops-web/screens/ops";
 import type { ComponentType } from "react";
 import type { UiPageLoader, UiPageLoaderRegistry } from "../../../../behavior/ui-page-loaders";
-import {
-  UiPageForbidden,
-  UiPageLoading,
-  UiPageNotFound,
-} from "../../../../ui/elements/ui-page-fallbacks";
-import { withUiPageGuard } from "../../../../ui/sections/ui-page-guard";
-import { OPS_MANAGE_PERMISSION, OPS_VIEW_PERMISSION } from "../../behavior/ops-host.adapter";
-import { withOpsHost } from "./ops-host-provider";
-
-const FALLBACKS = {
-  loading: UiPageLoading,
-  notFound: UiPageNotFound,
-  forbidden: UiPageForbidden,
-};
+import { uiPage } from "../../../../ui/sections/ui-page";
+import { OPS_MANAGE_PERMISSION, OPS_VIEW_PERMISSION, OpsHost } from "./ops-host";
 
 type OpsScreenName = keyof typeof opsScreens;
 
 /** One Ops page: the host outside, the operator grant inside. */
 function opsPage(screen: OpsScreenName): UiPageLoader {
-  return async () => {
-    const module = await opsScreens[screen]();
-    const guarded = withUiPageGuard({
-      permission: OPS_VIEW_PERMISSION,
-      fallbacks: FALLBACKS,
-    })(module.default as ComponentType);
-    return { default: withOpsHost(guarded) };
-  };
+  return uiPage({
+    screen: async () => ({ default: (await opsScreens[screen]()).default as ComponentType }),
+    host: OpsHost,
+    permission: OPS_VIEW_PERMISSION,
+  });
 }
 
 /** One Backoffice resource, behind the narrower grant. */
 function backofficePage(resource: BackofficeResource): UiPageLoader {
-  return async () => {
-    const module = await opsScreens.backoffice();
-    const Screen = module.default as ComponentType<{ resource?: BackofficeResource }>;
-    const OnResource = () => <Screen resource={resource} />;
-    OnResource.displayName = `BackofficePage(${resource})`;
-    const guarded = withUiPageGuard({
-      permission: OPS_MANAGE_PERMISSION,
-      fallbacks: FALLBACKS,
-    })(OnResource);
-    return { default: withOpsHost(guarded) };
-  };
+  return uiPage({
+    screen: async () => {
+      const module = await opsScreens.backoffice();
+      const Screen = module.default as ComponentType<{ resource?: BackofficeResource }>;
+      const OnResource = () => <Screen resource={resource} />;
+      OnResource.displayName = `BackofficePage(${resource})`;
+      return { default: OnResource };
+    },
+    host: OpsHost,
+    permission: OPS_MANAGE_PERMISSION,
+  });
 }
 
 export const opsPageLoaders: UiPageLoaderRegistry = {

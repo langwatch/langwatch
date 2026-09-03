@@ -55,7 +55,7 @@ import {
 } from "@langwatch/scenario-web/drawers";
 
 import { fromDrawerAddress } from "../../../drawers";
-import { withScenarioDrawerHost } from "./host-provider";
+import { withScenarioDrawerHost } from "./host";
 
 export const AgentCodeEditorDrawer = withScenarioDrawerHost(
   fromDrawerAddress(AgentCodeEditorDrawerFromUrl),

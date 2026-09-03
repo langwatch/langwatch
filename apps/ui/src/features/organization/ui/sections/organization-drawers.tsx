@@ -1,8 +1,8 @@
 /**
  * The organization drawers, mounted in the host their package asks for.
  *
- * A DRAWER IS NOT A PAGE. The Members and Teams screens are wrapped in
- * `withOrganizationHost` by the route they answer; these two open OVER whatever
+ * A DRAWER IS NOT A PAGE. The Members and Teams screens are wrapped in the
+ * organization host by the route they answer; these two open OVER whatever
  * address the reader is on — the command palette opens `inviteMember` from
  * anywhere in the product — so the host travels with the drawer rather than
  * with the address. Both read it: the invite form asks for the organization,
@@ -22,8 +22,9 @@ import {
 } from "@langwatch/organization-web/drawers";
 
 import { fromDrawerAddress } from "../../../drawers";
-import { withOrganizationHost } from "./organization-host-provider";
+import { withHost } from "../../../../ui/sections/ui-page";
+import { OrganizationHost } from "./organization-host";
 
-export const InviteMemberDrawer = withOrganizationHost(fromDrawerAddress(InviteMember));
+export const InviteMemberDrawer = withHost(OrganizationHost, fromDrawerAddress(InviteMember));
 
-export const CreateTeamDrawer = withOrganizationHost(fromDrawerAddress(CreateTeam));
+export const CreateTeamDrawer = withHost(OrganizationHost, fromDrawerAddress(CreateTeam));

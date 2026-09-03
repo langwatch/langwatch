@@ -145,22 +145,52 @@ vi.mock("@langwatch/ops-web/drawers", async () => {
 const passThroughHost = vi.hoisted(
   () => () =>
     ({
-      withScenarioHost: <P,>(Component: P) => Component,
-      withScenarioDrawerHost: <P,>(Component: P) => Component,
       withWorkflowHost: <P,>(Component: P) => Component,
-      withOrganizationHost: <P,>(Component: P) => Component,
-      withOpsHost: <P,>(Component: P) => Component,
-      withGatewayHost: <P,>(Component: P) => Component,
-      withAutomationsHost: <P,>(Component: P) => Component,
+      WorkflowHost: ({ children }: { children: ReactNode }) => children,
     }) as Record<string, unknown>,
 );
 
-vi.mock("../src/features/simulations/ui/sections/host-provider", passThroughHost);
-vi.mock("../src/features/workflows/ui/sections/workflows-host-provider", passThroughHost);
-vi.mock("../src/features/organization/ui/sections/organization-host-provider", passThroughHost);
-vi.mock("../src/features/ops/ui/sections/ops-host-provider", passThroughHost);
-vi.mock("../src/features/gateway/ui/sections/gateway-host-provider", passThroughHost);
-vi.mock("../src/features/automations/ui/sections/automations-host-provider", passThroughHost);
+/** The folded hosts: a component now, not a HOC, so the pass-through renders children. */
+const passThroughHostComponent = vi.hoisted(
+  () => () =>
+    ({
+      GatewayHost: ({ children }: { children: ReactNode }) => children,
+      OrganizationHost: ({ children }: { children: ReactNode }) => children,
+      AutomationsHost: ({ children }: { children: ReactNode }) => children,
+    }) as Record<string, unknown>,
+);
+
+/**
+ * Simulations: `ScenarioHost` is a component now, `withScenarioDrawerHost`
+ * stays a HOC — a drawer mounts its own host beside the page's, not inside it.
+ */
+const passThroughScenarioHost = vi.hoisted(
+  () => () =>
+    ({
+      ScenarioHost: ({ children }: { children: ReactNode }) => children,
+      withScenarioDrawerHost: <P,>(Component: P) => Component,
+    }) as Record<string, unknown>,
+);
+
+/**
+ * Ops: its module also exports the two permission constants its own routes
+ * file reads, which a full mock must still answer.
+ */
+const passThroughOpsHost = vi.hoisted(
+  () => () =>
+    ({
+      OpsHost: ({ children }: { children: ReactNode }) => children,
+      OPS_VIEW_PERMISSION: "ops:view",
+      OPS_MANAGE_PERMISSION: "ops:manage",
+    }) as Record<string, unknown>,
+);
+
+vi.mock("../src/features/simulations/ui/sections/host", passThroughScenarioHost);
+vi.mock("../src/features/workflows/ui/sections/workflows-host", passThroughHost);
+vi.mock("../src/features/organization/ui/sections/organization-host", passThroughHostComponent);
+vi.mock("../src/features/ops/ui/sections/ops-host", passThroughOpsHost);
+vi.mock("../src/features/gateway/ui/sections/gateway-host", passThroughHostComponent);
+vi.mock("../src/features/automations/ui/sections/automations-host", passThroughHostComponent);
 
 import { installedUiDrawers } from "../src/features/installed-ui-drawers";
 

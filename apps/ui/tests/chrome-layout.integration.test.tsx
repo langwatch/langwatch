@@ -117,10 +117,6 @@ vi.mock("../src/features/traces", () => ({
   UiTraceDrawerMount: () => null,
 }));
 
-vi.mock("../src/features/installed-ui-page-keys", () => ({
-  isUiInstalledPage: (key: string) => key === "pages/served-here",
-}));
-
 // The other composed registry the layout route reads. Both of them import every
 // feature in the package, which is the graph this suite is deliberately not
 // about — the drawer half has its own suite in `chrome-drawer.integration`.
@@ -144,7 +140,6 @@ afterEach(() => cleanup());
 const loaders = {
   "features/chrome/UiAppChrome": () => import("../src/features/chrome/ui/sections/ui-app-chrome"),
   "pages/served-here": async () => ({ default: () => <div>packaged screen</div> }),
-  "pages/served-by-platform": async () => ({ default: () => <div>legacy screen</div> }),
 };
 
 function renderAt(path: string) {
@@ -152,10 +147,7 @@ function renderAt(path: string) {
     table: [
       {
         page: "features/chrome/UiAppChrome",
-        children: [
-          { path: "/here", page: "pages/served-here" },
-          { path: "/legacy", page: "pages/served-by-platform" },
-        ],
+        children: [{ path: "/here", page: "pages/served-here" }],
       },
     ],
     loaders,
@@ -181,18 +173,6 @@ describe("given the chrome layout route", () => {
       expect(screen.getByTestId("product-sidebar")).toBeTruthy();
       expect(screen.getByTestId("shell-content-column")).toBeTruthy();
       expect(screen.getByLabelText("Settings")).toBeTruthy();
-    });
-  });
-
-  describe("when the matched page is one platform/app still serves", () => {
-    it("renders the page bare, so its own DashboardLayout is the only chrome", async () => {
-      renderAt("/legacy");
-
-      await waitFor(() => {
-        expect(screen.getByText("legacy screen")).toBeTruthy();
-      });
-      expect(screen.queryByTestId("product-sidebar")).toBeNull();
-      expect(screen.queryByTestId("shell-content-column")).toBeNull();
     });
   });
 });

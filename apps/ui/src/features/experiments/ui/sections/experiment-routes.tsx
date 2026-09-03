@@ -1,12 +1,7 @@
 /**
  * Which page keys the experiment screens answer, and what they are wrapped in.
  *
- * FIVE KEYS, FOUR SCREENS. `/:project/experiments` is the list — and its key
- * used to resolve a NAMED export (`GuardedExperimentsPage`) of the evaluations
- * module, because the wrapper `withPermissionGuard` produced was what that
- * address served. The wrapper is the route's now, so the module has a plain
- * default and the key names it; nothing about the URL changed.
- *
+ * FIVE KEYS, FOUR SCREENS. `/:project/experiments` is the list;
  * `/:project/experiments/workbench` creates an experiment and forwards to its
  * slug, `/:project/experiments/workbench/:slug` IS the workbench, and
  * `/:project/experiments/:experiment` is the read-only view for a legacy run.
@@ -20,75 +15,41 @@
  * of this family's own would have split the tRPC cache and left those hooks
  * asking a host nothing mounted. The copy permission is told to the host rather
  * than assumed: this family's replicate dialog asks `evaluations:manage`.
- *
- * ONLY THE LIST HAD A GUARD, and the asymmetry is the platform pages' own:
- * `evaluations.tsx` was `withPermissionGuard("experiments:view")` and the other
- * four were wrapped in nothing. Inventing a guard is a change to who can reach
- * a page, which a page move does not own.
- *
- * `layoutComponent: DashboardLayout` was the other half of the list page's call
- * and does not travel — chrome belongs to the route tree.
  */
 
 import {
   experimentScreens,
   EXPERIMENTS_PAGE_PERMISSION,
 } from "@langwatch/experiment-web/screens/experiments";
-import type { ComponentType } from "react";
+import type { ReactNode } from "react";
 
-import type { UiPageLoader, UiPageLoaderRegistry } from "../../../../behavior/ui-page-loaders";
-import {
-  UiPageForbidden,
-  UiPageLoading,
-  UiPageNotFound,
-} from "../../../../ui/elements/ui-page-fallbacks";
-import { withUiPageGuard } from "../../../../ui/sections/ui-page-guard";
-import { withWorkflowHost } from "../../../workflows/ui/sections/workflows-host-provider";
-
-const FALLBACKS = {
-  loading: UiPageLoading,
-  notFound: UiPageNotFound,
-  forbidden: UiPageForbidden,
-};
+import type { UiPageLoaderRegistry } from "../../../../behavior/ui-page-loaders";
+import { uiPage } from "../../../../ui/sections/ui-page";
+import { WorkflowHost } from "../../../workflows/ui/sections/workflows-host";
 
 /** The grant this family's replicate picker asks about, per target project. */
 const EXPERIMENT_COPY_PERMISSION = "evaluations:manage";
 
-function experimentPage(
-  screen: () => Promise<{ default: ComponentType }>,
-  { permission, displayName }: { permission?: string; displayName: string },
-): UiPageLoader {
-  return async () => {
-    const module = await screen();
-    const guarded = withUiPageGuard({
-      ...(permission ? { permission } : {}),
-      fallbacks: FALLBACKS,
-    })(module.default);
-    guarded.displayName = displayName;
-    return {
-      default: withWorkflowHost(guarded, { copyPermission: EXPERIMENT_COPY_PERMISSION }),
-    };
-  };
+function ExperimentWorkflowHost({ children }: { children: ReactNode }) {
+  return <WorkflowHost copyPermission={EXPERIMENT_COPY_PERMISSION}>{children}</WorkflowHost>;
 }
 
+const experimentPage = (
+  screen: (typeof experimentScreens)[keyof typeof experimentScreens],
+  permission?: string,
+) => uiPage({ screen, host: ExperimentWorkflowHost, permission });
+
 export const experimentPageLoaders: UiPageLoaderRegistry = {
-  "pages/[project]/experiments/index": experimentPage(experimentScreens.experiments, {
-    permission: EXPERIMENTS_PAGE_PERMISSION,
-    displayName: "ExperimentsPage",
-  }),
-  "pages/[project]/experiments/[experiment]": experimentPage(
-    experimentScreens.experimentDetail,
-    { displayName: "ExperimentPage" },
+  // Only the list had a guard: `evaluations.tsx` was `withPermissionGuard("experiments:view")`.
+  "pages/[project]/experiments/index": experimentPage(
+    experimentScreens.experiments,
+    EXPERIMENTS_PAGE_PERMISSION,
   ),
-  "pages/[project]/experiments/workbench/index": experimentPage(
-    experimentScreens.newWorkbench,
-    { displayName: "NewExperimentWorkbench" },
-  ),
-  "pages/[project]/experiments/workbench/[slug]": experimentPage(experimentScreens.workbench, {
-    displayName: "ExperimentsWorkbenchPage",
-  }),
+  // The other four were wrapped in nothing; inventing a guard changes who can reach a page.
+  "pages/[project]/experiments/[experiment]": experimentPage(experimentScreens.experimentDetail),
+  "pages/[project]/experiments/workbench/index": experimentPage(experimentScreens.newWorkbench),
+  "pages/[project]/experiments/workbench/[slug]": experimentPage(experimentScreens.workbench),
   "pages/[project]/evaluations/wizard/[slug]": experimentPage(
     experimentScreens.evaluationWizardRedirect,
-    { displayName: "EvaluationWizardRedirect" },
   ),
 };

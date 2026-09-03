@@ -5,17 +5,10 @@
  * exposes eleven loaders under names of its own. This is the map between them,
  * and the only place either vocabulary meets the other.
  *
- * Each page is wrapped twice, and the order matters. The host provider is
- * OUTSIDE the guard: a refusal renders the guard's own fallback, which asks
- * nothing of the governance host, but a page that opens needs the host mounted
- * above it before its first render. Inside that, the guard states the policy
- * the two platform higher-order components used to carry — the section flag
- * first, then the page's own flag where it has one, then the grant — with the
- * flag reading as a 404 for everyone before any permission is considered.
- *
- * The wrapping happens once per lazy load rather than once per render: React
- * Router caches what a `lazy` resolves to, so the component identity below is
- * stable for the life of the route.
+ * The guard states the policy the two platform higher-order components used to
+ * carry — the section flag first, then the page's own flag where it has one,
+ * then the grant — with the flag reading as a 404 for everyone before any
+ * permission is considered.
  */
 
 import type { ComponentType } from "react";
@@ -24,13 +17,8 @@ import {
   type GovernanceScreenName,
 } from "@langwatch/enterprise-governance-web/screens/governance";
 import type { UiPageLoader, UiPageLoaderRegistry } from "../../../../behavior/ui-page-loaders";
-import {
-  UiPageForbidden,
-  UiPageLoading,
-  UiPageNotFound,
-} from "../../../../ui/elements/ui-page-fallbacks";
-import { withUiPageGuard } from "../../../../ui/sections/ui-page-guard";
-import { withGovernanceHost } from "./governance-host-provider";
+import { uiPage } from "../../../../ui/sections/ui-page";
+import { GovernanceHost } from "./governance-host";
 
 /** Every governance page is behind this, and behind `governance:view`. */
 const GOVERNANCE_SECTION_FLAG = "release_ui_ai_governance_enabled";
@@ -40,22 +28,13 @@ const BILLED_COST_FLAG = "release_ui_governance_billed_cost_enabled";
 
 const GOVERNANCE_PERMISSION = "governance:view";
 
-const FALLBACKS = {
-  loading: UiPageLoading,
-  notFound: UiPageNotFound,
-  forbidden: UiPageForbidden,
-};
-
 function governancePage(screen: GovernanceScreenName, flags: readonly string[]): UiPageLoader {
-  return async () => {
-    const module = await governanceScreens[screen]();
-    const guarded = withUiPageGuard({
-      flags,
-      permission: GOVERNANCE_PERMISSION,
-      fallbacks: FALLBACKS,
-    })(module.default as ComponentType);
-    return { default: withGovernanceHost(guarded) };
-  };
+  return uiPage({
+    screen: async () => ({ default: (await governanceScreens[screen]()).default as ComponentType }),
+    host: GovernanceHost,
+    permission: GOVERNANCE_PERMISSION,
+    flags,
+  });
 }
 
 const SECTION = [GOVERNANCE_SECTION_FLAG] as const;

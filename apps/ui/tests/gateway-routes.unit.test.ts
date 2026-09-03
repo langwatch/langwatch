@@ -56,7 +56,7 @@ describe("given the gateway pages this package now serves", () => {
       // Both wrappers are named, and the order is the load-bearing part: the
       // host is outside the guard, so a refusal renders without one and a page
       // that opens has one.
-      expect(module.default.displayName).toContain("withGatewayHost");
+      expect(module.default.displayName).toContain("GatewayHost");
       expect(module.default.displayName).toContain("withUiPageGuard");
     });
   });

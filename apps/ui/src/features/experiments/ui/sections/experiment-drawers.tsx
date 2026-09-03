@@ -29,7 +29,7 @@ import {
   type ComparisonLeaderboardDrawerProps,
 } from "@langwatch/experiment-web/drawers";
 
-import { withWorkflowHost } from "../../../workflows/ui/sections/workflows-host-provider";
+import { withWorkflowHost } from "../../../workflows/ui/sections/workflows-host";
 
 /** The grant this family's replicate picker asks about, per target project. */
 const EXPERIMENT_COPY_PERMISSION = "evaluations:manage";

@@ -17,7 +17,8 @@
 import { RoutingPolicyDrawer as RoutingPolicy } from "@langwatch/gateway-web/drawers";
 import { useDrawer } from "@langwatch/ui-drawer";
 
-import { withGatewayHost } from "./gateway-host-provider";
+import { withHost } from "../../../../ui/sections/ui-page";
+import { GatewayHost } from "./gateway-host";
 
 /** The four scalars the address can carry, as the editor names them. */
 type RoutingPolicyAddress = {
@@ -41,4 +42,4 @@ function RoutingPolicyFromAddress(address: RoutingPolicyAddress) {
   );
 }
 
-export const RoutingPolicyDrawer = withGatewayHost(RoutingPolicyFromAddress);
+export const RoutingPolicyDrawer = withHost(GatewayHost, RoutingPolicyFromAddress);

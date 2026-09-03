@@ -23,12 +23,14 @@
  */
 
 import { ChakraProvider, defaultSystem } from "@chakra-ui/react";
-import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
+import { QueryClient, QueryClientProvider, useQueryClient } from "@tanstack/react-query";
 import { act, cleanup, render, screen, waitFor } from "@testing-library/react";
 import { useMemo, useState, type ReactNode } from "react";
 import { createMemoryRouter, RouterProvider } from "react-router";
+import { navigationApi } from "@langwatch/navigation-web/screens/landing";
 import { WithStubNavigationHost } from "@langwatch/navigation-web/testing";
 import { afterEach, beforeAll, describe, expect, it, vi } from "vitest";
+import { createUiFeatureApiClient } from "../src/behavior/ui-feature-transport";
 
 /**
  * Enough workspace for the trace host to resolve the project in scope: it
@@ -79,16 +81,44 @@ vi.mock("@langwatch/trace-web/screens/traces", async () => {
   };
 });
 
+/** A desktop viewport: jsdom implements no `matchMedia`, and the real shell reads it. */
+function useDesktopViewport() {
+  window.matchMedia = ((query: string) => ({
+    matches: query.includes("min-width"),
+    media: query,
+    onchange: null,
+    addEventListener: () => void 0,
+    removeEventListener: () => void 0,
+    addListener: () => void 0,
+    removeListener: () => void 0,
+    dispatchEvent: () => false,
+  })) as unknown as typeof window.matchMedia;
+}
+
+/**
+ * The chrome layout now always draws its real shell around a matched page, so
+ * `NavigationShell`'s own reads — the usage meter, the product flags — need a
+ * client to mount under, same as `chrome-layout.integration.test.tsx`.
+ */
+function ShellTransport({ children }: { children: ReactNode }) {
+  useDesktopViewport();
+  const queryClient = useQueryClient();
+  const [client] = useState(() => createUiFeatureApiClient());
+  return (
+    <navigationApi.Provider client={client} queryClient={queryClient}>
+      {children}
+    </navigationApi.Provider>
+  );
+}
+
 vi.mock("../src/features/navigation", () => ({
   NavigationHostSection: ({ children }: { children: ReactNode }) => (
-    <WithStubNavigationHost readings={SHELL_READINGS}>
-      <Capabilities>{children}</Capabilities>
-    </WithStubNavigationHost>
+    <ShellTransport>
+      <WithStubNavigationHost readings={SHELL_READINGS}>
+        <Capabilities>{children}</Capabilities>
+      </WithStubNavigationHost>
+    </ShellTransport>
   ),
-}));
-
-vi.mock("../src/features/installed-ui-page-keys", () => ({
-  isUiInstalledPage: () => false,
 }));
 
 vi.mock("../src/features/installed-ui-drawers", () => ({

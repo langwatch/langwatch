@@ -1,8 +1,8 @@
 /**
  * The Model Provider drawers, mounted in the host their package asks for.
  *
- * A DRAWER IS NOT A PAGE. The Model Costs screen is wrapped in
- * `withModelProviderHost` by the route it answers; the cost editor opens OVER
+ * A DRAWER IS NOT A PAGE. The Model Costs screen is wrapped in the model
+ * provider host by the route it answers; the cost editor opens OVER
  * whatever address the reader is on — the trace drawer's "this model has no
  * cost mapping" suggestion deep-links straight to it from the Trace Explorer —
  * so the host travels with the drawer rather than with the address.
@@ -22,7 +22,8 @@ import {
   LLMModelCostDrawer as LLMModelCost,
 } from "@langwatch/model-provider-web/drawers";
 
-import { withModelProviderHost } from "./model-provider-host-provider";
+import { withHost } from "../../../../ui/sections/ui-page";
+import { ModelProviderHost } from "./model-provider-host";
 
 /**
  * `llmModelCost`, as the address spells it.
@@ -33,7 +34,7 @@ import { withModelProviderHost } from "./model-provider-host-provider";
  * unmapped-cost suggestion writes so the form opens already filled in. None of
  * them means "add a rule", which is the address with no parameters at all.
  */
-export const LLMModelCostDrawer = withModelProviderHost(LLMModelCost);
+export const LLMModelCostDrawer = withHost(ModelProviderHost,LLMModelCost);
 
 /**
  * `defaultModelOverride`, as the address spells it.
@@ -43,7 +44,7 @@ export const LLMModelCostDrawer = withModelProviderHost(LLMModelCost);
  * itself reads the policy out of the same snapshot the table behind it already
  * holds, so opening it costs no round trip.
  */
-export const DefaultModelOverrideDrawer = withModelProviderHost(DefaultModelOverride);
+export const DefaultModelOverrideDrawer = withHost(ModelProviderHost,DefaultModelOverride);
 
 /**
  * `editModelProvider`, as the address spells it.
@@ -57,4 +58,4 @@ export const DefaultModelOverrideDrawer = withModelProviderHost(DefaultModelOver
  * only reaches a project through the scopes attached to it, so an organization
  * with no project can still configure one.
  */
-export const EditModelProviderDrawer = withModelProviderHost(EditModelProvider);
+export const EditModelProviderDrawer = withHost(ModelProviderHost,EditModelProvider);

@@ -19,6 +19,9 @@
 
 import type { ComponentType } from "react";
 
+/** The query parameter that names which drawer is open. */
+export const DRAWER_OPEN_PARAM = "drawer.open";
+
 /** Whether an address that named a drawer means it is open. */
 export function isDrawerOpenFromAddress(open: unknown): boolean {
   return open !== false && open !== void 0;

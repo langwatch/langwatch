@@ -8,6 +8,7 @@
 
 import { AnnotationScoreDrawer as ScoreEditor } from "@langwatch/annotation-web/screens/annotation-scores";
 
-import { withAnnotationScoresHost } from "./annotation-scores-host-provider";
+import { withHost } from "../../../../ui/sections/ui-page";
+import { AnnotationScoresHost } from "./annotation-scores-host";
 
-export const AnnotationScoreEditorDrawer = withAnnotationScoresHost(ScoreEditor);
+export const AnnotationScoreEditorDrawer = withHost(AnnotationScoresHost, ScoreEditor);

@@ -137,7 +137,7 @@ export type {
   UiFeatureInstall,
 } from "./ui/sections/ui-application";
 export { createUiApplication } from "./features/installed-ui-features.composition";
-export { installedUiFeatures, mergeUiFeatureInstalls } from "./features/installed-ui-features";
+export { installedUiFeatures } from "./features/installed-ui-features";
 export { createUiFeatureShell, type UiFeatureShellInstall } from "./ui/sections/ui-feature-shell";
 export {
   createUiInnerProvider,

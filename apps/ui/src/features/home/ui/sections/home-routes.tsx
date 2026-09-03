@@ -23,9 +23,10 @@
 import { projectHomeScreens } from "@langwatch/project-web/screens/home";
 import { useEffect, type ComponentType } from "react";
 
-import type { UiPageLoader, UiPageLoaderRegistry } from "../../../../behavior/ui-page-loaders";
+import type { UiPageLoaderRegistry } from "../../../../behavior/ui-page-loaders";
 import { useUiCapabilities } from "../../../../behavior/ui-capabilities";
-import { withProjectHomeHost } from "./home-host-provider";
+import { uiPage } from "../../../../ui/sections/ui-page";
+import { ProjectHomeHostSection } from "./home-host";
 
 /**
  * An internal path, and nothing else.
@@ -64,11 +65,11 @@ function withReturnToRedirect(Screen: ComponentType): ComponentType {
   return Mounted;
 }
 
-const projectHomePage: UiPageLoader = async () => {
-  const module = await projectHomeScreens.home();
-  return { default: withProjectHomeHost(withReturnToRedirect(module.default)) };
-};
-
 export const homePageLoaders: UiPageLoaderRegistry = {
-  "pages/[project]/index": projectHomePage,
+  "pages/[project]/index": uiPage({
+    screen: async () => ({
+      default: withReturnToRedirect((await projectHomeScreens.home()).default as ComponentType),
+    }),
+    host: ProjectHomeHostSection,
+  }),
 };

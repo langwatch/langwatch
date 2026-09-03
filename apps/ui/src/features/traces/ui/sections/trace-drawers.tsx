@@ -21,9 +21,10 @@ import {
 } from "@langwatch/trace-web/drawers";
 
 import { AddOrEditDatasetDrawer } from "../../../workflows/ui/sections/studio-host-drawers";
-import { withTraceHost } from "./host-provider";
+import { withHost } from "../../../../ui/sections/ui-page";
+import { TraceHost } from "./trace-host";
 
-const HostedAddDatasetRecord = withTraceHost(AddDatasetRecord);
+const HostedAddDatasetRecord = withHost(TraceHost, AddDatasetRecord);
 
 export function AddDatasetRecordDrawer(props: Omit<AddDatasetRecordDrawerProps, "DatasetEditor">) {
   return <HostedAddDatasetRecord {...props} DatasetEditor={AddOrEditDatasetDrawer} />;

@@ -17,7 +17,8 @@
 import { unsubscribeScreens } from "@langwatch/automation-web/screens/unsubscribe";
 import type { ComponentType } from "react";
 import { useUiCapabilities } from "../../../../behavior/ui-capabilities";
-import type { UiPageLoader, UiPageLoaderRegistry } from "../../../../behavior/ui-page-loaders";
+import type { UiPageLoaderRegistry } from "../../../../behavior/ui-page-loaders";
+import { uiPage } from "../../../../ui/sections/ui-page";
 
 /** Reads the token out of the address and hands it to the screen. */
 function withTokenFromAddress(Screen: ComponentType<{ token: string }>): ComponentType {
@@ -29,11 +30,11 @@ function withTokenFromAddress(Screen: ComponentType<{ token: string }>): Compone
   return OnToken;
 }
 
-const unsubscribePage: UiPageLoader = async () => {
-  const module = await unsubscribeScreens.unsubscribe();
-  return { default: withTokenFromAddress(module.default) };
-};
-
 export const unsubscribePageLoaders: UiPageLoaderRegistry = {
-  "pages/unsubscribe": unsubscribePage,
+  "pages/unsubscribe": uiPage({
+    screen: async () => {
+      const module = await unsubscribeScreens.unsubscribe();
+      return { default: withTokenFromAddress(module.default) };
+    },
+  }),
 };

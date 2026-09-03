@@ -1,7 +1,7 @@
 /**
  * The two project overlays, mounted in the host their package asks for.
  *
- * A DRAWER IS NOT A PAGE. The Teams page is wrapped in `withOrganizationHost`
+ * A DRAWER IS NOT A PAGE. The Teams page is wrapped in the organization host
  * by the route it answers; these two open OVER whatever address the reader is
  * on — `createProject` is opened from the Teams page, from the team form, and
  * from the CLI-auth screen, which is a different family's page entirely — so
@@ -37,8 +37,9 @@ import {
 } from "@langwatch/organization-web/drawers/project";
 
 import { fromDrawerAddress } from "../../../drawers";
-import { withOrganizationHost } from "../../../organization/ui/sections/organization-host-provider";
+import { withHost } from "../../../../ui/sections/ui-page";
+import { OrganizationHost } from "../../../organization/ui/sections/organization-host";
 
-export const CreateProjectDrawer = withOrganizationHost(fromDrawerAddress(CreateProject));
+export const CreateProjectDrawer = withHost(OrganizationHost, fromDrawerAddress(CreateProject));
 
-export const EditProjectDrawer = withOrganizationHost(fromDrawerAddress(EditProject));
+export const EditProjectDrawer = withHost(OrganizationHost, fromDrawerAddress(EditProject));

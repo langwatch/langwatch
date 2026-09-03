@@ -36,7 +36,7 @@ import {
 } from "@langwatch/evaluator-web/editor-drawers";
 import { PromptEditorDrawer as PromptEditor } from "@langwatch/prompt-web/components/prompts/PromptEditorDrawer";
 
-import { withWorkflowHost } from "./workflows-host-provider";
+import { withWorkflowHost } from "./workflows-host";
 
 export const AddOrEditDatasetDrawer = withWorkflowHost(AddOrEditDataset);
 export const UploadCSVDrawer = withWorkflowHost(UploadCSV);

@@ -62,7 +62,6 @@ import { NavigationShell, useNavigationTracking } from "@langwatch/navigation-we
 import { CurrentDrawer } from "@langwatch/ui-drawer";
 import { Outlet, useMatches } from "react-router";
 import { installedUiDrawers } from "../../../installed-ui-drawers";
-import { isUiInstalledPage } from "../../../installed-ui-page-keys";
 import { NavigationHostSection } from "../../../navigation";
 import { UiTraceDrawerMount } from "../../../traces";
 import { uiMatchedPageKey } from "../../../../ui/sections/ui-route-objects";
@@ -92,7 +91,7 @@ function UiAppChromeBody() {
   useNavigationTracking();
   const matches = useMatches();
   const page = uiMatchedPageKey(matches);
-  const servedHere = page !== void 0 && isUiInstalledPage(page);
+  const servedHere = page !== void 0;
 
   if (!servedHere) return <Outlet />;
 

@@ -47,7 +47,7 @@ describe("given the governance pages this package now serves", () => {
       // Both wrappers are named, and the order is the load-bearing part: the
       // host is outside the guard, so a refusal renders without one and a page
       // that opens has one.
-      expect(module.default.displayName).toContain("withGovernanceHost");
+      expect(module.default.displayName).toContain("withHost(GovernanceHost");
       expect(module.default.displayName).toContain("withUiPageGuard");
     });
   });

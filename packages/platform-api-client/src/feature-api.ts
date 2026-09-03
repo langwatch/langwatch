@@ -113,21 +113,3 @@ export function createFeatureApi<TMap extends FeatureApiMap>() {
  * travel in a single request. A second client would quietly split them.
  */
 export type FeatureApiClient<TMap extends FeatureApiMap> = TRPCUntypedClient<RouterFromMap<TMap>>;
-
-/**
- * Hands the shell's client to a feature's Provider.
- *
- * At runtime there is exactly one kind of untyped client: it dispatches on a
- * path string and knows nothing about router types. The cast exists only
- * because the shell's client is typed by the real `AppRouter` and a feature's
- * is typed by that feature's map. Keeping it in one named function is the point
- * — a cast at each mount site is a cast nobody reads.
- *
- * It disappears when `apps/api` owns the root router and the maps are generated
- * from it; see dev/docs/best_practices/feature-web-data-access.md.
- */
-export function asFeatureApiClient<TMap extends FeatureApiMap>(
-  client: unknown,
-): FeatureApiClient<TMap> {
-  return client as FeatureApiClient<TMap>;
-}

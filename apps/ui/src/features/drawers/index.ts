@@ -16,4 +16,8 @@
  */
 
 export { routeTraceDrawerForV2 } from "./model/ui-trace-drawer-routing";
-export { fromDrawerAddress, isDrawerOpenFromAddress } from "./model/ui-drawer-address";
+export {
+  DRAWER_OPEN_PARAM,
+  fromDrawerAddress,
+  isDrawerOpenFromAddress,
+} from "./model/ui-drawer-address";

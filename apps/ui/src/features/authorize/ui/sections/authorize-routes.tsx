@@ -6,9 +6,8 @@
  * NEITHER KEY CARRIES A PAGE-LEVEL GRANT, and that is the platform pages' policy
  * one for one. `/authorize` was `DashboardLayout` and a card; it refuses nothing,
  * because a reader without `project:update` is answered with an empty key by the
- * server rather than refused by the page — and refusing them outright would deny
- * a reader the product admits today. `/mcp/authorize` had no guard either: it
- * does its own session redirect, carrying the OAuth parameters through so the
+ * server rather than refused by the page. `/mcp/authorize` had no guard either:
+ * it does its own session redirect, carrying the OAuth parameters through so the
  * reader lands back on the grant they were asked for, which a permission guard
  * would pre-empt by refusing before the redirect could run.
  *
@@ -20,20 +19,17 @@
  */
 
 import { authorizeScreens } from "@langwatch/api-key-web/screens/authorize";
-import type { UiPageLoader, UiPageLoaderRegistry } from "../../../../behavior/ui-page-loaders";
-import { withAuthorizeHost } from "./authorize-host-provider";
-
-const authorizePage: UiPageLoader = async () => {
-  const module = await authorizeScreens.authorize();
-  return { default: withAuthorizeHost(module.default) };
-};
-
-const mcpAuthorizePage: UiPageLoader = async () => {
-  const module = await authorizeScreens.mcpAuthorize();
-  return { default: withAuthorizeHost(module.default) };
-};
+import type { UiPageLoaderRegistry } from "../../../../behavior/ui-page-loaders";
+import { uiPage } from "../../../../ui/sections/ui-page";
+import { AuthorizeHost } from "./authorize-host";
 
 export const authorizePageLoaders: UiPageLoaderRegistry = {
-  "pages/authorize": authorizePage,
-  "pages/mcp/authorize": mcpAuthorizePage,
+  "pages/authorize": uiPage({
+    screen: async () => ({ default: (await authorizeScreens.authorize()).default }),
+    host: AuthorizeHost,
+  }),
+  "pages/mcp/authorize": uiPage({
+    screen: async () => ({ default: (await authorizeScreens.mcpAuthorize()).default }),
+    host: AuthorizeHost,
+  }),
 };

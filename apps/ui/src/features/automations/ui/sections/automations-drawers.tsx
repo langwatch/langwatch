@@ -31,7 +31,8 @@ import {
 } from "@langwatch/automation-web/drawers";
 import { useDrawer } from "@langwatch/ui-drawer";
 
-import { withAutomationsHost } from "./automations-host-provider";
+import { withHost } from "../../../../ui/sections/ui-page";
+import { AutomationsHost } from "./automations-host";
 
 /**
  * What the address can carry, as the editor names it.
@@ -57,7 +58,7 @@ function AutomationFromAddress(address: AutomationAddress) {
   return <Automation {...address} onClose={closeDrawer} />;
 }
 
-export const AutomationDrawer = withAutomationsHost(AutomationFromAddress);
+export const AutomationDrawer = withHost(AutomationsHost, AutomationFromAddress);
 
 /**
  * The read-only panel, and the one hand-over it makes.
@@ -86,4 +87,4 @@ function ViewAutomationFromAddress({ automationId }: { automationId?: string }) 
   );
 }
 
-export const ViewAutomationDrawer = withAutomationsHost(ViewAutomationFromAddress);
+export const ViewAutomationDrawer = withHost(AutomationsHost, ViewAutomationFromAddress);

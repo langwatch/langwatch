@@ -34,7 +34,8 @@ import {
 } from "@langwatch/agent-web/screens/agent-management";
 import { getComplexProps, useDrawer } from "@langwatch/ui-drawer";
 
-import { withAgentHost } from "./agent-host-provider";
+import { withHost } from "../../../../ui/sections/ui-page";
+import { AgentHost } from "./agent-host";
 
 export type AgentTypeSelectorProps = Omit<PresentationalProps, "onGoBack">;
 
@@ -77,4 +78,4 @@ function AgentTypeSelectorFromAddress(props: AgentTypeSelectorProps) {
   );
 }
 
-export const AgentTypeSelectorDrawer = withAgentHost(AgentTypeSelectorFromAddress);
+export const AgentTypeSelectorDrawer = withHost(AgentHost, AgentTypeSelectorFromAddress);

@@ -12,28 +12,26 @@
  * around whatever it is given; which router is below it is the composition's
  * business, and `react-router` is sealed off from a feature package's screens
  * anyway. So the package's layout takes children, and this supplies them.
- *
- * Loaded lazily like every other key, so Langy's chat bundle stays out of the
- * bundle a signed-out reader downloads for the front door.
  */
 
 import { ProjectLangyLayout } from "@langwatch/langy-web/screens/langy-layout";
 import { Outlet } from "react-router";
 
 import type { UiPageLoaderRegistry } from "../../../../behavior/ui-page-loaders";
-import { LangyHost } from "./host-provider";
+import { uiPage } from "../../../../ui/sections/ui-page";
+import { LangyHost } from "./host";
 
 function ProjectLangyLayoutRoute() {
   return (
-    <LangyHost>
-      <ProjectLangyLayout>
-        <Outlet />
-      </ProjectLangyLayout>
-    </LangyHost>
+    <ProjectLangyLayout>
+      <Outlet />
+    </ProjectLangyLayout>
   );
 }
 
 export const langyPageLoaders: UiPageLoaderRegistry = {
-  "features/langy/ProjectLangyLayout": () =>
-    Promise.resolve({ default: ProjectLangyLayoutRoute }),
+  "features/langy/ProjectLangyLayout": uiPage({
+    screen: async () => ({ default: ProjectLangyLayoutRoute }),
+    host: LangyHost,
+  }),
 };
