@@ -6,7 +6,7 @@ import { z } from "zod";
 import { createTRPCRouter, protectedProcedure } from "~/server/api/trpc";
 import { launchScenarioRun } from "~/server/scenarios/launch-scenario-run.service";
 import { runParameterValuesSchema } from "~/server/scenarios/parameters";
-import { type RunActor } from "~/server/scenarios/run-actor";
+import type { RunActor } from "~/server/scenarios/run-actor";
 import { runNoteSchema } from "~/server/scenarios/run-note";
 import { simulationTargetSchema } from "~/server/scenarios/simulation-target";
 import { projectSchema } from "./schemas";

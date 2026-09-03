@@ -139,26 +139,27 @@ describe("GET /api/health/scenarios", () => {
       });
     });
 
-    it.each(["timeout", "run_failed", "judge_failed"] as const)(
-      "returns 503 with reason %s when the run is unhealthy",
-      async (reason) => {
-        runScenarioHealthCanary.mockResolvedValue({
-          healthy: false,
-          reason,
-          scenarioRunId: "canary-run-abc",
-          durationMs: 9000,
-        });
-        const app = await getApp();
+    it.each([
+      "timeout",
+      "run_failed",
+      "judge_failed",
+    ] as const)("returns 503 with reason %s when the run is unhealthy", async (reason) => {
+      runScenarioHealthCanary.mockResolvedValue({
+        healthy: false,
+        reason,
+        scenarioRunId: "canary-run-abc",
+        durationMs: 9000,
+      });
+      const app = await getApp();
 
-        const res = await app.request("/api/health/scenarios", {
-          headers: { authorization: `Bearer ${SECRET}` },
-        });
-        const body = (await res.json()) as Record<string, unknown>;
+      const res = await app.request("/api/health/scenarios", {
+        headers: { authorization: `Bearer ${SECRET}` },
+      });
+      const body = (await res.json()) as Record<string, unknown>;
 
-        expect(res.status).toBe(503);
-        expect(body).toMatchObject({ status: "unhealthy", reason });
-      },
-    );
+      expect(res.status).toBe(503);
+      expect(body).toMatchObject({ status: "unhealthy", reason });
+    });
 
     /** @scenario "A concurrent canary while one is in flight starts no second run" */
     it("returns 429 busy when the probe reports it is already in flight", async () => {

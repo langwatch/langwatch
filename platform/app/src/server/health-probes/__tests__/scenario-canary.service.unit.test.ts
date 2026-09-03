@@ -14,7 +14,10 @@
  */
 import { describe, expect, it, vi } from "vitest";
 
-import { ScenarioRunStatus, Verdict } from "~/server/scenarios/scenario-event.enums";
+import {
+  ScenarioRunStatus,
+  Verdict,
+} from "~/server/scenarios/scenario-event.enums";
 import type { ScenarioResults } from "~/server/scenarios/schemas/event-schemas";
 
 import {
@@ -102,20 +105,20 @@ describe("classifyCanaryOutcome", () => {
     });
   });
 
-  describe.each([Verdict.FAILURE, Verdict.INCONCLUSIVE])(
-    "given a terminal SUCCESS run judged %s",
-    (verdict) => {
-      /** @scenario "A run the judge marks FAILURE or INCONCLUSIVE is run_failed" */
-      it("classifies the outcome as unhealthy with reason run_failed", () => {
-        const outcome = classifyCanaryOutcome({
-          status: ScenarioRunStatus.SUCCESS,
-          results: verdictResults(verdict),
-        });
-
-        expect(outcome).toMatchObject({ healthy: false, reason: "run_failed" });
+  describe.each([
+    Verdict.FAILURE,
+    Verdict.INCONCLUSIVE,
+  ])("given a terminal SUCCESS run judged %s", (verdict) => {
+    /** @scenario "A run the judge marks FAILURE or INCONCLUSIVE is run_failed" */
+    it("classifies the outcome as unhealthy with reason run_failed", () => {
+      const outcome = classifyCanaryOutcome({
+        status: ScenarioRunStatus.SUCCESS,
+        results: verdictResults(verdict),
       });
-    },
-  );
+
+      expect(outcome).toMatchObject({ healthy: false, reason: "run_failed" });
+    });
+  });
 });
 
 describe("runScenarioCanary", () => {
@@ -372,7 +375,10 @@ describe("given the canary scenario is queued with no model override", () => {
 describe("raceAgainstRealDeadline", () => {
   /** @scenario "A wedged datastore times out and releases the in-flight lock" */
   it("resolves to the work value when the work settles before the deadline", async () => {
-    const result = await raceAgainstRealDeadline(1_000, Promise.resolve("done"));
+    const result = await raceAgainstRealDeadline(
+      1_000,
+      Promise.resolve("done"),
+    );
 
     expect(result).toEqual({ value: "done" });
   });
@@ -417,7 +423,8 @@ describe("runScenarioCanary with a wedged boundary await", () => {
           // No injected raceDeadline: exercise the real-timer default.
         };
 
-        const singleFlight = createSingleFlightScenarioCanary(runScenarioCanary);
+        const singleFlight =
+          createSingleFlightScenarioCanary(runScenarioCanary);
 
         const firstCall = singleFlight(deps);
         await vi.advanceTimersByTimeAsync(
@@ -425,7 +432,10 @@ describe("runScenarioCanary with a wedged boundary await", () => {
         );
         const firstOutcome = await firstCall;
 
-        expect(firstOutcome).toMatchObject({ healthy: false, reason: "timeout" });
+        expect(firstOutcome).toMatchObject({
+          healthy: false,
+          reason: "timeout",
+        });
 
         // Lock released: a following call runs a real attempt (queueRun fires
         // again) rather than being short-circuited to busy.
@@ -436,7 +446,10 @@ describe("runScenarioCanary with a wedged boundary await", () => {
         const secondOutcome = await secondCall;
 
         expect(secondOutcome).not.toEqual({ busy: true });
-        expect(secondOutcome).toMatchObject({ healthy: false, reason: "timeout" });
+        expect(secondOutcome).toMatchObject({
+          healthy: false,
+          reason: "timeout",
+        });
       } finally {
         vi.useRealTimers();
       }
@@ -487,7 +500,10 @@ describe("parseCanaryConfig", () => {
   describe("given the target type is not a member of the simulation-target union", () => {
     /** @scenario "A misconfigured canary reports unhealthy without launching a run" */
     it("returns invalid instead of casting an unknown type past validation", () => {
-      const result = parseCanaryConfig({ ...valid, targetType: "not-a-target" });
+      const result = parseCanaryConfig({
+        ...valid,
+        targetType: "not-a-target",
+      });
 
       expect(result).toHaveProperty("invalid");
     });

@@ -29,9 +29,9 @@ import {
   getOnPlatformSetId,
   isInternalSetId,
 } from "~/server/scenarios/internal-set-id";
-import {
-  type RunParameterValues,
-  type ScenarioParameterDefinition,
+import type {
+  RunParameterValues,
+  ScenarioParameterDefinition,
 } from "~/server/scenarios/parameters";
 import { resolveRunParameters } from "~/server/scenarios/resolve-run-parameters";
 import { type RunActor, withActor } from "~/server/scenarios/run-actor";
@@ -367,7 +367,10 @@ export async function launchScenarioRun({
 
   // No explicit job scheduling — the execution subscriber picks up the queued
   // event via the GroupQueue and spawns the child process.
-  logger.info({ batchRunId, scenarioRunId }, "Scenario queued via event-sourcing");
+  logger.info(
+    { batchRunId, scenarioRunId },
+    "Scenario queued via event-sourcing",
+  );
 
   return { scheduled: true, setId, batchRunId, scenarioRunId };
 }

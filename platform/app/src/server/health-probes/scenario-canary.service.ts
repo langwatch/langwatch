@@ -41,16 +41,16 @@ import { env } from "~/env.mjs";
 import { getApp } from "~/server/app-layer/app";
 import { prisma } from "~/server/db";
 import { launchScenarioRun } from "~/server/scenarios/launch-scenario-run.service";
+import type { RunActor } from "~/server/scenarios/run-actor";
 import {
   isTerminalStatus,
   ScenarioRunStatus,
   Verdict,
 } from "~/server/scenarios/scenario-event.enums";
 import type { ScenarioResults } from "~/server/scenarios/schemas/event-schemas";
-import type { RunActor } from "~/server/scenarios/run-actor";
 import {
-  simulationTargetSchema,
   type SimulationTarget,
+  simulationTargetSchema,
 } from "~/server/scenarios/simulation-target";
 
 const logger = createLogger("langwatch:scenario-canary");
