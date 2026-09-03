@@ -44,5 +44,13 @@ describe("given a page reported a failure of its own", () => {
       expect(error.fault).toBe("platform");
       expect(error.meta?.errorCode).toBeUndefined();
     });
+
+    it("still gives the agent its own tip rather than none at all", () => {
+      const error = new LangyUiHandlerFailedError("workbench.run");
+
+      expect(error.tips).toEqual([
+        "Read meta.errorCode for the page's own failure reason, re-read the current state, and adjust the payload before retrying",
+      ]);
+    });
   });
 });

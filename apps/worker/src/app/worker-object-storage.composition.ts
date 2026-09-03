@@ -1,13 +1,19 @@
 import { AwsClientProcessRuntime, OutboundProxyResolverPort } from "@langwatch/aws-client";
 import type { PrismaClient } from "@langwatch/prisma-client/generated";
 import type { ResourceScope } from "@langwatch/runtime-composition";
-import type { StoredObjectStorageRuntime } from "@langwatch/stored-object-server/storage";
+import { AzureBlobStoredObjectDriver, resolveAzureCredentials } from "@langwatch/stored-object-server";
+import type { StoredObjectStorageDriver, StoredObjectStorageRuntime } from "@langwatch/stored-object-server/storage";
 import {
+  WorkerAzureStorageFactoryPort,
   WorkerProjectS3SourcePort,
   WorkerStoredObjectStorageRuntimeFactory,
   type WorkerProjectS3Target,
 } from "../platform/infrastructure/worker-stored-object-storage.adapter";
-import type { WorkerConfig, WorkerOutboundProxyConfig } from "../platform/config/worker.config";
+import type {
+  WorkerConfig,
+  WorkerOutboundProxyConfig,
+  WorkerStorageConfig,
+} from "../platform/config/worker.config";
 
 /** The one table BYOC routing reads, named here and nowhere above it. */
 export type WorkerProjectStorageDatabase = Pick<PrismaClient, "project">;
@@ -24,7 +30,57 @@ export type WorkerObjectStorage = {
   projects: WorkerProjectS3SourcePort;
   /** The shared bucket, for a project with no route of its own. */
   globalS3?: WorkerProjectS3Target;
+  /**
+   * The `AZURE_BLOB_*` block this process read, exposed alongside the runtime
+   * so a second consumer (dataset normalization) can build its OWN Azure
+   * driver rather than reaching through the registry's scheme dispatch — it
+   * needs `head()`, which is deliberately outside `StoredObjectStorageDriver`.
+   */
+  azureConfig: WorkerStorageConfig["azure"];
 };
+
+/**
+ * This deployment's Azure Blob driver, or undefined when no account is
+ * configured. Shared by the general object-storage registry (narrowed to
+ * `StoredObjectStorageDriver`) and dataset normalization (which keeps the
+ * concrete type for `head()`).
+ */
+export function createWorkerAzureBlobDriver(
+  azure: WorkerStorageConfig["azure"],
+): AzureBlobStoredObjectDriver | undefined {
+  if (!azure.accountName) return undefined;
+  return AzureBlobStoredObjectDriver.create(
+    resolveAzureCredentials({ config: azure, purpose: "write", identity: azure.identity }),
+  );
+}
+
+/**
+ * Lazy so an inactive or BYOC-first deployment never resolves credentials —
+ * matching the registry's own Azure policy (`createDriver` is a factory the
+ * general path invokes only when an `azure-blob://` URI is actually touched).
+ */
+class WorkerAzureStorageAdapter extends WorkerAzureStorageFactoryPort {
+  static create(azure: WorkerStorageConfig["azure"]): WorkerAzureStorageAdapter {
+    return new WorkerAzureStorageAdapter(azure);
+  }
+
+  private constructor(private readonly azure: WorkerStorageConfig["azure"]) {
+    super();
+  }
+
+  resolve(): { accountName: string; container: string } {
+    if (!this.azure.accountName || !this.azure.container) {
+      throw new Error(
+        "Azure object storage requires AZURE_BLOB_ACCOUNT_NAME and AZURE_BLOB_CONTAINER",
+      );
+    }
+    return { accountName: this.azure.accountName, container: this.azure.container };
+  }
+
+  createDriver(): StoredObjectStorageDriver | undefined {
+    return createWorkerAzureBlobDriver(this.azure);
+  }
+}
 
 /**
  * The object storage this process reads and writes through.
@@ -71,16 +127,19 @@ export function createWorkerObjectStorage(options: {
     database: options.database,
     routes: storage.dataplaneS3,
   });
+  const azure =
+    storage.backend === "azure" ? WorkerAzureStorageAdapter.create(storage.azure) : undefined;
   const runtime = WorkerStoredObjectStorageRuntimeFactory.create({
     config: {
       backend: storage.backend,
       localFilesystemRoot: storage.localFilesystemRoot,
       ...(globalS3 ? { globalS3 } : {}),
+      ...(azure ? { azure } : {}),
     },
     projects,
   }).createRuntime();
 
-  return { runtime, aws, projects, ...(globalS3 ? { globalS3 } : {}) };
+  return { runtime, aws, projects, azureConfig: storage.azure, ...(globalS3 ? { globalS3 } : {}) };
 }
 
 /**

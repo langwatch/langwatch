@@ -129,6 +129,18 @@ describe("resolveWorkerConfig", () => {
             secretAccessKey: undefined,
             sessionToken: undefined,
           },
+          azure: {
+            backend: "s3",
+            authMode: undefined,
+            accountName: undefined,
+            accountKey: undefined,
+            container: undefined,
+            endpoint: undefined,
+            authorityHost: undefined,
+            tokenAudience: undefined,
+            allowInsecureTokenEndpointForTests: false,
+            identity: { tenantId: undefined, clientId: undefined, federatedTokenFile: undefined },
+          },
         },
         outboundProxy: { https: undefined, http: undefined, noProxy: undefined },
         // The fence a model-provider credential probe is judged by. An unset
@@ -308,6 +320,18 @@ describe("resolveWorkerConfig", () => {
           accessKeyId: "access-key",
           secretAccessKey: "secret-key",
           sessionToken: "session-token",
+        },
+        azure: {
+          backend: "s3",
+          authMode: undefined,
+          accountName: undefined,
+          accountKey: undefined,
+          container: undefined,
+          endpoint: undefined,
+          authorityHost: undefined,
+          tokenAudience: undefined,
+          allowInsecureTokenEndpointForTests: false,
+          identity: { tenantId: undefined, clientId: undefined, federatedTokenFile: undefined },
         },
       },
       outboundProxy: {
@@ -571,6 +595,55 @@ describe("given the four privacy variables the ingestion path reads", () => {
     expect(confirmed("false")).toBe(false);
     expect(confirmed("yes")).toBe(false);
     expect(resolveWorkerConfig({}).infrastructure.storage.azureSpoolRetentionConfirmed).toBe(false);
+  });
+
+  /** @scenario "Azure dataset normalization reads the same AZURE_BLOB_* block as the App" */
+  it("reads the Azure Blob account dataset normalization composes against", () => {
+    const config = resolveWorkerConfig({
+      STORED_OBJECTS_BACKEND: "azure",
+      AZURE_BLOB_AUTH_MODE: "sharedKey",
+      AZURE_BLOB_ACCOUNT_NAME: "acct",
+      AZURE_BLOB_ACCOUNT_KEY: "key",
+      AZURE_BLOB_CONTAINER: "datasets",
+      AZURE_BLOB_ENDPOINT: "https://acct.blob.core.windows.net",
+      AZURE_BLOB_AUTHORITY_HOST: "https://login.microsoftonline.com",
+      AZURE_BLOB_TOKEN_AUDIENCE: "https://storage.azure.com/.default",
+      AZURE_TENANT_ID: "tenant",
+      AZURE_CLIENT_ID: "client",
+      AZURE_FEDERATED_TOKEN_FILE: "/var/run/secrets/token",
+    });
+
+    expect(config.infrastructure.storage.azure).toEqual({
+      backend: "azure",
+      authMode: "sharedKey",
+      accountName: "acct",
+      accountKey: "key",
+      container: "datasets",
+      endpoint: "https://acct.blob.core.windows.net",
+      authorityHost: "https://login.microsoftonline.com",
+      tokenAudience: "https://storage.azure.com/.default",
+      allowInsecureTokenEndpointForTests: false,
+      identity: {
+        tenantId: "tenant",
+        clientId: "client",
+        federatedTokenFile: "/var/run/secrets/token",
+      },
+    });
+  });
+
+  /** @scenario "Azure dataset normalization reads the same AZURE_BLOB_* block as the App" */
+  it("refuses the insecure token endpoint escape hatch in production, like the App does", () => {
+    expect(
+      resolveWorkerConfig({
+        NODE_ENV: "production",
+        AZURE_BLOB_ALLOW_INSECURE_TOKEN_ENDPOINT_FOR_TESTS: "1",
+      }).infrastructure.storage.azure.allowInsecureTokenEndpointForTests,
+    ).toBe(false);
+    expect(
+      resolveWorkerConfig({
+        AZURE_BLOB_ALLOW_INSECURE_TOKEN_ENDPOINT_FOR_TESTS: "1",
+      }).infrastructure.storage.azure.allowInsecureTokenEndpointForTests,
+    ).toBe(true);
   });
 
   /** @scenario "The four privacy variables are read the way the application reads them" */

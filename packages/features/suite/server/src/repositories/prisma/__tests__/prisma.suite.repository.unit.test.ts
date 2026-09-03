@@ -3,6 +3,8 @@
 /**
  * `resolveDynamicRunMembership`'s row lock.
  *
+ * Spec: specs/suites/run-plan-dynamic-scopes.feature
+ *
  * A unit test, and named one: Prisma is a stub, so nothing here opens a
  * socket. The raw-SQL guard is asserted as SQL because that is what it is;
  * whether Postgres honours it is the integration lane's question.
@@ -44,7 +46,7 @@ describe("PrismaSuiteRepository.resolveDynamicRunMembership", () => {
   });
 
   describe("given a run plan row (kind = \"run_plan\")", () => {
-    /** @scenario "The row lock matches the row the read that follows it reads" */
+    /** @scenario "The row lock matches the row the resolution reads" */
     it("locks by id and projectId alone, not by a kind no plan row carries", async () => {
       const { repository, executeRaw } = build();
 

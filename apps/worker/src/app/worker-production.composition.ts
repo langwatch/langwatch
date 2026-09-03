@@ -230,6 +230,7 @@ import {
 import { createWorkerTraceSpool } from "./worker-trace-blob.composition";
 import { tryCreateWorkerTraceBroadcast } from "./worker-trace-broadcast.composition";
 import { tryCreateWorkerTenantBroadcast } from "./worker-tenant-broadcast.composition";
+import { installWorkerConnectedAgentRuntime } from "./worker-connected-agent-runtime.composition";
 import {
   createWorkerLangyConversation,
   WorkerLangyAbsenceReportPort,
@@ -274,26 +275,12 @@ export type WorkerTopicCompositionOptions = {
 /**
  * Reports the composition decisions Trace's own storage would otherwise hide.
  *
- * Both are decisions a deployment should read in its own logs at boot rather
- * than infer from work that quietly never completes.
+ * A decision a deployment should read in its own logs at boot rather than
+ * infer from work that quietly never completes.
  */
 export abstract class WorkerTraceAbsenceReportPort {
   /** No pub/sub bridge: the two broadcast subscribers register and stay inert. */
   abstract withoutBroadcast(): void;
-
-  /**
-   * Azure object storage: dataset normalization has no backend in this process.
-   *
-   * UNREACHABLE TODAY, and that is a defect rather than a design. This process
-   * composes its object storage BEFORE it reaches the report, and that
-   * composition throws for an Azure backend with no driver factory — so an
-   * `azure` deployment does not run with normalization refusing by name, it
-   * fails to boot. Closing it means composing the Azure driver (the driver and
-   * its credential resolver are both packaged, and this process already builds
-   * both in its object-storage migration task) over `AZURE_BLOB_*`
-   * configuration leaves the worker does not read yet.
-   */
-  abstract withoutDatasetStorage(): void;
 }
 
 /**
@@ -464,6 +451,13 @@ export class WorkerProductionComposition {
     // second: two connections would give one process two fold caches, two
     // dedup keyspaces and two tenant broadcast channels.
     const processRedis = infrastructure?.redis ?? eventingOptions.groupQueue.redis;
+    // The experiment feature's connected cell dispatches through
+    // `getConnectedAgentRuntime()` too (ADR-128); without Redis installed
+    // here it can never see an instance the API process registered.
+    installWorkerConnectedAgentRuntime({
+      redis: processRedis,
+      ...(options.resources ? { resources: options.resources } : {}),
+    });
     const mail = tryCreateWorkerMailComposition({
       config: options.config,
       ...(infrastructure ? { aws: infrastructure.aws } : {}),
@@ -868,9 +862,6 @@ export class WorkerProductionComposition {
         })
       : undefined;
     if (!traceBroadcast) traceAbsence?.withoutBroadcast();
-    if (options.config.infrastructure.storage.backend === "azure") {
-      traceAbsence?.withoutDatasetStorage();
-    }
     // The tenancy graph: the organization, project and permission services,
     // composed ONCE from the typed client and handed to every consumer that
     // derives a scope. It is built above the model gateway because the gateway
@@ -2502,7 +2493,7 @@ class AbsentEvaluationGraphActivity extends AutomationGraphActivityPort {
   }
 }
 
-/** Names Trace's two storage absences once, at boot, rather than leaving them inferred. */
+/** Names Trace's storage absence once, at boot, rather than leaving it inferred. */
 export class LoggedWorkerTraceAbsence extends WorkerTraceAbsenceReportPort {
   static create(logger: Pick<Logger, "warn">): LoggedWorkerTraceAbsence {
     return new LoggedWorkerTraceAbsence(logger);
@@ -2516,13 +2507,6 @@ export class LoggedWorkerTraceAbsence extends WorkerTraceAbsenceReportPort {
     this.logger.warn(
       { reason: "no-tenant-broadcast" },
       "worker composed trace processing without a tenant broadcast bridge: both broadcast subscribers stay registered and inert, so an open trace list will not update until it is reloaded",
-    );
-  }
-
-  withoutDatasetStorage(): void {
-    this.logger.warn(
-      { reason: "azure-dataset-storage-unsupported" },
-      "worker composed dataset normalization on an Azure-backed deployment: this process reads no Azure configuration and composes no blob driver for datasets, so a normalize job fails by name rather than writing chunks somewhere unreadable",
     );
   }
 }

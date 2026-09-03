@@ -7,6 +7,8 @@ import {
   type DatasetService,
 } from "@langwatch/dataset-contract";
 import {
+  AzureDatasetStorageAdapter,
+  DatasetAzureConfigResolver,
   DatasetContentRepository,
   DatasetNormalizationService,
   DatasetS3ClientResolver,
@@ -14,12 +16,15 @@ import {
   LocalDatasetStorageAdapter,
   PostgresDatasetAdapter,
   S3DatasetStorageAdapter,
+  type DatasetAzureConfig,
   type DatasetContentDatabase,
   type DatasetS3ClientLease,
   type DatasetStorage,
 } from "@langwatch/dataset-server";
 import type { PrismaClient } from "@langwatch/prisma-client/generated";
 import type { StoredObjectStorageRuntime } from "@langwatch/stored-object-server/storage";
+import { createWorkerAzureBlobDriver } from "./worker-object-storage.composition";
+import type { WorkerStorageConfig } from "../platform/config/worker.config";
 import type {
   WorkerProjectS3SourcePort,
   WorkerProjectS3Target,
@@ -46,15 +51,17 @@ import type {
  *            ├─ DatasetContentRepository     the chunk write, over Prisma
  *            └─ DatasetStorageResolver       one backend per project
  *                 ├─ S3DatasetStorageAdapter      BYOC first, then the shared bucket
+ *                 ├─ AzureDatasetStorageAdapter   the same AZURE_BLOB_* account object storage uses
  *                 └─ LocalDatasetStorageAdapter   the single-replica fallback
  *
- * AZURE IS A DECLARED ABSENCE, not a silent one. The Azure arm needs a blob
- * driver this process does not compose, and a resolver that quietly fell back
- * to the local filesystem on an Azure deployment would write one replica's
- * dataset chunks to a disk the next pod cannot read. So the resolver refuses
- * BY NAME for an Azure-routed project, and the composition root reports the
- * absence at boot rather than leaving it to be discovered by a customer whose
- * upload never completes.
+ * Azure reuses `createWorkerAzureBlobDriver` (worker-object-storage
+ * composition) rather than the general registry's Azure factory: the driver
+ * that factory returns is narrowed to `StoredObjectStorageDriver`, and the
+ * dataset adapter's staged-upload finalize needs `head()`, which is
+ * deliberately outside that interface. A misconfigured `azure` deployment
+ * still refuses BY NAME — `resolveAzureCredentials` throws
+ * `AzureBackendMisconfiguredError` naming exactly what's missing — rather than
+ * falling back to a local disk the next pod cannot read.
  */
 export function createWorkerDatasetNormalization(options: {
   database: DatasetContentDatabase;
@@ -74,6 +81,8 @@ export type WorkerDatasetObjectStorage = {
   aws: AwsClientProcessRuntime;
   projects: WorkerProjectS3SourcePort;
   globalS3?: WorkerProjectS3Target;
+  /** The `AZURE_BLOB_*` block this process read, for an Azure-routed project. */
+  azureConfig: WorkerStorageConfig["azure"];
 };
 
 /**
@@ -102,11 +111,6 @@ export function createWorkerDatasetWrites(options: {
   }).build();
 }
 
-/** Whether this deployment's object storage can back dataset normalization. */
-export function workerDatasetStorageBackendSupported(backend: "azure" | "s3"): boolean {
-  return backend !== "azure";
-}
-
 class WorkerDatasetNormalizationAdapter extends DatasetNormalizationWorkerPort {
   constructor(private readonly normalization: DatasetNormalizationService) {
     super();
@@ -130,8 +134,10 @@ class WorkerDatasetNormalizationAdapter extends DatasetNormalizationWorkerPort {
  * live in. A second policy over the same configuration would agree today and
  * drift the first time either side gained a rule.
  */
-class WorkerDatasetStorageResolver extends DatasetStorageResolver {
+export class WorkerDatasetStorageResolver extends DatasetStorageResolver {
   private readonly s3: S3DatasetStorageAdapter;
+  /** Built once, on first use — matching the general registry's Azure laziness. */
+  private azure: AzureDatasetStorageAdapter | undefined;
 
   constructor(private readonly storage: WorkerDatasetObjectStorage) {
     super();
@@ -147,11 +153,33 @@ class WorkerDatasetStorageResolver extends DatasetStorageResolver {
 
     if (destination.kind === "s3") return this.s3;
     if (destination.kind === "azure") {
-      throw new Error(
-        "Dataset normalization is not composed for Azure object storage in this process",
+      this.azure ??= AzureDatasetStorageAdapter.create(
+        new WorkerDatasetAzureConfigResolver(this.storage.azureConfig),
       );
+      return this.azure;
     }
     return LocalDatasetStorageAdapter.create(destination.root);
+  }
+}
+
+/**
+ * This deployment's single Azure Blob account, for every project — the same
+ * one-account model `WorkerAzureStorageAdapter` uses for the general path.
+ * `projectId` is unread: this process composes no per-project Azure routing.
+ */
+class WorkerDatasetAzureConfigResolver extends DatasetAzureConfigResolver {
+  constructor(private readonly azure: WorkerStorageConfig["azure"]) {
+    super();
+  }
+
+  async resolve(_projectId: string): Promise<DatasetAzureConfig> {
+    const driver = createWorkerAzureBlobDriver(this.azure);
+    if (!driver || !this.azure.accountName || !this.azure.container) {
+      throw new Error(
+        "Azure object storage requires AZURE_BLOB_ACCOUNT_NAME and AZURE_BLOB_CONTAINER",
+      );
+    }
+    return { driver, accountName: this.azure.accountName, container: this.azure.container };
   }
 }
 

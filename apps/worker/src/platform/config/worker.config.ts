@@ -573,6 +573,40 @@ export const workerConfigDefinition = RuntimeConfig.define({
       azureSpoolRetentionConfirmed: Config.value(environmentOneOrTrueSchema, {
         env: "AZURE_BLOB_SPOOL_RETENTION_CONFIRMED",
       }),
+      /**
+       * The Azure Blob account this process reads and writes dataset chunks
+       * through, mirroring the `AZURE_BLOB_*` block the App reads for the
+       * same purpose (`api.config.ts`). Interpreted nowhere here —
+       * `resolveAzureCredentials` is the one place that decides which auth
+       * mode applies.
+       */
+      azure: {
+        authMode: Config.value(optionalEnvironmentString, { env: "AZURE_BLOB_AUTH_MODE" }),
+        accountName: Config.value(optionalEnvironmentString, {
+          env: "AZURE_BLOB_ACCOUNT_NAME",
+        }),
+        accountKey: Config.value(optionalEnvironmentString, {
+          env: "AZURE_BLOB_ACCOUNT_KEY",
+        }),
+        container: Config.value(optionalEnvironmentString, { env: "AZURE_BLOB_CONTAINER" }),
+        endpoint: Config.value(optionalEnvironmentString, { env: "AZURE_BLOB_ENDPOINT" }),
+        authorityHost: Config.value(optionalEnvironmentString, {
+          env: "AZURE_BLOB_AUTHORITY_HOST",
+        }),
+        tokenAudience: Config.value(optionalEnvironmentString, {
+          env: "AZURE_BLOB_TOKEN_AUDIENCE",
+        }),
+        allowInsecureTokenEndpointForTests: Config.value(optionalEnvironmentString, {
+          env: "AZURE_BLOB_ALLOW_INSECURE_TOKEN_ENDPOINT_FOR_TESTS",
+        }),
+        identity: {
+          tenantId: Config.value(optionalEnvironmentString, { env: "AZURE_TENANT_ID" }),
+          clientId: Config.value(optionalEnvironmentString, { env: "AZURE_CLIENT_ID" }),
+          federatedTokenFile: Config.value(optionalEnvironmentString, {
+            env: "AZURE_FEDERATED_TOKEN_FILE",
+          }),
+        },
+      },
     },
     outboundProxy: {
       https: Config.value(optionalProxyValue, { env: "HTTPS_PROXY" }),
@@ -667,6 +701,23 @@ export type WorkerStorageConfig = Readonly<{
     accessKeyId?: string;
     secretAccessKey?: string;
     sessionToken?: string;
+  }>;
+  /** The Azure Blob account dataset chunks read and write through. */
+  azure: Readonly<{
+    backend: "azure" | "s3";
+    authMode?: string;
+    accountName?: string;
+    accountKey?: string;
+    container?: string;
+    endpoint?: string;
+    authorityHost?: string;
+    tokenAudience?: string;
+    allowInsecureTokenEndpointForTests: boolean;
+    identity: Readonly<{
+      tenantId?: string;
+      clientId?: string;
+      federatedTokenFile?: string;
+    }>;
   }>;
   /**
    * Organization id to that organization's own S3, keyed exactly as the
@@ -1080,6 +1131,28 @@ export function resolveWorkerConfig(source: Readonly<Record<string, unknown>>): 
         s3: {
           ...value.infrastructure.storage.s3,
           region: resolveS3Region(value.infrastructure.storage.s3),
+        },
+        azure: {
+          backend: value.infrastructure.storage.backend ?? "s3",
+          authMode: value.infrastructure.storage.azure.authMode?.trim() || undefined,
+          accountName: value.infrastructure.storage.azure.accountName?.trim() || undefined,
+          accountKey: value.infrastructure.storage.azure.accountKey?.trim() || undefined,
+          container: value.infrastructure.storage.azure.container?.trim() || undefined,
+          endpoint: value.infrastructure.storage.azure.endpoint?.trim() || undefined,
+          authorityHost: value.infrastructure.storage.azure.authorityHost?.trim() || undefined,
+          tokenAudience: value.infrastructure.storage.azure.tokenAudience?.trim() || undefined,
+          // Refused outright in production, matching the App's own guard: a
+          // real deployment cannot put a bearer token on the wire in
+          // plaintext no matter who sets the escape hatch.
+          allowInsecureTokenEndpointForTests:
+            value.nodeEnvironment !== "production" &&
+            value.infrastructure.storage.azure.allowInsecureTokenEndpointForTests?.trim() === "1",
+          identity: {
+            tenantId: value.infrastructure.storage.azure.identity.tenantId?.trim() || undefined,
+            clientId: value.infrastructure.storage.azure.identity.clientId?.trim() || undefined,
+            federatedTokenFile:
+              value.infrastructure.storage.azure.identity.federatedTokenFile?.trim() || undefined,
+          },
         },
         dataplaneS3: resolveWorkerDataplaneS3Config(source),
       },

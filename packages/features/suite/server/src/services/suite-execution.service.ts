@@ -151,7 +151,9 @@ export class SuiteExecutionService extends SuiteExecutionPort {
 
     for (const target of input.activeTargets) {
       const targetKey = targetKeyOf(target);
-      if (parameters.has(targetKey)) continue;
+      if (parameters.has(targetKey)) {
+        continue;
+      }
 
       const resolved = await this.scenarios.resolveRunParametersForScenarios({
         scenarios: input.scenarioConfigs,

@@ -84,6 +84,31 @@ const tips: Record<string, readonly string[]> = {
     "Retry — or ask for a narrower slice: a shorter time range or a single trace",
   ],
   langy_worker_restarting: ["An update interrupted this reply — resend the message"],
+  // UI-action channel errors (specs/langy/langy-ui-actions.feature). The
+  // primary reader is the agent, which prints the envelope's `meta.tips` and
+  // adapts its next step to them.
+  langy_ui_turn_inactive: [
+    "UI actions only work while your own turn is running; this command must be run by the agent during a conversation, not standalone",
+  ],
+  langy_ui_action_unknown: [
+    "Run `langwatch ui actions` to list the actions the current page accepts",
+  ],
+  langy_ui_payload_invalid: [
+    "Read meta.issues; each entry names the offending payload field and what was expected",
+    "Run `langwatch ui actions` to see the action's payload schema",
+  ],
+  langy_ui_no_browser: [
+    "The user has no page open that can run this action; tell them what you wanted to do, or use the equivalent API command instead",
+  ],
+  langy_ui_experiment_required: [
+    "Pass --experiment <slug> so the backend knows which experiment to apply the action to; the slug is on the experiment context chip and in `langwatch experiment list`",
+  ],
+  langy_ui_timeout: [
+    "The page may have applied part of the action; read the current state (for example `langwatch workbench get-state`) before retrying",
+  ],
+  langy_ui_handler_failed: [
+    "Read meta.errorCode for the page's own failure reason, re-read the current state, and adjust the payload before retrying",
+  ],
 };
 
 export function remediation(code: string): Remediation {
