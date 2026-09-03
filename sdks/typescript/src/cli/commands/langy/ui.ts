@@ -46,6 +46,23 @@ export function formatDuration(ms: number): string {
   return `${minutes} min ${seconds} s`;
 }
 
+/**
+ * How long ago a control request was asked for, as the picker prints it.
+ *
+ * The developer runs the command minutes after the card appeared, so the age
+ * is what tells one row from another when the same folder is asked for twice.
+ */
+export function askedAgo(createdAt: string, now: number = Date.now()): string {
+  const at = Date.parse(createdAt);
+  if (Number.isNaN(at)) return "asked just now";
+  const seconds = Math.max(0, Math.round((now - at) / 1000));
+  if (seconds < 60) return "asked just now";
+  const minutes = Math.round(seconds / 60);
+  if (minutes < 60) return `asked ${minutes} min ago`;
+  const hours = Math.round(minutes / 60);
+  return hours === 1 ? "asked 1 hour ago" : `asked ${hours} hours ago`;
+}
+
 /** What one call reads as: the tool and what it points at. */
 export function callLine(call: LocalCall): string {
   switch (call.tool) {

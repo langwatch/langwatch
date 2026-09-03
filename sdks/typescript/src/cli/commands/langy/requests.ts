@@ -22,6 +22,7 @@ import { LANGWATCH_SDK_VERSION } from "../../../internal/constants";
 import { resolveCredentials } from "../../utils/apiKey";
 import { isLoggedIn, loadConfig } from "../../utils/governance/config";
 import { LocalCallFailure } from "./errors";
+import { askedAgo } from "./ui";
 
 /** How often the CLI looks again while it waits for a request. */
 export const REQUEST_POLL_INTERVAL_MS = 5_000;
@@ -270,8 +271,43 @@ export async function ensureSignedIn({
   };
 }
 
-const requestTitle = (request: ControlRequest, root: string): string =>
-  `Langy session "${request.conversationTitle}" (project ${request.projectName}) is requesting control over ${root}`;
+const requestTitle = (
+  request: ControlRequest,
+  root: string,
+  now: number = Date.now(),
+): string =>
+  `Langy session "${request.conversationTitle}" (project ${request.projectName}, ${askedAgo(request.createdAt, now)}) is requesting control over ${root}`;
+
+/**
+ * One row per conversation, newest first.
+ *
+ * The same chat can raise the card again, and a request the developer never
+ * answered stays open for its fifteen minutes. Two rows with the same title
+ * only make the developer guess, so the older one is dropped and the newest
+ * one stands for the conversation.
+ */
+export function collapseByConversation(
+  requests: ControlRequest[],
+): ControlRequest[] {
+  const newest = new Map<string, ControlRequest>();
+  for (const request of requests) {
+    const held = newest.get(request.conversationId);
+    if (!held || Date.parse(request.createdAt) > Date.parse(held.createdAt)) {
+      newest.set(request.conversationId, request);
+    }
+  }
+  return [...newest.values()].sort(
+    (left, right) => Date.parse(right.createdAt) - Date.parse(left.createdAt),
+  );
+}
+
+/** What one row of the picker reads under its title. */
+export function requestRowDescription(
+  request: ControlRequest,
+  now: number = Date.now(),
+): string {
+  return `project ${request.projectName}, ${askedAgo(request.createdAt, now)}`;
+}
 
 /** What the user chose in the terminal. */
 export type RequestChoice =
@@ -287,30 +323,33 @@ export async function chooseRequest({
   requests,
   root,
   ask = prompts,
+  now = Date.now(),
 }: {
   requests: ControlRequest[];
   root: string;
   ask?: typeof prompts;
+  now?: number;
 }): Promise<RequestChoice> {
-  let request = requests[0];
-  if (requests.length > 1) {
+  const rows = collapseByConversation(requests);
+  let request = rows[0];
+  if (rows.length > 1) {
     const picked = await ask({
       type: "select",
       name: "requestId",
       message: "Which Langy session should get this folder?",
-      choices: requests.map((entry) => ({
+      choices: rows.map((entry) => ({
         title: entry.conversationTitle,
-        description: `project ${entry.projectName}`,
+        description: requestRowDescription(entry, now),
         value: entry.id,
       })),
       initial: 0,
     });
-    request = requests.find((entry) => entry.id === picked.requestId);
+    request = rows.find((entry) => entry.id === picked.requestId);
   }
   if (!request) return { action: "quit" };
 
   console.log("");
-  console.log(requestTitle(request, root));
+  console.log(requestTitle(request, root, now));
   const answer = await ask({
     type: "select",
     name: "action",

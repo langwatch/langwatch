@@ -46,7 +46,14 @@ Feature: `langwatch langy --share-control` shares this folder with a Langy sessi
       Given two conversations recorded a control request for me
       When I run "langwatch langy --share-control"
       Then the terminal lists both with their titles and projects
+      And each row says how long ago the conversation asked
       And I pick the one to approve
+
+    @unit
+    Scenario: One conversation is listed once
+      Given one conversation recorded two control requests for me
+      When I run "langwatch langy --share-control"
+      Then the terminal lists that conversation once, with the newest request
 
     @unit
     Scenario: No open request waits for one

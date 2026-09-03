@@ -289,6 +289,68 @@ describe("given the share-control command", () => {
       expect(picker[0]!.description).toContain("ACME Shop");
       expect(choice).toEqual({ action: "approve", request: requests[1] });
     });
+
+    /** @scenario "Several open requests become a picker" */
+    it("says how long ago each conversation asked", async () => {
+      const now = Date.parse("2026-01-01T12:00:00.000Z");
+      const asked: Array<Record<string, unknown>> = [];
+      const ask = (async (options: Record<string, unknown>) => {
+        asked.push(options);
+        return options.name === "requestId"
+          ? { requestId: "req_1" }
+          : { action: "approve" };
+      }) as never;
+
+      const requests = [
+        {
+          ...requestNamed("req_1", "Instrument tracing"),
+          createdAt: new Date(now - 3 * 60_000).toISOString(),
+        },
+        {
+          ...requestNamed("req_2", "Fix the refund scenario"),
+          createdAt: new Date(now - 20_000).toISOString(),
+        },
+      ];
+      await chooseRequest({ requests, root: "/work/acme", ask, now });
+
+      const picker = asked[0]!.choices as Array<{ description: string }>;
+      expect(picker[0]!.description).toBe("project ACME Shop, asked just now");
+      expect(picker[1]!.description).toBe("project ACME Shop, asked 3 min ago");
+    });
+  });
+
+  describe("when one conversation asked twice", () => {
+    /** @scenario "One conversation is listed once" */
+    it("keeps the newest request and never asks which one", async () => {
+      const now = Date.parse("2026-01-01T12:00:00.000Z");
+      const asked: Array<Record<string, unknown>> = [];
+      const log = vi.spyOn(console, "log").mockImplementation(() => undefined);
+      const ask = (async (options: Record<string, unknown>) => {
+        asked.push(options);
+        return { action: "approve" };
+      }) as never;
+
+      const older = {
+        ...requestNamed("req_1", "Instrument tracing"),
+        conversationId: "conv_same",
+        createdAt: new Date(now - 5 * 60_000).toISOString(),
+      };
+      const newer = {
+        ...requestNamed("req_2", "Instrument tracing"),
+        conversationId: "conv_same",
+        createdAt: new Date(now - 60_000).toISOString(),
+      };
+      const choice = await chooseRequest({
+        requests: [older, newer],
+        root: "/work/acme",
+        ask,
+        now,
+      });
+      log.mockRestore();
+
+      expect(asked.map((entry) => entry.name)).toEqual(["action"]);
+      expect(choice).toEqual({ action: "approve", request: newer });
+    });
   });
 
   describe("when no conversation asked yet", () => {
