@@ -105,12 +105,28 @@ describe("Langy changes a connected agent through the shared folder", () => {
               }),
             ],
             script: [
+              // The ask names the outcome, not the change: the refund case
+              // has to run on another account and another plan, and the agent
+              // takes neither today. Naming the run parameter here would ask
+              // the question the scenario exists to answer.
               scenario.user(
-                "make the refund scenario a free-plan-only case using the account acme-free",
+                "my refund scenario always runs on the pro plan. Let me pick the account and the plan when a run starts, and make that scenario run against the account acme-free on the free plan",
               ),
               scenario.agent(),
               async () => {
                 const conversationId = langy.state.conversationId ?? "";
+                // A failure here reads as an empty tool list otherwise, and
+                // the reply is what says why Langy did not ask for the code.
+                if (!langy.state.toolNames.includes("code_access")) {
+                  console.log(
+                    "[layer2] tools without code_access:",
+                    langy.state.toolNames.join(", "),
+                  );
+                  console.log(
+                    "[layer2] reply:",
+                    await watcher!.lastAssistantText(),
+                  );
+                }
                 expect(langy.state.toolNames).toContain("code_access");
                 await waitForPendingRequest({ conversationId });
                 seenTurns.push(...watcher!.turnIds);
