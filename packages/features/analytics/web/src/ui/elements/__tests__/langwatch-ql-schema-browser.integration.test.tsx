@@ -161,7 +161,7 @@ describe("the LangWatchQL schema browser", () => {
        * member left collapsed came back open, with no action of theirs that
        * could explain it.
        *
-       * @scenario "A search narrows the schema browser"
+       * @scenario "Schema documentation and completion use the live response"
        */
       it("does not let a click during the search silently flip a row open", () => {
         renderBrowser();

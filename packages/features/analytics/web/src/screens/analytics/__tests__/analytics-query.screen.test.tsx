@@ -187,7 +187,7 @@ describe("the Custom query page", () => {
   describe("given a member whose role lacks the analytics permission", () => {
     describe("when they open the route directly", () => {
       /**
-       * @scenario "A member without the analytics permission cannot reach the workbench"
+       * @scenario "Organization rules and project permissions govern access"
        *
        * THE GUARD IS NOT THIS MODULE'S ANY MORE. `platform/app` wrapped the
        * page in `withPermissionGuard("analytics:view")`; the policy is now

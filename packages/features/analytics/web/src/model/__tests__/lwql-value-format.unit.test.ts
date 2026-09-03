@@ -111,7 +111,7 @@ describe("a LangWatchQL result value", () => {
        * the round trip. These two do not, which is what makes the test able to
        * fail.
        *
-       * @scenario "Wide integers and decimals keep every digit"
+       * @scenario "Cell formatting is lossless and distinguishes absence"
        */
       it("would have lost digits had the value been coerced to a float", () => {
         expect(String(Number(WIDE_INTEGER))).not.toBe(WIDE_INTEGER);

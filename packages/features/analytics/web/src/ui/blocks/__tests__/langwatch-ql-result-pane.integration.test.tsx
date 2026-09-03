@@ -338,7 +338,7 @@ describe("the LangWatchQL result pane", () => {
   describe("given the database cancelled the query at its execution ceiling", () => {
     describe("when the pane renders the failure", () => {
       /**
-       * @scenario "A query that outruns the database ceiling renders a distinct timeout state"
+       * @scenario "Backend failures keep their code-specific presentation"
        *
        * THE DISTINCTION IS THE PANE'S, NOT THE REGISTRY'S, and that is what a
        * package can still prove. `platform/app`'s version compared the two
@@ -401,7 +401,7 @@ describe("the LangWatchQL result pane", () => {
        * worse than none at all — so this asserts the tab it names is really
        * in the document, not merely that the attribute is set.
        *
-       * @scenario "The first successful result opens in Table mode"
+       * @scenario "A result opens in a native table with deliberate states"
        */
       it("names the table panel after the tab that controls it", () => {
         renderPane(

@@ -291,8 +291,7 @@ describe("OtlpSpanCostEnrichmentService", () => {
       });
 
       /**
-       * @scenario "The raw name is tried against every rule before any
-       * transformed name is tried against any rule"
+       * @scenario "The raw name is tried against every rule before any transformed name is tried against any rule"
        *
        * The rule that only matches the SUBTYPE-STRIPPED name is listed FIRST,
        * so a matcher that ran the passes in the other order — every candidate
