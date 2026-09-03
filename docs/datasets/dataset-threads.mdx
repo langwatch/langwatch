@@ -17,10 +17,10 @@ Open the [Trace Explorer](https://app.langwatch.ai/@project/traces), select trac
 </Step>
 
 <Step title="Switch the mapping to Thread">
-In the **Add to Dataset** drawer, click **Thread** under **Mapping**. A badge shows how many traces the selected threads hold. Map the `traces` column to **traces** and pick the fields to keep per trace; **input** and **output** are selected by default. Map `thread_id` to **thread_id**.
+In the **Add to Dataset** drawer, click **Thread** under **Mapping**. A badge shows how many traces the selected threads hold. Map the `traces` column to the **traces** source and pick the fields to keep per trace; **input** and **output** are selected by default. Map `thread_id` to **thread_id**. The **traces** source also fits a `string` column, which then holds the JSON list as text.
 
 <Frame>
-<img src="/images/datasets/add-to-dataset-thread.png" alt="The Add to Dataset drawer with the mapping on Thread and the traces badge" />
+<img src="/images/datasets/add-to-dataset-thread.png" alt="The Add to Dataset drawer with the mapping on Thread, the 4 traces badge, the traces source keeping input and output per trace, and Full Thread (AI-Readable) mapped onto a second column" />
 </Frame>
 </Step>
 

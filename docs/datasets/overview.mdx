@@ -31,7 +31,7 @@ The menu has two entries:
 
 ### Create an empty dataset
 
-In the **New Dataset** drawer, type a **Name**; the slug under it is what the SDKs and the CLI use. Then define the **Columns**. A new dataset starts with `trace_id`, `timestamp`, `input`, `output`, `contexts`, `total_cost` and `annotations`. Remove the columns you do not need, click **Add Column** for the ones you do, and click **Create Dataset**.
+In the **New Dataset** drawer, type a **Name**; the slug under it is what the SDKs and the CLI use. Then define the **Columns**. A new dataset starts with `trace_id`, `timestamp`, `input`, `output`, `contexts`, `total_cost` and `annotations`. Remove the columns you do not need, click **Add Column** for the ones you do, and click **Create Dataset**. The type select on each column offers `string`, `number`, `boolean`, `date`, `list`, `json`, `image (URL)`, `json chat messages (OpenAI format)` and `json spans`.
 
 <Frame>
 <img src="/images/datasets/dataset-new-drawer.png" alt="The New Dataset drawer with the name, its slug, and the default columns with their types" />
@@ -68,12 +68,12 @@ Click a dataset in the list to open its page. The header shows the record count 
 | Button | What it does |
 |--------|--------------|
 | **Download as CSV** | Exports every row. |
-| **Add rows** | Opens **Add rows from CSV**. Map each dataset column to a column of your file, or pick **Set empty**, then click **Upload**. |
+| **Add rows** | Opens **Add rows from CSV**. Each dataset column has a **Select column** control that lists the columns of your file and **Set empty**. Map every column, then click **Upload**, which stays disabled until the file is attached. |
 | **Edit columns** | Opens the dataset drawer to add, rename, retype or remove columns. |
 | **Run experiment** | Opens the Experiments workbench with this dataset loaded. See [Experiments](/evaluations/experiments/overview). |
 
 <Frame>
-<img src="/images/datasets/dataset-add-rows-csv.png" alt="The Add rows from CSV modal with one select per dataset column" />
+<img src="/images/datasets/dataset-add-rows-csv.png" alt="The Add rows from CSV modal with a CSV file attached and a Select column control for the input and expected_output columns" />
 </Frame>
 
 Click a cell to edit it. **Add row** under the grid appends an empty row. Select rows with the checkboxes and click **Delete** to remove them. Every change saves as you make it.
@@ -85,7 +85,7 @@ The row menu in the datasets list has **Replicate to another project**, **Edit d
 Open the [Trace Explorer](https://app.langwatch.ai/@project/traces), select the traces with the checkboxes, and click **Add to dataset** in the action bar. From an open trace, the header menu has **Add trace to dataset** and, for a multi-turn conversation, **Add conversation to dataset**.
 
 <Frame>
-<img src="/images/datasets/trace-explorer-add-to-dataset.png" alt="The Trace Explorer with rows selected and the action bar showing Add to dataset" />
+<img src="/images/datasets/trace-explorer-add-to-dataset.png" alt="The Trace Explorer with three traces selected and the action bar: Export selected, Add to context, Add to annotation queue and Add to dataset" />
 </Frame>
 
 The **Add to Dataset** drawer has three parts:
@@ -95,7 +95,7 @@ The **Add to Dataset** drawer has three parts:
 3. **Preview**: the rows that will be added. Double-click a cell to edit it, and untick a row to leave it out.
 
 <Frame>
-<img src="/images/datasets/add-to-dataset-drawer.png" alt="The Add to Dataset drawer with the mapping on Current Trace and the preview rows" />
+<img src="/images/datasets/add-to-dataset-drawer.png" alt="The Add to Dataset drawer with the Current Trace mapping of input and output onto the dataset columns and the three preview rows that will be added" />
 </Frame>
 
 Click **Add N rows to dataset**. LangWatch remembers the mapping per dataset, so the next time you add traces to it the mapping is already set.
