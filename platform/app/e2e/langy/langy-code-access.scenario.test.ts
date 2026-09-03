@@ -127,12 +127,16 @@ describe("Langy reaches the code through the shared folder", () => {
                 });
                 seenTurns.push(autoTurnId);
                 await watcher!.waitForIdle(LONG_RUN_TIMEOUT_MS);
-                autoTurnText = await watcher!.lastAssistantText();
+                autoTurnText = await watcher!.lastAssistantText({
+                  turnId: autoTurnId,
+                });
                 // The tool record of this turn goes in front of the judge too.
                 // The panel started the turn, so it never passed through the
                 // adapter, and a reply with no calls behind it reads as
                 // ungrounded however true it is.
-                for (const message of await watcher!.lastTurnMessages()) {
+                for (const message of await watcher!.lastTurnMessages({
+                  turnId: autoTurnId,
+                })) {
                   await executor.message(message as never);
                 }
               },

@@ -147,7 +147,11 @@ describe("Langy changes a connected agent through the shared folder", () => {
                 // The panel started that turn, so it never passed through the
                 // adapter. Its tool record goes in front of the judge here, or
                 // the whole change reads as a plan Langy never carried out.
-                for (const message of await watcher!.lastTurnMessages()) {
+                // The turn is named: idle says the turn ended, and the answer
+                // row can land a moment later.
+                for (const message of await watcher!.lastTurnMessages({
+                  turnId: autoTurnId,
+                })) {
                   await executor.message(message as never);
                 }
               },

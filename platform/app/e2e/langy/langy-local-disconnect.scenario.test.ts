@@ -118,7 +118,9 @@ describe("Langy notices when the shared folder goes away", () => {
                 // The panel started that turn, so it never passed through the
                 // adapter. Its tool record goes in front of the judge here, or
                 // everything the next reply says about it reads as ungrounded.
-                for (const message of await watcher!.lastTurnMessages()) {
+                for (const message of await watcher!.lastTurnMessages({
+                  turnId: autoTurnId,
+                })) {
                   await executor.message(message as never);
                 }
               },

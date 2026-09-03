@@ -694,23 +694,69 @@ export interface ConversationWatcher {
     knownTurnIds: string[];
     timeoutMs?: number;
   }) => Promise<string>;
-  /** Wait until no turn is in flight. */
+  /**
+   * Wait until no turn is in flight.
+   *
+   * Idle says the turn ended, not that its answer is already readable: the
+   * fold and the message projection consume the same event on separate
+   * queues, so `currentTurnId` can be null a moment before the answer row
+   * exists. Ask for a turn's own messages with `turnId`, which waits for it.
+   */
   waitForIdle: (timeoutMs?: number) => Promise<void>;
   /** The whole conversation, as the panel would render it. */
   transcript: () => Promise<string>;
-  /** The text of the last assistant message. */
-  lastAssistantText: () => Promise<string>;
   /**
-   * The last assistant message as a judge reads a turn: the tool calls it made
-   * and what they answered, then its reply.
+   * The text of one turn's answer, or of the last answer stored when no turn
+   * is named.
+   */
+  lastAssistantText: (input?: {
+    turnId?: string;
+    timeoutMs?: number;
+  }) => Promise<string>;
+  /**
+   * One turn's answer as a judge reads it: the tool calls it made and what
+   * they answered, then its reply.
    *
    * A turn the panel starts on its own never passes through the scenario
    * adapter, so nothing else puts its work in front of the judge. Feeding only
    * the reply leaves every claim in it looking ungrounded, which is a fact
    * about the harness and not about the answer.
+   *
+   * Name the turn with `turnId`. Without it the read takes whatever answer is
+   * last right now, which after a turn that just ended can still be the answer
+   * before it.
    */
-  lastTurnMessages: () => Promise<JudgeMessage[]>;
+  lastTurnMessages: (input?: {
+    turnId?: string;
+    timeoutMs?: number;
+  }) => Promise<JudgeMessage[]>;
   stop: () => void;
+}
+
+/** One message of the stored conversation, as `langy.messages` returns it. */
+export interface StoredMessage {
+  id: string;
+  role: string;
+  parts: Array<Record<string, unknown>>;
+}
+
+/**
+ * The stored answer of one turn.
+ *
+ * The answer message of a turn carries the turn id inside its own message id,
+ * which is how the product keeps a turn's finalize idempotent. That is the one
+ * link between a turn and its stored answer, so a read can wait for the right
+ * message instead of taking whichever answer is last.
+ */
+export function answerOfTurn(
+  messages: StoredMessage[],
+  turnId: string,
+): StoredMessage | null {
+  return (
+    messages.find(
+      (message) => message.role === "assistant" && message.id.endsWith(turnId),
+    ) ?? null
+  );
 }
 
 interface StreamEntry {
@@ -919,7 +965,11 @@ export function watchLangyConversation({
 
   const readConversation = async (): Promise<{
     currentTurnId: string | null;
-    messages: Array<{ role: string; parts: Array<Record<string, unknown>> }>;
+    messages: Array<{
+      id: string;
+      role: string;
+      parts: Array<Record<string, unknown>>;
+    }>;
   } | null> => {
     const conversationId = adapter.state.conversationId;
     if (!conversationId) return null;
@@ -1004,6 +1054,51 @@ export function watchLangyConversation({
     ];
   };
 
+  const lastAnswer = async (): Promise<StoredMessage | null> => {
+    const snapshot = await readConversation();
+    const assistant = ((snapshot?.messages ?? []) as StoredMessage[]).filter(
+      (message) => message.role === "assistant",
+    );
+    return assistant[assistant.length - 1] ?? null;
+  };
+
+  /**
+   * Read a turn's answer, waiting for it to be stored.
+   *
+   * A turn that has just gone idle may have no answer row yet: the fold that
+   * clears `currentTurnId` and the projection that writes the message consume
+   * the same event on separate queues.
+   */
+  const readTurnAnswer = async ({
+    turnId,
+    timeoutMs = 60_000,
+  }: {
+    turnId?: string;
+    timeoutMs?: number;
+  }): Promise<StoredMessage | null> => {
+    if (!turnId) return await lastAnswer();
+    try {
+      return await waitFor({
+        what: `the stored answer of turn ${turnId}`,
+        timeoutMs,
+        intervalMs: 1_000,
+        read: async () => {
+          const snapshot = await readConversation();
+          return answerOfTurn(
+            (snapshot?.messages ?? []) as StoredMessage[],
+            turnId,
+          );
+        },
+      });
+    } catch (error) {
+      // A turn that failed stores no answer of its own. The last answer is
+      // then the best the judge can be given, which is what this read did
+      // before it could name a turn.
+      console.log(`[fixture] no stored answer for ${turnId}: ${String(error)}`);
+      return await lastAnswer();
+    }
+  };
+
   return {
     permissions,
     questions,
@@ -1036,22 +1131,14 @@ export function watchLangyConversation({
         .map((message) => `### ${message.role}\n\n${messageText(message)}`)
         .join("\n\n");
     },
-    lastAssistantText: async () => {
-      const snapshot = await readConversation();
-      const assistant = (snapshot?.messages ?? []).filter(
-        (message) => message.role === "assistant",
-      );
-      const last = assistant[assistant.length - 1];
-      return last ? messageText(last) : "";
+    lastAssistantText: async (input = {}) => {
+      const answer = await readTurnAnswer(input);
+      return answer ? messageText(answer) : "";
     },
-    lastTurnMessages: async () => {
-      const snapshot = await readConversation();
-      const assistant = (snapshot?.messages ?? []).filter(
-        (message) => message.role === "assistant",
-      );
-      const last = assistant[assistant.length - 1];
-      if (!last) return [];
-      return judgeMessagesOf(last);
+    lastTurnMessages: async (input = {}) => {
+      const answer = await readTurnAnswer(input);
+      if (!answer) return [];
+      return judgeMessagesOf(answer);
     },
     stop: () => {
       stopped = true;
