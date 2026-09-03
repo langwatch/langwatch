@@ -12,6 +12,7 @@
  */
 import { z } from "zod";
 import { datasetRecordFormSchema, datasetRecordInputSchema } from "./dataset";
+import type { Dataset, DatasetNameResult, DatasetSummary } from "./dataset";
 
 /**
  * The half of a dataset write that is the same either way: the tenant key and
@@ -96,3 +97,33 @@ export type DatasetApiDeleteInput = z.infer<typeof datasetApiDeleteInputSchema>;
 export type DatasetApiUpdateMappingInput = z.infer<typeof datasetApiUpdateMappingInputSchema>;
 export type DatasetApiFindNextNameInput = z.infer<typeof datasetApiFindNextNameInputSchema>;
 export type DatasetApiCopyInput = z.infer<typeof datasetApiCopyInputSchema>;
+
+/**
+ * The whole `upsert` payload, as one type.
+ *
+ * The router chains the two parsers above, so what a client sends is their
+ * intersection; the split exists for the authorization sweep's benefit and a
+ * caller should not have to know that.
+ */
+export type DatasetApiUpsertInput = DatasetApiUpsertBaseInput & DatasetApiUpsertTargetInput;
+
+/**
+ * What the five reads and writes the studio borrows answer.
+ *
+ * `Dataset`, `DatasetSummary` and `DatasetNameResult` are this contract's own
+ * zod-inferred shapes, and {@link DatasetService} declares exactly these
+ * returns, so stating them restates nothing and leaks no Prisma row.
+ *
+ * Two of them are the TRANSPORT's shape rather than the service's, and that is
+ * deliberate: `getAll` answers `listDatasets`'s `data` page without the
+ * pagination block beside it, and `getById` answers `null` where the service
+ * refuses, because the router catches its not-found and hands the picker an
+ * empty selection instead.
+ */
+export type DatasetApiGetAllOutput = DatasetSummary[];
+export type DatasetApiGetByIdOutput = Dataset | null;
+export type DatasetApiUpsertOutput = Dataset;
+export type DatasetApiValidateNameOutput = DatasetNameResult;
+
+/** The next free name itself — the copy dialog puts it straight in the field. */
+export type DatasetApiFindNextNameOutput = string;

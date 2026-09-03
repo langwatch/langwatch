@@ -11,6 +11,7 @@
  */
 import { z } from "zod";
 import { evaluatorTypeSchema } from "./evaluator";
+import type { Evaluator, EvaluatorWithFields } from "./evaluator";
 
 /** One project. The list read names it and nothing else. */
 export const evaluatorApiProjectInputSchema = z.object({ projectId: z.string() });
@@ -82,3 +83,39 @@ export type EvaluatorApiEvaluatorInput = z.infer<typeof evaluatorApiEvaluatorInp
 export type EvaluatorApiSlugInput = z.infer<typeof evaluatorApiSlugInputSchema>;
 export type EvaluatorApiUpdateInput = z.infer<typeof evaluatorApiUpdateInputSchema>;
 export type EvaluatorApiPushToCopiesInput = z.infer<typeof evaluatorApiPushToCopiesInputSchema>;
+
+/**
+ * The create payload a browser sends, as a declared type.
+ *
+ * The schema is a factory — it takes the id generator, because which id scheme
+ * a deployment uses is the process's decision — so the alias is taken over the
+ * factory's return rather than over a schema constant.
+ *
+ * `z.input` rather than `z.infer`, and the difference is load bearing: `id`
+ * carries `.default(generateEvaluatorId)`, so the parsed shape has it and what
+ * a client SENDS does not. Inferring the parsed shape here would make the id
+ * the browser never mints a required field, the way `UpdateAgentCommand` in
+ * `@langwatch/agent-contract` already does for its own defaulted keys.
+ */
+export type EvaluatorApiCreateInput = z.input<
+  ReturnType<typeof evaluatorApiCreateInputSchema>
+>;
+
+/**
+ * What the five reads and writes the studio borrows answer.
+ *
+ * `Evaluator` and `EvaluatorWithFields` are this contract's own zod-inferred
+ * shapes, and {@link EvaluatorService} declares exactly these returns — the
+ * Prisma repository parses its rows through `evaluatorSchema` before they get
+ * this far — so stating them restates nothing and leaks no Prisma row.
+ *
+ * `getById` answers `null` rather than refusing: the studio opens the drawer
+ * on an evaluator the project may no longer have.
+ */
+export type EvaluatorApiGetAllOutput = EvaluatorWithFields[];
+export type EvaluatorApiGetByIdOutput = EvaluatorWithFields | null;
+export type EvaluatorApiCreateOutput = Evaluator;
+export type EvaluatorApiUpdateOutput = Evaluator;
+
+/** Deleting archives the row and answers it, so the caller can offer an undo. */
+export type EvaluatorApiDeleteOutput = Evaluator;

@@ -51,6 +51,8 @@ import {
   modelProviderValidateApiKeyTrpcInputSchema,
   modelProviderValidateKeyWithCustomUrlTrpcInputSchema,
   type CodexTokenKeys,
+  type ModelDefaultResolvedTrpcOutput,
+  type ModelProviderListAllForProjectTrpcOutput,
   type ModelProviderListEntry,
   type ModelProviderService,
 } from "@langwatch/model-provider-contract";
@@ -263,9 +265,17 @@ function toLegacyProvider(provider: CanonicalProvider): ModelProviderListEntry {
   };
 }
 
+/**
+ * The entry is `as const` so `Object.fromEntries` sees a two-tuple and takes
+ * its typed overload. Without it the call is only one refactor away from the
+ * `Iterable<readonly any[]>: any` overload — today's tuple is inferred from
+ * the callback's contextual type, and a hoisted `const entries` is enough to
+ * lose it. An erased map answers `any` for both provider reads, which
+ * `toLegacyProvider`'s annotation cannot catch: `any` satisfies it.
+ */
 function toLegacyProviderMap(providers: Record<string, CanonicalProvider>) {
   return Object.fromEntries(
-    Object.entries(providers).map(([key, provider]) => [key, toLegacyProvider(provider)]),
+    Object.entries(providers).map(([key, provider]) => [key, toLegacyProvider(provider)] as const),
   );
 }
 
@@ -326,7 +336,7 @@ export class ModelProviderTrpcApi {
        */
       listAllForProjectForFrontend: policy("project:view")(
         procedure.input(modelProviderProjectTrpcInputSchema),
-      ).query(async ({ input, ctx }) => {
+      ).query(async ({ input, ctx }): Promise<ModelProviderListAllForProjectTrpcOutput> => {
         return (await ctx.app.modelProviders.listForProject({ projectId: input.projectId })).map(
           toLegacyProvider,
         );
@@ -583,7 +593,7 @@ export class ModelProviderTrpcApi {
        */
       getResolvedDefault: policy("project:view")(
         procedure.input(modelDefaultResolvedTrpcInputSchema),
-      ).query(async ({ input, ctx }) => {
+      ).query(async ({ input, ctx }): Promise<ModelDefaultResolvedTrpcOutput> => {
         return ctx.app.modelProviders.tryGetResolvedDefault({
           projectId: input.projectId,
           featureKey: input.featureKey,

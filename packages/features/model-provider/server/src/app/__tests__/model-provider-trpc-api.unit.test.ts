@@ -11,9 +11,12 @@
  * installed before `.input()` reads `undefined`, so every declaration that
  * resolves a scope id from the input would fail open.
  */
-import type { ModelProviderService } from "@langwatch/model-provider-contract";
+import type {
+  ModelProviderListEntry,
+  ModelProviderService,
+} from "@langwatch/model-provider-contract";
 import { initTRPC, TRPCError } from "@trpc/server";
-import { describe, expect, it, vi } from "vitest";
+import { describe, expect, expectTypeOf, it, vi } from "vitest";
 
 import { ModelProviderApp } from "../model-provider.app";
 import { ModelProviderTrpcApi } from "../../transport/api-trpc/model-provider.api";
@@ -435,6 +438,38 @@ describe("ModelProviderTrpcApi", () => {
       expect(validateProviderApiKey).toHaveBeenCalledWith("openai", {
         OPENAI_API_KEY: "sk-typed-by-the-customer",
       });
+    });
+  });
+
+  /**
+   * `toLegacyProviderMap` builds its entries with `Object.fromEntries`, whose
+   * untyped `Iterable<readonly any[]>` overload erases the whole map to `any`
+   * the moment the entry stops being inferred as a two-tuple — and a router
+   * output of `any` is invisible: it type-checks everywhere and tells the
+   * browser nothing. `toLegacyProvider`'s own annotation cannot catch that,
+   * because `any` is assignable to it. These assertions are type-level; they
+   * fail the package's `typecheck`, not its test run.
+   */
+  describe("given the two provider reads whose entries fromEntries builds", () => {
+    type Caller = ReturnType<typeof harness>["caller"];
+    type ProviderMap = Record<string, ModelProviderListEntry>;
+
+    it("answers getAllForProject with the contract's list entries, never any", () => {
+      type Output = Awaited<ReturnType<Caller["getAllForProject"]>>;
+
+      expectTypeOf<Output>().not.toBeAny();
+      expectTypeOf<Output>().toEqualTypeOf<ProviderMap>();
+      expect(Object.keys(harness().router._def.procedures)).toContain("getAllForProject");
+    });
+
+    it("answers getAllForProjectForFrontend with the contract's list entries, never any", () => {
+      type Output = Awaited<ReturnType<Caller["getAllForProjectForFrontend"]>>;
+
+      expectTypeOf<Output>().not.toBeAny();
+      expectTypeOf<Output>().toEqualTypeOf<ProviderMap>();
+      expect(Object.keys(harness().router._def.procedures)).toContain(
+        "getAllForProjectForFrontend",
+      );
     });
   });
 });

@@ -401,9 +401,16 @@ export class TracesTrpcApi {
           withEditOverlay: input.withEditOverlay,
         });
 
+        // `as const` is what keeps the answer a `Record<string, string>`: the
+        // `await` between the map and `Object.fromEntries` breaks the
+        // contextual typing that would infer the entry as a two-tuple, so
+        // untupled this lands on the `Iterable<readonly any[]>: any` overload
+        // and erases the procedure's output.
         return Object.fromEntries(
           await Promise.all(
-            traces.map(async (t) => [t.trace_id, await ports.formatSpansDigest(t.spans ?? [])]),
+            traces.map(
+              async (t) => [t.trace_id, await ports.formatSpansDigest(t.spans ?? [])] as const,
+            ),
           ),
         );
       }),

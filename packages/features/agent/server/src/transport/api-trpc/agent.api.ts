@@ -13,6 +13,7 @@ import {
   InvalidAgentConfigError,
   updateAgentCommandSchema,
 } from "@langwatch/agent-contract";
+import type { AgentApiUpdateOutput } from "@langwatch/agent-contract";
 import type { AuthzPermission } from "@langwatch/authz-contract";
 import {
   TRPCError,
@@ -175,7 +176,7 @@ export class AgentTrpcApi {
       ),
 
       update: policy("evaluations:manage")(procedure.input(updateAgentCommandSchema)).mutation(
-        async ({ ctx, input }) => {
+        async ({ ctx, input }): Promise<AgentApiUpdateOutput> => {
           ctx.actor();
           return withAgentErrors(() => ctx.app.agents.update(input));
         },

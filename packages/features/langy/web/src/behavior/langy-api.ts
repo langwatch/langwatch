@@ -28,6 +28,7 @@ import type {
   LangyConversationListCursorDto,
   LangyConversationListItemDto,
 } from "@langwatch/langy-contract";
+import type { ModelDefaultResolvedTrpcOutput } from "@langwatch/model-provider-contract";
 import { createFeatureApi } from "@langwatch/platform-api-client";
 
 /**
@@ -109,7 +110,12 @@ export type LangyApiMap = {
    * application still serves land on ONE React Query cache entry.
    */
   modelProvider: {
-    getResolvedDefault: Q;
+    getResolvedDefault: {
+      query: {
+        input: { projectId: string; featureKey: string };
+        output: ModelDefaultResolvedTrpcOutput;
+      };
+    };
     setFeatureOverrideForScope: M;
     setRoleAssignmentForScope: M;
   };

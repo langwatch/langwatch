@@ -17,6 +17,8 @@ import {
   ROUTING_HANDLE_MAX_LENGTH,
   ROUTING_HANDLE_RULE,
 } from "./model-provider";
+import type { ModelDefaultEffective } from "./model-provider";
+import type { ModelProviderListEntry } from "./model-provider-list-entry";
 
 /**
  * The scope-assignment shape the clients send. Deliberately not the
@@ -212,3 +214,19 @@ export const modelDefaultInheritedValuesTrpcInputSchema = z.object({
   scopes: modelDefaultScopedConfigInputSchema,
   excludeConfigId: z.string().optional(),
 });
+
+/**
+ * What the two reads the studio and the dock borrow answer.
+ *
+ * Both are this contract's own zod-inferred shapes.
+ * `listAllForProjectForFrontend` answers the LIST PROJECTION rather than
+ * `ModelProviderSummary`: the transport maps every row through the same
+ * function the two `getAllForProject*` reads use, which is what
+ * `ModelProviderListEntry` was declared for.
+ *
+ * `getResolvedDefault` answers `null` when nothing resolves — no override, no
+ * role default and no provider to infer one from — and the caller falls back
+ * to its own choice rather than refusing.
+ */
+export type ModelProviderListAllForProjectTrpcOutput = ModelProviderListEntry[];
+export type ModelDefaultResolvedTrpcOutput = ModelDefaultEffective | null;

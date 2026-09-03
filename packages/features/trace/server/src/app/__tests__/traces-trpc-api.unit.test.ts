@@ -16,7 +16,7 @@ import type { TraceLegacyReadPort } from "../../ports/trace-legacy-read.port";
 import { TracesTrpcApi } from "../../transport/api-trpc/traces.api";
 import { TraceApp, type TraceAppDependencies } from "../trace.app";
 import { initTRPC } from "@trpc/server";
-import { beforeEach, describe, expect, it, vi } from "vitest";
+import { beforeEach, describe, expect, expectTypeOf, it, vi } from "vitest";
 import { z } from "zod";
 
 const filterInputSchema = z.object({
@@ -318,6 +318,28 @@ describe("TracesTrpcApi", () => {
         undefined,
         { withEditOverlay: true },
       );
+    });
+  });
+
+  /**
+   * `getFormattedSpansDigest` builds its answer with `Object.fromEntries` over
+   * a `Promise.all`. The `await` between the two breaks the contextual typing
+   * that would otherwise infer the entry as a two-tuple, so without an
+   * explicit one the call lands on `Object.fromEntries`'s
+   * `Iterable<readonly any[]>: any` overload and the procedure's output is
+   * erased outright — a router that answers `any` type-checks everywhere and
+   * tells the browser nothing. These assertions are type-level; they fail the
+   * package's `typecheck`, not its test run.
+   */
+  describe("given the digest map fromEntries builds behind a Promise.all", () => {
+    it("answers a map of trace id to digest, never any", () => {
+      type Output = Awaited<
+        ReturnType<ReturnType<typeof harness>["caller"]["getFormattedSpansDigest"]>
+      >;
+
+      expectTypeOf<Output>().not.toBeAny();
+      expectTypeOf<Output>().toEqualTypeOf<Record<string, string>>();
+      expect(Object.keys(harness().router._def.procedures)).toContain("getFormattedSpansDigest");
     });
   });
 });

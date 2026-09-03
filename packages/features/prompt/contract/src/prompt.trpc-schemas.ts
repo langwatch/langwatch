@@ -24,6 +24,7 @@ import {
   runtimeParametersSchema,
 } from "./prompt.field-schemas";
 import { promptingTechniqueSchema, promptScopeSchema } from "./prompt";
+import type { PromptTagAssignment, VersionedPrompt } from "./prompt";
 
 /** One project, named by the surface that is reading it. */
 export const promptProjectTrpcInputSchema = z.object({ projectId: z.string() });
@@ -195,3 +196,46 @@ export type PromptCreateTrpcInput = z.infer<
 export type PromptUpdateTrpcInput = z.infer<
   ReturnType<typeof createPromptUpdateTrpcInputSchema<typeof nodeDatasetSchema>>
 >;
+
+/**
+ * The input shapes the nine borrowed procedures take, as declared types.
+ *
+ * The schemas above were already this contract's; only the `z.infer` aliases
+ * were missing, and without them a browser package could name the wire shape
+ * only by inferring it through the whole application router — the inference a
+ * feature-web package may not do.
+ */
+export type PromptProjectTrpcInput = z.infer<typeof promptProjectTrpcInputSchema>;
+export type PromptIdOrHandleTrpcInput = z.infer<typeof promptIdOrHandleTrpcInputSchema>;
+export type PromptUpdateHandleTrpcInput = z.infer<typeof promptUpdateHandleTrpcInputSchema>;
+export type PromptGetByIdOrHandleTrpcInput = z.infer<typeof promptGetByIdOrHandleTrpcInputSchema>;
+export type PromptHandleUniquenessTrpcInput = z.infer<typeof promptHandleUniquenessTrpcInputSchema>;
+export type PromptConfigTagsTrpcInput = z.infer<typeof promptConfigTagsTrpcInputSchema>;
+export type PromptAssignTagTrpcInput = z.infer<typeof promptAssignTagTrpcInputSchema>;
+
+/**
+ * What those procedures answer.
+ *
+ * Every one of them is this contract's own DTO already: `VersionedPrompt` and
+ * `PromptTagAssignment` are the zod-inferred shapes `prompt.ts` declares, and
+ * {@link PromptService} — which `@langwatch/prompt-server`'s application layer
+ * implements and its tRPC transport returns straight through — declares
+ * exactly these returns. So stating them here restates nothing and leaks no
+ * Prisma row.
+ *
+ * `getByIdOrHandle` answers `null` rather than refusing: the transport calls
+ * the application's `tryGetByIdOrHandle`, and the drawer renders an empty form
+ * for a prompt that is not there yet.
+ */
+export type PromptGetAllForProjectTrpcOutput = VersionedPrompt[];
+export type PromptGetByIdOrHandleTrpcOutput = VersionedPrompt | null;
+export type PromptGetAllVersionsTrpcOutput = VersionedPrompt[];
+export type PromptCreateTrpcOutput = VersionedPrompt;
+export type PromptUpdateTrpcOutput = VersionedPrompt;
+export type PromptUpdateHandleTrpcOutput = VersionedPrompt;
+
+/** Whether the handle is still free — the drawer's inline validation reads it. */
+export type PromptHandleUniquenessTrpcOutput = boolean;
+
+export type PromptConfigTagsTrpcOutput = PromptTagAssignment[];
+export type PromptAssignTagTrpcOutput = PromptTagAssignment;

@@ -10,6 +10,7 @@
  */
 import { z } from "zod";
 import { createAgentCommandSchema } from "./agent.commands";
+import type { AgentWithFields } from "./agent";
 
 /** One project. The list read names it and nothing else. */
 export const agentApiProjectInputSchema = z.object({ projectId: z.string() });
@@ -58,3 +59,15 @@ export type AgentApiProjectInput = z.infer<typeof agentApiProjectInputSchema>;
 export type AgentApiAgentInput = z.infer<typeof agentApiAgentInputSchema>;
 export type AgentApiAgentReferenceInput = z.infer<typeof agentApiAgentReferenceInputSchema>;
 export type AgentApiPushToCopiesInput = z.infer<typeof agentApiPushToCopiesInputSchema>;
+
+/**
+ * What the write the studio borrows answers.
+ *
+ * `AgentWithFields` is this contract's own zod-inferred shape and
+ * {@link AgentService} declares exactly this return, so stating it restates
+ * nothing and leaks no Prisma row. `update` is the one of the three `agents.*`
+ * procedures the studio calls that hands the application's answer straight
+ * back — `getAll` and `getById` are reshaped by the transport, which is why
+ * only this one is stated here.
+ */
+export type AgentApiUpdateOutput = AgentWithFields;

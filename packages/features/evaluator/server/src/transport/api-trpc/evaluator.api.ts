@@ -22,6 +22,13 @@
  */
 import { PermissionDeniedError } from "@langwatch/authz-contract";
 import type { AuthzPermission } from "@langwatch/authz-contract";
+import type {
+  EvaluatorApiCreateOutput,
+  EvaluatorApiDeleteOutput,
+  EvaluatorApiGetAllOutput,
+  EvaluatorApiGetByIdOutput,
+  EvaluatorApiUpdateOutput,
+} from "@langwatch/evaluator-contract";
 import {
   evaluatorApiCopyInputSchema,
   evaluatorApiCreateInputSchema,
@@ -157,7 +164,7 @@ export class EvaluatorTrpcApi {
        * Fields include required/optional inputs derived from evaluator type.
        */
       getAll: policy("evaluations:view")(procedure.input(evaluatorApiProjectInputSchema)).query(
-        async ({ ctx, input }) => {
+        async ({ ctx, input }): Promise<EvaluatorApiGetAllOutput> => {
           return await ctx.app.evaluatorApp.getAllWithFields({
             projectId: input.projectId,
           });
@@ -170,7 +177,7 @@ export class EvaluatorTrpcApi {
        */
       getById: policy("evaluations:view")(
         procedure.input(evaluatorApiEvaluatorIdInputSchema),
-      ).query(async ({ ctx, input }) => {
+      ).query(async ({ ctx, input }): Promise<EvaluatorApiGetByIdOutput> => {
         return await ctx.app.evaluatorApp.tryGetByIdWithFields({
           id: input.id,
           projectId: input.projectId,
@@ -189,7 +196,7 @@ export class EvaluatorTrpcApi {
 
       /** Creates a new evaluator. */
       create: policy("evaluations:manage")(procedure.input(createInputSchema)).mutation(
-        async ({ ctx, input }) => {
+        async ({ ctx, input }): Promise<EvaluatorApiCreateOutput> => {
           // If workflowId is provided, check if an evaluator already exists for this workflow
           if (input.workflowId) {
             const existingEvaluator = await ctx.app.evaluatorApp.tryGetByWorkflow({
@@ -223,7 +230,7 @@ export class EvaluatorTrpcApi {
 
       /** Updates an existing evaluator. */
       update: policy("evaluations:manage")(procedure.input(evaluatorApiUpdateInputSchema)).mutation(
-        async ({ ctx, input }) => {
+        async ({ ctx, input }): Promise<EvaluatorApiUpdateOutput> => {
           return await ctx.app.evaluatorApp.update({
             id: input.id,
             projectId: input.projectId,
@@ -308,7 +315,7 @@ export class EvaluatorTrpcApi {
       /** Soft deletes an evaluator. */
       delete: policy("evaluations:manage")(
         procedure.input(evaluatorApiEvaluatorIdInputSchema),
-      ).mutation(async ({ ctx, input }) => {
+      ).mutation(async ({ ctx, input }): Promise<EvaluatorApiDeleteOutput> => {
         return await ctx.app.evaluatorApp.archive({
           id: input.id,
           projectId: input.projectId,

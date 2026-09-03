@@ -6,6 +6,17 @@
  * refusals and what a copy receives from its source all live on the
  * application, where a second door reaches the same answers.
  */
+import type {
+  PromptAssignTagTrpcOutput,
+  PromptConfigTagsTrpcOutput,
+  PromptCreateTrpcOutput,
+  PromptGetAllForProjectTrpcOutput,
+  PromptGetAllVersionsTrpcOutput,
+  PromptGetByIdOrHandleTrpcOutput,
+  PromptHandleUniquenessTrpcOutput,
+  PromptUpdateHandleTrpcOutput,
+  PromptUpdateTrpcOutput,
+} from "@langwatch/prompt-contract";
 import {
   createPromptCreateTrpcInputSchema,
   createPromptUpdateTrpcInputSchema,
@@ -66,7 +77,7 @@ export class PromptTrpcApi {
        */
       getAllPromptsForProject: policy("prompts:view")(
         procedure.input(promptProjectTrpcInputSchema),
-      ).query(async ({ ctx, input }) => {
+      ).query(async ({ ctx, input }): Promise<PromptGetAllForProjectTrpcOutput> => {
         return await ctx.app.prompts.listForProject(input);
       }),
 
@@ -117,7 +128,7 @@ export class PromptTrpcApi {
        * Create a new prompt
        */
       create: policy("prompts:create")(procedure.input(createInputSchema)).mutation(
-        async ({ ctx, input }) => {
+        async ({ ctx, input }): Promise<PromptCreateTrpcOutput> => {
           const author = ctx.actor();
 
           const result = await ctx.app.prompts.create(
@@ -140,7 +151,7 @@ export class PromptTrpcApi {
        * Use the updateHandle method instead for those.
        */
       update: policy("prompts:update")(procedure.input(updateInputSchema)).mutation(
-        async ({ ctx, input }) => {
+        async ({ ctx, input }): Promise<PromptUpdateTrpcOutput> => {
           return await ctx.app.prompts.update(
             {
               idOrHandle: input.id,
@@ -157,7 +168,7 @@ export class PromptTrpcApi {
        */
       updateHandle: policy("prompts:update")(
         procedure.input(promptUpdateHandleTrpcInputSchema),
-      ).mutation(async ({ ctx, input }) => {
+      ).mutation(async ({ ctx, input }): Promise<PromptUpdateHandleTrpcOutput> => {
         return await ctx.app.prompts.updateHandle({
           idOrHandle: input.id,
           projectId: input.projectId,
@@ -176,7 +187,7 @@ export class PromptTrpcApi {
        */
       getByIdOrHandle: policy("prompts:view")(
         procedure.input(promptGetByIdOrHandleTrpcInputSchema),
-      ).query(async ({ ctx, input }) => {
+      ).query(async ({ ctx, input }): Promise<PromptGetByIdOrHandleTrpcOutput> => {
         return await ctx.app.prompts.tryGetByIdOrHandle(input);
       }),
 
@@ -185,7 +196,7 @@ export class PromptTrpcApi {
        */
       checkHandleUniqueness: policy("prompts:view")(
         procedure.input(promptHandleUniquenessTrpcInputSchema),
-      ).query(async ({ ctx, input }) => {
+      ).query(async ({ ctx, input }): Promise<PromptHandleUniquenessTrpcOutput> => {
         return await ctx.app.prompts.checkHandleUniqueness(input);
       }),
 
@@ -203,7 +214,7 @@ export class PromptTrpcApi {
        */
       getAllVersionsForPrompt: policy("prompts:view")(
         procedure.input(promptIdOrHandleTrpcInputSchema),
-      ).query(async ({ ctx, input }) => {
+      ).query(async ({ ctx, input }): Promise<PromptGetAllVersionsTrpcOutput> => {
         return await ctx.app.prompts.listVersions(input);
       }),
 
@@ -402,7 +413,7 @@ export class PromptTrpcApi {
        */
       getTagsForConfig: policy("prompts:view")(
         procedure.input(promptConfigTagsTrpcInputSchema),
-      ).query(async ({ ctx, input }) => {
+      ).query(async ({ ctx, input }): Promise<PromptConfigTagsTrpcOutput> => {
         return ctx.app.prompts.getTagsForConfig({
           configId: input.configId,
           projectId: input.projectId,
@@ -414,7 +425,7 @@ export class PromptTrpcApi {
        * Accepts built-in tags (production, staging) and custom tags defined for the org.
        */
       assignTag: policy("prompts:update")(procedure.input(promptAssignTagTrpcInputSchema)).mutation(
-        async ({ ctx, input }) => {
+        async ({ ctx, input }): Promise<PromptAssignTagTrpcOutput> => {
           return await ctx.app.prompts.assignTag(
             {
               configId: input.configId,

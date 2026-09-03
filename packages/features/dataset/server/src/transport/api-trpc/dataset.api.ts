@@ -26,6 +26,13 @@
  * Spec: packages/features/dataset/specs/dataset-service.feature.
  */
 import type { AuthzPermission } from "@langwatch/authz-contract";
+import type {
+  DatasetApiFindNextNameOutput,
+  DatasetApiGetAllOutput,
+  DatasetApiGetByIdOutput,
+  DatasetApiUpsertOutput,
+  DatasetApiValidateNameOutput,
+} from "@langwatch/dataset-contract";
 import {
   datasetApiCopyInputSchema,
   datasetApiDatasetInputSchema,
@@ -210,7 +217,7 @@ export class DatasetTrpcApi {
         procedure.input(datasetApiUpsertBaseInputSchema).input(datasetApiUpsertTargetInputSchema),
       )
         .use(datasetErrorHandler)
-        .mutation(async ({ ctx, input }) => {
+        .mutation(async ({ ctx, input }): Promise<DatasetApiUpsertOutput> => {
           // Borrowing the experiment's name when the caller named one is the
           // application's rule, not this transport's: the REST patch fills the
           // same hole from the dataset it is replacing, and one upsert decides
@@ -230,13 +237,13 @@ export class DatasetTrpcApi {
         procedure.input(datasetApiValidateNameInputSchema),
       )
         .use(datasetErrorHandler)
-        .query(async ({ input, ctx }) => {
+        .query(async ({ input, ctx }): Promise<DatasetApiValidateNameOutput> => {
           return await ctx.app.dataset.validateDatasetName(input);
         }),
 
       /** Every dataset in the project, for the list and picker surfaces. */
       getAll: policy("datasets:view")(procedure.input(datasetApiProjectInputSchema)).query(
-        async ({ input, ctx }) => {
+        async ({ input, ctx }): Promise<DatasetApiGetAllOutput> => {
           const result = await ctx.app.dataset.listDatasets({
             projectId: input.projectId,
             page: 1,
@@ -251,7 +258,7 @@ export class DatasetTrpcApi {
        * rather than failing the page that asked for it.
        */
       getById: policy("datasets:view")(procedure.input(datasetApiDatasetInputSchema)).query(
-        async ({ input, ctx }) => {
+        async ({ input, ctx }): Promise<DatasetApiGetByIdOutput> => {
           try {
             return await ctx.app.dataset.getBySlugOrId({
               projectId: input.projectId,
@@ -291,7 +298,7 @@ export class DatasetTrpcApi {
       /** The next free name for a proposed one. */
       findNextName: policy("datasets:view")(procedure.input(datasetApiFindNextNameInputSchema))
         .use(datasetErrorHandler)
-        .query(async ({ input, ctx }) => {
+        .query(async ({ input, ctx }): Promise<DatasetApiFindNextNameOutput> => {
           return await ctx.app.dataset.findNextAvailableName(input);
         }),
 

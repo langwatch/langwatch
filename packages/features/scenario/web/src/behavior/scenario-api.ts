@@ -31,6 +31,11 @@
  * under the name the process shell mounts it by.
  */
 
+import type { AgentApiUpdateOutput, UpdateAgentCommand } from "@langwatch/agent-contract";
+import type {
+  ModelDefaultResolvedTrpcOutput,
+  ModelProviderListAllForProjectTrpcOutput,
+} from "@langwatch/model-provider-contract";
 import { createFeatureApi } from "@langwatch/platform-api-client";
 
 /**
@@ -124,7 +129,7 @@ export type ScenarioApiMap = {
     getById: Q;
     getRelatedEntities: Q;
     create: M;
-    update: M;
+    update: { mutation: { input: UpdateAgentCommand; output: AgentApiUpdateOutput } };
     delete: M;
     cascadeArchive: M;
   };
@@ -147,8 +152,15 @@ export type ScenarioApiMap = {
   export: { onScenarioRunExportProgress: S };
   httpProxy: { execute: M };
   modelProvider: {
-    getResolvedDefault: Q;
-    listAllForProjectForFrontend: QL;
+    getResolvedDefault: {
+      query: {
+        input: { projectId: string; featureKey: string };
+        output: ModelDefaultResolvedTrpcOutput;
+      };
+    };
+    listAllForProjectForFrontend: {
+      query: { input: { projectId: string }; output: ModelProviderListAllForProjectTrpcOutput };
+    };
   };
   /**
    * The workspace graph, narrowed to what this family needs.

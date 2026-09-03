@@ -25,6 +25,54 @@
  * import below is the only one in the package.
  */
 
+import type { AgentApiUpdateOutput, UpdateAgentCommand } from "@langwatch/agent-contract";
+import type {
+  DatasetApiDatasetInput,
+  DatasetApiFindNextNameInput,
+  DatasetApiFindNextNameOutput,
+  DatasetApiGetAllOutput,
+  DatasetApiGetByIdOutput,
+  DatasetApiProjectInput,
+  DatasetApiUpsertInput,
+  DatasetApiUpsertOutput,
+  DatasetApiValidateNameInput,
+  DatasetApiValidateNameOutput,
+} from "@langwatch/dataset-contract";
+import type {
+  EvaluatorApiCreateInput,
+  EvaluatorApiCreateOutput,
+  EvaluatorApiDeleteOutput,
+  EvaluatorApiEvaluatorIdInput,
+  EvaluatorApiGetAllOutput,
+  EvaluatorApiGetByIdOutput,
+  EvaluatorApiProjectInput,
+  EvaluatorApiUpdateInput,
+  EvaluatorApiUpdateOutput,
+} from "@langwatch/evaluator-contract";
+import type {
+  ModelDefaultResolvedTrpcOutput,
+  ModelProviderListAllForProjectTrpcOutput,
+} from "@langwatch/model-provider-contract";
+import type {
+  PromptAssignTagTrpcInput,
+  PromptAssignTagTrpcOutput,
+  PromptConfigTagsTrpcInput,
+  PromptConfigTagsTrpcOutput,
+  PromptCreateTrpcInput,
+  PromptCreateTrpcOutput,
+  PromptGetAllForProjectTrpcOutput,
+  PromptGetAllVersionsTrpcOutput,
+  PromptGetByIdOrHandleTrpcInput,
+  PromptGetByIdOrHandleTrpcOutput,
+  PromptHandleUniquenessTrpcInput,
+  PromptHandleUniquenessTrpcOutput,
+  PromptIdOrHandleTrpcInput,
+  PromptProjectTrpcInput,
+  PromptUpdateHandleTrpcInput,
+  PromptUpdateHandleTrpcOutput,
+  PromptUpdateTrpcInput,
+  PromptUpdateTrpcOutput,
+} from "@langwatch/prompt-contract";
 import type {
   StudioWorkflow,
   WorkflowApiAutosaveInput,
@@ -300,16 +348,24 @@ export type WorkflowApiMap = {
    * letter for letter so a studio query and the same query fired from a page
    * this application still serves land on ONE React Query cache entry.
    */
-  agents: { getAll: UnpublishedQuery; getById: UnpublishedQuery; update: UnpublishedMutation };
+  agents: {
+    getAll: UnpublishedQuery;
+    getById: UnpublishedQuery;
+    update: { mutation: { input: UpdateAgentCommand; output: AgentApiUpdateOutput } };
+  };
   batchRecord: { getAllByexperimentSlug: UnpublishedQuery };
   analytics: { dataForFilter: UnpublishedQuery };
   annotationScore: { getAllActive: UnpublishedQuery };
   dataset: {
-    getAll: UnpublishedQuery;
-    getById: UnpublishedQuery;
-    upsert: UnpublishedMutation;
-    validateDatasetName: UnpublishedQuery;
-    findNextName: UnpublishedQuery;
+    getAll: { query: { input: DatasetApiProjectInput; output: DatasetApiGetAllOutput } };
+    getById: { query: { input: DatasetApiDatasetInput; output: DatasetApiGetByIdOutput } };
+    upsert: { mutation: { input: DatasetApiUpsertInput; output: DatasetApiUpsertOutput } };
+    validateDatasetName: {
+      query: { input: DatasetApiValidateNameInput; output: DatasetApiValidateNameOutput };
+    };
+    findNextName: {
+      query: { input: DatasetApiFindNextNameInput; output: DatasetApiFindNextNameOutput };
+    };
   };
   datasetRecord: {
     create: UnpublishedMutation;
@@ -327,11 +383,15 @@ export type WorkflowApiMap = {
     warmupLambda: UnpublishedMutation;
   };
   evaluators: {
-    getAll: UnpublishedQuery;
-    create: UnpublishedMutation;
-    delete: UnpublishedMutation;
-    getById: UnpublishedQuery;
-    update: UnpublishedMutation;
+    getAll: { query: { input: EvaluatorApiProjectInput; output: EvaluatorApiGetAllOutput } };
+    create: { mutation: { input: EvaluatorApiCreateInput; output: EvaluatorApiCreateOutput } };
+    delete: {
+      mutation: { input: EvaluatorApiEvaluatorIdInput; output: EvaluatorApiDeleteOutput };
+    };
+    getById: {
+      query: { input: EvaluatorApiEvaluatorIdInput; output: EvaluatorApiGetByIdOutput };
+    };
+    update: { mutation: { input: EvaluatorApiUpdateInput; output: EvaluatorApiUpdateOutput } };
   };
   /**
    * THE EXPERIMENTS FAMILY'S OWN, and the reason this block is the longest.
@@ -371,8 +431,15 @@ export type WorkflowApiMap = {
   modelProvider: {
     getAllForProject: UnpublishedQuery;
     getAllForProjectForFrontend: UnpublishedQuery;
-    getResolvedDefault: UnpublishedQuery;
-    listAllForProjectForFrontend: UnpublishedQuery;
+    getResolvedDefault: {
+      query: {
+        input: { projectId: string; featureKey: string };
+        output: ModelDefaultResolvedTrpcOutput;
+      };
+    };
+    listAllForProjectForFrontend: {
+      query: { input: { projectId: string }; output: ModelProviderListAllForProjectTrpcOutput };
+    };
   };
   monitors: {
     create: UnpublishedMutation;
@@ -394,15 +461,27 @@ export type WorkflowApiMap = {
     getAll: UnpublishedQuery;
   };
   prompts: {
-    assignTag: UnpublishedMutation;
-    checkHandleUniqueness: UnpublishedQuery;
-    getAllPromptsForProject: UnpublishedQuery;
-    create: UnpublishedMutation;
-    getAllVersionsForPrompt: UnpublishedQuery;
-    getByIdOrHandle: UnpublishedQuery;
-    getTagsForConfig: UnpublishedQuery;
-    update: UnpublishedMutation;
-    updateHandle: UnpublishedMutation;
+    assignTag: { mutation: { input: PromptAssignTagTrpcInput; output: PromptAssignTagTrpcOutput } };
+    checkHandleUniqueness: {
+      query: { input: PromptHandleUniquenessTrpcInput; output: PromptHandleUniquenessTrpcOutput };
+    };
+    getAllPromptsForProject: {
+      query: { input: PromptProjectTrpcInput; output: PromptGetAllForProjectTrpcOutput };
+    };
+    create: { mutation: { input: PromptCreateTrpcInput; output: PromptCreateTrpcOutput } };
+    getAllVersionsForPrompt: {
+      query: { input: PromptIdOrHandleTrpcInput; output: PromptGetAllVersionsTrpcOutput };
+    };
+    getByIdOrHandle: {
+      query: { input: PromptGetByIdOrHandleTrpcInput; output: PromptGetByIdOrHandleTrpcOutput };
+    };
+    getTagsForConfig: {
+      query: { input: PromptConfigTagsTrpcInput; output: PromptConfigTagsTrpcOutput };
+    };
+    update: { mutation: { input: PromptUpdateTrpcInput; output: PromptUpdateTrpcOutput } };
+    updateHandle: {
+      mutation: { input: PromptUpdateHandleTrpcInput; output: PromptUpdateHandleTrpcOutput };
+    };
   };
   savedViews: {
     create: UnpublishedMutation;
