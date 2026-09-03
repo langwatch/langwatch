@@ -5,6 +5,8 @@ description: Store image URLs in a dataset column of type image (URL), see them 
 
 Set a column's type to `image (URL)` and put the URL of an image in each cell. The grid renders the image as a thumbnail; click it to see it full size. The cell value stays the URL, so editing the cell edits the URL.
 
+The grid shows a thumbnail when the value is a `data:image/...;base64,` string, a markdown image (`![alt](url)`), or a URL that ends in `.jpeg`, `.jpg`, `.gif`, `.png`, `.webp`, `.svg` or `.bmp`. A URL without an image extension shows a thumbnail only when its path is longer than 30 characters and contains a word such as `image`, `img`, `photo`, `media` or `upload`. Any other value is shown as text, and the experiment still fetches it as an image.
+
 <Frame>
 <img src="/images/datasets/dataset-image-column.png" alt="A dataset grid with an image (URL) column rendered as thumbnails" />
 </Frame>
