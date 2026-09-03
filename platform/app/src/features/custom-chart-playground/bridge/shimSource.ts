@@ -71,6 +71,9 @@ export function buildShimScript(): string {
     return stringify(value);
   }
 
+  // keep in sync with bridge/lwGlobalTypes.ts — every member below (plus
+  // LW.useChartQuery, added after this object) needs a matching declared
+  // member with JSDoc there for Monaco's autocomplete/hover in the author pane.
   var LW = {
     params: undefined,
     theme: undefined,
