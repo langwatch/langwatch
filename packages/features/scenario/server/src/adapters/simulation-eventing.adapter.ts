@@ -61,7 +61,11 @@ class GatedSimulationRunStateFoldStore implements FoldProjectionStore<Simulation
       return false;
     });
     if (writable.length === 0) return;
-    await this.inner.storeBatch(writable);
+    if (this.inner.storeBatch) {
+      await this.inner.storeBatch(writable);
+      return;
+    }
+    for (const { state, context } of writable) await this.inner.store(state, context);
   }
 
   async get(
