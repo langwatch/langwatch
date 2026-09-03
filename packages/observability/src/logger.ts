@@ -1,8 +1,4 @@
-import pino, {
-  type DestinationStream,
-  type LoggerOptions,
-  type Logger as PinoLogger,
-} from "pino";
+import pino, { type DestinationStream, type LoggerOptions, type Logger as PinoLogger } from "pino";
 import type SuperJSON from "superjson";
 import { DEFAULT_SERVICE_NAME, REQUEST_CAUSE_FIELD } from "./constants";
 import {
@@ -21,8 +17,7 @@ export { loggerConfigurationFrom } from "./logger-config";
 
 type LogContextProvider = () => Record<string, string | null>;
 
-const isNodeRuntime =
-  typeof process !== "undefined" && typeof process.versions?.node === "string";
+const isNodeRuntime = typeof process !== "undefined" && typeof process.versions?.node === "string";
 
 let logContextProvider: LogContextProvider | undefined;
 let sharedSuperjson: typeof SuperJSON | undefined;
@@ -46,6 +41,31 @@ function getSuperjson(): typeof SuperJSON {
  */
 export function registerLogContextProvider(provider: LogContextProvider): void {
   logContextProvider = provider;
+}
+
+/**
+ * The request and tenant context, with the fields that have no value left off.
+ *
+ * The provider answers with every field on every call, null for the ones it
+ * cannot fill, and outside a request that is all of them. Stamped literally,
+ * every boot line carried fifty columns of
+ * `traceId=null spanId=null organizationId=null projectId=null userId=null`
+ * ahead of its message, on the console and in the exported record both.
+ *
+ * A field that is absent says exactly what a field that is null says, in no
+ * columns — and says it better downstream, where a `traceId != ""` filter
+ * matches the four characters "null" but never matches a field that is not
+ * there.
+ */
+function presentLogContext(): Record<string, string> {
+  const context = logContextProvider?.();
+  if (!context) return {};
+
+  const present: Record<string, string> = {};
+  for (const [field, value] of Object.entries(context)) {
+    if (value !== null) present[field] = value;
+  }
+  return present;
 }
 
 /**
@@ -267,7 +287,7 @@ function createNodeLogger(
       }),
       level: (label) => ({ level: label.toUpperCase() }),
     },
-    mixin: options?.disableContext ? undefined : () => logContextProvider?.() ?? {},
+    mixin: options?.disableContext ? undefined : () => presentLogContext(),
   };
 
   const transport = getSharedTransport();
@@ -306,6 +326,39 @@ export function consoleIgnoreFields(isOtelExportEnabled: boolean): string {
     : BASE_CONSOLE_IGNORE;
 }
 
+/**
+ * One line, in the shape every lane of a `pnpm dev` terminal prints:
+ *
+ *   [13:44:08.251] INFO (langwatch:api:rest): request handled {"method":"GET"}
+ *
+ * No date, because a development terminal is always today, and no process
+ * identity, because `concurrently` has already spent the first columns saying
+ * which of the five lanes a line came from.
+ *
+ * Every option here has to survive `structuredClone`: a transport target's
+ * options cross a worker-thread boundary, so a function — a custom prettifier
+ * for the time or the level — cannot be passed. Building the pretty stream on
+ * this thread instead, to get around that, is what the console used to do for
+ * about an hour: it works, and it silently kills the OTel log transport, whose
+ * worker only survives while it is pino's own destination rather than one leg
+ * of a multistream. The formatting is not worth the export.
+ */
+export function prettyConsoleOptions({
+  level,
+  isOtelExportEnabled,
+}: {
+  level: string;
+  isOtelExportEnabled: boolean;
+}): Record<string, unknown> {
+  return {
+    colorize: true,
+    singleLine: true,
+    ignore: consoleIgnoreFields(isOtelExportEnabled),
+    minimumLevel: level,
+    translateTime: "SYS:HH:MM:ss.l",
+  };
+}
+
 function buildConsoleTransport({
   usePretty,
   level,
@@ -318,12 +371,7 @@ function buildConsoleTransport({
   if (usePretty) {
     return {
       target: "pino-pretty",
-      options: {
-        colorize: true,
-        singleLine: true,
-        ignore: consoleIgnoreFields(isOtelExportEnabled),
-        minimumLevel: level,
-      },
+      options: prettyConsoleOptions({ level, isOtelExportEnabled }),
       level,
     };
   }

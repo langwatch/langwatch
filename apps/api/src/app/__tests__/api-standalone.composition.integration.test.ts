@@ -15,10 +15,7 @@ import {
   ApiBrowserSessionTransportPort,
 } from "../api-auth.composition";
 import type { ApiProductionCompositionOptions } from "../api-production.composition";
-import {
-  API_UNAVAILABLE_PRODUCT_ADAPTERS,
-  ApiStandaloneComposition,
-} from "../api-standalone.composition";
+import { ApiStandaloneComposition } from "../api-standalone.composition";
 import { resolveApiConfig, type ApiConfig } from "../../platform/config/api.config";
 
 function ephemeralConfig(source: Readonly<Record<string, unknown>> = {}): ApiConfig {
@@ -49,71 +46,6 @@ describe("ApiStandaloneComposition", () => {
 
       await process.close();
       await expect(fetch(`http://127.0.0.1:${address.port}/api/health`)).rejects.toThrow();
-    });
-
-    /** @scenario "The unavailable-adapter list names only the Better Auth transport" */
-    it("names every adapter it is still waiting on rather than leaving the gap implicit", () => {
-      expect(API_UNAVAILABLE_PRODUCT_ADAPTERS).toEqual([
-        "The deployment's Better Auth browser-session transport",
-      ]);
-    });
-
-    /** @scenario "The unavailable-adapter list names only the Better Auth transport" */
-    it("stops naming IdentityEmailService, now that it composes one over its own client", () => {
-      const named = API_UNAVAILABLE_PRODUCT_ADAPTERS.join("\n");
-
-      expect(named).not.toMatch(/IdentityEmailService|identifier email|read fork/i);
-    });
-
-    it("stops naming the instance administrator credential and the rate limiter it now owns", () => {
-      const named = API_UNAVAILABLE_PRODUCT_ADAPTERS.join("\n");
-
-      expect(named).not.toMatch(/PAT\/admin|instance admin|rate limiter/i);
-    });
-
-    it("stops naming the query guards, now that it composes its own guarded client", () => {
-      const named = API_UNAVAILABLE_PRODUCT_ADAPTERS.join("\n");
-
-      expect(named).not.toMatch(/PrismaQueryGuard|multitenancy|mass-delete/i);
-    });
-
-    it("stops naming the metric registry, now that it composes and renders its own", () => {
-      const named = API_UNAVAILABLE_PRODUCT_ADAPTERS.join("\n");
-
-      expect(named).not.toMatch(/ApiMetricsPort|metric registry/i);
-    });
-
-    /** @scenario "The API process composes its own AuthZ service" */
-    it("stops naming the grant command pipeline, now that it registers one itself", () => {
-      const named = API_UNAVAILABLE_PRODUCT_ADAPTERS.join("\n");
-
-      expect(named).not.toMatch(
-        /AuthzGrantsCommandDispatcher|AuthzRevocationTelemetry|grant command pipeline/i,
-      );
-    });
-
-    /** @scenario "The API process composes its own organization and API-key services" */
-    it("stops naming the identity ports, now that it composes the services that take them", () => {
-      const named = API_UNAVAILABLE_PRODUCT_ADAPTERS.join("\n");
-
-      expect(named).not.toMatch(
-        /ApiKeyBindingIdPort|ApiKeyDiagnosticsPort|organization identity ports/i,
-      );
-    });
-
-    /** @scenario "The unavailable-adapter list no longer names the agent ports" */
-    it("stops naming the agent ports, now that packaged adapters fill them", () => {
-      const named = API_UNAVAILABLE_PRODUCT_ADAPTERS.join("\n");
-
-      expect(named).not.toMatch(/AgentsWorkflowPort|AgentsAuditLogPort|agent audit history/i);
-    });
-
-    it("stops naming the stored-secret key, now that it reads and uses its own", () => {
-      const named = API_UNAVAILABLE_PRODUCT_ADAPTERS.join("\n");
-
-      expect(named).not.toMatch(
-        /SecretEncryptionPort|OrganizationSettingsSecretPort|encryption key/i,
-      );
     });
 
     /** @scenario "An injected metrics transport answers every scrape" */

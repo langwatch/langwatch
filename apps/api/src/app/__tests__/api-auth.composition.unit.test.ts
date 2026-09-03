@@ -415,6 +415,7 @@ describe("ApiAuthComposition", () => {
     });
 
     /** @scenario "A process with no browser-session transport mounts no product transports" */
+    /** @scenario "A process that can compose no browser sessions says so, with the reason" */
     it("composes nothing without the deployment's Better Auth transport", () => {
       const report = new RecordingAuthAbsence();
 

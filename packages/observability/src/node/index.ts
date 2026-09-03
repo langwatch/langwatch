@@ -8,6 +8,7 @@ export {
 } from "./process-observability";
 
 export { createAuthoritativeOtlpConfiguration } from "./otlp-configuration";
+export { UnexportedSpanProcessor } from "./unexported-spans";
 export {
   normaliseTagKey,
   startProfiling,

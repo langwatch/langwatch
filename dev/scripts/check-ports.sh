@@ -29,9 +29,13 @@ if [ "${NODE_ENV:-production}" != "development" ] || [ -f /.dockerenv ]; then
   exit 0
 fi
 
-PORT="${PORT:-5560}"
-API_PORT="${API_PORT:-$((PORT + 1000))}"
-WORKER_METRICS_PORT="${WORKER_METRICS_PORT:-$((PORT - 2561))}"
+# The same derivation the launcher hands to the lanes, so the ports reserved
+# here and the ports bound there can never disagree.
+# shellcheck source=./lib/derive-dev-ports.sh
+. "$(cd "$(dirname "$0")" && pwd)/lib/derive-dev-ports.sh"
+derive_dev_ports
+
+PORT="$APP_PORT"
 
 PORTS_TO_CHECK=("$PORT" "$API_PORT" "$WORKER_METRICS_PORT")
 PORT_LABELS=("ui — the browser application" "api" "worker metrics")

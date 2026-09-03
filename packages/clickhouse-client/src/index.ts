@@ -5,9 +5,15 @@ export type {
   VendorLogDecision,
   VendorLogLevel,
   VendorLogRecord,
+  VendorLogger,
   VendorLogSink,
 } from "./logging";
-export { decideVendorLog, emitVendorLog, VENDOR_CAUSE_FIELD } from "./logging";
+export {
+  decideVendorLog,
+  emitVendorLog,
+  vendorLoggerClassFor,
+  VENDOR_CAUSE_FIELD,
+} from "./logging";
 export type { AbortSignalLike, QueryDriver, QueryKind, QueryRequest, QueryResult } from "./query";
 export type { ClickHouseQueryClientOptions } from "./client";
 export { ClickHouseQueryClient } from "./client";
@@ -133,10 +139,7 @@ export {
 
 /** The per-query and per-insert settings every non-analytics statement carries.
  * Was `platform/app/src/server/clickhouse/queryDefaults.ts`. */
-export {
-  DEFAULT_CLICKHOUSE_SETTINGS,
-  READ_BACK_FOLD_INSERT_SETTINGS,
-} from "./queryDefaults";
+export { DEFAULT_CLICKHOUSE_SETTINGS, READ_BACK_FOLD_INSERT_SETTINGS } from "./queryDefaults";
 
 /** The `CLICKHOUSE_URL__<label>__<org>` private-route key grammar.
  * Was `platform/app/src/server/clickhouse/privateRouteKey.ts`. */

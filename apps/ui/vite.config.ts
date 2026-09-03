@@ -12,6 +12,8 @@ import {
 // projection module rather than being re-exported to browser code.
 import { resolveUiPublicBootstrap } from "@langwatch/config/public-app-config/projection";
 import { UI_ASSET_URL_GLOBAL } from "./src/model/ui-asset-base";
+import { createDevLogger } from "./vite/dev-logging";
+import { SHIKI_PREBUNDLE_INCLUDE } from "./vite/shiki-prebundle";
 import { havenHmrGate } from "./vite/havenHmrGate";
 import { rootDiscoveryProxyPattern } from "./vite/root-discovery-proxy";
 
@@ -156,6 +158,9 @@ export default defineConfig(async ({ command }): Promise<UserConfig> => {
   }
 
   return {
+    // One shape for every lane in a `pnpm dev` terminal, and the place the
+    // proxy's failures are collapsed to one line — see ./vite/dev-logging.
+    customLogger: createDevLogger({ proxyTarget: API_TARGET }),
     plugins: [
       react(),
       patchObjectInspectBrowserStub(),
@@ -184,20 +189,10 @@ export default defineConfig(async ({ command }): Promise<UserConfig> => {
       "process.env.VERCEL_URL": "undefined",
     },
     optimizeDeps: {
-      // DEV-ONLY: optimizeDeps never touches the production build (prod bundles
-      // Shiki via the manualChunks rule below). Pre-bundle the whole Shiki
-      // ecosystem at dev-server start so the server doesn't discover Shiki's
-      // Oniguruma WASM engine + langs/themes lazily on the first /traces
-      // navigation and re-optimize mid-session. That re-optimization invalidates
-      // the in-flight `.vite/deps/wasm-*.js` (onig.wasm, ~620KB) request the span
-      // highlighter awaits, leaving the trace drawer stuck on "loading spans".
-      include: [
-        "shiki",
-        "@shikijs/core",
-        "@shikijs/engine-oniguruma",
-        "@shikijs/langs",
-        "@shikijs/themes",
-      ],
+      // The list, and the reason each entry is named through its owner, live in
+      // ./vite/shiki-prebundle so one value is what the config and its guard
+      // both read.
+      include: [...SHIKI_PREBUNDLE_INCLUDE],
     },
     build: {
       outDir: "dist/client",

@@ -36,14 +36,23 @@ export NODE_ENV="${NODE_ENV:-development}"
 # writes a value that is missing or empty.
 "$HERE/ensure-ai-gateway-secrets.sh"
 
+# The port each lane binds, exported so the lane actually gets it. The Node
+# lanes load the workspace env files with `--env-file-if-exists`, which never
+# overwrites a variable already set, so an exported value beats the committed
+# one and a value merely set in this shell reaches nothing at all. Deriving the
+# api lane's port and NOT exporting it is what made the api process fall
+# through to PORT — the browser application's — and die on boot with
+# EADDRINUSE, taking the Vite proxy and the gateway's control-plane calls with
+# it. Sourced by the pre-flight below too, so what is reserved and what is
+# handed out cannot drift apart.
+# shellcheck source=./lib/derive-dev-ports.sh
+. "$HERE/lib/derive-dev-ports.sh"
+derive_dev_ports
+
 # Fail fast if any port we'd bind to is already taken (a stale `pnpm dev`,
 # Docker exposing the same port, …). Without this we'd only discover the
 # conflict half a minute later, after Vite and tsx finish booting.
 "$HERE/check-ports.sh"
-
-APP_PORT="${PORT:-5560}"
-API_PORT=$((APP_PORT + 1000))
-GATEWAY_PORT=$((APP_PORT + 3))
 
 # Auto-derive REDIS_DB_INDEX from the PORT slot so each worktree lands on its
 # own Redis DB. PORT=5560 → 0, 5570 → 1, 5580 → 2, …, 5710 → 15. Keeps BullMQ
@@ -123,7 +132,11 @@ if [ "${LANGWATCH_SKIP_AIGATEWAY:-}" != "1" ]; then
     echo "  ✓ aigateway: already running on :$GATEWAY_PORT, reusing"
     echo "  ! aigateway: that process may point at ANOTHER worktree's control plane; this one is ${LW_GATEWAY_BASE_URL}"
   else
-    START_GATEWAY_COMMAND="make -C \"$REPO_ROOT\" service svc=aigateway"
+    # SERVER_ADDR is what the gateway actually binds; GATEWAY_PORT is only the
+    # number this script reserved and announced. Passing it is what keeps the
+    # two in step — `make service` re-applies the inbound environment over
+    # `.env`, so this wins there as well.
+    START_GATEWAY_COMMAND="SERVER_ADDR=\":${GATEWAY_PORT}\" make -C \"$REPO_ROOT\" service svc=aigateway"
     echo "  ✓ aigateway: auto-start on :$GATEWAY_PORT"
   fi
 fi

@@ -62,10 +62,8 @@ Feature: The standalone API process composes its own agent service
       Then it records that it holds no workflow-copy capability
       And every other agent operation is served
 
-    @unit
-    Scenario: The unavailable-adapter list no longer names the agent ports
-      Given the API package composes the agent service from packaged adapters
-      When a deployment reads the process's boot statement
-      Then AgentsWorkflowPort and AgentsAuditLogPort are not on it
-      # The list is the executable's honest boot statement rather than a plan,
-      # so an entry that closed has to leave it.
+    # The boot statement used to carry a standing list of adapters no package
+    # implemented, and the entries that closed had to be removed from it by
+    # hand. The list outlived its last true entry and was deleted; what the
+    # agent service does or does not hold is stated by the service composing
+    # it, in the scenario above.

@@ -5,6 +5,7 @@ import {
   type SetupObservabilityOptions,
 } from "langwatch/observability/node";
 import { createLogger, type Logger } from "../logger";
+import { UnexportedSpanProcessor } from "./unexported-spans";
 
 type SetupOptions = Omit<SetupObservabilityOptions, "debug" | "serviceName">;
 
@@ -73,6 +74,9 @@ export function createProcessObservability(
     debug: {
       logger: sdkLogger,
     },
+    ...(recordsSpansAndExportsNothing(options.setup)
+      ? { spanProcessors: [new UnexportedSpanProcessor()] }
+      : {}),
     advanced: {
       ...options.setup?.advanced,
       disableAutoShutdown: true,
@@ -87,6 +91,23 @@ export function createProcessObservability(
   };
 
   return { logger, tracer, shutdown };
+}
+
+/**
+ * Whether this process has been configured to record spans and send them
+ * nowhere — the shape of every local `pnpm dev` lane, which has no LangWatch
+ * credentials and no exporter of its own.
+ *
+ * Told to the SDK rather than left to it, because the SDK cannot tell that
+ * shape apart from a deployment whose exporter was forgotten and used to write
+ * a nine-line ERROR on every boot of every lane on the strength of it.
+ */
+function recordsSpansAndExportsNothing(setup: SetupOptions | undefined): boolean {
+  return (
+    setup?.langwatch === "disabled" &&
+    setup.traceExporter === undefined &&
+    !setup.spanProcessors?.length
+  );
 }
 
 function createSdkLogger(logger: Logger): SdkLogger {

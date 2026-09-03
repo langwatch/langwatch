@@ -141,14 +141,29 @@ Feature: The standalone API process composes its own Auth service
       # A read fork or a database blip on this path must never turn into a
       # failed request; it turns into an unauthenticated one.
 
-  Rule: The capability it cannot compose is announced
+  Rule: An absence is announced by whatever ran into it
+
+    # The executable used to announce, at WARN on every boot, that it had
+    # started "without an adapter no package implements" and would mount no
+    # product transports — and then, on the next line, compose its own Better
+    # Auth over the stock Prisma storage engine and mount them. The
+    # announcement only ever looked at the two host-injected overrides, never
+    # at the deployment's own browser-session identity, which is what actually
+    # lets the process build one. A boot statement that is contradicted by the
+    # line under it is worse than no boot statement.
+
+    @integration
+    Scenario: A process that composes its own browser sessions announces no absence
+      Given a deployment that supplies no Better Auth transport but names its own browser-session identity
+      When the API process starts
+      Then it does not announce that transport as one nobody supplied
+      And what it says about Better Auth describes the one it composed
 
     @unit
-    Scenario: The unavailable-adapter list names only the Better Auth transport
-      Given the API package composes the Auth service from packaged adapters
-      When a deployment reads the process's boot statement
-      Then IdentityEmailService is not on it
-      And the deployment's Better Auth transport is
+    Scenario: A process that can compose no browser sessions says so, with the reason
+      Given a deployment that supplies no Better Auth transport and names no browser-session identity
+      When the API process starts
+      Then the composition that could not build one says so, naming the reason
 
     @unit
     Scenario: An avatar upload refuses by name on a process with no stored objects

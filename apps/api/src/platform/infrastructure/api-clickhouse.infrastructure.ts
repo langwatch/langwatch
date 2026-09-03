@@ -35,6 +35,7 @@ import {
   type ClickHouseVendorClientOptions,
   type LimiterStats,
   type TenantDirectory,
+  vendorLoggerClassFor,
 } from "@langwatch/clickhouse-client";
 import { HandledError } from "@langwatch/handled-error";
 import { createLogger, type Logger } from "@langwatch/observability";
@@ -100,9 +101,9 @@ class ApiOverloadErrorFactory extends ClickHouseOverloadErrorFactory {
  * receives a client the package has already wrapped in retries, a statement
  * limiter and the default query settings.
  */
-class ApiVendorClickHouseClientFactory
-  implements ClickHouseVendorClientFactory<ClickHouseClient & ClickHouseVendorClient>
-{
+class ApiVendorClickHouseClientFactory implements ClickHouseVendorClientFactory<
+  ClickHouseClient & ClickHouseVendorClient
+> {
   create(options: ClickHouseVendorClientOptions): ClickHouseClient & ClickHouseVendorClient {
     return createClient({
       url: options.url,
@@ -110,6 +111,12 @@ class ApiVendorClickHouseClientFactory
       request_timeout: options.requestTimeoutMs,
       keep_alive: { enabled: true, idle_socket_ttl: options.idleSocketTtlMs },
       clickhouse_settings: options.driverSettings as Record<string, never>,
+      // Without this the driver writes its own console lines —
+      // `[2026-09-03T10:58:28Z][ERROR][@clickhouse/client][Connection] …` — a
+      // shape nothing else in this lane prints.
+      ...(options.vendorLoggerClass === undefined
+        ? {}
+        : { log: { LoggerClass: options.vendorLoggerClass as never } }),
     }) as ClickHouseClient & ClickHouseVendorClient;
   }
 }
@@ -127,11 +134,7 @@ class LoggingClickHouseTelemetry extends ClickHouseManagedClientTelemetry {
 
   registerLimiter(_input: { instance: string; stats: () => LimiterStats }): void {}
   unregisterLimiter(_instance: string): void {}
-  observeStatementWait(_input: {
-    instance: string;
-    operation: string;
-    seconds: number;
-  }): void {}
+  observeStatementWait(_input: { instance: string; operation: string; seconds: number }): void {}
 
   incrementStatementsShed(input: { instance: string; operation: string }): void {
     this.logger.warn(
@@ -146,6 +149,7 @@ const apiManagedClickHouseClientFactory: ClickHouseClientFactory<
   ClickHouseClient & ClickHouseVendorClient
 > = ClickHouseManagedClientService.create({
   vendorClientFactory: new ApiVendorClickHouseClientFactory(),
+  vendorLoggerClass: vendorLoggerClassFor(createLogger("langwatch:api:clickhouse")),
   defaultQuerySettings: {},
   resilience: VendorClientResiliencePolicy.create(),
   telemetry: new LoggingClickHouseTelemetry(),

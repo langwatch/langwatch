@@ -4,12 +4,15 @@ import (
 	"context"
 	"fmt"
 	"os"
+	"regexp"
 	"sync"
+	"time"
 
 	prettyconsole "github.com/thessem/zap-prettyconsole"
 	"go.opentelemetry.io/contrib/bridges/otelzap"
 	sdklog "go.opentelemetry.io/otel/sdk/log"
 	"go.uber.org/zap"
+	"go.uber.org/zap/buffer"
 	"go.uber.org/zap/zapcore"
 
 	"github.com/langwatch/langwatch/pkg/contexts"
@@ -58,7 +61,7 @@ func New(ctx context.Context, cfg Config) *zap.Logger {
 
 	if cfg.Format == "pretty" {
 		logger = zap.New(zapcore.NewCore(
-			prettyconsole.NewEncoder(prettyEncoderConfig()),
+			prettyConsoleEncoder(),
 			zapcore.Lock(os.Stdout),
 			cfg.zapLevel(),
 		))
@@ -68,10 +71,23 @@ func New(ctx context.Context, cfg Config) *zap.Logger {
 		logger, _ = zapCfg.Build()
 	}
 
-	if fields := serviceFields(ctx); fields != nil {
+	if fields := consoleServiceFields(ctx, cfg.Format); fields != nil {
 		logger = logger.With(fields...)
 	}
 	return logger
+}
+
+// consoleServiceFields is the constant identity a console core carries, which
+// on the pretty console is nothing at all. `service`, `version` and `env` are
+// the same on every line this process ever writes, and in a `pnpm dev`
+// terminal `concurrently` has already said which lane a line came from — so
+// there they are three repeated columns the message could have used. Nothing
+// prefixes a machine-readable line, so that one keeps them.
+func consoleServiceFields(ctx context.Context, format string) []zap.Field {
+	if format == "pretty" {
+		return nil
+	}
+	return serviceFields(ctx)
 }
 
 // serviceFields stamps service/version/env from the context's ServiceInfo, so
@@ -112,6 +128,12 @@ func WithCollector(ctx context.Context, cfg Config, base *zap.Logger, lp *sdklog
 		otelzap.NewCore(otelScopeName, otelzap.WithLoggerProvider(lp)),
 		cfg.otelZapLevel(),
 	)
+	// The collector keeps the constant identity even when the console drops it
+	// (see consoleServiceFields): nothing prefixes an exported record with the
+	// service it came from, so there it is the only thing saying so.
+	if fields := serviceFields(ctx); fields != nil && cfg.Format == "pretty" {
+		otelCore = otelCore.With(fields)
+	}
 	// zap.New starts from a bare logger, so the caller/stacktrace annotation the
 	// New path gets from zap.NewProductionConfig has to be re-applied here or the
 	// split stream would silently lose it.
@@ -120,7 +142,7 @@ func WithCollector(ctx context.Context, cfg Config, base *zap.Logger, lp *sdklog
 		zap.AddCaller(),
 		zap.AddStacktrace(zapcore.ErrorLevel),
 	)
-	if fields := serviceFields(ctx); fields != nil {
+	if fields := consoleServiceFields(ctx, cfg.Format); fields != nil {
 		logger = logger.With(fields...)
 	}
 	return logger
@@ -131,21 +153,59 @@ func WithCollector(ctx context.Context, cfg Config, base *zap.Logger, lp *sdklog
 func buildConsoleCore(format string, level zapcore.Level) zapcore.Core {
 	out := zapcore.Lock(os.Stdout)
 	if format == "pretty" {
-		return zapcore.NewCore(prettyconsole.NewEncoder(prettyEncoderConfig()), out, level)
+		return zapcore.NewCore(prettyConsoleEncoder(), out, level)
 	}
 	return zapcore.NewCore(zapcore.NewJSONEncoder(zap.NewProductionEncoderConfig()), out, level)
 }
 
-// prettyEncoderConfig aligns the Go pretty console with the TS app's
-// pino-pretty lane, so a terminal interleaving Go and JS services reads as one
-// format: a 24h HH:MM:SS.mmm timestamp (prettyconsole's default is 12h with no
-// seconds) and a full-word capital level (INFO, not INF) — matching
-// pino-pretty's "[12:19:00.616] INFO (name): msg".
+// prettyEncoderConfig aligns the Go pretty console with the TS lanes'
+// pino-pretty console, so a terminal interleaving Go and JS services reads as
+// one format: a bracketed 24h HH:MM:SS.mmm timestamp (prettyconsole's default
+// is a bare 12h clock with no seconds) and a full-word capital level, matching
+// pino-pretty's "[13:10:46.108] INFO (name): msg".
 func prettyEncoderConfig() zapcore.EncoderConfig {
 	cfg := prettyconsole.NewEncoderConfig()
-	cfg.EncodeTime = prettyconsole.DefaultTimeEncoder("15:04:05.000")
+	cfg.EncodeTime = bracketedTimeEncoder
 	cfg.EncodeLevel = zapcore.CapitalColorLevelEncoder
 	return cfg
+}
+
+// bracketedTimeEncoder writes [15:04:05.000], the shape the Node lanes' console
+// prints and the one thing about it that is not configurable there.
+func bracketedTimeEncoder(at time.Time, encoder zapcore.PrimitiveArrayEncoder) {
+	encoder.AppendString("[" + at.Format("15:04:05.000") + "]")
+}
+
+// prettyMessageMarker is the "> " prettyconsole writes between the level and
+// the message, with the color codes it wraps it in and the separator ahead of
+// it. Nothing else in a `pnpm dev` terminal writes one, and prettyconsole
+// offers no option to leave it out.
+var prettyMessageMarker = regexp.MustCompile(
+	"(?:\x1b\\[[0-9;]*m)*\\s(?:\x1b\\[[0-9;]*m)*\x1b\\[1m(?:\x1b\\[[0-9;]*m)*>(?:\x1b\\[[0-9;]*m)*",
+)
+
+// prettyConsoleEncoder is prettyconsole's encoder with that marker removed.
+func prettyConsoleEncoder() zapcore.Encoder {
+	return markerlessEncoder{Encoder: prettyconsole.NewEncoder(prettyEncoderConfig())}
+}
+
+type markerlessEncoder struct {
+	zapcore.Encoder
+}
+
+func (e markerlessEncoder) Clone() zapcore.Encoder {
+	return markerlessEncoder{Encoder: e.Encoder.Clone()}
+}
+
+func (e markerlessEncoder) EncodeEntry(entry zapcore.Entry, fields []zapcore.Field) (*buffer.Buffer, error) {
+	encoded, err := e.Encoder.EncodeEntry(entry, fields)
+	if err != nil || encoded == nil {
+		return encoded, err
+	}
+	line := prettyMessageMarker.ReplaceAllString(encoded.String(), "")
+	encoded.Reset()
+	encoded.AppendString(line)
+	return encoded, nil
 }
 
 // leveledCore gates an inner core to a minimum level. Used to hold the otelzap

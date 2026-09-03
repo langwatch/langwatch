@@ -13,7 +13,6 @@ import {
   ApiBrowserSessionTransportPort,
 } from "../app/api-auth.composition";
 import type { ApiProductionCompositionOptions } from "../app/api-production.composition";
-import { API_UNAVAILABLE_PRODUCT_ADAPTERS } from "../app/api-standalone.composition";
 import {
   startStandaloneApi,
   type ApiExecutableHost,
@@ -73,15 +72,18 @@ describe("the standalone API executable", () => {
       await expect(fetch(`http://127.0.0.1:${environment.API_PORT}/api/health`)).rejects.toThrow();
     });
 
-    /** @scenario "The boot names the transport the deployment did not supply" */
-    it("announces the one adapter no package implements, and serves anyway", async () => {
+    /** @scenario "A collaborator the process goes on to compose itself is not announced as absent" */
+    /** @scenario "A process that composes its own browser sessions announces no absence" */
+    it("announces no adapter as one no package implements, and serves anyway", async () => {
       const environment = deployment();
       const log = spyOnBootLog(environment);
 
       const started = await startStandaloneApi({ host: new RecordingHost(environment) });
 
-      expect(log.warn).toHaveBeenCalledWith(
-        { adapters: API_UNAVAILABLE_PRODUCT_ADAPTERS },
+      // The executable used to say this on every boot and then compose Better
+      // Auth for itself a few lines later. Whatever it cannot build is
+      // reported by the composition that ran into it, naming the reason.
+      expect(logged(log.warn)).not.toContainEqual(
         expect.stringContaining("without an adapter no package implements"),
       );
       expect(await fetch(`http://127.0.0.1:${environment.API_PORT}/api/health`)).toHaveProperty(

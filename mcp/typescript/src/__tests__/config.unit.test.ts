@@ -1,5 +1,5 @@
 import { describe, it, expect, beforeEach, afterEach, vi } from "vitest";
-import { initConfig, getConfig, requireApiKey, runWithConfig } from "../config.js";
+import { initConfig, getConfig, requireApiKey, runWithConfig, tryGetConfig } from "../config.js";
 
 describe("config", () => {
   let originalApiKey: string | undefined;
@@ -123,28 +123,75 @@ describe("config", () => {
     });
   });
 
+  describe("given a process that has not initialised the MCP configuration", () => {
+    beforeEach(() => {
+      // The state lives on globalThis, so it survives between tests and has to
+      // be cleared rather than re-imported.
+      delete (globalThis as Record<string, unknown>).__langwatch_mcp_config;
+      delete (globalThis as Record<string, unknown>).__langwatch_mcp_config_storage;
+    });
+
+    describe("when it asks whether one is there", () => {
+      /** @scenario "Asking whether the MCP configuration exists is not a failure" */
+      it("is told there is none, and nothing is printed", () => {
+        const console_error = vi.spyOn(console, "error").mockImplementation(() => {});
+
+        expect(tryGetConfig()).toBeUndefined();
+        expect(console_error).not.toHaveBeenCalled();
+
+        console_error.mockRestore();
+      });
+    });
+
+    describe("when it demands the configuration rather than asking for it", () => {
+      /** @scenario "A caller that needs the MCP configuration is still refused loudly" */
+      it("is refused", () => {
+        const console_error = vi.spyOn(console, "error").mockImplementation(() => {});
+
+        expect(() => getConfig()).toThrow("Config not initialized");
+
+        console_error.mockRestore();
+      });
+    });
+  });
+
+  describe("given a process that has initialised the MCP configuration", () => {
+    describe("when it asks whether one is there", () => {
+      /** @scenario "The initialised configuration is what the asking caller gets" */
+      it("is handed the configuration it initialised", () => {
+        initConfig({ apiKey: "asked-key", endpoint: "https://asked.example.com" });
+
+        expect(tryGetConfig()).toEqual(getConfig());
+        expect(tryGetConfig()?.endpoint).toBe("https://asked.example.com");
+      });
+
+      /** @scenario "The initialised configuration is what the asking caller gets" */
+      it("is handed the scoped configuration inside a scoped call", () => {
+        initConfig({ apiKey: "global-key", endpoint: "https://global.example.com" });
+
+        runWithConfig({ apiKey: "scoped-key", endpoint: "https://scoped.example.com" }, () => {
+          expect(tryGetConfig()?.apiKey).toBe("scoped-key");
+        });
+      });
+    });
+  });
+
   describe("runWithConfig()", () => {
     it("overrides global config within the callback", () => {
       initConfig({ apiKey: "global-key" });
 
-      runWithConfig(
-        { apiKey: "session-key", endpoint: "https://session.example.com" },
-        () => {
-          expect(getConfig().apiKey).toBe("session-key");
-          expect(getConfig().endpoint).toBe("https://session.example.com");
-        },
-      );
+      runWithConfig({ apiKey: "session-key", endpoint: "https://session.example.com" }, () => {
+        expect(getConfig().apiKey).toBe("session-key");
+        expect(getConfig().endpoint).toBe("https://session.example.com");
+      });
     });
 
     it("restores global config after the callback completes", () => {
       initConfig({ apiKey: "global-key" });
 
-      runWithConfig(
-        { apiKey: "session-key", endpoint: "https://session.example.com" },
-        () => {
-          // inside: session config
-        },
-      );
+      runWithConfig({ apiKey: "session-key", endpoint: "https://session.example.com" }, () => {
+        // inside: session config
+      });
 
       expect(getConfig().apiKey).toBe("global-key");
     });
@@ -155,20 +202,14 @@ describe("config", () => {
       const results: string[] = [];
 
       await Promise.all([
-        runWithConfig(
-          { apiKey: "key-a", endpoint: "https://a.example.com" },
-          async () => {
-            await new Promise((r) => setTimeout(r, 10));
-            results.push(requireApiKey());
-          },
-        ),
-        runWithConfig(
-          { apiKey: "key-b", endpoint: "https://b.example.com" },
-          async () => {
-            await new Promise((r) => setTimeout(r, 5));
-            results.push(requireApiKey());
-          },
-        ),
+        runWithConfig({ apiKey: "key-a", endpoint: "https://a.example.com" }, async () => {
+          await new Promise((r) => setTimeout(r, 10));
+          results.push(requireApiKey());
+        }),
+        runWithConfig({ apiKey: "key-b", endpoint: "https://b.example.com" }, async () => {
+          await new Promise((r) => setTimeout(r, 5));
+          results.push(requireApiKey());
+        }),
       ]);
 
       expect(results).toContain("key-a");
@@ -177,10 +218,7 @@ describe("config", () => {
 
     it("returns the callback result", () => {
       initConfig({});
-      const result = runWithConfig(
-        { apiKey: "key", endpoint: "https://example.com" },
-        () => 42,
-      );
+      const result = runWithConfig({ apiKey: "key", endpoint: "https://example.com" }, () => 42);
       expect(result).toBe(42);
     });
 

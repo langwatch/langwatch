@@ -10,6 +10,8 @@ export declare function initConfig(args: {
   projectId?: string;
 }): void;
 
+export declare function tryGetConfig(): McpConfig | undefined;
+
 export declare function getConfig(): McpConfig;
 
 export declare function requireApiKey(): string;

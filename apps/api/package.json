@@ -28,12 +28,12 @@
     }
   },
   "scripts": {
-    "start": "tsx --env-file-if-exists=../../.env --env-file-if-exists=../../.env.portless src/api.entrypoint.ts",
-    "dev": "tsx watch --env-file-if-exists=../../.env --env-file-if-exists=../../.env.portless src/api.entrypoint.ts",
+    "start": "tsx $(test -f ../../.env && echo --env-file=../../.env) $(test -f ../../.env.portless && echo --env-file=../../.env.portless) src/api.entrypoint.ts",
+    "dev": "tsx watch $(test -f ../../.env && echo --env-file=../../.env) $(test -f ../../.env.portless && echo --env-file=../../.env.portless) src/api.entrypoint.ts",
     "task:prisma-migrate": "sh -c 'if [ \"$SKIP_PRISMA_MIGRATE\" != \"true\" ]; then pnpm exec prisma migrate deploy --config ./prisma.config.ts; else echo \"Skipping Prisma migrations\"; fi'",
-    "task:clickhouse-migrate": "tsx --env-file-if-exists=../../.env --env-file-if-exists=../../.env.portless src/tasks/clickhouse-migrate/clickhouse-migrate.entrypoint.ts",
-    "task:lwql-provision": "tsx --env-file-if-exists=../../.env --env-file-if-exists=../../.env.portless src/tasks/lwql-provision/lwql-provision.entrypoint.ts",
-    "task:model-provider-migrate": "tsx --env-file-if-exists=../../.env --env-file-if-exists=../../.env.portless src/tasks/model-provider-migrate/model-provider-migrate.entrypoint.ts",
+    "task:clickhouse-migrate": "tsx $(test -f ../../.env && echo --env-file=../../.env) $(test -f ../../.env.portless && echo --env-file=../../.env.portless) src/tasks/clickhouse-migrate/clickhouse-migrate.entrypoint.ts",
+    "task:lwql-provision": "tsx $(test -f ../../.env && echo --env-file=../../.env) $(test -f ../../.env.portless && echo --env-file=../../.env.portless) src/tasks/lwql-provision/lwql-provision.entrypoint.ts",
+    "task:model-provider-migrate": "tsx $(test -f ../../.env && echo --env-file=../../.env) $(test -f ../../.env.portless && echo --env-file=../../.env.portless) src/tasks/model-provider-migrate/model-provider-migrate.entrypoint.ts",
     "task:openapi-generate": "tsx src/tasks/openapi-document/openapi-generate.entrypoint.ts",
     "task:openapi-check": "tsx src/tasks/openapi-document/openapi-check.entrypoint.ts",
     "typecheck": "tsc --noEmit && tsc --noEmit -p tsconfig.test.json",

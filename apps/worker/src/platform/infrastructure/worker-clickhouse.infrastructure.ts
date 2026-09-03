@@ -33,6 +33,7 @@ import {
   type ClickHouseVendorClientOptions,
   type LimiterStats,
   type TenantDirectory,
+  vendorLoggerClassFor,
 } from "@langwatch/clickhouse-client";
 import { HandledError } from "@langwatch/handled-error";
 import { createLogger, type Logger } from "@langwatch/observability";
@@ -90,9 +91,9 @@ class WorkerOverloadErrorFactory extends ClickHouseOverloadErrorFactory {
  * receives a client the package has already wrapped in retries, a statement
  * limiter and the default query settings.
  */
-class WorkerVendorClickHouseClientFactory
-  implements ClickHouseVendorClientFactory<ClickHouseClient & ClickHouseVendorClient>
-{
+class WorkerVendorClickHouseClientFactory implements ClickHouseVendorClientFactory<
+  ClickHouseClient & ClickHouseVendorClient
+> {
   create(options: ClickHouseVendorClientOptions): ClickHouseClient & ClickHouseVendorClient {
     return createClient({
       url: options.url,
@@ -100,6 +101,12 @@ class WorkerVendorClickHouseClientFactory
       request_timeout: options.requestTimeoutMs,
       keep_alive: { enabled: true, idle_socket_ttl: options.idleSocketTtlMs },
       clickhouse_settings: options.driverSettings as Record<string, never>,
+      // Without this the driver writes its own console lines —
+      // `[2026-09-03T10:58:28Z][ERROR][@clickhouse/client][Connection] …` — a
+      // shape nothing else in this lane prints.
+      ...(options.vendorLoggerClass === undefined
+        ? {}
+        : { log: { LoggerClass: options.vendorLoggerClass as never } }),
     }) as ClickHouseClient & ClickHouseVendorClient;
   }
 }
@@ -131,6 +138,7 @@ const workerManagedClickHouseClientFactory: ClickHouseClientFactory<
   ClickHouseClient & ClickHouseVendorClient
 > = ClickHouseManagedClientService.create({
   vendorClientFactory: new WorkerVendorClickHouseClientFactory(),
+  vendorLoggerClass: vendorLoggerClassFor(createLogger("langwatch:worker:clickhouse")),
   defaultQuerySettings: {},
   resilience: VendorClientResiliencePolicy.create(),
   telemetry: new LoggingClickHouseTelemetry(),
@@ -187,9 +195,9 @@ export class WorkerClickHouseInfrastructure {
    * connection itself for the original reason — a caller still cannot reach
    * `shared()` and write one organization's rows on another's endpoint.
    */
-  readonly resolveInstances = async (): Promise<
-    { target: string; client: ClickHouseClient }[]
-  > => [...this.connection.instances()];
+  readonly resolveInstances = async (): Promise<{ target: string; client: ClickHouseClient }[]> => [
+    ...this.connection.instances(),
+  ];
 
   close(): Promise<void> {
     return ClickHouseShutdownService.create().shutdown(this.connection);

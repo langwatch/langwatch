@@ -85,10 +85,7 @@ export {
   type ApiEventingQueue,
 } from "./platform/infrastructure/api-eventing.infrastructure";
 export { ApiInstanceAdminKeyAdapter } from "./app/api-instance-admin-key.adapter";
-export {
-  API_UNAVAILABLE_PRODUCT_ADAPTERS,
-  ApiStandaloneComposition,
-} from "./app/api-standalone.composition";
+export { ApiStandaloneComposition } from "./app/api-standalone.composition";
 export {
   describeApiFailure,
   startStandaloneApi,

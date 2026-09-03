@@ -89,10 +89,10 @@ Feature: The standalone API process has an executable start
   Rule: A process that cannot serve product traffic says what it is missing
 
     @integration
-    Scenario: The boot names the transport the deployment did not supply
+    Scenario: A collaborator the process goes on to compose itself is not announced as absent
       Given a deployment that supplies no Better Auth browser-session transport
       When the API executable starts
-      Then it announces that transport as the collaborator it is waiting on
+      Then it announces no adapter as one no package implements
       And it serves its lifecycle surface rather than refusing to start
 
     @integration

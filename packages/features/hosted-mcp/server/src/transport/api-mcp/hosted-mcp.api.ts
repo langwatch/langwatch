@@ -22,7 +22,7 @@
 
 import { createHash, randomUUID } from "node:crypto";
 import type { IncomingMessage, ServerResponse } from "node:http";
-import { getConfig, initConfig, runWithConfig } from "@langwatch/mcp-server/config";
+import { getConfig, initConfig, runWithConfig, tryGetConfig } from "@langwatch/mcp-server/config";
 import { createMcpServer } from "@langwatch/mcp-server/create-mcp-server";
 import { createLogger } from "@langwatch/observability";
 import { SSEServerTransport } from "@modelcontextprotocol/sdk/server/sse.js";
@@ -87,13 +87,7 @@ interface RateLimitEntry {
   windowStart: number;
 }
 
-function createRateLimiter({
-  windowMs,
-  maxRequests,
-}: {
-  windowMs: number;
-  maxRequests: number;
-}) {
+function createRateLimiter({ windowMs, maxRequests }: { windowMs: number; maxRequests: number }) {
   const entries = new Map<string, RateLimitEntry>();
 
   return {
@@ -144,10 +138,7 @@ function createRateLimiter({
  */
 const requestLogFields = new WeakMap<ServerResponse, Record<string, string>>();
 
-function noteLogFields(
-  res: ServerResponse,
-  fields: Record<string, string | undefined>,
-): void {
+function noteLogFields(res: ServerResponse, fields: Record<string, string | undefined>): void {
   const existing = requestLogFields.get(res) ?? {};
   for (const [key, value] of Object.entries(fields)) {
     if (value) existing[key] = value;
@@ -227,10 +218,11 @@ export function createMcpHandler(dependencies: HostedMcpDependencies): McpHandle
   const encrypt = (plaintext: string): string => cipher.encrypt(plaintext);
   const decrypt = (ciphertext: string): string => cipher.decrypt(ciphertext);
 
-  // Ensure the MCP config is initialized with this deployment's endpoint
-  try {
-    getConfig();
-  } catch {
+  // Ensure the MCP config is initialized with this deployment's endpoint. Asked
+  // rather than demanded: on a cold process there is never one yet, and the
+  // demanding call answers that entirely normal case with a stack trace on the
+  // console before it throws.
+  if (tryGetConfig() === undefined) {
     initConfig({ endpoint: dependencies.baseHost });
   }
 
@@ -563,9 +555,7 @@ export function createMcpHandler(dependencies: HostedMcpDependencies): McpHandle
    * Validates an API key against the database.
    * Returns the project if valid, null otherwise.
    */
-  async function validateApiKey(
-    apiKey: string,
-  ): Promise<{ id: string; teamId: string } | null> {
+  async function validateApiKey(apiKey: string): Promise<{ id: string; teamId: string } | null> {
     try {
       return await projects.findLiveProjectByApiKey({ apiKey });
     } catch (err) {
@@ -618,10 +608,7 @@ export function createMcpHandler(dependencies: HostedMcpDependencies): McpHandle
   // runWithConfig wrapper
   // -------------------------------------------------------------------------
 
-  async function handleWithSessionConfig<T>(
-    apiKey: string,
-    fn: () => Promise<T>,
-  ): Promise<T> {
+  async function handleWithSessionConfig<T>(apiKey: string, fn: () => Promise<T>): Promise<T> {
     const baseConfig = getConfig();
     logger.debug(
       { hasApiKey: !!apiKey, endpoint: baseConfig.endpoint },
@@ -661,12 +648,7 @@ export function createMcpHandler(dependencies: HostedMcpDependencies): McpHandle
           userId,
           expiresAt: entry.expiresAt,
         });
-        await redis.set(
-          `${REDIS_TOKEN_PREFIX}${accessToken}`,
-          redisEntry,
-          "EX",
-          expiresIn,
-        );
+        await redis.set(`${REDIS_TOKEN_PREFIX}${accessToken}`, redisEntry, "EX", expiresIn);
       } catch (err) {
         logger.error({ error: err }, "Failed to store OAuth token in Redis");
       }
@@ -685,12 +667,7 @@ export function createMcpHandler(dependencies: HostedMcpDependencies): McpHandle
         encryptedApiKey: encrypt(apiKey),
         createdAt: Date.now(),
       });
-      await redis.set(
-        `${REDIS_SESSION_PREFIX}${sessionId}`,
-        data,
-        "EX",
-        SESSION_REDIS_TTL_SECONDS,
-      );
+      await redis.set(`${REDIS_SESSION_PREFIX}${sessionId}`, data, "EX", SESSION_REDIS_TTL_SECONDS);
       // Track session ID in a per-key set for counting
       await redis.sadd(`${REDIS_SESSION_SET_PREFIX}${hashApiKey(apiKey)}`, sessionId);
       await redis.expire(
@@ -706,10 +683,7 @@ export function createMcpHandler(dependencies: HostedMcpDependencies): McpHandle
   async function touchSessionInRedis(sessionId: string, apiKey: string): Promise<void> {
     if (!redis) return;
     try {
-      await redis.expire(
-        `${REDIS_SESSION_PREFIX}${sessionId}`,
-        SESSION_REDIS_TTL_SECONDS,
-      );
+      await redis.expire(`${REDIS_SESSION_PREFIX}${sessionId}`, SESSION_REDIS_TTL_SECONDS);
       await redis.expire(
         `${REDIS_SESSION_SET_PREFIX}${hashApiKey(apiKey)}`,
         SESSION_REDIS_TTL_SECONDS,
@@ -734,10 +708,7 @@ export function createMcpHandler(dependencies: HostedMcpDependencies): McpHandle
   }
 
   /** Remove session from Redis. */
-  async function removeSessionFromRedis(
-    sessionId: string,
-    apiKey: string,
-  ): Promise<void> {
+  async function removeSessionFromRedis(sessionId: string, apiKey: string): Promise<void> {
     if (!redis) return;
     try {
       await redis.del(`${REDIS_SESSION_PREFIX}${sessionId}`);
@@ -845,10 +816,7 @@ export function createMcpHandler(dependencies: HostedMcpDependencies): McpHandle
   }
 
   /** Record an SSE session so other replicas can find and reach it. */
-  async function storeSseSessionInRedis(
-    sessionId: string,
-    apiKey: string,
-  ): Promise<void> {
+  async function storeSseSessionInRedis(sessionId: string, apiKey: string): Promise<void> {
     if (!redis) return;
     const setKey = `${REDIS_SSE_SESSION_SET_PREFIX}${hashApiKey(apiKey)}`;
     await redis.set(
@@ -865,16 +833,10 @@ export function createMcpHandler(dependencies: HostedMcpDependencies): McpHandle
   }
 
   /** Keep an active SSE session from being reaped, wherever it is driven from. */
-  async function touchSseSessionInRedis(
-    sessionId: string,
-    apiKey: string,
-  ): Promise<void> {
+  async function touchSseSessionInRedis(sessionId: string, apiKey: string): Promise<void> {
     if (!redis) return;
     try {
-      await redis.expire(
-        `${REDIS_SSE_SESSION_PREFIX}${sessionId}`,
-        SSE_SESSION_REDIS_TTL_SECONDS,
-      );
+      await redis.expire(`${REDIS_SSE_SESSION_PREFIX}${sessionId}`, SSE_SESSION_REDIS_TTL_SECONDS);
       await redis.expire(
         `${REDIS_SSE_SESSION_SET_PREFIX}${hashApiKey(apiKey)}`,
         SSE_SESSION_REDIS_TTL_SECONDS,
@@ -897,18 +859,12 @@ export function createMcpHandler(dependencies: HostedMcpDependencies): McpHandle
     }
   }
 
-  async function removeSseSessionFromRedis(
-    sessionId: string,
-    apiKey?: string,
-  ): Promise<void> {
+  async function removeSseSessionFromRedis(sessionId: string, apiKey?: string): Promise<void> {
     if (!redis) return;
     try {
       await redis.del(`${REDIS_SSE_SESSION_PREFIX}${sessionId}`);
       if (apiKey) {
-        await redis.srem(
-          `${REDIS_SSE_SESSION_SET_PREFIX}${hashApiKey(apiKey)}`,
-          sessionId,
-        );
+        await redis.srem(`${REDIS_SSE_SESSION_SET_PREFIX}${hashApiKey(apiKey)}`, sessionId);
       }
     } catch {
       // Best-effort cleanup
@@ -985,10 +941,7 @@ export function createMcpHandler(dependencies: HostedMcpDependencies): McpHandle
     });
   }
 
-  async function handleOAuthRegister(
-    req: IncomingMessage,
-    res: ServerResponse,
-  ): Promise<void> {
+  async function handleOAuthRegister(req: IncomingMessage, res: ServerResponse): Promise<void> {
     const ip = getClientIp(req);
     if (registerRateLimiter.isBlocked(ip)) {
       sendRateLimited(res);
@@ -1029,8 +982,7 @@ export function createMcpHandler(dependencies: HostedMcpDependencies): McpHandle
     // this client_id to the redirect_uris it registered with, so /mcp/authorize
     // can reject a request that later shows up with a different one.
     const clientId = `mcp_${randomUUID().replace(/-/g, "")}`;
-    const clientName =
-      typeof body.client_name === "string" ? body.client_name : "MCP Client";
+    const clientName = typeof body.client_name === "string" ? body.client_name : "MCP Client";
 
     try {
       await registerOAuthClient({
@@ -1076,10 +1028,7 @@ export function createMcpHandler(dependencies: HostedMcpDependencies): McpHandle
     }
   }
 
-  async function handleOAuthToken(
-    req: IncomingMessage,
-    res: ServerResponse,
-  ): Promise<void> {
+  async function handleOAuthToken(req: IncomingMessage, res: ServerResponse): Promise<void> {
     // Rate limit token endpoint per IP
     const ip = getClientIp(req);
     if (tokenRateLimiter.isBlocked(ip)) {
@@ -1169,8 +1118,7 @@ export function createMcpHandler(dependencies: HostedMcpDependencies): McpHandle
       if (!registeredClient) {
         sendJson(res, 401, {
           error: "invalid_client",
-          error_description:
-            "Unknown client_id — register again via dynamic client registration",
+          error_description: "Unknown client_id — register again via dynamic client registration",
         });
         return;
       }
@@ -1234,9 +1182,7 @@ export function createMcpHandler(dependencies: HostedMcpDependencies): McpHandle
     }
 
     // PKCE S256 verification: base64url(SHA256(code_verifier)) == code_challenge
-    const computedChallenge = createHash("sha256")
-      .update(codeVerifier)
-      .digest("base64url");
+    const computedChallenge = createHash("sha256").update(codeVerifier).digest("base64url");
 
     if (computedChallenge !== stored.codeChallenge) {
       sendJson(res, 400, {
@@ -1314,9 +1260,7 @@ export function createMcpHandler(dependencies: HostedMcpDependencies): McpHandle
 
     // Re-resolve to recover OAuth userId if the token still has one;
     // graceful degradation to undefined for direct-apiKey sessions.
-    const recoveredCtx = incomingToken
-      ? await resolveSessionContext(incomingToken)
-      : null;
+    const recoveredCtx = incomingToken ? await resolveSessionContext(incomingToken) : null;
     const session: SessionState = {
       transport,
       apiKey: redisApiKey,
@@ -1408,9 +1352,7 @@ export function createMcpHandler(dependencies: HostedMcpDependencies): McpHandle
       // for governance MCP tool attribution. authenticateRequest only
       // returns the apiKey, but resolveSessionContext is cheap and the
       // entry was just populated.
-      const initialCtx = incomingToken
-        ? await resolveSessionContext(incomingToken)
-        : null;
+      const initialCtx = incomingToken ? await resolveSessionContext(incomingToken) : null;
       const userId = initialCtx?.userId;
 
       // Per-key session limit (cross-pod via Redis)
@@ -1445,9 +1387,7 @@ export function createMcpHandler(dependencies: HostedMcpDependencies): McpHandle
       sessionTools?.register({ server: sessionServer, apiKey, callerUserId: userId });
       await handleWithSessionConfig(apiKey, () => sessionServer.connect(transport));
 
-      await handleWithSessionConfig(apiKey, () =>
-        transport.handleRequest(req, res, body),
-      );
+      await handleWithSessionConfig(apiKey, () => transport.handleRequest(req, res, body));
       return;
     }
 
@@ -1516,15 +1456,10 @@ export function createMcpHandler(dependencies: HostedMcpDependencies): McpHandle
 
     session.lastActivityAt = Date.now();
     touchSessionInRedis(sessionId, session.apiKey).catch(() => {});
-    await handleWithSessionConfig(session.apiKey, () =>
-      session.transport.handleRequest(req, res),
-    );
+    await handleWithSessionConfig(session.apiKey, () => session.transport.handleRequest(req, res));
   }
 
-  async function handleMcpDelete(
-    req: IncomingMessage,
-    res: ServerResponse,
-  ): Promise<void> {
+  async function handleMcpDelete(req: IncomingMessage, res: ServerResponse): Promise<void> {
     const sessionId = req.headers["mcp-session-id"] as string | undefined;
 
     if (sessionId && sessions.has(sessionId)) {
@@ -1578,10 +1513,7 @@ export function createMcpHandler(dependencies: HostedMcpDependencies): McpHandle
       await subscriber.subscribe(channel);
     } catch (err) {
       relayListeners.delete(channel);
-      logger.error(
-        { error: err, sessionId },
-        "Failed to subscribe to the MCP SSE relay channel",
-      );
+      logger.error({ error: err, sessionId }, "Failed to subscribe to the MCP SSE relay channel");
     }
   }
 
@@ -1605,10 +1537,7 @@ export function createMcpHandler(dependencies: HostedMcpDependencies): McpHandle
     }
   }
 
-  async function handleSseConnect(
-    req: IncomingMessage,
-    res: ServerResponse,
-  ): Promise<void> {
+  async function handleSseConnect(req: IncomingMessage, res: ServerResponse): Promise<void> {
     const apiKey = await authenticateRequest(req, res);
     if (!apiKey) return;
 
@@ -1655,10 +1584,7 @@ export function createMcpHandler(dependencies: HostedMcpDependencies): McpHandle
     await handleWithSessionConfig(apiKey, () => sessionServer.connect(transport));
   }
 
-  async function handleSseMessage(
-    req: IncomingMessage,
-    res: ServerResponse,
-  ): Promise<void> {
+  async function handleSseMessage(req: IncomingMessage, res: ServerResponse): Promise<void> {
     const url = new URL(req.url ?? "", "http://localhost");
     const sessionId = url.searchParams.get("sessionId");
 
@@ -1758,9 +1684,7 @@ export function createMcpHandler(dependencies: HostedMcpDependencies): McpHandle
     pathname: string;
     method: string;
   }): boolean {
-    const prefix = OAUTH_METADATA_PREFIXES.find((candidate) =>
-      pathname.startsWith(candidate),
-    );
+    const prefix = OAUTH_METADATA_PREFIXES.find((candidate) => pathname.startsWith(candidate));
     if (!prefix) return false;
 
     if (method !== "GET") {

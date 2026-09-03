@@ -59,9 +59,46 @@ Feature: The local development process topology
 
   # --- The port pre-flight ---
 
-  @unimplemented
+  @unit
   Scenario: The pre-flight reserves all three Node ports
     Given NODE_ENV is "development"
     When the dev launcher checks its ports
     Then it reserves PORT, PORT + 1000 and PORT - 2561
     And it suggests a free slot only where all three are free
+
+  # --- The launcher hands each lane the port it derived ---
+
+  # Deriving a port and not handing it over is the same as not deriving it.
+  # `pnpm dev` computed the api lane's port and kept it to itself, so the api
+  # process fell through to PORT — the browser application's — read out of the
+  # workspace `.env`, and died on boot with EADDRINUSE. Everything downstream
+  # read as a different fault entirely: every Vite proxy attempt was an
+  # ECONNREFUSED stack, and the gateway called the control plane unreachable.
+  #
+  # One derivation, one place, and every consumer reads it: the pre-flight that
+  # reserves the ports and the launcher that hands them out cannot disagree
+  # about which port a lane gets.
+
+  @unit
+  Scenario: Each lane is told the port that was derived for it
+    Given a dev launcher deriving its ports from PORT
+    When it starts the lanes
+    Then the api lane is given PORT + 1000, not the browser application's port
+    And the worker is given the metrics port the pre-flight reserved
+    And the AI Gateway is given the port the launcher announced
+
+  # `--env-file-if-exists` never overwrites a variable that is already set, so
+  # exporting is what makes the derived value beat the committed one. A lane
+  # that only inherited it in the launcher's own shell would be handed the
+  # `.env` value the moment its entry point loaded the file.
+  @unit
+  Scenario: A derived port beats the value committed in the workspace env file
+    Given the workspace env file names a port for the browser application
+    When a lane is started with a port the launcher derived
+    Then the lane binds the derived port
+
+  @unit
+  Scenario: A port the developer set themselves is left alone
+    Given a developer who set the api port explicitly
+    When the launcher derives its ports
+    Then their value is kept and nothing is derived over it
