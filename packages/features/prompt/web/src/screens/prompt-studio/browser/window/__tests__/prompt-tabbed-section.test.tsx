@@ -713,6 +713,7 @@ describe("given a deployment that runs no playground chat", () => {
   });
 
   describe("when the reader opens the Conversation tab", () => {
+    /** @scenario "The Conversation tab explains an absent chat runtime" */
     it("explains the absence instead of mounting a chat that cannot send", () => {
       renderPromptTabbedSection({ layoutMode: "vertical" }, void 0, unavailableHost);
 
@@ -723,6 +724,7 @@ describe("given a deployment that runs no playground chat", () => {
       expect(screen.queryByTestId("copilot-chat")).not.toBeInTheDocument();
     });
 
+    /** @scenario "An absent chat runtime offers nothing to reset" */
     it("offers no reset for a chat that is not there", () => {
       renderPromptTabbedSection({ layoutMode: "vertical" }, void 0, unavailableHost);
 
@@ -731,6 +733,7 @@ describe("given a deployment that runs no playground chat", () => {
   });
 
   describe("when the deployment does run one", () => {
+    /** @scenario "The Conversation tab mounts the chat where a runtime is served" */
     it("mounts the chat as before", () => {
       renderPromptTabbedSection({ layoutMode: "vertical" });
 
