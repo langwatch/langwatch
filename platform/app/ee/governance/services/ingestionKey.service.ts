@@ -59,12 +59,29 @@ export interface IssuedIngestionKey {
  *
  * Two mint shapes, picked by the caller:
  *   - `ensureForProject` rotates hard-cut: it revokes any prior live ingest key
- *     for the same (project, sourceType) before creating the new one, so a
- *     single owner of a source never accumulates keys.
+ *     for the same (project, sourceType) before creating the new one. This is
+ *     what an explicit "rotate" means: the previous token dies now.
  *   - `issueForProject` only creates. Several machines can each hold their own
  *     live key for one (project, sourceType) pair, and revoking one machine's
  *     key leaves the others working.
+ *
+ * The CLI's personal-workspace mint (`issueForPersonalProject`) is the
+ * create-only shape with a cap. A developer runs the same tool on a laptop, a
+ * desktop and a few cloud machines under one login, and a golden VM image gets
+ * forked into many; a hard-cut mint from any one of them silently killed the
+ * key every other machine was still exporting with, and nothing on those
+ * machines could tell. Per-machine keys end that. The cap keeps the personal
+ * key list bounded without a rotation: past it, the key that has gone unused
+ * the longest is revoked, which is the machine most likely gone.
  */
+/**
+ * Live personal ingest keys one workspace may hold per (sourceType, template).
+ * Sized for a person's real machines with room to spare: a few laptops, a few
+ * cloud machines, and the forks of a golden image that share their parent's
+ * key rather than minting their own.
+ */
+export const PERSONAL_INGEST_KEYS_PER_TOOL_CAP = 10;
+
 export class IngestionKeyService {
   private readonly apiKeys: ApiKeyService;
   private readonly apiKeyRepo: ApiKeyRepository;
@@ -207,9 +224,119 @@ export class IngestionKeyService {
   }
 
   /**
-   * Issues an ingestion key for the caller's personal project in the given org.
-   * Used by the unified CLI Path B (no template) and by personal template
-   * installs (with a templateId).
+   * Issues an ingestion key for the caller's personal project WITHOUT
+   * touching the keys other machines hold for the same tool: the create-only
+   * shape, capped at `PERSONAL_INGEST_KEYS_PER_TOOL_CAP` live keys per
+   * (workspace, sourceType, template). Past the cap the least recently used
+   * key is revoked, oldest-created first among keys never used.
+   *
+   * This is the CLI device-session mint (`langwatch instrument <tool>`,
+   * `langwatch <tool>`): every device that signs in gets its own key, and no
+   * device's mint can break another device's telemetry. The just-minted key
+   * is never a candidate for the cap.
+   */
+  async issueForPersonalProject({
+    userId,
+    organizationId,
+    sourceType,
+    ingestionTemplateId = null,
+    createdByDeviceLabel = null,
+  }: {
+    userId: string;
+    organizationId: string;
+    sourceType: string;
+    ingestionTemplateId?: string | null;
+    createdByDeviceLabel?: string | null;
+  }): Promise<IssuedIngestionKey> {
+    const workspace = await this.personalWorkspace.findExisting({
+      userId,
+      organizationId,
+    });
+    if (!workspace) {
+      throw new PersonalWorkspaceMissingError();
+    }
+    const projectId = workspace.project.id;
+
+    const issued = await this.issueForProject({
+      callerUserId: userId,
+      ownerUserId: userId,
+      organizationId,
+      projectId,
+      sourceType,
+      ingestionTemplateId,
+      createdByDeviceLabel,
+    });
+
+    await this.revokePastCap({
+      callerUserId: userId,
+      organizationId,
+      projectId,
+      sourceType,
+      ingestionTemplateId,
+      keepApiKeyId: issued.apiKeyId,
+    });
+
+    return issued;
+  }
+
+  /**
+   * The cap behind `issueForPersonalProject`: revoke live keys for the same
+   * (project, sourceType, template) beyond the cap, least recently used
+   * first. A key never used ranks by its creation time, so a fresh machine
+   * that has not exported yet is not the first to go when the list is full.
+   * Revocations do not hold for the projection, like the rotation's.
+   */
+  private async revokePastCap({
+    callerUserId,
+    organizationId,
+    projectId,
+    sourceType,
+    ingestionTemplateId,
+    keepApiKeyId,
+  }: {
+    callerUserId: string;
+    organizationId: string;
+    projectId: string;
+    sourceType: string;
+    ingestionTemplateId: string | null;
+    keepApiKeyId: string;
+  }): Promise<void> {
+    const live = (
+      await this.apiKeyRepo.findIngestKeysForProject({
+        organizationId,
+        projectId,
+      })
+    ).filter(
+      (key) =>
+        key.id !== keepApiKeyId &&
+        key.ingestSourceType === sourceType &&
+        (key.ingestionTemplateId ?? null) === ingestionTemplateId,
+    );
+    // The kept key counts toward the cap, so the others may fill cap - 1.
+    const excess = live.length - (PERSONAL_INGEST_KEYS_PER_TOOL_CAP - 1);
+    if (excess <= 0) return;
+
+    const lastActivityMs = (key: (typeof live)[number]): number =>
+      (key.lastUsedAt ?? key.createdAt).getTime();
+    const doomed = [...live]
+      .sort((a, b) => lastActivityMs(a) - lastActivityMs(b))
+      .slice(0, excess);
+    for (const key of doomed) {
+      await this.apiKeys.revoke({
+        id: key.id,
+        callerUserId,
+        callerIsAdmin: true,
+        organizationId,
+        awaitProjection: false,
+      });
+    }
+  }
+
+  /**
+   * Issues an ingestion key for the caller's personal project in the given org,
+   * rotating in place: an explicit rotate from the /me tile and personal
+   * template installs (with a templateId). The CLI device mint uses
+   * `issueForPersonalProject` instead, so a machine never rotates another's key.
    */
   async ensureForPersonalProject({
     userId,

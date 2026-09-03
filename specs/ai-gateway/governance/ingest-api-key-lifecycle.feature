@@ -71,8 +71,9 @@ Feature: AI Gateway Governance — Ingest API Key Lifecycle
   # project that owns the code instead of the developer's personal workspace.
   # The named-project mint is create-only: two machines working on the same
   # repository each keep their own live key, and revoking one leaves the other
-  # working. Omitting `project` keeps the personal-project behaviour, which
-  # rotates in place.
+  # working. Omitting `project` mints into the personal workspace on the same
+  # terms, one key per device, capped per tool (see the personal-device
+  # scenarios below).
 
   @integration @ingest-api-key @issue @project-scoped
   Scenario: The CLI mints an ingestion key for a project named by id
@@ -116,6 +117,38 @@ Feature: AI Gateway Governance — Ingest API Key Lifecycle
     When her second machine mints one for the same project and source type
     Then both tokens authorize trace writes into "checkout-api"
     And neither key is revoked by the other
+
+  # ---------------------------------------------------------------------------
+  # Personal-workspace mint from the CLI: one key per device
+  # ---------------------------------------------------------------------------
+  # A person runs one tool from a laptop, a desktop and a few cloud machines
+  # under one login, and forks a golden image into many. The personal mint
+  # used to rotate in place, so any one machine's setup silently revoked the
+  # key every other machine was still exporting with, and nothing on those
+  # machines could tell. The personal mint is now create-only per device, and
+  # a cap keeps the list bounded by revoking the key unused the longest.
+
+  @integration @ingest-api-key @issue @personal @create-only
+  Scenario: Two devices each keep a live personal key for the same tool
+    Given jane's laptop already minted a personal ingestion key for "claude_code"
+    When her second device mints one for the same source type
+    Then both tokens authorize trace writes into her personal workspace
+    And neither key is revoked by the other
+
+  @integration @ingest-api-key @issue @personal @create-only
+  Scenario: Personal keys per tool are capped, least recently used first
+    Given jane's personal workspace holds the cap of live "claude_code" keys
+    And one of them was used less recently than the rest
+    When another device mints a personal key for "claude_code"
+    Then the new key is live
+    And the key used least recently is revoked
+    And every other key still authorizes trace writes
+
+  @integration @ingest-api-key @issue @personal @create-only
+  Scenario: The cap counts one tool at a time
+    Given jane's personal workspace holds the cap of live "claude_code" keys
+    When a device mints a personal key for "codex"
+    Then no "claude_code" key is revoked
 
   # ---------------------------------------------------------------------------
   # Ingest-only RBAC — the genuinely-write-only guarantee

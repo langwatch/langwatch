@@ -2116,8 +2116,9 @@ secured
 //
 // Body: { source_type, project?, device_label? }.
 //
-//   - Without `project`: the caller's personal project, rotating in place, so
-//     one user never accumulates keys for a tool. Returns
+//   - Without `project`: the caller's personal project, create-only per
+//     device and capped, so every machine a person signs in from keeps its
+//     own working token and no machine's mint kills another's. Returns
 //     { token, prefix, endpoint }.
 //   - With `project` (a project id or slug inside the caller's organization):
 //     that project, create-only, so two machines instrumenting the same
@@ -2387,7 +2388,9 @@ secured
 
 /**
  * The personal-project branch of the ingestion-key mint: the caller's own
- * workspace, rotating in place so one user never accumulates keys for a tool.
+ * workspace, one key per device. Create-only, because the caller is a
+ * device session and the other devices under this login are still exporting
+ * with theirs; the service's cap is what keeps the list bounded.
  */
 async function mintPersonalIngestionKey(
   c: Context,
@@ -2402,7 +2405,7 @@ async function mintPersonalIngestionKey(
   },
 ): Promise<Response> {
   try {
-    const result = await service.ensureForPersonalProject({
+    const result = await service.issueForPersonalProject({
       userId: tokenRecord.user_id,
       organizationId: tokenRecord.organization_id,
       sourceType,
