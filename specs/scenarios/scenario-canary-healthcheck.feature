@@ -87,10 +87,11 @@ Feature: A scenario canary health check that fires a real run and says what brok
     And exactly one run was queued
 
   @unit
-  Scenario: The canary run is pinned to one configured model
-    Given no model override is configured
-    When the canary resolves which model to run
-    Then the resolved model is "gpt-5-mini"
+  Scenario: The canary run uses the model configured on the canary scenario
+    Given the canary scenario is queued with no model override
+    When the probe runs the canary
+    Then the queued run carries no model override
+    And the run inherits the model configured on the canary scenario record
 
   @integration
   Scenario: A request with no auth secret is refused before any run is queued

@@ -196,17 +196,6 @@ export function createSingleFlightScenarioCanary(
   };
 }
 
-/**
- * The model the canary run is pinned to. One default, overridable by a single
- * env var, so the probe exercises the same model every time rather than
- * whatever a project default drifts to.
- */
-export function resolveScenarioCanaryModel(config: {
-  SCENARIO_CANARY_MODEL?: string;
-}): string {
-  return config.SCENARIO_CANARY_MODEL || "gpt-5-mini";
-}
-
 /** The synthetic actor a canary run is recorded against — no real person. */
 const CANARY_ACTOR: RunActor = { id: "scenario-canary", label: "api" };
 
@@ -261,9 +250,6 @@ const singleFlightCanary = createSingleFlightScenarioCanary(runScenarioCanary);
  * project.
  */
 export async function runScenarioHealthCanary(): Promise<CanaryResult> {
-  logger.info(
-    { model: resolveScenarioCanaryModel(env) },
-    "Running scenario canary health check",
-  );
+  logger.info("Running scenario canary health check");
   return singleFlightCanary(buildProductionDeps());
 }

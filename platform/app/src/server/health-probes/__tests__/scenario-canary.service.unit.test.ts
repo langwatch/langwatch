@@ -20,7 +20,6 @@ import type { ScenarioResults } from "~/server/scenarios/schemas/event-schemas";
 import {
   classifyCanaryOutcome,
   createSingleFlightScenarioCanary,
-  resolveScenarioCanaryModel,
   runScenarioCanary,
   SCENARIO_CANARY_ATTEMPT_BUDGET_MS,
   SCENARIO_CANARY_TOTAL_BUDGET_MS,
@@ -285,19 +284,25 @@ describe("createSingleFlightScenarioCanary", () => {
   });
 });
 
-describe("resolveScenarioCanaryModel", () => {
-  describe("given no model override is configured", () => {
-    /** @scenario "The canary run is pinned to one configured model" */
-    it("resolves to gpt-5-mini", () => {
-      expect(resolveScenarioCanaryModel({})).toBe("gpt-5-mini");
-    });
-  });
+describe("given the canary scenario is queued with no model override", () => {
+  /** @scenario "The canary run uses the model configured on the canary scenario" */
+  it("passes no model override to the queue call, so the run inherits the model configured on the canary scenario record", async () => {
+    const clock = fakeClock();
+    let queueRunCallArgs: unknown[] = [];
+    const deps: ScenarioCanaryDeps = {
+      queueRun: async (...args: unknown[]) => {
+        queueRunCallArgs = args;
+        return { scenarioRunId: "canary-run-1" };
+      },
+      getScenarioRunData: async () => ({
+        status: ScenarioRunStatus.SUCCESS,
+        results: verdictResults(Verdict.SUCCESS),
+      }),
+      ...clock,
+    };
 
-  describe("given a model override is configured", () => {
-    it("resolves to the configured override", () => {
-      expect(
-        resolveScenarioCanaryModel({ SCENARIO_CANARY_MODEL: "openai/gpt-5-mini" }),
-      ).toBe("openai/gpt-5-mini");
-    });
+    await runScenarioCanary(deps);
+
+    expect(queueRunCallArgs).toEqual([]);
   });
 });
