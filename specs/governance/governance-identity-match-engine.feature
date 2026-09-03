@@ -11,6 +11,17 @@ Feature: Deciding which provider-named person is which LangWatch account
   Background:
     Given an organization whose providers name people on the rows we pull
 
+  # ── The engine runs when it is asked to ───────────────────────────────────
+
+  @unit
+  Scenario: The matcher keeps no standing appointment of its own
+    When the background workers start
+    Then no recurring matcher run is booked for that organization
+    # Nothing fills the provider-named people table yet, so a pass on a timer
+    # would sweep an empty list every night forever, on every tenant. The
+    # engine itself stays and runs whenever something asks it to; the trigger
+    # arrives with the feed that discovers people.
+
   # ── Proof links by itself ─────────────────────────────────────────────────
 
   @unit

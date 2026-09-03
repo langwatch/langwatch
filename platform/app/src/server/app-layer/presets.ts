@@ -28,11 +28,6 @@ import { createGovernanceRollupReplayPort } from "@ee/governance/services/govern
 import { GovernanceTraceActivityClickHouseRepository } from "@ee/governance/services/governanceTraceActivity.clickhouse.repository";
 import { IdentityErasureService } from "@ee/governance/services/identityErasure.service";
 import { IdentityMatchService } from "@ee/governance/services/identityMatch.service";
-import {
-  IDENTITY_MATCH_TARGET_TYPE,
-  reconcileIdentityMatchSchedules,
-} from "@ee/governance/services/identityMatchSchedule";
-import { IdentityMatchSuggestionService } from "@ee/governance/services/identityMatchSuggestion.service";
 import { PersonalUsageClickHouseRepository } from "@ee/governance/services/personalUsage.clickhouse.repository";
 import { WebhookEndpointService } from "@ee/webhooks/webhookEndpoint.service";
 import { WebhookEventsClickHouseRepository } from "@ee/webhooks/webhookEvents.clickhouse.repository";
@@ -1298,70 +1293,12 @@ export function initializeDefaultApp(options?: {
       });
   }
 
-  // ADR-128 §12: the identity match engine, nightly, on the same calendar
-  // scheduler. Two passes per fire, in order — proof first, then guesses —
-  // because linking somebody proven closes every guess about them, and running
-  // the expensive half first would score a population we were about to shrink.
-  //
-  // Worker-role only, and that is the boundary the whole §12 design rests on:
-  // the scorer measured 2.9 seconds of blocked event loop at this ADR's own
-  // example size, so composing it anywhere a request could reach it would put
-  // that on a page load. A test walks the import graph to prove no request path
-  // does.
-  if (roleRunsWorkers(config.processRole)) {
-    const matchLogger = createLogger("langwatch:governance:identity-match");
-    const tenantHistory = new GovernanceTenantHistoryRepository();
-    const suggestions = new IdentityMatchSuggestionService({ prisma });
-
-    schedulerRegistry.register({
-      targetType: IDENTITY_MATCH_TARGET_TYPE,
-      handler: async (fire) => {
-        // The fire names a tenant; the identity tables are keyed by
-        // organization (ADR-128 §11), and the persisted history is the
-        // translation between them. Not the live resolver, which filters
-        // archived projects and would go permanently blind after one archive.
-        const owner = await tenantHistory.findByTenantId(prisma, {
-          tenantId: fire.projectId,
-        });
-        if (!owner) {
-          // A governance project nothing has written under yet. Nothing to
-          // match, and guessing an owner from the project's team would be a
-          // second translation with different answers from the one erasure
-          // uses.
-          matchLogger.warn(
-            { tenantId: fire.projectId },
-            "Identity matcher fired for a tenant with no recorded organization; skipping",
-          );
-          return;
-        }
-        const { organizationId } = owner;
-        await governanceIdentityMatch.linkProvenMatches({ organizationId });
-        await suggestions.recompute({ organizationId });
-      },
-    });
-
-    // Registering the handler is only half of it: without calendar entries
-    // carrying this targetType the loop never fires it.
-    void reconcileIdentityMatchSchedules({
-      prisma,
-      scheduledJobs: new PrismaScheduledJobRepository(prisma),
-      logger: matchLogger,
-    })
-      .then(({ created, deactivated }) => {
-        if (created > 0 || deactivated > 0) {
-          matchLogger.info(
-            { created, deactivated },
-            "Reconciled identity match schedules at boot",
-          );
-        }
-      })
-      .catch((error: unknown) => {
-        matchLogger.error(
-          { error: error instanceof Error ? error.message : String(error) },
-          "Identity match schedule reconciliation failed at boot (will retry next boot)",
-        );
-      });
-  }
+  // ADR-128 §12: the match engine gets no calendar entry, deliberately —
+  // nothing writes `DiscoveredPerson` yet, so a standing appointment would read
+  // an empty table on every tenant for ever. Its trigger arrives with the feed
+  // that discovers people and is a call site, not a schedule. Compose that
+  // caller on the worker role: the name scorer measured 2.9 seconds of blocked
+  // event loop at the ADR's example size.
 
   // ADR-044 Phase 3c: register the report handler so a due report ScheduledJob
   // renders + dispatches on schedule (worker-only, same notify pipeline as

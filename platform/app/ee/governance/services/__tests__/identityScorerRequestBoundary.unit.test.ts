@@ -14,8 +14,15 @@
  * Three claims, weakest to strongest:
  *
  *  1. exactly one module imports the scorer, and it is the background job;
- *  2. exactly one module imports that job, and it is the composition root;
+ *  2. nothing imports that job at all, now the nightly pass is gone;
  *  3. walking out from the request surfaces never arrives at the scorer.
+ *
+ * Claim 2 used to name the composition root, which booked the job nightly. The
+ * appointment is gone (nothing writes `DiscoveredPerson` yet, so every pass
+ * read an empty table) and the job is left with no caller. Asserting the empty
+ * list rather than deleting the claim is the point: the next caller written is
+ * the one that has to be a background job, and this line is what makes adding
+ * it visible in review instead of silent.
  *
  * The third treats the composition root as a leaf, and that exclusion is stated
  * rather than hidden: `presets.ts` composes every service in the process and is
@@ -32,16 +39,16 @@
  */
 import { existsSync, readdirSync, readFileSync, statSync } from "node:fs";
 import { dirname, join, relative, resolve } from "node:path";
-import { fileURLToPath } from "node:url";
 
 import { describe, expect, it } from "vitest";
 
-/** `…/ee/governance/services/__tests__` → `…/platform/app`. */
-const APP_DIR = resolve(
-  fileURLToPath(new URL("../../../../", import.meta.url)),
-);
-const SRC_DIR = join(APP_DIR, "src");
-const EE_DIR = join(APP_DIR, "ee");
+import {
+  APP_DIR,
+  appSourceFiles,
+  EE_DIR,
+  EXTENSIONS,
+  SRC_DIR,
+} from "./_governanceSourceScan";
 
 const SCORER = join(EE_DIR, "governance/services/logic/nameSimilarity.ts");
 const SUGGESTION_JOB = join(
@@ -67,8 +74,6 @@ const REQUEST_ROOTS = [
     .filter((entry) => entry.isFile() && entry.name.endsWith(".ts"))
     .map((entry) => join(EE_DIR, "governance/routers", entry.name)),
 ];
-
-const EXTENSIONS = [".ts", ".tsx", ".mts", ".cts", ".js"];
 
 /**
  * Static `import`/`export … from` specifiers. Deliberately not `import()`.
@@ -166,28 +171,9 @@ function reachableFiles({
   return seen;
 }
 
-/** Every source file in the app, tests and generated code excluded. */
-function sourceFiles(directory: string): string[] {
-  return readdirSync(directory, { withFileTypes: true }).flatMap((entry) => {
-    const path = join(directory, entry.name);
-    if (entry.isDirectory()) {
-      return ["__tests__", "__mocks__", "node_modules", "generated"].includes(
-        entry.name,
-      )
-        ? []
-        : sourceFiles(path);
-    }
-    if (entry.name.endsWith(".d.ts")) return [];
-    if (/\.(test|spec)\.[cm]?[jt]sx?$/.test(entry.name)) return [];
-    return EXTENSIONS.some((extension) => entry.name.endsWith(extension))
-      ? [path]
-      : [];
-  });
-}
-
 /** Files that import `target` directly, as paths relative to `platform/app`. */
 function directImportersOf(target: string): string[] {
-  return [...sourceFiles(SRC_DIR), ...sourceFiles(EE_DIR)]
+  return appSourceFiles()
     .filter((file) =>
       specifiersOf(readFileSync(file, "utf8")).some(
         (specifier) => resolveLocal({ specifier, fromFile: file }) === target,
@@ -207,10 +193,8 @@ describe("Feature: where the name scorer can be reached from", () => {
   });
 
   describe("given the modules that import the background job", () => {
-    it("finds exactly the composition root, which only builds it on the worker role", () => {
-      expect(directImportersOf(SUGGESTION_JOB)).toEqual([
-        relative(APP_DIR, COMPOSITION_ROOT),
-      ]);
+    it("finds none, because nothing calls the job yet", () => {
+      expect(directImportersOf(SUGGESTION_JOB)).toEqual([]);
     });
   });
 
