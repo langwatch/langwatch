@@ -1,0 +1,96 @@
+---
+title: POST /v1/images/*
+description: Image generation and editing through the LangWatch AI Gateway, on OpenAI's wire.
+sidebarTitle: Images
+---
+
+OpenAI-compatible image endpoints. Any client that speaks OpenAI's images API works with no code change for the non-streaming requests below: point its `OPENAI_BASE_URL` at the gateway and its `OPENAI_API_KEY` at a LangWatch virtual key. Image traffic gets the same governance as chat: virtual-key auth, model allowlists, budgets, rate limits, and per-call observability.
+
+Both routes are non-streaming. `stream: true` and `partial_images` above zero get a `400` from the gateway before any provider is contacted.
+
+Models: `openai/gpt-image-2`, `openai/gpt-image-1` and `openai/gpt-image-1-mini` on both routes. They are the models the cost catalog carries rates for; another OpenAI image model reaches the provider but its tokens price at zero until the catalog gets an entry. Configure the OpenAI key once in **Settings → Model Providers**; every virtual key routed to that provider can then call its image models.
+
+## Generation
+
+```
+POST /v1/images/generations
+Authorization: Bearer vk-lw-<ULID>
+Content-Type: application/json
+```
+
+Body matches OpenAI's [image generation schema](https://developers.openai.com/api/reference/resources/images/methods/generate/).
+
+```bash
+curl https://gateway.langwatch.ai/v1/images/generations \
+  -H "Authorization: Bearer vk-lw-..." \
+  -H "Content-Type: application/json" \
+  -d '{
+    "model": "openai/gpt-image-2",
+    "prompt": "a red bicycle leaning on a white wall",
+    "size": "1024x1024",
+    "quality": "low",
+    "n": 1
+  }'
+```
+
+The response is the standard images JSON, with the base64 image in `data[0].b64_json`.
+
+```javascript
+const image = await client.images.generate({
+  model: "openai/gpt-image-2",
+  prompt: "a red bicycle leaning on a white wall",
+  size: "1024x1024",
+  quality: "low",
+  n: 1,
+});
+const png = Buffer.from(image.data[0].b64_json, "base64");
+```
+
+`response_format` is forwarded only when you send it. The gpt-image family rejects the field and answers in base64; the older dall-e models take it and default to `url`. A value the gateway invented would break one family or the other, so it never sets one.
+
+## Editing
+
+```
+POST /v1/images/edits
+Authorization: Bearer vk-lw-<ULID>
+Content-Type: multipart/form-data
+```
+
+Form matches OpenAI's [image edit schema](https://developers.openai.com/api/reference/resources/images/methods/edit/): one or more `image[]` parts, a `prompt` part, and `model`. A single file may also be sent under `image`. Use one field name or the other: a form carrying files under both gets a `400`, because the parts state an order inside each field and none across them. The optional parts are `mask`, `n`, `size`, `quality`, `background`, `input_fidelity`, `output_format`, `output_compression`, `response_format` and `user`. A part this list does not name is dropped rather than sent to the provider; `stream` and `partial_images` are the exception, and get the same `400` the generation route gives them. `response_format` reaches the provider as sent, and the gpt-image models reject it on this route as well.
+
+```bash
+curl https://gateway.langwatch.ai/v1/images/edits \
+  -H "Authorization: Bearer vk-lw-..." \
+  -F "model=openai/gpt-image-2" \
+  -F "prompt=put the bicycle on a sandy beach" \
+  -F "size=1024x1024" \
+  -F "image[]=@bicycle.png" \
+  -F "mask=@mask.png"
+```
+
+```javascript
+const edited = await client.images.edit({
+  model: "openai/gpt-image-2",
+  prompt: "put the bicycle on a sandy beach",
+  image: [await toFile(fs.createReadStream("bicycle.png"), "bicycle.png")],
+  size: "1024x1024",
+});
+```
+
+Uploads are capped at 64 MiB; larger uploads get a `413` before any provider is contacted.
+
+## Credentials
+
+These routes need a direct OpenAI, Azure OpenAI, Gemini, Vertex or Bedrock credential. An OpenAI credential carrying a base-URL override routes to the generic OpenAI-compatible adapter, which serves no image endpoint, so the gateway refuses it with a message naming the credentials that do work.
+
+## Observability and cost measures
+
+Every image call lands as a gateway trace like chat does. Image tokens are reported apart from the text totals, because an output image token costs several times a text one:
+
+| Attribute | Meaning |
+|---|---|
+| `gen_ai.usage.input_image_tokens` | Image tokens in the prompt, what an edit pays for the pixels it reads |
+| `gen_ai.usage.output_image_tokens` | Image tokens in the answer, what every generated image is billed by |
+| `gen_ai.usage.image_count` | How many images the response carried |
+
+The span carries the prompt as its input. The response body is base64 image data, so it is never written to a span; when the model states a revised prompt, that is the span's output.

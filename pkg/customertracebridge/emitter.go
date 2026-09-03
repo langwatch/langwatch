@@ -288,6 +288,17 @@ func (e *Emitter) EndSpan(ctx context.Context, params domain.AITraceParams) {
 	if params.Usage.OutputAudioTokens > 0 {
 		attrs = append(attrs, attribute.Int(AttrGenAIUsageOutputAudioTokens, params.Usage.OutputAudioTokens))
 	}
+	// Image tokens ride beside the text totals for the same reason the audio
+	// ones do, and the image count is what a per-image price is applied to.
+	if params.Usage.InputImageTokens > 0 {
+		attrs = append(attrs, attribute.Int(AttrGenAIUsageInputImageTokens, params.Usage.InputImageTokens))
+	}
+	if params.Usage.OutputImageTokens > 0 {
+		attrs = append(attrs, attribute.Int(AttrGenAIUsageOutputImageTokens, params.Usage.OutputImageTokens))
+	}
+	if params.Usage.ImageCount > 0 {
+		attrs = append(attrs, attribute.Int(AttrGenAIUsageImageCount, params.Usage.ImageCount))
+	}
 	if params.Usage.CacheReadTokens > 0 {
 		attrs = append(attrs, attribute.Int(AttrGenAIUsageCacheRead, params.Usage.CacheReadTokens))
 	}
@@ -502,7 +513,8 @@ func endUserID(ctx context.Context, params domain.AITraceParams) string {
 	}
 	switch params.RequestType {
 	case domain.RequestTypeChat, domain.RequestTypeEmbeddings,
-		domain.RequestTypeResponses, domain.RequestTypeSpeech:
+		domain.RequestTypeResponses, domain.RequestTypeSpeech,
+		domain.RequestTypeImageGeneration, domain.RequestTypeImageEdit:
 		return EndUserIDFromBody(params.RequestBody)
 	case domain.RequestTypeMessages, domain.RequestTypePassthrough,
 		domain.RequestTypeTranscription, domain.RequestTypeRealtimeSession:
@@ -510,7 +522,9 @@ func endUserID(ctx context.Context, params domain.AITraceParams) string {
 		// messages body carries attribution under metadata.user_id, passthrough
 		// bodies are provider-shaped and forwarded verbatim, transcription
 		// arrives as multipart form data rather than JSON, and a realtime mint
-		// declares a socket rather than a completion.
+		// declares a socket rather than a completion. The image edit route is
+		// also multipart and still reads the field above, because its
+		// synthesized body states it.
 	}
 	return ""
 }
@@ -552,11 +566,12 @@ func clientSessionID(ctx context.Context, params domain.AITraceParams) string {
 		}
 	case domain.RequestTypeChat, domain.RequestTypeEmbeddings, domain.RequestTypePassthrough,
 		domain.RequestTypeSpeech, domain.RequestTypeTranscription,
+		domain.RequestTypeImageGeneration, domain.RequestTypeImageEdit,
 		domain.RequestTypeRealtimeSession:
-		// No inline session id on these request shapes (audio bodies carry no
-		// session field at all, and a realtime mint's session id is the one
-		// the gateway itself hands back); the header lifted above (when
-		// present) is the only source.
+		// No inline session id on these request shapes (audio and image bodies
+		// carry no session field at all, and a realtime mint's session id is
+		// the one the gateway itself hands back); the header lifted above
+		// (when present) is the only source.
 	}
 	return ""
 }
@@ -593,6 +608,15 @@ func extractInputMessages(body []byte, reqType domain.RequestType) string {
 		// only `messages` drops it from the trace. Prepend it as a
 		// system message and keep the caller's messages verbatim.
 		return anthropicBodyAsMessages(body)
+	case domain.RequestTypeImageGeneration, domain.RequestTypeImageEdit:
+		// Images: the prompt is the meaningful input, rendered as a single
+		// user message so the trace viewer shows it like any chat. The source
+		// images of an edit stay out: they are megabytes of binary that no
+		// span should carry.
+		if in := gjson.GetBytes(body, "prompt"); in.Exists() && in.String() != "" {
+			return fmt.Sprintf(`[{"role":"user","content":%s}]`, jsonString(in.String()))
+		}
+		return ""
 	case domain.RequestTypeSpeech:
 		// TTS: the synthesized text is the meaningful input. Rendered as a
 		// single user message so the trace viewer shows it like any chat.
@@ -841,6 +865,14 @@ func extractOutputMessages(body []byte, reqType domain.RequestType) string {
 		// non-JSON body) renders as empty rather than as raw bytes.
 		if t := gjson.GetBytes(body, "text"); t.Exists() && t.String() != "" {
 			return fmt.Sprintf(`[{"role":"assistant","content":%s}]`, jsonString(t.String()))
+		}
+		return ""
+	case domain.RequestTypeImageGeneration, domain.RequestTypeImageEdit:
+		// Images: the response body is base64 image data, megabytes of it,
+		// which must never land on a span. The model's rewritten prompt is
+		// the one renderable part, when the provider states one.
+		if p := gjson.GetBytes(body, "data.0.revised_prompt"); p.Exists() && p.String() != "" {
+			return fmt.Sprintf(`[{"role":"assistant","content":%s}]`, jsonString(p.String()))
 		}
 		return ""
 	default:
