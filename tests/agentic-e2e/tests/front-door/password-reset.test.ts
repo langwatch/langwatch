@@ -9,14 +9,15 @@
  * CI has no mail provider, so `/auth/forgot-password` itself renders the
  * "cannot send email" card rather than its form (see `signin-basics.test.ts`'s
  * header for the same coupling). The request endpoint still writes its token
- * row before it ever tries to send mail — better-auth's own
- * `requestPasswordReset` handler calls `runInBackgroundOrAwait` around
- * `sendResetPassword`, so a down mailer never blocks the response — so this
- * calls that endpoint directly and reads the token out of Postgres (`db.ts`),
- * the same way `signup-confirmation.test.ts` does for the sign-up link.
+ * before it ever tries to send mail — better-auth's own `requestPasswordReset`
+ * handler calls `runInBackgroundOrAwait` around `sendResetPassword`, so a
+ * down mailer never blocks the response — so this calls that endpoint
+ * directly and reads the token back out of where better-auth actually keeps
+ * it: Redis, its secondary storage, keyed by the account's id (`redis.ts`).
  */
 import { expect, test } from "@playwright/test";
-import { findPasswordResetToken } from "./db";
+import { findUserIdByEmail } from "./db";
+import { closeRedis, findPasswordResetToken } from "./redis";
 import { addVirtualAuthenticator, removeVirtualAuthenticator } from "./webauthn";
 import {
   betterAuthRequestHeaders,
@@ -28,10 +29,18 @@ import {
 
 test.use({ storageState: { cookies: [], origins: [] } });
 
+test.afterAll(async () => {
+  await closeRedis();
+});
+
 async function requestResetToken(
   page: import("@playwright/test").Page,
   email: string,
 ): Promise<string> {
+  const userId = await findUserIdByEmail(email);
+  if (!userId) {
+    throw new Error(`No account in Postgres for ${email} to request a reset for`);
+  }
   const response = await page.request.post("/api/auth/request-password-reset", {
     headers: betterAuthRequestHeaders(),
     data: { email, redirectTo: "/auth/reset-password" },
@@ -44,10 +53,12 @@ async function requestResetToken(
 
   const deadline = Date.now() + 10000;
   for (;;) {
-    const token = await findPasswordResetToken();
+    const token = await findPasswordResetToken(userId);
     if (token) return token;
     if (Date.now() > deadline) {
-      throw new Error("No password-reset token appeared in Postgres within 10s");
+      throw new Error(
+        `No password-reset token appeared in Redis for ${email} within 10s`,
+      );
     }
     await new Promise((resolve) => setTimeout(resolve, 250));
   }

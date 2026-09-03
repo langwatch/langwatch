@@ -247,17 +247,22 @@ export function EnterpriseCapabilitiesSection() {
 
         {!isEnterprise && (
           <HStack gap={3}>
-            {/* The label colour is stated, not left to the palette: rendered
+            {/* Both colours are stated, not left to the palette: rendered
                 through `asChild` onto an anchor, the solid recipe's contrast
                 colour did not reach the text in light mode and the button
-                read as dark ink on orange. White holds on every orange this
-                button wears, resting or hovered, in both modes. */}
+                read as dark ink on orange. White on the palette's own solid
+                (orange.600, #dd6b20) is only 3.4:1, short of the 4.5:1 WCAG AA
+                asks of 14px text; orange.700 (#c05621) carries white at
+                4.6:1 and orange.800 on hover at 8.9:1, in both modes.
+                `tests/agentic-e2e/tests/front-door/license-contrast.test.ts`
+                measures the rendered ratio. */}
             <Button
               asChild
               size="sm"
               colorPalette="orange"
+              bg="orange.700"
               color="white"
-              _hover={{ color: "white" }}
+              _hover={{ bg: "orange.800", color: "white" }}
             >
               <a href="/settings/license">Activate a license</a>
             </Button>

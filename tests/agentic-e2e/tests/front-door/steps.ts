@@ -241,6 +241,11 @@ export async function thenIAmCalledByMyEmailNeverNull(
   await page.waitForURL((url) => !url.pathname.startsWith("/auth/"), {
     timeout: 15000,
   });
+  // A password-made account gets the "Sign in faster next time" offer on its
+  // first authenticated screen (`SecureAccountNudge`, a modal dialog), and a
+  // modal's backdrop swallows the click on the user menu behind it. Answer
+  // it the way a person in a hurry does, then carry on.
+  await whenIDeclineTheSecureAccountNudgeIfOffered(page);
   await page
     .getByRole("button", { name: /Open user menu/ })
     .click();
@@ -250,6 +255,25 @@ export async function thenIAmCalledByMyEmailNeverNull(
   // The literal bug this guards: no name renders the email on both sides of
   // the parenthesis, e.g. "you@x.com (you@x.com)" — never "null (you@x.com)".
   await expect(group).toContainText(email);
+}
+
+/**
+ * Declines the passkey / two-step offer (`secure-account-nudge`) when it is
+ * on screen, and does nothing when it is not. The offer is a modal, so any
+ * step that needs to click through the app shell after a password sign-in
+ * has to get past it first.
+ */
+export async function whenIDeclineTheSecureAccountNudgeIfOffered(
+  page: Page,
+): Promise<void> {
+  const nudge = page.getByTestId("secure-account-nudge");
+  const offered = await nudge
+    .waitFor({ state: "visible", timeout: 3000 })
+    .then(() => true)
+    .catch(() => false);
+  if (!offered) return;
+  await page.getByRole("button", { name: "Not now" }).click();
+  await expect(nudge).not.toBeVisible();
 }
 
 function escapeRegExp(value: string): string {
@@ -330,8 +354,12 @@ export async function whenISignInWithPassword(
  * rate limit actually counts.
  */
 export async function whenISignOut(page: Page): Promise<void> {
+  // An empty JSON body, because better-auth answers a bodiless POST with 415
+  // (`Content-Type is required`) — `data: {}` is what makes Playwright send
+  // `application/json`.
   const response = await page.request.post("/api/auth/sign-out", {
     headers: betterAuthRequestHeaders(),
+    data: {},
   });
   if (!response.ok()) {
     throw new Error(

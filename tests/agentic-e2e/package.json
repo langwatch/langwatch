@@ -9,6 +9,7 @@
   "devDependencies": {
     "@playwright/test": "^1.57.0",
     "@types/pg": "^8.20.3",
+    "ioredis": "5.10.1",
     "pg": "^8.22.0"
   }
 }

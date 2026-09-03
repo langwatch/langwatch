@@ -4,33 +4,23 @@
  * CONFIRMATION AND RESET LINKS ARE EMAILED, AND CI HAS NO MAIL PROVIDER
  * (`e2e-ci.yml` sets no SendGrid/SES key, so `HAS_EMAIL_PROVIDER_KEY` is
  * false and `/auth/forgot-password` renders the "cannot send email" card
- * instead of its form). The app's own request endpoints
- * (`/api/auth/request-password-reset`, sign-up's `requestSignUpVerification`)
- * still write their single-use token row before they ever try to send mail —
- * `sendResetPassword` runs through `runInBackgroundOrAwait` and sign-up's
- * `SignUpVerificationService.issueLink` writes the row before calling the
- * mailer at all — so calling those endpoints directly and then reading the
- * token straight out of Postgres reproduces exactly what a person would do by
- * clicking the email, without needing an inbox in CI.
+ * instead of its form). Sign-up's own `requestSignUpVerification` still
+ * writes its single-use token row before it ever tries to send mail
+ * (`SignUpVerificationService.issueLink` writes the row, then calls the
+ * mailer), so reading the token straight out of Postgres reproduces exactly
+ * what a person would do by clicking the email, without needing an inbox.
  *
- * Both kinds of token live in the SAME table, `VerificationToken`
- * (better-auth's own `verification` model is mapped onto it, see
- * `platform/app/src/server/better-auth/config/models.ts`), distinguished by a
- * namespace prefix on the `identifier` column:
+ * The sign-up token lives in `VerificationToken`, under the identifier
+ * `identity-signup-verification:{"email":"...","passwordHash":...}` with the
+ * raw, URL-ready token in the `token` column (`signup-verification.service.ts`
+ * `SIGN_UP_TOKEN_NAMESPACE`). Password-reset tokens are better-auth's own and
+ * do NOT land here: with secondary storage configured better-auth keeps them
+ * in Redis — see `redis.ts`.
  *
- *   - sign-up confirmation: `identifier` is
- *     `identity-signup-verification:{"email":"...","passwordHash":...}` and
- *     the raw, URL-ready token lives in the `token` column
- *     (`signup-verification.service.ts` `SIGN_UP_TOKEN_NAMESPACE`).
- *   - password reset: `identifier` is `reset-password:<token>` — the token is
- *     embedded in the IDENTIFIER, and the `token` column instead holds the
- *     user id (better-auth's own `dist/api/routes/password.mjs`
- *     `requestPasswordReset` handler). This is the opposite shape from
- *     sign-up's own token store, so the two need separate queries.
- *
- * The `pg` dependency this file needs is the one deliberate exception to this
- * package's "nothing but @playwright/test" rule (see `license.fixture.ts`) —
- * required to read a token CI has no other way to hand a test.
+ * The `pg` dependency this file needs is one of the two deliberate exceptions
+ * (with `ioredis`, for the same reason) to this package's "nothing but
+ * @playwright/test" rule (see `license.fixture.ts`) — required to read a token
+ * CI has no other way to hand a test.
  */
 import { Pool } from "pg";
 
@@ -97,21 +87,16 @@ export async function findSignUpVerificationToken(
 }
 
 /**
- * The password-reset token most recently issued, full stop — not scoped to
- * an email, because better-auth's own reset rows carry the user id in the
- * `token` column and the email nowhere at all. Safe because every front-door
- * test that calls this uses a freshly generated, unique address for the one
- * request it makes right before reading this back.
+ * The id of the account registered under `email`, if any — what better-auth's
+ * reset token is keyed by (`redis.ts`), and the one thing `user.register`
+ * does not hand back.
  */
-export async function findPasswordResetToken(): Promise<string | null> {
-  const result = await getPool().query<{ identifier: string }>(
-    `SELECT identifier FROM "VerificationToken"
-     WHERE identifier LIKE 'reset-password:%'
-     ORDER BY "createdAt" DESC
-     LIMIT 1`,
+export async function findUserIdByEmail(email: string): Promise<string | null> {
+  const result = await getPool().query<{ id: string }>(
+    `SELECT id FROM "User" WHERE email = $1 LIMIT 1`,
+    [email],
   );
-  const identifier = result.rows[0]?.identifier ?? null;
-  return identifier ? identifier.slice("reset-password:".length) : null;
+  return result.rows[0]?.id ?? null;
 }
 
 /** Closes the pool. Call once, from a suite-level `afterAll`. */
