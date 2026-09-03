@@ -23,8 +23,8 @@
     "test:integration": "vitest run --config vitest.integration.config.ts"
   },
   "dependencies": {
-    "@langwatch/api": "workspace:*",
     "@clickhouse/client": "^1.23.0",
+    "@langwatch/api": "workspace:*",
     "@langwatch/clickhouse-client": "workspace:*",
     "@langwatch/data-retention-contract": "workspace:*",
     "@langwatch/enterprise-billing-contract": "workspace:*",
@@ -38,6 +38,7 @@
     "@langwatch/organization-contract": "workspace:*",
     "@langwatch/prisma-client": "workspace:*",
     "@langwatch/scenario-contract": "workspace:*",
+    "@langwatch/task": "workspace:*",
     "@langwatch/trace-contract": "workspace:*",
     "@slack/webhook": "^7.0.6",
     "@trpc/server": "^11.18.0",

@@ -56,8 +56,79 @@ has a ready-made factory). Details and the resume point are in
 `cleanupOldLambdas` stays retired: nothing on this branch invokes Lambda, so
 there is no subject left to restore.
 
-## Part 2 — the fallback, implemented
+## Part 2 — decided: (c), the ordinary tasks moved in, one stays a plugin
 
+Landed 2026-09-04. Five of langwatch-saas's six real tasks (its `src/task.ts`
+runner only ever found six `export default` entry points — `modelRegistry`
+held five more pure helper/library files with no default export, not
+separate tasks) moved into this repository as `Task` classes; the sixth
+stays a saas-only plugin on the mechanism Part 2 already built. The saas
+checkout was read, never written, to do this — see "What still has to happen
+in langwatch-saas" below for its side.
+
+| saas file                                              | Verdict                   | Landed as                                                                                                                                                                                                                                                                                                         |
+| ------------------------------------------------------ | ------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `src/tasks/stripe/syncStripePrices.ts`                 | Ordinary                  | `packages/enterprise/features/billing/server/src/tasks/stripe-prices-sync.task.ts` — task name `stripe-prices-sync`                                                                                                                                                                                               |
+| `src/tasks/migrations/migrateTieredFreeToSeatEvent.ts` | Ordinary                  | `packages/enterprise/features/billing/server/src/tasks/tiered-free-to-seat-event.task.ts` — task name `tiered-free-to-seat-event`                                                                                                                                                                                 |
+| `src/tasks/gdpr/deleteUserData.ts`                     | Ordinary                  | `packages/features/user/server/src/tasks/user-data-erase.task.ts` — task name `user-data-erase`                                                                                                                                                                                                                   |
+| `src/tasks/modelRegistry/*.ts` (6 files)               | Ordinary                  | `packages/features/model-provider/server/src/tasks/model-registry-sync.task.ts` (task name `model-registry-sync`) plus four `rules/*.rules.ts` siblings for the pure lookup tables — `reasoning-config.rules.ts`, `provider-id-mapping.rules.ts`, `litellm-audio-prices.rules.ts`, `catalog-price-audit.rules.ts` |
+| `src/tasks/analytics/onboardingCompletionRate.ts`      | Ordinary, but **blocked** | Not moved — see below                                                                                                                                                                                                                                                                                             |
+| `src/tasks/migrations/backfillInviteUsersToCio.ts`     | **Genuinely private**     | Stays in saas as a `@langwatch/task` plugin                                                                                                                                                                                                                                                                       |
+
+**Why `billing/server` for the first two but `packages/features/model-provider`
+and `packages/features/user` (not `packages/enterprise/features/*`) for the
+other two:** the destination is whichever package already owns the domain.
+`billing` is itself an enterprise feature, so its tasks land under
+`packages/enterprise/features/billing/server/src/tasks/`. `model-provider` and
+`user` are core features (`packages/features/*`), matching the
+`model-provider-migrate-credentials` example task this port was briefed from
+— inventing an enterprise-namespaced duplicate of an already-core feature
+would fork the package, not group it. The `dev/docs/plans/tasks-launch-interface-and-saas.md`
+Part 2 sketch below (kept for its shape) reads as if all five sat under
+`packages/enterprise/features/`; that was imprecise about the non-billing
+three and this table is the corrected mapping.
+
+**Why `backfillInviteUsersToCio` stays private.** It is a one-off repair for
+users who joined via an invite accepted before `langwatch/langwatch#3587`
+shipped — not a repeatable operation like a price sync or a GDPR erase, and
+its own docstring frames it as a historical backfill, not an ongoing job. It
+pushes a set of users' emails and names to Customer.io by raw cross-tenant
+SQL. `NurturingService`, the Customer.io client it drives, already lives in
+`packages/enterprise/features/billing/server/src/services/nurturing.service.ts`
+(moved separately), so the mechanism to port it exists if this call is ever
+revisited — it was left on the private side because "ordinary operation"
+should mean a job the product keeps needing, not a script for one incident.
+
+**Why `onboarding-completion-rate` is blocked, not moved.** The saas task
+calls `OnboardingChecksService.getCheckStatus`, which does not exist as a
+feature-owned service in this repository — its logic lives inline as a
+private `ApiOnboardingChecks` class inside
+`apps/api/src/app/api-trpc-collaborators.product.composition.ts`, an
+application composition file this port was scoped to leave untouched (and
+`apps/api/**` is off the feature-package layering `tasks/` may depend on
+regardless). Porting this task correctly needs `ApiOnboardingChecks`'s check
+logic extracted into a real onboarding-owned service first — `packages/features/onboarding`
+today is web-only, no `server/` package exists — which is a feature-extraction
+task in its own right, not a task port. Tracked here as the resume point;
+until then this one stays where it is in saas, unclassified rather than
+either moved or declared private.
+
+Every landed task was registered on `apps/tasks/src/tasks.catalogue.ts` and
+ships a unit test (lifted from the saas test where one existed — all except
+`tiered-free-to-seat-event`, which had none, and `deleteUserData`, whose test
+was integration-only against a live Postgres and was rewritten as a
+database-double unit test instead). Two mechanical adaptations were needed
+throughout, not behavior changes: `PublicShare` is `ShareLink` in this
+schema, and the `rules/<subject>.rules.ts` layout kind (decision 1) forbids
+any `new` expression, so `new Set`/`new Map` lookups in the ported
+`catalogAudit`/`litellmAudioPrices`/`providerMapping` modules became plain
+arrays/objects with `.includes()` / bracket access — same behavior, no
+allocation-heavy code in a small fixed-size table matters either way.
+
+## Part 2 (superseded) — the fallback, implemented
+
+The paragraphs below describe the mechanism as designed and are still
+accurate for the one task that uses it (`backfillInviteUsersToCio`).
 `@langwatch/task` is a leaf package (deps: `@langwatch/observability`, zod), so
 saas can depend on it as a git subdirectory dependency and implement `Task`.
 `apps/tasks` reads `LANGWATCH_TASK_MODULES` — a comma-separated list of module
@@ -110,8 +181,12 @@ import { Task, type TaskHostPort } from "@langwatch/task";
 class StripePricesSyncTask extends Task {
   readonly name = "stripe-prices-sync";
   readonly description = "...";
-  static create(host: TaskHostPort): StripePricesSyncTask { /* ... */ }
-  async run(input: { args: readonly string[]; signal: AbortSignal }): Promise<void> { /* ... */ }
+  static create(host: TaskHostPort): StripePricesSyncTask {
+    /* ... */
+  }
+  async run(input: { args: readonly string[]; signal: AbortSignal }): Promise<void> {
+    /* ... */
+  }
 }
 
 export function createTasks(host: TaskHostPort): Task[] {
@@ -124,10 +199,11 @@ Coverage:
 both export shapes, a module exporting neither, a `tasks` array holding a
 non-`Task`, and an unresolvable specifier, with fixtures beside it.
 
-## Part 2 — the move-in, still available
+## Part 2 (superseded) — the move-in, as sketched before it landed
 
-Alex took the fallback; the recommended option stays on the table and is
-decision 7 in `open-decisions-2026-09-03.md`.
+Landed as described in Part 2 above, with the destination correction noted
+there (model-provider/user are core features, not `packages/enterprise/`).
+Kept for the shape and the "why" reasoning, which still holds.
 
 ```
 langwatch-saas today                          the move-in, if taken
@@ -178,10 +254,26 @@ compose.
 
 ## What still has to happen in langwatch-saas
 
-Nothing in this repository blocks it, and nothing here has done it: the saas
-repo's runner and all 8 of its tasks still import
-`langwatch/platform/app/...`, which no longer exists, so **the saas repo does
-not build against this branch**. Under the fallback the saas PR replaces the
-submodule with the git subdirectory dependency on `@langwatch/task`, rewrites
-the 8 tasks as `Task` classes over `TaskHostPort`, and builds `FROM` the public
-image.
+Nothing in this repository blocks it, and nothing here has done it (this port
+only read the saas checkout, never wrote to it): the saas repo's runner and
+all of its tasks still import `langwatch/platform/app/...`, which no longer
+exists, so **the saas repo does not build against this branch**. The saas PR
+needs to:
+
+1. Delete `src/tasks/stripe/`, `src/tasks/migrations/migrateTieredFreeToSeatEvent.ts`,
+   `src/tasks/gdpr/`, and `src/tasks/modelRegistry/` — all five now live in
+   this repository and run via `pnpm --filter @langwatch/tasks task <name>`.
+2. Keep `src/tasks/migrations/backfillInviteUsersToCio.ts`, rewritten as a
+   `Task` class over `TaskHostPort` per the Part 2 mechanism above, exported
+   from a `createTasks(host)` module named by `LANGWATCH_TASK_MODULES`.
+3. Drop the `langwatch` submodule for a git subdirectory dependency on
+   `@langwatch/task`, and build `FROM langwatch/langwatch:<sha>` instead of
+   the standalone `Dockerfile.runtime`.
+4. Point `.github/workflows/sync-model-registry.yaml` at
+   `docker run … pnpm --filter @langwatch/tasks task model-registry-sync`
+   against the public image (or move the workflow into this repository,
+   since both the task and its output — `packages/features/model-provider/contract/src/catalog/model-catalog.json` —
+   now live here); `scripts/sync-model-registry.sh`'s stale-catalog check
+   needs the same path update.
+5. Leave `onboarding-completion-rate` where it is until the blocker above
+   (`OnboardingChecksService` extraction) is resolved.

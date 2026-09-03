@@ -198,3 +198,14 @@ export {
   createStripeWebhookRestApp,
   type StripeWebhookRestPorts,
 } from "./transport/api-rest/stripe-webhook.api";
+export {
+  runTieredFreeToSeatEventMigration,
+  TieredFreeToSeatEventMigrateTask,
+  type TieredFreeToSeatEventMigrationDatabase,
+  type TieredFreeToSeatEventMigrationOutcome,
+} from "./tasks/tiered-free-to-seat-event.task";
+export {
+  StripePricesSyncTask,
+  syncStripePrices,
+  type SyncStripePricesResult,
+} from "./tasks/stripe-prices-sync.task";

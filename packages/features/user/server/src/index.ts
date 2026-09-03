@@ -17,6 +17,12 @@ export {
 } from "./services/user-credential.service";
 export { UserService } from "./services/user.service";
 export {
+  runGdprUserDataErase,
+  UserDataEraseTask,
+  type GdprUserDataEraseDatabase,
+  type GdprUserDataEraseOutcome,
+} from "./tasks/user-data-erase.task";
+export {
   IdentityTrpcApi,
   type IdentityTrpcContext,
   type IdentityTrpcPorts,

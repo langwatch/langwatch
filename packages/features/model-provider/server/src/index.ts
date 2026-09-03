@@ -144,3 +144,8 @@ export type {
   ModelProviderMigrationDatabase,
   ModelProviderMigrationOutcome,
 } from "./tasks/model-provider-migration.shared";
+export {
+  ModelRegistrySyncTask,
+  syncModelRegistry,
+  type ModelRegistrySyncResult,
+} from "./tasks/model-registry-sync.task";

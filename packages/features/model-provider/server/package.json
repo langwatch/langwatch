@@ -38,6 +38,7 @@
     "@langwatch/secret-server": "workspace:*",
     "@langwatch/task": "workspace:*",
     "@langwatch/topic-contract": "workspace:*",
+    "@openrouter/sdk": "^0.3.12",
     "@trpc/server": "^11.18.0",
     "ai": "^6.0.217",
     "hono": "^4.12.27",
