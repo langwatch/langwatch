@@ -2,6 +2,7 @@ import {
   Badge,
   Box,
   Button,
+  Code,
   Heading,
   HStack,
   Table,
@@ -14,7 +15,9 @@ import {
   type NotificationCadence,
 } from "@langwatch/automations/cadences";
 import { HelpCircle, Plus } from "react-feather";
+import { FilterDisplay } from "~/components/automations/FilterDisplay";
 import { ConfirmDialog } from "~/components/gateway/ConfirmDialog";
+import { HoverableBigText } from "~/components/HoverableBigText";
 import { Tooltip } from "~/components/ui/tooltip";
 import {
   OPERATOR_LABELS,
@@ -24,6 +27,9 @@ import { resolveSeriesLabel } from "~/features/automations/logic/seriesOptions";
 import type { TriggerActionParams } from "~/features/automations/logic/triggerActionParams";
 import { useSwitchToProjectIntegration } from "~/features/automations/logic/useSwitchToProjectIntegration";
 import { describeError } from "~/features/errors";
+import { LangyContextTarget } from "~/features/langy/components/LangyContextTarget";
+import { automationContextChip } from "~/features/langy/logic/langyContextChips";
+import type { Monitor, TriggerAction } from "~/generated/prisma/client";
 import type { RouterOutputs } from "~/utils/api";
 import { formatTimeAgo } from "~/utils/formatTimeAgo";
 
@@ -473,6 +479,182 @@ export function AlertRuleCell({
       {actionParams.threshold !== undefined ? actionParams.threshold : ""}
       {window ? ` · over ${window}` : ""}
     </Text>
+  );
+}
+
+/** The subject cell of a trace-filter automation's row: which monitors apply
+ *  and the saved search query (or the legacy structured filters). */
+export function TraceFilterCell({
+  checks,
+  filterQuery,
+  filters,
+  applyChecks,
+}: {
+  checks: Monitor[];
+  filterQuery: string | null;
+  filters: unknown;
+  applyChecks: (checks: Monitor[]) => React.ReactNode;
+}) {
+  return (
+    <VStack gap={2} align="stretch" minWidth={0}>
+      <Text textStyle="sm" fontWeight="medium" lineClamp={1}>
+        Trace filter
+      </Text>
+      {applyChecks(checks)}
+      {filterQuery ? (
+        // ADR-043: a trace-subject automation shows its search query.
+        <HoverableBigText lineClamp={2} expandedVersion={filterQuery}>
+          <Code
+            size="sm"
+            variant="surface"
+            display="block"
+            minWidth={0}
+            wordBreak="break-word"
+          >
+            {filterQuery}
+          </Code>
+        </HoverableBigText>
+      ) : filters && typeof filters === "string" && filters !== "{}" ? (
+        <FilterDisplay filters={filters} hasBorder={true} />
+      ) : null}
+    </VStack>
+  );
+}
+
+/** One row of the automations table: a trace-filter or graph-watching
+ *  automation, plus its delivery, metrics and actions. Extracted out of the
+ *  table body's `.map` (rather than left inline) purely to keep that
+ *  callback under the function-length limit — the row still closes over
+ *  everything the page computed for it, just as named parameters instead of
+ *  free variables. */
+export function AutomationRow({
+  trigger,
+  graphJsonById,
+  statsByTriggerId,
+  applyChecks,
+  actionItems,
+  triggerActionName,
+  slackWorkspaceName,
+  canSwitchSlackToken,
+  projectId,
+  sharedRowProps,
+  activeCell,
+  rowActionsMenu,
+}: {
+  trigger: EnhancedTrigger;
+  graphJsonById: Map<string, unknown>;
+  statsByTriggerId: Map<string, TriggerStats>;
+  applyChecks: (checks: Monitor[]) => React.ReactNode;
+  actionItems: (
+    action: TriggerAction,
+    actionParams: TriggerActionParams,
+  ) => React.ReactNode;
+  triggerActionName: (action: TriggerAction) => string;
+  slackWorkspaceName: string | null | undefined;
+  canSwitchSlackToken: boolean;
+  projectId: string;
+  sharedRowProps: (
+    trigger: EnhancedTrigger,
+  ) => React.ComponentProps<typeof Table.Row>;
+  activeCell: (trigger: EnhancedTrigger) => React.ReactNode;
+  rowActionsMenu: (trigger: EnhancedTrigger) => React.ReactNode;
+}) {
+  const actionParams = trigger.actionParams as TriggerActionParams;
+  const stats = statsByTriggerId.get(trigger.id);
+  const isWatchingGraph = !!trigger.customGraphId;
+  return (
+    // Armed, the row can be handed to Langy; its own click (open the
+    // automation) is untouched. The chip id matches the one the
+    // `/automations/<id>` route derives, so the row and the open
+    // automation are one chip.
+    <LangyContextTarget
+      key={trigger.id}
+      target={automationContextChip({
+        automationId: trigger.id,
+        name: trigger.name,
+      })}
+    >
+      <Table.Row {...sharedRowProps(trigger)}>
+        <Table.Cell fontWeight="medium">{trigger.name}</Table.Cell>
+        <Table.Cell>
+          {isWatchingGraph ? (
+            <VStack gap={0} align="start" minWidth={0}>
+              <GraphWatchCell
+                graphName={trigger.customGraph?.name ?? null}
+                graph={graphJsonById.get(trigger.customGraphId ?? "")}
+                seriesName={actionParams.seriesName}
+              />
+              <AlertRuleCell actionParams={actionParams} />
+            </VStack>
+          ) : (
+            <TraceFilterCell
+              checks={
+                trigger.checks?.filter((check): check is Monitor => !!check) ??
+                []
+              }
+              filterQuery={trigger.filterQuery}
+              filters={trigger.filters}
+              applyChecks={applyChecks}
+            />
+          )}
+        </Table.Cell>
+        <Table.Cell>
+          <VStack align="start" gap={0} minWidth={0}>
+            <Text textStyle="sm" fontWeight="medium">
+              {triggerActionName(trigger.action)}
+            </Text>
+            {/* Clamped, so it needs a reveal: the
+                destination (a long email, a webhook
+                URL) is the whole point of the cell.
+                Not expandable — the dialog wants a
+                string and these are nodes. */}
+            <HoverableBigText
+              textStyle="xs"
+              color="fg.muted"
+              width="full"
+              lineClamp={2}
+              overflowWrap="anywhere"
+              expandable={false}
+            >
+              {actionItems(trigger.action, actionParams)}
+            </HoverableBigText>
+            {trigger.action === "SEND_SLACK_MESSAGE" &&
+            actionParams.slackBotTokenSet ? (
+              <OwnSlackTokenNudge
+                projectId={projectId}
+                automationId={trigger.id}
+                automationName={trigger.name}
+                workspaceName={slackWorkspaceName}
+                canSwitch={canSwitchSlackToken}
+              />
+            ) : null}
+          </VStack>
+        </Table.Cell>
+        <Table.Cell whiteSpace="nowrap">
+          <LastFiredCell trigger={trigger} stats={stats} />
+        </Table.Cell>
+        <Table.Cell>
+          <Text as="span" color="fg.muted">
+            {stats?.recentFireCount ?? 0}
+          </Text>
+        </Table.Cell>
+        <Table.Cell whiteSpace="nowrap">
+          {/* Only a threshold rule has something to
+              be firing or recovered from; a trace
+              filter acts per match and has no such
+              state to report. */}
+          {isWatchingGraph ? (
+            <FiringStatus firing={!!stats?.currentlyFiring} />
+          ) : (
+            <Text textStyle="sm" color="fg.muted">
+              —
+            </Text>
+          )}
+        </Table.Cell>
+        {activeCell(trigger)}
+        <Table.Cell>{rowActionsMenu(trigger)}</Table.Cell>
+      </Table.Row>
+    </LangyContextTarget>
   );
 }
 

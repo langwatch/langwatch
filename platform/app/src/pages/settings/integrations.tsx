@@ -641,6 +641,53 @@ function confirmDisconnectSlack(dependentAutomations: number): {
   };
 }
 
+/** The "already connected" state of {@link SlackTokenForm}: replace or
+ *  disconnect, with the disconnect gated behind a confirmation naming what it
+ *  costs. Extracted purely to keep the form's own function under the line
+ *  limit — it still shares the form's `disconnect` mutation. */
+function SlackTokenConnectedActions({
+  projectId,
+  dependentAutomations,
+  disconnect,
+  onReplace,
+}: {
+  projectId: string;
+  dependentAutomations: number;
+  disconnect: ReturnType<typeof useSlackConnection>["disconnect"];
+  onReplace: () => void;
+}) {
+  const [isDisconnectConfirming, setIsDisconnectConfirming] = useState(false);
+  const confirmation = confirmDisconnectSlack(dependentAutomations);
+  return (
+    <HStack gap={2}>
+      <Button variant="outline" size="sm" onClick={onReplace}>
+        Replace token
+      </Button>
+      <Button
+        variant="outline"
+        size="sm"
+        loading={disconnect.isPending}
+        onClick={() => setIsDisconnectConfirming(true)}
+      >
+        Disconnect
+      </Button>
+      <ConfirmDialog
+        open={isDisconnectConfirming}
+        onOpenChange={setIsDisconnectConfirming}
+        title={confirmation.title}
+        message={confirmation.message}
+        confirmLabel={confirmation.confirmLabel}
+        tone="danger"
+        loading={disconnect.isPending}
+        onConfirm={() => {
+          setIsDisconnectConfirming(false);
+          disconnect.mutate({ projectId });
+        }}
+      />
+    </HStack>
+  );
+}
+
 /** Paste a bot token to connect, or paste a new one to rotate — the same form
  *  and the same write, because Slack revalidates either way and the ciphertext
  *  is replaced either way. */
@@ -661,7 +708,6 @@ function SlackTokenForm({
 }) {
   const [token, setToken] = useState("");
   const [isFormShown, setIsFormShown] = useState(false);
-  const [isDisconnectConfirming, setIsDisconnectConfirming] = useState(false);
 
   const { connect, disconnect } = useSlackConnection({
     projectName,
@@ -682,38 +728,13 @@ function SlackTokenForm({
   }
 
   if (connected && !isFormShown) {
-    const confirmation = confirmDisconnectSlack(dependentAutomations);
     return (
-      <HStack gap={2}>
-        <Button
-          variant="outline"
-          size="sm"
-          onClick={() => setIsFormShown(true)}
-        >
-          Replace token
-        </Button>
-        <Button
-          variant="outline"
-          size="sm"
-          loading={disconnect.isPending}
-          onClick={() => setIsDisconnectConfirming(true)}
-        >
-          Disconnect
-        </Button>
-        <ConfirmDialog
-          open={isDisconnectConfirming}
-          onOpenChange={setIsDisconnectConfirming}
-          title={confirmation.title}
-          message={confirmation.message}
-          confirmLabel={confirmation.confirmLabel}
-          tone="danger"
-          loading={disconnect.isPending}
-          onConfirm={() => {
-            setIsDisconnectConfirming(false);
-            disconnect.mutate({ projectId });
-          }}
-        />
-      </HStack>
+      <SlackTokenConnectedActions
+        projectId={projectId}
+        dependentAutomations={dependentAutomations}
+        disconnect={disconnect}
+        onReplace={() => setIsFormShown(true)}
+      />
     );
   }
 
