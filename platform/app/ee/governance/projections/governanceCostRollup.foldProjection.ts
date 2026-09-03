@@ -613,7 +613,7 @@ export class GovernanceCostRollupFoldProjection
     const money = readPulledUsageMoney(d);
 
     if (previous && previous.observedAtMs >= d.observedAtMs) {
-      return this.foldStaleObservation(state, previous, d, money);
+      return this.foldStaleObservation(state, previous, d);
     }
 
     const movedTheFigure =
@@ -666,8 +666,8 @@ export class GovernanceCostRollupFoldProjection
     state: GovernanceCostRollupState,
     previous: PulledContribution,
     d: PulledUsageObservedEvent["data"],
-    money: ReturnType<typeof readPulledUsageMoney>,
   ): GovernanceCostRollupState {
+    const money = readPulledUsageMoney(d);
     // Only a stale look that DIFFERS from where the item stands now is
     // evidence of a change, and only the newest such look is the figure the
     // item held immediately before it.
