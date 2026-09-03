@@ -37,6 +37,8 @@ function harness(overrides?: {
   const order: string[] = [];
   const heads = {
     findUserHashKey: async () => "key_material",
+    // A newborn by definition: nothing has ever folded for this user.
+    hasFolded: async () => false,
     findHeads: async ({ userId }: { userId: string }) => ({
       userId,
       identifiers: {},

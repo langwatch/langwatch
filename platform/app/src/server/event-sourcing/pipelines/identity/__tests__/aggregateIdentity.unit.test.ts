@@ -54,6 +54,10 @@ class HeadsOf implements IdentityHeadsRepository {
     return "key_material";
   }
 
+  async hasFolded() {
+    return true;
+  }
+
   async findHeads() {
     return this.heads;
   }

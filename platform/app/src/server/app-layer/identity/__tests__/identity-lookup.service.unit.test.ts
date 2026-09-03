@@ -148,6 +148,9 @@ class InMemoryHeads {
   async findUserHashKey() {
     return null;
   }
+  async hasFolded() {
+    return true;
+  }
   async findHeads({ userId }: { userId: string }) {
     return this.heads.get(userId) ?? emptyIdentityHeads({ userId });
   }

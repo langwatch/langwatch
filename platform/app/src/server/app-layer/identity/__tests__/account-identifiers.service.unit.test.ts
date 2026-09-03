@@ -58,6 +58,7 @@ function build({
 
   const repository: IdentityHeadsRepository = {
     findHeads: () => Promise.resolve(state.heads),
+    hasFolded: () => Promise.resolve(true),
     findUserHashKey: () => Promise.resolve(null),
     findActiveIdentifierByValue: () => Promise.resolve(holder),
     findIdentifier: ({ identifierId }) =>

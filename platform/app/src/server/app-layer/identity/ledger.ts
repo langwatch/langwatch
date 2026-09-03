@@ -46,6 +46,7 @@ import {
   CONFIRM_LINK_COMMAND_TYPE,
   DETACH_IDENTIFIER_COMMAND_TYPE,
   ERASE_USER_COMMAND_TYPE,
+  type IdentifierFact,
   type IdentityCommand,
   type IdentityCommandType,
   type IdentityFact,
@@ -53,9 +54,13 @@ import {
   MARK_PRIMARY_COMMAND_TYPE,
   PROPOSE_LINK_COMMAND_TYPE,
   REJECT_LINK_COMMAND_TYPE,
+  reduceIdentity,
   VERIFY_IDENTIFIER_COMMAND_TYPE,
 } from "@langwatch/identity";
-import type { IdentityLedger } from "@langwatch/identity-server";
+import type {
+  IdentityHeadsRepository,
+  IdentityLedger,
+} from "@langwatch/identity-server";
 import { createLogger } from "@langwatch/observability";
 import type { Event } from "~/server/event-sourcing/domain/types";
 import { identityEventsFor } from "~/server/event-sourcing/pipelines/identity/envelope";
@@ -127,8 +132,21 @@ const resolveStagedSender = awaitedAppPipelineSender({
   pipelineName: IDENTITY_PIPELINE_NAME,
 });
 
+/**
+ * The projection's one write that is not the fold's: a newborn's heads, rows
+ * only, before the first fold lands. The cursor is never part of it.
+ */
+export interface ProvisionalHeadsWriter {
+  writeProvisionalHeads(args: { facts: IdentifierFact[] }): Promise<void>;
+}
+
 export interface IdentityLedgerWriterDeps {
-  projectionStore: StateProjectionStore<IdentityFoldState>;
+  projectionStore: StateProjectionStore<IdentityFoldState> &
+    ProvisionalHeadsWriter;
+  /** Whether the user has folded, and what their heads hold now — the two
+   *  reads the provisional write needs to know whether it applies and what
+   *  it implies. */
+  heads: Pick<IdentityHeadsRepository, "hasFolded" | "findHeads">;
   /** Production resolves the pipeline handle lazily; tests hand one in. */
   stagedSender?: (name: string) => Promise<StagedSender | null>;
   /** The read-your-writes window; production uses the constants above. */
@@ -139,6 +157,9 @@ export class IdentityLedgerWriter
   extends StagedLedgerWriter<IdentityCommand, IdentityEvent, IdentityFoldState>
   implements IdentityLedger
 {
+  private readonly heads: IdentityLedgerWriterDeps["heads"];
+  private readonly provisionalHeads: ProvisionalHeadsWriter;
+
   constructor(deps: IdentityLedgerWriterDeps) {
     const convergence = deps.convergence ?? {
       timeoutMs: IDENTITY_CONVERGENCE_TIMEOUT_MS,
@@ -168,6 +189,8 @@ export class IdentityLedgerWriter
         },
       },
     });
+    this.heads = deps.heads;
+    this.provisionalHeads = deps.projectionStore;
   }
 
   protected senderNameFor(command: IdentityCommand): string {
@@ -193,10 +216,65 @@ export class IdentityLedgerWriter
     if (events.length === 0) return [];
     const done = identityCommitDurationSeconds.startTimer();
     try {
+      await this.writeProvisionalHeads({ command, events });
       await this.stageAndAwait({ command, events });
       return events;
     } finally {
       done();
+    }
+  }
+
+  /**
+   * A NEWBORN's heads, on the calling path, before the command is staged.
+   *
+   * The front door reads the `Identifier` projection and nothing else, and
+   * the fold that writes it runs on the queue — so between a sign-up
+   * returning and its fold landing, the address just registered is an
+   * address nobody holds. For a user whose projection has never folded there
+   * is no event truth the rows could disagree with, so the ledger writes the
+   * heads the decided facts imply, ROWS ONLY. The cursor stays unwritten:
+   * it is the log's commit marker, the fold's own write overwrites these rows
+   * whole and sets it, and its absence is how the attach guard tells a
+   * provisional head from a folded one when the queued run re-runs it. A
+   * user who has folded gets no provisional write; their heads are event
+   * truth already, and the guard dedupes against them as before.
+   *
+   * Only an attach can make a newborn, so only an attach writes this. A
+   * failure here never fails the ceremony: the fold writes the same rows when
+   * the queue drains and the read-your-writes wait observes it. Staging
+   * failing AFTER this write leaves a row with no event behind it — a replay
+   * drops it, and the next pass over the user restates the attach, because
+   * the projection has still never folded.
+   */
+  private async writeProvisionalHeads({
+    command,
+    events,
+  }: {
+    command: IdentityCommand;
+    events: IdentityEvent[];
+  }): Promise<void> {
+    if (command.type !== ATTACH_IDENTIFIER_COMMAND_TYPE) return;
+    const { userId } = command.data;
+    try {
+      if (await this.heads.hasFolded({ userId })) return;
+      const current = await this.heads.findHeads({ userId });
+      const heads = events.reduce(
+        (folded, event) => reduceIdentity({ heads: folded, fact: event }),
+        current,
+      );
+      const facts = events.flatMap((event) => {
+        const identifierId =
+          "identifierId" in event.data ? event.data.identifierId : null;
+        const head = identifierId ? heads.identifiers[identifierId] : undefined;
+        return head ? [head] : [];
+      });
+      if (facts.length === 0) return;
+      await this.provisionalHeads.writeProvisionalHeads({ facts });
+    } catch (error) {
+      logger.warn(
+        { userId, error },
+        "could not write a newborn's provisional identifier heads; the fold writes them when the queue drains",
+      );
     }
   }
 

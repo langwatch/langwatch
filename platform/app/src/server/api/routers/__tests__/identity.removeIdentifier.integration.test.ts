@@ -108,6 +108,7 @@ function headsOf(...facts: IdentifierFact[]): IdentityHeads {
 function heldHeads(state: { heads: IdentityHeads }): IdentityHeadsRepository {
   return {
     findHeads: () => Promise.resolve(state.heads),
+    hasFolded: () => Promise.resolve(true),
     findUserHashKey: () => Promise.resolve(null),
     findActiveIdentifierByValue: () => Promise.resolve(null),
     findIdentifier: ({ identifierId }) =>

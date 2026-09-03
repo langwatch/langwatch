@@ -297,7 +297,10 @@ export function identityEmail(): IdentityEmailService {
 export function identityService(): IdentityService {
   return new IdentityService(
     identityGuards(),
-    new IdentityLedgerWriter({ projectionStore: identityProjectionStore() }),
+    new IdentityLedgerWriter({
+      projectionStore: identityProjectionStore(),
+      heads: identityHeads,
+    }),
   );
 }
 
@@ -422,6 +425,7 @@ export function identityBirth(): IdentityBirthService {
     guards: identityGuards(),
     ledger: new IdentityLedgerWriter({
       projectionStore: identityProjectionStore(),
+      heads: identityHeads,
     }),
     rows: identityNewborns,
     reservations: identityReservations,
@@ -1339,6 +1343,7 @@ export function linkProposals(): LinkProposalService {
     // repository to do it.
     ledger: new IdentityLedgerWriter({
       projectionStore: identityProjectionStore(),
+      heads: identityHeads,
     }),
     proposals: identityLinkProposalLog,
     directory: new BetterAuthLinkProposalDirectory({

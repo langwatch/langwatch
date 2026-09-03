@@ -50,6 +50,10 @@ class ProjectionHeads implements IdentityHeadsRepository {
     return "key_material";
   }
 
+  async hasFolded({ userId }: { userId: string }) {
+    return this.store.stored.has(userId);
+  }
+
   async findActiveIdentifierByValue() {
     return null;
   }

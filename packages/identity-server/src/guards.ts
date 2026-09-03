@@ -226,8 +226,20 @@ export class IdentityGuards {
     // A fact the heads already carry is not stated again: the staged re-run
     // of a ceremony and every backfill pass after the first both arrive here
     // with the identifier already folded, and must cost no event_log row.
+    //
+    // "Carry" means FOLDED. A newborn's heads may hold a provisional row the
+    // ledger wrote before staging, so the front door can route the address
+    // before the fold lands; the cursor says whether the projection has ever
+    // folded, and until it has, a head is an anticipation of the fact, not
+    // the fact. Deduping against it would leave the log without the event,
+    // the cursor unmoved and the address lock held forever.
     const heads = await this.heads.findHeads({ userId });
-    if (heads.identifiers[identifierId]) return [];
+    if (
+      heads.identifiers[identifierId] &&
+      (await this.heads.hasFolded({ userId }))
+    ) {
+      return [];
+    }
     const userHashKey = await this.heads.findUserHashKey({ userId });
     // Non-email providers arrive VERIFIED with no verify ceremony to
     // re-check them, so the attach itself is where a cross-user race
