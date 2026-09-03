@@ -43,7 +43,7 @@ Feature: Slack delivery
       Then the message is posted via the Slack Web API to that channel
       And chart, table, and alert blocks are delivered and render
 
-    @unit
+    @integration
     Scenario: The richer templates are offered only for a bot connection
       Given the template picker
       When the automation uses a webhook

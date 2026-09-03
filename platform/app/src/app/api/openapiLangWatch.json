@@ -63195,7 +63195,7 @@
     "/api/triggers": {
       "get": {
         "operationId": "getApiTriggers",
-        "description": "List all active triggers (automations) for the project",
+        "description": "List the project's automations, newest first. Paused automations are included.",
         "responses": {
           "200": {
             "description": "Success",
@@ -63605,9 +63605,7 @@
             }
           }
         },
-        "operationId": "getApiTriggers",
         "parameters": [],
-        "description": "List the project's automations, newest first. Paused automations are included.",
         "security": [
           {
             "project_api_key": []
@@ -63616,7 +63614,7 @@
       },
       "post": {
         "operationId": "postApiTriggers",
-        "description": "Create a new trigger (automation)",
+        "description": "Create an automation. Send `customGraphId` + `graphAlert` for an alert on a metric, `report` for a scheduled report, or conditions for a trace automation. The delivery channel is fixed at creation.",
         "responses": {
           "201": {
             "description": "Trigger created",
@@ -64023,9 +64021,7 @@
             }
           }
         },
-        "operationId": "postApiTriggers",
         "parameters": [],
-        "description": "Create an automation. Send `customGraphId` + `graphAlert` for an alert on a metric, `report` for a scheduled report, or conditions for a trace automation. The delivery channel is fixed at creation.",
         "requestBody": {
           "required": true,
           "content": {
@@ -66049,7 +66045,7 @@
       },
       "patch": {
         "operationId": "patchApiTriggersById",
-        "description": "Update a trigger (name, active state, message, filters)",
+        "description": "Update an automation. Every field is optional and what is left out is left alone, except `actionParams`, which replaces the delivery configuration as a whole. The delivery channel cannot be changed.",
         "responses": {
           "200": {
             "description": "Trigger updated",
@@ -66477,7 +66473,6 @@
             }
           }
         },
-        "operationId": "patchApiTriggersById",
         "parameters": [
           {
             "schema": {
@@ -66488,7 +66483,6 @@
             "required": true
           }
         ],
-        "description": "Update an automation. Every field is optional and what is left out is left alone, except `actionParams`, which replaces the delivery configuration as a whole. The delivery channel cannot be changed.",
         "requestBody": {
           "required": true,
           "content": {
@@ -66948,16 +66942,6 @@
             }
           }
         },
-        "parameters": [
-          {
-            "schema": {
-              "type": "string"
-            },
-            "in": "path",
-            "name": "id",
-            "required": true
-          }
-        ],
         "security": [
           {
             "project_api_key": []

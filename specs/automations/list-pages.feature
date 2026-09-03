@@ -68,14 +68,6 @@ Feature: Automations list pages, providers, and shared copy
       Then the queue is added to the selection
       And no duplicate, unresponsive listbox is left behind
 
-  Rule: The toaster reads as a toast in both themes
-
-    @unit
-    Scenario: A toast without a close button is not shifted off-centre
-      Given a toast created with no close action
-      When it renders
-      Then its content padding is symmetric, not reserved for an absent close button
-
   Rule: The automation view names its actual Slack destination
 
     An extra grant onto WS-6 (WS-3, the view drawer's own workstream, had

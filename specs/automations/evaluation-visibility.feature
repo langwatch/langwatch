@@ -53,7 +53,7 @@ Feature: The in-depth view of an automation
 
     @unit
     Scenario: A skipped check records why it was skipped
-      Given a graph-watching automation whose timeseries read exceeds the row ceiling
+      Given a graph-watching automation whose graph returns too many grouped values to evaluate
       When the evaluator checks it
       Then the latest evaluation records that the check was skipped for an oversized result
 

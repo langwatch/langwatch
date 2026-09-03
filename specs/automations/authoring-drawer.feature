@@ -461,14 +461,11 @@ Feature: Staged automation authoring drawer
 
   Rule: What a save writes is what the next open shows
 
-    The drawer reads the saved automation once per open and deliberately
-    ignores every later read, so an author's keystrokes are never overwritten
-    while they type. That makes the copy the app is holding the only thing the
-    next open can show: if a save leaves the previously read copy in place,
-    reopening latches onto it and shows the value the author just replaced,
-    while the stored automation holds the new one. The same rule covers what
-    the drawer offers to pick from — a graph created moments ago has to be on
-    the list of graphs a new alert can watch.
+    Edits in progress are never overwritten by data arriving in the background
+    while the drawer is open, and reopening the drawer always shows the values
+    that were last saved. The same rule covers what the drawer offers to pick
+    from — a graph created moments ago has to be on the list of graphs a new
+    alert can watch.
 
     @integration
     Scenario: Editing an automation shows the values that were last saved

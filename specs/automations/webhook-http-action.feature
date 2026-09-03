@@ -71,8 +71,7 @@ Feature: Webhook (generic HTTP) automation action
     Scenario: An automation saved before content types existed still sends JSON
       Given a webhook automation saved without stating a Content-Type
       When it is fired
-      Then it renders the JSON envelope and announces it as application/json,
-        exactly as it did before the field existed
+      Then it renders the JSON envelope and announces it as application/json, exactly as it did before the field existed
 
     @integration
     Scenario: Content-Type is a fixed header row that defaults to JSON
@@ -140,8 +139,7 @@ Feature: Webhook (generic HTTP) automation action
 
     @unit
     Scenario: Requests to private or internal addresses are blocked
-      Given a webhook automation whose URL resolves to a private, loopback,
-        link-local, or cloud-metadata address
+      Given a webhook automation whose URL resolves to a private, loopback, link-local, or cloud-metadata address
       When the automation fires or is test-fired
       Then the request fails terminally, and is not retried
 
@@ -161,8 +159,7 @@ Feature: Webhook (generic HTTP) automation action
     @unit
     Scenario: Client errors fail terminally without retry
       When the endpoint answers 3xx or any other 4xx
-      Then the dispatch is classified terminal, because retrying a misconfigured
-        endpoint only spams it
+      Then the dispatch is classified terminal, because retrying a misconfigured endpoint only spams it
 
     @unit
     Scenario: An endpoint that never answers is retried, not waited on
@@ -174,8 +171,7 @@ Feature: Webhook (generic HTTP) automation action
     Scenario: A receiver's Retry-After is carried onto the failure
       Given the endpoint answers 429 with a Retry-After header
       When the dispatch fails
-      Then the receiver's delay rides on the failure, so the queue's backoff
-        cannot be shorter than the receiver asked for
+      Then the receiver's delay rides on the failure, so the queue's backoff cannot be shorter than the receiver asked for
 
     @unit
     Scenario: Every attempt of one fire carries the same event id
@@ -195,8 +191,7 @@ Feature: Webhook (generic HTTP) automation action
     Scenario: Each attempt is recorded with its outcome
       Given a webhook automation that fires
       When the attempt completes
-      Then one row is recorded, carrying the dispatch id, the HTTP status,
-        the latency, and the outcome
+      Then one row is recorded, carrying the dispatch id, the HTTP status, the latency, and the outcome
 
     @unit
     Scenario: An attempt that never reached the endpoint is recorded too
@@ -220,8 +215,7 @@ Feature: Webhook (generic HTTP) automation action
     Scenario: The recent deliveries list shows what the endpoint answered
       Given a webhook automation with a failed delivery attempt
       When the user expands that attempt in the drawer
-      Then the receiver's response body and headers are shown as literal text,
-        never rendered as markup
+      Then the receiver's response body and headers are shown as literal text, never rendered as markup
 
     @integration
     Scenario: The delivery log is pruned after 30 days
