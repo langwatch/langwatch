@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { defaultCliKeyScopes } from "./cliKeyScopeDefaults";
+import { defaultCliKeyScopes } from "../cliKeyScopeDefaults";
 
 describe("defaultCliKeyScopes()", () => {
   const organizationId = "org-1";
